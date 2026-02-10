@@ -27,8 +27,8 @@ type CanvasGlyph struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Symbol        string                 `protobuf:"bytes,2,opt,name=symbol,proto3" json:"symbol,omitempty"`
-	X             float64                `protobuf:"fixed64,3,opt,name=x,proto3" json:"x,omitempty"`                                   // X position in pixels
-	Y             float64                `protobuf:"fixed64,4,opt,name=y,proto3" json:"y,omitempty"`                                   // Y position in pixels
+	X             int32                  `protobuf:"varint,3,opt,name=x,proto3" json:"x,omitempty"`                                    // X position in pixels
+	Y             int32                  `protobuf:"varint,4,opt,name=y,proto3" json:"y,omitempty"`                                    // Y position in pixels
 	Width         int32                  `protobuf:"varint,5,opt,name=width,proto3" json:"width,omitempty"`                            // optional: custom width (0 = use default)
 	Height        int32                  `protobuf:"varint,6,opt,name=height,proto3" json:"height,omitempty"`                          // optional: custom height (0 = use default)
 	Code          string                 `protobuf:"bytes,7,opt,name=code,proto3" json:"code,omitempty"`                               // optional: script content for py/ts/prompt/note glyphs
@@ -83,14 +83,14 @@ func (x *CanvasGlyph) GetSymbol() string {
 	return ""
 }
 
-func (x *CanvasGlyph) GetX() float64 {
+func (x *CanvasGlyph) GetX() int32 {
 	if x != nil {
 		return x.X
 	}
 	return 0
 }
 
-func (x *CanvasGlyph) GetY() float64 {
+func (x *CanvasGlyph) GetY() int32 {
 	if x != nil {
 		return x.Y
 	}
@@ -215,8 +215,8 @@ type Composition struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Edges         []*CompositionEdge     `protobuf:"bytes,2,rep,name=edges,proto3" json:"edges,omitempty"`
-	X             float64                `protobuf:"fixed64,4,opt,name=x,proto3" json:"x,omitempty"` // anchor X position in pixels
-	Y             float64                `protobuf:"fixed64,5,opt,name=y,proto3" json:"y,omitempty"` // anchor Y position in pixels
+	X             int32                  `protobuf:"varint,4,opt,name=x,proto3" json:"x,omitempty"` // anchor X position in pixels
+	Y             int32                  `protobuf:"varint,5,opt,name=y,proto3" json:"y,omitempty"` // anchor Y position in pixels
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -265,14 +265,14 @@ func (x *Composition) GetEdges() []*CompositionEdge {
 	return nil
 }
 
-func (x *Composition) GetX() float64 {
+func (x *Composition) GetX() int32 {
 	if x != nil {
 		return x.X
 	}
 	return 0
 }
 
-func (x *Composition) GetY() float64 {
+func (x *Composition) GetY() int32 {
 	if x != nil {
 		return x.Y
 	}
@@ -287,8 +287,8 @@ const file_glyph_proto_canvas_proto_rawDesc = "" +
 	"\vCanvasGlyph\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06symbol\x18\x02 \x01(\tR\x06symbol\x12\f\n" +
-	"\x01x\x18\x03 \x01(\x01R\x01x\x12\f\n" +
-	"\x01y\x18\x04 \x01(\x01R\x01y\x12\x14\n" +
+	"\x01x\x18\x03 \x01(\x05R\x01x\x12\f\n" +
+	"\x01y\x18\x04 \x01(\x05R\x01y\x12\x14\n" +
 	"\x05width\x18\x05 \x01(\x05R\x05width\x12\x16\n" +
 	"\x06height\x18\x06 \x01(\x05R\x06height\x12\x12\n" +
 	"\x04code\x18\a \x01(\tR\x04code\x12\x1f\n" +
@@ -307,8 +307,8 @@ const file_glyph_proto_canvas_proto_rawDesc = "" +
 	"\vComposition\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12,\n" +
 	"\x05edges\x18\x02 \x03(\v2\x16.glyph.CompositionEdgeR\x05edges\x12\f\n" +
-	"\x01x\x18\x04 \x01(\x01R\x01x\x12\f\n" +
-	"\x01y\x18\x05 \x01(\x01R\x01yJ\x04\b\x03\x10\x04B%Z#github.com/teranos/QNTX/glyph/protob\x06proto3"
+	"\x01x\x18\x04 \x01(\x05R\x01x\x12\f\n" +
+	"\x01y\x18\x05 \x01(\x05R\x01yJ\x04\b\x03\x10\x04B%Z#github.com/teranos/QNTX/glyph/protob\x06proto3"
 
 var (
 	file_glyph_proto_canvas_proto_rawDescOnce sync.Once

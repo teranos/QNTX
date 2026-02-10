@@ -9,8 +9,8 @@ option go_package = "github.com/teranos/QNTX/glyph/proto";
 message CanvasGlyph {
   string id = 1;
   string symbol = 2;
-  double x = 3;                    // X position in pixels
-  double y = 4;                    // Y position in pixels
+  int32 x = 3;                     // X position in pixels
+  int32 y = 4;                     // Y position in pixels
   int32 width = 5;                 // optional: custom width (0 = use default)
   int32 height = 6;                // optional: custom height (0 = use default)
   string code = 7;                 // optional: script content for py/ts/prompt/note glyphs
@@ -34,6 +34,6 @@ message Composition {
   string id = 1;
   repeated CompositionEdge edges = 2;
   reserved 3;  // formerly glyph_ids (removed for DAG-native approach)
-  double x = 4;                    // anchor X position in pixels
-  double y = 5;                    // anchor Y position in pixels
+  int32 x = 4;                     // anchor X position in pixels
+  int32 y = 5;                     // anchor Y position in pixels
 }
