@@ -159,20 +159,19 @@ The downstream glyph needs the triggering attestation.
 
 Prevent reprocessing on restart and handle edge cases.
 
-- [ ] New migration: `composition_edge_cursors` table
-  ```sql
-  CREATE TABLE composition_edge_cursors (
-      composition_id TEXT NOT NULL,
-      from_glyph_id TEXT NOT NULL,
-      to_glyph_id TEXT NOT NULL,
-      last_processed_id TEXT NOT NULL,
-      last_processed_at DATETIME NOT NULL,
-      PRIMARY KEY (composition_id, from_glyph_id, to_glyph_id)
-  );
-  ```
-- [ ] Update cursor after successful `executeGlyph()` in watcher engine
-- [ ] On `ReloadWatchers()` / server restart: apply cursor as `TimeStart` filter on meld edge watchers
-- [ ] On composition delete: cascade delete cursors
+- [x] New migration: `composition_edge_cursors` table
+  - `db/sqlite/migrations/023_composition_edge_cursors.sql`
+
+- [x] Update cursor after successful `executeGlyph()` in watcher engine
+  - `ats/watcher/engine.go:460` — `updateEdgeCursor()` upserts cursor from `GlyphExecuteAction` fields
+  - `GlyphExecuteAction` now includes `composition_id` and `source_glyph_id` alongside target fields
+
+- [x] On `ReloadWatchers()` / server restart: apply cursor as `TimeStart` filter on meld edge watchers
+  - `ats/watcher/engine.go:439` — `applyEdgeCursor()` queries cursor table, sets `w.Filter.TimeStart`
+  - Called during `loadWatchers()` for each `glyph_execute` watcher
+
+- [x] On composition delete: cascade delete cursors
+  - `glyph/handlers/canvas.go:234` — deletes from `composition_edge_cursors` before deleting composition
 
 **Manual verification:** Meld ax→py, fire some attestations, restart server, fire more — confirm no duplicates.
 

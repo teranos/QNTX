@@ -230,6 +230,14 @@ func (h *CanvasHandler) handleDeleteComposition(w http.ResponseWriter, r *http.R
 		}
 	}
 
+	// Cascade delete edge cursors
+	if h.watcherEngine != nil {
+		if _, err := h.watcherEngine.DB().ExecContext(r.Context(),
+			"DELETE FROM composition_edge_cursors WHERE composition_id = ?", id); err != nil {
+			h.logWarn("Failed to delete edge cursors for composition %s: %v", id, err)
+		}
+	}
+
 	if err := h.store.DeleteComposition(r.Context(), id); err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			h.writeError(w, err, http.StatusNotFound)
@@ -286,6 +294,8 @@ func (h *CanvasHandler) compileSubscriptions(ctx context.Context, comp *glyphsto
 		actionData, err := json.Marshal(map[string]string{
 			"target_glyph_id":   edge.To,
 			"target_glyph_type": targetType,
+			"composition_id":    comp.ID,
+			"source_glyph_id":   edge.From,
 		})
 		if err != nil {
 			return errors.Wrap(err, "failed to marshal action data")
