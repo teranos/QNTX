@@ -40,16 +40,6 @@ mock.module('../../state/sync-state', () => ({
     },
 }));
 
-// Mock script-storage (localStorage-based, returns no saved code)
-mock.module('../../storage/script-storage', () => ({
-    getScriptStorage: () => ({
-        load: async () => null,
-        save: async () => {},
-        delete: async () => {},
-        list: async () => [],
-    }),
-}));
-
 // Mock qntx-wasm (not needed for DOM structure tests)
 mock.module('../../qntx-wasm', () => ({
     putAttestation: async () => {},
