@@ -49,7 +49,7 @@ How attestations flow through meld compositions. The meld edge is both spatial g
 
 When the user melds these three glyphs, two subscriptions compile eagerly:
 
-1. `ax→py`: AX is a filter. Its query (`subjects: contact`) becomes the subscription filter. Any attestation matching that filter — existing or newly created — triggers py.
+1. `ax→py`: AX is a filter, always live. Its query (`subjects: contact`) becomes the subscription filter. Any new attestation matching that filter triggers py.
 2. `py→prompt`: Py is a producer. The subscription filter is `actor == glyph:{py_glyph_id}`. When py calls `attest()`, the resulting attestation triggers prompt.
 
 ### Two edge types
@@ -82,9 +82,11 @@ When the user melds these three glyphs, two subscriptions compile eagerly:
 
 Each step is one attestation in, one execution, zero or more attestations out.
 
-### Backfill on play
+### AX is always live
 
-Subscriptions are live from meld time, but only for new attestations. Clicking play on the AX root glyph triggers a backfill: run the query against existing attestations and deliver each match (respecting the edge cursor to avoid reprocessing). After backfill, the subscription continues live.
+AX has no play button. It is always running — this is the current state. When ax→py melds, the subscription starts delivering immediately. No backfill step, no manual trigger. The edge cursor initializes at meld time; attestations matching the AX filter from that point forward flow through.
+
+Existing attestations from before the meld are not retroactively delivered. The subscription is forward-looking from the moment of assembly. The edge cursor marks the boundary.
 
 ### What the python glyph receives
 
@@ -196,23 +198,20 @@ CREATE TABLE composition_edge_cursors (
 );
 ```
 
-Updated after each successful downstream execution. Consulted on restart and on backfill to avoid reprocessing. For AX edges, also consulted on backfill (play button) to only deliver attestations not yet processed.
+Updated after each successful downstream execution. Initialized at meld time for AX edges (forward-looking). Consulted on restart to avoid reprocessing.
 
 ### 5. Frontend: eager subscription lifecycle (frontend)
 
 On meld:
 - Extract edge info (from glyph type, from glyph ID, to glyph ID)
-- POST to backend to register the subscription
+- POST to backend to register the subscription (initializes edge cursor at now)
 - Downstream glyph UI shows "watching" state
+- AX edges are immediately live — AX is always running, no play button
 
 On unmeld:
 - POST to backend to deactivate the subscription
 
-On play (root AX glyph):
-- Triggers backfill: process existing attestations matching the filter, respecting edge cursor
-- After backfill, subscription continues live (already active from meld time)
-
-On play (non-root glyph, standalone):
+On play (py/prompt glyph, standalone):
 - Executes as today, no composition awareness needed
 
 ### 6. Subscription delivery + frontend feedback
