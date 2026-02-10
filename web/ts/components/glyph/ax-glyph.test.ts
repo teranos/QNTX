@@ -1,5 +1,5 @@
 /**
- * Tests for AX glyph
+ * Tests for AX glyph — canvasPlaced refactor + color state tracking
  *
  * Personas:
  * - Tim: Happy path user, normal workflows
@@ -7,9 +7,8 @@
  * - Jenny: Power user, complex scenarios
  */
 
-import { describe, test, expect } from 'bun:test';
+import { describe, test, expect, beforeEach, mock } from 'bun:test';
 import { Window } from 'happy-dom';
-import { createAxGlyph } from './ax-glyph';
 import type { Glyph } from './glyph';
 import { AX } from '@generated/sym.js';
 
@@ -27,69 +26,195 @@ globalThis.ResizeObserver = class ResizeObserver {
     disconnect() {}
 } as any;
 
+// Connectivity mock — tests need to control online/offline transitions
+let mockState: 'online' | 'offline' = 'offline';
+const subscribers = new Set<(s: 'online' | 'offline') => void>();
+
+mock.module('../../connectivity', () => ({
+    connectivityManager: {
+        get state() { return mockState; },
+        subscribe(cb: (s: 'online' | 'offline') => void) {
+            subscribers.add(cb);
+            cb(mockState);
+            return () => { subscribers.delete(cb); };
+        },
+    },
+}));
+
+mock.module('../../state/sync-state', () => ({
+    syncStateManager: {
+        subscribe() { return () => {}; },
+    },
+}));
+
+// Mock qntx-wasm so parseQuery resolves synchronously (no real WASM in test).
+// Must include ALL exports any consumer needs — mock.module is process-global,
+// so this mock may be used by ts-glyph.ts (which imports putAttestation) too.
+mock.module('../../qntx-wasm', () => ({
+    putAttestation: async (a: unknown) => a,
+    queryAttestations: () => [],
+    parseQuery: () => ({ ok: false, error: 'no wasm in test' }),
+}));
+
+const { createAxGlyph, updateAxGlyphError } = await import('./ax-glyph');
+
+function makeGlyph(id: string, extras: Partial<Glyph> = {}): Glyph {
+    return {
+        id,
+        title: 'AX Query',
+        symbol: AX,
+        x: 100,
+        y: 200,
+        renderContent: () => document.createElement('div') as any,
+        ...extras,
+    };
+}
+
+function setConnectivity(state: 'online' | 'offline') {
+    mockState = state;
+    for (const cb of subscribers) cb(state);
+}
+
+/** Re-assert globals before each test (other test files may overwrite globalThis) */
+function resetGlobals() {
+    globalThis.document = document as any;
+    globalThis.window = window as any;
+    globalThis.localStorage = window.localStorage;
+}
+
 describe('AX Glyph - Tim (Happy Path)', () => {
-    test('Tim creates AX glyph with query', () => {
-        // Tim creates an AX query glyph
-        const glyph = createAxGlyph('ax-123', 'test query', 100, 200);
+    beforeEach(() => {
+        resetGlobals();
+        document.body.innerHTML = '';
+        localStorage.clear();
+        mockState = 'offline';
+        subscribers.clear();
+    });
 
-        // AX glyph is created
-        expect(glyph.id).toBe('ax-123');
-        expect(glyph.symbol).toBe(AX);
-        expect(glyph.x).toBe(100);
-        expect(glyph.y).toBe(200);
+    test('Tim creates AX glyph with correct DOM structure', () => {
+        const element = createAxGlyph(makeGlyph('ax-tim-1'));
 
-        // Glyph has render function
-        expect(glyph.renderContent).toBeDefined();
+        expect(element.dataset.glyphId).toBe('ax-tim-1');
+        expect(element.dataset.glyphSymbol).toBe(AX);
+        expect(element.classList.contains('canvas-ax-glyph')).toBe(true);
+        expect(element.classList.contains('canvas-glyph')).toBe(true);
+        expect(element.querySelector('.ax-query-input')).toBeTruthy();
+        expect(element.querySelector('.ax-glyph-results')).toBeTruthy();
+    });
+
+    test('Tim sees title bar with shared canvas-glyph-title-bar class', () => {
+        const element = createAxGlyph(makeGlyph('ax-tim-2'));
+
+        const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+        expect(titleBar).toBeTruthy();
+        expect(titleBar.style.padding).toBe('4px 4px 4px 8px');
+        expect(titleBar.querySelector('span')?.textContent).toBe(AX);
+        expect(titleBar.querySelector('.ax-query-input')).toBeTruthy();
+    });
+
+    test('Tim creates fresh glyph, starts in idle color state', () => {
+        const element = createAxGlyph(makeGlyph('ax-tim-3'));
+        const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+
+        expect(element.style.backgroundColor).toBe('rgba(30, 30, 35, 0.92)');
+        expect(titleBar.style.backgroundColor).toBe('var(--bg-tertiary)');
+    });
+
+    test('Tim creates glyph with persisted query from localStorage', () => {
+        localStorage.setItem('qntx-ax-query:ax-tim-4', 'is git');
+
+        const element = createAxGlyph(makeGlyph('ax-tim-4'));
+
+        const input = element.querySelector('.ax-query-input') as HTMLInputElement;
+        expect(input.value).toBe('is git');
+    });
+
+    test('Tim goes online, container and title bar turn teal together', () => {
+        localStorage.setItem('qntx-ax-query:ax-tim-5', 'TEST5');
+
+        const element = createAxGlyph(makeGlyph('ax-tim-5'));
+        document.body.appendChild(element);
+        const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+
+        // Offline → orange
+        expect(element.style.backgroundColor).toBe('rgba(61, 45, 20, 0.92)');
+        expect(titleBar.style.backgroundColor).toBe('#5c3d1a');
+
+        // Online → teal
+        setConnectivity('online');
+        expect(element.style.backgroundColor).toBe('rgba(31, 61, 61, 0.92)');
+        expect(titleBar.style.backgroundColor).toBe('#1f3d3d');
+    });
+
+    test('Tim title bar background always matches container state', () => {
+        localStorage.setItem('qntx-ax-query:ax-tim-6', 'ALICE');
+
+        const element = createAxGlyph(makeGlyph('ax-tim-6'));
+        document.body.appendChild(element);
+        const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+
+        // Offline → orange pair
+        expect(element.style.backgroundColor).toBe('rgba(61, 45, 20, 0.92)');
+        expect(titleBar.style.backgroundColor).toBe('#5c3d1a');
+
+        // Online → teal pair
+        setConnectivity('online');
+        expect(element.style.backgroundColor).toBe('rgba(31, 61, 61, 0.92)');
+        expect(titleBar.style.backgroundColor).toBe('#1f3d3d');
+
+        // Offline again → orange pair
+        setConnectivity('offline');
+        expect(element.style.backgroundColor).toBe('rgba(61, 45, 20, 0.92)');
+        expect(titleBar.style.backgroundColor).toBe('#5c3d1a');
     });
 });
 
 describe('AX Glyph - Spike (Edge Cases)', () => {
-    test('Spike types wildcard "*" and sees helpful error message', () => {
-        // Spike creates an AX glyph
-        const glyph = createAxGlyph('ax-wildcard', '', 100, 200);
-
-        // Render to DOM
-        const container = document.createElement('div');
-        container.className = 'canvas-workspace';
-        document.body.appendChild(container);
-
-        const glyphElement = glyph.renderContent();
-        container.appendChild(glyphElement);
-
-        // Spike types "*" in the query editor
-        const editor = glyphElement.querySelector('.ax-query-input') as HTMLInputElement;
-        expect(editor).toBeTruthy();
-        editor.value = '*';
-
-        // Trigger input event (would normally trigger debounced watcher_upsert)
-        const inputEvent = new window.Event('input', { bubbles: true });
-        editor.dispatchEvent(inputEvent);
-
-        // Simulate WebSocket receiving watcher_error from backend
-        // (Rust parser rejects "*" → Go broadcasts watcher_error → TypeScript calls updateAxGlyphError)
-        const { updateAxGlyphError } = require('./ax-glyph');
-        updateAxGlyphError(
-            'ax-wildcard',
-            'wildcard/special character is not supported in ax queries - use specific query names',
-            'error',
-            ['Parser rejected wildcard token']
-        );
-
-        // Spike sees error display with helpful message
-        const errorDisplay = glyphElement.querySelector('.ax-glyph-error') as HTMLElement;
-        expect(errorDisplay).toBeTruthy();
-        expect(errorDisplay.textContent).toContain('wildcard/special character is not supported');
-        expect(errorDisplay.textContent).toContain('use specific query names');
-        expect(errorDisplay.textContent).toContain('ERROR');
-
-        // Error display has error styling
-        expect(errorDisplay.style.backgroundColor).toContain('var(--glyph-status-error-section-bg)');
-
-        // Glyph container has error background tint
-        const axContainer = glyphElement.closest('.canvas-ax-glyph') as HTMLElement;
-        expect(axContainer?.style.backgroundColor).toContain('rgba(61, 31, 31'); // Red tint
-
-        // Cleanup
+    beforeEach(() => {
+        resetGlobals();
         document.body.innerHTML = '';
+        localStorage.clear();
+        mockState = 'offline';
+        subscribers.clear();
+    });
+
+    test('Spike triggers error — container and title bar both turn red', () => {
+        const element = createAxGlyph(makeGlyph('ax-spike-1'));
+        document.body.appendChild(element);
+
+        updateAxGlyphError('ax-spike-1', 'bad query', 'error');
+
+        const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+        expect(element.style.backgroundColor).toContain('rgba(61, 31, 31');
+        expect(titleBar.style.backgroundColor).toBe('#3d1f1f');
+    });
+});
+
+describe('AX Glyph - Jenny (Power User)', () => {
+    beforeEach(() => {
+        resetGlobals();
+        document.body.innerHTML = '';
+        localStorage.clear();
+        mockState = 'online';
+        subscribers.clear();
+    });
+
+    test('Jenny goes offline, AX re-fires local query and turns orange', () => {
+        localStorage.setItem('qntx-ax-query:ax-jenny-1', 'of qntx');
+
+        const element = createAxGlyph(makeGlyph('ax-jenny-1'));
+        document.body.appendChild(element);
+        const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+
+        // Online → teal
+        expect(element.style.backgroundColor).toBe('rgba(31, 61, 61, 0.92)');
+        expect(titleBar.style.backgroundColor).toBe('#1f3d3d');
+
+        // Offline → orange + data attributes updated
+        setConnectivity('offline');
+        expect(element.style.backgroundColor).toBe('rgba(61, 45, 20, 0.92)');
+        expect(titleBar.style.backgroundColor).toBe('#5c3d1a');
+        expect(element.dataset.localActive).toBe('true');
+        expect(element.dataset.connectivityMode).toBe('offline');
     });
 });

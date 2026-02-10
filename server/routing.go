@@ -79,6 +79,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/types", s.corsMiddleware(s.HandleTypes))                        // List/create types (GET/POST)
 	http.HandleFunc("/api/watchers/", s.corsMiddleware(s.HandleWatchers))                 // Watcher CRUD (GET/PUT/DELETE /api/watchers/{id})
 	http.HandleFunc("/api/watchers", s.corsMiddleware(s.HandleWatchers))                  // List/create watchers (GET/POST)
+	http.HandleFunc("/api/attestations", s.corsMiddleware(s.HandleCreateAttestation))          // Sync browser-created attestations (POST)
 	http.HandleFunc("/api/canvas/glyphs/", s.corsMiddleware(s.canvasHandler.HandleGlyphs))         // Glyph CRUD (GET/POST/DELETE /api/canvas/glyphs/{id})
 	http.HandleFunc("/api/canvas/glyphs", s.corsMiddleware(s.canvasHandler.HandleGlyphs))          // List/create glyphs (GET/POST)
 	http.HandleFunc("/api/canvas/compositions/", s.corsMiddleware(s.canvasHandler.HandleCompositions)) // Composition CRUD (GET/POST/DELETE /api/canvas/compositions/{id})
