@@ -176,7 +176,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
                     const currentCode = update.state.doc.toString();
                     const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
                     if (existing) {
-                        uiState.upsertCanvasGlyph({ ...existing, code: currentCode });
+                        uiState.addCanvasGlyph({ ...existing, code: currentCode });
                         log.debug(SEG.GLYPH, `[PyGlyph] Auto-saved code for ${glyph.id}`);
                     }
                 }, 500);
@@ -205,7 +205,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
         if (!existingGlyph?.code) {
             const canvasGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
             if (canvasGlyph) {
-                uiState.upsertCanvasGlyph({ ...canvasGlyph, code });
+                uiState.addCanvasGlyph({ ...canvasGlyph, code });
                 log.debug(SEG.GLYPH, `[PyGlyph] Saved initial code for new glyph ${glyph.id}`);
             }
         }
@@ -242,9 +242,8 @@ function createAndDisplayResultGlyph(pyElement: HTMLElement, result: ExecutionRe
     }
     const canvasRect = canvas.getBoundingClientRect();
 
-    // TODO(#447): round to int — backend rejects float coordinates
-    const x = pyRect.left - canvasRect.left;
-    const y = pyRect.bottom - canvasRect.top;
+    const x = Math.round(pyRect.left - canvasRect.left);
+    const y = Math.round(pyRect.bottom - canvasRect.top);
 
     // Create result glyph metadata
     const resultGlyphId = `result-${crypto.randomUUID()}`;

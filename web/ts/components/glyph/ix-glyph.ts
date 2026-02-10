@@ -152,7 +152,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
             const currentInput = input.value;
             const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
             if (existing) {
-                uiState.upsertCanvasGlyph({ ...existing, code: currentInput });
+                uiState.addCanvasGlyph({ ...existing, code: currentInput });
                 log.debug(SEG.GLYPH, `[IX Glyph] Auto-saved input for ${glyph.id}`);
             }
         }, 500);

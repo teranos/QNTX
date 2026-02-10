@@ -48,7 +48,7 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
     // This prevents race condition with auto-save if user starts typing quickly
     const contentToUse = savedContent ?? defaultContent;
     if (!savedContent && existingGlyph) {
-        uiState.upsertCanvasGlyph({ ...existingGlyph, code: defaultContent });
+        uiState.addCanvasGlyph({ ...existingGlyph, code: defaultContent });
         log.debug(SEG.GLYPH, `[Note Glyph] Saved initial content for new glyph ${glyph.id}`);
     }
 
@@ -208,7 +208,7 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
                     const markdown = noteMarkdownSerializer.serialize(editorView.state.doc);
                     const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
                     if (existing) {
-                        uiState.upsertCanvasGlyph({ ...existing, code: markdown });
+                        uiState.addCanvasGlyph({ ...existing, code: markdown });
                         log.debug(SEG.GLYPH, `[Note Glyph] Auto-saved content for ${glyph.id}`);
                     }
                 }, 500);

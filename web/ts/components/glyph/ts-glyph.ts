@@ -202,7 +202,7 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
                     const currentCode = update.state.doc.toString();
                     const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
                     if (existing) {
-                        uiState.upsertCanvasGlyph({ ...existing, code: currentCode });
+                        uiState.addCanvasGlyph({ ...existing, code: currentCode });
                         log.debug(SEG.GLYPH, `[TsGlyph] Auto-saved code for ${glyph.id}`);
                     }
                 }, 500);
@@ -228,7 +228,7 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
         if (!existingGlyph?.code) {
             const canvasGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
             if (canvasGlyph) {
-                uiState.upsertCanvasGlyph({ ...canvasGlyph, code });
+                uiState.addCanvasGlyph({ ...canvasGlyph, code });
                 log.debug(SEG.GLYPH, `[TsGlyph] Saved initial code for new glyph ${glyph.id}`);
             }
         }
