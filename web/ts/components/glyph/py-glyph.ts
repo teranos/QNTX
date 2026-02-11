@@ -29,6 +29,23 @@ import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
 import { canvasPlaced } from './manifestations/canvas-placed';
 
+export const PY_DEFAULT_CODE = `import time
+import secrets
+
+foo = ['teach', 'meld', 'attach', 'developer', 'test', 'glyph']
+if upstream:
+  print(f"Fired! {upstream['subjects']} {upstream['predicates']} {upstream['contexts']}")
+  time.sleep(0.35)
+  attest(
+    subjects=["python"],
+    predicates=[secrets.choice(foo)],
+    contexts=["qntx"],
+    attributes={"key": secrets.choice(foo)}
+  )
+else:
+  print("No upstream — ran manually")
+`;
+
 /**
  * Create a Python editor glyph with CodeMirror
  *
@@ -37,8 +54,7 @@ import { canvasPlaced } from './manifestations/canvas-placed';
 export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Load code from canvas state or use default
     const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
-    const defaultCode = '# Python editor\nprint("Hello from canvas!")\n';
-    const code = existingGlyph?.content ?? defaultCode;
+    const code = existingGlyph?.content ?? PY_DEFAULT_CODE;
 
     // Calculate initial height based on content (if no saved size)
     const lineCount = code.split('\n').length;
