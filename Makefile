@@ -101,15 +101,12 @@ test-jsdom: ## Run web UI tests including JSDOM DOM tests
 	fi
 	@cd web && USE_JSDOM=1 bun test
 
-test: ## Run all tests (Go + TypeScript) — quiet on success, noisy on failure
-	@mkdir -p tmp
-	@go test -tags "rustsqlite,qntxwasm" -short ./... > tmp/gotest.out 2>&1; \
-		EXIT=$$?; grep -v '^ok \|^? ' tmp/gotest.out || true; exit $$EXIT
+test: ## Run all tests (Go + TypeScript)
+	@go test -tags "rustsqlite,qntxwasm" -short ./...
 	@if [ ! -d "web/node_modules" ]; then \
-		cd web && bun install > /dev/null 2>&1; \
+		cd web && bun install; \
 	fi
-	@cd web && USE_JSDOM=1 bun test > ../tmp/buntest.out 2>&1; \
-		EXIT=$$?; grep -E '\(fail\)|^ \d+ (pass|fail)|^Ran ' ../tmp/buntest.out || true; exit $$EXIT
+	@cd web && USE_JSDOM=1 bun test
 	@echo "✓ All tests complete"
 
 test-coverage: ## Run all tests (Go + TypeScript) with coverage
