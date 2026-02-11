@@ -2,20 +2,20 @@
 
 **Status:** Active — core touch interactions implemented, canvas navigation in progress
 
-Mobile is not a compromise. It is the primary exploratory interface. Desktop adds power-user features.
+Mobile is not a compromise. It is a primary exploratory interface. Desktop adds power-user features.
 
 ## The Story
 
-*Source: [tube-journey.test.ts](../../web/ts/state/tube-journey.test.ts) — every detail below is encoded as a passing test.*
+*Encoded as a test*: [tube-journey.test.ts](../../web/ts/state/tube-journey.test.ts)
 
 ### Jenny's Commute
 
-Jenny is a biology researcher. Every morning she rides the Northern Line from Morden to Old Street — 35 minutes, 17 stations, 18 tunnel segments where connectivity drops to zero.
+Jenny is a biology researcher in London. Every morning she rides the Northern Line from Morden to Old Street — 35 minutes, 17 stations, 18 tunnel segments where connectivity drops to zero.
 
 Last night, while Jenny slept, two things happened:
 
-1. Her metagenomic pipeline finished processing a soil microbiome dataset. Novel gene clusters appeared in the results.
-2. Parbattie, a field researcher in Guyana (UTC-4), worked through the evening documenting a rare flora inventory near Kaieteur Falls. Guyana's 11pm is London's 3am — by the time Jenny wakes, Parbattie's field notes (*Heliamphora chimantensis* pitcher plants, a possibly undiscovered orchid species, GPS coordinates) are already synced to the backend.
+1. Her metagenomic pipeline finished processing a soil microbiome dataset. Novel clusters appeared in the results.
+2. Parbattie, a field researcher in Guyana (UTC-4), worked through the evening documenting a rare flora inventory near Kaieteur Falls. Guyana's 11pm is London's 3am — by the time Jenny wakes, Parbattie's field notes (*Heliamphora chimantensis* a pitcher plant, and a possibly undiscovered orchid species, GPS coordinates) are already synced to the shared QNTX instance.
 
 ### 08:29 — Morden station
 
