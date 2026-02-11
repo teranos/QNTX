@@ -37,6 +37,8 @@ mock.module('../../connectivity', () => ({
 mock.module('../../state/sync-state', () => ({
     syncStateManager: {
         subscribe() { return () => {}; },
+        setState() {},
+        clearState() {},
     },
 }));
 
