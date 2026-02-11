@@ -36,8 +36,8 @@ pub mod storage;
 // Re-export main types at crate root
 pub use attestation::{Attestation, AttestationBuilder, AxFilter, AxResult, Conflict};
 pub use classify::{
-    classify_claims, ActorCredibility, ClassificationResult, ClassifyInput, ClassifyOutput,
-    ClaimGroup, ClaimInput, ClaimTiming, ClaimWithTiming, ConfidenceCalculator, ConflictType,
+    classify_claims, ActorCredibility, ClaimGroup, ClaimInput, ClaimTiming, ClaimWithTiming,
+    ClassificationResult, ClassifyInput, ClassifyOutput, ConfidenceCalculator, ConflictType,
     SmartClassifier, TemporalAnalyzer, TemporalConfig, TemporalPattern,
 };
 pub use fuzzy::{FuzzyEngine, FuzzyMatch};

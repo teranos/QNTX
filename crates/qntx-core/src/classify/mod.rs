@@ -29,7 +29,9 @@ mod credibility;
 pub mod temporal;
 mod types;
 
-pub use classifier::{classify_claims, ClassifyInput, ClassifyOutput, ClaimGroup, ClaimInput, SmartClassifier};
+pub use classifier::{
+    classify_claims, ClaimGroup, ClaimInput, ClassifyInput, ClassifyOutput, SmartClassifier,
+};
 pub use confidence::{ClaimWithTiming, ConfidenceCalculator};
 pub use credibility::ActorCredibility;
 pub use temporal::{ClaimTiming, TemporalAnalyzer, TemporalConfig, TemporalPattern};
