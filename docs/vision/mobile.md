@@ -95,7 +95,7 @@ Transitions between states animate smoothly over about a second and a half. Your
 
 ## Gestural Exploration
 
-*Source: [tile-based-typed-ui.md](./tile-based-typed-ui.md) — semantic zoom modes*
+*Related concept: [tile-based-typed-ui.md](./tile-based-typed-ui.md)*
 
 Three modes serve distinct cognitive tasks:
 
@@ -121,5 +121,5 @@ All under 2 minutes per tunnel segment. Gestural exploration enables hypothesis 
 ## Related
 
 - [Tube Journey Test](../../web/ts/state/tube-journey.test.ts) — the full scenario as passing tests
-- [Tile-Based Typed UI](./tile-based-typed-ui.md) — semantic zoom, pane-based computing
+- [Tile-Based Typed UI](./tile-based-typed-ui.md) — pane-based computing
 - [Mobile Canvas UX Analysis](../analysis/mobile-canvas-ux.md) — implementation status and gap tracking
