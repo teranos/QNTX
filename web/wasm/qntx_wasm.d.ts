@@ -2,6 +2,24 @@
 /* eslint-disable */
 
 /**
+ * Classify claim conflicts. Takes JSON input with claim groups, temporal config,
+ * and current time. Returns JSON with classified conflicts, resolution strategies,
+ * and actor rankings.
+ *
+ * Input:
+ * ```json
+ * {
+ *   "claim_groups": [{"key": "...", "claims": [...]}],
+ *   "config": {"verification_window_ms": 60000, ...},
+ *   "now_ms": 1234567890
+ * }
+ * ```
+ *
+ * Returns JSON with conflicts, auto_resolved count, review_required count.
+ */
+export function classify_claims(input: string): string;
+
+/**
  * Delete an attestation by ID from IndexedDB.
  * Returns a Promise that resolves to true if deleted, false if not found.
  */
@@ -91,6 +109,7 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
+    readonly classify_claims: (a: number, b: number) => [number, number];
     readonly delete_attestation: (a: number, b: number) => any;
     readonly exists_attestation: (a: number, b: number) => any;
     readonly fuzzy_rebuild_index: () => any;
@@ -114,8 +133,8 @@ export interface InitOutput {
     readonly __wbindgen_exn_store: (a: number) => void;
     readonly __externref_table_alloc: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;
-    readonly __externref_table_dealloc: (a: number) => void;
     readonly __wbindgen_free: (a: number, b: number, c: number) => void;
+    readonly __externref_table_dealloc: (a: number) => void;
     readonly __wbindgen_start: () => void;
 }
 
