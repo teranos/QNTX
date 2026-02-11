@@ -2,10 +2,12 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
@@ -412,15 +414,45 @@ func (s *QNTXServer) broadcastWatcherError(watcherID string, errorMsg string, se
 	}
 }
 
+// broadcastGlyphFired broadcasts a glyph execution event to all connected clients
+func (s *QNTXServer) broadcastGlyphFired(glyphID string, attestationID string, status string, execErr error) {
+	msg := GlyphFiredMessage{
+		Type:          "glyph_fired",
+		GlyphID:       glyphID,
+		AttestationID: attestationID,
+		Status:        status,
+		Timestamp:     time.Now().Unix(),
+	}
+	if execErr != nil {
+		msg.Error = execErr.Error()
+	}
+
+	req := &broadcastRequest{
+		reqType: "glyph_fired",
+		payload: msg,
+	}
+
+	select {
+	case s.broadcastReq <- req:
+		s.logger.Debugw("Broadcast glyph fired",
+			"glyph_id", glyphID,
+			"attestation_id", attestationID,
+			"status", status)
+	case <-s.ctx.Done():
+	}
+}
+
 // initWatcherEngine initializes the watcher engine and registers it as an observer
 func (s *QNTXServer) initWatcherEngine() error {
-	// Determine API base URL (default to localhost:877 for development)
-	apiBaseURL := "http://localhost:877"
+	apiBaseURL := fmt.Sprintf("http://127.0.0.1:%d", am.GetServerPort())
 
 	s.watcherEngine = watcher.NewEngine(s.db, apiBaseURL, s.logger)
 
 	// Set broadcast callback for live results
 	s.watcherEngine.SetBroadcastCallback(s.broadcastWatcherMatch)
+
+	// Set glyph fired callback for meld-triggered execution feedback
+	s.watcherEngine.SetGlyphFiredCallback(s.broadcastGlyphFired)
 
 	// Register as global observer (notified by SQLStore on all attestation creations)
 	storage.RegisterObserver(s.watcherEngine)

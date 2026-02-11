@@ -277,9 +277,13 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		// Non-fatal: server can still run without watchers
 	}
 
-	// Initialize canvas state handlers
+	// Initialize canvas state handlers — with watcher engine for meld edge subscriptions
 	canvasStore := glyphstorage.NewCanvasStore(db)
-	server.canvasHandler = handlers.NewCanvasHandler(canvasStore)
+	var canvasOpts []handlers.CanvasHandlerOption
+	if server.watcherEngine != nil {
+		canvasOpts = append(canvasOpts, handlers.WithWatcherEngine(server.watcherEngine, serverLogger))
+	}
+	server.canvasHandler = handlers.NewCanvasHandler(canvasStore, canvasOpts...)
 	serverLogger.Infow("Canvas state handlers initialized")
 
 	// TODO(#432): Add minimized window state persistence

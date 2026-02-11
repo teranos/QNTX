@@ -15,3 +15,8 @@ globalThis.document = document;
 globalThis.HTMLElement = window.HTMLElement;
 // @ts-ignore
 globalThis.localStorage = window.localStorage;
+// @ts-ignore - CSS.escape is not in happy-dom; provide minimal polyfill for tests
+if (!globalThis.CSS) {
+    // @ts-ignore
+    globalThis.CSS = { escape: (s: string) => s.replace(/([^\w-])/g, '\\$1') };
+}
