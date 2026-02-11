@@ -24,6 +24,29 @@ if (USE_JSDOM) {
     globalThis.window = window as any;
     globalThis.navigator = window.navigator as any;
     globalThis.DOMParser = window.DOMParser as any;
+
+    // Polyfills for APIs missing in JSDOM
+    globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => { cb(0); return 0; };
+    globalThis.cancelAnimationFrame = () => {};
+
+    // Mock Element.animate (Web Animations API, not in JSDOM)
+    // Calls the "finish" listener synchronously so morph completes in tests
+    (window as any).HTMLElement.prototype.animate = function() {
+        const listeners: Record<string, Function[]> = {};
+        return {
+            finished: Promise.resolve(),
+            cancel: () => {},
+            finish: () => {},
+            play: () => {},
+            pause: () => {},
+            addEventListener: (type: string, cb: Function) => {
+                (listeners[type] ??= []).push(cb);
+                // Fire finish immediately for test determinism
+                if (type === 'finish') queueMicrotask(() => cb());
+            },
+            removeEventListener: () => {},
+        };
+    };
 }
 
 // Mock uiState — run.ts calls addMinimizedWindow/removeMinimizedWindow
@@ -268,6 +291,227 @@ describe('Glyph Single Element Axiom', () => {
 
         // Invariant should still pass
         expect(() => glyphRun.verifyInvariant()).not.toThrow();
+    });
+});
+
+/**
+ * Helper: create a fake TouchEvent since JSDOM doesn't support TouchEvent.
+ * Must use JSDOM's Event constructor — JSDOM rejects events from other realms.
+ */
+function createTouchEvent(type: string, clientX: number, clientY: number): Event {
+    const Win = globalThis.window as any;
+    const event = new Win.Event(type, { bubbles: true, cancelable: true });
+    event.touches = [{ clientX, clientY, identifier: 0 }];
+    return event;
+}
+
+/**
+ * Helper: mock getBoundingClientRect on an element.
+ * JSDOM returns all zeros by default — we need real geometry for hit testing.
+ */
+function mockRect(element: HTMLElement, rect: { left: number; right: number; top: number; bottom: number }) {
+    element.getBoundingClientRect = () => ({
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.right - rect.left,
+        height: rect.bottom - rect.top,
+        x: rect.left,
+        y: rect.top,
+        toJSON: () => ({})
+    });
+}
+
+describe('Touch Browse', () => {
+    if (!USE_JSDOM) {
+        test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
+        return;
+    }
+
+    // Tray positioned at right edge: x 350-360, y 200-260
+    const TRAY_RECT = { left: 350, right: 360, top: 200, bottom: 260 };
+
+    beforeEach(() => {
+        document.body.innerHTML = '<div id="graph-container"></div>';
+        (glyphRun as any).element = null;
+        (glyphRun as any).indicatorContainer = null;
+        (glyphRun as any).items.clear();
+        (glyphRun as any).glyphElements.clear();
+        (glyphRun as any).deferredItems = [];
+
+        // Reset touch browse state from previous test (singleton leaks state)
+        (glyphRun as any).proximity.isTouchBrowsing = false;
+
+        glyphRun.init();
+
+        // Mock geometry on the tray container
+        const trayEl = (glyphRun as any).element as HTMLElement;
+        if (trayEl) mockRect(trayEl, TRAY_RECT);
+    });
+
+    function addTestGlyphs(count: number): Glyph[] {
+        const glyphs: Glyph[] = [];
+        for (let i = 0; i < count; i++) {
+            const g: Glyph = {
+                id: `touch-glyph-${i}`,
+                title: `Glyph ${i}`,
+                renderContent: () => document.createElement('div')
+            };
+            glyphs.push(g);
+            glyphRun.add(g);
+        }
+        return glyphs;
+    }
+
+    test('touchstart near tray enters browse mode', () => {
+        addTestGlyphs(3);
+
+        const proximity = (glyphRun as any).proximity;
+        expect(proximity.isTouchBrowsing).toBe(false);
+
+        // Touch within activation margin of tray
+        document.dispatchEvent(createTouchEvent('touchstart', 355, 230));
+
+        expect(proximity.isTouchBrowsing).toBe(true);
+    });
+
+    test('touchstart far from tray does NOT enter browse mode', () => {
+        addTestGlyphs(3);
+
+        const proximity = (glyphRun as any).proximity;
+
+        // Touch on the opposite side of the screen
+        document.dispatchEvent(createTouchEvent('touchstart', 50, 230));
+
+        expect(proximity.isTouchBrowsing).toBe(false);
+    });
+
+    test('touchstart with empty tray does NOT enter browse mode', () => {
+        // No glyphs added
+        const proximity = (glyphRun as any).proximity;
+
+        document.dispatchEvent(createTouchEvent('touchstart', 355, 230));
+
+        expect(proximity.isTouchBrowsing).toBe(false);
+    });
+
+    test('touchmove updates pointer position during browse', () => {
+        addTestGlyphs(3);
+
+        const proximity = (glyphRun as any).proximity;
+
+        // Enter browse
+        document.dispatchEvent(createTouchEvent('touchstart', 355, 230));
+        expect(proximity.isTouchBrowsing).toBe(true);
+
+        // Slide thumb down
+        document.dispatchEvent(createTouchEvent('touchmove', 355, 250));
+
+        const pos = proximity.getMousePosition();
+        expect(pos.x).toBe(355);
+        expect(pos.y).toBe(250);
+    });
+
+    test('touchmove outside browse mode is ignored', () => {
+        addTestGlyphs(3);
+
+        const proximity = (glyphRun as any).proximity;
+
+        // Move without starting browse (isTouchBrowsing is false)
+        document.dispatchEvent(createTouchEvent('touchmove', 355, 250));
+
+        // Position should still be at default (0,0) or wherever mouse left it
+        // The key assertion: isTouchBrowsing should remain false
+        expect(proximity.isTouchBrowsing).toBe(false);
+    });
+
+    test('touchend exits browse mode', () => {
+        addTestGlyphs(3);
+
+        const proximity = (glyphRun as any).proximity;
+
+        // Enter browse
+        document.dispatchEvent(createTouchEvent('touchstart', 355, 230));
+        expect(proximity.isTouchBrowsing).toBe(true);
+
+        // Release
+        document.dispatchEvent(createTouchEvent('touchend', 355, 230));
+
+        expect(proximity.isTouchBrowsing).toBe(false);
+    });
+
+    test('touchend collapses pointer to offscreen', () => {
+        addTestGlyphs(3);
+
+        const proximity = (glyphRun as any).proximity;
+
+        // Enter and browse
+        document.dispatchEvent(createTouchEvent('touchstart', 355, 230));
+        document.dispatchEvent(createTouchEvent('touchmove', 355, 240));
+
+        // Release
+        document.dispatchEvent(createTouchEvent('touchend', 355, 240));
+
+        // Pointer should be moved far offscreen to collapse all glyphs
+        const pos = proximity.getMousePosition();
+        expect(pos.x).toBe(-9999);
+        expect(pos.y).toBe(-9999);
+    });
+
+    test('findPeakedGlyph returns null when no glyphs are close', () => {
+        addTestGlyphs(3);
+
+        const proximity = (glyphRun as any).proximity;
+        // Set pointer far from everything
+        proximity.setPointerPosition(-9999, -9999);
+
+        const peaked = (glyphRun as any).findPeakedGlyph();
+        expect(peaked).toBeNull();
+    });
+
+    test('findPeakedGlyph returns the glyph with highest proximity', () => {
+        const testGlyphs = addTestGlyphs(3);
+
+        // Give glyphs real geometry so proximity calculations work.
+        // Stack them vertically at x=350-360
+        const indicatorContainer = (glyphRun as any).indicatorContainer as HTMLElement;
+        const dots = indicatorContainer.querySelectorAll('.glyph-run-glyph') as NodeListOf<HTMLElement>;
+
+        mockRect(dots[0], { left: 350, right: 360, top: 200, bottom: 212 });
+        mockRect(dots[1], { left: 350, right: 360, top: 218, bottom: 230 });
+        mockRect(dots[2], { left: 350, right: 360, top: 236, bottom: 248 });
+
+        const proximity = (glyphRun as any).proximity;
+
+        // Place pointer right on top of the second glyph (y=224 is center of 218-230)
+        proximity.setPointerPosition(355, 224);
+
+        const peaked = (glyphRun as any).findPeakedGlyph();
+        expect(peaked).not.toBeNull();
+        expect(peaked.item.id).toBe('touch-glyph-1');
+    });
+
+    test('touchend on peaked glyph triggers morph', () => {
+        addTestGlyphs(1);
+
+        // Give the dot real geometry on the tray
+        const indicatorContainer = (glyphRun as any).indicatorContainer as HTMLElement;
+        const dot = indicatorContainer.querySelector('.glyph-run-glyph') as HTMLElement;
+        mockRect(dot, { left: 350, right: 360, top: 220, bottom: 232 });
+
+        // Glyph should be in dot state before browse
+        expect(dot.dataset.windowState).toBeUndefined();
+
+        // Enter browse near glyph
+        document.dispatchEvent(createTouchEvent('touchstart', 355, 226));
+        expect((glyphRun as any).proximity.isTouchBrowsing).toBe(true);
+
+        // Release on glyph — triggers morphGlyph which sets isRestoring
+        document.dispatchEvent(createTouchEvent('touchend', 355, 226));
+
+        // morphGlyph was called: isRestoring is set during the morph animation
+        expect((glyphRun as any).isRestoring).toBe(true);
     });
 });
 
