@@ -275,6 +275,9 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		// Non-fatal: server can still run without watchers
 	}
 
+	// Initialize embedding service for semantic search (optional)
+	server.SetupEmbeddingService()
+
 	// Set up config file watcher for auto-reload
 	setupConfigWatcher(server, db, serverLogger)
 
