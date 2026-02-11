@@ -87,12 +87,11 @@ Glyphs are stateful entities that remember their window configuration:
 
 When a window collapses back to a glyph and later re-expands, it restores exactly as the user left it. This reinforces the mental model that the glyph IS the window - it's just temporarily minimized, not destroyed and recreated.
 
-### Attestable State Vision
+### Attestable Glyphs
 
-Canvas state will become attestations: glyph positions, code, results stored as provenance-tracked claims.
-Multi-device sync emerges naturally when canvas layouts are attestations queryable across client and server.
-Client and server share storage traits (qntx-indexeddb, qntx-sqlite) for unified state representation.
-Your canvas becomes queryable history: "show me all glyphs I created with Python code last week."
+Glyphs are attestable. Plugins attest new glyphs on-the-fly. The system is extended by attesting glyphs, not hardcoding them.
+
+Canvas state becomes attested: glyph positions, code, results stored as provenance-tracked claims. Multi-device sync works naturally (demonstrated in [mobile.md](./mobile.md) London tube journey).
 
 ## GlyphRun Positioning
 
@@ -241,7 +240,7 @@ The glyph primitive uses **⧉** as its symbol. This sits above the current symb
 
 ### Attestable Glyph State
 
-Glyphs are not just UI decorations - they become **first-class attestable entities**:
+Glyphs are **first-class attestable entities**:
 
 ```
 GLYPH-abc123 is expanded at {x:100, y:200, w:400, h:300} by USER-xyz at 2025-01-28T...
@@ -249,12 +248,10 @@ GLYPH-def456 is collapsed in GlyphRun by USER-xyz at 2025-01-28T...
 ```
 
 This enables:
-- **Persistent UI state**: User glyph positions, sizes, and states survive sessions
+- **Persistent UI state**: Glyph positions, sizes, and states survive sessions
 - **Shared workspaces**: Glyph arrangements can be attested and shared
 - **Time-travel UI**: Navigate to how your workspace looked at any point in time
 - **Auditable interactions**: Track how users interact with the interface
-
-The `glyph` package will handle both symbol definitions (current `sym` role) and state persistence logic.
 
 ### Replacing Seg and Sym
 
@@ -300,5 +297,5 @@ All sharing the same fundamental behavior: proximity morphing, smooth transforma
 ## Related Vision
 
 - [Continuous Intelligence](./continuous-intelligence.md) - The paradigm glyphs manifest
-- [Tile-Based Typed UI](./tile-based-typed-ui.md) - Tiles as specialized glyph forms
+- [Fractal Workspace](./fractal-workspace.md) - Fractal canvas navigation and glyph manifestations
 - [Time-Travel](./time-travel.md) - Navigate glyph states across time
