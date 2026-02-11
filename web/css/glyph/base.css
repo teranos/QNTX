@@ -55,24 +55,6 @@
     transition: border-color 0.2s ease;
 }
 
-/* Execution state — functional border color driven by data-execution-state attribute.
-   Set by glyph_fired WebSocket handler during meld-edge triggered execution.
-   Specificity 0,3,0 to override canvas.css sync-state border-color (0,2,0). */
-.canvas-glyph[data-execution-state="running"]:not(.canvas-error-glyph) {
-    border-color: var(--glyph-status-running-text);
-    transition: border-color 0.2s ease;
-}
-
-.canvas-glyph[data-execution-state="completed"]:not(.canvas-error-glyph) {
-    border-color: var(--glyph-status-success-text);
-    transition: border-color 0.2s ease;
-}
-
-.canvas-glyph[data-execution-state="failed"]:not(.canvas-error-glyph) {
-    border-color: var(--glyph-status-error-text);
-    transition: border-color 0.2s ease;
-}
-
 /* Shared resize handle for canvas glyphs (bottom-right corner) */
 .glyph-resize-handle {
     position: absolute;
