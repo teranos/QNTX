@@ -10,7 +10,8 @@ import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { unmeldComposition } from './meld/meld-composition';
-import { makeDraggable } from './glyph-interaction';
+import { makeDraggable, storeCleanup } from './glyph-interaction';
+import { morphCanvasGlyphToWindow } from './manifestations/morph';
 
 /**
  * Glyph execution result data
@@ -73,8 +74,32 @@ export function createResultGlyph(
     toWindowBtn.style.color = 'var(--text-primary)';
 
     toWindowBtn.addEventListener('click', () => {
-        // TODO: Implement window manifestation morphing (tracked in #440)
-        log.debug(SEG.GLYPH, '[ResultGlyph] To window clicked (not implemented)');
+        // Guard: already in window manifestation
+        if (element.dataset.manifestation === 'window') return;
+
+        const container = element.parentElement;
+        if (!container) return;
+
+        morphCanvasGlyphToWindow(element, glyph, container, {
+            title: `Result · ${result.duration_ms}ms`,
+            width: 600,
+            height: 400,
+            onClose: () => {
+                uiState.removeCanvasGlyph(glyph.id);
+                log.debug(SEG.GLYPH, `[ResultGlyph] Closed window for ${glyph.id}`);
+            },
+            onRestore: (el) => {
+                // Re-setup canvas drag handler on the header
+                const header = el.querySelector('.result-glyph-header') as HTMLElement;
+                if (header) {
+                    const cleanup = makeDraggable(el, header, glyph, {
+                        ignoreButtons: true,
+                        logLabel: 'ResultGlyph'
+                    });
+                    storeCleanup(el, cleanup);
+                }
+            }
+        });
     });
 
     buttonContainer.appendChild(toWindowBtn);

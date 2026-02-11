@@ -308,7 +308,7 @@ export function morphFromWindow(
 /**
  * Make a window draggable by its title bar
  */
-function makeWindowDraggable(windowElement: HTMLElement, handle: HTMLElement): void {
+export function makeWindowDraggable(windowElement: HTMLElement, handle: HTMLElement): void {
     let isDragging = false;
     let offsetX = 0;
     let offsetY = 0;
