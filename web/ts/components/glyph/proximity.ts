@@ -35,9 +35,9 @@ export class GlyphProximity {
     private readonly VERTICAL_EASE_EARLY = 0.8; // Transform 80% by breakpoint
     private readonly VERTICAL_EASE_LATE = 0.2; // Remaining 20% in final stretch
 
-    // Morphing dimensions
-    private readonly DOT_MIN_WIDTH = 8;
-    private readonly DOT_MIN_HEIGHT = 8;
+    // Morphing dimensions (min matches CSS .glyph-run-glyph base size)
+    private readonly DOT_MIN_WIDTH = 10;
+    private readonly DOT_MIN_HEIGHT = 10;
     private readonly DOT_MAX_WIDTH = 220;
     private readonly DOT_MAX_HEIGHT = 32;
     private readonly DOT_BORDER_RADIUS_MAX = 2; // Initial border radius for dots
