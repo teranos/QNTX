@@ -260,6 +260,39 @@ mod wazero {
     }
 
     // ============================================================================
+    // Classification
+    // ============================================================================
+
+    /// Inner logic for classify_claims — testable without WASM memory ABI.
+    fn classify_claims_impl(input: &str) -> String {
+        qntx_core::classify_claims(input)
+    }
+
+    /// Classify claim conflicts. Takes (ptr, len) pointing to a JSON string:
+    /// ```json
+    /// {
+    ///   "claim_groups": [{"key": "...", "claims": [...]}],
+    ///   "config": {"verification_window_ms": 60000, ...},
+    ///   "now_ms": 1234567890
+    /// }
+    /// ```
+    ///
+    /// Returns packed u64 pointing to JSON:
+    /// ```json
+    /// {
+    ///   "conflicts": [...],
+    ///   "auto_resolved": N,
+    ///   "review_required": N,
+    ///   "total_analyzed": N
+    /// }
+    /// ```
+    #[no_mangle]
+    pub extern "C" fn classify_claims(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&classify_claims_impl(input))
+    }
+
+    // ============================================================================
     // Tests
     // ============================================================================
 
@@ -391,6 +424,37 @@ mod wazero {
             let result = fuzzy_find_matches_impl("broken");
             let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
             assert!(parsed["error"].as_str().unwrap().contains("invalid JSON"));
+        }
+
+        #[test]
+        fn classify_claims_evolution() {
+            let now = 1_000_000_000_i64;
+            let input = serde_json::json!({
+                "claim_groups": [{
+                    "key": "ALICE|role|GitHub",
+                    "claims": [
+                        {"subject": "ALICE", "predicate": "is_junior", "context": "GitHub", "actor": "human:alice", "timestamp_ms": now - 200_000, "source_id": "as-1"},
+                        {"subject": "ALICE", "predicate": "is_senior", "context": "GitHub", "actor": "human:alice", "timestamp_ms": now - 1000, "source_id": "as-2"}
+                    ]
+                }],
+                "config": {"verification_window_ms": 60000, "evolution_window_ms": 86400000, "obsolescence_window_ms": 31536000000_i64},
+                "now_ms": now
+            });
+            let result = classify_claims_impl(&input.to_string());
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert!(parsed["error"].is_null(), "unexpected error: {}", result);
+            assert_eq!(parsed["total_analyzed"], 1);
+            assert_eq!(parsed["conflicts"][0]["conflict_type"], "Evolution");
+        }
+
+        #[test]
+        fn classify_claims_invalid() {
+            let result = classify_claims_impl("not json");
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert!(parsed["error"]
+                .as_str()
+                .unwrap()
+                .contains("invalid classify input"));
         }
     }
 } // end mod wazero
