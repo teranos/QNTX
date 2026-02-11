@@ -258,6 +258,14 @@ func (h *CanvasHandler) handleDeleteComposition(w http.ResponseWriter, r *http.R
 func (h *CanvasHandler) compileSubscriptions(ctx context.Context, comp *glyphstorage.CanvasComposition) error {
 	store := h.watcherEngine.GetStore()
 
+	// Delete all existing meld-edge watchers for this composition —
+	// removed edges become orphans otherwise.
+	prefix := fmt.Sprintf("meld-edge-%s-", comp.ID)
+	deleted, err := store.DeleteByPrefix(ctx, prefix)
+	if err != nil {
+		return errors.Wrapf(err, "failed to clean stale watchers for composition %s", comp.ID)
+	}
+
 	var created int
 	for _, edge := range comp.Edges {
 		if edge.Direction != "right" {
@@ -330,11 +338,11 @@ func (h *CanvasHandler) compileSubscriptions(ctx context.Context, comp *glyphsto
 		created++
 	}
 
-	if created > 0 {
+	if created > 0 || deleted > 0 {
 		if err := h.watcherEngine.ReloadWatchers(); err != nil {
 			return errors.Wrap(err, "failed to reload watchers after subscription compilation")
 		}
-		h.logInfo("Compiled %d subscriptions for composition %s", created, comp.ID)
+		h.logInfo("Compiled %d subscriptions for composition %s (cleaned %d stale)", created, comp.ID, deleted)
 	}
 
 	return nil
