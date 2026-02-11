@@ -62,23 +62,26 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/logs/download", s.corsMiddleware(s.HandleLogDownload))
 	http.HandleFunc("/api/timeseries/usage", s.corsMiddleware(s.HandleUsageTimeSeries))
 	http.HandleFunc("/api/config", s.corsMiddleware(s.HandleConfig))
-	http.HandleFunc("/api/dev", s.corsMiddleware(s.HandleDevMode))                        // Dev mode status
-	http.HandleFunc("/api/debug", s.corsMiddleware(s.HandleDebug))                        // Browser console debugging (dev mode only)
-	http.HandleFunc("/api/prose", s.corsMiddleware(s.HandleProse))                        // Prose content tree
-	http.HandleFunc("/api/prose/", s.corsMiddleware(s.HandleProseContent))                // Individual prose files
-	http.HandleFunc("/api/pulse/executions/", s.corsMiddleware(s.HandlePulseExecution))   // Individual execution (GET) and logs (GET /logs)
-	http.HandleFunc("/api/pulse/schedules/", s.corsMiddleware(s.HandlePulseSchedule))     // Individual schedule (GET/PATCH/DELETE)
-	http.HandleFunc("/api/pulse/schedules", s.corsMiddleware(s.HandlePulseSchedules))     // List/create schedules (GET/POST)
-	http.HandleFunc("/api/pulse/jobs/", s.corsMiddleware(s.HandlePulseJob))               // Individual async job and sub-resources (GET)
-	http.HandleFunc("/api/pulse/jobs", s.corsMiddleware(s.HandlePulseJobs))               // List async jobs (GET)
-	http.HandleFunc("/api/prompt/", s.corsMiddleware(s.HandlePrompt))                     // Prompt operations (preview/execute/list/save/get/versions)
-	http.HandleFunc("/api/plugins/{name}/config", s.corsMiddleware(s.HandlePluginConfig)) // Plugin configuration (GET/PUT)
-	http.HandleFunc("/api/plugins/", s.corsMiddleware(s.HandlePluginAction))              // Plugin actions: pause/resume (POST)
-	http.HandleFunc("/api/plugins", s.corsMiddleware(s.HandlePlugins))                    // List installed plugins (GET)
-	http.HandleFunc("/api/types/", s.corsMiddleware(s.HandleTypes))                       // Get specific type (GET /api/types/{typename})
-	http.HandleFunc("/api/types", s.corsMiddleware(s.HandleTypes))                        // List/create types (GET/POST)
-	http.HandleFunc("/api/watchers/", s.corsMiddleware(s.HandleWatchers))                 // Watcher CRUD (GET/PUT/DELETE /api/watchers/{id})
-	http.HandleFunc("/api/watchers", s.corsMiddleware(s.HandleWatchers))                  // List/create watchers (GET/POST)
+	http.HandleFunc("/api/dev", s.corsMiddleware(s.HandleDevMode))                           // Dev mode status
+	http.HandleFunc("/api/debug", s.corsMiddleware(s.HandleDebug))                           // Browser console debugging (dev mode only)
+	http.HandleFunc("/api/prose", s.corsMiddleware(s.HandleProse))                           // Prose content tree
+	http.HandleFunc("/api/prose/", s.corsMiddleware(s.HandleProseContent))                   // Individual prose files
+	http.HandleFunc("/api/pulse/executions/", s.corsMiddleware(s.HandlePulseExecution))      // Individual execution (GET) and logs (GET /logs)
+	http.HandleFunc("/api/pulse/schedules/", s.corsMiddleware(s.HandlePulseSchedule))        // Individual schedule (GET/PATCH/DELETE)
+	http.HandleFunc("/api/pulse/schedules", s.corsMiddleware(s.HandlePulseSchedules))        // List/create schedules (GET/POST)
+	http.HandleFunc("/api/pulse/jobs/", s.corsMiddleware(s.HandlePulseJob))                  // Individual async job and sub-resources (GET)
+	http.HandleFunc("/api/pulse/jobs", s.corsMiddleware(s.HandlePulseJobs))                  // List async jobs (GET)
+	http.HandleFunc("/api/prompt/", s.corsMiddleware(s.HandlePrompt))                        // Prompt operations (preview/execute/list/save/get/versions)
+	http.HandleFunc("/api/plugins/{name}/config", s.corsMiddleware(s.HandlePluginConfig))    // Plugin configuration (GET/PUT)
+	http.HandleFunc("/api/plugins/", s.corsMiddleware(s.HandlePluginAction))                 // Plugin actions: pause/resume (POST)
+	http.HandleFunc("/api/plugins", s.corsMiddleware(s.HandlePlugins))                       // List installed plugins (GET)
+	http.HandleFunc("/api/types/", s.corsMiddleware(s.HandleTypes))                          // Get specific type (GET /api/types/{typename})
+	http.HandleFunc("/api/types", s.corsMiddleware(s.HandleTypes))                           // List/create types (GET/POST)
+	http.HandleFunc("/api/watchers/", s.corsMiddleware(s.HandleWatchers))                    // Watcher CRUD (GET/PUT/DELETE /api/watchers/{id})
+	http.HandleFunc("/api/watchers", s.corsMiddleware(s.HandleWatchers))                     // List/create watchers (GET/POST)
+	http.HandleFunc("/api/search/semantic", s.corsMiddleware(s.HandleSemanticSearch))        // Semantic search (GET)
+	http.HandleFunc("/api/embeddings/generate", s.corsMiddleware(s.HandleEmbeddingGenerate)) // Generate embedding (POST)
+	http.HandleFunc("/api/embeddings/batch", s.corsMiddleware(s.HandleEmbeddingBatch))       // Batch generate embeddings (POST)
 	http.HandleFunc("/", s.corsMiddleware(s.HandleStatic))
 }
 
