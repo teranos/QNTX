@@ -22,6 +22,15 @@ import { canvasPlaced } from './manifestations/canvas-placed';
 import { putAttestation, queryAttestations, parseQuery } from '../../qntx-wasm';
 import type { Attestation } from '../../qntx-wasm';
 
+export const TS_DEFAULT_CODE = `// TypeScript editor
+await qntx.attest({
+      subjects: ["teranos"],
+      predicates: ["maintainer"],
+      contexts: ["QNTX11"]
+  })
+  qntx.log("Attested!")
+`;
+
 /** AsyncFunction constructor — supports `await` in user code */
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
@@ -93,8 +102,7 @@ function buildQntxApi(outputLines: string[]) {
 export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Load code from canvas state or use default
     const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
-    const defaultCode = '// TypeScript editor\nqntx.log("Hello from canvas!")\n';
-    const code = existingGlyph?.content ?? defaultCode;
+    const code = existingGlyph?.content ?? TS_DEFAULT_CODE;
 
     const lineCount = code.split('\n').length;
     const lineHeight = 24;

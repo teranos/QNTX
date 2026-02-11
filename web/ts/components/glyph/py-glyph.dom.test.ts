@@ -3,7 +3,7 @@
  */
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
-import { createPyGlyph } from './py-glyph';
+import { createPyGlyph, PY_DEFAULT_CODE } from './py-glyph';
 import type { Glyph } from './glyph';
 
 // Mock uiState to prevent API calls during tests
@@ -155,7 +155,7 @@ describe('PyGlyph', () => {
 
             // Check that default code was saved to uiState
             const saved = mockCanvasGlyphs.find(g => g.id === 'py-test-123');
-            expect(saved?.content).toContain('# Python editor');
+            expect(saved?.content).toBe(PY_DEFAULT_CODE);
         });
 
         test('loads saved code for existing glyph', async () => {

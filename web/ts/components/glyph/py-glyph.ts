@@ -29,6 +29,23 @@ import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
 import { canvasPlaced } from './manifestations/canvas-placed';
 
+export const PY_DEFAULT_CODE = `import time
+import secrets
+
+foo = ['teach', 'meld', 'attach', 'developer', 'test', 'glyph']
+if upstream:
+  print(f"Fired! {upstream['subjects']} {upstream['predicates']} {upstream['contexts']}")
+  time.sleep(0.35)
+  attest(
+    subjects=["python"],
+    predicates=[secrets.choice(foo)],
+    contexts=["qntx"],
+    attributes={"key": secrets.choice(foo)}
+  )
+else:
+  print("No upstream — ran manually")
+`;
+
 /**
  * Create a Python editor glyph with CodeMirror
  *
@@ -37,8 +54,7 @@ import { canvasPlaced } from './manifestations/canvas-placed';
 export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Load code from canvas state or use default
     const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
-    const defaultCode = '# Python editor\nprint("Hello from canvas!")\n';
-    const code = existingGlyph?.content ?? defaultCode;
+    const code = existingGlyph?.content ?? PY_DEFAULT_CODE;
 
     // Calculate initial height based on content (if no saved size)
     const lineCount = code.split('\n').length;
@@ -93,7 +109,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    code: currentCode,
+                    content: currentCode,
                     capture_variables: false,
                     glyph_id: glyph.id,
                 })
@@ -112,20 +128,6 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
             if (!response.ok && !result) {
                 throw new Error(`Execution failed: ${response.statusText}`);
             }
-
-            // TODO: Create attestation for script execution (success or failure)
-            // Call attest() with:
-            //   subjects: [`script:${glyph.id}`]
-            //   predicates: [result.success ? "executed" : "failed"]
-            //   contexts: ["canvas", "python"]
-            //   attributes: {
-            //     code: currentCode,
-            //     stdout: result.stdout,
-            //     stderr: result.stderr,
-            //     error: result.error,
-            //     duration_ms: result.duration_ms
-            //   }
-            // This creates audit trail of all Python executions on canvas.
 
             // Create result glyph for successful execution
             createAndDisplayResultGlyph(element, result);
@@ -154,8 +156,6 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     element.appendChild(editorContainer);
 
     // Initialize CodeMirror with loaded code
-    // TODO: Add run button in title bar that executes code via /api/python/execute
-    // TODO: Add output panel below editor to show execution results
     try {
         const { EditorView, keymap } = await import('@codemirror/view');
         const { EditorState } = await import('@codemirror/state');

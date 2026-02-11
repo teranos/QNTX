@@ -379,6 +379,7 @@ export function makeDraggable(
                 g.y = y;
 
                 if (g.symbol) {
+                    const existing = uiState.getCanvasGlyphs().find(cg => cg.id === g.id);
                     uiState.addCanvasGlyph({
                         id: g.id,
                         symbol: g.symbol,
@@ -386,7 +387,7 @@ export function makeDraggable(
                         y,
                         width: g.width,
                         height: g.height,
-                        content: g.content, // Preserve content for all glyph types
+                        content: existing?.content,
                     });
                 }
             }
@@ -402,6 +403,7 @@ export function makeDraggable(
             glyph.y = y;
 
             if (glyph.symbol) {
+                const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
                 uiState.addCanvasGlyph({
                     id: glyph.id,
                     symbol: glyph.symbol,
@@ -409,7 +411,7 @@ export function makeDraggable(
                     y,
                     width: glyph.width,
                     height: glyph.height,
-                    content: glyph.content, // Preserve content for all glyph types
+                    content: existing?.content,
                 });
             }
             log.debug(SEG.GLYPH, `[${logLabel}] Finished dragging ${glyph.id}`);
@@ -558,8 +560,9 @@ export function makeResizable(
         glyph.width = finalWidth;
         glyph.height = finalHeight;
 
-        // Persist to uiState
+        // Persist to uiState (read existing content from state, not glyph object)
         if (glyph.symbol && glyph.x !== undefined && glyph.y !== undefined) {
+            const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
             uiState.addCanvasGlyph({
                 id: glyph.id,
                 symbol: glyph.symbol,
@@ -567,6 +570,7 @@ export function makeResizable(
                 y: glyph.y,
                 width: finalWidth,
                 height: finalHeight,
+                content: existing?.content,
             });
         }
 
