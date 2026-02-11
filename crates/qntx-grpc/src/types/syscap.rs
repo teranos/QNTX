@@ -2,8 +2,8 @@
 // Regenerate with: make types
 // TODO: Migrate to proto generation
 // Source package: syscap
-// Source last modified: 2026-01-14T19:32:39+01:00
-// Source version: faf8c2d8
+// Source last modified: 2026-02-09T21:59:10+01:00
+// Source version: 42fb811c
 
 //! # syscap module
 //!

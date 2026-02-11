@@ -5,10 +5,48 @@
 
 | Method | Endpoint | Handler |
 |--------|----------|----------|
+| GET | `/api/attestations` | HandleCreateAttestation |
+| GET | `/api/canvas/compositions` | canvasHandler |
+| GET | `/api/canvas/compositions/` | canvasHandler |
+| GET | `/api/canvas/glyphs` | canvasHandler |
+| GET | `/api/canvas/glyphs/` | canvasHandler |
 | GET | `/api/types` | HandleTypes |
 | GET | `/api/types/` | HandleTypes |
 | GET | `/api/watchers` | HandleWatchers |
 | GET | `/api/watchers/` | HandleWatchers |
+
+---
+
+### `GET` /api/attestations
+
+HandleCreateAttestation accepts a browser-created attestation and stores it server-side.
+POST /api/attestations — idempotent (returns 200 if already exists).
+
+**Handler**: `HandleCreateAttestation`
+
+---
+
+### `GET` /api/canvas/compositions
+
+**Handler**: `canvasHandler`
+
+---
+
+### `GET` /api/canvas/compositions/
+
+**Handler**: `canvasHandler`
+
+---
+
+### `GET` /api/canvas/glyphs
+
+**Handler**: `canvasHandler`
+
+---
+
+### `GET` /api/canvas/glyphs/
+
+**Handler**: `canvasHandler`
 
 ---
 
