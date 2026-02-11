@@ -29,7 +29,6 @@ import {
     WINDOW_BOX_SHADOW,
     TITLE_BAR_HEIGHT,
     TITLE_BAR_PADDING,
-    WINDOW_BUTTON_SIZE,
     CANVAS_GLYPH_CONTENT_PADDING,
     GLYPH_CONTENT_INNER_PADDING,
     MAX_VIEWPORT_HEIGHT_RATIO,
@@ -126,7 +125,6 @@ export function morphToWindow(
         // Add window chrome (title bar, controls)
         const titleBar = document.createElement('div');
         titleBar.className = 'window-title-bar';
-        titleBar.style.height = TITLE_BAR_HEIGHT;
         titleBar.style.width = '100%';
         titleBar.style.backgroundColor = 'var(--bg-almost-black)';
         titleBar.style.borderBottom = '1px solid var(--border-on-dark)';
@@ -144,15 +142,9 @@ export function morphToWindow(
         titleText.style.color = 'var(--text-on-dark)';
         titleBar.appendChild(titleText);
 
-        // Add minimize button
+        // Add minimize button (sized by .window-title-bar button CSS, including touch breakpoints)
         const minimizeBtn = document.createElement('button');
         minimizeBtn.textContent = '−';
-        minimizeBtn.style.width = WINDOW_BUTTON_SIZE;
-        minimizeBtn.style.height = WINDOW_BUTTON_SIZE;
-        minimizeBtn.style.border = 'none';
-        minimizeBtn.style.background = 'transparent';
-        minimizeBtn.style.cursor = 'pointer';
-        minimizeBtn.style.color = 'var(--text-on-dark)';
         minimizeBtn.onclick = () => morphFromWindow(
             glyphElement,
             glyph,
@@ -161,16 +153,10 @@ export function morphToWindow(
         );
         titleBar.appendChild(minimizeBtn);
 
-        // Add close button if glyph has onClose
+        // Add close button if glyph has onClose (sized by CSS, including touch breakpoints)
         if (glyph.onClose) {
             const closeBtn = document.createElement('button');
             closeBtn.textContent = '×';
-            closeBtn.style.width = WINDOW_BUTTON_SIZE;
-            closeBtn.style.height = WINDOW_BUTTON_SIZE;
-            closeBtn.style.border = 'none';
-            closeBtn.style.background = 'transparent';
-            closeBtn.style.cursor = 'pointer';
-            closeBtn.style.color = 'var(--text-on-dark)';
             closeBtn.onclick = () => {
                 // Remove from tray data AND remove element
                 onRemove(glyph.id);

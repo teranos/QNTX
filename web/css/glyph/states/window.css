@@ -54,6 +54,20 @@
     background: var(--bg-hover);
 }
 
+/* Touch devices: enlarge title bar buttons for reliable thumb targeting */
+@media (pointer: coarse) {
+    .window-title-bar {
+        height: 44px;
+    }
+
+    .window-title-bar button {
+        width: 44px;
+        height: 44px;
+        font-size: 20px;
+        margin-left: 2px;
+    }
+}
+
 /* Window content area - styled by individual glyphs */
 .glyph-window-content {
     flex: 1;
