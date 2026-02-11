@@ -67,8 +67,12 @@ impl<'a> ConfidenceCalculator<'a> {
         let recency_bonus = self.recency_bonus(claims, now_ms);
         let consistency_bonus = self.consistency_bonus(claims);
 
-        let total =
-            base_score + source_bonus + credibility_bonus + temporal_bonus + recency_bonus + consistency_bonus;
+        let total = base_score
+            + source_bonus
+            + credibility_bonus
+            + temporal_bonus
+            + recency_bonus
+            + consistency_bonus;
 
         total.min(1.0)
     }
@@ -165,8 +169,8 @@ impl<'a> ConfidenceCalculator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::temporal::TemporalConfig;
+    use super::*;
 
     fn setup() -> (TemporalAnalyzer, i64) {
         let ta = TemporalAnalyzer::new(TemporalConfig::default());
@@ -198,7 +202,11 @@ mod tests {
         let claims = vec![claim("human:alice", now - 1000, "is_author_of")];
         let score = cc.calculate(&claims, now);
         // Human credibility (1.0 * 0.7) + recency (1.0 * 0.3) = 1.0
-        assert!(score > 0.9, "human claim should be high confidence, got {}", score);
+        assert!(
+            score > 0.9,
+            "human claim should be high confidence, got {}",
+            score
+        );
     }
 
     #[test]
@@ -211,7 +219,11 @@ mod tests {
             claim("system:ci", now - 3000, "is_author_of"),
         ];
         let score = cc.calculate(&claims, now);
-        assert!(score > 0.7, "multiple sources should boost confidence, got {}", score);
+        assert!(
+            score > 0.7,
+            "multiple sources should boost confidence, got {}",
+            score
+        );
     }
 
     #[test]
