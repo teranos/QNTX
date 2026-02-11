@@ -258,9 +258,9 @@ Wire up the UI to show subscription state and glyph execution feedback.
 
 ### 5.2 Stale edge cleanup on composition update
 
-- [ ] `compileSubscriptions` only creates/replaces watchers — doesn't delete watchers for edges that were removed
-  - When a glyph is unmelded from a composition, the old edge's watcher persists as orphan
-  - Fix: before compiling, query existing `meld-edge-{compositionId}-*` watchers, diff against current edges, delete stale ones
+- [x] `compileSubscriptions` deletes all `meld-edge-{compositionId}-*` watchers via `DeleteByPrefix` before recreating current edges
+  - Same pattern as `handleDeleteComposition` — clean slate, then recreate
+  - Reloads engine on deletions even when no new edges are created
 
 ### 5.3 AX query change propagation
 
