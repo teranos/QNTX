@@ -351,7 +351,7 @@ export interface PromptDirectRequest {
   provider?: string;
   model?: string;
   /**
-   * Canvas glyph ID — result attestations use actor "glyph:{id}"
+   * TODO(#458): create result attestation with actor "glyph:{id}" so prompt glyphs can be mid-chain producers
    */
   glyph_id?: string;
   /**
