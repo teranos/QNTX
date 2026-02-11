@@ -302,13 +302,19 @@ body.disconnected #container {
 
 /* Mobile Layout - Full screen graph with bottom input bar */
 @media (max-width: 768px) {
+    /* Disable flex layout on mobile - children are absolutely positioned */
+    #container {
+        display: block;
+    }
+
     /* Hide left panel chrome on mobile */
     #left-panel {
         position: static;
-        width: auto;
+        width: 0;
+        min-width: 0;
         background: transparent;
         border: none;
-        display: contents; /* Let children escape the container */
+        overflow: visible; /* Allow children to escape */
     }
 
     #header,
