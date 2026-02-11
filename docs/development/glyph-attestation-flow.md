@@ -74,40 +74,45 @@ The core: when a meld edge is created, compile it into a subscription that the w
 
 Add a watcher action type that executes a specific canvas glyph with an injected attestation, rather than running inline Python code.
 
-- [ ] Add `ActionTypeGlyphExecute` to `ats/storage/watcher_store.go:16-20`
-- [ ] Add `executeGlyph()` to `ats/watcher/engine.go` alongside `executePython()`/`executeWebhook()`
-  - Takes: target glyph ID, glyph type, attestation
-  - For py glyph: calls `/api/python/execute` with attestation in request body (new field, see 2.4)
-  - For prompt glyph: calls `/api/prompt/direct` with attestation in request body (new field)
-  - Broadcast `glyph_fired` WebSocket message to frontend (new message type)
-- [ ] Wire into `executeAction()` switch at `engine.go:386`
+- [x] Add `ActionTypeGlyphExecute` to `ats/storage/watcher_store.go`
+  - `ActionTypeGlyphExecute = "glyph_execute"` constant alongside python/webhook/llm_prompt
+
+- [x] Add `executeGlyph()` to `ats/watcher/engine.go` alongside `executePython()`/`executeWebhook()`
+  - Parses `GlyphExecuteAction` from `ActionData` JSON: `{target_glyph_id, target_glyph_type, composition_id, source_glyph_id}`
+  - For py glyph: fetches code from canvas store, calls `/api/python/execute` with `upstream_attestation`
+  - For prompt glyph: fetches template from canvas store, calls `/api/prompt/direct` with `upstream_attestation`
+  - Broadcasts `glyph_fired` WebSocket message: started → success/error
+
+- [x] Wire into `executeAction()` switch
+  - `engine.go` switch case dispatches `ActionTypeGlyphExecute` → `executeGlyph()`
 
 ### 2.2 Compile meld edges to subscriptions
 
 When the backend receives a composition upsert (POST `/api/canvas/compositions`), compile each `right`-direction edge into a watcher subscription.
 
-- [ ] Add `CompileSubscriptions()` to `glyph/handlers/canvas.go` or new `glyph/subscription/compiler.go`
-  - Input: composition edges + glyph metadata (type per glyph ID)
-  - For each `right` edge:
-    - Resolve source glyph type from `canvas_glyphs` table
-    - **AX source**: watcher filter = AX glyph's query (from `watchers` table, keyed by `ax-glyph-{fromId}`)
-    - **Py/Prompt source**: watcher filter = `{actors: ["glyph:{fromId}"]}`
-  - Output: watcher definition per edge with `ActionType: glyph_execute`, `ActionData: {target_glyph_id, target_glyph_type}`
+- [x] Add `compileSubscriptions()` to `glyph/handlers/canvas.go`
+  - Iterates composition edges, filters `direction == "right"`
+  - Resolves source and target glyph types via canvas store
+  - AX source: clones `AxQuery` from existing `ax-glyph-{fromId}` watcher
+  - Py/Prompt source: sets `Filter.Actors = ["glyph:{fromId}"]`
+  - Target must be executable (`py` or `prompt`)
 
-- [ ] Register compiled subscriptions with watcher engine
-  - Use watcher ID convention: `meld-edge-{compositionId}-{fromId}-{toId}`
-  - Create/update via `WatcherStore.Create()` / `WatcherStore.Update()`
-  - Call `engine.ReloadWatchers()` after registration
+- [x] Register compiled subscriptions with watcher engine
+  - Watcher ID: `meld-edge-{compositionId}-{fromId}-{toId}`
+  - Uses `CreateOrReplace` (INSERT OR REPLACE) for idempotent upserts — concurrent composition position updates would race with DeleteByPrefix+Create
+  - Calls `engine.ReloadWatchers()` after registration
 
-- [ ] Deregister on composition delete or edge removal
-  - On composition DELETE: remove all `meld-edge-{compositionId}-*` watchers
-  - On composition UPDATE: diff old vs new edges, remove stale watchers, create new ones
-  - `handleUpsertComposition` at `canvas.go:172` needs pre-update edge diffing
+- [x] Deregister on composition delete
+  - `handleDeleteComposition` deletes all `meld-edge-{compositionId}-*` watchers via `DeleteByPrefix`
+  - Reloads watchers after deletion
 
-- [ ] Handle AX edge compilation: reuse existing watcher filter
-  - AX glyph already has a watcher `ax-glyph-{glyphId}` with parsed filter
-  - Meld edge subscription can clone that filter (or reference the same AX query string)
-  - When AX query changes (debounce update), recompile affected meld edge subscriptions
+- [ ] Deregister stale edges on composition update
+  - Currently `compileSubscriptions` only creates/replaces — removed edges leave orphan watchers
+  - Need: diff old vs new edges, delete watchers for removed edges
+
+- [x] Handle AX edge compilation: reuse existing watcher filter
+  - Looks up `ax-glyph-{fromId}` watcher, clones its `AxQuery` field
+  - Logs warning and skips if AX watcher not found
 
 ### 2.3 Actor convention for py/prompt glyphs
 
@@ -161,6 +166,7 @@ Prevent reprocessing on restart and handle edge cases.
 
 - [x] New migration: `composition_edge_cursors` table
   - `db/sqlite/migrations/023_composition_edge_cursors.sql`
+  - **Gotcha:** Go's `//go:embed` caches migration files at build time. Adding migration 023 required `go clean -cache` to force re-embedding. Symptom: `total_migrations=22` in startup logs even after adding migration file.
 
 - [x] Update cursor after successful `executeGlyph()` in watcher engine
   - `ats/watcher/engine.go:460` — `updateEdgeCursor()` upserts cursor from `GlyphExecuteAction` fields
@@ -181,47 +187,118 @@ Prevent reprocessing on restart and handle edge cases.
 
 Wire up the UI to show subscription state and glyph execution feedback.
 
-- [ ] New WebSocket message type: `glyph_fired`
-  - Payload: `{glyph_id, attestation_id, status: "started"|"success"|"error", result?}`
-  - `web/ts/websocket.ts` — add handler alongside `watcher_match`
-  - Glyph element receives visual state update (border flash, status indicator)
+### 4.1 `glyph_fired` WebSocket message (complete)
 
-- [ ] Downstream glyph shows "watching" indicator when in meld with upstream
+- [x] Proto-defined shared type: `GlyphFired` in `glyph/proto/events.proto`
+  - Fields: `glyph_id`, `attestation_id`, `status` ("started"/"success"/"error"), `error`, `timestamp`
+  - Go struct `GlyphFiredMessage` in `server/types.go` with matching JSON tags
+  - TypeScript type generated from proto + extended with `type: 'glyph_fired'` in `web/types/websocket.ts`
+
+- [x] Server broadcasts `glyph_fired` in `executeGlyph()` — started before execution, success/error after
+  - `server/watcher_handlers.go:418-443` — `broadcastGlyphFired()` creates message, sends to broadcast hub
+  - `server/broadcast.go` — `processBroadcastRequest` routes `glyph_fired` to `sendMessageToClients`
+
+- [x] Frontend handler in `web/ts/websocket.ts` MESSAGE_HANDLERS
+  - Finds glyph DOM element by `data-glyph-id`, sets `data-execution-state` attribute
+  - Maps status: started→running, success→completed, error→failed
+  - Auto-clears "completed" after 3s
+  - Logs warning if DOM element not found (debugging aid)
+
+- [x] CSS-driven visual feedback in `web/css/glyph/base.css`
+  - `.canvas-glyph[data-execution-state="running"]` → blue border (`--glyph-status-running-text`)
+  - `.canvas-glyph[data-execution-state="completed"]` → green border (`--glyph-status-success-text`)
+  - `.canvas-glyph[data-execution-state="failed"]` → red border (`--glyph-status-error-text`)
+  - **Finding:** Needed `:not(.canvas-error-glyph)` qualifier for specificity 0,3,0 to override `canvas.css` sync-state border-color (0,2,0). Also needed inline `transition: border-color 0.2s ease` to override canvas.css's 1.5s mode transition.
+
+### 4.2 Bugs found and fixed during Phase 4
+
+- [x] **IPv6 connection refused** — macOS resolves `localhost` to `[::1]` (IPv6). Server binds all interfaces but HTTP client tried IPv6 first.
+  - Fix: `server/watcher_handlers.go` changed `localhost` → `127.0.0.1`
+
+- [x] **Hardcoded port 877** — `executeGlyphPython/Prompt` used hardcoded port instead of configured port.
+  - Fix: `server/watcher_handlers.go` uses `am.GetServerPort()` for dynamic port resolution
+
+- [x] **Race condition on concurrent composition updates** — Dragging a melded composition triggers multiple position-update upserts, each calling `compileSubscriptions`. `DeleteByPrefix` + `Create` raced.
+  - Fix: Added `CreateOrReplace` method to `WatcherStore` (INSERT OR REPLACE INTO), eliminated `DeleteByPrefix` during compile
+
+- [x] **Broadcast hub missing `glyph_fired` case** — `processBroadcastRequest` switch in `broadcast.go` didn't handle `glyph_fired`
+  - Fix: Added `case "glyph_fired": s.sendMessageToClients(req.payload, req.clientID)`
+
+- [x] **Go build cache stale after adding migration 023** — `//go:embed` baked in 22 migrations, didn't pick up new file
+  - Fix: `go clean -cache` forces re-embed on next build
+
+- [x] **Debug logs invisible at Info level** — Rate limit and `MaxFiresPerMinute=0` checks used `Debugw`, suppressed in dev
+  - Temporary fix: Upgraded key diagnostic logs to `Infow` (should revert to `Debugw` after debugging)
+
+### 4.3 Not yet implemented
+
+- [ ] "Watching" indicator when glyph is downstream in a meld
   - On meld: glyph detects it has an incoming `right` edge, shows subtle listening state
   - On unmeld: revert to standalone appearance
 
 - [ ] Result glyph auto-meld from subscription-triggered execution
-  - When `executeGlyph()` runs py code, result glyph creation + auto-meld needs to work
-  - Today result glyph is created client-side (`py-glyph.ts:232`); subscription execution is server-side
-  - Options: server returns result via `glyph_fired` message, frontend creates result glyph from that
+  - Server-side execution creates results, but result glyph creation is client-side (`py-glyph.ts:232`)
+  - Need: server returns result data via `glyph_fired` success message, frontend creates result glyph
 
 - [ ] Rate limit feedback
   - When a meld edge subscription is rate-limited, broadcast to frontend so user sees it
 
-**Manual verification:** Meld ax→py, create attestation, watch py glyph visually indicate firing, see result appear below.
+**Manual verification:** Meld ax→py, create attestation via TS glyph, watch py glyph border flash green on execution. Confirmed working.
 
 ---
 
 ## Phase 5: Edge cases + hardening
 
-- [ ] AX query change propagation
-  - When user edits AX glyph query, recompile all meld edge subscriptions sourced from that AX glyph
+### 5.1 Frontend routing for meld-edge watcher matches
+
+- [ ] `watcher_match` handler only recognizes `ax-glyph-` prefix
+  - Meld-edge watchers broadcast `watcher_match` messages with IDs like `meld-edge-melded-ax-{...}-py-{...}`
+  - Frontend logs: `Received watcher_match with unexpected watcher_id format: meld-edge-...`
+  - Fix: extend `watcher_match` handler to also route meld-edge matches (extract composition/glyph IDs from the watcher ID, deliver attestation to appropriate glyph)
+
+### 5.2 Stale edge cleanup on composition update
+
+- [ ] `compileSubscriptions` only creates/replaces watchers — doesn't delete watchers for edges that were removed
+  - When a glyph is unmelded from a composition, the old edge's watcher persists as orphan
+  - Fix: before compiling, query existing `meld-edge-{compositionId}-*` watchers, diff against current edges, delete stale ones
+
+### 5.3 AX query change propagation
+
+- [ ] When user edits AX glyph query, recompile all meld edge subscriptions sourced from that AX glyph
   - Hook into debounced save at `ax-glyph.ts:236-246`
+  - Backend: on AX watcher update, find all `meld-edge-*-{axGlyphId}-*` watchers, update their `AxQuery` field
+  - Or: frontend re-POSTs the composition on AX query change, triggering `compileSubscriptions`
 
-- [ ] Composition reconstruction on page load
-  - `canvas-glyph.ts:417-469` — reconstructs melded DOM. Also needs to verify subscriptions are registered with watcher engine (may have been created in a previous session)
-  - On load: for each composition, ensure meld edge watchers exist; create if missing
+### 5.4 Composition reconstruction on page load
 
-- [ ] Unmeld cleanup
-  - `meld-composition.ts` decompose flow: when glyphs are pulled apart, DELETE the meld edge watcher
+- [ ] `canvas-glyph.ts:417-469` reconstructs melded DOM on page load but doesn't verify subscriptions
+  - Subscriptions may have been created in a previous session and still exist in the watchers table
+  - On load: for each composition, call `compileSubscriptions` to ensure meld edge watchers exist
+  - Idempotent thanks to `CreateOrReplace` — safe to call repeatedly
+
+### 5.5 Unmeld cleanup
+
+- [ ] `meld-composition.ts` decompose flow: when glyphs are pulled apart, DELETE the meld edge watcher
   - Also delete edge cursor for that edge
+  - Frontend should call a delete endpoint, or the next composition upsert (with the glyph removed) should trigger stale edge cleanup (5.2)
 
-- [ ] Multiple downstream glyphs from same source
-  - One ax glyph melded to py-A on right AND py-B (if supported by future port rules)
+### 5.6 Multiple downstream glyphs from same source
+
+- [ ] One AX glyph melded to py-A on right AND py-B (if supported by future port rules)
   - Each edge compiles to its own subscription — both fire independently
+  - Already works architecturally (each edge = separate watcher), needs testing
 
-- [ ] Error propagation through the DAG
-  - If py glyph execution fails, should downstream glyphs be notified?
-  - Minimum: `glyph_fired` message with `status: "error"` so downstream UI knows
+### 5.7 Error propagation through the DAG
 
-**Manual verification:** Edit AX query while melded → downstream subscription updates. Refresh page → subscriptions still fire. Unmeld → subscription stops.
+- [ ] If py glyph execution fails, should downstream glyphs be notified?
+  - Currently: `glyph_fired` with `status: "error"` is broadcast, downstream glyphs don't react
+  - Minimum: failed glyph shows red border (already works via CSS)
+  - Future: downstream glyphs could show "upstream failed" indicator
+
+### 5.8 Diagnostic log cleanup
+
+- [ ] Revert temporary `Infow` diagnostic logs back to `Debugw` in `ats/watcher/engine.go`
+  - Rate limit checks, `MaxFiresPerMinute=0` skip logs, `executeAction` entry log
+  - These were upgraded for debugging during Phase 4; should return to Debug level for production
+
+**Manual verification:** Edit AX query while melded → downstream subscription updates. Refresh page → subscriptions still fire. Unmeld → subscription stops. Pull apart melded composition → orphan watchers cleaned up.
