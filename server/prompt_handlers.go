@@ -75,7 +75,7 @@ type PromptDirectRequest struct {
 	SystemPrompt          string          `json:"system_prompt,omitempty"`
 	Provider              string          `json:"provider,omitempty"`               // "openrouter" or "local"
 	Model                 string          `json:"model,omitempty"`
-	GlyphID               string          `json:"glyph_id,omitempty"`              // Canvas glyph ID — result attestations use actor "glyph:{id}"
+	GlyphID               string          `json:"glyph_id,omitempty"`              // TODO(#458): create result attestation with actor "glyph:{id}" so prompt glyphs can be mid-chain producers
 	UpstreamAttestation   *types.As       `json:"upstream_attestation,omitempty"`   // Triggering attestation — enables {{field}} interpolation
 }
 

@@ -123,6 +123,11 @@ func (e *Engine) loadWatchers() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	// Clear stale in-memory state — watchers deleted from DB must not keep firing
+	e.watchers = make(map[string]*storage.Watcher, len(watchers))
+	e.rateLimiters = make(map[string]*rate.Limiter, len(watchers))
+	e.parseErrors = make(map[string]error)
+
 	for _, w := range watchers {
 		// If watcher has an AX query string, parse it into the Filter
 		if w.AxQuery != "" {
@@ -772,6 +777,10 @@ func (e *Engine) processRetryQueue() {
 				err = e.executePython(w, pe.Attestation)
 			case storage.ActionTypeWebhook:
 				err = e.executeWebhook(w, pe.Attestation)
+			case storage.ActionTypeGlyphExecute:
+				err = e.executeGlyph(w, pe.Attestation)
+			default:
+				err = errors.Newf("unknown action type for retry: %s", w.ActionType)
 			}
 
 			if err != nil {
