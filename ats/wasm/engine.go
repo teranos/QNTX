@@ -179,6 +179,93 @@ func (e *Engine) FindFuzzyMatches(query, vocabType string, limit int, minScore f
 	return matches, nil
 }
 
+// ClassifyClaimInput represents a single claim for WASM classification.
+type ClassifyClaimInput struct {
+	Subject     string `json:"subject"`
+	Predicate   string `json:"predicate"`
+	Context     string `json:"context"`
+	Actor       string `json:"actor"`
+	TimestampMs int64  `json:"timestamp_ms"`
+	SourceID    string `json:"source_id"`
+}
+
+// ClassifyClaimGroup is a group of claims sharing the same key.
+type ClassifyClaimGroup struct {
+	Key    string               `json:"key"`
+	Claims []ClassifyClaimInput `json:"claims"`
+}
+
+// ClassifyTemporalConfig holds configurable time windows (in milliseconds).
+type ClassifyTemporalConfig struct {
+	VerificationWindowMs int64 `json:"verification_window_ms"`
+	EvolutionWindowMs    int64 `json:"evolution_window_ms"`
+	ObsolescenceWindowMs int64 `json:"obsolescence_window_ms"`
+}
+
+// ClassifyInput is the full input for classify_claims.
+type ClassifyInput struct {
+	ClaimGroups []ClassifyClaimGroup `json:"claim_groups"`
+	Config      ClassifyTemporalConfig `json:"config"`
+	NowMs       int64                  `json:"now_ms"`
+}
+
+// ClassifyConflictOutput represents a single classified conflict.
+type ClassifyConflictOutput struct {
+	Subject         string              `json:"subject"`
+	Predicate       string              `json:"predicate"`
+	Context         string              `json:"context"`
+	ConflictType    string              `json:"conflict_type"`
+	Confidence      float64             `json:"confidence"`
+	Strategy        string              `json:"strategy"`
+	ActorHierarchy  []ClassifyActorRank `json:"actor_hierarchy"`
+	TemporalPattern string              `json:"temporal_pattern"`
+	AutoResolved    bool                `json:"auto_resolved"`
+	SourceIDs       []string            `json:"source_ids"`
+}
+
+// ClassifyActorRank represents an actor with credibility ranking.
+type ClassifyActorRank struct {
+	Actor       string `json:"actor"`
+	Credibility string `json:"credibility"`
+	Timestamp   *int64 `json:"timestamp,omitempty"`
+}
+
+// ClassifyOutput is the result of classify_claims.
+type ClassifyOutput struct {
+	Conflicts      []ClassifyConflictOutput `json:"conflicts"`
+	AutoResolved   int                      `json:"auto_resolved"`
+	ReviewRequired int                      `json:"review_required"`
+	TotalAnalyzed  int                      `json:"total_analyzed"`
+}
+
+// ClassifyClaims invokes the WASM classify_claims function.
+func (e *Engine) ClassifyClaims(input ClassifyInput) (*ClassifyOutput, error) {
+	inputJSON, err := json.Marshal(input)
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal classify_claims input")
+	}
+
+	raw, err := e.Call("classify_claims", string(inputJSON))
+	if err != nil {
+		return nil, err
+	}
+
+	// Check for error response
+	var errResp struct {
+		Error string `json:"error,omitempty"`
+	}
+	if json.Unmarshal([]byte(raw), &errResp) == nil && errResp.Error != "" {
+		return nil, errors.Newf("classify_claims: %s", errResp.Error)
+	}
+
+	var output ClassifyOutput
+	if err := json.Unmarshal([]byte(raw), &output); err != nil {
+		return nil, errors.Wrapf(err, "unmarshal classify_claims result: %s", raw)
+	}
+
+	return &output, nil
+}
+
 // GetWASMSize returns the size of the embedded WASM module in bytes.
 func GetWASMSize() int {
 	return len(wasmBytes)

@@ -23,8 +23,14 @@
 //! assert_eq!(cred, ActorCredibility::Human);
 //! ```
 
+pub mod classifier;
+pub mod confidence;
 mod credibility;
+pub mod temporal;
 mod types;
 
+pub use classifier::{classify_claims, ClassifyInput, ClassifyOutput, ClaimGroup, ClaimInput, SmartClassifier};
+pub use confidence::{ClaimWithTiming, ConfidenceCalculator};
 pub use credibility::ActorCredibility;
-pub use types::{ClassificationResult, ConflictType};
+pub use temporal::{ClaimTiming, TemporalAnalyzer, TemporalConfig, TemporalPattern};
+pub use types::{ActorRanking, ClassificationResult, ConflictType};
