@@ -91,6 +91,7 @@ export type {
   CreateScheduledJobRequest,
   DaemonStatusMessage,
   ErrorResponse,
+  GlyphFiredMessage,
   JobChildrenResponse,
   JobStagesResponse,
   JobUpdateMessage,
