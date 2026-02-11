@@ -11,10 +11,10 @@ import { log, SEG } from '../../../logger';
 import { getMinimizeDuration } from '../glyph';
 import { createIxGlyph } from '../ix-glyph';
 import { createAxGlyph } from '../ax-glyph';
-import { createPyGlyph } from '../py-glyph';
-import { createPromptGlyph } from '../prompt-glyph';
+import { createPyGlyph, PY_DEFAULT_CODE } from '../py-glyph';
+import { createPromptGlyph, PROMPT_DEFAULT_TEMPLATE } from '../prompt-glyph';
 import { createNoteGlyph } from '../note-glyph';
-import { createTsGlyph } from '../ts-glyph';
+import { createTsGlyph, TS_DEFAULT_CODE } from '../ts-glyph';
 import { uiState } from '../../../state/ui';
 
 /** Duration multiplier for spawn menu animation */
@@ -366,7 +366,8 @@ async function spawnPyGlyph(
         x,
         y,
         width,
-        height
+        height,
+        content: PY_DEFAULT_CODE,
     });
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned Python glyph at (${x}, ${y}) with size ${width}x${height}`);
@@ -409,7 +410,8 @@ async function spawnTsGlyph(
         x,
         y,
         width,
-        height
+        height,
+        content: TS_DEFAULT_CODE,
     });
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned TypeScript glyph at (${x}, ${y}) with size ${width}x${height}`);
@@ -452,7 +454,8 @@ async function spawnPromptGlyph(
         x,
         y,
         width,
-        height
+        height,
+        content: PROMPT_DEFAULT_TEMPLATE,
     });
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned Prompt glyph at (${x}, ${y}) with size ${width}x${height}`);
