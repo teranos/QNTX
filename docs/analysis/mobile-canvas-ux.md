@@ -64,6 +64,24 @@ Drag, resize, rectangle select, spawn menu, meld — all use `mousedown`/`mousem
 
 All touch sizing is gated behind `@media (pointer: coarse)` — desktop unchanged. Inline `style.width`/`style.height` removed from window button creation in `window.ts` so CSS class rules (and the media query) control sizing.
 
+## Recent Fixes
+
+### Status Indicators (`status-indicators.ts`)
+- **Fixed**: Pulse daemon touch interactions disabled on mobile (`max-width: 768px`)
+- Prevents accidental daemon stops/starts when scrolling or browsing on mobile
+- Desktop click behavior unchanged
+
+### Command Palette (`symbol-palette.css`)
+- **Fixed**: Mobile command palette uses horizontal scroll instead of grid layout
+- Prevents balloon sizing and lost scroll on small screens
+- Cells are `flex: 0 0 auto` with `min-width/height: 48px` for touch targets
+- `-webkit-overflow-scrolling: touch` for smooth momentum scrolling
+
+### Layout (`core.css`)
+- **Fixed**: White left bar artifact removed on mobile
+- `#left-panel` set to `width: 0` with `overflow: visible` on mobile
+- `#container` changed to `display: block` for single-column mobile layout
+
 ## Remaining Work
 
 | Gap | Priority | Notes |
