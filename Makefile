@@ -112,7 +112,7 @@ test: ## Run all tests (Go + TypeScript)
 		echo "Installing web dependencies..."; \
 		cd web && bun install; \
 	fi
-	@cd web && bun test
+	@cd web && USE_JSDOM=1 bun test
 	@echo "✓ All tests complete"
 
 test-coverage: ## Run all tests (Go + TypeScript) with coverage
