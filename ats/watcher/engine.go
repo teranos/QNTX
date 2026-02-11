@@ -510,7 +510,7 @@ attestation = json.loads(_attestation_json)
 
 	// Call Python plugin
 	reqBody, err := json.Marshal(map[string]interface{}{
-		"code": injectedCode,
+		"content": injectedCode,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal request body")
@@ -596,11 +596,11 @@ func (e *Engine) executeGlyph(watcher *storage.Watcher, as *types.As) error {
 	return execErr
 }
 
-// executeGlyphPython runs a py glyph's code with the attestation injected as `upstream`.
+// executeGlyphPython runs a py glyph's content with the attestation injected as `upstream`.
 // Returns the JSON-encoded execution result on success.
-func (e *Engine) executeGlyphPython(glyphID string, code string, attestationJSON []byte) ([]byte, error) {
+func (e *Engine) executeGlyphPython(glyphID string, content string, attestationJSON []byte) ([]byte, error) {
 	reqBody, err := json.Marshal(map[string]interface{}{
-		"code":                  code,
+		"content":               content,
 		"glyph_id":              glyphID,
 		"upstream_attestation":  json.RawMessage(attestationJSON),
 	})
