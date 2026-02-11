@@ -451,7 +451,10 @@ mod wazero {
         fn classify_claims_invalid() {
             let result = classify_claims_impl("not json");
             let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
-            assert!(parsed["error"].as_str().unwrap().contains("invalid classify input"));
+            assert!(parsed["error"]
+                .as_str()
+                .unwrap()
+                .contains("invalid classify input"));
         }
     }
 } // end mod wazero

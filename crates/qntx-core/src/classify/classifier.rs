@@ -315,7 +315,13 @@ pub fn classify_claims(input: &str) -> String {
 mod tests {
     use super::*;
 
-    fn make_claim(subject: &str, predicate: &str, context: &str, actor: &str, ts: i64) -> ClaimInput {
+    fn make_claim(
+        subject: &str,
+        predicate: &str,
+        context: &str,
+        actor: &str,
+        ts: i64,
+    ) -> ClaimInput {
         ClaimInput {
             subject: subject.to_string(),
             predicate: predicate.to_string(),
@@ -333,8 +339,20 @@ mod tests {
             claim_groups: vec![ClaimGroup {
                 key: "ALICE|is_dev|GitHub|alice".to_string(),
                 claims: vec![
-                    make_claim("ALICE", "is_junior_dev", "GitHub", "human:alice", now - 200_000),
-                    make_claim("ALICE", "is_senior_dev", "GitHub", "human:alice", now - 1000),
+                    make_claim(
+                        "ALICE",
+                        "is_junior_dev",
+                        "GitHub",
+                        "human:alice",
+                        now - 200_000,
+                    ),
+                    make_claim(
+                        "ALICE",
+                        "is_senior_dev",
+                        "GitHub",
+                        "human:alice",
+                        now - 1000,
+                    ),
                 ],
             }],
             config: TemporalConfig::default(),
@@ -367,7 +385,10 @@ mod tests {
         let classifier = SmartClassifier::new(input.config.clone());
         let output = classifier.classify(&input);
 
-        assert_eq!(output.conflicts[0].conflict_type, ConflictType::Verification);
+        assert_eq!(
+            output.conflicts[0].conflict_type,
+            ConflictType::Verification
+        );
     }
 
     #[test]
@@ -401,8 +422,20 @@ mod tests {
             claim_groups: vec![ClaimGroup {
                 key: "ALICE|role|GitHub".to_string(),
                 claims: vec![
-                    make_claim("ALICE", "is_junior_dev", "GitHub", "llm:gpt-4", now - 10_000),
-                    make_claim("ALICE", "is_senior_dev", "GitHub", "human:alice", now - 5_000),
+                    make_claim(
+                        "ALICE",
+                        "is_junior_dev",
+                        "GitHub",
+                        "llm:gpt-4",
+                        now - 10_000,
+                    ),
+                    make_claim(
+                        "ALICE",
+                        "is_senior_dev",
+                        "GitHub",
+                        "human:alice",
+                        now - 5_000,
+                    ),
                 ],
             }],
             config: TemporalConfig::default(),
@@ -412,7 +445,10 @@ mod tests {
         let classifier = SmartClassifier::new(input.config.clone());
         let output = classifier.classify(&input);
 
-        assert_eq!(output.conflicts[0].conflict_type, ConflictType::Supersession);
+        assert_eq!(
+            output.conflicts[0].conflict_type,
+            ConflictType::Supersession
+        );
     }
 
     #[test]
@@ -465,6 +501,9 @@ mod tests {
     fn classify_claims_invalid_json() {
         let result = classify_claims("not json");
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
-        assert!(parsed["error"].as_str().unwrap().contains("invalid classify input"));
+        assert!(parsed["error"]
+            .as_str()
+            .unwrap()
+            .contains("invalid classify input"));
     }
 }
