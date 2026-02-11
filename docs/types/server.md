@@ -131,6 +131,7 @@ type GlyphFiredMessage struct {
 	AttestationID string `json:"attestation_id"`
 	Status string `json:"status"`
 	Error string `json:"error,omitempty"`
+	Result string `json:"result,omitempty"`
 	Timestamp int64 `json:"timestamp"`
 }
 ```
@@ -697,7 +698,7 @@ type WatcherCreateRequest struct {
 
 ## WatcherErrorMessage {#watchererrormessage}
 
-**Source**: [`server/types.go:246`](https://github.com/teranos/QNTX/blob/main/server/types.go#L246)
+**Source**: [`server/types.go:247`](https://github.com/teranos/QNTX/blob/main/server/types.go#L247)
 
 
 ```go

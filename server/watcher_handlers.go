@@ -415,7 +415,7 @@ func (s *QNTXServer) broadcastWatcherError(watcherID string, errorMsg string, se
 }
 
 // broadcastGlyphFired broadcasts a glyph execution event to all connected clients
-func (s *QNTXServer) broadcastGlyphFired(glyphID string, attestationID string, status string, execErr error) {
+func (s *QNTXServer) broadcastGlyphFired(glyphID string, attestationID string, status string, execErr error, result []byte) {
 	msg := GlyphFiredMessage{
 		Type:          "glyph_fired",
 		GlyphID:       glyphID,
@@ -425,6 +425,9 @@ func (s *QNTXServer) broadcastGlyphFired(glyphID string, attestationID string, s
 	}
 	if execErr != nil {
 		msg.Error = execErr.Error()
+	}
+	if len(result) > 0 {
+		msg.Result = string(result)
 	}
 
 	req := &broadcastRequest{
