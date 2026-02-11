@@ -19,77 +19,79 @@ Last night, while Jenny slept, two things happened:
 
 ### 08:29 — Morden station
 
-Jenny gets off her bike. She opens QNTX on her phone before boarding. Her local IndexedDB has only the AX glyph she left there yesterday. The backend has everything Parbattie documented overnight.
+Jenny gets off her bike. She opens QNTX on her phone before boarding. Her phone only has the AX glyph she left there yesterday. The server has everything Parbattie documented overnight.
 
-`mergeCanvasState` runs. Local wins on ID conflicts (Jenny's glyph positions preserved), backend-only items append. She sees her glyph plus Parbattie's two field note glyphs and their composition, all delivered in one merge. Two new glyphs, one composition. Jenny's screen now has the full picture.
+The phone and server merge their states. Jenny's glyph positions stay where she left them, and Parbattie's new work appears alongside. She sees her glyph plus Parbattie's two field note glyphs and their composition, all delivered in one merge. Two new glyphs, one composition. Jenny's screen now has the full picture.
 
 ### 08:31 — Board the train
 
-WiFi works at Morden. Jenny spots a novel gene cluster in the pipeline results, taps it, adds an annotation. The sync completes before the train moves. The glyph gets a subtle 110% saturation boost — *synced, safe*.
+WiFi works at Morden. Jenny spots a novel gene cluster in the pipeline results, taps it, adds an annotation. The upload completes before the train moves. The glyph brightens slightly — *saved*.
 
 ### 08:31–08:34 — Tunnel: Morden → South Wimbledon
 
-Connectivity drops. After 300ms debounce, the UI shifts to offline mode.
+Connectivity drops. After a brief delay, the UI shifts to offline mode.
 
-Jenny doesn't stop working. She identifies a candidate protein-coding gene and drags it onto the canvas. The glyph appears immediately but is marked `unsynced`. It goes ghostly — grayscale, border opacity 0.15. *This data exists only on your phone.*
+Jenny doesn't stop working. She identifies a candidate protein-coding gene and drags it onto the canvas. The glyph appears immediately but is marked as not yet saved. It goes ghostly — grayscale, faint border. *This data exists only on your phone.*
 
-Meanwhile, the cluster glyph she synced at Morden keeps its azure tint — saturate(65%), hue-rotate(10°), border opacity 0.35. *Synced and safe, just dormant while offline.*
+Meanwhile, the cluster glyph she saved at Morden keeps its azure tint — cooler color, visible but dormant. *Saved and safe, just dormant while offline.*
 
 Two visual states on the same screen, no labels needed. Ghostly = unreachable. Azure = safe.
 
 ### 08:34 — South Wimbledon
 
-Connectivity returns. Auto-sync fires in the background. The candidate gene transitions: ghostly → syncing → synced. The grayscale filter dissolves into a 110% saturation boost over 1.5 seconds. CSS transitions do the work.
+Connectivity returns. Automatic upload begins in the background. The candidate gene transitions: ghostly → saving → saved. The grayscale filter dissolves into a subtle brightening over about a second and a half. Smooth, automatic.
 
 ### 08:34–08:41 — Colliers Wood, Tooting Broadway, Tooting Bec, Balham
 
-The pattern repeats. Tunnel → station → tunnel → station. Each station is a sync window. Jenny adds a homolog relationship in a tunnel, it syncs at Colliers Wood. She reviews the growing network in the next tunnel (everything azure). By Balham, all three discovery glyphs — novel cluster, candidate gene, homolog — are synced.
+The pattern repeats. Tunnel → station → tunnel → station. Each station is an upload window. Jenny adds a homolog relationship in a tunnel, it saves at Colliers Wood. She reviews the growing network in the next tunnel (everything azure). By Balham, all three discovery glyphs — novel cluster, candidate gene, homolog — are saved automatically.
 
 ### 08:42–08:49 — Hypothesis formation
 
-Between Balham and Stockwell, Jenny forms a hypothesis about the candidate protein's function. She creates a hypothesis glyph in a tunnel (ghostly), syncs it at Clapham South. Refines it across three more tunnel-station cycles.
+Between Balham and Stockwell, Jenny forms a hypothesis about the candidate protein's function. She creates a hypothesis glyph in a tunnel (ghostly), saves it at Clapham South. Refines it across three more tunnel-station cycles.
 
-At 08:48, between Clapham North and Stockwell, she wants to cross-reference her hypothesis against existing attestations. She spawns an AX glyph and types a query. The AX glyph has locally-cached attestation data in IndexedDB — it works offline.
+At 08:48, between Clapham North and Stockwell, she wants to cross-reference her hypothesis against existing attestations. She spawns an AX glyph and types a query. The AX glyph works with data already stored on her phone — it works offline.
 
 Three distinct visual states on Jenny's screen:
 
 | State | Appearance | Meaning |
 |---|---|---|
 | **Orange** | Full opacity, warm tint | AX glyph — actively querying local data |
-| **Azure** | 65% saturation, 10° hue shift | Synced glyphs — safe, dormant |
-| **Ghostly** | Grayscale, border 0.15 | Unsynced — only on this device |
+| **Azure** | Cooler tint, softer | Saved glyphs — safe, dormant |
+| **Ghostly** | Grayscale, faint | Not yet saved — only on this device |
 
 Same connectivity, same moment, different visual treatments. The orange glyph is locally functional. The azure glyphs are safe. The ghostly ones need a station.
 
-### 08:51–08:54 — Sync failure and recovery
+### 08:51–08:54 — Upload failure and recovery
 
-At Oval, Jenny creates a validation note and sync begins. The tunnel to Kennington is long (3 minutes). Sync fails mid-transfer.
+At Oval, Jenny creates a validation note and the upload begins. The tunnel to Kennington is long (3 minutes). Upload fails mid-transfer.
 
-At Kennington, auto-retry fires. First retry fails (unstable connection). Exponential backoff. Second retry succeeds. The validation note transitions: `syncing → failed → syncing → failed → syncing → synced`. Seven state transitions, two failures, resilient recovery.
+At Kennington, automatic retry. First retry fails (unstable connection). Waits a bit longer. Second retry succeeds. The validation note transitions through multiple attempts: trying → failed → trying → failed → trying → saved. Seven state transitions, two failures, resilient recovery.
 
 ### 09:00–09:06 — City of London to arrival
 
-London Bridge, Bank Station, Moorgate. Each station confirms everything is synced. At 09:06, Jenny exits at Old Street. All six glyphs — novel cluster, candidate gene, homolog, hypothesis, AX query results, validation note — are synced.
+London Bridge, Bank Station, Moorgate. Each station confirms everything is saved. At 09:06, Jenny exits at Old Street. All six glyphs — novel cluster, candidate gene, homolog, hypothesis, AX query results, validation note — are saved.
 
 ### 09:10 — Desktop continuation
 
-Jenny sits down at her workstation. Same canvas URL. All mobile work is already there — no re-sync needed. She immediately begins deep analysis on a larger screen. The 35-minute commute produced a novel protein function hypothesis backed by local attestation cross-referencing, all built in tunnel segments averaging 2 minutes each.
+Jenny sits down at her workstation. Same canvas URL. All mobile work is already there — no re-upload needed. She immediately begins deep analysis on a larger screen. The 35-minute commute produced a novel protein function hypothesis backed by attestation cross-referencing, all built in tunnel segments averaging 2 minutes each.
 
 ---
 
 ## Visual State System
 
-The color system encodes connectivity × sync × capability without labels or icons.
+*Implementation note: Visual state is also influenced by work in [#466](https://github.com/teranos/QNTX/pull/466).*
 
-| Connectivity | Sync State | Local-Active? | Filter | Border | Name |
-|---|---|---|---|---|---|
-| Online | Synced | — | saturate(110%) | 1.0 | Enhanced color |
-| Online | Syncing/Unsynced/Failed | — | saturate(100%) | 1.0 | Normal |
-| Offline | Synced | No | saturate(65%) hue-rotate(10°) | 0.35 | Azure tint |
-| Offline | Unsynced/Failed | No | grayscale(100%) | 0.15 | Ghostly |
-| Offline | Any | Yes | none | 1.0 | Orange (local-active) |
+The color system shows what's safe and what needs saving, without labels or icons.
 
-CSS transitions animate between states over 1.5s. The researcher's mental model of data state is maintained without disrupting flow.
+| Connection | Status | Local-only work? | Appearance | Name |
+|---|---|---|---|---|
+| Online | Saved | — | Brightened | Enhanced |
+| Online | Saving/Not saved/Failed | — | Normal color | Normal |
+| Offline | Saved | No | Cooler tint, softer | Azure |
+| Offline | Not saved/Failed | No | Grayscale, faint | Ghostly |
+| Offline | Any | Yes | Full color, active | Orange |
+
+Transitions between states animate smoothly over about a second and a half. Your mental model of what's safe stays intact without disrupting your flow.
 
 ## Gestural Exploration
 
