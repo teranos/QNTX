@@ -298,7 +298,7 @@ func TestEngine_ExecutePython(t *testing.T) {
 
 		var req map[string]interface{}
 		json.NewDecoder(r.Body).Decode(&req)
-		receivedCode = req["code"].(string)
+		receivedCode = req["content"].(string)
 
 		w.WriteHeader(http.StatusOK)
 	}))
