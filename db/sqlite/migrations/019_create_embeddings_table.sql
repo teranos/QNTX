@@ -1,4 +1,8 @@
 -- Create embeddings table for semantic search using sqlite-vec
+-- TODO: This migration requires sqlite-vec extension to be available.
+-- The vec0 module must be loaded in SQLite for this to work.
+-- Currently fails with "no such module: vec0" when using standard go-sqlite3.
+-- See docs/embeddings_integration_status.md for integration details.
 CREATE TABLE IF NOT EXISTS embeddings (
     id TEXT PRIMARY KEY,
 
