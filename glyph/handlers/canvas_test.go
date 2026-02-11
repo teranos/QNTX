@@ -936,3 +936,23 @@ func TestCompileSubscriptions_BottomEdgesIgnored(t *testing.T) {
 		}
 	}
 }
+
+func TestGlyphSymbolToType(t *testing.T) {
+	tests := []struct {
+		symbol   string
+		expected string
+	}{
+		{"py", "py"},
+		{sym.AX, "ax"},     // ⋈ → ax
+		{sym.SO, "prompt"},  // ⟶ → prompt
+		{"note", "note"},    // Unknown passes through
+		{"result", "result"},
+	}
+
+	for _, tt := range tests {
+		got := glyphSymbolToType(tt.symbol)
+		if got != tt.expected {
+			t.Errorf("glyphSymbolToType(%q) = %q, want %q", tt.symbol, got, tt.expected)
+		}
+	}
+}
