@@ -18,7 +18,7 @@ import (
 type AxExecutor struct {
 	queryStore     ats.AttestationQueryStore
 	fuzzy          Matcher
-	classifier     *classification.SmartClassifier
+	classifier     Classifier
 	aliasResolver  *alias.Resolver
 	entityResolver ats.EntityResolver
 	queryExpander  ats.QueryExpander
@@ -62,7 +62,7 @@ func NewAxExecutorWithOptions(queryStore ats.AttestationQueryStore, aliasResolve
 	return &AxExecutor{
 		queryStore:     queryStore,
 		fuzzy:          opts.Matcher,
-		classifier:     classification.NewSmartClassifier(classification.DefaultTemporalConfig()),
+		classifier:     NewDefaultClassifier(classification.DefaultTemporalConfig()),
 		aliasResolver:  aliasResolver,
 		entityResolver: opts.EntityResolver,
 		queryExpander:  opts.QueryExpander,
@@ -72,7 +72,7 @@ func NewAxExecutorWithOptions(queryStore ats.AttestationQueryStore, aliasResolve
 
 // SetClassificationConfig replaces the classifier with one using the provided config
 func (ae *AxExecutor) SetClassificationConfig(config classification.TemporalConfig) {
-	ae.classifier = classification.NewSmartClassifier(config)
+	ae.classifier = NewDefaultClassifier(config)
 }
 
 // FuzzyBackend returns which fuzzy matching implementation is currently in use

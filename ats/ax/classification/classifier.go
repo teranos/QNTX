@@ -298,6 +298,11 @@ func (sc *SmartClassifier) getUniqueSourceAttestations(claims []ats.IndividualCl
 	return attestations
 }
 
+// Config returns the temporal configuration used by this classifier.
+func (sc *SmartClassifier) Config() TemporalConfig {
+	return sc.config
+}
+
 // SetCustomCredibility allows setting custom credibility for specific actors
 func (sc *SmartClassifier) SetCustomCredibility(actor string, credibility ActorCredibility) {
 	sc.credibilityManager.SetActorCredibility(actor, credibility)
