@@ -51,18 +51,21 @@ Drag, resize, rectangle select, spawn menu, meld — all use `mousedown`/`mousem
 
 ## Tap Target Inventory
 
-| Element | Size | Min Required | Status |
+| Element | Desktop | Touch (`pointer: coarse`) | Status |
 |---|---|---|---|
-| Glyph dot (tray, mobile) | 12×12px + 44px activation zone | 44×44px | **Fixed** — touch browse bypasses dot size |
-| Window minimize btn | 24×24px | 44×44px | Undersized |
-| Window close btn | 24×24px | 44×44px | Undersized |
-| Window title bar (drag) | 100%×36px | — | Works (touch handlers exist) |
-| Canvas minimize btn | 32×32px | 44×44px | Undersized |
+| Glyph dot (tray, mobile) | 8×8px + 44px activation zone | 12×12px + 44px zone | **Fixed** — touch browse bypasses dot size |
+| Window title bar | 32px tall | 44px tall | **Fixed** |
+| Window minimize btn | 24×24px | 44×44px, 20px font | **Fixed** |
+| Window close btn | 24×24px | 44×44px, 20px font | **Fixed** |
+| Canvas minimize btn | 32×32px | 48×48px, 20px font | **Fixed** |
+| Canvas action bar buttons | 22×22px | 40×40px, 16px font | **Fixed** |
+| Canvas spawn buttons | 40×40px | 48×48px, 22px font | **Fixed** |
+| Window title bar (drag) | 100%×32px | 100%×44px | Works (touch handlers exist) |
+
+All touch sizing is gated behind `@media (pointer: coarse)` — desktop unchanged. Inline `style.width`/`style.height` removed from window button creation in `window.ts` so CSS class rules (and the media query) control sizing.
 
 ## Remaining Work
 
 | Gap | Priority | Notes |
 |---|---|---|
 | Canvas pan/zoom for mobile viewer | **Critical** | Off-screen glyphs invisible on phone |
-| Window button tap targets | Medium | 24px minimize/close buttons |
-| Canvas minimize button | Medium | 32px, top-right corner |
