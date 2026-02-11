@@ -6,7 +6,7 @@ Mobile is not a compromise. It is a primary exploratory interface. Desktop adds 
 
 ## The Story
 
-*Encoded as a test*: [tube-journey.test.ts](../../web/ts/state/tube-journey.test.ts)
+*Encoded as a test in [tube-journey.test.ts](https://github.com/teranos/QNTX/blob/main/web/ts/state/tube-journey.test.ts)*
 
 ### Jenny's Commute
 
@@ -95,7 +95,7 @@ Transitions between states animate smoothly over about a second and a half. Your
 
 ## Gestural Exploration
 
-*Related concept: [tile-based-typed-ui.md](./tile-based-typed-ui.md)*
+*Related concept: [fractal-workspace.md](./fractal-workspace.md)*
 
 Three modes serve distinct cognitive tasks:
 
@@ -120,6 +120,6 @@ All under 2 minutes per tunnel segment. Gestural exploration enables hypothesis 
 
 ## Related
 
-- [Tube Journey Test](../../web/ts/state/tube-journey.test.ts) — the full scenario as passing tests
-- [Tile-Based Typed UI](./tile-based-typed-ui.md) — pane-based computing
+- [Tube Journey Test](https://github.com/teranos/QNTX/blob/main/web/ts/state/tube-journey.test.ts) — the full scenario as passing tests
+- [Fractal Workspace](./fractal-workspace.md) — pane-based computing
 - [Mobile Canvas UX Analysis](../analysis/mobile-canvas-ux.md) — implementation status and gap tracking
