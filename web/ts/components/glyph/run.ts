@@ -223,7 +223,7 @@ class GlyphRunImpl {
             this.updateProximity();
         }, { passive: false });
 
-        document.addEventListener('touchend', (e) => {
+        document.addEventListener('touchend', () => {
             if (!this.proximity.isTouchBrowsing) return;
 
             this.proximity.isTouchBrowsing = false;
@@ -239,7 +239,7 @@ class GlyphRunImpl {
                 // Suppress the synthetic click that fires ~300ms after touchend
                 suppressNextClick = true;
 
-                log.debug(SEG.GLYPH, `[GlyphRun] Touch browse selected ${peaked.id}`);
+                log.debug(SEG.GLYPH, `[GlyphRun] Touch browse selected ${peaked.item.id}`);
                 this.morphGlyph(peaked.element, peaked.item);
             } else {
                 log.debug(SEG.GLYPH, '[GlyphRun] Touch browse ended with no selection');
