@@ -220,6 +220,8 @@ const MESSAGE_HANDLERS = {
                     } catch (e) {
                         log.error(SEG.WS, 'Failed to parse glyph_fired result:', e);
                     }
+                } else {
+                    log.debug(SEG.WS, `Result glyph for ${data.glyph_id} gone — closed before update arrived`);
                 }
             } else if (data.status === 'error' && data.error) {
                 // Error without result payload — surface error text in existing result glyph
@@ -231,6 +233,8 @@ const MESSAGE_HANDLERS = {
                     };
                     updateResultGlyphContent(resultEl, errorResult);
                     log.debug(SEG.WS, 'Updated result glyph with error for', data.glyph_id);
+                } else {
+                    log.debug(SEG.WS, `Result glyph for ${data.glyph_id} gone — closed before error arrived`);
                 }
             }
         } else {
