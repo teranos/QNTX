@@ -9,6 +9,7 @@ export const AS = "+";
 export const AT = "✦";
 export const AX = "⋈";
 export const BY = "⌬";
+export const Canvas = "⧉";
 export const DB = "⊔";
 export const I = "⍟";
 export const IS = "=";

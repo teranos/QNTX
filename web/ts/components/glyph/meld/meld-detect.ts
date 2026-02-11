@@ -64,6 +64,19 @@ function checkDirectionalProximity(
         return targetRect.left - initiatorRect.right;
     }
 
+    if (direction === 'left') {
+        // Vertical alignment check (same as 'right')
+        const verticalOverlap = Math.min(initiatorRect.bottom, targetRect.bottom) -
+                              Math.max(initiatorRect.top, targetRect.top);
+        const minHeight = Math.min(initiatorRect.height, targetRect.height);
+        if (minHeight > 0 && verticalOverlap < minHeight * MIN_ALIGNMENT) return Infinity;
+
+        // Initiator must be right of target (flow goes left)
+        if (initiatorRect.left < targetRect.right) return Infinity;
+
+        return initiatorRect.left - targetRect.right;
+    }
+
     if (direction === 'bottom') {
         // Horizontal alignment check
         const horizontalOverlap = Math.min(initiatorRect.right, targetRect.right) -
