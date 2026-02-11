@@ -57,6 +57,8 @@ function loadPromptStatus(glyphId: string): PromptGlyphStatus | null {
 }
 
 
+export const PROMPT_DEFAULT_TEMPLATE = '---\nmodel: "anthropic/claude-haiku-4.5"\ntemperature: 0.7\nmax_tokens: 1000\n---\nWrite a haiku about quantum computing.\n';
+
 /**
  * Create a prompt glyph with template editor on canvas
  */
@@ -74,8 +76,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
 export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Promise<void> {
     // Load saved template from canvas state
     const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
-    const defaultTemplate = '---\nmodel: "anthropic/claude-haiku-4.5"\ntemperature: 0.7\nmax_tokens: 1000\n---\nWrite a haiku about quantum computing.\n';
-    const savedTemplate = existingGlyph?.content ?? defaultTemplate;
+    const savedTemplate = existingGlyph?.content ?? PROMPT_DEFAULT_TEMPLATE;
 
     // Load saved status
     const savedStatus = loadPromptStatus(glyph.id) ?? { state: 'idle' };
@@ -290,7 +291,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     if (!existingGlyph?.content) {
         const canvasGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
         if (canvasGlyph) {
-            uiState.addCanvasGlyph({ ...canvasGlyph, content: defaultTemplate });
+            uiState.addCanvasGlyph({ ...canvasGlyph, content: PROMPT_DEFAULT_TEMPLATE });
         }
     }
 
