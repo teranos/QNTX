@@ -109,7 +109,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    code: currentCode,
+                    content: currentCode,
                     capture_variables: false,
                     glyph_id: glyph.id,
                 })

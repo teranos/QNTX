@@ -1,8 +1,8 @@
 /**
- * Result Glyph - Python execution output display
+ * Result Glyph - Execution output display
  *
- * Displays stdout, stderr, and execution results from Python code.
- * Appears below py glyphs as execution history.
+ * Displays stdout, stderr, and execution results from glyph execution.
+ * Appears below executable glyphs as output.
  */
 
 import type { Glyph } from './glyph';
@@ -13,7 +13,7 @@ import { unmeldComposition } from './meld/meld-composition';
 import { makeDraggable } from './glyph-interaction';
 
 /**
- * Python execution result data
+ * Glyph execution result data
  */
 export interface ExecutionResult {
     success: boolean;
@@ -25,7 +25,7 @@ export interface ExecutionResult {
 }
 
 /**
- * Create a result glyph showing Python execution output
+ * Create a result glyph showing execution output
  */
 export function createResultGlyph(
     glyph: Glyph,
