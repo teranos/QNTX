@@ -13,6 +13,21 @@ describe('Status Indicators DOM Lifecycle', () => {
         document.body.innerHTML = '';
         // Reset singleton state if needed
         jest.clearAllMocks();
+
+        // Mock matchMedia to simulate desktop (non-mobile) mode
+        Object.defineProperty(window, 'matchMedia', {
+            writable: true,
+            value: jest.fn().mockImplementation(query => ({
+                matches: false, // Always return false (desktop mode)
+                media: query,
+                onchange: null,
+                addListener: jest.fn(),
+                removeListener: jest.fn(),
+                addEventListener: jest.fn(),
+                removeEventListener: jest.fn(),
+                dispatchEvent: jest.fn(),
+            })),
+        });
     });
 
     test('Status indicators create and manage DOM elements correctly', () => {
