@@ -30,6 +30,7 @@ type GlyphFired struct {
 	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`                                    // "started", "success", "error"
 	Error         string                 `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`                                      // Error message when status is "error"
 	Timestamp     int64                  `protobuf:"varint,5,opt,name=timestamp,proto3" json:"timestamp,omitempty"`                             // Unix timestamp
+	Result        string                 `protobuf:"bytes,6,opt,name=result,proto3" json:"result,omitempty"`                                    // JSON-encoded execution result (on success or error with output)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -99,18 +100,26 @@ func (x *GlyphFired) GetTimestamp() int64 {
 	return 0
 }
 
+func (x *GlyphFired) GetResult() string {
+	if x != nil {
+		return x.Result
+	}
+	return ""
+}
+
 var File_glyph_proto_events_proto protoreflect.FileDescriptor
 
 const file_glyph_proto_events_proto_rawDesc = "" +
 	"\n" +
-	"\x18glyph/proto/events.proto\x12\x05glyph\"\x9a\x01\n" +
+	"\x18glyph/proto/events.proto\x12\x05glyph\"\xb2\x01\n" +
 	"\n" +
 	"GlyphFired\x12\x19\n" +
 	"\bglyph_id\x18\x01 \x01(\tR\aglyphId\x12%\n" +
 	"\x0eattestation_id\x18\x02 \x01(\tR\rattestationId\x12\x16\n" +
 	"\x06status\x18\x03 \x01(\tR\x06status\x12\x14\n" +
 	"\x05error\x18\x04 \x01(\tR\x05error\x12\x1c\n" +
-	"\ttimestamp\x18\x05 \x01(\x03R\ttimestampB%Z#github.com/teranos/QNTX/glyph/protob\x06proto3"
+	"\ttimestamp\x18\x05 \x01(\x03R\ttimestamp\x12\x16\n" +
+	"\x06result\x18\x06 \x01(\tR\x06resultB%Z#github.com/teranos/QNTX/glyph/protob\x06proto3"
 
 var (
 	file_glyph_proto_events_proto_rawDescOnce sync.Once

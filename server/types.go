@@ -238,6 +238,7 @@ type GlyphFiredMessage struct {
 	AttestationID string `json:"attestation_id"`             // Triggering attestation ASID
 	Status        string `json:"status"`                     // "started", "success", "error"
 	Error         string `json:"error,omitempty"`            // Error message when status is "error"
+	Result        string `json:"result,omitempty"`           // JSON-encoded execution result
 	Timestamp     int64  `json:"timestamp"`                  // Unix timestamp
 }
 

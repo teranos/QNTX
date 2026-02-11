@@ -23,4 +23,6 @@ export interface GlyphFired {
   error: string;
   /** Unix timestamp */
   timestamp: number;
+  /** JSON-encoded execution result (on success or error with output) */
+  result: string;
 }
