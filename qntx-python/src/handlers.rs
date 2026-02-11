@@ -49,7 +49,7 @@ impl HandlerContext {
     pub async fn handle_execute(&self, body: serde_json::Value) -> Result<HttpResponse, Status> {
         #[derive(Deserialize)]
         struct ExecuteRequest {
-            code: String,
+            content: String,
             #[serde(default)]
             timeout_secs: Option<u64>,
             #[serde(default)]
@@ -67,8 +67,8 @@ impl HandlerContext {
         let req: ExecuteRequest = serde_json::from_value(body)
             .map_err(|e| Status::invalid_argument(format!("Invalid request: {}", e)))?;
 
-        if req.code.is_empty() {
-            return Err(Status::invalid_argument("Missing 'code' field"));
+        if req.content.is_empty() {
+            return Err(Status::invalid_argument("Missing 'content' field"));
         }
 
         let config = ExecutionConfig {
@@ -86,7 +86,7 @@ impl HandlerContext {
         let result = {
             let state = self.state.read();
             state.engine.execute_with_ats(
-                &req.code,
+                &req.content,
                 &config,
                 Some(state.ats_client.clone()),
                 req.upstream_attestation.as_ref(),

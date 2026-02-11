@@ -41,19 +41,29 @@ mock.module('../../connectivity', () => ({
     },
 }));
 
-// Mock uiState — ax-glyph reads/writes query via content field
+// Mock uiState — mock.module is process-global so every mock must be superset-complete
 const mockCanvasGlyphs: any[] = [];
+const mockCanvasCompositions: any[] = [];
 mock.module('../../state/ui', () => ({
     uiState: {
         getCanvasGlyphs: () => mockCanvasGlyphs,
+        setCanvasGlyphs: (glyphs: any[]) => { mockCanvasGlyphs.length = 0; mockCanvasGlyphs.push(...glyphs); },
+        upsertCanvasGlyph: (glyph: any) => {
+            const index = mockCanvasGlyphs.findIndex(g => g.id === glyph.id);
+            if (index >= 0) { mockCanvasGlyphs[index] = glyph; } else { mockCanvasGlyphs.push(glyph); }
+        },
         addCanvasGlyph: (glyph: any) => {
             const index = mockCanvasGlyphs.findIndex(g => g.id === glyph.id);
-            if (index >= 0) {
-                mockCanvasGlyphs[index] = glyph;
-            } else {
-                mockCanvasGlyphs.push(glyph);
-            }
+            if (index >= 0) { mockCanvasGlyphs[index] = glyph; } else { mockCanvasGlyphs.push(glyph); }
         },
+        removeCanvasGlyph: (id: string) => {
+            const index = mockCanvasGlyphs.findIndex(g => g.id === id);
+            if (index >= 0) mockCanvasGlyphs.splice(index, 1);
+        },
+        getCanvasCompositions: () => mockCanvasCompositions,
+        setCanvasCompositions: (comps: any[]) => { mockCanvasCompositions.length = 0; mockCanvasCompositions.push(...comps); },
+        clearCanvasGlyphs: () => mockCanvasGlyphs.length = 0,
+        clearCanvasCompositions: () => mockCanvasCompositions.length = 0,
         loadPersistedState: () => {},
     },
 }));
@@ -61,6 +71,8 @@ mock.module('../../state/ui', () => ({
 mock.module('../../state/sync-state', () => ({
     syncStateManager: {
         subscribe() { return () => {}; },
+        setState() {},
+        clearState() {},
     },
 }));
 

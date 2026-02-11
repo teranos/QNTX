@@ -24,10 +24,21 @@ import { handlePluginHealth } from './websocket-handlers/plugin-health';
 import { handleSystemCapabilities } from './websocket-handlers/system-capabilities';
 import { log, SEG } from './logger';
 import { connectivityManager } from './connectivity';
+import { updateResultGlyphContent, type ExecutionResult } from './components/glyph/result-glyph';
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let messageHandlers: MessageHandlers = {};
+
+/**
+ * Find a result glyph melded below a parent glyph element.
+ * Looks inside the parent's melded composition for a result glyph sibling.
+ */
+function findResultGlyphBelow(parentElement: HTMLElement): HTMLElement | null {
+    const composition = parentElement.closest('.melded-composition');
+    if (!composition) return null;
+    return composition.querySelector('[data-glyph-symbol="result"]') as HTMLElement | null;
+}
 
 /**
  * Built-in message handlers for WebSocket messages
@@ -196,6 +207,35 @@ const MESSAGE_HANDLERS = {
                         delete el.dataset.executionState;
                     }
                 }, 3000);
+            }
+
+            // Update existing result glyph melded below (if one exists)
+            if (data.result && (data.status === 'success' || data.status === 'error')) {
+                const resultEl = findResultGlyphBelow(el);
+                if (resultEl) {
+                    try {
+                        const result = JSON.parse(data.result) as ExecutionResult;
+                        updateResultGlyphContent(resultEl, result);
+                        log.debug(SEG.WS, 'Updated result glyph for', data.glyph_id);
+                    } catch (e) {
+                        log.error(SEG.WS, 'Failed to parse glyph_fired result:', e);
+                    }
+                } else {
+                    log.debug(SEG.WS, `Result glyph for ${data.glyph_id} gone — closed before update arrived`);
+                }
+            } else if (data.status === 'error' && data.error) {
+                // Error without result payload — surface error text in existing result glyph
+                const resultEl = findResultGlyphBelow(el);
+                if (resultEl) {
+                    const errorResult: ExecutionResult = {
+                        success: false, stdout: '', stderr: '',
+                        result: null, error: data.error, duration_ms: 0,
+                    };
+                    updateResultGlyphContent(resultEl, errorResult);
+                    log.debug(SEG.WS, 'Updated result glyph with error for', data.glyph_id);
+                } else {
+                    log.debug(SEG.WS, `Result glyph for ${data.glyph_id} gone — closed before error arrived`);
+                }
             }
         } else {
             log.warn(SEG.WS, 'Glyph fired: no DOM element found for', data.glyph_id);

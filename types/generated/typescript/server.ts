@@ -155,6 +155,10 @@ export interface GlyphFiredMessage {
    */
   error?: string;
   /**
+   * JSON-encoded execution result
+   */
+  result?: string;
+  /**
    * Unix timestamp
    */
   timestamp: number;

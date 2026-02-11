@@ -12,4 +12,5 @@ message GlyphFired {
   string status = 3;                  // "started", "success", "error"
   string error = 4;                   // Error message when status is "error"
   int64 timestamp = 5;                // Unix timestamp
+  string result = 6;                  // JSON-encoded execution result (on success or error with output)
 }

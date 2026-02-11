@@ -519,14 +519,14 @@ impl PythonPluginService {
         // Parse payload as JSON containing script_code
         #[derive(serde::Deserialize)]
         struct PythonScriptPayload {
-            script_code: String,
+            content: String,
         }
 
         let payload: PythonScriptPayload = serde_json::from_slice(&req.payload)
             .map_err(|e| Status::invalid_argument(format!("Invalid payload JSON: {}", e)))?;
 
-        if payload.script_code.is_empty() {
-            return Err(Status::invalid_argument("Missing script_code in payload"));
+        if payload.content.is_empty() {
+            return Err(Status::invalid_argument("Missing content in payload"));
         }
 
         // Execute the Python script
@@ -544,7 +544,7 @@ impl PythonPluginService {
         let result = {
             let state = self.handlers.state.read();
             state.engine.execute_with_ats(
-                &payload.script_code,
+                &payload.content,
                 &config,
                 Some(state.ats_client.clone()),
                 None,
@@ -694,7 +694,7 @@ mod tests {
         let service = PythonPluginService::new().unwrap();
 
         let body = serde_json::json!({
-            "code": "print('Hello from test')",
+            "content": "print('Hello from test')",
             "timeout_secs": 5
         });
 
@@ -721,7 +721,7 @@ mod tests {
         // It will error when called since ATSStore is not initialized,
         // but it should be defined and callable.
         let body = serde_json::json!({
-            "code": "result = callable(attest)\nprint('attest is callable:', result)",
+            "content": "result = callable(attest)\nprint('attest is callable:', result)",
             "timeout_secs": 5
         });
 
@@ -749,7 +749,7 @@ mod tests {
 
         // When ATSStore is not initialized, calling attest should fail gracefully
         let body = serde_json::json!({
-            "code": r#"
+            "content": r#"
 try:
     attest(['subject'], ['predicate'], ['context'])
     print('ERROR: should have raised')
