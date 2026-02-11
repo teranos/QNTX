@@ -132,11 +132,14 @@ class StatusIndicatorManager {
      * Add Pulse daemon indicator
      */
     private addPulseIndicator(): void {
+        // Disable touch interactions on mobile (max-width: 768px)
+        const isMobile = window.matchMedia('(max-width: 768px)').matches;
+
         this.addIndicator({
             id: 'pulse',
             label: 'Pulse: OFF',
-            clickable: true,
-            onClick: () => this.togglePulseDaemon(),
+            clickable: !isMobile,
+            onClick: isMobile ? undefined : () => this.togglePulseDaemon(),
             initialState: 'inactive'
         });
     }
