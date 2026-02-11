@@ -279,6 +279,29 @@ pub fn fuzzy_status() -> String {
 }
 
 // ============================================================================
+// Classification
+// ============================================================================
+
+/// Classify claim conflicts. Takes JSON input with claim groups, temporal config,
+/// and current time. Returns JSON with classified conflicts, resolution strategies,
+/// and actor rankings.
+///
+/// Input:
+/// ```json
+/// {
+///   "claim_groups": [{"key": "...", "claims": [...]}],
+///   "config": {"verification_window_ms": 60000, ...},
+///   "now_ms": 1234567890
+/// }
+/// ```
+///
+/// Returns JSON with conflicts, auto_resolved count, review_required count.
+#[wasm_bindgen]
+pub fn classify_claims(input: &str) -> String {
+    qntx_core::classify_claims(input)
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 
