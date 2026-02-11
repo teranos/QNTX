@@ -141,16 +141,21 @@ impl PythonEngine {
                     let json_module = py
                         .import("json")
                         .map_err(|e| Error::context("failed to import json module", e))?;
-                    let json_str = serde_json::to_string(attestation)
-                        .map_err(|e| Error::context("failed to serialize upstream attestation", e))?;
+                    let json_str = serde_json::to_string(attestation).map_err(|e| {
+                        Error::context("failed to serialize upstream attestation", e)
+                    })?;
                     let upstream = json_module
                         .call_method1("loads", (json_str,))
-                        .map_err(|e| Error::context("failed to parse upstream attestation as Python dict", e))?;
-                    globals.set_item("upstream", upstream)
+                        .map_err(|e| {
+                            Error::context("failed to parse upstream attestation as Python dict", e)
+                        })?;
+                    globals
+                        .set_item("upstream", upstream)
                         .map_err(|e| Error::context("failed to set upstream global", e))?;
                 }
                 None => {
-                    globals.set_item("upstream", py.None())
+                    globals
+                        .set_item("upstream", py.None())
                         .map_err(|e| Error::context("failed to set upstream = None", e))?;
                 }
             }
