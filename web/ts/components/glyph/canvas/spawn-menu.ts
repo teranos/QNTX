@@ -498,7 +498,8 @@ async function spawnNoteGlyph(
         x,
         y,
         width,
-        height
+        height,
+        content: 'Write here — select and click ⟶ to convert to a prompt glyph.',
     });
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned Note glyph at (${x}, ${y}) with size ${width}x${height}`);
