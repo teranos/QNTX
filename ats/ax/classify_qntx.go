@@ -12,20 +12,23 @@ import (
 	"github.com/teranos/QNTX/ats/wasm"
 )
 
-// NewDefaultClassifier creates the best available classifier.
-// With qntxwasm: tries WASM first, falls back to Go.
+// NewDefaultClassifier creates the WASM-backed classifier.
+// Panics if the WASM engine is unavailable — run `make rust-wasm` to build.
+//
+// TODO(QNTX): Remove ats/ax/classification/ (Go classifier) in a follow-up PR.
 func NewDefaultClassifier(config classification.TemporalConfig) Classifier {
-	if c, err := NewWasmClassifier(config); err == nil {
-		return c
+	c, err := NewWasmClassifier(config)
+	if err != nil {
+		panic("WASM classifier unavailable: " + err.Error() + " — run `make rust-wasm`")
 	}
-	return NewGoClassifier(config)
+	return c
 }
 
 // WasmClassifier delegates classification to the Rust engine via WASM (wazero).
 // Credibility methods stay in Go since they're used for post-classification
 // resolution application and are just pattern matching.
 type WasmClassifier struct {
-	goFallback *GoClassifier // For credibility methods
+	goFallback *GoClassifier // credibility methods + config access (no classification fallback)
 }
 
 // NewWasmClassifier creates a WASM-backed classifier.
@@ -43,18 +46,18 @@ func NewWasmClassifier(config classification.TemporalConfig) (*WasmClassifier, e
 func (w *WasmClassifier) ClassifyConflicts(claimGroups map[string][]ats.IndividualClaim) classification.ClassificationResult {
 	engine, err := wasm.GetEngine()
 	if err != nil {
-		return w.goFallback.ClassifyConflicts(claimGroups)
+		// WASM engine was available at construction time but is gone now.
+		// This should not happen — crash loud so we notice.
+		panic("WASM engine unavailable after successful init: " + err.Error())
 	}
 
-	// Convert Go claim groups to WASM input
 	input := w.buildWasmInput(claimGroups)
 
 	output, err := engine.ClassifyClaims(input)
 	if err != nil {
-		return w.goFallback.ClassifyConflicts(claimGroups)
+		panic("WASM classify_claims failed: " + err.Error())
 	}
 
-	// Convert WASM output back to Go classification types
 	return w.convertOutput(output, claimGroups)
 }
 
@@ -75,7 +78,7 @@ func (w *WasmClassifier) Backend() ClassifierBackend {
 
 // buildWasmInput converts Go claim groups to the WASM classify_claims input format.
 func (w *WasmClassifier) buildWasmInput(claimGroups map[string][]ats.IndividualClaim) wasm.ClassifyInput {
-	var groups []wasm.ClassifyClaimGroup
+	groups := make([]wasm.ClassifyClaimGroup, 0, len(claimGroups))
 
 	for key, claims := range claimGroups {
 		wasmClaims := make([]wasm.ClassifyClaimInput, len(claims))
