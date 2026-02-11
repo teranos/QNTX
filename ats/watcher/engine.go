@@ -36,6 +36,10 @@ type Engine struct {
 	// Called when an attestation matches a watcher's filter
 	broadcastMatch func(watcherID string, attestation *types.As)
 
+	// Broadcast callback for glyph execution events (optional)
+	// Called when a glyph_execute action fires, with status updates
+	broadcastGlyphFired func(glyphID string, attestationID string, status string, err error)
+
 	// In-memory state
 	mu           sync.RWMutex
 	watchers     map[string]*storage.Watcher
@@ -119,6 +123,11 @@ func (e *Engine) loadWatchers() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	// Clear stale in-memory state — watchers deleted from DB must not keep firing
+	e.watchers = make(map[string]*storage.Watcher, len(watchers))
+	e.rateLimiters = make(map[string]*rate.Limiter, len(watchers))
+	e.parseErrors = make(map[string]error)
+
 	for _, w := range watchers {
 		// If watcher has an AX query string, parse it into the Filter
 		if w.AxQuery != "" {
@@ -144,6 +153,11 @@ func (e *Engine) loadWatchers() error {
 			delete(e.parseErrors, w.ID)
 		}
 
+		// Apply edge cursor for meld-edge watchers: skip attestations already processed
+		if w.ActionType == storage.ActionTypeGlyphExecute {
+			e.applyEdgeCursor(w)
+		}
+
 		e.watchers[w.ID] = w
 		// Create rate limiter: MaxFiresPerMinute/60 = fires per second
 		// If MaxFiresPerMinute is 0, rate is 0/60 = 0, which means no fires allowed (QNTX LAW: zero means zero)
@@ -161,6 +175,11 @@ func (e *Engine) ReloadWatchers() error {
 // SetBroadcastCallback sets the callback function for broadcasting watcher matches
 func (e *Engine) SetBroadcastCallback(callback func(watcherID string, attestation *types.As)) {
 	e.broadcastMatch = callback
+}
+
+// SetGlyphFiredCallback sets the callback for glyph execution notifications
+func (e *Engine) SetGlyphFiredCallback(callback func(glyphID string, attestationID string, status string, err error)) {
+	e.broadcastGlyphFired = callback
 }
 
 // GetWatcher returns a watcher from the in-memory map if it exists
@@ -308,14 +327,14 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 		// Check rate limit for action execution
 		// Per QNTX LAW: "Zero means zero" - if MaxFiresPerMinute is 0, never execute
 		if watcher.MaxFiresPerMinute == 0 {
-			e.logger.Debugw("Watcher has MaxFiresPerMinute=0, not executing",
+			e.logger.Infow("Watcher has MaxFiresPerMinute=0, not executing",
 				"watcher_id", watcher.ID,
 				"attestation_id", as.ID)
 			continue
 		}
 		limiter := e.rateLimiters[watcher.ID]
 		if limiter != nil && !limiter.Allow() {
-			e.logger.Debugw("Watcher rate limited",
+			e.logger.Infow("Watcher rate limited",
 				"watcher_id", watcher.ID,
 				"attestation_id", as.ID)
 			continue
@@ -381,6 +400,11 @@ func hasOverlap(a, b []string) bool {
 
 // executeAction executes a watcher's action with the triggering attestation
 func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
+	e.logger.Infow("Executing watcher action",
+		"watcher_id", watcher.ID,
+		"action_type", watcher.ActionType,
+		"attestation_id", as.ID)
+
 	var err error
 
 	switch watcher.ActionType {
@@ -388,6 +412,8 @@ func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 		err = e.executePython(watcher, as)
 	case storage.ActionTypeWebhook:
 		err = e.executeWebhook(watcher, as)
+	case storage.ActionTypeGlyphExecute:
+		err = e.executeGlyph(watcher, as)
 	default:
 		err = errors.Newf("unknown action type: %s", watcher.ActionType)
 	}
@@ -410,6 +436,57 @@ func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 
 		// Record success
 		e.store.RecordFire(e.ctx, watcher.ID)
+
+		// Update edge cursor for meld-edge watchers to prevent reprocessing on restart
+		if watcher.ActionType == storage.ActionTypeGlyphExecute {
+			e.updateEdgeCursor(watcher, as)
+		}
+	}
+}
+
+// applyEdgeCursor sets TimeStart on a meld-edge watcher's filter based on the stored cursor.
+// This prevents reprocessing attestations that were already handled before a server restart.
+func (e *Engine) applyEdgeCursor(w *storage.Watcher) {
+	var action GlyphExecuteAction
+	if err := json.Unmarshal([]byte(w.ActionData), &action); err != nil || action.CompositionID == "" {
+		return
+	}
+
+	var lastProcessedAt time.Time
+	err := e.db.QueryRowContext(e.ctx,
+		"SELECT last_processed_at FROM composition_edge_cursors WHERE composition_id = ? AND from_glyph_id = ? AND to_glyph_id = ?",
+		action.CompositionID, action.SourceGlyphID, action.TargetGlyphID,
+	).Scan(&lastProcessedAt)
+	if err != nil {
+		return // No cursor yet — first run, process everything
+	}
+
+	// Set TimeStart to cursor timestamp so matchesFilter skips already-processed attestations
+	w.Filter.TimeStart = &lastProcessedAt
+}
+
+// updateEdgeCursor records the last processed attestation for a meld-edge watcher.
+// On server restart, loadWatchers applies the cursor as TimeStart to avoid reprocessing.
+func (e *Engine) updateEdgeCursor(watcher *storage.Watcher, as *types.As) {
+	var action GlyphExecuteAction
+	if err := json.Unmarshal([]byte(watcher.ActionData), &action); err != nil {
+		return
+	}
+	if action.CompositionID == "" {
+		return
+	}
+
+	_, err := e.db.ExecContext(e.ctx, `
+		INSERT INTO composition_edge_cursors (composition_id, from_glyph_id, to_glyph_id, last_processed_id, last_processed_at)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT (composition_id, from_glyph_id, to_glyph_id)
+		DO UPDATE SET last_processed_id = excluded.last_processed_id, last_processed_at = excluded.last_processed_at`,
+		action.CompositionID, action.SourceGlyphID, action.TargetGlyphID, as.ID, as.Timestamp)
+	if err != nil {
+		e.logger.Warnw("Failed to update edge cursor",
+			"watcher_id", watcher.ID,
+			"attestation_id", as.ID,
+			"error", err)
 	}
 }
 
@@ -455,6 +532,128 @@ attestation = json.loads(_attestation_json)
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return errors.Newf("Python execution failed (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// GlyphExecuteAction is the JSON structure stored in ActionData for glyph_execute watchers
+type GlyphExecuteAction struct {
+	TargetGlyphID   string `json:"target_glyph_id"`
+	TargetGlyphType string `json:"target_glyph_type"`
+	CompositionID   string `json:"composition_id"`
+	SourceGlyphID   string `json:"source_glyph_id"`
+}
+
+// executeGlyph executes a canvas glyph with the triggering attestation
+func (e *Engine) executeGlyph(watcher *storage.Watcher, as *types.As) error {
+	var action GlyphExecuteAction
+	if err := json.Unmarshal([]byte(watcher.ActionData), &action); err != nil {
+		return errors.Wrapf(err, "failed to parse glyph_execute action data for watcher %s", watcher.ID)
+	}
+
+	// Broadcast started
+	if e.broadcastGlyphFired != nil {
+		e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "started", nil)
+	}
+
+	// Fetch glyph's current content from canvas_glyphs
+	var content sql.NullString
+	err := e.db.QueryRowContext(e.ctx,
+		"SELECT content FROM canvas_glyphs WHERE id = ?", action.TargetGlyphID,
+	).Scan(&content)
+	if err != nil {
+		if e.broadcastGlyphFired != nil {
+			e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "error", err)
+		}
+		return errors.Wrapf(err, "failed to fetch glyph %s content", action.TargetGlyphID)
+	}
+
+	attestationJSON, err := json.Marshal(as)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal attestation")
+	}
+
+	var execErr error
+	switch action.TargetGlyphType {
+	case "py":
+		execErr = e.executeGlyphPython(action.TargetGlyphID, content.String, attestationJSON)
+	case "prompt":
+		execErr = e.executeGlyphPrompt(action.TargetGlyphID, content.String, attestationJSON)
+	default:
+		execErr = errors.Newf("unsupported glyph type for execution: %s (glyph %s)", action.TargetGlyphType, action.TargetGlyphID)
+	}
+
+	if e.broadcastGlyphFired != nil {
+		if execErr != nil {
+			e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "error", execErr)
+		} else {
+			e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "success", nil)
+		}
+	}
+
+	return execErr
+}
+
+// executeGlyphPython runs a py glyph's code with the attestation injected as `upstream`
+func (e *Engine) executeGlyphPython(glyphID string, code string, attestationJSON []byte) error {
+	reqBody, err := json.Marshal(map[string]interface{}{
+		"code":                  code,
+		"glyph_id":              glyphID,
+		"upstream_attestation":  json.RawMessage(attestationJSON),
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal request body")
+	}
+
+	url := e.apiBaseURL + "/api/python/execute"
+	req, err := http.NewRequestWithContext(e.ctx, "POST", url, bytes.NewReader(reqBody))
+	if err != nil {
+		return errors.Wrap(err, "failed to create request")
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := e.httpClient.Do(req)
+	if err != nil {
+		return errors.Wrapf(err, "failed to execute py glyph %s", glyphID)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return errors.Newf("py glyph %s execution failed (status %d): %s", glyphID, resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// executeGlyphPrompt runs a prompt glyph's template with attestation fields interpolated
+func (e *Engine) executeGlyphPrompt(glyphID string, template string, attestationJSON []byte) error {
+	reqBody, err := json.Marshal(map[string]interface{}{
+		"template":              template,
+		"glyph_id":              glyphID,
+		"upstream_attestation":  json.RawMessage(attestationJSON),
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal request body")
+	}
+
+	url := e.apiBaseURL + "/api/prompt/direct"
+	req, err := http.NewRequestWithContext(e.ctx, "POST", url, bytes.NewReader(reqBody))
+	if err != nil {
+		return errors.Wrap(err, "failed to create request")
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := e.httpClient.Do(req)
+	if err != nil {
+		return errors.Wrapf(err, "failed to execute prompt glyph %s", glyphID)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return errors.Newf("prompt glyph %s execution failed (status %d): %s", glyphID, resp.StatusCode, string(body))
 	}
 
 	return nil
@@ -578,6 +777,10 @@ func (e *Engine) processRetryQueue() {
 				err = e.executePython(w, pe.Attestation)
 			case storage.ActionTypeWebhook:
 				err = e.executeWebhook(w, pe.Attestation)
+			case storage.ActionTypeGlyphExecute:
+				err = e.executeGlyph(w, pe.Attestation)
+			default:
+				err = errors.Newf("unknown action type for retry: %s", w.ActionType)
 			}
 
 			if err != nil {
@@ -604,4 +807,8 @@ func (e *Engine) processRetryQueue() {
 // GetStore returns the underlying watcher store for CRUD operations
 func (e *Engine) GetStore() *storage.WatcherStore {
 	return e.store
+}
+
+func (e *Engine) DB() *sql.DB {
+	return e.db
 }

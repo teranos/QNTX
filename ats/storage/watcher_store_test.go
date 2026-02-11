@@ -427,3 +427,124 @@ func TestWatcherStore_UpdateStats(t *testing.T) {
 		t.Error("LastFiredAt was not persisted")
 	}
 }
+
+func TestWatcherStore_CreateOrReplace_NewWatcher(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := storage.NewWatcherStore(db)
+	ctx := context.Background()
+
+	watcher := &storage.Watcher{
+		ID:                "cor-new",
+		Name:              "Brand New",
+		ActionType:        storage.ActionTypePython,
+		ActionData:        "print('new')",
+		MaxFiresPerMinute: 60,
+		Enabled:           true,
+	}
+
+	err := store.CreateOrReplace(ctx, watcher)
+	if err != nil {
+		t.Fatalf("CreateOrReplace (new) failed: %v", err)
+	}
+
+	retrieved, err := store.Get(ctx, "cor-new")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if retrieved.Name != "Brand New" {
+		t.Errorf("Name mismatch: got %s, want Brand New", retrieved.Name)
+	}
+	if retrieved.ActionData != "print('new')" {
+		t.Errorf("ActionData mismatch: got %s", retrieved.ActionData)
+	}
+}
+
+func TestWatcherStore_CreateOrReplace_Idempotent(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := storage.NewWatcherStore(db)
+	ctx := context.Background()
+
+	original := &storage.Watcher{
+		ID:                "cor-idem",
+		Name:              "Version 1",
+		ActionType:        storage.ActionTypePython,
+		ActionData:        "print('v1')",
+		MaxFiresPerMinute: 60,
+		Enabled:           true,
+	}
+
+	if err := store.CreateOrReplace(ctx, original); err != nil {
+		t.Fatalf("First CreateOrReplace failed: %v", err)
+	}
+
+	// Replace with updated data — same ID, different content
+	replacement := &storage.Watcher{
+		ID:                "cor-idem",
+		Name:              "Version 2",
+		ActionType:        storage.ActionTypePython,
+		ActionData:        "print('v2')",
+		MaxFiresPerMinute: 120,
+		Enabled:           false,
+	}
+
+	if err := store.CreateOrReplace(ctx, replacement); err != nil {
+		t.Fatalf("Second CreateOrReplace failed: %v", err)
+	}
+
+	// Should get the replacement, not the original
+	retrieved, err := store.Get(ctx, "cor-idem")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if retrieved.Name != "Version 2" {
+		t.Errorf("Name not replaced: got %s, want Version 2", retrieved.Name)
+	}
+	if retrieved.ActionData != "print('v2')" {
+		t.Errorf("ActionData not replaced: got %s", retrieved.ActionData)
+	}
+	if retrieved.MaxFiresPerMinute != 120 {
+		t.Errorf("MaxFiresPerMinute not replaced: got %d, want 120", retrieved.MaxFiresPerMinute)
+	}
+	if retrieved.Enabled != false {
+		t.Error("Enabled not replaced: expected false")
+	}
+
+	// Should still be exactly 1 watcher, not 2
+	all, err := store.List(ctx, false)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	count := 0
+	for _, w := range all {
+		if w.ID == "cor-idem" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("Expected exactly 1 watcher with ID cor-idem, got %d", count)
+	}
+}
+
+func TestWatcherStore_CreateOrReplace_Validation(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := storage.NewWatcherStore(db)
+	ctx := context.Background()
+
+	// Empty ID
+	err := store.CreateOrReplace(ctx, &storage.Watcher{Name: "X", ActionType: storage.ActionTypePython})
+	if err == nil {
+		t.Error("Expected error for empty ID")
+	}
+
+	// Empty Name
+	err = store.CreateOrReplace(ctx, &storage.Watcher{ID: "x", ActionType: storage.ActionTypePython})
+	if err == nil {
+		t.Error("Expected error for empty Name")
+	}
+
+	// Empty ActionType
+	err = store.CreateOrReplace(ctx, &storage.Watcher{ID: "x", Name: "X"})
+	if err == nil {
+		t.Error("Expected error for empty ActionType")
+	}
+}

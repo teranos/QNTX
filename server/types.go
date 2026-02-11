@@ -231,6 +231,16 @@ type WatcherMatchMessage struct {
 	Timestamp   int64       `json:"timestamp"`    // Unix timestamp
 }
 
+// GlyphFiredMessage wraps proto.GlyphFired with WebSocket type discriminator
+type GlyphFiredMessage struct {
+	Type          string `json:"type"`                      // "glyph_fired"
+	GlyphID       string `json:"glyph_id"`                  // Target glyph that was executed
+	AttestationID string `json:"attestation_id"`             // Triggering attestation ASID
+	Status        string `json:"status"`                     // "started", "success", "error"
+	Error         string `json:"error,omitempty"`            // Error message when status is "error"
+	Timestamp     int64  `json:"timestamp"`                  // Unix timestamp
+}
+
 // WatcherErrorMessage represents a watcher error (parsing failure, validation error, etc.)
 // Sent when watcher creation/update fails
 type WatcherErrorMessage struct {

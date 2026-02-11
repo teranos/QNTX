@@ -238,7 +238,7 @@ rust-wasm: ## Build qntx-core as WASM module (for wazero integration + browser)
 # REQUIRES Nix: Platform-specific Python linking issues make cargo-only builds unreliable
 rust-python: ## Build Rust Python plugin binary (via Nix)
 	@echo "Building qntx-python-plugin via Nix..."
-	@nix build .#qntx-python
+	@nix build ./qntx-python#qntx-python-plugin
 	@mkdir -p bin
 	@cp -L result/bin/qntx-python-plugin bin/
 	@echo "✓ qntx-python-plugin built in bin/"

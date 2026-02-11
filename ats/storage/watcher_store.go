@@ -14,9 +14,10 @@ import (
 type ActionType string
 
 const (
-	ActionTypePython    ActionType = "python"
-	ActionTypeWebhook   ActionType = "webhook"
-	ActionTypeLLMPrompt ActionType = "llm_prompt"
+	ActionTypePython       ActionType = "python"
+	ActionTypeWebhook      ActionType = "webhook"
+	ActionTypeLLMPrompt    ActionType = "llm_prompt"
+	ActionTypeGlyphExecute ActionType = "glyph_execute"
 )
 
 // Watcher represents a reactive trigger that executes actions when attestations match a filter
@@ -124,6 +125,73 @@ func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to create watcher")
+	}
+	return nil
+}
+
+// CreateOrReplace creates a watcher or replaces it if one with the same ID exists.
+// Unlike Create, this is idempotent — safe for concurrent calls.
+func (ws *WatcherStore) CreateOrReplace(ctx context.Context, w *Watcher) error {
+	if w.ID == "" {
+		return errors.New("watcher ID cannot be empty")
+	}
+	if w.Name == "" {
+		return errors.New("watcher name cannot be empty")
+	}
+	if w.ActionType == "" {
+		return errors.New("watcher action_type cannot be empty")
+	}
+	if w.MaxFiresPerMinute < 0 {
+		return errors.Newf("max_fires_per_minute must be >= 0, got %d", w.MaxFiresPerMinute)
+	}
+
+	now := time.Now()
+	w.CreatedAt = now
+	w.UpdatedAt = now
+
+	subjectsJSON, err := json.Marshal(w.Filter.Subjects)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal subjects")
+	}
+	predicatesJSON, err := json.Marshal(w.Filter.Predicates)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal predicates")
+	}
+	contextsJSON, err := json.Marshal(w.Filter.Contexts)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal contexts")
+	}
+	actorsJSON, err := json.Marshal(w.Filter.Actors)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal actors")
+	}
+
+	var timeStart, timeEnd *string
+	if w.Filter.TimeStart != nil {
+		s := w.Filter.TimeStart.Format(time.RFC3339Nano)
+		timeStart = &s
+	}
+	if w.Filter.TimeEnd != nil {
+		s := w.Filter.TimeEnd.Format(time.RFC3339Nano)
+		timeEnd = &s
+	}
+
+	_, err = ws.db.ExecContext(ctx, `
+		INSERT OR REPLACE INTO watchers (
+			id, name,
+			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
+			action_type, action_data,
+			max_fires_per_minute, enabled,
+			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		w.ID, w.Name,
+		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd, w.AxQuery,
+		w.ActionType, w.ActionData,
+		w.MaxFiresPerMinute, w.Enabled,
+		w.CreatedAt.Format(time.RFC3339Nano), w.UpdatedAt.Format(time.RFC3339Nano), nil, 0, 0, nil,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to create or replace watcher")
 	}
 	return nil
 }
@@ -244,6 +312,15 @@ func (ws *WatcherStore) Delete(ctx context.Context, id string) error {
 		return errors.Wrap(err, "failed to delete watcher")
 	}
 	return nil
+}
+
+// DeleteByPrefix deletes all watchers whose ID starts with the given prefix
+func (ws *WatcherStore) DeleteByPrefix(ctx context.Context, prefix string) (int64, error) {
+	result, err := ws.db.ExecContext(ctx, "DELETE FROM watchers WHERE id LIKE ?", prefix+"%")
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to delete watchers with prefix %s", prefix)
+	}
+	return result.RowsAffected()
 }
 
 // RecordFire updates the watcher stats after a successful fire
