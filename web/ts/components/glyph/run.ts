@@ -89,35 +89,7 @@ class GlyphRunImpl {
         const clickHandler = (e: MouseEvent) => {
             e.stopPropagation();
             log.debug(SEG.GLYPH, `[Glyph ${item.id}] Click detected, windowState:`, isInWindowState(glyph));
-
-            // Only morph if in collapsed state (not already a window)
-            if (!isInWindowState(glyph)) {
-                this.isRestoring = true;
-
-                // Route to correct manifestation based on type
-                const manifestationType = item.manifestationType || 'window';
-                if (manifestationType === 'fullscreen' || manifestationType === 'canvas') {
-                    morphToCanvas(
-                        glyph,
-                        item,
-                        (id, element) => this.verifyElementTracking(id, element),
-                        (element, g) => this.reattachGlyphToIndicator(element, g)
-                    );
-                } else {
-                    morphToWindow(
-                        glyph,
-                        item,
-                        (id, element) => this.verifyElementTracking(id, element),
-                        (id) => this.remove(id),
-                        (element, g) => this.reattachGlyphToIndicator(element, g)
-                    );
-                }
-
-                // Re-enable proximity morphing after animation
-                setTimeout(() => {
-                    this.isRestoring = false;
-                }, getMaximizeDuration());
-            }
+            this.morphGlyph(glyph, item);
         };
 
         // Store handler in WeakMap for proper cleanup
@@ -180,16 +152,177 @@ class GlyphRunImpl {
         }
     }
 
+    // Touch browse activation zone — how close to the tray's right edge the touch must land (px)
+    private readonly TOUCH_ACTIVATION_MARGIN = 44;
+
     private setupEventListeners(): void {
         if (!this.element) return;
 
-        // Set up proximity morphing on mouse movement
+        // Desktop: proximity morphing on mouse movement
         document.addEventListener('mousemove', () => {
             this.updateProximity();
         });
 
-        // Note: mouseenter/mouseleave removed - proximity morphing replaces reveal behavior
-        // Container has pointer-events: none, only dots are interactive
+        // Mobile: touch browse — hold thumb near tray, slide to browse, release to open.
+        // Listens on document so the activation zone extends beyond the tiny dots.
+        this.setupTouchBrowse();
+    }
+
+    /**
+     * Touch browse for mobile tray navigation.
+     *
+     * touchstart near the tray right edge enters browse mode.
+     * touchmove slides through glyphs — proximity morphing shows labels.
+     * touchend opens the glyph with highest proximity (the one the thumb was on).
+     *
+     * Suppresses the synthetic click that would otherwise fire on the 8px dot
+     * to avoid double-opening.
+     */
+    private setupTouchBrowse(): void {
+        // Tracks whether the next click event should be swallowed
+        // (set true on touchend after a browse, reset on the suppressed click)
+        let suppressNextClick = false;
+
+        document.addEventListener('touchstart', (e) => {
+            if (!this.element || !this.indicatorContainer) return;
+            if (this.items.size === 0) return;
+
+            const touch = e.touches[0];
+            if (!touch) return;
+
+            // Check if touch landed within the activation zone near the tray
+            const trayRect = this.element.getBoundingClientRect();
+            const withinX = touch.clientX >= trayRect.left - this.TOUCH_ACTIVATION_MARGIN
+                         && touch.clientX <= trayRect.right + this.TOUCH_ACTIVATION_MARGIN;
+            const withinY = touch.clientY >= trayRect.top - this.TOUCH_ACTIVATION_MARGIN
+                         && touch.clientY <= trayRect.bottom + this.TOUCH_ACTIVATION_MARGIN;
+
+            if (!withinX || !withinY) return;
+
+            // Enter browse mode — prevent scroll, feed coordinates into proximity
+            e.preventDefault();
+            this.proximity.isTouchBrowsing = true;
+            this.proximity.setPointerPosition(touch.clientX, touch.clientY);
+            this.updateProximity();
+
+            log.debug(SEG.GLYPH, '[GlyphRun] Touch browse started', {
+                x: touch.clientX,
+                y: touch.clientY,
+                glyphCount: this.items.size
+            });
+        }, { passive: false });
+
+        document.addEventListener('touchmove', (e) => {
+            if (!this.proximity.isTouchBrowsing) return;
+
+            const touch = e.touches[0];
+            if (!touch) return;
+
+            e.preventDefault(); // Prevent scroll during browse
+            this.proximity.setPointerPosition(touch.clientX, touch.clientY);
+            this.updateProximity();
+        }, { passive: false });
+
+        document.addEventListener('touchend', (e) => {
+            if (!this.proximity.isTouchBrowsing) return;
+
+            this.proximity.isTouchBrowsing = false;
+
+            // Find the glyph with highest proximity at moment of release
+            const peaked = this.findPeakedGlyph();
+
+            // Collapse all glyphs back to dots by moving pointer far away
+            this.proximity.setPointerPosition(-9999, -9999);
+            this.updateProximity();
+
+            if (peaked) {
+                // Suppress the synthetic click that fires ~300ms after touchend
+                suppressNextClick = true;
+
+                log.debug(SEG.GLYPH, `[GlyphRun] Touch browse selected ${peaked.id}`);
+                this.morphGlyph(peaked.element, peaked.item);
+            } else {
+                log.debug(SEG.GLYPH, '[GlyphRun] Touch browse ended with no selection');
+            }
+        });
+
+        // Suppress the synthetic click fired after touch browse touchend.
+        // Capture phase so we catch it before the glyph's own click handler.
+        document.addEventListener('click', (e) => {
+            if (!suppressNextClick) return;
+            suppressNextClick = false;
+
+            // Only suppress clicks on glyph dots (don't interfere with other UI)
+            const target = e.target as HTMLElement;
+            if (target.closest('.glyph-run-glyph')) {
+                e.stopPropagation();
+                e.preventDefault();
+                log.debug(SEG.GLYPH, '[GlyphRun] Suppressed post-browse synthetic click');
+            }
+        }, { capture: true });
+    }
+
+    /**
+     * Find the glyph dot in the tray with the highest proximity factor.
+     * Returns the element and its Glyph data, or null if nothing is close enough.
+     */
+    private findPeakedGlyph(): { element: HTMLElement; item: Glyph } | null {
+        if (!this.indicatorContainer) return null;
+
+        const glyphs = Array.from(
+            this.indicatorContainer.querySelectorAll('.glyph-run-glyph')
+        ) as HTMLElement[];
+        const itemsArray = Array.from(this.items.values());
+
+        let bestProximity = 0;
+        let bestIndex = -1;
+
+        glyphs.forEach((glyph, index) => {
+            const { proximityRaw } = this.proximity.calculateProximity(glyph);
+            if (proximityRaw > bestProximity) {
+                bestProximity = proximityRaw;
+                bestIndex = index;
+            }
+        });
+
+        // Require meaningful proximity — don't open if thumb was far from any glyph
+        if (bestIndex < 0 || bestProximity < 0.3 || bestIndex >= itemsArray.length) {
+            return null;
+        }
+
+        return { element: glyphs[bestIndex], item: itemsArray[bestIndex] };
+    }
+
+    /**
+     * Morph a glyph from dot to its manifestation (window or canvas).
+     * Shared by click handler and touch browse release.
+     */
+    private morphGlyph(glyphElement: HTMLElement, item: Glyph): void {
+        if (isInWindowState(glyphElement)) return;
+
+        this.isRestoring = true;
+
+        const manifestationType = item.manifestationType || 'window';
+        if (manifestationType === 'fullscreen' || manifestationType === 'canvas') {
+            morphToCanvas(
+                glyphElement,
+                item,
+                (id, element) => this.verifyElementTracking(id, element),
+                (element, g) => this.reattachGlyphToIndicator(element, g)
+            );
+        } else {
+            morphToWindow(
+                glyphElement,
+                item,
+                (id, element) => this.verifyElementTracking(id, element),
+                (id) => this.remove(id),
+                (element, g) => this.reattachGlyphToIndicator(element, g)
+            );
+        }
+
+        setTimeout(() => {
+            this.isRestoring = false;
+        }, getMaximizeDuration());
     }
 
 
@@ -377,33 +510,7 @@ class GlyphRunImpl {
         const clickHandler = (e: MouseEvent) => {
             e.stopPropagation();
             log.debug(SEG.GLYPH, `[Glyph ${glyph.id}] Click detected, windowState:`, isInWindowState(glyphElement));
-
-            if (!isInWindowState(glyphElement)) {
-                this.isRestoring = true;
-
-                // Route to correct manifestation based on type
-                const manifestationType = glyph.manifestationType || 'window';
-                if (manifestationType === 'fullscreen' || manifestationType === 'canvas') {
-                    morphToCanvas(
-                        glyphElement,
-                        glyph,
-                        (id, element) => this.verifyElementTracking(id, element),
-                        (element, g) => this.reattachGlyphToIndicator(element, g)
-                    );
-                } else {
-                    morphToWindow(
-                        glyphElement,
-                        glyph,
-                        (id, element) => this.verifyElementTracking(id, element),
-                        (id) => this.remove(id),
-                        (element, g) => this.reattachGlyphToIndicator(element, g)
-                    );
-                }
-
-                setTimeout(() => {
-                    this.isRestoring = false;
-                }, getMaximizeDuration());
-            }
+            this.morphGlyph(glyphElement, glyph);
         };
 
         this.glyphClickHandlers.set(glyphElement, clickHandler);

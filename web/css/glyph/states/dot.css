@@ -27,3 +27,12 @@
 .glyph-run-glyph:hover {
     background: color-mix(in srgb, var(--bg-gray) 90%, white 10%);
 }
+
+/* Mobile: larger idle dots so the tray is findable for touch browse.
+   12px is still minimal but visible enough to anchor the thumb. */
+@media (max-width: 768px) {
+    .glyph-run-glyph {
+        width: 12px;
+        height: 12px;
+    }
+}
