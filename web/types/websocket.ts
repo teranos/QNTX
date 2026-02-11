@@ -432,7 +432,7 @@ export interface WatcherMatchMessage extends BaseMessage {
  * Glyph fired notification — sent when a meld-edge subscription triggers glyph execution.
  * Fields from proto GlyphFired + WebSocket type discriminator.
  */
-export interface GlyphFiredMessage extends BaseMessage, GlyphFired {
+export interface GlyphFiredMessage extends Omit<BaseMessage, 'timestamp'>, GlyphFired {
   type: 'glyph_fired';
 }
 

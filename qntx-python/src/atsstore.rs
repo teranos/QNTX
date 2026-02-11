@@ -217,9 +217,7 @@ pub fn attest(
         Some(a) if !a.is_empty() => Some(a), // User provided explicit actors — use them
         _ => {
             // Check if a glyph ID is set for this execution
-            CURRENT_GLYPH_ID.with(|g| {
-                g.borrow().as_ref().map(|id| vec![format!("glyph:{}", id)])
-            })
+            CURRENT_GLYPH_ID.with(|g| g.borrow().as_ref().map(|id| vec![format!("glyph:{}", id)]))
         }
     };
 
