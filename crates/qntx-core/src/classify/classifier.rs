@@ -311,6 +311,18 @@ pub fn classify_claims(input: &str) -> String {
     }
 }
 
+// Missing test coverage:
+// - Resolution priority ordering: claims that match multiple types (e.g. same actor +
+//   different contexts) should resolve to the highest-priority match. The priority chain
+//   is Evolution > Verification > Coexistence > Supersession > Review.
+// - Boundary conditions: claims exactly at verification_window_ms apart (evolution vs
+//   verification edge), custom TemporalConfig values.
+// - Multiple claim groups in a single input (auto_resolved/review_required counters).
+// - Actor hierarchy ordering within a conflict output.
+// - Low-confidence override: confidence below review_threshold should produce
+//   "human_review" strategy regardless of conflict type.
+// - Empty claim_groups input.
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -363,8 +375,14 @@ mod tests {
         let output = classifier.classify(&input);
 
         assert_eq!(output.total_analyzed, 1);
-        assert_eq!(output.conflicts[0].conflict_type, ConflictType::Evolution);
-        assert!(output.conflicts[0].auto_resolved);
+        assert_eq!(output.auto_resolved, 1);
+        assert_eq!(output.review_required, 0);
+
+        let c = &output.conflicts[0];
+        assert_eq!(c.conflict_type, ConflictType::Evolution);
+        assert_eq!(c.strategy, "show_latest");
+        assert!(c.auto_resolved);
+        assert!(c.confidence > 0.8, "evolution confidence={}", c.confidence);
     }
 
     #[test]
@@ -385,17 +403,20 @@ mod tests {
         let classifier = SmartClassifier::new(input.config.clone());
         let output = classifier.classify(&input);
 
-        assert_eq!(
-            output.conflicts[0].conflict_type,
-            ConflictType::Verification
+        let c = &output.conflicts[0];
+        assert_eq!(c.conflict_type, ConflictType::Verification);
+        assert_eq!(c.strategy, "show_all_sources");
+        assert!(c.auto_resolved);
+        assert!(
+            c.confidence > 0.7,
+            "verification confidence={}",
+            c.confidence
         );
     }
 
     #[test]
     fn different_contexts_coexistence() {
         let now = 1_000_000_000;
-        // Use different predicates so simultaneous_verification doesn't match
-        // (verification requires same predicate)
         let input = ClassifyInput {
             claim_groups: vec![ClaimGroup {
                 key: "ALICE|role".to_string(),
@@ -411,13 +432,20 @@ mod tests {
         let classifier = SmartClassifier::new(input.config.clone());
         let output = classifier.classify(&input);
 
-        assert_eq!(output.conflicts[0].conflict_type, ConflictType::Coexistence);
+        let c = &output.conflicts[0];
+        assert_eq!(c.conflict_type, ConflictType::Coexistence);
+        assert_eq!(c.strategy, "show_all_contexts");
+        assert!(c.auto_resolved);
+        assert!(
+            c.confidence > 0.9,
+            "coexistence confidence={}",
+            c.confidence
+        );
     }
 
     #[test]
-    fn human_supersession() {
+    fn human_supersedes_llm() {
         let now = 1_000_000_000;
-        // Different predicates so verification doesn't match; same context so coexistence doesn't match
         let input = ClassifyInput {
             claim_groups: vec![ClaimGroup {
                 key: "ALICE|role|GitHub".to_string(),
@@ -445,9 +473,14 @@ mod tests {
         let classifier = SmartClassifier::new(input.config.clone());
         let output = classifier.classify(&input);
 
-        assert_eq!(
-            output.conflicts[0].conflict_type,
-            ConflictType::Supersession
+        let c = &output.conflicts[0];
+        assert_eq!(c.conflict_type, ConflictType::Supersession);
+        assert_eq!(c.strategy, "show_highest_authority");
+        assert!(c.auto_resolved);
+        assert!(
+            c.confidence > 0.9,
+            "supersession confidence={}",
+            c.confidence
         );
     }
 
@@ -467,6 +500,8 @@ mod tests {
         let output = classifier.classify(&input);
 
         assert_eq!(output.total_analyzed, 0);
+        assert_eq!(output.auto_resolved, 0);
+        assert_eq!(output.review_required, 0);
         assert!(output.conflicts.is_empty());
     }
 
@@ -495,6 +530,8 @@ mod tests {
         assert!(parsed["error"].is_null(), "unexpected error: {}", result);
         assert_eq!(parsed["total_analyzed"], 1);
         assert_eq!(parsed["conflicts"][0]["conflict_type"], "Evolution");
+        assert_eq!(parsed["conflicts"][0]["strategy"], "show_latest");
+        assert!(parsed["conflicts"][0]["auto_resolved"].as_bool().unwrap());
     }
 
     #[test]
