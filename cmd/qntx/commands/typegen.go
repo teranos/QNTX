@@ -12,7 +12,6 @@ import (
 	"github.com/teranos/QNTX/typegen/api"
 	"github.com/teranos/QNTX/typegen/css"
 	"github.com/teranos/QNTX/typegen/markdown"
-	"github.com/teranos/QNTX/typegen/python"
 	"github.com/teranos/QNTX/typegen/rust"
 	"github.com/teranos/QNTX/typegen/typescript"
 )
@@ -41,10 +40,6 @@ var languagePackages = map[string][]string{
 		"github.com/teranos/QNTX/pulse/schedule",
 		// server package excluded - server-side HTTP handler types
 		"github.com/teranos/QNTX/server/syscap", // System capabilities types
-		"github.com/teranos/QNTX/sym",
-	},
-	"python": {
-		"github.com/teranos/QNTX/graph",
 		"github.com/teranos/QNTX/sym",
 	},
 	"css": {
@@ -110,7 +105,7 @@ Examples:
 func init() {
 	TypegenCmd.Flags().StringVarP(&typegenOutput, "output", "o", "", "Output directory (default: stdout)")
 	TypegenCmd.Flags().StringSliceVarP(&typegenPackages, "packages", "p", nil, "Packages to process (default: ats/types, pulse/async, server)")
-	TypegenCmd.Flags().StringVarP(&typegenLang, "lang", "l", "typescript", "Target language: typescript, python, rust, dart, all")
+	TypegenCmd.Flags().StringVarP(&typegenLang, "lang", "l", "typescript", "Target language: typescript, rust, css, markdown, all")
 
 	// Add check subcommand
 	TypegenCmd.AddCommand(TypegenCheckCmd)
@@ -152,7 +147,7 @@ func runTypegenCheck(cmd *cobra.Command, args []string) error {
 	defer func() { typegenOutput = originalOutput }()
 
 	// Generate all types to temp directory
-	languages := []string{"typescript", "python", "rust", "css", "markdown"}
+	languages := []string{"typescript", "rust", "css", "markdown"}
 
 	for _, lang := range languages {
 		packages := getDefaultPackages(lang)
@@ -190,7 +185,7 @@ func runTypegen(cmd *cobra.Command, args []string) error {
 	// Validate and determine languages to generate
 	languages := getLanguages(typegenLang)
 	if len(languages) == 0 {
-		return errors.Newf("invalid language: %s (supported: typescript, python, rust, dart, all)", typegenLang)
+		return errors.Newf("invalid language: %s (supported: typescript, rust, css, markdown, all)", typegenLang)
 	}
 
 	// Generate for each language
@@ -219,13 +214,11 @@ func getLanguages(lang string) []string {
 
 	switch lang {
 	case "all":
-		return []string{"typescript", "python", "rust", "css", "markdown"} // All supported languages
+		return []string{"typescript", "rust", "css", "markdown"} // All supported languages
 	case "typescript", "ts":
 		return []string{"typescript"}
 	case "markdown", "md":
 		return []string{"markdown"}
-	case "python", "py":
-		return []string{"python"}
 	case "rust", "rs":
 		return []string{"rust"}
 	case "css":
@@ -284,8 +277,6 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 		} else {
 			gen = rust.NewGenerator()
 		}
-	case "python":
-		gen = python.NewGenerator()
 	case "css":
 		gen = css.NewGenerator()
 	case "dart":
@@ -345,21 +336,6 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 			}
 		}
 		// Embedded location: skip scaffolding (custom mod.rs exists in parent crate)
-	}
-
-	// Generate __init__.py for Python
-	// Only generate when processing all default packages to avoid partial indices
-	if outputDir != "" && lang == "python" && generateIndex {
-		exports := convertToPythonPackageExports(results)
-		if err := python.GenerateInitFile(outputDir, exports); err != nil {
-			return errors.Wrap(err, "failed to generate __init__.py")
-		}
-		if err := python.GeneratePyProjectToml(outputDir); err != nil {
-			return errors.Wrap(err, "failed to generate pyproject.toml")
-		}
-		if err := python.GenerateReadme(outputDir, exports); err != nil {
-			return errors.Wrap(err, "failed to generate README.md")
-		}
 	}
 
 	// Generate README.md for CSS
@@ -488,8 +464,6 @@ func getOutputConfig(lang string) (outputDir, fileExt string) {
 		fileExt = ".ts"
 	case "markdown":
 		fileExt = ".md"
-	case "python":
-		fileExt = ".py"
 	case "rust":
 		fileExt = ".rs"
 	case "css":
@@ -511,12 +485,7 @@ func writeGeneratedOutput(results []genResult, outputDir, fileExt, lang string) 
 			fmt.Println(res.output)
 		} else {
 			// Write to file
-			// Handle Python keyword conflict: async -> async_
-			filename := res.packageName
-			if lang == "python" && filename == "async" {
-				filename = "async_"
-			}
-			filename = filename + fileExt
+			filename := res.packageName + fileExt
 			outputPath := filepath.Join(outputDir, filename)
 
 			// Create directory if needed
@@ -560,21 +529,6 @@ func convertToRustPackageExports(results []genResult) []rust.PackageExport {
 		exports[i] = rust.PackageExport{
 			PackageName: res.packageName,
 			TypeNames:   res.typeNames,
-		}
-	}
-	return exports
-}
-
-// convertToPythonPackageExports converts genResults to Python PackageExports
-func convertToPythonPackageExports(results []genResult) []python.PackageExport {
-	exports := make([]python.PackageExport, len(results))
-	for i, res := range results {
-		exports[i] = python.PackageExport{
-			PackageName: res.packageName,
-			TypeNames:   res.typeNames,
-			ConstNames:  res.constNames,
-			ArrayNames:  res.arrayNames,
-			MapNames:    res.mapNames,
 		}
 	}
 	return exports
