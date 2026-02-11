@@ -6,11 +6,12 @@
  *
  * Each glyph has directional ports that define valid connections:
  * - right: horizontal data flow (ax → py → prompt, py → py)
+ * - left: incoming horizontal flow (for canvas in-port)
  * - bottom: result/output attachment (py ↓ result, prompt ↓ result)
- * - top: (reserved for future upward connections)
+ * - top: upward connections (for canvas top-port)
  */
 
-export type EdgeDirection = 'right' | 'bottom' | 'top'; // 'top' reserved for future upward connections
+export type EdgeDirection = 'right' | 'left' | 'bottom' | 'top';
 
 export interface PortRule {
     direction: EdgeDirection;
@@ -34,6 +35,10 @@ export const MELDABILITY: Record<string, readonly PortRule[]> = {
     ],
     'canvas-note-glyph': [
         { direction: 'bottom', targets: ['canvas-prompt-glyph'] }
+    ],
+    'canvas-nested-glyph': [
+        { direction: 'right', targets: ['canvas-py-glyph', 'canvas-prompt-glyph', 'canvas-nested-glyph'] },
+        { direction: 'bottom', targets: ['canvas-py-glyph', 'canvas-prompt-glyph', 'canvas-result-glyph', 'canvas-nested-glyph'] },
     ]
 } as const;
 
@@ -282,6 +287,8 @@ export function computeGridPositions(
 
             if (direction === 'right') {
                 positions.set(to, { row: pos.row, col: pos.col + 1 + offset });
+            } else if (direction === 'left') {
+                positions.set(to, { row: pos.row, col: pos.col - 1 - offset });
             } else if (direction === 'bottom') {
                 positions.set(to, { row: pos.row + 1 + offset, col: pos.col });
             } else if (direction === 'top') {

@@ -22,11 +22,11 @@ message CanvasGlyph {
 }
 
 // CompositionEdge represents a directed edge in the composition DAG
-// Supports multi-directional melding: horizontal (right), vertical (top/bottom)
+// Supports multi-directional melding: horizontal (left/right), vertical (top/bottom)
 message CompositionEdge {
   string from = 1;           // source glyph ID
   string to = 2;             // target glyph ID
-  string direction = 3;      // 'right', 'top', 'bottom'
+  string direction = 3;      // 'left', 'right', 'top', 'bottom'
   int32 position = 4;        // ordering for multiple edges in same direction
 }
 

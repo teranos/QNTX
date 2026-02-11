@@ -6,7 +6,7 @@
  */
 
 import type { Glyph } from '../glyph';
-import { IX, AX, SO, Prose } from '@generated/sym.js';
+import { IX, AX, SO, Prose, Canvas } from '@generated/sym.js';
 import { log, SEG } from '../../../logger';
 import { getMinimizeDuration } from '../glyph';
 import { createIxGlyph } from '../ix-glyph';
@@ -15,6 +15,7 @@ import { createPyGlyph } from '../py-glyph';
 import { createPromptGlyph } from '../prompt-glyph';
 import { createNoteGlyph } from '../note-glyph';
 import { createTsGlyph } from '../ts-glyph';
+import { createNestedCanvasGlyph } from '../nested-canvas-glyph';
 import { uiState } from '../../../state/ui';
 
 /** Duration multiplier for spawn menu animation */
@@ -177,6 +178,19 @@ export function showSpawnMenu(
     });
 
     menu.appendChild(noteBtn);
+
+    // Add canvas button
+    const canvasBtn = document.createElement('button');
+    canvasBtn.className = 'canvas-spawn-button';
+    canvasBtn.textContent = Canvas;
+    canvasBtn.title = 'Spawn nested Canvas glyph';
+
+    canvasBtn.addEventListener('click', () => {
+        spawnNestedCanvasGlyph(x, y, canvas, glyphs);
+        removeMenu();
+    });
+
+    menu.appendChild(canvasBtn);
 
     document.body.appendChild(menu);
 
@@ -499,4 +513,47 @@ async function spawnNoteGlyph(
     });
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned Note glyph at (${x}, ${y}) with size ${width}x${height}`);
+}
+
+/**
+ * Spawn a new nested Canvas glyph at pixel position
+ */
+async function spawnNestedCanvasGlyph(
+    x: number,
+    y: number,
+    canvas: HTMLElement,
+    glyphs: Glyph[]
+): Promise<void> {
+    const canvasGlyph: Glyph = {
+        id: `canvas-${crypto.randomUUID()}`,
+        title: 'Canvas',
+        symbol: Canvas,
+        x,
+        y,
+        renderContent: () => {
+            const content = document.createElement('div');
+            content.textContent = 'Canvas glyph';
+            return content;
+        }
+    };
+
+    glyphs.push(canvasGlyph);
+
+    const glyphElement = await createNestedCanvasGlyph(canvasGlyph);
+    canvas.appendChild(glyphElement);
+
+    const rect = glyphElement.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+
+    uiState.addCanvasGlyph({
+        id: canvasGlyph.id,
+        symbol: Canvas,
+        x,
+        y,
+        width,
+        height
+    });
+
+    log.debug(SEG.GLYPH, `[Canvas] Spawned nested Canvas glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
