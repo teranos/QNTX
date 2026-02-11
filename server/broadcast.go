@@ -747,6 +747,8 @@ func (s *QNTXServer) processBroadcastRequest(req *broadcastRequest) {
 		s.sendMessageToClients(req.payload, req.clientID)
 	case "watcher_error":
 		s.sendMessageToClients(req.payload, req.clientID)
+	case "glyph_fired":
+		s.sendMessageToClients(req.payload, req.clientID)
 	default:
 		s.logger.Warnw("Unknown broadcast request type", "type", req.reqType)
 	}

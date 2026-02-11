@@ -322,14 +322,14 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 		// Check rate limit for action execution
 		// Per QNTX LAW: "Zero means zero" - if MaxFiresPerMinute is 0, never execute
 		if watcher.MaxFiresPerMinute == 0 {
-			e.logger.Debugw("Watcher has MaxFiresPerMinute=0, not executing",
+			e.logger.Infow("Watcher has MaxFiresPerMinute=0, not executing",
 				"watcher_id", watcher.ID,
 				"attestation_id", as.ID)
 			continue
 		}
 		limiter := e.rateLimiters[watcher.ID]
 		if limiter != nil && !limiter.Allow() {
-			e.logger.Debugw("Watcher rate limited",
+			e.logger.Infow("Watcher rate limited",
 				"watcher_id", watcher.ID,
 				"attestation_id", as.ID)
 			continue
@@ -395,6 +395,11 @@ func hasOverlap(a, b []string) bool {
 
 // executeAction executes a watcher's action with the triggering attestation
 func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
+	e.logger.Infow("Executing watcher action",
+		"watcher_id", watcher.ID,
+		"action_type", watcher.ActionType,
+		"attestation_id", as.ID)
+
 	var err error
 
 	switch watcher.ActionType {

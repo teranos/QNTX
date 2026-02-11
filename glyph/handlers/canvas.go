@@ -258,12 +258,6 @@ func (h *CanvasHandler) handleDeleteComposition(w http.ResponseWriter, r *http.R
 func (h *CanvasHandler) compileSubscriptions(ctx context.Context, comp *glyphstorage.CanvasComposition) error {
 	store := h.watcherEngine.GetStore()
 
-	// Clean up existing meld-edge watchers for this composition
-	prefix := fmt.Sprintf("meld-edge-%s-", comp.ID)
-	if _, err := store.DeleteByPrefix(ctx, prefix); err != nil {
-		return errors.Wrapf(err, "failed to clean up old subscriptions for composition %s", comp.ID)
-	}
-
 	var created int
 	for _, edge := range comp.Edges {
 		if edge.Direction != "right" {
@@ -330,7 +324,7 @@ func (h *CanvasHandler) compileSubscriptions(ctx context.Context, comp *glyphsto
 			continue
 		}
 
-		if err := store.Create(ctx, w); err != nil {
+		if err := store.CreateOrReplace(ctx, w); err != nil {
 			return errors.Wrapf(err, "failed to create subscription for edge %s→%s", edge.From, edge.To)
 		}
 		created++
