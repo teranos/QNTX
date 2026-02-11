@@ -19,17 +19,19 @@ const TRUNCATION_SUFFIX: &str = "...";
 impl PythonEngine {
     /// Execute Python code and return the result
     pub fn execute(&self, code: &str, config: &ExecutionConfig) -> ExecutionResult {
-        self.execute_with_ats(code, config, None)
+        self.execute_with_ats(code, config, None, None)
     }
 
     /// Execute Python code with optional ATSStore client for attestation support.
     /// When an ATSStore client is provided, the `attest()` function becomes available
-    /// in the Python execution context.
+    /// in the Python execution context. When `upstream_attestation` is provided, it is
+    /// injected as a Python dict global named `upstream` (or `None` when absent).
     pub fn execute_with_ats(
         &self,
         code: &str,
         config: &ExecutionConfig,
         ats_client: Option<SharedAtsStoreClient>,
+        upstream_attestation: Option<&serde_json::Value>,
     ) -> ExecutionResult {
         let start = std::time::Instant::now();
 
@@ -38,7 +40,7 @@ impl PythonEngine {
             atsstore::set_current_client(client.clone());
         }
 
-        let result = self.execute_inner(code, config, ats_client.is_some());
+        let result = self.execute_inner(code, config, ats_client.is_some(), upstream_attestation);
 
         // Clean up ATSStore client
         if ats_client.is_some() {
@@ -69,6 +71,7 @@ impl PythonEngine {
         code: &str,
         config: &ExecutionConfig,
         inject_attest: bool,
+        upstream_attestation: Option<&serde_json::Value>,
     ) -> Result<ExecutionResult, Error> {
         // Create CString for the code
         let code_cstr = CString::new(code)
@@ -130,6 +133,31 @@ impl PythonEngine {
             if inject_attest {
                 atsstore::inject_attest_function(py, &globals)
                     .map_err(|e| Error::context("failed to inject attest function", e))?;
+            }
+
+            // Inject upstream attestation as Python dict (or None)
+            match upstream_attestation {
+                Some(attestation) => {
+                    let json_module = py
+                        .import("json")
+                        .map_err(|e| Error::context("failed to import json module", e))?;
+                    let json_str = serde_json::to_string(attestation).map_err(|e| {
+                        Error::context("failed to serialize upstream attestation", e)
+                    })?;
+                    let upstream = json_module
+                        .call_method1("loads", (json_str,))
+                        .map_err(|e| {
+                            Error::context("failed to parse upstream attestation as Python dict", e)
+                        })?;
+                    globals
+                        .set_item("upstream", upstream)
+                        .map_err(|e| Error::context("failed to set upstream global", e))?;
+                }
+                None => {
+                    globals
+                        .set_item("upstream", py.None())
+                        .map_err(|e| Error::context("failed to set upstream = None", e))?;
+                }
             }
 
             // Execute the code using py.run
@@ -211,7 +239,7 @@ impl PythonEngine {
     ) -> ExecutionResult {
         // TODO(sec): Validate path is within allowed directories if config.allow_fs is false
         match std::fs::read_to_string(path) {
-            Ok(code) => self.execute_with_ats(&code, config, ats_client),
+            Ok(code) => self.execute_with_ats(&code, config, ats_client, None),
             Err(e) => ExecutionResult {
                 success: false,
                 stdout: String::new(),
@@ -237,7 +265,7 @@ impl PythonEngine {
     ) -> ExecutionResult {
         // Wrap expression to capture result
         let code = format!("_result = ({})", expr);
-        self.execute_with_ats(&code, &ExecutionConfig::default(), ats_client)
+        self.execute_with_ats(&code, &ExecutionConfig::default(), ats_client, None)
     }
 
     /// Install a package using pip (if allowed)

@@ -56,6 +56,12 @@ impl HandlerContext {
             capture_variables: Option<bool>,
             #[serde(default)]
             python_paths: Option<Vec<String>>,
+            /// Canvas glyph ID — when set, attest() defaults actor to "glyph:{id}"
+            #[serde(default)]
+            glyph_id: Option<String>,
+            /// Upstream attestation JSON — injected as Python `upstream` dict when present
+            #[serde(default)]
+            upstream_attestation: Option<serde_json::Value>,
         }
 
         let req: ExecuteRequest = serde_json::from_value(body)
@@ -72,12 +78,23 @@ impl HandlerContext {
             ..Default::default()
         };
 
+        // Set glyph ID for actor convention: attest() defaults actor to "glyph:{id}"
+        if let Some(ref glyph_id) = req.glyph_id {
+            crate::atsstore::set_current_glyph_id(Some(glyph_id.clone()));
+        }
+
         let result = {
             let state = self.state.read();
-            state
-                .engine
-                .execute_with_ats(&req.code, &config, Some(state.ats_client.clone()))
+            state.engine.execute_with_ats(
+                &req.code,
+                &config,
+                Some(state.ats_client.clone()),
+                req.upstream_attestation.as_ref(),
+            )
         };
+
+        // Clear glyph ID after execution
+        crate::atsstore::set_current_glyph_id(None);
 
         execution_result_to_response(result).map_err(|e| *e)
     }

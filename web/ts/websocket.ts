@@ -17,6 +17,7 @@ import type {
     RichSearchResultsMessage,
     WatcherMatchMessage,
     WatcherErrorMessage,
+    GlyphFiredMessage,
 } from '../types/websocket';
 import { handleJobNotification, notifyStorageWarning, handleDaemonStatusNotification } from './tauri-notifications';
 import { handlePluginHealth } from './websocket-handlers/plugin-health';
@@ -176,6 +177,32 @@ const MESSAGE_HANDLERS = {
 
         // Invoke registered handler
         messageHandlers['watcher_match']?.(data);
+    },
+
+    glyph_fired: (data: GlyphFiredMessage) => {
+        log.info(SEG.WS, 'Glyph fired:', data.glyph_id, data.status, data.error || '');
+
+        // Apply execution state to target glyph element for CSS-driven visual feedback
+        const el = document.querySelector(`[data-glyph-id="${CSS.escape(data.glyph_id)}"]`) as HTMLElement | null;
+        if (el) {
+            const stateMap: Record<string, string> = { started: 'running', success: 'completed', error: 'failed' };
+            const state = stateMap[data.status] || data.status;
+            el.dataset.executionState = state;
+
+            // Auto-clear success state after 3s so border returns to default
+            if (data.status === 'success') {
+                setTimeout(() => {
+                    if (el.dataset.executionState === 'completed') {
+                        delete el.dataset.executionState;
+                    }
+                }, 3000);
+            }
+        } else {
+            log.warn(SEG.WS, 'Glyph fired: no DOM element found for', data.glyph_id);
+        }
+
+        // Invoke registered handler
+        messageHandlers['glyph_fired']?.(data);
     },
 
     watcher_error: (data: WatcherErrorMessage) => {

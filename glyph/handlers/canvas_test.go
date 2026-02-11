@@ -11,6 +11,7 @@ import (
 	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	pb "github.com/teranos/QNTX/glyph/proto"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
+	"github.com/teranos/QNTX/sym"
 )
 
 // Helper function to create edges for testing
@@ -682,6 +683,26 @@ func TestCanvasHandler_HandleCompositions_POST_FourGlyphChain(t *testing.T) {
 		if response.Edges[i].From != expected[0] || response.Edges[i].To != expected[1] {
 			t.Errorf("Edge[%d]: expected %s→%s, got %s→%s", i,
 				expected[0], expected[1], response.Edges[i].From, response.Edges[i].To)
+		}
+	}
+}
+
+func TestGlyphSymbolToType(t *testing.T) {
+	tests := []struct {
+		symbol   string
+		expected string
+	}{
+		{"py", "py"},
+		{sym.AX, "ax"},     // ⋈ → ax
+		{sym.SO, "prompt"},  // ⟶ → prompt
+		{"note", "note"},    // Unknown passes through
+		{"result", "result"},
+	}
+
+	for _, tt := range tests {
+		got := glyphSymbolToType(tt.symbol)
+		if got != tt.expected {
+			t.Errorf("glyphSymbolToType(%q) = %q, want %q", tt.symbol, got, tt.expected)
 		}
 	}
 }

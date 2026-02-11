@@ -7,6 +7,7 @@
 
 import { GraphData } from './core';
 import type { Attestation } from '../ts/generated/proto/plugin/grpc/protocol/atsstore';
+import type { GlyphFired } from '../ts/generated/proto/glyph/proto/events';
 // Import LSP types for parse-related messages to ensure consistency
 import type {
   SemanticToken as LSPSemanticToken,
@@ -75,6 +76,7 @@ export type MessageType =
   | 'system_capabilities'
   | 'watcher_match'
   | 'watcher_error'
+  | 'glyph_fired'
   | 'database_stats'
   | 'rich_search_results'
   | 'vidstream_init_success'
@@ -427,6 +429,14 @@ export interface WatcherMatchMessage extends BaseMessage {
 }
 
 /**
+ * Glyph fired notification — sent when a meld-edge subscription triggers glyph execution.
+ * Fields from proto GlyphFired + WebSocket type discriminator.
+ */
+export interface GlyphFiredMessage extends Omit<BaseMessage, 'timestamp'>, GlyphFired {
+  type: 'glyph_fired';
+}
+
+/**
  * Watcher error notification - sent when a watcher encounters an error
  */
 export interface WatcherErrorMessage extends BaseMessage {
@@ -597,6 +607,7 @@ export type WebSocketMessage =
   | SystemCapabilitiesMessage
   | WatcherMatchMessage
   | WatcherErrorMessage
+  | GlyphFiredMessage
   | DatabaseStatsMessage
   | RichSearchResultsMessage
   | VidStreamInitSuccessMessage
@@ -646,6 +657,7 @@ export interface MessageHandlers {
   system_capabilities?: MessageHandler<SystemCapabilitiesMessage>;
   watcher_match?: MessageHandler<WatcherMatchMessage>;
   watcher_error?: MessageHandler<WatcherErrorMessage>;
+  glyph_fired?: MessageHandler<GlyphFiredMessage>;
   database_stats?: MessageHandler<DatabaseStatsMessage>;
   rich_search_results?: MessageHandler<RichSearchResultsMessage>;
   vidstream_init_success?: MessageHandler<VidStreamInitSuccessMessage>;

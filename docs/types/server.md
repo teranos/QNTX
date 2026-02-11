@@ -119,6 +119,22 @@ type ErrorResponse struct {
 }
 ```
 
+## GlyphFiredMessage {#glyphfiredmessage}
+
+**Source**: [`server/types.go:235`](https://github.com/teranos/QNTX/blob/main/server/types.go#L235)
+
+
+```go
+type GlyphFiredMessage struct {
+	Type string `json:"type"`
+	GlyphID string `json:"glyph_id"`
+	AttestationID string `json:"attestation_id"`
+	Status string `json:"status"`
+	Error string `json:"error,omitempty"`
+	Timestamp int64 `json:"timestamp"`
+}
+```
+
 ## JobChildrenResponse {#jobchildrenresponse}
 
 **Source**: [`server/pulse_types.go:103`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L103)
@@ -245,7 +261,7 @@ type PluginHealthMessage struct {
 
 ## PluginInfo {#plugininfo}
 
-**Source**: [`server/handlers.go:586`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L586)
+**Source**: [`server/handlers.go:574`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L574)
 
 
 ```go
@@ -306,12 +322,14 @@ type PromptDirectRequest struct {
 	SystemPrompt string `json:"system_prompt,omitempty"`
 	Provider string `json:"provider,omitempty"`
 	Model string `json:"model,omitempty"`
+	GlyphID string `json:"glyph_id,omitempty"`
+	UpstreamAttestation *types.As `json:"upstream_attestation,omitempty"`
 }
 ```
 
 ## PromptDirectResponse {#promptdirectresponse}
 
-**Source**: [`server/prompt_handlers.go:81`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L81)
+**Source**: [`server/prompt_handlers.go:83`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L83)
 
 
 ```go
@@ -341,7 +359,7 @@ type PromptExecuteRequest struct {
 
 ## PromptExecuteResponse {#promptexecuteresponse}
 
-**Source**: [`server/prompt_handlers.go:110`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L110)
+**Source**: [`server/prompt_handlers.go:112`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L112)
 
 
 ```go
@@ -388,7 +406,7 @@ type PromptPreviewResponse struct {
 
 ## PromptSaveRequest {#promptsaverequest}
 
-**Source**: [`server/prompt_handlers.go:594`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L594)
+**Source**: [`server/prompt_handlers.go:519`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L519)
 
 
 ```go
@@ -521,7 +539,7 @@ type QueryMessage struct {
 
 ## Result {#result}
 
-**Source**: [`server/prompt_handlers.go:90`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L90)
+**Source**: [`server/prompt_handlers.go:92`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L92)
 
 
 ```go
@@ -657,7 +675,7 @@ type UsageUpdateMessage struct {
 
 ## WatcherCreateRequest {#watchercreaterequest}
 
-**Source**: [`server/watcher_handlers.go:16`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L16)
+**Source**: [`server/watcher_handlers.go:18`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L18)
 
 
 ```go
@@ -679,7 +697,7 @@ type WatcherCreateRequest struct {
 
 ## WatcherErrorMessage {#watchererrormessage}
 
-**Source**: [`server/types.go:236`](https://github.com/teranos/QNTX/blob/main/server/types.go#L236)
+**Source**: [`server/types.go:246`](https://github.com/teranos/QNTX/blob/main/server/types.go#L246)
 
 
 ```go
@@ -709,7 +727,7 @@ type WatcherMatchMessage struct {
 
 ## WatcherResponse {#watcherresponse}
 
-**Source**: [`server/watcher_handlers.go:32`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L32)
+**Source**: [`server/watcher_handlers.go:34`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L34)
 
 
 ```go

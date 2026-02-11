@@ -17,6 +17,8 @@ use tracing::{error, info};
 // Thread-local storage for the ATSStore client during Python execution
 thread_local! {
     static CURRENT_CLIENT: RefCell<Option<SharedAtsStoreClient>> = const { RefCell::new(None) };
+    // Glyph ID for actor convention: when set, attest() defaults actor to "glyph:{id}"
+    static CURRENT_GLYPH_ID: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
 /// ATSStore client configuration
@@ -176,6 +178,14 @@ pub fn clear_current_client() {
     });
 }
 
+/// Set the current glyph ID for actor convention.
+/// When set, attest() defaults actor to "glyph:{id}" if no explicit actors provided.
+pub fn set_current_glyph_id(glyph_id: Option<String>) {
+    CURRENT_GLYPH_ID.with(|g| {
+        *g.borrow_mut() = glyph_id;
+    });
+}
+
 /// Python-callable attest function.
 /// Creates an attestation using the current thread's ATSStore client.
 #[pyfunction]
@@ -200,6 +210,15 @@ pub fn attest(
             Some(map)
         }
         None => None,
+    };
+
+    // Default actors to "glyph:{id}" when glyph_id is set and user didn't pass explicit actors
+    let actors = match actors {
+        Some(a) if !a.is_empty() => Some(a), // User provided explicit actors — use them
+        _ => {
+            // Check if a glyph ID is set for this execution
+            CURRENT_GLYPH_ID.with(|g| g.borrow().as_ref().map(|id| vec![format!("glyph:{}", id)]))
+        }
     };
 
     // Get the current client from thread-local storage

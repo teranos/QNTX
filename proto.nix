@@ -17,11 +17,12 @@
 
       echo "✓ Plugin proto files generated in plugin/grpc/protocol/"
 
-      # Generate glyph proto (canvas compositions)
+      # Generate glyph proto (canvas compositions + events)
       ${pkgs.protobuf}/bin/protoc \
         --plugin=${pkgs.protoc-gen-go}/bin/protoc-gen-go \
         --go_out=. --go_opt=paths=source_relative \
-        glyph/proto/canvas.proto
+        glyph/proto/canvas.proto \
+        glyph/proto/events.proto
 
       echo "✓ Glyph proto files generated in glyph/proto/"
 
@@ -80,7 +81,7 @@
 
       echo "✓ Plugin proto files generated in web/ts/generated/proto/"
 
-      # Generate TypeScript for glyph proto (canvas compositions)
+      # Generate TypeScript for glyph proto (canvas compositions + events)
       # useDate=string: google.protobuf.Timestamp → string (ISO 8601, matches Go JSON output)
       ${pkgs.protobuf}/bin/protoc \
         --plugin=protoc-gen-ts_proto=web/node_modules/.bin/protoc-gen-ts_proto \
@@ -93,7 +94,8 @@
         --ts_proto_opt=snakeToCamel=false \
         --ts_proto_opt=useDate=string \
         --ts_proto_out=web/ts/generated/proto \
-        glyph/proto/canvas.proto
+        glyph/proto/canvas.proto \
+        glyph/proto/events.proto
 
       echo "✓ Glyph proto TypeScript files generated in web/ts/generated/proto/"
     '');

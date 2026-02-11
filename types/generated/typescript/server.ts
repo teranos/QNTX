@@ -6,6 +6,7 @@
 
 import { Job } from './async';
 import { Execution } from './schedule';
+import { As } from './types';
 
 export interface ChildJobInfo {
   id: string;
@@ -130,6 +131,33 @@ export interface ErrorResponse {
    * Structured error context from errors.GetAllDetails()
    */
   details?: string[];
+}
+
+export interface GlyphFiredMessage {
+  /**
+   * "glyph_fired"
+   */
+  type: string;
+  /**
+   * Target glyph that was executed
+   */
+  glyph_id: string;
+  /**
+   * Triggering attestation ASID
+   */
+  attestation_id: string;
+  /**
+   * "started", "success", "error"
+   */
+  status: string;
+  /**
+   * Error message when status is "error"
+   */
+  error?: string;
+  /**
+   * Unix timestamp
+   */
+  timestamp: number;
 }
 
 export interface JobChildrenResponse {
@@ -313,7 +341,7 @@ export interface ProgressMessage {
 
 export interface PromptDirectRequest {
   /**
-   * Prompt template (no {{variables}} required)
+   * Prompt template with optional {{field}} placeholders
    */
   template: string;
   system_prompt?: string;
@@ -322,6 +350,14 @@ export interface PromptDirectRequest {
    */
   provider?: string;
   model?: string;
+  /**
+   * TODO(#458): create result attestation with actor "glyph:{id}" so prompt glyphs can be mid-chain producers
+   */
+  glyph_id?: string;
+  /**
+   * Triggering attestation — enables {{field}} interpolation
+   */
+  upstream_attestation?: As | null;
 }
 
 export interface PromptDirectResponse {
