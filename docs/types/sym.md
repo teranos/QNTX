@@ -32,7 +32,7 @@ const Pulse = "꩜"
 const PulseClose = "❀"
 const PulseOpen = "✿"
 const SO = "⟶"
-const Subcircuit = "⌗"
+const Subcanvas = "⌗"
 ```
 
 

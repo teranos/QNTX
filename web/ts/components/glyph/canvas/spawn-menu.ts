@@ -6,7 +6,7 @@
  */
 
 import type { Glyph } from '../glyph';
-import { IX, AX, SO, Prose, Subcircuit } from '@generated/sym.js';
+import { IX, AX, SO, Prose, Subcanvas } from '@generated/sym.js';
 import { log, SEG } from '../../../logger';
 import { getMinimizeDuration } from '../glyph';
 import { createIxGlyph } from '../ix-glyph';
@@ -15,7 +15,7 @@ import { createPyGlyph, PY_DEFAULT_CODE } from '../py-glyph';
 import { createPromptGlyph, PROMPT_DEFAULT_TEMPLATE } from '../prompt-glyph';
 import { createNoteGlyph } from '../note-glyph';
 import { createTsGlyph, TS_DEFAULT_CODE } from '../ts-glyph';
-import { createSubcircuitGlyph } from '../subcircuit-glyph';
+import { createSubcanvasGlyph } from '../subcanvas-glyph';
 import { uiState } from '../../../state/ui';
 
 /** Duration multiplier for spawn menu animation */
@@ -182,11 +182,11 @@ export function showSpawnMenu(
     // Add canvas button
     const canvasBtn = document.createElement('button');
     canvasBtn.className = 'canvas-spawn-button';
-    canvasBtn.textContent = Subcircuit;
-    canvasBtn.title = 'Spawn Subcircuit glyph';
+    canvasBtn.textContent = Subcanvas;
+    canvasBtn.title = 'Spawn Subcanvas glyph';
 
     canvasBtn.addEventListener('click', () => {
-        spawnSubcircuitGlyph(x, y, canvas, glyphs);
+        spawnSubcanvasGlyph(x, y, canvas, glyphs);
         removeMenu();
     });
 
@@ -520,30 +520,30 @@ async function spawnNoteGlyph(
 }
 
 /**
- * Spawn a new Subcircuit glyph at pixel position
+ * Spawn a new Subcanvas glyph at pixel position
  */
-async function spawnSubcircuitGlyph(
+async function spawnSubcanvasGlyph(
     x: number,
     y: number,
     canvas: HTMLElement,
     glyphs: Glyph[]
 ): Promise<void> {
-    const subcircuitGlyph: Glyph = {
-        id: `subcircuit-${crypto.randomUUID()}`,
-        title: 'Subcircuit',
-        symbol: Subcircuit,
+    const subcanvasGlyph: Glyph = {
+        id: `subcanvas-${crypto.randomUUID()}`,
+        title: 'Subcanvas',
+        symbol: Subcanvas,
         x,
         y,
         renderContent: () => {
             const content = document.createElement('div');
-            content.textContent = 'Subcircuit glyph';
+            content.textContent = 'Subcanvas glyph';
             return content;
         }
     };
 
-    glyphs.push(subcircuitGlyph);
+    glyphs.push(subcanvasGlyph);
 
-    const glyphElement = await createSubcircuitGlyph(subcircuitGlyph);
+    const glyphElement = await createSubcanvasGlyph(subcanvasGlyph);
     canvas.appendChild(glyphElement);
 
     const rect = glyphElement.getBoundingClientRect();
@@ -551,13 +551,13 @@ async function spawnSubcircuitGlyph(
     const height = Math.round(rect.height);
 
     uiState.addCanvasGlyph({
-        id: subcircuitGlyph.id,
-        symbol: Subcircuit,
+        id: subcanvasGlyph.id,
+        symbol: Subcanvas,
         x,
         y,
         width,
         height
     });
 
-    log.debug(SEG.GLYPH, `[Canvas] Spawned Subcircuit glyph at (${x}, ${y}) with size ${width}x${height}`);
+    log.debug(SEG.GLYPH, `[Canvas] Spawned Subcanvas glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
