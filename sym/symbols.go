@@ -27,7 +27,7 @@ const (
 	DB         = "⊔" // Database/storage layer
 	Prose      = "▣" // Documentation and prose content
 	Canvas     = "⧉" // Canvas - main workspace surface
-	Subcircuit = "⌗" // Subcircuit - composable nested workspace
+	Subcanvas = "⌗" // Subcanvas - composable nested workspace
 )
 
 // PaletteOrder defines the canonical ordering for UI controls,

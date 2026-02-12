@@ -1,5 +1,5 @@
 /**
- * Subcircuit Glyph — compact square glyph with centered ⌗ symbol.
+ * Subcanvas Glyph — compact square glyph with centered ⌗ symbol.
  *
  * Compact: small square on canvas, large centered symbol, no title bar.
  * Expanded: dblclick → viewport-inset bordered workspace. dblclick again → collapse.
@@ -20,10 +20,10 @@ import { canvasPlaced } from './manifestations/canvas-placed';
 const COMPACT_SIZE = 120;
 const EXPAND_INSET = 40;
 
-export async function createSubcircuitGlyph(glyph: Glyph): Promise<HTMLElement> {
+export async function createSubcanvasGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Content area — serves as drag handle in compact mode
     const content = document.createElement('div');
-    content.className = 'subcircuit-content';
+    content.className = 'subcanvas-content';
     content.style.flex = '1';
     content.style.position = 'relative';
     content.style.overflow = 'hidden';
@@ -34,7 +34,7 @@ export async function createSubcircuitGlyph(glyph: Glyph): Promise<HTMLElement> 
 
     const { element } = canvasPlaced({
         glyph,
-        className: 'canvas-subcircuit-glyph',
+        className: 'canvas-subcanvas-glyph',
         defaults: {
             x: glyph.x ?? 200,
             y: glyph.y ?? 200,
@@ -44,12 +44,12 @@ export async function createSubcircuitGlyph(glyph: Glyph): Promise<HTMLElement> 
         dragHandle: content,
         resizable: true,
         resizeHandleClass: 'glyph-resize-handle--hidden',
-        logLabel: 'Subcircuit',
+        logLabel: 'Subcanvas',
     });
 
     // Large centered symbol
     const symbol = document.createElement('span');
-    symbol.className = 'subcircuit-symbol';
+    symbol.className = 'subcanvas-symbol';
     symbol.textContent = '⌗';
     symbol.style.fontSize = '48px';
     symbol.style.color = '#c0a0e8';
@@ -74,19 +74,19 @@ export async function createSubcircuitGlyph(glyph: Glyph): Promise<HTMLElement> 
     // the click lands on the element itself.
     element.addEventListener('dblclick', (e) => {
         e.stopPropagation();
-        if (element.dataset.subcircuitExpanded === 'true') {
-            collapseSubcircuit(element, content);
+        if (element.dataset.subcanvasExpanded === 'true') {
+            collapseSubcanvas(element, content);
         } else {
-            expandSubcircuit(element, content);
+            expandSubcanvas(element, content);
         }
     });
 
-    log.debug(SEG.GLYPH, `[Subcircuit] Created compact subcircuit ${glyph.id}`);
+    log.debug(SEG.GLYPH, `[Subcanvas] Created compact subcanvas ${glyph.id}`);
 
     return element;
 }
 
-function expandSubcircuit(element: HTMLElement, content: HTMLElement): void {
+function expandSubcanvas(element: HTMLElement, content: HTMLElement): void {
     // Store compact geometry for collapse
     const rect = element.getBoundingClientRect();
     element.dataset.compactLeft = element.style.left;
@@ -137,12 +137,12 @@ function expandSubcircuit(element: HTMLElement, content: HTMLElement): void {
         });
     }
 
-    element.dataset.subcircuitExpanded = 'true';
+    element.dataset.subcanvasExpanded = 'true';
 
-    log.debug(SEG.GLYPH, `[Subcircuit] Expanded ${element.dataset.glyphId}`);
+    log.debug(SEG.GLYPH, `[Subcanvas] Expanded ${element.dataset.glyphId}`);
 }
 
-function collapseSubcircuit(element: HTMLElement, content: HTMLElement): void {
+function collapseSubcanvas(element: HTMLElement, content: HTMLElement): void {
     const expandedRect = element.getBoundingClientRect();
 
     // Retrieve stored compact geometry
@@ -197,12 +197,12 @@ function collapseSubcircuit(element: HTMLElement, content: HTMLElement): void {
     }
 
     // Clean up
-    delete element.dataset.subcircuitExpanded;
+    delete element.dataset.subcanvasExpanded;
     delete element.dataset.compactLeft;
     delete element.dataset.compactTop;
     delete element.dataset.compactWidth;
     delete element.dataset.compactHeight;
     delete element.dataset.compactZIndex;
 
-    log.debug(SEG.GLYPH, `[Subcircuit] Collapsed ${element.dataset.glyphId}`);
+    log.debug(SEG.GLYPH, `[Subcanvas] Collapsed ${element.dataset.glyphId}`);
 }
