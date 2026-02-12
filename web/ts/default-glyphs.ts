@@ -54,6 +54,7 @@
 import { glyphRun } from './components/glyph/run';
 import { createCanvasGlyph } from './components/glyph/canvas/canvas-glyph';
 import { createChartGlyph } from './components/glyph/chart-glyph';
+import { createOpenClawGlyph } from './components/glyph/openclaw-glyph';
 import { sendMessage } from './websocket';
 import { DB } from '@generated/sym.js';
 import { log, SEG } from './logger.ts';
@@ -240,6 +241,9 @@ export function registerDefaultGlyphs(): void {
     // Canvas Glyph - Fractal container with spatial grid
     glyphRun.add(createCanvasGlyph());
 
+    // OpenClaw Canvas - Live workspace file observability
+    glyphRun.add(createOpenClawGlyph());
+
     // Database Statistics Glyph
     glyphRun.add({
         id: 'database-glyph',
@@ -298,6 +302,7 @@ export function registerDefaultGlyphs(): void {
 
     log.debug(SEG.UI, 'Default glyphs registered:', {
         canvas: 'Spatial canvas grid',
+        openclaw: 'OpenClaw workspace observability',
         database: 'Database statistics',
         self: 'Self diagnostics',
         usage: 'API usage and costs'
