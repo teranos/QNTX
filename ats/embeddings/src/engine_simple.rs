@@ -1,33 +1,24 @@
 // Simplified engine for initial compilation
 use anyhow::Result;
 use std::path::Path;
-use std::sync::Arc;
 
 use crate::types::{BatchEmbeddingResult, EmbeddingResult, ModelInfo};
 
-/// ONNX-based embedding engine for sentence transformers (simplified)
+/// Stub embedding engine that returns dummy vectors (for compilation without ONNX model)
 pub struct EmbeddingEngine {
-    _session: Arc<ort::session::Session>,
     model_info: ModelInfo,
 }
 
 impl EmbeddingEngine {
     /// Create a new embedding engine from an ONNX model file
     pub fn new(_model_path: impl AsRef<Path>, model_name: String) -> Result<Self> {
-        // For now, create a dummy engine to get compilation working
-        // Real ONNX integration requires proper API study
-
         let model_info = ModelInfo {
             name: model_name,
             dimensions: 384,
             max_sequence_length: 512,
         };
 
-        // Dummy session - will replace with real ONNX loading
-        Ok(Self {
-            _session: Arc::new(unsafe { std::mem::zeroed() }),
-            model_info,
-        })
+        Ok(Self { model_info })
     }
 
     /// Get model information
