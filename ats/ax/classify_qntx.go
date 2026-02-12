@@ -13,13 +13,13 @@ import (
 )
 
 // NewDefaultClassifier creates the WASM-backed classifier.
-// Panics if the WASM engine is unavailable — run `make rust-wasm` to build.
+// Panics if the WASM engine is unavailable — run `make wasm` to build.
 //
 // TODO(QNTX): Remove ats/ax/classification/ (Go classifier) in a follow-up PR.
 func NewDefaultClassifier(config classification.TemporalConfig) Classifier {
 	c, err := NewWasmClassifier(config)
 	if err != nil {
-		panic("WASM classifier unavailable: " + err.Error() + " — run `make rust-wasm`")
+		panic("WASM classifier unavailable: " + err.Error() + " — run `make wasm`")
 	}
 	return c
 }
