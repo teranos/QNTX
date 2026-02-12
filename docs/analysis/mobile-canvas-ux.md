@@ -37,17 +37,21 @@ touchend             → find peaked glyph → morphToWindow/Canvas → collapse
 
 `manifestations/window.ts:316-401` handles both mouse and touch for window dragging. No changes needed.
 
-## Canvas Manifestation: Remaining Gaps
+## Canvas Manifestation
 
-For a viewer/monitor, the canvas doesn't need editing. It needs to display the current state legibly.
+For a viewer/monitor, the canvas needs to display the current state legibly and allow navigation.
 
-### No pan or zoom — off-screen glyphs invisible
+### Canvas Pan — Single finger drag (mobile/touch)
 
-`canvas-workspace` has `overflow: hidden`. Glyphs at absolute pixel coordinates from a desktop session are beyond the phone viewport with no way to see or reach them. There is no pinch-to-zoom, two-finger pan, scroll mechanism, or minimap. This is the next critical gap after the tray.
+`canvas-pan.ts` implements touch-based panning for mobile and responsive design mode. Single finger drag anywhere on the canvas (including on glyphs) pans the viewport. Desktop uses two-finger trackpad scroll and middle mouse button drag.
 
-### Canvas editing interactions are mouse-only (acceptable for viewer)
+Touch handlers are always set up (even on desktop) to support browser responsive design mode testing.
 
-Drag, resize, rectangle select, spawn menu, meld — all use `mousedown`/`mousemove`/`mouseup` exclusively. For a viewer this is acceptable.
+### Canvas editing interactions are mouse-only
+
+**Glyph drag, resize, rectangle select, spawn menu, meld** — all use `mousedown`/`mousemove`/`mouseup` exclusively. On mobile/touch devices, these interactions are not currently available. Glyphs can be viewed and the canvas panned, but glyph manipulation requires desktop.
+
+Future work could add touch-based glyph editing via long-press, dedicated edit mode toggle, or gesture-based interactions.
 
 ## Tap Target Inventory
 
@@ -82,8 +86,16 @@ All touch sizing is gated behind `@media (pointer: coarse)` — desktop unchange
 - `#left-panel` set to `width: 0` with `overflow: visible` on mobile
 - `#container` changed to `display: block` for single-column mobile layout
 
+### Canvas Pan (`canvas-pan.ts`)
+- **Fixed**: Touch-based canvas panning for mobile and responsive design mode
+- Single finger drag anywhere on canvas pans the viewport
+- Desktop uses two-finger trackpad scroll and middle mouse button drag
+- Touch handlers always active to support responsive design mode testing
+- Pan state persists per-canvas in localStorage
+
 ## Remaining Work
 
 | Gap | Priority | Notes |
 |---|---|---|
-| Canvas pan/zoom for mobile viewer | **Critical** | Off-screen glyphs invisible on phone |
+| Canvas zoom for mobile viewer | Medium | Pan implemented; pinch-to-zoom would improve navigation |
+| Touch-based glyph editing | Low | Glyph manipulation currently desktop-only; acceptable for viewer use case |
