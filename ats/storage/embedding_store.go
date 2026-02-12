@@ -83,14 +83,11 @@ func (s *EmbeddingStore) Save(embedding *EmbeddingModel) error {
 			embedding.ID, embedding.SourceType, embedding.SourceID)
 	}
 
-	// Also insert into the vec_embeddings virtual table for vector search
-	vecQuery := `
-		INSERT INTO vec_embeddings (embedding_id, embedding)
-		VALUES (?, ?)
-		ON CONFLICT(embedding_id) DO UPDATE SET
-			embedding = excluded.embedding
-	`
+	// Also update the vec_embeddings virtual table for vector search
+	// Virtual tables don't support UPSERT, so we delete then insert
+	_, _ = s.db.Exec("DELETE FROM vec_embeddings WHERE embedding_id = ?", embedding.ID)
 
+	vecQuery := `INSERT INTO vec_embeddings (embedding_id, embedding) VALUES (?, ?)`
 	_, err = s.db.Exec(vecQuery, embedding.ID, embedding.Embedding)
 	if err != nil {
 		return errors.Wrapf(err, "failed to save embedding %s to vec_embeddings table",
@@ -308,12 +305,14 @@ func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingM
 	}
 	defer embStmt.Close()
 
-	vecStmt, err := tx.Prepare(`
-		INSERT INTO vec_embeddings (embedding_id, embedding)
-		VALUES (?, ?)
-		ON CONFLICT(embedding_id) DO UPDATE SET
-			embedding = excluded.embedding
-	`)
+	// Virtual tables don't support UPSERT, so we need to delete then insert
+	delVecStmt, err := tx.Prepare(`DELETE FROM vec_embeddings WHERE embedding_id = ?`)
+	if err != nil {
+		return errors.Wrap(err, "failed to prepare vec_embeddings delete statement")
+	}
+	defer delVecStmt.Close()
+
+	vecStmt, err := tx.Prepare(`INSERT INTO vec_embeddings (embedding_id, embedding) VALUES (?, ?)`)
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare vec_embeddings insert statement")
 	}
@@ -346,7 +345,8 @@ func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingM
 			return errors.Wrapf(err, "failed to insert embedding %s", embedding.ID)
 		}
 
-		// Insert into vec_embeddings
+		// Delete existing vec_embeddings entry if it exists, then insert new one
+		_, _ = delVecStmt.Exec(embedding.ID)
 		_, err = vecStmt.Exec(embedding.ID, embedding.Embedding)
 		if err != nil {
 			return errors.Wrapf(err, "failed to insert into vec_embeddings %s", embedding.ID)

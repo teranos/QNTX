@@ -14,12 +14,19 @@ import (
 	"os"
 	"path/filepath"
 
+	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	_ "github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
 
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
 )
+
+func init() {
+	// Initialize sqlite-vec extension for vector similarity search
+	// This registers the vec0 module globally for all SQLite connections
+	sqlite_vec.Auto()
+}
 
 const (
 	// SQLiteJournalMode configures the database journal mode (WAL enables concurrent reads)
