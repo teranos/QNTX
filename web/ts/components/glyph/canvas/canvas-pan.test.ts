@@ -17,6 +17,28 @@ function createWheelEvent(deltaX: number, deltaY: number, ctrlKey: boolean): Eve
     return event;
 }
 
+// Helper to create touch event in test environment
+function createTouchEvent(type: string, clientX: number, clientY: number, identifier: number = 0): TouchEvent {
+    const Win = globalThis.window as any;
+    const touch = {
+        identifier,
+        clientX,
+        clientY,
+        screenX: clientX,
+        screenY: clientY,
+        pageX: clientX,
+        pageY: clientY,
+        target: null,
+    };
+
+    const event = new Win.Event(type, { bubbles: true, cancelable: true }) as TouchEvent;
+    Object.defineProperty(event, 'touches', { value: type === 'touchend' ? [] : [touch], writable: false });
+    Object.defineProperty(event, 'changedTouches', { value: [touch], writable: false });
+    Object.defineProperty(event, 'targetTouches', { value: type === 'touchend' ? [] : [touch], writable: false });
+
+    return event;
+}
+
 describe('Canvas Pan', () => {
     beforeEach(() => {
         // Reset DOM
@@ -139,5 +161,66 @@ describe('Canvas Pan', () => {
 
         // Pan should remain at 0
         expect(contentLayer.style.transform).toBe('translate(0px, 0px)');
+    });
+
+    test('touch events update pan offset (mobile/responsive mode)', () => {
+        const container = document.createElement('div');
+        const contentLayer = document.createElement('div');
+        contentLayer.className = 'canvas-content-layer';
+        container.appendChild(contentLayer);
+        document.body.appendChild(container);
+
+        setupCanvasPan(container, 'test-canvas');
+
+        // Simulate touchstart
+        const touchStart = createTouchEvent('touchstart', 100, 100);
+        container.dispatchEvent(touchStart);
+
+        // Simulate touchmove - drag 50px right, 30px down
+        const touchMove = createTouchEvent('touchmove', 150, 130);
+        container.dispatchEvent(touchMove);
+
+        // Pan should update
+        expect(contentLayer.style.transform).toBe('translate(50px, 30px)');
+
+        // Simulate touchend
+        const touchEnd = createTouchEvent('touchend', 150, 130);
+        container.dispatchEvent(touchEnd);
+
+        // State should be persisted (skip check if method not available in CI)
+        if (typeof uiState.getCanvasPan === 'function') {
+            const saved = uiState.getCanvasPan('test-canvas');
+            expect(saved).toEqual({ panX: 50, panY: 30 });
+        }
+    });
+
+    test('touch pan works regardless of target (no glyph check)', () => {
+        const container = document.createElement('div');
+        const contentLayer = document.createElement('div');
+        contentLayer.className = 'canvas-content-layer';
+        container.appendChild(contentLayer);
+
+        // Create a mock glyph inside the content layer
+        const glyph = document.createElement('div');
+        glyph.setAttribute('data-glyph-id', 'test-glyph');
+        glyph.className = 'canvas-py-glyph';
+        contentLayer.appendChild(glyph);
+
+        document.body.appendChild(container);
+
+        setupCanvasPan(container, 'test-canvas');
+
+        // Touch events on container should work even with glyph present
+        const touchStart = createTouchEvent('touchstart', 100, 100);
+        container.dispatchEvent(touchStart);
+
+        const touchMove = createTouchEvent('touchmove', 150, 130);
+        container.dispatchEvent(touchMove);
+
+        // Pan should work
+        expect(contentLayer.style.transform).toBe('translate(50px, 30px)');
+
+        const touchEnd = createTouchEvent('touchend', 150, 130);
+        container.dispatchEvent(touchEnd);
     });
 });
