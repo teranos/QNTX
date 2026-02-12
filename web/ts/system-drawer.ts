@@ -225,6 +225,12 @@ export function initSystemDrawer(): void {
         setStorageItem(DRAWER_HEIGHT_KEY, String(finalHeight));
     });
 
+    grabBar.addEventListener('pointercancel', (e: PointerEvent) => {
+        if (!dragging) return;
+        dragging = false;
+        grabBar.releasePointerCapture(e.pointerId);
+    });
+
     // --- Verbosity selector ---
     const verbositySelect = document.getElementById('verbosity-select') as HTMLSelectElement | null;
     if (verbositySelect) {
