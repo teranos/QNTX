@@ -33,7 +33,7 @@ import { showActionBar, hideActionBar } from './action-bar';
 import { showSpawnMenu } from './spawn-menu';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
 import { setupRectangleSelection, didRectangleSelectionJustComplete } from './rectangle-selection';
-import { setupCanvasPan } from './canvas-pan';
+import { setupCanvasPan, resetTransform } from './canvas-pan';
 import { getAllCompositions, removeComposition, extractGlyphIds } from '../../../state/compositions';
 import { convertNoteToPrompt, convertResultToNote } from '../conversions';
 import {
@@ -385,14 +385,15 @@ export function createCanvasGlyph(): Glyph {
                 }
             }, true);
 
-            // Setup keyboard shortcuts (ESC to deselect, DELETE/BACKSPACE to delete, U to unmeld)
+            // Setup keyboard shortcuts (ESC, DELETE, U, 0 for reset view)
             // AbortController signal auto-cleans up when container is removed from DOM
             void setupKeyboardShortcuts(
                 container,
                 hasSelection,
                 () => deselectAll(container),
                 () => deleteSelectedGlyphs(container),
-                () => unmeldFromSelection(container)
+                () => unmeldFromSelection(container),
+                () => resetTransform(container, 'canvas-workspace')
             );
             // Note: AbortController returned but not stored - signal handles cleanup automatically
             // Future: if we add explicit canvas.destroy(), store and call .abort()
