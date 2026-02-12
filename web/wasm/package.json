@@ -2,7 +2,7 @@
   "name": "qntx-wasm",
   "type": "module",
   "description": "QNTX WASM bridge - exposes qntx-core functions for Go via wazero and browser",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "license": "MIT",
   "repository": {
     "type": "git",
