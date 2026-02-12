@@ -1,60 +1,76 @@
 /**
- * Canvas Pan - Two-finger scroll and middle mouse pan for canvas navigation
+ * Canvas Pan & Zoom - Navigation for canvas workspace
  *
  * Desktop:
- * - Two-finger trackpad scroll (primary)
- * - Middle mouse button drag (fallback for external mouse)
+ * - Two-finger trackpad scroll: pan
+ * - Middle mouse button drag: pan
+ * - Ctrl+wheel (or Cmd+wheel): zoom
  *
  * Mobile:
- * - Single finger drag to pan
+ * - Single finger drag: pan
+ * - Two-finger pinch: zoom
  */
 
 import { log, SEG } from '../../../logger';
 import { uiState } from '../../../state/ui';
 
-interface PanState {
+// Zoom configuration
+const ZOOM_MIN = 0.25; // 25% - maximum zoom out
+const ZOOM_MAX = 4.0;  // 400% - maximum zoom in
+const ZOOM_SPEED = 0.001; // Desktop wheel sensitivity
+
+interface CanvasTransformState {
     panX: number;
     panY: number;
+    scale: number;
     isPanning: boolean;
+    isPinching: boolean;
     startX: number;
     startY: number;
     startPanX: number;
     startPanY: number;
+    startDistance: number;
+    startScale: number;
 }
 
 // Per-canvas state map
-const canvasStates = new Map<string, PanState>();
+const canvasStates = new Map<string, CanvasTransformState>();
 
-function getState(canvasId: string): PanState {
+function getState(canvasId: string): CanvasTransformState {
     if (!canvasStates.has(canvasId)) {
         canvasStates.set(canvasId, {
             panX: 0,
             panY: 0,
+            scale: 1.0,
             isPanning: false,
+            isPinching: false,
             startX: 0,
             startY: 0,
             startPanX: 0,
             startPanY: 0,
+            startDistance: 0,
+            startScale: 1.0,
         });
     }
     return canvasStates.get(canvasId)!;
 }
 
 /**
- * Apply pan transform to canvas content layer
+ * Apply pan and zoom transform to canvas content layer
+ * Order: translate first, then scale (applies translation in original coordinate space)
  */
-function applyPanTransform(container: HTMLElement, canvasId: string): void {
+function applyTransform(container: HTMLElement, canvasId: string): void {
     const state = getState(canvasId);
     const contentLayer = container.querySelector('.canvas-content-layer') as HTMLElement;
     if (contentLayer) {
-        contentLayer.style.transform = `translate(${state.panX}px, ${state.panY}px)`;
+        contentLayer.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.scale})`;
     }
 }
 
 /**
- * Load persisted pan state from uiState
+ * Load persisted pan and zoom state from uiState
  */
-function loadPanState(canvasId: string): void {
+function loadTransformState(canvasId: string): void {
     // Check if uiState methods are available (may not be in test environments)
     if (typeof uiState.getCanvasPan !== 'function') return;
 
@@ -63,19 +79,25 @@ function loadPanState(canvasId: string): void {
         const state = getState(canvasId);
         state.panX = saved.panX;
         state.panY = saved.panY;
-        log.debug(SEG.GLYPH, '[CanvasPan] Loaded pan state', { canvasId, panX: state.panX, panY: state.panY });
+        state.scale = saved.scale ?? 1.0; // Backward compatible - default to 1.0
+        log.debug(SEG.GLYPH, '[CanvasPan] Loaded transform state', {
+            canvasId,
+            panX: state.panX,
+            panY: state.panY,
+            scale: state.scale
+        });
     }
 }
 
 /**
- * Save pan state to uiState
+ * Save pan and zoom state to uiState
  */
-function savePanState(canvasId: string): void {
+function saveTransformState(canvasId: string): void {
     // Check if uiState methods are available (may not be in test environments)
     if (typeof uiState.setCanvasPan !== 'function') return;
 
     const state = getState(canvasId);
-    uiState.setCanvasPan(canvasId, { panX: state.panX, panY: state.panY });
+    uiState.setCanvasPan(canvasId, { panX: state.panX, panY: state.panY, scale: state.scale });
 }
 
 /**
@@ -87,8 +109,8 @@ export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortC
     const state = getState(canvasId);
 
     // Load persisted pan state
-    loadPanState(canvasId);
-    applyPanTransform(container, canvasId);
+    loadTransformState(canvasId);
+    applyTransform(container, canvasId);
 
     // Detect mobile for desktop-specific handlers
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
@@ -96,17 +118,35 @@ export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortC
     // Desktop: Two-finger trackpad scroll (wheel event) and middle mouse drag
     if (!isMobile) {
         container.addEventListener('wheel', (e: WheelEvent) => {
-            // Only handle non-pinch scroll (two-finger scroll has ctrlKey === false)
-            if (e.ctrlKey) return;
-
             e.preventDefault();
 
-            // Apply wheel delta to pan
-            state.panX -= e.deltaX;
-            state.panY -= e.deltaY;
+            if (e.ctrlKey || e.metaKey) {
+                // Pinch zoom (Ctrl+wheel or Cmd+wheel on Mac)
+                const delta = -e.deltaY * ZOOM_SPEED;
+                const oldScale = state.scale;
+                const newScale = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, oldScale * (1 + delta)));
 
-            applyPanTransform(container, canvasId);
-            savePanState(canvasId);
+                // Get cursor position relative to container
+                const rect = container.getBoundingClientRect();
+                const cursorX = e.clientX - rect.left;
+                const cursorY = e.clientY - rect.top;
+
+                // Apply zoom origin math - keep point under cursor stationary
+                const scaleFactor = newScale / oldScale;
+                state.panX = cursorX - (cursorX - state.panX) * scaleFactor;
+                state.panY = cursorY - (cursorY - state.panY) * scaleFactor;
+                state.scale = newScale;
+
+                applyTransform(container, canvasId);
+                saveTransformState(canvasId);
+            } else {
+                // Two-finger scroll = pan
+                state.panX -= e.deltaX;
+                state.panY -= e.deltaY;
+
+                applyTransform(container, canvasId);
+                saveTransformState(canvasId);
+            }
         }, { signal, passive: false });
 
         // Desktop: Middle mouse button drag
@@ -133,7 +173,7 @@ export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortC
             state.panX = state.startPanX + deltaX;
             state.panY = state.startPanY + deltaY;
 
-            applyPanTransform(container, canvasId);
+            applyTransform(container, canvasId);
         }, { signal });
 
         document.addEventListener('mouseup', (e: MouseEvent) => {
@@ -143,7 +183,7 @@ export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortC
             state.isPanning = false;
             container.style.cursor = '';
 
-            savePanState(canvasId);
+            saveTransformState(canvasId);
             log.debug(SEG.GLYPH, '[CanvasPan] Middle mouse pan end', { panX: state.panX, panY: state.panY });
         }, { signal });
     }
@@ -152,47 +192,103 @@ export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortC
     let touchIdentifier: number | null = null;
 
     container.addEventListener('touchstart', (e: TouchEvent) => {
-        // Only handle single touch
-        if (e.touches.length !== 1) return;
+        if (e.touches.length === 2) {
+            // Two-finger pinch zoom
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
 
-        const touch = e.touches[0];
-        touchIdentifier = touch.identifier;
-        state.isPanning = true;
-        state.startX = touch.clientX;
-        state.startY = touch.clientY;
-        state.startPanX = state.panX;
-        state.startPanY = state.panY;
+            state.isPinching = true;
+            state.isPanning = false;
+            touchIdentifier = null;
+
+            // Calculate initial distance between touches
+            state.startDistance = Math.hypot(
+                touch2.clientX - touch1.clientX,
+                touch2.clientY - touch1.clientY
+            );
+            state.startScale = state.scale;
+
+            // Calculate pinch center
+            state.startX = (touch1.clientX + touch2.clientX) / 2;
+            state.startY = (touch1.clientY + touch2.clientY) / 2;
+        } else if (e.touches.length === 1) {
+            // Single touch pan
+            const touch = e.touches[0];
+            touchIdentifier = touch.identifier;
+            state.isPanning = true;
+            state.isPinching = false;
+            state.startX = touch.clientX;
+            state.startY = touch.clientY;
+            state.startPanX = state.panX;
+            state.startPanY = state.panY;
+        }
     }, { signal, passive: true });
 
     container.addEventListener('touchmove', (e: TouchEvent) => {
-        if (!state.isPanning || touchIdentifier === null) return;
+        if (state.isPinching && e.touches.length === 2) {
+            // Two-finger pinch zoom
+            e.preventDefault();
 
-        // Find our touch
-        const touch = Array.from(e.touches).find(t => t.identifier === touchIdentifier);
-        if (!touch) return;
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
 
-        e.preventDefault();
+            // Calculate current distance between touches
+            const currentDistance = Math.hypot(
+                touch2.clientX - touch1.clientX,
+                touch2.clientY - touch1.clientY
+            );
 
-        const deltaX = touch.clientX - state.startX;
-        const deltaY = touch.clientY - state.startY;
+            // Calculate scale change
+            const scaleChange = currentDistance / state.startDistance;
+            const oldScale = state.startScale;
+            const newScale = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, oldScale * scaleChange));
 
-        state.panX = state.startPanX + deltaX;
-        state.panY = state.startPanY + deltaY;
+            // Calculate pinch center relative to container
+            const rect = container.getBoundingClientRect();
+            const centerX = (touch1.clientX + touch2.clientX) / 2 - rect.left;
+            const centerY = (touch1.clientY + touch2.clientY) / 2 - rect.top;
 
-        applyPanTransform(container, canvasId);
+            // Apply zoom origin math - keep pinch center stationary
+            const scaleFactor = newScale / oldScale;
+            state.panX = centerX - (centerX - state.panX) * scaleFactor;
+            state.panY = centerY - (centerY - state.panY) * scaleFactor;
+            state.scale = newScale;
+
+            applyTransform(container, canvasId);
+        } else if (state.isPanning && touchIdentifier !== null) {
+            // Single touch pan
+            const touch = Array.from(e.touches).find(t => t.identifier === touchIdentifier);
+            if (!touch) return;
+
+            e.preventDefault();
+
+            const deltaX = touch.clientX - state.startX;
+            const deltaY = touch.clientY - state.startY;
+
+            state.panX = state.startPanX + deltaX;
+            state.panY = state.startPanY + deltaY;
+
+            applyTransform(container, canvasId);
+        }
     }, { signal, passive: false });
 
     container.addEventListener('touchend', (e: TouchEvent) => {
-        if (!state.isPanning || touchIdentifier === null) return;
+        if (state.isPinching) {
+            // End pinch zoom
+            if (e.touches.length < 2) {
+                state.isPinching = false;
+                saveTransformState(canvasId);
+            }
+        } else if (state.isPanning && touchIdentifier !== null) {
+            // Check if our touch ended
+            const ended = Array.from(e.changedTouches).some(t => t.identifier === touchIdentifier);
+            if (!ended) return;
 
-        // Check if our touch ended
-        const ended = Array.from(e.changedTouches).some(t => t.identifier === touchIdentifier);
-        if (!ended) return;
+            state.isPanning = false;
+            touchIdentifier = null;
 
-        state.isPanning = false;
-        touchIdentifier = null;
-
-        savePanState(canvasId);
+            saveTransformState(canvasId);
+        }
     }, { signal });
 
     return controller;
@@ -200,10 +296,81 @@ export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortC
 
 /**
  * Get current pan offset (for coordinate transforms)
+ * @deprecated Use getTransform instead
  */
 export function getPanOffset(canvasId: string): { panX: number; panY: number } {
     const state = getState(canvasId);
     return { panX: state.panX, panY: state.panY };
+}
+
+/**
+ * Get current transform state (pan and zoom)
+ */
+export function getTransform(canvasId: string): { panX: number; panY: number; scale: number } {
+    const state = getState(canvasId);
+    return { panX: state.panX, panY: state.panY, scale: state.scale };
+}
+
+/**
+ * Set zoom level programmatically
+ * @param canvasId Canvas identifier
+ * @param scale Target zoom scale (clamped to ZOOM_MIN..ZOOM_MAX)
+ * @param centerX Optional zoom center X (container-relative). Defaults to container center.
+ * @param centerY Optional zoom center Y (container-relative). Defaults to container center.
+ */
+export function setZoom(canvasId: string, scale: number, centerX?: number, centerY?: number): void {
+    const state = getState(canvasId);
+    const oldScale = state.scale;
+    const newScale = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, scale));
+
+    // Use provided center or default to state center (previous zoom origin)
+    const zoomCenterX = centerX ?? state.panX;
+    const zoomCenterY = centerY ?? state.panY;
+
+    // Apply zoom origin math
+    const scaleFactor = newScale / oldScale;
+    state.panX = zoomCenterX - (zoomCenterX - state.panX) * scaleFactor;
+    state.panY = zoomCenterY - (zoomCenterY - state.panY) * scaleFactor;
+    state.scale = newScale;
+
+    saveTransformState(canvasId);
+}
+
+/**
+ * Reset transform to default (no pan, 100% zoom)
+ */
+export function resetTransform(canvasId: string): void {
+    const state = getState(canvasId);
+    state.panX = 0;
+    state.panY = 0;
+    state.scale = 1.0;
+    saveTransformState(canvasId);
+}
+
+/**
+ * Convert screen coordinates to canvas coordinates
+ * Takes a screen point and returns the corresponding canvas point accounting for pan and zoom
+ */
+export function screenToCanvas(canvasId: string, screenX: number, screenY: number): { x: number; y: number } {
+    const state = getState(canvasId);
+    // Inverse transform: (screen - pan) / scale
+    return {
+        x: (screenX - state.panX) / state.scale,
+        y: (screenY - state.panY) / state.scale,
+    };
+}
+
+/**
+ * Convert canvas coordinates to screen coordinates
+ * Takes a canvas point and returns the corresponding screen point accounting for pan and zoom
+ */
+export function canvasToScreen(canvasId: string, canvasX: number, canvasY: number): { x: number; y: number } {
+    const state = getState(canvasId);
+    // Forward transform: canvas * scale + pan
+    return {
+        x: canvasX * state.scale + state.panX,
+        y: canvasY * state.scale + state.panY,
+    };
 }
 
 /**

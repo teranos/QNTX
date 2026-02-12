@@ -114,8 +114,8 @@ export interface UIStateData {
     // Canvas melded compositions (for composition persistence)
     canvasCompositions: CompositionState[];
 
-    // Canvas pan offset (for canvas navigation)
-    canvasPan: Record<string, { panX: number; panY: number }>;
+    // Canvas pan offset and zoom scale (for canvas navigation)
+    canvasPan: Record<string, { panX: number; panY: number; scale?: number }>;
 
     // Timestamp for state versioning
     lastUpdated: number;
@@ -144,7 +144,7 @@ interface PersistedUIState {
     minimizedWindows: string[];
     canvasGlyphs: CanvasGlyphState[];
     canvasCompositions: CompositionState[];
-    canvasPan: Record<string, { panX: number; panY: number }>;
+    canvasPan: Record<string, { panX: number; panY: number; scale?: number }>;
 }
 
 // ============================================================================
