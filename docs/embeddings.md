@@ -50,6 +50,15 @@ To fully verify semantic search post-merge, copy attestations from an existing d
 - Composition with other glyphs via Meld system
 - Integration with Glyph Attestation flow
 
+### Open Questions
+- **Model distribution**: Bundled, downloaded on-demand, or user-provided?
+- **Caching**: What layer? In-memory, SQLite, or external?
+- **Multi-model support**: Should multiple embedding models run simultaneously?
+- **Fine-tuning**: Domain-specific fine-tuning for attestation language?
+- **Vector database**: sqlite-vec vs dedicated vector DB (Qdrant, Weaviate) at scale?
+- **Rate limiting**: Embedding generation is CPU-intensive — what limits are appropriate?
+- **Batch queue**: Should batch jobs go through Pulse daemon instead of synchronous HTTP?
+
 ### Technical Debt
 - `unsafe { std::mem::zeroed() }` in `engine_simple.rs` — undefined behavior for non-null types
 - `ort::init()` return value unused in `engine.rs` — `commit()` must be called
