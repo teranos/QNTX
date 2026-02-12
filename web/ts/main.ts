@@ -34,10 +34,13 @@ import './command-explorer-panel.ts';
 // while keyboard shortcuts in individual panels use the toggle functions directly.
 import './prose/panel.ts';
 import './plugin-panel.ts';
-import './webscraper-panel.ts';
 import { initDebugInterceptor } from './dev-debug-interceptor.ts';
 import { glyphRun } from './components/glyph/run.ts';
-import { registerTestGlyphs } from './test-glyphs.ts';
+import { registerDefaultGlyphs } from './default-glyphs.ts';
+import { initialize as initQntxWasm } from './qntx-wasm.ts';
+import { initStorage } from './indexeddb-storage.ts';
+import { initVisualMode } from './visual-mode.ts';
+import { log, SEG } from './logger.ts';
 
 import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/websocket';
 import type { GraphData } from '../types/core';
@@ -74,18 +77,6 @@ console.log('[TIMING] main.js module start:', Date.now() - navStart, 'ms');
 if (window.logLoaderStep) window.logLoaderStep('Loading core modules...');
 
 if (window.logLoaderStep) window.logLoaderStep('Core modules loaded');
-
-// Handle webscraper response from server
-async function handleWebscraperResponse(data: any): Promise<void> {
-    const { webscraperPanel } = await import('./webscraper-panel.js');
-    webscraperPanel.handleScraperResponse(data);
-}
-
-// Handle webscraper progress updates
-async function handleWebscraperProgress(data: any): Promise<void> {
-    const { webscraperPanel } = await import('./webscraper-panel.js');
-    webscraperPanel.handleScraperProgress(data);
-}
 
 // Handle version info from server
 function handleVersion(data: VersionMessage): void {
@@ -133,6 +124,11 @@ function handleVersion(data: VersionMessage): void {
         selfWindow.updateVersion(data);
     });
 
+    // Update Self diagnostic glyph
+    import('./default-glyphs.js').then(({ updateSelfVersion }) => {
+        updateSelfVersion(data);
+    });
+
     console.log('Server version:', data);
 }
 
@@ -152,6 +148,86 @@ async function init(): Promise<void> {
         console.error('[Init] Failed to initialize debug interceptor:', error);
         // Continue anyway - debug interception is not critical to app function
     }
+
+    // Initialize IndexedDB storage for UI state (canvas layouts, preferences)
+    // CRITICAL: Must complete before UI state operations
+    try {
+        if (window.logLoaderStep) window.logLoaderStep('Initializing storage...', false, true);
+        await initStorage();
+    } catch (error: unknown) {
+        console.error('[Init] Failed to initialize IndexedDB storage:', error);
+        // BLOCK: Canvas state persistence unavailable
+        // TODO: Show user notification that canvas state won't persist
+        throw error; // Stop initialization - storage is critical
+    }
+
+    // Load persisted UI state from IndexedDB (must happen after initStorage())
+    uiState.loadPersistedState();
+
+    // Bidirectional canvas state sync: merge backend state into local, then push local to backend.
+    // This ensures new clients receive canvas state from previous sessions on other devices,
+    // while preserving any locally-created glyphs that haven't been synced yet.
+    try {
+        if (window.logLoaderStep) window.logLoaderStep('Syncing canvas state...', false, true);
+        const { loadCanvasState, mergeCanvasState, upsertCanvasGlyph, upsertComposition } = await import('./api/canvas.ts');
+
+        // Merge backend state into local. Uses bulk setters to avoid per-item backend upserts.
+        try {
+            const backendState = await loadCanvasState();
+            const local = { glyphs: uiState.getCanvasGlyphs(), compositions: uiState.getCanvasCompositions() };
+            const merged = mergeCanvasState(local, backendState);
+
+            if (merged.mergedGlyphs > 0) uiState.setCanvasGlyphs(merged.glyphs);
+            if (merged.mergedComps > 0) uiState.setCanvasCompositions(merged.compositions);
+
+            if (merged.mergedGlyphs > 0 || merged.mergedComps > 0) {
+                log.info(SEG.GLYPH, `[Init] Merged ${merged.mergedGlyphs} glyphs and ${merged.mergedComps} compositions from backend`);
+            }
+        } catch (error: unknown) {
+            log.warn(SEG.GLYPH, '[Init] Failed to load canvas state from backend, continuing with local state:', error);
+        }
+
+        // Push local state to backend (ensures backend has all glyphs including locally-created ones)
+        const localGlyphs = uiState.getCanvasGlyphs();
+        const localCompositions = uiState.getCanvasCompositions();
+
+        const glyphSyncPromises = localGlyphs.map(glyph =>
+            upsertCanvasGlyph(glyph).catch(err => {
+                log.error(SEG.GLYPH, `Failed to sync glyph ${glyph.id} (${glyph.symbol} at ${glyph.x},${glyph.y}, content: ${glyph.content?.length ?? 0} chars):`, err);
+                return null;
+            })
+        );
+
+        const compSyncPromises = localCompositions.map(comp =>
+            upsertComposition(comp).catch(err => {
+                log.error(SEG.GLYPH, `Failed to sync composition ${comp.id} (${comp.edges?.length ?? 0} edges, at ${comp.x},${comp.y}):`, err);
+                return null;
+            })
+        );
+
+        const [glyphResults, compResults] = await Promise.all([
+            Promise.allSettled(glyphSyncPromises),
+            Promise.allSettled(compSyncPromises)
+        ]);
+
+        const failedGlyphs = glyphResults.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value === null));
+        const failedComps = compResults.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value === null));
+
+        if (failedGlyphs.length > 0 || failedComps.length > 0) {
+            log.warn(SEG.GLYPH, `Failed to sync ${failedGlyphs.length} glyphs and ${failedComps.length} compositions to backend`);
+        }
+
+        if (localGlyphs.length > 0 || localCompositions.length > 0) {
+            console.log(`[Init] Synced ${localGlyphs.length} glyphs and ${localCompositions.length} compositions to backend`);
+        }
+    } catch (error: unknown) {
+        console.error('[Init] Failed to sync canvas state to backend:', error);
+        // Non-fatal: Continue without backend sync
+    }
+
+    // Initialize QNTX WASM module with IndexedDB storage
+    if (window.logLoaderStep) window.logLoaderStep('Initializing WASM + IndexedDB...', false, true);
+    await initQntxWasm();
 
     // Restore previous session if exists
     const graphSession = uiState.getGraphSession();
@@ -193,12 +269,13 @@ async function init(): Promise<void> {
         'pulse_execution_log_stream': handlePulseExecutionLogStream,
         'storage_warning': handleStorageWarning,
         'storage_eviction': handleStorageEviction,
-        'webscraper_response': handleWebscraperResponse,
-        'webscraper_progress': handleWebscraperProgress,
         '_default': handleDefaultMessage
     };
 
     connectWebSocket(handlers);
+
+    // Initialize visual mode system (connectivity-based styling)
+    initVisualMode();
 
     // Initialize UI components
     if (window.logLoaderStep) window.logLoaderStep('Initializing system drawer...');
@@ -218,8 +295,8 @@ async function init(): Promise<void> {
     // This ensures the run is ready to receive glyphs
     glyphRun.init();
 
-    // Register test glyphs to demonstrate the morphing behavior
-    registerTestGlyphs();
+    // Register default system glyphs
+    registerDefaultGlyphs();
 
     if (window.logLoaderStep) window.logLoaderStep('Setting up file upload...');
     initQueryFileDrop();

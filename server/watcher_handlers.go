@@ -2,10 +2,12 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
@@ -52,11 +54,12 @@ type WatcherResponse struct {
 
 // HandleWatchers handles watcher CRUD operations
 // Routes:
-//   GET    /api/watchers       - List all watchers
-//   POST   /api/watchers       - Create a new watcher
-//   GET    /api/watchers/{id}  - Get a watcher by ID
-//   PUT    /api/watchers/{id}  - Update a watcher
-//   DELETE /api/watchers/{id}  - Delete a watcher
+//
+//	GET    /api/watchers       - List all watchers
+//	POST   /api/watchers       - Create a new watcher
+//	GET    /api/watchers/{id}  - Get a watcher by ID
+//	PUT    /api/watchers/{id}  - Update a watcher
+//	DELETE /api/watchers/{id}  - Delete a watcher
 func (s *QNTXServer) HandleWatchers(w http.ResponseWriter, r *http.Request) {
 	if s.watcherEngine == nil {
 		s.writeRichError(w, errors.New("watcher engine not initialized"), http.StatusServiceUnavailable)
@@ -97,7 +100,7 @@ func (s *QNTXServer) HandleWatchers(w http.ResponseWriter, r *http.Request) {
 func (s *QNTXServer) handleListWatchers(w http.ResponseWriter, r *http.Request) {
 	enabledOnly := r.URL.Query().Get("enabled") == "true"
 
-	watchers, err := s.watcherEngine.GetStore().List(enabledOnly)
+	watchers, err := s.watcherEngine.GetStore().List(r.Context(), enabledOnly)
 	if err != nil {
 		s.writeRichError(w, errors.Wrap(err, "failed to list watchers"), http.StatusInternalServerError)
 		return
@@ -113,7 +116,7 @@ func (s *QNTXServer) handleListWatchers(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *QNTXServer) handleGetWatcher(w http.ResponseWriter, r *http.Request, id string) {
-	watcher, err := s.watcherEngine.GetStore().Get(id)
+	watcher, err := s.watcherEngine.GetStore().Get(r.Context(), id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			s.writeRichError(w, err, http.StatusNotFound)
@@ -198,7 +201,7 @@ func (s *QNTXServer) handleCreateWatcher(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Create watcher
-	if err := s.watcherEngine.GetStore().Create(watcher); err != nil {
+	if err := s.watcherEngine.GetStore().Create(r.Context(), watcher); err != nil {
 		s.writeRichError(w, errors.Wrap(err, "failed to create watcher"), http.StatusInternalServerError)
 		return
 	}
@@ -215,7 +218,7 @@ func (s *QNTXServer) handleCreateWatcher(w http.ResponseWriter, r *http.Request)
 
 func (s *QNTXServer) handleUpdateWatcher(w http.ResponseWriter, r *http.Request, id string) {
 	// Get existing watcher
-	existing, err := s.watcherEngine.GetStore().Get(id)
+	existing, err := s.watcherEngine.GetStore().Get(r.Context(), id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			s.writeRichError(w, err, http.StatusNotFound)
@@ -277,7 +280,7 @@ func (s *QNTXServer) handleUpdateWatcher(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Update in DB
-	if err := s.watcherEngine.GetStore().Update(existing); err != nil {
+	if err := s.watcherEngine.GetStore().Update(r.Context(), existing); err != nil {
 		s.writeRichError(w, errors.Wrap(err, "failed to update watcher"), http.StatusInternalServerError)
 		return
 	}
@@ -293,7 +296,7 @@ func (s *QNTXServer) handleUpdateWatcher(w http.ResponseWriter, r *http.Request,
 
 func (s *QNTXServer) handleDeleteWatcher(w http.ResponseWriter, r *http.Request, id string) {
 	// Verify watcher exists
-	if _, err := s.watcherEngine.GetStore().Get(id); err != nil {
+	if _, err := s.watcherEngine.GetStore().Get(r.Context(), id); err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			s.writeRichError(w, err, http.StatusNotFound)
 		} else {
@@ -303,7 +306,7 @@ func (s *QNTXServer) handleDeleteWatcher(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Delete
-	if err := s.watcherEngine.GetStore().Delete(id); err != nil {
+	if err := s.watcherEngine.GetStore().Delete(r.Context(), id); err != nil {
 		s.writeRichError(w, errors.Wrap(err, "failed to delete watcher"), http.StatusInternalServerError)
 		return
 	}
@@ -378,13 +381,15 @@ func (s *QNTXServer) broadcastWatcherMatch(watcherID string, attestation *types.
 	}
 }
 
-// broadcastWatcherError broadcasts a watcher error to all connected clients
-// Used to send parsing errors, validation errors, etc. to the UI for immediate feedback
-func (s *QNTXServer) broadcastWatcherError(watcherID string, errorMsg string, severity string) {
+// broadcastWatcherError broadcasts a watcher error to all connected clients.
+// Used to send parsing errors, validation errors, etc. to the UI for immediate feedback.
+// Accepts an optional details slice for structured error context (from errors.GetAllDetails).
+func (s *QNTXServer) broadcastWatcherError(watcherID string, errorMsg string, severity string, details ...string) {
 	msg := WatcherErrorMessage{
 		Type:      "watcher_error",
 		WatcherID: watcherID,
 		Error:     errorMsg,
+		Details:   details,
 		Severity:  severity,
 		Timestamp: time.Now().Unix(),
 	}
@@ -400,6 +405,7 @@ func (s *QNTXServer) broadcastWatcherError(watcherID string, errorMsg string, se
 		s.logger.Debugw("Broadcast watcher error",
 			"watcher_id", watcherID,
 			"error", errorMsg,
+			"details", details,
 			"severity", severity)
 	case <-s.ctx.Done():
 		// Server shutting down
@@ -409,15 +415,48 @@ func (s *QNTXServer) broadcastWatcherError(watcherID string, errorMsg string, se
 	}
 }
 
+// broadcastGlyphFired broadcasts a glyph execution event to all connected clients
+func (s *QNTXServer) broadcastGlyphFired(glyphID string, attestationID string, status string, execErr error, result []byte) {
+	msg := GlyphFiredMessage{
+		Type:          "glyph_fired",
+		GlyphID:       glyphID,
+		AttestationID: attestationID,
+		Status:        status,
+		Timestamp:     time.Now().Unix(),
+	}
+	if execErr != nil {
+		msg.Error = execErr.Error()
+	}
+	if len(result) > 0 {
+		msg.Result = string(result)
+	}
+
+	req := &broadcastRequest{
+		reqType: "glyph_fired",
+		payload: msg,
+	}
+
+	select {
+	case s.broadcastReq <- req:
+		s.logger.Debugw("Broadcast glyph fired",
+			"glyph_id", glyphID,
+			"attestation_id", attestationID,
+			"status", status)
+	case <-s.ctx.Done():
+	}
+}
+
 // initWatcherEngine initializes the watcher engine and registers it as an observer
 func (s *QNTXServer) initWatcherEngine() error {
-	// Determine API base URL (default to localhost:877 for development)
-	apiBaseURL := "http://localhost:877"
+	apiBaseURL := fmt.Sprintf("http://127.0.0.1:%d", am.GetServerPort())
 
 	s.watcherEngine = watcher.NewEngine(s.db, apiBaseURL, s.logger)
 
 	// Set broadcast callback for live results
 	s.watcherEngine.SetBroadcastCallback(s.broadcastWatcherMatch)
+
+	// Set glyph fired callback for meld-triggered execution feedback
+	s.watcherEngine.SetGlyphFiredCallback(s.broadcastGlyphFired)
 
 	// Register as global observer (notified by SQLStore on all attestation creations)
 	storage.RegisterObserver(s.watcherEngine)

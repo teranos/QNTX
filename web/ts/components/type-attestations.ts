@@ -5,6 +5,7 @@ import { UI_TEXT } from '../config.ts';
 import type { GraphData, NodeTypeInfo } from '../../types/core';
 import { sendMessage } from '../websocket.ts';
 import { typeDefinitionWindow } from '../type-definition-window.js';
+import { log, SEG } from '../logger.ts';
 
 // Re-export graph visibility state from appState for backward compatibility
 // All visibility state is now centralized in appState.graphVisibility
@@ -182,7 +183,7 @@ export function buildTypeAttestations(graphData: GraphData | null = null): void 
 
     // Require backend data - fail loud if not provided (Phase 1: enforce backend responsibility)
     if (!graphData?.meta?.node_types || graphData.meta.node_types.length === 0) {
-        console.warn('No node type metadata from backend - legend cannot be rendered');
+        log.warn(SEG.UI, 'No node type metadata from backend - legend cannot be rendered');
         return;
     }
 

@@ -25,7 +25,7 @@ function createMorphAnimation(
     // Cancel any existing animation for this element (exclusivity)
     const existing = activeAnimations.get(element);
     if (existing) {
-        log.debug(SEG.UI, '[MorphTransaction] Cancelling existing animation');
+        log.debug(SEG.GLYPH, '[MorphTransaction] Cancelling existing animation');
         existing.cancel();
     }
 
@@ -43,7 +43,7 @@ function createMorphAnimation(
     return new Promise((resolve, reject) => {
         const handleFinish = () => {
             // COMMIT: Animation completed successfully
-            log.debug(SEG.UI, `[MorphTransaction] ${transactionName} committed`);
+            log.debug(SEG.GLYPH, `[MorphTransaction] ${transactionName} committed`);
             activeAnimations.delete(element);
             // Clean up event listeners to prevent memory leaks
             animation.removeEventListener('finish', handleFinish);
@@ -53,7 +53,7 @@ function createMorphAnimation(
 
         const handleCancel = () => {
             // ROLLBACK: Animation was cancelled
-            log.debug(SEG.UI, `[MorphTransaction] ${transactionName} rolled back`);
+            log.debug(SEG.GLYPH, `[MorphTransaction] ${transactionName} rolled back`);
             activeAnimations.delete(element);
             // Clean up event listeners to prevent memory leaks
             animation.removeEventListener('finish', handleFinish);

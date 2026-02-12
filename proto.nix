@@ -15,7 +15,16 @@
         --go-grpc_out=. --go-grpc_opt=paths=source_relative \
         plugin/grpc/protocol/domain.proto
 
-      echo "✓ Proto files generated in plugin/grpc/protocol/"
+      echo "✓ Plugin proto files generated in plugin/grpc/protocol/"
+
+      # Generate glyph proto (canvas compositions + events)
+      ${pkgs.protobuf}/bin/protoc \
+        --plugin=${pkgs.protoc-gen-go}/bin/protoc-gen-go \
+        --go_out=. --go_opt=paths=source_relative \
+        glyph/proto/canvas.proto \
+        glyph/proto/events.proto
+
+      echo "✓ Glyph proto files generated in glyph/proto/"
 
       # TODO: Generate proto for atsstore.proto and queue.proto (currently only domain.proto)
 
@@ -70,7 +79,25 @@
         --ts_proto_out=web/ts/generated/proto \
         plugin/grpc/protocol/atsstore.proto
 
-      echo "✓ TypeScript proto files generated in web/ts/generated/proto/"
+      echo "✓ Plugin proto files generated in web/ts/generated/proto/"
+
+      # Generate TypeScript for glyph proto (canvas compositions + events)
+      # useDate=string: google.protobuf.Timestamp → string (ISO 8601, matches Go JSON output)
+      ${pkgs.protobuf}/bin/protoc \
+        --plugin=protoc-gen-ts_proto=web/node_modules/.bin/protoc-gen-ts_proto \
+        --ts_proto_opt=esModuleInterop=true \
+        --ts_proto_opt=outputEncodeMethods=false \
+        --ts_proto_opt=outputJsonMethods=false \
+        --ts_proto_opt=outputClientImpl=false \
+        --ts_proto_opt=outputServices=false \
+        --ts_proto_opt=onlyTypes=true \
+        --ts_proto_opt=snakeToCamel=false \
+        --ts_proto_opt=useDate=string \
+        --ts_proto_out=web/ts/generated/proto \
+        glyph/proto/canvas.proto \
+        glyph/proto/events.proto
+
+      echo "✓ Glyph proto TypeScript files generated in web/ts/generated/proto/"
     '');
   };
 

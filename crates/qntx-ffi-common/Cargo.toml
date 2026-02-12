@@ -1,0 +1,13 @@
+[package]
+name = "qntx-ffi-common"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Common FFI utilities for QNTX C-compatible interfaces"
+
+[dependencies]
+# No dependencies - this is a minimal utility crate
+
+[features]
+default = []

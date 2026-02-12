@@ -49,20 +49,26 @@ impl HandlerContext {
     pub async fn handle_execute(&self, body: serde_json::Value) -> Result<HttpResponse, Status> {
         #[derive(Deserialize)]
         struct ExecuteRequest {
-            code: String,
+            content: String,
             #[serde(default)]
             timeout_secs: Option<u64>,
             #[serde(default)]
             capture_variables: Option<bool>,
             #[serde(default)]
             python_paths: Option<Vec<String>>,
+            /// Canvas glyph ID — when set, attest() defaults actor to "glyph:{id}"
+            #[serde(default)]
+            glyph_id: Option<String>,
+            /// Upstream attestation JSON — injected as Python `upstream` dict when present
+            #[serde(default)]
+            upstream_attestation: Option<serde_json::Value>,
         }
 
         let req: ExecuteRequest = serde_json::from_value(body)
             .map_err(|e| Status::invalid_argument(format!("Invalid request: {}", e)))?;
 
-        if req.code.is_empty() {
-            return Err(Status::invalid_argument("Missing 'code' field"));
+        if req.content.is_empty() {
+            return Err(Status::invalid_argument("Missing 'content' field"));
         }
 
         let config = ExecutionConfig {
@@ -72,14 +78,25 @@ impl HandlerContext {
             ..Default::default()
         };
 
+        // Set glyph ID for actor convention: attest() defaults actor to "glyph:{id}"
+        if let Some(ref glyph_id) = req.glyph_id {
+            crate::atsstore::set_current_glyph_id(Some(glyph_id.clone()));
+        }
+
         let result = {
             let state = self.state.read();
-            state
-                .engine
-                .execute_with_ats(&req.code, &config, Some(state.ats_client.clone()))
+            state.engine.execute_with_ats(
+                &req.content,
+                &config,
+                Some(state.ats_client.clone()),
+                req.upstream_attestation.as_ref(),
+            )
         };
 
-        execution_result_to_response(result)
+        // Clear glyph ID after execution
+        crate::atsstore::set_current_glyph_id(None);
+
+        execution_result_to_response(result).map_err(|e| *e)
     }
 
     /// Handle POST /evaluate - Evaluate a Python expression
@@ -103,7 +120,7 @@ impl HandlerContext {
                 .evaluate_with_ats(&req.expr, Some(state.ats_client.clone()))
         };
 
-        execution_result_to_response(result)
+        execution_result_to_response(result).map_err(|e| *e)
     }
 
     /// Handle POST /execute-file - Execute a Python file
@@ -140,7 +157,7 @@ impl HandlerContext {
                 .execute_file_with_ats(&req.path, &config, Some(state.ats_client.clone()))
         };
 
-        execution_result_to_response(result)
+        execution_result_to_response(result).map_err(|e| *e)
     }
 
     /// Handle POST /pip/install - Install a Python package
@@ -165,7 +182,7 @@ impl HandlerContext {
             state.engine.pip_install(&req.package)
         };
 
-        execution_result_to_response(result)
+        execution_result_to_response(result).map_err(|e| *e)
     }
 
     /// Handle GET /pip/check - Check if a module is available
@@ -251,7 +268,7 @@ impl HandlerContext {
 }
 
 /// Convert ExecutionResult to HttpResponse
-fn execution_result_to_response(result: ExecutionResult) -> Result<HttpResponse, Status> {
+fn execution_result_to_response(result: ExecutionResult) -> Result<HttpResponse, Box<Status>> {
     #[derive(Serialize)]
     struct ExecutionResponse {
         success: bool,
@@ -275,10 +292,11 @@ fn execution_result_to_response(result: ExecutionResult) -> Result<HttpResponse,
     };
 
     let status_code = if result.success { 200 } else { 400 };
-    json_response(status_code, &response)
+    json_response(status_code, &response).map_err(Box::new)
 }
 
 /// Create a JSON HTTP response
+#[allow(clippy::result_large_err)]
 fn json_response<T: Serialize>(status_code: i32, data: &T) -> Result<HttpResponse, Status> {
     let body = serde_json::to_vec(data)
         .map_err(|e| Status::internal(format!("Failed to serialize response: {}", e)))?;

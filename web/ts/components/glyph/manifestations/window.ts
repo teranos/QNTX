@@ -29,8 +29,12 @@ import {
     WINDOW_BOX_SHADOW,
     TITLE_BAR_HEIGHT,
     TITLE_BAR_PADDING,
-    WINDOW_BUTTON_SIZE,
-    CONTENT_PADDING
+    CANVAS_GLYPH_CONTENT_PADDING,
+    GLYPH_CONTENT_INNER_PADDING,
+    MAX_VIEWPORT_HEIGHT_RATIO,
+    MAX_VIEWPORT_WIDTH_RATIO,
+    MIN_WINDOW_HEIGHT,
+    MIN_WINDOW_WIDTH
 } from '../glyph';
 
 /**
@@ -99,7 +103,7 @@ export function morphToWindow(
         getMaximizeDuration()
     ).then(() => {
         // COMMIT PHASE: Animation completed successfully
-        log.debug(SEG.UI, `[Window] Animation committed for ${glyph.id}`);
+        log.debug(SEG.GLYPH, `[Window] Animation committed for ${glyph.id}`);
 
         // Apply final window state
         glyphElement.style.position = 'fixed';
@@ -108,10 +112,11 @@ export function morphToWindow(
         glyphElement.style.width = `${windowWidth}px`;
         glyphElement.style.height = `${windowHeight}px`;
         glyphElement.style.borderRadius = WINDOW_BORDER_RADIUS;
-        glyphElement.style.backgroundColor = 'var(--bg-primary)';
+        glyphElement.style.backgroundColor = 'var(--bg-almost-black)';
         glyphElement.style.boxShadow = WINDOW_BOX_SHADOW;
         glyphElement.style.padding = '0';
         glyphElement.style.opacity = '1';
+        glyphElement.style.color = 'var(--text-on-dark)';
 
         // Set up window as flex container
         glyphElement.style.display = 'flex';
@@ -120,28 +125,26 @@ export function morphToWindow(
         // Add window chrome (title bar, controls)
         const titleBar = document.createElement('div');
         titleBar.className = 'window-title-bar';
-        titleBar.style.height = TITLE_BAR_HEIGHT;
-        titleBar.style.backgroundColor = 'var(--bg-secondary)';
-        titleBar.style.borderBottom = '1px solid var(--border-color)';
+        titleBar.style.width = '100%';
+        titleBar.style.backgroundColor = 'var(--bg-almost-black)';
+        titleBar.style.borderBottom = '1px solid var(--border-on-dark)';
+        titleBar.style.borderRadius = '8px 8px 0 0';
         titleBar.style.display = 'flex';
         titleBar.style.alignItems = 'center';
         titleBar.style.padding = TITLE_BAR_PADDING;
         titleBar.style.flexShrink = '0'; // Prevent title bar from shrinking
+        titleBar.style.boxSizing = 'border-box'; // Include padding in width calculation
 
         // Add title
         const titleText = document.createElement('span');
         titleText.textContent = stripHtml(glyph.title);
         titleText.style.flex = '1';
+        titleText.style.color = 'var(--text-on-dark)';
         titleBar.appendChild(titleText);
 
-        // Add minimize button
+        // Add minimize button (sized by .window-title-bar button CSS, including touch breakpoints)
         const minimizeBtn = document.createElement('button');
         minimizeBtn.textContent = '−';
-        minimizeBtn.style.width = WINDOW_BUTTON_SIZE;
-        minimizeBtn.style.height = WINDOW_BUTTON_SIZE;
-        minimizeBtn.style.border = 'none';
-        minimizeBtn.style.background = 'transparent';
-        minimizeBtn.style.cursor = 'pointer';
         minimizeBtn.onclick = () => morphFromWindow(
             glyphElement,
             glyph,
@@ -150,15 +153,10 @@ export function morphToWindow(
         );
         titleBar.appendChild(minimizeBtn);
 
-        // Add close button if glyph has onClose
+        // Add close button if glyph has onClose (sized by CSS, including touch breakpoints)
         if (glyph.onClose) {
             const closeBtn = document.createElement('button');
             closeBtn.textContent = '×';
-            closeBtn.style.width = WINDOW_BUTTON_SIZE;
-            closeBtn.style.height = WINDOW_BUTTON_SIZE;
-            closeBtn.style.border = 'none';
-            closeBtn.style.background = 'transparent';
-            closeBtn.style.cursor = 'pointer';
             closeBtn.onclick = () => {
                 // Remove from tray data AND remove element
                 onRemove(glyph.id);
@@ -167,7 +165,7 @@ export function morphToWindow(
                 try {
                     glyph.onClose!();
                 } catch (error) {
-                    log.error(SEG.UI, `[Window ${glyph.id}] Error in onClose callback:`, error);
+                    log.error(SEG.GLYPH, `[Window ${glyph.id}] Error in onClose callback:`, error);
                 }
             };
             titleBar.appendChild(closeBtn);
@@ -176,33 +174,39 @@ export function morphToWindow(
         glyphElement.appendChild(titleBar);
 
         // Add content area with error boundary
+        let contentElement: HTMLElement;
         try {
             const content = glyph.renderContent();
-            content.style.padding = CONTENT_PADDING;
+            content.style.padding = `${CANVAS_GLYPH_CONTENT_PADDING}px`;
             content.style.flex = '1'; // Take remaining space in flex container
             content.style.overflow = 'auto';
             glyphElement.appendChild(content);
+            contentElement = content;
         } catch (error) {
             // Show error UI if renderContent fails
-            log.error(SEG.UI, `[Window ${glyph.id}] Error rendering content:`, error);
+            log.error(SEG.GLYPH, `[Window ${glyph.id}] Error rendering content:`, error);
             const errorContent = document.createElement('div');
-            errorContent.style.padding = CONTENT_PADDING;
+            errorContent.style.padding = '8px'; // Reduced from CONTENT_PADDING (16px)
             errorContent.style.flex = '1';
             errorContent.style.overflow = 'auto';
-            errorContent.style.color = '#ef4444'; // Red error text
+            errorContent.style.color = 'var(--color-error)';
             errorContent.style.fontFamily = 'var(--font-mono)';
             errorContent.innerHTML = `
                     <div style="margin-bottom: 8px; font-weight: bold;">Error rendering content</div>
                     <div style="opacity: 0.8; font-size: 12px;">${error instanceof Error ? error.message : String(error)}</div>
                 `;
             glyphElement.appendChild(errorContent);
+            contentElement = errorContent;
         }
+
+        // Set up ResizeObserver for auto-sizing window to content
+        setupWindowResizeObserver(glyphElement, contentElement, glyph.id);
 
         // Make window draggable
         makeWindowDraggable(glyphElement, titleBar);
     }).catch(error => {
         // ROLLBACK: Animation was cancelled or failed
-        log.warn(SEG.UI, `[Window] Animation failed for ${glyph.id}:`, error);
+        log.warn(SEG.GLYPH, `[Window] Animation failed for ${glyph.id}:`, error);
         // Element stays in glyph state, can retry
     });
 }
@@ -219,13 +223,21 @@ export function morphFromWindow(
 ): void {
     // AXIOM CHECK: Verify this is the correct element
     verifyElement(glyph.id, windowElement);
-    log.debug(SEG.UI, `[Window] Minimizing ${glyph.id}`);
+    log.debug(SEG.GLYPH, `[Window] Minimizing ${glyph.id}`);
 
     // Get current window state before clearing anything
     const currentRect = windowElement.getBoundingClientRect();
 
     // Remember window position for next time it opens
     setLastPosition(windowElement, currentRect.left, currentRect.top);
+
+    // Cleanup ResizeObserver
+    const resizeObserver = (windowElement as any).__resizeObserver;
+    if (resizeObserver && typeof resizeObserver.disconnect === 'function') {
+        resizeObserver.disconnect();
+        delete (windowElement as any).__resizeObserver;
+        log.debug(SEG.GLYPH, `[Window] ResizeObserver cleaned up for ${glyph.id}`);
+    }
 
     // Clear window content immediately for visual feedback
     windowElement.innerHTML = '';
@@ -249,7 +261,7 @@ export function morphFromWindow(
     beginMinimizeMorph(windowElement, currentRect, { x: targetX, y: targetY }, getMinimizeDuration())
         .then(() => {
             // Animation completed successfully
-            log.debug(SEG.UI, `[Window] Animation complete for ${glyph.id}`);
+            log.debug(SEG.GLYPH, `[Window] Animation complete for ${glyph.id}`);
 
             // Now reparent the element to the indicator container
             // Clear state flags
@@ -269,12 +281,12 @@ export function morphFromWindow(
             setGlyphId(windowElement, glyph.id);
 
             // Re-attach to indicator container
-            log.debug(SEG.UI, `[Window] Re-attaching to indicator container`);
+            log.debug(SEG.GLYPH, `[Window] Re-attaching to indicator container`);
             onMorphComplete(windowElement, glyph);
         })
         .catch(error => {
             // Animation was cancelled or failed
-            log.warn(SEG.UI, `[Window] Animation failed for ${glyph.id}:`, error);
+            log.warn(SEG.GLYPH, `[Window] Animation failed for ${glyph.id}:`, error);
             // Element stays in window state, can retry
         });
 }
@@ -372,4 +384,64 @@ function makeWindowDraggable(windowElement: HTMLElement, handle: HTMLElement): v
     // Add both mouse and touch/pen event handlers
     handle.addEventListener('mousedown', startDrag);
     handle.addEventListener('touchstart', startDrag, { passive: false });
+}
+
+/**
+ * Set up ResizeObserver to auto-size window to match content height
+ * Observes the inner .glyph-content element which has intrinsic size
+ */
+function setupWindowResizeObserver(
+    windowElement: HTMLElement,
+    contentElement: HTMLElement,
+    glyphId: string
+): void {
+    const titleBarHeight = parseInt(TITLE_BAR_HEIGHT);
+    const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
+    const minHeight = MIN_WINDOW_HEIGHT;
+
+    // Find the inner .glyph-content element which has intrinsic size
+    // The contentElement itself has flex: 1 and doesn't report natural height
+    const innerContent = contentElement.querySelector('.glyph-content, .glyph-loading') as HTMLElement;
+
+    if (!innerContent) {
+        log.warn(SEG.GLYPH, `[Window ${glyphId}] No .glyph-content element found for ResizeObserver`);
+        return;
+    }
+
+    const maxWidth = window.innerWidth * MAX_VIEWPORT_WIDTH_RATIO;
+    const minWidth = MIN_WINDOW_WIDTH;
+
+    const resizeObserver = new ResizeObserver(entries => {
+        for (const entry of entries) {
+            const contentHeight = entry.contentRect.height;
+            const contentWidth = entry.contentRect.width;
+
+            // Skip if content hasn't rendered yet (height is 0)
+            if (contentHeight === 0) {
+                log.debug(SEG.GLYPH, `[Window ${glyphId}] Skipping resize - content height is 0`);
+                return;
+            }
+
+            // Add padding for both layers:
+            // - contentElement padding: CANVAS_GLYPH_CONTENT_PADDING
+            // - .glyph-content padding: GLYPH_CONTENT_INNER_PADDING (CSS)
+            // Total: (8 + 4) * 2 = 24px per dimension
+            const contentElementPadding = CANVAS_GLYPH_CONTENT_PADDING * 2; // top + bottom OR left + right
+            const glyphContentPadding = GLYPH_CONTENT_INNER_PADDING * 2; // top + bottom OR left + right
+            const totalPadding = contentElementPadding + glyphContentPadding;
+
+            const totalHeight = Math.max(minHeight, Math.min(contentHeight + titleBarHeight + totalPadding, maxHeight));
+            const totalWidth = Math.max(minWidth, Math.min(contentWidth + totalPadding, maxWidth));
+
+            windowElement.style.height = `${totalHeight}px`;
+            windowElement.style.width = `${totalWidth}px`;
+
+            log.debug(SEG.GLYPH, `[Window ${glyphId}] Auto-resized to ${totalWidth}x${totalHeight}px (content: ${contentWidth}x${contentHeight}px + padding: ${totalPadding}px)`);
+        }
+    });
+
+    resizeObserver.observe(innerContent);
+
+    // Store observer for cleanup on minimize/close
+    (windowElement as any).__resizeObserver = resizeObserver;
 }

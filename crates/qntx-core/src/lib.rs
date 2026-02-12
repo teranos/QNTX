@@ -29,13 +29,23 @@
 
 pub mod attestation;
 pub mod classify;
+pub mod expand;
 pub mod fuzzy;
 pub mod parser;
 pub mod storage;
 
 // Re-export main types at crate root
 pub use attestation::{Attestation, AttestationBuilder, AxFilter, AxResult, Conflict};
-pub use classify::{ActorCredibility, ClassificationResult, ConflictType};
+pub use classify::{
+    classify_claims, ActorCredibility, ClaimGroup, ClaimInput, ClaimTiming, ClaimWithTiming,
+    ClassificationResult, ClassifyInput, ClassifyOutput, ConfidenceCalculator, ConflictType,
+    SmartClassifier, TemporalAnalyzer, TemporalConfig, TemporalPattern,
+};
+pub use expand::{
+    dedup_source_ids, dedup_source_ids_json, expand_cartesian, expand_claims_json, group_by_key,
+    group_claims_json, DedupInput, DedupOutput, ExpandAttestation, ExpandInput, ExpandOutput,
+    GroupInput, GroupOutput, IndividualClaim,
+};
 pub use fuzzy::{FuzzyEngine, FuzzyMatch};
 pub use parser::{AxQuery, ParseError, Parser, TemporalClause};
 pub use storage::{AttestationStore, MemoryStore, QueryStore, StoreError};

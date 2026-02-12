@@ -7,8 +7,14 @@ repository.workspace = true
 description = "SQLite storage backend for QNTX attestations"
 
 [dependencies]
+# Proto-generated types (part of proto migration - ADR-006)
+qntx-proto = { path = "../qntx-proto" }
+
 # Core QNTX types
 qntx-core = { path = "../qntx-core" }
+
+# Shared FFI utilities
+qntx-ffi-common = { path = "../qntx-ffi-common" }
 
 # SQLite database
 rusqlite = { version = "0.32", features = ["bundled"] }
