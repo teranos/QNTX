@@ -39,7 +39,7 @@ type AxExecutorOptions struct {
 	EntityResolver ats.EntityResolver // Optional entity ID resolution (default: NoOpEntityResolver)
 	QueryExpander  ats.QueryExpander  // Optional query expansion (default: NoOpQueryExpander)
 	Logger         *zap.SugaredLogger // Optional logger for debug output (default: nil, no logging)
-	Matcher        Matcher            // Optional fuzzy matcher (default: FuzzyMatcher, can use CGOMatcher)
+	Matcher        Matcher            // Optional fuzzy matcher (default: WasmMatcher via wazero)
 }
 
 // NewAxExecutorWithOptions creates an executor with custom options.
