@@ -74,7 +74,5 @@ Verified end-to-end by copying attestations from a backup database:
 - **Batch queue**: Should batch jobs go through Pulse daemon instead of synchronous HTTP?
 
 ### Technical Debt
-- `unsafe { std::mem::zeroed() }` in `engine_simple.rs` — undefined behavior for non-null types
-- `ort::init()` return value unused in `engine.rs` — `commit()` must be called
 - Error handling standardization across Rust/Go FFI boundary
 - sqlite-vec CGO import in `db/connection.go` is unconditional — affects all build times

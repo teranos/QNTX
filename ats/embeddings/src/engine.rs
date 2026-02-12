@@ -19,8 +19,8 @@ pub struct EmbeddingEngine {
 impl EmbeddingEngine {
     /// Create a new embedding engine from an ONNX model file
     pub fn new(model_path: impl AsRef<Path>, model_name: String) -> Result<Self> {
-        // Initialize ORT environment
-        ort::init();
+        // Initialize ORT environment (commit() returns false if already initialized)
+        ort::init().commit();
 
         // Load the ONNX model
         let session = Session::builder()?
