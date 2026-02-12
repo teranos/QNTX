@@ -90,10 +90,10 @@ export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortC
     loadPanState(canvasId);
     applyPanTransform(container, canvasId);
 
-    // Detect mobile
+    // Detect mobile for desktop-specific handlers
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
 
-    // Desktop: Two-finger trackpad scroll (wheel event)
+    // Desktop: Two-finger trackpad scroll (wheel event) and middle mouse drag
     if (!isMobile) {
         container.addEventListener('wheel', (e: WheelEvent) => {
             // Only handle non-pinch scroll (two-finger scroll has ctrlKey === false)
@@ -146,60 +146,54 @@ export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortC
             savePanState(canvasId);
             log.debug(SEG.GLYPH, '[CanvasPan] Middle mouse pan end', { panX: state.panX, panY: state.panY });
         }, { signal });
-    } else {
-        // Mobile: Single finger drag to pan
-        let touchIdentifier: number | null = null;
-
-        container.addEventListener('touchstart', (e: TouchEvent) => {
-            // Only handle single touch
-            if (e.touches.length !== 1) return;
-
-            // Don't pan if touching a glyph or interactive element
-            const target = e.target as HTMLElement;
-            if (target.closest('[data-glyph-id]') && target.closest('[data-glyph-id]') !== container) {
-                return;
-            }
-
-            const touch = e.touches[0];
-            touchIdentifier = touch.identifier;
-            state.isPanning = true;
-            state.startX = touch.clientX;
-            state.startY = touch.clientY;
-            state.startPanX = state.panX;
-            state.startPanY = state.panY;
-        }, { signal, passive: true });
-
-        container.addEventListener('touchmove', (e: TouchEvent) => {
-            if (!state.isPanning || touchIdentifier === null) return;
-
-            // Find our touch
-            const touch = Array.from(e.touches).find(t => t.identifier === touchIdentifier);
-            if (!touch) return;
-
-            e.preventDefault();
-
-            const deltaX = touch.clientX - state.startX;
-            const deltaY = touch.clientY - state.startY;
-
-            state.panX = state.startPanX + deltaX;
-            state.panY = state.startPanY + deltaY;
-
-            applyPanTransform(container, canvasId);
-        }, { signal, passive: false });
-
-        container.addEventListener('touchend', (e: TouchEvent) => {
-            if (!state.isPanning || touchIdentifier === null) return;
-
-            // Check if our touch ended
-            const ended = Array.from(e.changedTouches).some(t => t.identifier === touchIdentifier);
-            if (!ended) return;
-
-            state.isPanning = false;
-            touchIdentifier = null;
-
-            savePanState(canvasId);
-        }, { signal });
     }
+
+    // Touch handlers: Always set up for mobile and responsive design mode support
+    let touchIdentifier: number | null = null;
+
+    container.addEventListener('touchstart', (e: TouchEvent) => {
+        // Only handle single touch
+        if (e.touches.length !== 1) return;
+
+        const touch = e.touches[0];
+        touchIdentifier = touch.identifier;
+        state.isPanning = true;
+        state.startX = touch.clientX;
+        state.startY = touch.clientY;
+        state.startPanX = state.panX;
+        state.startPanY = state.panY;
+    }, { signal, passive: true });
+
+    container.addEventListener('touchmove', (e: TouchEvent) => {
+        if (!state.isPanning || touchIdentifier === null) return;
+
+        // Find our touch
+        const touch = Array.from(e.touches).find(t => t.identifier === touchIdentifier);
+        if (!touch) return;
+
+        e.preventDefault();
+
+        const deltaX = touch.clientX - state.startX;
+        const deltaY = touch.clientY - state.startY;
+
+        state.panX = state.startPanX + deltaX;
+        state.panY = state.startPanY + deltaY;
+
+        applyPanTransform(container, canvasId);
+    }, { signal, passive: false });
+
+    container.addEventListener('touchend', (e: TouchEvent) => {
+        if (!state.isPanning || touchIdentifier === null) return;
+
+        // Check if our touch ended
+        const ended = Array.from(e.changedTouches).some(t => t.identifier === touchIdentifier);
+        if (!ended) return;
+
+        state.isPanning = false;
+        touchIdentifier = null;
+
+        savePanState(canvasId);
+    }, { signal });
 
     return controller;
 }
