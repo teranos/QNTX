@@ -180,7 +180,9 @@ func mergeConfigFiles(v *viper.Viper) error {
 
 	// Ensure ~/.qntx directory exists
 	qntxDir := filepath.Join(homeDir, ".qntx")
-	os.MkdirAll(qntxDir, DefaultDirPermissions)
+	if err := os.MkdirAll(qntxDir, DefaultDirPermissions); err != nil {
+		return errors.Wrapf(err, "failed to create config directory %s", qntxDir)
+	}
 
 	// Build config paths, with project config found via upward search
 	projectConfig := findProjectConfig()

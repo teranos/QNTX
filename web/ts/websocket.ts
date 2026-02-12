@@ -12,16 +12,33 @@ import type {
     LLMStreamMessage,
     StorageWarningMessage,
     PluginHealthMessage,
-    SystemCapabilitiesMessage
+    SystemCapabilitiesMessage,
+    DatabaseStatsMessage,
+    RichSearchResultsMessage,
+    WatcherMatchMessage,
+    WatcherErrorMessage,
+    GlyphFiredMessage,
 } from '../types/websocket';
 import { handleJobNotification, notifyStorageWarning, handleDaemonStatusNotification } from './tauri-notifications';
 import { handlePluginHealth } from './websocket-handlers/plugin-health';
 import { handleSystemCapabilities } from './websocket-handlers/system-capabilities';
 import { log, SEG } from './logger';
+import { connectivityManager } from './connectivity';
+import { updateResultGlyphContent, type ExecutionResult } from './components/glyph/result-glyph';
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let messageHandlers: MessageHandlers = {};
+
+/**
+ * Find a result glyph melded below a parent glyph element.
+ * Looks inside the parent's melded composition for a result glyph sibling.
+ */
+function findResultGlyphBelow(parentElement: HTMLElement): HTMLElement | null {
+    const composition = parentElement.closest('.melded-composition');
+    if (!composition) return null;
+    return composition.querySelector('[data-glyph-symbol="result"]') as HTMLElement | null;
+}
 
 /**
  * Built-in message handlers for WebSocket messages
@@ -30,7 +47,9 @@ let messageHandlers: MessageHandlers = {};
 const MESSAGE_HANDLERS = {
     reload: (data: ReloadMessage) => {
         log.info(SEG.WS, 'Dev server triggered reload', data.reason);
-        window.location.reload();
+        if (typeof window !== 'undefined') {
+            window.location.reload();
+        }
     },
 
     backend_status: (data: BackendStatusMessage) => {
@@ -110,7 +129,7 @@ const MESSAGE_HANDLERS = {
         messageHandlers['system_capabilities']?.(data);
     },
 
-    database_stats: (data: any) => {
+    database_stats: (data: DatabaseStatsMessage) => {
         log.info(SEG.DB, 'Database stats:', {
             total_attestations: data.total_attestations,
             path: data.path
@@ -127,8 +146,13 @@ const MESSAGE_HANDLERS = {
                 unique_actors: data.unique_actors,
                 unique_subjects: data.unique_subjects,
                 unique_contexts: data.unique_contexts,
-                rich_fields: data.rich_fields
+                rich_fields: data.rich_fields as (string[] | undefined)
             });
+        });
+
+        // Update database stats glyph
+        import('./default-glyphs.js').then(({ updateDatabaseStats }) => {
+            updateDatabaseStats(data);
         });
 
         // Update status indicator with total count
@@ -137,7 +161,7 @@ const MESSAGE_HANDLERS = {
         });
     },
 
-    rich_search_results: (data: any) => {
+    rich_search_results: (data: RichSearchResultsMessage) => {
         log.info(SEG.QUERY, 'Rich search results:', data.total, 'matches');
 
         // Pass results to the CodeMirror editor's fuzzy search view
@@ -146,7 +170,7 @@ const MESSAGE_HANDLERS = {
         });
     },
 
-    watcher_match: (data: any) => {
+    watcher_match: (data: WatcherMatchMessage) => {
         log.debug(SEG.WS, 'Watcher match:', data.watcher_id, data.attestation?.id);
 
         // Extract glyph ID from watcher ID (format: "ax-glyph-{glyphId}")
@@ -166,17 +190,75 @@ const MESSAGE_HANDLERS = {
         messageHandlers['watcher_match']?.(data);
     },
 
-    watcher_error: (data: any) => {
+    glyph_fired: (data: GlyphFiredMessage) => {
+        log.info(SEG.WS, 'Glyph fired:', data.glyph_id, data.status, data.error || '');
+
+        // Apply execution state to target glyph element for CSS-driven visual feedback
+        const el = document.querySelector(`[data-glyph-id="${CSS.escape(data.glyph_id)}"]`) as HTMLElement | null;
+        if (el) {
+            const stateMap: Record<string, string> = { started: 'running', success: 'completed', error: 'failed' };
+            const state = stateMap[data.status] || data.status;
+            el.dataset.executionState = state;
+
+            // Auto-clear success state after 3s so border returns to default
+            if (data.status === 'success') {
+                setTimeout(() => {
+                    if (el.dataset.executionState === 'completed') {
+                        delete el.dataset.executionState;
+                    }
+                }, 3000);
+            }
+
+            // Update existing result glyph melded below (if one exists)
+            if (data.result && (data.status === 'success' || data.status === 'error')) {
+                const resultEl = findResultGlyphBelow(el);
+                if (resultEl) {
+                    try {
+                        const result = JSON.parse(data.result) as ExecutionResult;
+                        updateResultGlyphContent(resultEl, result);
+                        log.debug(SEG.WS, 'Updated result glyph for', data.glyph_id);
+                    } catch (e) {
+                        log.error(SEG.WS, 'Failed to parse glyph_fired result:', e);
+                    }
+                } else {
+                    log.debug(SEG.WS, `Result glyph for ${data.glyph_id} gone — closed before update arrived`);
+                }
+            } else if (data.status === 'error' && data.error) {
+                // Error without result payload — surface error text in existing result glyph
+                const resultEl = findResultGlyphBelow(el);
+                if (resultEl) {
+                    const errorResult: ExecutionResult = {
+                        success: false, stdout: '', stderr: '',
+                        result: null, error: data.error, duration_ms: 0,
+                    };
+                    updateResultGlyphContent(resultEl, errorResult);
+                    log.debug(SEG.WS, 'Updated result glyph with error for', data.glyph_id);
+                } else {
+                    log.debug(SEG.WS, `Result glyph for ${data.glyph_id} gone — closed before error arrived`);
+                }
+            }
+        } else {
+            log.warn(SEG.WS, 'Glyph fired: no DOM element found for', data.glyph_id);
+        }
+
+        // Invoke registered handler
+        messageHandlers['glyph_fired']?.(data);
+    },
+
+    watcher_error: (data: WatcherErrorMessage) => {
         log.warn(SEG.WS, 'Watcher error:', data.watcher_id, data.error, `(${data.severity})`);
+        if (data.details?.length) {
+            log.warn(SEG.WS, 'Watcher error details:', ...data.details);
+        }
 
         // Extract glyph ID from watcher ID (format: "ax-glyph-{glyphId}")
         const watcherIdPrefix = 'ax-glyph-';
         if (data.watcher_id && data.watcher_id.startsWith(watcherIdPrefix)) {
             const glyphId = data.watcher_id.substring(watcherIdPrefix.length);
 
-            // Update AX glyph with error message
+            // Update AX glyph with error message and details
             import('./components/glyph/ax-glyph.js').then(({ updateAxGlyphError }) => {
-                updateAxGlyphError(glyphId, data.error, data.severity);
+                updateAxGlyphError(glyphId, data.error, data.severity, data.details);
             });
         } else {
             log.warn(SEG.WS, 'Received watcher_error with unexpected watcher_id format:', data.watcher_id);
@@ -316,6 +398,9 @@ export function connectWebSocket(handlers: MessageHandlers): void {
  * @param connected - Whether the WebSocket is connected
  */
 function updateConnectionStatus(connected: boolean): void {
+    // Notify connectivity manager of WebSocket state change
+    connectivityManager.setWebSocketConnected(connected);
+
     // Update status indicator using the new system
     import('./status-indicators.ts').then(({ statusIndicators }) => {
         statusIndicators.handleConnectionStatus(connected);
@@ -360,11 +445,23 @@ export function isConnected(): boolean {
 /**
  * Register a message handler dynamically
  * Useful for components that initialize after WebSocket connection
- * @param type - Message type to handle
- * @param handler - Handler function
+ * @param type - Message type to handle (type-safe: must be a known message type)
+ * @param handler - Handler function matching the message type
  */
-export function registerHandler(type: string, handler: MessageHandler): void {
-    (messageHandlers as Record<string, MessageHandler>)[type] = handler;
+export function registerHandler<K extends keyof MessageHandlers>(
+    type: K,
+    handler: NonNullable<MessageHandlers[K]>
+): void {
+    (messageHandlers as Record<string, MessageHandler>)[type] = handler as MessageHandler;
+}
+
+/**
+ * Unregister a message handler
+ * Should be called when components are destroyed/hidden to prevent handler leaks
+ * @param type - Message type to unregister
+ */
+export function unregisterHandler<K extends keyof MessageHandlers>(type: K): void {
+    delete (messageHandlers as Record<string, MessageHandler>)[type];
 }
 
 /**

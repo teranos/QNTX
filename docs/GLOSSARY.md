@@ -150,6 +150,34 @@ Versioned with migrations using the migration system in `db/sqlite/migrations/`
 - Don't hide complexity - show it and make it comprehensible
 - Document reality, not aspiration
 
+## Canvas Execution Model
+
+### `upstream` (Python global)
+When a meld edge triggers a py glyph, the triggering attestation is injected as a Python dict named `upstream`. The glyph code doesn't fetch or subscribe — it is *invoked* with the attestation already present. Each matching attestation triggers a fresh execution.
+
+- **Present** (meld-triggered): `upstream = {"id": "...", "subjects": [...], "predicates": [...], ...}`
+- **Absent** (standalone, user clicks play): `upstream = None`
+
+The name `upstream` reflects that the attestation comes from the upstream glyph in the meld DAG. Injected by the Rust runtime (`qntx-python/src/execution.rs`) alongside `attest()`. See [vision/glyph-attestation-flow.md](vision/glyph-attestation-flow.md) for the full model.
+
+### `attest()` (Python builtin)
+Creates an attestation from within a py glyph. Injected into the Python execution context by the Rust runtime (`qntx-python/src/atsstore.rs`) — not a library import, just available as a global function.
+
+```python
+attest(
+    subjects=["alice"],
+    predicates=["enriched"],
+    contexts=["pipeline"],
+    actors=None,        # defaults to ["glyph:{glyph_id}"] when running in a glyph
+    attributes={"key": "value"}  # optional, arbitrary JSON
+)
+```
+
+Returns a dict with the created attestation's fields (`id`, `subjects`, `predicates`, etc.). When called inside a meld-triggered execution, the output attestation can trigger further downstream glyphs if the DAG continues.
+
+### Actor convention: `glyph:{id}`
+Attestations created by canvas glyphs carry `actor: glyph:{glyph_id}`. This is how producer→downstream edges scope their subscriptions: the edge watches for attestations from that specific upstream glyph. Defaulted automatically by `attest()` when running inside a glyph execution context.
+
 ## Common Patterns
 
 ### Query Pattern

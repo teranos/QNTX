@@ -1,0 +1,96 @@
+/**
+ * Glyph Execution State — visual feedback for meld-edge triggered execution.
+ *
+ * Driven by data-execution-state attribute set by glyph_fired WebSocket handler.
+ * Loads after canvas.css — specificity 0,3,0 overrides sync-state border-color (0,2,0).
+ *
+ * Sweep animation moves left→right matching meld data flow direction.
+ * Cascades naturally through melded chains via sequential glyph_fired timing.
+ */
+
+/* --- Border color --- */
+
+.canvas-glyph[data-execution-state="running"]:not(.canvas-error-glyph) {
+    border-color: var(--glyph-status-running-text);
+    transition: border-color 0.2s ease;
+}
+
+.canvas-glyph[data-execution-state="completed"]:not(.canvas-error-glyph) {
+    border-color: var(--glyph-status-success-text);
+    transition: border-color 0.2s ease;
+}
+
+.canvas-glyph[data-execution-state="failed"]:not(.canvas-error-glyph) {
+    border-color: var(--glyph-status-error-text);
+    transition: border-color 0.2s ease;
+}
+
+/* --- Sweep overlay --- */
+
+.canvas-glyph[data-execution-state]::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* Running: repeating blue sweep left→right */
+.canvas-glyph[data-execution-state="running"]::after {
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(107, 155, 209, 0.15) 30%,
+        rgba(107, 155, 209, 0.3) 50%,
+        rgba(107, 155, 209, 0.15) 70%,
+        transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: glyph-sweep 1s ease-in-out infinite;
+}
+
+/* Completed: green band sweeps out to the right, fades */
+.canvas-glyph[data-execution-state="completed"]::after {
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(168, 230, 161, 0.25) 40%,
+        rgba(168, 230, 161, 0.4) 50%,
+        rgba(168, 230, 161, 0.25) 60%,
+        transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: glyph-sweep-exit 0.4s ease-out forwards;
+}
+
+/* Failed: red band halts mid-glyph, fades */
+.canvas-glyph[data-execution-state="failed"]::after {
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 107, 107, 0.2) 30%,
+        rgba(255, 107, 107, 0.35) 50%,
+        rgba(255, 107, 107, 0.2) 70%,
+        transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: glyph-sweep-halt 0.3s ease-out forwards;
+}
+
+/* --- Keyframes --- */
+
+@keyframes glyph-sweep {
+    0%   { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+}
+
+@keyframes glyph-sweep-exit {
+    0%   { background-position: 50% 0; opacity: 1; }
+    100% { background-position: -100% 0; opacity: 0; }
+}
+
+@keyframes glyph-sweep-halt {
+    0%   { background-position: 50% 0; opacity: 1; }
+    60%  { background-position: 40% 0; opacity: 0.8; }
+    100% { background-position: 40% 0; opacity: 0; }
+}

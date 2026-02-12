@@ -1,24 +1,22 @@
 /**
  * Storage Warning Handler
  *
- * Handles storage_warning WebSocket messages and displays toast notifications
- * when bounded storage limits are approaching.
+ * Handles storage_warning WebSocket messages when bounded storage
+ * limits are approaching.
  */
 
-import { toast } from '../toast';
+import { log, SEG } from '../logger';
 import type { StorageWarningMessage } from '../../types/websocket';
 
 /**
- * Handle storage warning message - display as toast
+ * Handle storage warning message
  */
 export function handleStorageWarning(data: StorageWarningMessage): void {
     const percentFull = Math.round(data.fill_percent * 100);
-
-    // Format the warning message
     const message = `Storage ${percentFull}% full for ${data.actor}/${data.context} (${data.current}/${data.limit})`;
 
-    console.warn('⊔ Storage warning:', message, 'Time until full:', data.time_until_full);
+    log.warn(SEG.DB, 'Storage warning:', message, 'Time until full:', data.time_until_full);
 
-    // Show toast - use warning for 50-75%, more urgent styling could be added for >75%
-    toast.warning(message);
+    // TODO: figure out how to make evictions observable without toast spam —
+    // candidates: database status indicator flash, system drawer log entry, or dedicated eviction counter
 }

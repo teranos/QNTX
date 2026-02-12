@@ -322,7 +322,11 @@ func (s *Store) ListJobsDue(now time.Time) ([]*Job, error) {
 		jobs = append(jobs, &job)
 	}
 
-	return jobs, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "error iterating due jobs")
+	}
+
+	return jobs, nil
 }
 
 // ListJobsDueContext returns scheduled jobs that are ready to run with context support.
@@ -438,7 +442,11 @@ func (s *Store) ListJobsDueContext(ctx context.Context, now time.Time) ([]*Job, 
 		jobs = append(jobs, &job)
 	}
 
-	return jobs, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "error iterating due jobs (context)")
+	}
+
+	return jobs, nil
 }
 
 // ListAllScheduledJobs returns all scheduled jobs (excludes deleted).
@@ -553,7 +561,11 @@ func (s *Store) ListAllScheduledJobs() ([]*Job, error) {
 		jobs = append(jobs, &job)
 	}
 
-	return jobs, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "error iterating scheduled jobs")
+	}
+
+	return jobs, nil
 }
 
 // UpdateJobState updates the state of a scheduled job

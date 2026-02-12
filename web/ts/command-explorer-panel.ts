@@ -11,6 +11,7 @@
 import { BasePanel } from './base-panel.ts';
 import { AX } from '@generated/sym.js';
 import { setActive, DATA } from './css-classes.ts';
+import { log, SEG } from './logger.ts';
 
 interface AxStatement {
     type: string;
@@ -250,7 +251,7 @@ class CommandExplorerPanel extends BasePanel {
     private handleCommandItemClick(item: HTMLElement): void {
         const mode = item.dataset.mode as 'ax' | 'as' | undefined;
 
-        console.log(`[Command Explorer] Clicked ${mode} command`);
+        log.debug(SEG.UI, `[Command Explorer] Clicked ${mode} command`);
 
         if (mode === 'ax') {
             // For ax, populate the editor with a statement

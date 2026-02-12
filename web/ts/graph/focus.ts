@@ -2,6 +2,7 @@
 // Handles focusing viewport on a tile and expanding it to fill most of the view
 
 import { GRAPH_PHYSICS } from '../config.ts';
+import { log, SEG } from '../logger.ts';
 import { getSimulation, getSvg, getG, getZoom, getDomCache, getFocusedNodeId, getPreFocusTransform, setFocusedNodeId, setPreFocusTransform, setIsFocusAnimating } from './state.ts';
 import { getTransform } from './transform.ts';
 import { calculateFocusedTileDimensions, DEFAULT_TILE_WIDTH, DEFAULT_TILE_HEIGHT } from './focus/dimensions.ts';
@@ -29,7 +30,7 @@ export function focusOnTile(node: D3Node): void {
     const zoom = getZoom();
 
     if (!svg || !g || !zoom || node.x === undefined || node.y === undefined) {
-        console.warn('[focus] early return - missing requirements', {
+        log.warn(SEG.GRAPH, '[focus] early return - missing requirements', {
             svg: !!svg,
             g: !!g,
             zoom: !!zoom,
@@ -42,14 +43,14 @@ export function focusOnTile(node: D3Node): void {
     const domCache = getDomCache();
     const container = domCache.get('graphContainer', '#graph-container');
     if (!container) {
-        console.warn('[focus] container not found', { selector: '#graph-container' });
+        log.warn(SEG.GRAPH, '[focus] container not found', { selector: '#graph-container' });
         return;
     }
 
     const previouslyFocusedId = getFocusedNodeId();
     const isTransition = previouslyFocusedId !== null && previouslyFocusedId !== node.id;
 
-    console.log('[focus] focusOnTile', {
+    log.debug(SEG.GRAPH, '[focus] focusOnTile', {
         nodeId: node.id,
         nodeLabel: node.label,
         nodePos: { x: node.x, y: node.y },
@@ -60,7 +61,7 @@ export function focusOnTile(node: D3Node): void {
 
     // If transitioning between tiles, restore the previous tile to normal size
     if (isTransition) {
-        console.log('[focus] tile-transition', {
+        log.debug(SEG.GRAPH, '[focus] tile-transition', {
             from: previouslyFocusedId,
             to: node.id,
             toLabel: node.label
@@ -106,7 +107,7 @@ export function focusOnTile(node: D3Node): void {
     // Calculate the focused tile dimensions (at canonical zoom)
     const focusedDimensions = calculateFocusedTileDimensions();
 
-    console.log('[focus] dimensions', {
+    log.debug(SEG.GRAPH, '[focus] dimensions', {
         focusedDimensions,
         canonicalZoom,
         viewport: { width: viewportWidth, height: viewportHeight }
@@ -128,7 +129,7 @@ export function focusOnTile(node: D3Node): void {
     const targetX = viewportWidth / 2 - node.x * canonicalZoom;
     const targetY = viewportHeight / 2 - node.y * canonicalZoom;
 
-    console.log('[focus] pan-target', {
+    log.debug(SEG.GRAPH, '[focus] pan-target', {
         nodePos: { x: node.x, y: node.y },
         targetTransform: { x: targetX, y: targetY, k: canonicalZoom },
         calculation: `viewport_center (${viewportWidth/2}, ${viewportHeight/2}) - node_pos * zoom`
@@ -137,7 +138,7 @@ export function focusOnTile(node: D3Node): void {
     // Set flag to prevent unfocus detection during programmatic zoom animation
     setIsFocusAnimating(true);
 
-    console.log('[focus] animation-start', {
+    log.debug(SEG.GRAPH, '[focus] animation-start', {
         focusedNodeId: node.id,
         duration: GRAPH_PHYSICS.ANIMATION_DURATION
     });
@@ -149,7 +150,7 @@ export function focusOnTile(node: D3Node): void {
             .translate(targetX, targetY)
             .scale(canonicalZoom))  // Reset to canonical zoom level
         .on("end", () => {
-            console.log('[focus] animation-end', {
+            log.debug(SEG.GRAPH, '[focus] animation-end', {
                 focusedNodeId: node.id
             });
             // Clear animation flag once transition completes
@@ -209,7 +210,7 @@ export function unfocus(): void {
     if (!svg || !g || !zoom) return;
 
     const preFocusTransform = getPreFocusTransform();
-    console.log('[focus] unfocus', {
+    log.debug(SEG.GRAPH, '[focus] unfocus', {
         focusedId,
         hadPreFocusTransform: preFocusTransform !== null
     });

@@ -12,6 +12,7 @@ import { escapeHtml } from '../html-utils.ts';
 import { log, SEG } from '../logger.ts';
 import { handleError } from '../error-handler.ts';
 import { buttonPlaceholder, hydrateButtons, type Button } from '../components/button.ts';
+import type { EditorView } from '@codemirror/view';
 
 // Status type for plugin connection
 type PluginStatus = 'connecting' | 'ready' | 'error' | 'unavailable';
@@ -29,14 +30,14 @@ interface ExecutionResult {
     success: boolean;
     stdout: string;
     stderr: string;
-    result: any;
+    result: unknown;
     error: string | null;
     duration_ms: number;
     variables?: Record<string, string>;
 }
 
 class PythonEditorPanel extends BasePanel {
-    private editor: any | null = null;
+    private editor: EditorView | null = null;
     private currentTab: 'editor' | 'output' | null = null;
     private lastOutput: ExecutionResult | null = null;
     private isExecuting: boolean = false;
@@ -291,7 +292,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    code: code,
+                    content: code,
                     capture_variables: true
                 })
             });

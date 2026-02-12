@@ -3,6 +3,7 @@ package ax
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"go.uber.org/zap"
@@ -18,7 +19,7 @@ import (
 type AxExecutor struct {
 	queryStore     ats.AttestationQueryStore
 	fuzzy          Matcher
-	classifier     *classification.SmartClassifier
+	classifier     Classifier
 	aliasResolver  *alias.Resolver
 	entityResolver ats.EntityResolver
 	queryExpander  ats.QueryExpander
@@ -62,7 +63,7 @@ func NewAxExecutorWithOptions(queryStore ats.AttestationQueryStore, aliasResolve
 	return &AxExecutor{
 		queryStore:     queryStore,
 		fuzzy:          opts.Matcher,
-		classifier:     classification.NewSmartClassifier(classification.DefaultTemporalConfig()),
+		classifier:     NewDefaultClassifier(classification.DefaultTemporalConfig()),
 		aliasResolver:  aliasResolver,
 		entityResolver: opts.EntityResolver,
 		queryExpander:  opts.QueryExpander,
@@ -72,7 +73,7 @@ func NewAxExecutorWithOptions(queryStore ats.AttestationQueryStore, aliasResolve
 
 // SetClassificationConfig replaces the classifier with one using the provided config
 func (ae *AxExecutor) SetClassificationConfig(config classification.TemporalConfig) {
-	ae.classifier = classification.NewSmartClassifier(config)
+	ae.classifier = NewDefaultClassifier(config)
 }
 
 // FuzzyBackend returns which fuzzy matching implementation is currently in use
@@ -182,7 +183,12 @@ func (ae *AxExecutor) ExecuteAsk(ctx context.Context, filter types.AxFilter) (*t
 	return result, nil
 }
 
-// executeAdvancedClassification performs smart conflict classification
+// executeAdvancedClassification groups claims, classifies conflicts, applies resolution
+// strategies, and returns deterministically ordered results.
+//
+// Ordering contract: results are sorted by confidence desc, then recency desc.
+// Classified conflicts carry their computed confidence; unclassified claims (no conflict)
+// get a neutral 0.5 — present but uncorroborated.
 func (ae *AxExecutor) executeAdvancedClassification(claims []ats.IndividualClaim) ([]types.Conflict, []types.As) {
 	// Group claims by key for classification
 	claimGroups := make(map[string][]ats.IndividualClaim)
@@ -198,13 +204,33 @@ func (ae *AxExecutor) executeAdvancedClassification(claims []ats.IndividualClaim
 	// Apply resolution strategies to filter claims
 	filteredClaims := ae.applyResolutionStrategies(claimGroups, classificationResult.Conflicts)
 
+	// Build confidence lookup from classification results
+	confidenceMap := make(map[string]float64)
+	for _, conflict := range classificationResult.Conflicts {
+		key := conflict.Conflict.Subject + "|" + conflict.Conflict.Predicate + "|" + conflict.Conflict.Context
+		confidenceMap[key] = conflict.Confidence
+	}
+
+	// Sort by confidence desc, then recency desc, then source ID for deterministic ordering
+	sort.Slice(filteredClaims, func(i, j int) bool {
+		ci := claimConfidence(filteredClaims[i], confidenceMap)
+		cj := claimConfidence(filteredClaims[j], confidenceMap)
+		if ci != cj {
+			return ci > cj
+		}
+		if !filteredClaims[i].Timestamp.Equal(filteredClaims[j].Timestamp) {
+			return filteredClaims[i].Timestamp.After(filteredClaims[j].Timestamp)
+		}
+		return filteredClaims[i].SourceAs.ID < filteredClaims[j].SourceAs.ID
+	})
+
 	// Convert AdvancedConflicts back to basic Conflicts
 	var conflicts []types.Conflict
 	for _, advancedConflict := range classificationResult.Conflicts {
 		conflicts = append(conflicts, advancedConflict.Conflict)
 	}
 
-	// Convert filtered claims back to attestations
+	// Convert filtered claims back to attestations (preserves sorted order via first-seen dedup)
 	attestations := ats.ConvertClaimsToAttestations(filteredClaims)
 
 	return conflicts, attestations
@@ -309,6 +335,16 @@ func (ae *AxExecutor) getHighestAuthorityClaim(claims []ats.IndividualClaim) ats
 	return claims[0]
 }
 
+// claimConfidence returns the confidence for a claim based on its conflict group.
+// Unclassified claims get 0.5 — present but uncorroborated.
+func claimConfidence(claim ats.IndividualClaim, confidenceMap map[string]float64) float64 {
+	key := claim.Subject + "|" + claim.Predicate + "|" + claim.Context
+	if conf, ok := confidenceMap[key]; ok {
+		return conf
+	}
+	return 0.5
+}
+
 // expandFuzzyPredicates expands query predicates using fuzzy matching
 func (ae *AxExecutor) expandFuzzyPredicates(ctx context.Context, queryPredicates []string) ([]string, error) {
 	if len(queryPredicates) == 0 {
@@ -327,7 +363,11 @@ func (ae *AxExecutor) expandFuzzyPredicates(ctx context.Context, queryPredicates
 	expanded := []string{}
 	for _, queryPred := range queryPredicates {
 		matches := ae.fuzzy.FindMatches(queryPred, allPredicates)
-		expanded = append(expanded, matches...)
+		if len(matches) == 0 {
+			expanded = append(expanded, queryPred)
+		} else {
+			expanded = append(expanded, matches...)
+		}
 	}
 
 	// Remove duplicates
@@ -353,7 +393,11 @@ func (ae *AxExecutor) expandFuzzyContexts(ctx context.Context, queryContexts []s
 	expanded := []string{}
 	for _, queryContext := range queryContexts {
 		matches := ae.fuzzy.FindContextMatches(queryContext, allContexts)
-		expanded = append(expanded, matches...)
+		if len(matches) == 0 {
+			expanded = append(expanded, queryContext)
+		} else {
+			expanded = append(expanded, matches...)
+		}
 	}
 
 	// Remove duplicates

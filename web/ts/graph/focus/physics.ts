@@ -2,6 +2,7 @@
 
 import { GRAPH_PHYSICS } from '../../config.ts';
 import { getSimulation } from '../state.ts';
+import { log, SEG } from '../../logger.ts';
 import type { D3Node } from '../../../types/d3-graph';
 
 // Import D3 from vendor bundle
@@ -17,7 +18,7 @@ export function adjustPhysicsForFocus(focusedNode: D3Node): void {
     const simulation = getSimulation();
     if (!simulation) return;
 
-    console.log('[physics] adjusting for focus', {
+    log.debug(SEG.GRAPH, '[physics] adjusting for focus', {
         focusedNodeId: focusedNode.id,
         positionStrength: GRAPH_PHYSICS.FOCUS_POSITION_STRENGTH,
         chargeStrength: GRAPH_PHYSICS.FOCUS_CHARGE_STRENGTH,
@@ -56,7 +57,7 @@ export function restoreNormalPhysics(): void {
     const simulation = getSimulation();
     if (!simulation) return;
 
-    console.log('[physics] restoring normal physics', {
+    log.debug(SEG.GRAPH, '[physics] restoring normal physics', {
         chargeStrength: GRAPH_PHYSICS.TILE_CHARGE_STRENGTH,
         collisionRadius: GRAPH_PHYSICS.COLLISION_RADIUS,
         simulationAlpha: 0.2

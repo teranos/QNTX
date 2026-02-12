@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/teranos/QNTX/ai/tracker"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/internal/httpclient"
@@ -31,6 +33,7 @@ type Client struct {
 	httpClient   *httpclient.SaferClient
 	config       Config
 	usageTracker *tracker.UsageTracker
+	logger       *zap.SugaredLogger
 }
 
 // Config holds AI client configuration
@@ -40,11 +43,12 @@ type Config struct {
 	Temperature   *float64 // nil = use default (0.2)
 	MaxTokens     *int     // nil = use default (1000)
 	Debug         bool
-	DB            *sql.DB // Database for automatic cost/usage tracking (strongly recommended)
-	Verbosity     int     // Verbosity level for usage tracking output
-	OperationType string  // Operation type for tracking context (e.g., "code-analysis")
-	EntityType    string  // Entity type for tracking context (e.g., "file")
-	EntityID      string  // Entity ID for tracking context (e.g., file path)
+	Logger        *zap.SugaredLogger // Structured logger (nil = nop logger)
+	DB            *sql.DB            // Database for automatic cost/usage tracking (strongly recommended)
+	Verbosity     int                // Verbosity level for usage tracking output
+	OperationType string             // Operation type for tracking context (e.g., "code-analysis")
+	EntityType    string             // Entity type for tracking context (e.g., "file")
+	EntityID      string             // Entity ID for tracking context (e.g., file path)
 }
 
 // NewClient creates a new OpenRouter.ai client with QNTX-specific defaults
@@ -67,6 +71,12 @@ func NewClient(config Config) *Client {
 		usageTracker = tracker.NewUsageTracker(config.DB, config.Verbosity)
 	}
 
+	// Initialize logger (nop if not provided)
+	logger := config.Logger
+	if logger == nil {
+		logger = zap.NewNop().Sugar()
+	}
+
 	// Create SSRF-safer HTTP client with redirect protection
 	// Blocks private IPs, localhost, AWS metadata endpoint, dangerous schemes
 	blockPrivateIP := true
@@ -80,6 +90,7 @@ func NewClient(config Config) *Client {
 		httpClient:   saferClient,
 		config:       config,
 		usageTracker: usageTracker,
+		logger:       logger,
 	}
 }
 
@@ -209,16 +220,13 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 		model = *req.Model
 	}
 
-	// Debug output
-	if c.config.Debug {
-		fmt.Printf("\n🤖 AI Chat Request\n")
-		fmt.Printf("Model: %s\n", model)
-		fmt.Printf("Temperature: %.2f\n", temperature)
-		fmt.Printf("Max Tokens: %d\n", maxTokens)
-		fmt.Printf("System: %s\n", req.SystemPrompt)
-		fmt.Printf("User: %s\n", req.UserPrompt)
-		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	}
+	c.logger.Debugw("AI Chat Request",
+		"model", model,
+		"temperature", temperature,
+		"max_tokens", maxTokens,
+		"system_prompt", req.SystemPrompt,
+		"user_prompt", req.UserPrompt,
+	)
 
 	// Prepare OpenRouter request
 	messages := []Message{
@@ -256,9 +264,8 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
 			delay := time.Duration(attempt) * time.Second
-			if c.config.Debug {
-				fmt.Printf("🔄 Retry attempt %d/%d, waiting %v...\n", attempt, maxRetries-1, delay)
-			}
+			c.logger.Debugw("Retrying OpenRouter request",
+				"attempt", attempt, "max_retries", maxRetries-1, "delay", delay)
 			time.Sleep(delay)
 		}
 
@@ -266,25 +273,21 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 
 		// Success
 		if err == nil {
-			if attempt > 0 && c.config.Debug {
-				fmt.Printf("✅ Request succeeded after %d attempts\n", attempt+1)
+			if attempt > 0 {
+				c.logger.Infow("Request succeeded after retries", "attempts", attempt+1, "model", model)
 			}
 			break
 		}
 
-		// Always show detailed error info for debugging
-		if c.config.Debug || attempt == 0 {
-			fmt.Printf("❌ OpenRouter API Error (attempt %d/%d):\n", attempt+1, maxRetries)
-			fmt.Printf("🔍 Error: %v\n", err)
-			fmt.Printf("🔗 Model: %s\n", model)
-			fmt.Printf("📡 URL: %s/chat/completions\n", "https://openrouter.ai/api/v1")
-		}
+		// Log error details on first attempt or in debug
+		c.logger.Warnw("OpenRouter API error",
+			"attempt", attempt+1, "max_retries", maxRetries,
+			"error", err, "model", model,
+			"url", c.baseURL+"/chat/completions")
 
 		// Check if retryable
 		if c.isRetryableError(err) {
-			if c.config.Debug {
-				fmt.Printf("🌐 Retryable error, will retry...\n")
-			}
+			c.logger.Debugw("Retryable error detected, will retry", "error", err)
 			continue
 		}
 
@@ -303,14 +306,12 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 		return nil, errors.New("no response choices from OpenRouter")
 	}
 
-	// Debug response (debug mode shows full details)
-	if c.config.Debug {
-		fmt.Printf("🔍 OpenRouter Response:\n")
-		fmt.Printf("Content: %s\n", resp.Choices[0].Message.Content)
-		fmt.Printf("Usage: prompt=%d, completion=%d, total=%d\n",
-			resp.Usage.PromptTokens, resp.Usage.CompletionTokens, resp.Usage.TotalTokens)
-		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	}
+	c.logger.Debugw("OpenRouter response",
+		"content_length", len(resp.Choices[0].Message.Content),
+		"prompt_tokens", resp.Usage.PromptTokens,
+		"completion_tokens", resp.Usage.CompletionTokens,
+		"total_tokens", resp.Usage.TotalTokens,
+	)
 
 	// Track successful usage
 	if c.usageTracker != nil {
@@ -338,7 +339,7 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 
 		if err := c.usageTracker.TrackUsage(usage); err != nil {
 			// Always log tracking errors (budget system relies on this data)
-			fmt.Printf("⚠️  Failed to track usage: %v\n", err)
+			c.logger.Warnw("Failed to track usage", "error", err, "model", model, "tokens", tokensUsed)
 		}
 	}
 
@@ -414,7 +415,7 @@ func (c *Client) trackFailedRequest(requestTime time.Time, model string, tempera
 
 	if trackErr := c.usageTracker.TrackUsage(usage); trackErr != nil {
 		// Always log tracking errors (budget system relies on this data)
-		fmt.Printf("⚠️  Failed to track failed request: %v\n", trackErr)
+		c.logger.Warnw("Failed to track failed request", "error", trackErr, "model", model, "original_error", err.Error())
 	}
 }
 

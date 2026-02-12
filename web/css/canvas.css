@@ -2,40 +2,28 @@
  * Canvas Workspace - Fractal glyph container with spatial grid layout
  */
 
-/* Canvas workspace - full-screen, no padding, always dark */
+/* Canvas workspace - full-screen, no padding, always dark with fixed grid background */
 .canvas-workspace {
     width: 100%;
     height: 100%;
     position: relative;
     overflow: hidden;
     background-color: #2a2b2a; /* Mid-dark gray between mid-gray and almost-black for night work */
-}
-
-/* Subtle grid overlay - adjusted for dark background */
-/* TODO: Document grid overlay math (39px + 1px = 40px GRID_SIZE) */
-.canvas-grid-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
     background-image:
         repeating-linear-gradient(
             0deg,
             transparent,
-            transparent 39px,
-            rgba(255, 255, 255, 0.05) 39px,
-            rgba(255, 255, 255, 0.05) 40px
+            transparent 19px,
+            rgba(255, 255, 255, 0.05) 19px,
+            rgba(255, 255, 255, 0.05) 20px
         ),
         repeating-linear-gradient(
             90deg,
             transparent,
-            transparent 39px,
-            rgba(255, 255, 255, 0.05) 39px,
-            rgba(255, 255, 255, 0.05) 40px
+            transparent 19px,
+            rgba(255, 255, 255, 0.05) 19px,
+            rgba(255, 255, 255, 0.05) 20px
         );
-    pointer-events: none;
-    z-index: 0;
 }
 
 /* Right-click spawn menu */
@@ -57,7 +45,7 @@
     height: 40px;
     border: none;
     background: var(--bg-tertiary);
-    color: var(--text-primary);
+    color: rgba(255, 255, 255, 0.85);
     font-size: 20px;
     border-radius: var(--border-radius);
     cursor: pointer;
@@ -68,7 +56,8 @@
 }
 
 .canvas-spawn-button:hover {
-    background: var(--bg-hover);
+    background: #3a3b3a;
+    color: rgba(255, 255, 255, 1);
     transform: scale(1.1);
 }
 
@@ -76,45 +65,168 @@
     transform: scale(0.95);
 }
 
-/* Grid glyphs on canvas */
-.canvas-grid-glyph {
-    position: absolute;
-    width: 40px;
-    height: 40px;
+/* Canvas fullscreen minimize button - matches action bar styling */
+.canvas-minimize-btn {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: 32px;
+    height: 32px;
+    background: var(--bg-tertiary);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    color: rgba(255, 255, 255, 0.85);
+    opacity: 0.95;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 16px;
+    z-index: 10001;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 24px;
-    cursor: move;
-    user-select: none;
-    background-color: var(--bg-secondary);
-    border-radius: var(--border-radius);
-    border: 1px solid var(--border-color);
-    transition: opacity 0.15s ease;
-    z-index: 1;
-}
-
-.canvas-grid-glyph:hover {
-    background-color: var(--bg-hover);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: all 0.15s ease;
 }
 
-.canvas-grid-glyph:active {
-    cursor: grabbing;
+.canvas-minimize-btn:hover {
+    background: #3a3b3a;
+    border-color: rgba(255, 255, 255, 0.45);
+    color: rgba(255, 255, 255, 1);
+    opacity: 1;
 }
 
-/* Python editor glyphs on canvas */
-.canvas-py-glyph {
-    /* Base styles are set inline in py-glyph.ts */
+.canvas-minimize-btn:active {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(0.95);
 }
+
+/* Touch devices: enlarge canvas minimize and action bar for thumb targeting */
+@media (pointer: coarse) {
+    .canvas-minimize-btn {
+        width: 48px;
+        height: 48px;
+        font-size: 20px;
+        top: 12px;
+        right: 12px;
+    }
+
+    .canvas-action-bar {
+        gap: 4px;
+        padding: 4px;
+    }
+
+    .canvas-action-button {
+        width: 40px;
+        height: 40px;
+        font-size: 16px;
+    }
+
+    .canvas-spawn-button {
+        width: 48px;
+        height: 48px;
+        font-size: 22px;
+    }
+}
+
+/* Python editor glyphs on canvas — brand colors applied inline in py-glyph.ts */
 
 /* Interaction states for glyphs */
-.canvas-py-glyph.is-dragging,
-.canvas-grid-glyph.is-dragging {
+.canvas-py-glyph.is-dragging {
     opacity: 0.8;
     z-index: 1000;
 }
 
 .canvas-py-glyph.is-resizing {
     opacity: 0.9;
+}
+
+/* ============================================================================
+ * Glyph Sync State Visual Feedback
+ * ============================================================================ */
+
+/* Base glyph - applies saturation and hue shift based on connectivity mode */
+.canvas-glyph:not(.canvas-error-glyph) {
+    filter: saturate(var(--mode-glyph-saturation)) hue-rotate(var(--mode-glyph-hue));
+    transition: filter var(--mode-transition-duration) var(--mode-transition-timing),
+                border-color var(--mode-transition-duration) var(--mode-transition-timing);
+    border-color: rgba(220, 222, 221, var(--mode-glyph-border-opacity));
+}
+
+/* Totally monochrome while dragging offline (indicates unsaved local change) */
+.canvas-glyph.is-dragging[data-connectivity-mode="offline"]:not([data-local-active]) {
+    filter: grayscale(100%);
+    border-color: rgba(220, 222, 221, 0.15) !important; /* Almost invisible border */
+}
+
+/* Ghostly appearance for unsynced/failed glyphs while offline (persists after drag) */
+/* Local-active glyphs (ts-glyph, ax-glyph querying IndexedDB) stay orange */
+.canvas-glyph[data-connectivity-mode="offline"][data-sync-state="unsynced"]:not([data-local-active]),
+.canvas-glyph[data-connectivity-mode="offline"][data-sync-state="failed"]:not([data-local-active]) {
+    filter: grayscale(100%);
+    border-color: rgba(220, 222, 221, 0.15) !important; /* Almost invisible border */
+}
+
+/* Local-active glyphs: orange tint when offline (still functional via WASM/IndexedDB) */
+.canvas-glyph[data-connectivity-mode="offline"][data-local-active] {
+    filter: saturate(90%) hue-rotate(-10deg);
+    border-color: rgba(200, 160, 80, 0.5);
+}
+
+/* Server-side results: grayscale when offline (indicates stale/cached data) */
+/* Local results inside AX glyph stay colored */
+.ax-glyph-results[data-connectivity-mode="offline"]:not([data-local-active]) {
+    filter: grayscale(100%);
+    transition: filter var(--mode-transition-duration) var(--mode-transition-timing);
+}
+
+/* ============================================================================
+ * Glyph Selection
+ * ============================================================================ */
+
+/* Selected state - highlighted border on any glyph type */
+.canvas-glyph-selected {
+    outline: 2px solid rgba(122, 202, 122, 0.4);
+    outline-offset: 2px;
+}
+
+/* Action bar - floating toolbar above selected glyph */
+.canvas-action-bar {
+    display: flex;
+    gap: 3px;
+    background: var(--bg-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 4px;
+    padding: 3px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    pointer-events: auto;
+    transform: translateX(-50%);
+}
+
+.canvas-action-button {
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    opacity: 0.6;
+    font-size: 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.canvas-action-button:hover {
+    background: var(--bg-hover);
+    opacity: 0.9;
+}
+
+.canvas-action-button:active {
+    border: 1px solid var(--border-light);
+}
+
+.canvas-action-delete:hover {
+    background: #3d1a0a;
+    color: #d45030;
 }

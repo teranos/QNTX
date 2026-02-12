@@ -77,9 +77,6 @@ func init() {
 	rootCmd.AddCommand(commands.ServerCmd)
 	rootCmd.AddCommand(commands.TypegenCmd)
 	rootCmd.AddCommand(commands.VersionCmd)
-
-	// Add domain plugin commands
-	addPluginCommands()
 }
 
 // initializePluginRegistry sets up the domain plugin registry with async plugin discovery
@@ -200,14 +197,6 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 	} else {
 		pluginLogger.Warnw("Cannot initialize plugins - server or services not available yet")
 	}
-}
-
-// addPluginCommands was used to add commands from all registered plugins.
-// This is no longer needed as plugin commands are not integrated into the CLI.
-// Plugins should provide their own CLI binaries.
-// Domain functionality is exposed via the server API.
-func addPluginCommands() {
-	// No-op: Plugin commands are no longer registered
 }
 
 func main() {

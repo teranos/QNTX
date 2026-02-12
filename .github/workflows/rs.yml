@@ -10,7 +10,6 @@ on:
       - 'crates/qntx-core/Cargo.toml'
       - 'crates/qntx-sqlite/Cargo.toml'
       - 'crates/qntx-wasm/Cargo.toml'
-      - 'ats/ax/fuzzy-ax/Cargo.toml'
       - 'qntx-python/Cargo.toml'
       - '.github/workflows/rs.yml'
   push:
@@ -22,58 +21,15 @@ on:
       - 'web/src-tauri/Cargo.toml'
       - 'crates/qntx/Cargo.toml'
       - 'crates/qntx-wasm/Cargo.toml'
-      - 'ats/ax/fuzzy-ax/Cargo.toml'
       - 'qntx-python/Cargo.toml'
   workflow_dispatch:
 
 jobs:
-  fuzzy-ax:
-    name: Fuzzy Ax
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/teranos/qntx:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Configure git safe directory
-        run: git config --global --add safe.directory /__w/QNTX/QNTX
-
-      - name: Cache Rust dependencies
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: ats/ax/fuzzy-ax
-
-      - name: Check formatting
-        run: cd ats/ax/fuzzy-ax && cargo fmt --check
-
-      - name: Clippy
-        run: cd ats/ax/fuzzy-ax && cargo clippy --all-targets --all-features
-        env:
-          RUSTFLAGS: "-Dwarnings"
-
-      - name: Test
-        run: cd ats/ax/fuzzy-ax && cargo test --lib
-
-      - name: Build release
-        run: cd ats/ax/fuzzy-ax && cargo build --release --lib
-
-      - name: Test CGO integration
-        run: |
-          cd ats/ax/fuzzy-ax && cargo build --release --lib
-          export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
-          export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
-          cd ../../.. && go test -tags rustfuzzy -v ./ats/ax/...
-
   qntx-sqlite:
     name: SQLite Backend
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/teranos/qntx:latest
+      image: ghcr.io/teranos/qntx-ci:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -128,6 +84,9 @@ jobs:
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
 
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -137,7 +96,7 @@ jobs:
         run: cargo fmt --check --package qntx-wasm
 
       - name: Build WASM module
-        run: make rust-wasm
+        run: make wasm
 
       - name: Test Go integration
         run: go test -v ./ats/wasm/...
@@ -164,10 +123,13 @@ jobs:
           skipPush: true
 
       - name: Check formatting
-        run: cd qntx-python && nix develop .. --command cargo fmt --check
+        run: nix develop ./qntx-python --command cargo fmt --check
 
-      - name: Build via Nix (required for Python linking)
-        run: nix build .#qntx-python --print-build-logs
+      - name: Clippy (via Nix)
+        run: nix flake check ./qntx-python --print-build-logs
+
+      - name: Build and test via Nix (required for Python linking)
+        run: nix build ./qntx-python#qntx-python-plugin --print-build-logs
 
       - name: Verify binary works
         run: ./result/bin/qntx-python-plugin --version

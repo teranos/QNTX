@@ -22,7 +22,7 @@ func Migrate(db *sql.DB, logger *zap.SugaredLogger) error {
 	// Read migration files
 	entries, err := migrations.ReadDir("sqlite/migrations")
 	if err != nil {
-		return errors.Wrap(err, "read migrations")
+		return errors.Wrap(err, "failed to read embedded migration files from sqlite/migrations")
 	}
 
 	// Sort migrations (000_create_schema_migrations.sql runs first)

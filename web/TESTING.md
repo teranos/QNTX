@@ -2,12 +2,15 @@
 
 Uses [Bun Test](https://bun.sh/docs/cli/test) - Jest-compatible API, 10-100x faster.
 
+Don't test implementation details. Organize tests by persona: **Tim** (happy path), **Spike** (edge cases), **Jenny** (complex scenarios).
+
 ## Quick Start
 
 ```bash
 bun test              # Run once
 bun test --watch      # Watch mode
 make test-web         # From project root
+USE_JSDOM=1 bun test path/to/test.dom.test.ts  # Run single JSDOM test locally
 ```
 
 ## File Organization
@@ -20,10 +23,13 @@ ts/prose-navigation.test.ts
 
 ## Key Patterns
 
-**DOM Testing** (happy-dom is configured):
+**DOM Testing** (happy-dom for fast tests, JSDOM for complex browser APIs):
 ```typescript
+// Fast tests - use happy-dom (automatic)
 const panel = document.createElement('div');
 nav.bindElements(panel);
+
+// Complex tests requiring browser APIs - gate with USE_JSDOM=1 (see *.dom.test.ts files)
 ```
 
 **localStorage Mocking** (see `prose-navigation.test.ts`):
@@ -37,6 +43,8 @@ const mockLocalStorage = (() => {
     };
 })();
 ```
+
+**`mock.module` is process-global** — mocks leak across test files in the same `bun test` run; if two files mock the same module, the last one wins and can change async behavior (e.g., turning a throwing call into a real `await`).
 
 **Callbacks**:
 ```typescript

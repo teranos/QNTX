@@ -1,3 +1,5 @@
+//go:build qntxwasm
+
 package watcher_test
 
 import (
@@ -70,13 +72,13 @@ func TestEngine_LoadWatchers(t *testing.T) {
 		AxQuery:           "subjects=user:456 predicates=login",
 	}
 
-	if err := store.Create(enabledWatcher); err != nil {
+	if err := store.Create(context.Background(), enabledWatcher); err != nil {
 		t.Fatalf("Create enabled watcher failed: %v", err)
 	}
-	if err := store.Create(disabledWatcher); err != nil {
+	if err := store.Create(context.Background(), disabledWatcher); err != nil {
 		t.Fatalf("Create disabled watcher failed: %v", err)
 	}
-	if err := store.Create(axQueryWatcher); err != nil {
+	if err := store.Create(context.Background(), axQueryWatcher); err != nil {
 		t.Fatalf("Create ax query watcher failed: %v", err)
 	}
 
@@ -129,7 +131,7 @@ func TestEngine_MatchesFilter(t *testing.T) {
 			Contexts:   []string{"web"},
 		},
 	}
-	if err := store.Create(w); err != nil {
+	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
 	}
 
@@ -145,8 +147,8 @@ func TestEngine_MatchesFilter(t *testing.T) {
 	})
 
 	testCases := []struct {
-		name    string
-		as      *types.As
+		name        string
+		as          *types.As
 		shouldMatch bool
 	}{
 		{
@@ -243,9 +245,9 @@ func TestEngine_RateLimiting(t *testing.T) {
 		ActionData:        "pass",
 		MaxFiresPerMinute: 60, // 1 per second
 		Enabled:           true,
-		Filter: types.AxFilter{}, // Match all
+		Filter:            types.AxFilter{}, // Match all
 	}
-	if err := store.Create(w); err != nil {
+	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
 	}
 
@@ -296,7 +298,7 @@ func TestEngine_ExecutePython(t *testing.T) {
 
 		var req map[string]interface{}
 		json.NewDecoder(r.Body).Decode(&req)
-		receivedCode = req["code"].(string)
+		receivedCode = req["content"].(string)
 
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -313,9 +315,9 @@ func TestEngine_ExecutePython(t *testing.T) {
 		ActionData:        "print(attestation['id'])",
 		MaxFiresPerMinute: 105,
 		Enabled:           true,
-		Filter: types.AxFilter{}, // Match all
+		Filter:            types.AxFilter{}, // Match all
 	}
-	if err := store.Create(w); err != nil {
+	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
 	}
 
@@ -370,9 +372,9 @@ func TestEngine_ExecuteWebhook(t *testing.T) {
 		ActionData:        server.URL + "/webhook",
 		MaxFiresPerMinute: 105,
 		Enabled:           true,
-		Filter: types.AxFilter{}, // Match all
+		Filter:            types.AxFilter{}, // Match all
 	}
-	if err := store.Create(w); err != nil {
+	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
 	}
 
@@ -404,7 +406,6 @@ func TestEngine_ExecuteWebhook(t *testing.T) {
 		t.Errorf("Wrong attestation ID: %v", attestationData["id"])
 	}
 }
-
 
 func TestEngine_QueryHistoricalMatches(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
@@ -448,7 +449,7 @@ func TestEngine_QueryHistoricalMatches(t *testing.T) {
 			Predicates: []string{"login"},
 		},
 	}
-	if err := store.Create(w); err != nil {
+	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
 	}
 
@@ -498,7 +499,7 @@ func TestEngine_TimeFilters(t *testing.T) {
 			TimeEnd:   &future,
 		},
 	}
-	if err := store.Create(w); err != nil {
+	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
 	}
 
@@ -570,9 +571,9 @@ func TestEngine_ZeroMaxFiresPerMinute(t *testing.T) {
 		ActionData:        "pass",
 		MaxFiresPerMinute: 0, // Zero means zero - no fires allowed
 		Enabled:           true,
-		Filter: types.AxFilter{}, // Match all
+		Filter:            types.AxFilter{}, // Match all
 	}
-	if err := store.Create(w); err != nil {
+	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
 	}
 
@@ -642,7 +643,7 @@ func TestEngine_NoSharedMutation(t *testing.T) {
 			Enabled:           true,
 			Filter:            types.AxFilter{}, // Match all
 		}
-		if err := store.Create(w); err != nil {
+		if err := store.Create(context.Background(), w); err != nil {
 			t.Fatalf("Create watcher %d failed: %v", i, err)
 		}
 	}
@@ -694,6 +695,45 @@ func TestEngine_NoSharedMutation(t *testing.T) {
 	// Also verify the original attestation wasn't modified
 	if originalAttestation.Subjects[0] != "original-subject" {
 		t.Error("Original attestation was mutated!")
+	}
+}
+
+func TestEngine_GetParseError_SuccessfulWatcher(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zap.NewNop().Sugar()
+	engine := watcher.NewEngine(db, "http://localhost:877", logger)
+
+	// Create watcher with valid AX query
+	store := storage.NewWatcherStore(db)
+	validWatcher := &storage.Watcher{
+		ID:                "valid-query-watcher",
+		Name:              "Valid Query Watcher",
+		ActionType:        storage.ActionTypePython,
+		ActionData:        "print('ok')",
+		MaxFiresPerMinute: 105,
+		Enabled:           true,
+		AxQuery:           "ANNA is author",
+	}
+
+	if err := store.Create(context.Background(), validWatcher); err != nil {
+		t.Fatalf("Create watcher failed: %v", err)
+	}
+
+	// Start engine (loads watchers and parses queries)
+	if err := engine.Start(); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+	defer engine.Stop()
+
+	// Verify watcher was loaded successfully
+	if _, exists := engine.GetWatcher("valid-query-watcher"); !exists {
+		t.Fatal("Valid watcher not loaded")
+	}
+
+	// GetParseError should return nil for successful watcher
+	parseErr := engine.GetParseError("valid-query-watcher")
+	if parseErr != nil {
+		t.Errorf("Expected nil parse error for successful watcher, got: %v", parseErr)
 	}
 }
 

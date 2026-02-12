@@ -3,7 +3,7 @@
 //! Core engine for frame-by-frame video processing. Designed for
 //! ultra-low latency with minimal allocations in the hot path.
 
-use qntx::error::Error;
+use qntx_grpc::error::Error;
 use std::time::Instant;
 
 #[cfg(feature = "onnx")]

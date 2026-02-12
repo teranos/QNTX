@@ -48,15 +48,17 @@ jobs:
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
 
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
       - name: Build WASM module
-        run: make rust-wasm
+        run: make wasm
 
       - name: Build Rust SQLite library
         run: make rust-sqlite
 
       - name: Run tests
         # Test with core tags to ensure we test what we ship
-        # TODO: Add rustfuzzy,rustvideo once those are stabilized
         run: |
           export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
           go test -tags "rustsqlite,qntxwasm" ./...
@@ -92,8 +94,11 @@ jobs:
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
 
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
       - name: Build WASM module
-        run: make rust-wasm
+        run: make wasm
 
       - name: Build Rust SQLite library
         run: make rust-sqlite
@@ -101,7 +106,7 @@ jobs:
       - name: Run integration tests
         run: |
           export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
-          go test -tags=integration ./...
+          go test -tags="rustsqlite,qntxwasm,integration" ./...
 
   build:
     name: Go Build
@@ -134,8 +139,11 @@ jobs:
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
 
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
       - name: Build WASM module
-        run: make rust-wasm
+        run: make wasm
 
       - name: Build Rust SQLite library
         run: make rust-sqlite

@@ -160,9 +160,9 @@ impl PythonPluginService {
                     for attestation in response.attestations {
                         if let Some(handler_name) = attestation.subjects.first() {
                             // Parse JSON attributes to extract Python code
-                            if !attestation.attributes_json.is_empty() {
+                            if !attestation.attributes.is_empty() {
                                 match serde_json::from_str::<HashMap<String, serde_json::Value>>(
-                                    &attestation.attributes_json,
+                                    &attestation.attributes,
                                 ) {
                                     Ok(attrs) => {
                                         if let Some(serde_json::Value::String(code)) =
@@ -494,9 +494,9 @@ impl DomainPluginService for PythonPluginService {
         // Route to handler based on handler_name
         if handler_name == "python.script" {
             self.execute_python_script_job(req).await
-        } else if handler_name.starts_with("python.") {
+        } else if let Some(stripped) = handler_name.strip_prefix("python.") {
             // Strip python. prefix to get handler name
-            let handler_key = handler_name["python.".len()..].to_string();
+            let handler_key = stripped.to_string();
             self.execute_discovered_handler_job(req, &handler_key).await
         } else {
             Err(Status::not_found(format!(
@@ -519,16 +519,14 @@ impl PythonPluginService {
         // Parse payload as JSON containing script_code
         #[derive(serde::Deserialize)]
         struct PythonScriptPayload {
-            script_code: String,
-            #[serde(default)]
-            script_type: Option<String>,
+            content: String,
         }
 
         let payload: PythonScriptPayload = serde_json::from_slice(&req.payload)
             .map_err(|e| Status::invalid_argument(format!("Invalid payload JSON: {}", e)))?;
 
-        if payload.script_code.is_empty() {
-            return Err(Status::invalid_argument("Missing script_code in payload"));
+        if payload.content.is_empty() {
+            return Err(Status::invalid_argument("Missing content in payload"));
         }
 
         // Execute the Python script
@@ -546,9 +544,10 @@ impl PythonPluginService {
         let result = {
             let state = self.handlers.state.read();
             state.engine.execute_with_ats(
-                &payload.script_code,
+                &payload.content,
                 &config,
                 Some(state.ats_client.clone()),
+                None,
             )
         };
 
@@ -623,9 +622,12 @@ impl PythonPluginService {
 
         let result = {
             let state = self.handlers.state.read();
-            state
-                .engine
-                .execute_with_ats(&script_code, &config, Some(state.ats_client.clone()))
+            state.engine.execute_with_ats(
+                &script_code,
+                &config,
+                Some(state.ats_client.clone()),
+                None,
+            )
         };
 
         // Convert execution result to ExecuteJobResponse
@@ -692,7 +694,7 @@ mod tests {
         let service = PythonPluginService::new().unwrap();
 
         let body = serde_json::json!({
-            "code": "print('Hello from test')",
+            "content": "print('Hello from test')",
             "timeout_secs": 5
         });
 
@@ -719,7 +721,7 @@ mod tests {
         // It will error when called since ATSStore is not initialized,
         // but it should be defined and callable.
         let body = serde_json::json!({
-            "code": "result = callable(attest)\nprint('attest is callable:', result)",
+            "content": "result = callable(attest)\nprint('attest is callable:', result)",
             "timeout_secs": 5
         });
 
@@ -747,7 +749,7 @@ mod tests {
 
         // When ATSStore is not initialized, calling attest should fail gracefully
         let body = serde_json::json!({
-            "code": r#"
+            "content": r#"
 try:
     attest(['subject'], ['predicate'], ['context'])
     print('ERROR: should have raised')

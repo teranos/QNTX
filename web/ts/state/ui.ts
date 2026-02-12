@@ -18,8 +18,10 @@
  */
 
 import type { PanelState, Transform } from '../../types/core';
+import type { CanvasGlyph, CompositionEdge, Composition } from '../generated/proto/glyph/proto/canvas';
 import { getItem, setItem, removeItem } from './storage';
 import { log, SEG } from '../logger';
+import { upsertCanvasGlyph as apiUpsertGlyph, deleteCanvasGlyph as apiDeleteGlyph } from '../api/canvas';
 
 // ============================================================================
 // State Types
@@ -57,25 +59,32 @@ export interface GraphSessionState {
 }
 
 /**
- * Canvas glyph state (for persistence)
+ * Melded composition state (for persistence)
+ * Tracks spatial composition of glyphs that have been melded together
+ *
+ * Uses edge-based DAG structure to support multi-directional melding.
+ * Edges define directed relationships between glyphs (right, top, bottom).
+ * See ADR-009 for rationale.
+ *
+ * Example: [ax|py|prompt] = two edges:
+ *   { from: 'ax-1', to: 'py-1', direction: 'right', position: 0 }
+ *   { from: 'py-1', to: 'prompt-1', direction: 'right', position: 1 }
+ *
+ * CompositionEdge and Composition types are imported from proto (ADR-007).
  */
-export interface CanvasGlyphState {
-    id: string;
-    symbol: string;
-    gridX: number;
-    gridY: number;
-    width?: number;  // Optional: custom width in pixels (for resizable glyphs)
-    height?: number; // Optional: custom height in pixels (for resizable glyphs)
-    code?: string;   // Optional: editor content (for programmature glyphs)
-    result?: {       // Optional: execution result (for result glyphs)
-        success: boolean;
-        stdout: string;
-        stderr: string;
-        result: any;
-        error: string | null;
-        duration_ms: number;
-    };
-}
+export type { CompositionEdge };
+export type CompositionState =
+    Pick<Composition, 'id' | 'edges' | 'x' | 'y'>
+    & Partial<Omit<Composition, 'id' | 'edges' | 'x' | 'y'>>;
+
+/**
+ * Canvas glyph state (for persistence)
+ * Derived from proto CanvasGlyph — id/symbol/x/y always present,
+ * everything else optional (proto3 defaults 0/"" mean "unset").
+ */
+export type CanvasGlyphState =
+    Pick<CanvasGlyph, 'id' | 'symbol' | 'x' | 'y'>
+    & Partial<Omit<CanvasGlyph, 'id' | 'symbol' | 'x' | 'y'>>;
 
 /**
  * Consolidated UI state
@@ -101,6 +110,12 @@ export interface UIStateData {
 
     // Canvas workspace glyphs (for canvas glyph)
     canvasGlyphs: CanvasGlyphState[];
+
+    // Canvas melded compositions (for composition persistence)
+    canvasCompositions: CompositionState[];
+
+    // Canvas pan offset and zoom scale (for canvas navigation)
+    canvasPan: Record<string, { panX: number; panY: number; scale?: number }>;
 
     // Timestamp for state versioning
     lastUpdated: number;
@@ -128,6 +143,8 @@ interface PersistedUIState {
     graphSession: GraphSessionState;
     minimizedWindows: string[];
     canvasGlyphs: CanvasGlyphState[];
+    canvasCompositions: CompositionState[];
+    canvasPan: Record<string, { panX: number; panY: number; scale?: number }>;
 }
 
 // ============================================================================
@@ -161,6 +178,8 @@ function createDefaultState(): UIStateData {
         graphSession: {},
         minimizedWindows: [],
         canvasGlyphs: [],
+        canvasCompositions: [],
+        canvasPan: {},
         lastUpdated: Date.now(),
     };
 }
@@ -186,7 +205,19 @@ class UIState {
     private subscriberFailures: WeakMap<Function, number> = new WeakMap();
 
     constructor() {
-        this.state = this.loadFromStorage() || createDefaultState();
+        this.state = createDefaultState();
+    }
+
+    /**
+     * Load persisted state from storage (call after initStorage())
+     * Merges persisted values with current state
+     */
+    loadPersistedState(): void {
+        const loaded = this.loadFromStorage();
+        if (loaded) {
+            this.state = loaded;
+            log.debug(SEG.UI, '[UIState] Loaded persisted state from IndexedDB');
+        }
     }
 
     // ========================================================================
@@ -420,18 +451,38 @@ class UIState {
      * Add a glyph to canvas
      */
     addCanvasGlyph(glyph: CanvasGlyphState): void {
-        const existing = this.state.canvasGlyphs.find(g => g.id === glyph.id);
+        // Round coordinates to integers at the boundary (backend expects int, not float)
+        const normalizedGlyph = {
+            ...glyph,
+            x: Math.round(glyph.x),
+            y: Math.round(glyph.y)
+        };
+
+        // Debug logging for result glyphs
+        if (glyph.symbol === 'result') {
+            log.debug(SEG.UI, `[UIState] Adding result glyph ${glyph.id}`, {
+                hasContent: !!glyph.content,
+                contentSize: glyph.content?.length ?? 0
+            });
+        }
+
+        const existing = this.state.canvasGlyphs.find(g => g.id === normalizedGlyph.id);
         if (existing) {
             // Update existing glyph
             const updated = this.state.canvasGlyphs.map(g =>
-                g.id === glyph.id ? glyph : g
+                g.id === normalizedGlyph.id ? normalizedGlyph : g
             );
             this.update('canvasGlyphs', updated);
         } else {
             // Add new glyph
-            const updated = [...this.state.canvasGlyphs, glyph];
+            const updated = [...this.state.canvasGlyphs, normalizedGlyph];
             this.update('canvasGlyphs', updated);
         }
+
+        // Sync with backend (fire-and-forget)
+        apiUpsertGlyph(normalizedGlyph).catch(err => {
+            log.error(SEG.UI, '[UIState] Failed to sync glyph to backend:', err);
+        });
     }
 
     /**
@@ -440,6 +491,11 @@ class UIState {
     removeCanvasGlyph(id: string): void {
         const updated = this.state.canvasGlyphs.filter(g => g.id !== id);
         this.update('canvasGlyphs', updated);
+
+        // Sync with backend (fire-and-forget)
+        apiDeleteGlyph(id).catch(err => {
+            log.error(SEG.UI, '[UIState] Failed to delete glyph from backend:', err);
+        });
     }
 
     /**
@@ -447,6 +503,44 @@ class UIState {
      */
     clearCanvasGlyphs(): void {
         this.update('canvasGlyphs', []);
+    }
+
+    // ========================================================================
+    // Canvas Compositions Management
+    // (Composition logic in state/compositions.ts - these are low-level accessors)
+    // ========================================================================
+
+    /**
+     * Get canvas compositions
+     */
+    getCanvasCompositions(): CompositionState[] {
+        return this.state.canvasCompositions;
+    }
+
+    /**
+     * Set canvas compositions (full replace)
+     */
+    setCanvasCompositions(compositions: CompositionState[]): void {
+        this.update('canvasCompositions', compositions);
+    }
+
+    // ========================================================================
+    // Canvas Pan Management
+    // ========================================================================
+
+    /**
+     * Get canvas pan offset and zoom for a specific canvas
+     */
+    getCanvasPan(canvasId: string): { panX: number; panY: number; scale?: number } | null {
+        return this.state.canvasPan[canvasId] ?? null;
+    }
+
+    /**
+     * Set canvas pan offset and zoom for a specific canvas
+     */
+    setCanvasPan(canvasId: string, pan: { panX: number; panY: number; scale?: number }): void {
+        const updated = { ...this.state.canvasPan, [canvasId]: pan };
+        this.update('canvasPan', updated);
     }
 
     // ========================================================================
@@ -512,7 +606,7 @@ class UIState {
             }
         }
 
-        // Persist to localStorage
+        // Persist to storage (IndexedDB)
         this.saveToStorage();
     }
 
@@ -558,6 +652,8 @@ class UIState {
             graphSession: this.state.graphSession,
             minimizedWindows: this.state.minimizedWindows,
             canvasGlyphs: this.state.canvasGlyphs,
+            canvasCompositions: this.state.canvasCompositions,
+            canvasPan: this.state.canvasPan,
             // Don't persist: panels (should start closed), budgetWarnings (session-only)
         };
     }
@@ -589,6 +685,8 @@ class UIState {
             graphSession: persisted.graphSession ?? defaultState.graphSession,
             minimizedWindows: persisted.minimizedWindows ?? defaultState.minimizedWindows,
             canvasGlyphs: persisted.canvasGlyphs ?? defaultState.canvasGlyphs,
+            canvasCompositions: persisted.canvasCompositions ?? defaultState.canvasCompositions,
+            canvasPan: persisted.canvasPan ?? defaultState.canvasPan,
         };
     }
 

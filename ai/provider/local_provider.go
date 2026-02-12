@@ -130,36 +130,36 @@ func (lp *LocalProvider) generateTextWithContext(ctx context.Context, systemProm
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal request")
+		return nil, errors.Wrapf(err, "failed to marshal request for model %s", lp.model)
 	}
 
 	// Use OpenAI-compatible endpoint (works for Ollama, LocalAI, etc.)
 	endpoint := lp.baseURL + "/v1/chat/completions"
 	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create request")
+		return nil, errors.Wrapf(err, "failed to create request for %s", endpoint)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := lp.httpClient.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "request failed")
+		return nil, errors.Wrapf(err, "request to %s failed (model=%s)", endpoint, lp.model)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, errors.Newf("local inference returned status %d: %s", resp.StatusCode, string(body))
+		return nil, errors.Newf("local inference at %s returned status %d (model=%s): %s", endpoint, resp.StatusCode, lp.model, string(body))
 	}
 
 	var completion ChatCompletionResponse
 	if err := json.NewDecoder(resp.Body).Decode(&completion); err != nil {
-		return nil, errors.Wrap(err, "failed to decode response")
+		return nil, errors.Wrapf(err, "failed to decode response from %s (model=%s)", endpoint, lp.model)
 	}
 
 	if len(completion.Choices) == 0 {
-		return nil, errors.New("no completion choices returned")
+		return nil, errors.Newf("no completion choices returned from %s (model=%s)", endpoint, lp.model)
 	}
 
 	result := &GenerateTextResult{
@@ -236,7 +236,7 @@ func (lp *LocalProvider) generateTextStreamingWithContext(ctx context.Context, s
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
-		err = errors.Wrap(err, "failed to marshal request")
+		err = errors.Wrapf(err, "failed to marshal streaming request for model %s", lp.model)
 		chunkChan <- StreamingChunk{Error: err}
 		return err
 	}
@@ -244,7 +244,7 @@ func (lp *LocalProvider) generateTextStreamingWithContext(ctx context.Context, s
 	endpoint := lp.baseURL + "/v1/chat/completions"
 	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
-		err = errors.Wrap(err, "failed to create request")
+		err = errors.Wrapf(err, "failed to create streaming request for %s", endpoint)
 		chunkChan <- StreamingChunk{Error: err}
 		return err
 	}
@@ -253,7 +253,7 @@ func (lp *LocalProvider) generateTextStreamingWithContext(ctx context.Context, s
 
 	resp, err := lp.httpClient.Do(req)
 	if err != nil {
-		err = errors.Wrap(err, "request failed")
+		err = errors.Wrapf(err, "streaming request to %s failed (model=%s)", endpoint, lp.model)
 		chunkChan <- StreamingChunk{Error: err}
 		return err
 	}
@@ -261,7 +261,7 @@ func (lp *LocalProvider) generateTextStreamingWithContext(ctx context.Context, s
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		err := errors.Newf("local inference returned status %d: %s", resp.StatusCode, string(body))
+		err := errors.Newf("local inference at %s returned status %d during streaming (model=%s): %s", endpoint, resp.StatusCode, lp.model, string(body))
 		chunkChan <- StreamingChunk{Error: err}
 		return err
 	}
@@ -302,7 +302,7 @@ func (lp *LocalProvider) generateTextStreamingWithContext(ctx context.Context, s
 		}
 
 		if err := json.Unmarshal([]byte(jsonData), &chunk); err != nil {
-			err = errors.Wrap(err, "failed to decode chunk")
+			err = errors.Wrapf(err, "failed to decode streaming chunk from %s (model=%s)", endpoint, lp.model)
 			chunkChan <- StreamingChunk{Error: err}
 			return err
 		}
@@ -322,7 +322,7 @@ func (lp *LocalProvider) generateTextStreamingWithContext(ctx context.Context, s
 	}
 
 	if err := scanner.Err(); err != nil {
-		err = errors.Wrap(err, "stream read error")
+		err = errors.Wrapf(err, "stream read error from %s (model=%s)", endpoint, lp.model)
 		chunkChan <- StreamingChunk{Error: err}
 		return err
 	}
