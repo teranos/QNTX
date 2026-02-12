@@ -266,6 +266,146 @@ func (e *Engine) ClassifyClaims(input ClassifyInput) (*ClassifyOutput, error) {
 	return &output, nil
 }
 
+// ExpandAttestationInput represents a compact attestation for WASM cartesian expansion.
+type ExpandAttestationInput struct {
+	ID          string   `json:"id"`
+	Subjects    []string `json:"subjects"`
+	Predicates  []string `json:"predicates"`
+	Contexts    []string `json:"contexts"`
+	Actors      []string `json:"actors"`
+	TimestampMs int64    `json:"timestamp_ms"`
+}
+
+// ExpandInput is the full input for expand_cartesian_claims.
+type ExpandInput struct {
+	Attestations []ExpandAttestationInput `json:"attestations"`
+}
+
+// ExpandClaimOutput represents a single expanded claim from the WASM engine.
+type ExpandClaimOutput struct {
+	Subject     string `json:"subject"`
+	Predicate   string `json:"predicate"`
+	Context     string `json:"context"`
+	Actor       string `json:"actor"`
+	TimestampMs int64  `json:"timestamp_ms"`
+	SourceID    string `json:"source_id"`
+}
+
+// ExpandOutput is the result of expand_cartesian_claims.
+type ExpandOutput struct {
+	Claims []ExpandClaimOutput `json:"claims"`
+	Total  int                 `json:"total"`
+}
+
+// ExpandCartesianClaims invokes the WASM expand_cartesian_claims function.
+func (e *Engine) ExpandCartesianClaims(input ExpandInput) (*ExpandOutput, error) {
+	inputJSON, err := json.Marshal(input)
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal expand_cartesian_claims input")
+	}
+
+	raw, err := e.Call("expand_cartesian_claims", string(inputJSON))
+	if err != nil {
+		return nil, err
+	}
+
+	var errResp struct {
+		Error string `json:"error,omitempty"`
+	}
+	if json.Unmarshal([]byte(raw), &errResp) == nil && errResp.Error != "" {
+		return nil, errors.Newf("expand_cartesian_claims: %s", errResp.Error)
+	}
+
+	var output ExpandOutput
+	if err := json.Unmarshal([]byte(raw), &output); err != nil {
+		return nil, errors.Wrapf(err, "unmarshal expand_cartesian_claims result: %s", raw)
+	}
+
+	return &output, nil
+}
+
+// GroupClaimsInput is the input for group_claims.
+type GroupClaimsInput struct {
+	Claims []ExpandClaimOutput `json:"claims"`
+}
+
+// GroupClaimsGroupOutput represents a group of claims with the same key.
+type GroupClaimsGroupOutput struct {
+	Key    string              `json:"key"`
+	Claims []ExpandClaimOutput `json:"claims"`
+}
+
+// GroupClaimsOutput is the result of group_claims.
+type GroupClaimsOutput struct {
+	Groups      []GroupClaimsGroupOutput `json:"groups"`
+	TotalGroups int                      `json:"total_groups"`
+}
+
+// GroupClaims invokes the WASM group_claims function.
+func (e *Engine) GroupClaims(input GroupClaimsInput) (*GroupClaimsOutput, error) {
+	inputJSON, err := json.Marshal(input)
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal group_claims input")
+	}
+
+	raw, err := e.Call("group_claims", string(inputJSON))
+	if err != nil {
+		return nil, err
+	}
+
+	var errResp struct {
+		Error string `json:"error,omitempty"`
+	}
+	if json.Unmarshal([]byte(raw), &errResp) == nil && errResp.Error != "" {
+		return nil, errors.Newf("group_claims: %s", errResp.Error)
+	}
+
+	var output GroupClaimsOutput
+	if err := json.Unmarshal([]byte(raw), &output); err != nil {
+		return nil, errors.Wrapf(err, "unmarshal group_claims result: %s", raw)
+	}
+
+	return &output, nil
+}
+
+// DedupInput is the input for dedup_source_ids.
+type DedupInput struct {
+	Claims []ExpandClaimOutput `json:"claims"`
+}
+
+// DedupOutput is the result of dedup_source_ids.
+type DedupOutput struct {
+	IDs   []string `json:"ids"`
+	Total int      `json:"total"`
+}
+
+// DedupSourceIDs invokes the WASM dedup_source_ids function.
+func (e *Engine) DedupSourceIDs(input DedupInput) (*DedupOutput, error) {
+	inputJSON, err := json.Marshal(input)
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal dedup_source_ids input")
+	}
+
+	raw, err := e.Call("dedup_source_ids", string(inputJSON))
+	if err != nil {
+		return nil, err
+	}
+
+	var errResp struct {
+		Error string `json:"error,omitempty"`
+	}
+	if json.Unmarshal([]byte(raw), &errResp) == nil && errResp.Error != "" {
+		return nil, errors.Newf("dedup_source_ids: %s", errResp.Error)
+	}
+
+	var output DedupOutput
+	if err := json.Unmarshal([]byte(raw), &output); err != nil {
+		return nil, errors.Wrapf(err, "unmarshal dedup_source_ids result: %s", raw)
+	}
+
+	return &output, nil
+}
+
 // GetWASMSize returns the size of the embedded WASM module in bytes.
 func GetWASMSize() int {
 	return len(wasmBytes)
