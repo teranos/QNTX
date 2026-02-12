@@ -6,7 +6,7 @@
  */
 
 import type { Glyph } from '../glyph';
-import { IX, AX, SO, Prose, Canvas } from '@generated/sym.js';
+import { IX, AX, SO, Prose, Subcircuit } from '@generated/sym.js';
 import { log, SEG } from '../../../logger';
 import { getMinimizeDuration } from '../glyph';
 import { createIxGlyph } from '../ix-glyph';
@@ -15,7 +15,7 @@ import { createPyGlyph } from '../py-glyph';
 import { createPromptGlyph } from '../prompt-glyph';
 import { createNoteGlyph } from '../note-glyph';
 import { createTsGlyph } from '../ts-glyph';
-import { createNestedCanvasGlyph } from '../nested-canvas-glyph';
+import { createSubcircuitGlyph } from '../subcircuit-glyph';
 import { uiState } from '../../../state/ui';
 
 /** Duration multiplier for spawn menu animation */
@@ -182,11 +182,11 @@ export function showSpawnMenu(
     // Add canvas button
     const canvasBtn = document.createElement('button');
     canvasBtn.className = 'canvas-spawn-button';
-    canvasBtn.textContent = Canvas;
-    canvasBtn.title = 'Spawn nested Canvas glyph';
+    canvasBtn.textContent = Subcircuit;
+    canvasBtn.title = 'Spawn Subcircuit glyph';
 
     canvasBtn.addEventListener('click', () => {
-        spawnNestedCanvasGlyph(x, y, canvas, glyphs);
+        spawnSubcircuitGlyph(x, y, canvas, glyphs);
         removeMenu();
     });
 
@@ -516,30 +516,30 @@ async function spawnNoteGlyph(
 }
 
 /**
- * Spawn a new nested Canvas glyph at pixel position
+ * Spawn a new Subcircuit glyph at pixel position
  */
-async function spawnNestedCanvasGlyph(
+async function spawnSubcircuitGlyph(
     x: number,
     y: number,
     canvas: HTMLElement,
     glyphs: Glyph[]
 ): Promise<void> {
-    const canvasGlyph: Glyph = {
-        id: `canvas-${crypto.randomUUID()}`,
-        title: 'Canvas',
-        symbol: Canvas,
+    const subcircuitGlyph: Glyph = {
+        id: `subcircuit-${crypto.randomUUID()}`,
+        title: 'Subcircuit',
+        symbol: Subcircuit,
         x,
         y,
         renderContent: () => {
             const content = document.createElement('div');
-            content.textContent = 'Canvas glyph';
+            content.textContent = 'Subcircuit glyph';
             return content;
         }
     };
 
-    glyphs.push(canvasGlyph);
+    glyphs.push(subcircuitGlyph);
 
-    const glyphElement = await createNestedCanvasGlyph(canvasGlyph);
+    const glyphElement = await createSubcircuitGlyph(subcircuitGlyph);
     canvas.appendChild(glyphElement);
 
     const rect = glyphElement.getBoundingClientRect();
@@ -547,13 +547,13 @@ async function spawnNestedCanvasGlyph(
     const height = Math.round(rect.height);
 
     uiState.addCanvasGlyph({
-        id: canvasGlyph.id,
-        symbol: Canvas,
+        id: subcircuitGlyph.id,
+        symbol: Subcircuit,
         x,
         y,
         width,
         height
     });
 
-    log.debug(SEG.GLYPH, `[Canvas] Spawned nested Canvas glyph at (${x}, ${y}) with size ${width}x${height}`);
+    log.debug(SEG.GLYPH, `[Canvas] Spawned Subcircuit glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
