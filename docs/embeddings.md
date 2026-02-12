@@ -75,4 +75,12 @@ Verified end-to-end by copying attestations from a backup database:
 
 ### Technical Debt
 - Error handling standardization across Rust/Go FFI boundary
-- sqlite-vec CGO import in `db/connection.go` is unconditional — affects all build times
+
+### Design decision: unconditional sqlite-vec
+`db/connection.go` imports `sqlite-vec` CGO bindings unconditionally — every Go build pays the CGO compilation cost, even builds that don't use embeddings. This is coupled to migration 024, which creates a `vec0` virtual table that requires the extension to be loaded. The migration runs unconditionally via `//go:embed sqlite/migrations/*.sql`.
+
+Making this conditional requires solving both sides together:
+- Move the `sqlite_vec` import behind a build tag
+- Move migration 024 out of the embedded migrations directory (or split it: regular `embeddings` table stays universal, `vec_embeddings` virtual table becomes conditional)
+
+Current choice: accept the universal CGO dependency. The `cli-nocgo` target (CGO_ENABLED=0) will fail on migration 024 at runtime if it encounters a database that hasn't run that migration yet.
