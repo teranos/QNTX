@@ -1,5 +1,6 @@
 /**
  * Tests for canvas pan functionality
+ * Tests pan behavior on desktop (trackpad/mouse) and mobile (touch)
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';
