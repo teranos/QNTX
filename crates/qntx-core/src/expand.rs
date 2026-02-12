@@ -53,9 +53,7 @@ const CLAIM_KEY_SEP: &str = "|";
 pub fn expand_cartesian(attestations: &[ExpandAttestation]) -> Vec<IndividualClaim> {
     let total_capacity: usize = attestations
         .iter()
-        .map(|a| {
-            a.subjects.len() * a.predicates.len() * a.contexts.len() * a.actors.len()
-        })
+        .map(|a| a.subjects.len() * a.predicates.len() * a.contexts.len() * a.actors.len())
         .sum();
 
     let mut claims = Vec::with_capacity(total_capacity);
