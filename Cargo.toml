@@ -9,6 +9,7 @@ members = [
     "crates/qntx-sqlite",
     "crates/qntx-wasm",
     "qntx-python",
+    "qntx-claw",
     "web/src-tauri",
 ]
 exclude = [
