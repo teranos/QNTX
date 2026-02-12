@@ -437,9 +437,9 @@ export function makeDraggable(
 
         dragStartX = e.clientX;
         dragStartY = e.clientY;
-        const rect = element.getBoundingClientRect();
-        elementStartX = rect.left;
-        elementStartY = rect.top;
+        // Use offsetLeft/Top to get position relative to parent (ignores pan transform)
+        elementStartX = element.offsetLeft;
+        elementStartY = element.offsetTop;
 
         element.classList.add('is-dragging');
 
@@ -465,8 +465,9 @@ export function makeDraggable(
                         };
                         multiDragElements.push({
                             element: el,
-                            startX: elRect.left,
-                            startY: elRect.top,
+                            // Use offsetLeft/Top to get position relative to parent (ignores pan transform)
+                            startX: el.offsetLeft,
+                            startY: el.offsetTop,
                             glyph: glyphData
                         });
                         el.classList.add('is-dragging');
