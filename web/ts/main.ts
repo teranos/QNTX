@@ -4,7 +4,6 @@ import { listen } from '@tauri-apps/api/event';
 import { connectWebSocket } from './websocket.ts';
 import { handleLogBatch, initSystemDrawer } from './system-drawer.ts';
 import { initCodeMirrorEditor } from './codemirror-editor.ts';
-import { CSS } from './css-classes.ts';
 import { formatDateTime } from './html-utils.ts';
 import { updateGraph, initGraphResize } from './graph/index.ts';
 import { initTypeAttestations } from './components/type-attestations.ts';
