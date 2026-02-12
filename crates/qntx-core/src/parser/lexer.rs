@@ -147,6 +147,12 @@ impl<'a> Lexer<'a> {
                     start,
                 )
             }
+            '|' => {
+                // Pipe is the claim key separator - reject it explicitly
+                let start = self.position;
+                self.advance(c.len_utf8());
+                Token::new(TokenKind::Pipe, &self.input[start..self.position], start)
+            }
             _ if c.is_alphanumeric() || c == '_' || !c.is_ascii() => self.read_identifier(),
             _ => {
                 // Unknown character - skip it

@@ -63,6 +63,9 @@ pub enum ParseError {
         "wildcard/special character is not supported in ax queries - use specific {field} names"
     )]
     WildcardNotSupported { field: String },
+
+    #[error("pipe '|' is not supported in ax queries - it is the claim key separator")]
+    PipeNotSupported,
 }
 
 /// Parser state machine states
@@ -188,6 +191,9 @@ impl<'a> Parser<'a> {
                     field: "query".to_string(),
                 });
             }
+            TokenKind::Pipe => {
+                return Err(ParseError::PipeNotSupported);
+            }
             // NOTE: User dissatisfaction - this is terrible design. We're routing tokens to
             // different states based on fragile string patterns. A bare word like "has_experience"
             // becomes a predicate just because it has an underscore, while "ALICE" is a subject.
@@ -226,6 +232,9 @@ impl<'a> Parser<'a> {
                     return Err(ParseError::WildcardNotSupported {
                         field: "subject".to_string(),
                     });
+                }
+                TokenKind::Pipe => {
+                    return Err(ParseError::PipeNotSupported);
                 }
                 TokenKind::Identifier | TokenKind::QuotedString | TokenKind::NaturalPredicate => {
                     let t = self.next().unwrap();
@@ -298,6 +307,9 @@ impl<'a> Parser<'a> {
                     return Err(ParseError::WildcardNotSupported {
                         field: "predicate".to_string(),
                     });
+                }
+                TokenKind::Pipe => {
+                    return Err(ParseError::PipeNotSupported);
                 }
                 TokenKind::Identifier | TokenKind::QuotedString | TokenKind::NaturalPredicate => {
                     let t = self.next().unwrap();
@@ -372,6 +384,9 @@ impl<'a> Parser<'a> {
                         field: "context".to_string(),
                     });
                 }
+                TokenKind::Pipe => {
+                    return Err(ParseError::PipeNotSupported);
+                }
                 TokenKind::Identifier | TokenKind::QuotedString | TokenKind::NaturalPredicate => {
                     let t = self.next().unwrap();
                     self.query.contexts.push(t.text);
@@ -443,6 +458,9 @@ impl<'a> Parser<'a> {
                     return Err(ParseError::WildcardNotSupported {
                         field: "actor".to_string(),
                     });
+                }
+                TokenKind::Pipe => {
+                    return Err(ParseError::PipeNotSupported);
                 }
                 TokenKind::Identifier | TokenKind::QuotedString | TokenKind::NaturalPredicate => {
                     let t = self.next().unwrap();
@@ -813,5 +831,40 @@ mod tests {
         let result = Parser::parse("@ @ @");
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), ParseError::EmptyQuery));
+    }
+
+    #[test]
+    fn test_reject_pipe_bare() {
+        let result = Parser::parse("|");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ParseError::PipeNotSupported));
+    }
+
+    #[test]
+    fn test_reject_pipe_in_subject() {
+        let result = Parser::parse("ALICE | BOB");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ParseError::PipeNotSupported));
+    }
+
+    #[test]
+    fn test_reject_pipe_in_predicate() {
+        let result = Parser::parse("ALICE is author | editor");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ParseError::PipeNotSupported));
+    }
+
+    #[test]
+    fn test_reject_pipe_in_context() {
+        let result = Parser::parse("ALICE is author of GitHub | Linux");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ParseError::PipeNotSupported));
+    }
+
+    #[test]
+    fn test_reject_pipe_in_actor() {
+        let result = Parser::parse("ALICE is author by BOB | CHARLIE");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ParseError::PipeNotSupported));
     }
 }
