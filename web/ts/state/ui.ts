@@ -114,8 +114,8 @@ export interface UIStateData {
     // Canvas melded compositions (for composition persistence)
     canvasCompositions: CompositionState[];
 
-    // Canvas pan offset (for canvas navigation)
-    canvasPan: Record<string, { panX: number; panY: number }>;
+    // Canvas pan offset and zoom scale (for canvas navigation)
+    canvasPan: Record<string, { panX: number; panY: number; scale?: number }>;
 
     // Timestamp for state versioning
     lastUpdated: number;
@@ -144,7 +144,7 @@ interface PersistedUIState {
     minimizedWindows: string[];
     canvasGlyphs: CanvasGlyphState[];
     canvasCompositions: CompositionState[];
-    canvasPan: Record<string, { panX: number; panY: number }>;
+    canvasPan: Record<string, { panX: number; panY: number; scale?: number }>;
 }
 
 // ============================================================================
@@ -529,16 +529,16 @@ class UIState {
     // ========================================================================
 
     /**
-     * Get canvas pan offset for a specific canvas
+     * Get canvas pan offset and zoom for a specific canvas
      */
-    getCanvasPan(canvasId: string): { panX: number; panY: number } | null {
+    getCanvasPan(canvasId: string): { panX: number; panY: number; scale?: number } | null {
         return this.state.canvasPan[canvasId] ?? null;
     }
 
     /**
-     * Set canvas pan offset for a specific canvas
+     * Set canvas pan offset and zoom for a specific canvas
      */
-    setCanvasPan(canvasId: string, pan: { panX: number; panY: number }): void {
+    setCanvasPan(canvasId: string, pan: { panX: number; panY: number; scale?: number }): void {
         const updated = { ...this.state.canvasPan, [canvasId]: pan };
         this.update('canvasPan', updated);
     }
