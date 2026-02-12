@@ -37,7 +37,6 @@ pub enum TokenKind {
     Unknown,
     Wildcard, // Explicit wildcard token for rejecting '*'
     Pipe,     // Explicit pipe token for rejecting '|' (claim key separator)
-
 }
 
 impl TokenKind {
