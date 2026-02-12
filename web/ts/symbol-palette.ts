@@ -41,12 +41,11 @@ import { toggleProsePanel } from './prose/panel.js';
 import { toggleGoEditor } from './code/panel.js';
 import { togglePythonEditor } from './python/panel.js';
 import { togglePluginPanel } from './plugin-panel.js';
-import { webscraperPanel } from './webscraper-panel.js';
 import { VidStreamWindow } from './vidstream-window.js';
 import { toggleJobList } from './hixtory-panel.js';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
-type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'scraper' | 'vidstream' | 'db' | 'ctp2';
+type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'vidstream' | 'db' | 'ctp2';
 
 /**
  * Get symbol for a command, with fallback for UI-only commands
@@ -171,7 +170,7 @@ async function injectCTP2Glyph(): Promise<void> {
             cell.innerHTML = generateCTP2Glyph();
         }
     } catch (error: unknown) {
-        console.warn('[Symbol Palette] Failed to load CTP2 glyph:', error);
+        log.warn(SEG.UI, '[Symbol Palette] Failed to load CTP2 glyph:', error);
         // Fallback to text
         const cell = document.getElementById('ctp2-palette-cell');
         if (cell) {
@@ -202,7 +201,6 @@ function getInitialTooltip(cmd: string): string {
         'go': 'Go - code editor',
         'py': 'py - Python editor',
         'plugins': '⚙ Plugins - domain extensions',
-        'scraper': '⛶ Scraper - web extraction',
         'vidstream': '⮀ VidStream - video inference\n(version info loading...)',
         'ctp2': 'CTP2',
     };
@@ -323,10 +321,6 @@ function handleSymbolClick(e: Event): void {
             // Plugins - show installed domain plugins
             showPluginPanel();
             break;
-        case 'scraper':
-            // Web Scraper - show scraping panel
-            showWebscraperPanel();
-            break;
         case 'vidstream':
             // VidStream - show video inference window
             log(SEG.VID, 'VidStream button clicked');
@@ -337,7 +331,7 @@ function handleSymbolClick(e: Event): void {
             showCTP2Window();
             break;
         default:
-            console.warn(`[Symbol Palette] Unknown command: ${cmd}`);
+            log.warn(SEG.UI, `[Symbol Palette] Unknown command: ${cmd}`);
     }
 }
 
@@ -427,19 +421,12 @@ function showPluginPanel(): void {
 }
 
 /**
- * Show webscraper panel - UI for web scraping operations
- */
-function showWebscraperPanel(): void {
-    webscraperPanel.toggle();
-}
-
-/**
  * Show CTP2 window
  */
 async function showCTP2Window(): Promise<void> {
     // CTP2 is an optional/private module that may not exist in all environments
     // Comment out the import to prevent build failures when the module is missing
-    console.log('CTP2 module not available in this environment (optional/private feature)');
+    log.info(SEG.UI, 'CTP2 module not available in this environment (optional/private feature)');
     const statusEl = document.getElementById('status-message');
     if (statusEl) {
         statusEl.textContent = 'CTP2 module not available';

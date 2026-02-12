@@ -93,7 +93,7 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 	// Find an available port
 	actualPort, err := findAvailablePort(port)
 	if err != nil {
-		return errors.Wrap(err, "failed to find available port")
+		return errors.Wrapf(err, "failed to find available port starting from %d", port)
 	}
 
 	if actualPort != port {

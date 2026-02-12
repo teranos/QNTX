@@ -2,6 +2,7 @@
 
 import { GRAPH_PHYSICS } from '../../config.ts';
 import { getDomCache } from '../state.ts';
+import { log, SEG } from '../../logger.ts';
 
 // Default tile dimensions (must match renderer.ts)
 export const DEFAULT_TILE_WIDTH = 180;
@@ -17,7 +18,7 @@ export function calculateFocusedTileDimensions(): { width: number; height: numbe
     const domCache = getDomCache();
     const container = domCache.get('graphContainer', '#graph-container');
     if (!container) {
-        console.warn('[dimensions] container not found, using defaults', {
+        log.warn(SEG.GRAPH, '[dimensions] container not found, using defaults', {
             defaults: { width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT, scale: 1 }
         });
         return { width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT, scale: 1 };

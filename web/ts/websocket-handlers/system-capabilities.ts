@@ -32,10 +32,15 @@ export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void 
         selfWindow.updateCapabilities(data);
     });
 
+    // Update Self diagnostic glyph
+    import('../default-glyphs.js').then(({ updateSelfCapabilities }) => {
+        updateSelfCapabilities(data);
+    });
+
     // Handle ax button (fuzzy matching)
     const axButton = document.querySelector('.palette-cell[data-cmd="ax"]') as HTMLElement;
     if (!axButton) {
-        console.warn('[System Capabilities] ax button not found');
+        log.warn(SEG.UI, '[System Capabilities] ax button not found');
     } else {
         if (!data.fuzzy_optimized) {
             // Using Go fallback - show degraded state
@@ -55,7 +60,7 @@ export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void 
     // Handle vidstream button (ONNX video inference)
     const vidButton = document.querySelector('.palette-cell[data-cmd="vidstream"]') as HTMLElement;
     if (!vidButton) {
-        console.warn('[System Capabilities] vidstream button not found');
+        log.warn(SEG.UI, '[System Capabilities] vidstream button not found');
     } else {
         if (!data.vidstream_optimized) {
             // ONNX unavailable - show degraded state

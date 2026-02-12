@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package glyph;
+
+option go_package = "github.com/teranos/QNTX/glyph/proto";
+
+// GlyphFired is sent over WebSocket when a meld-edge subscription triggers glyph execution.
+// Status progression: started → success | error
+message GlyphFired {
+  string glyph_id = 1;                // Target glyph that was executed
+  string attestation_id = 2;          // Triggering attestation ASID
+  string status = 3;                  // "started", "success", "error"
+  string error = 4;                   // Error message when status is "error"
+  int64 timestamp = 5;                // Unix timestamp
+  string result = 6;                  // JSON-encoded execution result (on success or error with output)
+}

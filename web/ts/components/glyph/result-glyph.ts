@@ -1,68 +1,44 @@
 /**
- * Result Glyph - Python execution output display
+ * Result Glyph - Execution output display
  *
- * Displays stdout, stderr, and execution results from Python code.
- * Appears below py glyphs as execution history.
+ * Displays stdout, stderr, and execution results from glyph execution.
+ * Appears below executable glyphs as output.
  */
 
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { GRID_SIZE } from './grid-constants';
+import { canvasPlaced } from './manifestations/canvas-placed';
+import { unmeldComposition } from './meld/meld-composition';
 import { makeDraggable } from './glyph-interaction';
 
 /**
- * Python execution result data
+ * Glyph execution result data
  */
 export interface ExecutionResult {
     success: boolean;
     stdout: string;
     stderr: string;
-    result: any;
+    result: unknown;
     error: string | null;
     duration_ms: number;
 }
 
 /**
- * Create a result glyph showing Python execution output
+ * Create a result glyph showing execution output
  */
 export function createResultGlyph(
     glyph: Glyph,
     result: ExecutionResult
 ): HTMLElement {
-    const element = document.createElement('div');
-    element.className = 'canvas-result-glyph';
-    element.dataset.glyphId = glyph.id;
-
-    const gridX = glyph.gridX ?? 5;
-    const gridY = glyph.gridY ?? 5;
-    const width = glyph.width ?? 400;
-
     // Calculate height based on content
     const lineCount = (result.stdout + result.stderr + (result.error || '')).split('\n').length;
     const minHeight = 80;
     const maxHeight = 400;
     const lineHeight = 18;
     const calculatedHeight = Math.min(maxHeight, Math.max(minHeight, lineCount * lineHeight + 60));
-    const height = glyph.height ?? calculatedHeight;
 
-    // Style - integrated look with py glyph
-    element.style.position = 'absolute';
-    element.style.left = `${gridX * GRID_SIZE}px`;
-    element.style.top = `${gridY * GRID_SIZE}px`;
-    element.style.width = `${width}px`;
-    element.style.height = `${height}px`;
-    element.style.minHeight = '80px';
-    element.style.backgroundColor = '#1e1e1e'; // Solid dark background
-    element.style.borderRadius = '0 0 4px 4px'; // Rounded bottom only
-    element.style.border = '1px solid #3e3e3e';
-    element.style.borderTop = 'none'; // Visually connects to py glyph above
-    element.style.display = 'flex';
-    element.style.flexDirection = 'column';
-    element.style.overflow = 'hidden';
-    element.style.zIndex = '1';
-
-    // Header with buttons
+    // Build header first (used as custom drag handle)
     const header = document.createElement('div');
     header.className = 'result-glyph-header';
     header.style.padding = '4px 8px';
@@ -97,8 +73,8 @@ export function createResultGlyph(
     toWindowBtn.style.color = 'var(--text-primary)';
 
     toWindowBtn.addEventListener('click', () => {
-        // TODO: Implement window manifestation morphing
-        log.debug(SEG.UI, '[ResultGlyph] To window clicked (not implemented)');
+        // TODO: Implement window manifestation morphing (tracked in #440)
+        log.debug(SEG.GLYPH, '[ResultGlyph] To window clicked (not implemented)');
     });
 
     buttonContainer.appendChild(toWindowBtn);
@@ -117,13 +93,53 @@ export function createResultGlyph(
     closeBtn.style.color = 'var(--text-primary)';
 
     closeBtn.addEventListener('click', () => {
+        // Check if result is in a composition
+        const composition = element.closest('.melded-composition') as HTMLElement | null;
+        if (composition) {
+            // Unmeld composition first, then remove the result
+            const unmelded = unmeldComposition(composition);
+            if (unmelded) {
+                // Restore drag handlers for the unmelded glyphs (excluding the result we're closing)
+                for (const glyphElement of unmelded.glyphElements) {
+                    const glyphId = glyphElement.getAttribute('data-glyph-id');
+                    if (glyphId && glyphId !== glyph.id) {
+                        const glyphObj: Glyph = {
+                            id: glyphId,
+                            title: glyphElement.getAttribute('data-glyph-symbol') || 'Glyph',
+                            symbol: glyphElement.getAttribute('data-glyph-symbol') || undefined,
+                            renderContent: () => glyphElement
+                        };
+                        makeDraggable(glyphElement, glyphElement, glyphObj, {
+                            logLabel: 'RestoredGlyph'
+                        });
+                    }
+                }
+                log.debug(SEG.GLYPH, `[ResultGlyph] Unmelded composition before closing ${glyph.id}`);
+            }
+        }
+
         element.remove();
         uiState.removeCanvasGlyph(glyph.id);
-        log.debug(SEG.UI, `[ResultGlyph] Closed ${glyph.id}`);
+        log.debug(SEG.GLYPH, `[ResultGlyph] Closed ${glyph.id}`);
     });
 
     buttonContainer.appendChild(closeBtn);
     header.appendChild(buttonContainer);
+
+    const { element } = canvasPlaced({
+        glyph,
+        className: 'canvas-result-glyph',
+        defaults: { x: 200, y: 200, width: 400, height: calculatedHeight },
+        dragHandle: header,
+        draggableOptions: { ignoreButtons: true },
+        resizable: { minWidth: 200, minHeight: 80 },
+        logLabel: 'ResultGlyph',
+    });
+    element.style.minHeight = '80px';
+    element.style.borderRadius = '0 0 4px 4px';
+    element.style.border = '1px solid var(--border-on-dark)';
+    element.style.borderTop = 'none';
+    element.style.zIndex = '1';
     element.appendChild(header);
 
     // Output container
@@ -136,7 +152,8 @@ export function createResultGlyph(
     outputContainer.style.fontSize = '12px';
     outputContainer.style.whiteSpace = 'pre-wrap';
     outputContainer.style.wordBreak = 'break-word';
-    outputContainer.style.color = '#e0e0e0'; // Light text for dark background
+    outputContainer.style.backgroundColor = 'rgba(10, 10, 10, 0.85)'; // 15% transparency
+    outputContainer.style.color = 'var(--text-on-dark)';
 
     // Build output text
     let outputText = '';
@@ -147,7 +164,7 @@ export function createResultGlyph(
 
     if (result.stderr) {
         const stderrSpan = document.createElement('span');
-        stderrSpan.style.color = 'var(--error-color, #ff6b6b)';
+        stderrSpan.style.color = 'var(--glyph-status-error-text)';
         stderrSpan.textContent = result.stderr;
         outputContainer.appendChild(document.createTextNode(outputText));
         outputContainer.appendChild(stderrSpan);
@@ -156,7 +173,7 @@ export function createResultGlyph(
 
     if (result.error) {
         const errorSpan = document.createElement('span');
-        errorSpan.style.color = 'var(--error-color, #ff6b6b)';
+        errorSpan.style.color = 'var(--glyph-status-error-text)';
         errorSpan.style.fontWeight = 'bold';
         errorSpan.textContent = `\nError: ${result.error}`;
         outputContainer.appendChild(document.createTextNode(outputText));
@@ -177,9 +194,85 @@ export function createResultGlyph(
 
     element.appendChild(outputContainer);
 
-    // Make draggable by header
-    makeDraggable(element, header, glyph, { ignoreButtons: true, logLabel: 'ResultGlyph' });
+    // Ensure result data is attached to glyph object for drag persistence
+    (glyph as any).content = JSON.stringify(result);
 
     return element;
+}
+
+/**
+ * Render execution result output into a container element.
+ * Reused by createResultGlyph and updateResultGlyphContent.
+ */
+function renderOutput(container: HTMLElement, result: ExecutionResult): void {
+    container.innerHTML = '';
+    container.style.color = 'var(--text-on-dark)';
+    container.style.fontStyle = '';
+
+    let outputText = '';
+
+    if (result.stdout) {
+        outputText += result.stdout;
+    }
+
+    if (result.stderr) {
+        const stderrSpan = document.createElement('span');
+        stderrSpan.style.color = 'var(--glyph-status-error-text)';
+        stderrSpan.textContent = result.stderr;
+        container.appendChild(document.createTextNode(outputText));
+        container.appendChild(stderrSpan);
+        outputText = '';
+    }
+
+    if (result.error) {
+        const errorSpan = document.createElement('span');
+        errorSpan.style.color = 'var(--glyph-status-error-text)';
+        errorSpan.style.fontWeight = 'bold';
+        errorSpan.textContent = `\nError: ${result.error}`;
+        container.appendChild(document.createTextNode(outputText));
+        container.appendChild(errorSpan);
+        outputText = '';
+    }
+
+    if (outputText) {
+        container.appendChild(document.createTextNode(outputText));
+    }
+
+    if (!result.stdout && !result.stderr && !result.error) {
+        container.textContent = '(no output)';
+        container.style.color = 'var(--text-secondary)';
+        container.style.fontStyle = 'italic';
+    }
+}
+
+/**
+ * Update an existing result glyph's content in place.
+ * Returns true if the update succeeded, false if the element structure wasn't found.
+ */
+export function updateResultGlyphContent(resultElement: HTMLElement, result: ExecutionResult): boolean {
+    const output = resultElement.querySelector('.result-glyph-output') as HTMLElement | null;
+    if (!output) return false;
+
+    renderOutput(output, result);
+
+    // Update duration label (first span in header)
+    const header = resultElement.querySelector('.result-glyph-header') as HTMLElement | null;
+    if (header) {
+        const durationLabel = header.querySelector('span');
+        if (durationLabel) {
+            durationLabel.textContent = result.duration_ms ? `${result.duration_ms}ms` : '';
+        }
+    }
+
+    // Update persisted content
+    const glyphId = resultElement.getAttribute('data-glyph-id');
+    if (glyphId) {
+        const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+        if (existing) {
+            uiState.addCanvasGlyph({ ...existing, content: JSON.stringify(result) });
+        }
+    }
+
+    return true;
 }
 
