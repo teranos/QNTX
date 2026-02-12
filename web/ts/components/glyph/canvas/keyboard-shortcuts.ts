@@ -5,6 +5,8 @@
  * - ESC: deselect all glyphs
  * - DELETE/BACKSPACE: remove selected glyphs
  * - U: unmeld selected composition
+ * - 0: reset zoom/pan to origin
+ * - 1: fit all glyphs in view (TODO)
  *
  * Shortcuts are scoped to the focused canvas container
  * Uses AbortController for automatic cleanup when container is removed
@@ -26,7 +28,8 @@ export function setupKeyboardShortcuts(
     hasSelection: HasSelectionCallback,
     onDeselect: () => void,
     onDelete: () => void,
-    onUnmeld: () => void
+    onUnmeld: () => void,
+    onResetView: () => void
 ): AbortController {
     const controller = new AbortController();
 
@@ -47,11 +50,20 @@ export function setupKeyboardShortcuts(
             return;
         }
 
-        // DELETE/BACKSPACE to delete selected glyphs
+        // 0 to reset zoom and pan to origin (works regardless of selection)
+        if (e.key === '0' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+            e.preventDefault();
+            onResetView();
+            log.debug(SEG.GLYPH, '[Canvas] 0 pressed - resetting zoom/pan to origin');
+            return;
+        }
+
+        // Following shortcuts require selection
         if (!hasSelection()) {
             return;
         }
 
+        // DELETE/BACKSPACE to delete selected glyphs
         if (e.key === 'Delete' || e.key === 'Backspace') {
             e.preventDefault();
             onDelete();
@@ -66,6 +78,14 @@ export function setupKeyboardShortcuts(
             log.debug(SEG.GLYPH, '[Canvas] U pressed - unmelding selected composition');
             return;
         }
+
+        // TODO: 1 to fit all glyphs in view
+        // Calculate bounding box of all canvas glyphs and zoom/pan to show everything
+        // if (e.key === '1' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        //     e.preventDefault();
+        //     onFitToView();
+        //     return;
+        // }
     };
 
     container.addEventListener('keydown', handleKeydown, { signal: controller.signal });
