@@ -22,12 +22,7 @@ Without the `rustembeddings` build tag, all endpoints return 503.
 
 ## Model Files
 
-Located at `ats/embeddings/models/all-MiniLM-L6-v2/` (not in git):
-- `model.onnx` (~86MB)
-- `tokenizer.json`
-- `tokenizer_config.json`
-
-Export script: `ats/embeddings/export_model.py`
+Located at `ats/embeddings/models/all-MiniLM-L6-v2/` (not in git). See [ats/embeddings/README.md](https://github.com/teranos/QNTX/blob/main/ats/embeddings/README.md) for download instructions.
 
 ## Open Work
 
