@@ -33,6 +33,7 @@ import { showActionBar, hideActionBar } from './action-bar';
 import { showSpawnMenu } from './spawn-menu';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
 import { setupRectangleSelection, didRectangleSelectionJustComplete } from './rectangle-selection';
+import { setupCanvasPan } from './canvas-pan';
 import { getAllCompositions, removeComposition, extractGlyphIds } from '../../../state/compositions';
 import { convertNoteToPrompt, convertResultToNote } from '../conversions';
 import {
@@ -319,15 +320,20 @@ export function createCanvasGlyph(): Glyph {
             container.style.backgroundColor = 'var(--bg-dark-hover)';
             container.style.outline = 'none'; // Remove focus outline
 
-            // Add subtle grid overlay
-            const gridOverlay = document.createElement('div');
-            gridOverlay.className = 'canvas-grid-overlay';
-            container.appendChild(gridOverlay);
+            // Inner content layer that gets transformed (for pan)
+            const contentLayer = document.createElement('div');
+            contentLayer.className = 'canvas-content-layer';
+            contentLayer.style.position = 'absolute';
+            contentLayer.style.top = '0';
+            contentLayer.style.left = '0';
+            contentLayer.style.width = '100%';
+            contentLayer.style.height = '100%';
+            container.appendChild(contentLayer);
 
             // Right-click handler for spawn menu
             container.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
-                showSpawnMenu(e.clientX, e.clientY, container, glyphs);
+                showSpawnMenu(e.clientX, e.clientY, contentLayer, glyphs);
             });
 
             // Selection: click on a glyph to select, Shift+click for multi-select, click background to deselect
@@ -391,12 +397,19 @@ export function createCanvasGlyph(): Glyph {
             // Note: AbortController returned but not stored - signal handles cleanup automatically
             // Future: if we add explicit canvas.destroy(), store and call .abort()
 
+            // Setup canvas pan (two-finger scroll on desktop, single finger drag on mobile)
+            void setupCanvasPan(container, 'canvas-workspace');
+
             // Setup rectangle selection (drag on canvas background to select glyphs)
-            void setupRectangleSelection(
-                container,
-                selectGlyph,
-                deselectAll
-            );
+            // Only on desktop - mobile uses single-finger drag for pan
+            const isMobile = window.matchMedia('(max-width: 768px)').matches;
+            if (!isMobile) {
+                void setupRectangleSelection(
+                    container,
+                    selectGlyph,
+                    deselectAll
+                );
+            }
 
             // Clean up local glyphs array when a glyph is deleted
             container.addEventListener('glyph-deleted', ((e: CustomEvent<{ glyphId: string }>) => {
@@ -411,7 +424,7 @@ export function createCanvasGlyph(): Glyph {
                 // Step 1: Render all individual glyphs
                 for (const glyph of glyphs) {
                     const glyphElement = await renderGlyph(glyph);
-                    container.appendChild(glyphElement);
+                    contentLayer.appendChild(glyphElement);
                 }
 
                 // Step 2: Restore melded compositions after all glyphs are rendered
