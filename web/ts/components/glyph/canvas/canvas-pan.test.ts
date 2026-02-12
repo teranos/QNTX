@@ -45,6 +45,10 @@ describe('Canvas Pan', () => {
 
     test('setupCanvasPan returns AbortController', () => {
         const container = document.createElement('div');
+        const contentLayer = document.createElement('div');
+        contentLayer.className = 'canvas-content-layer';
+        container.appendChild(contentLayer);
+
         const controller = setupCanvasPan(container, 'test-canvas');
 
         expect(controller).toBeInstanceOf(AbortController);
@@ -56,14 +60,21 @@ describe('Canvas Pan', () => {
         uiState.setCanvasPan('test-canvas', { panX: 100, panY: 200 });
 
         const container = document.createElement('div');
+        const contentLayer = document.createElement('div');
+        contentLayer.className = 'canvas-content-layer';
+        container.appendChild(contentLayer);
+
         setupCanvasPan(container, 'test-canvas');
 
-        // Check transform was applied
-        expect(container.style.transform).toBe('translate(100px, 200px)');
+        // Check transform was applied to content layer
+        expect(contentLayer.style.transform).toBe('translate(100px, 200px)');
     });
 
     test('wheel event updates pan offset (desktop trackpad scroll)', () => {
         const container = document.createElement('div');
+        const contentLayer = document.createElement('div');
+        contentLayer.className = 'canvas-content-layer';
+        container.appendChild(contentLayer);
         document.body.appendChild(container);
 
         setupCanvasPan(container, 'test-canvas');
@@ -74,7 +85,7 @@ describe('Canvas Pan', () => {
         container.dispatchEvent(wheelEvent);
 
         // Pan should move opposite to scroll direction
-        expect(container.style.transform).toBe('translate(-10px, -20px)');
+        expect(contentLayer.style.transform).toBe('translate(-10px, -20px)');
 
         // State should be persisted
         const saved = uiState.getCanvasPan('test-canvas');
@@ -83,6 +94,9 @@ describe('Canvas Pan', () => {
 
     test('wheel event with ctrlKey is ignored (pinch zoom, not pan)', () => {
         const container = document.createElement('div');
+        const contentLayer = document.createElement('div');
+        contentLayer.className = 'canvas-content-layer';
+        container.appendChild(contentLayer);
         document.body.appendChild(container);
 
         setupCanvasPan(container, 'test-canvas');
@@ -93,11 +107,14 @@ describe('Canvas Pan', () => {
         container.dispatchEvent(wheelEvent);
 
         // Pan should not change
-        expect(container.style.transform).toBe('translate(0px, 0px)');
+        expect(contentLayer.style.transform).toBe('translate(0px, 0px)');
     });
 
     test('abort() cleans up event listeners', () => {
         const container = document.createElement('div');
+        const contentLayer = document.createElement('div');
+        contentLayer.className = 'canvas-content-layer';
+        container.appendChild(contentLayer);
         document.body.appendChild(container);
 
         const controller = setupCanvasPan(container, 'test-canvas');
@@ -111,6 +128,6 @@ describe('Canvas Pan', () => {
         container.dispatchEvent(wheelEvent);
 
         // Pan should remain at 0
-        expect(container.style.transform).toBe('translate(0px, 0px)');
+        expect(contentLayer.style.transform).toBe('translate(0px, 0px)');
     });
 });
