@@ -1,42 +1,13 @@
-// Package ats provides cartesian product expansion for attestations.
-// It expands compact attestation representations into individual claims for storage.
+//go:build !qntxwasm
+
 package ats
 
 import (
-	"time"
-
 	"github.com/teranos/QNTX/ats/types"
 )
 
-const (
-	// ClaimKeySeparator is used to join subject, predicate, and context into a unique key
-	ClaimKeySeparator = "|"
-)
-
-// IndividualClaim represents a single claim extracted from a multi-dimensional attestation
-type IndividualClaim struct {
-	Subject   string
-	Predicate string
-	Context   string
-	Actor     string
-	Timestamp time.Time
-	SourceAs  types.As // Reference to original attestation
-}
-
-// ClaimKey represents the unique identifier for a claim (Subject, Predicate, Context)
-type ClaimKey struct {
-	Subject   string
-	Predicate string
-	Context   string
-}
-
-// String returns a string representation of the claim key
-func (ck ClaimKey) String() string {
-	return ck.Subject + ClaimKeySeparator + ck.Predicate + ClaimKeySeparator + ck.Context
-}
-
-// ExpandCartesianClaims expands multi-dimensional attestations into individual claims
-// This is a simplified version - we defer complex filtering and conflict detection for later phases
+// ExpandCartesianClaims expands multi-dimensional attestations into individual claims.
+// Go fallback — used when the qntxwasm build tag is not set.
 func ExpandCartesianClaims(attestations []types.As) []IndividualClaim {
 	claims := []IndividualClaim{}
 
@@ -75,8 +46,8 @@ func expandSingleAttestation(as types.As) []IndividualClaim {
 	return claims
 }
 
-// GroupClaimsByKey groups claims by their (Subject, Predicate, Context) key
-// This will be useful for conflict detection in later phases
+// GroupClaimsByKey groups claims by their (Subject, Predicate, Context) key.
+// Go fallback — used when the qntxwasm build tag is not set.
 func GroupClaimsByKey(claims []IndividualClaim) map[ClaimKey][]IndividualClaim {
 	groups := make(map[ClaimKey][]IndividualClaim)
 
@@ -93,7 +64,8 @@ func GroupClaimsByKey(claims []IndividualClaim) map[ClaimKey][]IndividualClaim {
 }
 
 // ConvertClaimsToAttestations converts individual claims back to unique attestations
-// for display purposes - removes duplicates by source attestation ID
+// for display purposes - removes duplicates by source attestation ID.
+// Go fallback — used when the qntxwasm build tag is not set.
 func ConvertClaimsToAttestations(claims []IndividualClaim) []types.As {
 	seen := make(map[string]bool)
 	result := []types.As{}

@@ -302,6 +302,34 @@ pub fn classify_claims(input: &str) -> String {
 }
 
 // ============================================================================
+// Cartesian Expansion
+// ============================================================================
+
+/// Expand compact attestations into individual claims via cartesian product.
+/// Takes JSON: `{"attestations": [...]}`
+/// Returns JSON: `{"claims": [...], "total": N}`
+#[wasm_bindgen]
+pub fn expand_cartesian_claims(input: &str) -> String {
+    qntx_core::expand_claims_json(input)
+}
+
+/// Group individual claims by (subject, predicate, context) key.
+/// Takes JSON: `{"claims": [...]}`
+/// Returns JSON: `{"groups": [...], "total_groups": N}`
+#[wasm_bindgen]
+pub fn group_claims(input: &str) -> String {
+    qntx_core::group_claims_json(input)
+}
+
+/// Deduplicate claims to unique source attestation IDs, preserving order.
+/// Takes JSON: `{"claims": [...]}`
+/// Returns JSON: `{"ids": [...], "total": N}`
+#[wasm_bindgen]
+pub fn dedup_source_ids(input: &str) -> String {
+    qntx_core::dedup_source_ids_json(input)
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 
