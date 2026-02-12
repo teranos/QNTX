@@ -4,7 +4,7 @@ package ax
 type MatcherBackend string
 
 const (
-	// MatcherBackendGo indicates the built-in Go implementation
+	// MatcherBackendGo indicates no WASM backend is available
 	MatcherBackendGo MatcherBackend = "go"
 	// MatcherBackendWasm indicates the WASM-backed Rust implementation (via wazero)
 	MatcherBackendWasm MatcherBackend = "wasm"
@@ -28,24 +28,6 @@ type Matcher interface {
 	SetLogger(logger interface{})
 }
 
-// NewDefaultMatcher creates the best available matcher implementation.
-// Priority: WASM > pure Go.
-func NewDefaultMatcher() Matcher {
-	if matcher, err := NewWasmMatcher(); err == nil {
-		return matcher
-	}
-	return NewFuzzyMatcher()
-}
-
-// DetectBackend returns which fuzzy backend is available without
-// creating a full matcher instance.
-func DetectBackend() MatcherBackend {
-	if _, err := NewWasmMatcher(); err == nil {
-		return MatcherBackendWasm
-	}
-	return MatcherBackendGo
-}
-
 // hashStrings computes a simple FNV-1a hash of a string slice for change detection.
 func hashStrings(strs []string) uint64 {
 	var hash uint64 = 14695981039346656037 // FNV-1a offset basis
@@ -60,5 +42,20 @@ func hashStrings(strs []string) uint64 {
 	return hash
 }
 
-// Ensure FuzzyMatcher implements Matcher
-var _ Matcher = (*FuzzyMatcher)(nil)
+// removeDuplicates removes duplicate strings from a slice
+func removeDuplicates(slice []string) []string {
+	seen := make(map[string]bool)
+	result := []string{}
+
+	for _, item := range slice {
+		if !seen[item] {
+			seen[item] = true
+			result = append(result, item)
+		}
+	}
+
+	return result
+}
+
+// Ensure WasmMatcher implements Matcher
+var _ Matcher = (*WasmMatcher)(nil)
