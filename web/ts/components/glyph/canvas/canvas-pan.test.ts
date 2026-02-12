@@ -303,12 +303,12 @@ describe('Canvas Pan', () => {
         setupCanvasPan(container, 'test-canvas');
 
         // Try to zoom beyond max (4.0)
-        setZoom('test-canvas', 10.0);
+        setZoom(container, 'test-canvas', 10.0);
         let transform = getTransform('test-canvas');
         expect(transform.scale).toBe(4.0);
 
         // Try to zoom below min (0.25)
-        setZoom('test-canvas', 0.1);
+        setZoom(container, 'test-canvas', 0.1);
         transform = getTransform('test-canvas');
         expect(transform.scale).toBe(0.25);
     });
@@ -326,14 +326,19 @@ describe('Canvas Pan', () => {
         const wheelPan = createWheelEvent(50, 100, false);
         container.dispatchEvent(wheelPan);
 
-        // Then zoom (note: setZoom doesn't auto-apply DOM transform, it's state-only)
-        setZoom('test-canvas', 2.0);
+        let transform = getTransform('test-canvas');
+        const initialPanX = transform.panX;
+        const initialPanY = transform.panY;
 
-        // State should have both pan and zoom
-        const transform = getTransform('test-canvas');
-        expect(transform.panX).toBe(-50);
-        expect(transform.panY).toBe(-100);
+        // Then zoom toward origin (0, 0)
+        setZoom(container, 'test-canvas', 2.0);
+
+        // State should have zoom applied, pan adjusted for zoom origin
+        transform = getTransform('test-canvas');
         expect(transform.scale).toBe(2.0);
+        // Pan adjusts when zooming toward origin: panX = 0 - (0 - oldPanX) * 2 = -2 * oldPanX
+        expect(transform.panX).toBe(initialPanX * 2);
+        expect(transform.panY).toBe(initialPanY * 2);
 
         // State should be persisted (skip check if method not available in CI)
         if (typeof uiState.getCanvasPan === 'function') {
@@ -352,7 +357,7 @@ describe('Canvas Pan', () => {
         setupCanvasPan(container, 'test-canvas');
 
         // Set known transform: pan (100, 50), zoom 2x
-        setZoom('test-canvas', 2.0, 100, 50);
+        setZoom(container, 'test-canvas', 2.0, 100, 50);
 
         // Screen point (200, 100) should map to canvas coordinates
         const canvasPoint = screenToCanvas('test-canvas', 200, 100);
@@ -375,10 +380,10 @@ describe('Canvas Pan', () => {
         // Apply some transforms
         const wheelPan = createWheelEvent(50, 100, false);
         container.dispatchEvent(wheelPan);
-        setZoom('test-canvas', 2.0);
+        setZoom(container, 'test-canvas', 2.0);
 
         // Reset
-        resetTransform('test-canvas');
+        resetTransform(container, 'test-canvas');
 
         const transform = getTransform('test-canvas');
         expect(transform.panX).toBe(0);
@@ -475,5 +480,44 @@ describe('Canvas Pan', () => {
             const saved = uiState.getCanvasPan('test-canvas');
             expect(saved?.scale).toBeGreaterThan(1.0);
         }
+    });
+
+    test('0 key resets zoom and pan', () => {
+        const container = document.createElement('div');
+        const contentLayer = document.createElement('div');
+        contentLayer.className = 'canvas-content-layer';
+        container.appendChild(contentLayer);
+        document.body.appendChild(container);
+
+        // Make container focusable and give it focus
+        container.tabIndex = 0;
+        container.focus();
+
+        setupCanvasPan(container, 'test-canvas');
+
+        // Apply some transforms
+        const wheelPan = createWheelEvent(50, 100, false);
+        container.dispatchEvent(wheelPan);
+        setZoom(container, 'test-canvas', 2.0);
+
+        // Verify transforms were applied (zoom toward origin adjusts pan)
+        let transform = getTransform('test-canvas');
+        expect(transform.scale).toBe(2.0);
+        expect(transform.panX).not.toBe(0);
+        expect(transform.panY).not.toBe(0);
+
+        // Press '0' key
+        const Win = globalThis.window as any;
+        const keyEvent = new Win.KeyboardEvent('keydown', { key: '0', bubbles: true });
+        document.dispatchEvent(keyEvent);
+
+        // Should reset to origin
+        transform = getTransform('test-canvas');
+        expect(transform.panX).toBe(0);
+        expect(transform.panY).toBe(0);
+        expect(transform.scale).toBe(1.0);
+
+        // DOM should also be updated
+        expect(contentLayer.style.transform).toBe('translate(0px, 0px) scale(1)');
     });
 });

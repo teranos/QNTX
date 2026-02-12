@@ -291,6 +291,24 @@ export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortC
         }
     }, { signal });
 
+    // Keyboard shortcuts for canvas navigation
+    document.addEventListener('keydown', (e: KeyboardEvent) => {
+        // Only handle if canvas container or its children have focus
+        if (!container.contains(document.activeElement) && document.activeElement !== container) {
+            return;
+        }
+
+        // '0' key: Reset zoom and pan to origin
+        if (e.key === '0' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+            e.preventDefault();
+            resetTransform(container, canvasId);
+            log.debug(SEG.GLYPH, '[CanvasPan] Reset transform via keyboard (0 key)');
+        }
+
+        // TODO: '1' key: Fit all glyphs in view
+        // Calculate bounding box of all canvas glyphs and zoom/pan to show everything
+    }, { signal });
+
     return controller;
 }
 
@@ -313,19 +331,20 @@ export function getTransform(canvasId: string): { panX: number; panY: number; sc
 
 /**
  * Set zoom level programmatically
+ * @param container Canvas container element
  * @param canvasId Canvas identifier
  * @param scale Target zoom scale (clamped to ZOOM_MIN..ZOOM_MAX)
- * @param centerX Optional zoom center X (container-relative). Defaults to container center.
- * @param centerY Optional zoom center Y (container-relative). Defaults to container center.
+ * @param centerX Optional zoom center X (container-relative). Defaults to (0, 0) canvas origin.
+ * @param centerY Optional zoom center Y (container-relative). Defaults to (0, 0) canvas origin.
  */
-export function setZoom(canvasId: string, scale: number, centerX?: number, centerY?: number): void {
+export function setZoom(container: HTMLElement, canvasId: string, scale: number, centerX?: number, centerY?: number): void {
     const state = getState(canvasId);
     const oldScale = state.scale;
     const newScale = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, scale));
 
-    // Use provided center or default to state center (previous zoom origin)
-    const zoomCenterX = centerX ?? state.panX;
-    const zoomCenterY = centerY ?? state.panY;
+    // Default to (0, 0) canvas origin - predictable zoom toward origin point
+    const zoomCenterX = centerX ?? 0;
+    const zoomCenterY = centerY ?? 0;
 
     // Apply zoom origin math
     const scaleFactor = newScale / oldScale;
@@ -333,17 +352,21 @@ export function setZoom(canvasId: string, scale: number, centerX?: number, cente
     state.panY = zoomCenterY - (zoomCenterY - state.panY) * scaleFactor;
     state.scale = newScale;
 
+    applyTransform(container, canvasId);
     saveTransformState(canvasId);
 }
 
 /**
  * Reset transform to default (no pan, 100% zoom)
+ * @param container Canvas container element
+ * @param canvasId Canvas identifier
  */
-export function resetTransform(canvasId: string): void {
+export function resetTransform(container: HTMLElement, canvasId: string): void {
     const state = getState(canvasId);
     state.panX = 0;
     state.panY = 0;
     state.scale = 1.0;
+    applyTransform(container, canvasId);
     saveTransformState(canvasId);
 }
 
