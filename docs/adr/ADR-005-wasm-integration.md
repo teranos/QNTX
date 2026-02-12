@@ -67,7 +67,7 @@ Gradually migrate all Rust components to WASM:
 
 ### Neutral
 
-- **Runtime Choice**: wazero for server, considering alternatives later
+- **Runtime Choice**: wazero is the only pure-Go runtime (no CGO) — wasmtime/wasmer are faster but re-introduce the CGO dependency this migration eliminates
 - **Fallback Path**: Go implementation maintained during transition
 - **Tauri Architecture**: Tauri app can use either WASM or native Rust (flexibility)
 
