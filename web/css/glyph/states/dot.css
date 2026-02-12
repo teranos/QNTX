@@ -1,13 +1,13 @@
 /**
- * Glyph Dot State - Collapsed 8px indicator
+ * Glyph Dot State - Collapsed indicator
  *
  * The minimal collapsed state of a glyph when not interacted with.
  * This is the default resting state in the glyph run.
  */
 
 .glyph-run-glyph {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
     border-radius: 0;
     background: var(--bg-gray);
     border: 1px solid var(--border-on-dark);
@@ -26,4 +26,20 @@
 
 .glyph-run-glyph:hover {
     background: color-mix(in srgb, var(--bg-gray) 90%, white 10%);
+}
+
+/* Tablet: larger dots for touch browse */
+@media (max-width: 900px) {
+    .glyph-run-glyph {
+        width: 15px;
+        height: 15px;
+    }
+}
+
+/* Mobile: slightly smaller than tablet but still findable */
+@media (max-width: 768px) {
+    .glyph-run-glyph {
+        width: 13px;
+        height: 13px;
+    }
 }
