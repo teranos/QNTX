@@ -557,11 +557,13 @@ mod wazero {
 
         #[test]
         fn group_claims_basic() {
+            // Palace records and rebel intelligence both confirm Han is frozen;
+            // Lando's guard disguise is a separate key.
             let input = serde_json::json!({
                 "claims": [
-                    {"subject": "A", "predicate": "p", "context": "c", "actor": "x", "timestamp_ms": 1, "source_id": "id1"},
-                    {"subject": "A", "predicate": "p", "context": "c", "actor": "y", "timestamp_ms": 2, "source_id": "id2"},
-                    {"subject": "B", "predicate": "q", "context": "d", "actor": "x", "timestamp_ms": 3, "source_id": "id3"}
+                    {"subject": "HAN", "predicate": "frozen_in", "context": "JABBAS-PALACE", "actor": "palace-records", "timestamp_ms": 1, "source_id": "jabba-01"},
+                    {"subject": "HAN", "predicate": "frozen_in", "context": "JABBAS-PALACE", "actor": "rebel-intelligence", "timestamp_ms": 2, "source_id": "rescue-01"},
+                    {"subject": "LANDO", "predicate": "disguised_as", "context": "GUARD", "actor": "rebel-intelligence", "timestamp_ms": 3, "source_id": "rescue-02"}
                 ]
             });
             let result = group_claims_impl(&input.to_string());
@@ -572,18 +574,20 @@ mod wazero {
 
         #[test]
         fn dedup_source_ids_basic() {
+            // Luke's rescue plan covers both the droid delivery and Lando's infiltration;
+            // Leia's carbonite heist is a second source.
             let input = serde_json::json!({
                 "claims": [
-                    {"subject": "A", "predicate": "p", "context": "c", "actor": "x", "timestamp_ms": 1, "source_id": "id1"},
-                    {"subject": "B", "predicate": "p", "context": "c", "actor": "y", "timestamp_ms": 2, "source_id": "id1"},
-                    {"subject": "C", "predicate": "q", "context": "d", "actor": "x", "timestamp_ms": 3, "source_id": "id2"}
+                    {"subject": "R2D2", "predicate": "delivered_to", "context": "JABBAS-PALACE", "actor": "rebel-intelligence", "timestamp_ms": 1, "source_id": "rescue-plan"},
+                    {"subject": "LANDO", "predicate": "infiltrated", "context": "JABBAS-PALACE", "actor": "rebel-intelligence", "timestamp_ms": 2, "source_id": "rescue-plan"},
+                    {"subject": "LEIA", "predicate": "unfroze", "context": "HAN", "actor": "palace-surveillance", "timestamp_ms": 3, "source_id": "carbonite-heist"}
                 ]
             });
             let result = dedup_source_ids_impl(&input.to_string());
             let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
             assert!(parsed["error"].is_null(), "unexpected error: {}", result);
             assert_eq!(parsed["total"], 2);
-            assert_eq!(parsed["ids"].as_array().unwrap(), &["id1", "id2"]);
+            assert_eq!(parsed["ids"].as_array().unwrap(), &["rescue-plan", "carbonite-heist"]);
         }
     }
 } // end mod wazero

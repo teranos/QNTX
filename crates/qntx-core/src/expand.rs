@@ -318,30 +318,32 @@ mod tests {
 
     #[test]
     fn group_claims_by_key() {
+        // Two independent sources confirm Han is frozen in Jabba's palace;
+        // Leia's infiltration is known only to rebel intelligence.
         let claims = vec![
             IndividualClaim {
                 subject: "HAN".into(),
-                predicate: "smuggler".into(),
-                context: "MILLENNIUM-FALCON".into(),
-                actor: "rebel-intelligence".into(),
+                predicate: "frozen_in".into(),
+                context: "JABBAS-PALACE".into(),
+                actor: "palace-records".into(),
                 timestamp_ms: 100,
-                source_id: "as-1".into(),
+                source_id: "jabba-01".into(),
             },
             IndividualClaim {
                 subject: "HAN".into(),
-                predicate: "smuggler".into(),
-                context: "MILLENNIUM-FALCON".into(),
-                actor: "imperial-bounty".into(),
+                predicate: "frozen_in".into(),
+                context: "JABBAS-PALACE".into(),
+                actor: "rebel-intelligence".into(),
                 timestamp_ms: 200,
-                source_id: "as-2".into(),
+                source_id: "rescue-01".into(),
             },
             IndividualClaim {
-                subject: "VADER".into(),
-                predicate: "commands".into(),
-                context: "DEATH-STAR".into(),
-                actor: "imperial-records".into(),
+                subject: "LEIA".into(),
+                predicate: "disguised_as".into(),
+                context: "BOUSHH".into(),
+                actor: "rebel-intelligence".into(),
                 timestamp_ms: 300,
-                source_id: "as-3".into(),
+                source_id: "rescue-02".into(),
             },
         ];
 
@@ -349,43 +351,45 @@ mod tests {
         assert_eq!(groups.len(), 2);
 
         // BTreeMap ensures sorted order
-        assert_eq!(groups[0].key, "HAN|smuggler|MILLENNIUM-FALCON");
+        assert_eq!(groups[0].key, "HAN|frozen_in|JABBAS-PALACE");
         assert_eq!(groups[0].claims.len(), 2);
-        assert_eq!(groups[1].key, "VADER|commands|DEATH-STAR");
+        assert_eq!(groups[1].key, "LEIA|disguised_as|BOUSHH");
         assert_eq!(groups[1].claims.len(), 1);
     }
 
     #[test]
     fn dedup_preserves_order() {
+        // Luke's plan produced two claims (Lando infiltrated, droids delivered)
+        // from the same attestation; Leia's carbonite heist is a second source.
         let claims = vec![
             IndividualClaim {
-                subject: "A".into(),
-                predicate: "p".into(),
-                context: "c".into(),
-                actor: "x".into(),
+                subject: "LANDO".into(),
+                predicate: "infiltrated".into(),
+                context: "JABBAS-PALACE".into(),
+                actor: "rebel-intelligence".into(),
                 timestamp_ms: 1,
-                source_id: "SW003".into(),
+                source_id: "rescue-plan".into(),
             },
             IndividualClaim {
-                subject: "B".into(),
-                predicate: "p".into(),
-                context: "c".into(),
-                actor: "x".into(),
+                subject: "R2D2".into(),
+                predicate: "delivered_to".into(),
+                context: "JABBAS-PALACE".into(),
+                actor: "rebel-intelligence".into(),
                 timestamp_ms: 2,
-                source_id: "SW003".into(), // duplicate
+                source_id: "rescue-plan".into(), // same source
             },
             IndividualClaim {
-                subject: "C".into(),
-                predicate: "p".into(),
-                context: "c".into(),
-                actor: "x".into(),
+                subject: "LEIA".into(),
+                predicate: "unfroze".into(),
+                context: "HAN".into(),
+                actor: "palace-surveillance".into(),
                 timestamp_ms: 3,
-                source_id: "SW004".into(),
+                source_id: "carbonite-heist".into(),
             },
         ];
 
         let ids = dedup_source_ids(&claims);
-        assert_eq!(ids, vec!["SW003", "SW004"]);
+        assert_eq!(ids, vec!["rescue-plan", "carbonite-heist"]);
     }
 
     #[test]
@@ -421,11 +425,13 @@ mod tests {
 
     #[test]
     fn group_claims_json_roundtrip() {
+        // Two sources confirm Luke confronted Jabba on the sail barge;
+        // Lando's skiff fight is a separate key.
         let input = serde_json::json!({
             "claims": [
-                {"subject": "R2D2", "predicate": "copilot_of", "context": "X-WING", "actor": "rebel-fleet", "timestamp_ms": 1, "source_id": "sw-001"},
-                {"subject": "R2D2", "predicate": "copilot_of", "context": "X-WING", "actor": "astromech-logs", "timestamp_ms": 2, "source_id": "sw-002"},
-                {"subject": "BB8", "predicate": "assigned_to", "context": "MILLENNIUM-FALCON", "actor": "rebel-fleet", "timestamp_ms": 3, "source_id": "sw-003"}
+                {"subject": "LUKE", "predicate": "confronted", "context": "SAIL-BARGE", "actor": "rebel-intelligence", "timestamp_ms": 1, "source_id": "rescue-03"},
+                {"subject": "LUKE", "predicate": "confronted", "context": "SAIL-BARGE", "actor": "palace-surveillance", "timestamp_ms": 2, "source_id": "rescue-04"},
+                {"subject": "LANDO", "predicate": "fought_on", "context": "DESERT-SKIFF", "actor": "rebel-intelligence", "timestamp_ms": 3, "source_id": "rescue-05"}
             ]
         });
 
@@ -438,11 +444,13 @@ mod tests {
 
     #[test]
     fn dedup_source_ids_json_roundtrip() {
+        // R2D2 hid Luke's saber AND served drinks — same droid plan.
+        // Leia's carbonite heist is a second source.
         let input = serde_json::json!({
             "claims": [
-                {"subject": "R2D2", "predicate": "served_on", "context": "TANTIVE-IV", "actor": "rebel-archives", "timestamp_ms": 1, "source_id": "sw-001"},
-                {"subject": "C3PO", "predicate": "served_on", "context": "TANTIVE-IV", "actor": "rebel-archives", "timestamp_ms": 2, "source_id": "sw-001"},
-                {"subject": "R2D2", "predicate": "hacked", "context": "DEATH-STAR", "actor": "rebel-archives", "timestamp_ms": 3, "source_id": "sw-002"}
+                {"subject": "R2D2", "predicate": "concealed_saber_for", "context": "LUKE", "actor": "rebel-intelligence", "timestamp_ms": 1, "source_id": "droid-plan"},
+                {"subject": "R2D2", "predicate": "served_drinks_at", "context": "JABBAS-PALACE", "actor": "rebel-intelligence", "timestamp_ms": 2, "source_id": "droid-plan"},
+                {"subject": "LEIA", "predicate": "unfroze", "context": "HAN", "actor": "palace-surveillance", "timestamp_ms": 3, "source_id": "carbonite-heist"}
             ]
         });
 
@@ -451,6 +459,6 @@ mod tests {
 
         assert!(parsed["error"].is_null(), "unexpected error: {}", result);
         assert_eq!(parsed["total"], 2);
-        assert_eq!(parsed["ids"].as_array().unwrap(), &["sw-001", "sw-002"]);
+        assert_eq!(parsed["ids"].as_array().unwrap(), &["droid-plan", "carbonite-heist"]);
     }
 }
