@@ -41,11 +41,11 @@ pub use classify::{
     ClassificationResult, ClassifyInput, ClassifyOutput, ConfidenceCalculator, ConflictType,
     SmartClassifier, TemporalAnalyzer, TemporalConfig, TemporalPattern,
 };
+pub use expand::{
+    dedup_source_ids, dedup_source_ids_json, expand_cartesian, expand_claims_json, group_by_key,
+    group_claims_json, DedupInput, DedupOutput, ExpandAttestation, ExpandInput, ExpandOutput,
+    GroupInput, GroupOutput, IndividualClaim,
+};
 pub use fuzzy::{FuzzyEngine, FuzzyMatch};
 pub use parser::{AxQuery, ParseError, Parser, TemporalClause};
-pub use expand::{
-    dedup_source_ids, dedup_source_ids_json, expand_cartesian, expand_claims_json,
-    group_by_key, group_claims_json, DedupInput, DedupOutput, ExpandAttestation, ExpandInput,
-    ExpandOutput, GroupInput, GroupOutput, IndividualClaim,
-};
 pub use storage::{AttestationStore, MemoryStore, QueryStore, StoreError};
