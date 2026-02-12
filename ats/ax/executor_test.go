@@ -174,3 +174,101 @@ func TestExecuteAsk_NoLoggerNoPanic(t *testing.T) {
 	_, err := executor.ExecuteAsk(context.Background(), filter)
 	require.NoError(t, err, "ExecuteAsk should not fail without logger")
 }
+
+func TestClaimConfidence_ReturnsConflictConfidence(t *testing.T) {
+	confidenceMap := map[string]float64{
+		"ALICE|is_dev|GitHub": 0.85,
+	}
+
+	claim := ats.IndividualClaim{
+		Subject:   "ALICE",
+		Predicate: "is_dev",
+		Context:   "GitHub",
+	}
+
+	got := claimConfidence(claim, confidenceMap)
+	assert.Equal(t, 0.85, got)
+}
+
+func TestClaimConfidence_UnclassifiedGetsNeutralBaseline(t *testing.T) {
+	confidenceMap := map[string]float64{
+		"BOB|is_cto|Acme": 0.9,
+	}
+
+	// Different claim — not in the confidence map
+	claim := ats.IndividualClaim{
+		Subject:   "ALICE",
+		Predicate: "is_dev",
+		Context:   "GitHub",
+	}
+
+	got := claimConfidence(claim, confidenceMap)
+	assert.Equal(t, 0.5, got, "uncorroborated claim should get neutral 0.5")
+}
+
+func TestExecuteAdvancedClassification_DeterministicOrdering(t *testing.T) {
+	queryStore := &mockQueryStore{}
+	aliasResolver := alias.NewResolver(&mockAliasStore{})
+	executor := NewAxExecutor(queryStore, aliasResolver)
+
+	now := time.Now()
+	claims := []ats.IndividualClaim{
+		{Subject: "A", Predicate: "role", Context: "X", Actor: "human:alice", Timestamp: now.Add(-3 * time.Hour), SourceAs: types.As{ID: "as-1"}},
+		{Subject: "B", Predicate: "role", Context: "Y", Actor: "human:bob", Timestamp: now.Add(-1 * time.Hour), SourceAs: types.As{ID: "as-2"}},
+		{Subject: "C", Predicate: "role", Context: "Z", Actor: "human:carol", Timestamp: now.Add(-2 * time.Hour), SourceAs: types.As{ID: "as-3"}},
+	}
+
+	// Run 20 times — before the fix, map iteration randomized the order
+	var firstOrder []string
+	for i := 0; i < 20; i++ {
+		_, attestations := executor.executeAdvancedClassification(claims)
+		ids := make([]string, len(attestations))
+		for j, a := range attestations {
+			ids[j] = a.ID
+		}
+		if i == 0 {
+			firstOrder = ids
+		} else {
+			assert.Equal(t, firstOrder, ids, "ordering must be deterministic across runs (iteration %d)", i)
+		}
+	}
+
+	// All claims are unclassified (no conflicts), so they should sort by recency desc
+	assert.Equal(t, []string{"as-2", "as-3", "as-1"}, firstOrder, "should be sorted most-recent first")
+}
+
+// emptyMatcher returns no matches for any query, simulating WASM engine failure.
+type emptyMatcher struct{}
+
+func (e *emptyMatcher) FindMatches(query string, all []string) []string    { return nil }
+func (e *emptyMatcher) FindContextMatches(query string, all []string) []string { return nil }
+func (e *emptyMatcher) Backend() MatcherBackend                            { return MatcherBackendGo }
+func (e *emptyMatcher) SetLogger(logger interface{})                       {}
+
+func TestExpandFuzzyPredicates_PreservesOriginalWhenNoMatches(t *testing.T) {
+	queryStore := &mockQueryStore{
+		predicates: []string{"engineer", "manager"},
+	}
+	aliasResolver := alias.NewResolver(&mockAliasStore{})
+	executor := NewAxExecutorWithOptions(queryStore, aliasResolver, AxExecutorOptions{
+		Matcher: &emptyMatcher{},
+	})
+
+	expanded, err := executor.expandFuzzyPredicates(context.Background(), []string{"engineer"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"engineer"}, expanded, "original term must survive when fuzzy returns nothing")
+}
+
+func TestExpandFuzzyContexts_PreservesOriginalWhenNoMatches(t *testing.T) {
+	queryStore := &mockQueryStore{
+		contexts: []string{"GitHub", "GitLab"},
+	}
+	aliasResolver := alias.NewResolver(&mockAliasStore{})
+	executor := NewAxExecutorWithOptions(queryStore, aliasResolver, AxExecutorOptions{
+		Matcher: &emptyMatcher{},
+	})
+
+	expanded, err := executor.expandFuzzyContexts(context.Background(), []string{"GitHub"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"GitHub"}, expanded, "original term must survive when fuzzy returns nothing")
+}

@@ -1,6 +1,39 @@
 /* @ts-self-types="./qntx_wasm.d.ts" */
 
 /**
+ * Classify claim conflicts. Takes JSON input with claim groups, temporal config,
+ * and current time. Returns JSON with classified conflicts, resolution strategies,
+ * and actor rankings.
+ *
+ * Input:
+ * ```json
+ * {
+ *   "claim_groups": [{"key": "...", "claims": [...]}],
+ *   "config": {"verification_window_ms": 60000, ...},
+ *   "now_ms": 1234567890
+ * }
+ * ```
+ *
+ * Returns JSON with conflicts, auto_resolved count, review_required count.
+ * @param {string} input
+ * @returns {string}
+ */
+export function classify_claims(input) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        const ptr0 = passStringToWasm0(input, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.classify_claims(ptr0, len0);
+        deferred2_0 = ret[0];
+        deferred2_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
+}
+
+/**
  * Delete an attestation by ID from IndexedDB.
  * Returns a Promise that resolves to true if deleted, false if not found.
  * @param {string} id

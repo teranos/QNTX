@@ -1,8 +1,8 @@
 /**
- * Result Glyph - Python execution output display
+ * Result Glyph - Execution output display
  *
- * Displays stdout, stderr, and execution results from Python code.
- * Appears below py glyphs as execution history.
+ * Displays stdout, stderr, and execution results from glyph execution.
+ * Appears below executable glyphs as output.
  */
 
 import type { Glyph } from './glyph';
@@ -13,7 +13,7 @@ import { unmeldComposition } from './meld/meld-composition';
 import { makeDraggable } from './glyph-interaction';
 
 /**
- * Python execution result data
+ * Glyph execution result data
  */
 export interface ExecutionResult {
     success: boolean;
@@ -25,7 +25,7 @@ export interface ExecutionResult {
 }
 
 /**
- * Create a result glyph showing Python execution output
+ * Create a result glyph showing execution output
  */
 export function createResultGlyph(
     glyph: Glyph,
@@ -198,5 +198,81 @@ export function createResultGlyph(
     (glyph as any).content = JSON.stringify(result);
 
     return element;
+}
+
+/**
+ * Render execution result output into a container element.
+ * Reused by createResultGlyph and updateResultGlyphContent.
+ */
+function renderOutput(container: HTMLElement, result: ExecutionResult): void {
+    container.innerHTML = '';
+    container.style.color = 'var(--text-on-dark)';
+    container.style.fontStyle = '';
+
+    let outputText = '';
+
+    if (result.stdout) {
+        outputText += result.stdout;
+    }
+
+    if (result.stderr) {
+        const stderrSpan = document.createElement('span');
+        stderrSpan.style.color = 'var(--glyph-status-error-text)';
+        stderrSpan.textContent = result.stderr;
+        container.appendChild(document.createTextNode(outputText));
+        container.appendChild(stderrSpan);
+        outputText = '';
+    }
+
+    if (result.error) {
+        const errorSpan = document.createElement('span');
+        errorSpan.style.color = 'var(--glyph-status-error-text)';
+        errorSpan.style.fontWeight = 'bold';
+        errorSpan.textContent = `\nError: ${result.error}`;
+        container.appendChild(document.createTextNode(outputText));
+        container.appendChild(errorSpan);
+        outputText = '';
+    }
+
+    if (outputText) {
+        container.appendChild(document.createTextNode(outputText));
+    }
+
+    if (!result.stdout && !result.stderr && !result.error) {
+        container.textContent = '(no output)';
+        container.style.color = 'var(--text-secondary)';
+        container.style.fontStyle = 'italic';
+    }
+}
+
+/**
+ * Update an existing result glyph's content in place.
+ * Returns true if the update succeeded, false if the element structure wasn't found.
+ */
+export function updateResultGlyphContent(resultElement: HTMLElement, result: ExecutionResult): boolean {
+    const output = resultElement.querySelector('.result-glyph-output') as HTMLElement | null;
+    if (!output) return false;
+
+    renderOutput(output, result);
+
+    // Update duration label (first span in header)
+    const header = resultElement.querySelector('.result-glyph-header') as HTMLElement | null;
+    if (header) {
+        const durationLabel = header.querySelector('span');
+        if (durationLabel) {
+            durationLabel.textContent = result.duration_ms ? `${result.duration_ms}ms` : '';
+        }
+    }
+
+    // Update persisted content
+    const glyphId = resultElement.getAttribute('data-glyph-id');
+    if (glyphId) {
+        const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+        if (existing) {
+            uiState.addCanvasGlyph({ ...existing, content: JSON.stringify(result) });
+        }
+    }
+
+    return true;
 }
 

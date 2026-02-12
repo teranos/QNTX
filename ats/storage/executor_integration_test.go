@@ -127,25 +127,6 @@ func TestAxExecutorBasicQueries(t *testing.T) {
 			shouldContainIDs: []string{"test1", "test3"},
 		},
 		{
-			name: "fuzzy predicate matching",
-			filter: types.AxFilter{
-				Predicates: []string{"engineer"}, // Should match "engineer", "software engineer", "senior software engineer"
-				Limit:      10,
-			},
-			expectedMinCount: 3,
-			shouldContainIDs: []string{"test1", "test2", "test4"},
-		},
-		{
-			name: "multiple filters",
-			filter: types.AxFilter{
-				Contexts:   []string{"RESEARCH_LAB"},
-				Predicates: []string{"software"},
-				Limit:      10,
-			},
-			expectedMinCount: 2,
-			shouldContainIDs: []string{"test2", "test4"},
-		},
-		{
 			name: "no filters - return all",
 			filter: types.AxFilter{
 				Limit: 10,

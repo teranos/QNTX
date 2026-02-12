@@ -37,8 +37,8 @@ type Engine struct {
 	broadcastMatch func(watcherID string, attestation *types.As)
 
 	// Broadcast callback for glyph execution events (optional)
-	// Called when a glyph_execute action fires, with status updates
-	broadcastGlyphFired func(glyphID string, attestationID string, status string, err error)
+	// Called when a glyph_execute action fires, with status updates and execution result
+	broadcastGlyphFired func(glyphID string, attestationID string, status string, err error, result []byte)
 
 	// In-memory state
 	mu           sync.RWMutex
@@ -178,7 +178,7 @@ func (e *Engine) SetBroadcastCallback(callback func(watcherID string, attestatio
 }
 
 // SetGlyphFiredCallback sets the callback for glyph execution notifications
-func (e *Engine) SetGlyphFiredCallback(callback func(glyphID string, attestationID string, status string, err error)) {
+func (e *Engine) SetGlyphFiredCallback(callback func(glyphID string, attestationID string, status string, err error, result []byte)) {
 	e.broadcastGlyphFired = callback
 }
 
@@ -510,7 +510,7 @@ attestation = json.loads(_attestation_json)
 
 	// Call Python plugin
 	reqBody, err := json.Marshal(map[string]interface{}{
-		"code": injectedCode,
+		"content": injectedCode,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal request body")
@@ -554,7 +554,7 @@ func (e *Engine) executeGlyph(watcher *storage.Watcher, as *types.As) error {
 
 	// Broadcast started
 	if e.broadcastGlyphFired != nil {
-		e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "started", nil)
+		e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "started", nil, nil)
 	}
 
 	// Fetch glyph's current content from canvas_glyphs
@@ -564,7 +564,7 @@ func (e *Engine) executeGlyph(watcher *storage.Watcher, as *types.As) error {
 	).Scan(&content)
 	if err != nil {
 		if e.broadcastGlyphFired != nil {
-			e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "error", err)
+			e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "error", err, nil)
 		}
 		return errors.Wrapf(err, "failed to fetch glyph %s content", action.TargetGlyphID)
 	}
@@ -575,88 +575,91 @@ func (e *Engine) executeGlyph(watcher *storage.Watcher, as *types.As) error {
 	}
 
 	var execErr error
+	var resultBody []byte
 	switch action.TargetGlyphType {
 	case "py":
-		execErr = e.executeGlyphPython(action.TargetGlyphID, content.String, attestationJSON)
+		resultBody, execErr = e.executeGlyphPython(action.TargetGlyphID, content.String, attestationJSON)
 	case "prompt":
-		execErr = e.executeGlyphPrompt(action.TargetGlyphID, content.String, attestationJSON)
+		resultBody, execErr = e.executeGlyphPrompt(action.TargetGlyphID, content.String, attestationJSON)
 	default:
 		execErr = errors.Newf("unsupported glyph type for execution: %s (glyph %s)", action.TargetGlyphType, action.TargetGlyphID)
 	}
 
 	if e.broadcastGlyphFired != nil {
 		if execErr != nil {
-			e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "error", execErr)
+			e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "error", execErr, nil)
 		} else {
-			e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "success", nil)
+			e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "success", nil, resultBody)
 		}
 	}
 
 	return execErr
 }
 
-// executeGlyphPython runs a py glyph's code with the attestation injected as `upstream`
-func (e *Engine) executeGlyphPython(glyphID string, code string, attestationJSON []byte) error {
+// executeGlyphPython runs a py glyph's content with the attestation injected as `upstream`.
+// Returns the JSON-encoded execution result on success.
+func (e *Engine) executeGlyphPython(glyphID string, content string, attestationJSON []byte) ([]byte, error) {
 	reqBody, err := json.Marshal(map[string]interface{}{
-		"code":                  code,
+		"content":               content,
 		"glyph_id":              glyphID,
 		"upstream_attestation":  json.RawMessage(attestationJSON),
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal request body")
+		return nil, errors.Wrap(err, "failed to marshal request body")
 	}
 
 	url := e.apiBaseURL + "/api/python/execute"
 	req, err := http.NewRequestWithContext(e.ctx, "POST", url, bytes.NewReader(reqBody))
 	if err != nil {
-		return errors.Wrap(err, "failed to create request")
+		return nil, errors.Wrap(err, "failed to create request")
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := e.httpClient.Do(req)
 	if err != nil {
-		return errors.Wrapf(err, "failed to execute py glyph %s", glyphID)
+		return nil, errors.Wrapf(err, "failed to execute py glyph %s", glyphID)
 	}
 	defer resp.Body.Close()
 
+	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return errors.Newf("py glyph %s execution failed (status %d): %s", glyphID, resp.StatusCode, string(body))
+		return nil, errors.Newf("py glyph %s execution failed (status %d): %s", glyphID, resp.StatusCode, string(body))
 	}
 
-	return nil
+	return body, nil
 }
 
-// executeGlyphPrompt runs a prompt glyph's template with attestation fields interpolated
-func (e *Engine) executeGlyphPrompt(glyphID string, template string, attestationJSON []byte) error {
+// executeGlyphPrompt runs a prompt glyph's template with attestation fields interpolated.
+// Returns the JSON-encoded execution result on success.
+func (e *Engine) executeGlyphPrompt(glyphID string, template string, attestationJSON []byte) ([]byte, error) {
 	reqBody, err := json.Marshal(map[string]interface{}{
 		"template":              template,
 		"glyph_id":              glyphID,
 		"upstream_attestation":  json.RawMessage(attestationJSON),
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal request body")
+		return nil, errors.Wrap(err, "failed to marshal request body")
 	}
 
 	url := e.apiBaseURL + "/api/prompt/direct"
 	req, err := http.NewRequestWithContext(e.ctx, "POST", url, bytes.NewReader(reqBody))
 	if err != nil {
-		return errors.Wrap(err, "failed to create request")
+		return nil, errors.Wrap(err, "failed to create request")
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := e.httpClient.Do(req)
 	if err != nil {
-		return errors.Wrapf(err, "failed to execute prompt glyph %s", glyphID)
+		return nil, errors.Wrapf(err, "failed to execute prompt glyph %s", glyphID)
 	}
 	defer resp.Body.Close()
 
+	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return errors.Newf("prompt glyph %s execution failed (status %d): %s", glyphID, resp.StatusCode, string(body))
+		return nil, errors.Newf("prompt glyph %s execution failed (status %d): %s", glyphID, resp.StatusCode, string(body))
 	}
 
-	return nil
+	return body, nil
 }
 
 // executeWebhook sends the attestation to a webhook URL

@@ -2,7 +2,12 @@
  * Proximity morphing for glyphs
  *
  * Handles the smooth transformation of glyphs from 8px dots to 220px expanded state
- * based on mouse proximity. This modifies the SAME DOM element in place.
+ * based on pointer proximity (mouse cursor or touch position).
+ * This modifies the SAME DOM element in place.
+ *
+ * Desktop: mousemove drives proximity continuously.
+ * Mobile:  touchstart near tray enters browse mode, touchmove drives proximity,
+ *          touchend opens the peaked glyph. Between touches there is no pointer.
  *
  * CRITICAL: We ONLY change styles, never recreate or replace the element.
  * The element persists through: dot → proximity → window → dot
@@ -30,9 +35,9 @@ export class GlyphProximity {
     private readonly VERTICAL_EASE_EARLY = 0.8; // Transform 80% by breakpoint
     private readonly VERTICAL_EASE_LATE = 0.2; // Remaining 20% in final stretch
 
-    // Morphing dimensions
-    private readonly DOT_MIN_WIDTH = 8;
-    private readonly DOT_MIN_HEIGHT = 8;
+    // Morphing dimensions (min matches CSS .glyph-run-glyph base size)
+    private readonly DOT_MIN_WIDTH = 10;
+    private readonly DOT_MIN_HEIGHT = 10;
     private readonly DOT_MAX_WIDTH = 220;
     private readonly DOT_MAX_HEIGHT = 32;
     private readonly DOT_BORDER_RADIUS_MAX = 2; // Initial border radius for dots
@@ -41,16 +46,38 @@ export class GlyphProximity {
     private mouseY: number = 0;
     private proximityRAF: number | null = null;
 
+    // Touch browse state — active while finger is down in the tray zone
+    private _isTouchBrowsing: boolean = false;
+
     constructor() {
-        this.setupMouseTracking();
+        this.setupPointerTracking();
     }
 
-    private setupMouseTracking(): void {
-        // Track mouse position globally for proximity effect
+    /** True while the user's finger is down and sliding through the tray */
+    public get isTouchBrowsing(): boolean {
+        return this._isTouchBrowsing;
+    }
+
+    public set isTouchBrowsing(v: boolean) {
+        this._isTouchBrowsing = v;
+    }
+
+    /** Feed pointer coordinates from any input source */
+    public setPointerPosition(x: number, y: number): void {
+        this.mouseX = x;
+        this.mouseY = y;
+    }
+
+    private setupPointerTracking(): void {
+        // Desktop: track mouse position globally for proximity effect
         document.addEventListener('mousemove', (e) => {
             this.mouseX = e.clientX;
             this.mouseY = e.clientY;
         });
+
+        // Mobile: touchmove feeds the same coordinates during browse mode.
+        // The actual touchstart/touchend lifecycle is managed by GlyphRun
+        // which calls setPointerPosition and sets isTouchBrowsing.
     }
 
     /**

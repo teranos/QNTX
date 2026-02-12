@@ -114,6 +114,9 @@ export interface UIStateData {
     // Canvas melded compositions (for composition persistence)
     canvasCompositions: CompositionState[];
 
+    // Canvas pan offset (for canvas navigation)
+    canvasPan: Record<string, { panX: number; panY: number }>;
+
     // Timestamp for state versioning
     lastUpdated: number;
 }
@@ -141,6 +144,7 @@ interface PersistedUIState {
     minimizedWindows: string[];
     canvasGlyphs: CanvasGlyphState[];
     canvasCompositions: CompositionState[];
+    canvasPan: Record<string, { panX: number; panY: number }>;
 }
 
 // ============================================================================
@@ -175,6 +179,7 @@ function createDefaultState(): UIStateData {
         minimizedWindows: [],
         canvasGlyphs: [],
         canvasCompositions: [],
+        canvasPan: {},
         lastUpdated: Date.now(),
     };
 }
@@ -520,6 +525,25 @@ class UIState {
     }
 
     // ========================================================================
+    // Canvas Pan Management
+    // ========================================================================
+
+    /**
+     * Get canvas pan offset for a specific canvas
+     */
+    getCanvasPan(canvasId: string): { panX: number; panY: number } | null {
+        return this.state.canvasPan[canvasId] ?? null;
+    }
+
+    /**
+     * Set canvas pan offset for a specific canvas
+     */
+    setCanvasPan(canvasId: string, pan: { panX: number; panY: number }): void {
+        const updated = { ...this.state.canvasPan, [canvasId]: pan };
+        this.update('canvasPan', updated);
+    }
+
+    // ========================================================================
     // Subscription (Pub/Sub)
     // ========================================================================
 
@@ -629,6 +653,7 @@ class UIState {
             minimizedWindows: this.state.minimizedWindows,
             canvasGlyphs: this.state.canvasGlyphs,
             canvasCompositions: this.state.canvasCompositions,
+            canvasPan: this.state.canvasPan,
             // Don't persist: panels (should start closed), budgetWarnings (session-only)
         };
     }
@@ -661,6 +686,7 @@ class UIState {
             minimizedWindows: persisted.minimizedWindows ?? defaultState.minimizedWindows,
             canvasGlyphs: persisted.canvasGlyphs ?? defaultState.canvasGlyphs,
             canvasCompositions: persisted.canvasCompositions ?? defaultState.canvasCompositions,
+            canvasPan: persisted.canvasPan ?? defaultState.canvasPan,
         };
     }
 
