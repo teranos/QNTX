@@ -423,9 +423,9 @@ mod tests {
     fn group_claims_json_roundtrip() {
         let input = serde_json::json!({
             "claims": [
-                {"subject": "A", "predicate": "p", "context": "c", "actor": "x", "timestamp_ms": 1, "source_id": "id1"},
-                {"subject": "A", "predicate": "p", "context": "c", "actor": "y", "timestamp_ms": 2, "source_id": "id2"},
-                {"subject": "B", "predicate": "q", "context": "d", "actor": "x", "timestamp_ms": 3, "source_id": "id3"}
+                {"subject": "R2D2", "predicate": "copilot_of", "context": "X-WING", "actor": "rebel-fleet", "timestamp_ms": 1, "source_id": "sw-001"},
+                {"subject": "R2D2", "predicate": "copilot_of", "context": "X-WING", "actor": "astromech-logs", "timestamp_ms": 2, "source_id": "sw-002"},
+                {"subject": "BB8", "predicate": "assigned_to", "context": "MILLENNIUM-FALCON", "actor": "rebel-fleet", "timestamp_ms": 3, "source_id": "sw-003"}
             ]
         });
 
@@ -440,9 +440,9 @@ mod tests {
     fn dedup_source_ids_json_roundtrip() {
         let input = serde_json::json!({
             "claims": [
-                {"subject": "A", "predicate": "p", "context": "c", "actor": "x", "timestamp_ms": 1, "source_id": "id1"},
-                {"subject": "B", "predicate": "p", "context": "c", "actor": "x", "timestamp_ms": 2, "source_id": "id1"},
-                {"subject": "C", "predicate": "q", "context": "d", "actor": "x", "timestamp_ms": 3, "source_id": "id2"}
+                {"subject": "R2D2", "predicate": "served_on", "context": "TANTIVE-IV", "actor": "rebel-archives", "timestamp_ms": 1, "source_id": "sw-001"},
+                {"subject": "C3PO", "predicate": "served_on", "context": "TANTIVE-IV", "actor": "rebel-archives", "timestamp_ms": 2, "source_id": "sw-001"},
+                {"subject": "R2D2", "predicate": "hacked", "context": "DEATH-STAR", "actor": "rebel-archives", "timestamp_ms": 3, "source_id": "sw-002"}
             ]
         });
 
@@ -451,6 +451,6 @@ mod tests {
 
         assert!(parsed["error"].is_null(), "unexpected error: {}", result);
         assert_eq!(parsed["total"], 2);
-        assert_eq!(parsed["ids"].as_array().unwrap(), &["id1", "id2"]);
+        assert_eq!(parsed["ids"].as_array().unwrap(), &["sw-001", "sw-002"]);
     }
 }
