@@ -34,11 +34,30 @@ Options to explore:
 - Background job via Pulse daemon
 - On-demand embedding at search time
 
+### Similarity scoring
+The current formula `1.0 - (distance / 2.0)` assumes L2 distances stay below 2.0. Structured attestation text (short keywords like "buy AAPL 150 limit") produces L2 distances of 3–6, causing similarity to clamp to 0. The default threshold of 0.7 returns nothing for these inputs. Use `threshold=0.0` to see results — ranking is correct even when similarity reads 0.
+
+Needs rethinking: cosine similarity instead of L2, or a normalization scheme that accounts for the actual distance distribution of attestation text.
+
+### Rich semantic search integration
+Currently, embeddings are generated from the raw attestation command string. This produces poor vectors — short structured text is too sparse for sentence transformers.
+
+The existing fuzzy search system (`ats/storage/rich_search.go`) solves the same problem differently: type definitions declare `rich_string_fields` in their attributes (e.g. a Commit type declares `["message", "description"]`), discovered dynamically via `getTypeDefinitions()` from attestations with `predicate="type"`, `context="graph"`. At search time, `json_extract(a.attributes, '$.fieldName')` pulls the actual text from those fields. The fuzzy engine then tokenizes and matches against this vocabulary.
+
+Embeddings should follow the same pattern:
+- Use `rich_string_fields` from type definitions to determine what text to embed per attestation
+- Concatenate the declared fields into a single input string for the sentence transformer
+- Re-embed when rich text fields change (type def updates should invalidate affected embeddings)
+- Unify fuzzy search and semantic search under one search system — fuzzy becomes word-level matching, semantic becomes meaning-level matching, both operating on the same rich text fields
+- UI reflects this as search modes rather than separate features
+
+This is the critical integration point: `buildDynamicRichStringFields()` already aggregates all searchable field names across types. The embedding pipeline needs access to the same mechanism.
+
 ### Verification (requires populated database)
-To fully verify semantic search post-merge, copy attestations from an existing database, then:
-1. `POST /api/embeddings/batch` with attestation IDs
-2. `GET /api/search/semantic?q=<query>` — verify results return with similarity scores
-3. Verify result ordering reflects actual semantic similarity
+Verified end-to-end by copying attestations from a backup database:
+1. `POST /api/embeddings/batch` with attestation IDs — 8 attestations embedded in 983ms, 0 failures
+2. `GET /api/search/semantic?q=<query>&threshold=0.0` — returns semantically ranked results
+3. Result ordering reflects semantic similarity (see similarity scoring caveat above)
 
 ### Frontend
 - Semantic Search Glyph (proposed symbol: ⊨ double turnstile)
