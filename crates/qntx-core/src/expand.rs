@@ -459,6 +459,9 @@ mod tests {
 
         assert!(parsed["error"].is_null(), "unexpected error: {}", result);
         assert_eq!(parsed["total"], 2);
-        assert_eq!(parsed["ids"].as_array().unwrap(), &["droid-plan", "carbonite-heist"]);
+        assert_eq!(
+            parsed["ids"].as_array().unwrap(),
+            &["droid-plan", "carbonite-heist"]
+        );
     }
 }
