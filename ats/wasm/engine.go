@@ -7,7 +7,7 @@
 // Memory protocol: strings cross the boundary as (ptr, len) pairs in WASM
 // linear memory. Return values are packed as (ptr << 32) | len in a u64.
 //
-// Prerequisites: run `make rust-wasm` before `go build`.
+// Prerequisites: run `make wasm` before `go build`.
 // This compiles qntx-core to wasm32-unknown-unknown and copies the artifact here.
 package wasm
 
