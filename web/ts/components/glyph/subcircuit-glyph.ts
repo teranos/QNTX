@@ -1,13 +1,15 @@
 /**
- * Subcircuit Glyph — compact canvas-placed glyph that expands to a
- * bordered fullscreen workspace on double-click.
+ * Subcircuit Glyph — compact square glyph with centered ⌗ symbol.
  *
- * Compact state: small square canvasPlaced glyph (120x120) with purple title bar.
- * Expanded state: viewport-inset bordered workspace (fixed, z-index 1000).
+ * Compact: small square on canvas, large centered symbol, no title bar.
+ * Expanded: dblclick → viewport-inset bordered workspace. dblclick again → collapse.
  *
- * The element never leaves the canvas DOM — expand/collapse just toggles
- * between position:absolute (canvas-relative) and position:fixed (viewport).
+ * Element stays in canvas DOM — expand/collapse toggles position:absolute ↔ fixed.
  * Fixed positioning escapes parent overflow:hidden without reparenting.
+ *
+ * Drag is disabled when expanded by setting pointerEvents:none on the drag
+ * handle (content div). The dblclick listener lives on the outer element
+ * so it still fires for collapse.
  */
 
 import type { Glyph } from './glyph';
@@ -19,6 +21,17 @@ const COMPACT_SIZE = 120;
 const EXPAND_INSET = 40;
 
 export async function createSubcircuitGlyph(glyph: Glyph): Promise<HTMLElement> {
+    // Content area — serves as drag handle in compact mode
+    const content = document.createElement('div');
+    content.className = 'subcircuit-content';
+    content.style.flex = '1';
+    content.style.position = 'relative';
+    content.style.overflow = 'hidden';
+    content.style.backgroundColor = 'var(--bg-dark-hover)';
+    content.style.cursor = 'grab';
+    content.style.display = 'grid';
+    content.style.placeItems = 'center';
+
     const { element } = canvasPlaced({
         glyph,
         className: 'canvas-subcircuit-glyph',
@@ -28,30 +41,22 @@ export async function createSubcircuitGlyph(glyph: Glyph): Promise<HTMLElement> 
             width: glyph.width ?? COMPACT_SIZE,
             height: glyph.height ?? COMPACT_SIZE,
         },
-        titleBar: { label: '⌗ subcircuit' },
+        dragHandle: content,
         resizable: true,
+        resizeHandleClass: 'glyph-resize-handle--hidden',
         logLabel: 'Subcircuit',
     });
 
-    // Purple title bar styling
-    const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
-    if (titleBar) {
-        titleBar.style.backgroundColor = '#3a2d5a';
-        const labelSpan = titleBar.querySelector('span:first-child') as HTMLElement;
-        if (labelSpan) {
-            labelSpan.style.color = '#c0a0e8';
-            labelSpan.style.fontWeight = 'bold';
-        }
-    }
-
-    // Content area
-    const content = document.createElement('div');
-    content.className = 'subcircuit-content';
-    content.style.flex = '1';
-    content.style.position = 'relative';
-    content.style.overflow = 'hidden';
-    content.style.backgroundColor = 'var(--bg-dark-hover)';
-    element.appendChild(content);
+    // Large centered symbol
+    const symbol = document.createElement('span');
+    symbol.className = 'subcircuit-symbol';
+    symbol.textContent = '⌗';
+    symbol.style.fontSize = '48px';
+    symbol.style.color = '#c0a0e8';
+    symbol.style.pointerEvents = 'none';
+    symbol.style.userSelect = 'none';
+    symbol.style.lineHeight = '1';
+    content.appendChild(symbol);
 
     // Subtle inner grid overlay
     const gridOverlay = document.createElement('div');
@@ -62,11 +67,18 @@ export async function createSubcircuitGlyph(glyph: Glyph): Promise<HTMLElement> 
     gridOverlay.style.opacity = '0.3';
     content.appendChild(gridOverlay);
 
-    // Double-click to expand
+    element.appendChild(content);
+
+    // Double-click on the outer element toggles expand/collapse.
+    // This works even when content has pointerEvents:none because
+    // the click lands on the element itself.
     element.addEventListener('dblclick', (e) => {
         e.stopPropagation();
-        if (element.dataset.subcircuitExpanded === 'true') return;
-        expandSubcircuit(element);
+        if (element.dataset.subcircuitExpanded === 'true') {
+            collapseSubcircuit(element, content);
+        } else {
+            expandSubcircuit(element, content);
+        }
     });
 
     log.debug(SEG.GLYPH, `[Subcircuit] Created compact subcircuit ${glyph.id}`);
@@ -74,7 +86,7 @@ export async function createSubcircuitGlyph(glyph: Glyph): Promise<HTMLElement> 
     return element;
 }
 
-function expandSubcircuit(element: HTMLElement): void {
+function expandSubcircuit(element: HTMLElement, content: HTMLElement): void {
     // Store compact geometry for collapse
     const rect = element.getBoundingClientRect();
     element.dataset.compactLeft = element.style.left;
@@ -83,38 +95,17 @@ function expandSubcircuit(element: HTMLElement): void {
     element.dataset.compactHeight = element.style.height || element.style.minHeight;
     element.dataset.compactZIndex = element.style.zIndex;
 
+    // Disable drag — no drag handle when expanded
+    content.style.pointerEvents = 'none';
+    content.style.cursor = 'default';
+
     // Target rect: viewport with inset
     const targetLeft = EXPAND_INSET;
     const targetTop = EXPAND_INSET;
     const targetWidth = window.innerWidth - EXPAND_INSET * 2;
     const targetHeight = window.innerHeight - EXPAND_INSET * 2;
 
-    // Animate from compact to expanded
-    const duration = getMinimizeDuration() * 1.5;
-    if (duration > 0) {
-        element.animate([
-            {
-                position: 'fixed',
-                left: `${rect.left}px`,
-                top: `${rect.top}px`,
-                width: `${rect.width}px`,
-                height: `${rect.height}px`,
-            },
-            {
-                position: 'fixed',
-                left: `${targetLeft}px`,
-                top: `${targetTop}px`,
-                width: `${targetWidth}px`,
-                height: `${targetHeight}px`,
-            },
-        ], {
-            duration,
-            easing: 'ease-out',
-            fill: 'forwards',
-        });
-    }
-
-    // Apply expanded styles — stays in canvas DOM, fixed escapes overflow:hidden
+    // Apply expanded styles first so animation plays on top of final state
     element.style.position = 'fixed';
     element.style.left = `${targetLeft}px`;
     element.style.top = `${targetTop}px`;
@@ -124,36 +115,34 @@ function expandSubcircuit(element: HTMLElement): void {
     element.style.zIndex = '1000';
     element.style.border = '2px solid var(--border-bright, #c0a0e8)';
 
+    // Animate from compact to expanded (no fill — inline styles are source of truth)
+    const duration = getMinimizeDuration() * 1.5;
+    if (duration > 0) {
+        element.animate([
+            {
+                left: `${rect.left}px`,
+                top: `${rect.top}px`,
+                width: `${rect.width}px`,
+                height: `${rect.height}px`,
+            },
+            {
+                left: `${targetLeft}px`,
+                top: `${targetTop}px`,
+                width: `${targetWidth}px`,
+                height: `${targetHeight}px`,
+            },
+        ], {
+            duration,
+            easing: 'ease-out',
+        });
+    }
+
     element.dataset.subcircuitExpanded = 'true';
-
-    // Add minimize button
-    const minimizeBtn = document.createElement('button');
-    minimizeBtn.className = 'subcircuit-minimize-btn';
-    minimizeBtn.textContent = '−';
-    minimizeBtn.title = 'Collapse subcircuit';
-    minimizeBtn.style.position = 'absolute';
-    minimizeBtn.style.top = '4px';
-    minimizeBtn.style.right = '8px';
-    minimizeBtn.style.zIndex = '1';
-    minimizeBtn.style.background = 'none';
-    minimizeBtn.style.border = 'none';
-    minimizeBtn.style.color = '#c0a0e8';
-    minimizeBtn.style.fontSize = '18px';
-    minimizeBtn.style.cursor = 'pointer';
-    minimizeBtn.style.lineHeight = '1';
-    minimizeBtn.style.padding = '2px 6px';
-
-    minimizeBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        collapseSubcircuit(element, minimizeBtn);
-    });
-
-    element.appendChild(minimizeBtn);
 
     log.debug(SEG.GLYPH, `[Subcircuit] Expanded ${element.dataset.glyphId}`);
 }
 
-function collapseSubcircuit(element: HTMLElement, minimizeBtn: HTMLElement): void {
+function collapseSubcircuit(element: HTMLElement, content: HTMLElement): void {
     const expandedRect = element.getBoundingClientRect();
 
     // Retrieve stored compact geometry
@@ -163,7 +152,6 @@ function collapseSubcircuit(element: HTMLElement, minimizeBtn: HTMLElement): voi
     const compactHeight = element.dataset.compactHeight || `${COMPACT_SIZE}px`;
     const compactZIndex = element.dataset.compactZIndex || '';
 
-    // Animate from expanded to compact (still fixed during animation)
     const duration = getMinimizeDuration() * 1.5;
 
     // Calculate where the compact position will be in viewport coords for animation
@@ -172,50 +160,49 @@ function collapseSubcircuit(element: HTMLElement, minimizeBtn: HTMLElement): voi
     const viewportLeft = (canvasRect?.left ?? 0) + parseFloat(compactLeft);
     const viewportTop = (canvasRect?.top ?? 0) + parseFloat(compactTop);
 
+    // Restore compact styles immediately — animation plays on top
+    element.style.position = 'absolute';
+    element.style.left = compactLeft;
+    element.style.top = compactTop;
+    element.style.width = compactWidth;
+    element.style.height = compactHeight;
+    element.style.zIndex = compactZIndex;
+    element.style.border = '';
+
+    // Re-enable drag
+    content.style.pointerEvents = '';
+    content.style.cursor = 'grab';
+
+    // Animate from expanded to compact (no fill — inline styles are source of truth)
     if (duration > 0) {
-        const animation = element.animate([
+        element.animate([
             {
+                position: 'fixed',
                 left: `${expandedRect.left}px`,
                 top: `${expandedRect.top}px`,
                 width: `${expandedRect.width}px`,
                 height: `${expandedRect.height}px`,
             },
             {
-                left: `${viewportLeft}px`,
-                top: `${viewportTop}px`,
-                width: `${parseFloat(compactWidth)}px`,
-                height: `${parseFloat(compactHeight)}px`,
+                position: 'absolute',
+                left: compactLeft,
+                top: compactTop,
+                width: compactWidth,
+                height: compactHeight,
             },
         ], {
             duration,
             easing: 'ease-in',
-            fill: 'forwards',
         });
-
-        animation.onfinish = () => finishCollapse();
-    } else {
-        finishCollapse();
     }
 
-    function finishCollapse() {
-        // Restore compact styles — back to absolute within canvas
-        element.style.position = 'absolute';
-        element.style.left = compactLeft;
-        element.style.top = compactTop;
-        element.style.width = compactWidth;
-        element.style.height = compactHeight;
-        element.style.zIndex = compactZIndex;
-        element.style.border = '';
+    // Clean up
+    delete element.dataset.subcircuitExpanded;
+    delete element.dataset.compactLeft;
+    delete element.dataset.compactTop;
+    delete element.dataset.compactWidth;
+    delete element.dataset.compactHeight;
+    delete element.dataset.compactZIndex;
 
-        // Clean up
-        minimizeBtn.remove();
-        delete element.dataset.subcircuitExpanded;
-        delete element.dataset.compactLeft;
-        delete element.dataset.compactTop;
-        delete element.dataset.compactWidth;
-        delete element.dataset.compactHeight;
-        delete element.dataset.compactZIndex;
-
-        log.debug(SEG.GLYPH, `[Subcircuit] Collapsed ${element.dataset.glyphId}`);
-    }
+    log.debug(SEG.GLYPH, `[Subcircuit] Collapsed ${element.dataset.glyphId}`);
 }
