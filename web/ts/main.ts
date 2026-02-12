@@ -373,15 +373,10 @@ async function init(): Promise<void> {
         });
 
         listen('toggle-logs', () => {
-            // Toggle system drawer visibility
-            const systemDrawer = document.getElementById('system-drawer');
-            if (systemDrawer) {
-                const isCollapsed = systemDrawer.classList.contains(CSS.STATE.COLLAPSED);
-                if (isCollapsed) {
-                    systemDrawer.classList.remove(CSS.STATE.COLLAPSED);
-                } else {
-                    systemDrawer.classList.add(CSS.STATE.COLLAPSED);
-                }
+            // Toggle system drawer by simulating a click on the header
+            const header = document.getElementById('system-drawer-header');
+            if (header) {
+                header.click();
             }
         });
 
