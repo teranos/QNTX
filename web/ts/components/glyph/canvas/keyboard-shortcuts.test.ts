@@ -17,6 +17,7 @@ describe('Canvas Keyboard Shortcuts', () => {
             () => true,
             () => { },
             () => { },
+            () => { },
             () => { }
         );
 
@@ -44,6 +45,7 @@ describe('Canvas Keyboard Shortcuts', () => {
         const controller = setupKeyboardShortcuts(
             container,
             () => true,
+            () => { },
             () => { },
             () => { },
             () => { }
@@ -78,5 +80,32 @@ describe('Canvas Keyboard Shortcuts', () => {
         container.dispatchEvent(event);
 
         expect(unmeldCalled).toBe(true);
+    });
+
+    test('Tim presses 0 to reset zoom and pan', () => {
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+
+        let resetViewCalled = false;
+        const onResetView = () => { resetViewCalled = true; };
+
+        setupKeyboardShortcuts(
+            container,
+            () => false, // no selection
+            () => { },
+            () => { },
+            () => { },
+            onResetView
+        );
+
+        // Simulate '0' key press
+        const event = new window.KeyboardEvent('keydown', {
+            key: '0',
+            bubbles: true,
+            cancelable: true
+        });
+        container.dispatchEvent(event);
+
+        expect(resetViewCalled).toBe(true);
     });
 });
