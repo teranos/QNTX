@@ -338,7 +338,7 @@ export function unmeldComposition(composition: HTMLElement): {
     const firstChildId = glyphElements[0].getAttribute('data-glyph-id') || '';
     const storedComp = findCompositionByGlyph(firstChildId);
     const isVertical = storedComp?.edges.some(e => e.direction === 'bottom' || e.direction === 'top')
-        && !storedComp?.edges.some(e => e.direction === 'right');
+        && !storedComp?.edges.some(e => e.direction === 'right' || e.direction === 'left');
 
     // TODO(#450): animate the separation instead of instant repositioning
     let currentX = left;

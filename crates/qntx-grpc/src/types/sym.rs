@@ -2,8 +2,8 @@
 // Regenerate with: make types
 // TODO: Migrate to proto generation
 // Source package: sym
-// Source last modified: 2026-01-05T23:56:33+01:00
-// Source version: af91d283
+// Source last modified: 2026-02-11T02:26:15+00:00
+// Source version: 2b4b791d
 
 //! # sym module
 //!
@@ -20,6 +20,7 @@ pub const r#AS: &str = "+";
 pub const AT: &str = "✦";
 pub const AX: &str = "⋈";
 pub const BY: &str = "⌬";
+pub const CANVAS: &str = "⧉";
 pub const DB: &str = "⊔";
 pub const I: &str = "⍟";
 pub const IS: &str = "=";
@@ -30,6 +31,7 @@ pub const PULSE: &str = "꩜";
 pub const PULSE_CLOSE: &str = "❀";
 pub const PULSE_OPEN: &str = "✿";
 pub const SO: &str = "⟶";
+pub const SUBCANVAS: &str = "⌗";
 
 pub const PALETTE_ORDER: &[&str] = &[I, AM, IX, AX, BY, AT, SO];
 

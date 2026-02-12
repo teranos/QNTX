@@ -9,6 +9,7 @@ export const AS = "+";
 export const AT = "✦";
 export const AX = "⋈";
 export const BY = "⌬";
+export const Canvas = "⧉";
 export const DB = "⊔";
 export const I = "⍟";
 export const IS = "=";
@@ -19,6 +20,7 @@ export const Pulse = "꩜";
 export const PulseClose = "❀";
 export const PulseOpen = "✿";
 export const SO = "⟶";
+export const Subcanvas = "⌗";
 
 
 export const PaletteOrder = [I, AM, IX, AX, BY, AT, SO] as const;

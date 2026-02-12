@@ -78,6 +78,12 @@
     border-top-left-radius: 4px;
 }
 
+/* Invisible variant — functional resize area with no visual indicator */
+.glyph-resize-handle--hidden {
+    background-color: transparent;
+    border-top-left-radius: 0;
+}
+
 /* Smaller variant for note glyphs (sits over folded corner) */
 .glyph-resize-handle--small {
     width: 10px;

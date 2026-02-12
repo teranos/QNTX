@@ -6,7 +6,7 @@
  */
 
 import type { Glyph } from '../glyph';
-import { IX, AX, SO, Prose } from '@generated/sym.js';
+import { IX, AX, SO, Prose, Subcanvas } from '@generated/sym.js';
 import { log, SEG } from '../../../logger';
 import { getMinimizeDuration } from '../glyph';
 import { createIxGlyph } from '../ix-glyph';
@@ -15,6 +15,7 @@ import { createPyGlyph, PY_DEFAULT_CODE } from '../py-glyph';
 import { createPromptGlyph, PROMPT_DEFAULT_TEMPLATE } from '../prompt-glyph';
 import { createNoteGlyph } from '../note-glyph';
 import { createTsGlyph, TS_DEFAULT_CODE } from '../ts-glyph';
+import { createSubcanvasGlyph } from '../subcanvas-glyph';
 import { uiState } from '../../../state/ui';
 
 /** Duration multiplier for spawn menu animation */
@@ -177,6 +178,19 @@ export function showSpawnMenu(
     });
 
     menu.appendChild(noteBtn);
+
+    // Add canvas button
+    const canvasBtn = document.createElement('button');
+    canvasBtn.className = 'canvas-spawn-button';
+    canvasBtn.textContent = Subcanvas;
+    canvasBtn.title = 'Spawn Subcanvas glyph';
+
+    canvasBtn.addEventListener('click', () => {
+        spawnSubcanvasGlyph(x, y, canvas, glyphs);
+        removeMenu();
+    });
+
+    menu.appendChild(canvasBtn);
 
     document.body.appendChild(menu);
 
@@ -503,4 +517,47 @@ async function spawnNoteGlyph(
     });
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned Note glyph at (${x}, ${y}) with size ${width}x${height}`);
+}
+
+/**
+ * Spawn a new Subcanvas glyph at pixel position
+ */
+async function spawnSubcanvasGlyph(
+    x: number,
+    y: number,
+    canvas: HTMLElement,
+    glyphs: Glyph[]
+): Promise<void> {
+    const subcanvasGlyph: Glyph = {
+        id: `subcanvas-${crypto.randomUUID()}`,
+        title: 'Subcanvas',
+        symbol: Subcanvas,
+        x,
+        y,
+        renderContent: () => {
+            const content = document.createElement('div');
+            content.textContent = 'Subcanvas glyph';
+            return content;
+        }
+    };
+
+    glyphs.push(subcanvasGlyph);
+
+    const glyphElement = await createSubcanvasGlyph(subcanvasGlyph);
+    canvas.appendChild(glyphElement);
+
+    const rect = glyphElement.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+
+    uiState.addCanvasGlyph({
+        id: subcanvasGlyph.id,
+        symbol: Subcanvas,
+        x,
+        y,
+        width,
+        height
+    });
+
+    log.debug(SEG.GLYPH, `[Canvas] Spawned Subcanvas glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
