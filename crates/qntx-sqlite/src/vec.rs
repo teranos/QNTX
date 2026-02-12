@@ -96,11 +96,8 @@ mod tests {
         )?;
 
         // Verify insertion
-        let count: i32 = conn.query_row(
-            "SELECT COUNT(*) FROM test_embeddings",
-            [],
-            |row| row.get(0),
-        )?;
+        let count: i32 =
+            conn.query_row("SELECT COUNT(*) FROM test_embeddings", [], |row| row.get(0))?;
         assert_eq!(count, 1);
 
         Ok(())
@@ -137,7 +134,8 @@ mod tests {
         let conn = Connection::open_in_memory()?;
 
         // Run the embeddings migration
-        let migration_sql = include_str!("../../../db/sqlite/migrations/019_create_embeddings_table.sql");
+        let migration_sql =
+            include_str!("../../../db/sqlite/migrations/024_create_embeddings_table.sql");
         conn.execute_batch(migration_sql)?;
 
         // Verify tables were created

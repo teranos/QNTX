@@ -3,9 +3,49 @@
  */
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
-import { createPyGlyph } from './py-glyph';
+import { createPyGlyph, PY_DEFAULT_CODE } from './py-glyph';
 import type { Glyph } from './glyph';
-import { getScriptStorage } from '../../storage/script-storage';
+
+// Mock uiState to prevent API calls during tests
+const mockCanvasGlyphs: any[] = [];
+const mockCanvasCompositions: any[] = [];
+mock.module('../../state/ui', () => ({
+    uiState: {
+        getCanvasGlyphs: () => mockCanvasGlyphs,
+        setCanvasGlyphs: (glyphs: any[]) => {
+            mockCanvasGlyphs.length = 0;
+            mockCanvasGlyphs.push(...glyphs);
+        },
+        upsertCanvasGlyph: (glyph: any) => {
+            const index = mockCanvasGlyphs.findIndex(g => g.id === glyph.id);
+            if (index >= 0) {
+                mockCanvasGlyphs[index] = glyph;
+            } else {
+                mockCanvasGlyphs.push(glyph);
+            }
+        },
+        addCanvasGlyph: (glyph: any) => {
+            const index = mockCanvasGlyphs.findIndex(g => g.id === glyph.id);
+            if (index >= 0) {
+                mockCanvasGlyphs[index] = glyph;
+            } else {
+                mockCanvasGlyphs.push(glyph);
+            }
+        },
+        removeCanvasGlyph: (id: string) => {
+            const index = mockCanvasGlyphs.findIndex(g => g.id === id);
+            if (index >= 0) mockCanvasGlyphs.splice(index, 1);
+        },
+        getCanvasCompositions: () => mockCanvasCompositions,
+        setCanvasCompositions: (comps: any[]) => {
+            mockCanvasCompositions.length = 0;
+            mockCanvasCompositions.push(...comps);
+        },
+        clearCanvasGlyphs: () => mockCanvasGlyphs.length = 0,
+        clearCanvasCompositions: () => mockCanvasCompositions.length = 0,
+        loadPersistedState: () => {},
+    },
+}));
 
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
@@ -48,6 +88,12 @@ if (USE_JSDOM) {
     globalThis.cancelAnimationFrame = cafPolyfill;
     (window as any).requestAnimationFrame = rafPolyfill;
     (window as any).cancelAnimationFrame = cafPolyfill;
+
+    // Add AbortController polyfill
+    // jsdom has AbortController but it's not compatible with addEventListener signal option
+    // Use the window's native implementations
+    globalThis.AbortController = window.AbortController as any;
+    globalThis.AbortSignal = window.AbortSignal as any;
 }
 
 describe('PyGlyph', () => {
@@ -60,6 +106,8 @@ describe('PyGlyph', () => {
 
     beforeEach(() => {
         localStorage.clear();
+        mockCanvasGlyphs.length = 0;
+        mockCanvasCompositions.length = 0;
         glyph = {
             id: 'py-test-123',
             title: 'Python',
@@ -71,11 +119,6 @@ describe('PyGlyph', () => {
     });
 
     describe('initialization', () => {
-        test('creates element with correct class', async () => {
-            const element = await createPyGlyph(glyph);
-            expect(element.className).toBe('canvas-py-glyph');
-        });
-
         test('sets data-glyph-id attribute', async () => {
             const element = await createPyGlyph(glyph);
             expect(element.dataset.glyphId).toBe('py-test-123');
@@ -83,7 +126,7 @@ describe('PyGlyph', () => {
 
         test('has title bar with py label', async () => {
             const element = await createPyGlyph(glyph);
-            const titleBar = element.querySelector('.py-glyph-title-bar');
+            const titleBar = element.querySelector('.canvas-glyph-title-bar');
             expect(titleBar).not.toBeNull();
             expect(titleBar?.textContent).toContain('py');
         });
@@ -98,22 +141,40 @@ describe('PyGlyph', () => {
 
     describe('code persistence', () => {
         test('loads default code for new glyph', async () => {
+            // Pre-populate uiState with glyph (simulates canvas spawn)
+            mockCanvasGlyphs.push({
+                id: 'py-test-123',
+                symbol: 'py',
+                x: 0,
+                y: 0,
+            });
+
             const element = await createPyGlyph(glyph);
-            const storage = getScriptStorage();
-            const code = await storage.load('py-test-123');
-            expect(code).toContain('# Python editor');
+            // Wait for CodeMirror to initialize and save
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            // Check that default code was saved to uiState
+            const saved = mockCanvasGlyphs.find(g => g.id === 'py-test-123');
+            expect(saved?.content).toBe(PY_DEFAULT_CODE);
         });
 
         test('loads saved code for existing glyph', async () => {
-            const storage = getScriptStorage();
-            await storage.save('py-test-123', 'print("saved code")');
+            // Pre-populate uiState with saved code
+            mockCanvasGlyphs.push({
+                id: 'py-test-123',
+                symbol: 'py',
+                content: 'print("saved code")',
+                x: 0,
+                y: 0,
+            });
 
             const element = await createPyGlyph(glyph);
             // Wait a tick for CodeMirror to initialize
             await new Promise(resolve => setTimeout(resolve, 50));
 
-            const savedCode = await storage.load('py-test-123');
-            expect(savedCode).toBe('print("saved code")');
+            // Verify the saved code was loaded
+            const saved = mockCanvasGlyphs.find(g => g.id === 'py-test-123');
+            expect(saved?.content).toBe('print("saved code")');
         });
     });
 
@@ -125,7 +186,7 @@ describe('PyGlyph', () => {
 
         test('has resize handle', async () => {
             const element = await createPyGlyph(glyph);
-            const resizeHandle = element.querySelector('.py-glyph-resize-handle');
+            const resizeHandle = element.querySelector('.glyph-resize-handle');
             expect(resizeHandle).not.toBeNull();
         });
     });

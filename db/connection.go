@@ -55,25 +55,25 @@ func Open(path string, log *zap.SugaredLogger) (*sql.DB, error) {
 
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to open database")
+		return nil, errors.Wrapf(err, "failed to open database at %s", path)
 	}
 
 	// Enable WAL mode for concurrent reads during writes
 	if _, err := db.Exec("PRAGMA journal_mode = " + SQLiteJournalMode); err != nil {
 		db.Close()
-		return nil, errors.Wrap(err, "failed to enable WAL mode")
+		return nil, errors.Wrapf(err, "failed to enable %s journal mode for %s", SQLiteJournalMode, path)
 	}
 
 	// Enable foreign key constraints
 	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
 		db.Close()
-		return nil, errors.Wrap(err, "failed to enable foreign keys")
+		return nil, errors.Wrapf(err, "failed to enable foreign keys for %s", path)
 	}
 
 	// Set busy timeout
 	if _, err := db.Exec("PRAGMA busy_timeout = 5000"); err != nil {
 		db.Close()
-		return nil, errors.Wrap(err, "failed to set busy timeout")
+		return nil, errors.Wrapf(err, "failed to set busy timeout to %dms for %s", SQLiteBusyTimeoutMS, path)
 	}
 
 	if log != nil {
@@ -98,7 +98,7 @@ func OpenWithMigrations(path string, logger *zap.SugaredLogger) (*sql.DB, error)
 
 	if err := Migrate(db, logger); err != nil {
 		db.Close()
-		return nil, errors.Wrap(err, "failed to run migrations")
+		return nil, errors.Wrapf(err, "failed to run migrations for %s", path)
 	}
 
 	return db, nil

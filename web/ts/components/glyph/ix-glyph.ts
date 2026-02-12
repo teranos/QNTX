@@ -30,10 +30,10 @@
 import type { Glyph } from './glyph';
 import { IX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { GRID_SIZE } from './grid-constants';
-import { makeDraggable, makeResizable } from './glyph-interaction';
+import { preventDrag, storeCleanup } from './glyph-interaction';
+import { canvasPlaced } from './manifestations/canvas-placed';
 import { forceTriggerJob } from '../../pulse/api';
-import { getScriptStorage } from '../../storage/script-storage';
+import { uiState } from '../../state/ui';
 import { PULSE_EVENTS } from '../../pulse/events';
 import type { ExecutionStartedDetail, ExecutionCompletedDetail, ExecutionFailedDetail } from '../../pulse/events';
 
@@ -67,7 +67,7 @@ function loadIxStatus(glyphId: string): IxGlyphStatus | null {
     try {
         return JSON.parse(stored);
     } catch (e) {
-        log.error(SEG.UI, `[IX] Failed to parse stored status for ${glyphId}:`, e);
+        log.error(SEG.GLYPH, `[IX] Failed to parse stored status for ${glyphId}:`, e);
         return null;
     }
 }
@@ -76,68 +76,92 @@ function loadIxStatus(glyphId: string): IxGlyphStatus | null {
  * Create an IX glyph with input form on canvas
  */
 export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
-    // Load saved input from storage
-    const storage = getScriptStorage();
-    const savedInput = await storage.load(glyph.id) ?? '';
+    // Load saved input from canvas state
+    const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+    const savedInput = existingGlyph?.content ?? '';
 
     // Load saved execution status
     const savedStatus = loadIxStatus(glyph.id) ?? { state: 'idle' };
 
-    const element = document.createElement('div');
-    element.className = 'canvas-ix-glyph';
-    element.dataset.glyphId = glyph.id;
+    // Symbol (draggable area) — created before canvasPlaced to use as drag handle
+    const symbol = document.createElement('span');
+    symbol.textContent = IX;
+    symbol.style.cursor = 'move';
+    symbol.style.fontWeight = 'bold';
+    symbol.style.flexShrink = '0';
+    symbol.style.color = 'var(--accent-lavender)';
 
-    const gridX = glyph.gridX ?? 5;
-    const gridY = glyph.gridY ?? 5;
-
-    // Default size for IX glyph
-    const width = glyph.width ?? 360;
-    const height = glyph.height ?? 180;
-
-    // Style element
-    element.style.position = 'absolute';
-    element.style.left = `${gridX * GRID_SIZE}px`;
-    element.style.top = `${gridY * GRID_SIZE}px`;
-    element.style.width = `${width}px`;
-    element.style.minHeight = `${height}px`;
-    element.style.backgroundColor = 'var(--bg-secondary)';
-    element.style.border = '1px solid var(--border-color)';
-    element.style.borderRadius = '4px';
-    element.style.display = 'flex';
-    element.style.flexDirection = 'column';
+    const { element } = canvasPlaced({
+        glyph,
+        className: 'canvas-ix-glyph',
+        defaults: { x: 200, y: 200, width: 360, height: 120 },
+        dragHandle: symbol,
+        logLabel: 'IX Glyph',
+    });
+    element.style.height = 'auto';
     element.style.overflow = 'visible';
 
-    // Textarea (declared early so play button can reference it)
-    const textarea = document.createElement('textarea');
-    textarea.placeholder = 'Enter URL, file path, or data source...';
-    textarea.value = savedInput; // Restore saved content
-    textarea.style.flex = '1';
-    textarea.style.padding = '8px';
-    textarea.style.fontSize = '13px';
-    textarea.style.fontFamily = 'monospace';
-    textarea.style.backgroundColor = '#1a1b1a';
-    textarea.style.color = '#a8e6a1';
-    textarea.style.border = '1px solid var(--border-color)';
-    textarea.style.borderRadius = '4px';
-    textarea.style.resize = 'none';
+    // Input field (declared early so play button can reference it)
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'Enter URL, file path, or data source...';
+    input.value = savedInput; // Restore saved content
+    input.style.flex = '1';
+    input.style.padding = '4px 8px';
+    input.style.fontSize = '13px';
+    input.style.fontFamily = 'monospace';
+    input.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
+    input.style.color = 'var(--accent-lavender)';
+    input.style.border = 'none';
+    input.style.outline = 'none';
+    input.style.borderRadius = '2px';
 
-    // Auto-save input with debouncing
+    // Create canvas once for text measurement (avoid creating on every keystroke)
+    const measureCanvas = document.createElement('canvas');
+    const measureContext = measureCanvas.getContext('2d');
+
+    // Helper to resize glyph based on input text width
+    const resizeToFitText = () => {
+        if (!measureContext) return;
+
+        measureContext.font = '13px monospace'; // Match input font
+        const textWidth = measureContext.measureText(input.value || input.placeholder).width;
+
+        // Calculate glyph width: text width + padding + symbol + button
+        const symbolWidth = 40; // Symbol space
+        const buttonWidth = 40; // Play button space
+        const padding = 40; // Input padding and gaps
+        const minWidth = 200;
+        const maxWidth = 800;
+
+        const newWidth = Math.max(minWidth, Math.min(maxWidth, textWidth + symbolWidth + buttonWidth + padding));
+        element.style.width = `${newWidth}px`;
+        glyph.width = newWidth;
+    };
+
+    // Auto-save input with debouncing and resize
     let saveTimeout: number | undefined;
-    textarea.addEventListener('input', () => {
+    input.addEventListener('input', () => {
+        // Resize immediately for responsive feel
+        resizeToFitText();
+
         if (saveTimeout !== undefined) {
             clearTimeout(saveTimeout);
         }
-        saveTimeout = window.setTimeout(async () => {
-            const currentInput = textarea.value;
-            await storage.save(glyph.id, currentInput);
-            log.debug(SEG.UI, `[IX Glyph] Auto-saved input for ${glyph.id}`);
+        saveTimeout = window.setTimeout(() => {
+            const currentInput = input.value;
+            const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+            if (existing) {
+                uiState.addCanvasGlyph({ ...existing, content: currentInput });
+                log.debug(SEG.GLYPH, `[IX Glyph] Auto-saved input for ${glyph.id}`);
+            }
         }, 500);
     });
 
-    // Prevent drag from starting on textarea
-    textarea.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-    });
+    // Initial resize based on saved content
+    resizeToFitText();
+
+    preventDrag(input);
 
     // Status display section (declared early so helpers can reference it)
     const statusSection = document.createElement('div');
@@ -160,16 +184,16 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
         // Update background color
         switch (status.state) {
             case 'running':
-                element.style.backgroundColor = '#1f2a3d'; // Blue tint
+                element.style.backgroundColor = 'var(--glyph-status-running-bg)';
                 break;
             case 'success':
-                element.style.backgroundColor = '#1f3d1f'; // Green tint
+                element.style.backgroundColor = 'var(--glyph-status-success-bg)';
                 break;
             case 'error':
-                element.style.backgroundColor = '#3d1f1f'; // Red tint
+                element.style.backgroundColor = 'var(--glyph-status-error-bg)';
                 break;
             default:
-                element.style.backgroundColor = 'var(--bg-secondary)'; // Default
+                element.style.backgroundColor = 'var(--bg-secondary)';
         }
 
         // Update status section
@@ -177,19 +201,18 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
             statusSection.style.display = 'block';
             statusSection.textContent = status.message;
 
-            // Color the status section text
             switch (status.state) {
                 case 'running':
-                    statusSection.style.color = '#6b9bd1';
-                    statusSection.style.backgroundColor = '#1a2332';
+                    statusSection.style.color = 'var(--glyph-status-running-text)';
+                    statusSection.style.backgroundColor = 'var(--glyph-status-running-section-bg)';
                     break;
                 case 'success':
-                    statusSection.style.color = '#a8e6a1';
-                    statusSection.style.backgroundColor = '#1a2b1a';
+                    statusSection.style.color = 'var(--glyph-status-success-text)';
+                    statusSection.style.backgroundColor = 'var(--glyph-status-success-section-bg)';
                     break;
                 case 'error':
-                    statusSection.style.color = '#ff6b6b';
-                    statusSection.style.backgroundColor = '#2b1a1a';
+                    statusSection.style.color = 'var(--glyph-status-error-text)';
+                    statusSection.style.backgroundColor = 'var(--glyph-status-error-section-bg)';
                     break;
             }
         } else {
@@ -199,64 +222,34 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
         // Save to localStorage
         saveIxStatus(glyph.id, status);
 
-        log.debug(SEG.UI, `[IX Glyph] Updated status for ${glyph.id}:`, status);
+        log.debug(SEG.GLYPH, `[IX Glyph] Updated status for ${glyph.id}:`, status);
     }
 
     // Apply saved status on load
     updateStatus(savedStatus);
 
-    // Title bar
+    // Title bar (custom layout: symbol + input + play button)
     const titleBar = document.createElement('div');
     titleBar.className = 'canvas-glyph-title-bar';
-    titleBar.style.height = '32px';
-    titleBar.style.backgroundColor = 'var(--bg-tertiary)';
-    titleBar.style.borderBottom = '1px solid var(--border-color)';
-    titleBar.style.display = 'flex';
-    titleBar.style.alignItems = 'center';
-    titleBar.style.padding = '0 8px';
-    titleBar.style.gap = '8px';
-    titleBar.style.cursor = 'move';
-    titleBar.style.flexShrink = '0';
-
-    const symbol = document.createElement('span');
-    symbol.textContent = IX;
-    symbol.style.fontSize = '16px';
-    symbol.style.color = '#ffffff';
-    symbol.style.fontWeight = 'bold';
-
-    const title = document.createElement('span');
-    title.textContent = 'Ingest';
-    title.style.fontSize = '13px';
-    title.style.flex = '1';
-    title.style.color = '#ffffff';
-    title.style.fontWeight = 'bold';
 
     // Play button
     const playBtn = document.createElement('button');
     playBtn.textContent = '▶';
-    playBtn.style.width = '24px';
-    playBtn.style.height = '24px';
-    playBtn.style.padding = '0';
-    playBtn.style.fontSize = '12px';
-    playBtn.style.backgroundColor = 'var(--bg-secondary)';
-    playBtn.style.color = 'var(--text-primary)';
-    playBtn.style.border = '1px solid var(--border-color)';
-    playBtn.style.borderRadius = '4px';
-    playBtn.style.cursor = 'pointer';
-    playBtn.style.display = 'flex';
-    playBtn.style.alignItems = 'center';
-    playBtn.style.justifyContent = 'center';
+    playBtn.className = 'glyph-play-btn';
     playBtn.title = 'Execute';
+    playBtn.style.flexShrink = '0';
+
+    preventDrag(playBtn);
 
     playBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        const input = textarea.value.trim();
-        if (!input) {
-            log.debug(SEG.UI, '[IX] No input provided');
+        const inputValue = input.value.trim();
+        if (!inputValue) {
+            log.debug(SEG.GLYPH, '[IX] No input provided');
             return;
         }
 
-        log.debug(SEG.UI, `[IX] Executing: ${input}`);
+        log.debug(SEG.GLYPH, `[IX] Executing: ${inputValue}`);
 
         // Set to running state immediately
         updateStatus({
@@ -267,7 +260,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
 
         try {
             // Wrap input as ATS command and trigger one-time Pulse job
-            const atsCode = `ix ${input}`;
+            const atsCode = `ix ${inputValue}`;
             const job = await forceTriggerJob(atsCode);
 
             // Store job ID for event tracking
@@ -281,13 +274,13 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
                 timestamp: Date.now(),
             });
 
-            log.debug(SEG.UI, `[IX] Job created successfully`, {
+            log.debug(SEG.GLYPH, `[IX] Job created successfully`, {
                 jobId: job.id,
                 atsCode: atsCode
             });
 
         } catch (error) {
-            log.error(SEG.UI, '[IX] Failed to create job:', error);
+            log.error(SEG.GLYPH, '[IX] Failed to create job:', error);
             const errorMsg = error instanceof Error ? error.message : String(error);
 
             // Show error state
@@ -300,41 +293,17 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     });
 
     titleBar.appendChild(symbol);
-    titleBar.appendChild(title);
+    titleBar.appendChild(input);
     titleBar.appendChild(playBtn);
 
-    // Content area
-    const content = document.createElement('div');
-    content.style.flex = '1';
-    content.style.padding = '12px';
-    content.style.display = 'flex';
-    content.style.flexDirection = 'column';
-    content.style.overflow = 'visible';
-
     // Assemble
-    content.appendChild(textarea);
-    content.appendChild(statusSection);
-
     element.appendChild(titleBar);
-    element.appendChild(content);
-
-    // Resize handle
-    const resizeHandle = document.createElement('div');
-    resizeHandle.className = 'ix-glyph-resize-handle';
-    resizeHandle.style.position = 'absolute';
-    resizeHandle.style.bottom = '0';
-    resizeHandle.style.right = '0';
-    resizeHandle.style.width = '16px';
-    resizeHandle.style.height = '16px';
-    resizeHandle.style.cursor = 'nwse-resize';
-    resizeHandle.style.backgroundColor = 'var(--bg-tertiary)';
-    resizeHandle.style.borderTopLeftRadius = '4px';
-    element.appendChild(resizeHandle);
+    element.appendChild(statusSection);
 
     // Wire up Pulse execution event listeners
     const handleExecutionStarted = (e: Event) => {
         const detail = (e as CustomEvent<ExecutionStartedDetail>).detail;
-        log.debug(SEG.UI, `[IX Glyph ${glyph.id}] Got execution started event:`, {
+        log.debug(SEG.GLYPH, `[IX Glyph ${glyph.id}] Got execution started event:`, {
             eventScheduledJobId: detail.scheduledJobId,
             currentScheduledJobId,
             matches: detail.scheduledJobId === currentScheduledJobId
@@ -366,7 +335,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
 
     const handleExecutionFailed = (e: Event) => {
         const detail = (e as CustomEvent<ExecutionFailedDetail>).detail;
-        log.debug(SEG.UI, `[IX Glyph ${glyph.id}] Got execution failed event:`, {
+        log.debug(SEG.GLYPH, `[IX Glyph ${glyph.id}] Got execution failed event:`, {
             eventScheduledJobId: detail.scheduledJobId,
             currentScheduledJobId,
             matches: detail.scheduledJobId === currentScheduledJobId,
@@ -388,11 +357,12 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     document.addEventListener(PULSE_EVENTS.EXECUTION_COMPLETED, handleExecutionCompleted);
     document.addEventListener(PULSE_EVENTS.EXECUTION_FAILED, handleExecutionFailed);
 
-    // Make draggable via title bar
-    makeDraggable(element, titleBar, glyph, { logLabel: 'IX Glyph' });
-
-    // Make resizable via handle
-    makeResizable(element, resizeHandle, glyph, { logLabel: 'IX Glyph' });
+    // Register cleanup for event listeners
+    storeCleanup(element, () => {
+        document.removeEventListener(PULSE_EVENTS.EXECUTION_STARTED, handleExecutionStarted);
+        document.removeEventListener(PULSE_EVENTS.EXECUTION_COMPLETED, handleExecutionCompleted);
+        document.removeEventListener(PULSE_EVENTS.EXECUTION_FAILED, handleExecutionFailed);
+    });
 
     return element;
 }

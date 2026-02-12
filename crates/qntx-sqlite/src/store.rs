@@ -7,12 +7,13 @@ use qntx_core::{
 use rusqlite::{Connection, OptionalExtension};
 use std::collections::HashMap;
 
-type StoreResult<T> = Result<T, StoreError>;
-
+use crate::error::SqliteError;
 use crate::json::{
     deserialize_attributes, deserialize_string_vec, serialize_attributes, serialize_string_vec,
     sql_to_timestamp, timestamp_to_sql,
 };
+
+type StoreResult<T> = Result<T, StoreError>;
 
 /// SQLite-backed attestation store
 pub struct SqliteStore {
@@ -28,24 +29,13 @@ impl SqliteStore {
         Self { conn }
     }
 
-    /// Helper to execute SQL and convert errors to StoreError
-    fn execute_sql<P>(&self, sql: &str, params: P) -> StoreResult<usize>
-    where
-        P: rusqlite::Params,
-    {
-        self.conn
-            .execute(sql, params)
-            .map_err(|e| crate::error::SqliteError::Database(e).into())
-    }
-
     /// Create a new in-memory SQLite store (for testing)
     pub fn in_memory() -> crate::error::Result<Self> {
         // Initialize sqlite-vec extension BEFORE creating connection
         crate::vec::init_vec_extension();
 
-        let conn = Connection::open_in_memory()?; // rusqlite::Error -> SqliteError via #[from]
-
-        crate::migrate::migrate(&conn)?; // Already returns SqliteError
+        let conn = Connection::open_in_memory()?;
+        crate::migrate::migrate(&conn)?;
         Ok(Self::new(conn))
     }
 
@@ -65,46 +55,100 @@ impl SqliteStore {
     pub fn connection(&self) -> &Connection {
         &self.conn
     }
+
+    /// Helper to extract a row into an Attestation, converting errors through SqliteError.
+    fn row_to_attestation(
+        row_data: (
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+            Option<String>,
+            String,
+        ),
+    ) -> StoreResult<Attestation> {
+        let (
+            id,
+            subjects_json,
+            predicates_json,
+            contexts_json,
+            actors_json,
+            timestamp_str,
+            source,
+            attributes_json,
+            created_at_str,
+        ) = row_data;
+
+        let subjects = deserialize_string_vec(&subjects_json)?;
+        let predicates = deserialize_string_vec(&predicates_json)?;
+        let contexts = deserialize_string_vec(&contexts_json)?;
+        let actors = deserialize_string_vec(&actors_json)?;
+        let attributes = deserialize_attributes(attributes_json)?;
+        let timestamp = sql_to_timestamp(&timestamp_str)?;
+        let created_at = sql_to_timestamp(&created_at_str)?;
+
+        Ok(Attestation {
+            id,
+            subjects,
+            predicates,
+            contexts,
+            actors,
+            timestamp,
+            source,
+            attributes,
+            created_at,
+        })
+    }
+
+    /// Helper to query rows from a prepared statement.
+    fn query_distinct_values(&self, sql: &str) -> StoreResult<Vec<String>> {
+        let mut stmt = self.conn.prepare(sql).map_err(SqliteError::from)?;
+
+        let values = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(SqliteError::from)?
+            .collect::<Result<Vec<String>, rusqlite::Error>>()
+            .map_err(SqliteError::from)?;
+
+        Ok(values)
+    }
 }
 
 impl AttestationStore for SqliteStore {
     fn put(&mut self, attestation: Attestation) -> StoreResult<()> {
-        // Check if attestation already exists
         if self.exists(&attestation.id)? {
             return Err(StoreError::AlreadyExists(attestation.id.clone()));
         }
 
-        // Serialize JSON fields - these already return SqliteError, convert to StoreError
-        let subjects_json =
-            serialize_string_vec(&attestation.subjects).map_err(StoreError::from)?;
-        let predicates_json =
-            serialize_string_vec(&attestation.predicates).map_err(StoreError::from)?;
-        let contexts_json =
-            serialize_string_vec(&attestation.contexts).map_err(StoreError::from)?;
-        let actors_json = serialize_string_vec(&attestation.actors).map_err(StoreError::from)?;
-        let attributes_json =
-            serialize_attributes(&attestation.attributes).map_err(StoreError::from)?;
+        let subjects_json = serialize_string_vec(&attestation.subjects)?;
+        let predicates_json = serialize_string_vec(&attestation.predicates)?;
+        let contexts_json = serialize_string_vec(&attestation.contexts)?;
+        let actors_json = serialize_string_vec(&attestation.actors)?;
+        let attributes_json = serialize_attributes(&attestation.attributes)?;
 
-        // Convert timestamp to SQL format
         let timestamp_sql = timestamp_to_sql(attestation.timestamp);
         let created_at_sql = timestamp_to_sql(attestation.created_at);
 
-        // Insert into database - use our helper method
-        self.execute_sql(
-            "INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            rusqlite::params![
-                attestation.id,
-                subjects_json,
-                predicates_json,
-                contexts_json,
-                actors_json,
-                timestamp_sql,
-                attestation.source,
-                attributes_json,
-                created_at_sql,
-            ],
-        )?;
+        self.conn
+            .execute(
+                "INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                rusqlite::params![
+                    attestation.id,
+                    subjects_json,
+                    predicates_json,
+                    contexts_json,
+                    actors_json,
+                    timestamp_sql,
+                    attestation.source,
+                    attributes_json,
+                    created_at_sql,
+                ],
+            )
+            .map_err(SqliteError::from)?;
 
         Ok(())
     }
@@ -118,7 +162,7 @@ impl AttestationStore for SqliteStore {
                  FROM attestations
                  WHERE id = ?",
             )
-            .map_err(|e| StoreError::Backend(e.to_string()))?;
+            .map_err(SqliteError::from)?;
 
         let result: Option<(
             String,
@@ -145,41 +189,11 @@ impl AttestationStore for SqliteStore {
                 ))
             })
             .optional()
-            .map_err(|e: rusqlite::Error| StoreError::Backend(e.to_string()))?;
+            .map_err(SqliteError::from)?;
 
         match result {
             None => Ok(None),
-            Some(row_data) => {
-                // Deserialize JSON fields
-                let subjects = deserialize_string_vec(&row_data.1)
-                    .map_err(|e| StoreError::Serialization(e.to_string()))?;
-                let predicates = deserialize_string_vec(&row_data.2)
-                    .map_err(|e| StoreError::Serialization(e.to_string()))?;
-                let contexts = deserialize_string_vec(&row_data.3)
-                    .map_err(|e| StoreError::Serialization(e.to_string()))?;
-                let actors = deserialize_string_vec(&row_data.4)
-                    .map_err(|e| StoreError::Serialization(e.to_string()))?;
-                let attributes = deserialize_attributes(row_data.7.clone())
-                    .map_err(|e| StoreError::Serialization(e.to_string()))?;
-
-                // Convert timestamps from SQL format
-                let timestamp = sql_to_timestamp(&row_data.5)
-                    .map_err(|e| StoreError::Serialization(e.to_string()))?;
-                let created_at = sql_to_timestamp(&row_data.8)
-                    .map_err(|e| StoreError::Serialization(e.to_string()))?;
-
-                Ok(Some(Attestation {
-                    id: row_data.0,
-                    subjects,
-                    predicates,
-                    contexts,
-                    actors,
-                    timestamp,
-                    source: row_data.6,
-                    attributes,
-                    created_at,
-                }))
-            }
+            Some(row_data) => Self::row_to_attestation(row_data).map(Some),
         }
     }
 
@@ -187,33 +201,24 @@ impl AttestationStore for SqliteStore {
         let rows_affected = self
             .conn
             .execute("DELETE FROM attestations WHERE id = ?", [id])
-            .map_err(crate::error::SqliteError::Database)?;
+            .map_err(SqliteError::from)?;
 
         Ok(rows_affected > 0)
     }
 
     fn update(&mut self, attestation: Attestation) -> StoreResult<()> {
-        // Check if attestation exists
         if !self.exists(&attestation.id)? {
             return Err(StoreError::NotFound(attestation.id.clone()));
         }
 
-        // Serialize JSON fields
-        let subjects_json = serialize_string_vec(&attestation.subjects)
-            .map_err(|e| StoreError::Serialization(e.to_string()))?;
-        let predicates_json = serialize_string_vec(&attestation.predicates)
-            .map_err(|e| StoreError::Serialization(e.to_string()))?;
-        let contexts_json = serialize_string_vec(&attestation.contexts)
-            .map_err(|e| StoreError::Serialization(e.to_string()))?;
-        let actors_json = serialize_string_vec(&attestation.actors)
-            .map_err(|e| StoreError::Serialization(e.to_string()))?;
-        let attributes_json = serialize_attributes(&attestation.attributes)
-            .map_err(|e| StoreError::Serialization(e.to_string()))?;
+        let subjects_json = serialize_string_vec(&attestation.subjects)?;
+        let predicates_json = serialize_string_vec(&attestation.predicates)?;
+        let contexts_json = serialize_string_vec(&attestation.contexts)?;
+        let actors_json = serialize_string_vec(&attestation.actors)?;
+        let attributes_json = serialize_attributes(&attestation.attributes)?;
 
-        // Convert timestamp to SQL format
         let timestamp_sql = timestamp_to_sql(attestation.timestamp);
 
-        // Update in database (don't update created_at)
         self.conn
             .execute(
                 "UPDATE attestations
@@ -231,30 +236,19 @@ impl AttestationStore for SqliteStore {
                     attestation.id,
                 ],
             )
-            .map_err(|e| StoreError::Backend(e.to_string()))?;
+            .map_err(SqliteError::from)?;
 
         Ok(())
     }
 
     fn ids(&self) -> StoreResult<Vec<String>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT id FROM attestations ORDER BY created_at DESC")
-            .map_err(|e| StoreError::Backend(e.to_string()))?;
-
-        let ids = stmt
-            .query_map([], |row| row.get::<_, String>(0))
-            .map_err(|e| StoreError::Backend(e.to_string()))?
-            .collect::<Result<Vec<String>, rusqlite::Error>>()
-            .map_err(|e| StoreError::Backend(e.to_string()))?;
-
-        Ok(ids)
+        self.query_distinct_values("SELECT id FROM attestations ORDER BY created_at DESC")
     }
 
     fn clear(&mut self) -> StoreResult<()> {
         self.conn
             .execute("DELETE FROM attestations", [])
-            .map_err(|e| StoreError::Backend(e.to_string()))?;
+            .map_err(SqliteError::from)?;
 
         Ok(())
     }
@@ -342,10 +336,7 @@ impl QueryStore for SqliteStore {
         }
 
         // Execute query
-        let mut stmt = self
-            .conn
-            .prepare(&sql)
-            .map_err(|e| StoreError::Backend(e.to_string()))?;
+        let mut stmt = self.conn.prepare(&sql).map_err(SqliteError::from)?;
 
         let param_refs: Vec<&dyn rusqlite::ToSql> =
             params.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
@@ -364,41 +355,12 @@ impl QueryStore for SqliteStore {
                     row.get::<_, String>(8)?,
                 ))
             })
-            .map_err(|e| StoreError::Backend(e.to_string()))?;
+            .map_err(SqliteError::from)?;
 
         let mut attestations = Vec::new();
         for row_result in rows {
-            let row_data = row_result.map_err(|e| StoreError::Backend(e.to_string()))?;
-
-            // Deserialize JSON fields
-            let subjects = crate::json::deserialize_string_vec(&row_data.1)
-                .map_err(|e| StoreError::Serialization(e.to_string()))?;
-            let predicates = crate::json::deserialize_string_vec(&row_data.2)
-                .map_err(|e| StoreError::Serialization(e.to_string()))?;
-            let contexts = crate::json::deserialize_string_vec(&row_data.3)
-                .map_err(|e| StoreError::Serialization(e.to_string()))?;
-            let actors = crate::json::deserialize_string_vec(&row_data.4)
-                .map_err(|e| StoreError::Serialization(e.to_string()))?;
-            let attributes = crate::json::deserialize_attributes(row_data.7.clone())
-                .map_err(|e| StoreError::Serialization(e.to_string()))?;
-
-            // Convert timestamps
-            let timestamp = crate::json::sql_to_timestamp(&row_data.5)
-                .map_err(|e| StoreError::Serialization(e.to_string()))?;
-            let created_at = crate::json::sql_to_timestamp(&row_data.8)
-                .map_err(|e| StoreError::Serialization(e.to_string()))?;
-
-            attestations.push(Attestation {
-                id: row_data.0,
-                subjects,
-                predicates,
-                contexts,
-                actors,
-                timestamp,
-                source: row_data.6,
-                attributes,
-                created_at,
-            });
+            let row_data = row_result.map_err(SqliteError::from)?;
+            attestations.push(Self::row_to_attestation(row_data)?);
         }
 
         // Build summary
@@ -412,65 +374,27 @@ impl QueryStore for SqliteStore {
     }
 
     fn predicates(&self) -> StoreResult<Vec<String>> {
-        let mut stmt = self
-            .conn
-            .prepare(
-                "SELECT DISTINCT value FROM attestations, json_each(predicates) ORDER BY value",
-            )
-            .map_err(|e| StoreError::Backend(e.to_string()))?;
-
-        let predicates = stmt
-            .query_map([], |row| row.get::<_, String>(0))
-            .map_err(|e| StoreError::Backend(e.to_string()))?
-            .collect::<Result<Vec<String>, rusqlite::Error>>()
-            .map_err(|e| StoreError::Backend(e.to_string()))?;
-
-        Ok(predicates)
+        self.query_distinct_values(
+            "SELECT DISTINCT value FROM attestations, json_each(predicates) ORDER BY value",
+        )
     }
 
     fn contexts(&self) -> StoreResult<Vec<String>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT DISTINCT value FROM attestations, json_each(contexts) ORDER BY value")
-            .map_err(|e| StoreError::Backend(e.to_string()))?;
-
-        let contexts = stmt
-            .query_map([], |row| row.get::<_, String>(0))
-            .map_err(|e| StoreError::Backend(e.to_string()))?
-            .collect::<Result<Vec<String>, rusqlite::Error>>()
-            .map_err(|e| StoreError::Backend(e.to_string()))?;
-
-        Ok(contexts)
+        self.query_distinct_values(
+            "SELECT DISTINCT value FROM attestations, json_each(contexts) ORDER BY value",
+        )
     }
 
     fn subjects(&self) -> StoreResult<Vec<String>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT DISTINCT value FROM attestations, json_each(subjects) ORDER BY value")
-            .map_err(|e| StoreError::Backend(e.to_string()))?;
-
-        let subjects = stmt
-            .query_map([], |row| row.get::<_, String>(0))
-            .map_err(|e| StoreError::Backend(e.to_string()))?
-            .collect::<Result<Vec<String>, rusqlite::Error>>()
-            .map_err(|e| StoreError::Backend(e.to_string()))?;
-
-        Ok(subjects)
+        self.query_distinct_values(
+            "SELECT DISTINCT value FROM attestations, json_each(subjects) ORDER BY value",
+        )
     }
 
     fn actors(&self) -> StoreResult<Vec<String>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT DISTINCT value FROM attestations, json_each(actors) ORDER BY value")
-            .map_err(|e| StoreError::Backend(e.to_string()))?;
-
-        let actors = stmt
-            .query_map([], |row| row.get::<_, String>(0))
-            .map_err(|e| StoreError::Backend(e.to_string()))?
-            .collect::<Result<Vec<String>, rusqlite::Error>>()
-            .map_err(|e| StoreError::Backend(e.to_string()))?;
-
-        Ok(actors)
+        self.query_distinct_values(
+            "SELECT DISTINCT value FROM attestations, json_each(actors) ORDER BY value",
+        )
     }
 
     fn stats(&self) -> StoreResult<StorageStats> {

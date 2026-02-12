@@ -59,20 +59,20 @@ func runAsCommand(cmd *cobra.Command, args []string) error {
 	// Load configuration
 	cfg, err := am.Load()
 	if err != nil {
-		return errors.Wrap(err, "failed to load configuration")
+		return errors.Wrap(err, "failed to load am configuration")
 	}
 
 	// Open and migrate database
 	database, err := openDatabase("")
 	if err != nil {
-		return errors.Wrap(err, "failed to open database")
+		return errors.Wrap(err, "failed to open attestation database")
 	}
 	defer database.Close()
 
 	// Parse command arguments
 	asCommand, err := parser.ParseAsCommand(args)
 	if err != nil {
-		return errors.Wrap(err, "failed to parse command")
+		return errors.Wrapf(err, "failed to parse as command: %v", args)
 	}
 
 	// Create bounded store (enforces storage limits)
@@ -100,13 +100,13 @@ func runAsCommand(cmd *cobra.Command, args []string) error {
 		// Keep the user's specified actor (don't override with ASID)
 		err = boundedStore.CreateAttestation(as)
 		if err != nil {
-			return errors.Wrap(err, "failed to create attestation")
+			return errors.Wrapf(err, "failed to create attestation for subjects %v", asCommand.Subjects)
 		}
 	} else {
 		// No actor specified - use self-certifying ASID (avoids bounded storage limits)
 		as, err = boundedStore.CreateAttestationWithLimits(asCommand)
 		if err != nil {
-			return errors.Wrap(err, "failed to create attestation")
+			return errors.Wrapf(err, "failed to create attestation for subjects %v", asCommand.Subjects)
 		}
 	}
 

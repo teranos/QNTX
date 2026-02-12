@@ -6,6 +6,7 @@
 
 import { Job } from './async';
 import { Execution } from './schedule';
+import { As } from './types';
 
 export interface ChildJobInfo {
   id: string;
@@ -126,6 +127,41 @@ export interface DaemonStatusMessage {
 
 export interface ErrorResponse {
   error: string;
+  /**
+   * Structured error context from errors.GetAllDetails()
+   */
+  details?: string[];
+}
+
+export interface GlyphFiredMessage {
+  /**
+   * "glyph_fired"
+   */
+  type: string;
+  /**
+   * Target glyph that was executed
+   */
+  glyph_id: string;
+  /**
+   * Triggering attestation ASID
+   */
+  attestation_id: string;
+  /**
+   * "started", "success", "error"
+   */
+  status: string;
+  /**
+   * Error message when status is "error"
+   */
+  error?: string;
+  /**
+   * JSON-encoded execution result
+   */
+  result?: string;
+  /**
+   * Unix timestamp
+   */
+  timestamp: number;
 }
 
 export interface JobChildrenResponse {
@@ -305,6 +341,35 @@ export interface ProgressMessage {
    * Status message
    */
   message: string;
+}
+
+export interface PromptDirectRequest {
+  /**
+   * Prompt template with optional {{field}} placeholders
+   */
+  template: string;
+  system_prompt?: string;
+  /**
+   * "openrouter" or "local"
+   */
+  provider?: string;
+  model?: string;
+  /**
+   * TODO(#458): create result attestation with actor "glyph:{id}" so prompt glyphs can be mid-chain producers
+   */
+  glyph_id?: string;
+  /**
+   * Triggering attestation — enables {{field}} interpolation
+   */
+  upstream_attestation?: As | null;
+}
+
+export interface PromptDirectResponse {
+  response: string;
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  error?: string;
 }
 
 export interface PromptExecuteRequest {
@@ -835,6 +900,10 @@ export interface WatcherErrorMessage {
    * Error message
    */
   error: string;
+  /**
+   * Structured error context from errors.GetAllDetails()
+   */
+  details?: string[];
   /**
    * "error" or "warning"
    */

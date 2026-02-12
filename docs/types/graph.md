@@ -28,11 +28,11 @@ type AxGraphBuilder struct {
 
 ```go
 type Claim struct {
-	Subject string
-	Predicate string
-	Context string
-	Actor string
-	Timestamp string
+	Subject string `json:"subject"`
+	Predicate string `json:"predicate"`
+	Context string `json:"context"`
+	Actor string `json:"actor"`
+	Timestamp string `json:"timestamp"`
 }
 ```
 
@@ -122,12 +122,12 @@ type NodeTypeInfo struct {
 
 ```go
 type RelationshipDefinition struct {
-	PredicateName string
-	DisplayLabel string
-	Color string
-	LinkDistance *float64
-	LinkStrength *float64
-	Deprecated bool
+	PredicateName string `json:"predicate_name"`
+	DisplayLabel string `json:"display_label"`
+	Color string `json:"color,omitempty"`
+	LinkDistance *float64 `json:"link_distance,omitempty"`
+	LinkStrength *float64 `json:"link_strength,omitempty"`
+	Deprecated bool `json:"deprecated"`
 }
 ```
 

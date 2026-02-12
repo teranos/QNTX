@@ -51,7 +51,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        package: [qntx, typegen, qntx-code]
+        package: [qntx, typegen]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
@@ -78,12 +78,11 @@ jobs:
       - name: Push to Cachix
         run: nix build .#${{ matrix.package }} --print-out-paths --no-link | cachix push qntx
 
-  # Rust plugins (parallel builds per OS)
-  build-rust:
+  # qntx-code plugin (Go, parallel builds per OS)
+  build-qntx-code:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        package: [qntx-python]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
@@ -104,11 +103,42 @@ jobs:
       - name: Update flake lock
         run: nix flake lock --update-input fenix
 
-      - name: Build ${{ matrix.package }}
-        run: nix build .#${{ matrix.package }} --show-trace
+      - name: Build qntx-code plugin
+        run: nix build ./qntx-code#qntx-code-plugin --show-trace
 
       - name: Push to Cachix
-        run: nix build .#${{ matrix.package }} --print-out-paths --no-link | cachix push qntx
+        run: nix build ./qntx-code#qntx-code-plugin --print-out-paths --no-link | cachix push qntx
+
+  # qntx-python plugin (Rust, parallel builds per OS)
+  build-qntx-python:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: qntx
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Update flake lock
+        run: nix flake lock --update-input fenix
+
+      - name: Build qntx-python plugin
+        run: nix build ./qntx-python#qntx-python-plugin --show-trace
+
+      - name: Push to Cachix
+        run: nix build ./qntx-python#qntx-python-plugin --print-out-paths --no-link | cachix push qntx
 
   # Documentation (single OS, includes link checking)
   build-docs:
@@ -144,7 +174,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        image: [ci-image, qntx-code-plugin-image, qntx-python-plugin-image]
+        image: [ci-image]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -162,4 +192,4 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: Build ${{ matrix.image }}
-        run: nix build --show-trace .#checks.x86_64-linux.${{ matrix.image }}
+        run: nix build --show-trace ./ci#${{ matrix.image }}-amd64

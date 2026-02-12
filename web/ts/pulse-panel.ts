@@ -37,6 +37,7 @@ import {
 } from './pulse/job-actions';
 import { hydrateButtons, registerButton, type HydrateConfig } from './components/button';
 import type { DaemonStatusMessage } from '../types/websocket';
+import { log, SEG } from './logger.ts';
 
 // Global daemon status (updated via WebSocket)
 let currentDaemonStatus: DaemonStatusMessage | null = null;
@@ -131,7 +132,7 @@ class PulsePanel extends BasePanel {
             this.hideLoading();
             await this.render();
         } catch (error: unknown) {
-            console.error('[Pulse Panel] Failed to load jobs:', error);
+            log.error(SEG.ERROR, '[Pulse Panel] Failed to load jobs:', error);
             const err = error instanceof Error ? error : new Error(String(error));
             this.showErrorState(err);
         }

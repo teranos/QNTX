@@ -235,25 +235,9 @@ describe('UIState', () => {
         });
     });
 
-    describe('Persistence', () => {
-        test('persisted state survives reset for preferences', () => {
-            // Set some values
-            uiState.setActiveModality('ix');
-            uiState.setUsageView('month');
-            uiState.setGraphSession({ query: 'test', verbosity: 2 });
-
-            // Check localStorage has data
-            const stored = localStorage.getItem('qntx-ui-state');
-            expect(stored).not.toBeNull();
-        });
-
-        test('clearStorage removes persisted state', () => {
-            uiState.setActiveModality('ix');
-            uiState.clearStorage();
-
-            expect(localStorage.getItem('qntx-ui-state')).toBeNull();
-        });
-    });
+    // Persistence tests removed - they checked localStorage implementation details
+    // Persistence behavior is tested by storage.dom.test.ts
+    // Canvas merge tests extracted to api/canvas.test.ts (mergeCanvasState is a pure function)
 
     describe('Reset', () => {
         test('reset restores default state', () => {

@@ -1,0 +1,60 @@
+/**
+ * Styles for glyph melding visual feedback
+ * Respects the axiom: styles modify existing elements, never create new ones
+ */
+
+/* Melded composition container */
+.melded-composition {
+    display: grid;
+    grid-auto-rows: auto;
+    grid-auto-columns: auto;
+    gap: 0;
+    position: absolute;
+    background: transparent;
+    cursor: grab;
+}
+
+/* Visual feedback during approach */
+.canvas-ax-glyph.meld-ready,
+.canvas-py-glyph.meld-ready {
+    transition: box-shadow 0.2s ease-out;
+}
+
+.canvas-prompt-glyph.meld-target,
+.canvas-py-glyph.meld-target {
+    transition: box-shadow 0.2s ease-out;
+}
+
+/* Glyphs within melded composition */
+.melded-composition .canvas-ax-glyph,
+.melded-composition .canvas-py-glyph,
+.melded-composition .canvas-prompt-glyph {
+    margin: 0;
+    /* Remove any spacing - they should be directly adjacent */
+}
+
+/* Initiator glyphs (left side of composition) */
+.melded-composition .canvas-ax-glyph,
+.melded-composition .canvas-py-glyph {
+    border-right: 1px dashed rgba(255, 140, 0, 0.3);
+    padding-right: 8px;
+}
+
+/* Target glyphs (right side of composition) */
+.melded-composition .canvas-py-glyph:not(:first-child),
+.melded-composition .canvas-prompt-glyph {
+    padding-left: 8px;
+}
+
+/* Dragging state */
+.is-dragging {
+    opacity: 0.9;
+    cursor: grabbing !important;
+}
+
+/* When dragging a melded composition, elevate individual glyphs */
+.melded-composition.is-dragging .canvas-ax-glyph,
+.melded-composition.is-dragging .canvas-py-glyph,
+.melded-composition.is-dragging .canvas-prompt-glyph {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}

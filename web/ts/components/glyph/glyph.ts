@@ -35,24 +35,17 @@ export interface Glyph {
     layoutStrategy?: 'flow' | 'grid' | 'custom';  // How to layout children (default: flow)
     onSpawnMenu?: () => string[];        // Symbols that can be spawned inside (right-click)
 
-    // Grid position metadata (for grid-layout children)
-    gridX?: number;                      // Grid cell X position
-    gridY?: number;                      // Grid cell Y position
-    symbol?: string;                     // Symbol to display (for grid children)
+    // Position metadata (pixel coordinates)
+    x?: number;                          // X position in pixels
+    y?: number;                          // Y position in pixels
+    symbol?: string;                     // Symbol to display
 
     // Size metadata (for resizable glyphs)
     width?: number;                      // Custom width in pixels
     height?: number;                     // Custom height in pixels
 
-    // Execution result metadata (for result glyphs)
-    result?: {
-        success: boolean;
-        stdout: string;
-        stderr: string;
-        result: any;
-        error: string | null;
-        duration_ms: number;
-    };
+    // Glyph content: source code, markdown, template, or JSON result
+    content?: string;
 }
 
 // Function to check if user prefers reduced motion
@@ -80,10 +73,21 @@ export function getMinimizeDuration(): number {
 export const DEFAULT_WINDOW_WIDTH = '800px';
 export const DEFAULT_WINDOW_HEIGHT = '600px';
 export const WINDOW_BORDER_RADIUS = '8px';
-export const WINDOW_BOX_SHADOW = '0 8px 32px rgba(0, 0, 0, 0.3)';
+export const WINDOW_BOX_SHADOW = '0 4px 12px rgba(0, 0, 0, 0.15)';
 
 // Window chrome dimensions
 export const TITLE_BAR_HEIGHT = '32px';
 export const TITLE_BAR_PADDING = '0 12px';
 export const WINDOW_BUTTON_SIZE = '24px';
 export const CONTENT_PADDING = '16px';
+
+// Canvas glyph dimensions
+export const CANVAS_GLYPH_TITLE_BAR_HEIGHT = 32; // Height in pixels for AX/IX glyphs
+export const CANVAS_GLYPH_CONTENT_PADDING = 8; // Content element padding (reduced from CONTENT_PADDING)
+export const GLYPH_CONTENT_INNER_PADDING = 4; // .glyph-content CSS padding
+
+// ResizeObserver constraints
+export const MAX_VIEWPORT_HEIGHT_RATIO = 0.8; // Don't exceed 80% of viewport height
+export const MAX_VIEWPORT_WIDTH_RATIO = 0.8; // Don't exceed 80% of viewport width
+export const MIN_WINDOW_HEIGHT = 100; // Minimum window height in pixels
+export const MIN_WINDOW_WIDTH = 200; // Minimum window width in pixels

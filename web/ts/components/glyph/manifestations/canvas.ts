@@ -65,7 +65,7 @@ export function morphToCanvas(
         getMaximizeDuration()
     ).then(() => {
         // COMMIT PHASE: Animation completed successfully
-        log.debug(SEG.UI, `[Canvas] Animation committed for ${glyph.id}`);
+        log.debug(SEG.GLYPH, `[Canvas] Animation committed for ${glyph.id}`);
 
         // Apply final fullscreen state - NO CHROME
         glyphElement.style.position = 'fixed';
@@ -84,23 +84,9 @@ export function morphToCanvas(
         glyphElement.style.flexDirection = 'column';
 
         // Add minimize button (floating, top-right corner)
-        // TODO: Unify button sizing (32px here vs 24px in window)
         const minimizeBtn = document.createElement('button');
         minimizeBtn.textContent = '−';
         minimizeBtn.className = 'canvas-minimize-btn';
-        minimizeBtn.style.position = 'fixed';
-        minimizeBtn.style.top = '16px';
-        minimizeBtn.style.right = '16px';
-        minimizeBtn.style.width = '32px';
-        minimizeBtn.style.height = '32px';
-        minimizeBtn.style.border = 'none';
-        minimizeBtn.style.borderRadius = '4px';
-        // TODO: Extract color to CSS variable or class
-        minimizeBtn.style.backgroundColor = 'var(--bg-secondary)';
-        minimizeBtn.style.color = 'var(--text-primary)';
-        minimizeBtn.style.cursor = 'pointer';
-        minimizeBtn.style.zIndex = '10001';
-        minimizeBtn.style.fontSize = '20px';
         minimizeBtn.onclick = () => morphFromCanvas(
             glyphElement,
             glyph,
@@ -116,11 +102,11 @@ export function morphToCanvas(
             content.style.overflow = 'hidden';
             glyphElement.appendChild(content);
         } catch (error) {
-            log.error(SEG.UI, `[Canvas ${glyph.id}] Error rendering content:`, error);
+            log.error(SEG.GLYPH, `[Canvas ${glyph.id}] Error rendering content:`, error);
             const errorContent = document.createElement('div');
             errorContent.style.padding = '16px';
             errorContent.style.flex = '1';
-            errorContent.style.color = '#ef4444';
+            errorContent.style.color = 'var(--color-error)';
             errorContent.innerHTML = `
                 <div style="font-weight: bold;">Error rendering content</div>
                 <div style="opacity: 0.8; font-size: 12px;">${error instanceof Error ? error.message : String(error)}</div>
@@ -129,7 +115,7 @@ export function morphToCanvas(
         }
     }).catch(error => {
         // ROLLBACK: Animation failed
-        log.warn(SEG.UI, `[Canvas] Animation failed for ${glyph.id}:`, error);
+        log.warn(SEG.GLYPH, `[Canvas] Animation failed for ${glyph.id}:`, error);
     });
 }
 
@@ -144,7 +130,7 @@ export function morphFromCanvas(
 ): void {
     // AXIOM CHECK: Verify this is the correct element
     verifyElement(glyph.id, canvasElement);
-    log.debug(SEG.UI, `[Canvas] Minimizing ${glyph.id}`);
+    log.debug(SEG.GLYPH, `[Canvas] Minimizing ${glyph.id}`);
 
     // Get current canvas state
     const currentRect = canvasElement.getBoundingClientRect();
@@ -167,7 +153,7 @@ export function morphFromCanvas(
     // Begin minimize animation
     beginMinimizeMorph(canvasElement, currentRect, { x: targetX, y: targetY }, getMinimizeDuration())
         .then(() => {
-            log.debug(SEG.UI, `[Canvas] Animation complete for ${glyph.id}`);
+            log.debug(SEG.GLYPH, `[Canvas] Animation complete for ${glyph.id}`);
 
             // Clear state
             setWindowState(canvasElement, false);
@@ -186,6 +172,6 @@ export function morphFromCanvas(
             onMorphComplete(canvasElement, glyph);
         })
         .catch(error => {
-            log.warn(SEG.UI, `[Canvas] Animation failed for ${glyph.id}:`, error);
+            log.warn(SEG.GLYPH, `[Canvas] Animation failed for ${glyph.id}:`, error);
         });
 }

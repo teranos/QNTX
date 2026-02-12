@@ -97,7 +97,7 @@ func (s *Store) GetJob(id string) (*Job, error) {
 	}
 
 	if err := ProcessJobScanArgs(&job, args); err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to process scan args for job %s", id)
 	}
 
 	return &job, nil
@@ -311,7 +311,7 @@ func (s *Store) FindActiveJobBySourceAndHandler(source string, handlerName strin
 	}
 
 	if err := ProcessJobScanArgs(&job, args); err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to process scan args for active job (source=%s, handler=%s)", source, handlerName)
 	}
 
 	return &job, nil
@@ -346,7 +346,7 @@ func (s *Store) FindRecentJobBySourceAndHandler(source string, handlerName strin
 	}
 
 	if err := ProcessJobScanArgs(&job, args); err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to process scan args for recent job (source=%s, handler=%s)", source, handlerName)
 	}
 
 	return &job, nil

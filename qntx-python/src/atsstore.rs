@@ -12,11 +12,13 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tonic::transport::Channel;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 // Thread-local storage for the ATSStore client during Python execution
 thread_local! {
     static CURRENT_CLIENT: RefCell<Option<SharedAtsStoreClient>> = const { RefCell::new(None) };
+    // Glyph ID for actor convention: when set, attest() defaults actor to "glyph:{id}"
+    static CURRENT_GLYPH_ID: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
 /// ATSStore client configuration
@@ -27,67 +29,17 @@ pub struct AtsStoreConfig {
 }
 
 /// ATSStore client wrapper with blocking operations for PyO3 compatibility
+///
+/// TODO: Implement connection pooling - currently creates fresh connection per operation
+/// Each thread spawns its own runtime and connection, which works but is inefficient
 pub struct AtsStoreClient {
     config: AtsStoreConfig,
-    channel: Option<Channel>,
 }
 
 impl AtsStoreClient {
     /// Create a new ATSStore client
     pub fn new(config: AtsStoreConfig) -> Self {
-        Self {
-            config,
-            channel: None,
-        }
-    }
-
-    /// Connect to the ATSStore service (called lazily on first use)
-    fn connect(&mut self) -> Result<Channel, String> {
-        if let Some(ref channel) = self.channel {
-            return Ok(channel.clone());
-        }
-
-        let endpoint = self.config.endpoint.clone();
-        debug!("Connecting to ATSStore at {}", endpoint);
-
-        // Clone for error message after thread
-        let endpoint_for_error = endpoint.clone();
-
-        // Spawn a separate OS thread with its own runtime (avoid "runtime within runtime" error)
-        let channel = std::thread::spawn(move || {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .map_err(|e| format!("failed to create runtime: {}", e))?;
-
-            rt.block_on(async {
-                // Ensure endpoint has http:// scheme for tonic
-                let endpoint_uri =
-                    if endpoint.starts_with("http://") || endpoint.starts_with("https://") {
-                        endpoint.clone()
-                    } else {
-                        format!("http://{}", endpoint)
-                    };
-
-                let ep = Channel::from_shared(endpoint_uri)
-                    .map_err(|e| format!("invalid endpoint: {}", e))?;
-                ep.connect()
-                    .await
-                    .map_err(|e| format!("connection failed: {}", e))
-            })
-        })
-        .join()
-        .map_err(|e| format!("thread panicked: {:?}", e))?
-        .map_err(|e| {
-            format!(
-                "failed to connect to ATSStore at {}: {}",
-                endpoint_for_error, e
-            )
-        })?;
-
-        self.channel = Some(channel.clone());
-        info!("Connected to ATSStore at {}", endpoint_for_error);
-        Ok(channel)
+        Self { config }
     }
 
     /// Create an attestation with auto-generated ID
@@ -226,6 +178,14 @@ pub fn clear_current_client() {
     });
 }
 
+/// Set the current glyph ID for actor convention.
+/// When set, attest() defaults actor to "glyph:{id}" if no explicit actors provided.
+pub fn set_current_glyph_id(glyph_id: Option<String>) {
+    CURRENT_GLYPH_ID.with(|g| {
+        *g.borrow_mut() = glyph_id;
+    });
+}
+
 /// Python-callable attest function.
 /// Creates an attestation using the current thread's ATSStore client.
 #[pyfunction]
@@ -250,6 +210,15 @@ pub fn attest(
             Some(map)
         }
         None => None,
+    };
+
+    // Default actors to "glyph:{id}" when glyph_id is set and user didn't pass explicit actors
+    let actors = match actors {
+        Some(a) if !a.is_empty() => Some(a), // User provided explicit actors — use them
+        _ => {
+            // Check if a glyph ID is set for this execution
+            CURRENT_GLYPH_ID.with(|g| g.borrow().as_ref().map(|id| vec![format!("glyph:{}", id)]))
+        }
     };
 
     // Get the current client from thread-local storage
@@ -287,7 +256,7 @@ pub fn attest(
 }
 
 /// Convert a Python value to serde_json::Value
-fn python_value_to_json(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<serde_json::Value> {
+fn python_value_to_json(_py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<serde_json::Value> {
     if value.is_none() {
         Ok(serde_json::Value::Null)
     } else if let Ok(b) = value.extract::<bool>() {
@@ -299,13 +268,13 @@ fn python_value_to_json(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<se
     } else if let Ok(s) = value.extract::<String>() {
         Ok(serde_json::Value::String(s))
     } else if let Ok(list) = value.downcast::<pyo3::types::PyList>() {
-        let vec: Result<Vec<_>, _> = list.iter().map(|v| python_value_to_json(py, &v)).collect();
+        let vec: Result<Vec<_>, _> = list.iter().map(|v| python_value_to_json(_py, &v)).collect();
         Ok(serde_json::Value::Array(vec?))
     } else if let Ok(dict) = value.downcast::<PyDict>() {
         let mut map = serde_json::Map::new();
         for (k, v) in dict.iter() {
             let key: String = k.extract()?;
-            map.insert(key, python_value_to_json(py, &v)?);
+            map.insert(key, python_value_to_json(_py, &v)?);
         }
         Ok(serde_json::Value::Object(map))
     } else {

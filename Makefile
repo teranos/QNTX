@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-sqlite rust-embeddings rust-fuzzy-test rust-fuzzy-check rust-wasm rust-python rust-python-test rust-python-check
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -6,9 +6,9 @@ PREFIX ?= $(HOME)/.qntx
 # Use prebuilt qntx if available in PATH, otherwise use ./bin/qntx
 QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
-cli: rust-fuzzy rust-vidstream rust-sqlite rust-wasm ## Build QNTX CLI binary (with Rust fuzzy optimization, ONNX video, SQLite backend, and WASM parser)
-	@echo "Building QNTX CLI with Rust optimizations (fuzzy, video, sqlite) and WASM parser..."
-	@go build -tags "rustfuzzy,rustvideo,rustsqlite,qntxwasm" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
+cli: rust-vidstream rust-sqlite rust-embeddings wasm ## Build QNTX CLI binary (with Rust optimizations, embeddings, and WASM parser)
+	@echo "Building QNTX CLI with Rust optimizations (video, sqlite, embeddings) and WASM (parser, fuzzy)..."
+	@go build -tags "rustvideo,rustsqlite,rustembeddings,qntxwasm" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
 cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments without Rust toolchain)
 	@echo "Building QNTX CLI (pure Go, no CGO)..."
@@ -28,28 +28,31 @@ server: cli ## Start QNTX WebSocket server
 	@./bin/qntx server
 
 dev: web cli ## Build frontend and CLI, then start development servers (backend + frontend with live reload)
-	@# Read port from am.toml if exists, otherwise use default
-	@TOML_PORT=$$(grep -E '^port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
-	BACKEND_PORT=$${BACKEND_PORT:-$${TOML_PORT:-8773}}; \
-	FRONTEND_PORT=$${FRONTEND_PORT:-8820}; \
+	@# Read ports from am.toml if exists, otherwise use defaults
+	@TOML_BACKEND_PORT=$$(grep -E '^port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
+	TOML_FRONTEND_PORT=$$(grep -E '^frontend_port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
+	BACKEND_PORT=$${BACKEND_PORT:-$${TOML_BACKEND_PORT:-8773}}; \
+	FRONTEND_PORT=$${FRONTEND_PORT:-$${TOML_FRONTEND_PORT:-8820}}; \
 	echo "🚀 Starting development environment..."; \
 	echo "  Backend:  http://localhost:$$BACKEND_PORT"; \
 	echo "  Frontend: http://localhost:$$FRONTEND_PORT (with live reload)"; \
 	echo "  Database: Uses am.toml configuration"; \
 	echo "  Override: BACKEND_PORT=<port> FRONTEND_PORT=<port> make dev"; \
 	echo ""; \
-	pkill -f "qntx server" 2>/dev/null || true; \
-	pkill -f "bun.*dev" 2>/dev/null || true; \
+	lsof -ti:$$BACKEND_PORT | xargs kill -9 2>/dev/null || true; \
+	lsof -ti:$$FRONTEND_PORT | xargs kill -9 2>/dev/null || true; \
 	trap "echo ''; echo 'Shutting down dev servers...'; \
-		pkill -TERM -f 'qntx server' 2>/dev/null || true; \
-		pkill -TERM -f 'bun.*dev' 2>/dev/null || true; \
+		test -n \"\$$BACKEND_PID\" && kill -TERM -\$$BACKEND_PID 2>/dev/null || true; \
+		test -n \"\$$FRONTEND_PID\" && kill -TERM -\$$FRONTEND_PID 2>/dev/null || true; \
 		sleep 1; \
-		pkill -9 -f 'qntx server' 2>/dev/null || true; \
-		pkill -9 -f 'bun.*dev' 2>/dev/null || true; \
+		test -n \"\$$BACKEND_PID\" && kill -9 -\$$BACKEND_PID 2>/dev/null || true; \
+		test -n \"\$$FRONTEND_PID\" && kill -9 -\$$FRONTEND_PID 2>/dev/null || true; \
 		echo '✓ Servers stopped'" EXIT INT TERM; \
 	set -m; \
 	./bin/qntx server --dev --no-browser -vvv & \
+	BACKEND_PID=$$!; \
 	cd web && bun run dev & \
+	FRONTEND_PID=$$!; \
 	echo "✨ Development servers running"; \
 	echo "Press Ctrl+C to stop both servers"; \
 	wait
@@ -61,13 +64,12 @@ dev-mobile: web cli ## Start dev servers and run iOS app in simulator
 	@echo "  iOS:      Launching simulator..."
 	@echo ""
 	@# Clean up any lingering processes
-	@pkill -f "bun.*dev" 2>/dev/null || true
 	@lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true
 	@# Start servers in background
 	@trap 'echo "Shutting down dev servers..."; \
 		test -n "$$BACKEND_PID" && kill -TERM -$$BACKEND_PID 2>/dev/null || true; \
 		test -n "$$FRONTEND_PID" && kill -TERM -$$FRONTEND_PID 2>/dev/null || true; \
-		pkill -f "bun.*dev" 2>/dev/null || true; \
+		lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true; \
 		wait 2>/dev/null || true; \
 		echo "✓ Servers stopped cleanly"' INT; \
 	./bin/qntx server --dev --no-browser -vvv & \
@@ -79,7 +81,7 @@ dev-mobile: web cli ## Start dev servers and run iOS app in simulator
 	cd web/src-tauri && SKIP_DEV_SERVER=1 cargo tauri ios dev "iPhone 17 Pro"; \
 	wait
 
-web: ## Build web assets with Bun
+web: wasm ## Build web assets with Bun (requires WASM)
 	@echo "Building web assets..."
 	@cd web && bun install && bun run build
 
@@ -91,11 +93,26 @@ test-web: ## Run web UI tests
 	@echo "Running web UI tests..."
 	@cd web && bun test
 
-test: ## Run all tests (Go + TypeScript) with coverage
+test-jsdom: ## Run web UI tests including JSDOM DOM tests
+	@echo "Running web UI tests with JSDOM..."
+	@if [ ! -d "web/node_modules" ]; then \
+		echo "Installing web dependencies..."; \
+		cd web && bun install; \
+	fi
+	@cd web && USE_JSDOM=1 bun test
+
+test: ## Run all tests (Go + TypeScript)
+	@go test -tags "rustsqlite,qntxwasm" -short ./...
+	@if [ ! -d "web/node_modules" ]; then \
+		cd web && bun install; \
+	fi
+	@cd web && USE_JSDOM=1 bun test
+	@echo "✓ All tests complete"
+
+test-coverage: ## Run all tests (Go + TypeScript) with coverage
 	@echo "Running Go tests with coverage..."
 	@mkdir -p tmp
 	@# Test with core tags to ensure we test what we ship
-	@# TODO: Add rustfuzzy,rustvideo once those are stabilized
 	@go test -tags "rustsqlite,qntxwasm" -short -coverprofile=tmp/coverage.out -covermode=count ./...
 	@go tool cover -html=tmp/coverage.out -o tmp/coverage.html
 	@echo "✓ Go tests complete. Coverage report: tmp/coverage.html"
@@ -155,11 +172,10 @@ desktop-dev: desktop-prepare ## Run desktop app in development mode
 	@echo "  Backend will start as sidecar on port $${BACKEND_PORT:-877}"
 	@echo ""
 	@# Clean up any lingering dev server processes
-	@pkill -f "bun.*dev" 2>/dev/null || true
 	@lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true
 	@# Start dev server in background, then launch Tauri
 	@trap 'echo "Shutting down dev server..."; \
-		pkill -f "bun.*dev" 2>/dev/null || true; \
+		lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true; \
 		wait 2>/dev/null || true; \
 		echo "✓ Dev server stopped"' INT; \
 	cd web && bun run dev & \
@@ -182,20 +198,17 @@ desktop-build: desktop-prepare ## Build production desktop app (requires: cargo 
 proto: ## Generate Go code from protobuf definitions (via Nix)
 	@nix run .#generate-proto
 
+proto-rust: ## Rust proto types are now generated automatically at build time
+	@echo "ℹ️  Rust proto types are generated automatically when building qntx-proto"
+	@echo "   No manual generation needed - uses protoc-bin-vendored at build time"
+	@echo "   See: crates/qntx-proto/build.rs"
+
 code-plugin: ## Build and install code plugin to ~/.qntx/plugins/
 	@echo "Building code plugin..."
 	@mkdir -p $(PREFIX)/plugins
 	@go build -o $(PREFIX)/plugins/qntx-code-plugin ./qntx-code/cmd/qntx-code-plugin
 	@chmod +x $(PREFIX)/plugins/qntx-code-plugin
 	@echo "✓ qntx-code-plugin → $(PREFIX)/plugins/qntx-code-plugin"
-
-# Rust fuzzy matching library (ax segment optimization)
-rust-fuzzy: ## Build Rust fuzzy matching library (for CGO integration)
-	@echo "Building Rust fuzzy matching library..."
-	@cd ats/ax/fuzzy-ax && cargo build --release --lib
-	@echo "✓ libqntx_fuzzy built in ats/ax/fuzzy-ax/target/release/"
-	@echo "  Static:  libqntx_fuzzy.a"
-	@echo "  Shared:  libqntx_fuzzy.so (Linux) / libqntx_fuzzy.dylib (macOS)"
 
 rust-vidstream: ## Build Rust vidstream library with ONNX support (for CGO integration)
 	@echo "Building Rust vidstream library with ONNX..."
@@ -212,12 +225,22 @@ rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO inte
 	@echo "  Static:  libqntx_sqlite.a"
 	@echo "  Shared:  libqntx_sqlite.so (Linux) / libqntx_sqlite.dylib (macOS)"
 
-rust-wasm: ## Build qntx-core as WASM module (for wazero integration, no CGO needed)
-	@echo "Building qntx-core WASM module..."
+wasm: ## Build qntx-core as WASM module (for wazero integration + browser)
+	@echo "Building qntx-core WASM modules..."
+	@echo "  [1/2] Building Go/wazero WASM..."
 	@cargo build --release --target wasm32-unknown-unknown --package qntx-wasm
 	@cp target/wasm32-unknown-unknown/release/qntx_wasm.wasm ats/wasm/qntx_core.wasm
-	@echo "✓ qntx_core.wasm built and copied to ats/wasm/"
-	@ls -lh ats/wasm/qntx_core.wasm | awk '{print "  Size: " $$5}'
+	@echo "  ✓ qntx_core.wasm built and copied to ats/wasm/"
+	@ls -lh ats/wasm/qntx_core.wasm | awk '{print "    Size: " $$5}'
+	@echo "  [2/2] Building browser WASM with wasm-bindgen..."
+	@if ! command -v wasm-pack >/dev/null 2>&1; then \
+		echo "  ⚠️  wasm-pack not found. Install with: cargo install wasm-pack"; \
+		exit 1; \
+	fi
+	@cd crates/qntx-wasm && wasm-pack build --target web --features browser
+	@cp -r crates/qntx-wasm/pkg/* web/wasm/
+	@echo "  ✓ Browser WASM built and copied to web/wasm/"
+	@ls -lh web/wasm/*.wasm 2>/dev/null | awk '{print "    Size: " $$5 " - " $$9}' || (echo "    ERROR: wasm-pack ran but produced no .wasm files"; exit 1)
 
 rust-embeddings: ## Build Rust embeddings library with ONNX support (for CGO integration)
 	@echo "Building Rust embeddings library with ONNX..."
@@ -227,43 +250,14 @@ rust-embeddings: ## Build Rust embeddings library with ONNX support (for CGO int
 	@echo "  Shared:  libqntx_embeddings.so (Linux) / libqntx_embeddings.dylib (macOS)"
 	@echo "  Features: ONNX Runtime for sentence transformers"
 
-rust-fuzzy-test: ## Run Rust fuzzy matching tests
-	@echo "Running Rust fuzzy matching tests..."
-	@cd ats/ax/fuzzy-ax && cargo test --lib
-	@echo "✓ All Rust tests passed"
-
-rust-fuzzy-check: ## Check Rust fuzzy matching code (fmt + clippy)
-	@echo "Checking Rust fuzzy matching code..."
-	@cd ats/ax/fuzzy-ax && cargo fmt --check
-	@cd ats/ax/fuzzy-ax && cargo clippy --lib -- -D warnings
-	@echo "✓ Rust code checks passed"
-
-rust-fuzzy-integration: rust-fuzzy ## Run Rust fuzzy integration tests (Go + Rust)
-	@echo "Running Rust fuzzy integration tests..."
-	@export DYLD_LIBRARY_PATH=$(PWD)/ats/ax/fuzzy-ax/target/release:$$DYLD_LIBRARY_PATH && \
-		export LD_LIBRARY_PATH=$(PWD)/ats/ax/fuzzy-ax/target/release:$$LD_LIBRARY_PATH && \
-		go test -tags "integration rustfuzzy" -v ./ats/ax/fuzzy-ax/...
-	@echo "✓ Integration tests passed"
-
 # Rust Python plugin (PyO3-based Python execution)
 # REQUIRES Nix: Platform-specific Python linking issues make cargo-only builds unreliable
 rust-python: ## Build Rust Python plugin binary (via Nix)
 	@echo "Building qntx-python-plugin via Nix..."
-	@nix build .#qntx-python
+	@nix build ./qntx-python#qntx-python-plugin
 	@mkdir -p bin
 	@cp -L result/bin/qntx-python-plugin bin/
 	@echo "✓ qntx-python-plugin built in bin/"
-
-rust-python-test: ## Run Rust Python plugin tests (via Nix)
-	@echo "Running Rust Python plugin tests via Nix..."
-	@echo "Note: Use 'nix develop' shell and run 'cd qntx-python && cargo test' for iterative testing"
-	@nix develop --command bash -c "cd qntx-python && cargo test"
-	@echo "✓ All Rust Python tests passed"
-
-rust-python-check: ## Check Rust Python plugin code (fmt + clippy via Nix)
-	@echo "Checking Rust Python plugin code..."
-	@nix develop --command bash -c "cd qntx-python && cargo fmt --check && cargo clippy -- -D warnings"
-	@echo "✓ Rust Python code checks passed"
 
 rust-python-install: rust-python ## Install Rust Python plugin to ~/.qntx/plugins/
 	@echo "Installing qntx-python-plugin to $(PREFIX)/plugins..."

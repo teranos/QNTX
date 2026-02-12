@@ -5,6 +5,7 @@
 
 import { Window } from './components/window.js';
 import { apiFetch } from './api.js';
+import { log, SEG } from './logger.ts';
 
 interface TypeDefinition {
     name: string;
@@ -102,7 +103,7 @@ export class TypeDefinitionWindow {
                 this.processFieldData(data);
             }
         } catch (error) {
-            console.error('Failed to discover fields:', error);
+            log.error(SEG.ERROR, 'Failed to discover fields:', error);
             // Show user-friendly message in status area
             const statusEl = this.window.getContentElement()?.querySelector('#save-status') as HTMLElement;
             if (statusEl) {
@@ -403,7 +404,7 @@ export class TypeDefinitionWindow {
                     saveStatus.textContent = '✗ Failed to attest';
                     saveStatus.style.color = 'var(--error-color, #e74c3c)';
                 }
-                console.error('Failed to attest type definition:', error);
+                log.error(SEG.ERROR, 'Failed to attest type definition:', error);
             } finally {
                 saveBtn.disabled = false;
                 saveBtn.textContent = 'Attest Type Definition';

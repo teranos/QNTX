@@ -17,25 +17,25 @@ type AttestationStore interface {
 // Types are richer than single predicates - they represent semantic categories with
 // multiple identifying patterns, relationships, and behavioral rules.
 type TypeDef struct {
-	Name             string   // Type identifier (e.g., "commit", "author")
-	Label            string   // Human-readable label for UI (e.g., "Commit", "Author")
-	Color            string   // Hex color code for graph visualization (e.g., "#34495e")
-	Opacity          *float64 // Visual opacity (0.0-1.0), nil defaults to 1.0
-	Deprecated       bool     // Whether this type is being phased out
-	RichStringFields []string // Metadata field names containing rich text for semantic search (e.g., ["notes", "description"])
-	ArrayFields      []string // Field names that should be flattened into arrays (e.g., ["skills", "languages", "certifications"])
+	Name             string   `json:"name"`                         // Type identifier (e.g., "commit", "author")
+	Label            string   `json:"label"`                        // Human-readable label for UI (e.g., "Commit", "Author")
+	Color            string   `json:"color"`                        // Hex color code for graph visualization (e.g., "#34495e")
+	Opacity          *float64 `json:"opacity,omitempty"`            // Visual opacity (0.0-1.0), nil defaults to 1.0
+	Deprecated       bool     `json:"deprecated"`                   // Whether this type is being phased out
+	RichStringFields []string `json:"rich_string_fields,omitempty"` // Metadata field names containing rich text for semantic search (e.g., ["notes", "description"])
+	ArrayFields      []string `json:"array_fields,omitempty"`       // Field names that should be flattened into arrays (e.g., ["skills", "languages", "certifications"])
 }
 
 // RelationshipTypeDef defines a relationship type with physics and display metadata.
 // Relationship types represent predicates with their own visualization behavior,
 // allowing domains to control how their relationships render in force-directed graphs.
 type RelationshipTypeDef struct {
-	Name         string   // Predicate name (e.g., "is_child_of", "points_to")
-	Label        string   // Human-readable label for UI (e.g., "Child Of", "Points To")
-	Color        string   // Optional link color override (hex code)
-	LinkDistance *float64 // D3 force distance override (nil = use default)
-	LinkStrength *float64 // D3 force strength override (nil = use default)
-	Deprecated   bool     // Whether this relationship type is being phased out
+	Name         string   `json:"name"`                    // Predicate name (e.g., "is_child_of", "points_to")
+	Label        string   `json:"label"`                   // Human-readable label for UI (e.g., "Child Of", "Points To")
+	Color        string   `json:"color,omitempty"`         // Optional link color override (hex code)
+	LinkDistance *float64 `json:"link_distance,omitempty"` // D3 force distance override (nil = use default)
+	LinkStrength *float64 `json:"link_strength,omitempty"` // D3 force strength override (nil = use default)
+	Deprecated   bool     `json:"deprecated"`              // Whether this relationship type is being phased out
 }
 
 // AttestType creates a type definition attestation with arbitrary attributes.

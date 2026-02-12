@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/pulse/schedule"
 )
 
@@ -56,8 +55,7 @@ func (s *QNTXServer) HandleJobExecutions(w http.ResponseWriter, r *http.Request,
 	execStore := s.newExecutionStore()
 	executions, total, err := execStore.ListExecutions(jobID, limit, offset, statusFilter)
 	if err != nil {
-		s.logger.Errorw("Failed to list executions", "error", err, "job_id", jobID)
-		writeError(w, http.StatusInternalServerError, "Failed to list executions")
+		writeWrappedError(w, s.logger, err, fmt.Sprintf("failed to list executions for job %s", jobID), http.StatusInternalServerError)
 		return
 	}
 
@@ -101,12 +99,7 @@ func (s *QNTXServer) HandlePulseExecution(w http.ResponseWriter, r *http.Request
 	execStore := s.newExecutionStore()
 	execution, err := execStore.GetExecution(executionID)
 	if err != nil {
-		if errors.IsNotFoundError(err) {
-			writeError(w, http.StatusNotFound, "Execution not found")
-			return
-		}
-		s.logger.Errorw("Failed to get execution", "error", err, "execution_id", executionID)
-		writeError(w, http.StatusInternalServerError, "Failed to get execution")
+		handleError(w, s.logger, err, fmt.Sprintf("failed to get execution %s", executionID))
 		return
 	}
 

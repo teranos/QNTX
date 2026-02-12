@@ -7,7 +7,8 @@ import { EditorView } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 import type { Node as PMNode } from 'prosemirror-model';
-import type { EditorView as PMEditorView } from 'prosemirror-view';
+import type { EditorView as PMEditorView} from 'prosemirror-view';
+import { log, SEG } from '../../logger.ts';
 
 export class FrontmatterNodeView {
     dom: HTMLElement;
@@ -56,6 +57,7 @@ export class FrontmatterNodeView {
         this.storageKey = `frontmatter-collapsed-${docPath}`;
     }
 
+    // TODO: Migrate to IndexedDB via storage.ts (localStorage elimination)
     private get isCollapsed(): boolean {
         // Check localStorage first for user preference
         const stored = localStorage.getItem(this.storageKey);
@@ -88,7 +90,7 @@ export class FrontmatterNodeView {
             const yamlModule = await import('@codemirror/lang-yaml');
             yamlExtension = yamlModule.yaml();
         } catch (error: unknown) {
-            console.error('[Frontmatter Block] YAML language support unavailable:', error);
+            log.error(SEG.ERROR, '[Frontmatter Block] YAML language support unavailable:', error);
             yamlExtension = [];
         }
 

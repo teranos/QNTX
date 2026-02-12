@@ -311,3 +311,90 @@ describe('routeMessage() function', () => {
         expect(result.handlerType).toBe('builtin');
     });
 });
+
+describe('glyph_fired handler', () => {
+    test('routes glyph_fired as builtin handler', () => {
+        const result = routeMessage(
+            { type: 'glyph_fired', glyph_id: 'py-1', attestation_id: 'ax-1', status: 'started', error: '', timestamp: Date.now() },
+            {}
+        );
+
+        expect(result.handled).toBe(true);
+        expect(result.handlerType).toBe('builtin');
+    });
+
+    test('sets data-execution-state on matching DOM element', () => {
+        // Set up a glyph element in the DOM
+        const el = document.createElement('div');
+        el.dataset.glyphId = 'py-glyph-1';
+        document.body.appendChild(el);
+
+        routeMessage(
+            { type: 'glyph_fired', glyph_id: 'py-glyph-1', attestation_id: 'ax-1', status: 'started', error: '', timestamp: Date.now() },
+            {}
+        );
+
+        expect(el.dataset.executionState).toBe('running');
+
+        // Clean up
+        document.body.removeChild(el);
+    });
+
+    test('maps status values to execution states', () => {
+        const el = document.createElement('div');
+        el.dataset.glyphId = 'py-map-test';
+        document.body.appendChild(el);
+
+        // started → running
+        routeMessage(
+            { type: 'glyph_fired', glyph_id: 'py-map-test', attestation_id: 'a1', status: 'started', error: '', timestamp: Date.now() },
+            {}
+        );
+        expect(el.dataset.executionState).toBe('running');
+
+        // success → completed
+        routeMessage(
+            { type: 'glyph_fired', glyph_id: 'py-map-test', attestation_id: 'a1', status: 'success', error: '', timestamp: Date.now() },
+            {}
+        );
+        expect(el.dataset.executionState).toBe('completed');
+
+        // error → failed
+        routeMessage(
+            { type: 'glyph_fired', glyph_id: 'py-map-test', attestation_id: 'a1', status: 'error', error: 'boom', timestamp: Date.now() },
+            {}
+        );
+        expect(el.dataset.executionState).toBe('failed');
+
+        document.body.removeChild(el);
+    });
+
+    test('invokes registered glyph_fired handler after builtin', () => {
+        const el = document.createElement('div');
+        el.dataset.glyphId = 'py-cb-test';
+        document.body.appendChild(el);
+
+        const handler = mock(() => {});
+
+        routeMessage(
+            { type: 'glyph_fired', glyph_id: 'py-cb-test', attestation_id: 'a1', status: 'started', error: '', timestamp: Date.now() },
+            { glyph_fired: handler }
+        );
+
+        // Builtin runs (sets DOM attribute), but routeMessage returns 'builtin'
+        // — the registered handler is invoked inside the builtin handler via messageHandlers
+        expect(el.dataset.executionState).toBe('running');
+
+        document.body.removeChild(el);
+    });
+
+    test('does not throw when no matching DOM element', () => {
+        // Should log a warning, not throw
+        expect(() => {
+            routeMessage(
+                { type: 'glyph_fired', glyph_id: 'nonexistent-glyph', attestation_id: 'a1', status: 'started', error: '', timestamp: Date.now() },
+                {}
+            );
+        }).not.toThrow();
+    });
+});

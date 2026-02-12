@@ -130,12 +130,17 @@ func (s *Service) Parse(ctx context.Context, query string, verbosity int) (*Pars
 
 	// Build parse state for autocomplete
 	state := &ParseState{
-		CurrentState: inferCurrentState(sourceTokens, filter),
-		Subjects:     filter.Subjects,
-		Predicates:   filter.Predicates,
-		Contexts:     filter.Contexts,
-		Actors:       filter.Actors,
-		Valid:        parseErr == nil,
+		Valid: parseErr == nil,
+	}
+
+	if filter != nil {
+		state.CurrentState = inferCurrentState(sourceTokens, filter)
+		state.Subjects = filter.Subjects
+		state.Predicates = filter.Predicates
+		state.Contexts = filter.Contexts
+		state.Actors = filter.Actors
+	} else {
+		state.CurrentState = "start"
 	}
 
 	return &ParseResponse{

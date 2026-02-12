@@ -1,0 +1,30 @@
+/* tslint:disable */
+/* eslint-disable */
+export const memory: WebAssembly.Memory;
+export const classify_claims: (a: number, b: number) => [number, number];
+export const delete_attestation: (a: number, b: number) => any;
+export const exists_attestation: (a: number, b: number) => any;
+export const fuzzy_rebuild_index: () => any;
+export const fuzzy_search: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+export const fuzzy_status: () => [number, number];
+export const get_attestation: (a: number, b: number) => any;
+export const init_store: (a: number, b: number) => any;
+export const is_store_initialized: () => number;
+export const list_attestation_ids: () => any;
+export const parse_query: (a: number, b: number) => [number, number];
+export const put_attestation: (a: number, b: number) => any;
+export const query_attestations: (a: number, b: number) => any;
+export const version: () => [number, number];
+export const wasm_bindgen__closure__destroy__h622d11ff1c80a730: (a: number, b: number) => void;
+export const wasm_bindgen__closure__destroy__h332095daeac88dbb: (a: number, b: number) => void;
+export const wasm_bindgen__convert__closures_____invoke__h0970674685b3ee7c: (a: number, b: number, c: any, d: any) => void;
+export const wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea: (a: number, b: number, c: any) => void;
+export const wasm_bindgen__convert__closures_____invoke__h8a5ecd90b1aacdb2: (a: number, b: number, c: any) => void;
+export const __wbindgen_malloc: (a: number, b: number) => number;
+export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+export const __wbindgen_exn_store: (a: number) => void;
+export const __externref_table_alloc: () => number;
+export const __wbindgen_externrefs: WebAssembly.Table;
+export const __wbindgen_free: (a: number, b: number, c: number) => void;
+export const __externref_table_dealloc: (a: number) => void;
+export const __wbindgen_start: () => void;

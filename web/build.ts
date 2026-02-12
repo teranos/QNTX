@@ -20,6 +20,7 @@ const outputDir = join(sourceDir, "..", "internal", "server", "dist");
 const peach = "\x1b[38;5;217m";
 const darkPeach = "\x1b[38;5;216m";
 const lightPeach = "\x1b[38;5;223m";
+const red = "\x1b[91m"; // Bright red for errors
 const reset = "\x1b[0m";
 const dim = "\x1b[2m";
 
@@ -90,10 +91,51 @@ try {
   console.log(`${darkPeach}Copying static assets...${reset}`);
   await cp(join(sourceDir, "qntx.jpg"), join(outputDir, "qntx.jpg"));
 
+  // Copy WASM files for browser IndexedDB storage
+  // WASM binaries must be in /js/ alongside bundled JS (import.meta.url resolution)
+  console.log(`${darkPeach}Copying WASM modules...${reset}`);
+  try {
+    const wasmSourceDir = join(sourceDir, "wasm");
+    const wasmFiles = await readdir(wasmSourceDir);
+    let copiedCount = 0;
+
+    for (const file of wasmFiles) {
+      if (file.endsWith('.wasm')) {
+        await cp(
+          join(wasmSourceDir, file),
+          join(outputDir, "js", file)
+        );
+        copiedCount++;
+      }
+    }
+
+    if (copiedCount === 0) {
+      console.error(`\n${red}${'='.repeat(80)}${reset}`);
+      console.error(`${red}███ FATAL BUILD ERROR: No WASM files found ███${reset}`);
+      console.error(`${red}${'='.repeat(80)}${reset}`);
+      console.error(`  Searched in: ${wasmSourceDir}`);
+      console.error(`  WASM files are required for the frontend to function`);
+      console.error(`${red}${'='.repeat(80)}${reset}\n`);
+      process.exit(1);
+    }
+  } catch (error: unknown) {
+    const wasmSourceDir = join(sourceDir, "wasm");
+    console.error(`\n${red}${'='.repeat(80)}${reset}`);
+    console.error(`${red}███ FATAL BUILD ERROR: Could not read WASM directory ███${reset}`);
+    console.error(`${red}${'='.repeat(80)}${reset}`);
+    console.error(`  Path: ${wasmSourceDir}`);
+    console.error(`${red}${'='.repeat(80)}${reset}\n`);
+    process.exit(1);
+  }
+
   console.log(`${peach}Build complete!${reset}`);
   console.log(`${dim}   Output ready at: ${outputDir}${reset}`);
 
 } catch (error: unknown) {
-  console.error(`${darkPeach}Build failed:${reset}`, error);
+  console.error(`\n${red}${'='.repeat(80)}${reset}`);
+  console.error(`${red}███ BUILD FAILED ███${reset}`);
+  console.error(`${red}${'='.repeat(80)}${reset}`);
+  console.error(`  ${error}`);
+  console.error(`${red}${'='.repeat(80)}${reset}\n`);
   process.exit(1);
 }

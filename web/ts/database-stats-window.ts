@@ -2,6 +2,8 @@
  * Database Statistics Window
  *
  * Displays database statistics similar to `qntx db stats` output
+ *
+ * TODO: This will be removed in favor of the database-glyph in test-glyphs.ts
  */
 
 import { Window } from './components/window.ts';

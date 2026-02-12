@@ -11,6 +11,8 @@ import (
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/glyph/handlers"
+	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/plugin"
@@ -274,6 +276,19 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		serverLogger.Warnw("Failed to initialize watcher engine", "error", err)
 		// Non-fatal: server can still run without watchers
 	}
+
+	// Initialize canvas state handlers — with watcher engine for meld edge subscriptions
+	canvasStore := glyphstorage.NewCanvasStore(db)
+	var canvasOpts []handlers.CanvasHandlerOption
+	if server.watcherEngine != nil {
+		canvasOpts = append(canvasOpts, handlers.WithWatcherEngine(server.watcherEngine, serverLogger))
+	}
+	server.canvasHandler = handlers.NewCanvasHandler(canvasStore, canvasOpts...)
+	serverLogger.Infow("Canvas state handlers initialized")
+
+	// TODO(#432): Add minimized window state persistence
+	// Create handler and storage for minimized glyph run state
+	// (currently only persists to localStorage, doesn't sync across devices)
 
 	// Initialize embedding service for semantic search (optional)
 	server.SetupEmbeddingService()

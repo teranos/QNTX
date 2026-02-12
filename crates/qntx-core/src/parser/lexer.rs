@@ -137,6 +137,22 @@ impl<'a> Lexer<'a> {
 
         match c {
             '\'' | '"' => self.read_quoted_string(),
+            '*' | '^' | '%' | '$' | '#' => {
+                // Wildcards/special characters are not supported in ax queries
+                let start = self.position;
+                self.advance(c.len_utf8());
+                Token::new(
+                    TokenKind::Wildcard,
+                    &self.input[start..self.position],
+                    start,
+                )
+            }
+            '|' => {
+                // Pipe is the claim key separator - reject it explicitly
+                let start = self.position;
+                self.advance(c.len_utf8());
+                Token::new(TokenKind::Pipe, &self.input[start..self.position], start)
+            }
             _ if c.is_alphanumeric() || c == '_' || !c.is_ascii() => self.read_identifier(),
             _ => {
                 // Unknown character - skip it

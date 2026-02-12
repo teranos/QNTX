@@ -124,7 +124,7 @@ func saveUIConfig(config map[string]interface{}, configPath string) error {
 func UpdateLocalInferenceEnabled(enabled bool) error {
 	config, configPath, err := loadOrInitializeUIConfig()
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to load UI config for local_inference.enabled update (enabled=%t)", enabled)
 	}
 
 	// Get or create local_inference section
@@ -139,14 +139,17 @@ func UpdateLocalInferenceEnabled(enabled bool) error {
 	localInference["enabled"] = enabled
 	config["local_inference"] = localInference
 
-	return saveUIConfig(config, configPath)
+	if err := saveUIConfig(config, configPath); err != nil {
+		return errors.Wrapf(err, "failed to save local_inference.enabled=%t to %s", enabled, configPath)
+	}
+	return nil
 }
 
 // UpdateLocalInferenceModel updates the local_inference.model setting in UI config
 func UpdateLocalInferenceModel(model string) error {
 	config, configPath, err := loadOrInitializeUIConfig()
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to load UI config for local_inference.model update (model=%s)", model)
 	}
 
 	// Get or create local_inference section
@@ -161,14 +164,17 @@ func UpdateLocalInferenceModel(model string) error {
 	localInference["model"] = model
 	config["local_inference"] = localInference
 
-	return saveUIConfig(config, configPath)
+	if err := saveUIConfig(config, configPath); err != nil {
+		return errors.Wrapf(err, "failed to save local_inference.model=%s to %s", model, configPath)
+	}
+	return nil
 }
 
 // UpdateLocalInferenceONNXModelPath updates the local_inference.onnx_model_path setting in UI config
 func UpdateLocalInferenceONNXModelPath(path string) error {
 	config, configPath, err := loadOrInitializeUIConfig()
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to load UI config for local_inference.onnx_model_path update (path=%s)", path)
 	}
 
 	// Get or create local_inference section
@@ -183,14 +189,17 @@ func UpdateLocalInferenceONNXModelPath(path string) error {
 	localInference["onnx_model_path"] = path
 	config["local_inference"] = localInference
 
-	return saveUIConfig(config, configPath)
+	if err := saveUIConfig(config, configPath); err != nil {
+		return errors.Wrapf(err, "failed to save local_inference.onnx_model_path=%s to %s", path, configPath)
+	}
+	return nil
 }
 
 // UpdatePulseDailyBudget updates the daily budget in UI config
 func UpdatePulseDailyBudget(dailyBudget float64) error {
 	config, configPath, err := loadOrInitializeUIConfig()
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to load UI config for pulse.daily_budget_usd update (budget=%.2f)", dailyBudget)
 	}
 
 	// Get or create pulse section
@@ -205,14 +214,17 @@ func UpdatePulseDailyBudget(dailyBudget float64) error {
 	pulse["daily_budget_usd"] = dailyBudget
 	config["pulse"] = pulse
 
-	return saveUIConfig(config, configPath)
+	if err := saveUIConfig(config, configPath); err != nil {
+		return errors.Wrapf(err, "failed to save pulse.daily_budget_usd=%.2f to %s", dailyBudget, configPath)
+	}
+	return nil
 }
 
 // UpdatePulseMonthlyBudget updates the monthly budget in UI config
 func UpdatePulseMonthlyBudget(monthlyBudget float64) error {
 	config, configPath, err := loadOrInitializeUIConfig()
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to load UI config for pulse.monthly_budget_usd update (budget=%.2f)", monthlyBudget)
 	}
 
 	// Get or create pulse section
@@ -227,5 +239,8 @@ func UpdatePulseMonthlyBudget(monthlyBudget float64) error {
 	pulse["monthly_budget_usd"] = monthlyBudget
 	config["pulse"] = pulse
 
-	return saveUIConfig(config, configPath)
+	if err := saveUIConfig(config, configPath); err != nil {
+		return errors.Wrapf(err, "failed to save pulse.monthly_budget_usd=%.2f to %s", monthlyBudget, configPath)
+	}
+	return nil
 }

@@ -37,7 +37,7 @@ func ShouldOutputJSON(cmd *cobra.Command) bool {
 func OutputJSON(v interface{}) error {
 	data, err := MarshalJSON(v)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal JSON")
+		return errors.Wrapf(err, "failed to marshal JSON for type %T", v)
 	}
 	fmt.Println(string(data))
 	return nil
