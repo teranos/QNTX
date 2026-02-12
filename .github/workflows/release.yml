@@ -37,6 +37,7 @@ jobs:
           name: QNTX ${{ steps.version.outputs.version }}
           draft: false
           prerelease: false
+          generate_release_notes: true
           body: |
             ## QNTX ${{ steps.version.outputs.version }}
 
