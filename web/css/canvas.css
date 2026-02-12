@@ -2,7 +2,7 @@
  * Canvas Workspace - Fractal glyph container with spatial grid layout
  */
 
-/* Canvas workspace - full-screen, no padding, always dark with infinite grid */
+/* Canvas workspace - full-screen, no padding, always dark with fixed grid background */
 .canvas-workspace {
     width: 100%;
     height: 100%;
