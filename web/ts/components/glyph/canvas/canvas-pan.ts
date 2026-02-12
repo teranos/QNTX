@@ -357,17 +357,31 @@ export function setZoom(container: HTMLElement, canvasId: string, scale: number,
 }
 
 /**
- * Reset transform to default (no pan, 100% zoom)
+ * Reset transform to default (no pan, 100% zoom) with smooth animation
  * @param container Canvas container element
  * @param canvasId Canvas identifier
  */
 export function resetTransform(container: HTMLElement, canvasId: string): void {
     const state = getState(canvasId);
+    const contentLayer = container.querySelector('.canvas-content-layer') as HTMLElement;
+
+    // Enable CSS transition for smooth animation
+    if (contentLayer) {
+        contentLayer.style.transition = 'transform 0.55s ease-out';
+    }
+
     state.panX = 0;
     state.panY = 0;
     state.scale = 1.0;
     applyTransform(container, canvasId);
     saveTransformState(canvasId);
+
+    // Remove transition after animation completes
+    if (contentLayer) {
+        setTimeout(() => {
+            contentLayer.style.transition = '';
+        }, 550);
+    }
 }
 
 /**
