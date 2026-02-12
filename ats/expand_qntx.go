@@ -14,7 +14,7 @@ import (
 func ExpandCartesianClaims(attestations []types.As) []IndividualClaim {
 	engine, err := wasm.GetEngine()
 	if err != nil {
-		panic("WASM engine unavailable for expand: " + err.Error() + " — run `make rust-wasm`")
+		panic("WASM engine unavailable for expand: " + err.Error() + " — run `make wasm`")
 	}
 
 	wasmAttestations := make([]wasm.ExpandAttestationInput, len(attestations))
@@ -62,7 +62,7 @@ func ExpandCartesianClaims(attestations []types.As) []IndividualClaim {
 func GroupClaimsByKey(claims []IndividualClaim) map[ClaimKey][]IndividualClaim {
 	engine, err := wasm.GetEngine()
 	if err != nil {
-		panic("WASM engine unavailable for group_claims: " + err.Error() + " — run `make rust-wasm`")
+		panic("WASM engine unavailable for group_claims: " + err.Error() + " — run `make wasm`")
 	}
 
 	wasmClaims := make([]wasm.ExpandClaimOutput, len(claims))
@@ -120,7 +120,7 @@ func GroupClaimsByKey(claims []IndividualClaim) map[ClaimKey][]IndividualClaim {
 func ConvertClaimsToAttestations(claims []IndividualClaim) []types.As {
 	engine, err := wasm.GetEngine()
 	if err != nil {
-		panic("WASM engine unavailable for dedup_source_ids: " + err.Error() + " — run `make rust-wasm`")
+		panic("WASM engine unavailable for dedup_source_ids: " + err.Error() + " — run `make wasm`")
 	}
 
 	wasmClaims := make([]wasm.ExpandClaimOutput, len(claims))

@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-vidstream rust-sqlite rust-wasm rust-python
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-vidstream rust-sqlite wasm rust-python
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -6,7 +6,7 @@ PREFIX ?= $(HOME)/.qntx
 # Use prebuilt qntx if available in PATH, otherwise use ./bin/qntx
 QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
-cli: rust-vidstream rust-sqlite rust-wasm ## Build QNTX CLI binary (with Rust optimizations and WASM fuzzy+parser)
+cli: rust-vidstream rust-sqlite wasm ## Build QNTX CLI binary (with Rust optimizations and WASM fuzzy+parser)
 	@echo "Building QNTX CLI with Rust optimizations (video, sqlite) and WASM (parser, fuzzy)..."
 	@go build -tags "rustvideo,rustsqlite,qntxwasm" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
@@ -81,7 +81,7 @@ dev-mobile: web cli ## Start dev servers and run iOS app in simulator
 	cd web/src-tauri && SKIP_DEV_SERVER=1 cargo tauri ios dev "iPhone 17 Pro"; \
 	wait
 
-web: rust-wasm ## Build web assets with Bun (requires WASM)
+web: wasm ## Build web assets with Bun (requires WASM)
 	@echo "Building web assets..."
 	@cd web && bun install && bun run build
 
@@ -225,7 +225,7 @@ rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO inte
 	@echo "  Static:  libqntx_sqlite.a"
 	@echo "  Shared:  libqntx_sqlite.so (Linux) / libqntx_sqlite.dylib (macOS)"
 
-rust-wasm: ## Build qntx-core as WASM module (for wazero integration + browser)
+wasm: ## Build qntx-core as WASM module (for wazero integration + browser)
 	@echo "Building qntx-core WASM modules..."
 	@echo "  [1/2] Building Go/wazero WASM..."
 	@cargo build --release --target wasm32-unknown-unknown --package qntx-wasm
