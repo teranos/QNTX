@@ -291,24 +291,6 @@ export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortC
         }
     }, { signal });
 
-    // Keyboard shortcuts for canvas navigation
-    document.addEventListener('keydown', (e: KeyboardEvent) => {
-        // Only handle if canvas container or its children have focus
-        if (!container.contains(document.activeElement) && document.activeElement !== container) {
-            return;
-        }
-
-        // '0' key: Reset zoom and pan to origin
-        if (e.key === '0' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
-            e.preventDefault();
-            resetTransform(container, canvasId);
-            log.debug(SEG.GLYPH, '[CanvasPan] Reset transform via keyboard (0 key)');
-        }
-
-        // TODO: '1' key: Fit all glyphs in view
-        // Calculate bounding box of all canvas glyphs and zoom/pan to show everything
-    }, { signal });
-
     return controller;
 }
 
