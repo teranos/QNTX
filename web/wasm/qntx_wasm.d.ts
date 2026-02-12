@@ -20,13 +20,6 @@
 export function classify_claims(input: string): string;
 
 /**
- * Deduplicate claims to unique source attestation IDs, preserving order.
- * Takes JSON: `{"claims": [...]}`
- * Returns JSON: `{"ids": [...], "total": N}`
- */
-export function dedup_source_ids(input: string): string;
-
-/**
  * Delete an attestation by ID from IndexedDB.
  * Returns a Promise that resolves to true if deleted, false if not found.
  */
@@ -37,13 +30,6 @@ export function delete_attestation(id: string): Promise<boolean>;
  * Returns a Promise that resolves to true if exists, false otherwise.
  */
 export function exists_attestation(id: string): Promise<boolean>;
-
-/**
- * Expand compact attestations into individual claims via cartesian product.
- * Takes JSON: `{"attestations": [...]}`
- * Returns JSON: `{"claims": [...], "total": N}`
- */
-export function expand_cartesian_claims(input: string): string;
 
 /**
  * Rebuild the fuzzy search index from current IndexedDB vocabulary.
@@ -73,13 +59,6 @@ export function fuzzy_status(): string;
  * Converts from internal core::Attestation format before serialization.
  */
 export function get_attestation(id: string): Promise<string | undefined>;
-
-/**
- * Group individual claims by (subject, predicate, context) key.
- * Takes JSON: `{"claims": [...]}`
- * Returns JSON: `{"groups": [...], "total_groups": N}`
- */
-export function group_claims(input: string): string;
 
 /**
  * Initialize the IndexedDB store. Must be called before any storage operations.
@@ -131,15 +110,12 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly classify_claims: (a: number, b: number) => [number, number];
-    readonly dedup_source_ids: (a: number, b: number) => [number, number];
     readonly delete_attestation: (a: number, b: number) => any;
     readonly exists_attestation: (a: number, b: number) => any;
-    readonly expand_cartesian_claims: (a: number, b: number) => [number, number];
     readonly fuzzy_rebuild_index: () => any;
     readonly fuzzy_search: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly fuzzy_status: () => [number, number];
     readonly get_attestation: (a: number, b: number) => any;
-    readonly group_claims: (a: number, b: number) => [number, number];
     readonly init_store: (a: number, b: number) => any;
     readonly is_store_initialized: () => number;
     readonly list_attestation_ids: () => any;
