@@ -96,7 +96,7 @@ jobs:
         run: cargo fmt --check --package qntx-wasm
 
       - name: Build WASM module
-        run: make rust-wasm
+        run: make wasm
 
       - name: Test Go integration
         run: go test -v ./ats/wasm/...

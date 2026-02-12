@@ -36,6 +36,7 @@ pub enum TokenKind {
     Eof,
     Unknown,
     Wildcard, // Explicit wildcard token for rejecting '*'
+    Pipe,     // Explicit pipe token for rejecting '|' (claim key separator)
 }
 
 impl TokenKind {
@@ -88,6 +89,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Eof => write!(f, "end of input"),
             TokenKind::Unknown => write!(f, "unknown"),
             TokenKind::Wildcard => write!(f, "wildcard '*'"),
+            TokenKind::Pipe => write!(f, "pipe '|'"),
         }
     }
 }
