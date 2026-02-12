@@ -3763,7 +3763,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-wasm"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "js-sys",
  "qntx-core",
