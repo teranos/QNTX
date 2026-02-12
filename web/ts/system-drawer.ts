@@ -5,7 +5,10 @@ import { sendMessage } from './websocket.ts';
 import { CSS } from './css-classes.ts';
 import { formatTimestamp } from './html-utils.ts';
 import { log, SEG } from './logger.ts';
+import { getStorageItem, setStorageItem, isStorageInitialized } from './indexeddb-storage.ts';
 import type { LogsMessage, LogEntry } from '../types/websocket';
+
+const DRAWER_COLLAPSED_KEY = 'system-drawer-collapsed';
 
 // Make this a module
 export {};
@@ -184,14 +187,23 @@ export function initSystemDrawer(): void {
 
     // Log panel toggle
     const logHeader = document.getElementById('system-drawer-header') as HTMLElement | null;
+    const panel = document.getElementById('system-drawer') as HTMLElement | null;
+    const toggleBtn = document.getElementById('toggle-logs') as HTMLElement | null;
+
+    // Restore collapsed state from IndexedDB
+    if (panel && toggleBtn && isStorageInitialized()) {
+        const wasCollapsed = getStorageItem(DRAWER_COLLAPSED_KEY) === 'true';
+        if (wasCollapsed) {
+            panel.classList.add(CSS.STATE.COLLAPSED);
+            toggleBtn.textContent = '▲';
+        }
+    }
+
     if (logHeader) {
         logHeader.addEventListener('click', function(e: Event) {
             const target = e.target as HTMLElement;
             // Don't toggle if clicking on buttons
             if (target.tagName === 'BUTTON' || target.tagName === 'SELECT') return;
-
-            const panel = document.getElementById('system-drawer') as HTMLElement | null;
-            const toggleBtn = document.getElementById('toggle-logs') as HTMLElement | null;
 
             if (panel && toggleBtn) {
                 const isCollapsed = panel.classList.contains(CSS.STATE.COLLAPSED);
@@ -200,7 +212,11 @@ export function initSystemDrawer(): void {
                 } else {
                     panel.classList.add(CSS.STATE.COLLAPSED);
                 }
-                toggleBtn.textContent = panel.classList.contains(CSS.STATE.COLLAPSED) ? '▲' : '▼';
+                const nowCollapsed = panel.classList.contains(CSS.STATE.COLLAPSED);
+                toggleBtn.textContent = nowCollapsed ? '▲' : '▼';
+
+                // Persist collapsed state to IndexedDB
+                setStorageItem(DRAWER_COLLAPSED_KEY, String(nowCollapsed));
             }
         });
     }

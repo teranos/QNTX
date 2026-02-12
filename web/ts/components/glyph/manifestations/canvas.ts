@@ -31,11 +31,12 @@ export function morphToCanvas(
     // Get current glyph position and size
     const glyphRect = glyphElement.getBoundingClientRect();
 
-    // Target: full viewport
+    // Target: full viewport minus system drawer header (always visible)
+    const SYSTEM_DRAWER_HEADER_HEIGHT = 32;
     const targetX = 0;
     const targetY = 0;
     const targetWidth = window.innerWidth;
-    const targetHeight = window.innerHeight;
+    const targetHeight = window.innerHeight - SYSTEM_DRAWER_HEADER_HEIGHT;
 
     // Remove from indicator container and reparent to body
     glyphElement.remove();
@@ -72,7 +73,7 @@ export function morphToCanvas(
         glyphElement.style.left = '0';
         glyphElement.style.top = '0';
         glyphElement.style.width = '100vw';
-        glyphElement.style.height = '100vh';
+        glyphElement.style.height = 'calc(100vh - 32px)'; /* Leave room for system drawer header */
         glyphElement.style.borderRadius = '0'; // No rounded corners
         glyphElement.style.backgroundColor = 'var(--bg-primary)';
         glyphElement.style.boxShadow = 'none'; // No shadow
