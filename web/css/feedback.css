@@ -53,24 +53,6 @@
     margin-left: auto;
 }
 
-#toggle-logs {
-    background: none;
-    border: none;
-    color: var(--text-tertiary);
-    cursor: pointer;
-    padding: 0;
-    font-size: var(--font-size-md);
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-#toggle-logs:hover {
-    color: #fff;
-}
-
 #download-logs,
 #clear-logs {
     background: var(--bg-dark-light);
