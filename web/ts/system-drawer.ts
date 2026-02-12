@@ -5,10 +5,17 @@ import { sendMessage } from './websocket.ts';
 import { CSS } from './css-classes.ts';
 import { formatTimestamp } from './html-utils.ts';
 import { log, SEG } from './logger.ts';
+import { getStorageItem, setStorageItem } from './indexeddb-storage.ts';
 import type { LogsMessage, LogEntry } from '../types/websocket';
 
 // Make this a module
 export {};
+
+const DRAWER_HEIGHT_KEY = 'system-drawer-height';
+const DRAWER_MIN = 6;     // Hidden: just the grab bar
+const DRAWER_HEADER = 32; // Header-only height
+const DRAWER_MAX = 300;
+const DRAWER_DEFAULT = DRAWER_HEADER;
 
 // Type-safe log level to CSS class mapping
 const LOG_LEVEL_MAP: Record<string, string> = {
@@ -162,9 +169,63 @@ function updateDownloadButton(): void {
     }
 }
 
+function setDrawerHeight(panel: HTMLElement, height: number): void {
+    const clamped = Math.max(DRAWER_MIN, Math.min(DRAWER_MAX, height));
+    panel.style.height = `${clamped}px`;
+
+    if (clamped <= DRAWER_MIN) {
+        panel.classList.add('drawer-hidden');
+    } else {
+        panel.classList.remove('drawer-hidden');
+    }
+}
+
 // Initialize log panel event listeners
 export function initSystemDrawer(): void {
-    // Verbosity selector
+    const panel = document.getElementById('system-drawer') as HTMLElement | null;
+    if (!panel) return;
+
+    // Insert grab bar as first child of drawer
+    const grabBar = document.createElement('div');
+    grabBar.className = 'drawer-grab-bar';
+    panel.prepend(grabBar);
+
+    // Restore height from IndexedDB, fall back to default
+    const stored = getStorageItem(DRAWER_HEIGHT_KEY);
+    const initialHeight = stored ? parseInt(stored, 10) : DRAWER_DEFAULT;
+    setDrawerHeight(panel, initialHeight);
+
+    // Track last expanded height for click toggle
+    let lastExpandedHeight = initialHeight > DRAWER_HEADER ? initialHeight : DRAWER_MAX;
+
+    // --- Drag to resize ---
+    let dragging = false;
+
+    grabBar.addEventListener('pointerdown', (e: PointerEvent) => {
+        dragging = true;
+        grabBar.setPointerCapture(e.pointerId);
+        e.preventDefault();
+    });
+
+    grabBar.addEventListener('pointermove', (e: PointerEvent) => {
+        if (!dragging) return;
+        const height = window.innerHeight - e.clientY;
+        setDrawerHeight(panel, height);
+    });
+
+    grabBar.addEventListener('pointerup', (e: PointerEvent) => {
+        if (!dragging) return;
+        dragging = false;
+        grabBar.releasePointerCapture(e.pointerId);
+
+        const finalHeight = panel.offsetHeight;
+        if (finalHeight > DRAWER_HEADER) {
+            lastExpandedHeight = finalHeight;
+        }
+        setStorageItem(DRAWER_HEIGHT_KEY, String(finalHeight));
+    });
+
+    // --- Verbosity selector ---
     const verbositySelect = document.getElementById('verbosity-select') as HTMLSelectElement | null;
     if (verbositySelect) {
         verbositySelect.addEventListener('change', function(e: Event) {
@@ -177,31 +238,35 @@ export function initSystemDrawer(): void {
                 verbosity: verbosity
             });
 
-            // Update download button state
             updateDownloadButton();
         });
     }
 
-    // Log panel toggle
+    // --- Click header to toggle ---
     const logHeader = document.getElementById('system-drawer-header') as HTMLElement | null;
     if (logHeader) {
         logHeader.addEventListener('click', function(e: Event) {
+            if (dragging) return;
             const target = e.target as HTMLElement;
-            // Don't toggle if clicking on buttons
             if (target.tagName === 'BUTTON' || target.tagName === 'SELECT') return;
 
-            const panel = document.getElementById('system-drawer') as HTMLElement | null;
-            const toggleBtn = document.getElementById('toggle-logs') as HTMLElement | null;
+            const currentHeight = panel.offsetHeight;
+            let newHeight: number;
 
-            if (panel && toggleBtn) {
-                const isCollapsed = panel.classList.contains(CSS.STATE.COLLAPSED);
-                if (isCollapsed) {
-                    panel.classList.remove(CSS.STATE.COLLAPSED);
-                } else {
-                    panel.classList.add(CSS.STATE.COLLAPSED);
-                }
-                toggleBtn.textContent = panel.classList.contains(CSS.STATE.COLLAPSED) ? '▲' : '▼';
+            if (currentHeight > DRAWER_HEADER) {
+                // Collapse to header
+                lastExpandedHeight = currentHeight;
+                newHeight = DRAWER_HEADER;
+            } else if (currentHeight <= DRAWER_MIN) {
+                // From hidden → header
+                newHeight = DRAWER_HEADER;
+            } else {
+                // From header → expand
+                newHeight = lastExpandedHeight > DRAWER_HEADER ? lastExpandedHeight : DRAWER_MAX;
             }
+
+            setDrawerHeight(panel, newHeight);
+            setStorageItem(DRAWER_HEIGHT_KEY, String(newHeight));
         });
     }
 }

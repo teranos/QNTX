@@ -8,15 +8,30 @@
     right: 0;
     background: var(--bg-almost-black);
     border-top: 1px solid var(--border-on-dark);
-    max-height: 300px;
-    z-index: 1000;
+    z-index: 10002; /* Above fullscreen canvas (10000) and minimize btn (10001) */
     display: flex;
     flex-direction: column;
-    transition: max-height 0.3s ease-in-out;
+    overflow: hidden;
 }
 
-#system-drawer.collapsed {
-    max-height: 32px;
+#system-drawer.drawer-hidden #system-drawer-header {
+    opacity: 0;
+    pointer-events: none;
+}
+
+#system-drawer.drawer-hidden #log-panels-container {
+    display: none;
+}
+
+#system-drawer .drawer-grab-bar {
+    height: 6px;
+    cursor: ns-resize;
+    flex-shrink: 0;
+    background: transparent;
+}
+
+#system-drawer .drawer-grab-bar:hover {
+    background: rgba(255, 255, 255, 0.06);
 }
 
 #system-drawer-header {
@@ -87,9 +102,7 @@
     overflow: hidden;
 }
 
-#system-drawer.collapsed #log-panels-container {
-    display: none;
-}
+/* When drawer height is at header-only (32px), content hidden via overflow: hidden on parent */
 
 .log-column {
     flex: 1;
