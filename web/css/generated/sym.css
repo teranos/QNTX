@@ -8,6 +8,7 @@
   --sym-at: "✦";
   --sym-ax: "⋈";
   --sym-by: "⌬";
+  --sym-canvas: "⧉";
   --sym-db: "⊔";
   --sym-i: "⍟";
   --sym-is: "=";
@@ -18,4 +19,5 @@
   --sym-pulse-close: "❀";
   --sym-pulse-open: "✿";
   --sym-so: "⟶";
+  --sym-subcircuit: "⌗";
 }

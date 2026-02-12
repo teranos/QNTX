@@ -21,6 +21,7 @@ const AS = "+"
 const AT = "✦"
 const AX = "⋈"
 const BY = "⌬"
+const Canvas = "⧉"
 const DB = "⊔"
 const I = "⍟"
 const IS = "="
@@ -31,6 +32,7 @@ const Pulse = "꩜"
 const PulseClose = "❀"
 const PulseOpen = "✿"
 const SO = "⟶"
+const Subcircuit = "⌗"
 ```
 
 
