@@ -2,19 +2,12 @@
  * Test for storage warning handler
  */
 
-import { describe, test, expect, mock } from 'bun:test';
+import { describe, test, expect, mock, spyOn } from 'bun:test';
 import { handleStorageWarning } from './storage-warning';
 
-// Mock the toast module
-mock.module('../toast', () => ({
-    toast: {
-        warning: mock(() => {}),
-    },
-}));
-
 describe('Storage Warning Handler', () => {
-    test('storage warning shows correct fill percentage', () => {
-        const { toast } = require('../toast');
+    test('storage warning logs correct fill percentage', () => {
+        const warnSpy = spyOn(console, 'warn');
 
         handleStorageWarning({
             type: 'storage_warning',
@@ -27,9 +20,10 @@ describe('Storage Warning Handler', () => {
             timestamp: Date.now(),
         });
 
-        // Should display "Storage 85% full for user@test/work (85/100)"
-        const message = toast.warning.mock.calls[0][0];
-        expect(message).toContain('85%');
-        expect(message).toContain('85/100');
+        const loggedArgs = warnSpy.mock.calls[0].join(' ');
+        expect(loggedArgs).toContain('85%');
+        expect(loggedArgs).toContain('85/100');
+
+        warnSpy.mockRestore();
     });
 });
