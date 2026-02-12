@@ -293,6 +293,73 @@ mod wazero {
     }
 
     // ============================================================================
+    // Cartesian expansion
+    // ============================================================================
+
+    /// Inner logic for expand_cartesian_claims — testable without WASM memory ABI.
+    fn expand_cartesian_claims_impl(input: &str) -> String {
+        qntx_core::expand_claims_json(input)
+    }
+
+    /// Inner logic for group_claims — testable without WASM memory ABI.
+    fn group_claims_impl(input: &str) -> String {
+        qntx_core::group_claims_json(input)
+    }
+
+    /// Inner logic for dedup_source_ids — testable without WASM memory ABI.
+    fn dedup_source_ids_impl(input: &str) -> String {
+        qntx_core::dedup_source_ids_json(input)
+    }
+
+    /// Expand compact attestations into individual claims via cartesian product.
+    /// Takes (ptr, len) pointing to a JSON string:
+    /// ```json
+    /// {
+    ///   "attestations": [{
+    ///     "id": "...", "subjects": [...], "predicates": [...],
+    ///     "contexts": [...], "actors": [...], "timestamp_ms": N
+    ///   }]
+    /// }
+    /// ```
+    ///
+    /// Returns packed u64 pointing to JSON:
+    /// ```json
+    /// {
+    ///   "claims": [{"subject":"...","predicate":"...","context":"...","actor":"...","timestamp_ms":N,"source_id":"..."}],
+    ///   "total": N
+    /// }
+    /// ```
+    #[no_mangle]
+    pub extern "C" fn expand_cartesian_claims(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&expand_cartesian_claims_impl(input))
+    }
+
+    /// Group individual claims by (subject, predicate, context) key.
+    /// Takes (ptr, len) pointing to a JSON string:
+    /// `{"claims": [...]}`
+    ///
+    /// Returns packed u64 pointing to JSON:
+    /// `{"groups": [{"key": "...", "claims": [...]}], "total_groups": N}`
+    #[no_mangle]
+    pub extern "C" fn group_claims(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&group_claims_impl(input))
+    }
+
+    /// Deduplicate claims to unique source attestation IDs, preserving order.
+    /// Takes (ptr, len) pointing to a JSON string:
+    /// `{"claims": [...]}`
+    ///
+    /// Returns packed u64 pointing to JSON:
+    /// `{"ids": ["..."], "total": N}`
+    #[no_mangle]
+    pub extern "C" fn dedup_source_ids(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&dedup_source_ids_impl(input))
+    }
+
+    // ============================================================================
     // Tests
     // ============================================================================
 
@@ -455,6 +522,68 @@ mod wazero {
                 .as_str()
                 .unwrap()
                 .contains("invalid classify input"));
+        }
+
+        #[test]
+        fn expand_cartesian_basic() {
+            let input = serde_json::json!({
+                "attestations": [{
+                    "id": "SW001",
+                    "subjects": ["LUKE", "LEIA"],
+                    "predicates": ["operates_in"],
+                    "contexts": ["REBELLION"],
+                    "actors": ["imperial-records"],
+                    "timestamp_ms": 1000
+                }]
+            });
+            let result = expand_cartesian_claims_impl(&input.to_string());
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert!(parsed["error"].is_null(), "unexpected error: {}", result);
+            assert_eq!(parsed["total"], 2);
+            let claims = parsed["claims"].as_array().unwrap();
+            assert_eq!(claims[0]["subject"], "LUKE");
+            assert_eq!(claims[1]["subject"], "LEIA");
+        }
+
+        #[test]
+        fn expand_cartesian_invalid() {
+            let result = expand_cartesian_claims_impl("not json");
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert!(parsed["error"]
+                .as_str()
+                .unwrap()
+                .contains("invalid expand input"));
+        }
+
+        #[test]
+        fn group_claims_basic() {
+            let input = serde_json::json!({
+                "claims": [
+                    {"subject": "A", "predicate": "p", "context": "c", "actor": "x", "timestamp_ms": 1, "source_id": "id1"},
+                    {"subject": "A", "predicate": "p", "context": "c", "actor": "y", "timestamp_ms": 2, "source_id": "id2"},
+                    {"subject": "B", "predicate": "q", "context": "d", "actor": "x", "timestamp_ms": 3, "source_id": "id3"}
+                ]
+            });
+            let result = group_claims_impl(&input.to_string());
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert!(parsed["error"].is_null(), "unexpected error: {}", result);
+            assert_eq!(parsed["total_groups"], 2);
+        }
+
+        #[test]
+        fn dedup_source_ids_basic() {
+            let input = serde_json::json!({
+                "claims": [
+                    {"subject": "A", "predicate": "p", "context": "c", "actor": "x", "timestamp_ms": 1, "source_id": "id1"},
+                    {"subject": "B", "predicate": "p", "context": "c", "actor": "y", "timestamp_ms": 2, "source_id": "id1"},
+                    {"subject": "C", "predicate": "q", "context": "d", "actor": "x", "timestamp_ms": 3, "source_id": "id2"}
+                ]
+            });
+            let result = dedup_source_ids_impl(&input.to_string());
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert!(parsed["error"].is_null(), "unexpected error: {}", result);
+            assert_eq!(parsed["total"], 2);
+            assert_eq!(parsed["ids"].as_array().unwrap(), &["id1", "id2"]);
         }
     }
 } // end mod wazero
