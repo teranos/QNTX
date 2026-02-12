@@ -55,6 +55,9 @@ function applyPanTransform(container: HTMLElement, canvasId: string): void {
  * Load persisted pan state from uiState
  */
 function loadPanState(canvasId: string): void {
+    // Check if uiState methods are available (may not be in test environments)
+    if (typeof uiState.getCanvasPan !== 'function') return;
+
     const saved = uiState.getCanvasPan(canvasId);
     if (saved) {
         const state = getState(canvasId);
@@ -68,6 +71,9 @@ function loadPanState(canvasId: string): void {
  * Save pan state to uiState
  */
 function savePanState(canvasId: string): void {
+    // Check if uiState methods are available (may not be in test environments)
+    if (typeof uiState.setCanvasPan !== 'function') return;
+
     const state = getState(canvasId);
     uiState.setCanvasPan(canvasId, { panX: state.panX, panY: state.panY });
 }
