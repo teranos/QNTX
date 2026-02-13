@@ -25,7 +25,7 @@
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
 import { Window } from 'happy-dom';
 import { syncStateManager, type GlyphSyncState } from './sync-state';
-import type { CanvasGlyphState, CompositionState } from './ui';
+import { uiState, type CanvasGlyphState, type CompositionState } from './ui';
 
 // Setup happy-dom for localStorage (sync queue uses it)
 const happyWindow = new Window();
@@ -54,16 +54,9 @@ mock.module('../api', () => ({
     apiFetch: (path: string, init?: RequestInit) => mockApiFetch(path, init),
 }));
 
-// Mock UIState — glyph/composition data for sync queue flush
-let mockGlyphs: Array<{ id: string; symbol: string; x: number; y: number; content?: string }> = [];
-let mockCompositions: Array<{ id: string; edges: Array<{ from: string; to: string; direction: string; position: number }>; x: number; y: number }> = [];
-
-mock.module('./ui', () => ({
-    uiState: {
-        getCanvasGlyphs: () => mockGlyphs,
-        getCanvasCompositions: () => mockCompositions,
-    },
-}));
+// NOTE: Do NOT mock ./ui — mock.module is process-global and would break
+// compositions.test.ts and ui.test.ts. Instead, populate the real uiState
+// with test data via setCanvasGlyphs()/setCanvasCompositions().
 
 // Dynamic imports AFTER mocks
 const { mergeCanvasState } = await import('../api/canvas');
@@ -337,16 +330,16 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         localStorage.clear();
         mockConnectivity = 'offline';
         mockApiFetch = async () => new Response(null, { status: 200 });
-        // Mock glyph data for sync queue to resolve during flush
-        mockGlyphs = [
+        // Populate real uiState with glyph data for sync queue to resolve during flush
+        uiState.setCanvasGlyphs([
             { id: glyphs.novelCluster, symbol: 'ax', x: 100, y: 200 },
             { id: glyphs.candidateGene, symbol: 'gene', x: 200, y: 300 },
             { id: glyphs.homologA, symbol: 'gene', x: 300, y: 400 },
             { id: glyphs.hypothesis, symbol: 'note', x: 400, y: 500 },
             { id: glyphs.validationNote, symbol: 'note', x: 500, y: 600 },
             { id: glyphs.localAxQuery, symbol: 'ax', x: 600, y: 700 },
-        ];
-        mockCompositions = [];
+        ]);
+        uiState.setCanvasCompositions([]);
         Object.values(glyphs).forEach(id => {
             syncStateManager.clearState(id);
         });
@@ -773,7 +766,8 @@ describe('London Tube Journey: Gene Network Analysis', () => {
 
         // Researcher immediately continues with deep analysis on larger screen
         const deepAnalysisGlyph = 'desktop-deep-analysis-001';
-        mockGlyphs.push({ id: deepAnalysisGlyph, symbol: 'note', x: 800, y: 100 });
+        const currentGlyphs = uiState.getCanvasGlyphs();
+        uiState.setCanvasGlyphs([...currentGlyphs, { id: deepAnalysisGlyph, symbol: 'note', x: 800, y: 100 }]);
         canvasSyncQueue.add({ id: deepAnalysisGlyph, op: 'glyph_upsert' });
         await canvasSyncQueue.flush();
 
