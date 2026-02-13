@@ -14,8 +14,6 @@ import (
 
 // NewDefaultClassifier creates the WASM-backed classifier.
 // Panics if the WASM engine is unavailable — run `make wasm` to build.
-//
-// TODO(QNTX): Remove ats/ax/classification/ (Go classifier) in a follow-up PR.
 func NewDefaultClassifier(config classification.TemporalConfig) Classifier {
 	c, err := NewWasmClassifier(config)
 	if err != nil {
@@ -28,7 +26,8 @@ func NewDefaultClassifier(config classification.TemporalConfig) Classifier {
 // Credibility methods stay in Go since they're used for post-classification
 // resolution application and are just pattern matching.
 type WasmClassifier struct {
-	goFallback *GoClassifier // credibility methods + config access (no classification fallback)
+	credMgr *classification.CredibilityManager
+	config  classification.TemporalConfig
 }
 
 // NewWasmClassifier creates a WASM-backed classifier.
@@ -38,7 +37,8 @@ func NewWasmClassifier(config classification.TemporalConfig) (*WasmClassifier, e
 		return nil, err
 	}
 	return &WasmClassifier{
-		goFallback: NewGoClassifier(config),
+		credMgr: classification.NewCredibilityManager(),
+		config:  config,
 	}, nil
 }
 
@@ -61,14 +61,14 @@ func (w *WasmClassifier) ClassifyConflicts(claimGroups map[string][]ats.Individu
 	return w.convertOutput(output, claimGroups)
 }
 
-// GetActorCredibility delegates to the Go credibility manager.
+// GetActorCredibility delegates to the credibility manager.
 func (w *WasmClassifier) GetActorCredibility(actor string) classification.ActorCredibility {
-	return w.goFallback.GetActorCredibility(actor)
+	return w.credMgr.GetActorCredibility(actor)
 }
 
-// GetHighestCredibility delegates to the Go credibility manager.
+// GetHighestCredibility delegates to the credibility manager.
 func (w *WasmClassifier) GetHighestCredibility(actors []string) classification.ActorCredibility {
-	return w.goFallback.GetHighestCredibility(actors)
+	return w.credMgr.GetHighestCredibility(actors)
 }
 
 // Backend returns the classifier backend type.
@@ -101,9 +101,9 @@ func (w *WasmClassifier) buildWasmInput(claimGroups map[string][]ats.IndividualC
 	return wasm.ClassifyInput{
 		ClaimGroups: groups,
 		Config: wasm.ClassifyTemporalConfig{
-			VerificationWindowMs: w.goFallback.sc.Config().VerificationWindow.Milliseconds(),
-			EvolutionWindowMs:    w.goFallback.sc.Config().EvolutionWindow.Milliseconds(),
-			ObsolescenceWindowMs: w.goFallback.sc.Config().ObsolescenceWindow.Milliseconds(),
+			VerificationWindowMs: w.config.VerificationWindow.Milliseconds(),
+			EvolutionWindowMs:    w.config.EvolutionWindow.Milliseconds(),
+			ObsolescenceWindowMs: w.config.ObsolescenceWindow.Milliseconds(),
 		},
 		NowMs: time.Now().UnixMilli(),
 	}

@@ -62,7 +62,7 @@ func TestNewAxExecutor_DefaultsApplied(t *testing.T) {
 	executor := NewAxExecutor(queryStore, aliasResolver)
 
 	// Verify classifier is always created (never nil)
-	assert.NotNil(t, executor.classifier, "SmartClassifier should always be created")
+	assert.NotNil(t, executor.classifier, "Classifier should always be created")
 
 	// Verify default options are applied
 	assert.NotNil(t, executor.entityResolver, "EntityResolver should have default")

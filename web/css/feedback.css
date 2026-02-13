@@ -8,15 +8,30 @@
     right: 0;
     background: var(--bg-almost-black);
     border-top: 1px solid var(--border-on-dark);
-    max-height: 300px;
-    z-index: 1000;
+    z-index: 10002; /* Above fullscreen canvas (10000) and minimize btn (10001) */
     display: flex;
     flex-direction: column;
-    transition: max-height 0.3s ease-in-out;
+    overflow: hidden;
 }
 
-#system-drawer.collapsed {
-    max-height: 32px;
+#system-drawer.drawer-hidden #system-drawer-header {
+    opacity: 0;
+    pointer-events: none;
+}
+
+#system-drawer.drawer-hidden #log-panels-container {
+    display: none;
+}
+
+#system-drawer .drawer-grab-bar {
+    height: 6px;
+    cursor: ns-resize;
+    flex-shrink: 0;
+    background: transparent;
+}
+
+#system-drawer .drawer-grab-bar:hover {
+    background: rgba(255, 255, 255, 0.06);
 }
 
 #system-drawer-header {
@@ -36,24 +51,6 @@
     gap: var(--gap);
     align-items: center;
     margin-left: auto;
-}
-
-#toggle-logs {
-    background: none;
-    border: none;
-    color: var(--text-tertiary);
-    cursor: pointer;
-    padding: 0;
-    font-size: var(--font-size-md);
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-#toggle-logs:hover {
-    color: #fff;
 }
 
 #download-logs,
@@ -87,9 +84,7 @@
     overflow: hidden;
 }
 
-#system-drawer.collapsed #log-panels-container {
-    display: none;
-}
+/* When drawer height is at header-only (32px), content hidden via overflow: hidden on parent */
 
 .log-column {
     flex: 1;
@@ -307,66 +302,6 @@
 
 .att-value {
     color: #88c999;
-}
-
-/* Toast Notifications */
-#toast-container {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 2000;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    max-width: 400px;
-}
-
-.toast {
-    background: #000;
-    color: #fff;
-    padding: var(--panel-padding-md);
-    border: 1px solid var(--border-on-dark);
-    font-size: var(--font-size-sm);
-    line-height: 1.5;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    animation: slideInFromRight 0.3s ease-out;
-}
-
-.toast.error {
-    border-color: #ff6b6b;
-    background: #2a1a1a;
-}
-
-.toast.warning {
-    border-color: #ffa502;
-    background: #2a2a1a;
-}
-
-.toast-title {
-    font-weight: 600;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-    font-size: var(--font-size-sm);
-    letter-spacing: 0.5px;
-}
-
-.toast.error .toast-title {
-    color: #ff6b6b;
-}
-
-.toast.warning .toast-title {
-    color: #ffa502;
-}
-
-@keyframes slideInFromRight {
-    from {
-        transform: translateX(400px);
-        opacity: 0;
-    }
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
 }
 
 /* Hixtory - IX operation history */
