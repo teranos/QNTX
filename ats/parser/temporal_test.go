@@ -441,7 +441,6 @@ func TestIsTemporalContinuation(t *testing.T) {
 	}
 }
 
-
 // Benchmark tests for performance validation
 func BenchmarkParseTemporalExpression(b *testing.B) {
 	expressions := []string{
