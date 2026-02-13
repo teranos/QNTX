@@ -11,6 +11,7 @@ import { handleImportProgress, handleImportStats, handleImportComplete, initQuer
 import { uiState } from './state/ui.ts';
 import { appState } from './state/app.ts';
 import { initUsageBadge, handleUsageUpdate } from './usage-badge.ts';
+import { initSyncBadge } from './sync-badge.ts';
 import { handleParseResponse } from './ats-semantic-tokens-client.ts';
 import { handleJobUpdate } from './hixtory-panel.ts';
 import { handleDaemonStatus } from './websocket-handlers/daemon-status.ts';
@@ -163,14 +164,14 @@ async function init(): Promise<void> {
     // Load persisted UI state from IndexedDB (must happen after initStorage())
     uiState.loadPersistedState();
 
-    // Bidirectional canvas state sync: merge backend state into local, then push local to backend.
-    // This ensures new clients receive canvas state from previous sessions on other devices,
-    // while preserving any locally-created glyphs that haven't been synced yet.
-    try {
+    // Bidirectional canvas state sync: merge backend state into local, then enqueue local→server.
+    // Backend merge ensures new clients receive state from other devices.
+    // Sync queue ensures locally-created items reach the server when online.
+    {
         if (window.logLoaderStep) window.logLoaderStep('Syncing canvas state...', false, true);
         const { loadCanvasState, mergeCanvasState, upsertCanvasGlyph, upsertComposition } = await import('./api/canvas.ts');
 
-        // Merge backend state into local. Uses bulk setters to avoid per-item backend upserts.
+        // Merge backend state into local (skip if offline)
         try {
             const backendState = await loadCanvasState();
             const local = { glyphs: uiState.getCanvasGlyphs(), compositions: uiState.getCanvasCompositions() };
@@ -186,42 +187,15 @@ async function init(): Promise<void> {
             log.warn(SEG.GLYPH, '[Init] Failed to load canvas state from backend, continuing with local state:', error);
         }
 
-        // Push local state to backend (ensures backend has all glyphs including locally-created ones)
+        // Enqueue all local state for server sync (sync queue handles retry + dedup)
         const localGlyphs = uiState.getCanvasGlyphs();
         const localCompositions = uiState.getCanvasCompositions();
-
-        const glyphSyncPromises = localGlyphs.map(glyph =>
-            upsertCanvasGlyph(glyph).catch(err => {
-                log.error(SEG.GLYPH, `Failed to sync glyph ${glyph.id} (${glyph.symbol} at ${glyph.x},${glyph.y}, content: ${glyph.content?.length ?? 0} chars):`, err);
-                return null;
-            })
-        );
-
-        const compSyncPromises = localCompositions.map(comp =>
-            upsertComposition(comp).catch(err => {
-                log.error(SEG.GLYPH, `Failed to sync composition ${comp.id} (${comp.edges?.length ?? 0} edges, at ${comp.x},${comp.y}):`, err);
-                return null;
-            })
-        );
-
-        const [glyphResults, compResults] = await Promise.all([
-            Promise.allSettled(glyphSyncPromises),
-            Promise.allSettled(compSyncPromises)
-        ]);
-
-        const failedGlyphs = glyphResults.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value === null));
-        const failedComps = compResults.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value === null));
-
-        if (failedGlyphs.length > 0 || failedComps.length > 0) {
-            log.warn(SEG.GLYPH, `Failed to sync ${failedGlyphs.length} glyphs and ${failedComps.length} compositions to backend`);
-        }
+        for (const glyph of localGlyphs) upsertCanvasGlyph(glyph);
+        for (const comp of localCompositions) upsertComposition(comp);
 
         if (localGlyphs.length > 0 || localCompositions.length > 0) {
-            console.log(`[Init] Synced ${localGlyphs.length} glyphs and ${localCompositions.length} compositions to backend`);
+            log.info(SEG.GLYPH, `[Init] Enqueued ${localGlyphs.length} glyphs and ${localCompositions.length} compositions for sync`);
         }
-    } catch (error: unknown) {
-        console.error('[Init] Failed to sync canvas state to backend:', error);
-        // Non-fatal: Continue without backend sync
     }
 
     // Initialize QNTX WASM module with IndexedDB storage
@@ -303,6 +277,7 @@ async function init(): Promise<void> {
     if (window.logLoaderStep) window.logLoaderStep('Initializing UI controls...');
     initTypeAttestations(updateGraph);  // Pass renderGraph function for type attestation callbacks
     initUsageBadge();
+    initSyncBadge();
 
     // Listen for Tauri events (menu actions)
     if (typeof window.__TAURI__ !== 'undefined') {
