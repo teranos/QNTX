@@ -116,8 +116,8 @@ mod tests {
         let conn = Connection::open_in_memory()?;
 
         // Create vectors
-        let v1 = vec![1.0f32, 0.0, 0.0];
-        let v2 = vec![0.0f32, 1.0, 0.0];
+        let v1 = [1.0f32, 0.0, 0.0];
+        let v2 = [0.0f32, 1.0, 0.0];
 
         let blob1 = v1.iter().flat_map(|f| f.to_le_bytes()).collect::<Vec<u8>>();
         let blob2 = v2.iter().flat_map(|f| f.to_le_bytes()).collect::<Vec<u8>>();
