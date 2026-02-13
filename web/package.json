@@ -23,6 +23,7 @@
     "@codemirror/view": "6.38.1",
     "@lezer/highlight": "1.2.3",
     "@tauri-apps/api": "^2.9.1",
+    "@types/d3": "7.4.3",
     "@types/jsdom": "27.0.0",
     "codemirror-languageserver": "1.17.0",
     "fake-indexeddb": "^6.2.5",
@@ -51,6 +52,7 @@
     "@lezer/common": "1.4.0"
   },
   "dependencies": {
+    "d3": "7.9.0",
     "@codemirror/lang-javascript": "6.2.2",
     "@codemirror/lang-python": "^6.2.1",
     "@codemirror/lang-yaml": "^6.1.2",
