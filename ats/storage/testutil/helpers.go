@@ -4,11 +4,18 @@ import (
 	"database/sql"
 	"testing"
 
+	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
 
 	"github.com/teranos/QNTX/db"
 )
+
+func init() {
+	// Initialize sqlite-vec extension for vector similarity search in tests
+	// This registers the vec0 module globally for all SQLite connections
+	sqlite_vec.Auto()
+}
 
 // SetupTestDB creates an in-memory SQLite database for testing.
 // Uses real migrations to ensure test schema matches production schema.

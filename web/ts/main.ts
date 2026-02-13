@@ -4,7 +4,6 @@ import { listen } from '@tauri-apps/api/event';
 import { connectWebSocket } from './websocket.ts';
 import { handleLogBatch, initSystemDrawer } from './system-drawer.ts';
 import { initCodeMirrorEditor } from './codemirror-editor.ts';
-import { CSS } from './css-classes.ts';
 import { formatDateTime } from './html-utils.ts';
 import { updateGraph, initGraphResize } from './graph/index.ts';
 import { initTypeAttestations } from './components/type-attestations.ts';
@@ -348,15 +347,10 @@ async function init(): Promise<void> {
         });
 
         listen('toggle-logs', () => {
-            // Toggle system drawer visibility
-            const systemDrawer = document.getElementById('system-drawer');
-            if (systemDrawer) {
-                const isCollapsed = systemDrawer.classList.contains(CSS.STATE.COLLAPSED);
-                if (isCollapsed) {
-                    systemDrawer.classList.remove(CSS.STATE.COLLAPSED);
-                } else {
-                    systemDrawer.classList.add(CSS.STATE.COLLAPSED);
-                }
+            // Toggle system drawer by simulating a click on the header
+            const header = document.getElementById('system-drawer-header');
+            if (header) {
+                header.click();
             }
         });
 

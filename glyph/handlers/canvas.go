@@ -46,10 +46,11 @@ func WithWatcherEngine(engine *watcher.Engine, logger *zap.SugaredLogger) Canvas
 
 // HandleGlyphs handles glyph CRUD operations
 // Routes:
-//   GET    /api/canvas/glyphs       - List all glyphs
-//   POST   /api/canvas/glyphs       - Create/update a glyph
-//   GET    /api/canvas/glyphs/{id}  - Get a glyph by ID
-//   DELETE /api/canvas/glyphs/{id}  - Delete a glyph
+//
+//	GET    /api/canvas/glyphs       - List all glyphs
+//	POST   /api/canvas/glyphs       - Create/update a glyph
+//	GET    /api/canvas/glyphs/{id}  - Get a glyph by ID
+//	DELETE /api/canvas/glyphs/{id}  - Delete a glyph
 func (h *CanvasHandler) HandleGlyphs(w http.ResponseWriter, r *http.Request) {
 	// Extract ID from path if present
 	path := strings.TrimPrefix(r.URL.Path, "/api/canvas/glyphs")
@@ -78,10 +79,11 @@ func (h *CanvasHandler) HandleGlyphs(w http.ResponseWriter, r *http.Request) {
 
 // HandleCompositions handles composition CRUD operations
 // Routes:
-//   GET    /api/canvas/compositions       - List all compositions
-//   POST   /api/canvas/compositions       - Create/update a composition
-//   GET    /api/canvas/compositions/{id}  - Get a composition by ID
-//   DELETE /api/canvas/compositions/{id}  - Delete a composition
+//
+//	GET    /api/canvas/compositions       - List all compositions
+//	POST   /api/canvas/compositions       - Create/update a composition
+//	GET    /api/canvas/compositions/{id}  - Get a composition by ID
+//	DELETE /api/canvas/compositions/{id}  - Delete a composition
 func (h *CanvasHandler) HandleCompositions(w http.ResponseWriter, r *http.Request) {
 	// Extract ID from path if present
 	path := strings.TrimPrefix(r.URL.Path, "/api/canvas/compositions")
