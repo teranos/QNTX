@@ -153,3 +153,24 @@ func ScanAttestation(rows *sql.Rows) (*types.As, error) {
 
 	return &as, nil
 }
+
+// GetAttestationByID retrieves a single attestation by its ID.
+// Returns nil, nil if the attestation doesn't exist.
+func GetAttestationByID(db *sql.DB, id string) (*types.As, error) {
+	query := AttestationSelectQuery + " WHERE id = ?"
+	rows, err := db.Query(query, id)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to query attestation %s", id)
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, nil
+	}
+
+	as, err := ScanAttestation(rows)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to scan attestation %s", id)
+	}
+	return as, nil
+}
