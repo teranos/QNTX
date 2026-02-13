@@ -219,5 +219,21 @@ func (m *WasmMatcher) syncContexts(contexts []string) {
 	}
 }
 
-// Ensure WasmMatcher implements Matcher
-var _ Matcher = (*WasmMatcher)(nil)
+// NewDefaultMatcher creates a WASM-backed matcher.
+// Panics if the WASM engine is unavailable — run `make wasm`.
+func NewDefaultMatcher() Matcher {
+	matcher, err := NewWasmMatcher()
+	if err != nil {
+		panic("WASM engine unavailable for fuzzy matcher: " + err.Error() + " — run `make wasm`")
+	}
+	return matcher
+}
+
+// DetectBackend returns which fuzzy backend is available without
+// creating a full matcher instance.
+func DetectBackend() MatcherBackend {
+	if _, err := NewWasmMatcher(); err == nil {
+		return MatcherBackendWasm
+	}
+	return MatcherBackendGo
+}
