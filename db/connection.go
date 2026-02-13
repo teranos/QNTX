@@ -1,3 +1,12 @@
+// Package db provides SQLite database connection utilities for QNTX.
+//
+// IMPORTANT: The primary database storage backend for QNTX is implemented in Rust
+// (see crates/qntx-sqlite). This Go-based SQLite backend is legacy and will be
+// phased out over time. New database features should be implemented in the Rust
+// backend, which is accessed via CGO through the rustsqlite build tag.
+//
+// The Rust backend provides better performance, memory safety, and integration
+// with advanced features like sqlite-vec for vector similarity search.
 package db
 
 import (
@@ -5,12 +14,19 @@ import (
 	"os"
 	"path/filepath"
 
+	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	_ "github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
 
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
 )
+
+func init() {
+	// Initialize sqlite-vec extension for vector similarity search
+	// This registers the vec0 module globally for all SQLite connections
+	sqlite_vec.Auto()
+}
 
 const (
 	// SQLiteJournalMode configures the database journal mode (WAL enables concurrent reads)

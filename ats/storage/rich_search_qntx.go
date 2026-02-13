@@ -67,7 +67,7 @@ func (bs *BoundedStore) searchFuzzyWithEngine(ctx context.Context, query string,
 
 	// Build vocabulary from rich text fields
 	vocabulary := make(map[string]bool)
-	nodeWordMap := make(map[string]map[string][]string) // nodeID -> fieldName -> words
+	nodeWordMap := make(map[string]map[string][]string)       // nodeID -> fieldName -> words
 	nodeAttributes := make(map[string]map[string]interface{}) // nodeID -> attributes
 	rowCount := 0
 

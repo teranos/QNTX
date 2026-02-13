@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strings"
 
-	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/ai/provider"
+	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/alias"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
@@ -29,35 +29,35 @@ const (
 
 // PromptPreviewRequest represents a request to preview prompt execution with X-sampling
 type PromptPreviewRequest struct {
-	AxQuery      string `json:"ax_query"`
-	Template     string `json:"template"`                    // Prompt template with {{field}} placeholders
-	SystemPrompt string `json:"system_prompt,omitempty"`      // Optional system instruction for the LLM
-	SampleSize   int    `json:"sample_size,omitempty"`        // X value: number of samples to test (default: 1)
-	Provider     string `json:"provider,omitempty"`           // "openrouter" or "local"
-	Model        string `json:"model,omitempty"`               // Model override
-	PromptID     string `json:"prompt_id,omitempty"`          // Optional prompt ID for tracking
-	PromptVersion int   `json:"prompt_version,omitempty"`     // Optional prompt version for comparison
+	AxQuery       string `json:"ax_query"`
+	Template      string `json:"template"`                 // Prompt template with {{field}} placeholders
+	SystemPrompt  string `json:"system_prompt,omitempty"`  // Optional system instruction for the LLM
+	SampleSize    int    `json:"sample_size,omitempty"`    // X value: number of samples to test (default: 1)
+	Provider      string `json:"provider,omitempty"`       // "openrouter" or "local"
+	Model         string `json:"model,omitempty"`          // Model override
+	PromptID      string `json:"prompt_id,omitempty"`      // Optional prompt ID for tracking
+	PromptVersion int    `json:"prompt_version,omitempty"` // Optional prompt version for comparison
 }
 
 // PreviewSample represents a single sample execution result
 type PreviewSample struct {
-	Attestation      map[string]interface{} `json:"attestation"`       // The sampled attestation
-	InterpolatedPrompt string               `json:"interpolated_prompt"` // Prompt after template interpolation
-	Response         string                 `json:"response"`           // LLM response
-	PromptTokens     int                    `json:"prompt_tokens,omitempty"`
-	CompletionTokens int                    `json:"completion_tokens,omitempty"`
-	TotalTokens      int                    `json:"total_tokens,omitempty"`
-	Error            string                 `json:"error,omitempty"`    // Per-sample error if any
+	Attestation        map[string]interface{} `json:"attestation"`         // The sampled attestation
+	InterpolatedPrompt string                 `json:"interpolated_prompt"` // Prompt after template interpolation
+	Response           string                 `json:"response"`            // LLM response
+	PromptTokens       int                    `json:"prompt_tokens,omitempty"`
+	CompletionTokens   int                    `json:"completion_tokens,omitempty"`
+	TotalTokens        int                    `json:"total_tokens,omitempty"`
+	Error              string                 `json:"error,omitempty"` // Per-sample error if any
 }
 
 // PromptPreviewResponse represents the preview response with X samples
 type PromptPreviewResponse struct {
-	TotalAttestations int             `json:"total_attestations"`   // Total matching attestations from ax query
-	SampleSize        int             `json:"sample_size"`          // X value used for sampling
-	Samples           []PreviewSample `json:"samples"`              // X sample execution results
-	SuccessCount      int             `json:"success_count"`        // Number of successful samples
-	FailureCount      int             `json:"failure_count"`        // Number of failed samples
-	Error             string          `json:"error,omitempty"`      // Global error if any
+	TotalAttestations int             `json:"total_attestations"` // Total matching attestations from ax query
+	SampleSize        int             `json:"sample_size"`        // X value used for sampling
+	Samples           []PreviewSample `json:"samples"`            // X sample execution results
+	SuccessCount      int             `json:"success_count"`      // Number of successful samples
+	FailureCount      int             `json:"failure_count"`      // Number of failed samples
+	Error             string          `json:"error,omitempty"`    // Global error if any
 }
 
 // PromptExecuteRequest represents a request to execute a prompt
@@ -71,12 +71,12 @@ type PromptExecuteRequest struct {
 
 // PromptDirectRequest represents a request to execute a prompt without attestations
 type PromptDirectRequest struct {
-	Template              string          `json:"template"`                         // Prompt template with optional {{field}} placeholders
-	SystemPrompt          string          `json:"system_prompt,omitempty"`
-	Provider              string          `json:"provider,omitempty"`               // "openrouter" or "local"
-	Model                 string          `json:"model,omitempty"`
-	GlyphID               string          `json:"glyph_id,omitempty"`              // TODO(#458): create result attestation with actor "glyph:{id}" so prompt glyphs can be mid-chain producers
-	UpstreamAttestation   *types.As       `json:"upstream_attestation,omitempty"`   // Triggering attestation — enables {{field}} interpolation
+	Template            string    `json:"template"` // Prompt template with optional {{field}} placeholders
+	SystemPrompt        string    `json:"system_prompt,omitempty"`
+	Provider            string    `json:"provider,omitempty"` // "openrouter" or "local"
+	Model               string    `json:"model,omitempty"`
+	GlyphID             string    `json:"glyph_id,omitempty"`             // TODO(#458): create result attestation with actor "glyph:{id}" so prompt glyphs can be mid-chain producers
+	UpstreamAttestation *types.As `json:"upstream_attestation,omitempty"` // Triggering attestation — enables {{field}} interpolation
 }
 
 // PromptDirectResponse represents the direct execution response
@@ -655,21 +655,22 @@ func (s *QNTXServer) HandlePromptSave(w http.ResponseWriter, r *http.Request) {
 //   - Debugging: Non-reproducible results make it harder to debug specific failures
 //
 // POTENTIAL SOLUTIONS (choose based on use case priority):
-//   1. Add optional 'seed' parameter to API request
-//      - Pros: Reproducible when needed, random by default
-//      - Cons: Additional API complexity, users must understand seeding
 //
-//   2. Use deterministic sampling (first N, evenly spaced, hash-based)
-//      - Pros: Fully reproducible, simpler
-//      - Cons: Loses randomness benefit, may miss edge cases clustered in unsampled regions
+//  1. Add optional 'seed' parameter to API request
+//     - Pros: Reproducible when needed, random by default
+//     - Cons: Additional API complexity, users must understand seeding
 //
-//   3. Use crypto/rand for cryptographically secure randomness
-//      - Pros: More secure random
-//      - Cons: Still non-reproducible, overkill for this use case
+//  2. Use deterministic sampling (first N, evenly spaced, hash-based)
+//     - Pros: Fully reproducible, simpler
+//     - Cons: Loses randomness benefit, may miss edge cases clustered in unsampled regions
 //
-//   4. Accept non-determinism as a feature
-//      - Pros: Embraces the purpose of X-sampling
-//      - Cons: Violates QNTX standards, harder debugging
+//  3. Use crypto/rand for cryptographically secure randomness
+//     - Pros: More secure random
+//     - Cons: Still non-reproducible, overkill for this use case
+//
+//  4. Accept non-determinism as a feature
+//     - Pros: Embraces the purpose of X-sampling
+//     - Cons: Violates QNTX standards, harder debugging
 //
 // RECOMMENDATION: Add optional 'seed' parameter (solution 1) to balance reproducibility needs
 // with the feature's purpose. Default to time-seeded random, allow explicit seed for debugging.

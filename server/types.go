@@ -81,10 +81,10 @@ type QueryMessage struct {
 	Height              int     `json:"height"`               // For vidstream_frame: frame height
 	Format              string  `json:"format"`               // For vidstream_frame: "rgba8", "rgb8", etc.
 	// Watcher fields (for watcher_upsert messages)
-	WatcherID    string `json:"watcher_id"`     // For watcher_upsert: ID of watcher (generated if empty)
-	WatcherQuery string `json:"watcher_query"`  // For watcher_upsert: AX query string
-	WatcherName  string `json:"watcher_name"`   // For watcher_upsert: Human-readable watcher name
-	Enabled      bool   `json:"enabled"`        // For watcher_upsert: Whether watcher is enabled
+	WatcherID    string `json:"watcher_id"`    // For watcher_upsert: ID of watcher (generated if empty)
+	WatcherQuery string `json:"watcher_query"` // For watcher_upsert: AX query string
+	WatcherName  string `json:"watcher_name"`  // For watcher_upsert: Human-readable watcher name
+	Enabled      bool   `json:"enabled"`       // For watcher_upsert: Whether watcher is enabled
 }
 
 // ProgressMessage represents an import progress message
@@ -225,21 +225,21 @@ type PluginHealthMessage struct {
 // WatcherMatchMessage represents a watcher match event
 // Sent when an attestation matches a watcher's filter
 type WatcherMatchMessage struct {
-	Type        string      `json:"type"`         // "watcher_match"
-	WatcherID   string      `json:"watcher_id"`   // ID of watcher that matched
-	Attestation interface{} `json:"attestation"`  // The matching attestation (types.As)
-	Timestamp   int64       `json:"timestamp"`    // Unix timestamp
+	Type        string      `json:"type"`        // "watcher_match"
+	WatcherID   string      `json:"watcher_id"`  // ID of watcher that matched
+	Attestation interface{} `json:"attestation"` // The matching attestation (types.As)
+	Timestamp   int64       `json:"timestamp"`   // Unix timestamp
 }
 
 // GlyphFiredMessage wraps proto.GlyphFired with WebSocket type discriminator
 type GlyphFiredMessage struct {
-	Type          string `json:"type"`                      // "glyph_fired"
-	GlyphID       string `json:"glyph_id"`                  // Target glyph that was executed
-	AttestationID string `json:"attestation_id"`             // Triggering attestation ASID
-	Status        string `json:"status"`                     // "started", "success", "error"
-	Error         string `json:"error,omitempty"`            // Error message when status is "error"
-	Result        string `json:"result,omitempty"`           // JSON-encoded execution result
-	Timestamp     int64  `json:"timestamp"`                  // Unix timestamp
+	Type          string `json:"type"`             // "glyph_fired"
+	GlyphID       string `json:"glyph_id"`         // Target glyph that was executed
+	AttestationID string `json:"attestation_id"`   // Triggering attestation ASID
+	Status        string `json:"status"`           // "started", "success", "error"
+	Error         string `json:"error,omitempty"`  // Error message when status is "error"
+	Result        string `json:"result,omitempty"` // JSON-encoded execution result
+	Timestamp     int64  `json:"timestamp"`        // Unix timestamp
 }
 
 // WatcherErrorMessage represents a watcher error (parsing failure, validation error, etc.)
@@ -252,4 +252,3 @@ type WatcherErrorMessage struct {
 	Severity  string   `json:"severity"`          // "error" or "warning"
 	Timestamp int64    `json:"timestamp"`         // Unix timestamp
 }
-

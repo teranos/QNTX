@@ -204,7 +204,7 @@ type ClassifyTemporalConfig struct {
 
 // ClassifyInput is the full input for classify_claims.
 type ClassifyInput struct {
-	ClaimGroups []ClassifyClaimGroup `json:"claim_groups"`
+	ClaimGroups []ClassifyClaimGroup   `json:"claim_groups"`
 	Config      ClassifyTemporalConfig `json:"config"`
 	NowMs       int64                  `json:"now_ms"`
 }
