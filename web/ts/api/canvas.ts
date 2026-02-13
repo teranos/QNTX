@@ -9,78 +9,22 @@ import type { CanvasGlyphState, CompositionState } from '../state/ui';
 import type { CanvasGlyph, Composition } from '../generated/proto/glyph/proto/canvas';
 import { log, SEG } from '../logger';
 import { apiFetch } from '../api';
-import { syncStateManager } from '../state/sync-state';
+import { canvasSyncQueue } from './canvas-sync';
 
 /**
- * Upsert a canvas glyph (create or update)
+ * Upsert a canvas glyph (create or update).
+ * Enqueues for server sync — never throws.
  */
-export async function upsertCanvasGlyph(glyph: CanvasGlyphState): Promise<void> {
-    // Mark as syncing
-    syncStateManager.setState(glyph.id, 'syncing');
-
-    try {
-        const payload = {
-            id: glyph.id,
-            symbol: glyph.symbol,
-            x: glyph.x,
-            y: glyph.y,
-            width: glyph.width,
-            height: glyph.height,
-            content: glyph.content,
-        };
-
-        const response = await apiFetch('/api/canvas/glyphs', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to upsert canvas glyph');
-        }
-
-        log.debug(SEG.GLYPH, `[CanvasAPI] Upserted glyph ${glyph.id}`);
-
-        // Mark as synced on success
-        syncStateManager.setState(glyph.id, 'synced');
-    } catch (error) {
-        log.error(SEG.GLYPH, `[CanvasAPI] Failed to upsert glyph ${glyph.id}:`, error);
-
-        // Mark as failed on error
-        syncStateManager.setState(glyph.id, 'failed');
-
-        // TODO(#431): Queue operation for retry when offline
-        // Instead of just throwing, enqueue to offline queue (IndexedDB)
-        // Queue will automatically process when connectivity returns
-
-        throw error;
-    }
+export function upsertCanvasGlyph(glyph: CanvasGlyphState): void {
+    canvasSyncQueue.add({ id: glyph.id, op: 'glyph_upsert' });
 }
 
 /**
- * Delete a canvas glyph
+ * Delete a canvas glyph.
+ * Enqueues for server sync — never throws.
  */
-export async function deleteCanvasGlyph(id: string): Promise<void> {
-    try {
-        const response = await apiFetch(`/api/canvas/glyphs/${id}`, {
-            method: 'DELETE',
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to delete canvas glyph');
-        }
-
-        log.debug(SEG.GLYPH, `[CanvasAPI] Deleted glyph ${id}`);
-
-        // Clear sync state on successful deletion
-        syncStateManager.clearState(id);
-    } catch (error) {
-        log.error(SEG.GLYPH, `[CanvasAPI] Failed to delete glyph ${id}:`, error);
-        // TODO(#431): Queue deletion for retry when offline
-        throw error;
-    }
+export function deleteCanvasGlyph(id: string): void {
+    canvasSyncQueue.add({ id, op: 'glyph_delete' });
 }
 
 /**
@@ -104,69 +48,19 @@ export async function listCanvasGlyphs(): Promise<CanvasGlyph[]> {
 }
 
 /**
- * Upsert a canvas composition (create or update)
+ * Upsert a canvas composition (create or update).
+ * Enqueues for server sync — never throws.
  */
-export async function upsertComposition(composition: CompositionState): Promise<void> {
-    // Mark as syncing
-    syncStateManager.setState(composition.id, 'syncing');
-
-    try {
-        const payload = {
-            id: composition.id,
-            edges: composition.edges,
-            x: composition.x,
-            y: composition.y,
-        };
-
-        const response = await apiFetch('/api/canvas/compositions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to upsert composition');
-        }
-
-        log.debug(SEG.GLYPH, `[CanvasAPI] Upserted composition ${composition.id}`);
-
-        // Mark as synced on success
-        syncStateManager.setState(composition.id, 'synced');
-    } catch (error) {
-        log.error(SEG.GLYPH, `[CanvasAPI] Failed to upsert composition ${composition.id}:`, error);
-
-        // Mark as failed on error
-        syncStateManager.setState(composition.id, 'failed');
-
-        // TODO(#431): Queue operation for retry when offline
-        throw error;
-    }
+export function upsertComposition(composition: CompositionState): void {
+    canvasSyncQueue.add({ id: composition.id, op: 'composition_upsert' });
 }
 
 /**
- * Delete a canvas composition
+ * Delete a canvas composition.
+ * Enqueues for server sync — never throws.
  */
-export async function deleteComposition(id: string): Promise<void> {
-    try {
-        const response = await apiFetch(`/api/canvas/compositions/${id}`, {
-            method: 'DELETE',
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to delete composition');
-        }
-
-        log.debug(SEG.GLYPH, `[CanvasAPI] Deleted composition ${id}`);
-
-        // Clear sync state on successful deletion
-        syncStateManager.clearState(id);
-    } catch (error) {
-        log.error(SEG.GLYPH, `[CanvasAPI] Failed to delete composition ${id}:`, error);
-        // TODO(#431): Queue deletion for retry when offline
-        throw error;
-    }
+export function deleteComposition(id: string): void {
+    canvasSyncQueue.add({ id, op: 'composition_delete' });
 }
 
 /**
