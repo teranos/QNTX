@@ -156,29 +156,6 @@
           subPackages = [ "cmd/qntx" ];
         };
 
-        # Build typegen binary (standalone, no plugins/CGO)
-        # TODO: Type generation moving to protoc (ADR-006), docs generation staying
-        # After proto migration: will be renamed to 'docgen' for API docs + .md files
-        # Original typegen code will be extracted to separate repo as reusable library
-        # Current typegen requires full compilation due to packages.Load with NeedTypes
-        typegen = pkgs.buildGoModule {
-          pname = "typegen";
-          version = self.rev or "dev";
-          src = ./.;
-
-          # Same vendorHash as qntx (shared go.mod)
-          # To update: set to `pkgs.lib.fakeHash`, run `nix build .#typegen`, copy the hash from error
-          vendorHash = "sha256-Ix5m8m578Jj5mEUy/K1zSWy/wJK9zBO9bGHacPrwOoA=";
-
-          preBuild = goWasmPreBuild;
-
-          # HACK: Need qntxwasm tag because typegen compiles the whole codebase
-          # This will be removed when we migrate to protoc-based generation
-          tags = [ "qntxwasm" ];
-
-          subPackages = [ "cmd/typegen" ];
-        };
-
         mkQNTXImage = arch: pkgs.dockerTools.buildLayeredImage {
           name = "ghcr.io/teranos/qntx";
           tag = "latest";
@@ -255,9 +232,6 @@
         packages = {
           # QNTX CLI binary
           qntx = qntx;
-
-          # Typegen binary (standalone, no plugins/CGO)
-          typegen = typegen;
 
           # WASM module (qntx-core compiled to wasm32-unknown-unknown)
           qntx-wasm = qntx-wasm;
@@ -342,7 +316,6 @@
         checks = {
           pre-commit = pre-commit-check;
           qntx-build = qntx; # Ensure QNTX builds
-          typegen-build = typegen; # Ensure typegen builds
           docs-site-builds = self.packages.${system}.docs-site; # Ensure docs site builds
           docs-site-links = pkgs.runCommand "docs-site-link-check"
             {
@@ -411,7 +384,7 @@
 
                 # Build typegen only if needed
                 if [ $REBUILD_NEEDED -eq 1 ]; then
-                  ${pkgs.nix}/bin/nix build .#typegen
+                  ${pkgs.nix}/bin/nix build ./typegen
                 else
                   echo "Using existing typegen binary (skip rebuild)"
                 fi
