@@ -479,10 +479,8 @@ class UIState {
             this.update('canvasGlyphs', updated);
         }
 
-        // Sync with backend (fire-and-forget)
-        apiUpsertGlyph(normalizedGlyph).catch(err => {
-            log.error(SEG.UI, '[UIState] Failed to sync glyph to backend:', err);
-        });
+        // Enqueue for server sync (never throws)
+        apiUpsertGlyph(normalizedGlyph);
     }
 
     /**
@@ -492,10 +490,8 @@ class UIState {
         const updated = this.state.canvasGlyphs.filter(g => g.id !== id);
         this.update('canvasGlyphs', updated);
 
-        // Sync with backend (fire-and-forget)
-        apiDeleteGlyph(id).catch(err => {
-            log.error(SEG.UI, '[UIState] Failed to delete glyph from backend:', err);
-        });
+        // Enqueue for server sync (never throws)
+        apiDeleteGlyph(id);
     }
 
     /**
