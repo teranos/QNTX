@@ -737,10 +737,15 @@ dependencies = [
  "anyhow",
  "ndarray 0.16.1",
  "ort",
+ "qntx-ffi-common",
  "serde",
  "serde_json",
  "tokenizers",
 ]
+
+[[package]]
+name = "qntx-ffi-common"
+version = "0.1.0"
 
 [[package]]
 name = "quote"
