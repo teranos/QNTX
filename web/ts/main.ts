@@ -12,6 +12,7 @@ import { handleImportProgress, handleImportStats, handleImportComplete, initQuer
 import { uiState } from './state/ui.ts';
 import { appState } from './state/app.ts';
 import { initUsageBadge, handleUsageUpdate } from './usage-badge.ts';
+import { initSyncBadge } from './sync-badge.ts';
 import { handleParseResponse } from './ats-semantic-tokens-client.ts';
 import { handleJobUpdate } from './hixtory-panel.ts';
 import { handleDaemonStatus } from './websocket-handlers/daemon-status.ts';
@@ -277,6 +278,7 @@ async function init(): Promise<void> {
     if (window.logLoaderStep) window.logLoaderStep('Initializing UI controls...');
     initTypeAttestations(updateGraph);  // Pass renderGraph function for type attestation callbacks
     initUsageBadge();
+    initSyncBadge();
 
     // Listen for Tauri events (menu actions)
     if (typeof window.__TAURI__ !== 'undefined') {
