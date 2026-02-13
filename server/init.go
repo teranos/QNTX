@@ -290,6 +290,9 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	// Create handler and storage for minimized glyph run state
 	// (currently only persists to localStorage, doesn't sync across devices)
 
+	// Initialize embedding service for semantic search (optional)
+	server.SetupEmbeddingService()
+
 	// Set up config file watcher for auto-reload
 	setupConfigWatcher(server, db, serverLogger)
 

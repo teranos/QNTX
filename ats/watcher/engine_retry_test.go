@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package watcher_test
@@ -49,7 +50,7 @@ func TestEngine_RetryLogic(t *testing.T) {
 		ActionData:        "pass",
 		MaxFiresPerMinute: 105,
 		Enabled:           true,
-		Filter: types.AxFilter{}, // Match all
+		Filter:            types.AxFilter{}, // Match all
 	}
 	if err := store.Create(context.Background(), w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)

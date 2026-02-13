@@ -54,11 +54,12 @@ type WatcherResponse struct {
 
 // HandleWatchers handles watcher CRUD operations
 // Routes:
-//   GET    /api/watchers       - List all watchers
-//   POST   /api/watchers       - Create a new watcher
-//   GET    /api/watchers/{id}  - Get a watcher by ID
-//   PUT    /api/watchers/{id}  - Update a watcher
-//   DELETE /api/watchers/{id}  - Delete a watcher
+//
+//	GET    /api/watchers       - List all watchers
+//	POST   /api/watchers       - Create a new watcher
+//	GET    /api/watchers/{id}  - Get a watcher by ID
+//	PUT    /api/watchers/{id}  - Update a watcher
+//	DELETE /api/watchers/{id}  - Delete a watcher
 func (s *QNTXServer) HandleWatchers(w http.ResponseWriter, r *http.Request) {
 	if s.watcherEngine == nil {
 		s.writeRichError(w, errors.New("watcher engine not initialized"), http.StatusServiceUnavailable)
