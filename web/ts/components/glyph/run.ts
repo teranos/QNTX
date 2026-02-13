@@ -116,12 +116,6 @@ class GlyphRunImpl {
     public init(): void {
         if (this.element) return; // Already initialized
 
-        const graphContainer = document.getElementById('graph-container');
-        if (!graphContainer) {
-            log.warn(SEG.GLYPH, 'GlyphRun: #graph-container not found, deferring init');
-            return;
-        }
-
         this.element = document.createElement('div');
         this.element.className = 'glyph-run';
         this.element.setAttribute('data-empty', 'true');
@@ -131,7 +125,7 @@ class GlyphRunImpl {
         this.indicatorContainer.className = 'glyph-run-indicators';
         this.element.appendChild(this.indicatorContainer);
 
-        graphContainer.appendChild(this.element);
+        document.body.appendChild(this.element);
 
         this.setupEventListeners();
 
