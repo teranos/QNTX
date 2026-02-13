@@ -1,0 +1,52 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.3.15/schema.json",
+	"vcs": {
+		"enabled": false
+	},
+	"files": {
+		"includes": ["ts/**", "!ts/vendor/**"],
+		"ignoreUnknown": true
+	},
+	"formatter": {
+		"enabled": false
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			"suspicious": {
+				"noExplicitAny": "warn",
+				"noConfusingVoidType": "warn",
+				"noAssignInExpressions": "warn",
+				"noFallthroughSwitchClause": "warn",
+				"noImplicitAnyLet": "warn"
+			},
+			"complexity": {
+				"noExcessiveCognitiveComplexity": "warn",
+				"useOptionalChain": "warn",
+				"noUselessStringConcat": "warn",
+				"noUselessUndefinedInitialization": "warn"
+			},
+			"correctness": {
+				"noUnusedImports": "warn",
+				"noUnusedVariables": "warn",
+				"noUnusedFunctionParameters": "warn"
+			},
+			"style": {
+				"noNonNullAssertion": "warn",
+				"useTemplate": "warn",
+				"useConst": "warn",
+				"useExponentiationOperator": "warn",
+				"noParameterAssign": "warn",
+				"useThrowOnlyError": "warn",
+				"useEnumInitializers": "off"
+			},
+			"performance": {
+				"noAccumulatingSpread": "warn"
+			}
+		}
+	},
+	"assist": {
+		"enabled": false
+	}
+}
