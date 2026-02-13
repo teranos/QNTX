@@ -406,7 +406,7 @@ mod tests {
         // Create array of CStrings via the same path as production code
         let strings: Vec<*mut c_char> = vec!["one", "two", "three"]
             .into_iter()
-            .map(|s| cstring_new_or_empty(s))
+            .map(cstring_new_or_empty)
             .collect();
         let (ptr, len) = vec_into_raw(strings);
 

@@ -35,7 +35,6 @@ var (
 	NaturalPredicates = []string{"speak", "speaks", "know", "knows", "work", "worked", "study", "studied", "has_experience", "occupation"}
 )
 
-
 // ParseAxCommand parses natural language ax queries with flexible grammar
 // Grammar: qntx ax [SUBJECTS] [is|are PREDICATES] [of|from CONTEXTS] [by|via ACTORS] [temporal] [flags]
 func ParseAxCommand(args []string) (*types.AxFilter, error) {
@@ -53,7 +52,6 @@ func ParseAxCommandWithVerbosity(args []string, verbosity int) (*types.AxFilter,
 func ParseAxCommandWithContext(args []string, verbosity int, ctx ErrorContext) (*types.AxFilter, error) {
 	return parseAxQueryDispatch(args, verbosity, ctx)
 }
-
 
 type axToken struct {
 	value           string
@@ -82,7 +80,6 @@ const (
 	StateTemporal   = stateTemporal
 	StateSo         = stateSo
 )
-
 
 // IsAxKeyword checks if a value is an ax grammar keyword
 // Used for lookahead to determine when to stop parsing temporal expressions
@@ -138,4 +135,3 @@ func GetWarnings(err error) []string {
 	}
 	return nil
 }
-

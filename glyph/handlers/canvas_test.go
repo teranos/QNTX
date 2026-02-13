@@ -8,8 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	pb "github.com/teranos/QNTX/glyph/proto"
+	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/sym"
 )
@@ -694,8 +694,8 @@ func TestGlyphSymbolToType(t *testing.T) {
 	}{
 		{"py", "py"},
 		{sym.AX, "ax"},     // ⋈ → ax
-		{sym.SO, "prompt"},  // ⟶ → prompt
-		{"note", "note"},    // Unknown passes through
+		{sym.SO, "prompt"}, // ⟶ → prompt
+		{"note", "note"},   // Unknown passes through
 		{"result", "result"},
 	}
 

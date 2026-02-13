@@ -82,13 +82,13 @@ func (s *QNTXServer) handleGetTypes(w http.ResponseWriter, r *http.Request) {
 
 		// Build type response object
 		typeObj := map[string]interface{}{
-			"name":                typeName,
-			"label":               attributes["display_label"],
-			"color":               attributes["display_color"],
-			"opacity":             attributes["opacity"],
-			"deprecated":          attributes["deprecated"],
-			"rich_string_fields":  attributes["rich_string_fields"],
-			"array_fields":        attributes["array_fields"],
+			"name":               typeName,
+			"label":              attributes["display_label"],
+			"color":              attributes["display_color"],
+			"opacity":            attributes["opacity"],
+			"deprecated":         attributes["deprecated"],
+			"rich_string_fields": attributes["rich_string_fields"],
+			"array_fields":       attributes["array_fields"],
 		}
 		types = append(types, typeObj)
 	}
@@ -132,13 +132,13 @@ func (s *QNTXServer) handleGetType(w http.ResponseWriter, r *http.Request, typeN
 
 	// Build type response object
 	typeObj := map[string]interface{}{
-		"name":                typeName,
-		"label":               attributes["display_label"],
-		"color":               attributes["display_color"],
-		"opacity":             attributes["opacity"],
-		"deprecated":          attributes["deprecated"],
-		"rich_string_fields":  attributes["rich_string_fields"],
-		"array_fields":        attributes["array_fields"],
+		"name":               typeName,
+		"label":              attributes["display_label"],
+		"color":              attributes["display_color"],
+		"opacity":            attributes["opacity"],
+		"deprecated":         attributes["deprecated"],
+		"rich_string_fields": attributes["rich_string_fields"],
+		"array_fields":       attributes["array_fields"],
 	}
 
 	writeJSON(w, http.StatusOK, typeObj)
@@ -251,13 +251,13 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 
 	// Return the created type
 	response := map[string]interface{}{
-		"name":                req.Name,
-		"label":               req.Label,
-		"color":               req.Color,
-		"opacity":             req.Opacity,
-		"deprecated":          req.Deprecated,
-		"rich_string_fields":  req.RichStringFields,
-		"array_fields":        req.ArrayFields,
+		"name":               req.Name,
+		"label":              req.Label,
+		"color":              req.Color,
+		"opacity":            req.Opacity,
+		"deprecated":         req.Deprecated,
+		"rich_string_fields": req.RichStringFields,
+		"array_fields":       req.ArrayFields,
 	}
 
 	writeJSON(w, http.StatusCreated, response)

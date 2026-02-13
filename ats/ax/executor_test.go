@@ -240,10 +240,10 @@ func TestExecuteAdvancedClassification_DeterministicOrdering(t *testing.T) {
 // emptyMatcher returns no matches for any query, simulating WASM engine failure.
 type emptyMatcher struct{}
 
-func (e *emptyMatcher) FindMatches(query string, all []string) []string    { return nil }
+func (e *emptyMatcher) FindMatches(query string, all []string) []string        { return nil }
 func (e *emptyMatcher) FindContextMatches(query string, all []string) []string { return nil }
-func (e *emptyMatcher) Backend() MatcherBackend                            { return MatcherBackendGo }
-func (e *emptyMatcher) SetLogger(logger interface{})                       {}
+func (e *emptyMatcher) Backend() MatcherBackend                                { return MatcherBackendGo }
+func (e *emptyMatcher) SetLogger(logger interface{})                           {}
 
 func TestExpandFuzzyPredicates_PreservesOriginalWhenNoMatches(t *testing.T) {
 	queryStore := &mockQueryStore{

@@ -67,6 +67,7 @@ pub mod error;
 pub mod json;
 pub mod migrate;
 pub mod store;
+pub mod vec;
 
 // Re-export proto conversion utilities from qntx-proto
 pub use qntx_proto::proto_convert;

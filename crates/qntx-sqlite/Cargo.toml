@@ -19,6 +19,10 @@ qntx-ffi-common = { path = "../qntx-ffi-common" }
 # SQLite database
 rusqlite = { version = "0.32", features = ["bundled"] }
 
+# SQLite vector search extension
+sqlite-vec = "0.1.5"
+zerocopy = "0.8"
+
 # Serialization
 serde.workspace = true
 serde_json.workspace = true
