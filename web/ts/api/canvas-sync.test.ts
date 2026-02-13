@@ -3,7 +3,8 @@
  *
  * Personas:
  * - Tim: Happy path (enqueue, flush, sync succeeds)
- * - Spike: Network failures, missing UIState items, concurrent flushes, dedup
+ * - Spike: Network failures, missing UIState items, concurrent flushes, dedup, backoff
+ * - Jenny: Tube journey — realistic tunnel/station cycles through the sync queue
  */
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
@@ -262,7 +263,9 @@ describe('Canvas Sync - Spike (Edge Cases)', () => {
 
         expect(syncStateManager.getState('g-1')).toBe('failed');
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        expect(stored).toEqual([{ id: 'g-1', op: 'glyph_upsert' }]);
+        expect(stored).toHaveLength(1);
+        expect(stored[0].id).toBe('g-1');
+        expect(stored[0].op).toBe('glyph_upsert');
     });
 
     test('Spike: network error keeps entry in queue', async () => {
@@ -273,7 +276,9 @@ describe('Canvas Sync - Spike (Edge Cases)', () => {
 
         expect(syncStateManager.getState('g-1')).toBe('failed');
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        expect(stored).toEqual([{ id: 'g-1', op: 'glyph_upsert' }]);
+        expect(stored).toHaveLength(1);
+        expect(stored[0].id).toBe('g-1');
+        expect(stored[0].op).toBe('glyph_upsert');
     });
 
     test('Spike: glyph not found in UIState, dropped from queue', async () => {
@@ -363,6 +368,9 @@ describe('Canvas Sync - Spike (Edge Cases)', () => {
         expect(syncStateManager.getState('g-2')).toBe('synced');
 
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        expect(stored).toEqual([{ id: 'c-1', op: 'composition_upsert' }]);
+        expect(stored).toHaveLength(1);
+        expect(stored[0].id).toBe('c-1');
+        expect(stored[0].op).toBe('composition_upsert');
+        expect(stored[0].retryCount).toBe(1);
     });
 });
