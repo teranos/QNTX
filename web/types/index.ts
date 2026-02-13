@@ -3,7 +3,7 @@
  *
  * This module exports types from two sources:
  * 1. Generated types (from Go source via ats/typegen)
- * 2. Frontend-only types (UI state, D3 visualization, etc.)
+ * 2. Frontend-only types (UI state, etc.)
  *
  * IMPORTANT: Types in types/generated/typescript/ are auto-generated. Do not edit them directly.
  * Run `make types` to regenerate from Go source.
@@ -105,22 +105,9 @@ export type {
   EditorState,
   LogMessage,
   LogBatchData,
+  UIText,
   Result,
   PaginatedResponse,
-} from './core';
-
-// Graph visualization types
-export type {
-  GraphData,
-  Node,
-  Link,
-  GraphMeta,
-  NodeTypeInfo,
-  Transform,
-  NodeType,
-  GraphPhysics,
-  GraphStyles,
-  UIText,
 } from './core';
 
 // Git and AI types
@@ -140,9 +127,6 @@ export type {
   WebSocketState,
   WebSocketConfig,
 } from './websocket';
-
-// D3 graph types
-export * from './d3-graph';
 
 // LSP types
 export * from './lsp';
