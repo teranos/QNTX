@@ -5,7 +5,7 @@
 - Stick to what's explicitly stated in code and documentation
 - Don't add features, explanations, or context that weren't requested
 - If something is unclear, ask - don't assume or fill in gaps
-- State only what you can directly verify
+- State only what you can directly trace and verify
 - When a task cannot be completed correctly, stop and explain the blocker rather than implementing workarounds
 - **Maximize signal-to-noise: essential information only, no filler.**
 
