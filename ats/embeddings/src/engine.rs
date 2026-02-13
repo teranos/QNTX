@@ -207,7 +207,7 @@ impl EmbeddingEngine {
         eprintln!("Output tensor shape: {:?}", shape);
 
         // Handle different output shapes
-        let embeddings = match shape.len() {
+        let mut embeddings = match shape.len() {
             3 => {
                 // Shape is [batch, seq_len, hidden_size]
                 // Perform mean pooling over the sequence dimension
@@ -265,6 +265,14 @@ impl EmbeddingEngine {
             }
             _ => return Err(anyhow::anyhow!("Unexpected output shape: {:?}", shape)),
         };
+
+        // L2 normalize so distances fall in [0, 2] and map cleanly to cosine similarity
+        let norm: f32 = embeddings.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm > 0.0 {
+            for val in &mut embeddings {
+                *val /= norm;
+            }
+        }
 
         // Ensure we have the right dimension
         if embeddings.len() != expected_dimensions {
