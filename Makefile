@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-vidstream rust-sqlite wasm rust-python
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -6,9 +6,9 @@ PREFIX ?= $(HOME)/.qntx
 # Use prebuilt qntx if available in PATH, otherwise use ./bin/qntx
 QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
-cli: rust-vidstream rust-sqlite wasm ## Build QNTX CLI binary (with Rust optimizations and WASM fuzzy+parser)
-	@echo "Building QNTX CLI with Rust optimizations (video, sqlite) and WASM (parser, fuzzy)..."
-	@go build -tags "rustvideo,rustsqlite,qntxwasm" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
+cli: rust-vidstream rust-sqlite rust-embeddings wasm ## Build QNTX CLI binary (with Rust optimizations, embeddings, and WASM parser)
+	@echo "Building QNTX CLI with Rust optimizations (video, sqlite, embeddings) and WASM (parser, fuzzy)..."
+	@go build -tags "rustvideo,rustsqlite,rustembeddings,qntxwasm" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
 cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments without Rust toolchain)
 	@echo "Building QNTX CLI (pure Go, no CGO)..."
@@ -241,6 +241,14 @@ wasm: ## Build qntx-core as WASM module (for wazero integration + browser)
 	@cp -r crates/qntx-wasm/pkg/* web/wasm/
 	@echo "  ✓ Browser WASM built and copied to web/wasm/"
 	@ls -lh web/wasm/*.wasm 2>/dev/null | awk '{print "    Size: " $$5 " - " $$9}' || (echo "    ERROR: wasm-pack ran but produced no .wasm files"; exit 1)
+
+rust-embeddings: ## Build Rust embeddings library with ONNX support (for CGO integration)
+	@echo "Building Rust embeddings library with ONNX..."
+	@cd ats/embeddings && cargo build --release --features ffi --lib
+	@echo "✓ libqntx_embeddings built in ats/embeddings/target/release/"
+	@echo "  Static:  libqntx_embeddings.a"
+	@echo "  Shared:  libqntx_embeddings.so (Linux) / libqntx_embeddings.dylib (macOS)"
+	@echo "  Features: ONNX Runtime for sentence transformers"
 
 # Rust Python plugin (PyO3-based Python execution)
 # REQUIRES Nix: Platform-specific Python linking issues make cargo-only builds unreliable

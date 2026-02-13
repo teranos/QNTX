@@ -45,10 +45,10 @@ type Config struct {
 	Debug         bool
 	Logger        *zap.SugaredLogger // Structured logger (nil = nop logger)
 	DB            *sql.DB            // Database for automatic cost/usage tracking (strongly recommended)
-	Verbosity     int     // Verbosity level for usage tracking output
-	OperationType string  // Operation type for tracking context (e.g., "code-analysis")
-	EntityType    string  // Entity type for tracking context (e.g., "file")
-	EntityID      string  // Entity ID for tracking context (e.g., file path)
+	Verbosity     int                // Verbosity level for usage tracking output
+	OperationType string             // Operation type for tracking context (e.g., "code-analysis")
+	EntityType    string             // Entity type for tracking context (e.g., "file")
+	EntityID      string             // Entity ID for tracking context (e.g., file path)
 }
 
 // NewClient creates a new OpenRouter.ai client with QNTX-specific defaults

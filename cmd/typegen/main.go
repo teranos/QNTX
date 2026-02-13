@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/teranos/QNTX/cmd/qntx/commands"
+	"github.com/teranos/QNTX/typegen/cli"
 )
 
 func main() {
-	if err := commands.TypegenCmd.Execute(); err != nil {
+	if err := cli.TypegenCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}

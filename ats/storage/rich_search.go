@@ -34,8 +34,8 @@ type RichSearchMatch struct {
 // RichSearchResult contains search results with potential warnings
 type RichSearchResult struct {
 	Matches        []RichSearchMatch `json:"matches"`
-	Warnings       []string          `json:"warnings,omitempty"`       // Non-fatal issues during search
-	Degraded       bool              `json:"degraded,omitempty"`       // Indicates fallback search was used
+	Warnings       []string          `json:"warnings,omitempty"`        // Non-fatal issues during search
+	Degraded       bool              `json:"degraded,omitempty"`        // Indicates fallback search was used
 	SearchedFields []string          `json:"searched_fields,omitempty"` // Fields that were searched
 }
 

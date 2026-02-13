@@ -31,6 +31,9 @@ impl SqliteStore {
 
     /// Create a new in-memory SQLite store (for testing)
     pub fn in_memory() -> crate::error::Result<Self> {
+        // Initialize sqlite-vec extension BEFORE creating connection
+        crate::vec::init_vec_extension();
+
         let conn = Connection::open_in_memory()?;
         crate::migrate::migrate(&conn)?;
         Ok(Self::new(conn))
@@ -38,7 +41,11 @@ impl SqliteStore {
 
     /// Create a new file-backed SQLite store
     pub fn open(path: impl AsRef<std::path::Path>) -> crate::error::Result<Self> {
+        // Initialize sqlite-vec extension BEFORE creating connection
+        crate::vec::init_vec_extension();
+
         let conn = Connection::open(path)?;
+
         conn.execute("PRAGMA foreign_keys = ON", [])?;
         crate::migrate::migrate(&conn)?;
         Ok(Self::new(conn))

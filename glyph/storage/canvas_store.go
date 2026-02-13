@@ -12,27 +12,27 @@ import (
 // CanvasGlyph represents a glyph on the canvas workspace
 // Field types align with proto CanvasGlyph (int32 coordinates, string content)
 type CanvasGlyph struct {
-	ID         string    `json:"id"`
-	Symbol     string    `json:"symbol"`
-	X          int32     `json:"x"`
-	Y          int32     `json:"y"`
-	Width      *int32    `json:"width,omitempty"`
-	Height     *int32    `json:"height,omitempty"`
-	Content    *string   `json:"content,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID        string    `json:"id"`
+	Symbol    string    `json:"symbol"`
+	X         int32     `json:"x"`
+	Y         int32     `json:"y"`
+	Width     *int32    `json:"width,omitempty"`
+	Height    *int32    `json:"height,omitempty"`
+	Content   *string   `json:"content,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // CanvasComposition represents a melded composition of glyphs
 // Uses edge-based DAG structure to support multi-directional melding
 // See ADR-009 for rationale
 type CanvasComposition struct {
-	ID        string                  `json:"id"`
-	Edges     []*pb.CompositionEdge   `json:"edges"`
-	X         int32                   `json:"x"`
-	Y         int32                   `json:"y"`
-	CreatedAt time.Time               `json:"created_at"`
-	UpdatedAt time.Time               `json:"updated_at"`
+	ID        string                `json:"id"`
+	Edges     []*pb.CompositionEdge `json:"edges"`
+	X         int32                 `json:"x"`
+	Y         int32                 `json:"y"`
+	CreatedAt time.Time             `json:"created_at"`
+	UpdatedAt time.Time             `json:"updated_at"`
 }
 
 // compositionEdge is an internal struct for database operations
