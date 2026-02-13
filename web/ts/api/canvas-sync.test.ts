@@ -337,6 +337,28 @@ describe('Canvas Sync - Spike (Edge Cases)', () => {
         expect(flushCount).toBe(1);
     });
 
+    test('Spike: add() during flush() preserves new entry', async () => {
+        canvasSyncQueue.add({ id: 'g-1', op: 'glyph_upsert' });
+
+        let flushStarted = false;
+        mockApiFetch = async () => {
+            if (!flushStarted) {
+                flushStarted = true;
+                // Simulate user creating a new glyph while flush is in-flight
+                canvasSyncQueue.add({ id: 'g-2', op: 'glyph_upsert' });
+            }
+            return new Response(null, { status: 200 });
+        };
+
+        await canvasSyncQueue.flush();
+
+        // g-1 synced and removed, but g-2 must survive
+        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        expect(stored).toHaveLength(1);
+        expect(stored[0].id).toBe('g-2');
+        expect(stored[0].op).toBe('glyph_upsert');
+    });
+
     test('Spike: empty queue flush, nothing happens', async () => {
         let fetchCalled = false;
         mockApiFetch = async () => {
