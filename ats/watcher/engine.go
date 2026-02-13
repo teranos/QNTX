@@ -66,9 +66,9 @@ type PendingExecution struct {
 }
 
 const (
-	maxRetries       = 5
-	initialBackoff   = 1 * time.Second
-	maxBackoff       = 60 * time.Second
+	maxRetries          = 5
+	initialBackoff      = 1 * time.Second
+	maxBackoff          = 60 * time.Second
 	retryTickerInterval = 1 * time.Second
 )
 
@@ -76,10 +76,10 @@ const (
 func NewEngine(db *sql.DB, apiBaseURL string, logger *zap.SugaredLogger) *Engine {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Engine{
-		store:        storage.NewWatcherStore(db),
-		logger:       logger,
-		db:           db,
-		apiBaseURL:   strings.TrimSuffix(apiBaseURL, "/"),
+		store:      storage.NewWatcherStore(db),
+		logger:     logger,
+		db:         db,
+		apiBaseURL: strings.TrimSuffix(apiBaseURL, "/"),
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -342,7 +342,7 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 
 		// Execute async with a deep copy to prevent race conditions
 		// Each goroutine gets its own copy of the attestation
-		asCopy := *as  // Copy the struct
+		asCopy := *as // Copy the struct
 		// Deep copy slices to prevent shared references
 		asCopy.Subjects = append([]string(nil), as.Subjects...)
 		asCopy.Predicates = append([]string(nil), as.Predicates...)
@@ -600,9 +600,9 @@ func (e *Engine) executeGlyph(watcher *storage.Watcher, as *types.As) error {
 // Returns the JSON-encoded execution result on success.
 func (e *Engine) executeGlyphPython(glyphID string, content string, attestationJSON []byte) ([]byte, error) {
 	reqBody, err := json.Marshal(map[string]interface{}{
-		"content":               content,
-		"glyph_id":              glyphID,
-		"upstream_attestation":  json.RawMessage(attestationJSON),
+		"content":              content,
+		"glyph_id":             glyphID,
+		"upstream_attestation": json.RawMessage(attestationJSON),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal request body")
@@ -633,9 +633,9 @@ func (e *Engine) executeGlyphPython(glyphID string, content string, attestationJ
 // Returns the JSON-encoded execution result on success.
 func (e *Engine) executeGlyphPrompt(glyphID string, template string, attestationJSON []byte) ([]byte, error) {
 	reqBody, err := json.Marshal(map[string]interface{}{
-		"template":              template,
-		"glyph_id":              glyphID,
-		"upstream_attestation":  json.RawMessage(attestationJSON),
+		"template":             template,
+		"glyph_id":             glyphID,
+		"upstream_attestation": json.RawMessage(attestationJSON),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal request body")

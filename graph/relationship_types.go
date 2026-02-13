@@ -9,12 +9,12 @@ import (
 // RelationshipDefinition holds physics and display metadata for a relationship type from attestations.
 // Relationship type definitions use the "relationship_type" predicate in typespace.
 type RelationshipDefinition struct {
-	PredicateName string   `json:"predicate_name"`            // e.g., "is_child_of", "points_to"
-	DisplayLabel  string   `json:"display_label"`             // Human-readable label
-	Color         string   `json:"color,omitempty"`           // Optional link color override
-	LinkDistance  *float64 `json:"link_distance,omitempty"`   // D3 force distance (nil = use default)
-	LinkStrength  *float64 `json:"link_strength,omitempty"`   // D3 force strength (nil = use default)
-	Deprecated    bool     `json:"deprecated"`                // Whether this relationship type is deprecated
+	PredicateName string   `json:"predicate_name"`          // e.g., "is_child_of", "points_to"
+	DisplayLabel  string   `json:"display_label"`           // Human-readable label
+	Color         string   `json:"color,omitempty"`         // Optional link color override
+	LinkDistance  *float64 `json:"link_distance,omitempty"` // D3 force distance (nil = use default)
+	LinkStrength  *float64 `json:"link_strength,omitempty"` // D3 force strength (nil = use default)
+	Deprecated    bool     `json:"deprecated"`              // Whether this relationship type is deprecated
 }
 
 // extractRelationshipTypeDefinitions extracts relationship type definitions from attestations with physics metadata.
