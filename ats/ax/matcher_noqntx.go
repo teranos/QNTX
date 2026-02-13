@@ -9,7 +9,17 @@ type WasmMatcher struct{}
 
 // NewWasmMatcher returns an error when WASM is not available.
 func NewWasmMatcher() (*WasmMatcher, error) {
-	return nil, errors.New("WASM fuzzy matcher not available: built without qntxwasm tag")
+	return nil, errors.New("WASM fuzzy matcher not available: built without qntxwasm tag — run `make wasm`")
+}
+
+// NewDefaultMatcher panics without qntxwasm — WASM is required for fuzzy matching.
+func NewDefaultMatcher() Matcher {
+	panic("WASM fuzzy matcher required: built without qntxwasm tag — run `make wasm`")
+}
+
+// DetectBackend returns Go (non-WASM) when built without qntxwasm tag.
+func DetectBackend() MatcherBackend {
+	return MatcherBackendGo
 }
 
 // FindMatches is not available without WASM.
