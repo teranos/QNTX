@@ -287,6 +287,32 @@ func sortHashes(hashes []Hash) {
 	})
 }
 
+// Contains returns true if the given content hash exists in any group.
+func (t *Tree) Contains(contentHash Hash) bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	for _, g := range t.groups {
+		if _, ok := g.leaves[contentHash]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// findGroupKey returns the GroupKey for a given group key hash.
+// Returns false if the group doesn't exist.
+func (t *Tree) findGroupKey(gkh Hash) (GroupKey, bool) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	g, ok := t.groups[gkh]
+	if !ok {
+		return GroupKey{}, false
+	}
+	return g.key, true
+}
+
 // HexHash returns the hex-encoded string of a Hash (for logging/debugging).
 func HexHash(h Hash) string {
 	return hex.EncodeToString(h[:])
