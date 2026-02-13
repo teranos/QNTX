@@ -360,6 +360,77 @@ mod wazero {
     }
 
     // ============================================================================
+    // Sync: content-addressed attestation identity + Merkle tree
+    // ============================================================================
+
+    /// Compute content hash for an attestation.
+    /// Input: JSON-serialized Attestation
+    /// Output: `{"hash":"<64-char hex>"}` or `{"error":"..."}`
+    fn sync_content_hash_impl(input: &str) -> String {
+        qntx_core::sync::content_hash_json(input)
+    }
+
+    /// Compute content hash. Takes (ptr, len) pointing to JSON attestation.
+    /// Returns packed u64 pointing to `{"hash":"<hex>"}`.
+    #[no_mangle]
+    pub extern "C" fn sync_content_hash(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&sync_content_hash_impl(input))
+    }
+
+    /// Insert into the global Merkle tree.
+    /// Input: `{"actor":"...","context":"...","content_hash":"<hex>"}`
+    /// Returns packed u64 pointing to `{"ok":true}`.
+    #[no_mangle]
+    pub extern "C" fn sync_merkle_insert(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&qntx_core::sync::merkle_insert_json(input))
+    }
+
+    /// Remove from the global Merkle tree.
+    /// Input: `{"actor":"...","context":"...","content_hash":"<hex>"}`
+    /// Returns packed u64 pointing to `{"ok":true}`.
+    #[no_mangle]
+    pub extern "C" fn sync_merkle_remove(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&qntx_core::sync::merkle_remove_json(input))
+    }
+
+    /// Check if a content hash exists in the global Merkle tree.
+    /// Input: `{"content_hash":"<hex>"}`
+    /// Returns packed u64 pointing to `{"exists":true|false}`.
+    #[no_mangle]
+    pub extern "C" fn sync_merkle_contains(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&qntx_core::sync::merkle_contains_json(input))
+    }
+
+    /// Get the Merkle tree root hash and stats.
+    /// Returns packed u64 pointing to `{"root":"<hex>","size":N,"groups":N}`.
+    #[no_mangle]
+    pub extern "C" fn sync_merkle_root(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&qntx_core::sync::merkle_root_json(input))
+    }
+
+    /// Get all group hashes from the Merkle tree.
+    /// Returns packed u64 pointing to `{"groups":{"<hex>":"<hex>",...}}`.
+    #[no_mangle]
+    pub extern "C" fn sync_merkle_group_hashes(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&qntx_core::sync::merkle_group_hashes_json(input))
+    }
+
+    /// Diff Merkle tree against remote group hashes.
+    /// Input: `{"remote":{"<hex>":"<hex>",...}}`
+    /// Returns packed u64 pointing to `{"local_only":[...],"remote_only":[...],"divergent":[...]}`.
+    #[no_mangle]
+    pub extern "C" fn sync_merkle_diff(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&qntx_core::sync::merkle_diff_json(input))
+    }
+
+    // ============================================================================
     // Tests
     // ============================================================================
 
@@ -591,6 +662,42 @@ mod wazero {
                 parsed["ids"].as_array().unwrap(),
                 &["rescue-plan", "carbonite-heist"]
             );
+        }
+
+        #[test]
+        fn sync_content_hash_basic() {
+            let input = serde_json::json!({
+                "id": "as-test",
+                "subjects": ["user-1"],
+                "predicates": ["member"],
+                "contexts": ["team"],
+                "actors": ["hr"],
+                "timestamp": 1000,
+                "source": "cli",
+                "created_at": 2000
+            });
+            let result = sync_content_hash_impl(&input.to_string());
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert!(parsed["error"].is_null(), "unexpected error: {}", result);
+            assert_eq!(parsed["hash"].as_str().unwrap().len(), 64);
+        }
+
+        #[test]
+        fn sync_content_hash_deterministic() {
+            let input = serde_json::json!({
+                "id": "as-1",
+                "subjects": ["s"],
+                "predicates": ["p"],
+                "contexts": ["c"],
+                "actors": ["a"],
+                "timestamp": 1000,
+                "source": "cli",
+                "created_at": 0
+            });
+            let json = input.to_string();
+            let r1 = sync_content_hash_impl(&json);
+            let r2 = sync_content_hash_impl(&json);
+            assert_eq!(r1, r2);
         }
     }
 } // end mod wazero
