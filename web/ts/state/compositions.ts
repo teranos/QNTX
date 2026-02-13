@@ -71,10 +71,8 @@ export function addComposition(composition: CompositionState): void {
         });
     }
 
-    // Sync with backend (fire-and-forget)
-    apiUpsertComposition(composition).catch(err => {
-        log.error(SEG.GLYPH, '[Compositions] Failed to sync composition to backend:', err);
-    });
+    // Enqueue for server sync (never throws)
+    apiUpsertComposition(composition);
 }
 
 /**
@@ -86,10 +84,8 @@ export function removeComposition(id: string): void {
     uiState.setCanvasCompositions(updated);
     log.debug(SEG.GLYPH, '[Compositions] Removed composition', { id });
 
-    // Sync with backend (fire-and-forget)
-    apiDeleteComposition(id).catch(err => {
-        log.error(SEG.GLYPH, '[Compositions] Failed to delete composition from backend:', err);
-    });
+    // Enqueue for server sync (never throws)
+    apiDeleteComposition(id);
 }
 
 /**
