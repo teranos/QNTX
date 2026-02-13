@@ -144,7 +144,7 @@
 
           # Hash of vendored Go dependencies (computed from go.sum)
           # To update: set to `pkgs.lib.fakeHash`, run `nix build .#qntx`, copy the hash from error
-          vendorHash = pkgs.lib.fakeHash;
+          vendorHash = "sha256-Ix5m8m578Jj5mEUy/K1zSWy/wJK9zBO9bGHacPrwOoA=";
 
           preBuild = goWasmPreBuild;
 
@@ -168,7 +168,7 @@
 
           # Same vendorHash as qntx (shared go.mod)
           # To update: set to `pkgs.lib.fakeHash`, run `nix build .#typegen`, copy the hash from error
-          vendorHash = pkgs.lib.fakeHash;
+          vendorHash = "sha256-Ix5m8m578Jj5mEUy/K1zSWy/wJK9zBO9bGHacPrwOoA=";
 
           preBuild = goWasmPreBuild;
 
