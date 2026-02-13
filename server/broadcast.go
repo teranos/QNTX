@@ -31,8 +31,8 @@ type broadcastRequest struct {
 	logBatch *wslogs.Batch // Log batch (for reqType="log")
 	payload  interface{}   // Generic payload (for reqType="watcher_match")
 	clientID string        // Target client ID. Empty string means "broadcast to all clients"
-	                       // (semantically: no specific target = all targets).
-	client   *Client       // Client to close (for reqType="close")
+	// (semantically: no specific target = all targets).
+	client *Client // Client to close (for reqType="close")
 }
 
 // broadcastMessage sends a message to all connected clients.
@@ -128,6 +128,7 @@ func (s *QNTXServer) startUsageUpdateTicker() {
 // Alternative architectures considered:
 //   - Option 2: Dedicated Pulse execution broadcaster (separate subscription for clean separation)
 //   - Option 3: Worker-level callbacks (most direct, but changes WorkerPool API)
+//
 // We chose Option 1 (extend existing broadcaster) for minimal code change and reuse of existing subscription.
 func (s *QNTXServer) startJobUpdateBroadcaster() {
 	// Subscribe to job queue updates

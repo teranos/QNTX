@@ -10,8 +10,8 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/watcher"
-	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	pb "github.com/teranos/QNTX/glyph/proto"
+	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/sym"
 	"go.uber.org/zap"
