@@ -27,7 +27,7 @@ The developer always uses `make dev` to start the development environment with h
 
 `make test` runs both backend (Go) and frontend (TypeScript) tests. See [web/TESTING.md](web/TESTING.md) for frontend testing patterns.
 
-**It is FORBIDDEN to craft custom test commands.**
+**It is DISCOURAGED to craft custom test commands.**
 
 **Tests passing ≠ feature is correct.** Only manual verification by the developer confirms behavior matches intent.
 
