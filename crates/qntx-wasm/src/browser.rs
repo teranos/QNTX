@@ -302,6 +302,64 @@ pub fn classify_claims(input: &str) -> String {
 }
 
 // ============================================================================
+// Sync: content-addressed attestation identity + Merkle tree
+// ============================================================================
+
+/// Compute content hash for an attestation.
+/// Input: JSON-serialized Attestation
+/// Returns: `{"hash":"<64-char hex>"}` or `{"error":"..."}`
+#[wasm_bindgen]
+pub fn sync_content_hash(attestation_json: &str) -> String {
+    qntx_core::sync::content_hash_json(attestation_json)
+}
+
+/// Insert into the global Merkle tree.
+/// Input: `{"actor":"...","context":"...","content_hash":"<hex>"}`
+/// Returns: `{"ok":true}` or `{"error":"..."}`
+#[wasm_bindgen]
+pub fn sync_merkle_insert(input: &str) -> String {
+    qntx_core::sync::merkle_insert_json(input)
+}
+
+/// Remove from the global Merkle tree.
+/// Input: `{"actor":"...","context":"...","content_hash":"<hex>"}`
+/// Returns: `{"ok":true}`
+#[wasm_bindgen]
+pub fn sync_merkle_remove(input: &str) -> String {
+    qntx_core::sync::merkle_remove_json(input)
+}
+
+/// Check if a content hash exists in the global Merkle tree.
+/// Input: `{"content_hash":"<hex>"}`
+/// Returns: `{"exists":true|false}`
+#[wasm_bindgen]
+pub fn sync_merkle_contains(input: &str) -> String {
+    qntx_core::sync::merkle_contains_json(input)
+}
+
+/// Get the Merkle tree root hash and stats.
+/// Returns: `{"root":"<hex>","size":N,"groups":N}`
+#[wasm_bindgen]
+pub fn sync_merkle_root() -> String {
+    qntx_core::sync::merkle_root_json("")
+}
+
+/// Get all group hashes from the Merkle tree.
+/// Returns: `{"groups":{"<hex>":"<hex>",...}}`
+#[wasm_bindgen]
+pub fn sync_merkle_group_hashes() -> String {
+    qntx_core::sync::merkle_group_hashes_json("")
+}
+
+/// Diff Merkle tree against remote group hashes.
+/// Input: `{"remote":{"<hex>":"<hex>",...}}`
+/// Returns: `{"local_only":[...],"remote_only":[...],"divergent":[...]}`
+#[wasm_bindgen]
+pub fn sync_merkle_diff(remote_json: &str) -> String {
+    qntx_core::sync::merkle_diff_json(remote_json)
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 
