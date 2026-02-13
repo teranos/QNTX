@@ -304,66 +304,6 @@
     color: #88c999;
 }
 
-/* Toast Notifications */
-#toast-container {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 2000;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    max-width: 400px;
-}
-
-.toast {
-    background: #000;
-    color: #fff;
-    padding: var(--panel-padding-md);
-    border: 1px solid var(--border-on-dark);
-    font-size: var(--font-size-sm);
-    line-height: 1.5;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    animation: slideInFromRight 0.3s ease-out;
-}
-
-.toast.error {
-    border-color: #ff6b6b;
-    background: #2a1a1a;
-}
-
-.toast.warning {
-    border-color: #ffa502;
-    background: #2a2a1a;
-}
-
-.toast-title {
-    font-weight: 600;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-    font-size: var(--font-size-sm);
-    letter-spacing: 0.5px;
-}
-
-.toast.error .toast-title {
-    color: #ff6b6b;
-}
-
-.toast.warning .toast-title {
-    color: #ffa502;
-}
-
-@keyframes slideInFromRight {
-    from {
-        transform: translateX(400px);
-        opacity: 0;
-    }
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
-}
-
 /* Hixtory - IX operation history */
 .hixtory-item {
     padding: 4px 8px;
