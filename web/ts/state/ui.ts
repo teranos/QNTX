@@ -13,11 +13,11 @@
  * State domains:
  * - Panel visibility (transient, not persisted)
  * - User preferences (persisted)
- * - Graph session (persisted with expiry)
+ * - Session (query, verbosity — persisted with expiry)
  * - Budget warnings (transient)
  */
 
-import type { PanelState, Transform } from '../../types/core';
+import type { PanelState } from '../../types/core';
 import type { CanvasGlyph, CompositionEdge, Composition } from '../generated/proto/glyph/proto/canvas';
 import { getItem, setItem, removeItem } from './storage';
 import { log, SEG } from '../logger';
@@ -55,7 +55,6 @@ export interface BudgetWarningState {
 export interface GraphSessionState {
     query?: string;
     verbosity?: number;
-    transform?: Transform | null;
 }
 
 /**
@@ -371,13 +370,6 @@ class UIState {
      */
     setGraphVerbosity(verbosity: number): void {
         this.setGraphSession({ verbosity });
-    }
-
-    /**
-     * Set graph transform (zoom/pan state)
-     */
-    setGraphTransform(transform: Transform | null): void {
-        this.setGraphSession({ transform });
     }
 
     /**

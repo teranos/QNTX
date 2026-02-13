@@ -26,7 +26,6 @@
     "@types/d3": "7.4.3",
     "@types/jsdom": "27.0.0",
     "codemirror-languageserver": "1.17.0",
-    "d3": "7.9.0",
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "20.0.11",
     "jsdom": "27.4.0",
@@ -53,6 +52,7 @@
     "@lezer/common": "1.4.0"
   },
   "dependencies": {
+    "d3": "7.9.0",
     "@codemirror/lang-javascript": "6.2.2",
     "@codemirror/lang-python": "^6.2.1",
     "@codemirror/lang-yaml": "^6.1.2",
