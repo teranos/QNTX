@@ -1,0 +1,14 @@
+/* Sync Badge - Shows pending canvas sync queue count */
+
+.sync-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-sm);
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', 'Source Code Pro', monospace;
+    color: var(--warning-color, #ffa502);
+    transition: all 0.2s;
+    user-select: none;
+    background: transparent;
+}

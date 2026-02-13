@@ -22,10 +22,54 @@
  * NOTE: Times simulated (not real 35-minute wait), but sequence is authentic.
  */
 
-import { describe, test, expect, beforeEach } from 'bun:test';
+import { describe, test, expect, beforeEach, mock } from 'bun:test';
+import { Window } from 'happy-dom';
 import { syncStateManager, type GlyphSyncState } from './sync-state';
-import { mergeCanvasState } from '../api/canvas';
 import type { CanvasGlyphState, CompositionState } from './ui';
+
+// Setup happy-dom for localStorage (sync queue uses it)
+const happyWindow = new Window();
+globalThis.document = happyWindow.document as any;
+globalThis.window = happyWindow as any;
+globalThis.localStorage = happyWindow.localStorage;
+
+// Mock connectivity — offline by default (tunnel)
+let mockConnectivity: 'online' | 'offline' = 'offline';
+
+mock.module('../connectivity', () => ({
+    connectivityManager: {
+        get state() { return mockConnectivity; },
+        subscribe(cb: (s: 'online' | 'offline') => void) {
+            cb(mockConnectivity);
+            return () => {};
+        },
+    },
+}));
+
+// Mock apiFetch — controlled per test
+let mockApiFetch: (path: string, init?: RequestInit) => Promise<Response>;
+mockApiFetch = async () => new Response(null, { status: 200 });
+
+mock.module('../api', () => ({
+    apiFetch: (path: string, init?: RequestInit) => mockApiFetch(path, init),
+}));
+
+// Mock UIState — glyph/composition data for sync queue flush
+let mockGlyphs: Array<{ id: string; symbol: string; x: number; y: number; content?: string }> = [];
+let mockCompositions: Array<{ id: string; edges: Array<{ from: string; to: string; direction: string; position: number }>; x: number; y: number }> = [];
+
+mock.module('./ui', () => ({
+    uiState: {
+        getCanvasGlyphs: () => mockGlyphs,
+        getCanvasCompositions: () => mockCompositions,
+    },
+}));
+
+// Dynamic imports AFTER mocks
+const { mergeCanvasState } = await import('../api/canvas');
+const { canvasSyncQueue } = await import('../api/canvas-sync');
+
+const SYNC_QUEUE_KEY = 'qntx-canvas-sync-queue';
 
 /**
  * Helper to determine expected visual state based on connectivity and sync state
@@ -290,34 +334,43 @@ describe('London Tube Journey: Gene Network Analysis', () => {
     };
 
     beforeEach(() => {
-        // Clear all glyph states
+        localStorage.clear();
+        mockConnectivity = 'offline';
+        mockApiFetch = async () => new Response(null, { status: 200 });
+        // Mock glyph data for sync queue to resolve during flush
+        mockGlyphs = [
+            { id: glyphs.novelCluster, symbol: 'ax', x: 100, y: 200 },
+            { id: glyphs.candidateGene, symbol: 'gene', x: 200, y: 300 },
+            { id: glyphs.homologA, symbol: 'gene', x: 300, y: 400 },
+            { id: glyphs.hypothesis, symbol: 'note', x: 400, y: 500 },
+            { id: glyphs.validationNote, symbol: 'note', x: 500, y: 600 },
+            { id: glyphs.localAxQuery, symbol: 'ax', x: 600, y: 700 },
+        ];
+        mockCompositions = [];
         Object.values(glyphs).forEach(id => {
             syncStateManager.clearState(id);
         });
     });
 
-    test('08:31 Morden: Board train and identify novel gene cluster', () => {
+    test('08:31 Morden: Board train and identify novel gene cluster', async () => {
         // STATION: Morden (WiFi available)
-        const connectivity = 'online';
 
         // Researcher opens QNTX, sees overnight pipeline results
-        // Taps novel cluster glyph in overview mode
-        syncStateManager.setState(glyphs.novelCluster, 'unsynced');
+        // Taps novel cluster glyph — enqueued for sync
+        canvasSyncQueue.add({ id: glyphs.novelCluster, op: 'glyph_upsert' });
         expect(syncStateManager.getState(glyphs.novelCluster)).toBe('unsynced');
 
-        // Researcher adds annotation, triggers sync
-        syncStateManager.setState(glyphs.novelCluster, 'syncing');
-        expect(syncStateManager.getState(glyphs.novelCluster)).toBe('syncing');
-
-        // Backend confirms persistence
-        syncStateManager.setState(glyphs.novelCluster, 'synced');
+        // Station WiFi: queue flushes, backend confirms
+        await canvasSyncQueue.flush();
         expect(syncStateManager.getState(glyphs.novelCluster)).toBe('synced');
 
-        // Visual state: Normal appearance + 110% saturation boost
+        // Queue drained — nothing pending when train departs
+        const stored = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
+        expect(stored).toHaveLength(0);
     });
 
     test('Morden → South Wimbledon tunnel: First offline experience', () => {
-        // Pre-condition: Cluster already synced from previous station
+        // Pre-condition: Cluster already synced from Morden station
         syncStateManager.setState(glyphs.novelCluster, 'synced');
 
         // TUNNEL: Train departs Morden at 08:31
@@ -325,11 +378,16 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         const connectivity = 'offline';
 
         // Researcher identifies candidate gene and drags to canvas
-        // Glyph moves immediately but marked as unsynced
-        syncStateManager.setState(glyphs.candidateGene, 'unsynced');
+        // Enqueued offline — sits in localStorage, won't flush
+        canvasSyncQueue.add({ id: glyphs.candidateGene, op: 'glyph_upsert' });
 
         expect(syncStateManager.getState(glyphs.candidateGene)).toBe('unsynced');
         expect(syncStateManager.getState(glyphs.novelCluster)).toBe('synced');
+
+        // One item waiting in the sync queue
+        const stored = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
+        expect(stored).toHaveLength(1);
+        expect(stored[0].op).toBe('glyph_upsert');
 
         // Validate expected visual states
         const unsyncedVisual = getExpectedVisualState(connectivity, 'unsynced');
@@ -350,10 +408,10 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         expect(syncedVisual.description).toContain('Azure tint');
     });
 
-    test('08:34 South Wimbledon: First auto-sync at station', () => {
+    test('08:34 South Wimbledon: First auto-sync at station', async () => {
         // Pre-condition: Candidate gene created offline in tunnel
         syncStateManager.setState(glyphs.novelCluster, 'synced');
-        syncStateManager.setState(glyphs.candidateGene, 'unsynced');
+        canvasSyncQueue.add({ id: glyphs.candidateGene, op: 'glyph_upsert' });
 
         // Track state transitions
         const transitions: GlyphSyncState[] = [];
@@ -362,27 +420,25 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         });
 
         // STATION: South Wimbledon (08:34)
-        // Connectivity returns instantly (for fast tests)
-        const connectivity = 'online';
+        // Connectivity returns — queue flushes automatically
+        await canvasSyncQueue.flush();
 
-        // Auto-sync begins immediately in background
-        syncStateManager.setState(glyphs.candidateGene, 'syncing');
-
-        // Backend confirms persistence
-        syncStateManager.setState(glyphs.candidateGene, 'synced');
-
-        // Verify state transitions
+        // Verify state transitions driven by sync queue
         expect(transitions).toEqual([
-            'unsynced',  // Initial subscription
-            'syncing',   // Auto-sync started
-            'synced'     // Persistence confirmed
+            'unsynced',  // Initial subscription (enqueued offline)
+            'syncing',   // flush() starts processing entry
+            'synced'     // Backend confirms persistence
         ]);
 
         expect(syncStateManager.getState(glyphs.candidateGene)).toBe('synced');
 
+        // Queue drained
+        const stored = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
+        expect(stored).toHaveLength(0);
+
         // Validate visual transition: ghostly → enhanced color
         const beforeSync = getExpectedVisualState('offline', 'unsynced');
-        const afterSync = getExpectedVisualState(connectivity, 'synced');
+        const afterSync = getExpectedVisualState('online', 'synced');
 
         // Before: Offline + unsynced = ghostly
         expect(beforeSync.expectedFilter).toBe('grayscale(100%)');
@@ -433,32 +489,30 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         expect(testCases.length).toBe(10); // 2 connectivity × 4 sync states + 2 local-active
     });
 
-    test('Segment 1: Morden → Balham with multiple tunnel cycles', () => {
+    test('Segment 1: Morden → Balham with multiple tunnel cycles', async () => {
         // Simulate first 5 stations (10 minutes)
         const journey: Array<{ time: string; location: string; connectivity: 'online' | 'offline'; action: string }> = [];
 
         // 08:31 STATION: Morden
         journey.push({ time: '08:31', location: 'Morden', connectivity: 'online', action: 'Board train, identify novel cluster' });
-        syncStateManager.setState(glyphs.novelCluster, 'syncing');
-        syncStateManager.setState(glyphs.novelCluster, 'synced');
+        canvasSyncQueue.add({ id: glyphs.novelCluster, op: 'glyph_upsert' });
+        await canvasSyncQueue.flush();
 
         // 08:31-08:34 TUNNEL: Morden → South Wimbledon
         journey.push({ time: '08:32', location: 'Tunnel', connectivity: 'offline', action: 'Add candidate gene (offline)' });
-        syncStateManager.setState(glyphs.candidateGene, 'unsynced');
+        canvasSyncQueue.add({ id: glyphs.candidateGene, op: 'glyph_upsert' });
 
         // 08:34 STATION: South Wimbledon
         journey.push({ time: '08:34', location: 'South Wimbledon', connectivity: 'online', action: 'Auto-sync candidate gene' });
-        syncStateManager.setState(glyphs.candidateGene, 'syncing');
-        syncStateManager.setState(glyphs.candidateGene, 'synced');
+        await canvasSyncQueue.flush();
 
         // 08:34-08:36 TUNNEL: South Wimbledon → Colliers Wood
         journey.push({ time: '08:35', location: 'Tunnel', connectivity: 'offline', action: 'Add homolog relationship (offline)' });
-        syncStateManager.setState(glyphs.homologA, 'unsynced');
+        canvasSyncQueue.add({ id: glyphs.homologA, op: 'glyph_upsert' });
 
         // 08:36 STATION: Colliers Wood
         journey.push({ time: '08:36', location: 'Colliers Wood', connectivity: 'online', action: 'Auto-sync homolog' });
-        syncStateManager.setState(glyphs.homologA, 'syncing');
-        syncStateManager.setState(glyphs.homologA, 'synced');
+        await canvasSyncQueue.flush();
 
         // 08:36-08:38 TUNNEL: Colliers Wood → Tooting Broadway
         journey.push({ time: '08:37', location: 'Tunnel', connectivity: 'offline', action: 'Review gene network (all glyphs azure tint)' });
@@ -483,6 +537,10 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         expect(syncStateManager.getState(glyphs.candidateGene)).toBe('synced');
         expect(syncStateManager.getState(glyphs.homologA)).toBe('synced');
 
+        // Queue empty at segment end
+        const stored = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
+        expect(stored).toHaveLength(0);
+
         expect(journey.length).toBe(11);
         expect(journey[0].location).toBe('Morden');
         expect(journey[10].location).toBe('Balham');
@@ -501,9 +559,12 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         // "of QNTX" — IndexedDB has locally-cached attestation data.
         const connectivity = 'offline';
 
-        // AX glyph queries IndexedDB locally — it has data, it works.
-        // Marked unsynced (query result not persisted to server yet)
-        syncStateManager.setState(glyphs.localAxQuery, 'unsynced');
+        // AX glyph spawned offline — enqueued, won't flush until station
+        canvasSyncQueue.add({ id: glyphs.localAxQuery, op: 'glyph_upsert' });
+
+        // Queue has 1 pending item (the AX query glyph)
+        const queued = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
+        expect(queued).toHaveLength(1);
 
         // Regular unsynced glyph in offline mode → ghostly (grayscale, unreachable)
         const ghostlyVisual = getExpectedVisualState(connectivity, 'unsynced');
@@ -533,7 +594,7 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         // 3. Ghostly (if any unsynced) — unreachable
     });
 
-    test('Oval → Kennington: Sync failure with exponential backoff retry', () => {
+    test('Oval → Kennington: Sync failure with exponential backoff retry', async () => {
         // Pre-condition: Segment 1 glyphs synced, now in middle of segment 2
         syncStateManager.setState(glyphs.novelCluster, 'synced');
         syncStateManager.setState(glyphs.candidateGene, 'synced');
@@ -546,53 +607,47 @@ describe('London Tube Journey: Gene Network Analysis', () => {
             transitions.push(state);
         });
 
-        const retryLog: string[] = [];
+        // 08:51 STATION: Oval — Jenny creates validation note
+        canvasSyncQueue.add({ id: glyphs.validationNote, op: 'glyph_upsert' });
 
-        // 08:51 STATION: Oval
-        retryLog.push('08:51 Oval: Create validation note (online)');
-        syncStateManager.setState(glyphs.validationNote, 'syncing');
+        // 08:51 Server flaky — first sync attempt fails
+        mockApiFetch = async () => new Response(null, { status: 500 });
+        await canvasSyncQueue.flush();
+        expect(syncStateManager.getState(glyphs.validationNote)).toBe('failed');
 
-        // 08:51-08:54 TUNNEL: Oval → Kennington (3 min, longer tunnel)
-        // Sync fails due to poor connectivity
-        retryLog.push('08:52 Tunnel: First sync attempt fails');
-        syncStateManager.setState(glyphs.validationNote, 'failed');
+        // Backoff: entry stays in queue with retryCount=1
+        let stored = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
+        expect(stored).toHaveLength(1);
+        expect(stored[0].retryCount).toBe(1);
+        expect(stored[0].nextRetryAt).toBeDefined();
 
-        // 08:54 STATION: Kennington
-        // Auto-retry with exponential backoff
-        retryLog.push('08:54 Kennington: Retry attempt 1 (immediate)');
-        syncStateManager.setState(glyphs.validationNote, 'syncing');
+        // 08:54 STATION: Kennington — expire backoff, retry
+        stored[0].nextRetryAt = Date.now() - 1;
+        localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(stored));
 
-        // Brief connection issue at station
-        retryLog.push('08:54 Kennington: Retry 1 fails (unstable connection)');
-        syncStateManager.setState(glyphs.validationNote, 'failed');
+        // Second attempt also fails (unstable connection at Kennington)
+        await canvasSyncQueue.flush();
+        stored = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
+        expect(stored[0].retryCount).toBe(2);
 
-        // Exponential backoff: wait before retry 2
-        retryLog.push('08:54 Kennington: Retry attempt 2 (after backoff)');
-        syncStateManager.setState(glyphs.validationNote, 'syncing');
+        // Expire backoff again — third attempt succeeds
+        stored[0].nextRetryAt = Date.now() - 1;
+        localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(stored));
+        mockApiFetch = async () => new Response(null, { status: 200 });
 
-        // Success on second retry
-        retryLog.push('08:54 Kennington: Retry 2 succeeds');
-        syncStateManager.setState(glyphs.validationNote, 'synced');
-
-        // Verify resilient recovery
+        await canvasSyncQueue.flush();
         expect(syncStateManager.getState(glyphs.validationNote)).toBe('synced');
 
-        // Verify state transition sequence
-        expect(transitions).toEqual([
-            'unsynced',  // Initial subscription
-            'syncing',   // First attempt
-            'failed',    // First failure
-            'syncing',   // Retry 1
-            'failed',    // Retry 1 failure
-            'syncing',   // Retry 2
-            'synced'     // Final success
-        ]);
+        // Queue drained after successful retry
+        stored = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
+        expect(stored).toHaveLength(0);
 
-        expect(transitions.filter(s => s === 'failed').length).toBe(2); // Two failures
-        expect(transitions[transitions.length - 1]).toBe('synced'); // Final success
+        // Verify resilient recovery through sync queue
+        expect(transitions).toContain('failed');
+        expect(transitions[transitions.length - 1]).toBe('synced');
     });
 
-    test('Full journey: Morden → Old Street complete', () => {
+    test('Full journey: Morden → Old Street complete', async () => {
         // Complete 35-minute journey across all 17 stations
         const journey: Array<{
             time: string;
@@ -604,22 +659,20 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         // === SEGMENT 1: Morden → Balham ===
 
         journey.push({ time: '08:31', location: 'Morden', connectivity: 'online', event: 'Board train, identify cluster' });
-        syncStateManager.setState(glyphs.novelCluster, 'syncing');
-        syncStateManager.setState(glyphs.novelCluster, 'synced');
+        canvasSyncQueue.add({ id: glyphs.novelCluster, op: 'glyph_upsert' });
+        await canvasSyncQueue.flush();
 
         journey.push({ time: '08:32', location: 'Tunnel', connectivity: 'offline', event: 'Add candidate gene' });
-        syncStateManager.setState(glyphs.candidateGene, 'unsynced');
+        canvasSyncQueue.add({ id: glyphs.candidateGene, op: 'glyph_upsert' });
 
         journey.push({ time: '08:34', location: 'South Wimbledon', connectivity: 'online', event: 'Sync candidate' });
-        syncStateManager.setState(glyphs.candidateGene, 'syncing');
-        syncStateManager.setState(glyphs.candidateGene, 'synced');
+        await canvasSyncQueue.flush();
 
         journey.push({ time: '08:35', location: 'Tunnel', connectivity: 'offline', event: 'Add homolog' });
-        syncStateManager.setState(glyphs.homologA, 'unsynced');
+        canvasSyncQueue.add({ id: glyphs.homologA, op: 'glyph_upsert' });
 
         journey.push({ time: '08:36', location: 'Colliers Wood', connectivity: 'online', event: 'Sync homolog' });
-        syncStateManager.setState(glyphs.homologA, 'syncing');
-        syncStateManager.setState(glyphs.homologA, 'synced');
+        await canvasSyncQueue.flush();
 
         journey.push({ time: '08:37', location: 'Tunnel', connectivity: 'offline', event: 'Review network' });
         journey.push({ time: '08:38', location: 'Tooting Broadway', connectivity: 'online', event: 'All synced' });
@@ -631,32 +684,29 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         // === SEGMENT 2: Balham → Old Street ===
 
         journey.push({ time: '08:42', location: 'Tunnel', connectivity: 'offline', event: 'Form hypothesis' });
-        syncStateManager.setState(glyphs.hypothesis, 'unsynced');
+        canvasSyncQueue.add({ id: glyphs.hypothesis, op: 'glyph_upsert' });
 
         journey.push({ time: '08:43', location: 'Clapham South', connectivity: 'online', event: 'Sync hypothesis' });
-        syncStateManager.setState(glyphs.hypothesis, 'syncing');
-        syncStateManager.setState(glyphs.hypothesis, 'synced');
+        await canvasSyncQueue.flush();
 
         journey.push({ time: '08:44', location: 'Tunnel', connectivity: 'offline', event: 'Continue' });
         journey.push({ time: '08:45', location: 'Clapham Common', connectivity: 'online', event: 'All synced' });
         journey.push({ time: '08:46', location: 'Tunnel', connectivity: 'offline', event: 'Refine hypothesis' });
         journey.push({ time: '08:47', location: 'Clapham North', connectivity: 'online', event: 'All synced' });
         journey.push({ time: '08:48', location: 'Tunnel', connectivity: 'offline', event: 'AX query: local attestations (orange, not ghostly)' });
-        syncStateManager.setState(glyphs.localAxQuery, 'unsynced');
+        canvasSyncQueue.add({ id: glyphs.localAxQuery, op: 'glyph_upsert' });
 
         journey.push({ time: '08:49', location: 'Stockwell', connectivity: 'online', event: 'Sync AX query results' });
-        syncStateManager.setState(glyphs.localAxQuery, 'syncing');
-        syncStateManager.setState(glyphs.localAxQuery, 'synced');
+        await canvasSyncQueue.flush();
 
         journey.push({ time: '08:50', location: 'Tunnel', connectivity: 'offline', event: 'Begin validation' });
         journey.push({ time: '08:51', location: 'Oval', connectivity: 'online', event: 'Create validation note' });
-        syncStateManager.setState(glyphs.validationNote, 'unsynced');
+        canvasSyncQueue.add({ id: glyphs.validationNote, op: 'glyph_upsert' });
+        await canvasSyncQueue.flush();
 
         journey.push({ time: '08:52', location: 'Tunnel', connectivity: 'offline', event: 'Long tunnel (3 min)' });
 
-        journey.push({ time: '08:54', location: 'Kennington', connectivity: 'online', event: 'Retry sync' });
-        syncStateManager.setState(glyphs.validationNote, 'syncing');
-        syncStateManager.setState(glyphs.validationNote, 'synced');
+        journey.push({ time: '08:54', location: 'Kennington', connectivity: 'online', event: 'All synced' });
 
         journey.push({ time: '08:55', location: 'Tunnel', connectivity: 'offline', event: 'Continue work' });
         journey.push({ time: '08:56', location: 'Elephant & Castle', connectivity: 'online', event: 'All synced' });
@@ -679,6 +729,10 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         expect(syncStateManager.getState(glyphs.localAxQuery)).toBe('synced');
         expect(syncStateManager.getState(glyphs.validationNote)).toBe('synced');
 
+        // Queue empty at arrival — everything synced
+        const stored = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
+        expect(stored).toHaveLength(0);
+
         // Verify journey completeness
         expect(journey.length).toBe(35); // 35 events across full journey
         expect(journey[0].location).toBe('Morden');
@@ -692,7 +746,7 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         expect(stationEvents.length).toBe(18); // 18 station stops
     });
 
-    test('Desktop continuation: Seamless transition from mobile', () => {
+    test('Desktop continuation: Seamless transition from mobile', async () => {
         // SCENARIO: Researcher arrives at Old Street (09:06)
         // Opens desktop workstation, canvas already has all mobile work
 
@@ -701,7 +755,11 @@ describe('London Tube Journey: Gene Network Analysis', () => {
             syncStateManager.setState(id, 'synced');
         });
 
-        // Desktop opens same canvas URL - all work already present
+        // Desktop opens same canvas URL — all work already present
+        // No items in sync queue (everything was synced on mobile)
+        const mobileQueue = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
+        expect(mobileQueue).toHaveLength(0);
+
         const desktopSession = Object.entries(glyphs).map(([name, id]) => ({
             name,
             id,
@@ -715,11 +773,16 @@ describe('London Tube Journey: Gene Network Analysis', () => {
 
         // Researcher immediately continues with deep analysis on larger screen
         const deepAnalysisGlyph = 'desktop-deep-analysis-001';
-        syncStateManager.setState(deepAnalysisGlyph, 'syncing');
-        syncStateManager.setState(deepAnalysisGlyph, 'synced');
+        mockGlyphs.push({ id: deepAnalysisGlyph, symbol: 'note', x: 800, y: 100 });
+        canvasSyncQueue.add({ id: deepAnalysisGlyph, op: 'glyph_upsert' });
+        await canvasSyncQueue.flush();
 
         expect(syncStateManager.getState(deepAnalysisGlyph)).toBe('synced');
         expect(desktopSession.length).toBe(6); // All 6 mobile glyphs present (including AX query)
+
+        // Queue empty after desktop sync
+        const desktopQueue = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
+        expect(desktopQueue).toHaveLength(0);
 
         // SUCCESS: Researcher discovered novel protein function during 35-minute commute
         // Desktop ready for detailed validation work

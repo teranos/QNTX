@@ -17,16 +17,21 @@ export type CanvasSyncOp = 'glyph_upsert' | 'glyph_delete' | 'composition_upsert
 export interface CanvasSyncEntry {
     id: string;
     op: CanvasSyncOp;
+    retryCount?: number;
+    nextRetryAt?: number;
 }
 
 const STORAGE_KEY = 'qntx-canvas-sync-queue';
+const MAX_RETRIES = 3;
+const BASE_BACKOFF_MS = 1000;
 
 class CanvasSyncQueueImpl {
     private flushing = false;
+    private listeners = new Set<() => void>();
 
     private get queue(): CanvasSyncEntry[] {
         try {
-            const stored = localStorage.getItem(STORAGE_KEY);
+            const stored = globalThis.localStorage?.getItem(STORAGE_KEY);
             return stored ? JSON.parse(stored) : [];
         } catch {
             return [];
@@ -34,7 +39,24 @@ class CanvasSyncQueueImpl {
     }
 
     private set queue(entries: CanvasSyncEntry[]) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+        try {
+            globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(entries));
+        } catch { /* localStorage unavailable */ }
+    }
+
+    /** Number of pending entries in the queue */
+    get size(): number {
+        return this.queue.length;
+    }
+
+    /** Subscribe to queue changes. Returns unsubscribe function. */
+    onChange(cb: () => void): () => void {
+        this.listeners.add(cb);
+        return () => { this.listeners.delete(cb); };
+    }
+
+    private notify(): void {
+        for (const cb of this.listeners) cb();
     }
 
     /** Enqueue a canvas operation with deduplication */
@@ -43,12 +65,13 @@ class CanvasSyncQueueImpl {
 
         // Dedup: for same ID and entity type, latest op wins.
         // delete supersedes pending upsert; duplicate upserts collapse.
+        // Fresh add resets retry state (user edited again → no backoff).
         const entityType = entry.op.startsWith('glyph') ? 'glyph' : 'composition';
         const filtered = q.filter(e => {
             const eType = e.op.startsWith('glyph') ? 'glyph' : 'composition';
             return !(e.id === entry.id && eType === entityType);
         });
-        filtered.push(entry);
+        filtered.push({ id: entry.id, op: entry.op });
         this.queue = filtered;
 
         if (entry.op.endsWith('upsert')) {
@@ -56,6 +79,7 @@ class CanvasSyncQueueImpl {
         }
 
         log.debug(SEG.GLYPH, `[CanvasSync] Enqueued ${entry.op} ${entry.id} (queue: ${filtered.length})`);
+        this.notify();
 
         if (connectivityManager.state === 'online') {
             this.flush();
@@ -74,23 +98,46 @@ class CanvasSyncQueueImpl {
             log.debug(SEG.GLYPH, `[CanvasSync] Flushing ${q.length} operations`);
 
             const remaining: CanvasSyncEntry[] = [];
+            const now = Date.now();
             for (const entry of q) {
+                // Skip entries still in backoff
+                if (entry.nextRetryAt && entry.nextRetryAt > now) {
+                    remaining.push(entry);
+                    continue;
+                }
+
                 try {
                     const ok = await this.processEntry(entry);
                     if (!ok) {
-                        remaining.push(entry);
+                        remaining.push(this.applyBackoff(entry));
                     }
                 } catch (err) {
                     syncStateManager.setState(entry.id, 'failed');
-                    remaining.push(entry);
+                    remaining.push(this.applyBackoff(entry));
                     log.warn(SEG.GLYPH, `[CanvasSync] Error syncing ${entry.op} ${entry.id}:`, err);
                 }
             }
 
-            this.queue = remaining;
+            // Remove permanently failed entries (exceeded max retries)
+            this.queue = remaining.filter(e => {
+                if (e.retryCount && e.retryCount >= MAX_RETRIES) {
+                    syncStateManager.setState(e.id, 'failed');
+                    log.warn(SEG.GLYPH, `[CanvasSync] Permanently failed ${e.op} ${e.id} after ${MAX_RETRIES} retries`);
+                    return false;
+                }
+                return true;
+            });
         } finally {
             this.flushing = false;
+            this.notify();
         }
+    }
+
+    /** Increment retry count and set exponential backoff delay */
+    private applyBackoff(entry: CanvasSyncEntry): CanvasSyncEntry {
+        const retryCount = (entry.retryCount || 0) + 1;
+        const delay = BASE_BACKOFF_MS * Math.pow(2, retryCount - 1);
+        return { ...entry, retryCount, nextRetryAt: Date.now() + delay };
     }
 
     /** Process a single queue entry. Returns true if synced (remove from queue). */
