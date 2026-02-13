@@ -27,6 +27,7 @@ const BASE_BACKOFF_MS = 1000;
 
 class CanvasSyncQueueImpl {
     private flushing = false;
+    private flushAdditions: CanvasSyncEntry[] = [];
     private listeners = new Set<() => void>();
 
     private get queue(): CanvasSyncEntry[] {
@@ -78,6 +79,11 @@ class CanvasSyncQueueImpl {
             syncStateManager.setState(entry.id, 'unsynced');
         }
 
+        // Buffer additions during flush so they aren't overwritten
+        if (this.flushing) {
+            this.flushAdditions.push({ id: entry.id, op: entry.op });
+        }
+
         log.debug(SEG.GLYPH, `[CanvasSync] Enqueued ${entry.op} ${entry.id} (queue: ${filtered.length})`);
         this.notify();
 
@@ -119,7 +125,7 @@ class CanvasSyncQueueImpl {
             }
 
             // Remove permanently failed entries (exceeded max retries)
-            this.queue = remaining.filter(e => {
+            const survived = remaining.filter(e => {
                 if (e.retryCount && e.retryCount >= MAX_RETRIES) {
                     syncStateManager.setState(e.id, 'failed');
                     log.warn(SEG.GLYPH, `[CanvasSync] Permanently failed ${e.op} ${e.id} after ${MAX_RETRIES} retries`);
@@ -127,6 +133,21 @@ class CanvasSyncQueueImpl {
                 }
                 return true;
             });
+
+            // Merge entries added during flush (fresh adds take precedence)
+            const additions = this.flushAdditions;
+            this.flushAdditions = [];
+            for (const entry of additions) {
+                const entityType = entry.op.startsWith('glyph') ? 'glyph' : 'composition';
+                const idx = survived.findIndex(e => {
+                    const eType = e.op.startsWith('glyph') ? 'glyph' : 'composition';
+                    return e.id === entry.id && eType === entityType;
+                });
+                if (idx >= 0) survived[idx] = entry;
+                else survived.push(entry);
+            }
+
+            this.queue = survived;
         } finally {
             this.flushing = false;
             this.notify();
