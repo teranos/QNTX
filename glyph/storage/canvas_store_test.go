@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 	pb "github.com/teranos/QNTX/glyph/proto"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
 // Helper function to create edges for testing
@@ -451,7 +451,7 @@ func TestCanvasStore_DeleteComposition(t *testing.T) {
 			makeEdge("glyph-1", "glyph-2", "right", 0),
 		},
 		X: 100,
-		Y:        200,
+		Y: 200,
 	}
 
 	if err := store.UpsertComposition(ctx, comp); err != nil {
