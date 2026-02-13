@@ -5,7 +5,6 @@
  * and defines websocket-specific types that aren't generated from Go.
  */
 
-import { GraphData } from './core';
 import type { Attestation } from '../ts/generated/proto/plugin/grpc/protocol/atsstore';
 import type { GlyphFired } from '../ts/generated/proto/glyph/proto/events';
 // Import LSP types for parse-related messages to ensure consistency
@@ -64,7 +63,6 @@ export type MessageType =
   | 'parse_request'
   | 'job_details'
   | 'query'
-  | 'graph_data'
   | 'error'
   | 'pulse_execution_started'
   | 'pulse_execution_failed'
@@ -354,15 +352,6 @@ export interface QueryMessage extends BaseMessage {
   };
 }
 
-/**
- * Graph data response
- */
-export interface GraphDataMessage extends BaseMessage {
-  type: 'graph_data';
-  data: GraphData;
-  query?: string;
-  execution_time?: number;
-}
 
 /**
  * Log message entry from the backend
@@ -595,7 +584,6 @@ export type WebSocketMessage =
   | ParseRequestMessage
   | ParseResponseMessage
   | QueryMessage
-  | GraphDataMessage
   | LogsMessage
   | PulseExecutionStartedMessage
   | PulseExecutionFailedMessage
@@ -646,7 +634,6 @@ export interface MessageHandlers {
   usage_update?: MessageHandler<UsageUpdateMessage>;
   parse_response?: MessageHandler<ParseResponseMessage>;
   query?: MessageHandler<QueryMessage>;
-  graph_data?: MessageHandler<GraphDataMessage>;
   pulse_execution_started?: MessageHandler<PulseExecutionStartedMessage>;
   pulse_execution_failed?: MessageHandler<PulseExecutionFailedMessage>;
   pulse_execution_completed?: MessageHandler<PulseExecutionCompletedMessage>;
@@ -664,11 +651,6 @@ export interface MessageHandlers {
   vidstream_init_error?: MessageHandler<VidStreamInitErrorMessage>;
   vidstream_detections?: MessageHandler<VidStreamDetectionsMessage>;
   vidstream_frame_error?: MessageHandler<VidStreamFrameErrorMessage>;
-  /**
-   * Default handler for messages without explicit handlers.
-   * Currently receives raw GraphData from the server (no type field).
-   */
-  _default?: (data: GraphData | BaseMessage) => void | Promise<void>;
 }
 
 // ============================================================================

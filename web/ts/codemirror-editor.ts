@@ -24,7 +24,6 @@ import { log, SEG } from './logger.ts';
 let editorView: EditorView | null = null;
 let queryTimeout: ReturnType<typeof setTimeout> | null = null;
 let fuzzySearchView: FuzzySearchView | null = null;
-let editorMode: 'ats' | 'fuzzy' = 'ats'; // Track current mode
 
 // Syntax highlighting via LSP semantic tokens
 // TODO(issue #13): codemirror-languageserver doesn't support semantic tokens yet (v1.18.1)
@@ -53,113 +52,6 @@ const syntaxDecorationsField = StateField.define({
 });
 
 /**
- * Create the mode toggle button
- */
-function createModeToggle(): void {
-    const queryContainer = document.getElementById('query-container');
-    if (!queryContainer) return;
-
-    // Create toggle button container
-    const toggleContainer = document.createElement('div');
-    toggleContainer.style.cssText = `
-        display: flex;
-        align-items: center;
-        padding: 8px 12px;
-        border-bottom: 1px solid #333;
-        background: rgba(0, 0, 0, 0.3);
-    `;
-
-    // Create toggle button
-    const toggleButton = document.createElement('button');
-    toggleButton.id = 'mode-toggle';
-    toggleButton.style.cssText = `
-        padding: 4px 12px;
-        background: #1e2021;
-        color: #d3c6aa;
-        border: 1px solid #475258;
-        border-radius: 3px;
-        cursor: pointer;
-        font-size: 12px;
-        transition: all 0.2s ease;
-    `;
-    toggleButton.textContent = '⋈ ATS Mode';
-
-    toggleButton.onclick = () => {
-        toggleMode();
-    };
-
-    // Add mode label
-    const modeLabel = document.createElement('span');
-    modeLabel.style.cssText = `
-        margin-left: 12px;
-        font-size: 11px;
-        color: #888;
-    `;
-    modeLabel.textContent = 'Graph updates live';
-    modeLabel.id = 'mode-label';
-
-    toggleContainer.appendChild(toggleButton);
-    toggleContainer.appendChild(modeLabel);
-
-    // Insert before CodeMirror container
-    const codemirrorContainer = document.getElementById('codemirror-container');
-    if (codemirrorContainer && codemirrorContainer.parentNode) {
-        codemirrorContainer.parentNode.insertBefore(toggleContainer, codemirrorContainer);
-    }
-}
-
-/**
- * Toggle between ATS and Fuzzy search modes
- */
-function toggleMode(): void {
-    const button = document.getElementById('mode-toggle') as HTMLButtonElement;
-    const label = document.getElementById('mode-label');
-
-    if (editorMode === 'ats') {
-        editorMode = 'fuzzy';
-        if (button) {
-            button.textContent = '🔍 Fuzzy Search Mode';
-            button.style.background = '#2a3f5f';
-        }
-        if (label) {
-            label.textContent = 'Search RichStringFields';
-        }
-
-        // Show fuzzy search view
-        if (!fuzzySearchView) {
-            fuzzySearchView = new FuzzySearchView();
-        }
-        fuzzySearchView.show();
-
-        // Clear and re-run current query in fuzzy mode if there's content
-        const content = getEditorContent();
-        if (content.trim()) {
-            sendFuzzySearch(content.trim());
-        }
-    } else {
-        editorMode = 'ats';
-        if (button) {
-            button.textContent = '⋈ ATS Mode';
-            button.style.background = '#1e2021';
-        }
-        if (label) {
-            label.textContent = 'Graph updates live';
-        }
-
-        // Hide fuzzy search view
-        if (fuzzySearchView) {
-            fuzzySearchView.hide();
-        }
-
-        // Re-run queries in ATS mode
-        const content = getEditorContent();
-        if (content.trim()) {
-            sendMultiLineQueries(content);
-        }
-    }
-}
-
-/**
  * Initialize CodeMirror 6 editor with LSP support
  */
 export function initCodeMirrorEditor(): EditorView | null {
@@ -169,8 +61,9 @@ export function initCodeMirrorEditor(): EditorView | null {
         return null;
     }
 
-    // Create mode toggle button
-    createModeToggle();
+    // Initialize fuzzy search view (always-on, renders results in overlay)
+    fuzzySearchView = new FuzzySearchView();
+    fuzzySearchView.show();
 
     // LSP configuration (async connection, won't block page load)
     // Use backend URL from injected global with validation
@@ -246,45 +139,18 @@ function handleDocumentChange(update: any): void {
     const doc = update.state.doc.toString();
 
     // Request parse for syntax highlighting (via existing WebSocket custom protocol)
-    // Only in ATS mode - fuzzy search doesn't need LSP parsing
-    if (editorMode === 'ats') {
-        if (editorView) {
-            const cursorPos = editorView.state.selection.main.head;
-            requestParse(doc, 1, cursorPos);
-        }
+    if (editorView) {
+        const cursorPos = editorView.state.selection.main.head;
+        requestParse(doc, 1, cursorPos);
     }
 
-    // Execute query with debounce based on mode
+    // Execute fuzzy search with debounce
     if (queryTimeout) {
         clearTimeout(queryTimeout);
     }
     queryTimeout = setTimeout(() => {
-        if (editorMode === 'ats') {
-            sendMultiLineQueries(doc);
-        } else {
-            // In fuzzy mode, send the entire text as a search query
-            sendFuzzySearch(doc.trim());
-        }
-    }, 300); // 300ms debounce for query execution
-}
-
-/**
- * Send multi-line queries (one per line, skipping empty lines)
- * Copied from ats-editor.js to maintain execute-as-you-type functionality
- */
-function sendMultiLineQueries(text: string): void {
-    const lines = text.split('\n');
-    const nonEmptyLines = lines.filter(line => line.trim() !== '');
-
-    // Send each non-empty line as a separate query
-    nonEmptyLines.forEach((line: string) => {
-        sendMessage({
-            type: 'query',
-            query: line.trim()
-        });
-    });
-
-    // Status indicator removed - was low signal to users
+        sendFuzzySearch(doc.trim());
+    }, 300);
 }
 
 /**
@@ -378,9 +244,7 @@ export function setEditorContent(content: string): void {
  * Handle fuzzy search results from WebSocket
  */
 export function handleFuzzySearchResults(message: any): void {
-    if (!fuzzySearchView || editorMode !== 'fuzzy') return;
-
-    // Update the fuzzy search view with results
+    if (!fuzzySearchView) return;
     fuzzySearchView.updateResults(message);
 }
 

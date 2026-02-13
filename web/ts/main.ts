@@ -1,12 +1,10 @@
-// Main entry point for graph viewer
+// Main entry point for QNTX web UI
 
 import { listen } from '@tauri-apps/api/event';
 import { connectWebSocket } from './websocket.ts';
 import { handleLogBatch, initSystemDrawer } from './system-drawer.ts';
 import { initCodeMirrorEditor } from './codemirror-editor.ts';
 import { formatDateTime } from './html-utils.ts';
-import { updateGraph, initGraphResize } from './graph/index.ts';
-import { initTypeAttestations } from './components/type-attestations.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
 import { uiState } from './state/ui.ts';
 import { appState } from './state/app.ts';
@@ -41,24 +39,7 @@ import { initStorage } from './indexeddb-storage.ts';
 import { initVisualMode } from './visual-mode.ts';
 import { log, SEG } from './logger.ts';
 
-import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/websocket';
-import type { GraphData } from '../types/core';
-
-// Type guard to check if data is graph data (has nodes and links arrays)
-// TODO(#209): Remove this type guard once backend sends explicit 'graph_data' message type
-function isGraphData(data: GraphData | BaseMessage): data is GraphData {
-    return 'nodes' in data && 'links' in data && Array.isArray((data as GraphData).nodes);
-}
-
-// Wrapper for default handler that type-guards graph data
-// TODO(#209): Replace _default handler with explicit 'graph_data' handler
-function handleDefaultMessage(data: GraphData | BaseMessage): void {
-    if (isGraphData(data)) {
-        updateGraph(data);
-    } else {
-        console.warn('Received non-graph message without handler:', data);
-    }
-}
+import type { MessageHandlers, VersionMessage } from '../types/websocket';
 
 // Extend window interface for global functions
 declare global {
@@ -268,7 +249,6 @@ async function init(): Promise<void> {
         'pulse_execution_log_stream': handlePulseExecutionLogStream,
         'storage_warning': handleStorageWarning,
         'storage_eviction': handleStorageEviction,
-        '_default': handleDefaultMessage
     };
 
     connectWebSocket(handlers);
@@ -287,9 +267,6 @@ async function init(): Promise<void> {
     if (window.logLoaderStep) window.logLoaderStep('Setting up editor...', false, true);
     initCodeMirrorEditor();
 
-    if (window.logLoaderStep) window.logLoaderStep('Initializing graph...');
-    initGraphResize();
-
     // Initialize glyph run FIRST (before any glyphs are created)
     // This ensures the run is ready to receive glyphs
     glyphRun.init();
@@ -301,7 +278,6 @@ async function init(): Promise<void> {
     initQueryFileDrop();
 
     if (window.logLoaderStep) window.logLoaderStep('Initializing UI controls...');
-    initTypeAttestations(updateGraph);  // Pass renderGraph function for type attestation callbacks
     initUsageBadge();
 
     // Listen for Tauri events (menu actions)
@@ -361,16 +337,6 @@ async function init(): Promise<void> {
             });
         });
 
-        listen('refresh-graph', () => {
-            // Trigger graph refresh
-            import('./websocket.ts').then(({ sendMessage }) => {
-                sendMessage({
-                    type: 'query',
-                    query: appState.currentQuery || 'i'
-                });
-            });
-        });
-
         listen('toggle-logs', () => {
             // Toggle system drawer by simulating a click on the header
             const header = document.getElementById('system-drawer-header');
@@ -396,10 +362,6 @@ async function init(): Promise<void> {
     });
 
     if (window.logLoaderStep) window.logLoaderStep('Finalizing startup...');
-
-    // NOTE: We don't restore cached graph data because D3 object references
-    // don't serialize properly (causes isolated node detection bugs).
-    // Instead, if there's a saved query, the user can re-run it manually.
 }
 
 // Start application when DOM is ready
