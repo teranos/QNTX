@@ -23,7 +23,9 @@ pub fn init_vec_extension() {
                     *mut *mut i8,
                     *const rusqlite::ffi::sqlite3_api_routines,
                 ) -> i32,
-            >(sqlite_vec::sqlite3_vec_init as *const ())));
+            >(
+                sqlite_vec::sqlite3_vec_init as *const (),
+            )));
         }
     });
 }
