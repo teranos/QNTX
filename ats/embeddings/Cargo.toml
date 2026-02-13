@@ -13,6 +13,7 @@ ndarray = "0.16"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokenizers = "0.22.2"
+qntx-ffi-common = { path = "../../crates/qntx-ffi-common" }
 
 [features]
 default = []

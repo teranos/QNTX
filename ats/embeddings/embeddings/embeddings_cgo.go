@@ -3,7 +3,7 @@
 package embeddings
 
 /*
-#cgo LDFLAGS: -L${SRCDIR}/../../../target/release -lqntx_embeddings -L/nix/store/m4wq7714cbksjnc2ga1l09gwk2ww7hrf-onnxruntime-1.22.2/lib -lonnxruntime
+#cgo LDFLAGS: -L${SRCDIR}/../../../target/release -lqntx_embeddings
 #cgo darwin LDFLAGS: -framework CoreFoundation -framework Security -lresolv
 #cgo CFLAGS: -I${SRCDIR}/../include
 
@@ -19,9 +19,12 @@ import (
 	"github.com/teranos/QNTX/errors"
 )
 
-// CGOEmbeddingService implements EmbeddingService using Rust FFI
+// CGOEmbeddingService implements EmbeddingService using Rust FFI.
+// Go owns the engine pointer and manages synchronization via mu.
+// Rust has no global state — all FFI calls take the engine pointer.
 type CGOEmbeddingService struct {
 	mu          sync.Mutex
+	engine      *C.EmbeddingEngine
 	initialized bool
 	modelInfo   *ModelInfo
 }
@@ -43,24 +46,23 @@ func (s *CGOEmbeddingService) Init(modelPath string) error {
 	cPath := C.CString(modelPath)
 	defer C.free(unsafe.Pointer(cPath))
 
-	ret := C.embedding_engine_init(cPath)
-	if ret != 0 {
+	engine := C.embedding_engine_init(cPath)
+	if engine == nil {
 		return errors.Newf("failed to initialize embedding engine with model: %s", modelPath)
 	}
 
-	// Get model dimensions
-	dims := int(C.embedding_engine_dimensions())
+	dims := int(C.embedding_engine_dimensions(engine))
 	if dims < 0 {
-		C.embedding_engine_free()
+		C.embedding_engine_free(engine)
 		return errors.New("failed to get model dimensions")
 	}
 
+	s.engine = engine
 	s.modelInfo = &ModelInfo{
 		Name:              "sentence-transformers",
 		Dimensions:        dims,
-		MaxSequenceLength: 512, // Standard for most models
+		MaxSequenceLength: 512,
 	}
-
 	s.initialized = true
 	return nil
 }
@@ -86,17 +88,20 @@ func (s *CGOEmbeddingService) Embed(text string) (*EmbeddingResult, error) {
 		return nil, errors.New("embedding engine not initialized")
 	}
 
+	return s.embedLocked(text)
+}
+
+// embedLocked performs the actual embedding. Caller must hold s.mu.
+func (s *CGOEmbeddingService) embedLocked(text string) (*EmbeddingResult, error) {
 	cText := C.CString(text)
 	defer C.free(unsafe.Pointer(cText))
 
-	// Get JSON result from Rust
-	cJSON := C.embedding_engine_embed_json(cText)
+	cJSON := C.embedding_engine_embed_json(s.engine, cText)
 	if cJSON == nil {
-		return nil, errors.Newf("failed to embed text: %s", text)
+		return nil, errors.New("embedding engine returned null")
 	}
 	defer C.embedding_free_string(cJSON)
 
-	// Parse JSON result
 	jsonStr := C.GoString(cJSON)
 	var result EmbeddingResult
 	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
@@ -119,13 +124,8 @@ func (s *CGOEmbeddingService) EmbedBatch(texts []string) (*BatchEmbeddingResult,
 		Embeddings: make([]EmbeddingResult, 0, len(texts)),
 	}
 
-	// Process each text sequentially
-	// TODO: Implement proper batching in Rust
 	for _, text := range texts {
-		s.mu.Unlock() // Release lock for embedding
-		embedding, err := s.Embed(text)
-		s.mu.Lock() // Re-acquire lock
-
+		embedding, err := s.embedLocked(text)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to embed text in batch")
 		}
@@ -144,7 +144,8 @@ func (s *CGOEmbeddingService) Close() error {
 	defer s.mu.Unlock()
 
 	if s.initialized {
-		C.embedding_engine_free()
+		C.embedding_engine_free(s.engine)
+		s.engine = nil
 		s.initialized = false
 		s.modelInfo = nil
 	}
