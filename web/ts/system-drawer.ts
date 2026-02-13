@@ -199,35 +199,44 @@ export function initSystemDrawer(): void {
     let lastExpandedHeight = initialHeight > DRAWER_HEADER ? initialHeight : DRAWER_MAX;
 
     // --- Drag to resize ---
-    let dragging = false;
+    const DRAG_THRESHOLD = 4; // px — below this, treat as click not drag
+    let pointerDown = false;
+    let didDrag = false;
+    let startY = 0;
 
     grabBar.addEventListener('pointerdown', (e: PointerEvent) => {
-        dragging = true;
+        pointerDown = true;
+        didDrag = false;
+        startY = e.clientY;
         grabBar.setPointerCapture(e.pointerId);
         e.preventDefault();
     });
 
     grabBar.addEventListener('pointermove', (e: PointerEvent) => {
-        if (!dragging) return;
+        if (!pointerDown) return;
+        if (!didDrag && Math.abs(e.clientY - startY) < DRAG_THRESHOLD) return;
+        didDrag = true;
         const height = window.innerHeight - e.clientY;
         setDrawerHeight(panel, height);
     });
 
     grabBar.addEventListener('pointerup', (e: PointerEvent) => {
-        if (!dragging) return;
-        dragging = false;
+        if (!pointerDown) return;
+        pointerDown = false;
         grabBar.releasePointerCapture(e.pointerId);
 
-        const finalHeight = panel.offsetHeight;
-        if (finalHeight > DRAWER_HEADER) {
-            lastExpandedHeight = finalHeight;
+        if (didDrag) {
+            const finalHeight = panel.offsetHeight;
+            if (finalHeight > DRAWER_HEADER) {
+                lastExpandedHeight = finalHeight;
+            }
+            setStorageItem(DRAWER_HEIGHT_KEY, String(finalHeight));
         }
-        setStorageItem(DRAWER_HEIGHT_KEY, String(finalHeight));
     });
 
     grabBar.addEventListener('pointercancel', (e: PointerEvent) => {
-        if (!dragging) return;
-        dragging = false;
+        if (!pointerDown) return;
+        pointerDown = false;
         grabBar.releasePointerCapture(e.pointerId);
     });
 
@@ -252,7 +261,7 @@ export function initSystemDrawer(): void {
     const logHeader = document.getElementById('system-drawer-header') as HTMLElement | null;
     if (logHeader) {
         logHeader.addEventListener('click', function(e: Event) {
-            if (dragging) return;
+            if (didDrag) return;
             const target = e.target as HTMLElement;
             if (target.tagName === 'BUTTON' || target.tagName === 'SELECT') return;
 
