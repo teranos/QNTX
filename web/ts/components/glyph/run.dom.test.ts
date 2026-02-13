@@ -16,7 +16,7 @@ const USE_JSDOM = process.env.USE_JSDOM === '1';
 // Setup jsdom BEFORE importing run.ts — GlyphProximity calls document.addEventListener at module level
 if (USE_JSDOM) {
     const { JSDOM } = await import('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body><div id="graph-container"></div></body></html>');
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
     const { window } = dom;
     const { document } = window;
 
@@ -97,7 +97,7 @@ describe('Glyph Single Element Axiom', () => {
 
     beforeEach(() => {
         // Clear the glyph run state
-        document.body.innerHTML = '<div id="graph-container"></div>';
+        document.body.innerHTML = '';
         // Reset the singleton (this is a bit hacky but needed for testing)
         (glyphRun as any).element = null;
         (glyphRun as any).indicatorContainer = null;
@@ -232,35 +232,20 @@ describe('Glyph Single Element Axiom', () => {
         // which is the correct encapsulation. The handler will work when clicked.
     });
 
-    test('Deferred initialization: Glyphs added before DOM ready are handled', () => {
-        // Remove graph-container to simulate DOM not ready
-        const graphContainer = document.getElementById('graph-container');
-        graphContainer?.remove();
-
+    test('Auto-initialization: Glyphs added before explicit init() auto-initialize', () => {
+        // glyphRun.element is null (beforeEach resets it), but add() calls init() internally
         const testGlyph: Glyph = {
             id: 'deferred-glyph',
             title: 'Deferred',
             renderContent: () => document.createElement('div')
         };
 
-        // Add glyph when DOM not ready (should be deferred)
+        // Add glyph before explicit init — add() auto-initializes via document.body
         glyphRun.add(testGlyph);
 
-        // Should be deferred, not in DOM yet
-        const elementBefore = document.querySelector('[data-glyph-id="deferred-glyph"]');
-        expect(elementBefore).toBeNull();
-
-        // Recreate graph container
-        const newContainer = document.createElement('div');
-        newContainer.id = 'graph-container';
-        document.body.appendChild(newContainer);
-
-        // Now init with graph container present
-        glyphRun.init();
-
-        // Deferred glyph should now be in DOM
-        const elementAfter = document.querySelector('[data-glyph-id="deferred-glyph"]');
-        expect(elementAfter).not.toBeNull();
+        // Should be in DOM immediately (auto-init succeeds because body always exists)
+        const element = document.querySelector('[data-glyph-id="deferred-glyph"]');
+        expect(element).not.toBeNull();
 
         // Verify invariant holds
         expect(() => glyphRun.verifyInvariant()).not.toThrow();
@@ -353,7 +338,7 @@ describe('Touch Browse', () => {
     const TRAY_RECT = { left: 350, right: 360, top: 200, bottom: 260 };
 
     beforeEach(() => {
-        document.body.innerHTML = '<div id="graph-container"></div>';
+        document.body.innerHTML = '';
         (glyphRun as any).element = null;
         (glyphRun as any).indicatorContainer = null;
         (glyphRun as any).items.clear();
@@ -542,7 +527,7 @@ describe('Glyph State Transitions', () => {
     }
 
     beforeEach(() => {
-        document.body.innerHTML = '<div id="graph-container"></div>';
+        document.body.innerHTML = '';
         (glyphRun as any).element = null;
         (glyphRun as any).indicatorContainer = null;
         (glyphRun as any).items.clear();

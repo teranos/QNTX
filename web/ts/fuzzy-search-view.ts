@@ -41,7 +41,6 @@ export class FuzzySearchView {
      * Create the DOM elements for the search view
      */
     private createElements(): void {
-        // Create container that will overlay the graph
         this.container = document.createElement('div');
         this.container.id = 'fuzzy-search-view';
         this.container.className = 'fuzzy-search-view';
@@ -51,12 +50,7 @@ export class FuzzySearchView {
         this.resultsElement.className = 'fuzzy-results';
 
         this.container.appendChild(this.resultsElement);
-
-        // Add to graph container
-        const graphContainer = document.getElementById('graph-container');
-        if (graphContainer) {
-            graphContainer.appendChild(this.container);
-        }
+        document.body.appendChild(this.container);
     }
 
     /**

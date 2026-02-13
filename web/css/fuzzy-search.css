@@ -2,16 +2,27 @@
  * Fuzzy Search View - Compact dark overlay for search results
  */
 
-/* Main overlay */
+/* Main overlay — fills area right of left-panel */
 .fuzzy-search-view {
-    position: absolute;
-    inset: 0;
+    position: fixed;
+    top: 0;
+    left: 360px;
+    right: 0;
+    bottom: 0;
     background: var(--bg-almost-black);
     border: 1px solid var(--border-on-dark);
     box-shadow: var(--shadow-xl);
     z-index: 100;
     display: none;
     overflow: hidden;
+}
+
+/* Mobile: fill viewport above bottom bar */
+@media (max-width: 768px) {
+    .fuzzy-search-view {
+        left: 0;
+        bottom: 140px;
+    }
 }
 
 /* Results container */
