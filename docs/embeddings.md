@@ -68,6 +68,11 @@ Verified end-to-end by copying attestations from a backup database:
 - **Rate limiting**: Embedding generation is CPU-intensive — what limits are appropriate?
 - **Batch queue**: Should batch jobs go through Pulse daemon instead of synchronous HTTP?
 
+### Design decision: embedding tests are local-only
+Embedding tests (`ats/embeddings/embeddings/embeddings_test.go`) require the ONNX model files (~80MB) and add ~3s of inference per run. They're gated behind `//go:build cgo && rustembeddings` — CI doesn't pass this tag, so they only run locally.
+
+This avoids burdening every PR with model download/caching and inference time. If the embedding surface area grows, a dedicated `ci-embeddings.yml` workflow (triggered only on changes to `ats/embeddings/`, `ats/storage/embedding_store*`, `server/embeddings_handlers*`) can be added without affecting the main pipeline.
+
 ### Technical Debt
 - Error handling standardization across Rust/Go FFI boundary
 
