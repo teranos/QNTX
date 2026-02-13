@@ -51,7 +51,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        package: [qntx, typegen]
+        package: [qntx]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
@@ -77,6 +77,34 @@ jobs:
 
       - name: Push to Cachix
         run: nix build .#${{ matrix.package }} --print-out-paths --no-link | cachix push qntx
+
+  # Typegen (Go + WASM, own flake at typegen/flake.nix)
+  build-typegen:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: qntx
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Build typegen
+        run: nix build ./typegen --show-trace
+
+      - name: Push to Cachix
+        run: nix build ./typegen --print-out-paths --no-link | cachix push qntx
 
   # qntx-code plugin (Go, parallel builds per OS)
   build-qntx-code:
