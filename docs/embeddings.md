@@ -4,7 +4,7 @@ Semantic search over attestations using sentence transformers (all-MiniLM-L6-v2)
 
 ## Architecture
 
-- **Rust** (`ats/embeddings/src/`): ONNX Runtime 2.0 inference, HuggingFace tokenizer, mean pooling → 384-dim vectors
+- **Rust** (`ats/embeddings/src/`): ONNX Runtime 2.0 inference, HuggingFace tokenizer, mean pooling, L2 normalization → 384-dim unit vectors
 - **Go** (`ats/embeddings/embeddings/`): CGO bindings to Rust, model lifecycle, FLOAT32_BLOB serialization
 - **Storage** (`ats/storage/embedding_store.go`): sqlite-vec L2 distance search, DELETE+INSERT for virtual table compatibility
 - **API** (`server/embeddings_handlers.go`): conditional compilation via `rustembeddings` build tag (now default in `make cli`)
@@ -34,11 +34,6 @@ Options to explore:
 - Background job via Pulse daemon
 - On-demand embedding at search time
 
-### Similarity scoring
-The current formula `1.0 - (distance / 2.0)` assumes L2 distances stay below 2.0. Structured attestation text (short keywords like "buy AAPL 150 limit") produces L2 distances of 3–6, causing similarity to clamp to 0. The default threshold of 0.7 returns nothing for these inputs. Use `threshold=0.0` to see results — ranking is correct even when similarity reads 0.
-
-Needs rethinking: cosine similarity instead of L2, or a normalization scheme that accounts for the actual distance distribution of attestation text.
-
 ### Rich semantic search integration
 Currently, embeddings are generated from the raw attestation command string. This produces poor vectors — short structured text is too sparse for sentence transformers.
 
@@ -57,7 +52,7 @@ This is the critical integration point: `buildDynamicRichStringFields()` already
 Verified end-to-end by copying attestations from a backup database:
 1. `POST /api/embeddings/batch` with attestation IDs — 8 attestations embedded in 983ms, 0 failures
 2. `GET /api/search/semantic?q=<query>&threshold=0.0` — returns semantically ranked results
-3. Result ordering reflects semantic similarity (see similarity scoring caveat above)
+3. Similarity scores reflect cosine similarity (L2-normalized vectors, distances in [0, 2], default threshold 0.7 filters correctly)
 
 ### Frontend
 - Semantic Search Glyph (proposed symbol: ⊨ double turnstile)
