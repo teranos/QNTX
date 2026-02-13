@@ -3,7 +3,6 @@
 package server
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -123,77 +122,20 @@ func (s *QNTXServer) HandleSemanticSearch(w http.ResponseWriter, r *http.Request
 	}
 
 	for _, result := range searchResults {
-		// For attestation source type, fetch the attestation
 		if result.SourceType == "attestation" {
-			// Query attestation directly from database
-			query := `
-				SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at
-				FROM attestations WHERE id = ?
-			`
-			var attestation types.As
-			var subjects, predicates, contexts, actors, attributes string
-			var timestamp, createdAt string
-
-			err := s.db.QueryRow(query, result.SourceID).Scan(
-				&attestation.ID,
-				&subjects,
-				&predicates,
-				&contexts,
-				&actors,
-				&timestamp,
-				&attestation.Source,
-				&attributes,
-				&createdAt,
-			)
-
+			attestation, err := storage.GetAttestationByID(s.db, result.SourceID)
 			if err != nil {
-				if err != sql.ErrNoRows {
-					s.logger.Warnw("Failed to fetch attestation for search result",
-						"attestation_id", result.SourceID,
-						"error", err)
-				}
-				continue
-			}
-
-			// Parse JSON arrays
-			if err := json.Unmarshal([]byte(subjects), &attestation.Subjects); err != nil {
-				s.logger.Warnw("Failed to parse subjects",
+				s.logger.Warnw("Failed to fetch attestation for search result",
 					"attestation_id", result.SourceID,
 					"error", err)
 				continue
 			}
-			if err := json.Unmarshal([]byte(predicates), &attestation.Predicates); err != nil {
-				s.logger.Warnw("Failed to parse predicates",
-					"attestation_id", result.SourceID,
-					"error", err)
+			if attestation == nil {
 				continue
 			}
-			if err := json.Unmarshal([]byte(contexts), &attestation.Contexts); err != nil {
-				s.logger.Warnw("Failed to parse contexts",
-					"attestation_id", result.SourceID,
-					"error", err)
-				continue
-			}
-			if err := json.Unmarshal([]byte(actors), &attestation.Actors); err != nil {
-				s.logger.Warnw("Failed to parse actors",
-					"attestation_id", result.SourceID,
-					"error", err)
-				continue
-			}
-			if attributes != "{}" && attributes != "" {
-				if err := json.Unmarshal([]byte(attributes), &attestation.Attributes); err != nil {
-					s.logger.Warnw("Failed to parse attributes",
-						"attestation_id", result.SourceID,
-						"error", err)
-				}
-			}
-
-			// Parse timestamps
-			attestation.Timestamp, _ = time.Parse(time.RFC3339, timestamp)
-			attestation.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 
 			response.Results = append(response.Results, SemanticSearchResult{
-				Attestation: &attestation,
+				Attestation: attestation,
 				Similarity:  result.Similarity,
 				Distance:    result.Distance,
 			})
@@ -359,59 +301,15 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 		}
 
 		// Fetch attestation
-		query := `
-			SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at
-			FROM attestations WHERE id = ?
-		`
-		var attestation types.As
-		var subjects, predicates, contexts, actors, attributes string
-		var timestamp, createdAt string
-
-		err = s.db.QueryRow(query, attestationID).Scan(
-			&attestation.ID,
-			&subjects,
-			&predicates,
-			&contexts,
-			&actors,
-			&timestamp,
-			&attestation.Source,
-			&attributes,
-			&createdAt,
-		)
-
+		attestation, err := storage.GetAttestationByID(s.db, attestationID)
 		if err != nil {
-			if err == sql.ErrNoRows {
-				errorMessages = append(errorMessages, errors.Newf("attestation %s not found",
-					attestationID).Error())
-			} else {
-				errorMessages = append(errorMessages, errors.Wrapf(err, "failed to fetch attestation %s",
-					attestationID).Error())
-			}
-			failed++
-			continue
-		}
-
-		// Parse JSON arrays
-		if err := json.Unmarshal([]byte(subjects), &attestation.Subjects); err != nil {
-			errorMessages = append(errorMessages, errors.Wrapf(err, "failed to parse subjects for %s",
+			errorMessages = append(errorMessages, errors.Wrapf(err, "failed to fetch attestation %s",
 				attestationID).Error())
 			failed++
 			continue
 		}
-		if err := json.Unmarshal([]byte(predicates), &attestation.Predicates); err != nil {
-			errorMessages = append(errorMessages, errors.Wrapf(err, "failed to parse predicates for %s",
-				attestationID).Error())
-			failed++
-			continue
-		}
-		if err := json.Unmarshal([]byte(contexts), &attestation.Contexts); err != nil {
-			errorMessages = append(errorMessages, errors.Wrapf(err, "failed to parse contexts for %s",
-				attestationID).Error())
-			failed++
-			continue
-		}
-		if err := json.Unmarshal([]byte(actors), &attestation.Actors); err != nil {
-			errorMessages = append(errorMessages, errors.Wrapf(err, "failed to parse actors for %s",
+		if attestation == nil {
+			errorMessages = append(errorMessages, errors.Newf("attestation %s not found",
 				attestationID).Error())
 			failed++
 			continue
