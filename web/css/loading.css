@@ -15,7 +15,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    z-index: 10000;
+    z-index: 200000;
     color: var(--text-on-dark-tertiary);
     animation: fadeInLoader 300ms ease-out;
 }

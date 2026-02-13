@@ -205,27 +205,6 @@ body.disconnected #container {
     color: var(--text-secondary);
 }
 
-/* Stats */
-#stats {
-    padding: var(--panel-padding-md);
-    margin-bottom: 32px; /* Space for fixed log panel at bottom */
-    background: var(--bg-primary);
-    border-top: 1px solid var(--border-color);
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-}
-
-#stats .stat-item {
-    display: inline-block;
-    margin-right: 16px;
-}
-
-#stats .stat-value {
-    color: #000;
-    font-weight: 600;
-}
-
-
 /* LLM Streaming Styles */
 .progress-event.llm-stream {
     background: var(--bg-dark);
@@ -333,14 +312,5 @@ body.disconnected #container {
         display: none !important;
     }
 
-    /* Graph takes full viewport minus bottom bar */
-    #graph-container {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 140px; /* Space for bottom bar */
-        height: auto !important;
-    }
 }
 
