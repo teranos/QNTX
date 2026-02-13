@@ -14,6 +14,7 @@ members = [
 exclude = [
     "ats/ax/fuzzy-ax",      # CGO library for Go, not part of Rust ecosystem
     "ats/vidstream",        # CGO library for Go, not part of Rust ecosystem
+    "ats/embeddings",       # CGO library for Go, not part of Rust ecosystem
 ]
 
 [workspace.package]

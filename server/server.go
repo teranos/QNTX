@@ -9,7 +9,9 @@ import (
 
 	"github.com/teranos/QNTX/ai/tracker"
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/ats/lsp"
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/vidstream/vidstream"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/glyph/handlers"
@@ -79,6 +81,18 @@ type QNTXServer struct {
 
 	// Canvas state handlers
 	canvasHandler *handlers.CanvasHandler
+
+	// Embedding service for semantic search (optional, requires rustembeddings build tag)
+	embeddingService interface {
+		GenerateEmbedding(text string) (*embeddings.EmbeddingResult, error)
+		GenerateBatchEmbeddings(texts []string) (*embeddings.BatchEmbeddingResult, error)
+		GetModelInfo() (*embeddings.ModelInfo, error)
+		SerializeEmbedding(embedding []float32) ([]byte, error)
+		DeserializeEmbedding(data []byte) ([]float32, error)
+		ComputeSimilarity(a, b []float32) (float32, error)
+		Close() error
+	}
+	embeddingStore *storage.EmbeddingStore
 }
 
 // handleClientRegister handles a new client connection
