@@ -20,9 +20,11 @@
  */
 
 import type { Glyph } from '../glyph';
-import { Pulse, IX, AX } from '@generated/sym.js';
+import { Pulse, IX, AX, Doc } from '@generated/sym.js';
 import { log, SEG } from '../../../logger';
 import { getGlyphTypeBySymbol, getGlyphTypeByElement } from '../glyph-registry';
+import { uploadFile } from '../../../api/files';
+import { createDocGlyph, type DocGlyphContent } from '../doc-glyph';
 import { createErrorGlyph } from '../error-glyph';
 import { createResultGlyph } from '../result-glyph';
 import { uiState } from '../../../state/ui';
@@ -334,6 +336,72 @@ export function createCanvasGlyph(): Glyph {
             container.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
                 showSpawnMenu(e.clientX, e.clientY, contentLayer, glyphs);
+            });
+
+            // File drop: drag files onto canvas to create Doc glyphs
+            container.addEventListener('dragover', (e) => {
+                if (e.dataTransfer?.types.includes('Files')) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'copy';
+                }
+            });
+
+            container.addEventListener('drop', (e) => {
+                const files = e.dataTransfer?.files;
+                if (!files || files.length === 0) return;
+                e.preventDefault();
+
+                const canvasRect = contentLayer.getBoundingClientRect();
+                const baseX = Math.round(e.clientX - canvasRect.left);
+                const baseY = Math.round(e.clientY - canvasRect.top);
+
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const x = baseX + i * 30; // offset each file slightly
+                    const y = baseY + i * 30;
+
+                    void (async () => {
+                        try {
+                            const result = await uploadFile(file);
+                            const ext = file.name.includes('.') ? '.' + file.name.split('.').pop() : '';
+
+                            const contentMeta: DocGlyphContent = {
+                                fileId: result.id,
+                                filename: result.filename,
+                                ext,
+                            };
+
+                            const glyph: Glyph = {
+                                id: `doc-${crypto.randomUUID()}`,
+                                title: result.filename,
+                                symbol: Doc,
+                                x,
+                                y,
+                                content: JSON.stringify(contentMeta),
+                                renderContent: () => document.createElement('div'),
+                            };
+
+                            glyphs.push(glyph);
+                            const glyphElement = await createDocGlyph(glyph);
+                            contentLayer.appendChild(glyphElement);
+
+                            const rect = glyphElement.getBoundingClientRect();
+                            uiState.addCanvasGlyph({
+                                id: glyph.id,
+                                symbol: Doc,
+                                x,
+                                y,
+                                width: Math.round(rect.width),
+                                height: Math.round(rect.height),
+                                content: JSON.stringify(contentMeta),
+                            });
+
+                            log.info(SEG.GLYPH, `[Canvas] Spawned Doc glyph for ${result.filename} at (${x}, ${y})`);
+                        } catch (err) {
+                            log.error(SEG.GLYPH, `[Canvas] Failed to upload file ${file.name}`, { error: err });
+                        }
+                    })();
+                }
             });
 
             // Selection: click on a glyph to select, Shift+click for multi-select, click background to deselect

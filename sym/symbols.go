@@ -26,6 +26,7 @@ const (
 	PulseClose = "❀" // Graceful shutdown with checkpoint preservation
 	DB         = "⊔" // Database/storage layer
 	Prose      = "▣" // Documentation and prose content
+	Doc        = "▤" // Document/file content (PDF, etc.)
 )
 
 // PaletteOrder defines the canonical ordering for UI controls,
