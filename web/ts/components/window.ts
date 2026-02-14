@@ -1,4 +1,9 @@
 /**
+ * @deprecated Use the Glyph primitive instead. New windows should be registered
+ * via glyphRun.add() in default-glyphs.ts — the glyph system handles morphing,
+ * positioning, and lifecycle. This class will be removed once all existing
+ * windows are migrated to glyphs.
+ *
  * Generic draggable, non-modal window component
  * Supports multiple windows with z-index stacking
  */

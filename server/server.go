@@ -85,7 +85,7 @@ type QNTXServer struct {
 
 	// Sync: Merkle tree observer for content-addressed attestation sync
 	syncTree     syncPkg.SyncTree      // nil if WASM unavailable
-	syncObserver *syncPkg.TreeObserver  // nil if WASM unavailable
+	syncObserver *syncPkg.TreeObserver // nil if WASM unavailable
 
 	// Embedding service for semantic search (optional, requires rustembeddings build tag)
 	embeddingService interface {
