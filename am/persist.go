@@ -195,6 +195,83 @@ func UpdateLocalInferenceONNXModelPath(path string) error {
 	return nil
 }
 
+// UpdateEmbeddingsEnabled updates the embeddings.enabled setting in UI config.
+// Rejects enabled=true if the configured path does not exist on disk.
+func UpdateEmbeddingsEnabled(enabled bool) error {
+	if enabled {
+		path := GetString("embeddings.path")
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return errors.Newf("cannot enable embeddings: model file not found at %s — set embeddings.path in am.toml", path)
+		}
+	}
+
+	config, configPath, err := loadOrInitializeUIConfig()
+	if err != nil {
+		return errors.Wrapf(err, "failed to load UI config for embeddings.enabled update (enabled=%t)", enabled)
+	}
+
+	var embeddings map[string]interface{}
+	if e, ok := config["embeddings"].(map[string]interface{}); ok {
+		embeddings = e
+	} else {
+		embeddings = make(map[string]interface{})
+	}
+
+	embeddings["enabled"] = enabled
+	config["embeddings"] = embeddings
+
+	if err := saveUIConfig(config, configPath); err != nil {
+		return errors.Wrapf(err, "failed to save embeddings.enabled=%t to %s", enabled, configPath)
+	}
+	return nil
+}
+
+// UpdateEmbeddingsPath updates the embeddings.path setting in UI config
+func UpdateEmbeddingsPath(path string) error {
+	config, configPath, err := loadOrInitializeUIConfig()
+	if err != nil {
+		return errors.Wrapf(err, "failed to load UI config for embeddings.path update (path=%s)", path)
+	}
+
+	var embeddings map[string]interface{}
+	if e, ok := config["embeddings"].(map[string]interface{}); ok {
+		embeddings = e
+	} else {
+		embeddings = make(map[string]interface{})
+	}
+
+	embeddings["path"] = path
+	config["embeddings"] = embeddings
+
+	if err := saveUIConfig(config, configPath); err != nil {
+		return errors.Wrapf(err, "failed to save embeddings.path=%s to %s", path, configPath)
+	}
+	return nil
+}
+
+// UpdateEmbeddingsName updates the embeddings.name setting in UI config
+func UpdateEmbeddingsName(name string) error {
+	config, configPath, err := loadOrInitializeUIConfig()
+	if err != nil {
+		return errors.Wrapf(err, "failed to load UI config for embeddings.name update (name=%s)", name)
+	}
+
+	var embeddings map[string]interface{}
+	if e, ok := config["embeddings"].(map[string]interface{}); ok {
+		embeddings = e
+	} else {
+		embeddings = make(map[string]interface{})
+	}
+
+	embeddings["name"] = name
+	config["embeddings"] = embeddings
+
+	if err := saveUIConfig(config, configPath); err != nil {
+		return errors.Wrapf(err, "failed to save embeddings.name=%s to %s", name, configPath)
+	}
+	return nil
+}
+
 // UpdatePulseDailyBudget updates the daily budget in UI config
 func UpdatePulseDailyBudget(dailyBudget float64) error {
 	config, configPath, err := loadOrInitializeUIConfig()
