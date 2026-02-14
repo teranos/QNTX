@@ -87,24 +87,6 @@ describe('WebSocket Message Routing', () => {
         );
     });
 
-    test('falls back to _default for unknown message types', () => {
-        const defaultHandler = mock(() => {});
-        const handlers: MessageHandlers = { _default: defaultHandler };
-
-        const message = {
-            type: 'unknown_type' as any,
-            data: 'test'
-        };
-
-        // Unknown type logic (what websocket.ts:105-107 does)
-        const routedHandler = handlers[message.type] || handlers._default;
-        if (routedHandler) {
-            routedHandler(message);
-        }
-
-        expect(defaultHandler).toHaveBeenCalledWith(message);
-    });
-
     test('ignores message when no handler registered', () => {
         const handlers: MessageHandlers = {}; // Empty
 
@@ -241,22 +223,6 @@ describe('routeMessage() function', () => {
         expect(customHandler).toHaveBeenCalledTimes(1);
     });
 
-    test('routes to _default for unknown message types', () => {
-        const defaultHandler = mock(() => {});
-        const handlers: MessageHandlers = {
-            _default: defaultHandler
-        };
-
-        const result = routeMessage(
-            { type: 'unknown_type', data: 'test' },
-            handlers
-        );
-
-        expect(result.handled).toBe(true);
-        expect(result.handlerType).toBe('default');
-        expect(defaultHandler).toHaveBeenCalledTimes(1);
-    });
-
     test('returns not handled when no handler exists', () => {
         const result = routeMessage(
             { type: 'unknown_type', data: 'test' },
@@ -285,28 +251,20 @@ describe('routeMessage() function', () => {
         // (Note: Built-in reload calls window.location.reload(), can't easily test in Node)
     });
 
-    test('handler precedence: builtin > registered > default', () => {
-        const defaultHandler = mock(() => {});
+    test('handler precedence: builtin > registered', () => {
         const registeredHandler = mock(() => {});
 
-        // Test with only default
+        // Test with registered handler
         let result = routeMessage(
-            { type: 'unknown', data: 'test' },
-            { _default: defaultHandler }
-        );
-        expect(result.handlerType).toBe('default');
-
-        // Test with registered handler (overrides default)
-        result = routeMessage(
             { type: 'custom', data: 'test' },
-            { custom: registeredHandler, _default: defaultHandler }
+            { custom: registeredHandler }
         );
         expect(result.handlerType).toBe('registered');
 
-        // Test with built-in (overrides both)
+        // Test with built-in (overrides registered)
         result = routeMessage(
             { type: 'reload', reason: 'test' },
-            { reload: registeredHandler, _default: defaultHandler }
+            { reload: registeredHandler }
         );
         expect(result.handlerType).toBe('builtin');
     });

@@ -315,13 +315,6 @@ export function routeMessage(
         return { handled: true, handlerType: 'registered' };
     }
 
-    // Fall back to default handler for unknown types (e.g., graph data)
-    // TODO(#209): Graph data should have explicit 'graph_data' type instead of using _default
-    if (registeredHandlers['_default']) {
-        registeredHandlers['_default'](data);
-        return { handled: true, handlerType: 'default' };
-    }
-
     return { handled: false, handlerType: 'none' };
 }
 
