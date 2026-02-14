@@ -12,19 +12,9 @@ import { describe, test, expect, beforeEach } from 'bun:test';
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
-// Setup jsdom if enabled
+// Override the preload's no-op ResizeObserver with one that fires callbacks —
+// these tests need contentRect values to verify sizing logic.
 if (USE_JSDOM) {
-    const { JSDOM } = await import('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
-    const { window } = dom;
-    const { document } = window;
-
-    // Replace global document/window with jsdom's
-    globalThis.document = document as any;
-    globalThis.window = window as any;
-    globalThis.navigator = window.navigator as any;
-
-    // Mock ResizeObserver for jsdom
     globalThis.ResizeObserver = class ResizeObserver {
         private callback: ResizeObserverCallback;
 
@@ -33,7 +23,6 @@ if (USE_JSDOM) {
         }
 
         observe(target: Element) {
-            // Simulate immediate observation with mock dimensions
             const entry: ResizeObserverEntry = {
                 target,
                 contentRect: {
@@ -52,13 +41,12 @@ if (USE_JSDOM) {
                 devicePixelContentBoxSize: [] as any
             };
 
-            // Trigger callback asynchronously
             setTimeout(() => this.callback([entry], this), 0);
         }
 
         disconnect() {}
         unobserve() {}
-    };
+    } as any;
 }
 
 describe('Window ResizeObserver', () => {

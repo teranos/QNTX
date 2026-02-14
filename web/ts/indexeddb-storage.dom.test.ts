@@ -2,23 +2,21 @@
  * Minimal critical path tests for IndexedDB storage
  */
 
-import { describe, test, expect } from 'bun:test';
+import { describe, test, expect, beforeEach } from 'bun:test';
 import { initStorage, getStorageItem, setStorageItem, isStorageInitialized } from './indexeddb-storage';
 
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
-if (USE_JSDOM) {
-    const { JSDOM } = await import('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
-    globalThis.document = dom.window.document as any;
-    globalThis.window = dom.window as any;
-}
 
 describe('IndexedDB Storage', () => {
     if (!USE_JSDOM) {
         test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
         return;
     }
+
+    beforeEach(() => {
+        document.body.innerHTML = '';
+    });
 
     test('blocks when IndexedDB unavailable', async () => {
         await expect(initStorage()).rejects.toThrow('IndexedDB not available');
