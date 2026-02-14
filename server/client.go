@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -851,12 +852,11 @@ func (c *Client) handleGetDatabaseStats() {
 	)
 }
 
-// handleRichSearch performs fuzzy search on RichStringFields
+// handleRichSearch performs unified search: text search + semantic search
 func (c *Client) handleRichSearch(query string) {
 	// Trim and validate query
 	query = strings.TrimSpace(query)
 	if query == "" {
-		// Send empty result for empty query
 		c.sendJSON(map[string]interface{}{
 			"type":    "rich_search_results",
 			"query":   query,
@@ -866,19 +866,17 @@ func (c *Client) handleRichSearch(query string) {
 		return
 	}
 
-	c.server.logger.Infow("RichStringFields search",
+	c.server.logger.Infow("Unified search",
 		"query", query,
 		"client_id", c.id,
 	)
 
-	// Create bounded store to access search functionality
+	// Text search (fuzzy/exact)
 	boundedStore := storage.NewBoundedStore(c.server.db, c.server.logger.Named("search"))
-
-	// Just use the working substring search
 	ctx := c.server.ctx
 	matches, err := boundedStore.SearchRichStringFields(ctx, query, 50)
 	if err != nil {
-		c.server.logger.Warnw("RichStringFields search failed",
+		c.server.logger.Warnw("Text search failed",
 			"query", query,
 			"error", err,
 			"client_id", c.id,
@@ -890,7 +888,14 @@ func (c *Client) handleRichSearch(query string) {
 		return
 	}
 
-	// Send results to client
+	// Semantic search (if embedding service available)
+	if c.server.embeddingService != nil && c.server.embeddingStore != nil {
+		semanticMatches := c.searchSemantic(query)
+		if len(semanticMatches) > 0 {
+			matches = mergeSearchResults(matches, semanticMatches)
+		}
+	}
+
 	c.sendJSON(map[string]interface{}{
 		"type":    "rich_search_results",
 		"query":   query,
@@ -898,11 +903,113 @@ func (c *Client) handleRichSearch(query string) {
 		"total":   len(matches),
 	})
 
-	c.server.logger.Infow("RichStringFields search results sent",
+	c.server.logger.Infow("Unified search results sent",
 		"query", query,
-		"matches", len(matches),
+		"text_matches", len(matches),
+		"semantic_available", c.server.embeddingService != nil,
 		"client_id", c.id,
 	)
+}
+
+// searchSemantic generates an embedding for the query and searches the vector store.
+// Returns empty slice on any failure — semantic search is best-effort.
+func (c *Client) searchSemantic(query string) []storage.RichSearchMatch {
+	queryResult, err := c.server.embeddingService.GenerateEmbedding(query)
+	if err != nil {
+		c.server.logger.Debugw("Semantic embedding failed", "query", query, "error", err)
+		return nil
+	}
+
+	queryBlob, err := c.server.embeddingService.SerializeEmbedding(queryResult.Embedding)
+	if err != nil {
+		c.server.logger.Debugw("Semantic serialization failed", "query", query, "error", err)
+		return nil
+	}
+
+	searchResults, err := c.server.embeddingStore.SemanticSearch(queryBlob, 20, 0.7)
+	if err != nil {
+		c.server.logger.Debugw("Semantic search failed", "query", query, "error", err)
+		return nil
+	}
+
+	var matches []storage.RichSearchMatch
+	for _, result := range searchResults {
+		if result.SourceType != "attestation" {
+			continue
+		}
+
+		attestation, err := storage.GetAttestationByID(c.server.db, result.SourceID)
+		if err != nil || attestation == nil {
+			continue
+		}
+
+		nodeID := result.SourceID
+		if len(attestation.Subjects) > 0 {
+			nodeID = attestation.Subjects[0]
+		}
+
+		displayLabel := nodeID
+		typeName := "Document"
+		var attributes map[string]interface{}
+		if attestation.Attributes != nil {
+			attributes = attestation.Attributes
+			if label, ok := attributes["label"].(string); ok && label != "" {
+				displayLabel = label
+			} else if name, ok := attributes["name"].(string); ok && name != "" {
+				displayLabel = name
+			}
+			if t, ok := attributes["type"].(string); ok {
+				typeName = t
+			}
+		}
+
+		excerpt := result.Text
+		if len(excerpt) > 150 {
+			excerpt = excerpt[:150] + "..."
+		}
+
+		matches = append(matches, storage.RichSearchMatch{
+			NodeID:       nodeID,
+			TypeName:     typeName,
+			TypeLabel:    typeName,
+			FieldName:    "content",
+			FieldValue:   result.Text,
+			Excerpt:      excerpt,
+			Score:        float64(result.Similarity),
+			Strategy:     "semantic",
+			DisplayLabel: displayLabel,
+			Attributes:   attributes,
+		})
+	}
+
+	return matches
+}
+
+// mergeSearchResults combines text and semantic results, deduplicating by NodeID.
+func mergeSearchResults(text, semantic []storage.RichSearchMatch) []storage.RichSearchMatch {
+	seen := make(map[string]int) // NodeID -> index in result
+	result := make([]storage.RichSearchMatch, len(text))
+	copy(result, text)
+	for i, m := range result {
+		seen[m.NodeID] = i
+	}
+
+	for _, s := range semantic {
+		if idx, exists := seen[s.NodeID]; exists {
+			if s.Score > result[idx].Score {
+				result[idx] = s
+			}
+		} else {
+			seen[s.NodeID] = len(result)
+			result = append(result, s)
+		}
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Score > result[j].Score
+	})
+
+	return result
 }
 
 // handleVisibility updates client visibility preferences and refreshes the graph
