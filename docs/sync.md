@@ -1,5 +1,7 @@
 # Sync: Content-Addressed Attestation Reconciliation
 
+> Introduced in [#478](https://github.com/teranos/QNTX/pull/478). See [vision/sync.md](vision/sync.md) for direction (Reticulum, trust, topology).
+
 Every QNTX instance maintains an in-memory Merkle tree of its attestation store. When two instances connect, they compare trees and exchange only what differs. No central server, no coordination — just two peers and a WebSocket.
 
 ## Architecture
