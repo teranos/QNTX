@@ -10,6 +10,32 @@ Semantic search over attestations using sentence transformers (all-MiniLM-L6-v2)
 - **API** (`server/embeddings_handlers.go`): conditional compilation via `rustembeddings` build tag (now default in `make cli`)
 - **Migration**: `024_create_embeddings_table.sql` — `embeddings` table + `vec_embeddings` virtual table
 
+## Configuration
+
+Embeddings are configured via `am.toml` or the UI config API:
+
+```toml
+[embeddings]
+enabled = true
+path = "ats/embeddings/models/all-MiniLM-L6-v2/model.onnx"
+name = "all-MiniLM-L6-v2"
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `embeddings.enabled` | bool | `false` | Enable the embedding service on startup |
+| `embeddings.path` | string | `ats/embeddings/models/all-MiniLM-L6-v2/model.onnx` | Path to ONNX model file |
+| `embeddings.name` | string | `all-MiniLM-L6-v2` | Model identifier for metadata |
+
+When `enabled = false` (default), `SetupEmbeddingService` skips initialization even if built with the `rustembeddings` tag. Enabling requires the model file to exist at the configured `path`.
+
+Config can also be updated at runtime via the REST API:
+
+```
+PATCH /api/config
+{"updates": {"embeddings.enabled": true, "embeddings.path": "/path/to/model.onnx"}}
+```
+
 ## API Endpoints
 
 | Method | Path | Description |
