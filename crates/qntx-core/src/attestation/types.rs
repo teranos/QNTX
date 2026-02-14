@@ -35,7 +35,9 @@ pub struct Attestation {
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub attributes: HashMap<String, serde_json::Value>,
 
-    /// Database creation time (Unix timestamp milliseconds)
+    /// Database creation time (Unix timestamp milliseconds).
+    /// Defaults to 0 when absent (e.g. content hashing omits it deliberately).
+    #[serde(default)]
     pub created_at: i64,
 }
 
