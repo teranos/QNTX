@@ -93,6 +93,12 @@ mod tests {
 
     #[test]
     fn test_attestation_result_fields() {
+        let mut attributes = std::collections::HashMap::new();
+        attributes.insert(
+            "severity".to_string(),
+            serde_json::Value::String("high".to_string()),
+        );
+
         let result = AttestationResult {
             id: "AS123".to_string(),
             subjects: vec!["user:alice".to_string()],
@@ -101,6 +107,7 @@ mod tests {
             actors: vec!["system".to_string()],
             timestamp: 1234567890,
             source: "python".to_string(),
+            attributes: attributes.clone(),
         };
 
         assert_eq!(result.id, "AS123");
@@ -109,6 +116,10 @@ mod tests {
         assert_eq!(result.predicates[0], "completed");
         assert_eq!(result.timestamp, 1234567890);
         assert_eq!(result.source, "python");
+        assert_eq!(
+            result.attributes.get("severity"),
+            Some(&serde_json::Value::String("high".to_string()))
+        );
     }
 
     // Note: Full integration tests for create_attestation() require a running ATSStore server

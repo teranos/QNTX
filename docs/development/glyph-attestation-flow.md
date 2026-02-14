@@ -143,7 +143,7 @@ The downstream glyph needs the triggering attestation.
 - [x] Bump qntx-python-plugin version 0.4.2 → 0.5.0 (new `upstream_attestation` field + actor convention)
 
 - [x] Inject `upstream` in Python runtime
-  - `qntx-python/src/execution.rs:135-152` — after `inject_attest_function()`, uses `json.loads()` to convert attestation JSON to Python dict
+  - `qntx-python/src/execution.rs:135-152` — after `inject_ats_functions()`, uses `json.loads()` to convert attestation JSON to Python dict
   - When present: `upstream = {"id": "...", "subjects": [...], ...}`
   - When absent: `upstream = None` (always available as global)
 
