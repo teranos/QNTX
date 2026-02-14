@@ -166,12 +166,19 @@ export class SearchView {
         score.className = 'search-score';
         score.textContent = `${Math.round(match.score * 100)}%`;
 
+        // Strategy badge (⊨ semantic, ≡ text)
+        const strategy = document.createElement('span');
+        strategy.className = 'search-strategy';
+        strategy.textContent = match.strategy === 'semantic' ? '⊨' : '≡';
+        strategy.title = match.strategy;
+
         // Assemble the line
         line.appendChild(nodeLabel);
         line.appendChild(typeBadge);
         line.appendChild(fieldName);
         line.appendChild(excerpt);
         line.appendChild(score);
+        line.appendChild(strategy);
 
         return line;
     }

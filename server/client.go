@@ -896,6 +896,11 @@ func (c *Client) handleRichSearch(query string) {
 		}
 	}
 
+	// Ensure matches is never nil (nil serializes as JSON null, breaking frontend)
+	if matches == nil {
+		matches = []storage.RichSearchMatch{}
+	}
+
 	c.sendJSON(map[string]interface{}{
 		"type":    "rich_search_results",
 		"query":   query,
@@ -926,7 +931,7 @@ func (c *Client) searchSemantic(query string) []storage.RichSearchMatch {
 		return nil
 	}
 
-	searchResults, err := c.server.embeddingStore.SemanticSearch(queryBlob, 20, 0.7)
+	searchResults, err := c.server.embeddingStore.SemanticSearch(queryBlob, 20, 0.3)
 	if err != nil {
 		c.server.logger.Debugw("Semantic search failed", "query", query, "error", err)
 		return nil
