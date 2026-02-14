@@ -6,7 +6,7 @@ import { describe, test, expect, beforeEach, mock } from 'bun:test';
 
 // We need to test the class, not the singleton, so we'll import the module fresh
 // For now, test the singleton behavior
-import { uiState, type PanelId, type GraphSessionState } from './ui';
+import { uiState, type PanelId } from './ui';
 
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
@@ -142,7 +142,6 @@ describe('UIState', () => {
             const session = uiState.getGraphSession();
             expect(session.query).toBeUndefined();
             expect(session.verbosity).toBeUndefined();
-            expect(session.transform).toBeUndefined();
         });
 
         test('setGraphSession updates session partially', () => {
@@ -164,17 +163,10 @@ describe('UIState', () => {
             expect(uiState.getGraphSession().verbosity).toBe(5);
         });
 
-        test('setGraphTransform sets transform', () => {
-            const transform = { x: 100, y: 200, k: 1.5 };
-            uiState.setGraphTransform(transform);
-            expect(uiState.getGraphSession().transform).toEqual(transform);
-        });
-
         test('clearGraphSession resets graph session', () => {
             uiState.setGraphSession({
                 query: 'test',
                 verbosity: 3,
-                transform: { x: 1, y: 2, k: 1 },
             });
 
             uiState.clearGraphSession();
@@ -182,7 +174,6 @@ describe('UIState', () => {
             const session = uiState.getGraphSession();
             expect(session.query).toBeUndefined();
             expect(session.verbosity).toBeUndefined();
-            expect(session.transform).toBeUndefined();
         });
     });
 
