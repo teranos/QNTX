@@ -16,6 +16,13 @@ import (
 // Note: Rich string fields are discovered dynamically from type definition attestations.
 // There are no hardcoded defaults - all searchable fields must be attested.
 
+// Search strategy constants — must match web/ts/search-view.ts
+const (
+	StrategySubstring = "substring"
+	StrategyFuzzy     = "fuzzy"
+	StrategySemantic  = "semantic"
+)
+
 // RichSearchMatch represents a match in RichStringFields
 type RichSearchMatch struct {
 	NodeID       string                 `json:"node_id"`       // The subject ID from the attestation
@@ -265,7 +272,7 @@ func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit 
 							FieldValue:   strValue,
 							Excerpt:      excerpt,
 							Score:        score,
-							Strategy:     "substring",
+							Strategy:     StrategySubstring,
 							DisplayLabel: displayLabel,
 							Attributes:   attributes,
 						})

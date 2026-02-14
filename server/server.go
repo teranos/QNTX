@@ -23,6 +23,7 @@ import (
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/wslogs"
+	syncPkg "github.com/teranos/QNTX/sync"
 	"go.uber.org/zap"
 )
 
@@ -81,6 +82,10 @@ type QNTXServer struct {
 
 	// Canvas state handlers
 	canvasHandler *handlers.CanvasHandler
+
+	// Sync: Merkle tree observer for content-addressed attestation sync
+	syncTree     syncPkg.SyncTree      // nil if WASM unavailable
+	syncObserver *syncPkg.TreeObserver // nil if WASM unavailable
 
 	// Embedding service for semantic search (optional, requires rustembeddings build tag)
 	embeddingService interface {
