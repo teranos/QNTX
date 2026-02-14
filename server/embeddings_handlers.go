@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
+	"go.uber.org/zap"
 )
 
 // SemanticSearchRequest represents a semantic search API request
@@ -467,6 +468,15 @@ func (s *QNTXServer) SetupEmbeddingService() {
 	s.embeddingService = embService
 	s.embeddingStore = embStore
 
+	// Register observer for automatic embedding of attestations with rich text
+	observer := &EmbeddingObserver{
+		embeddingService: embService,
+		embeddingStore:   embStore,
+		richStore:        storage.NewBoundedStore(s.db, s.logger.Named("auto-embed")),
+		logger:           s.logger.Named("auto-embed"),
+	}
+	storage.RegisterObserver(observer)
+
 	s.logger.Infow("Embedding service initialized",
 		"model_path", modelPath)
 }
@@ -475,4 +485,122 @@ func (s *QNTXServer) SetupEmbeddingService() {
 func hasRustEmbeddings() bool {
 	// This function will be overridden by the build tag
 	return true
+}
+
+// EmbeddingObserver automatically embeds attestations that contain rich text.
+// Implements storage.AttestationObserver — called asynchronously by notifyObservers.
+// Only attestations with non-empty rich string fields (message, description, etc.)
+// trigger embedding; structural-only attestations are silently skipped.
+type EmbeddingObserver struct {
+	embeddingService interface {
+		GenerateEmbedding(text string) (*embeddings.EmbeddingResult, error)
+		SerializeEmbedding(embedding []float32) ([]byte, error)
+		GetModelInfo() (*embeddings.ModelInfo, error)
+	}
+	embeddingStore *storage.EmbeddingStore
+	richStore      *storage.BoundedStore // Reused across calls for 5-min rich field cache
+	logger         *zap.SugaredLogger
+}
+
+// OnAttestationCreated selectively embeds attestations with rich text content.
+func (o *EmbeddingObserver) OnAttestationCreated(as *types.As) {
+	text := o.extractRichText(as)
+	if text == "" {
+		return
+	}
+
+	// Check if already embedded
+	existing, err := o.embeddingStore.GetBySource("attestation", as.ID)
+	if err != nil {
+		o.logger.Warnw("Failed to check existing embedding",
+			"attestation_id", as.ID,
+			"error", err)
+		return
+	}
+	if existing != nil {
+		return
+	}
+
+	// Generate embedding via Rust FFI (~80ms)
+	result, err := o.embeddingService.GenerateEmbedding(text)
+	if err != nil {
+		o.logger.Warnw("Failed to auto-embed attestation",
+			"attestation_id", as.ID,
+			"text_length", len(text),
+			"error", err)
+		return
+	}
+
+	blob, err := o.embeddingService.SerializeEmbedding(result.Embedding)
+	if err != nil {
+		o.logger.Warnw("Failed to serialize auto-embedding",
+			"attestation_id", as.ID,
+			"dimensions", len(result.Embedding),
+			"error", err)
+		return
+	}
+
+	modelInfo, err := o.embeddingService.GetModelInfo()
+	if err != nil {
+		o.logger.Warnw("Failed to get model info for auto-embedding",
+			"attestation_id", as.ID,
+			"error", err)
+		return
+	}
+
+	model := &storage.EmbeddingModel{
+		SourceType: "attestation",
+		SourceID:   as.ID,
+		Text:       text,
+		Embedding:  blob,
+		Model:      modelInfo.Name,
+		Dimensions: modelInfo.Dimensions,
+	}
+	if err := o.embeddingStore.Save(model); err != nil {
+		o.logger.Warnw("Failed to save auto-embedding",
+			"attestation_id", as.ID,
+			"error", err)
+		return
+	}
+
+	o.logger.Infow("Auto-embedded attestation",
+		"attestation_id", as.ID,
+		"text_length", len(text),
+		"inference_ms", result.InferenceMS)
+}
+
+// extractRichText returns the concatenated rich text fields from an attestation's
+// attributes. Returns empty string if no rich text is found — this is the
+// selective gate that prevents embedding structural-only attestations.
+func (o *EmbeddingObserver) extractRichText(as *types.As) string {
+	if as.Attributes == nil || len(as.Attributes) == 0 {
+		return ""
+	}
+
+	richFields := o.richStore.GetDiscoveredRichFields()
+	if len(richFields) == 0 {
+		return ""
+	}
+
+	var parts []string
+	for _, field := range richFields {
+		value, exists := as.Attributes[field]
+		if !exists {
+			continue
+		}
+		switch v := value.(type) {
+		case string:
+			if v != "" {
+				parts = append(parts, v)
+			}
+		case []interface{}:
+			for _, item := range v {
+				if str, ok := item.(string); ok && str != "" {
+					parts = append(parts, str)
+				}
+			}
+		}
+	}
+
+	return strings.Join(parts, " ")
 }
