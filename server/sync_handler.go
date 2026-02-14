@@ -41,7 +41,7 @@ func (s *QNTXServer) HandleSyncWebSocket(w http.ResponseWriter, r *http.Request)
 
 	store := storage.NewSQLStore(s.db, s.logger)
 	wsConn := &gorillaSyncConn{conn: conn}
-	peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.logger)
+	peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.budgetTracker, s.logger)
 
 	sent, received, err := peer.Reconcile(r.Context())
 	if err != nil {
@@ -117,7 +117,7 @@ func (s *QNTXServer) HandleSync(w http.ResponseWriter, r *http.Request) {
 
 	store := storage.NewSQLStore(s.db, s.logger)
 	wsConn := &gorillaSyncConn{conn: conn}
-	peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.logger)
+	peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.budgetTracker, s.logger)
 
 	sent, received, err := peer.Reconcile(r.Context())
 	if err != nil {
@@ -127,6 +127,17 @@ func (s *QNTXServer) HandleSync(w http.ResponseWriter, r *http.Request) {
 			Error:    fmt.Sprintf("Reconciliation failed: %v", err),
 		})
 		return
+	}
+
+	if peer.RemoteBudget != nil {
+		s.budgetTracker.SetPeerSpend(req.Peer,
+			peer.RemoteBudget.DailyUSD,
+			peer.RemoteBudget.WeeklyUSD,
+			peer.RemoteBudget.MonthlyUSD,
+			peer.RemoteBudget.ClusterDailyLimitUSD,
+			peer.RemoteBudget.ClusterWeeklyLimitUSD,
+			peer.RemoteBudget.ClusterMonthlyLimitUSD,
+		)
 	}
 
 	writeJSON(w, http.StatusOK, syncResponse{
@@ -246,7 +257,7 @@ func (s *QNTXServer) syncAllPeers(ctx context.Context, failCounts map[string]int
 
 		store := storage.NewSQLStore(s.db, s.logger)
 		wsConn := &gorillaSyncConn{conn: conn}
-		peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.logger)
+		peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.budgetTracker, s.logger)
 
 		sent, received, err := peer.Reconcile(peerCtx)
 		conn.Close()
@@ -269,6 +280,16 @@ func (s *QNTXServer) syncAllPeers(ctx context.Context, failCounts map[string]int
 		// Success — reset failure tracking
 		failCounts[name] = 0
 		s.syncPeerStatus.Store(name, "ok")
+		if peer.RemoteBudget != nil {
+			s.budgetTracker.SetPeerSpend(name,
+				peer.RemoteBudget.DailyUSD,
+				peer.RemoteBudget.WeeklyUSD,
+				peer.RemoteBudget.MonthlyUSD,
+				peer.RemoteBudget.ClusterDailyLimitUSD,
+				peer.RemoteBudget.ClusterWeeklyLimitUSD,
+				peer.RemoteBudget.ClusterMonthlyLimitUSD,
+			)
+		}
 		synced++
 
 		if sent > 0 || received > 0 {
