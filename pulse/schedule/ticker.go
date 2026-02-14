@@ -117,6 +117,10 @@ func (t *Ticker) run() {
 			t.ticksSinceStart++
 			t.mu.Unlock()
 
+			// TODO(#478): Add a health check that verifies sync tree size matches attestation count
+			// periodically. If the WASM engine fails, the Merkle tree drifts from storage silently.
+			// See https://github.com/teranos/QNTX/pull/478 for context.
+
 			// Log time until next job
 			t.logNextJobInfo(tickTime)
 
