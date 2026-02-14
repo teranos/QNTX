@@ -517,12 +517,29 @@ func (e *Engine) matchesWatcher(as *types.As, watcher *storage.Watcher) (bool, f
 		return e.matchesSemantic(as, watcher)
 	}
 
-	// No semantic embedding cached — if the watcher IS semantic, this is a miss
-	// (embedding service was unavailable at load time)
+	// No semantic embedding cached — try lazy initialization if embedding service
+	// is now available (it may have been nil at loadWatchers time).
+	// NOTE: called under RLock — schedule async caching, use one-shot embedding for this match.
 	if watcher.SemanticQuery != "" {
-		e.logger.Debugw("Semantic watcher has no cached query embedding, skipping",
-			"watcher_id", watcher.ID,
-			"semantic_query", watcher.SemanticQuery)
+		if e.embeddingService != nil {
+			embedding, err := e.embeddingService.GenerateEmbedding(watcher.SemanticQuery)
+			if err == nil {
+				// Cache for future calls (needs write lock — do async to avoid deadlock)
+				go func(id string, emb []float32) {
+					e.mu.Lock()
+					e.queryEmbeddings[id] = emb
+					e.mu.Unlock()
+					e.logger.Infow("Lazy-initialized query embedding for semantic watcher",
+						"watcher_id", id)
+				}(watcher.ID, embedding)
+				// Use the embedding for this match immediately
+				return e.matchesSemanticWithEmbedding(as, watcher, embedding)
+			}
+			e.logger.Debugw("Lazy embedding generation failed for semantic watcher",
+				"watcher_id", watcher.ID,
+				"semantic_query", watcher.SemanticQuery,
+				"error", err)
+		}
 		return false, 0
 	}
 
@@ -555,24 +572,27 @@ func (e *Engine) matchesFilter(as *types.As, watcher *storage.Watcher) bool {
 	return true
 }
 
-// matchesSemantic checks if an attestation's text content is semantically similar
-// to the watcher's pre-computed query embedding. Extracts text from attestation
-// attributes (rich string fields) and structural fields, generates an embedding,
-// and compares against the cached query embedding using cosine similarity.
-// Returns (matched, similarity score).
+// matchesSemantic checks using the cached query embedding.
 func (e *Engine) matchesSemantic(as *types.As, watcher *storage.Watcher) (bool, float32) {
 	queryEmbedding := e.queryEmbeddings[watcher.ID]
-	if queryEmbedding == nil || e.embeddingService == nil {
+	if queryEmbedding == nil {
+		return false, 0
+	}
+	return e.matchesSemanticWithEmbedding(as, watcher, queryEmbedding)
+}
+
+// matchesSemanticWithEmbedding checks if an attestation's text content is semantically
+// similar to a given query embedding. Used by both cached and lazy-init paths.
+func (e *Engine) matchesSemanticWithEmbedding(as *types.As, watcher *storage.Watcher, queryEmbedding []float32) (bool, float32) {
+	if e.embeddingService == nil {
 		return false, 0
 	}
 
-	// Extract text from attestation for embedding
 	text := extractAttestationText(as)
 	if text == "" {
 		return false, 0
 	}
 
-	// Generate embedding for attestation text
 	attestationEmbedding, err := e.embeddingService.GenerateEmbedding(text)
 	if err != nil {
 		e.logger.Debugw("Failed to generate embedding for attestation",
@@ -582,7 +602,6 @@ func (e *Engine) matchesSemantic(as *types.As, watcher *storage.Watcher) (bool, 
 		return false, 0
 	}
 
-	// Compare similarity
 	similarity, err := e.embeddingService.ComputeSimilarity(queryEmbedding, attestationEmbedding)
 	if err != nil {
 		e.logger.Debugw("Failed to compute similarity",
