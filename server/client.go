@@ -889,10 +889,10 @@ func (c *Client) handleGetSyncStatus() {
 	cfg, _ := appcfg.Load()
 	peers := []map[string]string{}
 	if cfg != nil {
-		for _, p := range cfg.Sync.Peers {
+		for name, url := range cfg.Sync.Peers {
 			peers = append(peers, map[string]string{
-				"name": p.Name,
-				"url":  p.URL,
+				"name": name,
+				"url":  url,
 			})
 		}
 	}
