@@ -9,6 +9,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::content::{hex_decode, hex_encode};
 
+/// SHA-256 hash alias used throughout the Merkle tree.
+type Hash = [u8; 32];
+
+/// (local_only, remote_only, divergent) group key hashes from a tree diff.
+pub type MerkleDiff = (Vec<Hash>, Vec<Hash>, Vec<Hash>);
+
 /// Identifies a bounded storage group: one (actor, context) pair.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct GroupKey {
@@ -101,10 +107,7 @@ impl MerkleTree {
 
     /// Compute diff against remote group hashes.
     /// Returns (local_only, remote_only, divergent) group key hashes.
-    pub fn diff(
-        &mut self,
-        remote: &BTreeMap<[u8; 32], [u8; 32]>,
-    ) -> (Vec<[u8; 32]>, Vec<[u8; 32]>, Vec<[u8; 32]>) {
+    pub fn diff(&mut self, remote: &BTreeMap<[u8; 32], [u8; 32]>) -> MerkleDiff {
         let local = self.group_hashes();
 
         let mut local_only = Vec::new();
