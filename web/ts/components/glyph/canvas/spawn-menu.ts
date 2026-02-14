@@ -6,11 +6,12 @@
  */
 
 import type { Glyph } from '../glyph';
-import { IX, AX, SO, Prose } from '@generated/sym.js';
+import { IX, AX, SE, SO, Prose } from '@generated/sym.js';
 import { log, SEG } from '../../../logger';
 import { getMinimizeDuration } from '../glyph';
 import { createIxGlyph } from '../ix-glyph';
 import { createAxGlyph } from '../ax-glyph';
+import { createSemanticGlyph } from '../semantic-glyph';
 import { createPyGlyph, PY_DEFAULT_CODE } from '../py-glyph';
 import { createPromptGlyph, PROMPT_DEFAULT_TEMPLATE } from '../prompt-glyph';
 import { createNoteGlyph } from '../note-glyph';
@@ -121,6 +122,19 @@ export function showSpawnMenu(
     });
 
     menu.appendChild(axBtn);
+
+    // Add SE (semantic search) symbol
+    const seBtn = document.createElement('button');
+    seBtn.className = 'canvas-spawn-button';
+    seBtn.textContent = SE;
+    seBtn.title = 'Spawn Semantic Search glyph';
+
+    seBtn.addEventListener('click', () => {
+        spawnSemanticGlyph(x, y, canvas, glyphs);
+        removeMenu();
+    });
+
+    menu.appendChild(seBtn);
 
     // TODO: Refactor spawn menu to be data-driven
     // Loop over available symbols (Pulse, py, go, rs, ts) instead of hardcoding buttons
@@ -324,6 +338,49 @@ function spawnAxGlyph(
     });
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned AX glyph at (${x}, ${y}) with size ${width}x${height}`);
+}
+
+/**
+ * Spawn a new Semantic Search glyph at pixel position
+ */
+function spawnSemanticGlyph(
+    x: number,
+    y: number,
+    canvas: HTMLElement,
+    glyphs: Glyph[]
+): void {
+    const seGlyph: Glyph = {
+        id: `se-${crypto.randomUUID()}`,
+        title: 'Semantic Search',
+        symbol: SE,
+        x,
+        y,
+        renderContent: () => {
+            const content = document.createElement('div');
+            content.textContent = 'SE glyph';
+            return content;
+        }
+    };
+
+    glyphs.push(seGlyph);
+
+    const glyphElement = createSemanticGlyph(seGlyph);
+    canvas.appendChild(glyphElement);
+
+    const rect = glyphElement.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+
+    uiState.addCanvasGlyph({
+        id: seGlyph.id,
+        symbol: SE,
+        x,
+        y,
+        width,
+        height
+    });
+
+    log.debug(SEG.GLYPH, `[Canvas] Spawned SE glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
 
 /**

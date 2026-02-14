@@ -173,14 +173,16 @@ const MESSAGE_HANDLERS = {
     watcher_match: (data: WatcherMatchMessage) => {
         log.debug(SEG.WS, 'Watcher match:', data.watcher_id, data.attestation?.id);
 
-        // Extract glyph ID from watcher ID (format: "ax-glyph-{glyphId}")
-        const watcherIdPrefix = 'ax-glyph-';
-        if (data.watcher_id && data.watcher_id.startsWith(watcherIdPrefix)) {
-            const glyphId = data.watcher_id.substring(watcherIdPrefix.length);
-
-            // Update AX glyph with new result
+        // Route match to the correct glyph type by watcher ID prefix
+        if (data.watcher_id?.startsWith('ax-glyph-')) {
+            const glyphId = data.watcher_id.substring('ax-glyph-'.length);
             import('./components/glyph/ax-glyph.js').then(({ updateAxGlyphResults }) => {
                 updateAxGlyphResults(glyphId, data.attestation);
+            });
+        } else if (data.watcher_id?.startsWith('se-glyph-')) {
+            const glyphId = data.watcher_id.substring('se-glyph-'.length);
+            import('./components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphResults }) => {
+                updateSemanticGlyphResults(glyphId, data.attestation, data.score);
             });
         } else {
             log.warn(SEG.WS, 'Received watcher_match with unexpected watcher_id format:', data.watcher_id);
@@ -251,14 +253,16 @@ const MESSAGE_HANDLERS = {
             log.warn(SEG.WS, 'Watcher error details:', ...data.details);
         }
 
-        // Extract glyph ID from watcher ID (format: "ax-glyph-{glyphId}")
-        const watcherIdPrefix = 'ax-glyph-';
-        if (data.watcher_id && data.watcher_id.startsWith(watcherIdPrefix)) {
-            const glyphId = data.watcher_id.substring(watcherIdPrefix.length);
-
-            // Update AX glyph with error message and details
+        // Route error to the correct glyph type by watcher ID prefix
+        if (data.watcher_id?.startsWith('ax-glyph-')) {
+            const glyphId = data.watcher_id.substring('ax-glyph-'.length);
             import('./components/glyph/ax-glyph.js').then(({ updateAxGlyphError }) => {
                 updateAxGlyphError(glyphId, data.error, data.severity, data.details);
+            });
+        } else if (data.watcher_id?.startsWith('se-glyph-')) {
+            const glyphId = data.watcher_id.substring('se-glyph-'.length);
+            import('./components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphError }) => {
+                updateSemanticGlyphError(glyphId, data.error, data.severity, data.details);
             });
         } else {
             log.warn(SEG.WS, 'Received watcher_error with unexpected watcher_id format:', data.watcher_id);

@@ -142,7 +142,7 @@ func TestEngine_MatchesFilter(t *testing.T) {
 
 	// Track matches
 	var matches []string
-	engine.SetBroadcastCallback(func(watcherID string, attestation *types.As) {
+	engine.SetBroadcastCallback(func(watcherID string, attestation *types.As, score float32) {
 		matches = append(matches, attestation.ID)
 	})
 
@@ -460,7 +460,7 @@ func TestEngine_QueryHistoricalMatches(t *testing.T) {
 
 	// Track historical matches
 	var matches []string
-	engine.SetBroadcastCallback(func(watcherID string, attestation *types.As) {
+	engine.SetBroadcastCallback(func(watcherID string, attestation *types.As, score float32) {
 		matches = append(matches, attestation.ID)
 	})
 
@@ -510,7 +510,7 @@ func TestEngine_TimeFilters(t *testing.T) {
 
 	// Track matches
 	var matches []string
-	engine.SetBroadcastCallback(func(watcherID string, attestation *types.As) {
+	engine.SetBroadcastCallback(func(watcherID string, attestation *types.As, score float32) {
 		matches = append(matches, attestation.ID)
 	})
 

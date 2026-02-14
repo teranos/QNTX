@@ -29,9 +29,10 @@ pub const PROSE: &str = "▣";
 pub const PULSE: &str = "꩜";
 pub const PULSE_CLOSE: &str = "❀";
 pub const PULSE_OPEN: &str = "✿";
+pub const SE: &str = "⊨";
 pub const SO: &str = "⟶";
 
-pub const PALETTE_ORDER: &[&str] = &[I, AM, IX, AX, BY, AT, SO];
+pub const PALETTE_ORDER: &[&str] = &[I, AM, IX, AX, BY, AT, SO, SE];
 
 lazy_static::lazy_static! {
     pub static ref COMMAND_DESCRIPTIONS: std::collections::HashMap<&'static str, &'static str> = {
@@ -45,6 +46,7 @@ lazy_static::lazy_static! {
         m.insert("is", "Identity — Subject/equivalence in attestations");
         m.insert("ix", "Ingest — Import external data");
         m.insert("of", "Membership — Element-of/belonging in attestations");
+        m.insert("se", "Semantic — Meaning-based search and entailment");
         m.insert("so", "Therefore — Consequent action/trigger");
         m
     };
@@ -61,6 +63,7 @@ lazy_static::lazy_static! {
         m.insert("is", IS);
         m.insert("ix", IX);
         m.insert("of", OF);
+        m.insert("se", SE);
         m.insert("so", SO);
         m
     };
@@ -77,6 +80,7 @@ lazy_static::lazy_static! {
         m.insert(IS, "is");
         m.insert(IX, "ix");
         m.insert(OF, "of");
+        m.insert(SE, "se");
         m.insert(SO, "so");
         m
     };

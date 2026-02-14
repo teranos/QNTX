@@ -675,7 +675,7 @@ type UsageUpdateMessage struct {
 
 ## WatcherCreateRequest {#watchercreaterequest}
 
-**Source**: [`server/watcher_handlers.go:18`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L18)
+**Source**: [`server/watcher_handlers.go:19`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L19)
 
 
 ```go
@@ -692,6 +692,8 @@ type WatcherCreateRequest struct {
 	ActionData string `json:"action_data"`
 	MaxFiresPerMinute int `json:"max_fires_per_minute,omitempty"`
 	Enabled *bool `json:"enabled,omitempty"`
+	SemanticQuery string `json:"semantic_query,omitempty"`
+	SemanticThreshold float32 `json:"semantic_threshold,omitempty"`
 }
 ```
 
@@ -727,7 +729,7 @@ type WatcherMatchMessage struct {
 
 ## WatcherResponse {#watcherresponse}
 
-**Source**: [`server/watcher_handlers.go:34`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L34)
+**Source**: [`server/watcher_handlers.go:38`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L38)
 
 
 ```go
@@ -742,6 +744,8 @@ type WatcherResponse struct {
 	TimeEnd string `json:"time_end,omitempty"`
 	ActionType string `json:"action_type"`
 	ActionData string `json:"action_data"`
+	SemanticQuery string `json:"semantic_query,omitempty"`
+	SemanticThreshold float32 `json:"semantic_threshold,omitempty"`
 	MaxFiresPerMinute int `json:"max_fires_per_minute"`
 	Enabled bool `json:"enabled"`
 	CreatedAt string `json:"created_at"`
