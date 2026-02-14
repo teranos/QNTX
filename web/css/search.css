@@ -119,6 +119,14 @@
     text-align: right;
 }
 
+.search-strategy {
+    flex-shrink: 0;
+    min-width: 18px;
+    text-align: center;
+    color: var(--text-on-dark-tertiary);
+    font-size: var(--font-size-sm);
+}
+
 .search-excerpt {
     flex: 1;
     color: var(--text-on-dark);

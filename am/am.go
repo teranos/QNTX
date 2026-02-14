@@ -11,6 +11,12 @@ type Config struct {
 	Ax             AxConfig             `mapstructure:"ax"`
 	Plugin         PluginConfig         `mapstructure:"plugin"`
 	Embeddings     EmbeddingsConfig     `mapstructure:"embeddings"`
+	Sync           SyncConfig           `mapstructure:"sync"`
+}
+
+// SyncConfig configures peer-to-peer attestation sync
+type SyncConfig struct {
+	Peers map[string]string `mapstructure:"peers"` // name = "url" (e.g., phone = "http://phone.local:877")
 }
 
 // DatabaseConfig configures the SQLite database
@@ -51,10 +57,10 @@ type PulseConfig struct {
 	TickerIntervalSeconds int `mapstructure:"ticker_interval_seconds"` // How often to check for scheduled jobs (default: 1)
 
 	// Budget tracking
-	DailyBudgetUSD        float64 `mapstructure:"daily_budget_usd"`         // Daily spending limit in USD
-	WeeklyBudgetUSD       float64 `mapstructure:"weekly_budget_usd"`        // Weekly spending limit in USD
-	MonthlyBudgetUSD      float64 `mapstructure:"monthly_budget_usd"`       // Monthly spending limit in USD
-	CostPerScoreUSD float64 `mapstructure:"cost_per_score_usd"` // Estimated cost per operation
+	DailyBudgetUSD   float64 `mapstructure:"daily_budget_usd"`   // Daily spending limit in USD
+	WeeklyBudgetUSD  float64 `mapstructure:"weekly_budget_usd"`  // Weekly spending limit in USD
+	MonthlyBudgetUSD float64 `mapstructure:"monthly_budget_usd"` // Monthly spending limit in USD
+	CostPerScoreUSD  float64 `mapstructure:"cost_per_score_usd"` // Estimated cost per operation
 }
 
 // CodeConfig configures the code review system

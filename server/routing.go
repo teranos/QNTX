@@ -88,6 +88,9 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/embeddings/generate", s.corsMiddleware(s.HandleEmbeddingGenerate))           // Generate embedding (POST)
 	http.HandleFunc("/api/embeddings/batch", s.corsMiddleware(s.HandleEmbeddingBatch))                 // Batch generate embeddings (POST)
 	http.HandleFunc("/api/embeddings/info", s.corsMiddleware(s.HandleEmbeddingInfo))                   // Embedding service status (GET)
+	http.HandleFunc("/ws/sync", s.corsMiddleware(s.HandleSyncWebSocket))                               // Sync peer WebSocket (incoming reconciliation)
+	http.HandleFunc("/api/sync/status", s.corsMiddleware(s.HandleSyncStatus))                          // Sync tree status (GET)
+	http.HandleFunc("/api/sync", s.corsMiddleware(s.HandleSync))                                       // Initiate sync with peer (POST)
 	http.HandleFunc("/", s.corsMiddleware(s.HandleStatic))
 }
 
