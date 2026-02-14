@@ -286,7 +286,8 @@ func makeAs(id, subject, predicate, ctx, actor string) *types.As {
 
 func insertWithTree(store *memStore, tree SyncTree, as *types.As) {
 	store.CreateAttestation(as)
-	chHex, _ := tree.ContentHash(attestationJSON(as))
+	aj, _ := attestationJSON(as)
+	chHex, _ := tree.ContentHash(aj)
 	for _, actor := range as.Actors {
 		for _, ctx := range as.Contexts {
 			tree.Insert(actor, ctx, chHex)
@@ -509,7 +510,10 @@ func TestAttestationJSON_TimestampMillis(t *testing.T) {
 	as := makeAs("as-ts", "s", "p", "c", "a")
 	as.Timestamp = time.UnixMilli(1718452800000)
 
-	j := attestationJSON(as)
+	j, err := attestationJSON(as)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var parsed map[string]interface{}
 	if err := json.Unmarshal([]byte(j), &parsed); err != nil {
