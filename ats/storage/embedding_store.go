@@ -473,3 +473,112 @@ func (s *EmbeddingStore) GetClusterSummary() (*ClusterSummary, error) {
 
 	return summary, nil
 }
+
+// ClusterCentroid represents a stored cluster centroid.
+type ClusterCentroid struct {
+	ClusterID int
+	Centroid  []byte // FLOAT32_BLOB (little-endian f32)
+	NMembers  int
+}
+
+// SaveClusterCentroids replaces all centroids in a single transaction.
+func (s *EmbeddingStore) SaveClusterCentroids(centroids []ClusterCentroid) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return errors.Wrap(err, "failed to begin centroid save transaction")
+	}
+	defer func() {
+		if err != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				s.logger.Error("failed to rollback centroid save", zap.Error(rbErr))
+			}
+		}
+	}()
+
+	if _, err = tx.Exec(`DELETE FROM cluster_centroids`); err != nil {
+		return errors.Wrap(err, "failed to clear cluster_centroids")
+	}
+
+	stmt, err := tx.Prepare(`INSERT INTO cluster_centroids (cluster_id, centroid, n_members, updated_at) VALUES (?, ?, ?, ?)`)
+	if err != nil {
+		return errors.Wrap(err, "failed to prepare centroid insert")
+	}
+	defer stmt.Close()
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	for _, c := range centroids {
+		if _, err = stmt.Exec(c.ClusterID, c.Centroid, c.NMembers, now); err != nil {
+			return errors.Wrapf(err, "failed to insert centroid for cluster %d", c.ClusterID)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return errors.Wrap(err, "failed to commit centroid save")
+	}
+
+	s.logger.Info("saved cluster centroids", zap.Int("count", len(centroids)))
+	return nil
+}
+
+// GetAllClusterCentroids loads all stored centroids for prediction.
+func (s *EmbeddingStore) GetAllClusterCentroids() ([]ClusterCentroid, error) {
+	rows, err := s.db.Query(`SELECT cluster_id, centroid, n_members FROM cluster_centroids ORDER BY cluster_id`)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query cluster centroids")
+	}
+	defer rows.Close()
+
+	var centroids []ClusterCentroid
+	for rows.Next() {
+		var c ClusterCentroid
+		if err := rows.Scan(&c.ClusterID, &c.Centroid, &c.NMembers); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan centroid row %d", len(centroids)+1)
+		}
+		centroids = append(centroids, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate centroid rows (read %d)", len(centroids))
+	}
+
+	return centroids, nil
+}
+
+// PredictCluster assigns an embedding to the nearest cluster centroid using cosine similarity.
+// Returns cluster ID and similarity score, or -1 if below threshold.
+func (s *EmbeddingStore) PredictCluster(
+	embedding []float32,
+	centroids []ClusterCentroid,
+	deserialize func([]byte) ([]float32, error),
+	similarity func(a, b []float32) (float32, error),
+	threshold float32,
+) (clusterID int, prob float64, err error) {
+	if len(centroids) == 0 {
+		return -1, 0, nil
+	}
+
+	bestID := -1
+	var bestSim float32
+
+	for _, c := range centroids {
+		centroidVec, err := deserialize(c.Centroid)
+		if err != nil {
+			return -1, 0, errors.Wrapf(err, "failed to deserialize centroid for cluster %d", c.ClusterID)
+		}
+
+		sim, err := similarity(embedding, centroidVec)
+		if err != nil {
+			return -1, 0, errors.Wrapf(err, "failed to compute similarity for cluster %d", c.ClusterID)
+		}
+
+		if sim > bestSim {
+			bestSim = sim
+			bestID = c.ClusterID
+		}
+	}
+
+	if bestSim < threshold {
+		return -1, 0, nil
+	}
+
+	return bestID, float64(bestSim), nil
+}
