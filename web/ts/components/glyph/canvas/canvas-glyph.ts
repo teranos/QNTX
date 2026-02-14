@@ -34,7 +34,7 @@ export { isGlyphSelected, getSelectedGlyphIds, getSelectedGlyphElements } from '
  */
 export function createCanvasGlyph(): Glyph {
     // Load persisted glyphs from uiState
-    const allSavedGlyphs = uiState.getCanvasGlyphs();
+    const allSavedGlyphs = uiState.getCanvasGlyphs('canvas-workspace');
 
     // Filter out error glyphs (ephemeral - should never be persisted)
     const errorGlyphs = allSavedGlyphs.filter(g => g.symbol === 'error');
