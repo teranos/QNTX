@@ -20,16 +20,22 @@ import (
 // chanConn implements Conn over a pair of channels for in-process testing.
 // Messages are JSON-serialized through the channels to match real WebSocket behavior.
 type chanConn struct {
-	in  chan json.RawMessage
-	out chan json.RawMessage
+	in   chan json.RawMessage
+	out  chan json.RawMessage
+	done chan struct{}
+	once sync.Once
 }
 
 func (c *chanConn) ReadJSON(v interface{}) error {
-	raw, ok := <-c.in
-	if !ok {
+	select {
+	case raw, ok := <-c.in:
+		if !ok {
+			return fmt.Errorf("connection closed")
+		}
+		return json.Unmarshal(raw, v)
+	case <-c.done:
 		return fmt.Errorf("connection closed")
 	}
-	return json.Unmarshal(raw, v)
 }
 
 func (c *chanConn) WriteJSON(v interface{}) error {
@@ -37,11 +43,16 @@ func (c *chanConn) WriteJSON(v interface{}) error {
 	if err != nil {
 		return err
 	}
-	c.out <- raw
-	return nil
+	select {
+	case c.out <- raw:
+		return nil
+	case <-c.done:
+		return fmt.Errorf("connection closed")
+	}
 }
 
 func (c *chanConn) Close() error {
+	c.once.Do(func() { close(c.done) })
 	return nil
 }
 
@@ -49,7 +60,8 @@ func (c *chanConn) Close() error {
 func connPair() (Conn, Conn) {
 	ab := make(chan json.RawMessage, 32)
 	ba := make(chan json.RawMessage, 32)
-	return &chanConn{in: ba, out: ab}, &chanConn{in: ab, out: ba}
+	return &chanConn{in: ba, out: ab, done: make(chan struct{})},
+		&chanConn{in: ab, out: ba, done: make(chan struct{})}
 }
 
 // memStore is a minimal in-memory AttestationStore for testing.
@@ -503,6 +515,27 @@ func TestWireRoundtrip(t *testing.T) {
 	}
 	if back.Attributes["color"] != "blue" {
 		t.Fatal("attributes not preserved")
+	}
+}
+
+func TestPeer_ContextCancellation(t *testing.T) {
+	connA, _ := connPair()
+	tree := newMemTree()
+	store := newMemStore()
+	logger := testLogger()
+
+	// Insert data so roots won't match (forces the protocol past hello)
+	insertWithTree(store, tree, makeAs("as-1", "user-1", "member", "team", "hr"))
+
+	peer := NewPeer(connA, tree, store, logger)
+
+	// Short deadline — the other side never responds
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	_, _, err := peer.Reconcile(ctx)
+	if err == nil {
+		t.Fatal("expected error from cancelled context, got nil")
 	}
 }
 
