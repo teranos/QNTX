@@ -164,9 +164,9 @@ const MESSAGE_HANDLERS = {
     rich_search_results: (data: RichSearchResultsMessage) => {
         log.info(SEG.QUERY, 'Rich search results:', data.total, 'matches');
 
-        // Pass results to the CodeMirror editor's fuzzy search view
-        import('./codemirror-editor.js').then(({ handleFuzzySearchResults }) => {
-            handleFuzzySearchResults(data);
+        // Pass results to the CodeMirror editor's search view
+        import('./codemirror-editor.js').then(({ handleSearchResults }) => {
+            handleSearchResults(data);
         });
     },
 
@@ -313,13 +313,6 @@ export function routeMessage(
     if (registeredHandler) {
         (registeredHandler as MessageHandler)(data);
         return { handled: true, handlerType: 'registered' };
-    }
-
-    // Fall back to default handler for unknown types (e.g., graph data)
-    // TODO(#209): Graph data should have explicit 'graph_data' type instead of using _default
-    if (registeredHandlers['_default']) {
-        registeredHandlers['_default'](data);
-        return { handled: true, handlerType: 'default' };
     }
 
     return { handled: false, handlerType: 'none' };

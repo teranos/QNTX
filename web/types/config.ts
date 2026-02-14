@@ -3,7 +3,7 @@
  * Types for application configuration and settings
  */
 
-import { GraphPhysics, GraphStyles, NodeType, UIText } from './core';
+import { UIText } from './core';
 
 // ============================================================================
 // Application Configuration
@@ -15,9 +15,6 @@ import { GraphPhysics, GraphStyles, NodeType, UIText } from './core';
 export interface AppConfig {
   // UI Configuration
   ui: UIConfig;
-
-  // Graph Configuration
-  graph: GraphConfig;
 
   // WebSocket Configuration
   websocket: WebSocketConnectionConfig;
@@ -47,22 +44,6 @@ export interface UIConfig {
   showDebugInfo: boolean;
   defaultPanelStates: Record<string, boolean>;
   text: UIText;
-}
-
-/**
- * Graph configuration
- */
-export interface GraphConfig {
-  physics: GraphPhysics;
-  styles: GraphStyles;
-  nodeTypes: NodeType[];
-  defaultNodeColor: string;
-  defaultLinkColor: string;
-  showLabels: boolean;
-  labelThreshold: number;
-  autoCenter: boolean;
-  enableClustering: boolean;
-  clusterThreshold: number;
 }
 
 /**
@@ -215,7 +196,6 @@ export interface PrivacySettings {
 export interface KeyboardShortcuts {
   global: Record<string, string>;
   editor: Record<string, string>;
-  graph: Record<string, string>;
   panels: Record<string, string>;
 }
 
@@ -263,7 +243,6 @@ export interface LayoutPreset {
   id: string;
   name: string;
   panels: Record<string, PanelLayout>;
-  graphTransform?: { x: number; y: number; k: number };
 }
 
 /**
@@ -306,8 +285,6 @@ export interface AppConstants {
   MAX_LOGS: number;
   MAX_PROGRESS: number;
   MAX_QUERY_LENGTH: number;
-  MAX_NODES_DISPLAY: number;
-  MAX_LINKS_DISPLAY: number;
   MAX_FILE_SIZE: number;
   MAX_UPLOAD_SIZE: number;
 

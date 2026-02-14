@@ -13,11 +13,11 @@
  * State domains:
  * - Panel visibility (transient, not persisted)
  * - User preferences (persisted)
- * - Graph session (persisted with expiry)
+ * - Session (query, verbosity — persisted with expiry)
  * - Budget warnings (transient)
  */
 
-import type { PanelState, Transform } from '../../types/core';
+import type { PanelState } from '../../types/core';
 import type { CanvasGlyph, CompositionEdge, Composition } from '../generated/proto/glyph/proto/canvas';
 import { getItem, setItem, removeItem } from './storage';
 import { log, SEG } from '../logger';
@@ -55,7 +55,6 @@ export interface BudgetWarningState {
 export interface GraphSessionState {
     query?: string;
     verbosity?: number;
-    transform?: Transform | null;
 }
 
 /**
@@ -374,13 +373,6 @@ class UIState {
     }
 
     /**
-     * Set graph transform (zoom/pan state)
-     */
-    setGraphTransform(transform: Transform | null): void {
-        this.setGraphSession({ transform });
-    }
-
-    /**
      * Clear graph session
      */
     clearGraphSession(): void {
@@ -479,10 +471,8 @@ class UIState {
             this.update('canvasGlyphs', updated);
         }
 
-        // Sync with backend (fire-and-forget)
-        apiUpsertGlyph(normalizedGlyph).catch(err => {
-            log.error(SEG.UI, '[UIState] Failed to sync glyph to backend:', err);
-        });
+        // Enqueue for server sync (never throws)
+        apiUpsertGlyph(normalizedGlyph);
     }
 
     /**
@@ -492,10 +482,8 @@ class UIState {
         const updated = this.state.canvasGlyphs.filter(g => g.id !== id);
         this.update('canvasGlyphs', updated);
 
-        // Sync with backend (fire-and-forget)
-        apiDeleteGlyph(id).catch(err => {
-            log.error(SEG.UI, '[UIState] Failed to delete glyph from backend:', err);
-        });
+        // Enqueue for server sync (never throws)
+        apiDeleteGlyph(id);
     }
 
     /**
