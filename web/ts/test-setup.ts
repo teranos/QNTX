@@ -5,6 +5,8 @@
  * Per-file JSDOM setup is eliminated to prevent cross-DOM node rejection.
  */
 
+export {};
+
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
 if (USE_JSDOM) {
@@ -70,7 +72,7 @@ if (USE_JSDOM) {
         // @ts-ignore
         globalThis.crypto = {
             ...globalThis.crypto,
-            randomUUID: () => 'test-uuid-' + Math.random(),
+            randomUUID: () => 'test-uuid-' + Math.random() as `${string}-${string}-${string}-${string}-${string}`,
         };
     }
 
