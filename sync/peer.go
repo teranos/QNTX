@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
@@ -25,7 +26,7 @@ type Conn interface {
 // Both sides of the connection run the same code — the protocol is symmetric.
 type Peer struct {
 	conn   Conn
-	tree   *Tree
+	tree   SyncTree
 	store  ats.AttestationStore
 	logger *zap.SugaredLogger
 
@@ -35,7 +36,7 @@ type Peer struct {
 }
 
 // NewPeer creates a sync peer for a single reconciliation session.
-func NewPeer(conn Conn, tree *Tree, store ats.AttestationStore, logger *zap.SugaredLogger) *Peer {
+func NewPeer(conn Conn, tree SyncTree, store ats.AttestationStore, logger *zap.SugaredLogger) *Peer {
 	return &Peer{
 		conn:   conn,
 		tree:   tree,
@@ -53,10 +54,14 @@ func NewPeer(conn Conn, tree *Tree, store ats.AttestationStore, logger *zap.Suga
 // sides act simultaneously.
 func (p *Peer) Reconcile(ctx context.Context) (sent, received int, err error) {
 	// Phase 1: Exchange root hashes
-	root := p.tree.Root()
+	root, err := p.tree.Root()
+	if err != nil {
+		return 0, 0, errors.Wrap(err, "failed to compute sync root")
+	}
+
 	if err := p.send(Msg{
 		Type:     MsgHello,
-		RootHash: HexHash(root),
+		RootHash: root,
 	}); err != nil {
 		return 0, 0, errors.Wrap(err, "failed to send sync hello")
 	}
@@ -71,7 +76,7 @@ func (p *Peer) Reconcile(ctx context.Context) (sent, received int, err error) {
 	}
 
 	// Roots match — fully synced
-	if hello.RootHash == HexHash(root) {
+	if hello.RootHash == root {
 		p.logger.Debugw("Sync roots match, already in sync")
 		if err := p.sendDone(); err != nil {
 			return 0, 0, err
@@ -80,20 +85,20 @@ func (p *Peer) Reconcile(ctx context.Context) (sent, received int, err error) {
 	}
 
 	p.logger.Debugw("Sync roots differ, starting reconciliation",
-		"local_root", HexHash(root),
+		"local_root", root,
 		"remote_root", hello.RootHash,
 	)
 
 	// Phase 2: Exchange group hashes
-	localGroups := p.tree.GroupHashes()
-	hexGroups := make(map[string]string, len(localGroups))
-	for gkh, gh := range localGroups {
-		hexGroups[HexHash(gkh)] = HexHash(gh)
+	// GroupHashes() already returns hex strings — no conversion needed
+	localGroups, err := p.tree.GroupHashes()
+	if err != nil {
+		return 0, 0, errors.Wrap(err, "failed to get group hashes")
 	}
 
 	if err := p.send(Msg{
 		Type:   MsgGroupHashes,
-		Groups: hexGroups,
+		Groups: localGroups,
 	}); err != nil {
 		return 0, 0, errors.Wrap(err, "failed to send group hashes")
 	}
@@ -108,25 +113,16 @@ func (p *Peer) Reconcile(ctx context.Context) (sent, received int, err error) {
 	}
 
 	// Phase 3: Compute diff and exchange needs
-	remoteGroups := make(map[Hash]Hash, len(remoteGroupsMsg.Groups))
-	remoteHexToHash := make(map[string]Hash, len(remoteGroupsMsg.Groups))
-	for gkhHex, ghHex := range remoteGroupsMsg.Groups {
-		gkh := hexToHash(gkhHex)
-		gh := hexToHash(ghHex)
-		remoteGroups[gkh] = gh
-		remoteHexToHash[gkhHex] = gkh
+	// Diff takes hex strings directly — the WASM module handles all byte ↔ hex
+	_, remoteOnly, divergent, err := p.tree.Diff(remoteGroupsMsg.Groups)
+	if err != nil {
+		return 0, 0, errors.Wrap(err, "failed to compute sync diff")
 	}
-
-	_, remoteOnly, divergent := p.tree.Diff(remoteGroups)
 
 	// We need attestations from groups we don't have, and divergent groups
 	needed := make([]string, 0, len(remoteOnly)+len(divergent))
-	for _, h := range remoteOnly {
-		needed = append(needed, HexHash(h))
-	}
-	for _, h := range divergent {
-		needed = append(needed, HexHash(h))
-	}
+	needed = append(needed, remoteOnly...)
+	needed = append(needed, divergent...)
 
 	if err := p.send(Msg{
 		Type: MsgNeed,
@@ -182,23 +178,21 @@ func (p *Peer) sendRequestedAttestations(ctx context.Context, requestedHexKeys [
 	atts := make(map[string][]AttestationWire)
 
 	for _, hexKey := range requestedHexKeys {
-		// Look up which (actor, context) group this hash maps to.
-		// We need to search our tree's groups to find the matching key.
-		gkHash := hexToHash(hexKey)
-		groupKey, ok := p.tree.findGroupKey(gkHash)
-		if !ok {
+		// Reverse-lookup: group key hash → (actor, context)
+		actor, actCtx, err := p.tree.FindGroupKey(hexKey)
+		if err != nil {
 			continue // We don't have this group
 		}
 
 		// Query attestations for this actor+context pair
 		results, err := p.store.GetAttestations(ats.AttestationFilter{
-			Actors:   []string{groupKey.Actor},
-			Contexts: []string{groupKey.Context},
+			Actors:   []string{actor},
+			Contexts: []string{actCtx},
 		})
 		if err != nil {
 			p.logger.Warnw("Failed to query attestations for sync",
-				"actor", groupKey.Actor,
-				"context", groupKey.Context,
+				"actor", actor,
+				"context", actCtx,
 				"error", err,
 			)
 			continue
@@ -241,14 +235,30 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 				continue
 			}
 
-			// Skip if we already have this attestation
+			// Skip if we already have this attestation by ASID
 			if p.store.AttestationExists(as.ID) {
 				continue
 			}
 
 			// Check by content hash too — same claim might have different ASID
-			ch := ContentHash(as)
-			if p.tree.Contains(ch) {
+			chHex, err := p.tree.ContentHash(attestationJSON(as))
+			if err != nil {
+				p.logger.Warnw("Failed to compute content hash for synced attestation",
+					"id", as.ID,
+					"error", err,
+				)
+				continue
+			}
+
+			exists, err := p.tree.Contains(chHex)
+			if err != nil {
+				p.logger.Warnw("Failed to check content hash existence",
+					"id", as.ID,
+					"error", err,
+				)
+				continue
+			}
+			if exists {
 				continue
 			}
 
@@ -318,27 +328,29 @@ func fromWire(w AttestationWire) (*types.As, error) {
 	}, nil
 }
 
-// hexToHash converts a hex string to a Hash. Returns zero hash on error.
-func hexToHash(s string) Hash {
-	var h Hash
-	if len(s) != 64 {
-		return h
+// attestationJSON serializes a types.As to JSON matching Rust's Attestation struct.
+// Critical: timestamp is i64 milliseconds (UnixMilli), not nanoseconds or RFC3339.
+// This JSON is passed to SyncTree.ContentHash() which delegates to Rust.
+func attestationJSON(as *types.As) string {
+	v := struct {
+		ID         string                 `json:"id"`
+		Subjects   []string               `json:"subjects"`
+		Predicates []string               `json:"predicates"`
+		Contexts   []string               `json:"contexts"`
+		Actors     []string               `json:"actors"`
+		Timestamp  int64                  `json:"timestamp"`
+		Source     string                 `json:"source"`
+		Attributes map[string]interface{} `json:"attributes,omitempty"`
+	}{
+		ID:         as.ID,
+		Subjects:   as.Subjects,
+		Predicates: as.Predicates,
+		Contexts:   as.Contexts,
+		Actors:     as.Actors,
+		Timestamp:  as.Timestamp.UnixMilli(),
+		Source:     as.Source,
+		Attributes: as.Attributes,
 	}
-	for i := 0; i < 32; i++ {
-		h[i] = hexByte(s[i*2])<<4 | hexByte(s[i*2+1])
-	}
-	return h
-}
-
-func hexByte(c byte) byte {
-	switch {
-	case c >= '0' && c <= '9':
-		return c - '0'
-	case c >= 'a' && c <= 'f':
-		return c - 'a' + 10
-	case c >= 'A' && c <= 'F':
-		return c - 'A' + 10
-	default:
-		return 0
-	}
+	b, _ := json.Marshal(v)
+	return string(b)
 }
