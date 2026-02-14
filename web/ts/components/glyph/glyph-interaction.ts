@@ -444,8 +444,9 @@ export function makeDraggable(
         element.classList.add('is-dragging');
 
         // Check if this glyph is part of a multi-selection
-        const selectedIds = getSelectedGlyphIds();
-        if (selectedIds.length > 1 && isGlyphSelected(glyph.id)) {
+        const canvasId = (element.closest('[data-canvas-id]') as HTMLElement | null)?.dataset?.canvasId ?? 'canvas-workspace';
+        const selectedIds = getSelectedGlyphIds(canvasId);
+        if (selectedIds.length > 1 && isGlyphSelected(canvasId, glyph.id)) {
             isMultiDrag = true;
             const canvas = element.parentElement;
             if (canvas) {
