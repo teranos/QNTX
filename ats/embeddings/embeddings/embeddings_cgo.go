@@ -98,14 +98,14 @@ func (s *CGOEmbeddingService) embedLocked(text string) (*EmbeddingResult, error)
 
 	cJSON := C.embedding_engine_embed_json(s.engine, cText)
 	if cJSON == nil {
-		return nil, errors.New("embedding engine returned null")
+		return nil, errors.Newf("embedding engine returned null for text (%d chars)", len(text))
 	}
 	defer C.embedding_free_string(cJSON)
 
 	jsonStr := C.GoString(cJSON)
 	var result EmbeddingResult
 	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
-		return nil, errors.Wrap(err, "failed to parse embedding result")
+		return nil, errors.Wrapf(err, "failed to parse embedding result for text (%d chars)", len(text))
 	}
 
 	return &result, nil
@@ -124,10 +124,10 @@ func (s *CGOEmbeddingService) EmbedBatch(texts []string) (*BatchEmbeddingResult,
 		Embeddings: make([]EmbeddingResult, 0, len(texts)),
 	}
 
-	for _, text := range texts {
+	for i, text := range texts {
 		embedding, err := s.embedLocked(text)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to embed text in batch")
+			return nil, errors.Wrapf(err, "failed to embed text %d/%d in batch (%d chars)", i+1, len(texts), len(text))
 		}
 
 		result.Embeddings = append(result.Embeddings, *embedding)
