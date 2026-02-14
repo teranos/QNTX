@@ -744,6 +744,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_ax_function_available() {
+        let service = PythonPluginService::new().unwrap();
+
+        let body = serde_json::json!({
+            "content": "result = callable(ax)\nprint('ax is callable:', result)",
+            "timeout_secs": 5
+        });
+
+        let result = service.handlers.handle_execute(body).await.unwrap();
+
+        #[derive(Deserialize)]
+        struct ExecutionResponse {
+            success: bool,
+            stdout: String,
+            error: Option<String>,
+        }
+
+        let response: ExecutionResponse = serde_json::from_slice(&result.body).unwrap();
+        assert!(
+            response.success,
+            "Expected success, got error: {:?}",
+            response.error
+        );
+        assert!(response.stdout.contains("ax is callable: True"));
+    }
+
+    #[tokio::test]
     async fn test_attest_without_atsstore_errors() {
         let service = PythonPluginService::new().unwrap();
 

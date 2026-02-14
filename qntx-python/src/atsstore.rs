@@ -4,7 +4,8 @@
 //! called from PyO3 functions during Python execution.
 
 use crate::proto::{
-    ats_store_service_client::AtsStoreServiceClient, AttestationCommand, GenerateAttestationRequest,
+    ats_store_service_client::AtsStoreServiceClient, AttestationCommand, AttestationFilter,
+    GenerateAttestationRequest, GetAttestationsRequest,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -125,6 +126,12 @@ impl AtsStoreClient {
 
         info!("Created attestation via Python: {}", attestation.id);
 
+        let attributes = if attestation.attributes.is_empty() {
+            HashMap::new()
+        } else {
+            serde_json::from_str(&attestation.attributes).unwrap_or_default()
+        };
+
         Ok(AttestationResult {
             id: attestation.id,
             subjects: attestation.subjects,
@@ -133,7 +140,101 @@ impl AtsStoreClient {
             actors: attestation.actors,
             timestamp: attestation.timestamp,
             source: attestation.source,
+            attributes,
         })
+    }
+
+    /// Query attestations with optional filters.
+    ///
+    /// Called from Python via `query()`.
+    pub fn query_attestations(
+        &mut self,
+        subjects: Option<Vec<String>>,
+        predicates: Option<Vec<String>>,
+        contexts: Option<Vec<String>>,
+        actors: Option<Vec<String>>,
+        limit: Option<i32>,
+    ) -> Result<Vec<AttestationResult>, String> {
+        let endpoint = self.config.endpoint.clone();
+        let auth_token = self.config.auth_token.clone();
+
+        let filter = AttestationFilter {
+            subjects: subjects.unwrap_or_default(),
+            predicates: predicates.unwrap_or_default(),
+            contexts: contexts.unwrap_or_default(),
+            actors: actors.unwrap_or_default(),
+            time_start: 0,
+            time_end: 0,
+            limit,
+        };
+
+        let request = GetAttestationsRequest {
+            auth_token,
+            filter: Some(filter),
+        };
+
+        let response = std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| format!("failed to create runtime: {}", e))?;
+
+            rt.block_on(async {
+                let endpoint_uri =
+                    if endpoint.starts_with("http://") || endpoint.starts_with("https://") {
+                        endpoint.clone()
+                    } else {
+                        format!("http://{}", endpoint)
+                    };
+
+                let ep = Channel::from_shared(endpoint_uri)
+                    .map_err(|e| format!("invalid endpoint: {}", e))?;
+
+                let channel = ep
+                    .connect()
+                    .await
+                    .map_err(|e| format!("connection failed: {}", e))?;
+
+                let mut client = AtsStoreServiceClient::new(channel);
+                client
+                    .get_attestations(request)
+                    .await
+                    .map_err(|e| format!("gRPC error: {}", e))
+            })
+        })
+        .join()
+        .map_err(|e| format!("thread panicked: {:?}", e))??
+        .into_inner();
+
+        if !response.success {
+            error!("Failed to query attestations: {}", response.error);
+            return Err(response.error);
+        }
+
+        let results: Vec<AttestationResult> = response
+            .attestations
+            .into_iter()
+            .map(|a| {
+                let attributes = if a.attributes.is_empty() {
+                    HashMap::new()
+                } else {
+                    serde_json::from_str(&a.attributes).unwrap_or_default()
+                };
+                AttestationResult {
+                    id: a.id,
+                    subjects: a.subjects,
+                    predicates: a.predicates,
+                    contexts: a.contexts,
+                    actors: a.actors,
+                    timestamp: a.timestamp,
+                    source: a.source,
+                    attributes,
+                }
+            })
+            .collect();
+
+        info!("Queried {} attestation(s) via Python", results.len());
+        Ok(results)
     }
 }
 
@@ -147,6 +248,7 @@ pub struct AttestationResult {
     pub actors: Vec<String>,
     pub timestamp: i64,
     pub source: String,
+    pub attributes: HashMap<String, serde_json::Value>,
 }
 
 /// Shared ATSStore client that can be passed to Python execution context
@@ -249,9 +351,100 @@ pub fn attest(
             dict.set_item("actors", &attestation.actors)?;
             dict.set_item("timestamp", attestation.timestamp)?;
             dict.set_item("source", &attestation.source)?;
+            // Convert attributes HashMap to Python dict
+            let attrs_dict = PyDict::new(py);
+            for (k, v) in &attestation.attributes {
+                attrs_dict.set_item(k, json_to_python(py, v)?)?;
+            }
+            dict.set_item("attributes", attrs_dict)?;
             Ok(dict.into())
         }
         Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(e)),
+    }
+}
+
+/// Python-callable ax (⋈) function.
+/// Queries attestations from the ATSStore using optional filters.
+#[pyfunction]
+#[pyo3(signature = (subjects=None, predicates=None, contexts=None, actors=None, limit=None))]
+pub fn ax(
+    py: Python<'_>,
+    subjects: Option<Vec<String>>,
+    predicates: Option<Vec<String>>,
+    contexts: Option<Vec<String>>,
+    actors: Option<Vec<String>>,
+    limit: Option<i32>,
+) -> PyResult<PyObject> {
+    let result = CURRENT_CLIENT.with(|c| {
+        let client_opt = c.borrow();
+        match client_opt.as_ref() {
+            Some(shared_client) => {
+                let mut guard = shared_client.lock();
+                match guard.as_mut() {
+                    Some(client) => {
+                        client.query_attestations(subjects, predicates, contexts, actors, limit)
+                    }
+                    None => Err("ATSStore client not initialized".to_string()),
+                }
+            }
+            None => Err("ATSStore client not available in this context".to_string()),
+        }
+    });
+
+    match result {
+        Ok(attestations) => {
+            let list = pyo3::types::PyList::empty(py);
+            for attestation in attestations {
+                let dict = PyDict::new(py);
+                dict.set_item("id", &attestation.id)?;
+                dict.set_item("subjects", &attestation.subjects)?;
+                dict.set_item("predicates", &attestation.predicates)?;
+                dict.set_item("contexts", &attestation.contexts)?;
+                dict.set_item("actors", &attestation.actors)?;
+                dict.set_item("timestamp", attestation.timestamp)?;
+                dict.set_item("source", &attestation.source)?;
+                let attrs_dict = PyDict::new(py);
+                for (k, v) in &attestation.attributes {
+                    attrs_dict.set_item(k, json_to_python(py, v)?)?;
+                }
+                dict.set_item("attributes", attrs_dict)?;
+                list.append(dict)?;
+            }
+            Ok(list.into())
+        }
+        Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(e)),
+    }
+}
+
+/// Convert a serde_json::Value to a Python object
+fn json_to_python(py: Python<'_>, value: &serde_json::Value) -> PyResult<PyObject> {
+    match value {
+        serde_json::Value::Null => Ok(py.None()),
+        serde_json::Value::Bool(b) => Ok(b.into_pyobject(py)?.into_any().unbind()),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Ok(i.into_pyobject(py)?.into_any().unbind())
+            } else if let Some(f) = n.as_f64() {
+                Ok(f.into_pyobject(py)?.into_any().unbind())
+            } else {
+                Ok(py.None())
+            }
+        }
+        serde_json::Value::String(s) => Ok(s.into_pyobject(py)?.into_any().unbind()),
+        serde_json::Value::Array(arr) => {
+            let list = pyo3::types::PyList::empty(py);
+            for item in arr {
+                list.append(json_to_python(py, item)?)?;
+            }
+            Ok(list.into())
+        }
+        serde_json::Value::Object(map) => {
+            let dict = PyDict::new(py);
+            for (k, v) in map {
+                dict.set_item(k, json_to_python(py, v)?)?;
+            }
+            Ok(dict.into())
+        }
     }
 }
 
@@ -283,11 +476,12 @@ fn python_value_to_json(_py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<s
     }
 }
 
-/// Add the attest function to a Python globals dict.
-/// Call this before executing Python code to make attest() available.
-pub fn inject_attest_function(py: Python<'_>, globals: &Bound<'_, PyDict>) -> PyResult<()> {
-    // Create the attest function and add it to globals
+/// Add the attest and query functions to a Python globals dict.
+/// Call this before executing Python code to make attest() and query() available.
+pub fn inject_ats_functions(py: Python<'_>, globals: &Bound<'_, PyDict>) -> PyResult<()> {
     let attest_fn = wrap_pyfunction!(attest, py)?;
     globals.set_item("attest", attest_fn)?;
+    let ax_fn = wrap_pyfunction!(ax, py)?;
+    globals.set_item("ax", ax_fn)?;
     Ok(())
 }

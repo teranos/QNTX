@@ -262,6 +262,74 @@ func TestCompileSubscriptions_BottomEdgesIgnored(t *testing.T) {
 	}
 }
 
+func TestCompileSubscriptions_PyToPy(t *testing.T) {
+	handler, _, watcherStore := setupHandlerWithWatcher(t)
+	ctx := context.Background()
+
+	// Create two Py glyphs
+	glyphs := []*glyphstorage.CanvasGlyph{
+		{ID: "py-source", Symbol: "py", X: 100, Y: 100},
+		{ID: "py-sink", Symbol: "py", X: 200, Y: 100},
+	}
+	for _, g := range glyphs {
+		if err := handler.store.UpsertGlyph(ctx, g); err != nil {
+			t.Fatalf("UpsertGlyph failed: %v", err)
+		}
+	}
+
+	// Upsert composition: py-source → py-sink
+	comp := glyphstorage.CanvasComposition{
+		ID: "comp-py-py",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("py-source", "py-sink", "right", 0),
+		},
+		X: 100, Y: 100,
+	}
+	body, _ := json.Marshal(comp)
+	req := httptest.NewRequest(http.MethodPost, "/api/canvas/compositions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.HandleCompositions(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Verify meld-edge watcher was created with actor filter
+	meldWatcher, err := watcherStore.Get(ctx, "meld-edge-comp-py-py-py-source-py-sink")
+	if err != nil {
+		t.Fatalf("Meld-edge watcher not found: %v", err)
+	}
+
+	if meldWatcher.ActionType != storage.ActionTypeGlyphExecute {
+		t.Errorf("Expected action type glyph_execute, got %s", meldWatcher.ActionType)
+	}
+
+	// Py source uses actor filter (attestations created by the upstream glyph)
+	if meldWatcher.AxQuery != "" {
+		t.Errorf("Producer edge should not have AxQuery, got %q", meldWatcher.AxQuery)
+	}
+	if len(meldWatcher.Filter.Actors) != 1 || meldWatcher.Filter.Actors[0] != "glyph:py-source" {
+		t.Errorf("Expected actors filter [glyph:py-source], got %v", meldWatcher.Filter.Actors)
+	}
+
+	// Verify action data targets py-sink
+	var actionData map[string]string
+	if err := json.Unmarshal([]byte(meldWatcher.ActionData), &actionData); err != nil {
+		t.Fatalf("Failed to parse action data: %v", err)
+	}
+	if actionData["target_glyph_id"] != "py-sink" {
+		t.Errorf("Expected target_glyph_id 'py-sink', got %q", actionData["target_glyph_id"])
+	}
+	if actionData["target_glyph_type"] != "py" {
+		t.Errorf("Expected target_glyph_type 'py', got %q", actionData["target_glyph_type"])
+	}
+	if actionData["source_glyph_id"] != "py-source" {
+		t.Errorf("Expected source_glyph_id 'py-source', got %q", actionData["source_glyph_id"])
+	}
+}
+
 func TestCompileSubscriptions_StaleEdgeCleanup(t *testing.T) {
 	handler, engine, watcherStore := setupHandlerWithWatcher(t)
 	ctx := context.Background()
