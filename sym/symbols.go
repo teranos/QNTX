@@ -27,6 +27,7 @@ const (
 	DB         = "⊔" // Database/storage layer
 	Prose      = "▣" // Documentation and prose content
 	Doc        = "▤" // Document/file content (PDF, etc.)
+	Subcanvas  = "⌗" // Nested canvas (subcanvas workspace)
 )
 
 // PaletteOrder defines the canonical ordering for UI controls,
