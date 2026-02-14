@@ -68,7 +68,7 @@ Reticulum eliminates these assumptions. Nodes are identified by cryptographic ke
 
 This is the network that attestation sync needs. Not because QNTX is building a LoRa mesh (though it could), but because the properties Reticulum provides — cryptographic identity, transport agnosticism, delay tolerance, self-configuration — are exactly the properties that make decentralized attestation propagation work.
 
-### QNTX nodes as Reticulum destinations
+### QNTX nodes as Reticulum destinations (proposed)
 
 A Reticulum destination is a cryptographic identity (X25519 for key exchange, Ed25519 for signing) that can receive messages over any Reticulum link. A QNTX node running on Reticulum would be a destination that accepts sync protocol messages.
 
@@ -86,7 +86,7 @@ A Reticulum link implements `Conn`. The reconciliation protocol runs over it unc
 
 The sync protocol was designed symmetric for exactly this reason. There is no "server" to connect to. Two destinations find each other on the Reticulum mesh, establish a link, and reconcile. Either side can initiate.
 
-### Identity convergence
+### Identity convergence (open question)
 
 Reticulum identifies destinations by Ed25519/X25519 keypairs. QNTX identifies actors by name strings today, but the actor model is designed around the concept that an actor is an identity that can sign attestations.
 
