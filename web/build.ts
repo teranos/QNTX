@@ -83,10 +83,6 @@ try {
   console.log(`${darkPeach}Copying fonts...${reset}`);
   await cp(join(sourceDir, "fonts"), join(outputDir, "fonts"), { recursive: true });
 
-  // Copy vendor libraries (d3, pre-built bundles)
-  console.log(`${darkPeach}Copying vendor libraries...${reset}`);
-  await cp(join(sourceDir, "ts", "vendor"), join(outputDir, "js", "vendor"), { recursive: true });
-
   // Copy static assets
   console.log(`${darkPeach}Copying static assets...${reset}`);
   await cp(join(sourceDir, "qntx.jpg"), join(outputDir, "qntx.jpg"));
