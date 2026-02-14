@@ -27,6 +27,7 @@ const (
 	PulseClose = "❀" // Graceful shutdown with checkpoint preservation
 	DB         = "⊔" // Database/storage layer
 	Prose      = "▣" // Documentation and prose content
+	Subcanvas  = "⌗" // Nested canvas (subcanvas workspace)
 )
 
 // PaletteOrder defines the canonical ordering for UI controls,

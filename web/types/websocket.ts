@@ -76,6 +76,7 @@ export type MessageType =
   | 'watcher_error'
   | 'glyph_fired'
   | 'database_stats'
+  | 'sync_status'
   | 'rich_search_results'
   | 'vidstream_init_success'
   | 'vidstream_init_error'
@@ -455,6 +456,19 @@ export interface DatabaseStatsMessage extends BaseMessage {
 }
 
 /**
+ * Sync status response — Merkle tree state, peers, availability
+ */
+export interface SyncStatusMessage extends BaseMessage {
+  type: 'sync_status';
+  available: boolean;
+  root?: string;      // Merkle root hash (64-char hex)
+  groups?: number;    // Number of (actor, context) groups in the tree
+  peers?: Array<{ name: string; url: string; status?: string }>;
+  reason?: string;    // Why sync is unavailable
+  error?: string;     // Error reading tree state
+}
+
+/**
  * Rich search results response
  */
 export interface RichSearchResultsMessage extends BaseMessage {
@@ -598,6 +612,7 @@ export type WebSocketMessage =
   | WatcherErrorMessage
   | GlyphFiredMessage
   | DatabaseStatsMessage
+  | SyncStatusMessage
   | RichSearchResultsMessage
   | VidStreamInitSuccessMessage
   | VidStreamInitErrorMessage
@@ -647,6 +662,7 @@ export interface MessageHandlers {
   watcher_error?: MessageHandler<WatcherErrorMessage>;
   glyph_fired?: MessageHandler<GlyphFiredMessage>;
   database_stats?: MessageHandler<DatabaseStatsMessage>;
+  sync_status?: MessageHandler<SyncStatusMessage>;
   rich_search_results?: MessageHandler<RichSearchResultsMessage>;
   vidstream_init_success?: MessageHandler<VidStreamInitSuccessMessage>;
   vidstream_init_error?: MessageHandler<VidStreamInitErrorMessage>;

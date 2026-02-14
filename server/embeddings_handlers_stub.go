@@ -21,6 +21,12 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
 }
 
+// HandleEmbeddingInfo returns embedding service status (GET /api/embeddings/info)
+func (s *QNTXServer) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"available":false,"model_name":"","dimensions":0,"embedding_count":0,"attestation_count":0}`))
+}
+
 // SetupEmbeddingService is a no-op when embeddings are not available
 func (s *QNTXServer) SetupEmbeddingService() {
 	s.logger.Debugw("Embeddings service not available (build without rustembeddings tag)")

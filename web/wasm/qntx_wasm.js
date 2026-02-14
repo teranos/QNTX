@@ -222,6 +222,174 @@ export function query_attestations(filter_json) {
 }
 
 /**
+ * Compute content hash for an attestation.
+ * Input: JSON-serialized Attestation
+ * Returns: `{"hash":"<64-char hex>"}` or `{"error":"..."}`
+ * @param {string} attestation_json
+ * @returns {string}
+ */
+export function sync_content_hash(attestation_json) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        const ptr0 = passStringToWasm0(attestation_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.sync_content_hash(ptr0, len0);
+        deferred2_0 = ret[0];
+        deferred2_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
+}
+
+/**
+ * Check if a content hash exists in the global Merkle tree.
+ * Input: `{"content_hash":"<hex>"}`
+ * Returns: `{"exists":true|false}`
+ * @param {string} input
+ * @returns {string}
+ */
+export function sync_merkle_contains(input) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        const ptr0 = passStringToWasm0(input, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.sync_merkle_contains(ptr0, len0);
+        deferred2_0 = ret[0];
+        deferred2_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
+}
+
+/**
+ * Diff Merkle tree against remote group hashes.
+ * Input: `{"remote":{"<hex>":"<hex>",...}}`
+ * Returns: `{"local_only":[...],"remote_only":[...],"divergent":[...]}`
+ * @param {string} remote_json
+ * @returns {string}
+ */
+export function sync_merkle_diff(remote_json) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        const ptr0 = passStringToWasm0(remote_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.sync_merkle_diff(ptr0, len0);
+        deferred2_0 = ret[0];
+        deferred2_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
+}
+
+/**
+ * Reverse-lookup a group key hash to its (actor, context) pair.
+ * Input: `{"group_key_hash":"<hex>"}`
+ * Returns: `{"actor":"...","context":"..."}` or `{"error":"group not found"}`
+ * @param {string} input
+ * @returns {string}
+ */
+export function sync_merkle_find_group_key(input) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        const ptr0 = passStringToWasm0(input, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.sync_merkle_find_group_key(ptr0, len0);
+        deferred2_0 = ret[0];
+        deferred2_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
+}
+
+/**
+ * Get all group hashes from the Merkle tree.
+ * Returns: `{"groups":{"<hex>":"<hex>",...}}`
+ * @returns {string}
+ */
+export function sync_merkle_group_hashes() {
+    let deferred1_0;
+    let deferred1_1;
+    try {
+        const ret = wasm.sync_merkle_group_hashes();
+        deferred1_0 = ret[0];
+        deferred1_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+    }
+}
+
+/**
+ * Insert into the global Merkle tree.
+ * Input: `{"actor":"...","context":"...","content_hash":"<hex>"}`
+ * Returns: `{"ok":true}` or `{"error":"..."}`
+ * @param {string} input
+ * @returns {string}
+ */
+export function sync_merkle_insert(input) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        const ptr0 = passStringToWasm0(input, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.sync_merkle_insert(ptr0, len0);
+        deferred2_0 = ret[0];
+        deferred2_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
+}
+
+/**
+ * Remove from the global Merkle tree.
+ * Input: `{"actor":"...","context":"...","content_hash":"<hex>"}`
+ * Returns: `{"ok":true}`
+ * @param {string} input
+ * @returns {string}
+ */
+export function sync_merkle_remove(input) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        const ptr0 = passStringToWasm0(input, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.sync_merkle_remove(ptr0, len0);
+        deferred2_0 = ret[0];
+        deferred2_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
+}
+
+/**
+ * Get the Merkle tree root hash and stats.
+ * Returns: `{"root":"<hex>","size":N,"groups":N}`
+ * @returns {string}
+ */
+export function sync_merkle_root() {
+    let deferred1_0;
+    let deferred1_1;
+    try {
+        const ret = wasm.sync_merkle_root();
+        deferred1_0 = ret[0];
+        deferred1_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+    }
+}
+
+/**
  * Get the qntx-core version.
  * @returns {string}
  */
@@ -487,18 +655,18 @@ function __wbg_get_imports() {
             return ret;
         }, arguments); },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { dtor_idx: 102, function: Function { arguments: [Externref], shim_idx: 103, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { dtor_idx: 103, function: Function { arguments: [Externref], shim_idx: 104, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h622d11ff1c80a730, wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { dtor_idx: 83, function: Function { arguments: [NamedExternref("Event")], shim_idx: 84, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h332095daeac88dbb, wasm_bindgen__convert__closures_____invoke__h8a5ecd90b1aacdb2);
+            // Cast intrinsic for `Closure(Closure { dtor_idx: 84, function: Function { arguments: [NamedExternref("Event")], shim_idx: 85, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h63454322f75c3832, wasm_bindgen__convert__closures_____invoke__h857fdb0c9bdea0c8);
             return ret;
         },
         __wbindgen_cast_0000000000000003: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { dtor_idx: 83, function: Function { arguments: [NamedExternref("IDBVersionChangeEvent")], shim_idx: 84, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h332095daeac88dbb, wasm_bindgen__convert__closures_____invoke__h8a5ecd90b1aacdb2);
+            // Cast intrinsic for `Closure(Closure { dtor_idx: 84, function: Function { arguments: [NamedExternref("IDBVersionChangeEvent")], shim_idx: 85, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h63454322f75c3832, wasm_bindgen__convert__closures_____invoke__h857fdb0c9bdea0c8);
             return ret;
         },
         __wbindgen_cast_0000000000000004: function(arg0) {
@@ -531,8 +699,8 @@ function wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea(arg0, arg
     wasm.wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea(arg0, arg1, arg2);
 }
 
-function wasm_bindgen__convert__closures_____invoke__h8a5ecd90b1aacdb2(arg0, arg1, arg2) {
-    wasm.wasm_bindgen__convert__closures_____invoke__h8a5ecd90b1aacdb2(arg0, arg1, arg2);
+function wasm_bindgen__convert__closures_____invoke__h857fdb0c9bdea0c8(arg0, arg1, arg2) {
+    wasm.wasm_bindgen__convert__closures_____invoke__h857fdb0c9bdea0c8(arg0, arg1, arg2);
 }
 
 function wasm_bindgen__convert__closures_____invoke__h0970674685b3ee7c(arg0, arg1, arg2, arg3) {

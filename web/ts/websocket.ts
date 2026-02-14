@@ -14,6 +14,7 @@ import type {
     PluginHealthMessage,
     SystemCapabilitiesMessage,
     DatabaseStatsMessage,
+    SyncStatusMessage,
     RichSearchResultsMessage,
     WatcherMatchMessage,
     WatcherErrorMessage,
@@ -158,6 +159,19 @@ const MESSAGE_HANDLERS = {
         // Update status indicator with total count
         import('./status-indicators.js').then(({ statusIndicators }) => {
             statusIndicators.handleDatabaseStats(data.total_attestations);
+        });
+    },
+
+    sync_status: (data: SyncStatusMessage) => {
+        log.info(SEG.WS, 'Sync status:', {
+            available: data.available,
+            root: data.root?.substring(0, 12),
+            groups: data.groups,
+        });
+
+        // Update sync glyph
+        import('./default-glyphs.js').then(({ updateSyncStatus }) => {
+            updateSyncStatus(data);
         });
     },
 

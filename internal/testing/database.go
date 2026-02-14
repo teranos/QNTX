@@ -20,11 +20,14 @@ func init() {
 func CreateTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
-	// Create in-memory SQLite database
+	// Create in-memory SQLite database.
+	// MaxOpenConns(1) is critical: each `:memory:` connection gets its own
+	// database, so a second pooled connection would see no tables.
 	database, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to create test database: %v", err)
 	}
+	database.SetMaxOpenConns(1)
 
 	// Enable foreign keys
 	if _, err := database.Exec("PRAGMA foreign_keys = ON"); err != nil {

@@ -149,6 +149,44 @@ export function beginMaximizeMorph(
 
 
 /**
+ * Begin a morph transaction for restore (fullscreen → canvas-placed rect)
+ * Unlike minimize (which targets an 8px dot), restore animates to a specific width/height
+ */
+export function beginRestoreMorph(
+    element: HTMLElement,
+    fromRect: DOMRect,
+    toRect: { x: number; y: number; width: number; height: number },
+    duration: number
+): Promise<void> {
+    const keyframes: Keyframe[] = [
+        // From: Fullscreen state
+        {
+            left: `${fromRect.left}px`,
+            top: `${fromRect.top}px`,
+            width: `${fromRect.width}px`,
+            height: `${fromRect.height}px`,
+            borderRadius: '0',
+            backgroundColor: 'var(--bg-primary)',
+            boxShadow: 'none',
+            opacity: '1'
+        },
+        // To: Canvas-placed rect
+        {
+            left: `${toRect.x}px`,
+            top: `${toRect.y}px`,
+            width: `${toRect.width}px`,
+            height: `${toRect.height}px`,
+            borderRadius: '8px',
+            backgroundColor: 'var(--bg-secondary)',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+            opacity: '1'
+        }
+    ];
+
+    return createMorphAnimation(element, keyframes, duration, 'Restore');
+}
+
+/**
  * Cancel any active morph for an element
  * Used when element is being removed or state is changing unexpectedly
  */

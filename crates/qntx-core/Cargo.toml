@@ -36,6 +36,9 @@ strsim = "0.11"
 # compile-time-rng uses compile-time randomness, avoiding runtime getrandom issues
 ahash = { version = "0.8", default-features = false, features = ["compile-time-rng"] }
 
+# Cryptographic hashing for content-addressed attestation sync
+sha2 = { version = "0.10", default-features = false }
+
 # Native-only: SIMD substring search
 memchr = { version = "2.7", optional = true }
 
