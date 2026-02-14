@@ -466,8 +466,16 @@ func (s *QNTXServer) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request)
 
 	// Count embeddings and total attestations
 	var embCount, atsCount int
-	s.db.QueryRow("SELECT COUNT(*) FROM embeddings").Scan(&embCount)
-	s.db.QueryRow("SELECT COUNT(*) FROM attestations").Scan(&atsCount)
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM embeddings").Scan(&embCount); err != nil {
+		s.logger.Errorw("Failed to count embeddings", "error", err)
+		http.Error(w, "Failed to retrieve embedding count", http.StatusInternalServerError)
+		return
+	}
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM attestations").Scan(&atsCount); err != nil {
+		s.logger.Errorw("Failed to count attestations", "error", err)
+		http.Error(w, "Failed to retrieve attestation count", http.StatusInternalServerError)
+		return
+	}
 	resp.EmbeddingCount = embCount
 	resp.AttestationCount = atsCount
 
@@ -477,18 +485,32 @@ func (s *QNTXServer) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request)
 		LEFT JOIN embeddings e ON e.source_type = 'attestation' AND e.source_id = a.id
 		WHERE e.id IS NULL
 	`)
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var id string
-			if rows.Scan(&id) == nil {
-				resp.UnembeddedIDs = append(resp.UnembeddedIDs, id)
-			}
+	if err != nil {
+		s.logger.Errorw("Failed to query unembedded attestations", "error", err)
+		http.Error(w, "Failed to retrieve unembedded attestation list", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			s.logger.Warnw("Failed to scan attestation ID", "error", err)
+			continue
 		}
+		resp.UnembeddedIDs = append(resp.UnembeddedIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		s.logger.Warnw("Error iterating unembedded attestations", "error", err)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		s.logger.Errorw("Failed to encode embeddings info response",
+			"available", resp.Available,
+			"embedding_count", resp.EmbeddingCount,
+			"attestation_count", resp.AttestationCount,
+			"error", err)
+	}
 }
 
 // SetupEmbeddingService initializes the embedding service if available
