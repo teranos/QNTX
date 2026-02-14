@@ -22,35 +22,10 @@ import { AX, SO } from '@generated/sym.js';
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
-// Setup jsdom if enabled
+// Test-specific mocks that aren't in the shared preload
 if (USE_JSDOM) {
-    const { JSDOM } = await import('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
-        url: 'http://localhost' // Required for localStorage
-    });
-    const { window } = dom;
-    const { document } = window;
-
-    // Replace global document/window with jsdom's
-    globalThis.document = document as any;
-    globalThis.window = window as any;
-    globalThis.navigator = window.navigator as any;
-    globalThis.DOMParser = window.DOMParser as any;
-    globalThis.localStorage = window.localStorage;
-
-    // jsdom's AbortController is compatible with addEventListener signal option
-    globalThis.AbortController = window.AbortController as any;
-    globalThis.AbortSignal = window.AbortSignal as any;
-
-    // Mock ResizeObserver for jsdom
-    globalThis.ResizeObserver = class ResizeObserver {
-        observe() {}
-        unobserve() {}
-        disconnect() {}
-    } as any;
-
     // Mock DragEvent for jsdom (not fully implemented in jsdom)
-    globalThis.DragEvent = window.DragEvent || class DragEvent extends window.MouseEvent {
+    globalThis.DragEvent = (globalThis.window as any).DragEvent || class DragEvent extends (globalThis.window as any).MouseEvent {
         constructor(type: string, eventInitDict?: DragEventInit) {
             super(type, eventInitDict);
         }
@@ -58,7 +33,7 @@ if (USE_JSDOM) {
     } as any;
 
     // Mock InputEvent for jsdom
-    globalThis.InputEvent = window.InputEvent || class InputEvent extends window.Event {
+    globalThis.InputEvent = (globalThis.window as any).InputEvent || class InputEvent extends (globalThis.window as any).Event {
         constructor(type: string, eventInitDict?: InputEventInit) {
             super(type, eventInitDict);
         }
