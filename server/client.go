@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
@@ -891,24 +890,12 @@ func (c *Client) handleGetSyncStatus() {
 		return
 	}
 
-	// Read configured peers from config
-	cfg, _ := appcfg.Load()
-	peers := []map[string]string{}
-	if cfg != nil {
-		for name, url := range cfg.Sync.Peers {
-			peers = append(peers, map[string]string{
-				"name": name,
-				"url":  url,
-			})
-		}
-	}
-
 	c.sendJSON(map[string]interface{}{
 		"type":      "sync_status",
 		"available": true,
 		"root":      root,
 		"groups":    len(groups),
-		"peers":     peers,
+		"peers":     c.server.buildPeerList(),
 	})
 }
 

@@ -232,6 +232,7 @@ func (s *QNTXServer) syncAllPeers(ctx context.Context, failCounts map[string]int
 			cancel()
 			failCounts[name]++
 			unreachable = append(unreachable, name)
+			s.syncPeerStatus.Store(name, "unreachable")
 
 			if failCounts[name] <= syncWarnInitialAttempts || time.Since(lastWarned[name]) > time.Hour {
 				s.logger.Warnw("Scheduled sync: failed to connect",
@@ -254,6 +255,7 @@ func (s *QNTXServer) syncAllPeers(ctx context.Context, failCounts map[string]int
 		if err != nil {
 			failCounts[name]++
 			unreachable = append(unreachable, name)
+			s.syncPeerStatus.Store(name, "unreachable")
 
 			if failCounts[name] <= syncWarnInitialAttempts || time.Since(lastWarned[name]) > time.Hour {
 				s.logger.Warnw("Scheduled sync: reconciliation failed",
@@ -266,12 +268,16 @@ func (s *QNTXServer) syncAllPeers(ctx context.Context, failCounts map[string]int
 
 		// Success — reset failure tracking
 		failCounts[name] = 0
+		s.syncPeerStatus.Store(name, "ok")
 		synced++
 
 		if sent > 0 || received > 0 {
 			transferred = append(transferred, fmt.Sprintf("%s ↑%d↓%d", name, sent, received))
 		}
 	}
+
+	// Push updated status to connected browsers (peer reachability + tree state)
+	s.broadcastSyncStatus()
 
 	// One summary line per tick (only when something noteworthy happened)
 	if len(transferred) > 0 || len(unreachable) > 0 {
@@ -287,4 +293,49 @@ func (s *QNTXServer) syncAllPeers(ctx context.Context, failCounts map[string]int
 		}
 		s.logger.Infow("Sync tick", fields...)
 	}
+}
+
+// broadcastSyncStatus pushes the current tree state to all connected browsers.
+func (s *QNTXServer) broadcastSyncStatus() {
+	if s.syncTree == nil {
+		return
+	}
+
+	root, err := s.syncTree.Root()
+	if err != nil {
+		return
+	}
+
+	groups, err := s.syncTree.GroupHashes()
+	if err != nil {
+		return
+	}
+
+	s.sendMessageToClients(map[string]interface{}{
+		"type":      "sync_status",
+		"available": true,
+		"root":      root,
+		"groups":    len(groups),
+		"peers":     s.buildPeerList(),
+	}, "")
+}
+
+// buildPeerList returns configured peers with their reachability status.
+func (s *QNTXServer) buildPeerList() []map[string]string {
+	cfg, _ := appcfg.Load()
+	peers := []map[string]string{}
+	if cfg != nil {
+		for name, url := range cfg.Sync.Peers {
+			status := ""
+			if v, ok := s.syncPeerStatus.Load(name); ok {
+				status = v.(string)
+			}
+			peers = append(peers, map[string]string{
+				"name":   name,
+				"url":    url,
+				"status": status,
+			})
+		}
+	}
+	return peers
 }
