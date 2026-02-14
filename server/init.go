@@ -8,6 +8,7 @@ import (
 
 	"github.com/teranos/QNTX/ai/tracker"
 	appcfg "github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
@@ -21,6 +22,7 @@ import (
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/wslogs"
+	syncPkg "github.com/teranos/QNTX/sync"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -293,10 +295,67 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	// Initialize embedding service for semantic search (optional)
 	server.SetupEmbeddingService()
 
+	// Initialize sync tree and observer for content-addressed attestation sync
+	setupSync(server, db, serverLogger)
+
 	// Set up config file watcher for auto-reload
 	setupConfigWatcher(server, db, serverLogger)
 
 	return server, nil
+}
+
+// setupSync initializes the Merkle tree, registers the attestation observer,
+// and backfills the tree from existing attestations. Non-fatal: if WASM is
+// unavailable the server runs without sync.
+func setupSync(server *QNTXServer, db *sql.DB, logger *zap.SugaredLogger) {
+	// NewSyncTree panics without the qntxwasm build tag — recover gracefully
+	var tree syncPkg.SyncTree
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Infow("Sync disabled (WASM engine not available)", "reason", r)
+			}
+		}()
+		tree = syncPkg.NewSyncTree()
+	}()
+	if tree == nil {
+		return
+	}
+
+	observer := syncPkg.NewTreeObserver(tree, logger)
+	storage.RegisterObserver(observer)
+
+	server.syncTree = tree
+	server.syncObserver = observer
+
+	// Backfill: load existing attestations into the Merkle tree so the root
+	// reflects the full dataset (not just attestations created after startup).
+	store := storage.NewSQLStore(db, logger)
+	go backfillSyncTree(store, tree, observer, logger)
+
+	logger.Infow("Sync observer registered, backfill started")
+}
+
+// backfillSyncTree walks all existing attestations and inserts them into the
+// Merkle tree. Runs in a background goroutine to avoid blocking server startup.
+func backfillSyncTree(store *storage.SQLStore, tree syncPkg.SyncTree, observer *syncPkg.TreeObserver, logger *zap.SugaredLogger) {
+	start := time.Now()
+	allAtts, err := store.GetAttestations(ats.AttestationFilter{})
+	if err != nil {
+		logger.Warnw("Sync backfill failed: could not load attestations", "error", err)
+		return
+	}
+
+	for _, as := range allAtts {
+		observer.OnAttestationCreated(as)
+	}
+
+	root, _ := tree.Root()
+	logger.Infow("Sync backfill complete",
+		"attestations", len(allAtts),
+		"duration_ms", time.Since(start).Milliseconds(),
+		"root", root,
+	)
 }
 
 // createGraphLogger creates a multi-output zap logger (console + WebSocket + file)
