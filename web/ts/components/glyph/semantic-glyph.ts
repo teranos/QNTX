@@ -52,8 +52,8 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
             const parsed = JSON.parse(existingGlyph.content);
             currentQuery = parsed.query ?? '';
             currentThreshold = parsed.threshold ?? 0.5;
-        } catch {
-            // Legacy or plain string content — treat as query
+        } catch (err) {
+            log.debug(SEG.GLYPH, `[SeGlyph] Failed to parse persisted content as JSON for ${glyphId}, treating as legacy string:`, err);
             currentQuery = existingGlyph.content;
         }
     } else if (glyph.content) {
@@ -61,7 +61,8 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
             const parsed = JSON.parse(glyph.content);
             currentQuery = parsed.query ?? '';
             currentThreshold = parsed.threshold ?? 0.5;
-        } catch {
+        } catch (err) {
+            log.debug(SEG.GLYPH, `[SeGlyph] Failed to parse glyph content as JSON for ${glyphId}, treating as legacy string:`, err);
             currentQuery = glyph.content;
         }
     }
