@@ -5,6 +5,11 @@
 
 import { typeDefinitionWindow } from './type-definition-window.ts';
 
+// Search strategy constants — must match ats/storage/rich_search.go
+const STRATEGY_SUBSTRING = 'substring';
+const STRATEGY_FUZZY = 'fuzzy';
+const STRATEGY_SEMANTIC = 'semantic';
+
 export interface SearchMatch {
     node_id: string;
     type_name: string;
@@ -169,7 +174,7 @@ export class SearchView {
         // Strategy badge (⊨ semantic, ≡ text)
         const strategy = document.createElement('span');
         strategy.className = 'search-strategy';
-        strategy.textContent = match.strategy === 'semantic' ? '⊨' : '≡';
+        strategy.textContent = match.strategy === STRATEGY_SEMANTIC ? '⊨' : '≡';
         strategy.title = match.strategy;
 
         // Assemble the line
