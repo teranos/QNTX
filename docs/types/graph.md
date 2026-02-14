@@ -9,7 +9,6 @@ This document shows Go type definitions from the codebase.
 **Generated types**:
 - TypeScript: [`types/generated/typescript/graph.ts`](https://github.com/teranos/QNTX/blob/main/types/generated/typescript/graph.ts)
 - Rust: [`types/generated/rust/graph.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/graph.rs)
-- Python: [`types/generated/python/graph.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/graph.py)
 
 ## AxGraphBuilder {#axgraphbuilder}
 

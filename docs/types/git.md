@@ -9,7 +9,6 @@ This document shows Go type definitions from the codebase.
 **Generated types**:
 - TypeScript: [`types/generated/typescript/git.ts`](https://github.com/teranos/QNTX/blob/main/types/generated/typescript/git.ts)
 - Rust: [`types/generated/rust/git.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/git.rs)
-- Python: [`types/generated/python/git.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/git.py)
 
 ## CargoLock {#cargolock}
 
