@@ -310,6 +310,10 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 				continue
 			}
 			if exists {
+				p.logger.Debugw("Skipping duplicate attestation by content hash",
+					"id", as.ID,
+					"content_hash", chHex,
+				)
 				continue
 			}
 
