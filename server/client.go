@@ -987,7 +987,7 @@ func (c *Client) searchSemantic(query string) []storage.RichSearchMatch {
 			FieldValue:   result.Text,
 			Excerpt:      excerpt,
 			Score:        float64(result.Similarity),
-			Strategy:     "semantic",
+			Strategy:     storage.StrategySemantic,
 			DisplayLabel: displayLabel,
 			Attributes:   attributes,
 		})
