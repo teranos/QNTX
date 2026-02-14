@@ -53,6 +53,18 @@ func NewPeer(conn Conn, tree SyncTree, store ats.AttestationStore, logger *zap.S
 // other needs, and sends it. No leader election, no request/response — both
 // sides act simultaneously.
 func (p *Peer) Reconcile(ctx context.Context) (sent, received int, err error) {
+	// Close the connection if context expires to unblock any blocking recv/send.
+	// Normal completion closes `done` first, so the goroutine exits cleanly.
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		select {
+		case <-ctx.Done():
+			p.conn.Close()
+		case <-done:
+		}
+	}()
+
 	// Phase 1: Exchange root hashes
 	root, err := p.tree.Root()
 	if err != nil {
