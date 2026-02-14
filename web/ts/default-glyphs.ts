@@ -55,6 +55,7 @@ import { glyphRun } from './components/glyph/run';
 import { createCanvasGlyph } from './components/glyph/canvas/canvas-glyph';
 import { createChartGlyph } from './components/glyph/chart-glyph';
 import { sendMessage } from './websocket';
+import { apiFetch } from './api.ts';
 import { DB } from '@generated/sym.js';
 import { log, SEG } from './logger.ts';
 import { formatBuildTime } from './components/tooltip.ts';
@@ -63,6 +64,11 @@ import type { VersionMessage, SystemCapabilitiesMessage } from '../types/websock
 // Database stats state
 let dbStatsElement: HTMLElement | null = null;
 let dbStats: any = null;
+
+// Embeddings state
+let embeddingsElement: HTMLElement | null = null;
+let embeddingsInfo: { available: boolean; model_name: string; dimensions: number; embedding_count: number; attestation_count: number; unembedded_ids?: string[] } | null = null;
+let embeddingsReembedding = false;
 
 // Self diagnostics state
 let selfElement: HTMLElement | null = null;
@@ -235,6 +241,104 @@ function renderSelf(): void {
     `;
 }
 
+export async function fetchEmbeddingsInfo(): Promise<void> {
+    try {
+        const resp = await apiFetch('/api/embeddings/info');
+        embeddingsInfo = await resp.json();
+    } catch {
+        embeddingsInfo = null;
+    }
+    renderEmbeddings();
+}
+
+function renderEmbeddings(): void {
+    if (!embeddingsElement) return;
+
+    if (!embeddingsInfo) {
+        embeddingsElement.innerHTML = '<div class="glyph-loading">Loading...</div>';
+        return;
+    }
+
+    const { available, model_name, dimensions, embedding_count, attestation_count } = embeddingsInfo;
+    const unembedded = attestation_count - embedding_count;
+
+    let reembedSection = '';
+    if (available && unembedded > 0) {
+        reembedSection = `
+            <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
+                <button class="emb-reembed-btn panel-btn" style="width:100%"
+                    ${embeddingsReembedding ? 'disabled' : ''}>
+                    ${embeddingsReembedding ? 'Embedding...' : `Embed ${unembedded} unembedded attestations`}
+                </button>
+                <div class="emb-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
+            </div>
+        `;
+    }
+
+    embeddingsElement.innerHTML = `
+        <div class="glyph-content">
+            <div class="glyph-row">
+                <span class="glyph-label">Status:</span>
+                <span class="glyph-value">${available ? '<span style="color:#4ade80">Active</span>' : '<span style="color:#fbbf24">Unavailable</span>'}</span>
+            </div>
+            ${available ? `
+            <div class="glyph-row">
+                <span class="glyph-label">Model:</span>
+                <span class="glyph-value">${model_name}</span>
+            </div>
+            <div class="glyph-row">
+                <span class="glyph-label">Dimensions:</span>
+                <span class="glyph-value">${dimensions}</span>
+            </div>
+            ` : ''}
+            <div class="glyph-row">
+                <span class="glyph-label">Embedded:</span>
+                <span class="glyph-value">${embedding_count} / ${attestation_count}</span>
+            </div>
+            ${reembedSection}
+        </div>
+    `;
+
+    const btn = embeddingsElement.querySelector('.emb-reembed-btn');
+    if (btn) {
+        btn.addEventListener('click', reembedAll);
+    }
+}
+
+async function reembedAll(): Promise<void> {
+    if (embeddingsReembedding || !embeddingsInfo?.available) return;
+
+    embeddingsReembedding = true;
+    renderEmbeddings();
+
+    const resultEl = embeddingsElement?.querySelector('.emb-result');
+
+    try {
+        const ids = embeddingsInfo?.unembedded_ids ?? [];
+        if (ids.length === 0) return;
+
+        const resp = await apiFetch('/api/embeddings/batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ attestation_ids: ids })
+        });
+        const result = await resp.json();
+
+        if (resultEl) {
+            resultEl.textContent = `${result.processed} embedded, ${result.failed} failed (${result.time_ms.toFixed(0)}ms)`;
+        }
+
+        await fetchEmbeddingsInfo();
+    } catch (err) {
+        if (resultEl) {
+            resultEl.textContent = `Error: ${err}`;
+        }
+    } finally {
+        embeddingsReembedding = false;
+        renderEmbeddings();
+    }
+}
+
 // Register default system glyphs
 export function registerDefaultGlyphs(): void {
     // Canvas Glyph - Fractal container with spatial grid
@@ -255,6 +359,20 @@ export function registerDefaultGlyphs(): void {
         initialHeight: '240px',
         defaultX: 100,
         defaultY: 100
+    });
+
+    // Embeddings Glyph
+    glyphRun.add({
+        id: 'embeddings-glyph',
+        title: '\u29C9 Embeddings',
+        renderContent: () => {
+            const content = document.createElement('div');
+            embeddingsElement = content;
+            fetchEmbeddingsInfo();
+            return content;
+        },
+        initialWidth: '360px',
+        initialHeight: '200px'
     });
 
     // Self Diagnostics Glyph
@@ -299,6 +417,7 @@ export function registerDefaultGlyphs(): void {
     log.debug(SEG.UI, 'Default glyphs registered:', {
         canvas: 'Spatial canvas grid',
         database: 'Database statistics',
+        embeddings: 'Embedding service status',
         self: 'Self diagnostics',
         usage: 'API usage and costs'
     });
