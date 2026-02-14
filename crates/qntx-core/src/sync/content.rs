@@ -200,7 +200,10 @@ mod tests {
     fn json_invalid_input() {
         let result = content_hash_json("not json");
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
-        assert!(parsed["error"].as_str().unwrap().contains("invalid attestation JSON"));
+        assert!(parsed["error"]
+            .as_str()
+            .unwrap()
+            .contains("invalid attestation JSON"));
     }
 
     #[test]
