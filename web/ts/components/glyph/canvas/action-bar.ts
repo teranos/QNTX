@@ -3,6 +3,9 @@
  *
  * Floating toolbar that appears at top center when glyphs are selected.
  * Provides delete and unmeld actions.
+ *
+ * Container-scoped: each workspace manages its own action bar via DOM queries.
+ * No global singleton — supports multiple simultaneous workspaces.
  */
 
 import { getMinimizeDuration } from '../glyph';
@@ -12,9 +15,6 @@ import { Prose } from '@generated/sym.js';
 // Action bar animation constants
 const ACTION_BAR_ANIMATION_SPEED = 0.5;
 const ACTION_BAR_TOP_OFFSET = 8;
-
-// Module state
-let actionBar: HTMLElement | null = null;
 
 /**
  * Show the action bar at top middle of canvas with slide-in animation
@@ -31,9 +31,7 @@ export function showActionBar(
         return;
     }
 
-    hideActionBar();
-
-    // Defensive cleanup: remove any orphaned action bars
+    // Defensive cleanup: remove any existing action bars in this container
     container.querySelectorAll('.canvas-action-bar').forEach(el => el.remove());
 
     const bar = document.createElement('div');
@@ -111,7 +109,6 @@ export function showActionBar(
     container.appendChild(bar);
 
     positionActionBar(bar);
-    actionBar = bar;
 
     // Slide in from top
     const duration = getMinimizeDuration() * ACTION_BAR_ANIMATION_SPEED;
@@ -138,13 +135,11 @@ function positionActionBar(bar: HTMLElement): void {
 }
 
 /**
- * Hide the action bar with slide-up animation
+ * Hide the action bar within a specific container with slide-up animation
  */
-export function hideActionBar(): void {
-    if (!actionBar) return;
-
-    const bar = actionBar;
-    actionBar = null;
+export function hideActionBar(container: HTMLElement): void {
+    const bar = container.querySelector('.canvas-action-bar') as HTMLElement | null;
+    if (!bar) return;
 
     // Cancel any running animations (if Web Animations API is available)
     if (typeof bar.getAnimations === 'function') {

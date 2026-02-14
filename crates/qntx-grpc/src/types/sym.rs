@@ -31,6 +31,7 @@ pub const PULSE: &str = "꩜";
 pub const PULSE_CLOSE: &str = "❀";
 pub const PULSE_OPEN: &str = "✿";
 pub const SO: &str = "⟶";
+pub const SUBCANVAS: &str = "⌗";
 
 pub const PALETTE_ORDER: &[&str] = &[I, AM, IX, AX, BY, AT, SO];
 

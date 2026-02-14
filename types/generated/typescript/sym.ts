@@ -20,6 +20,7 @@ export const Pulse = "꩜";
 export const PulseClose = "❀";
 export const PulseOpen = "✿";
 export const SO = "⟶";
+export const Subcanvas = "⌗";
 
 
 export const PaletteOrder = [I, AM, IX, AX, BY, AT, SO] as const;
