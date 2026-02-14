@@ -30,7 +30,15 @@ func (o *TreeObserver) OnAttestationCreated(as *types.As) {
 		return
 	}
 
-	chHex, err := o.tree.ContentHash(attestationJSON(as))
+	aj, err := attestationJSON(as)
+	if err != nil {
+		o.logger.Warnw("Failed to serialize attestation for content hash",
+			"id", as.ID,
+			"error", err,
+		)
+		return
+	}
+	chHex, err := o.tree.ContentHash(aj)
 	if err != nil {
 		o.logger.Warnw("Failed to compute content hash for attestation",
 			"id", as.ID,
