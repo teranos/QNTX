@@ -179,18 +179,18 @@
 }
 
 /* Rich string field highlighting - using search yellow */
-.field-item.rich-string-field {
+.field-item.searchable-field {
     background: linear-gradient(90deg,
         rgba(255, 235, 59, 0.1) 0%,
         rgba(255, 235, 59, 0.05) 100%);
 }
 
-.field-item.rich-string-field .field-name {
+.field-item.searchable-field .field-name {
     color: #333;
     text-shadow: 0 0 8px rgba(255, 235, 59, 0.4);
 }
 
-.field-item.rich-string-field.selected {
+.field-item.searchable-field.selected {
     background: linear-gradient(90deg,
         rgba(255, 235, 59, 0.2) 0%,
         rgba(230, 242, 255, 1) 100%);

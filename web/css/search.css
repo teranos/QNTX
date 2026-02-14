@@ -38,11 +38,32 @@
 
 /* Header */
 .search-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 12px;
     padding-bottom: 8px;
     border-bottom: 1px solid var(--border-on-dark);
     color: var(--text-on-dark-secondary);
     font-weight: 500;
+}
+
+.search-new-type-btn {
+    background: none;
+    border: 1px solid var(--border-on-dark);
+    color: var(--text-on-dark-secondary);
+    font-size: 14px;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.search-new-type-btn:hover {
+    color: var(--text-on-dark-primary, #fff);
+    border-color: var(--text-on-dark-primary, #fff);
 }
 
 /* Result line */
