@@ -6,11 +6,12 @@ import "github.com/teranos/QNTX/errors"
 
 // ClusterResult holds the output of HDBSCAN clustering.
 type ClusterResult struct {
-	Labels        []int32   `json:"labels"`
-	Probabilities []float32 `json:"probabilities"`
-	NClusters     int       `json:"n_clusters"`
-	NPoints       int       `json:"n_points"`
-	NNoise        int       `json:"n_noise"`
+	Labels        []int32     `json:"labels"`
+	Probabilities []float32   `json:"probabilities"`
+	NClusters     int         `json:"n_clusters"`
+	NPoints       int         `json:"n_points"`
+	NNoise        int         `json:"n_noise"`
+	Centroids     [][]float32 `json:"centroids"` // one centroid per cluster, indexed by label
 }
 
 // ClusterHDBSCAN is a stub that returns an error when built without rustembeddings.

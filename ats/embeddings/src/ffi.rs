@@ -142,6 +142,8 @@ pub struct ClusterResultC {
     pub probabilities: *mut c_float,
     pub count: c_int,
     pub n_clusters: c_int,
+    pub centroids: *mut c_float, // flat: n_clusters * centroid_dims; free with embedding_free_float_array
+    pub centroid_dims: c_int,    // dimensions per centroid (same as input dimensions)
 }
 
 impl qntx_ffi_common::FfiResult for ClusterResultC {
@@ -155,6 +157,8 @@ impl qntx_ffi_common::FfiResult for ClusterResultC {
             probabilities: ptr::null_mut(),
             count: 0,
             n_clusters: 0,
+            centroids: ptr::null_mut(),
+            centroid_dims: 0,
         }
     }
 }
@@ -195,6 +199,19 @@ pub extern "C" fn embedding_cluster_hdbscan(
             let (labels_ptr, _) = vec_into_raw(labels_vec);
             let (probs_ptr, _) = vec_into_raw(result.probabilities);
 
+            // Flatten centroids: Vec<Vec<f32>> → Vec<f32>
+            let centroid_dims = if result.centroids.is_empty() {
+                0
+            } else {
+                result.centroids[0].len() as c_int
+            };
+            let flat_centroids: Vec<c_float> = result
+                .centroids
+                .into_iter()
+                .flat_map(|c| c.into_iter())
+                .collect();
+            let (centroids_ptr, _) = vec_into_raw(flat_centroids);
+
             ClusterResultC {
                 success: 1,
                 error_msg: ptr::null_mut(),
@@ -202,6 +219,8 @@ pub extern "C" fn embedding_cluster_hdbscan(
                 probabilities: probs_ptr,
                 count,
                 n_clusters,
+                centroids: centroids_ptr,
+                centroid_dims,
             }
         }
         Err(e) => ClusterResultC::error(&e),

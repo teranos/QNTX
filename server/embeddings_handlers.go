@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	appcfg "github.com/teranos/QNTX/am"
@@ -617,6 +618,45 @@ func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Save cluster centroids for incremental prediction
+	if len(result.Centroids) > 0 {
+		// Count members per cluster from labels
+		memberCounts := make(map[int]int)
+		for _, l := range result.Labels {
+			if l >= 0 {
+				memberCounts[int(l)]++
+			}
+		}
+
+		centroidModels := make([]storage.ClusterCentroid, 0, len(result.Centroids))
+		for i, centroid := range result.Centroids {
+			blob, err := s.embeddingService.SerializeEmbedding(centroid)
+			if err != nil {
+				s.logger.Errorw("Failed to serialize centroid",
+					"cluster_id", i,
+					"error", err)
+				continue
+			}
+			centroidModels = append(centroidModels, storage.ClusterCentroid{
+				ClusterID: i,
+				Centroid:  blob,
+				NMembers:  memberCounts[i],
+			})
+		}
+
+		if err := s.embeddingStore.SaveClusterCentroids(centroidModels); err != nil {
+			s.logger.Errorw("Failed to save cluster centroids",
+				"count", len(centroidModels),
+				"error", err)
+			// Non-fatal: clustering succeeded, just centroids not saved
+		}
+
+		// Invalidate observer's centroid cache so it picks up fresh data
+		if s.embeddingClusterInvalidator != nil {
+			s.embeddingClusterInvalidator()
+		}
+	}
+
 	// Return summary
 	summary, err := s.embeddingStore.GetClusterSummary()
 	if err != nil {
@@ -696,8 +736,10 @@ func (s *QNTXServer) SetupEmbeddingService() {
 		embeddingStore:   embStore,
 		richStore:        storage.NewBoundedStore(s.db, s.logger.Named("auto-embed")),
 		logger:           s.logger.Named("auto-embed"),
+		clusterThreshold: 0.5,
 	}
 	storage.RegisterObserver(observer)
+	s.embeddingClusterInvalidator = observer.InvalidateClusterCache
 
 	s.logger.Infow("Embedding service initialized",
 		"path", modelPath,
@@ -719,11 +761,23 @@ type EmbeddingObserver struct {
 	embeddingService interface {
 		GenerateEmbedding(text string) (*embeddings.EmbeddingResult, error)
 		SerializeEmbedding(embedding []float32) ([]byte, error)
+		DeserializeEmbedding(data []byte) ([]float32, error)
+		ComputeSimilarity(a, b []float32) (float32, error)
 		GetModelInfo() (*embeddings.ModelInfo, error)
 	}
-	embeddingStore *storage.EmbeddingStore
-	richStore      *storage.BoundedStore // Reused across calls for 5-min rich field cache
-	logger         *zap.SugaredLogger
+	embeddingStore   *storage.EmbeddingStore
+	richStore        *storage.BoundedStore // Reused across calls for 5-min rich field cache
+	logger           *zap.SugaredLogger
+	clusterMu        sync.RWMutex
+	clusterCache     []storage.ClusterCentroid // loaded once, refreshed on re-cluster
+	clusterThreshold float32                   // minimum similarity for cluster assignment
+}
+
+// InvalidateClusterCache clears cached centroids so the next prediction reloads from DB.
+func (o *EmbeddingObserver) InvalidateClusterCache() {
+	o.clusterMu.Lock()
+	o.clusterCache = nil
+	o.clusterMu.Unlock()
 }
 
 // OnAttestationCreated selectively embeds attestations with rich text content.
@@ -784,6 +838,67 @@ func (o *EmbeddingObserver) OnAttestationCreated(as *types.As) {
 		"attestation_id", as.ID,
 		"text_length", len(text),
 		"inference_ms", result.InferenceMS)
+
+	// Predict cluster assignment for the new embedding
+	o.predictCluster(model.ID, as.ID, result.Embedding)
+}
+
+// predictCluster assigns the embedding to the nearest cluster centroid.
+func (o *EmbeddingObserver) predictCluster(embeddingID, attestationID string, embedding []float32) {
+	// Lazy-load centroids from DB
+	o.clusterMu.RLock()
+	centroids := o.clusterCache
+	o.clusterMu.RUnlock()
+
+	if centroids == nil {
+		loaded, err := o.embeddingStore.GetAllClusterCentroids()
+		if err != nil {
+			o.logger.Warnw("Failed to load cluster centroids",
+				"error", errors.Wrapf(err, "attestation %s", attestationID))
+			return
+		}
+		if len(loaded) == 0 {
+			return // no clusters yet
+		}
+		o.clusterMu.Lock()
+		o.clusterCache = loaded
+		o.clusterMu.Unlock()
+		centroids = loaded
+	}
+
+	clusterID, prob, err := o.embeddingStore.PredictCluster(
+		embedding,
+		centroids,
+		o.embeddingService.DeserializeEmbedding,
+		o.embeddingService.ComputeSimilarity,
+		o.clusterThreshold,
+	)
+	if err != nil {
+		o.logger.Warnw("Failed to predict cluster",
+			"error", errors.Wrapf(err, "attestation %s", attestationID))
+		return
+	}
+
+	if clusterID < 0 {
+		return // below threshold, stays as noise
+	}
+
+	err = o.embeddingStore.UpdateClusterAssignments([]storage.ClusterAssignment{{
+		ID:          embeddingID,
+		ClusterID:   clusterID,
+		Probability: prob,
+	}})
+	if err != nil {
+		o.logger.Warnw("Failed to save predicted cluster assignment",
+			"error", errors.Wrapf(err, "attestation %s embedding %s cluster %d", attestationID, embeddingID, clusterID))
+		return
+	}
+
+	o.logger.Infow("Predicted cluster for new embedding",
+		"attestation_id", attestationID,
+		"embedding_id", embeddingID,
+		"cluster_id", clusterID,
+		"similarity", prob)
 }
 
 // extractRichText returns the concatenated rich text fields from an attestation's
