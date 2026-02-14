@@ -36,6 +36,30 @@ char* embedding_engine_embed_json(EmbeddingEngine* engine, const char* text);
 // Free a string returned by the FFI
 void embedding_free_string(char* s);
 
+// --- HDBSCAN clustering ---
+
+// Result of HDBSCAN clustering
+typedef struct ClusterResultC {
+    int success;          // 1 on success, 0 on error
+    char* error_msg;      // NULL on success; free with embedding_free_string
+    int* labels;          // cluster IDs per point (-1 = noise); free with embedding_free_int_array
+    float* probabilities; // membership per point [0,1]; free with embedding_free_float_array
+    int count;            // number of points
+    int n_clusters;       // distinct clusters (excl. noise)
+} ClusterResultC;
+
+// Run HDBSCAN clustering on embedding vectors
+// data: flat array of n_points * dimensions floats
+// Returns ClusterResultC; caller must free labels, probabilities, and error_msg
+ClusterResultC embedding_cluster_hdbscan(
+    const float* data, int n_points, int dimensions, int min_cluster_size);
+
+// Free an int array returned by clustering
+void embedding_free_int_array(int* arr, int len);
+
+// Free a float array returned by clustering
+void embedding_free_float_array(float* arr, int len);
+
 #ifdef __cplusplus
 }
 #endif
