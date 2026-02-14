@@ -117,7 +117,10 @@ export function morphCanvasPlacedToFullscreen(
             element.appendChild(workspace);
         })
         .catch(err => {
-            log.warn(SEG.GLYPH, `[CanvasExpanded] Morph to fullscreen failed for ${glyph.id}:`, err);
+            log.warn(SEG.GLYPH, `[CanvasExpanded] Morph to fullscreen failed for ${glyph.id}:`, err, {
+                canvasId, fromRect: { x: fromRect.x, y: fromRect.y, width: fromRect.width, height: fromRect.height },
+                toRect,
+            });
         });
 }
 
@@ -170,7 +173,9 @@ export function morphFullscreenToCanvasPlaced(
             onRestoreComplete(element, glyph);
         })
         .catch(err => {
-            log.warn(SEG.GLYPH, `[CanvasExpanded] Restore animation failed for ${glyph.id}:`, err);
+            log.warn(SEG.GLYPH, `[CanvasExpanded] Restore animation failed for ${glyph.id}:`, err, {
+                canvasId: origin.canvasId, origin, toRect,
+            });
         });
 }
 

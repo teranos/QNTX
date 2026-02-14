@@ -90,23 +90,9 @@ function restoreToCanvas(
     preview.className = 'subcanvas-preview';
     element.appendChild(preview);
 
-    // Reparent to canvas content layer
+    // Reparent to canvas content layer — dblclick handler from createSubcanvasGlyph
+    // persists on the element (it uses closest() at dispatch time, no re-registration needed)
     contentLayer.appendChild(element);
-
-    // Re-attach dblclick for next expand
-    element.addEventListener('dblclick', (e) => {
-        e.stopPropagation();
-        const cl = element.closest('.canvas-content-layer');
-        const parentCanvas = cl?.closest('.canvas-workspace') as HTMLElement | null;
-        const canvasId = parentCanvas?.dataset?.canvasId ?? 'canvas-workspace';
-
-        morphCanvasPlacedToFullscreen(
-            element,
-            glyph,
-            canvasId,
-            (el, g) => restoreToCanvas(el, g, cl as HTMLElement)
-        );
-    });
 
     log.debug(SEG.GLYPH, `[Subcanvas] Restored ${glyph.id} to canvas at (${glyph.x}, ${glyph.y})`);
 }
