@@ -3,6 +3,8 @@
  * Displays search results in an fzf-style list format
  */
 
+import { typeDefinitionWindow } from './type-definition-window.ts';
+
 export interface SearchMatch {
     node_id: string;
     type_name: string;
@@ -91,10 +93,24 @@ export class SearchView {
         // Clear existing results
         this.resultsElement.innerHTML = '';
 
-        // Add header with match count
+        // Add header with match count and type definition shortcut
         const header = document.createElement('div');
         header.className = 'search-header';
-        header.textContent = `Found ${message.total} matches for "${message.query}"`;
+
+        const headerText = document.createElement('span');
+        headerText.textContent = `Found ${message.total} matches for "${message.query}"`;
+        header.appendChild(headerText);
+
+        const newTypeBtn = document.createElement('button');
+        newTypeBtn.className = 'search-new-type-btn';
+        newTypeBtn.textContent = '+';
+        newTypeBtn.title = 'Define new type';
+        newTypeBtn.onclick = (e) => {
+            e.stopPropagation();
+            typeDefinitionWindow.createNewType();
+        };
+        header.appendChild(newTypeBtn);
+
         this.resultsElement.appendChild(header);
 
         // Add each match as a result line
