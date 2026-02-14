@@ -876,15 +876,20 @@ export interface WatcherCreateRequest {
    */
   time_end?: string;
   /**
-   * "python" or "webhook"
+   * "python", "webhook", or "semantic_match"
    */
   action_type: string;
   /**
-   * Python code or webhook URL
+   * Python code or webhook URL (not required for semantic_match)
    */
   action_data: string;
   max_fires_per_minute?: number;
   enabled?: boolean | null;
+  /**
+   * Semantic matching fields (for ⊨ glyphs)
+   */
+  semantic_query?: string;
+  semantic_threshold?: number;
 }
 
 export interface WatcherErrorMessage {
@@ -944,6 +949,8 @@ export interface WatcherResponse {
   time_end?: string;
   action_type: string;
   action_data: string;
+  semantic_query?: string;
+  semantic_threshold?: number;
   max_fires_per_minute: number;
   enabled: boolean;
   created_at: string;

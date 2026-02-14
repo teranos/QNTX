@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
@@ -24,10 +25,13 @@ type WatcherCreateRequest struct {
 	Actors            []string `json:"actors,omitempty"`
 	TimeStart         string   `json:"time_start,omitempty"` // RFC3339
 	TimeEnd           string   `json:"time_end,omitempty"`   // RFC3339
-	ActionType        string   `json:"action_type"`          // "python" or "webhook"
-	ActionData        string   `json:"action_data"`          // Python code or webhook URL
+	ActionType        string   `json:"action_type"`          // "python", "webhook", or "semantic_match"
+	ActionData        string   `json:"action_data"`          // Python code or webhook URL (not required for semantic_match)
 	MaxFiresPerMinute int      `json:"max_fires_per_minute,omitempty"`
 	Enabled           *bool    `json:"enabled,omitempty"`
+	// Semantic matching fields (for ⊨ glyphs)
+	SemanticQuery     string  `json:"semantic_query,omitempty"`
+	SemanticThreshold float32 `json:"semantic_threshold,omitempty"`
 }
 
 // WatcherResponse represents a watcher in API responses
@@ -42,6 +46,8 @@ type WatcherResponse struct {
 	TimeEnd           string   `json:"time_end,omitempty"`
 	ActionType        string   `json:"action_type"`
 	ActionData        string   `json:"action_data"`
+	SemanticQuery     string   `json:"semantic_query,omitempty"`
+	SemanticThreshold float32  `json:"semantic_threshold,omitempty"`
 	MaxFiresPerMinute int      `json:"max_fires_per_minute"`
 	Enabled           bool     `json:"enabled"`
 	CreatedAt         string   `json:"created_at"`
@@ -150,12 +156,19 @@ func (s *QNTXServer) handleCreateWatcher(w http.ResponseWriter, r *http.Request)
 		s.writeRichError(w, errors.New("action_type is required"), http.StatusBadRequest)
 		return
 	}
-	if req.ActionType != "python" && req.ActionType != "webhook" {
-		s.writeRichError(w, errors.Newf("invalid action_type: %s (must be 'python' or 'webhook')", req.ActionType), http.StatusBadRequest)
-		return
-	}
-	if req.ActionData == "" {
-		s.writeRichError(w, errors.New("action_data is required"), http.StatusBadRequest)
+	switch req.ActionType {
+	case "python", "webhook":
+		if req.ActionData == "" {
+			s.writeRichError(w, errors.New("action_data is required for python/webhook watchers"), http.StatusBadRequest)
+			return
+		}
+	case "semantic_match":
+		if req.SemanticQuery == "" {
+			s.writeRichError(w, errors.New("semantic_query is required for semantic_match watchers"), http.StatusBadRequest)
+			return
+		}
+	default:
+		s.writeRichError(w, errors.Newf("invalid action_type: %s (must be 'python', 'webhook', or 'semantic_match')", req.ActionType), http.StatusBadRequest)
 		return
 	}
 
@@ -171,6 +184,8 @@ func (s *QNTXServer) handleCreateWatcher(w http.ResponseWriter, r *http.Request)
 		},
 		ActionType:        storage.ActionType(req.ActionType),
 		ActionData:        req.ActionData,
+		SemanticQuery:     req.SemanticQuery,
+		SemanticThreshold: req.SemanticThreshold,
 		MaxFiresPerMinute: 105, // Default
 		Enabled:           true,
 	}
@@ -278,6 +293,12 @@ func (s *QNTXServer) handleUpdateWatcher(w http.ResponseWriter, r *http.Request,
 		}
 		existing.Filter.TimeEnd = &t
 	}
+	if req.SemanticQuery != "" {
+		existing.SemanticQuery = req.SemanticQuery
+	}
+	if req.SemanticThreshold > 0 {
+		existing.SemanticThreshold = req.SemanticThreshold
+	}
 
 	// Update in DB
 	if err := s.watcherEngine.GetStore().Update(r.Context(), existing); err != nil {
@@ -330,6 +351,8 @@ func watcherToResponse(w *storage.Watcher) WatcherResponse {
 		Actors:            w.Filter.Actors,
 		ActionType:        string(w.ActionType),
 		ActionData:        w.ActionData,
+		SemanticQuery:     w.SemanticQuery,
+		SemanticThreshold: w.SemanticThreshold,
 		MaxFiresPerMinute: w.MaxFiresPerMinute,
 		Enabled:           w.Enabled,
 		CreatedAt:         w.CreatedAt.Format(time.RFC3339),
@@ -353,11 +376,12 @@ func watcherToResponse(w *storage.Watcher) WatcherResponse {
 }
 
 // broadcastWatcherMatch broadcasts a watcher match to all connected clients
-func (s *QNTXServer) broadcastWatcherMatch(watcherID string, attestation *types.As) {
+func (s *QNTXServer) broadcastWatcherMatch(watcherID string, attestation *types.As, score float32) {
 	msg := WatcherMatchMessage{
 		Type:        "watcher_match",
 		WatcherID:   watcherID,
 		Attestation: attestation,
+		Score:       score,
 		Timestamp:   time.Now().Unix(),
 	}
 
@@ -458,6 +482,16 @@ func (s *QNTXServer) initWatcherEngine() error {
 	// Set glyph fired callback for meld-triggered execution feedback
 	s.watcherEngine.SetGlyphFiredCallback(s.broadcastGlyphFired)
 
+	// Wire embedding service for semantic matching (optional — nil when embeddings unavailable)
+	// Note: embeddingService may be nil here if SetupEmbeddingService() hasn't run yet.
+	// In that case, init.go reconnects after embedding init.
+	if s.embeddingService != nil {
+		s.watcherEngine.SetEmbeddingService(&watcherEmbeddingAdapter{svc: s.embeddingService})
+		if s.embeddingStore != nil {
+			s.watcherEngine.SetEmbeddingSearcher(&watcherSearchAdapter{store: s.embeddingStore})
+		}
+	}
+
 	// Register as global observer (notified by SQLStore on all attestation creations)
 	storage.RegisterObserver(s.watcherEngine)
 
@@ -468,4 +502,53 @@ func (s *QNTXServer) initWatcherEngine() error {
 
 	s.logger.Info("Watcher engine initialized")
 	return nil
+}
+
+// watcherEmbeddingAdapter adapts the server's embedding service (which returns
+// *embeddings.EmbeddingResult) to the watcher engine's simpler interface.
+type watcherEmbeddingAdapter struct {
+	svc interface {
+		GenerateEmbedding(text string) (*embeddings.EmbeddingResult, error)
+		ComputeSimilarity(a, b []float32) (float32, error)
+		SerializeEmbedding(embedding []float32) ([]byte, error)
+	}
+}
+
+func (a *watcherEmbeddingAdapter) GenerateEmbedding(text string) ([]float32, error) {
+	result, err := a.svc.GenerateEmbedding(text)
+	if err != nil {
+		return nil, err
+	}
+	return result.Embedding, nil
+}
+
+func (a *watcherEmbeddingAdapter) ComputeSimilarity(x, y []float32) (float32, error) {
+	return a.svc.ComputeSimilarity(x, y)
+}
+
+func (a *watcherEmbeddingAdapter) SerializeEmbedding(embedding []float32) ([]byte, error) {
+	return a.svc.SerializeEmbedding(embedding)
+}
+
+// watcherSearchAdapter adapts the storage.EmbeddingStore to the watcher engine's EmbeddingSearcher.
+type watcherSearchAdapter struct {
+	store *storage.EmbeddingStore
+}
+
+func (a *watcherSearchAdapter) Search(queryEmbedding []byte, limit int, threshold float32) ([]watcher.SemanticSearchResult, error) {
+	results, err := a.store.SemanticSearch(queryEmbedding, limit, threshold)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]watcher.SemanticSearchResult, 0, len(results))
+	for _, r := range results {
+		if r.SourceType == "attestation" {
+			out = append(out, watcher.SemanticSearchResult{
+				SourceID:   r.SourceID,
+				Text:       r.Text,
+				Similarity: r.Similarity,
+			})
+		}
+	}
+	return out, nil
 }

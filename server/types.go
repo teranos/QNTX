@@ -81,10 +81,12 @@ type QueryMessage struct {
 	Height              int     `json:"height"`               // For vidstream_frame: frame height
 	Format              string  `json:"format"`               // For vidstream_frame: "rgba8", "rgb8", etc.
 	// Watcher fields (for watcher_upsert messages)
-	WatcherID    string `json:"watcher_id"`    // For watcher_upsert: ID of watcher (generated if empty)
-	WatcherQuery string `json:"watcher_query"` // For watcher_upsert: AX query string
-	WatcherName  string `json:"watcher_name"`  // For watcher_upsert: Human-readable watcher name
-	Enabled      bool   `json:"enabled"`       // For watcher_upsert: Whether watcher is enabled
+	WatcherID          string  `json:"watcher_id"`          // For watcher_upsert: ID of watcher (generated if empty)
+	WatcherQuery       string  `json:"watcher_query"`       // For watcher_upsert: AX query string
+	WatcherName        string  `json:"watcher_name"`        // For watcher_upsert: Human-readable watcher name
+	Enabled            bool    `json:"enabled"`             // For watcher_upsert: Whether watcher is enabled
+	SemanticQuery      string  `json:"semantic_query"`      // For watcher_upsert: Natural language query for semantic matching
+	SemanticThreshold  float32 `json:"semantic_threshold"`  // For watcher_upsert: Minimum similarity score (0-1)
 }
 
 // ProgressMessage represents an import progress message
@@ -225,10 +227,11 @@ type PluginHealthMessage struct {
 // WatcherMatchMessage represents a watcher match event
 // Sent when an attestation matches a watcher's filter
 type WatcherMatchMessage struct {
-	Type        string      `json:"type"`        // "watcher_match"
-	WatcherID   string      `json:"watcher_id"`  // ID of watcher that matched
-	Attestation interface{} `json:"attestation"` // The matching attestation (types.As)
-	Timestamp   int64       `json:"timestamp"`   // Unix timestamp
+	Type        string      `json:"type"`                 // "watcher_match"
+	WatcherID   string      `json:"watcher_id"`           // ID of watcher that matched
+	Attestation interface{} `json:"attestation"`          // The matching attestation (types.As)
+	Score       float32     `json:"score,omitempty"`      // Semantic similarity score (0-1), 0 for structural matches
+	Timestamp   int64       `json:"timestamp"`            // Unix timestamp
 }
 
 // GlyphFiredMessage wraps proto.GlyphFired with WebSocket type discriminator
