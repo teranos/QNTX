@@ -23,6 +23,8 @@ describe('ResultGlyph', () => {
     let result: ExecutionResult;
 
     beforeEach(() => {
+        document.body.innerHTML = '';
+
         glyph = {
             id: 'result-test-123',
             title: 'Python Result',
@@ -117,9 +119,6 @@ describe('ResultGlyph', () => {
             closeBtn?.click();
 
             expect(container.contains(element)).toBe(false);
-
-            // Cleanup
-            document.body.removeChild(container);
         });
 
         test('close button unmelds composition when result is in composition', () => {
@@ -170,9 +169,7 @@ describe('ResultGlyph', () => {
             // Verify result glyph is removed
             expect(canvas.contains(resultElement)).toBe(false);
 
-            // Cleanup
             uiState.setCanvasCompositions([]);
-            document.body.removeChild(canvas);
         });
     });
 });
