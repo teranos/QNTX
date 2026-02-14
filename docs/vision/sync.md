@@ -282,8 +282,8 @@ The server wiring is complete:
 - ~~Backfill Merkle tree from existing attestations~~ → `server/init.go:backfillSyncTree()`
 
 Next:
-1. **Frontend sync trigger**: Button or command that calls `POST /api/sync {"peer":"..."}` — the protocol is ready, needs a way for users to invoke it
-2. **Scheduled sync**: Use Pulse to periodically reconcile with configured peers (`am.toml` sync.peers)
+1. ~~**Frontend sync trigger**~~: Per-peer "Sync" button in the sync glyph, live reachability status dots
+2. ~~**Scheduled sync**~~: Background goroutine reconciles with all configured peers on `interval_seconds` (`am.toml`)
 3. **Reactive push**: On `TreeObserver.OnAttestationCreated()`, notify connected sync peers to trigger immediate reconciliation
 4. **Reticulum integration**: A parallel `Conn` implementation over Reticulum links. The protocol doesn't change — only the transport beneath `Conn`
 

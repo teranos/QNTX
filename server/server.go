@@ -84,8 +84,9 @@ type QNTXServer struct {
 	canvasHandler *handlers.CanvasHandler
 
 	// Sync: Merkle tree observer for content-addressed attestation sync
-	syncTree     syncPkg.SyncTree      // nil if WASM unavailable
-	syncObserver *syncPkg.TreeObserver // nil if WASM unavailable
+	syncTree       syncPkg.SyncTree      // nil if WASM unavailable
+	syncObserver   *syncPkg.TreeObserver // nil if WASM unavailable
+	syncPeerStatus sync.Map              // map[string]string — peer name → "ok" or "unreachable"
 
 	// Embedding service for semantic search (optional, requires rustembeddings build tag)
 	embeddingService interface {
