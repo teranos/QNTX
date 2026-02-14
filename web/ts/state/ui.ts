@@ -426,10 +426,15 @@ class UIState {
     // ========================================================================
 
     /**
-     * Get canvas glyphs
+     * Get canvas glyphs, optionally filtered by canvas_id.
+     * Without argument: returns all glyphs (backward compatible).
+     * With canvasId: returns only glyphs belonging to that canvas.
+     * 'canvas-workspace' maps to '' (root canvas).
      */
-    getCanvasGlyphs(): CanvasGlyphState[] {
-        return this.state.canvasGlyphs;
+    getCanvasGlyphs(canvasId?: string): CanvasGlyphState[] {
+        if (canvasId === undefined) return this.state.canvasGlyphs;
+        const targetId = canvasId === 'canvas-workspace' ? '' : canvasId;
+        return this.state.canvasGlyphs.filter(g => (g.canvas_id ?? '') === targetId);
     }
 
     /**
