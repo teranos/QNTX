@@ -103,6 +103,7 @@ func (s *QNTXServer) HandleSync(w http.ResponseWriter, r *http.Request) {
 	dialer := websocket.Dialer{}
 	conn, _, err := dialer.DialContext(r.Context(), wsURL, nil)
 	if err != nil {
+		s.logger.Warnw("Failed to connect to sync peer", "peer", wsURL, "error", err)
 		writeJSON(w, http.StatusBadGateway, syncResponse{
 			Error: fmt.Sprintf("Failed to connect to peer %s: %v", req.Peer, err),
 		})

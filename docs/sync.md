@@ -123,14 +123,9 @@ Response:
 
 ```toml
 # am.toml
-[sync]
-[[sync.peers]]
-name = "phone"
-url = "https://phone.local:877"
-
-[[sync.peers]]
-name = "lab-server"
-url = "https://lab.university.edu:877"
+[sync.peers]
+phone = "https://phone.local:877"
+lab-server = "https://lab.university.edu:877"
 ```
 
 ## Files
