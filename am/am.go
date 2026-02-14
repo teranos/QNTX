@@ -16,7 +16,8 @@ type Config struct {
 
 // SyncConfig configures peer-to-peer attestation sync
 type SyncConfig struct {
-	Peers map[string]string `mapstructure:"peers"` // name = "url" (e.g., phone = "http://phone.local:877")
+	IntervalSeconds int               `mapstructure:"interval_seconds"` // 0 = manual only
+	Peers           map[string]string `mapstructure:"peers"`            // name = "url" (e.g., phone = "http://phone.local:877")
 }
 
 // DatabaseConfig configures the SQLite database
