@@ -2,6 +2,7 @@ package commands
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -51,6 +52,12 @@ Inference Rules:
 	RunE: runAsCommand,
 }
 
+var asAttributes string
+
+func init() {
+	AsCmd.Flags().StringVar(&asAttributes, "attr", "", `JSON attributes (e.g. '{"msg":"hello"}')`)
+}
+
 func runAsCommand(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return errors.New("at least one subject is required")
@@ -73,6 +80,13 @@ func runAsCommand(cmd *cobra.Command, args []string) error {
 	asCommand, err := parser.ParseAsCommand(args)
 	if err != nil {
 		return errors.Wrapf(err, "failed to parse as command: %v", args)
+	}
+
+	// Merge JSON attributes from --attr flag
+	if asAttributes != "" {
+		if err := json.Unmarshal([]byte(asAttributes), &asCommand.Attributes); err != nil {
+			return errors.Wrapf(err, "invalid JSON in --attr: %s", asAttributes)
+		}
 	}
 
 	// Create bounded store (enforces storage limits)
@@ -119,6 +133,10 @@ func runAsCommand(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("  Actors:     %v\n", as.Actors)
 	fmt.Printf("  Timestamp:  %s\n", as.Timestamp.Format("2006-01-02 15:04:05"))
+	if len(as.Attributes) > 0 {
+		attrJSON, _ := json.Marshal(as.Attributes)
+		fmt.Printf("  Attributes: %s\n", attrJSON)
+	}
 
 	// Check bounded storage status and warn if approaching limits
 	warnings := boundedStore.CheckStorageStatus(as)
