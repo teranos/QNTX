@@ -12,7 +12,10 @@
 | GET | `/api/canvas/glyphs/` | canvasHandler |
 | GET | `/api/embeddings/batch` | HandleEmbeddingBatch |
 | GET | `/api/embeddings/generate` | HandleEmbeddingGenerate |
+| GET | `/api/embeddings/info` | HandleEmbeddingInfo |
 | GET | `/api/search/semantic` | HandleSemanticSearch |
+| GET | `/api/sync` | HandleSync |
+| GET | `/api/sync/status` | HandleSyncStatus |
 | GET | `/api/types` | HandleTypes |
 | GET | `/api/types/` | HandleTypes |
 | GET | `/api/watchers` | HandleWatchers |
@@ -73,6 +76,16 @@ HandleEmbeddingGenerate handles embedding generation requests (POST /api/embeddi
 
 ---
 
+### `GET` /api/embeddings/info
+
+HandleEmbeddingInfo returns embedding service status (GET /api/embeddings/info)
+
+**Handler**: `HandleEmbeddingInfo`
+
+**Response**: [`EmbeddingInfoResponse`](../types/server.md#embeddinginforesponse)
+
+---
+
 ### `GET` /api/search/semantic
 
 HandleSemanticSearch handles semantic search requests (GET /api/search/semantic)
@@ -80,6 +93,26 @@ HandleSemanticSearch handles semantic search requests (GET /api/search/semantic)
 **Handler**: `HandleSemanticSearch`
 
 **Response**: [`SemanticSearchResponse`](../types/server.md#semanticsearchresponse)
+
+---
+
+### `GET` /api/sync
+
+HandleSync initiates outbound sync with a peer.
+POST /api/sync {"peer":"https://phone.local:877"}
+
+**Handler**: `HandleSync`
+
+**Response**: [`syncResponse`](../types/server.md#syncresponse)
+
+---
+
+### `GET` /api/sync/status
+
+HandleSyncStatus returns the current sync tree state.
+GET /api/sync/status
+
+**Handler**: `HandleSyncStatus`
 
 ---
 

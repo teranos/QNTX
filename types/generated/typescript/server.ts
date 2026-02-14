@@ -689,6 +689,14 @@ export interface QueryMessage {
    * For watcher_upsert: Whether watcher is enabled
    */
   enabled: boolean;
+  /**
+   * For watcher_upsert: Natural language query for semantic matching
+   */
+  semantic_query: string;
+  /**
+   * For watcher_upsert: Minimum similarity score (0-1)
+   */
+  semantic_threshold: number;
 }
 
 export interface Result {
@@ -932,6 +940,10 @@ export interface WatcherMatchMessage {
    * The matching attestation (types.As)
    */
   attestation: unknown;
+  /**
+   * Semantic similarity score (0-1), 0 for structural matches
+   */
+  score?: number;
   /**
    * Unix timestamp
    */
