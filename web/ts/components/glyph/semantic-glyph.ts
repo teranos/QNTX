@@ -291,7 +291,71 @@ function setupSeGlyphResizeObserver(
 }
 
 /**
- * Render a single attestation result with similarity score
+ * Extract rich text from attestation attributes (string values),
+ * falling back to structural fields if no attributes present.
+ */
+function extractRichText(attestation: Attestation): string {
+    if (attestation.attributes) {
+        try {
+            const attrs = typeof attestation.attributes === 'string'
+                ? JSON.parse(attestation.attributes)
+                : attestation.attributes;
+            const parts: string[] = [];
+            for (const value of Object.values(attrs)) {
+                if (typeof value === 'string' && value !== '') {
+                    parts.push(value);
+                } else if (Array.isArray(value)) {
+                    for (const item of value) {
+                        if (typeof item === 'string' && item !== '') {
+                            parts.push(item);
+                        }
+                    }
+                }
+            }
+            if (parts.length > 0) return parts.join(' ');
+        } catch { /* ignore parse errors */ }
+    }
+    return '';
+}
+
+/**
+ * Build tooltip showing attestation structure and which attribute fields matched.
+ */
+function buildAttestationTooltip(attestation: Attestation): string {
+    const subjects = attestation.subjects?.join(', ') || 'N/A';
+    const predicates = attestation.predicates?.join(', ') || 'N/A';
+    const contexts = attestation.contexts?.join(', ') || 'N/A';
+
+    const lines: string[] = [`${subjects} is ${predicates} of ${contexts}`];
+
+    if (attestation.attributes) {
+        try {
+            const attrs = typeof attestation.attributes === 'string'
+                ? JSON.parse(attestation.attributes)
+                : attestation.attributes;
+            for (const [key, value] of Object.entries(attrs)) {
+                if (key === 'rich_string_fields') continue;
+                if (typeof value === 'string' && value !== '') {
+                    const truncated = value.length > 80 ? value.substring(0, 80) + '...' : value;
+                    lines.push(`${key}: ${truncated}`);
+                } else if (Array.isArray(value) && value.some(v => typeof v === 'string')) {
+                    const strs = value.filter((v): v is string => typeof v === 'string' && v !== '');
+                    if (strs.length > 0) {
+                        const joined = strs.join(', ');
+                        const truncated = joined.length > 80 ? joined.substring(0, 80) + '...' : joined;
+                        lines.push(`${key}: ${truncated}`);
+                    }
+                }
+            }
+        } catch { /* ignore parse errors */ }
+    }
+
+    return lines.join('\n');
+}
+
+/**
+ * Render a single attestation result with similarity score.
+ * Shows rich text as primary display; attestation structure on hover.
  */
 function renderAttestation(attestation: Attestation, score?: number): HTMLElement {
     const item = document.createElement('div');
@@ -308,10 +372,6 @@ function renderAttestation(attestation: Attestation, score?: number): HTMLElemen
         item.dataset.score = String(score);
     }
 
-    const subjects = attestation.subjects?.join(', ') || 'N/A';
-    const predicates = attestation.predicates?.join(', ') || 'N/A';
-    const contexts = attestation.contexts?.join(', ') || 'N/A';
-
     const text = document.createElement('div');
     text.style.fontSize = '11px';
     text.style.color = '#d4f0d4';
@@ -320,10 +380,9 @@ function renderAttestation(attestation: Attestation, score?: number): HTMLElemen
     text.style.overflow = 'hidden';
     text.style.textOverflow = 'ellipsis';
     text.style.flex = '1';
+    text.textContent = extractRichText(attestation);
 
-    text.innerHTML = `<span style="color: #d4f0d4;">${subjects}</span> <span style="color: #6b7b6b;">is</span> <span style="color: #d4f0d4;">${predicates}</span> <span style="color: #6b7b6b;">of</span> <span style="color: #d4f0d4;">${contexts}</span>`;
-
-    item.dataset.tooltip = attestation.id || 'unknown';
+    item.dataset.tooltip = buildAttestationTooltip(attestation);
     item.appendChild(text);
 
     // Score badge (right-aligned)
