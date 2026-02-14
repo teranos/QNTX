@@ -132,17 +132,20 @@ function renderSync(): void {
     const peers = syncStatus.peers || [];
     let peersSection = '';
     if (peers.length > 0) {
-        const peerRows = peers.map(p => `
+        const peerRows = peers.map(p => {
+            const statusColor = p.status === 'ok' ? '#4ade80' : p.status === 'unreachable' ? '#f87171' : '#6b7280';
+            const statusDot = p.status ? `<span style="color: ${statusColor}; margin-right: 6px;">●</span>` : '';
+            return `
             <div class="glyph-row" style="align-items: center;">
-                <span class="glyph-label">${p.name}:</span>
+                ${statusDot}<span class="glyph-label">${p.name}:</span>
                 <span class="glyph-value" style="font-size: 11px; flex: 1;">${p.url}</span>
                 <button class="sync-peer-btn" data-peer-url="${p.url}" style="
                     background: transparent; border: 1px solid #60a5fa; color: #60a5fa;
                     padding: 2px 8px; border-radius: 3px; cursor: pointer;
                     font-family: monospace; font-size: 11px; margin-left: 8px;
                 ">Sync</button>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
         peersSection = `
             <div class="glyph-section">
                 <h3 class="glyph-section-title">Configured Peers</h3>
@@ -167,7 +170,7 @@ phone = "http://phone.local:877"</pre>
         <div class="glyph-section">
             <h3 class="glyph-section-title">The Road Ahead</h3>
             <div style="color: #9ca3af; font-size: 12px; line-height: 1.6; padding: 4px 0;">
-                <div style="margin-bottom: 6px;"><span style="color: #60a5fa;">Scheduled sync</span> — Pulse reconciles with peers on an interval</div>
+                <div style="margin-bottom: 6px;"><span style="color: #4ade80; text-decoration: line-through;">Scheduled sync</span> — peers reconcile on a configurable interval</div>
                 <div style="margin-bottom: 6px;"><span style="color: #60a5fa;">Reactive push</span> — new attestations trigger immediate peer sync</div>
                 <div><span style="color: #60a5fa;">Reticulum</span> — cryptographic mesh transport beneath the same protocol</div>
             </div>
