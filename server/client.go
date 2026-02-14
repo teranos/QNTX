@@ -1203,15 +1203,21 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 		watcherID = fmt.Sprintf("watcher-%d", time.Now().UnixNano())
 	}
 
-	// Create watcher struct
+	// Create watcher struct — detect SE glyph (semantic query) vs AX glyph (structured query)
 	watcher := &storage.Watcher{
 		ID:                watcherID,
 		Name:              msg.WatcherName,
-		AxQuery:           msg.WatcherQuery,
-		ActionType:        storage.ActionTypePython, // Default to Python action
-		ActionData:        "",                       // Empty for now
-		MaxFiresPerMinute: 60,                       // Default rate limit
+		MaxFiresPerMinute: 60, // Default rate limit
 		Enabled:           msg.Enabled,
+	}
+
+	if msg.SemanticQuery != "" {
+		watcher.ActionType = storage.ActionTypeSemanticMatch
+		watcher.SemanticQuery = msg.SemanticQuery
+		watcher.SemanticThreshold = msg.SemanticThreshold
+	} else {
+		watcher.AxQuery = msg.WatcherQuery
+		watcher.ActionType = storage.ActionTypePython // Default to Python action
 	}
 
 	// Try to get existing watcher first

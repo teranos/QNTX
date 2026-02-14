@@ -415,6 +415,7 @@ export interface WatcherMatchMessage extends BaseMessage {
   type: 'watcher_match';
   watcher_id: string;
   attestation: Attestation;
+  score?: number;
   timestamp: number;
 }
 
