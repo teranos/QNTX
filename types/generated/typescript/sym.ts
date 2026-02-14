@@ -18,11 +18,12 @@ export const Prose = "▣";
 export const Pulse = "꩜";
 export const PulseClose = "❀";
 export const PulseOpen = "✿";
+export const SE = "⊨";
 export const SO = "⟶";
 export const Subcanvas = "⌗";
 
 
-export const PaletteOrder = [I, AM, IX, AX, BY, AT, SO] as const;
+export const PaletteOrder = [I, AM, IX, AX, BY, AT, SO, SE] as const;
 export type PaletteOrderSymbol = typeof PaletteOrder[number];
 
 export const CommandDescriptions: Record<string, string> = {
@@ -35,6 +36,7 @@ export const CommandDescriptions: Record<string, string> = {
   "is": "Identity — Subject/equivalence in attestations",
   "ix": "Ingest — Import external data",
   "of": "Membership — Element-of/belonging in attestations",
+  "se": "Semantic — Meaning-based search and entailment",
   "so": "Therefore — Consequent action/trigger"
 };
 export const CommandToSymbol: Record<string, string> = {
@@ -47,6 +49,7 @@ export const CommandToSymbol: Record<string, string> = {
   "is": IS,
   "ix": IX,
   "of": OF,
+  "se": SE,
   "so": SO
 };
 export const SymbolToCommand: Record<string, string> = {
@@ -59,6 +62,7 @@ export const SymbolToCommand: Record<string, string> = {
   [IS]: "is",
   [IX]: "ix",
   [OF]: "of",
+  [SE]: "se",
   [SO]: "so"
 };
 

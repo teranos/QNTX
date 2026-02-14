@@ -14,10 +14,11 @@ import (
 type ActionType string
 
 const (
-	ActionTypePython       ActionType = "python"
-	ActionTypeWebhook      ActionType = "webhook"
-	ActionTypeLLMPrompt    ActionType = "llm_prompt"
-	ActionTypeGlyphExecute ActionType = "glyph_execute"
+	ActionTypePython        ActionType = "python"
+	ActionTypeWebhook       ActionType = "webhook"
+	ActionTypeLLMPrompt     ActionType = "llm_prompt"
+	ActionTypeGlyphExecute  ActionType = "glyph_execute"
+	ActionTypeSemanticMatch ActionType = "semantic_match"
 )
 
 // Watcher represents a reactive trigger that executes actions when attestations match a filter
@@ -28,6 +29,10 @@ type Watcher struct {
 	// Filter - what attestations to match (empty = match all)
 	Filter  types.AxFilter `json:"filter"`
 	AxQuery string         `json:"ax_query,omitempty"` // Raw AX query string (alternative to Filter fields)
+
+	// Semantic matching — used by ⊨ glyphs for meaning-based search
+	SemanticQuery     string  `json:"semantic_query,omitempty"`     // Natural language query for embedding comparison
+	SemanticThreshold float32 `json:"semantic_threshold,omitempty"` // Minimum similarity score (0-1) to fire
 
 	// Action - what to do when matched
 	ActionType ActionType `json:"action_type"`
@@ -113,12 +118,14 @@ func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
 		INSERT INTO watchers (
 			id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
+			semantic_query, semantic_threshold,
 			action_type, action_data,
 			max_fires_per_minute, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		w.ID, w.Name,
 		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd, w.AxQuery,
+		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold),
 		w.ActionType, w.ActionData,
 		w.MaxFiresPerMinute, w.Enabled,
 		w.CreatedAt.Format(time.RFC3339Nano), w.UpdatedAt.Format(time.RFC3339Nano), nil, 0, 0, nil,
@@ -180,12 +187,14 @@ func (ws *WatcherStore) CreateOrReplace(ctx context.Context, w *Watcher) error {
 		INSERT OR REPLACE INTO watchers (
 			id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
+			semantic_query, semantic_threshold,
 			action_type, action_data,
 			max_fires_per_minute, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		w.ID, w.Name,
 		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd, w.AxQuery,
+		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold),
 		w.ActionType, w.ActionData,
 		w.MaxFiresPerMinute, w.Enabled,
 		w.CreatedAt.Format(time.RFC3339Nano), w.UpdatedAt.Format(time.RFC3339Nano), nil, 0, 0, nil,
@@ -201,6 +210,7 @@ func (ws *WatcherStore) Get(ctx context.Context, id string) (*Watcher, error) {
 	row := ws.db.QueryRowContext(ctx, `
 		SELECT id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
+			semantic_query, semantic_threshold,
 			action_type, action_data,
 			max_fires_per_minute, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
@@ -214,6 +224,7 @@ func (ws *WatcherStore) List(ctx context.Context, enabledOnly bool) ([]*Watcher,
 	query := `
 		SELECT id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
+			semantic_query, semantic_threshold,
 			action_type, action_data,
 			max_fires_per_minute, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
@@ -286,6 +297,7 @@ func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
 		UPDATE watchers SET
 			name = ?,
 			subjects = ?, predicates = ?, contexts = ?, actors = ?, time_start = ?, time_end = ?, ax_query = ?,
+			semantic_query = ?, semantic_threshold = ?,
 			action_type = ?, action_data = ?,
 			max_fires_per_minute = ?, enabled = ?,
 			fire_count = ?, error_count = ?, last_error = ?, last_fired_at = ?,
@@ -293,6 +305,7 @@ func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
 		WHERE id = ?`,
 		w.Name,
 		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd, w.AxQuery,
+		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold),
 		w.ActionType, w.ActionData,
 		w.MaxFiresPerMinute, w.Enabled,
 		w.FireCount, w.ErrorCount, w.LastError, lastFiredAt,
@@ -355,25 +368,41 @@ func (ws *WatcherStore) RecordError(ctx context.Context, id string, errMsg strin
 
 // scanWatcher scans a single row into a Watcher
 func (ws *WatcherStore) scanWatcher(row *sql.Row) (*Watcher, error) {
+	w, err := scanWatcherFields(func(dest ...interface{}) error {
+		return row.Scan(dest...)
+	})
+	if err == sql.ErrNoRows {
+		return nil, errors.New("watcher not found")
+	}
+	return w, err
+}
+
+// scanWatcherRows scans a rows result into a Watcher
+func (ws *WatcherStore) scanWatcherRows(rows *sql.Rows) (*Watcher, error) {
+	return scanWatcherFields(rows.Scan)
+}
+
+// scanWatcherFields is the shared scanner for both sql.Row and sql.Rows.
+func scanWatcherFields(scan func(dest ...interface{}) error) (*Watcher, error) {
 	var w Watcher
 	var subjectsJSON, predicatesJSON, contextsJSON, actorsJSON sql.NullString
 	var timeStart, timeEnd sql.NullString
 	var axQuery sql.NullString
+	var semanticQuery sql.NullString
+	var semanticThreshold sql.NullFloat64
 	var createdAt, updatedAt string
 	var lastFiredAt sql.NullString
 	var lastError sql.NullString
 	var actionType string
 
-	err := row.Scan(
+	err := scan(
 		&w.ID, &w.Name,
 		&subjectsJSON, &predicatesJSON, &contextsJSON, &actorsJSON, &timeStart, &timeEnd, &axQuery,
+		&semanticQuery, &semanticThreshold,
 		&actionType, &w.ActionData,
 		&w.MaxFiresPerMinute, &w.Enabled,
 		&createdAt, &updatedAt, &lastFiredAt, &w.FireCount, &w.ErrorCount, &lastError,
 	)
-	if err == sql.ErrNoRows {
-		return nil, errors.New("watcher not found")
-	}
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to scan watcher")
 	}
@@ -418,9 +447,15 @@ func (ws *WatcherStore) scanWatcher(row *sql.Row) (*Watcher, error) {
 		w.Filter.TimeEnd = &t
 	}
 
-	// Set AX query string
+	// Set query strings
 	if axQuery.Valid {
 		w.AxQuery = axQuery.String
+	}
+	if semanticQuery.Valid {
+		w.SemanticQuery = semanticQuery.String
+	}
+	if semanticThreshold.Valid {
+		w.SemanticThreshold = float32(semanticThreshold.Float64)
 	}
 
 	w.CreatedAt, err = time.Parse(time.RFC3339Nano, createdAt)
@@ -447,93 +482,10 @@ func (ws *WatcherStore) scanWatcher(row *sql.Row) (*Watcher, error) {
 	return &w, nil
 }
 
-// scanWatcherRows scans a rows result into a Watcher
-func (ws *WatcherStore) scanWatcherRows(rows *sql.Rows) (*Watcher, error) {
-	var w Watcher
-	var subjectsJSON, predicatesJSON, contextsJSON, actorsJSON sql.NullString
-	var timeStart, timeEnd sql.NullString
-	var axQuery sql.NullString
-	var createdAt, updatedAt string
-	var lastFiredAt sql.NullString
-	var lastError sql.NullString
-	var actionType string
-
-	err := rows.Scan(
-		&w.ID, &w.Name,
-		&subjectsJSON, &predicatesJSON, &contextsJSON, &actorsJSON, &timeStart, &timeEnd, &axQuery,
-		&actionType, &w.ActionData,
-		&w.MaxFiresPerMinute, &w.Enabled,
-		&createdAt, &updatedAt, &lastFiredAt, &w.FireCount, &w.ErrorCount, &lastError,
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to scan watcher")
+// nullIfZero returns nil for zero values, allowing SQL NULL storage.
+func nullIfZero(f float32) interface{} {
+	if f == 0 {
+		return nil
 	}
-
-	w.ActionType = ActionType(actionType)
-
-	// Parse JSON arrays
-	if subjectsJSON.Valid {
-		if err := json.Unmarshal([]byte(subjectsJSON.String), &w.Filter.Subjects); err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal subjects for watcher %s", w.ID)
-		}
-	}
-	if predicatesJSON.Valid {
-		if err := json.Unmarshal([]byte(predicatesJSON.String), &w.Filter.Predicates); err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal predicates for watcher %s", w.ID)
-		}
-	}
-	if contextsJSON.Valid {
-		if err := json.Unmarshal([]byte(contextsJSON.String), &w.Filter.Contexts); err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal contexts for watcher %s", w.ID)
-		}
-	}
-	if actorsJSON.Valid {
-		if err := json.Unmarshal([]byte(actorsJSON.String), &w.Filter.Actors); err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal actors for watcher %s", w.ID)
-		}
-	}
-
-	// Parse timestamps
-	if timeStart.Valid {
-		t, err := time.Parse(time.RFC3339Nano, timeStart.String)
-		if err != nil {
-			return nil, errors.Wrapf(err, "invalid time_start timestamp for watcher %s: %s", w.ID, timeStart.String)
-		}
-		w.Filter.TimeStart = &t
-	}
-	if timeEnd.Valid {
-		t, err := time.Parse(time.RFC3339Nano, timeEnd.String)
-		if err != nil {
-			return nil, errors.Wrapf(err, "invalid time_end timestamp for watcher %s: %s", w.ID, timeEnd.String)
-		}
-		w.Filter.TimeEnd = &t
-	}
-
-	// Set AX query string
-	if axQuery.Valid {
-		w.AxQuery = axQuery.String
-	}
-
-	w.CreatedAt, err = time.Parse(time.RFC3339Nano, createdAt)
-	if err != nil {
-		return nil, errors.Wrapf(err, "invalid created_at timestamp for watcher %s: %s", w.ID, createdAt)
-	}
-	w.UpdatedAt, err = time.Parse(time.RFC3339Nano, updatedAt)
-	if err != nil {
-		return nil, errors.Wrapf(err, "invalid updated_at timestamp for watcher %s: %s", w.ID, updatedAt)
-	}
-
-	if lastFiredAt.Valid {
-		t, err := time.Parse(time.RFC3339Nano, lastFiredAt.String)
-		if err != nil {
-			return nil, errors.Wrapf(err, "invalid last_fired_at timestamp for watcher %s: %s", w.ID, lastFiredAt.String)
-		}
-		w.LastFiredAt = &t
-	}
-
-	if lastError.Valid {
-		w.LastError = lastError.String
-	}
-
-	return &w, nil
+	return f
 }
