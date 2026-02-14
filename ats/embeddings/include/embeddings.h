@@ -46,6 +46,8 @@ typedef struct ClusterResultC {
     float* probabilities; // membership per point [0,1]; free with embedding_free_float_array
     int count;            // number of points
     int n_clusters;       // distinct clusters (excl. noise)
+    float* centroids;     // flat: n_clusters * centroid_dims; free with embedding_free_float_array
+    int centroid_dims;    // dimensions per centroid (same as input dimensions)
 } ClusterResultC;
 
 // Run HDBSCAN clustering on embedding vectors

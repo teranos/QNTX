@@ -644,7 +644,7 @@ export function registerDefaultGlyphs(): void {
             return content;
         },
         initialWidth: '360px',
-        initialHeight: '200px'
+        initialHeight: '200px' // TODO: Too small — content overflows when cluster info is present. Needs auto-sizing or a larger default.
     });
 
     // Sync Status Glyph
