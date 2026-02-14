@@ -438,6 +438,81 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// EmbeddingInfoResponse represents embedding service status
+type EmbeddingInfoResponse struct {
+	Available        bool     `json:"available"`
+	ModelName        string   `json:"model_name"`
+	Dimensions       int      `json:"dimensions"`
+	EmbeddingCount   int      `json:"embedding_count"`
+	AttestationCount int      `json:"attestation_count"`
+	UnembeddedIDs    []string `json:"unembedded_ids,omitempty"`
+}
+
+// HandleEmbeddingInfo returns embedding service status and counts (GET /api/embeddings/info)
+func (s *QNTXServer) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	resp := EmbeddingInfoResponse{Available: s.embeddingService != nil}
+
+	if s.embeddingService != nil {
+		if info, err := s.embeddingService.GetModelInfo(); err == nil {
+			resp.ModelName = info.Name
+			resp.Dimensions = info.Dimensions
+		}
+	}
+
+	// Count embeddings and total attestations
+	var embCount, atsCount int
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM embeddings").Scan(&embCount); err != nil {
+		s.logger.Errorw("Failed to count embeddings", "error", err)
+		http.Error(w, "Failed to retrieve embedding count", http.StatusInternalServerError)
+		return
+	}
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM attestations").Scan(&atsCount); err != nil {
+		s.logger.Errorw("Failed to count attestations", "error", err)
+		http.Error(w, "Failed to retrieve attestation count", http.StatusInternalServerError)
+		return
+	}
+	resp.EmbeddingCount = embCount
+	resp.AttestationCount = atsCount
+
+	// Collect IDs of attestations without embeddings
+	rows, err := s.db.Query(`
+		SELECT a.id FROM attestations a
+		LEFT JOIN embeddings e ON e.source_type = 'attestation' AND e.source_id = a.id
+		WHERE e.id IS NULL
+	`)
+	if err != nil {
+		s.logger.Errorw("Failed to query unembedded attestations", "error", err)
+		http.Error(w, "Failed to retrieve unembedded attestation list", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			s.logger.Warnw("Failed to scan attestation ID", "error", err)
+			continue
+		}
+		resp.UnembeddedIDs = append(resp.UnembeddedIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		s.logger.Warnw("Error iterating unembedded attestations", "error", err)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		s.logger.Errorw("Failed to encode embeddings info response",
+			"available", resp.Available,
+			"embedding_count", resp.EmbeddingCount,
+			"attestation_count", resp.AttestationCount,
+			"error", err)
+	}
+}
+
 // SetupEmbeddingService initializes the embedding service if available
 func (s *QNTXServer) SetupEmbeddingService() {
 	// Check for rustembeddings build tag
