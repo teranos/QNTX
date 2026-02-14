@@ -876,6 +876,7 @@ func (c *Client) handleRichSearch(query string) {
 	ctx := c.server.ctx
 	matches, err := boundedStore.SearchRichStringFields(ctx, query, 50)
 	if err != nil {
+		err = errors.Wrapf(err, "text search failed for query %q", query)
 		c.server.logger.Warnw("Text search failed",
 			"query", query,
 			"error", err,
