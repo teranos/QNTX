@@ -173,7 +173,8 @@
 
 /* Server-side results: grayscale when offline (indicates stale/cached data) */
 /* Local results inside AX glyph stay colored */
-.ax-glyph-results[data-connectivity-mode="offline"]:not([data-local-active]) {
+.ax-glyph-results[data-connectivity-mode="offline"]:not([data-local-active]),
+.se-glyph-results[data-connectivity-mode="offline"]:not([data-local-active]) {
     filter: grayscale(100%);
     transition: filter var(--mode-transition-duration) var(--mode-transition-timing);
 }
