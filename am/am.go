@@ -10,6 +10,7 @@ type Config struct {
 	OpenRouter     OpenRouterConfig     `mapstructure:"openrouter"`
 	Ax             AxConfig             `mapstructure:"ax"`
 	Plugin         PluginConfig         `mapstructure:"plugin"`
+	Embeddings     EmbeddingsConfig     `mapstructure:"embeddings"`
 }
 
 // DatabaseConfig configures the SQLite database
@@ -114,6 +115,13 @@ type PluginKeepaliveConfig struct {
 	PingIntervalSecs  *int `mapstructure:"ping_interval_secs"` // Seconds between PING messages (nil = default 30)
 	PongTimeoutSecs   *int `mapstructure:"pong_timeout_secs"`  // Seconds to wait for PONG (nil = default 60)
 	ReconnectAttempts *int `mapstructure:"reconnect_attempts"` // Number of reconnect attempts (nil = default 3)
+}
+
+// EmbeddingsConfig configures the embedding service for semantic search
+type EmbeddingsConfig struct {
+	Enabled bool   `mapstructure:"enabled"` // Enable embedding service (default: false)
+	Path    string `mapstructure:"path"`    // Path to ONNX model file
+	Name    string `mapstructure:"name"`    // Model identifier for metadata
 }
 
 // File system constants
