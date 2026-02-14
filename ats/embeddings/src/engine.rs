@@ -48,16 +48,6 @@ impl EmbeddingEngine {
             return Err(anyhow::anyhow!("Model should have at least 1 output"));
         }
 
-        // Log input/output info
-        eprintln!("Model inputs:");
-        for (i, input) in inputs.iter().enumerate() {
-            eprintln!("  [{}] {}", i, input.name());
-        }
-        eprintln!("Model outputs:");
-        for (i, output) in outputs.iter().enumerate() {
-            eprintln!("  [{}] {}", i, output.name());
-        }
-
         // Default dimensions for all-MiniLM-L6-v2
         let dimensions = 384;
         let max_sequence_length = 512;
@@ -75,7 +65,6 @@ impl EmbeddingEngine {
             .ok_or_else(|| anyhow::anyhow!("Invalid model path"))?;
         let tokenizer_path = model_dir.join("tokenizer.json");
 
-        eprintln!("Loading tokenizer from: {:?}", tokenizer_path);
         let tokenizer = EmbeddingTokenizer::from_file(tokenizer_path, max_sequence_length)?;
 
         Ok(Self {
@@ -204,7 +193,6 @@ impl EmbeddingEngine {
 
         // Shape is an ort::tensor::Shape which we can iterate
         let shape: Vec<i64> = tensor_shape.iter().copied().collect();
-        eprintln!("Output tensor shape: {:?}", shape);
 
         // Handle different output shapes
         let mut embeddings = match shape.len() {

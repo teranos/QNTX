@@ -1,6 +1,6 @@
 /**
  * Type Definition Window - Floating window for configuring type field metadata
- * Allows marking fields as rich/fuzzy searchable with immediate persistence
+ * Allows marking fields as searchable with immediate persistence
  */
 
 import { Window } from './components/window.js';
@@ -199,8 +199,8 @@ export class TypeDefinitionWindow {
             <div class="field-control-options">
                 <label class="field-option">
                     <input type="checkbox" id="rich-string-toggle">
-                    <span>Fuzzy Searchable</span>
-                    <span class="field-option-desc">Enable fuzzy text search on this field</span>
+                    <span>Searchable</span>
+                    <span class="field-option-desc">Enable text search on this field</span>
                 </label>
                 <label class="field-option">
                     <input type="checkbox" id="array-toggle">
@@ -246,7 +246,7 @@ export class TypeDefinitionWindow {
 
         // Add rich string highlight
         if (field.isRichString) {
-            fieldEl.classList.add('rich-string-field');
+            fieldEl.classList.add('searchable-field');
         }
 
         // Add array indicator
@@ -257,7 +257,7 @@ export class TypeDefinitionWindow {
         fieldEl.innerHTML = `
             <span class="field-name">${field.name}</span>
             <div class="field-indicators">
-                ${field.isRichString ? '<span class="indicator fuzzy-indicator" title="Fuzzy Searchable">🔍</span>' : ''}
+                ${field.isRichString ? '<span class="indicator search-indicator" title="Searchable">🔍</span>' : ''}
                 ${field.isArray ? '<span class="indicator array-indicator" title="Array Field">📦</span>' : ''}
             </div>
         `;
