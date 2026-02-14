@@ -18,12 +18,12 @@ import { languageServer } from 'codemirror-languageserver';
 import { sendMessage, validateBackendURL } from './websocket.ts';
 import { requestParse } from './ats-semantic-tokens-client.ts';
 import type { Diagnostic, SemanticToken } from '../types/lsp';
-import { FuzzySearchView } from './fuzzy-search-view.ts';
+import { SearchView } from './search-view.ts';
 import { log, SEG } from './logger.ts';
 
 let editorView: EditorView | null = null;
 let queryTimeout: ReturnType<typeof setTimeout> | null = null;
-let fuzzySearchView: FuzzySearchView | null = null;
+let searchView: SearchView | null = null;
 
 // Syntax highlighting via LSP semantic tokens
 // TODO(issue #13): codemirror-languageserver doesn't support semantic tokens yet (v1.18.1)
@@ -61,9 +61,9 @@ export function initCodeMirrorEditor(): EditorView | null {
         return null;
     }
 
-    // Initialize fuzzy search view (always-on, renders results in overlay)
-    fuzzySearchView = new FuzzySearchView();
-    fuzzySearchView.show();
+    // Initialize search view (always-on, renders results in overlay)
+    searchView = new SearchView();
+    searchView.show();
 
     // LSP configuration (async connection, won't block page load)
     // Use backend URL from injected global with validation
@@ -144,23 +144,23 @@ function handleDocumentChange(update: any): void {
         requestParse(doc, 1, cursorPos);
     }
 
-    // Execute fuzzy search with debounce
+    // Execute search with debounce
     if (queryTimeout) {
         clearTimeout(queryTimeout);
     }
     queryTimeout = setTimeout(() => {
-        sendFuzzySearch(doc.trim());
+        sendSearch(doc.trim());
     }, 300);
 }
 
 /**
- * Send fuzzy search query
+ * Send search query
  */
-function sendFuzzySearch(text: string): void {
+function sendSearch(text: string): void {
     if (!text.trim()) {
         // Clear results if empty
-        if (fuzzySearchView) {
-            fuzzySearchView.clear();
+        if (searchView) {
+            searchView.clear();
         }
         return;
     }
@@ -241,11 +241,11 @@ export function setEditorContent(content: string): void {
 }
 
 /**
- * Handle fuzzy search results from WebSocket
+ * Handle search results from WebSocket
  */
-export function handleFuzzySearchResults(message: any): void {
-    if (!fuzzySearchView) return;
-    fuzzySearchView.updateResults(message);
+export function handleSearchResults(message: any): void {
+    if (!searchView) return;
+    searchView.updateResults(message);
 }
 
 /**
@@ -256,8 +256,8 @@ export function destroyEditor(): void {
         editorView.destroy();
         editorView = null;
     }
-    if (fuzzySearchView) {
-        fuzzySearchView = null;
+    if (searchView) {
+        searchView = null;
     }
     // LSP client is managed by languageServer() extension, no manual cleanup needed
 }

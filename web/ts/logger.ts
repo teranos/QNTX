@@ -27,7 +27,7 @@
  *   - Editors: prose/editor.ts, code/panel.ts, code/suggestions.ts, codemirror-editor.ts
  *   - Components: type-attestations.ts, base-panel-error.ts, glyph/py-glyph.ts
  *   - Prose nodes: ats-code-block.ts, go-code-block.ts, frontmatter-block.ts
- *   - Utilities: tauri-notifications.ts, symbol-palette.ts, fuzzy-search-view.ts
+ *   - Utilities: tauri-notifications.ts, symbol-palette.ts, search-view.ts
  *   - And more...
  *
  * Note: dev-debug-interceptor.ts and test files intentionally use console.* directly

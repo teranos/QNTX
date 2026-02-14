@@ -1,9 +1,9 @@
 /**
- * Fuzzy Search Results View Component
+ * Search Results View Component
  * Displays search results in an fzf-style list format
  */
 
-export interface FuzzySearchMatch {
+export interface SearchMatch {
     node_id: string;
     type_name: string;
     type_label: string;
@@ -17,21 +17,21 @@ export interface FuzzySearchMatch {
     matched_words?: string[];  // The actual words that were matched for highlighting
 }
 
-export interface FuzzySearchResultsMessage {
+export interface SearchResultsMessage {
     type: 'rich_search_results';
     query: string;
-    matches: FuzzySearchMatch[];
+    matches: SearchMatch[];
     total: number;
 }
 
-export class FuzzySearchView {
+export class SearchView {
     private container: HTMLElement | null = null;
     private resultsElement: HTMLElement | null = null;
     private currentQuery: string = '';
     private isVisible: boolean = false;
 
     /**
-     * Initialize the fuzzy search view
+     * Initialize the search view
      */
     constructor() {
         this.createElements();
@@ -42,19 +42,19 @@ export class FuzzySearchView {
      */
     private createElements(): void {
         this.container = document.createElement('div');
-        this.container.id = 'fuzzy-search-view';
-        this.container.className = 'fuzzy-search-view';
+        this.container.id = 'search-view';
+        this.container.className = 'search-view';
 
         // Create results container
         this.resultsElement = document.createElement('div');
-        this.resultsElement.className = 'fuzzy-results';
+        this.resultsElement.className = 'search-results';
 
         this.container.appendChild(this.resultsElement);
         document.body.appendChild(this.container);
     }
 
     /**
-     * Show the fuzzy search view
+     * Show the search view
      */
     public show(): void {
         if (this.container) {
@@ -64,7 +64,7 @@ export class FuzzySearchView {
     }
 
     /**
-     * Hide the fuzzy search view
+     * Hide the search view
      */
     public hide(): void {
         if (this.container) {
@@ -83,7 +83,7 @@ export class FuzzySearchView {
     /**
      * Update the search results
      */
-    public updateResults(message: FuzzySearchResultsMessage): void {
+    public updateResults(message: SearchResultsMessage): void {
         if (!this.resultsElement) return;
 
         this.currentQuery = message.query;
@@ -93,7 +93,7 @@ export class FuzzySearchView {
 
         // Add header with match count
         const header = document.createElement('div');
-        header.className = 'fuzzy-header';
+        header.className = 'search-header';
         header.textContent = `Found ${message.total} matches for "${message.query}"`;
         this.resultsElement.appendChild(header);
 
@@ -106,7 +106,7 @@ export class FuzzySearchView {
         // If no matches
         if (message.matches.length === 0) {
             const noResults = document.createElement('div');
-            noResults.className = 'fuzzy-no-results';
+            noResults.className = 'search-no-results';
             noResults.textContent = 'No matches found';
             this.resultsElement.appendChild(noResults);
         }
@@ -115,9 +115,9 @@ export class FuzzySearchView {
     /**
      * Create a single result line
      */
-    private createResultLine(match: FuzzySearchMatch): HTMLElement {
+    private createResultLine(match: SearchMatch): HTMLElement {
         const line = document.createElement('div');
-        line.className = 'fuzzy-result-line';
+        line.className = 'search-result-line';
 
         // Click handler to focus on node
         line.onclick = () => {
@@ -126,28 +126,28 @@ export class FuzzySearchView {
 
         // Node ID/Label (shortened hash)
         const nodeLabel = document.createElement('span');
-        nodeLabel.className = 'fuzzy-node-id';
+        nodeLabel.className = 'search-node-id';
         const shortId = (match.node_id || '').substring(0, 7);
         nodeLabel.textContent = shortId;
 
         // Type badge
         const typeBadge = document.createElement('span');
-        typeBadge.className = 'fuzzy-type-badge';
+        typeBadge.className = 'search-type-badge';
         typeBadge.textContent = match.type_label || match.type_name;
 
         // Field name
         const fieldName = document.createElement('span');
-        fieldName.className = 'fuzzy-field-name';
+        fieldName.className = 'search-field-name';
         fieldName.textContent = `[${match.field_name}]`;
 
         // Excerpt with highlighting
         const excerpt = document.createElement('span');
-        excerpt.className = 'fuzzy-excerpt';
+        excerpt.className = 'search-excerpt';
         excerpt.innerHTML = this.highlightMatch(match.excerpt, this.currentQuery, match.matched_words);
 
         // Score indicator
         const score = document.createElement('span');
-        score.className = 'fuzzy-score';
+        score.className = 'search-score';
         score.textContent = `${Math.round(match.score * 100)}%`;
 
         // Assemble the line
@@ -166,7 +166,7 @@ export class FuzzySearchView {
     private highlightMatch(text: string, query: string, matchedWords?: string[]): string {
         if (!query && !matchedWords) return text;
 
-        // If we have matched words from fuzzy search, use those for highlighting
+        // If we have matched words from search, use those for highlighting
         if (matchedWords && matchedWords.length > 0) {
             let highlightedText = text;
             // Sort by length descending to avoid replacing parts of longer words
@@ -174,14 +174,14 @@ export class FuzzySearchView {
 
             for (const word of sortedWords) {
                 const regex = new RegExp(`\\b(${this.escapeRegex(word)})\\b`, 'gi');
-                highlightedText = highlightedText.replace(regex, '<mark class="fuzzy-highlight">$1</mark>');
+                highlightedText = highlightedText.replace(regex, '<mark class="search-highlight">$1</mark>');
             }
             return highlightedText;
         }
 
         // Fallback to exact query matching
         const regex = new RegExp(`(${this.escapeRegex(query)})`, 'gi');
-        return text.replace(regex, '<mark class="fuzzy-highlight">$1</mark>');
+        return text.replace(regex, '<mark class="search-highlight">$1</mark>');
     }
 
     /**
@@ -194,18 +194,18 @@ export class FuzzySearchView {
     /**
      * Handle clicking on a result
      */
-    private handleResultClick(match: FuzzySearchMatch): void {
+    private handleResultClick(match: SearchMatch): void {
         // Import log dynamically to avoid circular dependency
         import('./logger.ts').then(({ log, SEG }) => {
             log.debug(SEG.QUERY, 'Focusing on node:', match.node_id);
         });
 
-        // Hide the fuzzy search view
+        // Hide the search view
         this.hide();
 
         // Send a message to focus on this node in the graph
         // This will be handled by the graph module
-        const event = new CustomEvent('fuzzy-search-select', {
+        const event = new CustomEvent('search-select', {
             detail: {
                 nodeId: match.node_id,
                 match: match

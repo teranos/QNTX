@@ -5,10 +5,12 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
@@ -413,11 +415,26 @@ func (s *QNTXServer) SetupEmbeddingService() {
 		return
 	}
 
-	// Initialize embedding service
-	modelPath := "ats/embeddings/models/all-MiniLM-L6-v2/model.onnx"
+	// Check if embeddings are enabled in config
+	if !appcfg.GetBool("embeddings.enabled") {
+		s.logger.Infow("Embeddings service disabled in config (embeddings.enabled=false)")
+		return
+	}
+
+	// Read model path from config and validate it exists before attempting init
+	modelPath := appcfg.GetString("embeddings.path")
+	modelName := appcfg.GetString("embeddings.name")
+
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		s.logger.Errorw("Embeddings enabled but model file not found — set embeddings.path in am.toml",
+			"path", modelPath)
+		return
+	}
+
 	embService, err := embeddings.NewManagedEmbeddingService(modelPath)
 	if err != nil {
 		s.logger.Errorw("Failed to create embedding service",
+			"path", modelPath,
 			"error", err)
 		return
 	}
@@ -425,6 +442,7 @@ func (s *QNTXServer) SetupEmbeddingService() {
 	// Initialize the service
 	if err := embService.Initialize(); err != nil {
 		s.logger.Errorw("Failed to initialize embedding service",
+			"path", modelPath,
 			"error", err)
 		return
 	}
@@ -437,7 +455,8 @@ func (s *QNTXServer) SetupEmbeddingService() {
 	s.embeddingStore = embStore
 
 	s.logger.Infow("Embedding service initialized",
-		"model_path", modelPath)
+		"path", modelPath,
+		"name", modelName)
 }
 
 // hasRustEmbeddings returns true if compiled with rustembeddings build tag
