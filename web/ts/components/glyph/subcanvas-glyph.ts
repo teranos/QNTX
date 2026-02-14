@@ -6,6 +6,10 @@
  * Minimize: morphs back to compact position on parent canvas.
  *
  * The glyph ID doubles as the canvas_id for inner glyphs (no mapping table).
+ *
+ * TODO(#483): Meld support — subcanvas glyphs should be meldable with other glyphs
+ * on the parent canvas. A melded subcanvas acts as a spatial grouping container:
+ * its inner workspace becomes the shared context for the melded neighbours.
  */
 
 import type { Glyph } from './glyph';

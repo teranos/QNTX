@@ -87,25 +87,25 @@ export function morphCanvasPlacedToFullscreen(
             minimizeBtn.className = 'canvas-minimize-btn';
 
             const doMinimize = () => {
-                // Remove escape listener before morphing back
-                document.removeEventListener('keydown', escapeHandler);
+                element.removeEventListener('keydown', escapeHandler);
                 morphFullscreenToCanvasPlaced(element, glyph, onMinimize);
             };
 
             minimizeBtn.onclick = doMinimize;
             element.appendChild(minimizeBtn);
 
-            // Escape key minimizes back to canvas-placed position
+            // Escape key minimizes back to canvas-placed position.
+            // Listener on element (not document) so nested subcanvases only
+            // collapse one level at a time — the innermost catches the event first.
             const escapeHandler = (e: KeyboardEvent) => {
                 if (e.key !== 'Escape') return;
-                // Only handle if no inner selection (let workspace ESC deselect first)
                 const target = e.target as HTMLElement;
                 if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
                 e.preventDefault();
                 e.stopPropagation();
                 doMinimize();
             };
-            document.addEventListener('keydown', escapeHandler);
+            element.addEventListener('keydown', escapeHandler);
 
             // Load inner glyphs for this subcanvas workspace
             const innerGlyphs = loadInnerGlyphs(glyph.id);
