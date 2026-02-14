@@ -325,13 +325,38 @@ function extractRichText(attestation: Attestation): string {
 }
 
 /**
- * Build tooltip text showing structured attestation fields.
+ * Build tooltip showing attestation structure and which attribute fields matched.
  */
 function buildAttestationTooltip(attestation: Attestation): string {
     const subjects = attestation.subjects?.join(', ') || 'N/A';
     const predicates = attestation.predicates?.join(', ') || 'N/A';
     const contexts = attestation.contexts?.join(', ') || 'N/A';
-    return `${subjects} is ${predicates} of ${contexts}`;
+
+    const lines: string[] = [`${subjects} is ${predicates} of ${contexts}`];
+
+    if (attestation.attributes) {
+        try {
+            const attrs = typeof attestation.attributes === 'string'
+                ? JSON.parse(attestation.attributes)
+                : attestation.attributes;
+            for (const [key, value] of Object.entries(attrs)) {
+                if (key === 'rich_string_fields') continue;
+                if (typeof value === 'string' && value !== '') {
+                    const truncated = value.length > 80 ? value.substring(0, 80) + '...' : value;
+                    lines.push(`${key}: ${truncated}`);
+                } else if (Array.isArray(value) && value.some(v => typeof v === 'string')) {
+                    const strs = value.filter((v): v is string => typeof v === 'string' && v !== '');
+                    if (strs.length > 0) {
+                        const joined = strs.join(', ');
+                        const truncated = joined.length > 80 ? joined.substring(0, 80) + '...' : joined;
+                        lines.push(`${key}: ${truncated}`);
+                    }
+                }
+            }
+        } catch { /* ignore parse errors */ }
+    }
+
+    return lines.join('\n');
 }
 
 /**
