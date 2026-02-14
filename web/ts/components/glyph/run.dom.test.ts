@@ -13,25 +13,10 @@ import type { Glyph } from './glyph.ts';
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
-// Setup jsdom BEFORE importing run.ts — GlyphProximity calls document.addEventListener at module level
+// Mock Element.animate (Web Animations API, not in JSDOM)
+// Calls the "finish" listener synchronously so morph completes in tests
 if (USE_JSDOM) {
-    const { JSDOM } = await import('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
-    const { window } = dom;
-    const { document } = window;
-
-    globalThis.document = document as any;
-    globalThis.window = window as any;
-    globalThis.navigator = window.navigator as any;
-    globalThis.DOMParser = window.DOMParser as any;
-
-    // Polyfills for APIs missing in JSDOM
-    globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => { cb(0); return 0; };
-    globalThis.cancelAnimationFrame = () => {};
-
-    // Mock Element.animate (Web Animations API, not in JSDOM)
-    // Calls the "finish" listener synchronously so morph completes in tests
-    (window as any).HTMLElement.prototype.animate = function() {
+    (globalThis.window as any).HTMLElement.prototype.animate = function() {
         const listeners: Record<string, Function[]> = {};
         return {
             finished: Promise.resolve(),
