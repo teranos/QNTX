@@ -1,6 +1,6 @@
 # Attestation Sync
 
-**Status:** Foundation built — Merkle tree, content hashing, symmetric reconciliation protocol tested. Peering not yet wired into the server.
+**Status:** Wired. Merkle tree, content hashing, symmetric reconciliation protocol, WebSocket peering, observer registration, and startup backfill are all in place. Ready for `make wasm && make dev`.
 
 Attestations are claims. Claims are useful only if they reach the nodes that need them. Sync is how claims propagate — not through a central server pushing updates, but through peers that compare state and exchange what differs.
 
@@ -275,12 +275,17 @@ Jenny's commute: her phone is a Reticulum destination. The office server is a Re
 
 ## What Comes Next
 
-Immediate (wiring the foundation into the server over HTTP/WebSocket):
-1. WebSocket handler wrapping `gorilla/websocket` as a `Conn`
-2. `POST /api/sync` route initiating reconciliation with a peer URL
-3. `TreeObserver` registered at server startup
+The server wiring is complete:
+- ~~WebSocket handler wrapping `gorilla/websocket` as a `Conn`~~ → `server/sync_handler.go`
+- ~~`POST /api/sync` route initiating reconciliation with a peer URL~~ → `server/routing.go`
+- ~~`TreeObserver` registered at server startup~~ → `server/init.go:setupSync()`
+- ~~Backfill Merkle tree from existing attestations~~ → `server/init.go:backfillSyncTree()`
 
-Then: Reticulum integration as a parallel `Conn` implementation. A QNTX node that can sync over both WebSocket and Reticulum links, using whichever is available. The protocol doesn't change — only the transport beneath `Conn`.
+Next:
+1. **Frontend sync trigger**: Button or command that calls `POST /api/sync {"peer":"..."}` — the protocol is ready, needs a way for users to invoke it
+2. **Scheduled sync**: Use Pulse to periodically reconcile with configured peers (`am.toml` sync.peers)
+3. **Reactive push**: On `TreeObserver.OnAttestationCreated()`, notify connected sync peers to trigger immediate reconciliation
+4. **Reticulum integration**: A parallel `Conn` implementation over Reticulum links. The protocol doesn't change — only the transport beneath `Conn`
 
 ## Related
 
