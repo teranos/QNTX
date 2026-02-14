@@ -381,13 +381,13 @@ export function makeDraggable(
                 if (g.symbol) {
                     const existing = uiState.getCanvasGlyphs().find(cg => cg.id === g.id);
                     uiState.addCanvasGlyph({
+                        ...existing,
                         id: g.id,
                         symbol: g.symbol,
                         x,
                         y,
                         width: g.width,
                         height: g.height,
-                        content: existing?.content,
                     });
                 }
             }
@@ -405,13 +405,13 @@ export function makeDraggable(
             if (glyph.symbol) {
                 const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
                 uiState.addCanvasGlyph({
+                    ...existing,
                     id: glyph.id,
                     symbol: glyph.symbol,
                     x,
                     y,
                     width: glyph.width,
                     height: glyph.height,
-                    content: existing?.content,
                 });
             }
             log.debug(SEG.GLYPH, `[${logLabel}] Finished dragging ${glyph.id}`);
@@ -565,13 +565,13 @@ export function makeResizable(
         if (glyph.symbol && glyph.x !== undefined && glyph.y !== undefined) {
             const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
             uiState.addCanvasGlyph({
+                ...existing,
                 id: glyph.id,
                 symbol: glyph.symbol,
                 x: glyph.x,
                 y: glyph.y,
                 width: finalWidth,
                 height: finalHeight,
-                content: existing?.content,
             });
         }
 

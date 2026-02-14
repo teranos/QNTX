@@ -21,7 +21,7 @@ import { morphCanvasPlacedToFullscreen } from './manifestations/canvas-expanded'
  * Create a compact subcanvas glyph for the canvas workspace
  */
 export function createSubcanvasGlyph(glyph: Glyph): HTMLElement {
-    const { element, titleBar } = canvasPlaced({
+    const { element } = canvasPlaced({
         glyph,
         className: 'canvas-subcanvas-glyph',
         defaults: { x: 100, y: 100, width: 180, height: 120 },
@@ -42,7 +42,7 @@ export function createSubcanvasGlyph(glyph: Glyph): HTMLElement {
 
         // Find parent canvas ID from the content layer this glyph lives in
         const contentLayer = element.closest('.canvas-content-layer');
-        const parentCanvas = contentLayer?.closest('.canvas-workspace');
+        const parentCanvas = contentLayer?.closest('.canvas-workspace') as HTMLElement | null;
         const canvasId = parentCanvas?.dataset?.canvasId ?? 'canvas-workspace';
 
         morphCanvasPlacedToFullscreen(
@@ -97,7 +97,7 @@ function restoreToCanvas(
     element.addEventListener('dblclick', (e) => {
         e.stopPropagation();
         const cl = element.closest('.canvas-content-layer');
-        const parentCanvas = cl?.closest('.canvas-workspace');
+        const parentCanvas = cl?.closest('.canvas-workspace') as HTMLElement | null;
         const canvasId = parentCanvas?.dataset?.canvasId ?? 'canvas-workspace';
 
         morphCanvasPlacedToFullscreen(
