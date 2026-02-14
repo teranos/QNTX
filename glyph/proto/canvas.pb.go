@@ -28,11 +28,12 @@ type CanvasGlyph struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Symbol        string                 `protobuf:"bytes,2,opt,name=symbol,proto3" json:"symbol,omitempty"`
-	X             int32                  `protobuf:"varint,3,opt,name=x,proto3" json:"x,omitempty"`            // X position in pixels
-	Y             int32                  `protobuf:"varint,4,opt,name=y,proto3" json:"y,omitempty"`            // Y position in pixels
-	Width         int32                  `protobuf:"varint,5,opt,name=width,proto3" json:"width,omitempty"`    // optional: custom width (0 = use default)
-	Height        int32                  `protobuf:"varint,6,opt,name=height,proto3" json:"height,omitempty"`  // optional: custom height (0 = use default)
-	Content       string                 `protobuf:"bytes,7,opt,name=content,proto3" json:"content,omitempty"` // glyph content: source code, markdown, template, or JSON result
+	X             int32                  `protobuf:"varint,3,opt,name=x,proto3" json:"x,omitempty"`                               // X position in pixels
+	Y             int32                  `protobuf:"varint,4,opt,name=y,proto3" json:"y,omitempty"`                               // Y position in pixels
+	Width         int32                  `protobuf:"varint,5,opt,name=width,proto3" json:"width,omitempty"`                       // optional: custom width (0 = use default)
+	Height        int32                  `protobuf:"varint,6,opt,name=height,proto3" json:"height,omitempty"`                     // optional: custom height (0 = use default)
+	Content       string                 `protobuf:"bytes,7,opt,name=content,proto3" json:"content,omitempty"`                    // glyph content: source code, markdown, template, or JSON result
+	CanvasId      string                 `protobuf:"bytes,11,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"` // which canvas this glyph belongs to ("" = root)
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -114,6 +115,13 @@ func (x *CanvasGlyph) GetHeight() int32 {
 func (x *CanvasGlyph) GetContent() string {
 	if x != nil {
 		return x.Content
+	}
+	return ""
+}
+
+func (x *CanvasGlyph) GetCanvasId() string {
+	if x != nil {
+		return x.CanvasId
 	}
 	return ""
 }
@@ -292,7 +300,7 @@ var File_glyph_proto_canvas_proto protoreflect.FileDescriptor
 
 const file_glyph_proto_canvas_proto_rawDesc = "" +
 	"\n" +
-	"\x18glyph/proto/canvas.proto\x12\x05glyph\x1a\x1fgoogle/protobuf/timestamp.proto\"\x95\x02\n" +
+	"\x18glyph/proto/canvas.proto\x12\x05glyph\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb2\x02\n" +
 	"\vCanvasGlyph\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06symbol\x18\x02 \x01(\tR\x06symbol\x12\f\n" +
@@ -300,7 +308,8 @@ const file_glyph_proto_canvas_proto_rawDesc = "" +
 	"\x01y\x18\x04 \x01(\x05R\x01y\x12\x14\n" +
 	"\x05width\x18\x05 \x01(\x05R\x05width\x12\x16\n" +
 	"\x06height\x18\x06 \x01(\x05R\x06height\x12\x18\n" +
-	"\acontent\x18\a \x01(\tR\acontent\x129\n" +
+	"\acontent\x18\a \x01(\tR\acontent\x12\x1b\n" +
+	"\tcanvas_id\x18\v \x01(\tR\bcanvasId\x129\n" +
 	"\n" +
 	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +

@@ -25,6 +25,8 @@ export interface CanvasGlyph {
   height: number;
   /** glyph content: source code, markdown, template, or JSON result */
   content: string;
+  /** which canvas this glyph belongs to ("" = root) */
+  canvas_id: string;
   created_at: string | undefined;
   updated_at: string | undefined;
 }

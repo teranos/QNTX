@@ -9,7 +9,6 @@ This document shows Go type definitions from the codebase.
 **Generated types**:
 - TypeScript: [`types/generated/typescript/syscap.ts`](https://github.com/teranos/QNTX/blob/main/types/generated/typescript/syscap.ts)
 - Rust: [`types/generated/rust/syscap.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/syscap.rs)
-- Python: [`types/generated/python/syscap.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/syscap.py)
 
 ## Message {#message}
 

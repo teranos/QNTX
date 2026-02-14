@@ -9,7 +9,6 @@ This document shows Go type definitions from the codebase.
 **Generated types**:
 - TypeScript: [`types/generated/typescript/schedule.ts`](https://github.com/teranos/QNTX/blob/main/types/generated/typescript/schedule.ts)
 - Rust: [`types/generated/rust/schedule.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/schedule.rs)
-- Python: [`types/generated/python/schedule.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/schedule.py)
 
 ## Constants {#constants}
 
