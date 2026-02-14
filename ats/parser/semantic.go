@@ -128,16 +128,18 @@ func (st SourceToken) ToSemanticToken(state parseState) SemanticToken {
 	}
 }
 
-// isCommand checks if value is an ATS command
-func isCommand(s string) bool {
-	lower := strings.ToLower(s)
-	commands := []string{"i", "am", "ix", "ax", "as"}
-	for _, cmd := range commands {
-		if lower == cmd {
-			return true
-		}
+// commandLookupMap provides O(1) command detection derived from sym.Commands
+var commandLookupMap = func() map[string]bool {
+	m := make(map[string]bool, len(sym.Commands))
+	for _, cmd := range sym.Commands {
+		m[cmd] = true
 	}
-	return false
+	return m
+}()
+
+// isCommand checks if value is an ATS command (query-initiating token)
+func isCommand(s string) bool {
+	return commandLookupMap[strings.ToLower(s)]
 }
 
 // isKeyword checks if value is an ATS grammatical keyword using O(1) map lookup

@@ -28,6 +28,11 @@ const (
 	Prose      = "▣" // Documentation and prose content
 )
 
+// Commands are tokens that initiate ATS queries (first position).
+// Keywords (is, of, by, at, so) are grammatical connectors within queries.
+// This distinction is semantic: commands open a query, keywords connect parts of one.
+var Commands = []string{"i", "am", "ix", "ax", "as"}
+
 // PaletteOrder defines the canonical ordering for UI controls,
 // shortcuts, selection bars, etc.
 // Only includes primary SEG operators (not attestation building blocks)
