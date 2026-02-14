@@ -21,6 +21,7 @@ pub const AT: &str = "✦";
 pub const AX: &str = "⋈";
 pub const BY: &str = "⌬";
 pub const DB: &str = "⊔";
+pub const DOC: &str = "▤";
 pub const I: &str = "⍟";
 pub const IS: &str = "=";
 pub const IX: &str = "⨳";
