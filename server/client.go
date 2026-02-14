@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
@@ -254,6 +255,8 @@ func (c *Client) routeMessage(msg *QueryMessage) {
 		c.handleVidStreamFrame(*msg)
 	case "get_database_stats":
 		c.handleGetDatabaseStats()
+	case "get_sync_status":
+		c.handleGetSyncStatus()
 	case "watcher_upsert":
 		c.handleWatcherUpsert(*msg)
 	case "ping":
@@ -849,6 +852,58 @@ func (c *Client) handleGetDatabaseStats() {
 		"total_attestations", totalAttestations,
 		"client_id", c.id,
 	)
+}
+
+// handleGetSyncStatus sends the current Merkle tree state to the client
+func (c *Client) handleGetSyncStatus() {
+	if c.server.syncTree == nil {
+		c.sendJSON(map[string]interface{}{
+			"type":      "sync_status",
+			"available": false,
+			"reason":    "WASM engine not loaded",
+		})
+		return
+	}
+
+	root, err := c.server.syncTree.Root()
+	if err != nil {
+		c.sendJSON(map[string]interface{}{
+			"type":      "sync_status",
+			"available": true,
+			"error":     fmt.Sprintf("Failed to read tree root: %v", err),
+		})
+		return
+	}
+
+	groups, err := c.server.syncTree.GroupHashes()
+	if err != nil {
+		c.sendJSON(map[string]interface{}{
+			"type":      "sync_status",
+			"available": true,
+			"error":     fmt.Sprintf("Failed to read group hashes: %v", err),
+		})
+		return
+	}
+
+	// Read configured peers from config
+	cfg, _ := appcfg.Load()
+	peers := []map[string]string{}
+	if cfg != nil {
+		for _, p := range cfg.Sync.Peers {
+			peers = append(peers, map[string]string{
+				"name": p.Name,
+				"url":  p.URL,
+			})
+		}
+	}
+
+	c.sendJSON(map[string]interface{}{
+		"type":      "sync_status",
+		"available": true,
+		"root":      root,
+		"groups":    len(groups),
+		"peers":     peers,
+	})
 }
 
 // handleRichSearch performs fuzzy search on RichStringFields
