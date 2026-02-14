@@ -234,6 +234,7 @@ export function buildCanvasWorkspace(
 ): HTMLElement {
     const container = document.createElement('div');
     container.className = 'canvas-workspace';
+    container.dataset.canvasId = canvasId;
     container.tabIndex = 0;
 
     container.style.width = '100%';
