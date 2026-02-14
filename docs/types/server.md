@@ -9,7 +9,6 @@ This document shows Go type definitions from the codebase.
 **Generated types**:
 - TypeScript: [`types/generated/typescript/server.ts`](https://github.com/teranos/QNTX/blob/main/types/generated/typescript/server.ts)
 - Rust: [`types/generated/rust/server.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/server.rs)
-- Python: [`types/generated/python/server.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/server.py)
 
 ## ChildJobInfo {#childjobinfo}
 
@@ -262,7 +261,7 @@ type PluginHealthMessage struct {
 
 ## PluginInfo {#plugininfo}
 
-**Source**: [`server/handlers.go:574`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L574)
+**Source**: [`server/handlers.go:577`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L577)
 
 
 ```go

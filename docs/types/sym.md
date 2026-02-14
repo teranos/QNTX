@@ -9,7 +9,6 @@ This document shows Go type definitions from the codebase.
 **Generated types**:
 - TypeScript: [`types/generated/typescript/sym.ts`](https://github.com/teranos/QNTX/blob/main/types/generated/typescript/sym.ts)
 - Rust: [`types/generated/rust/sym.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/sym.rs)
-- Python: [`types/generated/python/sym.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/sym.py)
 
 ## Constants {#constants}
 

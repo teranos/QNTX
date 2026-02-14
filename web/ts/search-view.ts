@@ -5,6 +5,11 @@
 
 import { typeDefinitionWindow } from './type-definition-window.ts';
 
+// Search strategy constants — must match ats/storage/rich_search.go
+export const STRATEGY_SUBSTRING = 'substring';
+export const STRATEGY_FUZZY = 'fuzzy';
+export const STRATEGY_SEMANTIC = 'semantic';
+
 export interface SearchMatch {
     node_id: string;
     type_name: string;
@@ -166,12 +171,19 @@ export class SearchView {
         score.className = 'search-score';
         score.textContent = `${Math.round(match.score * 100)}%`;
 
+        // Strategy badge (⊨ semantic, ≡ text)
+        const strategy = document.createElement('span');
+        strategy.className = 'search-strategy';
+        strategy.textContent = match.strategy === STRATEGY_SEMANTIC ? '⊨' : '≡';
+        strategy.title = match.strategy;
+
         // Assemble the line
         line.appendChild(nodeLabel);
         line.appendChild(typeBadge);
         line.appendChild(fieldName);
         line.appendChild(excerpt);
         line.appendChild(score);
+        line.appendChild(strategy);
 
         return line;
     }

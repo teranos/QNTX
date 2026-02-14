@@ -9,7 +9,6 @@ This document shows Go type definitions from the codebase.
 **Generated types**:
 - TypeScript: [`types/generated/typescript/types.ts`](https://github.com/teranos/QNTX/blob/main/types/generated/typescript/types.ts)
 - Rust: [`types/generated/rust/types.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/types.rs)
-- Python: [`types/generated/python/types.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/types.py)
 
 ## As {#as}
 
