@@ -10,6 +10,9 @@
 | GET | `/api/canvas/compositions/` | canvasHandler |
 | GET | `/api/canvas/glyphs` | canvasHandler |
 | GET | `/api/canvas/glyphs/` | canvasHandler |
+| GET | `/api/embeddings/batch` | HandleEmbeddingBatch |
+| GET | `/api/embeddings/generate` | HandleEmbeddingGenerate |
+| GET | `/api/search/semantic` | HandleSemanticSearch |
 | GET | `/api/types` | HandleTypes |
 | GET | `/api/types/` | HandleTypes |
 | GET | `/api/watchers` | HandleWatchers |
@@ -50,6 +53,36 @@ POST /api/attestations — idempotent (returns 200 if already exists).
 
 ---
 
+### `GET` /api/embeddings/batch
+
+HandleEmbeddingBatch handles batch embedding generation (POST /api/embeddings/batch)
+
+**Handler**: `HandleEmbeddingBatch`
+
+**Response**: [`EmbeddingBatchResponse`](../types/server.md#embeddingbatchresponse)
+
+---
+
+### `GET` /api/embeddings/generate
+
+HandleEmbeddingGenerate handles embedding generation requests (POST /api/embeddings/generate)
+
+**Handler**: `HandleEmbeddingGenerate`
+
+**Response**: [`EmbeddingGenerateResponse`](../types/server.md#embeddinggenerateresponse)
+
+---
+
+### `GET` /api/search/semantic
+
+HandleSemanticSearch handles semantic search requests (GET /api/search/semantic)
+
+**Handler**: `HandleSemanticSearch`
+
+**Response**: [`SemanticSearchResponse`](../types/server.md#semanticsearchresponse)
+
+---
+
 ### `GET` /api/types
 
 **Handler**: `HandleTypes`
@@ -77,11 +110,6 @@ GET /api/types/{typename} - Get a specific type attestation
 
 HandleWatchers handles watcher CRUD operations
 Routes:
-  GET    /api/watchers       - List all watchers
-  POST   /api/watchers       - Create a new watcher
-  GET    /api/watchers/{id}  - Get a watcher by ID
-  PUT    /api/watchers/{id}  - Update a watcher
-  DELETE /api/watchers/{id}  - Delete a watcher
 
 **Handler**: `HandleWatchers`
 
