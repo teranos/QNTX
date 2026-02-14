@@ -530,8 +530,7 @@ func (o *EmbeddingObserver) OnAttestationCreated(as *types.As) {
 	existing, err := o.embeddingStore.GetBySource("attestation", as.ID)
 	if err != nil {
 		o.logger.Warnw("Failed to check existing embedding",
-			"attestation_id", as.ID,
-			"error", err)
+			"error", errors.Wrapf(err, "attestation %s", as.ID))
 		return
 	}
 	if existing != nil {
@@ -541,27 +540,22 @@ func (o *EmbeddingObserver) OnAttestationCreated(as *types.As) {
 	// Generate embedding via Rust FFI (~80ms)
 	result, err := o.embeddingService.GenerateEmbedding(text)
 	if err != nil {
-		o.logger.Warnw("Failed to auto-embed attestation",
-			"attestation_id", as.ID,
-			"text_length", len(text),
-			"error", err)
+		o.logger.Warnw("Failed to generate embedding",
+			"error", errors.Wrapf(err, "attestation %s (%d chars)", as.ID, len(text)))
 		return
 	}
 
 	blob, err := o.embeddingService.SerializeEmbedding(result.Embedding)
 	if err != nil {
-		o.logger.Warnw("Failed to serialize auto-embedding",
-			"attestation_id", as.ID,
-			"dimensions", len(result.Embedding),
-			"error", err)
+		o.logger.Warnw("Failed to serialize embedding",
+			"error", errors.Wrapf(err, "attestation %s (%d dimensions)", as.ID, len(result.Embedding)))
 		return
 	}
 
 	modelInfo, err := o.embeddingService.GetModelInfo()
 	if err != nil {
-		o.logger.Warnw("Failed to get model info for auto-embedding",
-			"attestation_id", as.ID,
-			"error", err)
+		o.logger.Warnw("Failed to get model info",
+			"error", errors.Wrapf(err, "attestation %s", as.ID))
 		return
 	}
 
@@ -574,9 +568,8 @@ func (o *EmbeddingObserver) OnAttestationCreated(as *types.As) {
 		Dimensions: modelInfo.Dimensions,
 	}
 	if err := o.embeddingStore.Save(model); err != nil {
-		o.logger.Warnw("Failed to save auto-embedding",
-			"attestation_id", as.ID,
-			"error", err)
+		o.logger.Warnw("Failed to save embedding",
+			"error", errors.Wrapf(err, "attestation %s", as.ID))
 		return
 	}
 
