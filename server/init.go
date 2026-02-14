@@ -432,10 +432,13 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore zapcore.Core, ws
 
 	// Create budget tracker for Pulse daemon monitoring
 	budgetTracker := budget.NewTracker(db, budget.BudgetConfig{
-		DailyBudgetUSD:   cfg.Pulse.DailyBudgetUSD,
-		WeeklyBudgetUSD:  cfg.Pulse.WeeklyBudgetUSD,
-		MonthlyBudgetUSD: cfg.Pulse.MonthlyBudgetUSD,
-		CostPerScoreUSD:  cfg.Pulse.CostPerScoreUSD,
+		DailyBudgetUSD:          cfg.Pulse.DailyBudgetUSD,
+		WeeklyBudgetUSD:         cfg.Pulse.WeeklyBudgetUSD,
+		MonthlyBudgetUSD:        cfg.Pulse.MonthlyBudgetUSD,
+		CostPerScoreUSD:         cfg.Pulse.CostPerScoreUSD,
+		ClusterDailyBudgetUSD:   cfg.Pulse.ClusterDailyBudgetUSD,
+		ClusterWeeklyBudgetUSD:  cfg.Pulse.ClusterWeeklyBudgetUSD,
+		ClusterMonthlyBudgetUSD: cfg.Pulse.ClusterMonthlyBudgetUSD,
 	})
 
 	// Create daemon (background job processor)
@@ -492,10 +495,13 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 
 		// Update budget tracker with new limits
 		server.budgetTracker = budget.NewTracker(db, budget.BudgetConfig{
-			DailyBudgetUSD:   newCfg.Pulse.DailyBudgetUSD,
-			WeeklyBudgetUSD:  newCfg.Pulse.WeeklyBudgetUSD,
-			MonthlyBudgetUSD: newCfg.Pulse.MonthlyBudgetUSD,
-			CostPerScoreUSD:  newCfg.Pulse.CostPerScoreUSD,
+			DailyBudgetUSD:          newCfg.Pulse.DailyBudgetUSD,
+			WeeklyBudgetUSD:         newCfg.Pulse.WeeklyBudgetUSD,
+			MonthlyBudgetUSD:        newCfg.Pulse.MonthlyBudgetUSD,
+			CostPerScoreUSD:         newCfg.Pulse.CostPerScoreUSD,
+			ClusterDailyBudgetUSD:   newCfg.Pulse.ClusterDailyBudgetUSD,
+			ClusterWeeklyBudgetUSD:  newCfg.Pulse.ClusterWeeklyBudgetUSD,
+			ClusterMonthlyBudgetUSD: newCfg.Pulse.ClusterMonthlyBudgetUSD,
 		})
 
 		// Broadcast updated daemon status to all clients (includes new budget limits)
