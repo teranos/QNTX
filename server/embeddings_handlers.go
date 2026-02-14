@@ -89,12 +89,14 @@ func (s *QNTXServer) HandleSemanticSearch(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Failed to generate query embedding", http.StatusInternalServerError)
 		return
 	}
-	inferenceMS := time.Now().Sub(startInference).Milliseconds()
+	inferenceMS := time.Since(startInference).Milliseconds()
 
 	// Serialize embedding for sqlite-vec
 	queryBlob, err := s.embeddingService.SerializeEmbedding(queryResult.Embedding)
 	if err != nil {
 		s.logger.Errorw("Failed to serialize query embedding",
+			"query", query,
+			"dimensions", len(queryResult.Embedding),
 			"error", err)
 		http.Error(w, "Failed to serialize embedding", http.StatusInternalServerError)
 		return
@@ -106,11 +108,13 @@ func (s *QNTXServer) HandleSemanticSearch(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		s.logger.Errorw("Failed to perform semantic search",
 			"query", query,
+			"limit", limit,
+			"threshold", threshold,
 			"error", err)
 		http.Error(w, "Failed to perform search", http.StatusInternalServerError)
 		return
 	}
-	searchMS := time.Now().Sub(startSearch).Milliseconds()
+	searchMS := time.Since(startSearch).Milliseconds()
 
 	// Fetch attestations for results
 	response := SemanticSearchResponse{
@@ -149,7 +153,8 @@ func (s *QNTXServer) HandleSemanticSearch(w http.ResponseWriter, r *http.Request
 	// Send response
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		s.logger.Errorw("Failed to encode response",
+		s.logger.Errorw("Failed to encode semantic search response",
+			"result_count", len(response.Results),
 			"error", err)
 	}
 }
@@ -225,7 +230,8 @@ func (s *QNTXServer) HandleEmbeddingGenerate(w http.ResponseWriter, r *http.Requ
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		s.logger.Errorw("Failed to encode response",
+		s.logger.Errorw("Failed to encode embedding response",
+			"dimensions", response.Dimensions,
 			"error", err)
 	}
 }
@@ -285,6 +291,12 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 	// Prepare batch of embeddings
 	embeddingModels := []*storage.EmbeddingModel{}
 
+	// Get rich string fields from type definitions for embedding text construction.
+	// Rich fields (message, description, etc.) produce better embeddings than
+	// raw structural identifiers (predicates/subjects/contexts).
+	richStore := storage.NewBoundedStore(s.db, s.logger.Named("embeddings"))
+	richFields := richStore.GetDiscoveredRichFields()
+
 	for _, attestationID := range req.AttestationIDs {
 		// Check if embedding already exists
 		existing, err := s.embeddingStore.GetBySource("attestation", attestationID)
@@ -317,22 +329,37 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 			continue
 		}
 
-		// Build text for embedding from attestation fields
+		// Build text for embedding: prefer rich text from attributes (same fields
+		// the fuzzy search uses), fall back to structural fields if none found.
 		textParts := []string{}
-
-		// Add predicates
-		for _, pred := range attestation.Predicates {
-			textParts = append(textParts, pred)
+		if attestation.Attributes != nil && len(richFields) > 0 {
+			for _, field := range richFields {
+				if value, exists := attestation.Attributes[field]; exists {
+					switch v := value.(type) {
+					case string:
+						if v != "" {
+							textParts = append(textParts, v)
+						}
+					case []interface{}:
+						for _, item := range v {
+							if str, ok := item.(string); ok && str != "" {
+								textParts = append(textParts, str)
+							}
+						}
+					}
+				}
+			}
 		}
-
-		// Add subjects
-		for _, subj := range attestation.Subjects {
-			textParts = append(textParts, subj)
-		}
-
-		// Add contexts
-		for _, ctx := range attestation.Contexts {
-			textParts = append(textParts, ctx)
+		if len(textParts) == 0 {
+			for _, pred := range attestation.Predicates {
+				textParts = append(textParts, pred)
+			}
+			for _, subj := range attestation.Subjects {
+				textParts = append(textParts, subj)
+			}
+			for _, ctx := range attestation.Contexts {
+				textParts = append(textParts, ctx)
+			}
 		}
 
 		text := strings.Join(textParts, " ")
@@ -385,7 +412,7 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 			// Count all as failed
 			failed += len(embeddingModels)
 			processed -= len(embeddingModels)
-			errorMessages = append(errorMessages, errors.Wrap(err, "failed to save embeddings to database").Error())
+			errorMessages = append(errorMessages, errors.Wrapf(err, "failed to save %d embeddings to database", len(embeddingModels)).Error())
 		}
 	}
 
@@ -393,7 +420,7 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 	response := EmbeddingBatchResponse{
 		Processed: processed,
 		Failed:    failed,
-		TimeMS:    float64(time.Now().Sub(startTime).Milliseconds()),
+		TimeMS:    float64(time.Since(startTime).Milliseconds()),
 	}
 
 	if len(errorMessages) > 0 {
@@ -402,7 +429,9 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		s.logger.Errorw("Failed to encode response",
+		s.logger.Errorw("Failed to encode batch response",
+			"processed", response.Processed,
+			"failed", response.Failed,
 			"error", err)
 	}
 }
