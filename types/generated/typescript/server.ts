@@ -689,6 +689,14 @@ export interface QueryMessage {
    * For watcher_upsert: Whether watcher is enabled
    */
   enabled: boolean;
+  /**
+   * For watcher_upsert: Natural language query for semantic matching
+   */
+  semantic_query: string;
+  /**
+   * For watcher_upsert: Minimum similarity score (0-1)
+   */
+  semantic_threshold: number;
 }
 
 export interface Result {
@@ -876,15 +884,20 @@ export interface WatcherCreateRequest {
    */
   time_end?: string;
   /**
-   * "python" or "webhook"
+   * "python", "webhook", or "semantic_match"
    */
   action_type: string;
   /**
-   * Python code or webhook URL
+   * Python code or webhook URL (not required for semantic_match)
    */
   action_data: string;
   max_fires_per_minute?: number;
   enabled?: boolean | null;
+  /**
+   * Semantic matching fields (for ⊨ glyphs)
+   */
+  semantic_query?: string;
+  semantic_threshold?: number;
 }
 
 export interface WatcherErrorMessage {
@@ -928,6 +941,10 @@ export interface WatcherMatchMessage {
    */
   attestation: unknown;
   /**
+   * Semantic similarity score (0-1), 0 for structural matches
+   */
+  score?: number;
+  /**
    * Unix timestamp
    */
   timestamp: number;
@@ -944,6 +961,8 @@ export interface WatcherResponse {
   time_end?: string;
   action_type: string;
   action_data: string;
+  semantic_query?: string;
+  semantic_threshold?: number;
   max_fires_per_minute: number;
   enabled: boolean;
   created_at: string;
