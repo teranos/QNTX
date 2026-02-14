@@ -6,9 +6,9 @@
 import { typeDefinitionWindow } from './type-definition-window.ts';
 
 // Search strategy constants — must match ats/storage/rich_search.go
-const STRATEGY_SUBSTRING = 'substring';
-const STRATEGY_FUZZY = 'fuzzy';
-const STRATEGY_SEMANTIC = 'semantic';
+export const STRATEGY_SUBSTRING = 'substring';
+export const STRATEGY_FUZZY = 'fuzzy';
+export const STRATEGY_SEMANTIC = 'semantic';
 
 export interface SearchMatch {
     node_id: string;
