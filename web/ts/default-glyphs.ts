@@ -170,8 +170,8 @@ phone = "http://phone.local:877"</pre>
         <div class="glyph-section">
             <h3 class="glyph-section-title">The Road Ahead</h3>
             <div style="color: #9ca3af; font-size: 12px; line-height: 1.6; padding: 4px 0;">
-                <div style="margin-bottom: 6px;"><span style="color: #4ade80; text-decoration: line-through;">Scheduled sync</span> — peers reconcile on a configurable interval</div>
                 <div style="margin-bottom: 6px;"><span style="color: #60a5fa;">Reactive push</span> — new attestations trigger immediate peer sync</div>
+                <div style="margin-bottom: 6px;"><span style="color: #60a5fa;">Authentication</span> — peer identity verification before reconciliation</div>
                 <div><span style="color: #60a5fa;">Reticulum</span> — cryptographic mesh transport beneath the same protocol</div>
             </div>
         </div>
