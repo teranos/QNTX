@@ -232,8 +232,6 @@ Systems that currently operate per-node but could leverage sync infrastructure.
 
 **Canvas sync.** Glyphs are positioned widgets with content — they map cleanly to `(actor, "canvas:" + id)` groups in the Merkle tree. Two nodes sharing a canvas co-create diagrams; mobile-to-desktop canvas sync falls out for free.
 
-**Watcher cross-node triggers.** Watchers currently only see local attestations. When sync brings in peer attestations, `OnAttestationCreated()` fires on the receiving node — watchers could evaluate and trigger. "Phone creates attestation → desktop watcher fires enrichment."
-
 **Embedding sync.** Each node independently computes embeddings for semantic search. Syncing embeddings alongside attestations lets resource-constrained devices (phone) search against a desktop's index without re-computing. Requires extending the protocol to handle binary blobs.
 
 **Distributed budget tracking.** Desktop and phone both calling Claude can blow past a shared budget. Peers exchanging usage summaries during sync enables aggregate limit enforcement across nodes.
