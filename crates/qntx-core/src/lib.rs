@@ -33,6 +33,7 @@ pub mod expand;
 pub mod fuzzy;
 pub mod parser;
 pub mod storage;
+pub mod sync;
 
 // Re-export main types at crate root
 pub use attestation::{Attestation, AttestationBuilder, AxFilter, AxResult, Conflict};
