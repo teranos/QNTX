@@ -231,3 +231,40 @@
     background: #3d1a0a;
     color: #d45030;
 }
+
+/* ============================================================================
+ * Subcanvas Glyph
+ * ============================================================================ */
+
+/* Compact subcanvas title bar — purple accent */
+.canvas-subcanvas-glyph .canvas-glyph-title-bar {
+    background: #3a2d5a;
+    color: #c0a0e8;
+}
+
+/* Grid preview inside compact subcanvas */
+.subcanvas-preview {
+    flex: 1;
+    overflow: hidden;
+    background-color: #2a2b2a;
+    background-image:
+        repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 9px,
+            rgba(160, 120, 200, 0.08) 9px,
+            rgba(160, 120, 200, 0.08) 10px
+        ),
+        repeating-linear-gradient(
+            90deg,
+            transparent,
+            transparent 9px,
+            rgba(160, 120, 200, 0.08) 9px,
+            rgba(160, 120, 200, 0.08) 10px
+        );
+}
+
+/* Expanded subcanvas fullscreen state */
+.canvas-subcanvas-glyph-expanded {
+    background: var(--bg-primary);
+}

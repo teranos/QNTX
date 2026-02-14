@@ -55,14 +55,201 @@ import { glyphRun } from './components/glyph/run';
 import { createCanvasGlyph } from './components/glyph/canvas/canvas-glyph';
 import { createChartGlyph } from './components/glyph/chart-glyph';
 import { sendMessage } from './websocket';
+import { apiFetch } from './api';
 import { DB } from '@generated/sym.js';
 import { log, SEG } from './logger.ts';
 import { formatBuildTime } from './components/tooltip.ts';
-import type { VersionMessage, SystemCapabilitiesMessage } from '../types/websocket';
+import type { VersionMessage, SystemCapabilitiesMessage, SyncStatusMessage } from '../types/websocket';
+
+// Sync status state
+let syncElement: HTMLElement | null = null;
+let syncStatus: SyncStatusMessage | null = null;
+
+export function updateSyncStatus(data: SyncStatusMessage): void {
+    syncStatus = data;
+    if (syncElement) {
+        renderSync();
+    }
+}
+
+function renderSync(): void {
+    if (!syncElement) return;
+
+    if (!syncStatus) {
+        syncElement.innerHTML = '<div class="glyph-loading">Loading sync status...</div>';
+        return;
+    }
+
+    if (!syncStatus.available) {
+        syncElement.innerHTML = `
+            <div class="glyph-content">
+                <div class="glyph-section">
+                    <h3 class="glyph-section-title">Sync Engine</h3>
+                    <div class="glyph-row">
+                        <span class="glyph-label">Status:</span>
+                        <span class="glyph-value" style="color: #fbbf24;">unavailable</span>
+                    </div>
+                    <div class="glyph-row">
+                        <span class="glyph-label">Reason:</span>
+                        <span class="glyph-value">${syncStatus.reason || 'unknown'}</span>
+                    </div>
+                </div>
+                <div class="glyph-section">
+                    <h3 class="glyph-section-title">What's Next</h3>
+                    <div style="color: #9ca3af; font-size: 12px; line-height: 1.5; padding: 4px 0;">
+                        Build with <code style="background: #1e293b; padding: 2px 6px; border-radius: 3px;">make wasm</code> to enable the sync engine.
+                        The Merkle tree, content hashing, and symmetric reconciliation protocol are ready —
+                        they need the qntx-core WASM module to run.
+                    </div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    if (syncStatus.error) {
+        syncElement.innerHTML = `
+            <div class="glyph-content">
+                <div class="glyph-row">
+                    <span class="glyph-label">Status:</span>
+                    <span class="glyph-value" style="color: #f87171;">error</span>
+                </div>
+                <div class="glyph-row">
+                    <span class="glyph-label">Error:</span>
+                    <span class="glyph-value">${syncStatus.error}</span>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    const rootShort = syncStatus.root
+        ? `${syncStatus.root.substring(0, 8)}...${syncStatus.root.substring(56)}`
+        : 'empty';
+    const rootColor = syncStatus.root && syncStatus.root !== '0'.repeat(64) ? '#4ade80' : '#9ca3af';
+
+    // Peers section
+    const peers = syncStatus.peers || [];
+    let peersSection = '';
+    if (peers.length > 0) {
+        const peerRows = peers.map(p => {
+            const statusColor = p.status === 'ok' ? '#4ade80' : p.status === 'unreachable' ? '#f87171' : '#6b7280';
+            const statusDot = p.status ? `<span style="color: ${statusColor}; margin-right: 6px;">●</span>` : '';
+            return `
+            <div class="glyph-row" style="align-items: center;">
+                ${statusDot}<span class="glyph-label">${p.name}:</span>
+                <span class="glyph-value" style="font-size: 11px; flex: 1;">${p.url}</span>
+                <button class="sync-peer-btn" data-peer-url="${p.url}" style="
+                    background: transparent; border: 1px solid #60a5fa; color: #60a5fa;
+                    padding: 2px 8px; border-radius: 3px; cursor: pointer;
+                    font-family: monospace; font-size: 11px; margin-left: 8px;
+                ">Sync</button>
+            </div>`;
+        }).join('');
+        peersSection = `
+            <div class="glyph-section">
+                <h3 class="glyph-section-title">Configured Peers</h3>
+                ${peerRows}
+            </div>
+        `;
+    } else {
+        peersSection = `
+            <div class="glyph-section">
+                <h3 class="glyph-section-title">Peers</h3>
+                <div style="color: #9ca3af; font-size: 12px; line-height: 1.5; padding: 4px 0;">
+                    No peers configured. Add peers to <code style="background: #1e293b; padding: 2px 6px; border-radius: 3px;">am.toml</code>:
+                    <pre style="margin: 8px 0 0; background: #0f172a; padding: 8px; border-radius: 4px; font-size: 11px; overflow-x: auto;">[sync.peers]
+phone = "http://phone.local:877"</pre>
+                </div>
+            </div>
+        `;
+    }
+
+    // Vision teaser
+    const visionSection = `
+        <div class="glyph-section">
+            <h3 class="glyph-section-title">The Road Ahead</h3>
+            <div style="color: #9ca3af; font-size: 12px; line-height: 1.6; padding: 4px 0;">
+                <div style="margin-bottom: 6px;"><span style="color: #60a5fa;">Reactive push</span> — new attestations trigger immediate peer sync</div>
+                <div style="margin-bottom: 6px;"><span style="color: #60a5fa;">Authentication</span> — peer identity verification before reconciliation</div>
+                <div><span style="color: #60a5fa;">Reticulum</span> — cryptographic mesh transport beneath the same protocol</div>
+            </div>
+        </div>
+    `;
+
+    syncElement.innerHTML = `
+        <div class="glyph-content">
+            <div class="glyph-section">
+                <h3 class="glyph-section-title">Merkle Tree</h3>
+                <div class="glyph-row">
+                    <span class="glyph-label">Root:</span>
+                    <span class="glyph-value" style="color: ${rootColor}; font-family: monospace; font-size: 12px;">${rootShort}</span>
+                </div>
+                <div class="glyph-row">
+                    <span class="glyph-label">Groups:</span>
+                    <span class="glyph-value">${(syncStatus.groups ?? 0).toLocaleString()} <span style="color: #6b7280;">(actor, context) pairs</span></span>
+                </div>
+            </div>
+            ${peersSection}
+            ${visionSection}
+        </div>
+    `;
+
+    // Attach per-peer sync button handlers
+    syncElement.querySelectorAll('.sync-peer-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const button = btn as HTMLButtonElement;
+            const peerUrl = button.dataset.peerUrl!;
+
+            button.textContent = 'Syncing\u2026';
+            button.disabled = true;
+            button.style.borderColor = '#fbbf24';
+            button.style.color = '#fbbf24';
+
+            try {
+                const resp = await apiFetch('/api/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ peer: peerUrl }),
+                });
+                const data = await resp.json();
+
+                if (data.error) {
+                    button.textContent = 'Error';
+                    button.title = data.error;
+                    button.style.borderColor = '#f87171';
+                    button.style.color = '#f87171';
+                } else {
+                    button.textContent = `\u2191${data.sent} \u2193${data.received}`;
+                    button.style.borderColor = '#4ade80';
+                    button.style.color = '#4ade80';
+                    sendMessage({ type: 'get_sync_status' });
+                }
+            } catch {
+                button.textContent = 'Failed';
+                button.style.borderColor = '#f87171';
+                button.style.color = '#f87171';
+            }
+
+            setTimeout(() => {
+                button.textContent = 'Sync';
+                button.disabled = false;
+                button.style.borderColor = '#60a5fa';
+                button.style.color = '#60a5fa';
+                button.title = '';
+            }, 3000);
+        });
+    });
+}
 
 // Database stats state
 let dbStatsElement: HTMLElement | null = null;
 let dbStats: any = null;
+
+// Embeddings state
+let embeddingsElement: HTMLElement | null = null;
+let embeddingsInfo: { available: boolean; model_name: string; dimensions: number; embedding_count: number; attestation_count: number; unembedded_ids?: string[] } | null = null;
+let embeddingsReembedding = false;
 
 // Self diagnostics state
 let selfElement: HTMLElement | null = null;
@@ -235,6 +422,104 @@ function renderSelf(): void {
     `;
 }
 
+export async function fetchEmbeddingsInfo(): Promise<void> {
+    try {
+        const resp = await apiFetch('/api/embeddings/info');
+        embeddingsInfo = await resp.json();
+    } catch {
+        embeddingsInfo = null;
+    }
+    renderEmbeddings();
+}
+
+function renderEmbeddings(): void {
+    if (!embeddingsElement) return;
+
+    if (!embeddingsInfo) {
+        embeddingsElement.innerHTML = '<div class="glyph-loading">Loading...</div>';
+        return;
+    }
+
+    const { available, model_name, dimensions, embedding_count, attestation_count } = embeddingsInfo;
+    const unembedded = attestation_count - embedding_count;
+
+    let reembedSection = '';
+    if (available && unembedded > 0) {
+        reembedSection = `
+            <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
+                <button class="emb-reembed-btn panel-btn" style="width:100%"
+                    ${embeddingsReembedding ? 'disabled' : ''}>
+                    ${embeddingsReembedding ? 'Embedding...' : `Embed ${unembedded} unembedded attestations`}
+                </button>
+                <div class="emb-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
+            </div>
+        `;
+    }
+
+    embeddingsElement.innerHTML = `
+        <div class="glyph-content">
+            <div class="glyph-row">
+                <span class="glyph-label">Status:</span>
+                <span class="glyph-value">${available ? '<span style="color:#4ade80">Active</span>' : '<span style="color:#fbbf24">Unavailable</span>'}</span>
+            </div>
+            ${available ? `
+            <div class="glyph-row">
+                <span class="glyph-label">Model:</span>
+                <span class="glyph-value">${model_name}</span>
+            </div>
+            <div class="glyph-row">
+                <span class="glyph-label">Dimensions:</span>
+                <span class="glyph-value">${dimensions}</span>
+            </div>
+            ` : ''}
+            <div class="glyph-row">
+                <span class="glyph-label">Embedded:</span>
+                <span class="glyph-value">${embedding_count} / ${attestation_count}</span>
+            </div>
+            ${reembedSection}
+        </div>
+    `;
+
+    const btn = embeddingsElement.querySelector('.emb-reembed-btn');
+    if (btn) {
+        btn.addEventListener('click', reembedAll);
+    }
+}
+
+async function reembedAll(): Promise<void> {
+    if (embeddingsReembedding || !embeddingsInfo?.available) return;
+
+    embeddingsReembedding = true;
+    renderEmbeddings();
+
+    const resultEl = embeddingsElement?.querySelector('.emb-result');
+
+    try {
+        const ids = embeddingsInfo?.unembedded_ids ?? [];
+        if (ids.length === 0) return;
+
+        const resp = await apiFetch('/api/embeddings/batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ attestation_ids: ids })
+        });
+        const result = await resp.json();
+
+        if (resultEl) {
+            resultEl.textContent = `${result.processed} embedded, ${result.failed} failed (${result.time_ms.toFixed(0)}ms)`;
+        }
+
+        await fetchEmbeddingsInfo();
+    } catch (err) {
+        if (resultEl) {
+            resultEl.textContent = `Error: ${err}`;
+        }
+    } finally {
+        embeddingsReembedding = false;
+        renderEmbeddings();
+    }
+}
+
 // Register default system glyphs
 export function registerDefaultGlyphs(): void {
     // Canvas Glyph - Fractal container with spatial grid
@@ -255,6 +540,37 @@ export function registerDefaultGlyphs(): void {
         initialHeight: '240px',
         defaultX: 100,
         defaultY: 100
+    });
+
+    // Embeddings Glyph
+    glyphRun.add({
+        id: 'embeddings-glyph',
+        title: '\u29C9 Embeddings',
+        renderContent: () => {
+            const content = document.createElement('div');
+            embeddingsElement = content;
+            fetchEmbeddingsInfo();
+            return content;
+        },
+        initialWidth: '360px',
+        initialHeight: '200px'
+    });
+
+    // Sync Status Glyph
+    glyphRun.add({
+        id: 'sync-glyph',
+        title: '↔ Sync',
+        renderContent: () => {
+            const content = document.createElement('div');
+            syncElement = content;
+            sendMessage({ type: 'get_sync_status' });
+            renderSync();
+            return content;
+        },
+        initialWidth: '420px',
+        initialHeight: '360px',
+        defaultX: 120,
+        defaultY: 120
     });
 
     // Self Diagnostics Glyph
@@ -299,6 +615,8 @@ export function registerDefaultGlyphs(): void {
     log.debug(SEG.UI, 'Default glyphs registered:', {
         canvas: 'Spatial canvas grid',
         database: 'Database statistics',
+        embeddings: 'Embedding service status',
+        sync: 'Attestation sync status',
         self: 'Self diagnostics',
         usage: 'API usage and costs'
     });

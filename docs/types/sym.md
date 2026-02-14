@@ -31,6 +31,7 @@ const PulseClose = "❀"
 const PulseOpen = "✿"
 const SE = "⊨"
 const SO = "⟶"
+const Subcanvas = "⌗"
 ```
 
 

@@ -6,7 +6,7 @@
  */
 
 import type { Glyph } from '../glyph';
-import { IX, AX, SE, SO, Prose } from '@generated/sym.js';
+import { IX, AX, SE, SO, Prose, Subcanvas } from '@generated/sym.js';
 import { log, SEG } from '../../../logger';
 import { getMinimizeDuration } from '../glyph';
 import { createIxGlyph } from '../ix-glyph';
@@ -16,6 +16,7 @@ import { createPyGlyph, PY_DEFAULT_CODE } from '../py-glyph';
 import { createPromptGlyph, PROMPT_DEFAULT_TEMPLATE } from '../prompt-glyph';
 import { createNoteGlyph } from '../note-glyph';
 import { createTsGlyph, TS_DEFAULT_CODE } from '../ts-glyph';
+import { createSubcanvasGlyph } from '../subcanvas-glyph';
 import { uiState } from '../../../state/ui';
 
 /** Duration multiplier for spawn menu animation */
@@ -50,7 +51,8 @@ export function showSpawnMenu(
     mouseX: number,
     mouseY: number,
     canvas: HTMLElement,
-    glyphs: Glyph[]
+    glyphs: Glyph[],
+    canvasId: string = 'canvas-workspace'
 ): void {
     // Remove any existing menu
     const existingMenu = document.querySelector('.canvas-spawn-menu');
@@ -104,7 +106,7 @@ export function showSpawnMenu(
     ixBtn.title = 'Spawn IX glyph';
 
     ixBtn.addEventListener('click', () => {
-        spawnIxGlyph(x, y, canvas, glyphs);
+        spawnIxGlyph(x, y, canvas, glyphs, canvasId);
         removeMenu();
     });
 
@@ -117,7 +119,7 @@ export function showSpawnMenu(
     axBtn.title = 'Spawn AX query glyph';
 
     axBtn.addEventListener('click', () => {
-        spawnAxGlyph(x, y, canvas, glyphs);
+        spawnAxGlyph(x, y, canvas, glyphs, canvasId);
         removeMenu();
     });
 
@@ -147,7 +149,7 @@ export function showSpawnMenu(
     pyBtn.title = 'Spawn Python glyph';
 
     pyBtn.addEventListener('click', () => {
-        spawnPyGlyph(x, y, canvas, glyphs);
+        spawnPyGlyph(x, y, canvas, glyphs, canvasId);
         removeMenu();
     });
 
@@ -160,7 +162,7 @@ export function showSpawnMenu(
     tsBtn.title = 'Spawn TypeScript glyph';
 
     tsBtn.addEventListener('click', () => {
-        spawnTsGlyph(x, y, canvas, glyphs);
+        spawnTsGlyph(x, y, canvas, glyphs, canvasId);
         removeMenu();
     });
 
@@ -173,7 +175,7 @@ export function showSpawnMenu(
     promptBtn.title = 'Spawn Prompt glyph';
 
     promptBtn.addEventListener('click', () => {
-        spawnPromptGlyph(x, y, canvas, glyphs);
+        spawnPromptGlyph(x, y, canvas, glyphs, canvasId);
         removeMenu();
     });
 
@@ -186,11 +188,24 @@ export function showSpawnMenu(
     noteBtn.title = 'Spawn Note glyph';
 
     noteBtn.addEventListener('click', () => {
-        spawnNoteGlyph(x, y, canvas, glyphs);
+        spawnNoteGlyph(x, y, canvas, glyphs, canvasId);
         removeMenu();
     });
 
     menu.appendChild(noteBtn);
+
+    // Add subcanvas button
+    const subcanvasBtn = document.createElement('button');
+    subcanvasBtn.className = 'canvas-spawn-button';
+    subcanvasBtn.textContent = Subcanvas;
+    subcanvasBtn.title = 'Spawn Subcanvas glyph';
+
+    subcanvasBtn.addEventListener('click', () => {
+        spawnSubcanvasGlyph(x, y, canvas, glyphs, canvasId);
+        removeMenu();
+    });
+
+    menu.appendChild(subcanvasBtn);
 
     document.body.appendChild(menu);
 
@@ -251,11 +266,17 @@ export function showSpawnMenu(
 /**
  * Spawn a new IX glyph at pixel position
  */
+/** Normalize canvasId for storage: 'canvas-workspace' → '' (root) */
+function storageCanvasId(canvasId: string): string {
+    return canvasId === 'canvas-workspace' ? '' : canvasId;
+}
+
 async function spawnIxGlyph(
     x: number,
     y: number,
     canvas: HTMLElement,
-    glyphs: Glyph[]
+    glyphs: Glyph[],
+    canvasId: string
 ): Promise<void> {
     const ixGlyph: Glyph = {
         id: `ix-${crypto.randomUUID()}`,
@@ -288,7 +309,8 @@ async function spawnIxGlyph(
         x,
         y,
         width,
-        height
+        height,
+        canvas_id: storageCanvasId(canvasId),
     });
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned IX glyph at (${x}, ${y}) with size ${width}x${height}`);
@@ -301,7 +323,8 @@ function spawnAxGlyph(
     x: number,
     y: number,
     canvas: HTMLElement,
-    glyphs: Glyph[]
+    glyphs: Glyph[],
+    canvasId: string
 ): void {
     const axGlyph: Glyph = {
         id: `ax-${crypto.randomUUID()}`,
@@ -334,7 +357,8 @@ function spawnAxGlyph(
         x,
         y,
         width,
-        height
+        height,
+        canvas_id: storageCanvasId(canvasId),
     });
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned AX glyph at (${x}, ${y}) with size ${width}x${height}`);
@@ -390,7 +414,8 @@ async function spawnPyGlyph(
     x: number,
     y: number,
     canvas: HTMLElement,
-    glyphs: Glyph[]
+    glyphs: Glyph[],
+    canvasId: string
 ): Promise<void> {
     const pyGlyph: Glyph = {
         id: `py-${crypto.randomUUID()}`,
@@ -425,6 +450,7 @@ async function spawnPyGlyph(
         width,
         height,
         content: PY_DEFAULT_CODE,
+        canvas_id: storageCanvasId(canvasId),
     });
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned Python glyph at (${x}, ${y}) with size ${width}x${height}`);
@@ -437,7 +463,8 @@ async function spawnTsGlyph(
     x: number,
     y: number,
     canvas: HTMLElement,
-    glyphs: Glyph[]
+    glyphs: Glyph[],
+    canvasId: string
 ): Promise<void> {
     const tsGlyph: Glyph = {
         id: `ts-${crypto.randomUUID()}`,
@@ -469,6 +496,7 @@ async function spawnTsGlyph(
         width,
         height,
         content: TS_DEFAULT_CODE,
+        canvas_id: storageCanvasId(canvasId),
     });
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned TypeScript glyph at (${x}, ${y}) with size ${width}x${height}`);
@@ -481,7 +509,8 @@ async function spawnPromptGlyph(
     x: number,
     y: number,
     canvas: HTMLElement,
-    glyphs: Glyph[]
+    glyphs: Glyph[],
+    canvasId: string
 ): Promise<void> {
     const promptGlyph: Glyph = {
         id: `prompt-${crypto.randomUUID()}`,
@@ -513,6 +542,7 @@ async function spawnPromptGlyph(
         width,
         height,
         content: PROMPT_DEFAULT_TEMPLATE,
+        canvas_id: storageCanvasId(canvasId),
     });
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned Prompt glyph at (${x}, ${y}) with size ${width}x${height}`);
@@ -525,7 +555,8 @@ async function spawnNoteGlyph(
     x: number,
     y: number,
     canvas: HTMLElement,
-    glyphs: Glyph[]
+    glyphs: Glyph[],
+    canvasId: string
 ): Promise<void> {
     const noteGlyph: Glyph = {
         id: `note-${crypto.randomUUID()}`,
@@ -557,7 +588,53 @@ async function spawnNoteGlyph(
         width,
         height,
         content: 'Write here — select and click ⟶ to convert to a prompt glyph.',
+        canvas_id: storageCanvasId(canvasId),
     });
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned Note glyph at (${x}, ${y}) with size ${width}x${height}`);
+}
+
+/**
+ * Spawn a new Subcanvas glyph at pixel position
+ */
+function spawnSubcanvasGlyph(
+    x: number,
+    y: number,
+    canvas: HTMLElement,
+    glyphs: Glyph[],
+    canvasId: string
+): void {
+    const subcanvasGlyph: Glyph = {
+        id: `subcanvas-${crypto.randomUUID()}`,
+        title: 'Subcanvas',
+        symbol: Subcanvas,
+        x,
+        y,
+        renderContent: () => {
+            const content = document.createElement('div');
+            content.textContent = 'Subcanvas glyph';
+            return content;
+        }
+    };
+
+    glyphs.push(subcanvasGlyph);
+
+    const glyphElement = createSubcanvasGlyph(subcanvasGlyph);
+    canvas.appendChild(glyphElement);
+
+    const rect = glyphElement.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+
+    uiState.addCanvasGlyph({
+        id: subcanvasGlyph.id,
+        symbol: Subcanvas,
+        x,
+        y,
+        width,
+        height,
+        canvas_id: storageCanvasId(canvasId),
+    });
+
+    log.debug(SEG.GLYPH, `[Canvas] Spawned Subcanvas glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
