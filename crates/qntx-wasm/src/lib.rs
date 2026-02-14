@@ -430,6 +430,15 @@ mod wazero {
         write_result(&qntx_core::sync::merkle_diff_json(input))
     }
 
+    /// Reverse-lookup a group key hash to its (actor, context) pair.
+    /// Input: `{"group_key_hash":"<hex>"}`
+    /// Returns packed u64 pointing to `{"actor":"...","context":"..."}`.
+    #[no_mangle]
+    pub extern "C" fn sync_merkle_find_group_key(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&qntx_core::sync::merkle_find_group_key_json(input))
+    }
+
     // ============================================================================
     // Tests
     // ============================================================================

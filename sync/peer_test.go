@@ -2,8 +2,12 @@ package sync
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,16 +20,22 @@ import (
 // chanConn implements Conn over a pair of channels for in-process testing.
 // Messages are JSON-serialized through the channels to match real WebSocket behavior.
 type chanConn struct {
-	in  chan json.RawMessage
-	out chan json.RawMessage
+	in   chan json.RawMessage
+	out  chan json.RawMessage
+	done chan struct{}
+	once sync.Once
 }
 
 func (c *chanConn) ReadJSON(v interface{}) error {
-	raw, ok := <-c.in
-	if !ok {
+	select {
+	case raw, ok := <-c.in:
+		if !ok {
+			return fmt.Errorf("connection closed")
+		}
+		return json.Unmarshal(raw, v)
+	case <-c.done:
 		return fmt.Errorf("connection closed")
 	}
-	return json.Unmarshal(raw, v)
 }
 
 func (c *chanConn) WriteJSON(v interface{}) error {
@@ -33,11 +43,16 @@ func (c *chanConn) WriteJSON(v interface{}) error {
 	if err != nil {
 		return err
 	}
-	c.out <- raw
-	return nil
+	select {
+	case c.out <- raw:
+		return nil
+	case <-c.done:
+		return fmt.Errorf("connection closed")
+	}
 }
 
 func (c *chanConn) Close() error {
+	c.once.Do(func() { close(c.done) })
 	return nil
 }
 
@@ -45,7 +60,8 @@ func (c *chanConn) Close() error {
 func connPair() (Conn, Conn) {
 	ab := make(chan json.RawMessage, 32)
 	ba := make(chan json.RawMessage, 32)
-	return &chanConn{in: ba, out: ab}, &chanConn{in: ab, out: ba}
+	return &chanConn{in: ba, out: ab, done: make(chan struct{})},
+		&chanConn{in: ab, out: ba, done: make(chan struct{})}
 }
 
 // memStore is a minimal in-memory AttestationStore for testing.
@@ -106,6 +122,162 @@ func anyIn(want, have []string) bool {
 	return false
 }
 
+// --------------------------------------------------------------------------
+// memTree: in-memory SyncTree for protocol testing.
+//
+// Uses Go's SHA-256 for hashing. The hashes won't match Rust's output, but
+// the protocol tests verify message exchange and attestation transfer — not
+// hash correctness. Hash correctness is tested by `cargo test` on the Rust side.
+// --------------------------------------------------------------------------
+
+type memTreeGroup struct {
+	actor, context string
+	leaves         map[string]bool // content hash hex → present
+}
+
+type memTree struct {
+	mu     sync.Mutex
+	groups map[string]*memTreeGroup // group key hash hex → group
+}
+
+func newMemTree() *memTree {
+	return &memTree{groups: make(map[string]*memTreeGroup)}
+}
+
+func (t *memTree) groupKeyHash(actor, ctx string) string {
+	h := sha256.New()
+	h.Write([]byte("gk:"))
+	h.Write([]byte(actor))
+	h.Write([]byte("\x00"))
+	h.Write([]byte(ctx))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func (t *memTree) groupHash(g *memTreeGroup) string {
+	hashes := make([]string, 0, len(g.leaves))
+	for h := range g.leaves {
+		hashes = append(hashes, h)
+	}
+	sort.Strings(hashes)
+
+	hasher := sha256.New()
+	hasher.Write([]byte("grp:"))
+	hasher.Write([]byte(g.actor))
+	hasher.Write([]byte("\x00"))
+	hasher.Write([]byte(g.context))
+	hasher.Write([]byte("\x00"))
+	for _, h := range hashes {
+		hasher.Write([]byte(h))
+	}
+	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+func (t *memTree) Root() (string, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if len(t.groups) == 0 {
+		return "0000000000000000000000000000000000000000000000000000000000000000", nil
+	}
+
+	ghashes := make([]string, 0, len(t.groups))
+	for _, g := range t.groups {
+		ghashes = append(ghashes, t.groupHash(g))
+	}
+	sort.Strings(ghashes)
+
+	h := sha256.New()
+	h.Write([]byte("root:"))
+	for _, gh := range ghashes {
+		h.Write([]byte(gh))
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+func (t *memTree) GroupHashes() (map[string]string, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	result := make(map[string]string, len(t.groups))
+	for gkh, g := range t.groups {
+		result[gkh] = t.groupHash(g)
+	}
+	return result, nil
+}
+
+func (t *memTree) Diff(remoteGroups map[string]string) (localOnly, remoteOnly, divergent []string, err error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	for gkh, g := range t.groups {
+		rgh, exists := remoteGroups[gkh]
+		if !exists {
+			localOnly = append(localOnly, gkh)
+		} else if rgh != t.groupHash(g) {
+			divergent = append(divergent, gkh)
+		}
+	}
+
+	for gkh := range remoteGroups {
+		if _, exists := t.groups[gkh]; !exists {
+			remoteOnly = append(remoteOnly, gkh)
+		}
+	}
+	return
+}
+
+func (t *memTree) Contains(contentHashHex string) (bool, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	for _, g := range t.groups {
+		if g.leaves[contentHashHex] {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (t *memTree) FindGroupKey(gkhHex string) (actor, context string, err error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	g, ok := t.groups[gkhHex]
+	if !ok {
+		return "", "", fmt.Errorf("group not found: %s", gkhHex)
+	}
+	return g.actor, g.context, nil
+}
+
+func (t *memTree) Insert(actor, context, contentHashHex string) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	gkh := t.groupKeyHash(actor, context)
+	g, ok := t.groups[gkh]
+	if !ok {
+		g = &memTreeGroup{
+			actor:   actor,
+			context: context,
+			leaves:  make(map[string]bool),
+		}
+		t.groups[gkh] = g
+	}
+	g.leaves[contentHashHex] = true
+	return nil
+}
+
+func (t *memTree) ContentHash(attestationJSON string) (string, error) {
+	// Simple deterministic hash of the JSON — doesn't match Rust, but
+	// that's fine for protocol tests.
+	h := sha256.Sum256([]byte(attestationJSON))
+	return hex.EncodeToString(h[:]), nil
+}
+
+// --------------------------------------------------------------------------
+// Test helpers
+// --------------------------------------------------------------------------
+
 func testLogger() *zap.SugaredLogger {
 	logger, _ := zap.NewDevelopment()
 	return logger.Sugar()
@@ -124,19 +296,24 @@ func makeAs(id, subject, predicate, ctx, actor string) *types.As {
 	}
 }
 
-func insertWithTree(store *memStore, tree *Tree, as *types.As) {
+func insertWithTree(store *memStore, tree SyncTree, as *types.As) {
 	store.CreateAttestation(as)
-	ch := ContentHash(as)
+	aj, _ := attestationJSON(as)
+	chHex, _ := tree.ContentHash(aj)
 	for _, actor := range as.Actors {
 		for _, ctx := range as.Contexts {
-			tree.Insert(GroupKey{Actor: actor, Context: ctx}, ch)
+			tree.Insert(actor, ctx, chHex)
 		}
 	}
 }
 
+// --------------------------------------------------------------------------
+// Tests
+// --------------------------------------------------------------------------
+
 func TestPeer_AlreadyInSync(t *testing.T) {
 	connA, connB := connPair()
-	treeA, treeB := NewTree(), NewTree()
+	treeA, treeB := newMemTree(), newMemTree()
 	storeA, storeB := newMemStore(), newMemStore()
 	logger := testLogger()
 
@@ -178,7 +355,7 @@ func TestPeer_AlreadyInSync(t *testing.T) {
 
 func TestPeer_OneSideHasMore(t *testing.T) {
 	connA, connB := connPair()
-	treeA, treeB := NewTree(), NewTree()
+	treeA, treeB := newMemTree(), newMemTree()
 	storeA, storeB := newMemStore(), newMemStore()
 	logger := testLogger()
 
@@ -233,7 +410,7 @@ func TestPeer_OneSideHasMore(t *testing.T) {
 
 func TestPeer_BothHaveUnique(t *testing.T) {
 	connA, connB := connPair()
-	treeA, treeB := NewTree(), NewTree()
+	treeA, treeB := newMemTree(), newMemTree()
 	storeA, storeB := newMemStore(), newMemStore()
 	logger := testLogger()
 
@@ -282,7 +459,7 @@ func TestPeer_BothHaveUnique(t *testing.T) {
 
 func TestPeer_EmptyTrees(t *testing.T) {
 	connA, connB := connPair()
-	treeA, treeB := NewTree(), NewTree()
+	treeA, treeB := newMemTree(), newMemTree()
 	storeA, storeB := newMemStore(), newMemStore()
 	logger := testLogger()
 
@@ -341,12 +518,47 @@ func TestWireRoundtrip(t *testing.T) {
 	}
 }
 
-func TestHexToHash_Roundtrip(t *testing.T) {
-	original := ContentHash(makeAs("as-1", "s", "p", "c", "a"))
-	hexStr := HexHash(original)
-	recovered := hexToHash(hexStr)
+func TestPeer_ContextCancellation(t *testing.T) {
+	connA, _ := connPair()
+	tree := newMemTree()
+	store := newMemStore()
+	logger := testLogger()
 
-	if original != recovered {
-		t.Fatalf("hex roundtrip failed: %x vs %x", original, recovered)
+	// Insert data so roots won't match (forces the protocol past hello)
+	insertWithTree(store, tree, makeAs("as-1", "user-1", "member", "team", "hr"))
+
+	peer := NewPeer(connA, tree, store, logger)
+
+	// Short deadline — the other side never responds
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	_, _, err := peer.Reconcile(ctx)
+	if err == nil {
+		t.Fatal("expected error from cancelled context, got nil")
+	}
+}
+
+func TestAttestationJSON_TimestampMillis(t *testing.T) {
+	as := makeAs("as-ts", "s", "p", "c", "a")
+	as.Timestamp = time.UnixMilli(1718452800000)
+
+	j, err := attestationJSON(as)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var parsed map[string]interface{}
+	if err := json.Unmarshal([]byte(j), &parsed); err != nil {
+		t.Fatal(err)
+	}
+
+	// Timestamp should be a number (milliseconds), not a string
+	ts, ok := parsed["timestamp"].(float64)
+	if !ok {
+		t.Fatalf("timestamp should be a number, got %T", parsed["timestamp"])
+	}
+	if int64(ts) != 1718452800000 {
+		t.Fatalf("timestamp should be 1718452800000, got %v", ts)
 	}
 }

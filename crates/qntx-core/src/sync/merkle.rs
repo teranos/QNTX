@@ -9,6 +9,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::content::{hex_decode, hex_encode};
 
+/// SHA-256 hash alias used throughout the Merkle tree.
+type Hash = [u8; 32];
+
+/// (local_only, remote_only, divergent) group key hashes from a tree diff.
+pub type MerkleDiff = (Vec<Hash>, Vec<Hash>, Vec<Hash>);
+
 /// Identifies a bounded storage group: one (actor, context) pair.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct GroupKey {
@@ -74,7 +80,9 @@ impl MerkleTree {
 
     /// Returns true if the content hash exists in any group.
     pub fn contains(&self, content_hash: &[u8; 32]) -> bool {
-        self.groups.values().any(|g| g.leaves.contains(content_hash))
+        self.groups
+            .values()
+            .any(|g| g.leaves.contains(content_hash))
     }
 
     /// Get the root hash. Recomputes lazily when dirty.
@@ -99,10 +107,7 @@ impl MerkleTree {
 
     /// Compute diff against remote group hashes.
     /// Returns (local_only, remote_only, divergent) group key hashes.
-    pub fn diff(
-        &mut self,
-        remote: &BTreeMap<[u8; 32], [u8; 32]>,
-    ) -> (Vec<[u8; 32]>, Vec<[u8; 32]>, Vec<[u8; 32]>) {
+    pub fn diff(&mut self, remote: &BTreeMap<[u8; 32], [u8; 32]>) -> MerkleDiff {
         let local = self.group_hashes();
 
         let mut local_only = Vec::new();
@@ -388,6 +393,38 @@ pub fn merkle_diff_json(input: &str) -> String {
     })
 }
 
+/// Find the GroupKey for a group key hash in the global tree.
+/// Input: `{"group_key_hash":"<hex>"}`
+/// Output: `{"actor":"...","context":"..."}` or `{"error":"group not found"}`
+pub fn merkle_find_group_key_json(input: &str) -> String {
+    #[derive(Deserialize)]
+    struct Input {
+        group_key_hash: String,
+    }
+
+    let parsed: Input = match serde_json::from_str(input) {
+        Ok(v) => v,
+        Err(e) => return format!(r#"{{"error":"invalid JSON: {}"}}"#, e),
+    };
+
+    let gkh = match hex_decode(&parsed.group_key_hash) {
+        Some(h) => h,
+        None => return r#"{"error":"invalid hex group_key_hash (expected 64 chars)"}"#.into(),
+    };
+
+    TREE.with(|t| {
+        let tree = t.borrow();
+        match tree.find_group_key(&gkh) {
+            Some(key) => format!(
+                r#"{{"actor":"{}","context":"{}"}}"#,
+                key.actor.replace('"', "\\\""),
+                key.context.replace('"', "\\\""),
+            ),
+            None => r#"{"error":"group not found"}"#.into(),
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -568,10 +605,7 @@ mod tests {
         TREE.with(|t| *t.borrow_mut() = MerkleTree::new());
 
         let hash = hex_encode(hash_bytes("test"));
-        let input = format!(
-            r#"{{"actor":"a","context":"c","content_hash":"{}"}}"#,
-            hash
-        );
+        let input = format!(r#"{{"actor":"a","context":"c","content_hash":"{}"}}"#, hash);
         let result = merkle_insert_json(&input);
         assert!(result.contains(r#""ok":true"#), "got: {}", result);
 
@@ -616,5 +650,38 @@ mod tests {
         let missing = hex_encode(hash_bytes("missing"));
         let result = merkle_contains_json(&format!(r#"{{"content_hash":"{}"}}"#, missing));
         assert!(result.contains(r#""exists":false"#), "got: {}", result);
+    }
+
+    #[test]
+    fn json_find_group_key() {
+        // Start with a fresh tree
+        TREE.with(|t| *t.borrow_mut() = MerkleTree::new());
+
+        // Insert a group with known actor/context
+        let hash = hex_encode(hash_bytes("test"));
+        merkle_insert_json(&format!(
+            r#"{{"actor":"alice","context":"team-eng","content_hash":"{}"}}"#,
+            hash
+        ));
+
+        // merkle_group_hashes_json returns {"groups":{"<gkh_hex>":"<gh_hex>"}}.
+        // The key in that map is the group key hash — the opaque identifier
+        // that peers exchange during sync. We grab it here to test the
+        // reverse lookup.
+        let gh_result = merkle_group_hashes_json("");
+        let parsed: serde_json::Value = serde_json::from_str(&gh_result).unwrap();
+        let groups = parsed["groups"].as_object().unwrap();
+        let gkh = groups.keys().next().unwrap();
+
+        // Reverse lookup: hex group key hash → (actor, context)
+        let result = merkle_find_group_key_json(&format!(r#"{{"group_key_hash":"{}"}}"#, gkh));
+        let found: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(found["actor"], "alice");
+        assert_eq!(found["context"], "team-eng");
+
+        // Non-existent group returns error
+        let missing = hex_encode(hash_bytes("no-such-group"));
+        let result = merkle_find_group_key_json(&format!(r#"{{"group_key_hash":"{}"}}"#, missing));
+        assert!(result.contains("group not found"), "got: {}", result);
     }
 }

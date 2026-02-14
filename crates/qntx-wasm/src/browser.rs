@@ -359,6 +359,14 @@ pub fn sync_merkle_diff(remote_json: &str) -> String {
     qntx_core::sync::merkle_diff_json(remote_json)
 }
 
+/// Reverse-lookup a group key hash to its (actor, context) pair.
+/// Input: `{"group_key_hash":"<hex>"}`
+/// Returns: `{"actor":"...","context":"..."}` or `{"error":"group not found"}`
+#[wasm_bindgen]
+pub fn sync_merkle_find_group_key(input: &str) -> String {
+    qntx_core::sync::merkle_find_group_key_json(input)
+}
+
 // ============================================================================
 // Utilities
 // ============================================================================

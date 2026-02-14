@@ -31,7 +31,7 @@ pub fn content_hash(attestation: &Attestation) -> [u8; 32] {
     h.update(b"\na:");
     h.update(canonical(&attestation.actors).as_bytes());
     h.update(b"\nt:");
-    h.update(&attestation.timestamp.to_be_bytes());
+    h.update(attestation.timestamp.to_be_bytes());
     h.update(b"\nrc:");
     h.update(attestation.source.as_bytes());
 
@@ -200,7 +200,10 @@ mod tests {
     fn json_invalid_input() {
         let result = content_hash_json("not json");
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
-        assert!(parsed["error"].as_str().unwrap().contains("invalid attestation JSON"));
+        assert!(parsed["error"]
+            .as_str()
+            .unwrap()
+            .contains("invalid attestation JSON"));
     }
 
     #[test]

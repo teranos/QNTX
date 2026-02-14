@@ -8,8 +8,8 @@ import (
 )
 
 func TestTreeObserver_InsertsIntoTree(t *testing.T) {
-	tree := NewTree()
-	obs := NewTreeObserver(tree)
+	tree := newMemTree()
+	obs := NewTreeObserver(tree, testLogger())
 
 	as := &types.As{
 		ID:         "as-test-1",
@@ -23,28 +23,27 @@ func TestTreeObserver_InsertsIntoTree(t *testing.T) {
 
 	obs.OnAttestationCreated(as)
 
-	if tree.Size() != 1 {
-		t.Fatalf("expected tree size 1, got %d", tree.Size())
+	// Should have 1 group with 1 leaf
+	groups, _ := tree.GroupHashes()
+	if len(groups) != 1 {
+		t.Fatalf("expected 1 group, got %d", len(groups))
 	}
 
-	if tree.GroupCount() != 1 {
-		t.Fatalf("expected 1 group, got %d", tree.GroupCount())
+	// Content hash should be findable
+	aj, err := attestationJSON(as)
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	leaves := tree.GroupLeaves(GroupKey{Actor: "hr-system", Context: "team-eng"})
-	if len(leaves) != 1 {
-		t.Fatalf("expected 1 leaf in group, got %d", len(leaves))
-	}
-
-	expected := ContentHash(as)
-	if leaves[0] != expected {
-		t.Fatal("leaf hash doesn't match content hash")
+	chHex, _ := tree.ContentHash(aj)
+	exists, _ := tree.Contains(chHex)
+	if !exists {
+		t.Fatal("tree should contain the attestation's content hash")
 	}
 }
 
 func TestTreeObserver_MultipleActorsContexts(t *testing.T) {
-	tree := NewTree()
-	obs := NewTreeObserver(tree)
+	tree := newMemTree()
+	obs := NewTreeObserver(tree, testLogger())
 
 	as := &types.As{
 		ID:         "as-test-2",
@@ -59,42 +58,30 @@ func TestTreeObserver_MultipleActorsContexts(t *testing.T) {
 	obs.OnAttestationCreated(as)
 
 	// 2 actors × 2 contexts = 4 groups
-	if tree.GroupCount() != 4 {
-		t.Fatalf("expected 4 groups (2 actors × 2 contexts), got %d", tree.GroupCount())
-	}
-
-	// Each group should have 1 leaf (the same content hash)
-	ch := ContentHash(as)
-	for _, actor := range as.Actors {
-		for _, ctx := range as.Contexts {
-			leaves := tree.GroupLeaves(GroupKey{Actor: actor, Context: ctx})
-			if len(leaves) != 1 {
-				t.Fatalf("group (%s, %s): expected 1 leaf, got %d", actor, ctx, len(leaves))
-			}
-			if leaves[0] != ch {
-				t.Fatalf("group (%s, %s): leaf hash mismatch", actor, ctx)
-			}
-		}
+	groups, _ := tree.GroupHashes()
+	if len(groups) != 4 {
+		t.Fatalf("expected 4 groups (2 actors × 2 contexts), got %d", len(groups))
 	}
 }
 
 func TestTreeObserver_NilAttestation(t *testing.T) {
-	tree := NewTree()
-	obs := NewTreeObserver(tree)
+	tree := newMemTree()
+	obs := NewTreeObserver(tree, testLogger())
 
 	// Should not panic
 	obs.OnAttestationCreated(nil)
 
-	if tree.Size() != 0 {
+	groups, _ := tree.GroupHashes()
+	if len(groups) != 0 {
 		t.Fatal("nil attestation should not add to tree")
 	}
 }
 
 func TestTreeObserver_RootChangesWithAttestations(t *testing.T) {
-	tree := NewTree()
-	obs := NewTreeObserver(tree)
+	tree := newMemTree()
+	obs := NewTreeObserver(tree, testLogger())
 
-	empty := tree.Root()
+	empty, _ := tree.Root()
 
 	obs.OnAttestationCreated(&types.As{
 		Subjects:   []string{"s1"},
@@ -105,15 +92,15 @@ func TestTreeObserver_RootChangesWithAttestations(t *testing.T) {
 		Source:     "cli",
 	})
 
-	after := tree.Root()
+	after, _ := tree.Root()
 	if after == empty {
 		t.Fatal("root should change after attestation creation")
 	}
 }
 
 func TestTreeObserver_TreeAccessor(t *testing.T) {
-	tree := NewTree()
-	obs := NewTreeObserver(tree)
+	tree := newMemTree()
+	obs := NewTreeObserver(tree, testLogger())
 
 	if obs.Tree() != tree {
 		t.Fatal("Tree() should return the underlying tree")
