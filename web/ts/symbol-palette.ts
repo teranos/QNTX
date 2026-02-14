@@ -27,6 +27,7 @@ import {
     SO,
     Pulse, Prose, DB,
     CommandToSymbol,
+    CommandDescriptions,
 } from '@generated/sym.js';
 import { uiState } from './state/ui.ts';
 import { log, SEG } from './logger';
@@ -50,16 +51,28 @@ type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 
 /**
  * Get symbol for a command, with fallback for UI-only commands
  */
+// UI-only command symbols not in generated CommandToSymbol
+const uiOnlySymbols: Record<string, string> = {
+    'pulse': Pulse,
+    'prose': Prose,
+    'db': DB,
+    'go': 'Go',
+    'py': 'py',
+    'plugins': '\u2699',   // Gear symbol
+    'scraper': '⛶',       // White draughts king - extraction/capture
+    'vidstream': '⮀',     // VidStream - video inference
+    'ctp2': 'CTP2',
+};
+
 function getSymbol(cmd: string): string {
-    if (cmd === 'pulse') return Pulse;
-    if (cmd === 'prose') return Prose;
-    if (cmd === 'db') return DB;
-    if (cmd === 'go') return 'Go';
-    if (cmd === 'py') return 'py';
-    if (cmd === 'plugins') return '\u2699'; // Gear symbol
-    if (cmd === 'scraper') return '⛶'; // White draughts king - extraction/capture
-    if (cmd === 'vidstream') return '⮀'; // VidStream - video inference
-    return CommandToSymbol[cmd] || cmd;
+    const uiSymbol = uiOnlySymbols[cmd];
+    if (uiSymbol) return uiSymbol;
+
+    const symbol = CommandToSymbol[cmd];
+    if (symbol) return symbol;
+
+    log.warn(SEG.UI, `[Symbol Palette] getSymbol: unknown command "${cmd}"`);
+    return cmd;
 }
 
 // Extend window interface for global functions
@@ -184,27 +197,26 @@ async function injectCTP2Glyph(): Promise<void> {
  * Will be updated with version info when system capabilities are received
  */
 function getInitialTooltip(cmd: string): string {
-    const tooltips: Record<string, string> = {
-        'i': '⍟ Self - system diagnostic',
-        'am': '≡ Config - system configuration',
-        'ix': '⨳ Ingest - import data',
-        'ax': '⋈ Expand - contextual query\n(version info loading...)',
-        'as': '+ Assert - emit attestation',
-        'is': '= Identity - equivalence',
-        'of': '∈ Membership - belonging',
-        'by': '⌬ Actor - origin of action',
-        'at': '✦ Event - temporal marker',
-        'so': '⟶ Therefore - consequent action',
+    // UI-only commands not in generated CommandDescriptions
+    const uiOnlyTooltips: Record<string, string> = {
         'pulse': '꩜ Pulse - async operations',
         'db': '⊔ Database - storage layer',
-        'prose': '⚇ Prose - documentation',
+        'prose': '▣ Prose - documentation',
         'go': 'Go - code editor',
         'py': 'py - Python editor',
         'plugins': '⚙ Plugins - domain extensions',
         'vidstream': '⮀ VidStream - video inference\n(version info loading...)',
         'ctp2': 'CTP2',
     };
-    return tooltips[cmd] || cmd;
+
+    // Use generated descriptions for core commands (single source of truth)
+    const generated = CommandDescriptions[cmd];
+    if (generated) {
+        const symbol = getSymbol(cmd);
+        return `${symbol} ${generated}`;
+    }
+
+    return uiOnlyTooltips[cmd] || cmd;
 }
 
 /**
@@ -220,7 +232,8 @@ function setActiveModality(cmd: string): void {
     });
 
     // Add active class to current modality
-    const activeCell = document.querySelector(`.palette-cell[data-cmd="${cmd}"]`);
+    // Use attribute selector with CSS.escape to prevent selector injection from persisted state
+    const activeCell = document.querySelector(`.palette-cell[data-cmd="${CSS.escape(cmd)}"]`);
     if (activeCell) {
         activeCell.classList.add('active');
     }
