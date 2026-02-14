@@ -562,3 +562,41 @@ func TestAttestationJSON_TimestampMillis(t *testing.T) {
 		t.Fatalf("timestamp should be 1718452800000, got %v", ts)
 	}
 }
+
+// --------------------------------------------------------------------------
+// TODO: Spike tests — protocol failure modes
+//
+// Spike (edge cases, adversarial inputs, failure recovery):
+//
+// - Connection drop mid-attestation transfer: close the Conn after sending
+//   MsgNeed but before MsgAttestations. Verify Reconcile returns error,
+//   no partial state corruption in the store.
+//
+// - Malformed messages: peer sends invalid JSON, wrong message type at
+//   each phase (e.g. MsgAttestations where MsgHello expected), missing
+//   required fields. Verify clean error, no panic.
+//
+// - Peer sends Need for groups that don't exist: fabricated group key
+//   hashes. Verify FindGroupKey misses are handled, empty attestation
+//   response sent.
+//
+// - Sync limits: peer requests >maxGroupsPerSync groups. Verify truncation
+//   and warning log. Peer triggers >maxAttestationsPerSync. Verify cap.
+//
+// --------------------------------------------------------------------------
+// TODO: Jenny tests — complex real-world scenarios
+//
+// Jenny (multi-step, stateful, realistic):
+//
+// - Large-scale sync: 1000+ divergent groups, verify convergence and that
+//   both sides end up with the union of attestations.
+//
+// - Multi-hop convergence: three nodes (A, B, C). A syncs with B, B syncs
+//   with C. Verify C gets A's attestations through B without direct contact.
+//
+// - Repeated sync idempotency: sync twice in a row. Second sync should
+//   match roots immediately (zero transfer).
+//
+// - Intermittent connectivity (tube scenario): sync, add attestations
+//   on both sides, sync again. Verify incremental reconciliation works.
+// --------------------------------------------------------------------------

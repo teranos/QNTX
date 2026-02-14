@@ -209,6 +209,10 @@ fn group_key_hash(key: &GroupKey) -> [u8; 32] {
 // JSON entry points for WASM bridge
 // ============================================================================
 // The Merkle tree is stateful, so WASM targets use thread-local storage.
+// Thread-local works for single-threaded WASM contexts. Multi-instance
+// scenarios (parallel wazero or Web Workers) get separate trees per thread,
+// which is correct — but would need instance-specific state management if
+// trees need to be shared across instances.
 // These functions operate on a global tree instance (set up by the bridge).
 
 use std::cell::RefCell;
