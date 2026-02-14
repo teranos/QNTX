@@ -178,7 +178,7 @@
     box-shadow: 0 0 0 1px var(--accent-color, #0066cc);
 }
 
-/* Rich string field highlighting - using fuzzy search yellow */
+/* Rich string field highlighting - using search yellow */
 .field-item.rich-string-field {
     background: linear-gradient(90deg,
         rgba(255, 235, 59, 0.1) 0%,
@@ -217,8 +217,8 @@
     cursor: help;
 }
 
-.fuzzy-indicator {
-    color: #ffeb3b; /* Yellow like fuzzy search */
+.search-indicator {
+    color: #ffeb3b;
     text-shadow: 0 0 4px rgba(255, 235, 59, 0.5);
 }
 
