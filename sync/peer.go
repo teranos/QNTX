@@ -14,6 +14,14 @@ import (
 
 const timestampFormat = time.RFC3339Nano
 
+// Sync protocol limits. Sufficient for trusted/manual peering today.
+// For public-facing endpoints or automatic discovery, these need research:
+// rate limiting at the connection level, pagination, and per-peer quotas.
+const (
+	maxGroupsPerSync        = 100
+	maxAttestationsPerSync  = 1000
+)
+
 // Conn abstracts the WebSocket connection for testability.
 // The real implementation wraps gorilla/websocket; tests use a channel pair.
 type Conn interface {
@@ -153,8 +161,18 @@ func (p *Peer) Reconcile(ctx context.Context) (sent, received int, err error) {
 		return 0, 0, errors.Newf("expected sync_need, got %s", needMsg.Type)
 	}
 
+	// Cap the number of groups we'll fulfill to prevent unbounded work
+	requested := needMsg.Need
+	if len(requested) > maxGroupsPerSync {
+		p.logger.Warnw("Peer requested more groups than allowed, truncating",
+			"requested", len(requested),
+			"max", maxGroupsPerSync,
+		)
+		requested = requested[:maxGroupsPerSync]
+	}
+
 	// Fulfill their request — send attestations they need
-	if err := p.sendRequestedAttestations(ctx, needMsg.Need); err != nil {
+	if err := p.sendRequestedAttestations(ctx, requested); err != nil {
 		return 0, 0, errors.Wrap(err, "failed to send requested attestations")
 	}
 
@@ -188,6 +206,7 @@ func (p *Peer) Reconcile(ctx context.Context) (sent, received int, err error) {
 // requested and sends them.
 func (p *Peer) sendRequestedAttestations(ctx context.Context, requestedHexKeys []string) error {
 	atts := make(map[string][]AttestationWire)
+	total := 0
 
 	for _, hexKey := range requestedHexKeys {
 		// Reverse-lookup: group key hash → (actor, context)
@@ -212,10 +231,22 @@ func (p *Peer) sendRequestedAttestations(ctx context.Context, requestedHexKeys [
 
 		wires := make([]AttestationWire, 0, len(results))
 		for _, as := range results {
+			if total >= maxAttestationsPerSync {
+				p.logger.Warnw("Attestation limit reached, stopping send",
+					"max", maxAttestationsPerSync,
+					"groups_fulfilled", len(atts),
+				)
+				break
+			}
 			wires = append(wires, toWire(as))
+			total++
 		}
 		atts[hexKey] = wires
 		p.sent += len(wires)
+
+		if total >= maxAttestationsPerSync {
+			break
+		}
 	}
 
 	return p.send(Msg{
