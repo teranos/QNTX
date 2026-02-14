@@ -4,6 +4,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -505,7 +506,8 @@ func hasRustEmbeddings() bool {
 }
 
 // EmbeddingObserver automatically embeds attestations that contain rich text.
-// Implements storage.AttestationObserver — called asynchronously by notifyObservers.
+// Implements storage.AttestationObserver — called asynchronously in a goroutine
+// by notifyObservers, so errors are logged but don't block attestation creation.
 // Only attestations with non-empty rich string fields (message, description, etc.)
 // trigger embedding; structural-only attestations are silently skipped.
 type EmbeddingObserver struct {
@@ -609,6 +611,11 @@ func (o *EmbeddingObserver) extractRichText(as *types.As) string {
 					parts = append(parts, str)
 				}
 			}
+		default:
+			o.logger.Debugw("Unexpected type for rich field",
+				"field", field,
+				"type", fmt.Sprintf("%T", v),
+				"attestation_id", as.ID)
 		}
 	}
 
