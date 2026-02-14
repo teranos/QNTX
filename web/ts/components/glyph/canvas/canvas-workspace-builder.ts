@@ -275,10 +275,11 @@ export function buildCanvasWorkspace(
         // Focus container to enable keyboard shortcuts
         container.focus();
 
-        // Walk up from click target to find a glyph element
+        // Walk up from click target to find a glyph element (must be inside this workspace)
         const glyphEl = target.closest('[data-glyph-id]') as HTMLElement | null;
         const isInsideComposition = glyphEl?.closest('.melded-composition') !== null;
-        if (glyphEl && glyphEl.dataset.glyphId !== 'canvas-workspace' && !isInsideComposition) {
+        const isInsideWorkspace = glyphEl ? container.contains(glyphEl) : false;
+        if (glyphEl && isInsideWorkspace && glyphEl.dataset.glyphId !== 'canvas-workspace' && !isInsideComposition) {
             const glyphId = glyphEl.dataset.glyphId;
             if (glyphId) {
                 e.stopPropagation();
