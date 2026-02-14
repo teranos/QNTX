@@ -22,6 +22,7 @@ import { canvasToScreen, getTransform } from '../canvas/canvas-pan';
 import { buildCanvasWorkspace } from '../canvas/canvas-workspace-builder';
 import { uiState } from '../../../state/ui';
 import { getGlyphTypeBySymbol } from '../glyph-registry';
+import { destroyCanvasSelection } from '../canvas/selection';
 
 /**
  * Morph a canvas-placed glyph to fullscreen workspace
@@ -141,6 +142,9 @@ export function morphFullscreenToCanvasPlaced(
         log.error(SEG.GLYPH, `[CanvasExpanded] No canvas origin for ${glyph.id}, cannot restore`);
         return;
     }
+
+    // Clean up subcanvas selection state before collapsing
+    destroyCanvasSelection(glyph.id);
 
     // Clear fullscreen content
     element.innerHTML = '';

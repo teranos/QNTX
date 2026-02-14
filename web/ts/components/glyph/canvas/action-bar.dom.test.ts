@@ -95,7 +95,7 @@ describe('Canvas Action Bar DOM', () => {
         let actionBar = container.querySelector('.canvas-action-bar');
         expect(actionBar).not.toBeNull();
 
-        hideActionBar();
+        hideActionBar(container);
 
         // Action bar should be removed (after animation or immediately)
         setTimeout(() => {
