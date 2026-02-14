@@ -293,6 +293,18 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	// Initialize embedding service for semantic search (optional)
 	server.SetupEmbeddingService()
 
+	// Wire embedding service into watcher engine now that it's available
+	// (watcher engine starts before embeddings — reconnect and reload)
+	if server.embeddingService != nil && server.watcherEngine != nil {
+		server.watcherEngine.SetEmbeddingService(&watcherEmbeddingAdapter{svc: server.embeddingService})
+		if server.embeddingStore != nil {
+			server.watcherEngine.SetEmbeddingSearcher(&watcherSearchAdapter{store: server.embeddingStore})
+		}
+		if err := server.watcherEngine.ReloadWatchers(); err != nil {
+			serverLogger.Warnw("Failed to reload watchers after embedding service init", "error", err)
+		}
+	}
+
 	// Set up config file watcher for auto-reload
 	setupConfigWatcher(server, db, serverLogger)
 

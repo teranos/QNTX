@@ -11,6 +11,7 @@ const (
 	BY = "⌬" // by - actor/catalyst/origin (all forms: creator, source, user)
 	AT = "✦" // at - temporal marker/moment
 	SO = "⟶" // so - therefore/consequent action
+	SE = "⊨" // se - semantic search/entailment
 
 	// Attestation building blocks (not UI elements)
 	// These are fundamental components of the attestation pattern:
@@ -39,6 +40,7 @@ var PaletteOrder = []string{
 	BY,
 	AT,
 	SO,
+	SE,
 }
 
 // SymbolToCommand maps symbols to their text command equivalents
@@ -53,6 +55,7 @@ var SymbolToCommand = map[string]string{
 	BY: "by",
 	AT: "at",
 	SO: "so",
+	SE: "se",
 	// Attestation building blocks
 	AS: "as",
 	IS: "is",
@@ -70,6 +73,7 @@ var CommandToSymbol = map[string]string{
 	"by": BY,
 	"at": AT,
 	"so": SO,
+	"se": SE,
 	// Attestation building blocks
 	"as": AS,
 	"is": IS,
@@ -87,6 +91,7 @@ var CommandDescriptions = map[string]string{
 	"by": "Actor — Origin of action (creator/source/user)",
 	"at": "Temporal — Time marker/moment",
 	"so": "Therefore — Consequent action/trigger",
+	"se": "Semantic — Meaning-based search and entailment",
 	// Attestation building blocks
 	"as": "Assert — Emit an attestation",
 	"is": "Identity — Subject/equivalence in attestations",
