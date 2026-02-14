@@ -283,6 +283,12 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 	// Prepare batch of embeddings
 	embeddingModels := []*storage.EmbeddingModel{}
 
+	// Get rich string fields from type definitions for embedding text construction.
+	// Rich fields (message, description, etc.) produce better embeddings than
+	// raw structural identifiers (predicates/subjects/contexts).
+	richStore := storage.NewBoundedStore(s.db, s.logger.Named("embeddings"))
+	richFields := richStore.GetDiscoveredRichFields()
+
 	for _, attestationID := range req.AttestationIDs {
 		// Check if embedding already exists
 		existing, err := s.embeddingStore.GetBySource("attestation", attestationID)
@@ -315,22 +321,37 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 			continue
 		}
 
-		// Build text for embedding from attestation fields
+		// Build text for embedding: prefer rich text from attributes (same fields
+		// the fuzzy search uses), fall back to structural fields if none found.
 		textParts := []string{}
-
-		// Add predicates
-		for _, pred := range attestation.Predicates {
-			textParts = append(textParts, pred)
+		if attestation.Attributes != nil && len(richFields) > 0 {
+			for _, field := range richFields {
+				if value, exists := attestation.Attributes[field]; exists {
+					switch v := value.(type) {
+					case string:
+						if v != "" {
+							textParts = append(textParts, v)
+						}
+					case []interface{}:
+						for _, item := range v {
+							if str, ok := item.(string); ok && str != "" {
+								textParts = append(textParts, str)
+							}
+						}
+					}
+				}
+			}
 		}
-
-		// Add subjects
-		for _, subj := range attestation.Subjects {
-			textParts = append(textParts, subj)
-		}
-
-		// Add contexts
-		for _, ctx := range attestation.Contexts {
-			textParts = append(textParts, ctx)
+		if len(textParts) == 0 {
+			for _, pred := range attestation.Predicates {
+				textParts = append(textParts, pred)
+			}
+			for _, subj := range attestation.Subjects {
+				textParts = append(textParts, subj)
+			}
+			for _, ctx := range attestation.Contexts {
+				textParts = append(textParts, ctx)
+			}
 		}
 
 		text := strings.Join(textParts, " ")
