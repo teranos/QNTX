@@ -246,7 +246,7 @@ export class TypeDefinitionWindow {
 
         // Add rich string highlight
         if (field.isRichString) {
-            fieldEl.classList.add('rich-string-field');
+            fieldEl.classList.add('searchable-field');
         }
 
         // Add array indicator
