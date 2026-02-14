@@ -38,6 +38,11 @@ const (
 	//       Binary format: 12-byte header (width:u32, height:u32, format:u32) + raw bytes
 	//       This would allow reducing maxMessageSize back to 2MB
 	maxMessageSize = 10 * 1024 * 1024
+
+	// Semantic search defaults for unified search
+	// TODO(#486): Make configurable via am.toml and UI
+	semanticSearchLimit     = 20
+	semanticSearchThreshold = float32(0.3)
 )
 
 // createErrorGraph creates an empty graph with error metadata.
@@ -932,7 +937,7 @@ func (c *Client) searchSemantic(query string) []storage.RichSearchMatch {
 		return nil
 	}
 
-	searchResults, err := c.server.embeddingStore.SemanticSearch(queryBlob, 20, 0.3)
+	searchResults, err := c.server.embeddingStore.SemanticSearch(queryBlob, semanticSearchLimit, semanticSearchThreshold)
 	if err != nil {
 		c.server.logger.Debugw("Semantic search failed", "query", query, "error", err)
 		return nil
