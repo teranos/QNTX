@@ -259,6 +259,9 @@ export function buildCanvasWorkspace(
         showSpawnMenu(e.clientX, e.clientY, contentLayer, glyphs, canvasId);
     });
 
+    // Prevent dblclick from bubbling past workspace boundary (stops re-morph on parent subcanvas)
+    container.addEventListener('dblclick', (e) => { e.stopPropagation(); });
+
     // Selection: click on a glyph to select, Shift+click for multi-select, click background to deselect
     container.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
