@@ -1,11 +1,15 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
+	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/storage"
 	syncPkg "github.com/teranos/QNTX/sync"
 )
@@ -180,4 +184,107 @@ func httpToWS(url string) string {
 		return "ws://" + url[7:]
 	}
 	return url
+}
+
+// startSyncTicker runs periodic sync with all configured peers.
+func (s *QNTXServer) startSyncTicker(ctx context.Context, interval time.Duration) {
+	s.logger.Infow("Sync ticker started", "interval", interval)
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	// Per-peer failure tracking for log suppression
+	failCounts := map[string]int{}
+	lastWarned := map[string]time.Time{}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.syncAllPeers(ctx, failCounts, lastWarned)
+		}
+	}
+}
+
+const syncWarnInitialAttempts = 5 // warn individually for first N failures per peer
+
+// syncAllPeers reconciles with every configured peer. Emits one summary log
+// per tick. Individual failure warnings are suppressed after 5 consecutive
+// failures per peer, then re-emitted hourly.
+func (s *QNTXServer) syncAllPeers(ctx context.Context, failCounts map[string]int, lastWarned map[string]time.Time) {
+	cfg, _ := appcfg.Load()
+	if cfg == nil || len(cfg.Sync.Peers) == 0 {
+		return
+	}
+
+	var synced int
+	var transferred []string
+	var unreachable []string
+
+	for name, peerURL := range cfg.Sync.Peers {
+		peerCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+
+		wsURL := httpToWS(peerURL) + "/ws/sync"
+		dialer := websocket.Dialer{}
+		conn, _, err := dialer.DialContext(peerCtx, wsURL, nil)
+		if err != nil {
+			cancel()
+			failCounts[name]++
+			unreachable = append(unreachable, name)
+
+			if failCounts[name] <= syncWarnInitialAttempts || time.Since(lastWarned[name]) > time.Hour {
+				s.logger.Warnw("Scheduled sync: failed to connect",
+					"peer", name, "url", peerURL, "error", err,
+					"consecutive_failures", failCounts[name],
+				)
+				lastWarned[name] = time.Now()
+			}
+			continue
+		}
+
+		store := storage.NewSQLStore(s.db, s.logger)
+		wsConn := &gorillaSyncConn{conn: conn}
+		peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.logger)
+
+		sent, received, err := peer.Reconcile(peerCtx)
+		conn.Close()
+		cancel()
+
+		if err != nil {
+			failCounts[name]++
+			unreachable = append(unreachable, name)
+
+			if failCounts[name] <= syncWarnInitialAttempts || time.Since(lastWarned[name]) > time.Hour {
+				s.logger.Warnw("Scheduled sync: reconciliation failed",
+					"peer", name, "sent", sent, "received", received, "error", err,
+				)
+				lastWarned[name] = time.Now()
+			}
+			continue
+		}
+
+		// Success — reset failure tracking
+		failCounts[name] = 0
+		synced++
+
+		if sent > 0 || received > 0 {
+			transferred = append(transferred, fmt.Sprintf("%s ↑%d↓%d", name, sent, received))
+		}
+	}
+
+	// One summary line per tick (only when something noteworthy happened)
+	if len(transferred) > 0 || len(unreachable) > 0 {
+		fields := []interface{}{}
+		if synced > 0 {
+			fields = append(fields, "synced", synced)
+		}
+		if len(transferred) > 0 {
+			fields = append(fields, "transferred", strings.Join(transferred, ", "))
+		}
+		if len(unreachable) > 0 {
+			fields = append(fields, "unreachable", len(unreachable))
+		}
+		s.logger.Infow("Sync tick", fields...)
+	}
 }
