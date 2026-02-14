@@ -17,6 +17,7 @@ message CanvasGlyph {
   int32 height = 6;                // optional: custom height (0 = use default)
   string content = 7;              // glyph content: source code, markdown, template, or JSON result
   reserved 8;                      // formerly result_data
+  string canvas_id = 11;            // which canvas this glyph belongs to ("" = root)
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp updated_at = 10;
 }
