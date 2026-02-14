@@ -7,12 +7,6 @@ import { initStorage, getStorageItem, setStorageItem, isStorageInitialized } fro
 
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
-if (USE_JSDOM) {
-    const { JSDOM } = await import('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
-    globalThis.document = dom.window.document as any;
-    globalThis.window = dom.window as any;
-}
 
 describe('IndexedDB Storage', () => {
     if (!USE_JSDOM) {
