@@ -63,16 +63,17 @@ export function setupRectangleSelection(
     container.addEventListener('mousedown', (e) => {
         const target = e.target as HTMLElement;
 
-        // Only start rectangle selection on canvas background (not on glyphs or other interactive elements)
-        // Check if click is on a glyph element
+        // Only start rectangle selection on canvas background (not on glyphs)
+        // Scope check to this workspace: glyph ancestors outside the container
+        // (e.g. parent subcanvas element) are ignored
         const glyphEl = target.closest('[data-glyph-id]') as HTMLElement | null;
-        if (glyphEl && glyphEl.dataset.glyphId !== 'canvas-workspace') {
+        if (glyphEl && glyphEl !== container && container.contains(glyphEl)) {
             return;
         }
 
-        // Check if click is on grid overlay or other canvas children that should allow selection
-        const isCanvasChild = target.classList.contains('canvas-grid-overlay') ||
-                              target === container;
+        // Allow rectangle selection to start on the container or its content layer
+        const isCanvasChild = target === container ||
+                              target.classList.contains('canvas-content-layer');
 
         if (!isCanvasChild) {
             return;
