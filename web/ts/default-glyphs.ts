@@ -55,6 +55,7 @@ import { glyphRun } from './components/glyph/run';
 import { createCanvasGlyph } from './components/glyph/canvas/canvas-glyph';
 import { createChartGlyph } from './components/glyph/chart-glyph';
 import { sendMessage } from './websocket';
+import { apiFetch } from './api';
 import { DB } from '@generated/sym.js';
 import { log, SEG } from './logger.ts';
 import { formatBuildTime } from './components/tooltip.ts';
@@ -132,9 +133,14 @@ function renderSync(): void {
     let peersSection = '';
     if (peers.length > 0) {
         const peerRows = peers.map(p => `
-            <div class="glyph-row">
+            <div class="glyph-row" style="align-items: center;">
                 <span class="glyph-label">${p.name}:</span>
-                <span class="glyph-value" style="font-size: 11px;">${p.url}</span>
+                <span class="glyph-value" style="font-size: 11px; flex: 1;">${p.url}</span>
+                <button class="sync-peer-btn" data-peer-url="${p.url}" style="
+                    background: transparent; border: 1px solid #60a5fa; color: #60a5fa;
+                    padding: 2px 8px; border-radius: 3px; cursor: pointer;
+                    font-family: monospace; font-size: 11px; margin-left: 8px;
+                ">Sync</button>
             </div>
         `).join('');
         peersSection = `
@@ -149,10 +155,8 @@ function renderSync(): void {
                 <h3 class="glyph-section-title">Peers</h3>
                 <div style="color: #9ca3af; font-size: 12px; line-height: 1.5; padding: 4px 0;">
                     No peers configured. Add peers to <code style="background: #1e293b; padding: 2px 6px; border-radius: 3px;">am.toml</code>:
-                    <pre style="margin: 8px 0 0; background: #0f172a; padding: 8px; border-radius: 4px; font-size: 11px; overflow-x: auto;">[sync]
-[[sync.peers]]
-name = "phone"
-url = "https://phone.local:877"</pre>
+                    <pre style="margin: 8px 0 0; background: #0f172a; padding: 8px; border-radius: 4px; font-size: 11px; overflow-x: auto;">[sync.peers]
+phone = "http://phone.local:877"</pre>
                 </div>
             </div>
         `;
@@ -187,6 +191,52 @@ url = "https://phone.local:877"</pre>
             ${visionSection}
         </div>
     `;
+
+    // Attach per-peer sync button handlers
+    syncElement.querySelectorAll('.sync-peer-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const button = btn as HTMLButtonElement;
+            const peerUrl = button.dataset.peerUrl!;
+
+            button.textContent = 'Syncing\u2026';
+            button.disabled = true;
+            button.style.borderColor = '#fbbf24';
+            button.style.color = '#fbbf24';
+
+            try {
+                const resp = await apiFetch('/api/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ peer: peerUrl }),
+                });
+                const data = await resp.json();
+
+                if (data.error) {
+                    button.textContent = 'Error';
+                    button.title = data.error;
+                    button.style.borderColor = '#f87171';
+                    button.style.color = '#f87171';
+                } else {
+                    button.textContent = `\u2191${data.sent} \u2193${data.received}`;
+                    button.style.borderColor = '#4ade80';
+                    button.style.color = '#4ade80';
+                    sendMessage({ type: 'get_sync_status' });
+                }
+            } catch {
+                button.textContent = 'Failed';
+                button.style.borderColor = '#f87171';
+                button.style.color = '#f87171';
+            }
+
+            setTimeout(() => {
+                button.textContent = 'Sync';
+                button.disabled = false;
+                button.style.borderColor = '#60a5fa';
+                button.style.color = '#60a5fa';
+                button.title = '';
+            }, 3000);
+        });
+    });
 }
 
 // Database stats state

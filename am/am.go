@@ -16,13 +16,7 @@ type Config struct {
 
 // SyncConfig configures peer-to-peer attestation sync
 type SyncConfig struct {
-	Peers []SyncPeer `mapstructure:"peers"` // Known peers to sync with
-}
-
-// SyncPeer represents a configured sync peer
-type SyncPeer struct {
-	Name string `mapstructure:"name"` // Human-readable peer name (e.g., "phone", "lab-server")
-	URL  string `mapstructure:"url"`  // Peer URL (e.g., "https://phone.local:877")
+	Peers map[string]string `mapstructure:"peers"` // name = "url" (e.g., phone = "http://phone.local:877")
 }
 
 // DatabaseConfig configures the SQLite database
