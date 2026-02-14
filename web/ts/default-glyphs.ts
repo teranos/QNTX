@@ -248,8 +248,17 @@ let dbStats: any = null;
 
 // Embeddings state
 let embeddingsElement: HTMLElement | null = null;
-let embeddingsInfo: { available: boolean; model_name: string; dimensions: number; embedding_count: number; attestation_count: number; unembedded_ids?: string[] } | null = null;
+let embeddingsInfo: {
+    available: boolean;
+    model_name: string;
+    dimensions: number;
+    embedding_count: number;
+    attestation_count: number;
+    unembedded_ids?: string[];
+    cluster_info?: { n_clusters: number; n_noise: number; n_total: number; clusters: Record<string, number> };
+} | null = null;
 let embeddingsReembedding = false;
+let embeddingsClustering = false;
 
 // Self diagnostics state
 let selfElement: HTMLElement | null = null;
@@ -456,6 +465,51 @@ function renderEmbeddings(): void {
         `;
     }
 
+    // Cluster info section
+    const ci = embeddingsInfo.cluster_info;
+    let clusterSection = '';
+    if (available && embedding_count >= 2) {
+        let clusterRows = '';
+        if (ci && ci.n_clusters > 0) {
+            const clusterSizes = Object.entries(ci.clusters)
+                .sort(([a], [b]) => Number(a) - Number(b))
+                .map(([id, count]) => `<span style="color:#60a5fa">#${id}</span>:${count}`)
+                .join('  ');
+            clusterRows = `
+                <div class="glyph-row">
+                    <span class="glyph-label">Clusters:</span>
+                    <span class="glyph-value">${ci.n_clusters}</span>
+                </div>
+                <div class="glyph-row">
+                    <span class="glyph-label">Noise:</span>
+                    <span class="glyph-value">${ci.n_noise}</span>
+                </div>
+                <div class="glyph-row">
+                    <span class="glyph-label">Sizes:</span>
+                    <span class="glyph-value" style="font-size:11px">${clusterSizes}</span>
+                </div>
+            `;
+        } else {
+            clusterRows = `
+                <div class="glyph-row">
+                    <span class="glyph-label">Clusters:</span>
+                    <span class="glyph-value" style="color:#6b7280">not computed</span>
+                </div>
+            `;
+        }
+        clusterSection = `
+            <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
+                <h3 class="glyph-section-title">HDBSCAN Clustering</h3>
+                ${clusterRows}
+                <button class="emb-cluster-btn panel-btn" style="width:100%;margin-top:6px"
+                    ${embeddingsClustering ? 'disabled' : ''}>
+                    ${embeddingsClustering ? 'Clustering...' : 'Recompute Clusters'}
+                </button>
+                <div class="emb-cluster-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
+            </div>
+        `;
+    }
+
     embeddingsElement.innerHTML = `
         <div class="glyph-content">
             <div class="glyph-row">
@@ -477,12 +531,18 @@ function renderEmbeddings(): void {
                 <span class="glyph-value">${embedding_count} / ${attestation_count}</span>
             </div>
             ${reembedSection}
+            ${clusterSection}
         </div>
     `;
 
     const btn = embeddingsElement.querySelector('.emb-reembed-btn');
     if (btn) {
         btn.addEventListener('click', reembedAll);
+    }
+
+    const clusterBtn = embeddingsElement.querySelector('.emb-cluster-btn');
+    if (clusterBtn) {
+        clusterBtn.addEventListener('click', recluster);
     }
 }
 
@@ -516,6 +576,37 @@ async function reembedAll(): Promise<void> {
         }
     } finally {
         embeddingsReembedding = false;
+        renderEmbeddings();
+    }
+}
+
+async function recluster(): Promise<void> {
+    if (embeddingsClustering || !embeddingsInfo?.available) return;
+
+    embeddingsClustering = true;
+    renderEmbeddings();
+
+    const resultEl = embeddingsElement?.querySelector('.emb-cluster-result');
+
+    try {
+        const resp = await apiFetch('/api/embeddings/cluster', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ min_cluster_size: 5 })
+        });
+        const result = await resp.json();
+
+        if (resultEl) {
+            resultEl.textContent = `${result.summary.n_clusters} clusters, ${result.summary.n_noise} noise (${result.time_ms.toFixed(0)}ms)`;
+        }
+
+        await fetchEmbeddingsInfo();
+    } catch (err) {
+        if (resultEl) {
+            resultEl.textContent = `Error: ${err}`;
+        }
+    } finally {
+        embeddingsClustering = false;
         renderEmbeddings();
     }
 }

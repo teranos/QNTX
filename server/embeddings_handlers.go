@@ -440,12 +440,13 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 
 // EmbeddingInfoResponse represents embedding service status
 type EmbeddingInfoResponse struct {
-	Available        bool     `json:"available"`
-	ModelName        string   `json:"model_name"`
-	Dimensions       int      `json:"dimensions"`
-	EmbeddingCount   int      `json:"embedding_count"`
-	AttestationCount int      `json:"attestation_count"`
-	UnembeddedIDs    []string `json:"unembedded_ids,omitempty"`
+	Available        bool                    `json:"available"`
+	ModelName        string                  `json:"model_name"`
+	Dimensions       int                     `json:"dimensions"`
+	EmbeddingCount   int                     `json:"embedding_count"`
+	AttestationCount int                     `json:"attestation_count"`
+	UnembeddedIDs    []string                `json:"unembedded_ids,omitempty"`
+	ClusterInfo      *storage.ClusterSummary `json:"cluster_info,omitempty"`
 }
 
 // HandleEmbeddingInfo returns embedding service status and counts (GET /api/embeddings/info)
@@ -503,6 +504,13 @@ func (s *QNTXServer) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request)
 		s.logger.Warnw("Error iterating unembedded attestations", "error", err)
 	}
 
+	// Include cluster summary if available
+	if s.embeddingStore != nil {
+		if summary, err := s.embeddingStore.GetClusterSummary(); err == nil && summary.NClusters > 0 {
+			resp.ClusterInfo = summary
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		s.logger.Errorw("Failed to encode embeddings info response",
@@ -510,6 +518,128 @@ func (s *QNTXServer) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request)
 			"embedding_count", resp.EmbeddingCount,
 			"attestation_count", resp.AttestationCount,
 			"error", err)
+	}
+}
+
+// ClusterRequest represents the request body for clustering
+type ClusterRequest struct {
+	MinClusterSize int `json:"min_cluster_size,omitempty"`
+}
+
+// ClusterResponse represents the result of a clustering operation
+type ClusterResponse struct {
+	Summary *storage.ClusterSummary `json:"summary"`
+	TimeMS  float64                 `json:"time_ms"`
+}
+
+// HandleEmbeddingCluster runs HDBSCAN clustering on all stored embeddings (POST /api/embeddings/cluster)
+func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.embeddingService == nil || s.embeddingStore == nil {
+		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Parse optional min_cluster_size from body
+	minClusterSize := 5
+	if r.Body != nil {
+		var req ClusterRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil && req.MinClusterSize > 0 {
+			minClusterSize = req.MinClusterSize
+		}
+	}
+
+	startTime := time.Now()
+
+	// Read all embedding vectors
+	ids, blobs, err := s.embeddingStore.GetAllEmbeddingVectors()
+	if err != nil {
+		s.logger.Errorw("Failed to read embedding vectors for clustering", "error", err)
+		http.Error(w, "Failed to read embeddings", http.StatusInternalServerError)
+		return
+	}
+
+	if len(ids) < 2 {
+		http.Error(w, fmt.Sprintf("Need at least 2 embeddings to cluster, have %d", len(ids)), http.StatusBadRequest)
+		return
+	}
+
+	// Deserialize blobs into flat float32 array
+	var dims int
+	flat := make([]float32, 0, len(blobs)*384) // pre-allocate assuming 384d
+	for i, blob := range blobs {
+		vec, err := s.embeddingService.DeserializeEmbedding(blob)
+		if err != nil {
+			s.logger.Errorw("Failed to deserialize embedding",
+				"embedding_id", ids[i],
+				"blob_len", len(blob),
+				"error", err)
+			http.Error(w, fmt.Sprintf("Failed to deserialize embedding %s", ids[i]), http.StatusInternalServerError)
+			return
+		}
+		if i == 0 {
+			dims = len(vec)
+		}
+		flat = append(flat, vec...)
+	}
+
+	// Run HDBSCAN
+	result, err := embeddings.ClusterHDBSCAN(flat, len(ids), dims, minClusterSize)
+	if err != nil {
+		s.logger.Errorw("HDBSCAN clustering failed",
+			"n_points", len(ids),
+			"dimensions", dims,
+			"min_cluster_size", minClusterSize,
+			"error", err)
+		http.Error(w, fmt.Sprintf("Clustering failed: %s", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Build assignments and write to DB
+	assignments := make([]storage.ClusterAssignment, len(ids))
+	for i, id := range ids {
+		assignments[i] = storage.ClusterAssignment{
+			ID:          id,
+			ClusterID:   int(result.Labels[i]),
+			Probability: float64(result.Probabilities[i]),
+		}
+	}
+
+	if err := s.embeddingStore.UpdateClusterAssignments(assignments); err != nil {
+		s.logger.Errorw("Failed to save cluster assignments",
+			"count", len(assignments),
+			"error", err)
+		http.Error(w, "Failed to save cluster assignments", http.StatusInternalServerError)
+		return
+	}
+
+	// Return summary
+	summary, err := s.embeddingStore.GetClusterSummary()
+	if err != nil {
+		s.logger.Errorw("Failed to get cluster summary after assignment", "error", err)
+		http.Error(w, "Clustering succeeded but failed to read summary", http.StatusInternalServerError)
+		return
+	}
+
+	resp := ClusterResponse{
+		Summary: summary,
+		TimeMS:  float64(time.Since(startTime).Milliseconds()),
+	}
+
+	s.logger.Infow("HDBSCAN clustering complete",
+		"n_points", len(ids),
+		"n_clusters", result.NClusters,
+		"n_noise", result.NNoise,
+		"min_cluster_size", minClusterSize,
+		"time_ms", resp.TimeMS)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		s.logger.Errorw("Failed to encode cluster response", "error", err)
 	}
 }
 

@@ -11,15 +11,17 @@ import (
 
 // EmbeddingModel represents a stored embedding in the database
 type EmbeddingModel struct {
-	ID         string    `json:"id"`
-	SourceType string    `json:"source_type"`
-	SourceID   string    `json:"source_id"`
-	Text       string    `json:"text"`
-	Embedding  []byte    `json:"-"` // Binary FLOAT32_BLOB data
-	Model      string    `json:"model"`
-	Dimensions int       `json:"dimensions"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID                 string    `json:"id"`
+	SourceType         string    `json:"source_type"`
+	SourceID           string    `json:"source_id"`
+	Text               string    `json:"text"`
+	Embedding          []byte    `json:"-"` // Binary FLOAT32_BLOB data
+	Model              string    `json:"model"`
+	Dimensions         int       `json:"dimensions"`
+	ClusterID          int       `json:"cluster_id"`
+	ClusterProbability float64   `json:"cluster_probability"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 // EmbeddingStore provides database operations for embeddings
@@ -361,4 +363,113 @@ func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingM
 		zap.Int("count", len(embeddings)))
 
 	return nil
+}
+
+// GetAllEmbeddingVectors reads all embedding IDs and blobs for HDBSCAN input.
+func (s *EmbeddingStore) GetAllEmbeddingVectors() (ids []string, blobs [][]byte, err error) {
+	rows, err := s.db.Query(`SELECT id, embedding FROM embeddings ORDER BY id`)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to query embedding vectors")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id string
+		var blob []byte
+		if err := rows.Scan(&id, &blob); err != nil {
+			return nil, nil, errors.Wrapf(err, "failed to scan embedding row %d", len(ids)+1)
+		}
+		ids = append(ids, id)
+		blobs = append(blobs, blob)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to iterate embedding rows (read %d)", len(ids))
+	}
+
+	return ids, blobs, nil
+}
+
+// ClusterAssignment maps an embedding ID to its cluster label and probability.
+type ClusterAssignment struct {
+	ID          string
+	ClusterID   int
+	Probability float64
+}
+
+// UpdateClusterAssignments batch-updates cluster labels in a single transaction.
+func (s *EmbeddingStore) UpdateClusterAssignments(assignments []ClusterAssignment) error {
+	if len(assignments) == 0 {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return errors.Wrap(err, "failed to begin cluster assignment transaction")
+	}
+	defer func() {
+		if err != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				s.logger.Error("failed to rollback cluster assignment", zap.Error(rbErr))
+			}
+		}
+	}()
+
+	stmt, err := tx.Prepare(`UPDATE embeddings SET cluster_id = ?, cluster_probability = ? WHERE id = ?`)
+	if err != nil {
+		return errors.Wrap(err, "failed to prepare cluster update statement")
+	}
+	defer stmt.Close()
+
+	for _, a := range assignments {
+		if _, err = stmt.Exec(a.ClusterID, a.Probability, a.ID); err != nil {
+			return errors.Wrapf(err, "failed to update cluster for embedding %s", a.ID)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return errors.Wrap(err, "failed to commit cluster assignments")
+	}
+
+	s.logger.Info("updated cluster assignments", zap.Int("count", len(assignments)))
+	return nil
+}
+
+// ClusterSummary aggregates cluster assignment counts.
+type ClusterSummary struct {
+	NClusters int         `json:"n_clusters"`
+	NNoise    int         `json:"n_noise"`
+	NTotal    int         `json:"n_total"`
+	Clusters  map[int]int `json:"clusters"` // cluster_id → count
+}
+
+// GetClusterSummary returns aggregated cluster counts.
+func (s *EmbeddingStore) GetClusterSummary() (*ClusterSummary, error) {
+	rows, err := s.db.Query(`SELECT cluster_id, COUNT(*) FROM embeddings GROUP BY cluster_id ORDER BY cluster_id`)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query cluster summary")
+	}
+	defer rows.Close()
+
+	summary := &ClusterSummary{
+		Clusters: make(map[int]int),
+	}
+
+	for rows.Next() {
+		var clusterID, count int
+		if err := rows.Scan(&clusterID, &count); err != nil {
+			return nil, errors.Wrap(err, "failed to scan cluster summary row")
+		}
+		if clusterID < 0 {
+			summary.NNoise += count
+		} else {
+			summary.Clusters[clusterID] = count
+			summary.NClusters++
+		}
+		summary.NTotal += count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "failed to iterate cluster summary rows")
+	}
+
+	return summary, nil
 }
