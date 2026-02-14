@@ -38,7 +38,7 @@ export async function createDocGlyph(glyph: Glyph): Promise<HTMLElement> {
 
     const filename = meta?.filename ?? 'Document';
 
-    const { titleBar } = canvasPlaced({
+    canvasPlaced({
         element,
         glyph,
         className: 'canvas-doc-glyph',
