@@ -18,8 +18,8 @@ const timestampFormat = time.RFC3339Nano
 // For public-facing endpoints or automatic discovery, these need research:
 // rate limiting at the connection level, pagination, and per-peer quotas.
 const (
-	maxGroupsPerSync        = 100
-	maxAttestationsPerSync  = 1000
+	maxGroupsPerSync       = 100
+	maxAttestationsPerSync = 1000
 )
 
 // Conn abstracts the WebSocket connection for testability.
