@@ -9,7 +9,6 @@ This document shows Go type definitions from the codebase.
 **Generated types**:
 - TypeScript: [`types/generated/typescript/budget.ts`](https://github.com/teranos/QNTX/blob/main/types/generated/typescript/budget.ts)
 - Rust: [`types/generated/rust/budget.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/budget.rs)
-- Python: [`types/generated/python/budget.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/budget.py)
 
 ## BudgetConfig {#budgetconfig}
 
