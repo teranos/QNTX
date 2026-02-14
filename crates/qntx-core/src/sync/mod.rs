@@ -13,7 +13,7 @@ mod merkle;
 
 pub use content::content_hash;
 pub use content::content_hash_hex;
-pub use merkle::{GroupKey, MerkleTree};
+pub use merkle::{GroupKey, MerkleDiff, MerkleTree};
 
 // JSON-based entry points for WASM bridge
 pub use content::content_hash_json;

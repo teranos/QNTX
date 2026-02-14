@@ -31,7 +31,7 @@ pub fn content_hash(attestation: &Attestation) -> [u8; 32] {
     h.update(b"\na:");
     h.update(canonical(&attestation.actors).as_bytes());
     h.update(b"\nt:");
-    h.update(&attestation.timestamp.to_be_bytes());
+    h.update(attestation.timestamp.to_be_bytes());
     h.update(b"\nrc:");
     h.update(attestation.source.as_bytes());
 
