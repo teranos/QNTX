@@ -125,6 +125,9 @@ Response:
 
 ```toml
 # am.toml
+[sync]
+interval_seconds = 300  # reconcile every 5 minutes (0 = manual only)
+
 [sync.peers]
 phone = "https://phone.local:877"
 lab-server = "https://lab.university.edu:877"

@@ -298,6 +298,15 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	// Initialize sync tree and observer for content-addressed attestation sync
 	setupSync(server, db, serverLogger)
 
+	// Start periodic sync with configured peers
+	if deps.config.Sync.IntervalSeconds > 0 && server.syncTree != nil {
+		server.wg.Add(1)
+		go func() {
+			defer server.wg.Done()
+			server.startSyncTicker(ctx, time.Duration(deps.config.Sync.IntervalSeconds)*time.Second)
+		}()
+	}
+
 	// Set up config file watcher for auto-reload
 	setupConfigWatcher(server, db, serverLogger)
 
