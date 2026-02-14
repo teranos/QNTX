@@ -241,7 +241,15 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 			}
 
 			// Check by content hash too — same claim might have different ASID
-			chHex, err := p.tree.ContentHash(attestationJSON(as))
+			aj, err := attestationJSON(as)
+			if err != nil {
+				p.logger.Warnw("Failed to serialize attestation for content hash",
+					"id", as.ID,
+					"error", err,
+				)
+				continue
+			}
+			chHex, err := p.tree.ContentHash(aj)
 			if err != nil {
 				p.logger.Warnw("Failed to compute content hash for synced attestation",
 					"id", as.ID,
@@ -331,7 +339,7 @@ func fromWire(w AttestationWire) (*types.As, error) {
 // attestationJSON serializes a types.As to JSON matching Rust's Attestation struct.
 // Critical: timestamp is i64 milliseconds (UnixMilli), not nanoseconds or RFC3339.
 // This JSON is passed to SyncTree.ContentHash() which delegates to Rust.
-func attestationJSON(as *types.As) string {
+func attestationJSON(as *types.As) (string, error) {
 	v := struct {
 		ID         string                 `json:"id"`
 		Subjects   []string               `json:"subjects"`
@@ -351,6 +359,9 @@ func attestationJSON(as *types.As) string {
 		Source:     as.Source,
 		Attributes: as.Attributes,
 	}
-	b, _ := json.Marshal(v)
-	return string(b)
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to marshal attestation %s to JSON", as.ID)
+	}
+	return string(b), nil
 }

@@ -30,7 +30,11 @@ func TestTreeObserver_InsertsIntoTree(t *testing.T) {
 	}
 
 	// Content hash should be findable
-	chHex, _ := tree.ContentHash(attestationJSON(as))
+	aj, err := attestationJSON(as)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chHex, _ := tree.ContentHash(aj)
 	exists, _ := tree.Contains(chHex)
 	if !exists {
 		t.Fatal("tree should contain the attestation's content hash")
