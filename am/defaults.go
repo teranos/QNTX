@@ -54,6 +54,11 @@ func SetDefaults(v *viper.Viper) {
 	})
 	v.SetDefault("server.log_theme", "everforest")
 
+	// Embeddings (semantic search) defaults
+	v.SetDefault("embeddings.enabled", false) // Disabled by default - requires ONNX model
+	v.SetDefault("embeddings.path", "ats/embeddings/models/all-MiniLM-L6-v2/model.onnx")
+	v.SetDefault("embeddings.name", "all-MiniLM-L6-v2")
+
 	// Plugin configuration defaults
 	v.SetDefault("plugin.enabled", []string{}) // No plugins enabled by default (explicit opt-in via am.toml)
 	v.SetDefault("plugin.paths", []string{
