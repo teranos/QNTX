@@ -73,6 +73,47 @@ export function setGlyphId(element: HTMLElement, id: string): void {
 }
 
 /**
+ * Store canvas-placed origin coordinates for morph return
+ * Coordinates are canvas-local (not screen) — use canvasToScreen() at morph time
+ */
+export function setCanvasOrigin(
+    element: HTMLElement,
+    origin: { x: number; y: number; width: number; height: number; canvasId: string }
+): void {
+    element.dataset.canvasOriginX = String(origin.x);
+    element.dataset.canvasOriginY = String(origin.y);
+    element.dataset.canvasOriginW = String(origin.width);
+    element.dataset.canvasOriginH = String(origin.height);
+    element.dataset.canvasOriginId = origin.canvasId;
+}
+
+/**
+ * Get canvas-placed origin coordinates for morph return
+ */
+export function getCanvasOrigin(
+    element: HTMLElement
+): { x: number; y: number; width: number; height: number; canvasId: string } | null {
+    const x = parseFloat(element.dataset.canvasOriginX ?? '');
+    const y = parseFloat(element.dataset.canvasOriginY ?? '');
+    const w = parseFloat(element.dataset.canvasOriginW ?? '');
+    const h = parseFloat(element.dataset.canvasOriginH ?? '');
+    const canvasId = element.dataset.canvasOriginId;
+    if (isNaN(x) || isNaN(y) || isNaN(w) || isNaN(h) || !canvasId) return null;
+    return { x, y, width: w, height: h, canvasId };
+}
+
+/**
+ * Clear canvas-placed origin coordinates
+ */
+export function clearCanvasOrigin(element: HTMLElement): void {
+    delete element.dataset.canvasOriginX;
+    delete element.dataset.canvasOriginY;
+    delete element.dataset.canvasOriginW;
+    delete element.dataset.canvasOriginH;
+    delete element.dataset.canvasOriginId;
+}
+
+/**
  * Get glyph symbol from element
  */
 export function getGlyphSymbol(element: HTMLElement): string | undefined {
