@@ -1,9 +1,10 @@
-use hdbscan::{Hdbscan, HdbscanHyperParams};
+use hdbscan::{Center, Hdbscan, HdbscanHyperParams};
 
 pub struct ClusterResult {
     pub labels: Vec<i32>,
     pub probabilities: Vec<f32>,
     pub n_clusters: usize,
+    pub centroids: Vec<Vec<f32>>, // one centroid per cluster, indexed by label
 }
 
 /// Cluster embedding vectors using HDBSCAN.
@@ -66,10 +67,24 @@ pub fn cluster_embeddings(
         .map(|&l| if l >= 0 { 1.0 } else { 0.0 })
         .collect();
 
+    // Compute cluster centroids (mean of each cluster's points)
+    let centroids: Vec<Vec<f32>> = if n_clusters > 0 {
+        let centers_f64 = clusterer
+            .calc_centers(Center::Centroid, &labels)
+            .map_err(|e| format!("centroid computation failed: {:?}", e))?;
+        centers_f64
+            .into_iter()
+            .map(|c| c.into_iter().map(|v| v as f32).collect())
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     Ok(ClusterResult {
         labels,
         probabilities,
         n_clusters,
+        centroids,
     })
 }
 
@@ -99,6 +114,11 @@ mod tests {
             "expected 2 clusters, got {}",
             result.n_clusters
         );
+        // Should have 2 centroids, each with 2 dimensions
+        assert_eq!(result.centroids.len(), 2, "expected 2 centroids");
+        for (i, centroid) in result.centroids.iter().enumerate() {
+            assert_eq!(centroid.len(), 2, "centroid {} should have 2 dimensions", i);
+        }
     }
 
     #[test]
