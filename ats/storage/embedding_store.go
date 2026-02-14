@@ -180,7 +180,7 @@ func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, thresh
 
 	rows, err := s.db.Query(query, queryEmbedding, limit)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to perform semantic search")
+		return nil, errors.Wrapf(err, "failed to perform semantic search (limit=%d, threshold=%.2f)", limit, threshold)
 	}
 	defer rows.Close()
 
@@ -195,7 +195,7 @@ func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, thresh
 			&result.Distance,
 		)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to scan search result")
+			return nil, errors.Wrapf(err, "failed to scan search result at row %d", len(results)+1)
 		}
 
 		// Convert L2 distance to similarity score
@@ -214,7 +214,7 @@ func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, thresh
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, errors.Wrapf(err, "failed to iterate search results")
+		return nil, errors.Wrapf(err, "failed to iterate search results (scanned %d rows)", len(results))
 	}
 
 	s.logger.Debug("semantic search completed",
