@@ -438,6 +438,59 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// EmbeddingInfoResponse represents embedding service status
+type EmbeddingInfoResponse struct {
+	Available        bool     `json:"available"`
+	ModelName        string   `json:"model_name"`
+	Dimensions       int      `json:"dimensions"`
+	EmbeddingCount   int      `json:"embedding_count"`
+	AttestationCount int      `json:"attestation_count"`
+	UnembeddedIDs    []string `json:"unembedded_ids,omitempty"`
+}
+
+// HandleEmbeddingInfo returns embedding service status and counts (GET /api/embeddings/info)
+func (s *QNTXServer) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	resp := EmbeddingInfoResponse{Available: s.embeddingService != nil}
+
+	if s.embeddingService != nil {
+		if info, err := s.embeddingService.GetModelInfo(); err == nil {
+			resp.ModelName = info.Name
+			resp.Dimensions = info.Dimensions
+		}
+	}
+
+	// Count embeddings and total attestations
+	var embCount, atsCount int
+	s.db.QueryRow("SELECT COUNT(*) FROM embeddings").Scan(&embCount)
+	s.db.QueryRow("SELECT COUNT(*) FROM attestations").Scan(&atsCount)
+	resp.EmbeddingCount = embCount
+	resp.AttestationCount = atsCount
+
+	// Collect IDs of attestations without embeddings
+	rows, err := s.db.Query(`
+		SELECT a.id FROM attestations a
+		LEFT JOIN embeddings e ON e.source_type = 'attestation' AND e.source_id = a.id
+		WHERE e.id IS NULL
+	`)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var id string
+			if rows.Scan(&id) == nil {
+				resp.UnembeddedIDs = append(resp.UnembeddedIDs, id)
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
 // SetupEmbeddingService initializes the embedding service if available
 func (s *QNTXServer) SetupEmbeddingService() {
 	// Check for rustembeddings build tag
