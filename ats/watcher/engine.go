@@ -312,6 +312,11 @@ func (e *Engine) queryHistoricalSemantic(watcherID string, watcher *storage.Watc
 			continue
 		}
 
+		// Only broadcast attestations with rich text content
+		if extractAttestationText(as) == "" {
+			continue
+		}
+
 		matchCount++
 		if e.broadcastMatch != nil {
 			e.broadcastMatch(watcherID, as, result.Similarity)
@@ -627,35 +632,32 @@ func (e *Engine) matchesSemanticWithEmbedding(as *types.As, watcher *storage.Wat
 	return matches, similarity
 }
 
-// extractAttestationText builds a text string from an attestation for embedding.
-// Prefers attribute string values (the same fields used by rich search),
-// falls back to structural fields (predicates, subjects, contexts).
+// extractAttestationText returns rich text from an attestation's attributes.
+// Returns empty string for structural-only attestations — semantic search
+// only applies to attestations with rich text content.
+// Skips metadata keys (rich_string_fields) that contain field names, not content.
 func extractAttestationText(as *types.As) string {
-	var parts []string
+	if as.Attributes == nil {
+		return ""
+	}
 
-	// Collect all string attribute values
-	if as.Attributes != nil {
-		for _, value := range as.Attributes {
-			switch v := value.(type) {
-			case string:
-				if v != "" {
-					parts = append(parts, v)
-				}
-			case []interface{}:
-				for _, item := range v {
-					if str, ok := item.(string); ok && str != "" {
-						parts = append(parts, str)
-					}
+	var parts []string
+	for key, value := range as.Attributes {
+		if key == "rich_string_fields" {
+			continue
+		}
+		switch v := value.(type) {
+		case string:
+			if v != "" {
+				parts = append(parts, v)
+			}
+		case []interface{}:
+			for _, item := range v {
+				if str, ok := item.(string); ok && str != "" {
+					parts = append(parts, str)
 				}
 			}
 		}
-	}
-
-	// Fall back to structural fields if no attribute text found
-	if len(parts) == 0 {
-		parts = append(parts, as.Predicates...)
-		parts = append(parts, as.Subjects...)
-		parts = append(parts, as.Contexts...)
 	}
 
 	return strings.Join(parts, " ")

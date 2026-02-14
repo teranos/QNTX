@@ -313,15 +313,9 @@ function extractRichText(attestation: Attestation): string {
                 }
             }
             if (parts.length > 0) return parts.join(' ');
-        } catch { /* fall through to structural */ }
+        } catch { /* ignore parse errors */ }
     }
-    // Fallback: structural fields
-    const parts = [
-        ...(attestation.subjects || []),
-        ...(attestation.predicates || []),
-        ...(attestation.contexts || []),
-    ].filter(Boolean);
-    return parts.join(' ') || 'N/A';
+    return '';
 }
 
 /**
