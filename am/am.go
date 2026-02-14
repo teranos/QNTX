@@ -11,6 +11,12 @@ type Config struct {
 	Ax             AxConfig             `mapstructure:"ax"`
 	Plugin         PluginConfig         `mapstructure:"plugin"`
 	Embeddings     EmbeddingsConfig     `mapstructure:"embeddings"`
+	Sync           SyncConfig           `mapstructure:"sync"`
+}
+
+// SyncConfig configures peer-to-peer attestation sync
+type SyncConfig struct {
+	Peers map[string]string `mapstructure:"peers"` // name = "url" (e.g., phone = "http://phone.local:877")
 }
 
 // DatabaseConfig configures the SQLite database
