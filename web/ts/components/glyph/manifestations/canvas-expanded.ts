@@ -85,7 +85,11 @@ export function morphCanvasPlacedToFullscreen(
 
             const doMinimize = (instant: boolean = false) => {
                 element.removeEventListener('keydown', escapeHandler);
-                popBreadcrumb();
+                // Only pop when directly minimized (button/Escape).
+                // Cascade via jumpToBreadcrumb splices the stack itself.
+                if (!instant) {
+                    popBreadcrumb();
+                }
 
                 if (instant) {
                     collapseImmediately(element, glyph, onMinimize);
