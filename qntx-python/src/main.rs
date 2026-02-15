@@ -10,9 +10,11 @@ use clap::Parser;
 use qntx_python_plugin::proto::domain_plugin_service_server::DomainPluginServiceServer;
 use qntx_python_plugin::PythonPluginService;
 use std::net::SocketAddr;
+use tokio::net::TcpListener;
 use tokio::signal;
+use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::Server;
-use tracing::{info, Level};
+use tracing::{info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 
 #[derive(Parser, Debug)]
@@ -36,6 +38,9 @@ struct Args {
     #[arg(short = 'V', long)]
     version: bool,
 }
+
+/// Max port retries when the requested port is occupied (multi-session conflicts).
+const MAX_PORT_RETRIES: u16 = 10;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -84,29 +89,50 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Initializing QNTX Python Plugin");
     info!("  Version: {}", env!("CARGO_PKG_VERSION"));
 
-    // Determine server address
-    let addr: SocketAddr = if let Some(address) = args.address {
-        info!("Parsing address: {}", address);
-        match address.parse() {
-            Ok(a) => a,
-            Err(e) => {
-                eprintln!("ERROR: Failed to parse address '{}': {}", address, e);
-                return Err(format!("Invalid address: {}", e).into());
-            }
-        }
+    // Bind with port retry to handle multi-session port conflicts.
+    // When multiple QNTX sessions run concurrently, they each allocate ports
+    // starting from DefaultPluginBasePort (38700). If another session's plugin
+    // already occupies our assigned port, we increment and retry.
+    let listener = if let Some(address) = args.address {
+        let addr: SocketAddr = address
+            .parse()
+            .map_err(|e| format!("Invalid address '{}': {}", address, e))?;
+        TcpListener::bind(addr).await?
     } else {
-        let addr_str = format!("0.0.0.0:{}", args.port);
-        info!("Using default address: {}", addr_str);
-        match addr_str.parse() {
-            Ok(a) => a,
-            Err(e) => {
-                eprintln!("ERROR: Failed to parse address '{}': {}", addr_str, e);
-                return Err(format!("Invalid address: {}", e).into());
+        let mut port = args.port;
+        let mut last_err = None;
+        let mut bound = None;
+        for _ in 0..MAX_PORT_RETRIES {
+            let addr: SocketAddr = format!("0.0.0.0:{}", port).parse()?;
+            match TcpListener::bind(addr).await {
+                Ok(l) => {
+                    bound = Some(l);
+                    break;
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
+                    warn!("Port {} in use, trying {}", port, port + 1);
+                    last_err = Some(e);
+                    port += 1;
+                }
+                Err(e) => return Err(e.into()),
             }
         }
+        bound.ok_or_else(|| {
+            format!(
+                "failed to bind after {} attempts (last port {}): {}",
+                MAX_PORT_RETRIES,
+                port,
+                last_err.unwrap()
+            )
+        })?
     };
 
-    info!("Address parsed successfully: {}", addr);
+    let local_addr = listener.local_addr()?;
+
+    // Announce actual port to the plugin manager via stdout protocol.
+    // The manager watches for QNTX_PLUGIN_PORT=N and uses it instead of
+    // the port it passed via --port. Must be println (stdout), not info (stderr).
+    println!("QNTX_PLUGIN_PORT={}", local_addr.port());
 
     // Create the Python plugin service
     info!("Creating Python plugin service...");
@@ -121,24 +147,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    info!("Starting QNTX Python Plugin");
-    info!("  Version: {}", env!("CARGO_PKG_VERSION"));
-    info!("  Address: {}", addr);
+    info!("Starting gRPC server on {}", local_addr);
 
-    // Build and start the gRPC server
-    info!("Building gRPC server...");
-    let server = Server::builder().add_service(DomainPluginServiceServer::new(service));
-
-    info!("Starting gRPC server on {}...", addr);
-    match server.serve_with_shutdown(addr, shutdown_signal()).await {
-        Ok(_) => {
-            info!("gRPC server stopped gracefully");
-        }
-        Err(e) => {
-            eprintln!("ERROR: gRPC server failed: {}", e);
-            return Err(format!("Server failed: {}", e).into());
-        }
-    }
+    let incoming = TcpListenerStream::new(listener);
+    Server::builder()
+        .add_service(DomainPluginServiceServer::new(service))
+        .serve_with_incoming_shutdown(incoming, shutdown_signal())
+        .await?;
 
     info!("Plugin shutdown complete");
     Ok(())
