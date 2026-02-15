@@ -84,6 +84,48 @@ describe('Subcanvas Glyph - Tim (Happy Path)', () => {
     });
 });
 
+describe('Subcanvas Naming - Tim (Happy Path)', () => {
+    test('Tim sees custom name from content field in title bar', () => {
+        const glyph = makeGlyph({ content: 'My Notes' });
+        const element = createSubcanvasGlyph(glyph);
+
+        const label = element.querySelector('.canvas-glyph-title-bar span');
+        expect(label?.textContent).toBe('My Notes');
+    });
+
+    test('Tim sees default label when no content is set', () => {
+        const glyph = makeGlyph();
+        const element = createSubcanvasGlyph(glyph);
+
+        const label = element.querySelector('.canvas-glyph-title-bar span');
+        expect(label?.textContent).toBe('⌗ subcanvas');
+    });
+
+    test('Tim dblclicks label to start editing', () => {
+        const glyph = makeGlyph({ content: 'Plans' });
+        const element = createSubcanvasGlyph(glyph);
+
+        const label = element.querySelector('.canvas-glyph-title-bar span') as HTMLElement;
+        label.dispatchEvent(new window.MouseEvent('dblclick', { bubbles: true }));
+
+        expect(label.contentEditable).toBe('true');
+    });
+
+    test('Tim edits name and blurs to commit', () => {
+        const glyph = makeGlyph({ content: 'Old Name' });
+        const element = createSubcanvasGlyph(glyph);
+
+        const label = element.querySelector('.canvas-glyph-title-bar span') as HTMLElement;
+        label.dispatchEvent(new window.MouseEvent('dblclick', { bubbles: true }));
+
+        label.innerText = 'New Name';
+        label.dispatchEvent(new window.Event('blur'));
+
+        expect(glyph.content).toBe('New Name');
+        expect(label.contentEditable).toBe('false');
+    });
+});
+
 // canvas_id isolation tests live in ts/state/canvas-id.test.ts to avoid
 // mock.module leaks from glyph test files that mock ../../state/ui.
 

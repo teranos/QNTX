@@ -29,12 +29,13 @@ export function getBreadcrumbStack(): ReadonlyArray<BreadcrumbEntry> {
 /**
  * Jump to a specific breadcrumb level by collapsing everything above it.
  * targetIndex = -1 means "go to root" (minimize all).
- * Pops from top down to targetIndex+1, calling minimize(true) for each.
+ * Splices the stack first, then calls minimize(true) on each removed entry
+ * from innermost to outermost.
  */
 export function jumpToBreadcrumb(targetIndex: number): void {
-    while (stack.length > targetIndex + 1) {
-        const entry = stack[stack.length - 1];
-        entry.minimize(true);
+    const removed = stack.splice(targetIndex + 1);
+    for (let i = removed.length - 1; i >= 0; i--) {
+        removed[i].minimize(true);
     }
 }
 
