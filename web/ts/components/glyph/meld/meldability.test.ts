@@ -68,22 +68,24 @@ describe('Port-aware MELDABILITY registry', () => {
     });
 
     describe('getInitiatorClasses', () => {
-        test('includes ax, se, py, prompt, note', () => {
+        test('includes ax, se, py, prompt, note, subcanvas', () => {
             const classes = getInitiatorClasses();
             expect(classes).toContain('canvas-ax-glyph');
             expect(classes).toContain('canvas-se-glyph');
             expect(classes).toContain('canvas-py-glyph');
             expect(classes).toContain('canvas-prompt-glyph');
             expect(classes).toContain('canvas-note-glyph');
+            expect(classes).toContain('canvas-subcanvas-glyph');
         });
     });
 
     describe('getTargetClasses', () => {
-        test('includes prompt, py, result (all targets across all ports)', () => {
+        test('includes prompt, py, result, subcanvas (all targets across all ports)', () => {
             const classes = getTargetClasses();
             expect(classes).toContain('canvas-prompt-glyph');
             expect(classes).toContain('canvas-py-glyph');
             expect(classes).toContain('canvas-result-glyph');
+            expect(classes).toContain('canvas-subcanvas-glyph');
         });
     });
 
@@ -95,18 +97,20 @@ describe('Port-aware MELDABILITY registry', () => {
             expect(targets).toContain('canvas-result-glyph');
         });
 
-        test('ax can target prompt and py', () => {
+        test('ax can target prompt, py, and subcanvas', () => {
             const targets = getCompatibleTargets('canvas-ax-glyph');
             expect(targets).toContain('canvas-prompt-glyph');
             expect(targets).toContain('canvas-py-glyph');
-            expect(targets.length).toBe(2);
+            expect(targets).toContain('canvas-subcanvas-glyph');
+            expect(targets.length).toBe(3);
         });
 
-        test('se can target prompt and py (same as ax)', () => {
+        test('se can target prompt, py, and subcanvas (same as ax)', () => {
             const targets = getCompatibleTargets('canvas-se-glyph');
             expect(targets).toContain('canvas-prompt-glyph');
             expect(targets).toContain('canvas-py-glyph');
-            expect(targets.length).toBe(2);
+            expect(targets).toContain('canvas-subcanvas-glyph');
+            expect(targets.length).toBe(3);
         });
 
         test('unknown class returns empty', () => {
@@ -368,6 +372,57 @@ describe('Port-aware MELDABILITY registry', () => {
             const positions = computeGridPositions(edges);
             expect(positions.get('note1')).toEqual({ row: 1, col: 1 });
             expect(positions.get('prompt1')).toEqual({ row: 0, col: 1 });
+        });
+    });
+
+    describe('Subcanvas meld compatibility - Tim (Happy Path)', () => {
+        test('Tim: subcanvas is compatible as target from ax (right)', () => {
+            expect(areClassesCompatible('canvas-ax-glyph', 'canvas-subcanvas-glyph')).toBe('right');
+        });
+
+        test('Tim: subcanvas is compatible as target from py (right and bottom)', () => {
+            expect(areClassesCompatible('canvas-py-glyph', 'canvas-subcanvas-glyph')).toBe('right');
+        });
+
+        test('Tim: subcanvas is compatible as target from se (right)', () => {
+            expect(areClassesCompatible('canvas-se-glyph', 'canvas-subcanvas-glyph')).toBe('right');
+        });
+
+        test('Tim: subcanvas is compatible as target from note (bottom)', () => {
+            expect(areClassesCompatible('canvas-note-glyph', 'canvas-subcanvas-glyph')).toBe('bottom');
+        });
+
+        test('Tim: subcanvas is compatible as target from prompt (bottom)', () => {
+            expect(areClassesCompatible('canvas-prompt-glyph', 'canvas-subcanvas-glyph')).toBe('bottom');
+        });
+
+        test('Tim: subcanvas can initiate meld toward prompt (right)', () => {
+            expect(areClassesCompatible('canvas-subcanvas-glyph', 'canvas-prompt-glyph')).toBe('right');
+        });
+
+        test('Tim: subcanvas can initiate meld toward py (right)', () => {
+            expect(areClassesCompatible('canvas-subcanvas-glyph', 'canvas-py-glyph')).toBe('right');
+        });
+
+        test('Tim: subcanvas can initiate meld toward result (right)', () => {
+            expect(areClassesCompatible('canvas-subcanvas-glyph', 'canvas-result-glyph')).toBe('right');
+        });
+    });
+
+    describe('Subcanvas meld compatibility - Spike (Edge Cases)', () => {
+        test('Spike: subcanvas-to-subcanvas compatibility works', () => {
+            expect(areClassesCompatible('canvas-subcanvas-glyph', 'canvas-subcanvas-glyph')).toBe('right');
+        });
+
+        test('Spike: subcanvas has ports in all three directions', () => {
+            const targets = getCompatibleTargets('canvas-subcanvas-glyph');
+            expect(targets).toContain('canvas-ax-glyph');
+            expect(targets).toContain('canvas-se-glyph');
+            expect(targets).toContain('canvas-py-glyph');
+            expect(targets).toContain('canvas-prompt-glyph');
+            expect(targets).toContain('canvas-note-glyph');
+            expect(targets).toContain('canvas-result-glyph');
+            expect(targets).toContain('canvas-subcanvas-glyph');
         });
     });
 });

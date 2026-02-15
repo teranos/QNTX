@@ -351,6 +351,14 @@
         );
 }
 
+/* Ghost placeholder — holds grid cell when melded subcanvas is expanded fullscreen */
+.subcanvas-ghost {
+    border: 1px dashed rgba(160, 120, 200, 0.3);
+    background: rgba(160, 120, 200, 0.05);
+    border-radius: var(--border-radius);
+    pointer-events: none;
+}
+
 /* Expanded subcanvas fullscreen state */
 .canvas-subcanvas-glyph-expanded {
     background: var(--bg-primary);

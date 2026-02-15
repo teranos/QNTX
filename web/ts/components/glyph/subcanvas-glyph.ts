@@ -53,11 +53,25 @@ export function createSubcanvasGlyph(glyph: Glyph): HTMLElement {
         const parentCanvas = contentLayer?.closest('.canvas-workspace') as HTMLElement | null;
         const canvasId = parentCanvas?.dataset?.canvasId ?? 'canvas-workspace';
 
+        // If melded, insert ghost placeholder to hold the grid cell
+        const composition = element.closest('.melded-composition') as HTMLElement | null;
+        let ghost: HTMLElement | null = null;
+        if (composition) {
+            ghost = document.createElement('div');
+            ghost.className = 'subcanvas-ghost';
+            ghost.style.gridRow = element.style.gridRow;
+            ghost.style.gridColumn = element.style.gridColumn;
+            ghost.style.width = element.offsetWidth + 'px';
+            ghost.style.height = element.offsetHeight + 'px';
+            element.parentNode!.insertBefore(ghost, element);
+            log.debug(SEG.GLYPH, `[Subcanvas] Ghost inserted for ${glyph.id} at grid(${element.style.gridRow}, ${element.style.gridColumn})`);
+        }
+
         morphCanvasPlacedToFullscreen(
             element,
             glyph,
             canvasId,
-            (el, g) => restoreToCanvas(el, g, contentLayer as HTMLElement)
+            (el, g) => restoreToCanvas(el, g, contentLayer as HTMLElement, ghost, composition)
         );
     });
 
@@ -134,7 +148,9 @@ function wireEditableLabel(titleBar: HTMLElement, glyph: Glyph): void {
 function restoreToCanvas(
     element: HTMLElement,
     glyph: Glyph,
-    contentLayer: HTMLElement | null
+    contentLayer: HTMLElement | null,
+    ghost: HTMLElement | null,
+    composition: HTMLElement | null
 ): void {
     if (!contentLayer) {
         log.error(SEG.GLYPH, `[Subcanvas] Cannot restore ${glyph.id} — no content layer`);
@@ -169,9 +185,13 @@ function restoreToCanvas(
     preview.className = 'subcanvas-preview';
     element.appendChild(preview);
 
-    // Reparent to canvas content layer — dblclick handler from createSubcanvasGlyph
-    // persists on the element (it uses closest() at dispatch time, no re-registration needed)
-    contentLayer.appendChild(element);
+    // Replace ghost with real element in the composition, or reparent to content layer
+    if (ghost && composition && ghost.parentNode) {
+        ghost.parentNode.replaceChild(element, ghost);
+        log.debug(SEG.GLYPH, `[Subcanvas] Replaced ghost for ${glyph.id}, back in composition`);
+    } else {
+        contentLayer.appendChild(element);
+    }
 
     log.debug(SEG.GLYPH, `[Subcanvas] Restored ${glyph.id} to canvas at (${glyph.x}, ${glyph.y})`);
 }
