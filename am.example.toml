@@ -141,3 +141,22 @@ timeout_seconds = 3600
 # Used when no actor is explicitly specified
 # Default: "ax@user"
 default_actor = "ax@user"
+
+# ════════════════════════════════════════════════════════════════
+# Sync Configuration (Peer-to-Peer Attestation Sync)
+# ════════════════════════════════════════════════════════════════
+
+[sync]
+# Node name advertised to peers during sync handshake.
+# Shows up in peer logs so operators know which node synced.
+# Default: "" (anonymous)
+# name = "laptop"
+
+# Automatic sync interval in seconds (0 = manual only via UI)
+# Default: 0
+# interval_seconds = 300
+
+# [sync.peers]
+# Named peers to sync with. Name is for your logs; URL is the peer's address.
+# phone = "http://phone.local:877"
+# server = "https://server.example.com:877"

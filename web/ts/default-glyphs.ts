@@ -141,9 +141,10 @@ function renderSync(): void {
                     padding: 2px 8px; border-radius: 3px; cursor: pointer;
                     font-family: monospace; font-size: 11px; margin-left: 8px;
                 ">Sync</button>`;
+            const advertisedName = p.advertised_name ? ` <span style="color: #9ca3af;">(${p.advertised_name})</span>` : '';
             return `
             <div class="glyph-row" style="align-items: center;">
-                ${statusDot}<span class="glyph-label">${p.name}:</span>
+                ${statusDot}<span class="glyph-label">${p.name}${advertisedName}:</span>
                 <span class="glyph-value" style="font-size: 11px; flex: 1;">${p.url}</span>
                 ${syncBtn}
             </div>`;

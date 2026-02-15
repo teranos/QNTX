@@ -86,7 +86,8 @@ type QNTXServer struct {
 	// Sync: Merkle tree observer for content-addressed attestation sync
 	syncTree       syncPkg.SyncTree      // nil if WASM unavailable
 	syncObserver   *syncPkg.TreeObserver // nil if WASM unavailable
-	syncPeerStatus sync.Map              // map[string]string — peer name → "ok" or "unreachable"
+	syncPeerStatus sync.Map              // map[string]string — peer name → "ok", "unreachable", or "self"
+	syncPeerRemoteName sync.Map          // map[string]string — peer name → advertised name from hello
 
 	// Embedding service for semantic search (optional, requires rustembeddings build tag)
 	embeddingService interface {
