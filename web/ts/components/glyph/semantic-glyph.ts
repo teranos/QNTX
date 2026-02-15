@@ -235,12 +235,6 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
         handleInputChange();
     });
 
-    // If we loaded a persisted query, send watcher to server
-    if (currentQuery.trim()) {
-        commitQuery();
-        log.debug(SEG.GLYPH, `[SeGlyph] Restored query for ${glyphId}: "${currentQuery}" threshold=${currentThreshold}`);
-    }
-
     // ResizeObserver for auto-sizing
     setupSeGlyphResizeObserver(element, resultsContainer, glyphId);
 
