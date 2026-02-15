@@ -14,6 +14,7 @@ import { log, SEG } from '../../logger';
 import { preventDrag, storeCleanup, cleanupResizeObserver } from './glyph-interaction';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { sendMessage } from '../../websocket';
+import { apiFetch } from '../../api';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { tooltip } from '../tooltip';
 import { uiState } from '../../state/ui';
@@ -47,11 +48,13 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
     const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
     let currentQuery = '';
     let currentThreshold = 0.5;
+    let currentClusterId: number | null = null;
     if (existingGlyph?.content) {
         try {
             const parsed = JSON.parse(existingGlyph.content);
             currentQuery = parsed.query ?? '';
             currentThreshold = parsed.threshold ?? 0.5;
+            currentClusterId = parsed.clusterId ?? null;
         } catch (err) {
             log.debug(SEG.GLYPH, `[SeGlyph] Failed to parse persisted content as JSON for ${glyphId}, treating as legacy string:`, err);
             currentQuery = existingGlyph.content;
@@ -61,6 +64,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
             const parsed = JSON.parse(glyph.content);
             currentQuery = parsed.query ?? '';
             currentThreshold = parsed.threshold ?? 0.5;
+            currentClusterId = parsed.clusterId ?? null;
         } catch (err) {
             log.debug(SEG.GLYPH, `[SeGlyph] Failed to parse glyph content as JSON for ${glyphId}, treating as legacy string:`, err);
             currentQuery = glyph.content;
@@ -104,6 +108,47 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
 
     preventDrag(editor);
 
+    // Cluster scope dropdown
+    const clusterSelect = document.createElement('select');
+    clusterSelect.className = 'se-cluster-select';
+    clusterSelect.style.padding = '2px 4px';
+    clusterSelect.style.fontSize = '11px';
+    clusterSelect.style.fontFamily = 'monospace';
+    clusterSelect.style.border = 'none';
+    clusterSelect.style.outline = 'none';
+    clusterSelect.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
+    clusterSelect.style.color = 'var(--text-secondary)';
+    clusterSelect.style.borderRadius = '2px';
+    clusterSelect.style.cursor = 'pointer';
+    clusterSelect.style.flexShrink = '0';
+
+    const allOption = document.createElement('option');
+    allOption.value = '';
+    allOption.textContent = 'All';
+    clusterSelect.appendChild(allOption);
+
+    // Fetch clusters from server
+    apiFetch('/api/embeddings/info')
+        .then(r => r.json())
+        .then(info => {
+            if (info.cluster_info?.clusters) {
+                const clusters = info.cluster_info.clusters as Record<string, number>;
+                for (const [id, count] of Object.entries(clusters)) {
+                    if (parseInt(id) < 0) continue; // Skip noise (-1)
+                    const opt = document.createElement('option');
+                    opt.value = id;
+                    opt.textContent = `#${id} (${count})`;
+                    clusterSelect.appendChild(opt);
+                }
+                if (currentClusterId !== null) {
+                    clusterSelect.value = String(currentClusterId);
+                }
+            }
+        })
+        .catch(err => log.debug(SEG.GLYPH, `[SeGlyph] Failed to fetch cluster info:`, err));
+
+    preventDrag(clusterSelect);
+
     // Threshold slider
     const thresholdContainer = document.createElement('div');
     thresholdContainer.style.display = 'flex';
@@ -139,6 +184,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
 
     titleBar.appendChild(symbol);
     titleBar.appendChild(editor);
+    titleBar.appendChild(clusterSelect);
     titleBar.appendChild(thresholdContainer);
 
     element.appendChild(titleBar);
@@ -183,7 +229,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
         // Persist to canvas state
         const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
         if (existing) {
-            uiState.addCanvasGlyph({ ...existing, content: JSON.stringify({ query: currentQuery, threshold: currentThreshold }) });
+            uiState.addCanvasGlyph({ ...existing, content: JSON.stringify({ query: currentQuery, threshold: currentThreshold, clusterId: currentClusterId }) });
         }
 
         if (!query) {
@@ -197,6 +243,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
                 watcher_id: `se-glyph-${glyphId}`,
                 semantic_query: query,
                 semantic_threshold: currentThreshold,
+                semantic_cluster_id: currentClusterId,
                 watcher_name: `SE: ${query.substring(0, 30)}${query.length > 30 ? '...' : ''}`,
                 enabled: true
             });
@@ -232,6 +279,11 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
     thresholdSlider.addEventListener('input', () => {
         currentThreshold = parseFloat(thresholdSlider.value);
         thresholdLabel.textContent = currentThreshold.toFixed(2);
+        handleInputChange();
+    });
+
+    clusterSelect.addEventListener('change', () => {
+        currentClusterId = clusterSelect.value ? parseInt(clusterSelect.value) : null;
         handleInputChange();
     });
 
