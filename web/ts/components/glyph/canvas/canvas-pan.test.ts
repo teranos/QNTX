@@ -15,6 +15,8 @@ import {
     canvasToScreen,
     resetCanvasState
 } from './canvas-pan';
+import { makeDraggable, makeResizable } from '../glyph-interaction';
+import type { Glyph } from '../glyph';
 import { uiState } from '../../../state/ui';
 
 // Helper to create wheel event in test environment
@@ -480,5 +482,146 @@ describe('Canvas Pan', () => {
             const saved = uiState.getCanvasPan('test-canvas');
             expect(saved?.scale).toBeGreaterThan(1.0);
         }
+    });
+});
+
+// ── Drag/resize respect canvas zoom ─────────────────────────────────
+
+// Mock ResizeObserver (used by some glyph code paths)
+globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+} as any;
+
+function buildCanvasWithGlyph(canvasId: string) {
+    const container = document.createElement('div');
+    container.setAttribute('data-canvas-id', canvasId);
+
+    const contentLayer = document.createElement('div');
+    contentLayer.className = 'canvas-content-layer';
+    container.appendChild(contentLayer);
+
+    const el = document.createElement('div');
+    el.setAttribute('data-glyph-id', 'g1');
+    el.style.position = 'absolute';
+    el.style.left = '100px';
+    el.style.top = '100px';
+    el.style.width = '200px';
+    el.style.height = '150px';
+    // happy-dom doesn't compute layout from CSS; mock offset* so drag/resize starts from real values
+    Object.defineProperty(el, 'offsetLeft', { value: 100, configurable: true });
+    Object.defineProperty(el, 'offsetTop', { value: 100, configurable: true });
+    Object.defineProperty(el, 'offsetWidth', { value: 200, configurable: true });
+    Object.defineProperty(el, 'offsetHeight', { value: 150, configurable: true });
+    contentLayer.appendChild(el);
+
+    document.body.appendChild(container);
+
+    const glyph: Glyph = {
+        id: 'g1',
+        title: 'Test',
+        symbol: '⊨',
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 150,
+        renderContent: () => el,
+    };
+
+    return { container, contentLayer, el, glyph };
+}
+
+function mouseEvent(type: string, clientX: number, clientY: number): MouseEvent {
+    const Win = globalThis.window as any;
+    const e = new Win.Event(type, { bubbles: true, cancelable: true }) as MouseEvent;
+    Object.defineProperty(e, 'clientX', { value: clientX });
+    Object.defineProperty(e, 'clientY', { value: clientY });
+    return e;
+}
+
+describe('Drag respects canvas zoom - Tim (Happy Path)', () => {
+    beforeEach(() => {
+        document.body.innerHTML = '';
+        resetCanvasState('drag-zoom');
+    });
+
+    test('Tim drags glyph at scale 1.0 — delta matches mouse', () => {
+        const { container, el, glyph } = buildCanvasWithGlyph('drag-zoom');
+        setupCanvasPan(container, 'drag-zoom');
+
+        const handle = el;
+        makeDraggable(el, handle, glyph);
+
+        handle.dispatchEvent(mouseEvent('mousedown', 200, 200));
+        document.dispatchEvent(mouseEvent('mousemove', 300, 250));
+
+        expect(el.style.left).toBe('200px'); // 100 + 100/1
+        expect(el.style.top).toBe('150px');  // 100 + 50/1
+
+        document.dispatchEvent(mouseEvent('mouseup', 300, 250));
+    });
+
+    test('Tim drags glyph at scale 0.5 — glyph moves 2x mouse delta in CSS space', () => {
+        const { container, el, glyph } = buildCanvasWithGlyph('drag-zoom');
+        setupCanvasPan(container, 'drag-zoom');
+        setZoom(container, 'drag-zoom', 0.5);
+
+        const handle = el;
+        makeDraggable(el, handle, glyph);
+
+        handle.dispatchEvent(mouseEvent('mousedown', 200, 200));
+        document.dispatchEvent(mouseEvent('mousemove', 300, 250));
+
+        // 100px mouse delta / 0.5 scale = 200px CSS delta
+        expect(el.style.left).toBe('300px'); // 100 + 200
+        expect(el.style.top).toBe('200px');  // 100 + 100
+
+        document.dispatchEvent(mouseEvent('mouseup', 300, 250));
+    });
+
+    test('Tim drags glyph at scale 2.0 — glyph moves 0.5x mouse delta in CSS space', () => {
+        const { container, el, glyph } = buildCanvasWithGlyph('drag-zoom');
+        setupCanvasPan(container, 'drag-zoom');
+        setZoom(container, 'drag-zoom', 2.0);
+
+        const handle = el;
+        makeDraggable(el, handle, glyph);
+
+        handle.dispatchEvent(mouseEvent('mousedown', 200, 200));
+        document.dispatchEvent(mouseEvent('mousemove', 300, 250));
+
+        // 100px mouse delta / 2.0 scale = 50px CSS delta
+        expect(el.style.left).toBe('150px'); // 100 + 50
+        expect(el.style.top).toBe('125px');  // 100 + 25
+
+        document.dispatchEvent(mouseEvent('mouseup', 300, 250));
+    });
+});
+
+describe('Resize respects canvas zoom - Tim (Happy Path)', () => {
+    beforeEach(() => {
+        document.body.innerHTML = '';
+        resetCanvasState('resize-zoom');
+    });
+
+    test('Tim resizes glyph at scale 0.5 — size grows 2x mouse delta', () => {
+        const { container, el, glyph } = buildCanvasWithGlyph('resize-zoom');
+        setupCanvasPan(container, 'resize-zoom');
+        setZoom(container, 'resize-zoom', 0.5);
+
+        const resizeHandle = document.createElement('div');
+        el.appendChild(resizeHandle);
+
+        makeResizable(el, resizeHandle, glyph);
+
+        resizeHandle.dispatchEvent(mouseEvent('mousedown', 300, 250));
+        document.dispatchEvent(mouseEvent('mousemove', 350, 300));
+
+        // 50px mouse delta / 0.5 scale = 100px CSS delta
+        expect(el.style.width).toBe('300px');  // 200 + 100
+        expect(el.style.height).toBe('250px'); // 150 + 100
+
+        document.dispatchEvent(mouseEvent('mouseup', 350, 300));
     });
 });
