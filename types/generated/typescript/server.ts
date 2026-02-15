@@ -116,6 +116,22 @@ export interface DaemonStatusMessage {
    */
   budget_monthly_limit: number;
   /**
+   * Aggregate spend (local + non-stale peers). Matches what CheckBudget() enforces. Falls back to local spend when no peers are configured.
+   */
+  budget_daily_aggregate: number;
+  budget_weekly_aggregate: number;
+  budget_monthly_aggregate: number;
+  /**
+   * Number of non-stale peers included
+   */
+  peer_count: number;
+  /**
+   * Cluster limits (averaged across all nodes). 0 = not configured.
+   */
+  cluster_daily_limit: number;
+  cluster_weekly_limit: number;
+  cluster_monthly_limit: number;
+  /**
    * Opening/Closing Phase 4: "running", "draining", "stopped"
    */
   server_state: string;

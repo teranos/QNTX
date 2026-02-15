@@ -12,7 +12,7 @@ This document shows Go type definitions from the codebase.
 
 ## BudgetConfig {#budgetconfig}
 
-**Source**: [`pulse/budget/tracker.go:15`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L15)
+**Source**: [`pulse/budget/tracker.go:18`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L18)
 
 
 ```go
@@ -21,6 +21,9 @@ type BudgetConfig struct {
 	WeeklyBudgetUSD float64
 	MonthlyBudgetUSD float64
 	CostPerScoreUSD float64
+	ClusterDailyBudgetUSD float64
+	ClusterWeeklyBudgetUSD float64
+	ClusterMonthlyBudgetUSD float64
 }
 ```
 
@@ -34,9 +37,26 @@ type Limiter struct {
 }
 ```
 
+## PeerSpend {#peerspend}
+
+**Source**: [`pulse/budget/tracker.go:46`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L46)
+
+
+```go
+type PeerSpend struct {
+	DailyUSD float64
+	WeeklyUSD float64
+	MonthlyUSD float64
+	ClusterDailyLimitUSD float64
+	ClusterWeeklyLimitUSD float64
+	ClusterMonthlyLimitUSD float64
+	ReceivedAt time.Time
+}
+```
+
 ## Status {#status}
 
-**Source**: [`pulse/budget/tracker.go:23`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L23)
+**Source**: [`pulse/budget/tracker.go:33`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L33)
 
 
 ```go
@@ -55,7 +75,7 @@ type Status struct {
 
 ## Tracker {#tracker}
 
-**Source**: [`pulse/budget/tracker.go:36`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L36)
+**Source**: [`pulse/budget/tracker.go:59`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L59)
 
 
 ```go

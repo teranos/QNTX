@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -41,7 +42,7 @@ func (s *QNTXServer) HandleSyncWebSocket(w http.ResponseWriter, r *http.Request)
 
 	store := storage.NewSQLStore(s.db, s.logger)
 	wsConn := &gorillaSyncConn{conn: conn}
-	peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.logger)
+	peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.budgetTracker, s.logger)
 
 	sent, received, err := peer.Reconcile(r.Context())
 	if err != nil {
@@ -98,6 +99,11 @@ func (s *QNTXServer) HandleSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if isSelfPeer(req.Peer, appcfg.GetServerPort()) {
+		writeJSON(w, http.StatusOK, syncResponse{})
+		return
+	}
+
 	// Convert HTTP(S) URL to WebSocket URL
 	wsURL := httpToWS(req.Peer) + "/ws/sync"
 
@@ -117,7 +123,7 @@ func (s *QNTXServer) HandleSync(w http.ResponseWriter, r *http.Request) {
 
 	store := storage.NewSQLStore(s.db, s.logger)
 	wsConn := &gorillaSyncConn{conn: conn}
-	peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.logger)
+	peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.budgetTracker, s.logger)
 
 	sent, received, err := peer.Reconcile(r.Context())
 	if err != nil {
@@ -127,6 +133,17 @@ func (s *QNTXServer) HandleSync(w http.ResponseWriter, r *http.Request) {
 			Error:    fmt.Sprintf("Reconciliation failed: %v", err),
 		})
 		return
+	}
+
+	if peer.RemoteBudget != nil {
+		s.budgetTracker.SetPeerSpend(req.Peer,
+			peer.RemoteBudget.DailyUSD,
+			peer.RemoteBudget.WeeklyUSD,
+			peer.RemoteBudget.MonthlyUSD,
+			peer.RemoteBudget.ClusterDailyLimitUSD,
+			peer.RemoteBudget.ClusterWeeklyLimitUSD,
+			peer.RemoteBudget.ClusterMonthlyLimitUSD,
+		)
 	}
 
 	writeJSON(w, http.StatusOK, syncResponse{
@@ -175,6 +192,20 @@ func (s *QNTXServer) HandleSyncStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// isSelfPeer checks if a peer URL points to this node by comparing ports.
+// Shared cluster rosters naturally include self — this silently filters it.
+func isSelfPeer(peerURL string, serverPort int) bool {
+	parsed, err := url.Parse(peerURL)
+	if err != nil {
+		return false
+	}
+	port := parsed.Port()
+	if port == "" {
+		return false
+	}
+	return port == fmt.Sprintf("%d", serverPort)
+}
+
 // httpToWS converts http(s) URLs to ws(s) URLs.
 func httpToWS(url string) string {
 	if len(url) >= 8 && url[:8] == "https://" {
@@ -218,11 +249,18 @@ func (s *QNTXServer) syncAllPeers(ctx context.Context, failCounts map[string]int
 		return
 	}
 
+	serverPort := appcfg.GetServerPort()
+
 	var synced int
 	var transferred []string
 	var unreachable []string
 
 	for name, peerURL := range cfg.Sync.Peers {
+		// Shared cluster rosters include self — skip silently
+		if isSelfPeer(peerURL, serverPort) {
+			s.syncPeerStatus.Store(name, "self")
+			continue
+		}
 		peerCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 
 		wsURL := httpToWS(peerURL) + "/ws/sync"
@@ -246,7 +284,7 @@ func (s *QNTXServer) syncAllPeers(ctx context.Context, failCounts map[string]int
 
 		store := storage.NewSQLStore(s.db, s.logger)
 		wsConn := &gorillaSyncConn{conn: conn}
-		peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.logger)
+		peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.budgetTracker, s.logger)
 
 		sent, received, err := peer.Reconcile(peerCtx)
 		conn.Close()
@@ -269,6 +307,16 @@ func (s *QNTXServer) syncAllPeers(ctx context.Context, failCounts map[string]int
 		// Success — reset failure tracking
 		failCounts[name] = 0
 		s.syncPeerStatus.Store(name, "ok")
+		if peer.RemoteBudget != nil {
+			s.budgetTracker.SetPeerSpend(name,
+				peer.RemoteBudget.DailyUSD,
+				peer.RemoteBudget.WeeklyUSD,
+				peer.RemoteBudget.MonthlyUSD,
+				peer.RemoteBudget.ClusterDailyLimitUSD,
+				peer.RemoteBudget.ClusterWeeklyLimitUSD,
+				peer.RemoteBudget.ClusterMonthlyLimitUSD,
+			)
+		}
 		synced++
 
 		if sent > 0 || received > 0 {
