@@ -10,6 +10,7 @@
 import type { Glyph } from '../glyph';
 import { Doc } from '@generated/sym.js';
 import { log, SEG } from '../../../logger';
+import { toast } from '../../../toast';
 import { getGlyphTypeBySymbol, getGlyphTypeByElement } from '../glyph-registry';
 import { createErrorGlyph } from '../error-glyph';
 import { createResultGlyph } from '../result-glyph';
@@ -323,7 +324,9 @@ export function buildCanvasWorkspace(
 
                     log.info(SEG.GLYPH, `[Canvas] Spawned Doc glyph for ${result.filename} at (${x}, ${y})`);
                 } catch (err) {
+                    const message = err instanceof Error ? err.message : String(err);
                     log.error(SEG.GLYPH, `[Canvas] Failed to upload file ${file.name}`, { error: err });
+                    toast.error(`Failed to upload ${file.name}: ${message}`);
                 }
             })();
         }
