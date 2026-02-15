@@ -133,9 +133,10 @@ type PluginKeepaliveConfig struct {
 
 // EmbeddingsConfig configures the embedding service for semantic search
 type EmbeddingsConfig struct {
-	Enabled bool   `mapstructure:"enabled"` // Enable embedding service (default: false)
-	Path    string `mapstructure:"path"`    // Path to ONNX model file
-	Name    string `mapstructure:"name"`    // Model identifier for metadata
+	Enabled          bool    `mapstructure:"enabled"`           // Enable embedding service (default: false)
+	Path             string  `mapstructure:"path"`              // Path to ONNX model file
+	Name             string  `mapstructure:"name"`              // Model identifier for metadata
+	ClusterThreshold float64 `mapstructure:"cluster_threshold"` // Minimum similarity for cluster assignment (default: 0.5)
 }
 
 // File system constants

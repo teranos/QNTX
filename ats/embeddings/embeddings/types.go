@@ -4,6 +4,10 @@ import (
 	"time"
 )
 
+// ClusterNoise is the label assigned to points not belonging to any cluster.
+// HDBSCAN convention: -1 means noise/outlier.
+const ClusterNoise = -1
+
 // ModelInfo contains information about the loaded embedding model
 type ModelInfo struct {
 	Name              string `json:"name"`
