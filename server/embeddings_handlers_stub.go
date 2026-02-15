@@ -36,6 +36,16 @@ func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Reque
 	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
 }
 
+// HandleEmbeddingProject runs UMAP projection (POST /api/embeddings/project)
+func (s *QNTXServer) HandleEmbeddingProject(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
+}
+
+// HandleEmbeddingProjections serves 2D projections (GET /api/embeddings/projections)
+func (s *QNTXServer) HandleEmbeddingProjections(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
+}
+
 // SetupEmbeddingService is a no-op when embeddings are not available
 func (s *QNTXServer) SetupEmbeddingService() {
 	s.logger.Debugw("Embeddings service not available (build without rustembeddings tag)")
