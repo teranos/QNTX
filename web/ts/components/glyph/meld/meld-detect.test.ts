@@ -6,15 +6,8 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { Window } from 'happy-dom';
 import { findMeldTarget, PROXIMITY_THRESHOLD } from './meld-detect';
 import { uiState } from '../../../state/ui';
-
-// Setup happy-dom
-const window = new Window();
-const document = window.document;
-globalThis.document = document as any;
-globalThis.window = window as any;
 
 /** Helper: mock getBoundingClientRect on an element */
 function mockRect(el: HTMLElement, rect: { left: number; top: number; width: number; height: number }) {

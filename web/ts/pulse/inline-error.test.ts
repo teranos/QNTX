@@ -5,12 +5,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { Window } from 'happy-dom';
-
-// Set up DOM environment
-const window = new Window();
-globalThis.document = window.document as unknown as Document;
-globalThis.window = window as unknown as Window & typeof globalThis;
 
 // Mock scheduling controls error display
 function showSchedulingError(container: HTMLElement, message: string): HTMLElement {

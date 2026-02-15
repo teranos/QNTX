@@ -91,6 +91,8 @@ if (USE_JSDOM) {
     // @ts-ignore
     globalThis.localStorage = window.localStorage;
     // @ts-ignore
+    globalThis.MutationObserver = window.MutationObserver;
+    // @ts-ignore
     if (!globalThis.CSS) {
         // @ts-ignore
         globalThis.CSS = { escape: (s: string) => s.replace(/([^\w-])/g, '\\$1') };

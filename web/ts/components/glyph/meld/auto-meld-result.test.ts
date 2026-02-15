@@ -8,17 +8,10 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { Window } from 'happy-dom';
 import { autoMeldResultBelow } from './auto-meld-result';
 import { performMeld } from './meld-composition';
 import type { Glyph } from '../glyph';
 import { uiState } from '../../../state/ui';
-
-// Setup happy-dom
-const window = new Window();
-const document = window.document;
-globalThis.document = document as any;
-globalThis.window = window as any;
 
 describe('Auto-Meld Result Below - Tim (Happy Path)', () => {
     function clearState() {

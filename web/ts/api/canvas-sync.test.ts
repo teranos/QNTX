@@ -8,21 +8,7 @@
  */
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
-import { Window } from 'happy-dom';
 import { syncStateManager } from '../state/sync-state';
-
-// Setup happy-dom (sync queue uses localStorage)
-const window = new Window();
-const document = window.document;
-globalThis.document = document as any;
-globalThis.window = window as any;
-globalThis.localStorage = window.localStorage;
-
-function resetGlobals() {
-    globalThis.document = document as any;
-    globalThis.window = window as any;
-    globalThis.localStorage = window.localStorage;
-}
 
 // Mock connectivity — start offline so add() doesn't auto-flush
 let mockConnectivity: 'online' | 'offline' = 'offline';
@@ -63,7 +49,6 @@ const STORAGE_KEY = 'qntx-canvas-sync-queue';
 
 describe('Canvas Sync - Tim (Happy Path)', () => {
     beforeEach(() => {
-        resetGlobals();
         localStorage.clear();
         mockConnectivity = 'offline';
         connectivitySubscribers.clear();
@@ -203,7 +188,6 @@ describe('Canvas Sync - Tim (Happy Path)', () => {
 
 describe('Canvas Sync - Spike (Edge Cases)', () => {
     beforeEach(() => {
-        resetGlobals();
         localStorage.clear();
         mockConnectivity = 'offline';
         connectivitySubscribers.clear();

@@ -3,16 +3,10 @@
  */
 
 import { test, expect, mock } from 'bun:test';
-import { Window } from 'happy-dom';
 import { ProseEditor } from './editor.ts';
 
-const window = new Window();
-globalThis.document = window.document;
-globalThis.window = window as any;
-globalThis.HTMLElement = window.HTMLElement as any;
-
 test('can save document', async () => {
-    const panel = window.document.createElement('div');
+    const panel = document.createElement('div');
     panel.innerHTML = '<div id="prose-editor"></div>';
 
     global.fetch = mock(() =>

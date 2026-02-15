@@ -6,19 +6,7 @@
  */
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
-import { Window } from 'happy-dom';
 import { syncStateManager } from '../state/sync-state';
-
-const window = new Window();
-globalThis.document = window.document as any;
-globalThis.window = window as any;
-globalThis.localStorage = window.localStorage;
-
-function resetGlobals() {
-    globalThis.document = window.document as any;
-    globalThis.window = window as any;
-    globalThis.localStorage = window.localStorage;
-}
 
 let mockConnectivity: 'online' | 'offline' = 'offline';
 
@@ -53,7 +41,6 @@ const STORAGE_KEY = 'qntx-canvas-sync-queue';
 
 describe('Canvas Sync - Spike (Backoff)', () => {
     beforeEach(() => {
-        resetGlobals();
         localStorage.clear();
         mockConnectivity = 'offline';
         mockApiFetch = async () => new Response(null, { status: 200 });

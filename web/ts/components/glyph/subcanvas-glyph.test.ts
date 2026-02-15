@@ -6,17 +6,9 @@
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { Window } from 'happy-dom';
 import { createSubcanvasGlyph } from './subcanvas-glyph';
 import { buildCanvasWorkspace } from './canvas/canvas-workspace-builder';
 import type { Glyph } from './glyph';
-
-// Setup happy-dom
-const window = new Window();
-const document = window.document;
-globalThis.document = document as any;
-globalThis.window = window as any;
-globalThis.localStorage = window.localStorage;
 
 // Mock animate for morph transitions
 (window as any).Element.prototype.animate = function() {
