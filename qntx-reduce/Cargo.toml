@@ -1,0 +1,40 @@
+[package]
+name = "qntx-reduce-plugin"
+version = "0.1.1"
+edition.workspace = true
+description = "QNTX gRPC plugin for dimensionality reduction (UMAP)"
+license.workspace = true
+authors = ["QNTX Contributors"]
+
+[[bin]]
+name = "qntx-reduce-plugin"
+path = "src/main.rs"
+
+[dependencies]
+# QNTX gRPC infrastructure
+qntx-grpc = { path = "../crates/qntx-grpc", features = ["plugin"] }
+
+# gRPC and async
+tonic.workspace = true
+prost.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+
+# Python embedding via PyO3
+# REQUIRES Nix build (flake.nix) - provides Python 3.13 + umap-learn
+pyo3 = { version = "0.23", features = ["auto-initialize"] }
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Utilities
+thiserror.workspace = true
+parking_lot.workspace = true
