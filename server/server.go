@@ -98,7 +98,8 @@ type QNTXServer struct {
 		ComputeSimilarity(a, b []float32) (float32, error)
 		Close() error
 	}
-	embeddingStore *storage.EmbeddingStore
+	embeddingStore              *storage.EmbeddingStore
+	embeddingClusterInvalidator func() // called after re-cluster to invalidate centroid cache
 }
 
 // handleClientRegister handles a new client connection
