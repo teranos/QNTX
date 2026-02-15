@@ -10,6 +10,7 @@ export const AT = "✦";
 export const AX = "⋈";
 export const BY = "⌬";
 export const DB = "⊔";
+export const Doc = "▤";
 export const I = "⍟";
 export const IS = "=";
 export const IX = "⨳";
