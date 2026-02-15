@@ -38,6 +38,11 @@ The SE glyph feeds results into downstream glyphs:
 |-------------|--------|
 | SE → py | Matched attestations passed as input to Python glyph |
 | SE → prompt | Matched attestations injected into prompt template |
+
+### Planned
+
+| Composition | Effect |
+|-------------|--------|
 | AX → SE | AX query results fed as context for semantic refinement |
 
 ## Files
