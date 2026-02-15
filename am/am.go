@@ -57,11 +57,18 @@ type PulseConfig struct {
 	// Ticker configuration for scheduled job execution
 	TickerIntervalSeconds int `mapstructure:"ticker_interval_seconds"` // How often to check for scheduled jobs (default: 1)
 
-	// Budget tracking
+	// Node-level budget tracking (enforced locally per node)
 	DailyBudgetUSD   float64 `mapstructure:"daily_budget_usd"`   // Daily spending limit in USD
 	WeeklyBudgetUSD  float64 `mapstructure:"weekly_budget_usd"`  // Weekly spending limit in USD
 	MonthlyBudgetUSD float64 `mapstructure:"monthly_budget_usd"` // Monthly spending limit in USD
 	CostPerScoreUSD  float64 `mapstructure:"cost_per_score_usd"` // Estimated cost per operation
+
+	// Cluster-level budget (enforced against aggregate spend across all nodes).
+	// Effective limit = average of all nodes' configured cluster limits.
+	// 0 = no cluster-level enforcement.
+	ClusterDailyBudgetUSD   float64 `mapstructure:"cluster_daily_budget_usd"`
+	ClusterWeeklyBudgetUSD  float64 `mapstructure:"cluster_weekly_budget_usd"`
+	ClusterMonthlyBudgetUSD float64 `mapstructure:"cluster_monthly_budget_usd"`
 }
 
 // CodeConfig configures the code review system
