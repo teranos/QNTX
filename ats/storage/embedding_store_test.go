@@ -131,7 +131,7 @@ func TestEmbeddingStore_SemanticSearch(t *testing.T) {
 
 	// Search with a query embedding
 	queryEmbedding := createTestEmbedding(384)
-	results, err := store.SemanticSearch(queryEmbedding, 10, 0.0)
+	results, err := store.SemanticSearch(queryEmbedding, 10, 0.0, nil)
 	require.NoError(t, err)
 	assert.Len(t, results, 3)
 
@@ -141,7 +141,7 @@ func TestEmbeddingStore_SemanticSearch(t *testing.T) {
 	}
 
 	// Test with threshold
-	results, err = store.SemanticSearch(queryEmbedding, 10, 0.9)
+	results, err = store.SemanticSearch(queryEmbedding, 10, 0.9, nil)
 	require.NoError(t, err)
 	// Should filter out low similarity results
 	for _, result := range results {
@@ -231,7 +231,7 @@ func TestEmbeddingStore_BatchSaveAttestationEmbeddings(t *testing.T) {
 
 	// Verify they're searchable
 	queryEmbedding := createTestEmbedding(384)
-	results, err := store.SemanticSearch(queryEmbedding, 10, 0.0)
+	results, err := store.SemanticSearch(queryEmbedding, 10, 0.0, nil)
 	require.NoError(t, err)
 	assert.Len(t, results, 3)
 }

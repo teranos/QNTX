@@ -8,7 +8,7 @@
  */
 
 import type { Glyph } from './glyph';
-import { AX, IX, SO, SE, Prose, Subcanvas } from '@generated/sym.js';
+import { AX, IX, SO, SE, Prose, Doc, Subcanvas } from '@generated/sym.js';
 import { createAxGlyph } from './ax-glyph';
 import { createSemanticGlyph } from './semantic-glyph';
 import { createPyGlyph } from './py-glyph';
@@ -16,6 +16,7 @@ import { createIxGlyph } from './ix-glyph';
 import { createPromptGlyph } from './prompt-glyph';
 import { createNoteGlyph } from './note-glyph';
 import { createTsGlyph } from './ts-glyph';
+import { createDocGlyph } from './doc-glyph';
 import { createSubcanvasGlyph } from './subcanvas-glyph';
 
 export interface GlyphTypeEntry {
@@ -39,6 +40,7 @@ const GLYPH_TYPES: GlyphTypeEntry[] = [
     { symbol: SO,       className: 'canvas-prompt-glyph',  title: 'Prompt',   label: 'Prompt', render: createPromptGlyph },
     { symbol: 'ts',     className: 'canvas-ts-glyph',      title: 'TypeScript', label: 'TS',   render: createTsGlyph },
     { symbol: Prose,    className: 'canvas-note-glyph',    title: 'Note',     label: 'Note',   render: createNoteGlyph },
+    { symbol: Doc,      className: 'canvas-doc-glyph',     title: 'Document', label: 'Doc',    render: createDocGlyph },
     { symbol: Subcanvas, className: 'canvas-subcanvas-glyph', title: 'Subcanvas', label: 'Subcanvas', render: createSubcanvasGlyph },
 ];
 
