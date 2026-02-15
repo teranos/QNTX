@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -194,4 +195,63 @@ func (s *QNTXServer) handleFileServe(w http.ResponseWriter, r *http.Request, id 
 	}
 
 	http.Error(w, "file not found", http.StatusNotFound)
+}
+
+// mimeByExtension maps file extensions to MIME types.
+// http.DetectContentType often misdetects PDFs as application/octet-stream,
+// so we use extension-based lookup as the primary source.
+var mimeByExtension = map[string]string{
+	".pdf":  "application/pdf",
+	".png":  "image/png",
+	".jpg":  "image/jpeg",
+	".jpeg": "image/jpeg",
+	".gif":  "image/gif",
+	".webp": "image/webp",
+	".svg":  "image/svg+xml",
+	".txt":  "text/plain",
+}
+
+// readFileBase64 reads a stored file by ID, detects its MIME type, and returns
+// the content as a base64-encoded string suitable for data URI construction.
+func (s *QNTXServer) readFileBase64(fileID string) (mimeType, b64Data string, err error) {
+	// Sanitize: only allow alphanumeric, hyphens, dots (same as handleFileServe)
+	fileID = filepath.Base(fileID)
+	for _, c := range fileID {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '.') {
+			return "", "", errors.Newf("invalid file ID %q", fileID)
+		}
+	}
+
+	dir, err := s.filesDir()
+	if err != nil {
+		return "", "", errors.Wrapf(err, "failed to resolve files directory for %s", fileID)
+	}
+
+	// Try exact match first (id already includes extension)
+	path := filepath.Join(dir, fileID)
+	if _, statErr := os.Stat(path); statErr != nil {
+		// Try globbing for id.* (bare UUID without extension)
+		matches, _ := filepath.Glob(filepath.Join(dir, fileID+".*"))
+		if len(matches) != 1 {
+			return "", "", errors.Newf("file not found: %s", fileID)
+		}
+		path = matches[0]
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", "", errors.Wrapf(err, "failed to read file %s", path)
+	}
+
+	// Determine MIME type: extension-based first, then content detection fallback
+	ext := strings.ToLower(filepath.Ext(path))
+	mime, ok := mimeByExtension[ext]
+	if !ok {
+		mime = http.DetectContentType(data)
+		if idx := strings.Index(mime, ";"); idx != -1 {
+			mime = strings.TrimSpace(mime[:idx])
+		}
+	}
+
+	return mime, base64.StdEncoding.EncodeToString(data), nil
 }

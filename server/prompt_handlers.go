@@ -77,6 +77,7 @@ type PromptDirectRequest struct {
 	Model               string    `json:"model,omitempty"`
 	GlyphID             string    `json:"glyph_id,omitempty"`             // TODO(#458): create result attestation with actor "glyph:{id}" so prompt glyphs can be mid-chain producers
 	UpstreamAttestation *types.As `json:"upstream_attestation,omitempty"` // Triggering attestation — enables {{field}} interpolation
+	FileIDs             []string  `json:"file_ids,omitempty"`             // Attached document/image file IDs for multimodal prompts
 }
 
 // PromptDirectResponse represents the direct execution response
@@ -491,6 +492,26 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 	// Set max tokens if specified in frontmatter
 	if doc.Metadata.MaxTokens != nil {
 		chatReq.MaxTokens = doc.Metadata.MaxTokens
+	}
+
+	// Build multimodal attachments from file IDs (melded Doc glyphs)
+	if len(req.FileIDs) > 0 {
+		for _, fid := range req.FileIDs {
+			mime, b64, readErr := s.readFileBase64(fid)
+			if readErr != nil {
+				s.logger.Warnw("Failed to read attached file, skipping",
+					"file_id", fid, "error", readErr)
+				continue
+			}
+			chatReq.Attachments = append(chatReq.Attachments, openrouter.ContentPart{
+				Type: "image_url",
+				ImageURL: &openrouter.ContentPartImage{
+					URL: "data:" + mime + ";base64," + b64,
+				},
+			})
+			s.logger.Debugw("Attached file to prompt",
+				"file_id", fid, "mime", mime, "b64_length", len(b64))
+		}
 	}
 
 	// Execute prompt
