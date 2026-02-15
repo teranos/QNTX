@@ -3,7 +3,9 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -16,6 +18,8 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
+	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 )
 
@@ -709,6 +713,7 @@ func (s *QNTXServer) SetupEmbeddingService() {
 		richStore:        storage.NewBoundedStore(s.db, s.logger.Named("auto-embed")),
 		logger:           s.logger.Named("auto-embed"),
 		clusterThreshold: float32(appcfg.GetFloat64("embeddings.cluster_threshold")),
+		projectFunc:      s.projectToCanvas,
 	}
 	storage.RegisterObserver(observer)
 	s.embeddingClusterInvalidator = observer.InvalidateClusterCache
@@ -743,6 +748,7 @@ type EmbeddingObserver struct {
 	clusterMu        sync.RWMutex
 	clusterCache     []storage.ClusterCentroid // loaded once, refreshed on re-cluster
 	clusterThreshold float32                   // minimum similarity for cluster assignment
+	projectFunc      func(embeddingID string, embedding []float32)
 }
 
 // InvalidateClusterCache clears cached centroids so the next prediction reloads from DB.
@@ -813,6 +819,11 @@ func (o *EmbeddingObserver) OnAttestationCreated(as *types.As) {
 
 	// Predict cluster assignment for the new embedding
 	o.predictCluster(model.ID, as.ID, result.Embedding)
+
+	// Project to 2D canvas if reduce plugin is available
+	if o.projectFunc != nil {
+		o.projectFunc(model.ID, result.Embedding)
+	}
 }
 
 // predictCluster assigns the embedding to the nearest cluster centroid.
@@ -913,4 +924,219 @@ func extractRichTextFromAttributes(attrs map[string]interface{}, richFields []st
 	}
 
 	return strings.Join(parts, " ")
+}
+
+// callReducePlugin sends an HTTP request to the reduce plugin via gRPC.
+// Returns the response body or an error.
+func (s *QNTXServer) callReducePlugin(ctx context.Context, method, path string, body []byte) ([]byte, error) {
+	if s.pluginRegistry == nil {
+		return nil, errors.New("plugin registry not available")
+	}
+	p, ok := s.pluginRegistry.Get("reduce")
+	if !ok {
+		return nil, errors.New("reduce plugin not registered")
+	}
+	proxy, ok := p.(*grpcplugin.ExternalDomainProxy)
+	if !ok {
+		return nil, errors.New("reduce plugin is not a gRPC plugin")
+	}
+
+	resp, err := proxy.Client().HandleHTTP(ctx, &protocol.HTTPRequest{
+		Method: method,
+		Path:   path,
+		Body:   body,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "reduce plugin %s %s gRPC call failed", method, path)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, errors.Newf("reduce plugin %s %s returned status %d: %s",
+			method, path, resp.StatusCode, string(resp.Body))
+	}
+	return resp.Body, nil
+}
+
+// HandleEmbeddingProject runs UMAP on all embeddings and stores 2D projections.
+// POST /api/embeddings/project
+func (s *QNTXServer) HandleEmbeddingProject(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.embeddingService == nil || s.embeddingStore == nil {
+		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	startTime := time.Now()
+
+	// Read all embedding vectors
+	ids, blobs, err := s.embeddingStore.GetAllEmbeddingVectors()
+	if err != nil {
+		s.logger.Errorw("Failed to read embedding vectors for projection", "error", err)
+		http.Error(w, "Failed to read embeddings", http.StatusInternalServerError)
+		return
+	}
+
+	if len(ids) < 2 {
+		http.Error(w, fmt.Sprintf("Need at least 2 embeddings to project, have %d", len(ids)), http.StatusBadRequest)
+		return
+	}
+
+	// Deserialize blobs into float32 arrays
+	allEmbeddings := make([][]float32, 0, len(blobs))
+	for i, blob := range blobs {
+		vec, err := s.embeddingService.DeserializeEmbedding(blob)
+		if err != nil {
+			s.logger.Errorw("Failed to deserialize embedding for projection",
+				"embedding_id", ids[i], "error", err)
+			http.Error(w, fmt.Sprintf("Failed to deserialize embedding %s", ids[i]), http.StatusInternalServerError)
+			return
+		}
+		allEmbeddings = append(allEmbeddings, vec)
+	}
+
+	// Call reduce plugin /fit
+	fitReq, err := json.Marshal(map[string]interface{}{
+		"embeddings": allEmbeddings,
+	})
+	if err != nil {
+		http.Error(w, "Failed to marshal fit request", http.StatusInternalServerError)
+		return
+	}
+
+	fitResp, err := s.callReducePlugin(r.Context(), "POST", "/fit", fitReq)
+	if err != nil {
+		s.logger.Errorw("Reduce plugin /fit failed", "n_points", len(ids), "error", err)
+		http.Error(w, fmt.Sprintf("UMAP fit failed: %s", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Parse projections
+	var fitResult struct {
+		Projections [][]float64 `json:"projections"`
+		NPoints     int         `json:"n_points"`
+		FitMS       int64       `json:"fit_ms"`
+	}
+	if err := json.Unmarshal(fitResp, &fitResult); err != nil {
+		s.logger.Errorw("Failed to parse reduce plugin response", "error", err)
+		http.Error(w, "Failed to parse UMAP response", http.StatusInternalServerError)
+		return
+	}
+
+	if len(fitResult.Projections) != len(ids) {
+		http.Error(w, fmt.Sprintf("Projection count mismatch: got %d, expected %d",
+			len(fitResult.Projections), len(ids)), http.StatusInternalServerError)
+		return
+	}
+
+	// Write projections to DB
+	assignments := make([]storage.ProjectionAssignment, len(ids))
+	for i, id := range ids {
+		assignments[i] = storage.ProjectionAssignment{
+			ID:          id,
+			ProjectionX: fitResult.Projections[i][0],
+			ProjectionY: fitResult.Projections[i][1],
+		}
+	}
+
+	if err := s.embeddingStore.UpdateProjections(assignments); err != nil {
+		s.logger.Errorw("Failed to save projections", "count", len(assignments), "error", err)
+		http.Error(w, "Failed to save projections", http.StatusInternalServerError)
+		return
+	}
+
+	totalMS := time.Since(startTime).Milliseconds()
+
+	s.logger.Infow("UMAP projection complete",
+		"n_points", len(ids),
+		"fit_ms", fitResult.FitMS,
+		"total_ms", totalMS)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"n_points": len(ids),
+		"fit_ms":   fitResult.FitMS,
+		"total_ms": totalMS,
+	})
+}
+
+// HandleEmbeddingProjections serves 2D projections for frontend visualization.
+// GET /api/embeddings/projections
+func (s *QNTXServer) HandleEmbeddingProjections(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.embeddingStore == nil {
+		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	projections, err := s.embeddingStore.GetAllProjections()
+	if err != nil {
+		s.logger.Errorw("Failed to get projections", "error", err)
+		http.Error(w, "Failed to retrieve projections", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(projections)
+}
+
+// projectToCanvas projects a single embedding to 2D via the reduce plugin's /transform.
+// Silently returns if the plugin is not available or not fitted.
+func (s *QNTXServer) projectToCanvas(embeddingID string, embedding []float32) {
+	if s.pluginRegistry == nil {
+		return
+	}
+	if _, ok := s.pluginRegistry.Get("reduce"); !ok {
+		return
+	}
+
+	reqBody, err := json.Marshal(map[string]interface{}{
+		"embeddings": [][]float32{embedding},
+	})
+	if err != nil {
+		s.logger.Warnw("Failed to marshal transform request", "embedding_id", embeddingID, "error", err)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := s.callReducePlugin(ctx, "POST", "/transform", reqBody)
+	if err != nil {
+		// Silently skip — plugin may not be fitted yet
+		s.logger.Debugw("Transform skipped (plugin not fitted or unavailable)",
+			"embedding_id", embeddingID, "error", err)
+		return
+	}
+
+	var result struct {
+		Projections [][]float64 `json:"projections"`
+	}
+	if err := json.Unmarshal(resp, &result); err != nil || len(result.Projections) == 0 {
+		s.logger.Warnw("Failed to parse transform response",
+			"embedding_id", embeddingID, "error", err)
+		return
+	}
+
+	err = s.embeddingStore.UpdateProjections([]storage.ProjectionAssignment{{
+		ID:          embeddingID,
+		ProjectionX: result.Projections[0][0],
+		ProjectionY: result.Projections[0][1],
+	}})
+	if err != nil {
+		s.logger.Warnw("Failed to save projection for new embedding",
+			"embedding_id", embeddingID, "error", err)
+		return
+	}
+
+	s.logger.Debugw("Auto-projected new embedding",
+		"embedding_id", embeddingID,
+		"x", result.Projections[0][0],
+		"y", result.Projections[0][1])
 }
