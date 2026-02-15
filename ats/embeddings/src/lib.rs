@@ -1,3 +1,4 @@
+pub mod cluster;
 pub mod engine;
 pub mod tokenizer;
 pub mod types;

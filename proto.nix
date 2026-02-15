@@ -22,7 +22,8 @@
         --plugin=${pkgs.protoc-gen-go}/bin/protoc-gen-go \
         --go_out=. --go_opt=paths=source_relative \
         glyph/proto/canvas.proto \
-        glyph/proto/events.proto
+        glyph/proto/events.proto \
+        glyph/proto/files.proto
 
       echo "✓ Glyph proto files generated in glyph/proto/"
 
@@ -95,7 +96,8 @@
         --ts_proto_opt=useDate=string \
         --ts_proto_out=web/ts/generated/proto \
         glyph/proto/canvas.proto \
-        glyph/proto/events.proto
+        glyph/proto/events.proto \
+        glyph/proto/files.proto
 
       echo "✓ Glyph proto TypeScript files generated in web/ts/generated/proto/"
     '');
