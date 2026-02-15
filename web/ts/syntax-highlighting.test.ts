@@ -35,17 +35,7 @@ const testOrSkip = USE_JSDOM ? test : test.skip;
 
 // Setup jsdom if enabled
 if (USE_JSDOM) {
-    const { JSDOM } = await import('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
-    const { window } = dom;
-    const { document } = window;
-
-    globalThis.document = document as any;
-    globalThis.window = window as any;
-    globalThis.HTMLElement = window.HTMLElement as any;
-    globalThis.MutationObserver = window.MutationObserver as any;
-
-    // Polyfill browser APIs that jsdom doesn't provide
+    // Polyfill browser APIs that happy-dom doesn't provide
     globalThis.requestAnimationFrame = (cb: any) => setTimeout(cb, 0) as any;
     globalThis.cancelAnimationFrame = (id: any) => clearTimeout(id);
     (window as any).requestAnimationFrame = globalThis.requestAnimationFrame;
