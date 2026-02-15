@@ -115,98 +115,17 @@ function handleVersion(data: VersionMessage): void {
 
 
 // Initialize the application
-// Avoid Sin #4: Callback Hell - Use async/await for sequential async operations
+// WebSocket connects immediately — storage, WASM, and canvas sync run in parallel.
 async function init(): Promise<void> {
     // TIMING: Track when init() is called
     console.log('[TIMING] init() called:', Date.now() - navStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Initializing application...');
 
-    // Initialize debug interceptor (dev mode only)
-    // Avoid Sin #7: Silent Failures - Log errors even for non-critical components
-    try {
-        await initDebugInterceptor();
-    } catch (error: unknown) {
-        console.error('[Init] Failed to initialize debug interceptor:', error);
-        // Continue anyway - debug interception is not critical to app function
-    }
-
-    // Initialize IndexedDB storage for UI state (canvas layouts, preferences)
-    // CRITICAL: Must complete before UI state operations
-    try {
-        if (window.logLoaderStep) window.logLoaderStep('Initializing storage...', false, true);
-        await initStorage();
-    } catch (error: unknown) {
-        console.error('[Init] Failed to initialize IndexedDB storage:', error);
-        // BLOCK: Canvas state persistence unavailable
-        // TODO: Show user notification that canvas state won't persist
-        throw error; // Stop initialization - storage is critical
-    }
-
-    // Load persisted UI state from IndexedDB (must happen after initStorage())
-    uiState.loadPersistedState();
-
-    // Bidirectional canvas state sync: merge backend state into local, then enqueue local→server.
-    // Backend merge ensures new clients receive state from other devices.
-    // Sync queue ensures locally-created items reach the server when online.
-    {
-        if (window.logLoaderStep) window.logLoaderStep('Syncing canvas state...', false, true);
-        const { loadCanvasState, mergeCanvasState, upsertCanvasGlyph, upsertComposition } = await import('./api/canvas.ts');
-
-        // Merge backend state into local (skip if offline)
-        try {
-            const backendState = await loadCanvasState();
-            const local = { glyphs: uiState.getCanvasGlyphs(), compositions: uiState.getCanvasCompositions() };
-            const merged = mergeCanvasState(local, backendState);
-
-            if (merged.mergedGlyphs > 0) uiState.setCanvasGlyphs(merged.glyphs);
-            if (merged.mergedComps > 0) uiState.setCanvasCompositions(merged.compositions);
-
-            if (merged.mergedGlyphs > 0 || merged.mergedComps > 0) {
-                log.info(SEG.GLYPH, `[Init] Merged ${merged.mergedGlyphs} glyphs and ${merged.mergedComps} compositions from backend`);
-            }
-        } catch (error: unknown) {
-            log.warn(SEG.GLYPH, '[Init] Failed to load canvas state from backend, continuing with local state:', error);
-        }
-
-        // Enqueue all local state for server sync (sync queue handles retry + dedup)
-        const localGlyphs = uiState.getCanvasGlyphs();
-        const localCompositions = uiState.getCanvasCompositions();
-        for (const glyph of localGlyphs) upsertCanvasGlyph(glyph);
-        for (const comp of localCompositions) upsertComposition(comp);
-
-        if (localGlyphs.length > 0 || localCompositions.length > 0) {
-            log.info(SEG.GLYPH, `[Init] Enqueued ${localGlyphs.length} glyphs and ${localCompositions.length} compositions for sync`);
-        }
-    }
-
-    // Initialize QNTX WASM module with IndexedDB storage
-    if (window.logLoaderStep) window.logLoaderStep('Initializing WASM + IndexedDB...', false, true);
-    await initQntxWasm();
-
-    // Restore previous session if exists
-    const graphSession = uiState.getGraphSession();
-    if (graphSession.query || graphSession.verbosity !== undefined) {
-        if (window.logLoaderStep) window.logLoaderStep('Restoring session...', false, true);
-        // Restore verbosity
-        if (graphSession.verbosity !== undefined) {
-            appState.currentVerbosity = graphSession.verbosity;
-            const verbositySelect = document.getElementById('verbosity-select') as HTMLSelectElement | null;
-            if (verbositySelect) {
-                verbositySelect.value = graphSession.verbosity.toString();
-            }
-        }
-
-        // Restore query (will be re-run to get fresh graph data)
-        if (graphSession.query) {
-            appState.currentQuery = graphSession.query;
-        }
-    }
-
-    // Set up WebSocket with message handlers
+    // Connect WebSocket FIRST — this is the critical transport and must not wait
+    // on storage, WASM, or canvas sync which can take seconds (or 30s on timeout).
     console.log('[TIMING] Calling connectWebSocket():', Date.now() - navStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Connecting to server...');
 
-    // Message handlers are now properly typed to match their WebSocket message types
     const handlers: MessageHandlers = {
         'version': handleVersion,
         'logs': handleLogBatch,
@@ -226,6 +145,87 @@ async function init(): Promise<void> {
     };
 
     connectWebSocket(handlers);
+
+    // Initialize debug interceptor (dev mode only)
+    try {
+        await initDebugInterceptor();
+    } catch (error: unknown) {
+        console.error('[Init] Failed to initialize debug interceptor:', error);
+    }
+
+    // Initialize IndexedDB storage for UI state (canvas layouts, preferences)
+    // CRITICAL: Must complete before UI state operations
+    try {
+        if (window.logLoaderStep) window.logLoaderStep('Initializing storage...', false, true);
+        await initStorage();
+    } catch (error: unknown) {
+        console.error('[Init] Failed to initialize IndexedDB storage:', error);
+        throw error; // Stop initialization - storage is critical
+    }
+
+    // Load persisted UI state from IndexedDB (must happen after initStorage())
+    uiState.loadPersistedState();
+
+    // Run WASM init and canvas state sync in parallel — neither depends on the other,
+    // and both depend only on IndexedDB storage being ready (which it is at this point).
+    if (window.logLoaderStep) window.logLoaderStep('Initializing WASM + syncing canvas...', false, true);
+    await Promise.all([
+        // WASM module init
+        initQntxWasm(),
+
+        // Canvas state sync (with timeout — never block init for more than 3s)
+        (async () => {
+            const { loadCanvasState, mergeCanvasState, upsertCanvasGlyph, upsertComposition } = await import('./api/canvas.ts');
+
+            // Merge backend state into local (skip if offline or slow)
+            try {
+                const backendState = await Promise.race([
+                    loadCanvasState(),
+                    new Promise<never>((_, reject) =>
+                        setTimeout(() => reject(new Error('canvas state fetch timed out after 3s')), 3000)
+                    ),
+                ]);
+                const local = { glyphs: uiState.getCanvasGlyphs(), compositions: uiState.getCanvasCompositions() };
+                const merged = mergeCanvasState(local, backendState);
+
+                if (merged.mergedGlyphs > 0) uiState.setCanvasGlyphs(merged.glyphs);
+                if (merged.mergedComps > 0) uiState.setCanvasCompositions(merged.compositions);
+
+                if (merged.mergedGlyphs > 0 || merged.mergedComps > 0) {
+                    log.info(SEG.GLYPH, `[Init] Merged ${merged.mergedGlyphs} glyphs and ${merged.mergedComps} compositions from backend`);
+                }
+            } catch (error: unknown) {
+                log.warn(SEG.GLYPH, '[Init] Failed to load canvas state from backend, continuing with local state:', error);
+            }
+
+            // Enqueue all local state for server sync (sync queue handles retry + dedup)
+            const localGlyphs = uiState.getCanvasGlyphs();
+            const localCompositions = uiState.getCanvasCompositions();
+            for (const glyph of localGlyphs) upsertCanvasGlyph(glyph);
+            for (const comp of localCompositions) upsertComposition(comp);
+
+            if (localGlyphs.length > 0 || localCompositions.length > 0) {
+                log.info(SEG.GLYPH, `[Init] Enqueued ${localGlyphs.length} glyphs and ${localCompositions.length} compositions for sync`);
+            }
+        })(),
+    ]);
+
+    // Restore previous session if exists
+    const graphSession = uiState.getGraphSession();
+    if (graphSession.query || graphSession.verbosity !== undefined) {
+        if (window.logLoaderStep) window.logLoaderStep('Restoring session...', false, true);
+        if (graphSession.verbosity !== undefined) {
+            appState.currentVerbosity = graphSession.verbosity;
+            const verbositySelect = document.getElementById('verbosity-select') as HTMLSelectElement | null;
+            if (verbositySelect) {
+                verbositySelect.value = graphSession.verbosity.toString();
+            }
+        }
+
+        if (graphSession.query) {
+            appState.currentQuery = graphSession.query;
+        }
+    }
 
     // Initialize visual mode system (connectivity-based styling)
     initVisualMode();
