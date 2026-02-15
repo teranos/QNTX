@@ -377,9 +377,9 @@ class JobDetailPanel {
 
         ${isExpanded ? `
           <div class="execution-stages-container">
-            ${stages && children ?
-              // Show children if stages are empty
-              (stages.stages.length === 0 && children.children.length > 0 ?
+            ${stages ?
+              // Show children if stages are empty and children exist
+              (stages.stages.length === 0 && children && children.children.length > 0 ?
                 this.renderChildren(children) :
                 this.renderStages(stages)
               ) :
