@@ -50,6 +50,10 @@ describe('Port-aware MELDABILITY registry', () => {
             expect(areClassesCompatible('canvas-prompt-glyph', 'canvas-result-glyph')).toBe('bottom');
         });
 
+        test('doc → prompt returns bottom (doc sits above prompt)', () => {
+            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-prompt-glyph')).toBe('bottom');
+        });
+
         test('note → prompt returns bottom (note sits above prompt)', () => {
             expect(areClassesCompatible('canvas-note-glyph', 'canvas-prompt-glyph')).toBe('bottom');
         });
@@ -68,12 +72,13 @@ describe('Port-aware MELDABILITY registry', () => {
     });
 
     describe('getInitiatorClasses', () => {
-        test('includes ax, se, py, prompt, note', () => {
+        test('includes ax, se, py, prompt, doc, note', () => {
             const classes = getInitiatorClasses();
             expect(classes).toContain('canvas-ax-glyph');
             expect(classes).toContain('canvas-se-glyph');
             expect(classes).toContain('canvas-py-glyph');
             expect(classes).toContain('canvas-prompt-glyph');
+            expect(classes).toContain('canvas-doc-glyph');
             expect(classes).toContain('canvas-note-glyph');
         });
     });
