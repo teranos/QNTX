@@ -30,6 +30,7 @@ const Prose = "▣"
 const Pulse = "꩜"
 const PulseClose = "❀"
 const PulseOpen = "✿"
+const SE = "⊨"
 const SO = "⟶"
 const Subcanvas = "⌗"
 ```
@@ -48,6 +49,7 @@ var PaletteOrder = []string{
 	BY,
 	AT,
 	SO,
+	SE,
 }
 ```
 
@@ -64,6 +66,7 @@ var CommandDescriptions = map[string]string{
 	"is": "Identity — Subject/equivalence in attestations",
 	"ix": "Ingest — Import external data",
 	"of": "Membership — Element-of/belonging in attestations",
+	"se": "Semantic — Meaning-based search and entailment",
 	"so": "Therefore — Consequent action/trigger",
 }
 ```
@@ -81,6 +84,7 @@ var CommandToSymbol = map[string]string{
 	"is": IS,
 	"ix": IX,
 	"of": OF,
+	"se": SE,
 	"so": SO,
 }
 ```
@@ -98,6 +102,7 @@ var SymbolToCommand = map[string]string{
 	IS: "is",
 	IX: "ix",
 	OF: "of",
+	SE: "se",
 	SO: "so",
 }
 ```
