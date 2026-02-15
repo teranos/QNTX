@@ -13,7 +13,7 @@
  */
 
 import type { Glyph } from './glyph';
-import { SO, Doc } from '@generated/sym.js';
+import { SO, Doc, Prose } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { apiFetch } from '../../api';
 import { preventDrag, storeCleanup } from './glyph-interaction';
@@ -211,20 +211,26 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
         });
 
         try {
-            // Collect file IDs from melded Doc glyphs
+            // Collect attachments from melded glyphs
             const fileIds: string[] = [];
+            const noteTexts: string[] = [];
             const comp = findCompositionByGlyph(glyph.id);
             if (comp) {
                 const memberIds = extractGlyphIds(comp.edges);
                 for (const mid of memberIds) {
+                    if (mid === glyph.id) continue; // skip self
                     const g = uiState.getCanvasGlyphs().find(cg => cg.id === mid);
-                    if (g?.symbol === Doc && g.content) {
+                    if (!g?.content) continue;
+
+                    if (g.symbol === Doc) {
                         try {
                             const meta = JSON.parse(g.content);
                             if (meta.fileId && meta.ext) {
                                 fileIds.push(meta.fileId + meta.ext);
                             }
                         } catch { /* skip malformed content */ }
+                    } else if (g.symbol === Prose) {
+                        noteTexts.push(g.content);
                     }
                 }
             }
