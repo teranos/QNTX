@@ -11,8 +11,11 @@
 | GET | `/api/canvas/glyphs` | canvasHandler |
 | GET | `/api/canvas/glyphs/` | canvasHandler |
 | GET | `/api/embeddings/batch` | HandleEmbeddingBatch |
+| GET | `/api/embeddings/cluster` | HandleEmbeddingCluster |
 | GET | `/api/embeddings/generate` | HandleEmbeddingGenerate |
 | GET | `/api/embeddings/info` | HandleEmbeddingInfo |
+| GET | `/api/files` | HandleFiles |
+| GET | `/api/files/` | HandleFiles |
 | GET | `/api/search/semantic` | HandleSemanticSearch |
 | GET | `/api/sync` | HandleSync |
 | GET | `/api/sync/status` | HandleSyncStatus |
@@ -66,6 +69,16 @@ HandleEmbeddingBatch handles batch embedding generation (POST /api/embeddings/ba
 
 ---
 
+### `GET` /api/embeddings/cluster
+
+HandleEmbeddingCluster runs HDBSCAN clustering (POST /api/embeddings/cluster)
+
+**Handler**: `HandleEmbeddingCluster`
+
+**Response**: [`ClusterResponse`](../types/server.md#clusterresponse)
+
+---
+
 ### `GET` /api/embeddings/generate
 
 HandleEmbeddingGenerate handles embedding generation requests (POST /api/embeddings/generate)
@@ -83,6 +96,20 @@ HandleEmbeddingInfo returns embedding service status (GET /api/embeddings/info)
 **Handler**: `HandleEmbeddingInfo`
 
 **Response**: [`EmbeddingInfoResponse`](../types/server.md#embeddinginforesponse)
+
+---
+
+### `GET` /api/files
+
+**Handler**: `HandleFiles`
+
+---
+
+### `GET` /api/files/
+
+HandleFiles routes file upload and serve requests.
+
+**Handler**: `HandleFiles`
 
 ---
 

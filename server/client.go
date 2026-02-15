@@ -979,7 +979,7 @@ func (c *Client) searchSemantic(query string) []storage.RichSearchMatch {
 		return nil
 	}
 
-	searchResults, err := c.server.embeddingStore.SemanticSearch(queryBlob, semanticSearchLimit, semanticSearchThreshold)
+	searchResults, err := c.server.embeddingStore.SemanticSearch(queryBlob, semanticSearchLimit, semanticSearchThreshold, nil)
 	if err != nil {
 		c.server.logger.Debugw("Semantic search failed", "query", query, "error", err)
 		return nil
@@ -1215,6 +1215,7 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 		watcher.ActionType = storage.ActionTypeSemanticMatch
 		watcher.SemanticQuery = msg.SemanticQuery
 		watcher.SemanticThreshold = msg.SemanticThreshold
+		watcher.SemanticClusterID = msg.SemanticClusterID
 	} else {
 		watcher.AxQuery = msg.WatcherQuery
 		watcher.ActionType = storage.ActionTypePython // Default to Python action

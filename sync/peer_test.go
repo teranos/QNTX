@@ -568,7 +568,7 @@ func TestAttestationJSON_TimestampMillis(t *testing.T) {
 // --------------------------------------------------------------------------
 
 type mockBudgetProvider struct {
-	daily, weekly, monthly          float64
+	daily, weekly, monthly                      float64
 	clusterDaily, clusterWeekly, clusterMonthly float64
 }
 

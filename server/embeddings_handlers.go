@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	appcfg "github.com/teranos/QNTX/am"
@@ -80,6 +81,13 @@ func (s *QNTXServer) HandleSemanticSearch(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	var clusterID *int
+	if cidStr := r.URL.Query().Get("cluster_id"); cidStr != "" {
+		if parsedCID, err := strconv.Atoi(cidStr); err == nil {
+			clusterID = &parsedCID
+		}
+	}
+
 	// Generate embedding for query
 	startInference := time.Now()
 	queryResult, err := s.embeddingService.GenerateEmbedding(query)
@@ -105,7 +113,7 @@ func (s *QNTXServer) HandleSemanticSearch(w http.ResponseWriter, r *http.Request
 
 	// Perform semantic search
 	startSearch := time.Now()
-	searchResults, err := s.embeddingStore.SemanticSearch(queryBlob, limit, threshold)
+	searchResults, err := s.embeddingStore.SemanticSearch(queryBlob, limit, threshold, clusterID)
 	if err != nil {
 		s.logger.Errorw("Failed to perform semantic search",
 			"query", query,
@@ -405,12 +413,13 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 
 // EmbeddingInfoResponse represents embedding service status
 type EmbeddingInfoResponse struct {
-	Available        bool     `json:"available"`
-	ModelName        string   `json:"model_name"`
-	Dimensions       int      `json:"dimensions"`
-	EmbeddingCount   int      `json:"embedding_count"`
-	AttestationCount int      `json:"attestation_count"`
-	UnembeddedIDs    []string `json:"unembedded_ids,omitempty"`
+	Available        bool                    `json:"available"`
+	ModelName        string                  `json:"model_name"`
+	Dimensions       int                     `json:"dimensions"`
+	EmbeddingCount   int                     `json:"embedding_count"`
+	AttestationCount int                     `json:"attestation_count"`
+	UnembeddedIDs    []string                `json:"unembedded_ids,omitempty"`
+	ClusterInfo      *storage.ClusterSummary `json:"cluster_info,omitempty"`
 }
 
 // HandleEmbeddingInfo returns embedding service status and counts (GET /api/embeddings/info)
@@ -468,6 +477,13 @@ func (s *QNTXServer) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request)
 		s.logger.Warnw("Error iterating unembedded attestations", "error", err)
 	}
 
+	// Include cluster summary if available
+	if s.embeddingStore != nil {
+		if summary, err := s.embeddingStore.GetClusterSummary(); err == nil && summary.NClusters > 0 {
+			resp.ClusterInfo = summary
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		s.logger.Errorw("Failed to encode embeddings info response",
@@ -475,6 +491,167 @@ func (s *QNTXServer) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request)
 			"embedding_count", resp.EmbeddingCount,
 			"attestation_count", resp.AttestationCount,
 			"error", err)
+	}
+}
+
+// ClusterRequest represents the request body for clustering
+type ClusterRequest struct {
+	MinClusterSize int `json:"min_cluster_size,omitempty"`
+}
+
+// ClusterResponse represents the result of a clustering operation
+type ClusterResponse struct {
+	Summary *storage.ClusterSummary `json:"summary"`
+	TimeMS  float64                 `json:"time_ms"`
+}
+
+// HandleEmbeddingCluster runs HDBSCAN clustering on all stored embeddings (POST /api/embeddings/cluster)
+func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.embeddingService == nil || s.embeddingStore == nil {
+		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Parse optional min_cluster_size from body
+	minClusterSize := 5
+	if r.Body != nil {
+		var req ClusterRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil && req.MinClusterSize > 0 {
+			minClusterSize = req.MinClusterSize
+		}
+	}
+
+	startTime := time.Now()
+
+	// Read all embedding vectors
+	ids, blobs, err := s.embeddingStore.GetAllEmbeddingVectors()
+	if err != nil {
+		s.logger.Errorw("Failed to read embedding vectors for clustering", "error", err)
+		http.Error(w, "Failed to read embeddings", http.StatusInternalServerError)
+		return
+	}
+
+	if len(ids) < 2 {
+		http.Error(w, fmt.Sprintf("Need at least 2 embeddings to cluster, have %d", len(ids)), http.StatusBadRequest)
+		return
+	}
+
+	// Deserialize blobs into flat float32 array
+	var dims int
+	flat := make([]float32, 0, len(blobs)*384) // pre-allocate assuming 384d
+	for i, blob := range blobs {
+		vec, err := s.embeddingService.DeserializeEmbedding(blob)
+		if err != nil {
+			s.logger.Errorw("Failed to deserialize embedding",
+				"embedding_id", ids[i],
+				"blob_len", len(blob),
+				"error", err)
+			http.Error(w, fmt.Sprintf("Failed to deserialize embedding %s", ids[i]), http.StatusInternalServerError)
+			return
+		}
+		if i == 0 {
+			dims = len(vec)
+		}
+		flat = append(flat, vec...)
+	}
+
+	// Run HDBSCAN
+	result, err := embeddings.ClusterHDBSCAN(flat, len(ids), dims, minClusterSize)
+	if err != nil {
+		s.logger.Errorw("HDBSCAN clustering failed",
+			"n_points", len(ids),
+			"dimensions", dims,
+			"min_cluster_size", minClusterSize,
+			"error", err)
+		http.Error(w, fmt.Sprintf("Clustering failed: %s", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Build assignments and write to DB
+	assignments := make([]storage.ClusterAssignment, len(ids))
+	for i, id := range ids {
+		assignments[i] = storage.ClusterAssignment{
+			ID:          id,
+			ClusterID:   int(result.Labels[i]),
+			Probability: float64(result.Probabilities[i]),
+		}
+	}
+
+	if err := s.embeddingStore.UpdateClusterAssignments(assignments); err != nil {
+		s.logger.Errorw("Failed to save cluster assignments",
+			"count", len(assignments),
+			"error", err)
+		http.Error(w, "Failed to save cluster assignments", http.StatusInternalServerError)
+		return
+	}
+
+	// Save cluster centroids for incremental prediction
+	if len(result.Centroids) > 0 {
+		// Count members per cluster from labels
+		memberCounts := make(map[int]int)
+		for _, l := range result.Labels {
+			if l >= 0 {
+				memberCounts[int(l)]++
+			}
+		}
+
+		centroidModels := make([]storage.ClusterCentroid, 0, len(result.Centroids))
+		for i, centroid := range result.Centroids {
+			blob, err := s.embeddingService.SerializeEmbedding(centroid)
+			if err != nil {
+				s.logger.Errorw("Failed to serialize centroid",
+					"cluster_id", i,
+					"error", err)
+				continue
+			}
+			centroidModels = append(centroidModels, storage.ClusterCentroid{
+				ClusterID: i,
+				Centroid:  blob,
+				NMembers:  memberCounts[i],
+			})
+		}
+
+		if err := s.embeddingStore.SaveClusterCentroids(centroidModels); err != nil {
+			s.logger.Errorw("Failed to save cluster centroids",
+				"count", len(centroidModels),
+				"error", err)
+			// Non-fatal: clustering succeeded, just centroids not saved
+		}
+
+		// Invalidate observer's centroid cache so it picks up fresh data
+		if s.embeddingClusterInvalidator != nil {
+			s.embeddingClusterInvalidator()
+		}
+	}
+
+	// Return summary
+	summary, err := s.embeddingStore.GetClusterSummary()
+	if err != nil {
+		s.logger.Errorw("Failed to get cluster summary after assignment", "error", err)
+		http.Error(w, "Clustering succeeded but failed to read summary", http.StatusInternalServerError)
+		return
+	}
+
+	resp := ClusterResponse{
+		Summary: summary,
+		TimeMS:  float64(time.Since(startTime).Milliseconds()),
+	}
+
+	s.logger.Infow("HDBSCAN clustering complete",
+		"n_points", len(ids),
+		"n_clusters", result.NClusters,
+		"n_noise", result.NNoise,
+		"min_cluster_size", minClusterSize,
+		"time_ms", resp.TimeMS)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		s.logger.Errorw("Failed to encode cluster response", "error", err)
 	}
 }
 
@@ -531,8 +708,10 @@ func (s *QNTXServer) SetupEmbeddingService() {
 		embeddingStore:   embStore,
 		richStore:        storage.NewBoundedStore(s.db, s.logger.Named("auto-embed")),
 		logger:           s.logger.Named("auto-embed"),
+		clusterThreshold: float32(appcfg.GetFloat64("embeddings.cluster_threshold")),
 	}
 	storage.RegisterObserver(observer)
+	s.embeddingClusterInvalidator = observer.InvalidateClusterCache
 
 	s.logger.Infow("Embedding service initialized",
 		"path", modelPath,
@@ -554,11 +733,23 @@ type EmbeddingObserver struct {
 	embeddingService interface {
 		GenerateEmbedding(text string) (*embeddings.EmbeddingResult, error)
 		SerializeEmbedding(embedding []float32) ([]byte, error)
+		DeserializeEmbedding(data []byte) ([]float32, error)
+		ComputeSimilarity(a, b []float32) (float32, error)
 		GetModelInfo() (*embeddings.ModelInfo, error)
 	}
-	embeddingStore *storage.EmbeddingStore
-	richStore      *storage.BoundedStore // Reused across calls for 5-min rich field cache
-	logger         *zap.SugaredLogger
+	embeddingStore   *storage.EmbeddingStore
+	richStore        *storage.BoundedStore // Reused across calls for 5-min rich field cache
+	logger           *zap.SugaredLogger
+	clusterMu        sync.RWMutex
+	clusterCache     []storage.ClusterCentroid // loaded once, refreshed on re-cluster
+	clusterThreshold float32                   // minimum similarity for cluster assignment
+}
+
+// InvalidateClusterCache clears cached centroids so the next prediction reloads from DB.
+func (o *EmbeddingObserver) InvalidateClusterCache() {
+	o.clusterMu.Lock()
+	o.clusterCache = nil
+	o.clusterMu.Unlock()
 }
 
 // OnAttestationCreated selectively embeds attestations with rich text content.
@@ -619,6 +810,67 @@ func (o *EmbeddingObserver) OnAttestationCreated(as *types.As) {
 		"attestation_id", as.ID,
 		"text_length", len(text),
 		"inference_ms", result.InferenceMS)
+
+	// Predict cluster assignment for the new embedding
+	o.predictCluster(model.ID, as.ID, result.Embedding)
+}
+
+// predictCluster assigns the embedding to the nearest cluster centroid.
+func (o *EmbeddingObserver) predictCluster(embeddingID, attestationID string, embedding []float32) {
+	// Lazy-load centroids from DB
+	o.clusterMu.RLock()
+	centroids := o.clusterCache
+	o.clusterMu.RUnlock()
+
+	if centroids == nil {
+		loaded, err := o.embeddingStore.GetAllClusterCentroids()
+		if err != nil {
+			o.logger.Warnw("Failed to load cluster centroids",
+				"error", errors.Wrapf(err, "attestation %s", attestationID))
+			return
+		}
+		if len(loaded) == 0 {
+			return // no clusters yet
+		}
+		o.clusterMu.Lock()
+		o.clusterCache = loaded
+		o.clusterMu.Unlock()
+		centroids = loaded
+	}
+
+	clusterID, prob, err := o.embeddingStore.PredictCluster(
+		embedding,
+		centroids,
+		o.embeddingService.DeserializeEmbedding,
+		o.embeddingService.ComputeSimilarity,
+		o.clusterThreshold,
+	)
+	if err != nil {
+		o.logger.Warnw("Failed to predict cluster",
+			"error", errors.Wrapf(err, "attestation %s", attestationID))
+		return
+	}
+
+	if clusterID == storage.ClusterNoise {
+		return // below threshold, stays as noise
+	}
+
+	err = o.embeddingStore.UpdateClusterAssignments([]storage.ClusterAssignment{{
+		ID:          embeddingID,
+		ClusterID:   clusterID,
+		Probability: prob,
+	}})
+	if err != nil {
+		o.logger.Warnw("Failed to save predicted cluster assignment",
+			"error", errors.Wrapf(err, "attestation %s embedding %s cluster %d", attestationID, embeddingID, clusterID))
+		return
+	}
+
+	o.logger.Infow("Predicted cluster for new embedding",
+		"attestation_id", attestationID,
+		"embedding_id", embeddingID,
+		"cluster_id", clusterID,
+		"similarity", prob)
 }
 
 // extractRichText returns the concatenated rich text fields from an attestation's

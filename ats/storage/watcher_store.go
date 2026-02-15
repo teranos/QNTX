@@ -31,8 +31,9 @@ type Watcher struct {
 	AxQuery string         `json:"ax_query,omitempty"` // Raw AX query string (alternative to Filter fields)
 
 	// Semantic matching — used by ⊨ glyphs for meaning-based search
-	SemanticQuery     string  `json:"semantic_query,omitempty"`     // Natural language query for embedding comparison
-	SemanticThreshold float32 `json:"semantic_threshold,omitempty"` // Minimum similarity score (0-1) to fire
+	SemanticQuery     string  `json:"semantic_query,omitempty"`      // Natural language query for embedding comparison
+	SemanticThreshold float32 `json:"semantic_threshold,omitempty"`  // Minimum similarity score (0-1) to fire
+	SemanticClusterID *int    `json:"semantic_cluster_id,omitempty"` // Cluster scope (nil = all clusters)
 
 	// Action - what to do when matched
 	ActionType ActionType `json:"action_type"`
@@ -118,14 +119,14 @@ func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
 		INSERT INTO watchers (
 			id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
-			semantic_query, semantic_threshold,
+			semantic_query, semantic_threshold, semantic_cluster_id,
 			action_type, action_data,
 			max_fires_per_minute, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		w.ID, w.Name,
 		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd, w.AxQuery,
-		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold),
+		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold), w.SemanticClusterID,
 		w.ActionType, w.ActionData,
 		w.MaxFiresPerMinute, w.Enabled,
 		w.CreatedAt.Format(time.RFC3339Nano), w.UpdatedAt.Format(time.RFC3339Nano), nil, 0, 0, nil,
@@ -187,14 +188,14 @@ func (ws *WatcherStore) CreateOrReplace(ctx context.Context, w *Watcher) error {
 		INSERT OR REPLACE INTO watchers (
 			id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
-			semantic_query, semantic_threshold,
+			semantic_query, semantic_threshold, semantic_cluster_id,
 			action_type, action_data,
 			max_fires_per_minute, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		w.ID, w.Name,
 		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd, w.AxQuery,
-		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold),
+		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold), w.SemanticClusterID,
 		w.ActionType, w.ActionData,
 		w.MaxFiresPerMinute, w.Enabled,
 		w.CreatedAt.Format(time.RFC3339Nano), w.UpdatedAt.Format(time.RFC3339Nano), nil, 0, 0, nil,
@@ -210,7 +211,7 @@ func (ws *WatcherStore) Get(ctx context.Context, id string) (*Watcher, error) {
 	row := ws.db.QueryRowContext(ctx, `
 		SELECT id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
-			semantic_query, semantic_threshold,
+			semantic_query, semantic_threshold, semantic_cluster_id,
 			action_type, action_data,
 			max_fires_per_minute, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
@@ -224,7 +225,7 @@ func (ws *WatcherStore) List(ctx context.Context, enabledOnly bool) ([]*Watcher,
 	query := `
 		SELECT id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
-			semantic_query, semantic_threshold,
+			semantic_query, semantic_threshold, semantic_cluster_id,
 			action_type, action_data,
 			max_fires_per_minute, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
@@ -297,7 +298,7 @@ func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
 		UPDATE watchers SET
 			name = ?,
 			subjects = ?, predicates = ?, contexts = ?, actors = ?, time_start = ?, time_end = ?, ax_query = ?,
-			semantic_query = ?, semantic_threshold = ?,
+			semantic_query = ?, semantic_threshold = ?, semantic_cluster_id = ?,
 			action_type = ?, action_data = ?,
 			max_fires_per_minute = ?, enabled = ?,
 			fire_count = ?, error_count = ?, last_error = ?, last_fired_at = ?,
@@ -305,7 +306,7 @@ func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
 		WHERE id = ?`,
 		w.Name,
 		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd, w.AxQuery,
-		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold),
+		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold), w.SemanticClusterID,
 		w.ActionType, w.ActionData,
 		w.MaxFiresPerMinute, w.Enabled,
 		w.FireCount, w.ErrorCount, w.LastError, lastFiredAt,
@@ -390,6 +391,7 @@ func scanWatcherFields(scan func(dest ...interface{}) error) (*Watcher, error) {
 	var axQuery sql.NullString
 	var semanticQuery sql.NullString
 	var semanticThreshold sql.NullFloat64
+	var semanticClusterID sql.NullInt64
 	var createdAt, updatedAt string
 	var lastFiredAt sql.NullString
 	var lastError sql.NullString
@@ -398,7 +400,7 @@ func scanWatcherFields(scan func(dest ...interface{}) error) (*Watcher, error) {
 	err := scan(
 		&w.ID, &w.Name,
 		&subjectsJSON, &predicatesJSON, &contextsJSON, &actorsJSON, &timeStart, &timeEnd, &axQuery,
-		&semanticQuery, &semanticThreshold,
+		&semanticQuery, &semanticThreshold, &semanticClusterID,
 		&actionType, &w.ActionData,
 		&w.MaxFiresPerMinute, &w.Enabled,
 		&createdAt, &updatedAt, &lastFiredAt, &w.FireCount, &w.ErrorCount, &lastError,
@@ -456,6 +458,10 @@ func scanWatcherFields(scan func(dest ...interface{}) error) (*Watcher, error) {
 	}
 	if semanticThreshold.Valid {
 		w.SemanticThreshold = float32(semanticThreshold.Float64)
+	}
+	if semanticClusterID.Valid {
+		v := int(semanticClusterID.Int64)
+		w.SemanticClusterID = &v
 	}
 
 	w.CreatedAt, err = time.Parse(time.RFC3339Nano, createdAt)
