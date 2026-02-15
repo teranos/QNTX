@@ -2,7 +2,11 @@
 
 package server
 
-import "net/http"
+import (
+	"net/http"
+
+	am "github.com/teranos/QNTX/am"
+)
 
 // Stub handlers when rustembeddings build tag is not present
 
@@ -36,6 +40,9 @@ func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Reque
 func (s *QNTXServer) SetupEmbeddingService() {
 	s.logger.Debugw("Embeddings service not available (build without rustembeddings tag)")
 }
+
+// setupEmbeddingReclusterSchedule is a no-op when embeddings are not available
+func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *am.Config) {}
 
 // hasRustEmbeddings returns false when compiled without rustembeddings build tag
 func hasRustEmbeddings() bool {
