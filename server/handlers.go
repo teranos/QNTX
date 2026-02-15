@@ -104,6 +104,13 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		s.sendInitialJobsToClient(client)
 	}()
 
+	// Send daemon status on connection (so budget bars + daemon badge render immediately)
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		s.sendInitialDaemonStatusToClient(client)
+	}()
+
 	// Start goroutines for reading and writing
 	s.wg.Add(2)
 	go func() {
@@ -142,6 +149,81 @@ func (s *QNTXServer) sendInitialJobsToClient(client *Client) {
 
 	for _, job := range jobs {
 		s.sendJobToClient(client, job, true)
+	}
+}
+
+// sendInitialDaemonStatusToClient sends current daemon status to a newly connected client.
+// Without this, clients wait up to 30s (idle broadcaster tick) before seeing budget bars.
+func (s *QNTXServer) sendInitialDaemonStatusToClient(client *Client) {
+	// Small delay to ensure client is fully registered
+	select {
+	case <-time.After(50 * time.Millisecond):
+	case <-s.ctx.Done():
+		return
+	}
+
+	if s.daemon == nil || s.budgetTracker == nil {
+		return
+	}
+
+	daemonRunning, _ := s.getDaemonState()
+
+	// Get current status (same logic as broadcastDaemonStatus but targeted to one client)
+	stats, err := s.daemon.GetQueue().GetStats()
+	if err != nil {
+		return
+	}
+
+	activeJobs := stats.Running + stats.Queued
+	loadPercent := float64(activeJobs) / float64(1) * 100
+	if loadPercent > 100 {
+		loadPercent = 100
+	}
+
+	var budgetDaily, budgetWeekly, budgetMonthly float64
+	budgetStatus, err := s.budgetTracker.GetStatus()
+	if err == nil {
+		budgetDaily = budgetStatus.DailySpend
+		budgetWeekly = budgetStatus.WeeklySpend
+		budgetMonthly = budgetStatus.MonthlySpend
+	}
+
+	aggDaily, aggWeekly, aggMonthly, peerCount := s.budgetTracker.AggregateSpend(budgetDaily, budgetWeekly, budgetMonthly)
+	budgetLimits := s.budgetTracker.GetBudgetLimits()
+	clusterDaily, clusterWeekly, clusterMonthly, _ := s.budgetTracker.ClusterLimits()
+
+	msg := DaemonStatusMessage{
+		Type:                   "daemon_status",
+		Running:                daemonRunning,
+		ActiveJobs:             activeJobs,
+		QueuedJobs:             stats.Queued,
+		LoadPercent:            loadPercent,
+		BudgetDaily:            budgetDaily,
+		BudgetWeekly:           budgetWeekly,
+		BudgetMonthly:          budgetMonthly,
+		BudgetDailyLimit:       budgetLimits.DailyBudgetUSD,
+		BudgetWeeklyLimit:      budgetLimits.WeeklyBudgetUSD,
+		BudgetMonthlyLimit:     budgetLimits.MonthlyBudgetUSD,
+		BudgetDailyAggregate:   aggDaily,
+		BudgetWeeklyAggregate:  aggWeekly,
+		BudgetMonthlyAggregate: aggMonthly,
+		PeerCount:              peerCount,
+		ClusterDailyLimit:      clusterDaily,
+		ClusterWeeklyLimit:     clusterWeekly,
+		ClusterMonthlyLimit:    clusterMonthly,
+		Timestamp:              time.Now().Unix(),
+	}
+
+	req := &broadcastRequest{
+		reqType:  "message",
+		msg:      msg,
+		clientID: client.id,
+	}
+
+	select {
+	case s.broadcastReq <- req:
+	case <-s.ctx.Done():
+	default:
 	}
 }
 
