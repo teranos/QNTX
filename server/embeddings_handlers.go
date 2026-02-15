@@ -989,7 +989,9 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 	schedStore := schedule.NewStore(s.db)
 	existing, err := schedStore.ListAllScheduledJobs()
 	if err != nil {
-		s.logger.Errorw("Failed to list scheduled jobs for recluster idempotency check", "error", err)
+		s.logger.Errorw("Failed to list scheduled jobs for recluster idempotency check",
+			"handler_name", ReclusterHandlerName,
+			"error", err)
 		return
 	}
 	for _, j := range existing {
