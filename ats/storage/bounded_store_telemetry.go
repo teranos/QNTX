@@ -92,7 +92,7 @@ func (bs *BoundedStore) logStorageEventWithDetails(eventType, actor, context, en
 			msg += " (deleted oldest)"
 		}
 
-		bs.logger.Infow(msg,
+		bs.logger.Debugw(msg,
 			"event_type", eventType,
 			"actor", actor,
 			"context", context,
