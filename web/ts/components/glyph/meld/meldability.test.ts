@@ -26,6 +26,14 @@ describe('Port-aware MELDABILITY registry', () => {
             expect(areClassesCompatible('canvas-ax-glyph', 'canvas-py-glyph')).toBe('right');
         });
 
+        test('se → py returns right', () => {
+            expect(areClassesCompatible('canvas-se-glyph', 'canvas-py-glyph')).toBe('right');
+        });
+
+        test('se → prompt returns right', () => {
+            expect(areClassesCompatible('canvas-se-glyph', 'canvas-prompt-glyph')).toBe('right');
+        });
+
         test('py → prompt returns right', () => {
             expect(areClassesCompatible('canvas-py-glyph', 'canvas-prompt-glyph')).toBe('right');
         });
@@ -60,9 +68,10 @@ describe('Port-aware MELDABILITY registry', () => {
     });
 
     describe('getInitiatorClasses', () => {
-        test('includes ax, py, prompt, note', () => {
+        test('includes ax, se, py, prompt, note', () => {
             const classes = getInitiatorClasses();
             expect(classes).toContain('canvas-ax-glyph');
+            expect(classes).toContain('canvas-se-glyph');
             expect(classes).toContain('canvas-py-glyph');
             expect(classes).toContain('canvas-prompt-glyph');
             expect(classes).toContain('canvas-note-glyph');
@@ -88,6 +97,13 @@ describe('Port-aware MELDABILITY registry', () => {
 
         test('ax can target prompt and py', () => {
             const targets = getCompatibleTargets('canvas-ax-glyph');
+            expect(targets).toContain('canvas-prompt-glyph');
+            expect(targets).toContain('canvas-py-glyph');
+            expect(targets.length).toBe(2);
+        });
+
+        test('se can target prompt and py (same as ax)', () => {
+            const targets = getCompatibleTargets('canvas-se-glyph');
             expect(targets).toContain('canvas-prompt-glyph');
             expect(targets).toContain('canvas-py-glyph');
             expect(targets.length).toBe(2);
@@ -222,6 +238,35 @@ describe('Port-aware MELDABILITY registry', () => {
             expect(bottomOption).toBeDefined();
             expect(bottomOption!.glyphId).toBe('py1');
             expect(bottomOption!.incomingRole).toBe('to');
+        });
+
+        test('py can append to se (se leaf, right port)', () => {
+            const composition = document.createElement('div');
+            const se = document.createElement('div');
+            se.className = 'canvas-se-glyph';
+            se.setAttribute('data-glyph-id', 'se1');
+            composition.appendChild(se);
+
+            const edges = [{ from: 'se1', to: 'se1', direction: 'right' }];
+            // Single-node composition: se1 has no outgoing right edge yet
+            const singleEdges: Array<{ from: string; to: string; direction: string }> = [];
+            const options = getMeldOptions('canvas-py-glyph', composition, singleEdges);
+            // se1 can initiate right → py, but with no edges se1 isn't in the edge set
+            // Use a real edge to test:
+            const composition2 = document.createElement('div');
+            const se2 = document.createElement('div');
+            se2.className = 'canvas-se-glyph';
+            se2.setAttribute('data-glyph-id', 'se1');
+            const py = document.createElement('div');
+            py.className = 'canvas-py-glyph';
+            py.setAttribute('data-glyph-id', 'py1');
+            composition2.appendChild(se2);
+            composition2.appendChild(py);
+
+            const edges2 = [{ from: 'se1', to: 'py1', direction: 'right' }];
+            const promptOptions = getMeldOptions('canvas-prompt-glyph', composition2, edges2);
+            const appendOption = promptOptions.find(o => o.glyphId === 'py1' && o.direction === 'right');
+            expect(appendOption).toBeDefined();
         });
 
         test('incompatible glyph returns no options', () => {
