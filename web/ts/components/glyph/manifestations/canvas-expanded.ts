@@ -23,6 +23,7 @@ import { buildCanvasWorkspace } from '../canvas/canvas-workspace-builder';
 import { uiState } from '../../../state/ui';
 import { getGlyphTypeBySymbol } from '../glyph-registry';
 import { destroyCanvasSelection } from '../canvas/selection';
+import { pushBreadcrumb, popBreadcrumb, buildBreadcrumbBar } from '../canvas/breadcrumb';
 
 /**
  * Morph a canvas-placed glyph to fullscreen workspace
@@ -82,18 +83,38 @@ export function morphCanvasPlacedToFullscreen(
             element.style.flexDirection = 'column';
             element.className = 'canvas-subcanvas-glyph-expanded';
 
-            // Add minimize button (back to canvas-placed position)
+            const doMinimize = (instant: boolean = false) => {
+                element.removeEventListener('keydown', escapeHandler);
+                // Only pop when directly minimized (button/Escape).
+                // Cascade via jumpToBreadcrumb splices the stack itself.
+                if (!instant) {
+                    popBreadcrumb();
+                }
+
+                if (instant) {
+                    collapseImmediately(element, glyph, onMinimize);
+                } else {
+                    morphFullscreenToCanvasPlaced(element, glyph, onMinimize);
+                }
+            };
+
+            // Push breadcrumb entry
+            pushBreadcrumb({
+                canvasId: glyph.id,
+                name: glyph.content || 'subcanvas',
+                minimize: doMinimize,
+            });
+
+            // Build breadcrumb bar with minimize button inside it
+            const breadcrumbBar = buildBreadcrumbBar();
+
             const minimizeBtn = document.createElement('button');
             minimizeBtn.textContent = '−';
             minimizeBtn.className = 'canvas-minimize-btn';
+            minimizeBtn.onclick = () => doMinimize(false);
+            breadcrumbBar.appendChild(minimizeBtn);
 
-            const doMinimize = () => {
-                element.removeEventListener('keydown', escapeHandler);
-                morphFullscreenToCanvasPlaced(element, glyph, onMinimize);
-            };
-
-            minimizeBtn.onclick = doMinimize;
-            element.appendChild(minimizeBtn);
+            element.appendChild(breadcrumbBar);
 
             // Escape key minimizes back to canvas-placed position.
             // Listener on element (not document) so nested subcanvases only
@@ -104,7 +125,7 @@ export function morphCanvasPlacedToFullscreen(
                 if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
                 e.preventDefault();
                 e.stopPropagation();
-                doMinimize();
+                doMinimize(false);
             };
             element.addEventListener('keydown', escapeHandler);
 
@@ -126,7 +147,7 @@ export function morphCanvasPlacedToFullscreen(
 }
 
 /**
- * Morph fullscreen back to canvas-placed position
+ * Morph fullscreen back to canvas-placed position (animated)
  */
 export function morphFullscreenToCanvasPlaced(
     element: HTMLElement,
@@ -184,6 +205,26 @@ export function morphFullscreenToCanvasPlaced(
 }
 
 /**
+ * Collapse fullscreen immediately without morph animation.
+ * Same cleanup as morphFullscreenToCanvasPlaced but instant.
+ */
+function collapseImmediately(
+    element: HTMLElement,
+    glyph: Glyph,
+    onRestoreComplete: (element: HTMLElement, glyph: Glyph) => void
+): void {
+    log.debug(SEG.GLYPH, `[CanvasExpanded] Instant collapse ${glyph.id}`);
+
+    destroyCanvasSelection(glyph.id);
+    element.innerHTML = '';
+    setWindowState(element, false);
+    clearCanvasOrigin(element);
+    element.remove();
+    element.style.cssText = '';
+    onRestoreComplete(element, glyph);
+}
+
+/**
  * Load inner glyphs for a subcanvas workspace from uiState
  */
 function loadInnerGlyphs(subcanvasId: string): Glyph[] {
@@ -205,4 +246,3 @@ function loadInnerGlyphs(subcanvasId: string): Glyph[] {
             };
         });
 }
-
