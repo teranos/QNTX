@@ -37,10 +37,10 @@ func SetDefaults(v *viper.Viper) {
 	// Pulse (async job infrastructure) defaults
 	v.SetDefault("pulse.workers", 1)
 	v.SetDefault("pulse.ticker_interval_seconds", 1)
-	v.SetDefault("pulse.daily_budget_usd", 3.0) // Default $3/day limit
-	v.SetDefault("pulse.weekly_budget_usd", 7.0)               // Default $7/week limit
-	v.SetDefault("pulse.monthly_budget_usd", 15.0)             // Default $15/month limit
-	v.SetDefault("pulse.cost_per_score_usd", 0.002)            // Default $0.002 per operation
+	v.SetDefault("pulse.daily_budget_usd", 3.0)     // Default $3/day limit
+	v.SetDefault("pulse.weekly_budget_usd", 7.0)    // Default $7/week limit
+	v.SetDefault("pulse.monthly_budget_usd", 15.0)  // Default $15/month limit
+	v.SetDefault("pulse.cost_per_score_usd", 0.002) // Default $0.002 per operation
 
 	// Server configuration defaults
 	v.SetDefault("server.port", DefaultServerPort)
@@ -58,6 +58,7 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("embeddings.enabled", false) // Disabled by default - requires ONNX model
 	v.SetDefault("embeddings.path", "ats/embeddings/models/all-MiniLM-L6-v2/model.onnx")
 	v.SetDefault("embeddings.name", "all-MiniLM-L6-v2")
+	v.SetDefault("embeddings.cluster_threshold", 0.5) // Minimum cosine similarity for cluster prediction
 
 	// Plugin configuration defaults
 	v.SetDefault("plugin.enabled", []string{}) // No plugins enabled by default (explicit opt-in via am.toml)
