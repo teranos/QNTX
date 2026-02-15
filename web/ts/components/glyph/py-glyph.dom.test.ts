@@ -50,50 +50,12 @@ mock.module('../../state/ui', () => ({
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
-// Setup jsdom if enabled
+// crypto.randomUUID override for deterministic test IDs
 if (USE_JSDOM) {
-    const { JSDOM } = await import('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
-        url: 'http://localhost'
-    });
-    const { window } = dom;
-    const { document } = window;
-
-    globalThis.document = document as any;
-    globalThis.window = window as any;
-    globalThis.localStorage = window.localStorage as any;
     globalThis.crypto = {
-        randomUUID: () => 'test-uuid-' + Math.random()
+        ...globalThis.crypto,
+        randomUUID: () => 'test-uuid-' + Math.random(),
     } as any;
-
-    // Add MutationObserver polyfill for CodeMirror
-    // Simple stub that doesn't actually observe
-    globalThis.MutationObserver = class MutationObserver {
-        constructor(callback: any) {}
-        observe() {}
-        disconnect() {}
-        takeRecords() { return []; }
-    } as any;
-
-    // Add requestAnimationFrame polyfill for CodeMirror
-    const rafPolyfill = ((callback: FrameRequestCallback) => {
-        return setTimeout(callback, 0);
-    }) as any;
-
-    const cafPolyfill = ((id: number) => {
-        clearTimeout(id);
-    }) as any;
-
-    globalThis.requestAnimationFrame = rafPolyfill;
-    globalThis.cancelAnimationFrame = cafPolyfill;
-    (window as any).requestAnimationFrame = rafPolyfill;
-    (window as any).cancelAnimationFrame = cafPolyfill;
-
-    // Add AbortController polyfill
-    // jsdom has AbortController but it's not compatible with addEventListener signal option
-    // Use the window's native implementations
-    globalThis.AbortController = window.AbortController as any;
-    globalThis.AbortSignal = window.AbortSignal as any;
 }
 
 describe('PyGlyph', () => {
