@@ -9,9 +9,25 @@ export interface BudgetConfig {
   WeeklyBudgetUSD: number;
   MonthlyBudgetUSD: number;
   CostPerScoreUSD: number;
+  /**
+   * Cluster-level limits: enforced against aggregate spend across all nodes. Effective limit = average of all nodes' configured cluster limits. 0 = no cluster-level enforcement.
+   */
+  ClusterDailyBudgetUSD: number;
+  ClusterWeeklyBudgetUSD: number;
+  ClusterMonthlyBudgetUSD: number;
 }
 
 export interface Limiter {
+}
+
+export interface PeerSpend {
+  DailyUSD: number;
+  WeeklyUSD: number;
+  MonthlyUSD: number;
+  ClusterDailyLimitUSD: number;
+  ClusterWeeklyLimitUSD: number;
+  ClusterMonthlyLimitUSD: number;
+  ReceivedAt: string;
 }
 
 export interface Status {
