@@ -46,9 +46,12 @@ pub fn cluster_embeddings(
         .build();
 
     let clusterer = Hdbscan::new(&points, params);
-    let labels = clusterer
-        .cluster()
-        .map_err(|e| format!("HDBSCAN failed: {:?}", e))?;
+    let labels = clusterer.cluster().map_err(|e| {
+        format!(
+            "HDBSCAN failed for {} points ({}D, min_cluster_size={}): {:?}",
+            n_points, dimensions, min_cluster_size, e
+        )
+    })?;
 
     // Count distinct clusters (labels >= 0)
     let n_clusters = {
@@ -71,7 +74,12 @@ pub fn cluster_embeddings(
     let centroids: Vec<Vec<f32>> = if n_clusters > 0 {
         let centers_f64 = clusterer
             .calc_centers(Center::Centroid, &labels)
-            .map_err(|e| format!("centroid computation failed: {:?}", e))?;
+            .map_err(|e| {
+                format!(
+                    "centroid computation failed for {} clusters ({}D): {:?}",
+                    n_clusters, dimensions, e
+                )
+            })?;
         centers_f64
             .into_iter()
             .map(|c| c.into_iter().map(|v| v as f32).collect())

@@ -86,7 +86,7 @@ func ClusterHDBSCAN(data []float32, nPoints, dimensions, minClusterSize int) (*C
 	// Count noise points
 	nNoise := 0
 	for _, l := range labels {
-		if l < 0 {
+		if l == ClusterNoise {
 			nNoise++
 		}
 	}
