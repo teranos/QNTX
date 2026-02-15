@@ -57,6 +57,18 @@ type Peer struct {
 	budget BudgetProvider // nil = no budget data exchanged
 	logger *zap.SugaredLogger
 
+	// Name identifies the remote peer in logs (e.g. the am.toml key like "phone").
+	// Outbound: set by caller from config. Inbound: populated from hello message.
+	Name string
+
+	// LocalName is this node's self-identified name, advertised in hello.
+	// Set by caller from [sync] name config.
+	LocalName string
+
+	// RemoteName is the peer's self-identified name from their hello message.
+	// Populated after Reconcile completes.
+	RemoteName string
+
 	// Stats tracked during reconciliation
 	sent     int
 	received int
@@ -106,6 +118,7 @@ func (p *Peer) Reconcile(ctx context.Context) (sent, received int, err error) {
 	if err := p.send(Msg{
 		Type:     MsgHello,
 		RootHash: root,
+		Name:     p.LocalName,
 	}); err != nil {
 		return 0, 0, errors.Wrap(err, "failed to send sync hello")
 	}
@@ -117,6 +130,14 @@ func (p *Peer) Reconcile(ctx context.Context) (sent, received int, err error) {
 
 	if hello.Type != MsgHello {
 		return 0, 0, errors.Newf("expected sync_hello, got %s", hello.Type)
+	}
+
+	// Capture the remote's self-identified name
+	p.RemoteName = hello.Name
+
+	// For inbound connections we don't know who connected — use their advertised name
+	if p.Name == "" && hello.Name != "" {
+		p.Name = hello.Name
 	}
 
 	// Roots match — fully synced
@@ -224,10 +245,11 @@ func (p *Peer) Reconcile(ctx context.Context) (sent, received int, err error) {
 		return 0, 0, err
 	}
 
-	p.logger.Infow("Sync reconciliation complete",
-		"sent", p.sent,
-		"received", p.received,
-	)
+	fields := []interface{}{"sent", p.sent, "received", p.received}
+	if p.Name != "" {
+		fields = append([]interface{}{"peer", p.Name}, fields...)
+	}
+	p.logger.Debugw("Sync reconciliation complete", fields...)
 
 	return p.sent, p.received, nil
 }

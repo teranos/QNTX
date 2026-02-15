@@ -40,26 +40,22 @@ func (s *QNTXServer) HandleSyncWebSocket(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	cfg, _ := appcfg.Load()
 	store := storage.NewSQLStore(s.db, s.logger)
 	wsConn := &gorillaSyncConn{conn: conn}
 	peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.budgetTracker, s.logger)
-
-	sent, received, err := peer.Reconcile(r.Context())
-	if err != nil {
-		s.logger.Warnw("Sync reconciliation failed",
-			"remote_addr", r.RemoteAddr,
-			"sent", sent,
-			"received", received,
-			"error", err,
-		)
-		return
+	if cfg != nil {
+		peer.LocalName = cfg.Sync.Name
 	}
 
-	s.logger.Infow("Sync reconciliation complete",
-		"remote_addr", r.RemoteAddr,
-		"sent", sent,
-		"received", received,
-	)
+	_, _, err = peer.Reconcile(r.Context())
+	if err != nil {
+		s.logger.Warnw("Sync reconciliation failed",
+			"peer", peer.Name,
+			"remote_addr", r.RemoteAddr,
+			"error", err,
+		)
+	}
 }
 
 // syncRequest is the JSON body for POST /api/sync.
@@ -99,21 +95,34 @@ func (s *QNTXServer) HandleSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cfg, _ := appcfg.Load()
+
 	if isSelfPeer(req.Peer, appcfg.GetServerPort()) {
 		writeJSON(w, http.StatusOK, syncResponse{})
 		return
 	}
 
+	// Resolve peer name from config (reverse lookup URL → name)
+	peerName := req.Peer
+	if cfg != nil {
+		for name, u := range cfg.Sync.Peers {
+			if u == req.Peer {
+				peerName = name
+				break
+			}
+		}
+	}
+
 	// Convert HTTP(S) URL to WebSocket URL
 	wsURL := httpToWS(req.Peer) + "/ws/sync"
 
-	s.logger.Infow("Initiating sync with peer", "peer", wsURL)
+	s.logger.Infow("Initiating sync with peer", "peer", peerName)
 
 	// Dial the remote peer's sync WebSocket
 	dialer := websocket.Dialer{}
 	conn, _, err := dialer.DialContext(r.Context(), wsURL, nil)
 	if err != nil {
-		s.logger.Warnw("Failed to connect to sync peer", "peer", wsURL, "error", err)
+		s.logger.Warnw("Failed to connect to sync peer", "peer", peerName, "error", err)
 		writeJSON(w, http.StatusBadGateway, syncResponse{
 			Error: fmt.Sprintf("Failed to connect to peer %s: %v", req.Peer, err),
 		})
@@ -124,6 +133,10 @@ func (s *QNTXServer) HandleSync(w http.ResponseWriter, r *http.Request) {
 	store := storage.NewSQLStore(s.db, s.logger)
 	wsConn := &gorillaSyncConn{conn: conn}
 	peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.budgetTracker, s.logger)
+	peer.Name = peerName
+	if cfg != nil {
+		peer.LocalName = cfg.Sync.Name
+	}
 
 	sent, received, err := peer.Reconcile(r.Context())
 	if err != nil {
@@ -133,6 +146,10 @@ func (s *QNTXServer) HandleSync(w http.ResponseWriter, r *http.Request) {
 			Error:    fmt.Sprintf("Reconciliation failed: %v", err),
 		})
 		return
+	}
+
+	if peer.RemoteName != "" {
+		s.syncPeerRemoteName.Store(peerName, peer.RemoteName)
 	}
 
 	if peer.RemoteBudget != nil {
@@ -206,6 +223,16 @@ func isSelfPeer(peerURL string, serverPort int) bool {
 	return port == fmt.Sprintf("%d", serverPort)
 }
 
+// shortError extracts a compact reason from an error (e.g. "connection refused").
+func shortError(err error) string {
+	s := err.Error()
+	// Dial errors: "dial tcp [::1]:8777: connect: connection refused"
+	if i := strings.LastIndex(s, ": "); i >= 0 {
+		return s[i+2:]
+	}
+	return s
+}
+
 // httpToWS converts http(s) URLs to ws(s) URLs.
 func httpToWS(url string) string {
 	if len(url) >= 8 && url[:8] == "https://" {
@@ -224,26 +251,46 @@ func (s *QNTXServer) startSyncTicker(ctx context.Context, interval time.Duration
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	// Per-peer failure tracking for log suppression
-	failCounts := map[string]int{}
-	lastWarned := map[string]time.Time{}
+	state := &syncTickState{
+		failCounts:  map[string]int{},
+		nextAttempt: map[string]time.Time{},
+		interval:    interval,
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.syncAllPeers(ctx, failCounts, lastWarned)
+			s.syncAllPeers(ctx, state)
 		}
 	}
 }
 
-const syncWarnInitialAttempts = 5 // warn individually for first N failures per peer
+// syncTickState tracks per-peer failure counts and backoff timing.
+type syncTickState struct {
+	failCounts  map[string]int
+	nextAttempt map[string]time.Time // skip peer until this time
+	interval    time.Duration
+}
+
+// backoffMultiplier returns how many intervals to wait before retrying.
+// Failures 1-3: every tick. 4-6: 10× interval. 7+: 100× interval.
+func (st *syncTickState) backoffMultiplier(failures int) int {
+	switch {
+	case failures <= 3:
+		return 1
+	case failures <= 6:
+		return 10
+	default:
+		return 100
+	}
+}
 
 // syncAllPeers reconciles with every configured peer. Emits one summary log
-// per tick. Individual failure warnings are suppressed after 5 consecutive
-// failures per peer, then re-emitted hourly.
-func (s *QNTXServer) syncAllPeers(ctx context.Context, failCounts map[string]int, lastWarned map[string]time.Time) {
+// per tick. First failure per peer gets a separate WARN; after that, failures
+// are only reported in the summary. Unreachable peers are retried with backoff.
+func (s *QNTXServer) syncAllPeers(ctx context.Context, st *syncTickState) {
 	cfg, _ := appcfg.Load()
 	if cfg == nil || len(cfg.Sync.Peers) == 0 {
 		return
@@ -251,9 +298,13 @@ func (s *QNTXServer) syncAllPeers(ctx context.Context, failCounts map[string]int
 
 	serverPort := appcfg.GetServerPort()
 
-	var synced int
+	var syncedNames []string
 	var transferred []string
-	var unreachable []string
+	// Group unreachable peers by reason for compact summary
+	failedByReason := map[string][]string{} // short reason → peer names
+
+	now := time.Now()
+	var backedOff []string
 
 	for name, peerURL := range cfg.Sync.Peers {
 		// Shared cluster rosters include self — skip silently
@@ -261,6 +312,13 @@ func (s *QNTXServer) syncAllPeers(ctx context.Context, failCounts map[string]int
 			s.syncPeerStatus.Store(name, "self")
 			continue
 		}
+
+		// Backoff: skip peers that aren't due for a retry yet
+		if next, ok := st.nextAttempt[name]; ok && now.Before(next) {
+			backedOff = append(backedOff, name)
+			continue
+		}
+
 		peerCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 
 		wsURL := httpToWS(peerURL) + "/ws/sync"
@@ -268,45 +326,48 @@ func (s *QNTXServer) syncAllPeers(ctx context.Context, failCounts map[string]int
 		conn, _, err := dialer.DialContext(peerCtx, wsURL, nil)
 		if err != nil {
 			cancel()
-			failCounts[name]++
-			unreachable = append(unreachable, name)
-			s.syncPeerStatus.Store(name, "unreachable")
-
-			if failCounts[name] <= syncWarnInitialAttempts || time.Since(lastWarned[name]) > time.Hour {
-				s.logger.Warnw("Scheduled sync: failed to connect",
-					"peer", name, "url", peerURL, "error", err,
-					"consecutive_failures", failCounts[name],
-				)
-				lastWarned[name] = time.Now()
+			st.failCounts[name]++
+			if st.failCounts[name] == 1 {
+				s.logger.Warnw("Sync peer unreachable", "peer", name, "error", err)
 			}
+			backoff := time.Duration(st.backoffMultiplier(st.failCounts[name])) * st.interval
+			st.nextAttempt[name] = now.Add(backoff)
+			reason := shortError(err)
+			failedByReason[reason] = append(failedByReason[reason], name)
+			s.syncPeerStatus.Store(name, "unreachable")
 			continue
 		}
 
 		store := storage.NewSQLStore(s.db, s.logger)
 		wsConn := &gorillaSyncConn{conn: conn}
 		peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.budgetTracker, s.logger)
+		peer.Name = name
+		peer.LocalName = cfg.Sync.Name
 
 		sent, received, err := peer.Reconcile(peerCtx)
 		conn.Close()
 		cancel()
 
 		if err != nil {
-			failCounts[name]++
-			unreachable = append(unreachable, name)
-			s.syncPeerStatus.Store(name, "unreachable")
-
-			if failCounts[name] <= syncWarnInitialAttempts || time.Since(lastWarned[name]) > time.Hour {
-				s.logger.Warnw("Scheduled sync: reconciliation failed",
-					"peer", name, "sent", sent, "received", received, "error", err,
-				)
-				lastWarned[name] = time.Now()
+			st.failCounts[name]++
+			if st.failCounts[name] == 1 {
+				s.logger.Warnw("Sync reconciliation failed", "peer", name, "error", err)
 			}
+			backoff := time.Duration(st.backoffMultiplier(st.failCounts[name])) * st.interval
+			st.nextAttempt[name] = now.Add(backoff)
+			reason := shortError(err)
+			failedByReason[reason] = append(failedByReason[reason], name)
+			s.syncPeerStatus.Store(name, "unreachable")
 			continue
 		}
 
 		// Success — reset failure tracking
-		failCounts[name] = 0
+		st.failCounts[name] = 0
+		delete(st.nextAttempt, name)
 		s.syncPeerStatus.Store(name, "ok")
+		if peer.RemoteName != "" {
+			s.syncPeerRemoteName.Store(name, peer.RemoteName)
+		}
 		if peer.RemoteBudget != nil {
 			s.budgetTracker.SetPeerSpend(name,
 				peer.RemoteBudget.DailyUSD,
@@ -317,7 +378,7 @@ func (s *QNTXServer) syncAllPeers(ctx context.Context, failCounts map[string]int
 				peer.RemoteBudget.ClusterMonthlyLimitUSD,
 			)
 		}
-		synced++
+		syncedNames = append(syncedNames, name)
 
 		if sent > 0 || received > 0 {
 			transferred = append(transferred, fmt.Sprintf("%s ↑%d↓%d", name, sent, received))
@@ -328,16 +389,23 @@ func (s *QNTXServer) syncAllPeers(ctx context.Context, failCounts map[string]int
 	s.broadcastSyncStatus()
 
 	// One summary line per tick (only when something noteworthy happened)
-	if len(transferred) > 0 || len(unreachable) > 0 {
+	if len(syncedNames) > 0 || len(failedByReason) > 0 || len(backedOff) > 0 {
 		fields := []interface{}{}
-		if synced > 0 {
-			fields = append(fields, "synced", synced)
+		if len(syncedNames) > 0 {
+			fields = append(fields, "synced", strings.Join(syncedNames, ","))
 		}
 		if len(transferred) > 0 {
 			fields = append(fields, "transferred", strings.Join(transferred, ", "))
 		}
-		if len(unreachable) > 0 {
-			fields = append(fields, "unreachable", len(unreachable))
+		if len(failedByReason) > 0 {
+			var groups []string
+			for reason, names := range failedByReason {
+				groups = append(groups, fmt.Sprintf("%s (%s)", strings.Join(names, ","), reason))
+			}
+			fields = append(fields, "unreachable", strings.Join(groups, ", "))
+		}
+		if len(backedOff) > 0 {
+			fields = append(fields, "backed_off", strings.Join(backedOff, ","))
 		}
 		s.logger.Infow("Sync tick", fields...)
 	}
@@ -378,11 +446,15 @@ func (s *QNTXServer) buildPeerList() []map[string]string {
 			if v, ok := s.syncPeerStatus.Load(name); ok {
 				status = v.(string)
 			}
-			peers = append(peers, map[string]string{
+			entry := map[string]string{
 				"name":   name,
 				"url":    url,
 				"status": status,
-			})
+			}
+			if v, ok := s.syncPeerRemoteName.Load(name); ok {
+				entry["advertised_name"] = v.(string)
+			}
+			peers = append(peers, entry)
 		}
 	}
 	return peers

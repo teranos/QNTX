@@ -152,4 +152,58 @@ describe('Status Indicators DOM Lifecycle', () => {
         // Also check body class updates
         expect(document.body.classList.contains('disconnected')).toBe(true);
     });
+
+    test('handleConnectionStatus before init() does not crash', () => {
+        // WebSocket may connect before status indicators are initialized.
+        // handleConnectionStatus must not throw — it silently no-ops.
+        document.body.innerHTML = `
+            <div id="system-drawer-header">
+                <span id="system-version"></span>
+                <div class="controls"></div>
+            </div>
+        `;
+
+        // Call before init — must not throw
+        expect(() => statusIndicators.handleConnectionStatus(true)).not.toThrow();
+        expect(() => statusIndicators.handleConnectionStatus(false)).not.toThrow();
+    });
+
+    test('handleConnectionStatus before init() leaves indicator stale after init()', () => {
+        // This test documents the ordering requirement: if handleConnectionStatus
+        // fires before init(), the indicator stays on "Connecting..." because the
+        // update silently no-ops on missing DOM elements.
+        // This is why main.ts must call statusIndicators.init() BEFORE connectWebSocket().
+        document.body.innerHTML = `
+            <div id="system-drawer-header">
+                <span id="system-version"></span>
+                <div class="controls"></div>
+            </div>
+        `;
+
+        // Simulate wrong ordering: WS connects before init()
+        statusIndicators.handleConnectionStatus(true);
+
+        // Now init — indicator gets created with default "Connecting..." state
+        statusIndicators.init();
+
+        const connectionText = document.getElementById('connection-text');
+        // Indicator is stuck on initial state — the earlier handleConnectionStatus was lost
+        expect(connectionText?.textContent).toBe('Connecting...');
+    });
+
+    test('init() then handleConnectionStatus() shows correct state', () => {
+        // Correct ordering: init creates DOM, then WS connect updates it
+        document.body.innerHTML = `
+            <div id="system-drawer-header">
+                <span id="system-version"></span>
+                <div class="controls"></div>
+            </div>
+        `;
+
+        statusIndicators.init();
+        statusIndicators.handleConnectionStatus(true);
+
+        const connectionText = document.getElementById('connection-text');
+        expect(connectionText?.textContent).toBe('Connected');
+    });
 });
