@@ -66,7 +66,7 @@ export function createSubcanvasGlyph(glyph: Glyph): HTMLElement {
 
 /**
  * Wire inline editing on the title bar label <span>.
- * dblclick → contentEditable, blur → persist, Enter → commit, Escape → revert.
+ * dblclick → contentEditable, blur → persist, Enter → commit.
  */
 function wireEditableLabel(titleBar: HTMLElement, glyph: Glyph): void {
     const labelSpan = titleBar.querySelector('span');
@@ -121,10 +121,6 @@ function wireEditableLabel(titleBar: HTMLElement, glyph: Glyph): void {
         if (e.key === 'Enter') {
             e.preventDefault();
             labelSpan.blur();
-        } else if (e.key === 'Escape') {
-            e.preventDefault();
-            labelSpan.textContent = previousValue();
-            labelSpan.contentEditable = 'false';
         }
     });
 }
