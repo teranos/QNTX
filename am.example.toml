@@ -68,6 +68,21 @@ workers = 1
 # Default: 1
 ticker_interval_seconds = 1
 
+# Node-level budget limits (enforced per-node against aggregate spend)
+# Uses sliding windows (24h/7d/30d) on ai_model_usage table
+# Default: $3/day, $7/week, $15/month
+# daily_budget_usd = 3.0
+# weekly_budget_usd = 7.0
+# monthly_budget_usd = 15.0
+# cost_per_score_usd = 0.002
+
+# Cluster-level budget (enforced against aggregate spend across all synced nodes)
+# Effective limit = average of all nodes' configured cluster limits
+# 0 = no cluster enforcement (default)
+# cluster_daily_budget_usd = 0
+# cluster_weekly_budget_usd = 0
+# cluster_monthly_budget_usd = 0
+
 # ════════════════════════════════════════════════════════════════
 # Code Configuration (GitHub & LSP Integration)
 # ════════════════════════════════════════════════════════════════
