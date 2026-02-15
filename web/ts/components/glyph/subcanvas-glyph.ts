@@ -16,19 +16,27 @@ import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { morphCanvasPlacedToFullscreen } from './manifestations/canvas-expanded';
+import { uiState } from '../../state/ui';
 
 /**
  * Create a compact subcanvas glyph for the canvas workspace
  */
 export function createSubcanvasGlyph(glyph: Glyph): HTMLElement {
-    const { element } = canvasPlaced({
+    const label = glyph.content || '⌗ subcanvas';
+
+    const { element, titleBar } = canvasPlaced({
         glyph,
         className: 'canvas-subcanvas-glyph',
         defaults: { x: 100, y: 100, width: 180, height: 120 },
-        titleBar: { label: '⌗ subcanvas' },
+        titleBar: { label },
         resizable: { minWidth: 120, minHeight: 80 },
         logLabel: 'Subcanvas',
     });
+
+    // Wire up inline editing on the title bar label span
+    if (titleBar) {
+        wireEditableLabel(titleBar, glyph);
+    }
 
     // Grid preview content area
     const preview = document.createElement('div');
@@ -57,6 +65,71 @@ export function createSubcanvasGlyph(glyph: Glyph): HTMLElement {
 }
 
 /**
+ * Wire inline editing on the title bar label <span>.
+ * dblclick → contentEditable, blur → persist, Enter → commit, Escape → revert.
+ */
+function wireEditableLabel(titleBar: HTMLElement, glyph: Glyph): void {
+    const labelSpan = titleBar.querySelector('span');
+    if (!labelSpan) return;
+
+    labelSpan.addEventListener('dblclick', (e) => {
+        e.stopPropagation(); // prevent expand-to-fullscreen
+        labelSpan.contentEditable = 'true';
+        labelSpan.focus();
+
+        // Select all text
+        const range = document.createRange();
+        range.selectNodeContents(labelSpan);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+    });
+
+    // Prevent drag initiation while editing
+    labelSpan.addEventListener('mousedown', (e) => {
+        if (labelSpan.contentEditable === 'true') {
+            e.stopPropagation();
+        }
+    });
+
+    const previousValue = () => glyph.content || '⌗ subcanvas';
+
+    labelSpan.addEventListener('blur', () => {
+        if (labelSpan.contentEditable !== 'true') return;
+        const newName = labelSpan.innerText.trim();
+        labelSpan.contentEditable = 'false';
+
+        if (newName && newName !== previousValue()) {
+            glyph.content = newName;
+            // Persist to uiState + API
+            uiState.addCanvasGlyph({
+                id: glyph.id,
+                symbol: glyph.symbol ?? '⌗',
+                x: glyph.x ?? 100,
+                y: glyph.y ?? 100,
+                content: newName,
+            });
+        } else {
+            // Revert to previous value
+            labelSpan.textContent = previousValue();
+        }
+    });
+
+    labelSpan.addEventListener('keydown', (e) => {
+        if (labelSpan.contentEditable !== 'true') return;
+
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            labelSpan.blur();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            labelSpan.textContent = previousValue();
+            labelSpan.contentEditable = 'false';
+        }
+    });
+}
+
+/**
  * Restore subcanvas glyph back to canvas-placed position after fullscreen minimize
  *
  * Uses canvasPlaced() with the `element` option to re-attach drag/resize handlers
@@ -72,18 +145,28 @@ function restoreToCanvas(
         return;
     }
 
+    // Read latest name from persisted state
+    const saved = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+    const name = saved?.content || glyph.content || '⌗ subcanvas';
+    glyph.content = saved?.content || glyph.content;
+
     // Clear fullscreen content, rebuild compact appearance via canvasPlaced()
     element.innerHTML = '';
 
-    canvasPlaced({
+    const { titleBar } = canvasPlaced({
         glyph,
         className: 'canvas-subcanvas-glyph',
         defaults: { x: 100, y: 100, width: 180, height: 120 },
-        titleBar: { label: '⌗ subcanvas' },
+        titleBar: { label: name },
         resizable: { minWidth: 120, minHeight: 80 },
         logLabel: 'Subcanvas',
         element, // Reuse existing element — restores class, layout, drag, resize
     });
+
+    // Re-wire inline editing on the restored title bar
+    if (titleBar) {
+        wireEditableLabel(titleBar, glyph);
+    }
 
     // Grid preview content area
     const preview = document.createElement('div');
