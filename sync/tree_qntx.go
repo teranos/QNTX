@@ -62,10 +62,16 @@ func (t *wasmTree) GroupHashes() (map[string]string, error) {
 	if result.Error != "" {
 		return nil, errors.Newf("sync_merkle_group_hashes: %s", result.Error)
 	}
+	if result.Groups == nil {
+		return make(map[string]string), nil
+	}
 	return result.Groups, nil
 }
 
 func (t *wasmTree) Diff(remoteGroups map[string]string) (localOnly, remoteOnly, divergent []string, err error) {
+	if remoteGroups == nil {
+		remoteGroups = make(map[string]string)
+	}
 	input, merr := json.Marshal(struct {
 		Remote map[string]string `json:"remote"`
 	}{Remote: remoteGroups})
