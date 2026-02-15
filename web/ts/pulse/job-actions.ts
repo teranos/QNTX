@@ -43,9 +43,9 @@ export async function handleForceTrigger(
     if (!job) return;
 
     try {
-        log.debug(SEG.PULSE, 'Force triggering job:', job.ats_code);
+        log.debug(SEG.PULSE, 'Force triggering job:', job.ats_code || job.handler_name);
 
-        await forceTriggerJob(job.ats_code);
+        await forceTriggerJob(job.ats_code, job.handler_name);
 
         if (!ctx.state.expandedJobs.has(jobId)) {
             ctx.state.expandedJobs.add(jobId);
@@ -199,8 +199,8 @@ export function createForceTriggerButton(
     return new Button({
         label: 'Force Trigger',
         onClick: async () => {
-            log.debug(SEG.PULSE, 'Force triggering job:', job.ats_code);
-            await forceTriggerJob(job.ats_code);
+            log.debug(SEG.PULSE, 'Force triggering job:', job.ats_code || job.handler_name);
+            await forceTriggerJob(job.ats_code, job.handler_name);
 
             if (!ctx.state.expandedJobs.has(job.id)) {
                 ctx.state.expandedJobs.add(job.id);
