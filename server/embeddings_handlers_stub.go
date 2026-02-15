@@ -27,6 +27,11 @@ func (s *QNTXServer) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request)
 	w.Write([]byte(`{"available":false,"model_name":"","dimensions":0,"embedding_count":0,"attestation_count":0}`))
 }
 
+// HandleEmbeddingCluster runs HDBSCAN clustering (POST /api/embeddings/cluster)
+func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
+}
+
 // SetupEmbeddingService is a no-op when embeddings are not available
 func (s *QNTXServer) SetupEmbeddingService() {
 	s.logger.Debugw("Embeddings service not available (build without rustembeddings tag)")
