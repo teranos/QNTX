@@ -56,6 +56,18 @@ type Msg struct {
 	// Stats (on Done): how many attestations were exchanged
 	Sent     int `json:"sent,omitempty"`
 	Received int `json:"received,omitempty"`
+
+	// Budget (on Done): peer's local spend and cluster limits.
+	// Pointer fields so old peers that omit these just get nil.
+	BudgetDailyUSD   *float64 `json:"budget_daily_usd,omitempty"`
+	BudgetWeeklyUSD  *float64 `json:"budget_weekly_usd,omitempty"`
+	BudgetMonthlyUSD *float64 `json:"budget_monthly_usd,omitempty"`
+
+	// Cluster budget limits: each node's configured ceiling.
+	// The effective cluster limit is the average across all nodes.
+	ClusterDailyLimitUSD   *float64 `json:"cluster_daily_limit_usd,omitempty"`
+	ClusterWeeklyLimitUSD  *float64 `json:"cluster_weekly_limit_usd,omitempty"`
+	ClusterMonthlyLimitUSD *float64 `json:"cluster_monthly_limit_usd,omitempty"`
 }
 
 // AttestationWire is the over-the-wire representation of an attestation.
