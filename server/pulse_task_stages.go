@@ -10,7 +10,7 @@ func (s *QNTXServer) handleGetJobStages(w http.ResponseWriter, r *http.Request, 
 	query := `
 		SELECT
 			COALESCE(stage, 'unknown') as stage,
-			COALESCE(task_id, 'unknown') as task_id,
+			COALESCE(task_id, stage, 'unknown') as task_id,
 			COUNT(*) as log_count
 		FROM task_logs
 		WHERE job_id = ?
