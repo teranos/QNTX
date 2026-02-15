@@ -326,6 +326,16 @@ func (h *CanvasHandler) compileSubscriptions(ctx context.Context, comp *glyphsto
 				continue
 			}
 			w.AxQuery = axWatcher.AxQuery
+		case "semantic":
+			// Semantic source: reuse the ⊨ glyph's semantic query from its existing watcher
+			seWatcherID := fmt.Sprintf("se-glyph-%s", edge.From)
+			seWatcher, err := store.Get(ctx, seWatcherID)
+			if err != nil {
+				h.logWarn("Skipping semantic edge %s→%s: no watcher found for %s: %v", edge.From, edge.To, seWatcherID, err)
+				continue
+			}
+			w.SemanticQuery = seWatcher.SemanticQuery
+			w.SemanticThreshold = seWatcher.SemanticThreshold
 		case "py", "prompt":
 			// Producer source: filter on attestations created by the upstream glyph
 			w.Filter.Actors = []string{fmt.Sprintf("glyph:%s", edge.From)}
@@ -358,6 +368,8 @@ func glyphSymbolToType(symbol string) string {
 		return "py"
 	case sym.AX: // ⋈
 		return "ax"
+	case sym.SE: // ⊨ — semantic search glyph
+		return "semantic"
 	case sym.SO: // ⟶ — prompt glyph uses SO symbol
 		return "prompt"
 	default:

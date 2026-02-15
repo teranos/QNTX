@@ -20,6 +20,27 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// EmbeddingService is the subset of the embedding service needed by the watcher engine.
+// Optional — nil when the build does not include embedding support.
+type EmbeddingService interface {
+	GenerateEmbedding(text string) ([]float32, error)
+	ComputeSimilarity(a, b []float32) (float32, error)
+	SerializeEmbedding(embedding []float32) ([]byte, error)
+}
+
+// SemanticSearchResult represents a match from the vector embedding store
+type SemanticSearchResult struct {
+	SourceID   string
+	Text       string
+	Similarity float32
+}
+
+// EmbeddingSearcher queries pre-computed embeddings via vector similarity (sqlite-vec).
+// Used for historical semantic search. Optional — nil when embeddings unavailable.
+type EmbeddingSearcher interface {
+	Search(queryEmbedding []byte, limit int, threshold float32) ([]SemanticSearchResult, error)
+}
+
 // Engine manages watchers and executes actions when attestations match filters
 type Engine struct {
 	store  *storage.WatcherStore
@@ -32,19 +53,25 @@ type Engine struct {
 	// HTTP client with timeout for external calls
 	httpClient *http.Client
 
+	// Embedding service for semantic matching (optional, nil when unavailable)
+	embeddingService  EmbeddingService
+	embeddingSearcher EmbeddingSearcher
+
 	// Broadcast callback for watcher matches (optional)
-	// Called when an attestation matches a watcher's filter
-	broadcastMatch func(watcherID string, attestation *types.As)
+	// Called when an attestation matches a watcher's filter.
+	// score is 0 for structural-only matches, >0 for semantic matches.
+	broadcastMatch func(watcherID string, attestation *types.As, score float32)
 
 	// Broadcast callback for glyph execution events (optional)
 	// Called when a glyph_execute action fires, with status updates and execution result
 	broadcastGlyphFired func(glyphID string, attestationID string, status string, err error, result []byte)
 
 	// In-memory state
-	mu           sync.RWMutex
-	watchers     map[string]*storage.Watcher
-	rateLimiters map[string]*rate.Limiter
-	parseErrors  map[string]error // Stores parse errors for watchers that failed to load
+	mu              sync.RWMutex
+	watchers        map[string]*storage.Watcher
+	rateLimiters    map[string]*rate.Limiter
+	parseErrors     map[string]error     // Stores parse errors for watchers that failed to load
+	queryEmbeddings map[string][]float32 // Pre-computed query embeddings for semantic watchers (watcherID → embedding)
 
 	// Retry queue
 	retryMu    sync.Mutex
@@ -83,10 +110,11 @@ func NewEngine(db *sql.DB, apiBaseURL string, logger *zap.SugaredLogger) *Engine
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		watchers:     make(map[string]*storage.Watcher),
-		rateLimiters: make(map[string]*rate.Limiter),
-		parseErrors:  make(map[string]error),
-		retryQueue:   make([]*PendingExecution, 0),
+		watchers:        make(map[string]*storage.Watcher),
+		rateLimiters:    make(map[string]*rate.Limiter),
+		parseErrors:     make(map[string]error),
+		queryEmbeddings: make(map[string][]float32),
+		retryQueue:      make([]*PendingExecution, 0),
 		ctx:          ctx,
 		cancel:       cancel,
 	}
@@ -127,6 +155,7 @@ func (e *Engine) loadWatchers() error {
 	e.watchers = make(map[string]*storage.Watcher, len(watchers))
 	e.rateLimiters = make(map[string]*rate.Limiter, len(watchers))
 	e.parseErrors = make(map[string]error)
+	e.queryEmbeddings = make(map[string][]float32)
 
 	for _, w := range watchers {
 		// If watcher has an AX query string, parse it into the Filter
@@ -153,6 +182,25 @@ func (e *Engine) loadWatchers() error {
 			delete(e.parseErrors, w.ID)
 		}
 
+		// Pre-compute query embedding for semantic watchers
+		if w.SemanticQuery != "" && e.embeddingService != nil {
+			embedding, err := e.embeddingService.GenerateEmbedding(w.SemanticQuery)
+			if err != nil {
+				enrichedErr := errors.Wrapf(err, "failed to generate embedding for semantic watcher %s: %q", w.ID, w.SemanticQuery)
+				e.logger.Warnw("Failed to generate query embedding, skipping semantic watcher",
+					"watcher_id", w.ID,
+					"semantic_query", w.SemanticQuery,
+					"error", enrichedErr)
+				e.parseErrors[w.ID] = enrichedErr
+				continue
+			}
+			e.queryEmbeddings[w.ID] = embedding
+			e.logger.Debugw("Cached query embedding for semantic watcher",
+				"watcher_id", w.ID,
+				"semantic_query", w.SemanticQuery,
+				"threshold", w.SemanticThreshold)
+		}
+
 		// Apply edge cursor for meld-edge watchers: skip attestations already processed
 		if w.ActionType == storage.ActionTypeGlyphExecute {
 			e.applyEdgeCursor(w)
@@ -173,8 +221,20 @@ func (e *Engine) ReloadWatchers() error {
 }
 
 // SetBroadcastCallback sets the callback function for broadcasting watcher matches
-func (e *Engine) SetBroadcastCallback(callback func(watcherID string, attestation *types.As)) {
+func (e *Engine) SetBroadcastCallback(callback func(watcherID string, attestation *types.As, score float32)) {
 	e.broadcastMatch = callback
+}
+
+// SetEmbeddingService sets the optional embedding service for semantic matching.
+// Must be called before Start(). When nil, semantic watchers are skipped.
+func (e *Engine) SetEmbeddingService(svc EmbeddingService) {
+	e.embeddingService = svc
+}
+
+// SetEmbeddingSearcher sets the vector similarity searcher for historical semantic queries.
+// Uses pre-computed embeddings in the vector DB (sqlite-vec).
+func (e *Engine) SetEmbeddingSearcher(searcher EmbeddingSearcher) {
+	e.embeddingSearcher = searcher
 }
 
 // SetGlyphFiredCallback sets the callback for glyph execution notifications
@@ -199,19 +259,80 @@ func (e *Engine) GetParseError(watcherID string) error {
 	return e.parseErrors[watcherID]
 }
 
-// QueryHistoricalMatches queries all historical attestations and broadcasts matches for a watcher
-// This is called when a watcher is created/updated to show existing matches, not just new ones
+// QueryHistoricalMatches queries historical attestations and broadcasts matches for a watcher.
+// For semantic watchers with an embedding searcher available, uses vector DB (sorted by similarity).
+// For structural watchers, scans all attestations.
 func (e *Engine) QueryHistoricalMatches(watcherID string) error {
-	// Get watcher from in-memory map
 	e.mu.RLock()
 	watcher, exists := e.watchers[watcherID]
+	queryEmbedding := e.queryEmbeddings[watcherID]
 	e.mu.RUnlock()
 
 	if !exists {
 		return errors.Newf("watcher %s not found in engine", watcherID)
 	}
 
-	// Query all attestations from database
+	// Semantic watchers: use pre-computed embeddings via vector DB (fast, sorted by similarity)
+	if watcher.SemanticQuery != "" && queryEmbedding != nil && e.embeddingSearcher != nil && e.embeddingService != nil {
+		return e.queryHistoricalSemantic(watcherID, watcher, queryEmbedding)
+	}
+
+	// Structural watchers: scan all attestations
+	return e.queryHistoricalStructural(watcherID, watcher)
+}
+
+// queryHistoricalSemantic queries pre-computed embeddings via vector similarity search.
+// Returns results sorted by similarity score (highest first).
+func (e *Engine) queryHistoricalSemantic(watcherID string, watcher *storage.Watcher, queryEmbedding []float32) error {
+	// Serialize query embedding for sqlite-vec
+	queryBlob, err := e.embeddingService.SerializeEmbedding(queryEmbedding)
+	if err != nil {
+		return errors.Wrapf(err, "failed to serialize query embedding for watcher %s", watcherID)
+	}
+
+	threshold := watcher.SemanticThreshold
+	if threshold <= 0 {
+		threshold = 0.3
+	}
+
+	results, err := e.embeddingSearcher.Search(queryBlob, 50, threshold)
+	if err != nil {
+		return errors.Wrapf(err, "failed to search embeddings for watcher %s", watcherID)
+	}
+
+	// Load full attestation records for matched source IDs
+	matchCount := 0
+	for _, result := range results {
+		as, err := e.loadAttestation(result.SourceID)
+		if err != nil {
+			e.logger.Debugw("Failed to load attestation for semantic match",
+				"watcher_id", watcherID,
+				"source_id", result.SourceID,
+				"error", err)
+			continue
+		}
+
+		// Only broadcast attestations with rich text content
+		if extractAttestationText(as) == "" {
+			continue
+		}
+
+		matchCount++
+		if e.broadcastMatch != nil {
+			e.broadcastMatch(watcherID, as, result.Similarity)
+		}
+	}
+
+	e.logger.Infow("Historical semantic query completed",
+		"watcher_id", watcherID,
+		"matches_found", matchCount,
+		"threshold", threshold)
+
+	return nil
+}
+
+// queryHistoricalStructural scans all attestations and applies structural filters.
+func (e *Engine) queryHistoricalStructural(watcherID string, watcher *storage.Watcher) error {
 	query := `SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes
 	          FROM attestations
 	          ORDER BY timestamp DESC`
@@ -224,19 +345,7 @@ func (e *Engine) QueryHistoricalMatches(watcherID string) error {
 
 	matchCount := 0
 	for rows.Next() {
-		var as types.As
-		var subjectsJSON, predicatesJSON, contextsJSON, actorsJSON, attributesJSON []byte
-
-		err := rows.Scan(
-			&as.ID,
-			&subjectsJSON,
-			&predicatesJSON,
-			&contextsJSON,
-			&actorsJSON,
-			&as.Timestamp,
-			&as.Source,
-			&attributesJSON,
-		)
+		as, err := scanAttestation(rows)
 		if err != nil {
 			e.logger.Warnw("Failed to scan attestation row",
 				"watcher_id", watcherID,
@@ -244,51 +353,10 @@ func (e *Engine) QueryHistoricalMatches(watcherID string) error {
 			continue
 		}
 
-		// Parse JSON arrays
-		if err := json.Unmarshal(subjectsJSON, &as.Subjects); err != nil {
-			e.logger.Warnw("Failed to unmarshal subjects",
-				"watcher_id", watcherID,
-				"attestation_id", as.ID,
-				"error", err)
-			continue
-		}
-		if err := json.Unmarshal(predicatesJSON, &as.Predicates); err != nil {
-			e.logger.Warnw("Failed to unmarshal predicates",
-				"watcher_id", watcherID,
-				"attestation_id", as.ID,
-				"error", err)
-			continue
-		}
-		if err := json.Unmarshal(contextsJSON, &as.Contexts); err != nil {
-			e.logger.Warnw("Failed to unmarshal contexts",
-				"watcher_id", watcherID,
-				"attestation_id", as.ID,
-				"error", err)
-			continue
-		}
-		if err := json.Unmarshal(actorsJSON, &as.Actors); err != nil {
-			e.logger.Warnw("Failed to unmarshal actors",
-				"watcher_id", watcherID,
-				"attestation_id", as.ID,
-				"error", err)
-			continue
-		}
-		if len(attributesJSON) > 0 && string(attributesJSON) != "null" {
-			if err := json.Unmarshal(attributesJSON, &as.Attributes); err != nil {
-				e.logger.Warnw("Failed to unmarshal attributes",
-					"watcher_id", watcherID,
-					"attestation_id", as.ID,
-					"error", err)
-				// Continue - attributes are optional
-			}
-		}
-
-		// Check if attestation matches watcher filter
-		if e.matchesFilter(&as, watcher) {
+		if matched, score := e.matchesWatcher(as, watcher); matched {
 			matchCount++
-			// Broadcast match using callback if set
 			if e.broadcastMatch != nil {
-				e.broadcastMatch(watcherID, &as)
+				e.broadcastMatch(watcherID, as, score)
 			}
 		}
 	}
@@ -297,11 +365,91 @@ func (e *Engine) QueryHistoricalMatches(watcherID string) error {
 		return errors.Wrap(err, "error iterating attestation rows")
 	}
 
-	e.logger.Infow("Historical query completed",
+	e.logger.Infow("Historical structural query completed",
 		"watcher_id", watcherID,
 		"matches_found", matchCount)
 
 	return nil
+}
+
+// loadAttestation fetches a single attestation by ID from the database.
+func (e *Engine) loadAttestation(id string) (*types.As, error) {
+	query := `SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes
+	          FROM attestations WHERE id = ?`
+	row := e.db.QueryRow(query, id)
+
+	var as types.As
+	var subjectsJSON, predicatesJSON, contextsJSON, actorsJSON, attributesJSON []byte
+
+	err := row.Scan(
+		&as.ID,
+		&subjectsJSON,
+		&predicatesJSON,
+		&contextsJSON,
+		&actorsJSON,
+		&as.Timestamp,
+		&as.Source,
+		&attributesJSON,
+	)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to load attestation %s", id)
+	}
+
+	if err := json.Unmarshal(subjectsJSON, &as.Subjects); err != nil {
+		return nil, errors.Wrapf(err, "failed to unmarshal subjects for %s", id)
+	}
+	if err := json.Unmarshal(predicatesJSON, &as.Predicates); err != nil {
+		return nil, errors.Wrapf(err, "failed to unmarshal predicates for %s", id)
+	}
+	if err := json.Unmarshal(contextsJSON, &as.Contexts); err != nil {
+		return nil, errors.Wrapf(err, "failed to unmarshal contexts for %s", id)
+	}
+	if err := json.Unmarshal(actorsJSON, &as.Actors); err != nil {
+		return nil, errors.Wrapf(err, "failed to unmarshal actors for %s", id)
+	}
+	if len(attributesJSON) > 0 && string(attributesJSON) != "null" {
+		_ = json.Unmarshal(attributesJSON, &as.Attributes)
+	}
+
+	return &as, nil
+}
+
+// scanAttestation scans a single attestation from a database row.
+func scanAttestation(rows *sql.Rows) (*types.As, error) {
+	var as types.As
+	var subjectsJSON, predicatesJSON, contextsJSON, actorsJSON, attributesJSON []byte
+
+	err := rows.Scan(
+		&as.ID,
+		&subjectsJSON,
+		&predicatesJSON,
+		&contextsJSON,
+		&actorsJSON,
+		&as.Timestamp,
+		&as.Source,
+		&attributesJSON,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(subjectsJSON, &as.Subjects); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(predicatesJSON, &as.Predicates); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(contextsJSON, &as.Contexts); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(actorsJSON, &as.Actors); err != nil {
+		return nil, err
+	}
+	if len(attributesJSON) > 0 && string(attributesJSON) != "null" {
+		_ = json.Unmarshal(attributesJSON, &as.Attributes)
+	}
+
+	return &as, nil
 }
 
 // OnAttestationCreated is called when a new attestation is created
@@ -315,13 +463,14 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 			continue
 		}
 
-		if !e.matchesFilter(as, watcher) {
+		matched, score := e.matchesWatcher(as, watcher)
+		if !matched {
 			continue
 		}
 
 		// Broadcast match to frontend (for live results display)
 		if e.broadcastMatch != nil {
-			e.broadcastMatch(watcher.ID, as)
+			e.broadcastMatch(watcher.ID, as, score)
 		}
 
 		// Check rate limit for action execution
@@ -358,6 +507,50 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 	}
 }
 
+// matchesWatcher checks if an attestation matches a watcher using the appropriate strategy.
+// Structural filters (AxQuery / Filter fields) and semantic queries are ANDed:
+// if both are set, both must pass.
+// Returns (matched, similarity score). Score is 0 for structural-only matches.
+func (e *Engine) matchesWatcher(as *types.As, watcher *storage.Watcher) (bool, float32) {
+	// Structural filter check (empty filter passes all)
+	if !e.matchesFilter(as, watcher) {
+		return false, 0
+	}
+
+	// Semantic check — only if this watcher has a query embedding cached
+	if _, hasSemantic := e.queryEmbeddings[watcher.ID]; hasSemantic {
+		return e.matchesSemantic(as, watcher)
+	}
+
+	// No semantic embedding cached — try lazy initialization if embedding service
+	// is now available (it may have been nil at loadWatchers time).
+	// NOTE: called under RLock — schedule async caching, use one-shot embedding for this match.
+	if watcher.SemanticQuery != "" {
+		if e.embeddingService != nil {
+			embedding, err := e.embeddingService.GenerateEmbedding(watcher.SemanticQuery)
+			if err == nil {
+				// Cache for future calls (needs write lock — do async to avoid deadlock)
+				go func(id string, emb []float32) {
+					e.mu.Lock()
+					e.queryEmbeddings[id] = emb
+					e.mu.Unlock()
+					e.logger.Infow("Lazy-initialized query embedding for semantic watcher",
+						"watcher_id", id)
+				}(watcher.ID, embedding)
+				// Use the embedding for this match immediately
+				return e.matchesSemanticWithEmbedding(as, watcher, embedding)
+			}
+			e.logger.Debugw("Lazy embedding generation failed for semantic watcher",
+				"watcher_id", watcher.ID,
+				"semantic_query", watcher.SemanticQuery,
+				"error", err)
+		}
+		return false, 0
+	}
+
+	return true, 0
+}
+
 // matchesFilter checks if an attestation matches a watcher's filter using exact field matching
 func (e *Engine) matchesFilter(as *types.As, watcher *storage.Watcher) bool {
 	filter := &watcher.Filter
@@ -382,6 +575,92 @@ func (e *Engine) matchesFilter(as *types.As, watcher *storage.Watcher) bool {
 		return false
 	}
 	return true
+}
+
+// matchesSemantic checks using the cached query embedding.
+func (e *Engine) matchesSemantic(as *types.As, watcher *storage.Watcher) (bool, float32) {
+	queryEmbedding := e.queryEmbeddings[watcher.ID]
+	if queryEmbedding == nil {
+		return false, 0
+	}
+	return e.matchesSemanticWithEmbedding(as, watcher, queryEmbedding)
+}
+
+// matchesSemanticWithEmbedding checks if an attestation's text content is semantically
+// similar to a given query embedding. Used by both cached and lazy-init paths.
+func (e *Engine) matchesSemanticWithEmbedding(as *types.As, watcher *storage.Watcher, queryEmbedding []float32) (bool, float32) {
+	if e.embeddingService == nil {
+		return false, 0
+	}
+
+	text := extractAttestationText(as)
+	if text == "" {
+		return false, 0
+	}
+
+	attestationEmbedding, err := e.embeddingService.GenerateEmbedding(text)
+	if err != nil {
+		e.logger.Debugw("Failed to generate embedding for attestation",
+			"watcher_id", watcher.ID,
+			"attestation_id", as.ID,
+			"error", err)
+		return false, 0
+	}
+
+	similarity, err := e.embeddingService.ComputeSimilarity(queryEmbedding, attestationEmbedding)
+	if err != nil {
+		e.logger.Debugw("Failed to compute similarity",
+			"watcher_id", watcher.ID,
+			"attestation_id", as.ID,
+			"error", err)
+		return false, 0
+	}
+
+	threshold := watcher.SemanticThreshold
+	if threshold <= 0 {
+		threshold = 0.3 // Default threshold
+	}
+
+	matches := similarity >= threshold
+	e.logger.Debugw("Semantic comparison",
+		"watcher_id", watcher.ID,
+		"attestation_id", as.ID,
+		"similarity", similarity,
+		"threshold", threshold,
+		"matches", matches)
+
+	return matches, similarity
+}
+
+// extractAttestationText returns rich text from an attestation's attributes.
+// Returns empty string for structural-only attestations — semantic search
+// only applies to attestations with rich text content.
+// Skips metadata keys (rich_string_fields) that contain field names, not content.
+func extractAttestationText(as *types.As) string {
+	if as.Attributes == nil {
+		return ""
+	}
+
+	var parts []string
+	for key, value := range as.Attributes {
+		if key == "rich_string_fields" {
+			continue
+		}
+		switch v := value.(type) {
+		case string:
+			if v != "" {
+				parts = append(parts, v)
+			}
+		case []interface{}:
+			for _, item := range v {
+				if str, ok := item.(string); ok && str != "" {
+					parts = append(parts, str)
+				}
+			}
+		}
+	}
+
+	return strings.Join(parts, " ")
 }
 
 // hasOverlap returns true if there's any overlap between two string slices
@@ -414,6 +693,10 @@ func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 		err = e.executeWebhook(watcher, as)
 	case storage.ActionTypeGlyphExecute:
 		err = e.executeGlyph(watcher, as)
+	case storage.ActionTypeSemanticMatch:
+		// Semantic match watchers only broadcast — no separate action to execute.
+		// The match was already broadcast in OnAttestationCreated.
+		return
 	default:
 		err = errors.Newf("unknown action type: %s", watcher.ActionType)
 	}
@@ -782,6 +1065,8 @@ func (e *Engine) processRetryQueue() {
 				err = e.executeWebhook(w, pe.Attestation)
 			case storage.ActionTypeGlyphExecute:
 				err = e.executeGlyph(w, pe.Attestation)
+			case storage.ActionTypeSemanticMatch:
+				return // No action to retry — semantic watchers only broadcast
 			default:
 				err = errors.Newf("unknown action type for retry: %s", w.ActionType)
 			}
