@@ -9,16 +9,8 @@
  */
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
-import { Window } from 'happy-dom';
 import { ProseNavigation } from './navigation.ts';
 import type { ProseEntry } from './navigation.ts';
-
-// Setup happy-dom for DOM testing
-const window = new Window();
-const document = window.document;
-globalThis.document = document;
-globalThis.window = window as any;
-globalThis.HTMLElement = window.HTMLElement as any;
 
 // Mock localStorage for testing
 const mockLocalStorage = (() => {

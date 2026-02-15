@@ -10,17 +10,9 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { Window } from 'happy-dom';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { createErrorGlyph } from './error-glyph';
 import type { Glyph } from './glyph';
-
-// Setup happy-dom
-const window = new Window();
-const document = window.document;
-globalThis.document = document as any;
-globalThis.window = window as any;
-globalThis.localStorage = window.localStorage;
 
 // Mock ResizeObserver
 globalThis.ResizeObserver = class ResizeObserver {

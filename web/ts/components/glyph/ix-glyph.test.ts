@@ -8,17 +8,9 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { Window } from 'happy-dom';
 import { createIxGlyph } from './ix-glyph';
 import type { Glyph } from './glyph';
 import { IX } from '@generated/sym.js';
-
-// Setup happy-dom
-const window = new Window();
-const document = window.document;
-globalThis.document = document as any;
-globalThis.window = window as any;
-globalThis.localStorage = window.localStorage;
 
 describe('IX Glyph Auto-Sizing - Tim (Happy Path)', () => {
     test('Tim creates IX glyph with default size', async () => {

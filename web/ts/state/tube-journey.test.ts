@@ -23,15 +23,8 @@
  */
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
-import { Window } from 'happy-dom';
 import { syncStateManager, type GlyphSyncState } from './sync-state';
 import { uiState, type CanvasGlyphState, type CompositionState } from './ui';
-
-// Setup happy-dom for localStorage (sync queue uses it)
-const happyWindow = new Window();
-globalThis.document = happyWindow.document as any;
-globalThis.window = happyWindow as any;
-globalThis.localStorage = happyWindow.localStorage;
 
 // Mock connectivity — offline by default (tunnel)
 let mockConnectivity: 'online' | 'offline' = 'offline';

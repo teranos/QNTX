@@ -8,16 +8,8 @@
  */
 
 import { describe, test, expect, mock } from 'bun:test';
-import { Window } from 'happy-dom';
 import { convertNoteToPrompt, convertResultToNote } from './conversions';
 import { SO, Prose } from '@generated/sym.js';
-
-// Setup happy-dom
-const window = new Window();
-const document = window.document;
-globalThis.document = document as any;
-globalThis.window = window as any;
-globalThis.localStorage = window.localStorage;
 
 // Mock ResizeObserver for tests
 globalThis.ResizeObserver = class ResizeObserver {

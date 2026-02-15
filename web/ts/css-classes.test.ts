@@ -5,7 +5,6 @@
  */
 
 import { describe, it, expect } from 'bun:test';
-import { Window } from 'happy-dom';
 import {
     DATA,
     setVisibility,
@@ -14,11 +13,6 @@ import {
     setActive,
     setLoading,
 } from './css-classes';
-
-// Setup happy-dom for DOM testing
-const window = new Window();
-const document = window.document;
-globalThis.document = document as any;
 
 describe('data-attribute helpers', () => {
     it('setVisibility sets data-visibility attribute', () => {

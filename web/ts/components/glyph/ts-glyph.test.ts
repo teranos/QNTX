@@ -6,15 +6,7 @@
  */
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
-import { Window } from 'happy-dom';
 import type { Glyph } from './glyph';
-
-// Setup happy-dom
-const window = new Window();
-const document = window.document;
-globalThis.document = document as any;
-globalThis.window = window as any;
-globalThis.localStorage = window.localStorage;
 
 // Mock ResizeObserver
 globalThis.ResizeObserver = class ResizeObserver {
@@ -97,16 +89,8 @@ function makeGlyph(id: string, extras: Partial<Glyph> = {}): Glyph {
     };
 }
 
-/** Re-assert globals before each test (other test files may overwrite globalThis) */
-function resetGlobals() {
-    globalThis.document = document as any;
-    globalThis.window = window as any;
-    globalThis.localStorage = window.localStorage;
-}
-
 describe('TS Glyph - Tim (Happy Path)', () => {
     beforeEach(() => {
-        resetGlobals();
         document.body.innerHTML = '';
         localStorage.clear();
     });
@@ -138,7 +122,7 @@ describe('TS Glyph - Tim (Happy Path)', () => {
         expect(element.style.backgroundColor).toBe('rgba(61, 45, 20, 0.92)');
 
         const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
-        expect(titleBar.style.backgroundColor).toBe('#5c3d1a');
+        expect(titleBar.style.backgroundColor).toMatch(/#5c3d1a|rgb\(92, 61, 26\)/);
     });
 
     test('Tim sees title bar label styled warm to match orange tint', async () => {
@@ -146,7 +130,7 @@ describe('TS Glyph - Tim (Happy Path)', () => {
 
         const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
         const label = titleBar.querySelector('span:first-child') as HTMLElement;
-        expect(label.style.color).toBe('#f0c878');
+        expect(label.style.color).toMatch(/#f0c878|rgb\(240, 200, 120\)/);
         expect(label.style.fontWeight).toBe('bold');
     });
 

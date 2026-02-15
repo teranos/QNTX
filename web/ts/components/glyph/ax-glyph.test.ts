@@ -8,16 +8,8 @@
  */
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
-import { Window } from 'happy-dom';
 import type { Glyph } from './glyph';
 import { AX } from '@generated/sym.js';
-
-// Setup happy-dom
-const window = new Window();
-const document = window.document;
-globalThis.document = document as any;
-globalThis.window = window as any;
-globalThis.localStorage = window.localStorage;
 
 // Mock ResizeObserver
 globalThis.ResizeObserver = class ResizeObserver {
@@ -104,16 +96,8 @@ function setConnectivity(state: 'online' | 'offline') {
     for (const cb of subscribers) cb(state);
 }
 
-/** Re-assert globals before each test (other test files may overwrite globalThis) */
-function resetGlobals() {
-    globalThis.document = document as any;
-    globalThis.window = window as any;
-    globalThis.localStorage = window.localStorage;
-}
-
 describe('AX Glyph - Tim (Happy Path)', () => {
     beforeEach(() => {
-        resetGlobals();
         document.body.innerHTML = '';
         mockCanvasGlyphs.length = 0;
         mockState = 'offline';
@@ -167,12 +151,12 @@ describe('AX Glyph - Tim (Happy Path)', () => {
 
         // Offline → orange
         expect(element.style.backgroundColor).toBe('rgba(61, 45, 20, 0.92)');
-        expect(titleBar.style.backgroundColor).toBe('#5c3d1a');
+        expect(titleBar.style.backgroundColor).toMatch(/#5c3d1a|rgb\(92, 61, 26\)/);
 
         // Online → teal
         setConnectivity('online');
         expect(element.style.backgroundColor).toBe('rgba(31, 61, 61, 0.92)');
-        expect(titleBar.style.backgroundColor).toBe('#1f3d3d');
+        expect(titleBar.style.backgroundColor).toMatch(/#1f3d3d|rgb\(31, 61, 61\)/);
     });
 
     test('Tim title bar background always matches container state', () => {
@@ -184,23 +168,22 @@ describe('AX Glyph - Tim (Happy Path)', () => {
 
         // Offline → orange pair
         expect(element.style.backgroundColor).toBe('rgba(61, 45, 20, 0.92)');
-        expect(titleBar.style.backgroundColor).toBe('#5c3d1a');
+        expect(titleBar.style.backgroundColor).toMatch(/#5c3d1a|rgb\(92, 61, 26\)/);
 
         // Online → teal pair
         setConnectivity('online');
         expect(element.style.backgroundColor).toBe('rgba(31, 61, 61, 0.92)');
-        expect(titleBar.style.backgroundColor).toBe('#1f3d3d');
+        expect(titleBar.style.backgroundColor).toMatch(/#1f3d3d|rgb\(31, 61, 61\)/);
 
         // Offline again → orange pair
         setConnectivity('offline');
         expect(element.style.backgroundColor).toBe('rgba(61, 45, 20, 0.92)');
-        expect(titleBar.style.backgroundColor).toBe('#5c3d1a');
+        expect(titleBar.style.backgroundColor).toMatch(/#5c3d1a|rgb\(92, 61, 26\)/);
     });
 });
 
 describe('AX Glyph - Spike (Edge Cases)', () => {
     beforeEach(() => {
-        resetGlobals();
         document.body.innerHTML = '';
         mockCanvasGlyphs.length = 0;
         mockState = 'offline';
@@ -215,13 +198,12 @@ describe('AX Glyph - Spike (Edge Cases)', () => {
 
         const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
         expect(element.style.backgroundColor).toContain('rgba(61, 31, 31');
-        expect(titleBar.style.backgroundColor).toBe('#3d1f1f');
+        expect(titleBar.style.backgroundColor).toMatch(/#3d1f1f|rgb\(61, 31, 31\)/);
     });
 });
 
 describe('AX Glyph - Jenny (Power User)', () => {
     beforeEach(() => {
-        resetGlobals();
         document.body.innerHTML = '';
         mockCanvasGlyphs.length = 0;
         mockState = 'online';
@@ -237,12 +219,12 @@ describe('AX Glyph - Jenny (Power User)', () => {
 
         // Online → teal
         expect(element.style.backgroundColor).toBe('rgba(31, 61, 61, 0.92)');
-        expect(titleBar.style.backgroundColor).toBe('#1f3d3d');
+        expect(titleBar.style.backgroundColor).toMatch(/#1f3d3d|rgb\(31, 61, 61\)/);
 
         // Offline → orange + data attributes updated
         setConnectivity('offline');
         expect(element.style.backgroundColor).toBe('rgba(61, 45, 20, 0.92)');
-        expect(titleBar.style.backgroundColor).toBe('#5c3d1a');
+        expect(titleBar.style.backgroundColor).toMatch(/#5c3d1a|rgb\(92, 61, 26\)/);
         expect(element.dataset.localActive).toBe('true');
         expect(element.dataset.connectivityMode).toBe('offline');
     });

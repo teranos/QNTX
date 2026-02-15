@@ -10,17 +10,10 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { Window } from 'happy-dom';
 import { performMeld, unmeldComposition, isMeldedComposition, reconstructMeld, extendComposition } from './meld-composition';
 import { MELD_THRESHOLD } from './meld-detect';
 import type { Glyph } from '../glyph';
 import { uiState } from '../../../state/ui';
-
-// Setup happy-dom
-const window = new Window();
-const document = window.document;
-globalThis.document = document as any;
-globalThis.window = window as any;
 
 describe('Meld System - Critical Behavior', () => {
     test('compatible glyphs meld into composition preserving element identity', () => {

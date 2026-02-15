@@ -8,17 +8,10 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { Window } from 'happy-dom';
 import { showActionBar, hideActionBar } from './action-bar';
 
-// Setup happy-dom
-const window = new Window();
-const document = window.document;
-globalThis.document = document as any;
-globalThis.window = window as any;
-
 // Mock animate for tests
-(window as any).Element.prototype.animate = function() {
+(globalThis.window as any).Element.prototype.animate = function() {
     return { finished: Promise.resolve() } as any;
 };
 
