@@ -65,11 +65,46 @@
     transform: scale(0.95);
 }
 
-/* Canvas fullscreen minimize button - matches action bar styling */
+/* Breadcrumb bar — nesting trail at top of expanded subcanvas */
+.canvas-breadcrumb-bar {
+    display: flex;
+    align-items: center;
+    height: 36px;
+    padding: 0 12px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 13px;
+    flex-shrink: 0;
+    z-index: 10001;
+}
+
+.breadcrumb-item {
+    white-space: nowrap;
+}
+
+.breadcrumb-clickable {
+    color: rgba(255, 255, 255, 0.55);
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.breadcrumb-clickable:hover {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.breadcrumb-current {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.breadcrumb-separator {
+    color: rgba(255, 255, 255, 0.3);
+    margin: 0 2px;
+    user-select: none;
+}
+
+/* Canvas fullscreen minimize button — inside breadcrumb bar */
 .canvas-minimize-btn {
-    position: fixed;
-    top: 16px;
-    right: 16px;
+    margin-left: auto;
     width: 32px;
     height: 32px;
     background: var(--bg-tertiary);
@@ -79,7 +114,6 @@
     border-radius: 3px;
     cursor: pointer;
     font-size: 16px;
-    z-index: 10001;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -105,8 +139,6 @@
         width: 48px;
         height: 48px;
         font-size: 20px;
-        top: 12px;
-        right: 12px;
     }
 
     .canvas-action-bar {
