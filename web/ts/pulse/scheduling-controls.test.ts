@@ -5,14 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, mock } from 'bun:test';
-import { Window } from 'happy-dom';
 import { createSchedulingControls } from './scheduling-controls';
 import type { ScheduledJobResponse } from './types';
-
-// Set up DOM environment
-const window = new Window();
-globalThis.document = window.document as unknown as Document;
-globalThis.window = window as unknown as Window & typeof globalThis;
 
 // Mock API functions
 const mockCreateScheduledJob = mock(() => Promise.resolve());
