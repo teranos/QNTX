@@ -184,6 +184,136 @@ func TestTracker_MultipleJobsCounted(t *testing.T) {
 	}
 }
 
+// TestTracker_PeerSpendAggregation verifies that CheckBudget includes non-stale peer spends
+func TestTracker_PeerSpendAggregation(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	defer db.Close()
+
+	// Given: $2.00 local spend
+	insertUsage(t, db, time.Now(), 2.00)
+
+	config := BudgetConfig{
+		DailyBudgetUSD:   10.00,
+		WeeklyBudgetUSD:  999999.0,
+		MonthlyBudgetUSD: 100.00,
+	}
+	tracker := NewTracker(db, config)
+
+	// Add peer spend: phone reports $7.00 daily
+	tracker.SetPeerSpend("phone", 7.00, 30.00, 80.00, 0, 0, 0)
+
+	// Aggregate daily = $2.00 (local) + $7.00 (phone) = $9.00
+	// CheckBudget($2.00) → $9.00 + $2.00 = $11.00 > $10.00 → blocked
+	err := tracker.CheckBudget(2.00)
+	if err == nil {
+		t.Fatal("CheckBudget should fail when aggregate spend + cost > node limit")
+	}
+	if !strings.Contains(err.Error(), "daily budget would be exceeded") {
+		t.Errorf("expected daily budget error, got: %v", err)
+	}
+
+	// CheckBudget($0.50) → $9.00 + $0.50 = $9.50 < $10.00 → allowed
+	err = tracker.CheckBudget(0.50)
+	if err != nil {
+		t.Errorf("CheckBudget($0.50) should succeed when within limit, got: %v", err)
+	}
+}
+
+// TestTracker_StalePeerSpendIgnored verifies that old peer spends are excluded from aggregation
+func TestTracker_StalePeerSpendIgnored(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	defer db.Close()
+
+	insertUsage(t, db, time.Now(), 2.00)
+
+	config := BudgetConfig{
+		DailyBudgetUSD:   5.00,
+		WeeklyBudgetUSD:  999999.0,
+		MonthlyBudgetUSD: 100.00,
+	}
+	tracker := NewTracker(db, config)
+	tracker.stalenessLimit = 1 * time.Second // Short staleness for test
+
+	// Add peer spend
+	tracker.SetPeerSpend("phone", 4.00, 20.00, 60.00, 0, 0, 0)
+
+	// Immediately: aggregate = $2.00 + $4.00 = $6.00 > $5.00 limit → blocked
+	err := tracker.CheckBudget(0.01)
+	if err == nil {
+		t.Fatal("CheckBudget should fail with fresh peer spend")
+	}
+
+	// Wait for staleness
+	time.Sleep(1100 * time.Millisecond)
+
+	// Now: stale peer is ignored, aggregate = $2.00 (local only)
+	err = tracker.CheckBudget(2.00)
+	if err != nil {
+		t.Errorf("CheckBudget should succeed after peer spend becomes stale, got: %v", err)
+	}
+}
+
+// TestTracker_ClusterBudgetEnforcement verifies cluster-level budget averaging and enforcement
+func TestTracker_ClusterBudgetEnforcement(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	defer db.Close()
+
+	// Local spend: $2.00
+	insertUsage(t, db, time.Now(), 2.00)
+
+	config := BudgetConfig{
+		DailyBudgetUSD:        999999.0, // High node limit so node check passes
+		WeeklyBudgetUSD:       999999.0,
+		MonthlyBudgetUSD:      999999.0,
+		ClusterDailyBudgetUSD: 6.00, // This node configures $6/day cluster limit
+	}
+	tracker := NewTracker(db, config)
+
+	// Peer "phone" reports $3.00 spend and $8.00 cluster limit
+	tracker.SetPeerSpend("phone", 3.00, 10.00, 40.00, 8.00, 0, 0)
+
+	// Effective cluster daily limit = average(6.00, 8.00) = $7.00
+	// Aggregate daily spend = $2.00 (local) + $3.00 (phone) = $5.00
+	// $5.00 + $1.50 = $6.50 < $7.00 → allowed
+	err := tracker.CheckBudget(1.50)
+	if err != nil {
+		t.Errorf("CheckBudget($1.50) should succeed: aggregate $5.00 + $1.50 = $6.50 < cluster limit $7.00, got: %v", err)
+	}
+
+	// $5.00 + $2.50 = $7.50 > $7.00 → blocked
+	err = tracker.CheckBudget(2.50)
+	if err == nil {
+		t.Fatal("CheckBudget($2.50) should fail: aggregate $5.00 + $2.50 = $7.50 > cluster limit $7.00")
+	}
+	if !strings.Contains(err.Error(), "cluster daily budget would be exceeded") {
+		t.Errorf("expected cluster daily budget error, got: %v", err)
+	}
+}
+
+// TestTracker_ClusterBudgetSkippedWhenNotConfigured verifies no cluster enforcement when limits are 0
+func TestTracker_ClusterBudgetSkippedWhenNotConfigured(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	defer db.Close()
+
+	insertUsage(t, db, time.Now(), 2.00)
+
+	config := BudgetConfig{
+		DailyBudgetUSD:   999999.0,
+		WeeklyBudgetUSD:  999999.0,
+		MonthlyBudgetUSD: 999999.0,
+		// No cluster limits configured (all zero)
+	}
+	tracker := NewTracker(db, config)
+
+	// Even with a peer reporting cluster limits, local node has none → skip cluster check
+	tracker.SetPeerSpend("phone", 999.00, 999.00, 999.00, 10.00, 50.00, 100.00)
+
+	err := tracker.CheckBudget(1.00)
+	if err != nil {
+		t.Errorf("CheckBudget should succeed when cluster budget is not configured locally, got: %v", err)
+	}
+}
+
 // Helper functions
 
 func setupTestDB(t *testing.T) *sql.DB {
