@@ -102,6 +102,7 @@ HandleFiles routes file upload and serve requests.
 
 ---
 
+
 ### `GET` /api/search/semantic
 
 HandleSemanticSearch handles semantic search requests (GET /api/search/semantic)
