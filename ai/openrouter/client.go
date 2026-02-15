@@ -114,6 +114,7 @@ type ChatRequest struct {
 	Temperature  *float64 // Override default temperature
 	MaxTokens    *int     // Override default max tokens
 	Model        *string  // Override default model
+	Attachments  []ContentPart // Multimodal attachments (base64 documents/images) — not serialized to JSON
 }
 
 // ChatResponse represents the AI response
@@ -122,10 +123,52 @@ type ChatResponse struct {
 	Usage   Usage
 }
 
-// Message represents a message in a chat completion
+// ContentPart represents a single part in a multimodal message content array.
+// Used for text and base64-encoded documents/images in OpenRouter's content array format.
+type ContentPart struct {
+	Type     string            `json:"type"`
+	Text     string            `json:"text,omitempty"`
+	ImageURL *ContentPartImage `json:"image_url,omitempty"`
+}
+
+// ContentPartImage holds a data URI for an image or document attachment.
+// URL is a data URI: "data:{mime};base64,{data}"
+type ContentPartImage struct {
+	URL string `json:"url"`
+}
+
+// Message represents a message in a chat completion.
+// Content is json.RawMessage so it can serialize as either a plain string
+// (for text-only) or a []ContentPart array (for multimodal).
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    string          `json:"role"`
+	Content json.RawMessage `json:"content"`
+}
+
+// NewTextMessage creates a Message with plain text content (serialized as a JSON string).
+func NewTextMessage(role, text string) Message {
+	raw, _ := json.Marshal(text)
+	return Message{Role: role, Content: raw}
+}
+
+// NewMultimodalMessage creates a Message with a content parts array (text + attachments).
+func NewMultimodalMessage(role, text string, attachments []ContentPart) Message {
+	parts := make([]ContentPart, 0, 1+len(attachments))
+	parts = append(parts, ContentPart{Type: "text", Text: text})
+	parts = append(parts, attachments...)
+	raw, _ := json.Marshal(parts)
+	return Message{Role: role, Content: raw}
+}
+
+// TextContent extracts the plain text from Content.
+// LLM responses are always plain strings; this unmarshals back from json.RawMessage.
+func (m Message) TextContent() string {
+	var s string
+	if err := json.Unmarshal(m.Content, &s); err != nil {
+		// Fallback: return raw bytes as string (shouldn't happen for LLM responses)
+		return string(m.Content)
+	}
+	return s
 }
 
 // ChatCompletionResponse represents the response from chat completions
@@ -229,21 +272,17 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 	)
 
 	// Prepare OpenRouter request
-	messages := []Message{
-		{
-			Role:    "user",
-			Content: req.UserPrompt,
-		},
+	var userMsg Message
+	if len(req.Attachments) > 0 {
+		userMsg = NewMultimodalMessage("user", req.UserPrompt, req.Attachments)
+	} else {
+		userMsg = NewTextMessage("user", req.UserPrompt)
 	}
+	messages := []Message{userMsg}
 
 	// Add system prompt if provided
 	if req.SystemPrompt != "" {
-		messages = append([]Message{
-			{
-				Role:    "system",
-				Content: req.SystemPrompt,
-			},
-		}, messages...)
+		messages = append([]Message{NewTextMessage("system", req.SystemPrompt)}, messages...)
 	}
 
 	openrouterReq := ChatCompletionRequest{
@@ -306,8 +345,10 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 		return nil, errors.New("no response choices from OpenRouter")
 	}
 
+	responseText := resp.Choices[0].Message.TextContent()
+
 	c.logger.Debugw("OpenRouter response",
-		"content_length", len(resp.Choices[0].Message.Content),
+		"content_length", len(responseText),
 		"prompt_tokens", resp.Usage.PromptTokens,
 		"completion_tokens", resp.Usage.CompletionTokens,
 		"total_tokens", resp.Usage.TotalTokens,
@@ -344,7 +385,7 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 	}
 
 	return &ChatResponse{
-		Content: strings.TrimSpace(resp.Choices[0].Message.Content),
+		Content: strings.TrimSpace(responseText),
 		Usage: Usage{
 			PromptTokens:     resp.Usage.PromptTokens,
 			CompletionTokens: resp.Usage.CompletionTokens,
