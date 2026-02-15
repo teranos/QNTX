@@ -3,7 +3,6 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { Window } from 'happy-dom';
 import {
     areClassesCompatible,
     getInitiatorClasses,
@@ -16,12 +15,6 @@ import {
     computeGridPositions,
     type EdgeDirection
 } from './meldability';
-
-// Setup happy-dom
-const window = new Window();
-const document = window.document;
-globalThis.document = document as any;
-globalThis.window = window as any;
 
 describe('Port-aware MELDABILITY registry', () => {
     describe('areClassesCompatible', () => {

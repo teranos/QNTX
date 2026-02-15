@@ -5,7 +5,6 @@
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { JSDOM } from 'jsdom';
 import { PluginPanel } from './plugin-panel';
 
 // Mock the plugin panel's build time formatting logic
@@ -266,13 +265,10 @@ describe('Plugin Panel Build Time Display', () => {
 });
 
 describe('PluginPanel error handling', () => {
-    let dom: JSDOM;
     let panel: PluginPanel;
 
     beforeEach(() => {
-        dom = new JSDOM('<!DOCTYPE html><html><body><div id="panel-container"></div><template id="panel-skeleton"><div class="panel-header"><h3 class="panel-title"></h3><div class="panel-header-actions"><button class="panel-fullscreen-toggle" type="button" aria-label="Enter fullscreen">⛶</button><button class="panel-close" type="button" aria-label="Close">✕</button></div></div><div class="panel-search" hidden><input type="text" class="panel-search-input" placeholder="Filter..."></div><div class="panel-content"><div class="panel-loading"><p>Loading...</p></div></div></template></body></html>');
-        global.document = dom.window.document as unknown as Document;
-        global.window = dom.window as unknown as Window & typeof globalThis;
+        document.body.innerHTML = '<div id="panel-container"></div><template id="panel-skeleton"><div class="panel-header"><h3 class="panel-title"></h3><div class="panel-header-actions"><button class="panel-fullscreen-toggle" type="button" aria-label="Enter fullscreen">⛶</button><button class="panel-close" type="button" aria-label="Close">✕</button></div></div><div class="panel-search" hidden><input type="text" class="panel-search-input" placeholder="Filter..."></div><div class="panel-content"><div class="panel-loading"><p>Loading...</p></div></div></template>';
         global.fetch = () => Promise.resolve({
             ok: true,
             json: () => Promise.resolve({ plugins: [] })
@@ -317,7 +313,7 @@ describe('PluginPanel error handling', () => {
         (panel as any).render();
 
         // Check that error is displayed
-        const html = dom.window.document.body.innerHTML;
+        const html = document.body.innerHTML;
         expect(html).toContain('Failed to save configuration');
         expect(html).toContain('Error Details');
         expect(html).toContain('Connection timeout after 5 seconds');
@@ -353,7 +349,7 @@ describe('PluginPanel error handling', () => {
 
         (panel as any).render();
 
-        const html = dom.window.document.body.innerHTML;
+        const html = document.body.innerHTML;
         expect(html).toContain('Must be a valid integer');
         expect(html).toContain('plugin-config-row-error');
     });
@@ -386,7 +382,7 @@ describe('PluginPanel error handling', () => {
 
         (panel as any).render();
 
-        const html = dom.window.document.body.innerHTML;
+        const html = document.body.innerHTML;
         expect(html).toContain('Confirm Restart');
         expect(html).toContain('This will apply your changes and reinitialize the plugin');
     });
