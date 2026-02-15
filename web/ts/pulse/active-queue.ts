@@ -5,6 +5,7 @@
 import { formatRelativeTime, escapeHtml } from './panel.ts';
 import { log, SEG } from '../logger';
 import { handleError } from '../error-handler';
+import { apiFetch } from '../api.ts';
 
 /**
  * Render Active Queue section
@@ -57,7 +58,7 @@ function renderActiveJob(job: any): string {
  */
 export async function fetchActiveJobs(): Promise<any[]> {
     try {
-        const response = await fetch('/api/pulse/jobs?limit=50');
+        const response = await apiFetch('/api/pulse/jobs?limit=50');
         if (!response.ok) {
             log.error(SEG.PULSE, 'Failed to fetch active jobs:', response.statusText);
             return [];

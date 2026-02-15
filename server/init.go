@@ -294,6 +294,7 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 
 	// Initialize embedding service for semantic search (optional)
 	server.SetupEmbeddingService()
+	server.setupEmbeddingReclusterSchedule(deps.config)
 
 	// Wire embedding service into watcher engine now that it's available
 	// (watcher engine starts before embeddings — reconnect and reload)

@@ -25,6 +25,9 @@ export const MELDABILITY: Record<string, readonly PortRule[]> = {
     'canvas-ax-glyph': [
         { direction: 'right', targets: ['canvas-prompt-glyph', 'canvas-py-glyph'] }
     ],
+    'canvas-se-glyph': [
+        { direction: 'right', targets: ['canvas-prompt-glyph', 'canvas-py-glyph'] }
+    ],
     'canvas-py-glyph': [
         { direction: 'right', targets: ['canvas-prompt-glyph', 'canvas-py-glyph'] },
         { direction: 'bottom', targets: ['canvas-result-glyph'] }
