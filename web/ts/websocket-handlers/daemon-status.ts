@@ -27,48 +27,76 @@ export async function handleDaemonStatus(data: DaemonStatusMessage): Promise<voi
 }
 
 /**
- * Check if budget limits are approaching and show warning toasts
- * Uses centralized UIState to track warning state across the session
+ * Check a single budget window against both node and cluster limits.
+ * Uses aggregate spend (local + peers) which matches what CheckBudget() enforces.
+ * Returns true if a warning was fired.
+ */
+function checkWindow(
+    period: 'daily' | 'weekly' | 'monthly',
+    aggregate: number,
+    nodeLimit: number,
+    clusterLimit: number,
+    alreadyWarned: boolean,
+): boolean {
+    // Determine which limit is binding (closest to being exceeded)
+    let bindingLimit = 0;
+    let isCluster = false;
+
+    if (nodeLimit > 0 && clusterLimit > 0) {
+        // Both configured — the lower effective limit is binding
+        if (clusterLimit <= nodeLimit) {
+            bindingLimit = clusterLimit;
+            isCluster = true;
+        } else {
+            bindingLimit = nodeLimit;
+        }
+    } else if (clusterLimit > 0) {
+        bindingLimit = clusterLimit;
+        isCluster = true;
+    } else if (nodeLimit > 0) {
+        bindingLimit = nodeLimit;
+    }
+
+    if (bindingLimit <= 0) return false;
+
+    const percent = aggregate / bindingLimit;
+    if (percent >= BUDGET_WARNING_THRESHOLD && !alreadyWarned) {
+        const suffix = isCluster ? ' (cluster)' : '';
+        toast.warning(`${period.charAt(0).toUpperCase() + period.slice(1)} budget ${Math.round(percent * 100)}% used ($${aggregate.toFixed(2)}/$${bindingLimit.toFixed(2)})${suffix}`);
+        uiState.setBudgetWarning(period, true);
+        return true;
+    } else if (percent < BUDGET_WARNING_THRESHOLD) {
+        uiState.setBudgetWarning(period, false);
+    }
+    return false;
+}
+
+/**
+ * Check if budget limits are approaching and show warning toasts.
+ * Uses aggregate spend (local + non-stale peers) against both node and cluster limits,
+ * matching the enforcement logic in CheckBudget().
  */
 function checkBudgetWarnings(data: DaemonStatusMessage): void {
     const warnings = uiState.getBudgetWarnings();
 
-    // Daily budget
-    const dailyUsage = data.budget_daily ?? 0;
-    const dailyLimit = data.budget_daily_limit ?? 0;
-    if (dailyLimit > 0) {
-        const dailyPercent = dailyUsage / dailyLimit;
-        if (dailyPercent >= BUDGET_WARNING_THRESHOLD && !warnings.daily) {
-            toast.warning(`Daily budget ${Math.round(dailyPercent * 100)}% used ($${dailyUsage.toFixed(2)}/$${dailyLimit.toFixed(2)})`);
-            uiState.setBudgetWarning('daily', true);
-        } else if (dailyPercent < BUDGET_WARNING_THRESHOLD) {
-            uiState.setBudgetWarning('daily', false);
-        }
-    }
+    checkWindow('daily',
+        data.budget_daily_aggregate ?? data.budget_daily ?? 0,
+        data.budget_daily_limit ?? 0,
+        data.cluster_daily_limit ?? 0,
+        warnings.daily,
+    );
 
-    // Weekly budget
-    const weeklyUsage = data.budget_weekly ?? 0;
-    const weeklyLimit = data.budget_weekly_limit ?? 0;
-    if (weeklyLimit > 0) {
-        const weeklyPercent = weeklyUsage / weeklyLimit;
-        if (weeklyPercent >= BUDGET_WARNING_THRESHOLD && !warnings.weekly) {
-            toast.warning(`Weekly budget ${Math.round(weeklyPercent * 100)}% used ($${weeklyUsage.toFixed(2)}/$${weeklyLimit.toFixed(2)})`);
-            uiState.setBudgetWarning('weekly', true);
-        } else if (weeklyPercent < BUDGET_WARNING_THRESHOLD) {
-            uiState.setBudgetWarning('weekly', false);
-        }
-    }
+    checkWindow('weekly',
+        data.budget_weekly_aggregate ?? data.budget_weekly ?? 0,
+        data.budget_weekly_limit ?? 0,
+        data.cluster_weekly_limit ?? 0,
+        warnings.weekly,
+    );
 
-    // Monthly budget
-    const monthlyUsage = data.budget_monthly ?? 0;
-    const monthlyLimit = data.budget_monthly_limit ?? 0;
-    if (monthlyLimit > 0) {
-        const monthlyPercent = monthlyUsage / monthlyLimit;
-        if (monthlyPercent >= BUDGET_WARNING_THRESHOLD && !warnings.monthly) {
-            toast.warning(`Monthly budget ${Math.round(monthlyPercent * 100)}% used ($${monthlyUsage.toFixed(2)}/$${monthlyLimit.toFixed(2)})`);
-            uiState.setBudgetWarning('monthly', true);
-        } else if (monthlyPercent < BUDGET_WARNING_THRESHOLD) {
-            uiState.setBudgetWarning('monthly', false);
-        }
-    }
+    checkWindow('monthly',
+        data.budget_monthly_aggregate ?? data.budget_monthly ?? 0,
+        data.budget_monthly_limit ?? 0,
+        data.cluster_monthly_limit ?? 0,
+        warnings.monthly,
+    );
 }

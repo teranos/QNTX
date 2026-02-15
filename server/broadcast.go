@@ -388,40 +388,56 @@ func (s *QNTXServer) broadcastDaemonStatus() {
 		budgetMonthly = budgetStatus.MonthlySpend
 	}
 
+	// Compute aggregate spend (local + non-stale peers) — matches CheckBudget() enforcement
+	aggDaily, aggWeekly, aggMonthly, peerCount := s.budgetTracker.AggregateSpend(budgetDaily, budgetWeekly, budgetMonthly)
+
 	// Check if status has changed meaningfully (with lock for lastStatus access)
 	s.mu.Lock()
-	if !s.statusHasChangedLocked(activeJobs, stats.Queued, loadPercent, budgetDaily, budgetWeekly, budgetMonthly) {
+	if !s.statusHasChangedLocked(activeJobs, stats.Queued, loadPercent, budgetDaily, budgetWeekly, budgetMonthly, aggDaily, aggWeekly, aggMonthly) {
 		s.mu.Unlock()
 		return // Skip broadcast if nothing changed
 	}
 
 	// Update cached status (still under lock)
 	s.lastStatus = &cachedDaemonStatus{
-		activeJobs:    activeJobs,
-		queuedJobs:    stats.Queued,
-		loadPercent:   loadPercent,
-		budgetDaily:   budgetDaily,
-		budgetWeekly:  budgetWeekly,
-		budgetMonthly: budgetMonthly,
+		activeJobs:             activeJobs,
+		queuedJobs:             stats.Queued,
+		loadPercent:            loadPercent,
+		budgetDaily:            budgetDaily,
+		budgetWeekly:           budgetWeekly,
+		budgetMonthly:          budgetMonthly,
+		budgetDailyAggregate:   aggDaily,
+		budgetWeeklyAggregate:  aggWeekly,
+		budgetMonthlyAggregate: aggMonthly,
 	}
 	s.mu.Unlock()
 
 	// Get budget limits from tracker config
 	budgetLimits := s.budgetTracker.GetBudgetLimits()
 
+	// Get cluster limits (averaged across nodes)
+	clusterDaily, clusterWeekly, clusterMonthly, _ := s.budgetTracker.ClusterLimits()
+
 	msg := DaemonStatusMessage{
-		Type:               "daemon_status",
-		Running:            true, // Daemon is running if this function is called
-		ActiveJobs:         activeJobs,
-		QueuedJobs:         stats.Queued,
-		LoadPercent:        loadPercent,
-		BudgetDaily:        budgetDaily,
-		BudgetWeekly:       budgetWeekly,
-		BudgetMonthly:      budgetMonthly,
-		BudgetDailyLimit:   budgetLimits.DailyBudgetUSD,
-		BudgetWeeklyLimit:  budgetLimits.WeeklyBudgetUSD,
-		BudgetMonthlyLimit: budgetLimits.MonthlyBudgetUSD,
-		Timestamp:          time.Now().Unix(),
+		Type:                   "daemon_status",
+		Running:                true, // Daemon is running if this function is called
+		ActiveJobs:             activeJobs,
+		QueuedJobs:             stats.Queued,
+		LoadPercent:            loadPercent,
+		BudgetDaily:            budgetDaily,
+		BudgetWeekly:           budgetWeekly,
+		BudgetMonthly:          budgetMonthly,
+		BudgetDailyLimit:       budgetLimits.DailyBudgetUSD,
+		BudgetWeeklyLimit:      budgetLimits.WeeklyBudgetUSD,
+		BudgetMonthlyLimit:     budgetLimits.MonthlyBudgetUSD,
+		BudgetDailyAggregate:   aggDaily,
+		BudgetWeeklyAggregate:  aggWeekly,
+		BudgetMonthlyAggregate: aggMonthly,
+		PeerCount:              peerCount,
+		ClusterDailyLimit:      clusterDaily,
+		ClusterWeeklyLimit:     clusterWeekly,
+		ClusterMonthlyLimit:    clusterMonthly,
+		Timestamp:              time.Now().Unix(),
 	}
 
 	s.broadcastMessage(msg)
@@ -494,7 +510,7 @@ func (s *QNTXServer) usageHasChangedLocked(totalCost float64, requests, success 
 
 // statusHasChangedLocked checks if the daemon status has meaningfully changed since last broadcast.
 // REQUIRES: s.mu must be held by caller.
-func (s *QNTXServer) statusHasChangedLocked(activeJobs, queuedJobs int, loadPercent, budgetDaily, budgetWeekly, budgetMonthly float64) bool {
+func (s *QNTXServer) statusHasChangedLocked(activeJobs, queuedJobs int, loadPercent, budgetDaily, budgetWeekly, budgetMonthly, aggDaily, aggWeekly, aggMonthly float64) bool {
 	if s.lastStatus == nil {
 		return true // First broadcast always sends
 	}
@@ -505,7 +521,10 @@ func (s *QNTXServer) statusHasChangedLocked(activeJobs, queuedJobs int, loadPerc
 		absDiff(s.lastStatus.loadPercent, loadPercent) > 1.0 || // 1% tolerance
 		absDiff(s.lastStatus.budgetDaily, budgetDaily) > 0.01 ||
 		absDiff(s.lastStatus.budgetWeekly, budgetWeekly) > 0.01 ||
-		absDiff(s.lastStatus.budgetMonthly, budgetMonthly) > 0.01
+		absDiff(s.lastStatus.budgetMonthly, budgetMonthly) > 0.01 ||
+		absDiff(s.lastStatus.budgetDailyAggregate, aggDaily) > 0.01 ||
+		absDiff(s.lastStatus.budgetWeeklyAggregate, aggWeekly) > 0.01 ||
+		absDiff(s.lastStatus.budgetMonthlyAggregate, aggMonthly) > 0.01
 }
 
 // absDiff returns the absolute difference between two float64 values
