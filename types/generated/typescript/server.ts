@@ -53,6 +53,10 @@ export interface CreateScheduledJobRequest {
    */
   ats_code: string;
   /**
+   * Direct handler name (alternative to ats_code for programmatic schedules)
+   */
+  handler_name?: string;
+  /**
    * Execution interval in seconds
    */
   interval_seconds: number;
@@ -747,6 +751,7 @@ export interface Result {
 export interface ScheduledJobResponse {
   id: string;
   ats_code: string;
+  handler_name?: string;
   interval_seconds?: number;
   /**
    * RFC3339 timestamp

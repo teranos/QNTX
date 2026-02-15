@@ -127,10 +127,40 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
     allOption.textContent = 'All';
     clusterSelect.appendChild(allOption);
 
-    // Fetch clusters from server
+    // Track whether embedding service is available
+    let embeddingsAvailable = true;
+
+    // Fetch embedding service status and clusters
     apiFetch('/api/embeddings/info')
         .then(r => r.json())
         .then(info => {
+            if (!info.available) {
+                embeddingsAvailable = false;
+                editor.disabled = true;
+                editor.placeholder = 'Embedding service unavailable';
+                thresholdSlider.disabled = true;
+                clusterSelect.disabled = true;
+                setColorState('idle');
+
+                // Show unavailable message in results area
+                resultsContainer.innerHTML = '';
+                const notice = document.createElement('div');
+                notice.className = 'se-glyph-unavailable';
+                notice.style.padding = '16px';
+                notice.style.color = 'var(--text-secondary)';
+                notice.style.fontSize = '12px';
+                notice.style.fontFamily = 'monospace';
+                notice.style.textAlign = 'center';
+                notice.style.lineHeight = '1.6';
+                notice.innerHTML = `Embedding service is not enabled.<br><br>`
+                    + `Enable in <code style="color: #d4f0d4;">am.toml</code>:<br>`
+                    + `<code style="color: #d4f0d4;">[embeddings]<br>enabled = true</code>`;
+                resultsContainer.appendChild(notice);
+
+                log.debug(SEG.GLYPH, `[SeGlyph] Embedding service unavailable for ${glyphId}`);
+                return;
+            }
+
             if (info.cluster_info?.clusters) {
                 const clusters = info.cluster_info.clusters as Record<string, number>;
                 for (const [id, count] of Object.entries(clusters)) {
@@ -145,7 +175,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
                 }
             }
         })
-        .catch(err => log.debug(SEG.GLYPH, `[SeGlyph] Failed to fetch cluster info:`, err));
+        .catch(err => log.debug(SEG.GLYPH, `[SeGlyph] Failed to fetch embedding info:`, err));
 
     preventDrag(clusterSelect);
 
@@ -224,6 +254,8 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
 
     // Persist state and send watcher upsert to server
     function commitQuery(): void {
+        if (!embeddingsAvailable) return;
+
         const query = currentQuery.trim();
 
         // Persist to canvas state

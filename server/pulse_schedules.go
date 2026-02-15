@@ -117,15 +117,16 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 
 	pulseLog.Infow("Pulse create job request",
 		"ats_code", req.ATSCode,
+		"handler_name", req.HandlerName,
 		"interval_seconds", req.IntervalSeconds,
 		"force", req.Force,
 		"created_from_doc", req.CreatedFromDoc,
 		"remote", r.RemoteAddr)
 
-	// Validate request
-	if req.ATSCode == "" {
-		pulseLog.Warnw("Pulse create job - missing ats_code")
-		writeError(w, http.StatusBadRequest, "ats_code is required")
+	// Validate request — require either ats_code or handler_name
+	if req.ATSCode == "" && req.HandlerName == "" {
+		pulseLog.Warnw("Pulse create job - missing ats_code and handler_name")
+		writeError(w, http.StatusBadRequest, "ats_code or handler_name is required")
 		return
 	}
 	// Allow interval_seconds = 0 for one-time force trigger executions
@@ -144,35 +145,48 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Generate job ID using ASID format
-	jobID, err := id.GenerateASID(req.ATSCode, "scheduled", "pulse", "system")
-	if err != nil {
-		writeWrappedError(w, s.logger, err, "failed to generate job ID", http.StatusInternalServerError)
-		return
-	}
+	// Resolve handler name and payload — either from ATS code parsing or direct handler_name
+	var handlerName string
+	var payload []byte
+	var sourceURL string
+	var jobID string
 
-	// Parse ATS code to pre-compute handler, payload, and source URL
-	// This validates the ATS code format and makes the ticker domain-agnostic
-	parsed, err := ParseATSCodeWithForce(req.ATSCode, jobID, req.Force)
-	if err != nil {
-		writeRichError(w, s.logger, err, http.StatusBadRequest)
-		return
+	if req.ATSCode != "" {
+		// ATS code path: parse to extract handler, payload, source URL
+		var err error
+		jobID, err = id.GenerateASID(req.ATSCode, "scheduled", "pulse", "system")
+		if err != nil {
+			writeWrappedError(w, s.logger, err, "failed to generate job ID", http.StatusInternalServerError)
+			return
+		}
+
+		parsed, err := ParseATSCodeWithForce(req.ATSCode, jobID, req.Force)
+		if err != nil {
+			writeRichError(w, s.logger, err, http.StatusBadRequest)
+			return
+		}
+		handlerName = parsed.HandlerName
+		payload = parsed.Payload
+		sourceURL = parsed.SourceURL
+	} else {
+		// Handler-only path: use handler_name directly (programmatic schedules)
+		handlerName = req.HandlerName
+		jobID = fmt.Sprintf("SPJ_force_%s_%d", req.HandlerName, time.Now().Unix())
 	}
 
 	// Validate handler availability (fail early if handler not registered)
 	registry := s.daemon.Registry()
-	if registry != nil && !registry.Has(parsed.HandlerName) {
-		err := errors.Newf("handler '%s' not available (required plugin may be disabled)", parsed.HandlerName)
-		err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", req.ATSCode))
-		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", parsed.HandlerName))
+	if registry != nil && !registry.Has(handlerName) {
+		err := errors.Newf("handler '%s' not available (required plugin may be disabled)", handlerName)
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", handlerName))
 		writeRichError(w, s.logger, err, http.StatusBadRequest)
 		return
 	}
 
-	pulseLog.Infow("Pulse create job - parsed",
+	pulseLog.Infow("Pulse create job - resolved",
 		"job_id", jobID,
-		"handler_name", parsed.HandlerName,
-		"source_url", parsed.SourceURL,
+		"handler_name", handlerName,
+		"source_url", sourceURL,
 		"force", req.Force)
 
 	now := time.Now()
@@ -181,8 +195,8 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 	if req.Force && req.IntervalSeconds == 0 {
 		pulseLog.Infow("Force trigger - preparing tracking and async job",
 			"job_id", jobID,
-			"handler_name", parsed.HandlerName,
-			"source_url", parsed.SourceURL)
+			"handler_name", handlerName,
+			"source_url", sourceURL)
 
 		// CRITICAL: Create all tracking records BEFORE enqueueing async job
 		// Use transaction to prevent race conditions (job deletion between SELECT and INSERT)
@@ -199,19 +213,29 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 		}
 		defer tx.Rollback() // Rollback if not committed
 
-		// Try to find active scheduled job
-		err = tx.QueryRow(`SELECT id FROM scheduled_pulse_jobs WHERE ats_code = ? AND state = 'active' LIMIT 1`,
-			req.ATSCode).Scan(&scheduledJobID)
+		// Try to find active scheduled job by handler_name (covers both ATS and handler-only schedules)
+		lookupKey := req.ATSCode
+		lookupCol := "ats_code"
+		if lookupKey == "" {
+			lookupKey = handlerName
+			lookupCol = "handler_name"
+		}
+		err = tx.QueryRow(fmt.Sprintf(`SELECT id FROM scheduled_pulse_jobs WHERE %s = ? AND state = 'active' LIMIT 1`, lookupCol),
+			lookupKey).Scan(&scheduledJobID)
 
 		// If no active scheduled job found, check for existing temp job and reuse or create new one
 		if err != nil || scheduledJobID == "" {
-			// Try to find existing temp job for this ATS code (prevents proliferation)
-			err = tx.QueryRow(`SELECT id FROM scheduled_pulse_jobs WHERE ats_code = ? AND created_from_doc_id = '__force_trigger__' ORDER BY created_at DESC LIMIT 1`,
-				req.ATSCode).Scan(&scheduledJobID)
+			err = tx.QueryRow(fmt.Sprintf(`SELECT id FROM scheduled_pulse_jobs WHERE %s = ? AND created_from_doc_id = '__force_trigger__' ORDER BY created_at DESC LIMIT 1`, lookupCol),
+				lookupKey).Scan(&scheduledJobID)
 
 			if err != nil || scheduledJobID == "" {
 				// No temp job exists - create temporary scheduled job for tracking
-				scheduledJobID, err = id.GenerateASID(req.ATSCode, "force-trigger", "pulse", "system")
+				if req.ATSCode != "" {
+					scheduledJobID, err = id.GenerateASID(req.ATSCode, "force-trigger", "pulse", "system")
+				} else {
+					scheduledJobID = fmt.Sprintf("SPJ_force_%s_%d", handlerName, now.Unix())
+					err = nil
+				}
 				if err != nil {
 					writeWrappedError(w, s.logger, err, "failed to generate tracking job ID", http.StatusInternalServerError)
 					return
@@ -220,7 +244,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 				_, err = tx.Exec(`
 					INSERT INTO scheduled_pulse_jobs (id, ats_code, handler_name, payload, source_url, state, interval_seconds, created_at, updated_at, created_from_doc_id)
 					VALUES (?, ?, ?, ?, ?, 'inactive', 0, ?, ?, '__force_trigger__')
-				`, scheduledJobID, req.ATSCode, parsed.HandlerName, parsed.Payload, parsed.SourceURL, now.Format(time.RFC3339), now.Format(time.RFC3339))
+				`, scheduledJobID, req.ATSCode, handlerName, payload, sourceURL, now.Format(time.RFC3339), now.Format(time.RFC3339))
 
 				if err != nil {
 					writeWrappedError(w, s.logger, err, "failed to create tracking job", http.StatusInternalServerError)
@@ -229,19 +253,19 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 
 				pulseLog.Infow("Created temp scheduled job for force trigger",
 					"scheduled_job_id", scheduledJobID,
-					"ats_code", req.ATSCode)
+					"handler_name", handlerName)
 			} else {
 				pulseLog.Infow("Reusing existing temp job for force trigger",
 					"scheduled_job_id", scheduledJobID,
-					"ats_code", req.ATSCode)
+					"handler_name", handlerName)
 			}
 		}
 
 		// Step 2: Create async job (but don't enqueue yet)
 		asyncJob, err := async.NewJobWithPayload(
-			parsed.HandlerName,
-			parsed.SourceURL,
-			parsed.Payload,
+			handlerName,
+			sourceURL,
+			payload,
 			0,   // Total unknown
 			0.0, // Cost calculated during execution
 			fmt.Sprintf("user:force-trigger:%s", jobID),
@@ -283,15 +307,15 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 
 		pulseLog.Infow("Force trigger enqueued",
 			"async_job_id", asyncJob.ID,
-			"handler_name", parsed.HandlerName,
-			"source_url", parsed.SourceURL)
+			"handler_name", handlerName,
+			"source_url", sourceURL)
 
 		// Return success - all operations completed
 		writeJSON(w, http.StatusCreated, map[string]interface{}{
 			"id":           scheduledJobID, // Return scheduled job ID for UI tracking
 			"async_job_id": asyncJob.ID,
-			"handler_name": parsed.HandlerName,
-			"source_url":   parsed.SourceURL,
+			"handler_name": handlerName,
+			"source_url":   sourceURL,
 			"force":        true,
 		})
 		return
@@ -301,9 +325,9 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 	job := &schedule.Job{
 		ID:              jobID,
 		ATSCode:         req.ATSCode,
-		HandlerName:     parsed.HandlerName,
-		Payload:         parsed.Payload,
-		SourceURL:       parsed.SourceURL,
+		HandlerName:     handlerName,
+		Payload:         payload,
+		SourceURL:       sourceURL,
 		IntervalSeconds: req.IntervalSeconds,
 		NextRunAt:       &now, // Run immediately on first execution
 		State:           schedule.StateActive,

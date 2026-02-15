@@ -156,7 +156,7 @@ func (p *StorageEventsPoller) broadcastEviction(eventType, actor, context, entit
 		logFields = append(logFields, "eviction_details", detailsMap)
 	}
 
-	logger.AddDBSymbol(p.logger).Infow("Storage eviction", logFields...)
+	logger.AddDBSymbol(p.logger).Debugw("Storage eviction", logFields...)
 
 	// Broadcast as storage_eviction message
 	msg := map[string]interface{}{
