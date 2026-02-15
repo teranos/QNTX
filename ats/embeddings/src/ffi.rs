@@ -205,6 +205,24 @@ pub extern "C" fn embedding_cluster_hdbscan(
             } else {
                 result.centroids[0].len() as c_int
             };
+
+            // Validate all centroids have same dimensions before flattening —
+            // a mismatch would silently corrupt the flat array that Go reads
+            // with a fixed stride of centroid_dims.
+            if !result.centroids.is_empty() {
+                let expected = centroid_dims as usize;
+                for (i, c) in result.centroids.iter().enumerate() {
+                    if c.len() != expected {
+                        return ClusterResultC::error(&format!(
+                            "centroid {} has {} dimensions, expected {}",
+                            i,
+                            c.len(),
+                            expected
+                        ));
+                    }
+                }
+            }
+
             let flat_centroids: Vec<c_float> = result
                 .centroids
                 .into_iter()

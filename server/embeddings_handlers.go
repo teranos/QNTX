@@ -743,7 +743,7 @@ func (s *QNTXServer) SetupEmbeddingService() {
 		embeddingStore:   embStore,
 		richStore:        storage.NewBoundedStore(s.db, s.logger.Named("auto-embed")),
 		logger:           s.logger.Named("auto-embed"),
-		clusterThreshold: 0.5,
+		clusterThreshold: float32(appcfg.GetFloat64("embeddings.cluster_threshold")),
 	}
 	storage.RegisterObserver(observer)
 	s.embeddingClusterInvalidator = observer.InvalidateClusterCache
@@ -886,7 +886,7 @@ func (o *EmbeddingObserver) predictCluster(embeddingID, attestationID string, em
 		return
 	}
 
-	if clusterID < 0 {
+	if clusterID == storage.ClusterNoise {
 		return // below threshold, stays as noise
 	}
 

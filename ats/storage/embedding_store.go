@@ -9,6 +9,10 @@ import (
 	"go.uber.org/zap"
 )
 
+// ClusterNoise is returned by PredictCluster when no cluster is close enough.
+// Matches HDBSCAN convention: -1 = noise/outlier.
+const ClusterNoise = -1
+
 // EmbeddingModel represents a stored embedding in the database
 type EmbeddingModel struct {
 	ID                 string    `json:"id"`
@@ -566,7 +570,7 @@ func (s *EmbeddingStore) GetAllClusterCentroids() ([]ClusterCentroid, error) {
 }
 
 // PredictCluster assigns an embedding to the nearest cluster centroid using cosine similarity.
-// Returns cluster ID and similarity score, or -1 if below threshold.
+// Returns cluster ID and similarity score, or ClusterNoise if below threshold.
 func (s *EmbeddingStore) PredictCluster(
 	embedding []float32,
 	centroids []ClusterCentroid,
@@ -575,21 +579,21 @@ func (s *EmbeddingStore) PredictCluster(
 	threshold float32,
 ) (clusterID int, prob float64, err error) {
 	if len(centroids) == 0 {
-		return -1, 0, nil
+		return ClusterNoise, 0, nil
 	}
 
-	bestID := -1
+	bestID := ClusterNoise
 	var bestSim float32
 
 	for _, c := range centroids {
 		centroidVec, err := deserialize(c.Centroid)
 		if err != nil {
-			return -1, 0, errors.Wrapf(err, "failed to deserialize centroid for cluster %d", c.ClusterID)
+			return ClusterNoise, 0, errors.Wrapf(err, "failed to deserialize centroid for cluster %d", c.ClusterID)
 		}
 
 		sim, err := similarity(embedding, centroidVec)
 		if err != nil {
-			return -1, 0, errors.Wrapf(err, "failed to compute similarity for cluster %d", c.ClusterID)
+			return ClusterNoise, 0, errors.Wrapf(err, "failed to compute similarity for cluster %d", c.ClusterID)
 		}
 
 		if sim > bestSim {
@@ -599,7 +603,7 @@ func (s *EmbeddingStore) PredictCluster(
 	}
 
 	if bestSim < threshold {
-		return -1, 0, nil
+		return ClusterNoise, 0, nil
 	}
 
 	return bestID, float64(bestSim), nil
