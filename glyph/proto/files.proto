@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package glyph;
+
+option go_package = "github.com/teranos/QNTX/glyph/proto";
+
+// FileUploadResult is returned after a successful file upload.
+// Used as the HTTP response body for POST /api/files.
+message FileUploadResult {
+  string id = 1;
+  string filename = 2;
+  string content_type = 3;
+  int64 size = 4;
+}

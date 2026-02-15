@@ -4,7 +4,6 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -302,8 +301,6 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 	embeddingModels := []*storage.EmbeddingModel{}
 
 	// Get rich string fields from type definitions for embedding text construction.
-	// Rich fields (message, description, etc.) produce better embeddings than
-	// raw structural identifiers (predicates/subjects/contexts).
 	richStore := storage.NewBoundedStore(s.db, s.logger.Named("embeddings"))
 	richFields := richStore.GetDiscoveredRichFields()
 
@@ -339,42 +336,10 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 			continue
 		}
 
-		// Build text for embedding: prefer rich text from attributes (same fields
-		// the fuzzy search uses), fall back to structural fields if none found.
-		textParts := []string{}
-		if attestation.Attributes != nil && len(richFields) > 0 {
-			for _, field := range richFields {
-				if value, exists := attestation.Attributes[field]; exists {
-					switch v := value.(type) {
-					case string:
-						if v != "" {
-							textParts = append(textParts, v)
-						}
-					case []interface{}:
-						for _, item := range v {
-							if str, ok := item.(string); ok && str != "" {
-								textParts = append(textParts, str)
-							}
-						}
-					}
-				}
-			}
-		}
-		if len(textParts) == 0 {
-			for _, pred := range attestation.Predicates {
-				textParts = append(textParts, pred)
-			}
-			for _, subj := range attestation.Subjects {
-				textParts = append(textParts, subj)
-			}
-			for _, ctx := range attestation.Contexts {
-				textParts = append(textParts, ctx)
-			}
-		}
-
-		text := strings.Join(textParts, " ")
+		// Extract rich text only — skip structural-only attestations
+		text := extractRichTextFromAttributes(attestation.Attributes, richFields)
 		if text == "" {
-			errorMessages = append(errorMessages, errors.Newf("attestation %s has no text content",
+			errorMessages = append(errorMessages, errors.Newf("attestation %s has no rich text content",
 				attestationID).Error())
 			failed++
 			continue
@@ -921,9 +886,15 @@ func (o *EmbeddingObserver) extractRichText(as *types.As) string {
 		return ""
 	}
 
+	return extractRichTextFromAttributes(as.Attributes, richFields)
+}
+
+// extractRichTextFromAttributes extracts text from the named rich fields in an
+// attestation's attribute map. Shared by EmbeddingObserver and batch handler.
+func extractRichTextFromAttributes(attrs map[string]interface{}, richFields []string) string {
 	var parts []string
 	for _, field := range richFields {
-		value, exists := as.Attributes[field]
+		value, exists := attrs[field]
 		if !exists {
 			continue
 		}
@@ -938,11 +909,6 @@ func (o *EmbeddingObserver) extractRichText(as *types.As) string {
 					parts = append(parts, str)
 				}
 			}
-		default:
-			o.logger.Debugw("Unexpected type for rich field",
-				"field", field,
-				"type", fmt.Sprintf("%T", v),
-				"attestation_id", as.ID)
 		}
 	}
 

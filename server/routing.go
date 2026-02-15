@@ -84,6 +84,8 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/canvas/glyphs", s.corsMiddleware(s.canvasHandler.HandleGlyphs))              // List/create glyphs (GET/POST)
 	http.HandleFunc("/api/canvas/compositions/", s.corsMiddleware(s.canvasHandler.HandleCompositions)) // Composition CRUD (GET/POST/DELETE /api/canvas/compositions/{id})
 	http.HandleFunc("/api/canvas/compositions", s.corsMiddleware(s.canvasHandler.HandleCompositions))  // List/create compositions (GET/POST)
+	http.HandleFunc("/api/files/", s.corsMiddleware(s.HandleFiles))                                    // Serve stored file (GET /api/files/{id})
+	http.HandleFunc("/api/files", s.corsMiddleware(s.HandleFiles))                                     // Upload file (POST)
 	http.HandleFunc("/api/search/semantic", s.corsMiddleware(s.HandleSemanticSearch))                  // Semantic search (GET)
 	http.HandleFunc("/api/embeddings/generate", s.corsMiddleware(s.HandleEmbeddingGenerate))           // Generate embedding (POST)
 	http.HandleFunc("/api/embeddings/batch", s.corsMiddleware(s.HandleEmbeddingBatch))                 // Batch generate embeddings (POST)

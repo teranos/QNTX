@@ -2,8 +2,8 @@
 // Regenerate with: make types
 // TODO: Migrate to proto generation
 // Source package: sym
-// Source last modified: 2026-02-14T20:53:22+01:00
-// Source version: 4fdfb43e
+// Source last modified: 2026-02-15T01:43:16+01:00
+// Source version: 94d9499c
 
 //! # sym module
 //!
@@ -21,6 +21,7 @@ pub const AT: &str = "✦";
 pub const AX: &str = "⋈";
 pub const BY: &str = "⌬";
 pub const DB: &str = "⊔";
+pub const DOC: &str = "▤";
 pub const I: &str = "⍟";
 pub const IS: &str = "=";
 pub const IX: &str = "⨳";
