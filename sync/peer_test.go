@@ -321,8 +321,8 @@ func TestPeer_AlreadyInSync(t *testing.T) {
 	insertWithTree(storeA, treeA, as)
 	insertWithTree(storeB, treeB, as)
 
-	peerA := NewPeer(connA, treeA, storeA, logger)
-	peerB := NewPeer(connB, treeB, storeB, logger)
+	peerA := NewPeer(connA, treeA, storeA, nil, logger)
+	peerB := NewPeer(connB, treeB, storeB, nil, logger)
 
 	ctx := context.Background()
 
@@ -368,8 +368,8 @@ func TestPeer_OneSideHasMore(t *testing.T) {
 	as2 := makeAs("as-2", "user-2", "admin", "team", "hr")
 	insertWithTree(storeA, treeA, as2)
 
-	peerA := NewPeer(connA, treeA, storeA, logger)
-	peerB := NewPeer(connB, treeB, storeB, logger)
+	peerA := NewPeer(connA, treeA, storeA, nil, logger)
+	peerB := NewPeer(connB, treeB, storeB, nil, logger)
 
 	ctx := context.Background()
 
@@ -421,8 +421,8 @@ func TestPeer_BothHaveUnique(t *testing.T) {
 	as2 := makeAs("as-2", "user-2", "admin", "team-b", "actor-b")
 	insertWithTree(storeB, treeB, as2)
 
-	peerA := NewPeer(connA, treeA, storeA, logger)
-	peerB := NewPeer(connB, treeB, storeB, logger)
+	peerA := NewPeer(connA, treeA, storeA, nil, logger)
+	peerB := NewPeer(connB, treeB, storeB, nil, logger)
 
 	ctx := context.Background()
 
@@ -463,8 +463,8 @@ func TestPeer_EmptyTrees(t *testing.T) {
 	storeA, storeB := newMemStore(), newMemStore()
 	logger := testLogger()
 
-	peerA := NewPeer(connA, treeA, storeA, logger)
-	peerB := NewPeer(connB, treeB, storeB, logger)
+	peerA := NewPeer(connA, treeA, storeA, nil, logger)
+	peerB := NewPeer(connB, treeB, storeB, nil, logger)
 
 	ctx := context.Background()
 
@@ -527,7 +527,7 @@ func TestPeer_ContextCancellation(t *testing.T) {
 	// Insert data so roots won't match (forces the protocol past hello)
 	insertWithTree(store, tree, makeAs("as-1", "user-1", "member", "team", "hr"))
 
-	peer := NewPeer(connA, tree, store, logger)
+	peer := NewPeer(connA, tree, store, nil, logger)
 
 	// Short deadline — the other side never responds
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
@@ -560,6 +560,153 @@ func TestAttestationJSON_TimestampMillis(t *testing.T) {
 	}
 	if int64(ts) != 1718452800000 {
 		t.Fatalf("timestamp should be 1718452800000, got %v", ts)
+	}
+}
+
+// --------------------------------------------------------------------------
+// Budget round-trip tests
+// --------------------------------------------------------------------------
+
+type mockBudgetProvider struct {
+	daily, weekly, monthly          float64
+	clusterDaily, clusterWeekly, clusterMonthly float64
+}
+
+func (m *mockBudgetProvider) GetSpendSummary() (daily, weekly, monthly float64, err error) {
+	return m.daily, m.weekly, m.monthly, nil
+}
+
+func (m *mockBudgetProvider) GetClusterLimits() (daily, weekly, monthly float64) {
+	return m.clusterDaily, m.clusterWeekly, m.clusterMonthly
+}
+
+func TestPeer_BudgetRoundTrip(t *testing.T) {
+	connA, connB := connPair()
+	treeA, treeB := newMemTree(), newMemTree()
+	storeA, storeB := newMemStore(), newMemStore()
+	logger := testLogger()
+
+	// Both trees are empty → roots match → fast-path through sendDone/recvDone
+	budgetA := &mockBudgetProvider{
+		daily: 1.50, weekly: 8.00, monthly: 25.00,
+		clusterDaily: 5.00, clusterWeekly: 20.00, clusterMonthly: 60.00,
+	}
+	budgetB := &mockBudgetProvider{
+		daily: 2.00, weekly: 12.00, monthly: 40.00,
+		clusterDaily: 6.00, clusterWeekly: 25.00, clusterMonthly: 80.00,
+	}
+
+	peerA := NewPeer(connA, treeA, storeA, budgetA, logger)
+	peerB := NewPeer(connB, treeB, storeB, budgetB, logger)
+
+	ctx := context.Background()
+
+	type result struct {
+		peer *Peer
+		err  error
+	}
+	ch := make(chan result, 2)
+
+	go func() {
+		_, _, err := peerA.Reconcile(ctx)
+		ch <- result{peerA, err}
+	}()
+	go func() {
+		_, _, err := peerB.Reconcile(ctx)
+		ch <- result{peerB, err}
+	}()
+
+	peers := make(map[string]*Peer)
+	for i := 0; i < 2; i++ {
+		res := <-ch
+		if res.err != nil {
+			t.Fatalf("reconciliation failed: %v", res.err)
+		}
+		if res.peer == peerA {
+			peers["A"] = res.peer
+		} else {
+			peers["B"] = res.peer
+		}
+	}
+
+	// A should have received B's budget
+	if peers["A"].RemoteBudget == nil {
+		t.Fatal("peer A should have received budget from B")
+	}
+	rb := peers["A"].RemoteBudget
+	if rb.DailyUSD != 2.00 || rb.WeeklyUSD != 12.00 || rb.MonthlyUSD != 40.00 {
+		t.Fatalf("peer A got wrong spend from B: daily=%.2f weekly=%.2f monthly=%.2f",
+			rb.DailyUSD, rb.WeeklyUSD, rb.MonthlyUSD)
+	}
+	if rb.ClusterDailyLimitUSD != 6.00 || rb.ClusterWeeklyLimitUSD != 25.00 || rb.ClusterMonthlyLimitUSD != 80.00 {
+		t.Fatalf("peer A got wrong cluster limits from B: daily=%.2f weekly=%.2f monthly=%.2f",
+			rb.ClusterDailyLimitUSD, rb.ClusterWeeklyLimitUSD, rb.ClusterMonthlyLimitUSD)
+	}
+
+	// B should have received A's budget
+	if peers["B"].RemoteBudget == nil {
+		t.Fatal("peer B should have received budget from A")
+	}
+	rb = peers["B"].RemoteBudget
+	if rb.DailyUSD != 1.50 || rb.WeeklyUSD != 8.00 || rb.MonthlyUSD != 25.00 {
+		t.Fatalf("peer B got wrong spend from A: daily=%.2f weekly=%.2f monthly=%.2f",
+			rb.DailyUSD, rb.WeeklyUSD, rb.MonthlyUSD)
+	}
+	if rb.ClusterDailyLimitUSD != 5.00 || rb.ClusterWeeklyLimitUSD != 20.00 || rb.ClusterMonthlyLimitUSD != 60.00 {
+		t.Fatalf("peer B got wrong cluster limits from A: daily=%.2f weekly=%.2f monthly=%.2f",
+			rb.ClusterDailyLimitUSD, rb.ClusterWeeklyLimitUSD, rb.ClusterMonthlyLimitUSD)
+	}
+}
+
+func TestPeer_NilBudgetOmitsBudgetData(t *testing.T) {
+	connA, connB := connPair()
+	treeA, treeB := newMemTree(), newMemTree()
+	storeA, storeB := newMemStore(), newMemStore()
+	logger := testLogger()
+
+	// A has budget, B does not
+	budgetA := &mockBudgetProvider{daily: 1.00, weekly: 5.00, monthly: 20.00}
+	peerA := NewPeer(connA, treeA, storeA, budgetA, logger)
+	peerB := NewPeer(connB, treeB, storeB, nil, logger) // nil budget
+
+	ctx := context.Background()
+
+	type result struct {
+		peer *Peer
+		err  error
+	}
+	ch := make(chan result, 2)
+
+	go func() {
+		_, _, err := peerA.Reconcile(ctx)
+		ch <- result{peerA, err}
+	}()
+	go func() {
+		_, _, err := peerB.Reconcile(ctx)
+		ch <- result{peerB, err}
+	}()
+
+	peers := make(map[string]*Peer)
+	for i := 0; i < 2; i++ {
+		res := <-ch
+		if res.err != nil {
+			t.Fatalf("reconciliation failed: %v", res.err)
+		}
+		if res.peer == peerA {
+			peers["A"] = res.peer
+		} else {
+			peers["B"] = res.peer
+		}
+	}
+
+	// A should get nil budget from B (B has no budget provider)
+	if peers["A"].RemoteBudget != nil {
+		t.Fatal("peer A should NOT have received budget from B (B has nil budget)")
+	}
+
+	// B should get A's budget
+	if peers["B"].RemoteBudget == nil {
+		t.Fatal("peer B should have received budget from A")
 	}
 }
 
