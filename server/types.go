@@ -38,12 +38,15 @@ const (
 
 // cachedDaemonStatus tracks the last broadcast status to detect changes
 type cachedDaemonStatus struct {
-	activeJobs    int
-	queuedJobs    int
-	loadPercent   float64
-	budgetDaily   float64
-	budgetWeekly  float64
-	budgetMonthly float64
+	activeJobs             int
+	queuedJobs             int
+	loadPercent            float64
+	budgetDaily            float64
+	budgetWeekly           float64
+	budgetMonthly          float64
+	budgetDailyAggregate   float64
+	budgetWeeklyAggregate  float64
+	budgetMonthlyAggregate float64
 }
 
 type cachedUsageStats struct {
@@ -144,8 +147,18 @@ type DaemonStatusMessage struct {
 	BudgetDailyLimit   float64 `json:"budget_daily_limit"`   // Daily budget limit (config)
 	BudgetWeeklyLimit  float64 `json:"budget_weekly_limit"`  // Weekly budget limit (config)
 	BudgetMonthlyLimit float64 `json:"budget_monthly_limit"` // Monthly budget limit (config)
-	ServerState        string  `json:"server_state"`         // Opening/Closing Phase 4: "running", "draining", "stopped"
-	Timestamp          int64   `json:"timestamp"`            // Unix timestamp
+	// Aggregate spend (local + non-stale peers). Matches what CheckBudget() enforces.
+	// Falls back to local spend when no peers are configured.
+	BudgetDailyAggregate   float64 `json:"budget_daily_aggregate"`
+	BudgetWeeklyAggregate  float64 `json:"budget_weekly_aggregate"`
+	BudgetMonthlyAggregate float64 `json:"budget_monthly_aggregate"`
+	PeerCount              int     `json:"peer_count"` // Number of non-stale peers included
+	// Cluster limits (averaged across all nodes). 0 = not configured.
+	ClusterDailyLimit   float64 `json:"cluster_daily_limit"`
+	ClusterWeeklyLimit  float64 `json:"cluster_weekly_limit"`
+	ClusterMonthlyLimit float64 `json:"cluster_monthly_limit"`
+	ServerState         string  `json:"server_state"` // Opening/Closing Phase 4: "running", "draining", "stopped"
+	Timestamp           int64   `json:"timestamp"`    // Unix timestamp
 }
 
 // LLMStreamMessage represents streaming LLM output

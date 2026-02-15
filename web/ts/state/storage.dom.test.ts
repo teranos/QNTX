@@ -9,23 +9,11 @@ import { initStorage } from '../indexeddb-storage';
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
-// Setup jsdom if enabled
+// Wire fake-indexeddb into the shared JSDOM window (storage tests need it)
 if (USE_JSDOM) {
-    const { JSDOM } = await import('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
-        url: 'http://localhost'
-    });
-    const { window } = dom;
-    const { document } = window;
-
-    // Add fake IndexedDB
     const fakeIndexedDB = await import('fake-indexeddb');
-    window.indexedDB = fakeIndexedDB.default as any;
-
-    // Replace global document/window with jsdom's
-    globalThis.document = document as any;
-    globalThis.window = window as any;
-    globalThis.indexedDB = window.indexedDB as any;
+    (window as any).indexedDB = fakeIndexedDB.default;
+    globalThis.indexedDB = fakeIndexedDB.default as any;
 }
 
 describe('Storage', () => {

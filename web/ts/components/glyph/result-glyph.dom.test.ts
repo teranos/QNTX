@@ -12,23 +12,6 @@ import { uiState } from '../../state/ui';
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
-// Setup jsdom if enabled
-if (USE_JSDOM) {
-    const { JSDOM } = await import('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
-        url: 'http://localhost'
-    });
-    const { window } = dom;
-    const { document } = window;
-
-    globalThis.document = document as any;
-    globalThis.window = window as any;
-    globalThis.localStorage = window.localStorage as any;
-
-    // jsdom's AbortController is compatible with addEventListener signal option
-    globalThis.AbortController = window.AbortController as any;
-    globalThis.AbortSignal = window.AbortSignal as any;
-}
 
 describe('ResultGlyph', () => {
     if (!USE_JSDOM) {
@@ -40,6 +23,8 @@ describe('ResultGlyph', () => {
     let result: ExecutionResult;
 
     beforeEach(() => {
+        document.body.innerHTML = '';
+
         glyph = {
             id: 'result-test-123',
             title: 'Python Result',
@@ -134,9 +119,6 @@ describe('ResultGlyph', () => {
             closeBtn?.click();
 
             expect(container.contains(element)).toBe(false);
-
-            // Cleanup
-            document.body.removeChild(container);
         });
 
         test('close button unmelds composition when result is in composition', () => {
@@ -187,9 +169,7 @@ describe('ResultGlyph', () => {
             // Verify result glyph is removed
             expect(canvas.contains(resultElement)).toBe(false);
 
-            // Cleanup
             uiState.setCanvasCompositions([]);
-            document.body.removeChild(canvas);
         });
     });
 });
