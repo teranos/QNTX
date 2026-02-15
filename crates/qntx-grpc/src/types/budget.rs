@@ -25,12 +25,29 @@ pub struct BudgetConfig {
     pub weekly_budget_usd: f64,
     pub monthly_budget_usd: f64,
     pub cost_per_score_usd: f64,
+    /// Cluster-level limits: enforced against aggregate spend across all nodes. Effective limit = average of all nodes' configured cluster limits. 0 = no cluster-level enforcement.
+    pub cluster_daily_budget_usd: f64,
+    pub cluster_weekly_budget_usd: f64,
+    pub cluster_monthly_budget_usd: f64,
 }
 
 /// Limiter enforces max calls per time window using sliding window algorithm
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#limiter>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Limiter {}
+
+/// PeerSpend holds the last-known spend and cluster limit data from a remote peer.
+#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#peerspend>"]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PeerSpend {
+    pub daily_usd: f64,
+    pub weekly_usd: f64,
+    pub monthly_usd: f64,
+    pub cluster_daily_limit_usd: f64,
+    pub cluster_weekly_limit_usd: f64,
+    pub cluster_monthly_limit_usd: f64,
+    pub received_at: String,
+}
 
 /// Status represents current budget state
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#status>"]

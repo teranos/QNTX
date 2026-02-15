@@ -226,6 +226,10 @@ lab-server = "https://lab.university.edu:877"
 
 **Graceful degradation.** If WASM is unavailable (binary not built), `NewSyncTree()` panics and `setupSync()` recovers — the server runs without sync. All sync endpoints return 503.
 
+## Budget Coordination
+
+The `sync_done` message carries each peer's spend summary (daily/weekly/monthly) and cluster limit configuration. `CheckBudget()` aggregates local spend with non-stale peer spends before enforcing limits. See [architecture/budget-tracking.md](architecture/budget-tracking.md) for the two-tier enforcement model (node limits + cluster limits).
+
 ## Opportunities
 
 Systems that currently operate per-node but could leverage sync infrastructure.
@@ -233,8 +237,6 @@ Systems that currently operate per-node but could leverage sync infrastructure.
 **Canvas sync.** Glyphs are positioned widgets with content — they map cleanly to `(actor, "canvas:" + id)` groups in the Merkle tree. Two nodes sharing a canvas co-create diagrams; mobile-to-desktop canvas sync falls out for free.
 
 **Embedding sync.** Each node independently computes embeddings for semantic search. Syncing embeddings alongside attestations lets resource-constrained devices (phone) search against a desktop's index without re-computing. Requires extending the protocol to handle binary blobs.
-
-**Distributed budget tracking.** Desktop and phone both calling Claude can blow past a shared budget. Peers exchanging usage summaries during sync enables aggregate limit enforcement across nodes.
 
 **Distributed job scheduling.** Pulse jobs run on whichever node owns the DB. Peers could coordinate via leasing to avoid duplicate execution or enable failover when a node goes offline.
 

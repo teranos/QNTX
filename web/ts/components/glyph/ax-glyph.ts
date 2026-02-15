@@ -221,12 +221,6 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
         }, 500);
     });
 
-    // If we loaded a persisted query, run local + server query
-    if (currentQuery.trim()) {
-        void runLocalQuery();
-        log.debug(SEG.GLYPH, `[AxGlyph] Restored query for ${glyphId}: "${currentQuery}"`);
-    }
-
     // Set up ResizeObserver for auto-sizing glyph to content
     setupAxGlyphResizeObserver(element, resultsContainer, glyphId);
 

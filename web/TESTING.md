@@ -23,14 +23,7 @@ ts/prose-navigation.test.ts
 
 ## Key Patterns
 
-**DOM Testing** (happy-dom for fast tests, JSDOM for complex browser APIs):
-```typescript
-// Fast tests - use happy-dom (automatic)
-const panel = document.createElement('div');
-nav.bindElements(panel);
-
-// Complex tests requiring browser APIs - gate with USE_JSDOM=1 (see *.dom.test.ts files)
-```
+**DOM Testing** — `test-setup.ts` creates happy-dom or JSDOM based on `USE_JSDOM=1`. Gate DOM tests with the skip pattern in `*.dom.test.ts` files.
 
 **localStorage Mocking** (see `prose-navigation.test.ts`):
 ```typescript

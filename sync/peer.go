@@ -30,25 +30,49 @@ type Conn interface {
 	Close() error
 }
 
+// BudgetProvider supplies local spend and cluster limit data for budget coordination.
+// Implemented by pulse/budget.Tracker. Nil means budget data is not exchanged.
+type BudgetProvider interface {
+	GetSpendSummary() (daily, weekly, monthly float64, err error)
+	GetClusterLimits() (daily, weekly, monthly float64)
+}
+
+// PeerBudget holds the spend and cluster limit data received from a remote peer.
+type PeerBudget struct {
+	DailyUSD   float64
+	WeeklyUSD  float64
+	MonthlyUSD float64
+
+	ClusterDailyLimitUSD   float64
+	ClusterWeeklyLimitUSD  float64
+	ClusterMonthlyLimitUSD float64
+}
+
 // Peer manages one sync session with a remote QNTX instance.
 // Both sides of the connection run the same code — the protocol is symmetric.
 type Peer struct {
 	conn   Conn
 	tree   SyncTree
 	store  ats.AttestationStore
+	budget BudgetProvider // nil = no budget data exchanged
 	logger *zap.SugaredLogger
 
 	// Stats tracked during reconciliation
 	sent     int
 	received int
+
+	// Populated after Reconcile if the remote peer sent budget data
+	RemoteBudget *PeerBudget
 }
 
 // NewPeer creates a sync peer for a single reconciliation session.
-func NewPeer(conn Conn, tree SyncTree, store ats.AttestationStore, logger *zap.SugaredLogger) *Peer {
+// budget may be nil if budget tracking is not configured.
+func NewPeer(conn Conn, tree SyncTree, store ats.AttestationStore, budget BudgetProvider, logger *zap.SugaredLogger) *Peer {
 	return &Peer{
 		conn:   conn,
 		tree:   tree,
 		store:  store,
+		budget: budget,
 		logger: logger,
 	}
 }
@@ -99,6 +123,9 @@ func (p *Peer) Reconcile(ctx context.Context) (sent, received int, err error) {
 	if hello.RootHash == root {
 		p.logger.Debugw("Sync roots match, already in sync")
 		if err := p.sendDone(); err != nil {
+			return 0, 0, err
+		}
+		if err := p.recvDone(); err != nil {
 			return 0, 0, err
 		}
 		return 0, 0, nil
@@ -191,6 +218,9 @@ func (p *Peer) Reconcile(ctx context.Context) (sent, received int, err error) {
 	}
 
 	if err := p.sendDone(); err != nil {
+		return 0, 0, err
+	}
+	if err := p.recvDone(); err != nil {
 		return 0, 0, err
 	}
 
@@ -342,11 +372,53 @@ func (p *Peer) recv(msg *Msg) error {
 }
 
 func (p *Peer) sendDone() error {
-	return p.send(Msg{
+	msg := Msg{
 		Type:     MsgDone,
 		Sent:     p.sent,
 		Received: p.received,
-	})
+	}
+	if p.budget != nil {
+		daily, weekly, monthly, err := p.budget.GetSpendSummary()
+		if err != nil {
+			p.logger.Warnw("Failed to get budget spend for sync_done", "error", err)
+		} else {
+			msg.BudgetDailyUSD = &daily
+			msg.BudgetWeeklyUSD = &weekly
+			msg.BudgetMonthlyUSD = &monthly
+		}
+
+		cd, cw, cm := p.budget.GetClusterLimits()
+		if cd > 0 || cw > 0 || cm > 0 {
+			msg.ClusterDailyLimitUSD = &cd
+			msg.ClusterWeeklyLimitUSD = &cw
+			msg.ClusterMonthlyLimitUSD = &cm
+		}
+	}
+	return p.send(msg)
+}
+
+func (p *Peer) recvDone() error {
+	var msg Msg
+	if err := p.recv(&msg); err != nil {
+		return errors.Wrap(err, "failed to receive sync_done from peer")
+	}
+	if msg.Type != MsgDone {
+		return errors.Newf("expected sync_done, got %s", msg.Type)
+	}
+	if msg.BudgetDailyUSD != nil {
+		pb := &PeerBudget{
+			DailyUSD:   *msg.BudgetDailyUSD,
+			WeeklyUSD:  *msg.BudgetWeeklyUSD,
+			MonthlyUSD: *msg.BudgetMonthlyUSD,
+		}
+		if msg.ClusterDailyLimitUSD != nil {
+			pb.ClusterDailyLimitUSD = *msg.ClusterDailyLimitUSD
+			pb.ClusterWeeklyLimitUSD = *msg.ClusterWeeklyLimitUSD
+			pb.ClusterMonthlyLimitUSD = *msg.ClusterMonthlyLimitUSD
+		}
+		p.RemoteBudget = pb
+	}
+	return nil
 }
 
 // toWire converts an attestation to its wire format.

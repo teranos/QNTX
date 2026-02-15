@@ -26,6 +26,7 @@ export type {
 export type {
   BudgetConfig,
   Limiter,
+  PeerSpend,
   Status,
   Tracker,
 } from './budget';
