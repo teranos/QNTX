@@ -3,19 +3,13 @@
  */
 
 import { test, expect } from 'bun:test';
-import { Window } from 'happy-dom';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { proseSchema } from './schema.ts';
 import { proseInputRules } from './input-rules.ts';
 
-const window = new Window();
-globalThis.document = window.document;
-globalThis.window = window as any;
-globalThis.HTMLElement = window.HTMLElement as any;
-
 test('--- at document start creates frontmatter block', () => {
-    const container = window.document.createElement('div');
+    const container = document.createElement('div');
 
     const state = EditorState.create({
         doc: proseSchema.node('doc', null, [
@@ -37,7 +31,7 @@ test('--- at document start creates frontmatter block', () => {
 });
 
 test('--- in middle of document does not create frontmatter', () => {
-    const container = window.document.createElement('div');
+    const container = document.createElement('div');
 
     const state = EditorState.create({
         doc: proseSchema.node('doc', null, [
@@ -66,7 +60,7 @@ test('--- in middle of document does not create frontmatter', () => {
 });
 
 test('--- does not create frontmatter when one already exists', () => {
-    const container = window.document.createElement('div');
+    const container = document.createElement('div');
 
     const state = EditorState.create({
         doc: proseSchema.node('doc', null, [
@@ -107,7 +101,7 @@ test('--- does not create frontmatter when one already exists', () => {
 });
 
 test('```ats at any position creates ATS code block', () => {
-    const container = window.document.createElement('div');
+    const container = document.createElement('div');
 
     const state = EditorState.create({
         doc: proseSchema.node('doc', null, [
@@ -130,7 +124,7 @@ test('```ats at any position creates ATS code block', () => {
 });
 
 test('``` without language creates regular code block', () => {
-    const container = window.document.createElement('div');
+    const container = document.createElement('div');
 
     const state = EditorState.create({
         doc: proseSchema.node('doc', null, [

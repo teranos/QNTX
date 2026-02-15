@@ -3,16 +3,8 @@
  */
 
 import { describe, test, expect, mock, beforeEach } from 'bun:test';
-import { Window } from 'happy-dom';
 import { GoEditorNavigation } from './navigation.ts';
 import type { CodeEntry } from './navigation.ts';
-
-// Setup happy-dom for DOM testing
-const window = new Window();
-const document = window.document;
-globalThis.document = document as any;
-globalThis.window = window as any;
-globalThis.HTMLElement = window.HTMLElement as any;
 
 // Mock localStorage for testing
 const mockLocalStorage = (() => {
@@ -42,7 +34,7 @@ describe('Go Editor Panel', () => {
         statusEl.style.color = '#4ec9b0';
 
         expect(statusEl.textContent).toBe('ready');
-        expect(statusEl.style.color).toBe('#4ec9b0'); // Green
+        expect(statusEl.style.color).toMatch(/#4ec9b0|rgb\(78, 201, 176\)/); // Green
     });
 
     test('status shows error when gopls is unavailable', () => {
@@ -57,7 +49,7 @@ describe('Go Editor Panel', () => {
         statusEl.style.color = '#858585';
 
         expect(statusEl.textContent).toBe('gopls disabled');
-        expect(statusEl.style.color).toBe('#858585'); // Gray
+        expect(statusEl.style.color).toMatch(/#858585|rgb\(133, 133, 133\)/); // Gray
     });
 
     test('panel toggles between hidden and visible', () => {
