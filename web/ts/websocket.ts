@@ -74,7 +74,7 @@ const MESSAGE_HANDLERS = {
     },
 
     daemon_status: (data: DaemonStatusMessage) => {
-        log.info(SEG.PULSE, 'Daemon status:',
+        log.debug(SEG.PULSE, 'Daemon status:',
             data.server_state || 'running',
             `${data.active_jobs} active`,
             `${data.queued_jobs} queued`,
@@ -163,7 +163,7 @@ const MESSAGE_HANDLERS = {
     },
 
     sync_status: (data: SyncStatusMessage) => {
-        log.info(SEG.WS, 'Sync status:', {
+        log.debug(SEG.WS, 'Sync status:', {
             available: data.available,
             root: data.root?.substring(0, 12),
             groups: data.groups,
