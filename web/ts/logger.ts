@@ -135,7 +135,7 @@ const logger = {
      */
     debug(context: string, message: string, ...args: unknown[]): void {
         if (shouldLog('debug')) {
-            console.log(formatPrefix(context), message, ...args);
+            console.debug(formatPrefix(context), message, ...args);
         }
     },
 
