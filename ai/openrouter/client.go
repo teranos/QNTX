@@ -124,17 +124,28 @@ type ChatResponse struct {
 }
 
 // ContentPart represents a single part in a multimodal message content array.
-// Used for text and base64-encoded documents/images in OpenRouter's content array format.
+// Used for text, images, and file attachments in OpenRouter's content array format.
+//
+// Images use type "image_url" with a data URI.
+// Files (PDFs) use type "file" with filename + data URI.
 type ContentPart struct {
 	Type     string            `json:"type"`
 	Text     string            `json:"text,omitempty"`
 	ImageURL *ContentPartImage `json:"image_url,omitempty"`
+	File     *ContentPartFile  `json:"file,omitempty"`
 }
 
-// ContentPartImage holds a data URI for an image or document attachment.
+// ContentPartImage holds a data URI for an image attachment.
 // URL is a data URI: "data:{mime};base64,{data}"
 type ContentPartImage struct {
 	URL string `json:"url"`
+}
+
+// ContentPartFile holds a file attachment (e.g. PDF).
+// FileData is a data URI: "data:{mime};base64,{data}"
+type ContentPartFile struct {
+	Filename string `json:"filename"`
+	FileData string `json:"file_data"`
 }
 
 // Message represents a message in a chat completion.

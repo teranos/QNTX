@@ -54,6 +54,10 @@ describe('Port-aware MELDABILITY registry', () => {
             expect(areClassesCompatible('canvas-doc-glyph', 'canvas-prompt-glyph')).toBe('bottom');
         });
 
+        test('doc → doc returns bottom (stack multiple documents)', () => {
+            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-doc-glyph')).toBe('bottom');
+        });
+
         test('note → prompt returns bottom (note sits above prompt)', () => {
             expect(areClassesCompatible('canvas-note-glyph', 'canvas-prompt-glyph')).toBe('bottom');
         });
