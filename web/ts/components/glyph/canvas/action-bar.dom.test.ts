@@ -18,25 +18,16 @@ import { setupRectangleSelection } from './rectangle-selection';
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
-// Setup jsdom if enabled
+// Mock WAAPI methods (not available in JSDOM)
+// animate() synchronously calls onfinish so assertions don't need setTimeout
 if (USE_JSDOM) {
-    const { JSDOM } = await import('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
-    const { window } = dom;
-    const { document } = window;
-
-    // Replace global document/window with jsdom's
-    globalThis.document = document as any;
-    globalThis.window = window as any;
-    globalThis.navigator = window.navigator as any;
-    globalThis.AbortController = window.AbortController as any;
-    globalThis.AbortSignal = window.AbortSignal as any;
-
-    // Mock WAAPI methods (not available in JSDOM)
-    window.Element.prototype.animate = function () {
-        return { onfinish: null, finished: Promise.resolve() } as any;
+    const win = globalThis.window as any;
+    win.Element.prototype.animate = function () {
+        const anim = { onfinish: null as (() => void) | null, finished: Promise.resolve() };
+        queueMicrotask(() => { anim.onfinish?.(); });
+        return anim;
     };
-    window.Element.prototype.getAnimations = function () {
+    win.Element.prototype.getAnimations = function () {
         return [];
     };
 }
@@ -84,7 +75,7 @@ describe('Canvas Action Bar DOM', () => {
         expect(deleteBtn?.getAttribute('data-tooltip')).toContain('Delete');
     });
 
-    test('removes action bar from DOM when hidden', () => {
+    test('removes action bar from DOM when hidden', async () => {
         showActionBar(
             ['glyph-1'],
             container,
@@ -92,16 +83,22 @@ describe('Canvas Action Bar DOM', () => {
             () => { }
         );
 
-        let actionBar = container.querySelector('.canvas-action-bar');
+        const actionBar = container.querySelector('.canvas-action-bar') as HTMLElement;
         expect(actionBar).not.toBeNull();
 
-        hideActionBar();
+        // Ensure animate mock fires onfinish (other tests may overwrite prototype)
+        actionBar.animate = function () {
+            const anim = { onfinish: null as (() => void) | null, finished: Promise.resolve() };
+            queueMicrotask(() => { anim.onfinish?.(); });
+            return anim as any;
+        };
+        actionBar.getAnimations = () => [] as any;
 
-        // Action bar should be removed (after animation or immediately)
-        setTimeout(() => {
-            actionBar = container.querySelector('.canvas-action-bar');
-            expect(actionBar).toBeNull();
-        }, 100);
+        hideActionBar(container);
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        expect(container.querySelector('.canvas-action-bar')).toBeNull();
     });
 });
 

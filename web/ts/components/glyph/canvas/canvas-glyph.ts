@@ -26,9 +26,6 @@ import { getGlyphTypeBySymbol } from '../glyph-registry';
 import { uiState } from '../../../state/ui';
 import { buildCanvasWorkspace } from './canvas-workspace-builder';
 
-// Re-export selection queries so existing consumers don't break
-export { isGlyphSelected, getSelectedGlyphIds, getSelectedGlyphElements } from './canvas-workspace-builder';
-
 /**
  * Factory function to create a Canvas glyph
  */

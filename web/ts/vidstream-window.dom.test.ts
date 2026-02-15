@@ -14,18 +14,6 @@ import { Window } from './components/window.ts';
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
-// Setup jsdom if enabled
-if (USE_JSDOM) {
-    const { JSDOM } = await import('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
-    const { window } = dom;
-    const { document } = window;
-
-    // Replace global document/window with jsdom's
-    globalThis.document = document as any;
-    globalThis.window = window as any;
-    globalThis.navigator = window.navigator as any;
-}
 
 describe('VidStream Critical Paths', () => {
     if (!USE_JSDOM) {
