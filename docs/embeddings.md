@@ -50,40 +50,14 @@ Without the `rustembeddings` build tag, all endpoints return 503.
 
 Located at `ats/embeddings/models/all-MiniLM-L6-v2/` (not in git). See [ats/embeddings/README.md](https://github.com/teranos/QNTX/blob/main/ats/embeddings/README.md) for download instructions.
 
+## Completed
+
+- **Auto-embedding pipeline**: `EmbeddingObserver` embeds attestations with rich text on creation (#482)
+- **Rich text integration**: Uses `rich_string_fields` from type definitions (#479)
+- **Unified search**: Text + semantic results merged and deduplicated (#485)
+- **Semantic Search Glyph (⊨)**: Live canvas glyph with historical + live matching (#496, #499)
+
 ## Open Work
-
-### Attestation → Embedding pipeline
-Nothing currently triggers embedding generation when attestations are created. The batch endpoint exists but must be called manually. Semantic search returns empty results until attestations have embeddings. This is the critical gap between "embeddings work" and "semantic search is useful."
-
-Options to explore:
-- Automatic embedding on attestation creation (hook in storage layer)
-- Background job via Pulse daemon
-- On-demand embedding at search time
-
-### Rich semantic search integration
-Currently, embeddings are generated from the raw attestation command string. This produces poor vectors — short structured text is too sparse for sentence transformers.
-
-The existing fuzzy search system (`ats/storage/rich_search.go`) solves the same problem differently: type definitions declare `rich_string_fields` in their attributes (e.g. a Commit type declares `["message", "description"]`), discovered dynamically via `getTypeDefinitions()` from attestations with `predicate="type"`, `context="graph"`. At search time, `json_extract(a.attributes, '$.fieldName')` pulls the actual text from those fields. The fuzzy engine then tokenizes and matches against this vocabulary.
-
-Embeddings should follow the same pattern:
-- Use `rich_string_fields` from type definitions to determine what text to embed per attestation
-- Concatenate the declared fields into a single input string for the sentence transformer
-- Re-embed when rich text fields change (type def updates should invalidate affected embeddings)
-- Unify fuzzy search and semantic search under one search system — fuzzy becomes word-level matching, semantic becomes meaning-level matching, both operating on the same rich text fields
-- UI reflects this as search modes rather than separate features
-
-This is the critical integration point: `buildDynamicRichStringFields()` already aggregates all searchable field names across types. The embedding pipeline needs access to the same mechanism.
-
-### Verification (requires populated database)
-Verified end-to-end by copying attestations from a backup database:
-1. `POST /api/embeddings/batch` with attestation IDs — 8 attestations embedded in 983ms, 0 failures
-2. `GET /api/search/semantic?q=<query>&threshold=0.0` — returns semantically ranked results
-3. Similarity scores reflect cosine similarity (L2-normalized vectors, distances in [0, 2], default threshold 0.7 filters correctly)
-
-### Frontend
-- Semantic Search Glyph (proposed symbol: ⊨ double turnstile)
-- Composition with other glyphs via Meld system
-- Integration with Glyph Attestation flow
 
 ### Open Questions
 - **Model distribution**: Bundled, downloaded on-demand, or user-provided?
