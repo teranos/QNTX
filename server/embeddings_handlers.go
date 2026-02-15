@@ -82,6 +82,13 @@ func (s *QNTXServer) HandleSemanticSearch(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	var clusterID *int
+	if cidStr := r.URL.Query().Get("cluster_id"); cidStr != "" {
+		if parsedCID, err := strconv.Atoi(cidStr); err == nil {
+			clusterID = &parsedCID
+		}
+	}
+
 	// Generate embedding for query
 	startInference := time.Now()
 	queryResult, err := s.embeddingService.GenerateEmbedding(query)
@@ -107,7 +114,7 @@ func (s *QNTXServer) HandleSemanticSearch(w http.ResponseWriter, r *http.Request
 
 	// Perform semantic search
 	startSearch := time.Now()
-	searchResults, err := s.embeddingStore.SemanticSearch(queryBlob, limit, threshold)
+	searchResults, err := s.embeddingStore.SemanticSearch(queryBlob, limit, threshold, clusterID)
 	if err != nil {
 		s.logger.Errorw("Failed to perform semantic search",
 			"query", query,

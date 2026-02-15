@@ -155,8 +155,9 @@ type SearchResult struct {
 	Similarity  float32 `json:"similarity"` // 1.0 - normalized distance
 }
 
-// SemanticSearch performs a vector similarity search
-func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, threshold float32) ([]*SearchResult, error) {
+// SemanticSearch performs a vector similarity search.
+// When clusterID is non-nil, results are scoped to that cluster only.
+func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, threshold float32, clusterID *int) ([]*SearchResult, error) {
 	if len(queryEmbedding) == 0 {
 		return nil, errors.New("query embedding is empty")
 	}
@@ -167,20 +168,41 @@ func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, thresh
 
 	// Use L2 distance with sqlite-vec
 	// Lower distance means more similar
-	query := `
-		SELECT
-			v.embedding_id,
-			e.source_type,
-			e.source_id,
-			e.text,
-			vec_distance_L2(v.embedding, ?) as distance
-		FROM vec_embeddings v
-		JOIN embeddings e ON v.embedding_id = e.id
-		ORDER BY distance
-		LIMIT ?
-	`
+	var query string
+	var args []interface{}
 
-	rows, err := s.db.Query(query, queryEmbedding, limit)
+	if clusterID != nil {
+		query = `
+			SELECT
+				v.embedding_id,
+				e.source_type,
+				e.source_id,
+				e.text,
+				vec_distance_L2(v.embedding, ?) as distance
+			FROM vec_embeddings v
+			JOIN embeddings e ON v.embedding_id = e.id
+			WHERE e.cluster_id = ?
+			ORDER BY distance
+			LIMIT ?
+		`
+		args = []interface{}{queryEmbedding, *clusterID, limit}
+	} else {
+		query = `
+			SELECT
+				v.embedding_id,
+				e.source_type,
+				e.source_id,
+				e.text,
+				vec_distance_L2(v.embedding, ?) as distance
+			FROM vec_embeddings v
+			JOIN embeddings e ON v.embedding_id = e.id
+			ORDER BY distance
+			LIMIT ?
+		`
+		args = []interface{}{queryEmbedding, limit}
+	}
+
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to perform semantic search (limit=%d, threshold=%.2f)", limit, threshold)
 	}
