@@ -187,8 +187,14 @@ function restoreToCanvas(
 
     // Replace ghost with real element in the composition, or reparent to content layer
     if (ghost && composition && ghost.parentNode) {
+        // Restore grid positioning — canvasPlaced sets absolute left/top which fights CSS grid
+        element.style.position = 'relative';
+        element.style.left = '';
+        element.style.top = '';
+        element.style.gridRow = ghost.style.gridRow;
+        element.style.gridColumn = ghost.style.gridColumn;
         ghost.parentNode.replaceChild(element, ghost);
-        log.debug(SEG.GLYPH, `[Subcanvas] Replaced ghost for ${glyph.id}, back in composition`);
+        log.debug(SEG.GLYPH, `[Subcanvas] Replaced ghost for ${glyph.id}, back in composition at grid(${element.style.gridRow}, ${element.style.gridColumn})`);
     } else {
         contentLayer.appendChild(element);
     }
