@@ -535,8 +535,8 @@ type watcherSearchAdapter struct {
 	store *storage.EmbeddingStore
 }
 
-func (a *watcherSearchAdapter) Search(queryEmbedding []byte, limit int, threshold float32) ([]watcher.SemanticSearchResult, error) {
-	results, err := a.store.SemanticSearch(queryEmbedding, limit, threshold)
+func (a *watcherSearchAdapter) Search(queryEmbedding []byte, limit int, threshold float32, clusterID *int) ([]watcher.SemanticSearchResult, error) {
+	results, err := a.store.SemanticSearch(queryEmbedding, limit, threshold, clusterID)
 	if err != nil {
 		return nil, err
 	}

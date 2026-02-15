@@ -38,7 +38,7 @@ type SemanticSearchResult struct {
 // EmbeddingSearcher queries pre-computed embeddings via vector similarity (sqlite-vec).
 // Used for historical semantic search. Optional — nil when embeddings unavailable.
 type EmbeddingSearcher interface {
-	Search(queryEmbedding []byte, limit int, threshold float32) ([]SemanticSearchResult, error)
+	Search(queryEmbedding []byte, limit int, threshold float32, clusterID *int) ([]SemanticSearchResult, error)
 }
 
 // Engine manages watchers and executes actions when attestations match filters
@@ -115,8 +115,8 @@ func NewEngine(db *sql.DB, apiBaseURL string, logger *zap.SugaredLogger) *Engine
 		parseErrors:     make(map[string]error),
 		queryEmbeddings: make(map[string][]float32),
 		retryQueue:      make([]*PendingExecution, 0),
-		ctx:          ctx,
-		cancel:       cancel,
+		ctx:             ctx,
+		cancel:          cancel,
 	}
 }
 
@@ -295,7 +295,7 @@ func (e *Engine) queryHistoricalSemantic(watcherID string, watcher *storage.Watc
 		threshold = 0.3
 	}
 
-	results, err := e.embeddingSearcher.Search(queryBlob, 50, threshold)
+	results, err := e.embeddingSearcher.Search(queryBlob, 50, threshold, watcher.SemanticClusterID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to search embeddings for watcher %s", watcherID)
 	}

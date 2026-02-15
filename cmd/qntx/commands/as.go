@@ -58,6 +58,10 @@ func init() {
 	AsCmd.Flags().StringVar(&asAttributes, "attr", "", `JSON attributes (e.g. '{"msg":"hello"}')`)
 }
 
+// TODO: Rewrite to POST to the running server (POST /api/attestations) instead of
+// writing directly to SQLite. Direct DB writes bypass server-side observers
+// (auto-embedding, cluster prediction, sync) — the UX must be identical
+// regardless of whether the attestation is created via CLI or browser.
 func runAsCommand(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return errors.New("at least one subject is required")
