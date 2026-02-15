@@ -503,12 +503,29 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 					"file_id", fid, "error", readErr)
 				continue
 			}
-			chatReq.Attachments = append(chatReq.Attachments, openrouter.ContentPart{
-				Type: "image_url",
-				ImageURL: &openrouter.ContentPartImage{
-					URL: "data:" + mime + ";base64," + b64,
-				},
-			})
+
+			switch {
+			case strings.HasPrefix(mime, "image/"):
+				chatReq.Attachments = append(chatReq.Attachments, openrouter.ContentPart{
+					Type: "image_url",
+					ImageURL: &openrouter.ContentPartImage{
+						URL: "data:" + mime + ";base64," + b64,
+					},
+				})
+			case mime == "application/pdf":
+				chatReq.Attachments = append(chatReq.Attachments, openrouter.ContentPart{
+					Type: "file",
+					File: &openrouter.ContentPartFile{
+						Filename: fid,
+						FileData: "data:" + mime + ";base64," + b64,
+					},
+				})
+			default:
+				s.logger.Warnw("Unsupported MIME type for LLM attachment, skipping",
+					"file_id", fid, "mime", mime)
+				continue
+			}
+
 			s.logger.Debugw("Attached file to prompt",
 				"file_id", fid, "mime", mime, "b64_length", len(b64))
 		}
