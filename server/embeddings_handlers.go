@@ -20,6 +20,8 @@ import (
 	"github.com/teranos/QNTX/errors"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/pulse/schedule"
 	"go.uber.org/zap"
 )
 
@@ -509,6 +511,130 @@ type ClusterResponse struct {
 	TimeMS  float64                 `json:"time_ms"`
 }
 
+// EmbeddingServiceForClustering is the subset of the embedding service needed for clustering
+type EmbeddingServiceForClustering interface {
+	DeserializeEmbedding(data []byte) ([]float32, error)
+	SerializeEmbedding(embedding []float32) ([]byte, error)
+}
+
+// EmbeddingClusterResult holds the outcome of a clustering run
+type EmbeddingClusterResult struct {
+	Summary *storage.ClusterSummary
+	TimeMS  float64
+}
+
+// RunHDBSCANClustering executes HDBSCAN on all stored embeddings and writes results to DB.
+// Shared by the HTTP handler and the Pulse recluster handler.
+func RunHDBSCANClustering(
+	store *storage.EmbeddingStore,
+	svc EmbeddingServiceForClustering,
+	invalidator func(),
+	minClusterSize int,
+	logger *zap.SugaredLogger,
+) (*EmbeddingClusterResult, error) {
+	startTime := time.Now()
+
+	// Read all embedding vectors
+	ids, blobs, err := store.GetAllEmbeddingVectors()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read embedding vectors for clustering")
+	}
+
+	if len(ids) < 2 {
+		return nil, errors.Newf("need at least 2 embeddings to cluster, have %d", len(ids))
+	}
+
+	// Deserialize blobs into flat float32 array
+	var dims int
+	flat := make([]float32, 0, len(blobs)*384) // pre-allocate assuming 384d
+	for i, blob := range blobs {
+		vec, err := svc.DeserializeEmbedding(blob)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to deserialize embedding %s (blob_len=%d)", ids[i], len(blob))
+		}
+		if i == 0 {
+			dims = len(vec)
+		}
+		flat = append(flat, vec...)
+	}
+
+	// Run HDBSCAN
+	result, err := embeddings.ClusterHDBSCAN(flat, len(ids), dims, minClusterSize)
+	if err != nil {
+		return nil, errors.Wrapf(err, "HDBSCAN failed (n_points=%d, dims=%d, min_cluster_size=%d)", len(ids), dims, minClusterSize)
+	}
+
+	// Build assignments and write to DB
+	assignments := make([]storage.ClusterAssignment, len(ids))
+	for i, id := range ids {
+		assignments[i] = storage.ClusterAssignment{
+			ID:          id,
+			ClusterID:   int(result.Labels[i]),
+			Probability: float64(result.Probabilities[i]),
+		}
+	}
+
+	if err := store.UpdateClusterAssignments(assignments); err != nil {
+		return nil, errors.Wrapf(err, "failed to save %d cluster assignments", len(assignments))
+	}
+
+	// Save cluster centroids for incremental prediction
+	if len(result.Centroids) > 0 {
+		memberCounts := make(map[int]int)
+		for _, l := range result.Labels {
+			if l >= 0 {
+				memberCounts[int(l)]++
+			}
+		}
+
+		centroidModels := make([]storage.ClusterCentroid, 0, len(result.Centroids))
+		for i, centroid := range result.Centroids {
+			blob, err := svc.SerializeEmbedding(centroid)
+			if err != nil {
+				logger.Errorw("Failed to serialize centroid",
+					"cluster_id", i,
+					"error", err)
+				continue
+			}
+			centroidModels = append(centroidModels, storage.ClusterCentroid{
+				ClusterID: i,
+				Centroid:  blob,
+				NMembers:  memberCounts[i],
+			})
+		}
+
+		if err := store.SaveClusterCentroids(centroidModels); err != nil {
+			logger.Errorw("Failed to save cluster centroids",
+				"count", len(centroidModels),
+				"error", err)
+			// Non-fatal: clustering succeeded, just centroids not saved
+		}
+
+		if invalidator != nil {
+			invalidator()
+		}
+	}
+
+	summary, err := store.GetClusterSummary()
+	if err != nil {
+		return nil, errors.Wrap(err, "clustering succeeded but failed to read summary")
+	}
+
+	timeMS := float64(time.Since(startTime).Milliseconds())
+
+	logger.Infow("HDBSCAN clustering complete",
+		"n_points", len(ids),
+		"n_clusters", result.NClusters,
+		"n_noise", result.NNoise,
+		"min_cluster_size", minClusterSize,
+		"time_ms", timeMS)
+
+	return &EmbeddingClusterResult{
+		Summary: summary,
+		TimeMS:  timeMS,
+	}, nil
+}
+
 // HandleEmbeddingCluster runs HDBSCAN clustering on all stored embeddings (POST /api/embeddings/cluster)
 func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -530,128 +656,23 @@ func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	startTime := time.Now()
-
-	// Read all embedding vectors
-	ids, blobs, err := s.embeddingStore.GetAllEmbeddingVectors()
+	result, err := RunHDBSCANClustering(
+		s.embeddingStore,
+		s.embeddingService,
+		s.embeddingClusterInvalidator,
+		minClusterSize,
+		s.logger,
+	)
 	if err != nil {
-		s.logger.Errorw("Failed to read embedding vectors for clustering", "error", err)
-		http.Error(w, "Failed to read embeddings", http.StatusInternalServerError)
-		return
-	}
-
-	if len(ids) < 2 {
-		http.Error(w, fmt.Sprintf("Need at least 2 embeddings to cluster, have %d", len(ids)), http.StatusBadRequest)
-		return
-	}
-
-	// Deserialize blobs into flat float32 array
-	var dims int
-	flat := make([]float32, 0, len(blobs)*384) // pre-allocate assuming 384d
-	for i, blob := range blobs {
-		vec, err := s.embeddingService.DeserializeEmbedding(blob)
-		if err != nil {
-			s.logger.Errorw("Failed to deserialize embedding",
-				"embedding_id", ids[i],
-				"blob_len", len(blob),
-				"error", err)
-			http.Error(w, fmt.Sprintf("Failed to deserialize embedding %s", ids[i]), http.StatusInternalServerError)
-			return
-		}
-		if i == 0 {
-			dims = len(vec)
-		}
-		flat = append(flat, vec...)
-	}
-
-	// Run HDBSCAN
-	result, err := embeddings.ClusterHDBSCAN(flat, len(ids), dims, minClusterSize)
-	if err != nil {
-		s.logger.Errorw("HDBSCAN clustering failed",
-			"n_points", len(ids),
-			"dimensions", dims,
-			"min_cluster_size", minClusterSize,
-			"error", err)
-		http.Error(w, fmt.Sprintf("Clustering failed: %s", err), http.StatusInternalServerError)
-		return
-	}
-
-	// Build assignments and write to DB
-	assignments := make([]storage.ClusterAssignment, len(ids))
-	for i, id := range ids {
-		assignments[i] = storage.ClusterAssignment{
-			ID:          id,
-			ClusterID:   int(result.Labels[i]),
-			Probability: float64(result.Probabilities[i]),
-		}
-	}
-
-	if err := s.embeddingStore.UpdateClusterAssignments(assignments); err != nil {
-		s.logger.Errorw("Failed to save cluster assignments",
-			"count", len(assignments),
-			"error", err)
-		http.Error(w, "Failed to save cluster assignments", http.StatusInternalServerError)
-		return
-	}
-
-	// Save cluster centroids for incremental prediction
-	if len(result.Centroids) > 0 {
-		// Count members per cluster from labels
-		memberCounts := make(map[int]int)
-		for _, l := range result.Labels {
-			if l >= 0 {
-				memberCounts[int(l)]++
-			}
-		}
-
-		centroidModels := make([]storage.ClusterCentroid, 0, len(result.Centroids))
-		for i, centroid := range result.Centroids {
-			blob, err := s.embeddingService.SerializeEmbedding(centroid)
-			if err != nil {
-				s.logger.Errorw("Failed to serialize centroid",
-					"cluster_id", i,
-					"error", err)
-				continue
-			}
-			centroidModels = append(centroidModels, storage.ClusterCentroid{
-				ClusterID: i,
-				Centroid:  blob,
-				NMembers:  memberCounts[i],
-			})
-		}
-
-		if err := s.embeddingStore.SaveClusterCentroids(centroidModels); err != nil {
-			s.logger.Errorw("Failed to save cluster centroids",
-				"count", len(centroidModels),
-				"error", err)
-			// Non-fatal: clustering succeeded, just centroids not saved
-		}
-
-		// Invalidate observer's centroid cache so it picks up fresh data
-		if s.embeddingClusterInvalidator != nil {
-			s.embeddingClusterInvalidator()
-		}
-	}
-
-	// Return summary
-	summary, err := s.embeddingStore.GetClusterSummary()
-	if err != nil {
-		s.logger.Errorw("Failed to get cluster summary after assignment", "error", err)
-		http.Error(w, "Clustering succeeded but failed to read summary", http.StatusInternalServerError)
+		s.logger.Errorw("HDBSCAN clustering failed", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	resp := ClusterResponse{
-		Summary: summary,
-		TimeMS:  float64(time.Since(startTime).Milliseconds()),
+		Summary: result.Summary,
+		TimeMS:  result.TimeMS,
 	}
-
-	s.logger.Infow("HDBSCAN clustering complete",
-		"n_points", len(ids),
-		"n_clusters", result.NClusters,
-		"n_noise", result.NNoise,
-		"min_cluster_size", minClusterSize,
-		"time_ms", resp.TimeMS)
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
@@ -1139,4 +1160,97 @@ func (s *QNTXServer) projectToCanvas(embeddingID string, embedding []float32) {
 		"embedding_id", embeddingID,
 		"x", result.Projections[0][0],
 		"y", result.Projections[0][1])
+}
+
+// --- Pulse HDBSCAN recluster handler ---
+
+const ReclusterHandlerName = "embeddings.recluster"
+
+// ReclusterHandler runs HDBSCAN re-clustering as a Pulse scheduled job
+type ReclusterHandler struct {
+	store          *storage.EmbeddingStore
+	svc            EmbeddingServiceForClustering
+	invalidator    func()
+	minClusterSize int
+	logger         *zap.SugaredLogger
+}
+
+func (h *ReclusterHandler) Name() string { return ReclusterHandlerName }
+
+func (h *ReclusterHandler) Execute(ctx context.Context, job *async.Job) error {
+	_, err := RunHDBSCANClustering(h.store, h.svc, h.invalidator, h.minClusterSize, h.logger)
+	return err
+}
+
+// setupEmbeddingReclusterSchedule registers the recluster handler and auto-creates
+// a Pulse schedule if embeddings.recluster_interval_seconds > 0.
+func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
+	if s.embeddingService == nil || s.embeddingStore == nil {
+		return
+	}
+
+	handler := &ReclusterHandler{
+		store:          s.embeddingStore,
+		svc:            s.embeddingService,
+		invalidator:    s.embeddingClusterInvalidator,
+		minClusterSize: cfg.Embeddings.MinClusterSize,
+		logger:         s.logger.Named("recluster"),
+	}
+	if handler.minClusterSize <= 0 {
+		handler.minClusterSize = 5
+	}
+
+	registry := s.daemon.Registry()
+	registry.Register(handler)
+	s.logger.Infow("Registered HDBSCAN recluster handler")
+
+	interval := cfg.Embeddings.ReclusterIntervalSeconds
+	if interval <= 0 {
+		return
+	}
+
+	// Check for existing schedule to avoid duplicates on restart
+	schedStore := schedule.NewStore(s.db)
+	existing, err := schedStore.ListAllScheduledJobs()
+	if err != nil {
+		s.logger.Errorw("Failed to list scheduled jobs for recluster idempotency check",
+			"handler_name", ReclusterHandlerName,
+			"error", err)
+		return
+	}
+	for _, j := range existing {
+		if j.HandlerName == ReclusterHandlerName && j.State == schedule.StateActive {
+			// Update interval if it changed
+			if j.IntervalSeconds != interval {
+				if err := schedStore.UpdateJobInterval(j.ID, interval); err != nil {
+					s.logger.Errorw("Failed to update recluster schedule interval",
+						"job_id", j.ID,
+						"error", err)
+				} else {
+					s.logger.Infow("Updated HDBSCAN recluster schedule interval",
+						"job_id", j.ID,
+						"interval_seconds", interval)
+				}
+			}
+			return
+		}
+	}
+
+	now := time.Now()
+	job := &schedule.Job{
+		ID:              fmt.Sprintf("SPJ_recluster_%d", now.Unix()),
+		HandlerName:     ReclusterHandlerName,
+		IntervalSeconds: interval,
+		State:           schedule.StateActive,
+		NextRunAt:       &now,
+	}
+	if err := schedStore.CreateJob(job); err != nil {
+		s.logger.Errorw("Failed to create HDBSCAN recluster schedule",
+			"interval_seconds", interval,
+			"error", err)
+		return
+	}
+	s.logger.Infow("Auto-created HDBSCAN recluster schedule",
+		"job_id", job.ID,
+		"interval_seconds", interval)
 }

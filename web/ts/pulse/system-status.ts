@@ -7,6 +7,7 @@
 
 import { Pulse } from '@generated/sym.js';
 import { log, SEG } from '../logger';
+import { apiFetch } from '../api.ts';
 import type { DaemonStatusMessage } from '../../types/websocket';
 
 /**
@@ -202,7 +203,7 @@ function openBudgetConfigPanel(): void {
     }
 
     // Fetch current config from server
-    fetch('/api/pulse/config')
+    apiFetch('/api/pulse/config')
         .then(res => res.json())
         .then(config => {
             dailyInput.value = (config.daily_budget_usd ?? 1.0).toString();
