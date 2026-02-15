@@ -11,6 +11,7 @@
 | GET | `/api/canvas/glyphs` | canvasHandler |
 | GET | `/api/canvas/glyphs/` | canvasHandler |
 | GET | `/api/embeddings/batch` | HandleEmbeddingBatch |
+| GET | `/api/embeddings/cluster` | HandleEmbeddingCluster |
 | GET | `/api/embeddings/generate` | HandleEmbeddingGenerate |
 | GET | `/api/embeddings/info` | HandleEmbeddingInfo |
 | GET | `/api/search/semantic` | HandleSemanticSearch |
@@ -63,6 +64,16 @@ HandleEmbeddingBatch handles batch embedding generation (POST /api/embeddings/ba
 **Handler**: `HandleEmbeddingBatch`
 
 **Response**: [`EmbeddingBatchResponse`](../types/server.md#embeddingbatchresponse)
+
+---
+
+### `GET` /api/embeddings/cluster
+
+HandleEmbeddingCluster runs HDBSCAN clustering (POST /api/embeddings/cluster)
+
+**Handler**: `HandleEmbeddingCluster`
+
+**Response**: [`ClusterResponse`](../types/server.md#clusterresponse)
 
 ---
 
