@@ -78,7 +78,7 @@ The reconciliation protocol is **symmetric** — both sides run the same state m
 
 | Phase | Both send | Purpose |
 |-------|-----------|---------|
-| 1 | `sync_hello` (root hash) | Quick check — if roots match, done |
+| 1 | `sync_hello` (root hash, name) | Quick check — if roots match, done |
 | 2 | `sync_group_hashes` | Exchange all group hash pairs |
 | 3 | `sync_need` | Each side says which groups it wants |
 | 4 | `sync_attestations` | Each side sends what the other asked for |
@@ -173,6 +173,7 @@ Response:
 ```toml
 # am.toml
 [sync]
+name = "laptop"         # advertised to peers in hello (shows in their logs)
 interval_seconds = 300  # reconcile every 5 minutes (0 = manual only)
 
 [sync.peers]
