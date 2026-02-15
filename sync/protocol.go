@@ -43,6 +43,7 @@ type Msg struct {
 
 	// Hello
 	RootHash string `json:"root_hash,omitempty"`
+	Name     string `json:"name,omitempty"` // self-identified node name (from [sync] name)
 
 	// GroupHashes: hex-encoded group key hash → hex-encoded group hash
 	Groups map[string]string `json:"groups,omitempty"`
