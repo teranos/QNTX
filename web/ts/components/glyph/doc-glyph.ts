@@ -4,6 +4,13 @@
  * Created by dragging a file onto the canvas workspace.
  * Content field stores JSON: { fileId, filename, ext }
  * The file is served from /api/files/{fileId}{ext}.
+ *
+ * Known limitation: browsers render their native PDF toolbar inside the <embed>.
+ * Firefox (pdf.js) and Chrome each show their own toolbar with page nav, zoom,
+ * and annotation controls. There is no cross-browser way to suppress it —
+ * Chrome's #toolbar=0 URL fragment doesn't work in Firefox. Replacing <embed>
+ * with pdf.js as a library would give full rendering control but adds a
+ * dependency and page navigation/zoom logic.
  */
 
 import type { Glyph } from './glyph';
