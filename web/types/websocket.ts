@@ -463,7 +463,7 @@ export interface SyncStatusMessage extends BaseMessage {
   available: boolean;
   root?: string;      // Merkle root hash (64-char hex)
   groups?: number;    // Number of (actor, context) groups in the tree
-  peers?: Array<{ name: string; url: string; status?: string }>;
+  peers?: Array<{ name: string; url: string; status?: string; advertised_name?: string }>;
   reason?: string;    // Why sync is unavailable
   error?: string;     // Error reading tree state
 }
