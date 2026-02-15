@@ -133,17 +133,19 @@ function renderSync(): void {
     let peersSection = '';
     if (peers.length > 0) {
         const peerRows = peers.map(p => {
+            const isSelf = p.status === 'self';
             const statusColor = p.status === 'ok' ? '#4ade80' : p.status === 'unreachable' ? '#f87171' : '#6b7280';
             const statusDot = p.status ? `<span style="color: ${statusColor}; margin-right: 6px;">●</span>` : '';
+            const syncBtn = isSelf ? '' : `<button class="sync-peer-btn" data-peer-url="${p.url}" style="
+                    background: transparent; border: 1px solid #60a5fa; color: #60a5fa;
+                    padding: 2px 8px; border-radius: 3px; cursor: pointer;
+                    font-family: monospace; font-size: 11px; margin-left: 8px;
+                ">Sync</button>`;
             return `
             <div class="glyph-row" style="align-items: center;">
                 ${statusDot}<span class="glyph-label">${p.name}:</span>
                 <span class="glyph-value" style="font-size: 11px; flex: 1;">${p.url}</span>
-                <button class="sync-peer-btn" data-peer-url="${p.url}" style="
-                    background: transparent; border: 1px solid #60a5fa; color: #60a5fa;
-                    padding: 2px 8px; border-radius: 3px; cursor: pointer;
-                    font-family: monospace; font-size: 11px; margin-left: 8px;
-                ">Sync</button>
+                ${syncBtn}
             </div>`;
         }).join('');
         peersSection = `

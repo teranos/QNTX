@@ -112,7 +112,8 @@ class PulsePanel extends BasePanel {
     }
 
     protected async onShow(): Promise<void> {
-        this.showLoading('Loading scheduled jobs...');
+        // Don't use base showLoading() — it wipes .panel-content, destroying our section containers.
+        // The template already has per-section "Loading..." placeholders.
         await this.loadJobs();
     }
 
@@ -129,7 +130,6 @@ class PulsePanel extends BasePanel {
             // Clean up orphaned job IDs from expandedJobs
             this.state.cleanupOrphanedJobs(new Set(this.jobs.keys()));
 
-            this.hideLoading();
             await this.render();
         } catch (error: unknown) {
             log.error(SEG.ERROR, '[Pulse Panel] Failed to load jobs:', error);
@@ -153,17 +153,7 @@ class PulsePanel extends BasePanel {
 
         const { renderSystemStatus } = await import('./pulse/system-status.ts');
 
-        const daemonStatus = {
-            running: currentDaemonStatus?.running ?? false,
-            budget_daily: currentDaemonStatus?.budget_daily ?? 0,
-            budget_daily_limit: currentDaemonStatus?.budget_daily_limit ?? 1.0,
-            budget_weekly: currentDaemonStatus?.budget_weekly ?? 0,
-            budget_weekly_limit: currentDaemonStatus?.budget_weekly_limit ?? 7.0,
-            budget_monthly: currentDaemonStatus?.budget_monthly ?? 0,
-            budget_monthly_limit: currentDaemonStatus?.budget_monthly_limit ?? 30.0
-        };
-
-        container.innerHTML = renderSystemStatus(daemonStatus);
+        container.innerHTML = renderSystemStatus(currentDaemonStatus);
         this.attachSystemStatusHandlers();
     }
 
