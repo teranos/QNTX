@@ -33,7 +33,7 @@ type ChildJobInfo struct {
 
 ## CompleteMessage {#completemessage}
 
-**Source**: [`server/types.go:109`](https://github.com/teranos/QNTX/blob/main/server/types.go#L109)
+**Source**: [`server/types.go:110`](https://github.com/teranos/QNTX/blob/main/server/types.go#L110)
 
 
 ```go
@@ -85,7 +85,7 @@ type CreateScheduledJobRequest struct {
 
 ## DaemonStatusMessage {#daemonstatusmessage}
 
-**Source**: [`server/types.go:134`](https://github.com/teranos/QNTX/blob/main/server/types.go#L134)
+**Source**: [`server/types.go:135`](https://github.com/teranos/QNTX/blob/main/server/types.go#L135)
 
 
 ```go
@@ -120,7 +120,7 @@ type ErrorResponse struct {
 
 ## GlyphFiredMessage {#glyphfiredmessage}
 
-**Source**: [`server/types.go:238`](https://github.com/teranos/QNTX/blob/main/server/types.go#L238)
+**Source**: [`server/types.go:239`](https://github.com/teranos/QNTX/blob/main/server/types.go#L239)
 
 
 ```go
@@ -161,7 +161,7 @@ type JobStagesResponse struct {
 
 ## JobUpdateMessage {#jobupdatemessage}
 
-**Source**: [`server/types.go:127`](https://github.com/teranos/QNTX/blob/main/server/types.go#L127)
+**Source**: [`server/types.go:128`](https://github.com/teranos/QNTX/blob/main/server/types.go#L128)
 
 
 ```go
@@ -174,7 +174,7 @@ type JobUpdateMessage struct {
 
 ## LLMStreamMessage {#llmstreammessage}
 
-**Source**: [`server/types.go:151`](https://github.com/teranos/QNTX/blob/main/server/types.go#L151)
+**Source**: [`server/types.go:152`](https://github.com/teranos/QNTX/blob/main/server/types.go#L152)
 
 
 ```go
@@ -245,7 +245,7 @@ type ParsedATSCode struct {
 
 ## PluginHealthMessage {#pluginhealthmessage}
 
-**Source**: [`server/types.go:218`](https://github.com/teranos/QNTX/blob/main/server/types.go#L218)
+**Source**: [`server/types.go:219`](https://github.com/teranos/QNTX/blob/main/server/types.go#L219)
 
 
 ```go
@@ -299,7 +299,7 @@ type PreviewSample struct {
 
 ## ProgressMessage {#progressmessage}
 
-**Source**: [`server/types.go:93`](https://github.com/teranos/QNTX/blob/main/server/types.go#L93)
+**Source**: [`server/types.go:94`](https://github.com/teranos/QNTX/blob/main/server/types.go#L94)
 
 
 ```go
@@ -436,7 +436,7 @@ type ProseEntry struct {
 
 ## PulseExecutionCompletedMessage {#pulseexecutioncompletedmessage}
 
-**Source**: [`server/types.go:184`](https://github.com/teranos/QNTX/blob/main/server/types.go#L184)
+**Source**: [`server/types.go:185`](https://github.com/teranos/QNTX/blob/main/server/types.go#L185)
 
 
 ```go
@@ -454,7 +454,7 @@ type PulseExecutionCompletedMessage struct {
 
 ## PulseExecutionFailedMessage {#pulseexecutionfailedmessage}
 
-**Source**: [`server/types.go:172`](https://github.com/teranos/QNTX/blob/main/server/types.go#L172)
+**Source**: [`server/types.go:173`](https://github.com/teranos/QNTX/blob/main/server/types.go#L173)
 
 
 ```go
@@ -472,7 +472,7 @@ type PulseExecutionFailedMessage struct {
 
 ## PulseExecutionLogStreamMessage {#pulseexecutionlogstreammessage}
 
-**Source**: [`server/types.go:196`](https://github.com/teranos/QNTX/blob/main/server/types.go#L196)
+**Source**: [`server/types.go:197`](https://github.com/teranos/QNTX/blob/main/server/types.go#L197)
 
 
 ```go
@@ -487,7 +487,7 @@ type PulseExecutionLogStreamMessage struct {
 
 ## PulseExecutionStartedMessage {#pulseexecutionstartedmessage}
 
-**Source**: [`server/types.go:163`](https://github.com/teranos/QNTX/blob/main/server/types.go#L163)
+**Source**: [`server/types.go:164`](https://github.com/teranos/QNTX/blob/main/server/types.go#L164)
 
 
 ```go
@@ -536,6 +536,7 @@ type QueryMessage struct {
 	Enabled bool `json:"enabled"`
 	SemanticQuery string `json:"semantic_query"`
 	SemanticThreshold float32 `json:"semantic_threshold"`
+	SemanticClusterID *int `json:"semantic_cluster_id"`
 }
 ```
 
@@ -591,7 +592,7 @@ type StageInfo struct {
 
 ## StatsMessage {#statsmessage}
 
-**Source**: [`server/types.go:101`](https://github.com/teranos/QNTX/blob/main/server/types.go#L101)
+**Source**: [`server/types.go:102`](https://github.com/teranos/QNTX/blob/main/server/types.go#L102)
 
 
 ```go
@@ -605,7 +606,7 @@ type StatsMessage struct {
 
 ## StorageWarningMessage {#storagewarningmessage}
 
-**Source**: [`server/types.go:205`](https://github.com/teranos/QNTX/blob/main/server/types.go#L205)
+**Source**: [`server/types.go:206`](https://github.com/teranos/QNTX/blob/main/server/types.go#L206)
 
 
 ```go
@@ -659,7 +660,7 @@ type UpdateScheduledJobRequest struct {
 
 ## UsageUpdateMessage {#usageupdatemessage}
 
-**Source**: [`server/types.go:115`](https://github.com/teranos/QNTX/blob/main/server/types.go#L115)
+**Source**: [`server/types.go:116`](https://github.com/teranos/QNTX/blob/main/server/types.go#L116)
 
 
 ```go
@@ -701,7 +702,7 @@ type WatcherCreateRequest struct {
 
 ## WatcherErrorMessage {#watchererrormessage}
 
-**Source**: [`server/types.go:250`](https://github.com/teranos/QNTX/blob/main/server/types.go#L250)
+**Source**: [`server/types.go:251`](https://github.com/teranos/QNTX/blob/main/server/types.go#L251)
 
 
 ```go
@@ -717,7 +718,7 @@ type WatcherErrorMessage struct {
 
 ## WatcherMatchMessage {#watchermatchmessage}
 
-**Source**: [`server/types.go:229`](https://github.com/teranos/QNTX/blob/main/server/types.go#L229)
+**Source**: [`server/types.go:230`](https://github.com/teranos/QNTX/blob/main/server/types.go#L230)
 
 
 ```go

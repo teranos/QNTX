@@ -697,6 +697,10 @@ export interface QueryMessage {
    * For watcher_upsert: Minimum similarity score (0-1)
    */
   semantic_threshold: number;
+  /**
+   * For watcher_upsert: Cluster scope (nil = all clusters)
+   */
+  semantic_cluster_id?: number | null;
 }
 
 export interface Result {
