@@ -121,6 +121,10 @@ async function init(): Promise<void> {
     console.log('[TIMING] init() called:', Date.now() - navStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Initializing application...');
 
+    // Status indicators must exist before WebSocket connects — the WS open handler
+    // updates the connection indicator, which silently no-ops if init() hasn't run.
+    statusIndicators.init();
+
     // Connect WebSocket FIRST — this is the critical transport and must not wait
     // on storage, WASM, or canvas sync which can take seconds (or 30s on timeout).
     console.log('[TIMING] Calling connectWebSocket():', Date.now() - navStart, 'ms');
@@ -233,9 +237,6 @@ async function init(): Promise<void> {
     // Initialize UI components
     if (window.logLoaderStep) window.logLoaderStep('Initializing system drawer...');
     initSystemDrawer();
-
-    // Initialize status indicators (connection, pulse daemon, etc.)
-    statusIndicators.init();
 
     // Initialize CodeMirror editor (replaces textarea)
     if (window.logLoaderStep) window.logLoaderStep('Setting up editor...', false, true);
