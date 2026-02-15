@@ -13,7 +13,7 @@
  */
 
 import type { Glyph } from './glyph';
-import { SO } from '@generated/sym.js';
+import { SO, Doc } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { apiFetch } from '../../api';
 import { preventDrag, storeCleanup } from './glyph-interaction';
@@ -22,6 +22,7 @@ import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { autoMeldResultBelow } from './meld/meld-system';
 import { uiState } from '../../state/ui';
 import { tooltip } from '../tooltip';
+import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
 
 /**
  * Prompt glyph execution status
@@ -210,11 +211,30 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
         });
 
         try {
+            // Collect file IDs from melded Doc glyphs
+            const fileIds: string[] = [];
+            const comp = findCompositionByGlyph(glyph.id);
+            if (comp) {
+                const memberIds = extractGlyphIds(comp.edges);
+                for (const mid of memberIds) {
+                    const g = uiState.getCanvasGlyphs().find(cg => cg.id === mid);
+                    if (g?.symbol === Doc && g.content) {
+                        try {
+                            const meta = JSON.parse(g.content);
+                            if (meta.fileId && meta.ext) {
+                                fileIds.push(meta.fileId + meta.ext);
+                            }
+                        } catch { /* skip malformed content */ }
+                    }
+                }
+            }
+
             const response = await apiFetch('/api/prompt/direct', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     template: template,
+                    ...(fileIds.length > 0 && { file_ids: fileIds }),
                 }),
             });
 
