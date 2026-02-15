@@ -13,6 +13,8 @@
 | GET | `/api/embeddings/batch` | HandleEmbeddingBatch |
 | GET | `/api/embeddings/generate` | HandleEmbeddingGenerate |
 | GET | `/api/embeddings/info` | HandleEmbeddingInfo |
+| GET | `/api/files` | HandleFiles |
+| GET | `/api/files/` | HandleFiles |
 | GET | `/api/search/semantic` | HandleSemanticSearch |
 | GET | `/api/sync` | HandleSync |
 | GET | `/api/sync/status` | HandleSyncStatus |
@@ -83,6 +85,20 @@ HandleEmbeddingInfo returns embedding service status (GET /api/embeddings/info)
 **Handler**: `HandleEmbeddingInfo`
 
 **Response**: [`EmbeddingInfoResponse`](../types/server.md#embeddinginforesponse)
+
+---
+
+### `GET` /api/files
+
+**Handler**: `HandleFiles`
+
+---
+
+### `GET` /api/files/
+
+HandleFiles routes file upload and serve requests.
+
+**Handler**: `HandleFiles`
 
 ---
 
