@@ -13,6 +13,7 @@ import (
 // CreateScheduledJobRequest represents the request to create a new scheduled job
 type CreateScheduledJobRequest struct {
 	ATSCode         string `json:"ats_code"`                   // ATS code to execute (e.g., "ix https://...")
+	HandlerName     string `json:"handler_name,omitempty"`     // Direct handler name (alternative to ats_code for programmatic schedules)
 	IntervalSeconds int    `json:"interval_seconds"`           // Execution interval in seconds
 	CreatedFromDoc  string `json:"created_from_doc,omitempty"` // Optional: ProseMirror document ID
 	Metadata        string `json:"metadata,omitempty"`         // Optional: JSON metadata
@@ -29,6 +30,7 @@ type UpdateScheduledJobRequest struct {
 type ScheduledJobResponse struct {
 	ID              string  `json:"id"`
 	ATSCode         string  `json:"ats_code"`
+	HandlerName     string  `json:"handler_name,omitempty"`
 	IntervalSeconds int     `json:"interval_seconds,omitempty"`
 	NextRunAt       string  `json:"next_run_at"`                 // RFC3339 timestamp
 	LastRunAt       *string `json:"last_run_at,omitempty"`       // RFC3339 timestamp
@@ -120,6 +122,7 @@ func toScheduledJobResponse(job *schedule.Job) ScheduledJobResponse {
 	resp := ScheduledJobResponse{
 		ID:              job.ID,
 		ATSCode:         job.ATSCode,
+		HandlerName:     job.HandlerName,
 		IntervalSeconds: job.IntervalSeconds,
 		NextRunAt:       nextRunStr,
 		LastExecutionID: job.LastExecutionID,
