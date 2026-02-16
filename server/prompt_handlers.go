@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/ai/provider"
@@ -16,6 +17,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
+	id "github.com/teranos/vanity-id"
 )
 
 const (
@@ -75,7 +77,7 @@ type PromptDirectRequest struct {
 	SystemPrompt        string    `json:"system_prompt,omitempty"`
 	Provider            string    `json:"provider,omitempty"` // "openrouter" or "local"
 	Model               string    `json:"model,omitempty"`
-	GlyphID             string    `json:"glyph_id,omitempty"`             // TODO(#458): create result attestation with actor "glyph:{id}" so prompt glyphs can be mid-chain producers
+	GlyphID             string    `json:"glyph_id,omitempty"`             // Glyph that initiated execution; used as actor for the result attestation
 	UpstreamAttestation *types.As `json:"upstream_attestation,omitempty"` // Triggering attestation — enables {{field}} interpolation
 	FileIDs             []string  `json:"file_ids,omitempty"`             // Attached document/image file IDs for multimodal prompts
 }
@@ -83,6 +85,7 @@ type PromptDirectRequest struct {
 // PromptDirectResponse represents the direct execution response
 type PromptDirectResponse struct {
 	Response         string `json:"response"`
+	AttestationID    string `json:"attestation_id,omitempty"`
 	PromptTokens     int    `json:"prompt_tokens,omitempty"`
 	CompletionTokens int    `json:"completion_tokens,omitempty"`
 	TotalTokens      int    `json:"total_tokens,omitempty"`
@@ -542,9 +545,53 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Create prompt-result attestation so the response is discoverable in the graph
+	var attestationID string
+	if req.GlyphID != "" {
+		actor := "glyph:" + req.GlyphID
+		subject := modelName
+		if subject == "" {
+			subject = "unknown-model"
+		}
+
+		asid, asidErr := id.GenerateASID(subject, "prompt-result", req.GlyphID, actor)
+		if asidErr != nil {
+			s.logger.Warnw("Failed to generate ASID for prompt-result attestation",
+				"glyph_id", req.GlyphID, "error", asidErr)
+		} else {
+			now := time.Now()
+			attrs := map[string]interface{}{
+				"response": resp.Content,
+				"template": req.Template,
+			}
+			as := &types.As{
+				ID:         asid,
+				Subjects:   []string{subject},
+				Predicates: []string{"prompt-result"},
+				Contexts:   []string{req.GlyphID},
+				Actors:     []string{actor},
+				Timestamp:  now,
+				Source:     "prompt-direct",
+				Attributes: attrs,
+				CreatedAt:  now,
+			}
+
+			store := storage.NewSQLStore(s.db, s.logger)
+			if storeErr := store.CreateAttestation(as); storeErr != nil {
+				s.logger.Warnw("Failed to create prompt-result attestation",
+					"glyph_id", req.GlyphID, "asid", asid, "error", storeErr)
+			} else {
+				attestationID = asid
+				s.logger.Infow("Created prompt-result attestation",
+					"asid", asid, "subject", subject, "glyph_id", req.GlyphID)
+			}
+		}
+	}
+
 	// Return response
 	response := PromptDirectResponse{
 		Response:         resp.Content,
+		AttestationID:    attestationID,
 		PromptTokens:     resp.Usage.PromptTokens,
 		CompletionTokens: resp.Usage.CompletionTokens,
 		TotalTokens:      resp.Usage.TotalTokens,

@@ -240,6 +240,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     template: template,
+                    glyph_id: glyph.id,
                     ...(fileIds.length > 0 && { file_ids: fileIds }),
                 }),
             });
