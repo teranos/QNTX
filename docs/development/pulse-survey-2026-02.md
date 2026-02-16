@@ -36,15 +36,11 @@ web/ts/pulse/        Frontend (22 modules — panels, cards, real-time handlers)
 
 ## Code Observations
 
-### Frontend: 3 different fetch patterns
-- `active-queue.ts` uses `apiFetch()` (central wrapper with backend URL)
-- `api.ts` uses raw `fetch()` with `getBaseUrl()`
-- `execution-api.ts` uses `safeFetch()` (custom error classification)
+### Frontend: 3 different fetch patterns ✅ RESOLVED (#518)
+All Pulse frontend modules now use `apiFetch()` from `web/ts/api.ts`. `getBaseUrl()` + raw `fetch()` and `safeFetch()` removed.
 
-Each has different error handling, timeout, and retry behavior. Should converge on one pattern.
-
-### Frontend: duplicated utilities
-`formatDuration()` is defined in both `panel.ts` and `execution-api.ts` with identical logic, imported by different consumers. `buildExecutionError()` in `schedules.ts` reimplements error classification that `execution-api.ts` also does.
+### Frontend: duplicated utilities ✅ RESOLVED (#518)
+`formatDuration`, `formatRelativeTime`, `escapeHtml` consolidated in `web/ts/html-utils.ts`. Duplicate definitions in `panel.ts` and `execution-api.ts` removed.
 
 ### Backend: store instantiated per request
 `s.newScheduleStore()` / `s.newExecutionStore()` called ~13 times across pulse handlers. Lightweight but unnecessary — could be a field on `QNTXServer`.
@@ -69,10 +65,45 @@ Creating a schedule with a nonexistent handler silently succeeds. Fails at execu
 | `realtime-handlers.ts:16` | #30 | Execution progress, cancellation, batch updates |
 | `async.ts`, `schedule.ts` | — | Migrate generated types to proto generation |
 
-## Quick Wins
+## Backend Coupling Analysis
 
-1. **Unify fetch pattern** — pick `apiFetch` or `safeFetch`, use everywhere
-2. **Extract shared formatting** — `formatDuration`, `formatRelativeTime`, `escapeHtml` into one utility module
-3. **Store as server field** — instantiate schedule/execution stores once, not per request
-4. **Validate handler at schedule creation** — check registry before persisting
-5. **Add jitter to poller** — `3s ± 500ms` prevents synchronized polling
+### Handler–DB coupling: 8 handler files, 3 patterns
+
+The `server/pulse_*.go` handlers access data three ways:
+
+| Pattern | Files | Risk |
+|---------|-------|------|
+| Store abstraction | `pulse_schedules.go`, `pulse_execution_handlers.go`, `pulse_execution_poller.go` | Clean |
+| Raw SQL on `task_logs` | ~~`pulse_task_stages.go`~~, ~~`pulse_task_logs.go`~~ | ✅ Fixed — now uses `TaskLogStore` |
+| Raw SQL on `pulse_executions` | `pulse_job_children.go` | Schema coupled |
+| Raw transaction in handler | `pulse_schedules.go:209-294` (force-trigger) | Worst: multi-step mutation with `__force_trigger__` sentinel |
+
+### `s.db` exposed to all handlers
+Every handler receives `*QNTXServer` which has a public `db` field. No compile-time enforcement that handlers use stores.
+
+### Store instantiation: per-request, inconsistent
+Some handlers call `s.newScheduleStore()`, others call `schedule.NewStore(s.db)` directly. Stores are stateless so this is correct but inconsistent.
+
+### Store coverage gaps
+
+| Table | Store exists? | Gap |
+|-------|---------------|-----|
+| `scheduled_pulse_jobs` | ✅ `schedule.Store` | Force-trigger path bypasses it |
+| `pulse_executions` | ✅ `schedule.ExecutionStore` | `pulse_job_children.go` uses raw SQL to find `async_job_id` |
+| `task_logs` | ✅ `schedule.TaskLogStore` | Write path (`embeddings_pulse.go`) still uses raw INSERT |
+| `async_ix_jobs` | ✅ `async.Queue` (store.go) | — |
+
+## Decoupling Roadmap
+
+### Done
+1. ~~**Unify fetch pattern**~~ — ✅ #518: All modules use `apiFetch`
+2. ~~**Extract shared formatting**~~ — ✅ #518: `html-utils.ts` is canonical
+3. ~~**Create task_logs store**~~ — ✅ `schedule.TaskLogStore` replaces raw SQL in `pulse_task_stages.go` and `pulse_task_logs.go`
+
+### Next steps
+4. **Add `GetAsyncJobIDForExecution` to ExecutionStore** — replaces raw SQL in `pulse_job_children.go` (~15 min)
+5. **Extract force-trigger into `schedule.Store`** — move 85-line transaction block from `pulse_schedules.go:209-294` into `Store.CreateForceTriggerExecution()` (~45 min)
+6. **Store as server field** — instantiate schedule/execution/task-log stores once, not per request
+7. **Validate handler at schedule creation** — check registry before persisting
+8. **Add jitter to poller** — `3s ± 500ms` prevents synchronized polling
+9. **Move task_logs INSERT into TaskLogStore** — `embeddings_pulse.go` write path uses raw SQL (2 duplicate INSERT statements)
