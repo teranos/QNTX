@@ -1,67 +1,21 @@
+// pulse_task_stages.go — GET /api/pulse/jobs/{id}/stages
+// Returns stages and tasks for a job, grouped by execution phase with log counts.
 package server
 
 import (
 	"net/http"
+
+	"github.com/teranos/QNTX/pulse/schedule"
 )
 
 // handleGetJobStages returns stages and tasks for a job
 func (s *QNTXServer) handleGetJobStages(w http.ResponseWriter, r *http.Request, jobID string) {
-	// Query task_logs grouped by stage and task_id
-	query := `
-		SELECT
-			COALESCE(stage, 'unknown') as stage,
-			COALESCE(task_id, stage, 'unknown') as task_id,
-			COUNT(*) as log_count
-		FROM task_logs
-		WHERE job_id = ?
-		GROUP BY stage, task_id
-		ORDER BY MIN(id) ASC
-	`
+	store := schedule.NewTaskLogStore(s.db)
 
-	rows, err := s.db.Query(query, jobID)
+	stages, err := store.ListStagesForJob(jobID)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "failed to query task logs", http.StatusInternalServerError)
 		return
-	}
-	defer rows.Close()
-
-	// Build stage map
-	stageMap := make(map[string][]TaskInfo)
-	stageOrder := []string{} // Track order of stages
-
-	for rows.Next() {
-		var stage, taskID string
-		var logCount int
-		if err := rows.Scan(&stage, &taskID, &logCount); err != nil {
-			s.logger.Errorw("Failed to scan task log row - database type mismatch or corrupt data",
-				"job_id", jobID,
-				"error", err,
-				"error_detail", err.Error(),
-				"expected_columns", []string{"stage (TEXT)", "task_id (TEXT)", "log_count (INTEGER)"},
-				"query", "SELECT COALESCE(stage, 'unknown'), COALESCE(task_id, stage), COUNT(*) FROM task_logs",
-			)
-			continue
-		}
-
-		// Track stage order
-		if _, exists := stageMap[stage]; !exists {
-			stageOrder = append(stageOrder, stage)
-			stageMap[stage] = []TaskInfo{}
-		}
-
-		stageMap[stage] = append(stageMap[stage], TaskInfo{
-			TaskID:   taskID,
-			LogCount: logCount,
-		})
-	}
-
-	// Convert to ordered stages array
-	stages := make([]StageInfo, 0, len(stageOrder))
-	for _, stage := range stageOrder {
-		stages = append(stages, StageInfo{
-			Stage: stage,
-			Tasks: stageMap[stage],
-		})
 	}
 
 	writeJSON(w, http.StatusOK, JobStagesResponse{

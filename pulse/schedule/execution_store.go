@@ -432,6 +432,33 @@ func (s *ExecutionStore) GetExecutionByAsyncJobID(asyncJobID string) (*Execution
 	return &exec, nil
 }
 
+// GetAsyncJobIDForScheduledJob returns the async_job_id from the most recent execution
+// of a scheduled job. Returns empty string and nil error if no executions exist.
+func (s *ExecutionStore) GetAsyncJobIDForScheduledJob(scheduledJobID string) (string, error) {
+	query := `
+		SELECT async_job_id
+		FROM pulse_executions
+		WHERE scheduled_job_id = ?
+		ORDER BY started_at DESC
+		LIMIT 1
+	`
+
+	var asyncJobID sql.NullString
+	err := s.db.QueryRow(query, scheduledJobID).Scan(&asyncJobID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil
+		}
+		return "", errors.Wrapf(err, "failed to get async job ID for scheduled job %s", scheduledJobID)
+	}
+
+	if !asyncJobID.Valid {
+		return "", nil
+	}
+
+	return asyncJobID.String, nil
+}
+
 // CleanupOldExecutions deletes execution records (and their associated task logs via CASCADE)
 // that are older than the specified retention period.
 // Returns the number of executions deleted.
