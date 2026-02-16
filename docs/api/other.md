@@ -14,6 +14,8 @@
 | GET | `/api/embeddings/cluster` | HandleEmbeddingCluster |
 | GET | `/api/embeddings/generate` | HandleEmbeddingGenerate |
 | GET | `/api/embeddings/info` | HandleEmbeddingInfo |
+| GET | `/api/embeddings/project` | HandleEmbeddingProject |
+| GET | `/api/embeddings/projections` | HandleEmbeddingProjections |
 | GET | `/api/files` | HandleFiles |
 | GET | `/api/files/` | HandleFiles |
 | GET | `/api/search/semantic` | HandleSemanticSearch |
@@ -96,6 +98,22 @@ HandleEmbeddingInfo returns embedding service status (GET /api/embeddings/info)
 **Handler**: `HandleEmbeddingInfo`
 
 **Response**: [`EmbeddingInfoResponse`](../types/server.md#embeddinginforesponse)
+
+---
+
+### `GET` /api/embeddings/project
+
+HandleEmbeddingProject runs UMAP projection (POST /api/embeddings/project)
+
+**Handler**: `HandleEmbeddingProject`
+
+---
+
+### `GET` /api/embeddings/projections
+
+HandleEmbeddingProjections serves 2D projections (GET /api/embeddings/projections)
+
+**Handler**: `HandleEmbeddingProjections`
 
 ---
 
