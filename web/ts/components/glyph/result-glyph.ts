@@ -91,25 +91,10 @@ export function createResultGlyph(
 
     function headerBtn(label: string, title: string, fontSize = '11px'): HTMLButtonElement {
         const btn = document.createElement('button');
+        btn.className = 'result-header-btn';
         btn.textContent = label;
         btn.title = title;
-        btn.style.background = '#4a4b4a';
-        btn.style.border = '1px solid #555';
-        btn.style.borderRadius = '2px';
-        btn.style.padding = '2px 5px';
-        btn.style.cursor = 'pointer';
         btn.style.fontSize = fontSize;
-        btn.style.lineHeight = '1';
-        btn.style.color = '#ccc';
-        btn.style.transition = 'background 0.15s, border-color 0.15s';
-        btn.addEventListener('mouseenter', () => {
-            btn.style.background = '#5e5f5e';
-            btn.style.borderColor = '#6a6a6a';
-        });
-        btn.addEventListener('mouseleave', () => {
-            btn.style.background = '#4a4b4a';
-            btn.style.borderColor = '#555';
-        });
         return btn;
     }
 
@@ -263,12 +248,14 @@ export function createResultGlyph(
     const followupStatus = document.createElement('span');
     followupStatus.className = 'followup-status';
 
+    let isExecuting = false;
     followupInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             const text = followupInput.value.trim();
-            if (!text) return;
+            if (!text || isExecuting) return;
 
+            isExecuting = true;
             followupInput.disabled = true;
             followupStatus.textContent = 'Running…';
 
@@ -327,6 +314,7 @@ export function createResultGlyph(
                 .then((data: any) => {
                     const elapsedMs = Date.now() - startTime;
                     followupStatus.textContent = `${(elapsedMs / 1000).toFixed(2)}s`;
+                    isExecuting = false;
                     followupInput.value = '';
                     followupInput.style.height = 'auto';
                     followupInput.disabled = false;
@@ -342,10 +330,12 @@ export function createResultGlyph(
                     spawnFollowUpResult(element, glyph, followupResult, promptConfig, text);
                 })
                 .catch((err) => {
+                    isExecuting = false;
                     const msg = err instanceof Error ? err.message : String(err);
-                    followupStatus.textContent = `Failed: ${msg}`;
+                    const attachmentInfo = fileIds.length > 0 ? ` (${fileIds.length} file${fileIds.length > 1 ? 's' : ''} attached)` : '';
+                    followupStatus.textContent = `Failed${attachmentInfo}: ${msg}`;
                     followupInput.disabled = false;
-                    log.error(SEG.GLYPH, `[ResultGlyph] Follow-up failed for ${glyph.id}:`, err);
+                    log.error(SEG.GLYPH, `[ResultGlyph] Follow-up failed for ${glyph.id}${attachmentInfo}:`, err);
                 });
         }
     });
@@ -378,7 +368,7 @@ function spawnFollowUpResult(
     const parentRect = parentElement.getBoundingClientRect();
     const canvas = parentElement.closest('.canvas-workspace') as HTMLElement;
     if (!canvas) {
-        log.error(SEG.GLYPH, '[ResultGlyph] Cannot spawn follow-up: no canvas-workspace ancestor');
+        log.error(SEG.GLYPH, `[ResultGlyph] Cannot spawn follow-up: no canvas-workspace ancestor for ${parentGlyph.id} (element: ${parentElement.dataset.glyphId})`);
         return;
     }
     const canvasRect = canvas.getBoundingClientRect();
