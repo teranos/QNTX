@@ -70,7 +70,11 @@ describe('Port-aware MELDABILITY registry', () => {
             expect(areClassesCompatible('canvas-prompt-glyph', 'canvas-prompt-glyph')).toBe(null);
         });
 
-        test('result → anything returns null (result has no output ports)', () => {
+        test('result → result returns bottom (conversational chaining)', () => {
+            expect(areClassesCompatible('canvas-result-glyph', 'canvas-result-glyph')).toBe('bottom');
+        });
+
+        test('result → non-result returns null', () => {
             expect(areClassesCompatible('canvas-result-glyph', 'canvas-py-glyph')).toBe(null);
         });
 
@@ -80,7 +84,7 @@ describe('Port-aware MELDABILITY registry', () => {
     });
 
     describe('getInitiatorClasses', () => {
-        test('includes ax, se, py, prompt, doc, note, subcanvas', () => {
+        test('includes ax, se, py, prompt, doc, note, result, subcanvas', () => {
             const classes = getInitiatorClasses();
             expect(classes).toContain('canvas-ax-glyph');
             expect(classes).toContain('canvas-se-glyph');
@@ -88,6 +92,7 @@ describe('Port-aware MELDABILITY registry', () => {
             expect(classes).toContain('canvas-prompt-glyph');
             expect(classes).toContain('canvas-doc-glyph');
             expect(classes).toContain('canvas-note-glyph');
+            expect(classes).toContain('canvas-result-glyph');
             expect(classes).toContain('canvas-subcanvas-glyph');
         });
     });
