@@ -11,7 +11,6 @@
 
 import type { ScheduledJobResponse } from './types';
 import { pauseScheduledJob, resumeScheduledJob, deleteScheduledJob, forceTriggerJob } from './api';
-import { toast } from '../toast';
 import { listExecutions } from './execution-api';
 import type { PulsePanelState } from './panel-state';
 import { handleError, SEG } from '../error-handler';
@@ -53,8 +52,6 @@ export async function handleForceTrigger(
         }
 
         await loadExecutionsForJob(jobId, ctx);
-
-        toast.success('Force trigger started - check execution history below');
     } catch (error: unknown) {
         handleError(error, 'Force trigger failed', { context: SEG.PULSE, showBuildInfo: true });
         throw error; // Re-throw so Button component can show error state
@@ -208,7 +205,6 @@ export function createForceTriggerButton(
             }
 
             await loadExecutionsForJob(job.id, ctx);
-            toast.success('Force trigger started - check execution history below');
         },
         variant: 'warning',
         size: 'small',

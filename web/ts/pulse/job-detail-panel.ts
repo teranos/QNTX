@@ -193,8 +193,8 @@ class JobDetailPanel {
         <!-- Job Info -->
         <div class="panel-card job-info-card">
           <div class="job-info-row">
-            <span class="job-info-label">ATS Code:</span>
-            <code class="job-info-value">${this.escapeHtml(this.currentJob.ats_code)}</code>
+            <span class="job-info-label">${this.currentJob.ats_code ? 'ATS Code:' : 'Handler:'}</span>
+            <code class="job-info-value">${this.escapeHtml(this.currentJob.ats_code || this.currentJob.handler_name || '')}</code>
           </div>
           <div class="job-info-row">
             <span class="job-info-label">Interval:</span>
@@ -377,9 +377,9 @@ class JobDetailPanel {
 
         ${isExpanded ? `
           <div class="execution-stages-container">
-            ${stages && children ?
-              // Show children if stages are empty
-              (stages.stages.length === 0 && children.children.length > 0 ?
+            ${stages ?
+              // Show children if stages are empty and children exist
+              (stages.stages.length === 0 && children && children.children.length > 0 ?
                 this.renderChildren(children) :
                 this.renderStages(stages)
               ) :
@@ -580,7 +580,7 @@ class JobDetailPanel {
    */
   private buildRichError(message: string): RichError {
     const lowerMessage = message.toLowerCase();
-    const jobContext = this.currentJob ? `ATS Code: ${this.currentJob.ats_code}` : '';
+    const jobContext = this.currentJob ? (this.currentJob.ats_code || this.currentJob.handler_name || '') : '';
 
     // Network errors
     if (lowerMessage.includes('network') || lowerMessage.includes('failed to fetch') || lowerMessage.includes('connection')) {
@@ -763,10 +763,10 @@ class JobDetailPanel {
     if (!this.currentJob) return;
 
     try {
-      log.debug(SEG.PULSE, 'Force triggering job:', this.currentJob.ats_code);
+      log.debug(SEG.PULSE, 'Force triggering job:', this.currentJob.ats_code || this.currentJob.handler_name);
 
       // Call API to create one-time force trigger job
-      await forceTriggerJob(this.currentJob.ats_code);
+      await forceTriggerJob(this.currentJob.ats_code, this.currentJob.handler_name);
 
       // Reload executions to show the new forced execution
       await this.loadExecutions();

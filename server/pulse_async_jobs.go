@@ -30,7 +30,7 @@ func (s *QNTXServer) HandlePulseJobs(w http.ResponseWriter, r *http.Request) {
 
 // HandlePulseJob handles requests to /api/pulse/jobs/{id}
 // GET: Get async job details
-// Sub-resources: /api/pulse/jobs/{id}/children, /api/pulse/jobs/{id}/stages, /api/pulse/jobs/{id}/tasks/:task_id/logs
+// Sub-resources: /api/pulse/jobs/{id}/executions, /api/pulse/jobs/{id}/children, /api/pulse/jobs/{id}/stages, /api/pulse/jobs/{id}/tasks/:task_id/logs
 func (s *QNTXServer) HandlePulseJob(w http.ResponseWriter, r *http.Request) {
 	// Extract job ID from URL path
 	pathParts := extractPathParts(r.URL.Path, "/api/pulse/jobs/")
@@ -57,6 +57,16 @@ func (s *QNTXServer) HandlePulseJob(w http.ResponseWriter, r *http.Request) {
 		}
 		logger.AddPulseSymbol(s.logger).Infow("Pulse get stages", "job_id", jobID)
 		s.handleGetJobStages(w, r, jobID)
+		return
+	}
+
+	// Check if this is a request for executions (schedule execution history)
+	if len(pathParts) > 1 && pathParts[1] == "executions" {
+		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
+		logger.AddPulseSymbol(s.logger).Infow("Pulse get executions", "job_id", jobID)
+		s.HandleJobExecutions(w, r, jobID)
 		return
 	}
 
