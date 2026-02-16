@@ -267,6 +267,7 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	// Create and start storage events poller for broadcasting warnings/evictions
 	storagePoller := NewStorageEventsPoller(db, server, serverLogger)
 	server.storageEventsPoller = storagePoller
+	ticker.SetEvictionStats(storagePoller)
 	server.wg.Add(1)
 	go func() {
 		defer server.wg.Done()
