@@ -197,7 +197,8 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
             // Backwards-compatible: new format has .result, old is raw ExecutionResult
             const result = parsed.result ?? parsed;
             const promptConfig: PromptConfig | undefined = parsed.promptConfig;
-            return createResultGlyph(glyph, result, promptConfig);
+            const prompt: string | undefined = parsed.prompt;
+            return createResultGlyph(glyph, result, promptConfig, prompt);
         } catch (err) {
             log.error(SEG.GLYPH, `[Canvas] Result glyph ${glyph.id} has invalid JSON content`, err);
             return createErrorGlyph(

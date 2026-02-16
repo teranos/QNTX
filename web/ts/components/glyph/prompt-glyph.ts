@@ -291,6 +291,9 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
             // Extract prompt config from frontmatter for result inheritance
             const promptConfig = parseFrontmatterConfig(template);
 
+            // Extract prompt body (sans frontmatter) for display in result header
+            const promptBody = template.replace(/^---\n[\s\S]*?\n---\n?/, '').trim();
+
             // Spawn result glyph below the prompt
             const result: ExecutionResult = {
                 success: !data.error,
@@ -300,7 +303,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
                 error: data.error ?? null,
                 duration_ms: elapsedMs,
             };
-            spawnResultGlyph(element, result, promptConfig);
+            spawnResultGlyph(element, result, promptConfig, promptBody);
 
         } catch (error) {
             log.error(SEG.GLYPH, '[Prompt] Execution failed:', error);
@@ -365,7 +368,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
      * Spawn a result glyph directly below this prompt glyph.
      * Composition-aware: extends existing composition or creates new meld.
      */
-    function spawnResultGlyph(promptEl: HTMLElement, result: ExecutionResult, promptConfig?: PromptConfig): void {
+    function spawnResultGlyph(promptEl: HTMLElement, result: ExecutionResult, promptConfig?: PromptConfig, prompt?: string): void {
         const promptRect = promptEl.getBoundingClientRect();
         const canvas = promptEl.closest('.canvas-workspace') as HTMLElement;
         if (!canvas) {
@@ -388,11 +391,11 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
             renderContent: () => document.createElement('div')
         };
 
-        const resultElement = createResultGlyph(resultGlyph, result, promptConfig);
+        const resultElement = createResultGlyph(resultGlyph, result, promptConfig, prompt);
         canvas.appendChild(resultElement);
 
         const resultRect = resultElement.getBoundingClientRect();
-        const contentPayload: ResultGlyphContent = { result, ...(promptConfig && { promptConfig }) };
+        const contentPayload: ResultGlyphContent = { result, ...(promptConfig && { promptConfig }), ...(prompt && { prompt }) };
         uiState.addCanvasGlyph({
             id: resultGlyphId,
             symbol: 'result',
