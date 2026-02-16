@@ -12,6 +12,7 @@ import { createSchedulingControls } from "./scheduling-controls.ts";
 import { subscribeATSBlock, type ATSExecutionState } from "./realtime-handlers.ts";
 import { log, SEG } from "../logger";
 import { handleError } from "../error-handler";
+import { apiFetch } from "../api.ts";
 
 export interface ATSNodeViewOptions {
   documentId?: string;
@@ -91,7 +92,7 @@ export class ATSNodeView implements NodeView {
    */
   private async loadScheduledJob(jobId: string): Promise<void> {
     try {
-      const response = await fetch(`/api/pulse/schedules/${jobId}`);
+      const response = await apiFetch(`/api/pulse/schedules/${jobId}`);
       if (response.ok) {
         this.currentJob = await response.json();
         this.renderSchedulingControls();
