@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -259,9 +259,29 @@ rust-python: ## Build Rust Python plugin binary (via Nix)
 	@cp -L result/bin/qntx-python-plugin bin/
 	@echo "✓ qntx-python-plugin built in bin/"
 
+# Rust Reduce plugin (PyO3-based UMAP dimensionality reduction)
+# REQUIRES Nix: Python linking + umap-learn dependency
+rust-reduce: ## Build Rust Reduce plugin binary (via Nix)
+	@echo "Building qntx-reduce-plugin via Nix..."
+	@nix build ./qntx-reduce#qntx-reduce-plugin
+	@mkdir -p bin
+	@rm -f bin/qntx-reduce-plugin
+	@cp -L result/bin/qntx-reduce-plugin bin/
+	@chmod +x bin/qntx-reduce-plugin
+	@echo "✓ qntx-reduce-plugin built in bin/"
+
+rust-reduce-install: rust-reduce ## Install Rust Reduce plugin to ~/.qntx/plugins/
+	@echo "Installing qntx-reduce-plugin to $(PREFIX)/plugins..."
+	@mkdir -p $(PREFIX)/plugins
+	@rm -f $(PREFIX)/plugins/qntx-reduce-plugin
+	@cp bin/qntx-reduce-plugin $(PREFIX)/plugins/
+	@chmod +x $(PREFIX)/plugins/qntx-reduce-plugin
+	@echo "✓ qntx-reduce-plugin installed to $(PREFIX)/plugins/"
+
 rust-python-install: rust-python ## Install Rust Python plugin to ~/.qntx/plugins/
 	@echo "Installing qntx-python-plugin to $(PREFIX)/plugins..."
 	@mkdir -p $(PREFIX)/plugins
+	@rm -f $(PREFIX)/plugins/qntx-python-plugin
 	@cp bin/qntx-python-plugin $(PREFIX)/plugins/
 	@chmod +x $(PREFIX)/plugins/qntx-python-plugin
 	@echo "✓ qntx-python-plugin installed to $(PREFIX)/plugins/"

@@ -282,3 +282,137 @@ func TestEmbeddingStore_UpdateExisting(t *testing.T) {
 	// UpdatedAt should be at least as recent as CreatedAt
 	assert.True(t, retrieved.UpdatedAt.After(retrieved.CreatedAt) || retrieved.UpdatedAt.Equal(retrieved.CreatedAt))
 }
+
+func TestEmbeddingStore_UpdateProjections(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zap.NewNop()
+	store := NewEmbeddingStore(db, logger)
+
+	// Save 3 embeddings
+	embeddings := make([]*EmbeddingModel, 3)
+	for i := range embeddings {
+		embeddings[i] = &EmbeddingModel{
+			SourceType: "attestation",
+			SourceID:   generateTestID(),
+			Text:       fmt.Sprintf("projection test %d", i),
+			Embedding:  createTestEmbedding(384),
+			Model:      "all-MiniLM-L6-v2",
+			Dimensions: 384,
+		}
+		require.NoError(t, store.Save(embeddings[i]))
+	}
+
+	// Update projections for all 3
+	assignments := []ProjectionAssignment{
+		{ID: embeddings[0].ID, ProjectionX: 1.5, ProjectionY: -2.3},
+		{ID: embeddings[1].ID, ProjectionX: 0.0, ProjectionY: 4.7},
+		{ID: embeddings[2].ID, ProjectionX: -3.1, ProjectionY: 0.9},
+	}
+	err := store.UpdateProjections(assignments)
+	require.NoError(t, err)
+
+	// GetAllProjections should return all 3 with correct coordinates
+	projections, err := store.GetAllProjections()
+	require.NoError(t, err)
+	assert.Len(t, projections, 3)
+
+	// Build a map for easy lookup (order is by ID, not insertion)
+	byID := make(map[string]ProjectionWithCluster)
+	for _, p := range projections {
+		byID[p.ID] = p
+	}
+
+	for _, a := range assignments {
+		p, ok := byID[a.ID]
+		require.True(t, ok, "projection missing for %s", a.ID)
+		assert.Equal(t, a.ProjectionX, p.ProjectionX)
+		assert.Equal(t, a.ProjectionY, p.ProjectionY)
+	}
+}
+
+func TestEmbeddingStore_GetAllProjections_ExcludesUnprojected(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zap.NewNop()
+	store := NewEmbeddingStore(db, logger)
+
+	// Save 3 embeddings
+	embeddings := make([]*EmbeddingModel, 3)
+	for i := range embeddings {
+		embeddings[i] = &EmbeddingModel{
+			SourceType: "attestation",
+			SourceID:   generateTestID(),
+			Text:       fmt.Sprintf("exclude test %d", i),
+			Embedding:  createTestEmbedding(384),
+			Model:      "all-MiniLM-L6-v2",
+			Dimensions: 384,
+		}
+		require.NoError(t, store.Save(embeddings[i]))
+	}
+
+	// Project only the first 2
+	err := store.UpdateProjections([]ProjectionAssignment{
+		{ID: embeddings[0].ID, ProjectionX: 1.0, ProjectionY: 2.0},
+		{ID: embeddings[1].ID, ProjectionX: 3.0, ProjectionY: 4.0},
+	})
+	require.NoError(t, err)
+
+	projections, err := store.GetAllProjections()
+	require.NoError(t, err)
+	assert.Len(t, projections, 2)
+
+	// The unprojected embedding must not appear
+	for _, p := range projections {
+		assert.NotEqual(t, embeddings[2].ID, p.ID)
+	}
+}
+
+func TestEmbeddingStore_UpdateProjections_Empty(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zap.NewNop()
+	store := NewEmbeddingStore(db, logger)
+
+	err := store.UpdateProjections([]ProjectionAssignment{})
+	require.NoError(t, err)
+
+	// No projections should exist
+	projections, err := store.GetAllProjections()
+	require.NoError(t, err)
+	assert.Empty(t, projections)
+}
+
+func TestEmbeddingStore_ProjectionRoundTrip(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zap.NewNop()
+	store := NewEmbeddingStore(db, logger)
+
+	embedding := &EmbeddingModel{
+		SourceType: "attestation",
+		SourceID:   generateTestID(),
+		Text:       "round trip test",
+		Embedding:  createTestEmbedding(384),
+		Model:      "all-MiniLM-L6-v2",
+		Dimensions: 384,
+	}
+	require.NoError(t, store.Save(embedding))
+
+	// Project it
+	err := store.UpdateProjections([]ProjectionAssignment{
+		{ID: embedding.ID, ProjectionX: -7.77, ProjectionY: 3.14},
+	})
+	require.NoError(t, err)
+
+	// Retrieve via GetBySource — embedding still intact
+	retrieved, err := store.GetBySource(embedding.SourceType, embedding.SourceID)
+	require.NoError(t, err)
+	require.NotNil(t, retrieved)
+	assert.Equal(t, embedding.Text, retrieved.Text)
+
+	// Retrieve projection via GetAllProjections — coordinates survive full cycle
+	projections, err := store.GetAllProjections()
+	require.NoError(t, err)
+	require.Len(t, projections, 1)
+	assert.Equal(t, embedding.ID, projections[0].ID)
+	assert.Equal(t, embedding.SourceID, projections[0].SourceID)
+	assert.Equal(t, -7.77, projections[0].ProjectionX)
+	assert.Equal(t, 3.14, projections[0].ProjectionY)
+}

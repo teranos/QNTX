@@ -32,6 +32,12 @@ type ExecutionBroadcaster interface {
 	BroadcastPulseExecutionFailed(scheduledJobID, executionID, atsCode, errorMsg string, errorDetails []string, durationMs int)
 }
 
+// EvictionStats provides accumulated eviction counts for periodic summaries.
+// DrainEvictionCounts atomically reads and resets the counters.
+type EvictionStats interface {
+	DrainEvictionCounts() (events int, attestations int)
+}
+
 // Ticker manages periodic execution of scheduled ATS jobs
 // Runs every second to check for jobs that need execution
 type Ticker struct {
@@ -49,6 +55,7 @@ type Ticker struct {
 	lastTickAt      time.Time
 	ticksSinceStart int64
 	lastActiveWork  int // Track last active work count to detect changes
+	evictionStats   EvictionStats
 }
 
 // TickerConfig contains configuration for the Pulse ticker
@@ -84,6 +91,11 @@ func NewTickerWithContext(ctx context.Context, store *Store, queue *async.Queue,
 		logger:      log,
 		pulseLog:    logger.AddPulseSymbol(log),
 	}
+}
+
+// SetEvictionStats injects an eviction counter for periodic summary logging.
+func (t *Ticker) SetEvictionStats(es EvictionStats) {
+	t.evictionStats = es
 }
 
 // Start begins the ticker loop
@@ -134,6 +146,14 @@ func (t *Ticker) run() {
 
 // logNextJobInfo logs time until the next scheduled job
 func (t *Ticker) logNextJobInfo(now time.Time) {
+	// Periodic eviction summary (every 50 ticks)
+	if t.evictionStats != nil && t.ticksSinceStart%50 == 0 {
+		events, attestations := t.evictionStats.DrainEvictionCounts()
+		if events > 0 {
+			t.pulseLog.Infow(fmt.Sprintf("Evicted %d attestations across %d events since last summary", attestations, events))
+		}
+	}
+
 	nextJob, err := t.store.GetNextScheduledJob()
 	if err != nil {
 		t.pulseLog.Warnw("Failed to get next scheduled job", "error", err)

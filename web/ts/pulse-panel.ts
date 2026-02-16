@@ -67,9 +67,12 @@ class PulsePanel extends BasePanel {
      * Get job action context for handlers
      */
     private getActionContext(): JobActionContext {
+        // Use getters so ctx always resolves current values — setupEventListeners()
+        // runs during super() before field initializers set this.jobs/this.state.
+        const self = this;
         return {
-            jobs: this.jobs,
-            state: this.state,
+            get jobs() { return self.jobs; },
+            get state() { return self.state; },
             render: () => this.render(),
             loadJobs: () => this.loadJobs(),
         };

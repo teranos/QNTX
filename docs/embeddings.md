@@ -52,9 +52,19 @@ PATCH /api/config
 | POST | `/api/embeddings/generate` | Generate embedding for `{"text": "..."}` — returns 384-dim vector |
 | POST | `/api/embeddings/batch` | Embed attestations by ID: `{"attestation_ids": ["..."]}` |
 | POST | `/api/embeddings/cluster` | Run HDBSCAN clustering: `{"min_cluster_size": 5}` |
+| POST | `/api/embeddings/project` | Run UMAP projection via reduce plugin, store 2D coords |
+| GET | `/api/embeddings/projections` | Get `[{id, source_id, x, y, cluster_id}]` for visualization |
 | GET | `/api/embeddings/info` | Embedding service status, counts, and cluster summary |
 
 Without the `rustembeddings` build tag, all endpoints return 503.
+
+## 2D Projection (UMAP)
+
+Embeddings are 384-dimensional — too high to visualize directly. The `qntx-reduce` plugin projects them to 2D via UMAP for canvas visualization.
+
+See [qntx-reduce/README.md](../qntx-reduce/README.md) for setup and API details.
+
+**Flow:** `POST /api/embeddings/project` reads all embeddings, calls the reduce plugin's `/fit` endpoint, and writes `projection_x`/`projection_y` back to the embeddings table. New attestations are auto-projected via `/transform` if the model is fitted.
 
 ## Model Files
 
