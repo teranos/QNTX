@@ -690,8 +690,8 @@ async function recluster(): Promise<void> {
 }
 
 function renderScatter(container: HTMLElement, data: ProjectionPoint[]): void {
-    const width = 130;
-    const height = 130;
+    const width = 155;
+    const height = 180;
     const pad = 8;
 
     const svg = d3.select(container)
@@ -783,8 +783,8 @@ export function registerDefaultGlyphs(): void {
             fetchEmbeddingsInfo();
             return content;
         },
-        initialWidth: '480px',
-        initialHeight: '520px',
+        initialWidth: '540px',
+        initialHeight: '620px',
     });
 
     // Sync Status Glyph
