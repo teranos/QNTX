@@ -445,3 +445,53 @@ func TestCleanupOldExecutions_NoneToDelete(t *testing.T) {
 	assert.Equal(t, 2, total)
 	assert.Len(t, execs, 2)
 }
+
+func TestGetAsyncJobIDForScheduledJob(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+
+	jobStore := NewStore(db)
+	job := &Job{
+		ID:              "SPJ_async_lookup",
+		ATSCode:         "ix https://example.com/jobs",
+		IntervalSeconds: 3600,
+		NextRunAt:       ptr(time.Now().Add(1 * time.Hour)),
+		State:           StateActive,
+	}
+	require.NoError(t, jobStore.CreateJob(job))
+
+	execStore := NewExecutionStore(db)
+	now := time.Now()
+
+	// Create two executions — older one with async_job_id "JB_old", newer with "JB_new"
+	oldAsyncID := "JB_old"
+	newAsyncID := "JB_new"
+	execs := []*Execution{
+		{
+			ID: "PEX_old", ScheduledJobID: job.ID, AsyncJobID: &oldAsyncID,
+			Status: ExecutionStatusCompleted,
+			StartedAt: now.Add(-2 * time.Hour).Format(time.RFC3339),
+			CreatedAt: now.Add(-2 * time.Hour).Format(time.RFC3339),
+			UpdatedAt: now.Add(-2 * time.Hour).Format(time.RFC3339),
+		},
+		{
+			ID: "PEX_new", ScheduledJobID: job.ID, AsyncJobID: &newAsyncID,
+			Status: ExecutionStatusCompleted,
+			StartedAt: now.Add(-1 * time.Hour).Format(time.RFC3339),
+			CreatedAt: now.Add(-1 * time.Hour).Format(time.RFC3339),
+			UpdatedAt: now.Add(-1 * time.Hour).Format(time.RFC3339),
+		},
+	}
+	for _, exec := range execs {
+		require.NoError(t, execStore.CreateExecution(exec))
+	}
+
+	// Should return the most recent execution's async_job_id
+	asyncID, err := execStore.GetAsyncJobIDForScheduledJob(job.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "JB_new", asyncID)
+
+	// Nonexistent scheduled job returns empty string, not error
+	asyncID, err = execStore.GetAsyncJobIDForScheduledJob("SPJ_nonexistent")
+	require.NoError(t, err)
+	assert.Equal(t, "", asyncID)
+}
