@@ -18,7 +18,11 @@ Closing a result that is inside a melded composition unmelds the entire composit
 
 ## Meld position
 
-Result is a terminal node — it has no outgoing ports in the meld registry. It receives `bottom` connections from py and prompt glyphs.
+Result receives `bottom` connections from py and prompt glyphs. It can also chain downward to other result glyphs (`bottom → result`).
+
+## Chaining
+
+Result glyphs chain via `bottom` meld edges for conversational follow-ups. A hover-reveal input appears at the bottom edge of a result; typing a follow-up and pressing Enter sends the previous output plus the new prompt to the LLM, spawning a chained result below. Chains extend indefinitely through melded compositions.
 
 ## Content persistence
 
