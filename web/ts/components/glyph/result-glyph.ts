@@ -59,51 +59,75 @@ export function createResultGlyph(
     const header = document.createElement('div');
     header.className = 'result-glyph-header';
     header.style.padding = '4px 8px';
-    header.style.backgroundColor = 'var(--bg-tertiary)';
+    header.style.backgroundColor = '#333433';
     header.style.borderBottom = '1px solid var(--border-color)';
     header.style.display = 'flex';
-    header.style.alignItems = 'center';
+    header.style.alignItems = 'flex-start';
     header.style.justifyContent = 'space-between';
     header.style.fontSize = '11px';
     header.style.color = 'var(--text-secondary)';
 
-    // Duration label
-    const durationLabel = document.createElement('span');
-    durationLabel.style.flexShrink = '0';
-    durationLabel.textContent = `${result.duration_ms}ms`;
-    header.appendChild(durationLabel);
-
-    // Prompt label — truncated text showing what generated this result
+    // Prompt label — full multiline prompt text
     if (prompt) {
         const promptLabel = document.createElement('span');
         promptLabel.className = 'result-prompt-label';
         promptLabel.style.flex = '1';
-        promptLabel.style.overflow = 'hidden';
-        promptLabel.style.textOverflow = 'ellipsis';
-        promptLabel.style.whiteSpace = 'nowrap';
+        promptLabel.style.whiteSpace = 'pre-wrap';
+        promptLabel.style.wordBreak = 'break-word';
         promptLabel.style.padding = '0 8px';
-        promptLabel.style.opacity = '0.7';
+        promptLabel.style.color = 'var(--text-on-dark)';
+        promptLabel.style.fontSize = '12px';
         promptLabel.textContent = prompt;
-        promptLabel.title = prompt;
         header.appendChild(promptLabel);
     }
 
     // Button container
     const buttonContainer = document.createElement('div');
     buttonContainer.style.display = 'flex';
-    buttonContainer.style.gap = '4px';
+    buttonContainer.style.gap = '3px';
+    buttonContainer.style.flexShrink = '0';
+
+    function headerBtn(label: string, title: string, fontSize = '11px'): HTMLButtonElement {
+        const btn = document.createElement('button');
+        btn.textContent = label;
+        btn.title = title;
+        btn.style.background = '#4a4b4a';
+        btn.style.border = '1px solid #555';
+        btn.style.borderRadius = '2px';
+        btn.style.padding = '2px 5px';
+        btn.style.cursor = 'pointer';
+        btn.style.fontSize = fontSize;
+        btn.style.lineHeight = '1';
+        btn.style.color = '#ccc';
+        btn.style.transition = 'background 0.15s, border-color 0.15s';
+        btn.addEventListener('mouseenter', () => {
+            btn.style.background = '#5e5f5e';
+            btn.style.borderColor = '#6a6a6a';
+        });
+        btn.addEventListener('mouseleave', () => {
+            btn.style.background = '#4a4b4a';
+            btn.style.borderColor = '#555';
+        });
+        return btn;
+    }
+
+    // Copy button — copies prompt + result to clipboard
+    const copyBtn = headerBtn('⎘', 'Copy to clipboard', '12px');
+
+    copyBtn.addEventListener('click', () => {
+        let text = '';
+        if (prompt) text += `> ${prompt.replace(/\n/g, '\n> ')}\n\n`;
+        text += result.stdout || result.error || '(no output)';
+        navigator.clipboard.writeText(text).then(() => {
+            copyBtn.textContent = '✓';
+            setTimeout(() => { copyBtn.textContent = '⎘'; }, 1500);
+        });
+    });
+
+    buttonContainer.appendChild(copyBtn);
 
     // To window button
-    const toWindowBtn = document.createElement('button');
-    toWindowBtn.textContent = '⬆';
-    toWindowBtn.title = 'Expand to window';
-    toWindowBtn.style.background = 'var(--bg-hover)';
-    toWindowBtn.style.border = '1px solid var(--border-color)';
-    toWindowBtn.style.borderRadius = '3px';
-    toWindowBtn.style.padding = '2px 6px';
-    toWindowBtn.style.cursor = 'pointer';
-    toWindowBtn.style.fontSize = '10px';
-    toWindowBtn.style.color = 'var(--text-primary)';
+    const toWindowBtn = headerBtn('⬆', 'Expand to window', '10px');
 
     toWindowBtn.addEventListener('click', () => {
         // TODO: Implement window manifestation morphing (tracked in #440)
@@ -113,17 +137,7 @@ export function createResultGlyph(
     buttonContainer.appendChild(toWindowBtn);
 
     // Close button
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = '×';
-    closeBtn.title = 'Close result';
-    closeBtn.style.background = 'var(--bg-hover)';
-    closeBtn.style.border = '1px solid var(--border-color)';
-    closeBtn.style.borderRadius = '3px';
-    closeBtn.style.padding = '2px 6px';
-    closeBtn.style.cursor = 'pointer';
-    closeBtn.style.fontSize = '14px';
-    closeBtn.style.lineHeight = '1';
-    closeBtn.style.color = 'var(--text-primary)';
+    const closeBtn = headerBtn('×', 'Close result', '13px');
 
     closeBtn.addEventListener('click', () => {
         // Check if result is in a composition
@@ -169,7 +183,7 @@ export function createResultGlyph(
         logLabel: 'ResultGlyph',
     });
     element.style.minHeight = '80px';
-    element.style.borderRadius = '0 0 4px 4px';
+    element.style.borderRadius = '0 0 2px 2px';
     element.style.border = '1px solid var(--border-on-dark)';
     element.style.borderTop = 'none';
     element.style.zIndex = '1';
@@ -429,16 +443,7 @@ export function updateResultGlyphContent(resultElement: HTMLElement, result: Exe
 
     renderOutput(output, result);
 
-    // Update duration label (first span in header)
-    const header = resultElement.querySelector('.result-glyph-header') as HTMLElement | null;
-    if (header) {
-        const durationLabel = header.querySelector('span');
-        if (durationLabel) {
-            durationLabel.textContent = result.duration_ms ? `${result.duration_ms}ms` : '';
-        }
-    }
-
-    // Update persisted content (preserve promptConfig if present)
+    // Update persisted content (preserve promptConfig and prompt if present)
     const glyphId = resultElement.getAttribute('data-glyph-id');
     if (glyphId) {
         const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
