@@ -14,7 +14,8 @@ import (
 	pb "github.com/teranos/QNTX/glyph/proto"
 )
 
-// maxUploadSize limits file uploads to 50MB
+// maxUploadSize limits file uploads to 50MB — sized for large PDFs while staying
+// within OpenRouter's per-file limit for multimodal prompts.
 const maxUploadSize = 50 << 20
 
 // allowedContentTypes is the set of MIME types accepted for upload.
@@ -97,7 +98,8 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	buf := make([]byte, 512)
 	n, _ := file.Read(buf)
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		s.logger.Errorw("Failed to seek uploaded file after content detection", "filename", header.Filename, "error", err)
+		wrappedErr := errors.Wrapf(err, "failed to seek uploaded file %s after content detection", header.Filename)
+		s.logger.Errorw("File seek failed", "error", wrappedErr)
 		http.Error(w, "failed to process upload", http.StatusInternalServerError)
 		return
 	}
@@ -117,6 +119,15 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		s.logger.Warnw("Rejected file upload: disallowed content type",
 			"filename", header.Filename, "detected_type", detectedType, "extension", ext)
 		http.Error(w, "unsupported content type: "+detectedType, http.StatusBadRequest)
+		return
+	}
+
+	// Verify extension matches detected content type to prevent mismatched files
+	if expectedMIME, ok := mimeByExtension[ext]; ok && expectedMIME != detectedType {
+		s.logger.Warnw("Rejected file upload: extension/content mismatch",
+			"filename", header.Filename, "extension", ext,
+			"expected_mime", expectedMIME, "detected_mime", detectedType)
+		http.Error(w, "file content does not match extension "+ext, http.StatusBadRequest)
 		return
 	}
 
@@ -162,8 +173,8 @@ func (s *QNTXServer) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 // handleFileServe serves a stored file by ID.
 // The ID may include the original extension (e.g., "uuid.pdf") or be bare ("uuid").
 func (s *QNTXServer) handleFileServe(w http.ResponseWriter, r *http.Request, id string) {
-	// Strip path components first (prevents ../../../etc/passwd)
-	id = filepath.Base(id)
+	// Defence-in-depth: Clean then Base to strip any path traversal
+	id = filepath.Base(filepath.Clean(id))
 
 	// Sanitize: only allow alphanumeric, hyphens, dots
 	for _, c := range id {
@@ -181,7 +192,11 @@ func (s *QNTXServer) handleFileServe(w http.ResponseWriter, r *http.Request, id 
 	}
 
 	// Try exact match first (id already includes extension)
-	path := filepath.Join(dir, id)
+	path := filepath.Clean(filepath.Join(dir, id))
+	if !strings.HasPrefix(path, dir) {
+		http.Error(w, "invalid file ID", http.StatusBadRequest)
+		return
+	}
 	if _, err := os.Stat(path); err == nil {
 		http.ServeFile(w, r, path)
 		return
@@ -214,8 +229,8 @@ var mimeByExtension = map[string]string{
 // readFileBase64 reads a stored file by ID, detects its MIME type, and returns
 // the content as a base64-encoded string suitable for data URI construction.
 func (s *QNTXServer) readFileBase64(fileID string) (mimeType, b64Data string, err error) {
-	// Sanitize: only allow alphanumeric, hyphens, dots (same as handleFileServe)
-	fileID = filepath.Base(fileID)
+	// Defence-in-depth: Clean then Base to strip any path traversal
+	fileID = filepath.Base(filepath.Clean(fileID))
 	for _, c := range fileID {
 		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '.') {
 			return "", "", errors.Newf("invalid file ID %q", fileID)
@@ -228,7 +243,10 @@ func (s *QNTXServer) readFileBase64(fileID string) (mimeType, b64Data string, er
 	}
 
 	// Try exact match first (id already includes extension)
-	path := filepath.Join(dir, fileID)
+	path := filepath.Clean(filepath.Join(dir, fileID))
+	if !strings.HasPrefix(path, dir) {
+		return "", "", errors.Newf("invalid file ID %q", fileID)
+	}
 	if _, statErr := os.Stat(path); statErr != nil {
 		// Try globbing for id.* (bare UUID without extension)
 		matches, _ := filepath.Glob(filepath.Join(dir, fileID+".*"))

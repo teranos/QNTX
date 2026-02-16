@@ -228,18 +228,24 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
                             if (meta.fileId && meta.ext) {
                                 fileIds.push(meta.fileId + meta.ext);
                             }
-                        } catch { /* skip malformed content */ }
+                        } catch (e) { log.warn(SEG.GLYPH, `[Prompt] Failed to parse doc metadata for ${mid}:`, e); }
                     } else if (g.symbol === Prose) {
                         noteTexts.push(g.content);
                     }
                 }
             }
 
+            // Prepend melded note texts as context
+            let finalTemplate = template;
+            if (noteTexts.length > 0) {
+                finalTemplate = noteTexts.join('\n\n') + '\n\n' + template;
+            }
+
             const response = await apiFetch('/api/prompt/direct', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    template: template,
+                    template: finalTemplate,
                     glyph_id: glyph.id,
                     ...(fileIds.length > 0 && { file_ids: fileIds }),
                 }),
