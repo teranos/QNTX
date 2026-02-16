@@ -7,7 +7,7 @@
  * - Jenny: Power user, complex scenarios
  */
 
-import { describe, test, expect, mock } from 'bun:test';
+import { describe, test, expect } from 'bun:test';
 import { convertNoteToPrompt, convertResultToNote } from './conversions';
 import { SO, Prose } from '@generated/sym.js';
 
@@ -18,51 +18,13 @@ globalThis.ResizeObserver = class ResizeObserver {
     disconnect() {}
 } as any;
 
-// Mock uiState for conversions
-const mockCanvasGlyphs: any[] = [];
-const mockCanvasCompositions: any[] = [];
-mock.module('../../state/ui', () => ({
-    uiState: {
-        getCanvasGlyphs: () => mockCanvasGlyphs,
-        setCanvasGlyphs: (glyphs: any[]) => {
-            mockCanvasGlyphs.length = 0;
-            mockCanvasGlyphs.push(...glyphs);
-        },
-        upsertCanvasGlyph: (glyph: any) => {
-            const index = mockCanvasGlyphs.findIndex(g => g.id === glyph.id);
-            if (index >= 0) {
-                mockCanvasGlyphs[index] = glyph;
-            } else {
-                mockCanvasGlyphs.push(glyph);
-            }
-        },
-        addCanvasGlyph: (glyph: any) => {
-            const index = mockCanvasGlyphs.findIndex(g => g.id === glyph.id);
-            if (index >= 0) {
-                mockCanvasGlyphs[index] = glyph;
-            } else {
-                mockCanvasGlyphs.push(glyph);
-            }
-        },
-        removeCanvasGlyph: (id: string) => {
-            const index = mockCanvasGlyphs.findIndex(g => g.id === id);
-            if (index >= 0) mockCanvasGlyphs.splice(index, 1);
-        },
-        getCanvasCompositions: () => mockCanvasCompositions,
-        setCanvasCompositions: (comps: any[]) => {
-            mockCanvasCompositions.length = 0;
-            mockCanvasCompositions.push(...comps);
-        },
-        clearCanvasGlyphs: () => mockCanvasGlyphs.length = 0,
-        clearCanvasCompositions: () => mockCanvasCompositions.length = 0,
-        loadPersistedState: () => {},
-    },
-}));
+// NOTE: Do NOT mock ../../state/ui — use the real uiState instead (see TESTING.md)
+import { uiState } from '../../state/ui';
 
 describe('Glyph Conversions - Tim (Happy Path)', () => {
     test('Tim converts note to prompt successfully', async () => {
         // Clear mock state
-        mockCanvasGlyphs.length = 0;
+        uiState.setCanvasGlyphs([]);
 
         // Tim creates a canvas
         const container = document.createElement('div');
@@ -81,7 +43,7 @@ describe('Glyph Conversions - Tim (Happy Path)', () => {
         container.appendChild(noteElement);
 
         // Add glyph to mock uiState
-        mockCanvasGlyphs.push({
+        uiState.addCanvasGlyph({
             id: 'note-123',
             symbol: Prose,
             x: 0,
@@ -107,7 +69,7 @@ describe('Glyph Conversions - Tim (Happy Path)', () => {
 
     test('Tim converts result to note successfully', async () => {
         // Clear mock state
-        mockCanvasGlyphs.length = 0;
+        uiState.setCanvasGlyphs([]);
 
         // Tim creates a canvas
         const container = document.createElement('div');
@@ -128,7 +90,7 @@ describe('Glyph Conversions - Tim (Happy Path)', () => {
         container.appendChild(resultElement);
 
         // Add glyph to mock uiState
-        mockCanvasGlyphs.push({
+        uiState.addCanvasGlyph({
             id: 'result-456',
             symbol: 'result',
             x: 0,
@@ -159,7 +121,7 @@ describe('Glyph Conversions - Tim (Happy Path)', () => {
 describe('Glyph Conversions - Spike (Edge Cases)', () => {
     test('Spike tries to convert non-existent glyph', async () => {
         // Clear mock state
-        mockCanvasGlyphs.length = 0;
+        uiState.setCanvasGlyphs([]);
 
         // Spike creates a canvas
         const container = document.createElement('div');
@@ -177,7 +139,7 @@ describe('Glyph Conversions - Spike (Edge Cases)', () => {
 describe('Glyph Conversions - Jenny (Complex Scenarios)', () => {
     test('Jenny cannot convert glyph inside melded composition', async () => {
         // Clear mock state
-        mockCanvasGlyphs.length = 0;
+        uiState.setCanvasGlyphs([]);
 
         // Jenny has a canvas with a melded composition
         const container = document.createElement('div');
@@ -202,7 +164,7 @@ describe('Glyph Conversions - Jenny (Complex Scenarios)', () => {
         container.appendChild(composition);
 
         // Add glyph to mock uiState
-        mockCanvasGlyphs.push({
+        uiState.addCanvasGlyph({
             id: 'note-nested',
             symbol: Prose,
             x: 0,

@@ -9,6 +9,7 @@
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
 import { syncStateManager } from '../state/sync-state';
+import { uiState } from '../state/ui';
 
 // Mock connectivity — start offline so add() doesn't auto-flush
 let mockConnectivity: 'online' | 'offline' = 'offline';
@@ -32,16 +33,7 @@ mock.module('../api', () => ({
     apiFetch: (path: string, init?: RequestInit) => mockApiFetch(path, init),
 }));
 
-// Mock UIState — controlled glyph/composition data per test
-let mockGlyphs: Array<{ id: string; symbol: string; x: number; y: number; width?: number; height?: number; content?: string }> = [];
-let mockCompositions: Array<{ id: string; edges: Array<{ from: string; to: string; direction: string; position: number }>; x: number; y: number }> = [];
-
-mock.module('../state/ui', () => ({
-    uiState: {
-        getCanvasGlyphs: () => mockGlyphs,
-        getCanvasCompositions: () => mockCompositions,
-    },
-}));
+// NOTE: Do NOT mock ../state/ui — populate the real uiState instead (see TESTING.md)
 
 const { canvasSyncQueue } = await import('./canvas-sync');
 
@@ -53,13 +45,13 @@ describe('Canvas Sync - Tim (Happy Path)', () => {
         mockConnectivity = 'offline';
         connectivitySubscribers.clear();
         mockApiFetch = async () => new Response(null, { status: 200 });
-        mockGlyphs = [
+        uiState.setCanvasGlyphs([
             { id: 'g-1', symbol: 'ax', x: 100, y: 200 },
             { id: 'g-2', symbol: 'py', x: 300, y: 400 },
-        ];
-        mockCompositions = [
+        ] as any);
+        uiState.setCanvasCompositions([
             { id: 'c-1', edges: [{ from: 'g-1', to: 'g-2', direction: 'right', position: 0 }], x: 100, y: 200 },
-        ];
+        ] as any);
         syncStateManager.clearState('g-1');
         syncStateManager.clearState('g-2');
         syncStateManager.clearState('c-1');
@@ -192,13 +184,13 @@ describe('Canvas Sync - Spike (Edge Cases)', () => {
         mockConnectivity = 'offline';
         connectivitySubscribers.clear();
         mockApiFetch = async () => new Response(null, { status: 200 });
-        mockGlyphs = [
+        uiState.setCanvasGlyphs([
             { id: 'g-1', symbol: 'ax', x: 100, y: 200 },
             { id: 'g-2', symbol: 'py', x: 300, y: 400 },
-        ];
-        mockCompositions = [
+        ] as any);
+        uiState.setCanvasCompositions([
             { id: 'c-1', edges: [{ from: 'g-1', to: 'g-2', direction: 'right', position: 0 }], x: 100, y: 200 },
-        ];
+        ] as any);
         syncStateManager.clearState('g-1');
         syncStateManager.clearState('g-2');
         syncStateManager.clearState('c-1');

@@ -33,32 +33,8 @@ mock.module('../../connectivity', () => ({
     },
 }));
 
-// Mock uiState — mock.module is process-global so every mock must be superset-complete
-const mockCanvasGlyphs: any[] = [];
-const mockCanvasCompositions: any[] = [];
-mock.module('../../state/ui', () => ({
-    uiState: {
-        getCanvasGlyphs: () => mockCanvasGlyphs,
-        setCanvasGlyphs: (glyphs: any[]) => { mockCanvasGlyphs.length = 0; mockCanvasGlyphs.push(...glyphs); },
-        upsertCanvasGlyph: (glyph: any) => {
-            const index = mockCanvasGlyphs.findIndex(g => g.id === glyph.id);
-            if (index >= 0) { mockCanvasGlyphs[index] = glyph; } else { mockCanvasGlyphs.push(glyph); }
-        },
-        addCanvasGlyph: (glyph: any) => {
-            const index = mockCanvasGlyphs.findIndex(g => g.id === glyph.id);
-            if (index >= 0) { mockCanvasGlyphs[index] = glyph; } else { mockCanvasGlyphs.push(glyph); }
-        },
-        removeCanvasGlyph: (id: string) => {
-            const index = mockCanvasGlyphs.findIndex(g => g.id === id);
-            if (index >= 0) mockCanvasGlyphs.splice(index, 1);
-        },
-        getCanvasCompositions: () => mockCanvasCompositions,
-        setCanvasCompositions: (comps: any[]) => { mockCanvasCompositions.length = 0; mockCanvasCompositions.push(...comps); },
-        clearCanvasGlyphs: () => mockCanvasGlyphs.length = 0,
-        clearCanvasCompositions: () => mockCanvasCompositions.length = 0,
-        loadPersistedState: () => {},
-    },
-}));
+// NOTE: Do NOT mock ../../state/ui — use the real uiState instead (see TESTING.md)
+import { uiState } from '../../state/ui';
 
 mock.module('../../state/sync-state', () => ({
     syncStateManager: {
@@ -99,7 +75,7 @@ function setConnectivity(state: 'online' | 'offline') {
 describe('AX Glyph - Tim (Happy Path)', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
-        mockCanvasGlyphs.length = 0;
+        uiState.setCanvasGlyphs([]);
         mockState = 'offline';
         subscribers.clear();
     });
@@ -134,7 +110,7 @@ describe('AX Glyph - Tim (Happy Path)', () => {
     });
 
     test('Tim creates glyph with persisted query from uiState', () => {
-        mockCanvasGlyphs.push({ id: 'ax-tim-4', symbol: AX, x: 0, y: 0, content: 'is git' });
+        uiState.addCanvasGlyph({ id: 'ax-tim-4', symbol: AX, x: 0, y: 0, content: 'is git' });
 
         const element = createAxGlyph(makeGlyph('ax-tim-4'));
 
@@ -143,7 +119,7 @@ describe('AX Glyph - Tim (Happy Path)', () => {
     });
 
     test('Tim goes online, container and title bar turn teal together', () => {
-        mockCanvasGlyphs.push({ id: 'ax-tim-5', symbol: AX, x: 0, y: 0, content: 'TEST5' });
+        uiState.addCanvasGlyph({ id: 'ax-tim-5', symbol: AX, x: 0, y: 0, content: 'TEST5' });
 
         const element = createAxGlyph(makeGlyph('ax-tim-5'));
         document.body.appendChild(element);
@@ -160,7 +136,7 @@ describe('AX Glyph - Tim (Happy Path)', () => {
     });
 
     test('Tim title bar background always matches container state', () => {
-        mockCanvasGlyphs.push({ id: 'ax-tim-6', symbol: AX, x: 0, y: 0, content: 'ALICE' });
+        uiState.addCanvasGlyph({ id: 'ax-tim-6', symbol: AX, x: 0, y: 0, content: 'ALICE' });
 
         const element = createAxGlyph(makeGlyph('ax-tim-6'));
         document.body.appendChild(element);
@@ -185,7 +161,7 @@ describe('AX Glyph - Tim (Happy Path)', () => {
 describe('AX Glyph - Spike (Edge Cases)', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
-        mockCanvasGlyphs.length = 0;
+        uiState.setCanvasGlyphs([]);
         mockState = 'offline';
         subscribers.clear();
     });
@@ -205,13 +181,13 @@ describe('AX Glyph - Spike (Edge Cases)', () => {
 describe('AX Glyph - Jenny (Power User)', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
-        mockCanvasGlyphs.length = 0;
+        uiState.setCanvasGlyphs([]);
         mockState = 'online';
         subscribers.clear();
     });
 
     test('Jenny goes offline, AX re-fires local query and turns orange', () => {
-        mockCanvasGlyphs.push({ id: 'ax-jenny-1', symbol: AX, x: 0, y: 0, content: 'of qntx' });
+        uiState.addCanvasGlyph({ id: 'ax-jenny-1', symbol: AX, x: 0, y: 0, content: 'of qntx' });
 
         const element = createAxGlyph(makeGlyph('ax-jenny-1'));
         document.body.appendChild(element);

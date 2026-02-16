@@ -7,6 +7,7 @@
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
 import { syncStateManager } from '../state/sync-state';
+import { uiState } from '../state/ui';
 
 let mockConnectivity: 'online' | 'offline' = 'offline';
 
@@ -26,14 +27,7 @@ mock.module('../api', () => ({
     apiFetch: (path: string, init?: RequestInit) => mockApiFetch(path, init),
 }));
 
-let mockGlyphs: Array<{ id: string; symbol: string; x: number; y: number }> = [];
-
-mock.module('../state/ui', () => ({
-    uiState: {
-        getCanvasGlyphs: () => mockGlyphs,
-        getCanvasCompositions: () => [],
-    },
-}));
+// NOTE: Do NOT mock ../state/ui — populate the real uiState instead (see TESTING.md)
 
 const { canvasSyncQueue } = await import('./canvas-sync');
 
@@ -44,7 +38,8 @@ describe('Canvas Sync - Spike (Backoff)', () => {
         localStorage.clear();
         mockConnectivity = 'offline';
         mockApiFetch = async () => new Response(null, { status: 200 });
-        mockGlyphs = [{ id: 'g-1', symbol: 'ax', x: 100, y: 200 }];
+        uiState.setCanvasGlyphs([{ id: 'g-1', symbol: 'ax', x: 100, y: 200 }] as any);
+        uiState.setCanvasCompositions([]);
         syncStateManager.clearState('g-1');
     });
 
