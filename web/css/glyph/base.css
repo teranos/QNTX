@@ -172,6 +172,23 @@
     min-height: 0;
 }
 
+/* Result glyph header buttons — small solid buttons on dark surface */
+.result-header-btn {
+    background: #4a4b4a;
+    border: 1px solid #555;
+    border-radius: 2px;
+    padding: 2px 5px;
+    cursor: pointer;
+    line-height: 1;
+    color: #ccc;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.result-header-btn:hover {
+    background: #5e5f5e;
+    border-color: #6a6a6a;
+}
+
 .canvas-glyph-title-bar {
     height: 32px;
     background-color: var(--bg-tertiary);
