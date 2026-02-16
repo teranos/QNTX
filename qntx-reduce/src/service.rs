@@ -20,8 +20,7 @@ pub struct ReducePluginService {
 impl ReducePluginService {
     pub fn new() -> Self {
         let state = Arc::new(RwLock::new(ReduceState {
-            fitted: false,
-            n_points: 0,
+            fitted: HashMap::new(),
         }));
 
         Self {
@@ -47,8 +46,9 @@ impl DomainPluginService for ReducePluginService {
             name: "reduce".to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
             qntx_version: ">=0.1.0".to_string(),
-            description: "Dimensionality reduction plugin (UMAP) for embedding visualization"
-                .to_string(),
+            description:
+                "Dimensionality reduction plugin (UMAP, t-SNE, PCA) for embedding visualization"
+                    .to_string(),
             author: "QNTX Contributors".to_string(),
             license: "MIT".to_string(),
         }))
@@ -61,15 +61,17 @@ impl DomainPluginService for ReducePluginService {
         info!("Initializing Reduce plugin");
 
         Ok(Response::new(InitializeResponse {
-            handler_names: vec!["reduce.umap".to_string()],
+            handler_names: vec![
+                "reduce.umap".to_string(),
+                "reduce.tsne".to_string(),
+                "reduce.pca".to_string(),
+            ],
         }))
     }
 
     async fn shutdown(&self, _request: Request<Empty>) -> Result<Response<Empty>, Status> {
         info!("Shutting down Reduce plugin");
-        let mut state = self.handlers.state.write();
-        state.fitted = false;
-        state.n_points = 0;
+        self.handlers.clear_models();
         Ok(Response::new(Empty {}))
     }
 
@@ -141,8 +143,9 @@ impl DomainPluginService for ReducePluginService {
         let state = self.handlers.state.read();
 
         let mut details = HashMap::new();
-        details.insert("fitted".to_string(), state.fitted.to_string());
-        details.insert("n_points".to_string(), state.n_points.to_string());
+        let fitted_methods: Vec<String> = state.fitted.keys().cloned().collect();
+        details.insert("fitted_methods".to_string(), fitted_methods.join(","));
+        details.insert("n_methods".to_string(), state.fitted.len().to_string());
 
         Ok(Response::new(HealthResponse {
             healthy: true,
