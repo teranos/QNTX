@@ -104,10 +104,7 @@ func TestClient_Chat(t *testing.T) {
 				Choices: []Choice{
 					{
 						Index: 0,
-						Message: Message{
-							Role:    "assistant",
-							Content: "Test response content",
-						},
+						Message:      NewTextMessage("assistant", "Test response content"),
 						FinishReason: "stop",
 					},
 				},
@@ -178,7 +175,7 @@ func TestClient_Chat(t *testing.T) {
 
 			// Send mock response
 			response := ChatCompletionResponse{
-				Choices: []Choice{{Message: Message{Content: "test"}}},
+				Choices: []Choice{{Message: NewTextMessage("assistant", "test")}},
 				Usage:   Usage{},
 			}
 			json.NewEncoder(w).Encode(response)
@@ -348,7 +345,7 @@ func TestClient_ErrorHandling(t *testing.T) {
 func BenchmarkClient_Chat(b *testing.B) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		response := ChatCompletionResponse{
-			Choices: []Choice{{Message: Message{Content: "test response"}}},
+			Choices: []Choice{{Message: NewTextMessage("assistant", "test response")}},
 			Usage:   Usage{TotalTokens: 10},
 		}
 		json.NewEncoder(w).Encode(response)

@@ -375,17 +375,22 @@ export interface PromptDirectRequest {
   provider?: string;
   model?: string;
   /**
-   * TODO(#458): create result attestation with actor "glyph:{id}" so prompt glyphs can be mid-chain producers
+   * Glyph that initiated execution; used as actor for the result attestation
    */
   glyph_id?: string;
   /**
    * Triggering attestation — enables {{field}} interpolation
    */
   upstream_attestation?: As | null;
+  /**
+   * Attached document/image file IDs for multimodal prompts
+   */
+  file_ids?: string[];
 }
 
 export interface PromptDirectResponse {
   response: string;
+  attestation_id?: string;
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;

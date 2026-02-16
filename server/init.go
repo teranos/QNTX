@@ -11,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/glyph/handlers"
 	glyphstorage "github.com/teranos/QNTX/glyph/storage"
@@ -190,6 +191,14 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 
 	// Configure log transport to route sends through broadcast worker (thread-safe)
 	wsTransport.SetSendFunc(server.sendLogBatch)
+
+	// Register prompt-result type so prompt glyph attestations render in the graph
+	{
+		store := storage.NewSQLStore(db, serverLogger)
+		if err := types.EnsureTypes(store, "prompt-direct", types.PromptResult); err != nil {
+			serverLogger.Warnw("Failed to register prompt-result type", "error", err)
+		}
+	}
 
 	// Initialize domain plugin registry
 	pluginRegistry := plugin.GetDefaultRegistry()

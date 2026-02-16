@@ -3,6 +3,8 @@
 *.db-shm
 *.db-wal
 
+.qntx/files
+
 am.toml
 
 # Node/Bun
