@@ -198,70 +198,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 			"handler_name", handlerName,
 			"source_url", sourceURL)
 
-		// CRITICAL: Create all tracking records BEFORE enqueueing async job
-		// Use transaction to prevent race conditions (job deletion between SELECT and INSERT)
-
-		// Step 1: Find or create scheduled job for tracking (with transaction)
-		var scheduledJobID string
-		var executionID string
-
-		// Start transaction for atomic job lookup/creation and execution record insert
-		tx, err := s.db.Begin()
-		if err != nil {
-			writeWrappedError(w, s.logger, err, "failed to begin transaction", http.StatusInternalServerError)
-			return
-		}
-		defer tx.Rollback() // Rollback if not committed
-
-		// Try to find active scheduled job by handler_name (covers both ATS and handler-only schedules)
-		lookupKey := req.ATSCode
-		lookupCol := "ats_code"
-		if lookupKey == "" {
-			lookupKey = handlerName
-			lookupCol = "handler_name"
-		}
-		err = tx.QueryRow(fmt.Sprintf(`SELECT id FROM scheduled_pulse_jobs WHERE %s = ? AND state = 'active' LIMIT 1`, lookupCol),
-			lookupKey).Scan(&scheduledJobID)
-
-		// If no active scheduled job found, check for existing temp job and reuse or create new one
-		if err != nil || scheduledJobID == "" {
-			err = tx.QueryRow(fmt.Sprintf(`SELECT id FROM scheduled_pulse_jobs WHERE %s = ? AND created_from_doc_id = '__force_trigger__' ORDER BY created_at DESC LIMIT 1`, lookupCol),
-				lookupKey).Scan(&scheduledJobID)
-
-			if err != nil || scheduledJobID == "" {
-				// No temp job exists - create temporary scheduled job for tracking
-				if req.ATSCode != "" {
-					scheduledJobID, err = id.GenerateASID(req.ATSCode, "force-trigger", "pulse", "system")
-				} else {
-					scheduledJobID = fmt.Sprintf("SPJ_force_%s_%d", handlerName, now.Unix())
-					err = nil
-				}
-				if err != nil {
-					writeWrappedError(w, s.logger, err, "failed to generate tracking job ID", http.StatusInternalServerError)
-					return
-				}
-
-				_, err = tx.Exec(`
-					INSERT INTO scheduled_pulse_jobs (id, ats_code, handler_name, payload, source_url, state, interval_seconds, created_at, updated_at, created_from_doc_id)
-					VALUES (?, ?, ?, ?, ?, 'inactive', 0, ?, ?, '__force_trigger__')
-				`, scheduledJobID, req.ATSCode, handlerName, payload, sourceURL, now.Format(time.RFC3339), now.Format(time.RFC3339))
-
-				if err != nil {
-					writeWrappedError(w, s.logger, err, "failed to create tracking job", http.StatusInternalServerError)
-					return
-				}
-
-				pulseLog.Infow("Created temp scheduled job for force trigger",
-					"scheduled_job_id", scheduledJobID,
-					"handler_name", handlerName)
-			} else {
-				pulseLog.Infow("Reusing existing temp job for force trigger",
-					"scheduled_job_id", scheduledJobID,
-					"handler_name", handlerName)
-			}
-		}
-
-		// Step 2: Create async job (but don't enqueue yet)
+		// Step 1: Create async job (needed for its ID before creating tracking records)
 		asyncJob, err := async.NewJobWithPayload(
 			handlerName,
 			sourceURL,
@@ -275,30 +212,31 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		// Step 3: Create execution record (within same transaction - guaranteed FK integrity)
-		executionID = id.GenerateExecutionID()
-
-		_, err = tx.Exec(`
-			INSERT INTO pulse_executions (id, scheduled_job_id, async_job_id, status, started_at, created_at, updated_at)
-			VALUES (?, ?, ?, 'running', ?, ?, ?)
-		`, executionID, scheduledJobID, asyncJob.ID, now.Format(time.RFC3339), now.Format(time.RFC3339), now.Format(time.RFC3339))
+		// Step 2: Atomically find-or-create scheduled job + execution record
+		result, err := s.newScheduleStore().CreateForceTriggerExecution(schedule.ForceTriggerParams{
+			ATSCode:     req.ATSCode,
+			HandlerName: handlerName,
+			Payload:     payload,
+			SourceURL:   sourceURL,
+			AsyncJobID:  asyncJob.ID,
+		})
 		if err != nil {
-			writeWrappedError(w, s.logger, err, "failed to create execution record", http.StatusInternalServerError)
+			writeWrappedError(w, s.logger, err, "failed to create force trigger tracking", http.StatusInternalServerError)
 			return
 		}
 
-		// Commit transaction - all tracking records now atomically created
-		if err = tx.Commit(); err != nil {
-			writeWrappedError(w, s.logger, err, "failed to commit force trigger transaction", http.StatusInternalServerError)
-			return
+		if result.CreatedNewJob {
+			pulseLog.Infow("Created temp scheduled job for force trigger",
+				"scheduled_job_id", result.ScheduledJobID,
+				"handler_name", handlerName)
 		}
 
 		pulseLog.Infow("Created pulse_execution for force trigger",
-			"execution_id", executionID,
+			"execution_id", result.ExecutionID,
 			"async_job_id", asyncJob.ID,
-			"scheduled_job_id", scheduledJobID)
+			"scheduled_job_id", result.ScheduledJobID)
 
-		// Step 4: NOW enqueue async job (all tracking is in place)
+		// Step 3: NOW enqueue async job (all tracking is in place)
 		queue := s.daemon.GetQueue()
 		if err := queue.Enqueue(asyncJob); err != nil {
 			writeWrappedError(w, s.logger, err, "failed to enqueue force trigger job", http.StatusInternalServerError)
@@ -310,9 +248,8 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 			"handler_name", handlerName,
 			"source_url", sourceURL)
 
-		// Return success - all operations completed
-		writeJSON(w, http.StatusCreated, map[string]interface{}{
-			"id":           scheduledJobID, // Return scheduled job ID for UI tracking
+		writeJSON(w, http.StatusCreated, map[string]any{
+			"id":           result.ScheduledJobID,
 			"async_job_id": asyncJob.ID,
 			"handler_name": handlerName,
 			"source_url":   sourceURL,
