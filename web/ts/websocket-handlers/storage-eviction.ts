@@ -12,7 +12,7 @@ import type { StorageEvictionMessage } from '../../types/websocket';
  * Handle storage eviction message
  */
 export function handleStorageEviction(data: StorageEvictionMessage): void {
-    log.warn(SEG.DB, 'Storage eviction:', data.message, 'Event type:', data.event_type);
+    log.debug(SEG.DB, 'Storage eviction:', data.message, 'Event type:', data.event_type);
 
     // TODO: figure out how to make evictions observable without toast spam —
     // candidates: database status indicator flash, system drawer log entry, or dedicated eviction counter

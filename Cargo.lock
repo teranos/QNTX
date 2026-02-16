@@ -3729,7 +3729,26 @@ dependencies = [
 
 [[package]]
 name = "qntx-python-plugin"
-version = "0.5.1"
+version = "0.5.2"
+dependencies = [
+ "clap",
+ "parking_lot",
+ "prost",
+ "pyo3",
+ "qntx-grpc",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "qntx-reduce-plugin"
+version = "0.1.1"
 dependencies = [
  "clap",
  "parking_lot",

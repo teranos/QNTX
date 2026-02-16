@@ -569,6 +569,88 @@ func (s *EmbeddingStore) GetAllClusterCentroids() ([]ClusterCentroid, error) {
 	return centroids, nil
 }
 
+// ProjectionAssignment maps an embedding ID to its 2D projection coordinates.
+type ProjectionAssignment struct {
+	ID          string
+	ProjectionX float64
+	ProjectionY float64
+}
+
+// UpdateProjections batch-updates projection coordinates in a single transaction.
+func (s *EmbeddingStore) UpdateProjections(assignments []ProjectionAssignment) error {
+	if len(assignments) == 0 {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return errors.Wrap(err, "failed to begin projection update transaction")
+	}
+	defer func() {
+		if err != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				s.logger.Error("failed to rollback projection update", zap.Error(rbErr))
+			}
+		}
+	}()
+
+	stmt, err := tx.Prepare(`UPDATE embeddings SET projection_x = ?, projection_y = ? WHERE id = ?`)
+	if err != nil {
+		return errors.Wrap(err, "failed to prepare projection update statement")
+	}
+	defer stmt.Close()
+
+	for _, a := range assignments {
+		if _, err = stmt.Exec(a.ProjectionX, a.ProjectionY, a.ID); err != nil {
+			return errors.Wrapf(err, "failed to update projection for embedding %s", a.ID)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return errors.Wrap(err, "failed to commit projection updates")
+	}
+
+	s.logger.Info("updated projections", zap.Int("count", len(assignments)))
+	return nil
+}
+
+// ProjectionWithCluster holds a 2D projection along with its cluster assignment.
+type ProjectionWithCluster struct {
+	ID          string  `json:"id"`
+	SourceID    string  `json:"source_id"`
+	ProjectionX float64 `json:"x"`
+	ProjectionY float64 `json:"y"`
+	ClusterID   int     `json:"cluster_id"`
+}
+
+// GetAllProjections returns all embeddings that have non-NULL projection coordinates.
+func (s *EmbeddingStore) GetAllProjections() ([]ProjectionWithCluster, error) {
+	rows, err := s.db.Query(`
+		SELECT id, source_id, projection_x, projection_y, cluster_id
+		FROM embeddings
+		WHERE projection_x IS NOT NULL AND projection_y IS NOT NULL
+		ORDER BY id
+	`)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query projections")
+	}
+	defer rows.Close()
+
+	var results []ProjectionWithCluster
+	for rows.Next() {
+		var p ProjectionWithCluster
+		if err := rows.Scan(&p.ID, &p.SourceID, &p.ProjectionX, &p.ProjectionY, &p.ClusterID); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan projection row %d", len(results)+1)
+		}
+		results = append(results, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate projection rows (read %d)", len(results))
+	}
+
+	return results, nil
+}
+
 // PredictCluster assigns an embedding to the nearest cluster centroid using cosine similarity.
 // Returns cluster ID and similarity score, or ClusterNoise if below threshold.
 func (s *EmbeddingStore) PredictCluster(

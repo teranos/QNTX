@@ -1,13 +1,13 @@
 [package]
-name = "qntx-python-plugin"
-version = "0.5.2"
+name = "qntx-reduce-plugin"
+version = "0.1.1"
 edition.workspace = true
-description = "QNTX gRPC plugin for running Python code"
+description = "QNTX gRPC plugin for dimensionality reduction (UMAP)"
 license.workspace = true
 authors = ["QNTX Contributors"]
 
 [[bin]]
-name = "qntx-python-plugin"
+name = "qntx-reduce-plugin"
 path = "src/main.rs"
 
 [dependencies]
@@ -21,8 +21,7 @@ tokio.workspace = true
 tokio-stream.workspace = true
 
 # Python embedding via PyO3
-# REQUIRES Nix build (flake.nix) - provides Python 3.13 deterministically
-# Local cargo builds not supported due to platform-specific Python linking issues
+# REQUIRES Nix build (flake.nix) - provides Python 3.13 + umap-learn
 pyo3 = { version = "0.23", features = ["auto-initialize"] }
 
 # Serialization
