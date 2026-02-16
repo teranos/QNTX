@@ -13,7 +13,7 @@
  */
 
 import type { Glyph } from './glyph';
-import { SO } from '@generated/sym.js';
+import { SO, Doc, Prose } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { apiFetch } from '../../api';
 import { preventDrag, storeCleanup } from './glyph-interaction';
@@ -22,6 +22,7 @@ import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { autoMeldResultBelow } from './meld/meld-system';
 import { uiState } from '../../state/ui';
 import { tooltip } from '../tooltip';
+import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
 
 /**
  * Prompt glyph execution status
@@ -210,11 +211,43 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
         });
 
         try {
+            // Collect attachments from melded glyphs
+            const fileIds: string[] = [];
+            const noteTexts: string[] = [];
+            const comp = findCompositionByGlyph(glyph.id);
+            if (comp) {
+                const memberIds = extractGlyphIds(comp.edges);
+                for (const mid of memberIds) {
+                    if (mid === glyph.id) continue; // skip self
+                    const g = uiState.getCanvasGlyphs().find(cg => cg.id === mid);
+                    if (!g?.content) continue;
+
+                    if (g.symbol === Doc) {
+                        try {
+                            const meta = JSON.parse(g.content);
+                            if (meta.fileId && meta.ext) {
+                                fileIds.push(meta.fileId + meta.ext);
+                            }
+                        } catch (e) { log.warn(SEG.GLYPH, `[Prompt] Failed to parse doc metadata for ${mid}:`, e); }
+                    } else if (g.symbol === Prose) {
+                        noteTexts.push(g.content);
+                    }
+                }
+            }
+
+            // Prepend melded note texts as context
+            let finalTemplate = template;
+            if (noteTexts.length > 0) {
+                finalTemplate = noteTexts.join('\n\n') + '\n\n' + template;
+            }
+
             const response = await apiFetch('/api/prompt/direct', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    template: template,
+                    template: finalTemplate,
+                    glyph_id: glyph.id,
+                    ...(fileIds.length > 0 && { file_ids: fileIds }),
                 }),
             });
 
