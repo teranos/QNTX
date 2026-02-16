@@ -737,6 +737,14 @@ func (s *QNTXServer) SetupEmbeddingService() {
 		clusterThreshold: float32(appcfg.GetFloat64("embeddings.cluster_threshold")),
 		projectFunc:      s.projectToCanvas,
 	}
+
+	// Wire semantic watcher matching through the embedding observer.
+	// After embedding, the observer passes the attestation + vector to the watcher
+	// engine — eliminates redundant GenerateEmbedding FFI calls per semantic watcher.
+	if s.watcherEngine != nil {
+		observer.onEmbedded = s.watcherEngine.OnAttestationEmbedded
+	}
+
 	storage.RegisterObserver(observer)
 	s.embeddingClusterInvalidator = observer.InvalidateClusterCache
 
@@ -771,6 +779,11 @@ type EmbeddingObserver struct {
 	clusterCache     []storage.ClusterCentroid // loaded once, refreshed on re-cluster
 	clusterThreshold float32                   // minimum similarity for cluster assignment
 	projectFunc      func(embeddingID string, embedding []float32)
+
+	// onEmbedded is called after an attestation is successfully embedded and stored.
+	// The watcher engine uses this to run semantic matching with the pre-computed
+	// embedding, eliminating redundant GenerateEmbedding FFI calls.
+	onEmbedded func(as *types.As, embedding []float32)
 }
 
 // InvalidateClusterCache clears cached centroids so the next prediction reloads from DB.
@@ -838,6 +851,11 @@ func (o *EmbeddingObserver) OnAttestationCreated(as *types.As) {
 		"attestation_id", as.ID,
 		"text_length", len(text),
 		"inference_ms", result.InferenceMS)
+
+	// Notify watcher engine with the pre-computed embedding for semantic matching
+	if o.onEmbedded != nil {
+		o.onEmbedded(as, result.Embedding)
+	}
 
 	// Predict cluster assignment for the new embedding
 	o.predictCluster(model.ID, as.ID, result.Embedding)

@@ -319,12 +319,6 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
         handleInputChange();
     });
 
-    // If we loaded a persisted query, send watcher to server
-    if (currentQuery.trim()) {
-        commitQuery();
-        log.debug(SEG.GLYPH, `[SeGlyph] Restored query for ${glyphId}: "${currentQuery}" threshold=${currentThreshold}`);
-    }
-
     // ResizeObserver for auto-sizing
     setupSeGlyphResizeObserver(element, resultsContainer, glyphId);
 
@@ -334,7 +328,8 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
     });
     storeCleanup(element, syncUnsub);
 
-    // Connectivity subscription — re-commit on transition
+    // Connectivity subscription — fires immediately with current state (serves as
+    // initial commitQuery for persisted queries) and on subsequent transitions.
     const connectUnsub = connectivityManager.subscribe((state) => {
         element.dataset.connectivityMode = state;
         resultsContainer.dataset.connectivityMode = state;
@@ -452,6 +447,9 @@ function renderAttestation(attestation: Attestation, score?: number): HTMLElemen
     item.style.display = 'flex';
     item.style.alignItems = 'center';
     item.style.gap = '8px';
+    if (attestation.id) {
+        item.dataset.attestationId = attestation.id;
+    }
     if (score !== undefined) {
         item.dataset.score = String(score);
     }
@@ -510,6 +508,17 @@ export function updateSemanticGlyphResults(glyphId: string, attestation: Attesta
     const errorDisplay = resultsContainer.querySelector('.se-glyph-error');
     if (errorDisplay) {
         errorDisplay.remove();
+    }
+
+    // Dedup: skip if this attestation is already displayed
+    if (attestation.id) {
+        const existingItems = resultsContainer.querySelectorAll('.se-glyph-result-item');
+        for (const existing of existingItems) {
+            if ((existing as HTMLElement).dataset.attestationId === attestation.id) {
+                log.debug(SEG.GLYPH, `[SeGlyph] Skipped duplicate ${attestation.id} for ${glyphId}`);
+                return;
+            }
+        }
     }
 
     const resultItem = renderAttestation(attestation, score);
