@@ -502,8 +502,8 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		for _, fid := range req.FileIDs {
 			mime, b64, readErr := s.readFileBase64(fid)
 			if readErr != nil {
-				s.logger.Warnw("Failed to read attached file, skipping",
-					"file_id", fid, "error", readErr)
+				s.logger.Warnw("Skipping attached file",
+					"file_id", fid, "error", errors.Wrapf(readErr, "failed to read attachment %s", fid))
 				continue
 			}
 
@@ -530,7 +530,7 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 			}
 
 			s.logger.Debugw("Attached file to prompt",
-				"file_id", fid, "mime", mime, "b64_length", len(b64))
+				"file_id", fid, "mime", mime, "size_kb", len(b64)*3/4/1024)
 		}
 	}
 
