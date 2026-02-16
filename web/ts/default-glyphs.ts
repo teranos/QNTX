@@ -498,7 +498,7 @@ function renderEmbeddings(): void {
                 </div>
                 <div class="glyph-row">
                     <span class="glyph-label">Sizes:</span>
-                    <span class="glyph-value" style="font-size:11px">${clusterSizes}</span>
+                    <span class="glyph-value" style="font-size:11px;flex-wrap:wrap;display:flex;gap:2px 8px">${clusterSizes}</span>
                 </div>
             `;
         } else {
@@ -677,7 +677,9 @@ function renderScatter(container: HTMLElement): void {
     const svg = d3.select(container)
         .append('svg')
         .attr('width', width)
-        .attr('height', height);
+        .attr('height', height)
+        .style('background', '#1e293b')
+        .style('border-radius', '4px');
 
     const xExtent = d3.extent(projectionsData, d => d.x) as [number, number];
     const yExtent = d3.extent(projectionsData, d => d.y) as [number, number];
