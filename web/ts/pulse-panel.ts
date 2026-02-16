@@ -49,6 +49,7 @@ class PulsePanel extends BasePanel {
     private jobs: Map<string, ScheduledJobResponse> = new Map();
     private state: PulsePanelState;
     private unsubscribers: Array<() => void> = [];
+    private activeQueueCleanupTimer: ReturnType<typeof setTimeout> | null = null;
 
     constructor() {
         super({
@@ -165,9 +166,21 @@ class PulsePanel extends BasePanel {
         if (!container) return;
 
         const { renderActiveQueue, fetchActiveJobs } = await import('./pulse/active-queue.ts');
-        const activeJobs = await fetchActiveJobs();
+        const result = await fetchActiveJobs();
 
-        container.innerHTML = renderActiveQueue(activeJobs);
+        container.innerHTML = renderActiveQueue(result);
+
+        // Schedule cleanup re-render when recently-finished jobs will expire
+        if (this.activeQueueCleanupTimer) {
+            clearTimeout(this.activeQueueCleanupTimer);
+            this.activeQueueCleanupTimer = null;
+        }
+        if (result.hasRecent) {
+            this.activeQueueCleanupTimer = setTimeout(() => {
+                this.activeQueueCleanupTimer = null;
+                this.renderActiveQueue();
+            }, 8000);
+        }
     }
 
     private renderSchedules(): void {
@@ -310,6 +323,10 @@ class PulsePanel extends BasePanel {
     protected onDestroy(): void {
         this.unsubscribers.forEach(unsub => unsub());
         this.unsubscribers = [];
+        if (this.activeQueueCleanupTimer) {
+            clearTimeout(this.activeQueueCleanupTimer);
+            this.activeQueueCleanupTimer = null;
+        }
     }
 }
 

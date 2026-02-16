@@ -6,7 +6,7 @@ import type { ScheduledJobResponse } from './types';
 import type { Execution } from './execution-types';
 import type { PulsePanelState } from './panel-state';
 import { formatInterval } from './types';
-import { formatRelativeTime, escapeHtml, formatDuration } from './panel.ts';
+import { formatRelativeTime, escapeHtml, formatDuration } from '../html-utils.ts';
 import { Pulse } from '@generated/sym.js';
 import type { RichError } from '../base-panel-error.ts';
 import { buildTooltipText } from '../components/tooltip.ts';

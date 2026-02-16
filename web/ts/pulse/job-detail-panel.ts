@@ -17,10 +17,10 @@ import {
   getJobStages,
   getTaskLogsForJob,
   getJobChildren,
-  formatDuration,
-  formatRelativeTime,
   getStatusColorClass,
 } from './execution-api.ts';
+import { formatDuration, formatRelativeTime, escapeHtml } from '../html-utils.ts';
+import { formatInterval } from './types.ts';
 import { forceTriggerJob } from './api.ts';
 import {
   onExecutionStarted,
@@ -194,15 +194,15 @@ class JobDetailPanel {
         <div class="panel-card job-info-card">
           <div class="job-info-row">
             <span class="job-info-label">${this.currentJob.ats_code ? 'ATS Code:' : 'Handler:'}</span>
-            <code class="job-info-value">${this.escapeHtml(this.currentJob.ats_code || this.currentJob.handler_name || '')}</code>
+            <code class="job-info-value">${escapeHtml(this.currentJob.ats_code || this.currentJob.handler_name || '')}</code>
           </div>
           <div class="job-info-row">
             <span class="job-info-label">Interval:</span>
-            <span class="job-info-value">${this.formatInterval(this.currentJob.interval_seconds ?? 0)}</span>
+            <span class="job-info-value">${formatInterval(this.currentJob.interval_seconds ?? 0)}</span>
           </div>
           <div class="job-info-row">
             <span class="job-info-label">State:</span>
-            <span class="job-info-value job-state-${this.escapeHtml(this.currentJob.state)}">${this.escapeHtml(this.currentJob.state)}</span>
+            <span class="job-info-value job-state-${escapeHtml(this.currentJob.state)}">${escapeHtml(this.currentJob.state)}</span>
           </div>
           <div class="job-info-actions">
             <button class="force-trigger-btn" onclick="window.jobDetailPanel.handleForceTrigger()">
@@ -351,27 +351,27 @@ class JobDetailPanel {
       <div class="panel-card execution-card ${statusClass} ${isExpanded ? 'expanded' : ''}" data-execution-id="${exec.id}">
         <div class="execution-header" data-action="toggle-expand">
           <span class="execution-expand-icon">${isExpanded ? '▼' : '▶'}</span>
-          <span class="panel-badge execution-status execution-status-${this.escapeHtml(exec.status)}">${this.escapeHtml(exec.status)}</span>
+          <span class="panel-badge execution-status execution-status-${escapeHtml(exec.status)}">${escapeHtml(exec.status)}</span>
           <span class="execution-time">${timeAgo}</span>
           <span class="execution-duration">${duration}</span>
         </div>
 
         ${exec.result_summary ? `
           <div class="execution-summary">
-            ${this.escapeHtml(exec.result_summary)}
+            ${escapeHtml(exec.result_summary)}
           </div>
         ` : ''}
 
         ${exec.error_message ? `
           <div class="execution-error">
-            Error: ${this.escapeHtml(exec.error_message)}
+            Error: ${escapeHtml(exec.error_message)}
           </div>
         ` : ''}
 
         ${exec.async_job_id ? `
           <div class="execution-meta">
             <span class="execution-meta-label">Async Job:</span>
-            <code class="execution-job-id">${this.escapeHtml(exec.async_job_id.substring(0, 12))}...</code>
+            <code class="execution-job-id">${escapeHtml(exec.async_job_id.substring(0, 12))}...</code>
           </div>
         ` : ''}
 
@@ -402,7 +402,7 @@ class JobDetailPanel {
       <div class="execution-stages">
         ${stagesResponse.stages.map(stage => `
           <div class="execution-stage">
-            <div class="stage-header">${this.escapeHtml(stage.stage)}</div>
+            <div class="stage-header">${escapeHtml(stage.stage)}</div>
             <div class="stage-logs-direct">
               ${stage.tasks.map(task => this.renderTaskLogsDirectly(task, contextJobId)).join('')}
             </div>
@@ -444,18 +444,18 @@ class JobDetailPanel {
 
           return `
             <div class="execution-child ${isExpanded ? 'expanded' : ''}" data-child-id="${child.id}">
-              <div class="child-header" onclick="window.jobDetailPanel.handleChildClick('${this.escapeHtml(child.id)}')">
+              <div class="child-header" onclick="window.jobDetailPanel.handleChildClick('${escapeHtml(child.id)}')">
                 <span class="child-expand-icon">${isExpanded ? '▼' : '▶'}</span>
-                <span class="child-handler">${this.escapeHtml(child.handler_name)}</span>
-                <span class="child-status child-status-${this.escapeHtml(child.status)}">${this.escapeHtml(child.status)}</span>
+                <span class="child-handler">${escapeHtml(child.handler_name)}</span>
+                <span class="child-status child-status-${escapeHtml(child.status)}">${escapeHtml(child.status)}</span>
                 <span class="child-progress">${Math.round(child.progress_pct ?? 0)}%</span>
               </div>
               <div class="child-meta">
-                <span class="child-id">${this.escapeHtml(child.id.substring(0, 16))}...</span>
-                <span class="child-source">${this.escapeHtml(child.source.substring(0, 50))}...</span>
+                <span class="child-id">${escapeHtml(child.id.substring(0, 16))}...</span>
+                <span class="child-source">${escapeHtml(child.source.substring(0, 50))}...</span>
               </div>
               ${child.error ? `
-                <div class="child-error">Error: ${this.escapeHtml(child.error)}</div>
+                <div class="child-error">Error: ${escapeHtml(child.error)}</div>
               ` : ''}
               ${isExpanded ? `
                 <div class="child-stages-container">
@@ -516,10 +516,10 @@ class JobDetailPanel {
           const levelBadge = this.getLevelBadge(log.level);
 
           return `
-            <div class="task-log-entry task-log-${this.escapeHtml(log.level)}">
+            <div class="task-log-entry task-log-${escapeHtml(log.level)}">
               <span class="task-log-timestamp">${formattedTime}</span>
-              <span class="task-log-level ${levelBadge}">${this.escapeHtml(log.level.toUpperCase())}</span>
-              <span class="task-log-message">${this.escapeHtml(log.message)}</span>
+              <span class="task-log-level ${levelBadge}">${escapeHtml(log.level.toUpperCase())}</span>
+              <span class="task-log-message">${escapeHtml(log.message)}</span>
             </div>
           `;
         }).join('')}
@@ -777,21 +777,6 @@ class JobDetailPanel {
     }
   }
 
-  private formatInterval(seconds: number): string {
-    if (seconds < 60) return `${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h`;
-    const days = Math.floor(hours / 24);
-    return `${days}d`;
-  }
-
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
 
   // ==========================================================================
   // Real-time update methods (called by WebSocket handlers)
