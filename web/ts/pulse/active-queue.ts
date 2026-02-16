@@ -64,7 +64,7 @@ function renderActiveJob(job: any): string {
                 <span class="pulse-job-status ${job.status}">${job.status}</span>
                 <span class="pulse-job-time">${timeAgo}</span>
             </div>
-            <div class="pulse-job-command">${escapeHtml(job.metadata?.command || job.type || 'Unknown')}</div>
+            <div class="pulse-job-command">${escapeHtml(job.handler_name || job.metadata?.command || job.type || 'Unknown')}</div>
             ${total > 0 ? `
                 <div class="pulse-job-operations">
                     ${completed} / ${total} operations
@@ -81,7 +81,7 @@ function renderActiveJob(job: any): string {
  * Render a recently finished job (with fade-out class)
  */
 function renderFinishedJob(job: any): string {
-    const command = escapeHtml(job.metadata?.command || job.type || 'Unknown');
+    const command = escapeHtml(job.handler_name || job.metadata?.command || job.type || 'Unknown');
     const duration = job.duration_ms ? formatDuration(job.duration_ms) : '';
     const timeAgo = job.completed_at ? formatRelativeTime(job.completed_at) : '';
 
@@ -101,7 +101,7 @@ function renderFinishedJob(job: any): string {
  * Render persistent last-completed summary row
  */
 function renderLastCompleted(job: any): string {
-    const command = escapeHtml(job.metadata?.command || job.type || 'Unknown');
+    const command = escapeHtml(job.handler_name || job.metadata?.command || job.type || 'Unknown');
     const timeAgo = job.completed_at ? formatRelativeTime(job.completed_at) : '';
     const duration = job.duration_ms ? ` (${formatDuration(job.duration_ms)})` : '';
 
