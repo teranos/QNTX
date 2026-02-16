@@ -23,7 +23,7 @@ GET: List all async jobs (active, completed, failed)
 
 HandlePulseJob handles requests to /api/pulse/jobs/{id}
 GET: Get async job details
-Sub-resources: /api/pulse/jobs/{id}/children, /api/pulse/jobs/{id}/stages, /api/pulse/jobs/{id}/tasks/:task_id/logs
+Sub-resources: /api/pulse/jobs/{id}/executions, /api/pulse/jobs/{id}/children, /api/pulse/jobs/{id}/stages, /api/pulse/jobs/{id}/tasks/:task_id/logs
 
 **Handler**: `HandlePulseJob`
 

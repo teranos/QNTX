@@ -84,11 +84,11 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 			Label: "Restaurant",
 			Color: "#e74c3c", // Appetizing red
 			RichStringFields: []string{
-				"name",           // "Chez Laurent"
-				"cuisine_type",   // "French Bistro"
-				"chef_bio",       // "Trained at Le Cordon Bleu..."
-				"specialties",    // "Duck confit, Bouillabaisse"
-				"neighborhood",   // "Mission District"
+				"name",         // "Chez Laurent"
+				"cuisine_type", // "French Bistro"
+				"chef_bio",     // "Trained at Le Cordon Bleu..."
+				"specialties",  // "Duck confit, Bouillabaisse"
+				"neighborhood", // "Mission District"
 			},
 			// NOT searchable: tax_id, license_number, owner_ssn
 		}
@@ -114,11 +114,11 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 			Label: "Menu Item",
 			Color: "#f39c12", // Golden like a croissant
 			RichStringFields: []string{
-				"dish_name",        // "Coq au Vin"
-				"description",      // "Braised chicken in wine sauce..."
-				"ingredients",      // "chicken, red wine, mushrooms, pearl onions"
-				"dietary_tags",     // "gluten-free, dairy-free"
-				"wine_pairing",     // "Pairs well with Burgundy"
+				"dish_name",    // "Coq au Vin"
+				"description",  // "Braised chicken in wine sauce..."
+				"ingredients",  // "chicken, red wine, mushrooms, pearl onions"
+				"dietary_tags", // "gluten-free, dairy-free"
+				"wine_pairing", // "Pairs well with Burgundy"
 			},
 			ArrayFields: []string{
 				"allergens", // ["nuts", "shellfish"]
@@ -147,10 +147,10 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 			Label: "City",
 			Color: "#3498db", // Ocean blue for SF
 			RichStringFields: []string{
-				"name",              // "San Francisco"
-				"culinary_scene",    // "Famous for sourdough, Dungeness crab..."
-				"famous_districts",  // "Mission for burritos, Chinatown for dim sum"
-				"food_festivals",    // "Eat Drink SF, SF Street Food Festival"
+				"name",             // "San Francisco"
+				"culinary_scene",   // "Famous for sourdough, Dungeness crab..."
+				"famous_districts", // "Mission for burritos, Chinatown for dim sum"
+				"food_festivals",   // "Eat Drink SF, SF Street Food Festival"
 			},
 			// Hints at future relationships:
 			// - city has_many restaurants
@@ -177,10 +177,10 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 			Label: "Food Review",
 			Color: "#9b59b6", // Sophisticated purple
 			RichStringFields: []string{
-				"reviewer_name",     // "Ruth Reichl"
-				"review_text",       // "The Duck à l'Orange transported me..."
+				"reviewer_name",      // "Ruth Reichl"
+				"review_text",        // "The Duck à l'Orange transported me..."
 				"highlighted_dishes", // "Don't miss the soufflé"
-				"ambiance_notes",    // "Romantic lighting, jazz trio on Fridays"
+				"ambiance_notes",     // "Romantic lighting, jazz trio on Fridays"
 			},
 			// Relationships hinted at:
 			// - food_review reviews restaurant
@@ -263,7 +263,7 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 
 		// Should have complete restaurant domain model
 		// Note: health_inspection appears twice (initial + update)
-		require.Len(t, types, 6, "Should have restaurant, menu_item, city, food_review, and health_inspection (2 versions)")
+		require.Len(t, types, 7, "Should have restaurant, menu_item, city, food_review, health_inspection (2 versions), and prompt-result")
 
 		// Map for easy verification
 		typeMap := make(map[string]map[string]interface{})
