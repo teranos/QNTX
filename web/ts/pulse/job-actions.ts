@@ -11,7 +11,6 @@
 
 import type { ScheduledJobResponse } from './types';
 import { pauseScheduledJob, resumeScheduledJob, deleteScheduledJob, forceTriggerJob } from './api';
-import { toast } from '../toast';
 import { listExecutions } from './execution-api';
 import type { PulsePanelState } from './panel-state';
 import { handleError, SEG } from '../error-handler';
@@ -43,9 +42,9 @@ export async function handleForceTrigger(
     if (!job) return;
 
     try {
-        log.debug(SEG.PULSE, 'Force triggering job:', job.ats_code);
+        log.debug(SEG.PULSE, 'Force triggering job:', job.ats_code || job.handler_name);
 
-        await forceTriggerJob(job.ats_code);
+        await forceTriggerJob(job.ats_code, job.handler_name);
 
         if (!ctx.state.expandedJobs.has(jobId)) {
             ctx.state.expandedJobs.add(jobId);
@@ -53,8 +52,6 @@ export async function handleForceTrigger(
         }
 
         await loadExecutionsForJob(jobId, ctx);
-
-        toast.success('Force trigger started - check execution history below');
     } catch (error: unknown) {
         handleError(error, 'Force trigger failed', { context: SEG.PULSE, showBuildInfo: true });
         throw error; // Re-throw so Button component can show error state
@@ -199,8 +196,8 @@ export function createForceTriggerButton(
     return new Button({
         label: 'Force Trigger',
         onClick: async () => {
-            log.debug(SEG.PULSE, 'Force triggering job:', job.ats_code);
-            await forceTriggerJob(job.ats_code);
+            log.debug(SEG.PULSE, 'Force triggering job:', job.ats_code || job.handler_name);
+            await forceTriggerJob(job.ats_code, job.handler_name);
 
             if (!ctx.state.expandedJobs.has(job.id)) {
                 ctx.state.expandedJobs.add(job.id);
@@ -208,7 +205,6 @@ export function createForceTriggerButton(
             }
 
             await loadExecutionsForJob(job.id, ctx);
-            toast.success('Force trigger started - check execution history below');
         },
         variant: 'warning',
         size: 'small',
