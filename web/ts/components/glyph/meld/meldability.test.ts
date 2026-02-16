@@ -50,8 +50,20 @@ describe('Port-aware MELDABILITY registry', () => {
             expect(areClassesCompatible('canvas-prompt-glyph', 'canvas-result-glyph')).toBe('bottom');
         });
 
+        test('doc → prompt returns bottom (doc sits above prompt)', () => {
+            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-prompt-glyph')).toBe('bottom');
+        });
+
+        test('doc → doc returns bottom (stack multiple documents)', () => {
+            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-doc-glyph')).toBe('bottom');
+        });
+
         test('note → prompt returns bottom (note sits above prompt)', () => {
             expect(areClassesCompatible('canvas-note-glyph', 'canvas-prompt-glyph')).toBe('bottom');
+        });
+
+        test('doc → result returns null (docs cannot meld onto results)', () => {
+            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-result-glyph')).toBe(null);
         });
 
         test('prompt → prompt returns null (incompatible)', () => {
@@ -68,12 +80,13 @@ describe('Port-aware MELDABILITY registry', () => {
     });
 
     describe('getInitiatorClasses', () => {
-        test('includes ax, se, py, prompt, note', () => {
+        test('includes ax, se, py, prompt, doc, note', () => {
             const classes = getInitiatorClasses();
             expect(classes).toContain('canvas-ax-glyph');
             expect(classes).toContain('canvas-se-glyph');
             expect(classes).toContain('canvas-py-glyph');
             expect(classes).toContain('canvas-prompt-glyph');
+            expect(classes).toContain('canvas-doc-glyph');
             expect(classes).toContain('canvas-note-glyph');
         });
     });
@@ -359,6 +372,27 @@ describe('Port-aware MELDABILITY registry', () => {
             expect(positions.get('py2')).toEqual({ row: 1, col: 2 });
             // prompt1 reached first from py1
             expect(positions.get('prompt1')).toEqual({ row: 1, col: 2 });
+        });
+
+        test('3+ docs stacking on prompt → stacked rows above', () => {
+            const edges = [
+                { from: 'doc1', to: 'prompt1', direction: 'bottom' },
+                { from: 'doc2', to: 'doc1', direction: 'bottom' },
+                { from: 'doc3', to: 'doc2', direction: 'bottom' }
+            ];
+            const positions = computeGridPositions(edges);
+            expect(positions.size).toBe(4);
+        });
+
+        test('note + doc both melded on prompt → separate bottom edges', () => {
+            const edges = [
+                { from: 'doc1', to: 'prompt1', direction: 'bottom' },
+                { from: 'note1', to: 'prompt1', direction: 'bottom' }
+            ];
+            const positions = computeGridPositions(edges);
+            expect(positions.get('prompt1')).toBeDefined();
+            expect(positions.get('doc1')).toBeDefined();
+            expect(positions.get('note1')).toBeDefined();
         });
 
         test('top direction edge → row above parent', () => {
