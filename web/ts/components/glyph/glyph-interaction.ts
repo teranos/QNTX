@@ -23,6 +23,7 @@ import {
 } from './meld/meld-system';
 import { getMeldOptions, getGlyphClass } from './meld/meldability';
 import { isGlyphSelected, getSelectedGlyphIds } from './canvas/selection';
+import { getTransform } from './canvas/canvas-pan.js';
 import { addComposition, findCompositionByGlyph } from '../../state/compositions';
 
 // ── Options ─────────────────────────────────────────────────────────
@@ -179,6 +180,7 @@ export function makeDraggable(
     let dragController: AbortController | null = null;
     let currentMeldTarget: HTMLElement | null = null;
     let rafId: number | null = null; // Track requestAnimationFrame for meld feedback
+    let dragCanvasId = '';
 
     // Multi-selection drag support
     let isMultiDrag = false;
@@ -187,8 +189,9 @@ export function makeDraggable(
     const handleMouseMove = (e: MouseEvent) => {
         if (!isDragging) return;
 
-        const deltaX = e.clientX - dragStartX;
-        const deltaY = e.clientY - dragStartY;
+        const scale = getTransform(dragCanvasId).scale || 1;
+        const deltaX = (e.clientX - dragStartX) / scale;
+        const deltaY = (e.clientY - dragStartY) / scale;
 
         if (isMultiDrag) {
             // Move all selected glyphs together
@@ -445,6 +448,7 @@ export function makeDraggable(
 
         // Check if this glyph is part of a multi-selection
         const canvasId = (element.closest('[data-canvas-id]') as HTMLElement | null)?.dataset?.canvasId ?? 'canvas-workspace';
+        dragCanvasId = canvasId;
         const selectedIds = getSelectedGlyphIds(canvasId);
         if (selectedIds.length > 1 && isGlyphSelected(canvasId, glyph.id)) {
             isMultiDrag = true;
@@ -534,12 +538,14 @@ export function makeResizable(
     let startWidth = 0;
     let startHeight = 0;
     let abortController: AbortController | null = null;
+    let resizeCanvasId = '';
 
     const handleMouseMove = (e: MouseEvent) => {
         if (!isResizing) return;
 
-        const deltaX = e.clientX - startX;
-        const deltaY = e.clientY - startY;
+        const scale = getTransform(resizeCanvasId).scale || 1;
+        const deltaX = (e.clientX - startX) / scale;
+        const deltaY = (e.clientY - startY) / scale;
 
         const newWidth = Math.max(minWidth, startWidth + deltaX);
         const newHeight = Math.max(minHeight, startHeight + deltaY);
@@ -554,10 +560,9 @@ export function makeResizable(
 
         element.classList.remove('is-resizing');
 
-        // Save final size
-        const rect = element.getBoundingClientRect();
-        const finalWidth = Math.round(rect.width);
-        const finalHeight = Math.round(rect.height);
+        // Save final size (offsetWidth/Height gives CSS-space, unaffected by canvas zoom)
+        const finalWidth = element.offsetWidth;
+        const finalHeight = element.offsetHeight;
 
         glyph.width = finalWidth;
         glyph.height = finalHeight;
@@ -589,9 +594,9 @@ export function makeResizable(
 
         startX = e.clientX;
         startY = e.clientY;
-        const rect = element.getBoundingClientRect();
-        startWidth = rect.width;
-        startHeight = rect.height;
+        resizeCanvasId = (element.closest('[data-canvas-id]') as HTMLElement | null)?.dataset?.canvasId ?? 'canvas-workspace';
+        startWidth = element.offsetWidth;
+        startHeight = element.offsetHeight;
 
         element.classList.add('is-resizing');
 

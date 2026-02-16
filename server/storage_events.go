@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/teranos/QNTX/logger"
@@ -18,6 +19,10 @@ type StorageEventsPoller struct {
 	logger   *zap.SugaredLogger
 	interval time.Duration
 	lastID   int64 // Track last processed event ID
+
+	// Accumulated eviction counters, drained by the Pulse ticker for periodic summaries
+	evictionEvents       atomic.Int64
+	evictedAttestations  atomic.Int64
 }
 
 // NewStorageEventsPoller creates a new storage events poller
@@ -156,7 +161,10 @@ func (p *StorageEventsPoller) broadcastEviction(eventType, actor, context, entit
 		logFields = append(logFields, "eviction_details", detailsMap)
 	}
 
-	logger.AddDBSymbol(p.logger).Infow("Storage eviction", logFields...)
+	logger.AddDBSymbol(p.logger).Debugw("Storage eviction", logFields...)
+
+	p.evictionEvents.Add(1)
+	p.evictedAttestations.Add(int64(deletionsCount))
 
 	// Broadcast as storage_eviction message
 	msg := map[string]interface{}{
@@ -201,6 +209,12 @@ func (p *StorageEventsPoller) broadcastWarning(actor, context string, current, l
 	}
 
 	p.server.broadcastMessage(msg)
+}
+
+// DrainEvictionCounts atomically reads and resets the accumulated eviction counters.
+// Returns (eviction events, attestations evicted). Both zero means no evictions since last drain.
+func (p *StorageEventsPoller) DrainEvictionCounts() (events int, attestations int) {
+	return int(p.evictionEvents.Swap(0)), int(p.evictedAttestations.Swap(0))
 }
 
 // getDefaultLimit returns the default limit for a given event type
