@@ -1,17 +1,12 @@
 /**
- * Pulse Panel Template and Utilities
+ * Pulse Panel Template
  *
- * Contains the main panel template and shared utility functions.
+ * Contains the main panel template.
  * Job card rendering is in schedules.ts, system status in system-status.ts,
  * and active queue in active-queue.ts.
  */
 
 import { Pulse } from '@generated/sym.js';
-import { escapeHtml as escapeHtmlUtil, formatRelativeTime as formatRelativeTimeUtil } from '../html-utils.ts';
-
-// Time conversion constants
-const MS_PER_SECOND = 1000;
-const SECONDS_PER_MINUTE = 60;
 
 /**
  * Render the main panel template (header + content wrapper)
@@ -49,25 +44,3 @@ export function renderPanelTemplate(): string {
         </div>
     `;
 }
-
-/**
- * Format duration in milliseconds to human-readable string
- */
-export function formatDuration(durationMs: number): string {
-    if (durationMs < MS_PER_SECOND) return `${durationMs}ms`;
-    const seconds = Math.floor(durationMs / MS_PER_SECOND);
-    if (seconds < SECONDS_PER_MINUTE) return `${seconds}s`;
-    const minutes = Math.floor(seconds / SECONDS_PER_MINUTE);
-    const remainingSeconds = seconds % SECONDS_PER_MINUTE;
-    return `${minutes}m ${remainingSeconds}s`;
-}
-
-/**
- * Format timestamp to relative time string (e.g., "5m ago", "2h from now")
- */
-export const formatRelativeTime = formatRelativeTimeUtil;
-
-/**
- * Escape HTML special characters
- */
-export const escapeHtml = escapeHtmlUtil;

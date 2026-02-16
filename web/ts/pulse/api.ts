@@ -6,6 +6,7 @@
 
 import { log, SEG } from "../logger";
 import { handleError } from "../error-handler";
+import { apiFetch } from "../api.ts";
 import type {
   ScheduledJobResponse,
   CreateScheduledJobRequest,
@@ -14,27 +15,10 @@ import type {
 } from "./types.ts";
 
 /**
- * Get base URL for Pulse API - resolves at call time to ensure __BACKEND_URL__ is available
- */
-function getBaseUrl(): string {
-    const backendUrl = (window as any).__BACKEND_URL__ || '';
-    const baseUrl = `${backendUrl}/api/pulse/schedules`;
-
-    if (backendUrl) {
-        log.debug(SEG.PULSE, 'Backend URL configured:', backendUrl);
-    } else {
-        log.debug(SEG.PULSE, 'Using same-origin backend');
-    }
-    log.debug(SEG.PULSE, 'Full URL:', baseUrl);
-
-    return baseUrl;
-}
-
-/**
  * List all scheduled jobs
  */
 export async function listScheduledJobs(): Promise<ScheduledJobResponse[]> {
-  const response = await fetch(getBaseUrl());
+  const response = await apiFetch('/api/pulse/schedules');
   if (!response.ok) {
     throw new Error(`Failed to list scheduled jobs: ${response.statusText}`);
   }
@@ -46,7 +30,7 @@ export async function listScheduledJobs(): Promise<ScheduledJobResponse[]> {
  * Get a specific scheduled job by ID
  */
 export async function getScheduledJob(id: string): Promise<ScheduledJobResponse> {
-  const response = await fetch(`${getBaseUrl()}/${id}`);
+  const response = await apiFetch(`/api/pulse/schedules/${id}`);
   if (!response.ok) {
     throw new Error(`Failed to get scheduled job: ${response.statusText}`);
   }
@@ -59,10 +43,9 @@ export async function getScheduledJob(id: string): Promise<ScheduledJobResponse>
 export async function createScheduledJob(
   request: CreateScheduledJobRequest
 ): Promise<ScheduledJobResponse> {
-  const baseUrl = getBaseUrl();
   log.debug(SEG.PULSE, 'Creating scheduled job:', request);
 
-  const response = await fetch(baseUrl, {
+  const response = await apiFetch('/api/pulse/schedules', {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
@@ -115,12 +98,9 @@ export async function updateScheduledJob(
   id: string,
   request: UpdateScheduledJobRequest
 ): Promise<ScheduledJobResponse> {
-  const baseUrl = getBaseUrl();
-  const url = `${baseUrl}/${id}`;
+  log.debug(SEG.PULSE, 'Updating scheduled job:', { id, request });
 
-  log.debug(SEG.PULSE, 'Updating scheduled job:', { id, request, url });
-
-  const response = await fetch(url, {
+  const response = await apiFetch(`/api/pulse/schedules/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
@@ -129,7 +109,6 @@ export async function updateScheduledJob(
   log.debug(SEG.PULSE, 'Update response:', {
     status: response.status,
     statusText: response.statusText,
-    url: response.url,
   });
 
   if (!response.ok) {
@@ -144,7 +123,7 @@ export async function updateScheduledJob(
  * Delete a scheduled job (sets to inactive state)
  */
 export async function deleteScheduledJob(id: string): Promise<void> {
-  const response = await fetch(`${getBaseUrl()}/${id}`, {
+  const response = await apiFetch(`/api/pulse/schedules/${id}`, {
     method: "DELETE",
   });
 
