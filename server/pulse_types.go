@@ -54,36 +54,16 @@ type ErrorResponse struct {
 	Details []string `json:"details,omitempty"` // Structured error context from errors.GetAllDetails()
 }
 
-// TaskInfo represents a task within a stage
-type TaskInfo struct {
-	TaskID   string `json:"task_id"`
-	LogCount int    `json:"log_count,omitempty"`
-}
-
-// StageInfo represents a stage with its tasks
-type StageInfo struct {
-	Stage string     `json:"stage"`
-	Tasks []TaskInfo `json:"tasks"`
-}
-
 // JobStagesResponse represents the response for GET /jobs/:job_id/stages
 type JobStagesResponse struct {
-	JobID  string      `json:"job_id"`
-	Stages []StageInfo `json:"stages"`
-}
-
-// LogEntry represents a single log entry
-type LogEntry struct {
-	Timestamp string                 `json:"timestamp"`
-	Level     string                 `json:"level"`
-	Message   string                 `json:"message"`
-	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+	JobID  string               `json:"job_id"`
+	Stages []schedule.StageInfo `json:"stages"`
 }
 
 // TaskLogsResponse represents the response for GET /tasks/:task_id/logs
 type TaskLogsResponse struct {
-	TaskID string     `json:"task_id"`
-	Logs   []LogEntry `json:"logs"`
+	TaskID string              `json:"task_id"`
+	Logs   []schedule.LogEntry `json:"logs"`
 }
 
 // ChildJobInfo represents a child job summary
