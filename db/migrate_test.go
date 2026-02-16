@@ -59,6 +59,9 @@ func TestOpenWithMigrations(t *testing.T) {
 	})
 
 	t.Run("migration errors include stack traces", func(t *testing.T) {
+		if os.Getuid() == 0 {
+			t.Skip("skipping: root bypasses filesystem permission restrictions")
+		}
 		// Create a scenario where opening database will fail
 		// This tests that OpenWithMigrations properly wraps errors with stack traces
 		tmpDir := t.TempDir()

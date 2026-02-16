@@ -43,6 +43,9 @@ func TestOpen(t *testing.T) {
 	})
 
 	t.Run("returns error for invalid path", func(t *testing.T) {
+		if os.Getuid() == 0 {
+			t.Skip("skipping: root bypasses filesystem permission restrictions")
+		}
 		// Use a path that doesn't exist and can't be created
 		invalidPath := "/invalid/nonexistent/path/db.sqlite"
 
@@ -75,6 +78,9 @@ func TestOpen(t *testing.T) {
 	})
 
 	t.Run("errors include stack traces from errors package", func(t *testing.T) {
+		if os.Getuid() == 0 {
+			t.Skip("skipping: root bypasses filesystem permission restrictions")
+		}
 		// Create a scenario where WAL mode enabling will fail
 		// 1. Create a temporary directory with a database
 		tmpDir := t.TempDir()
