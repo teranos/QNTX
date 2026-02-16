@@ -619,3 +619,67 @@
 .has-tooltip {
     cursor: help;
 }
+
+/* =============================================================================
+   Active Queue - Recently Finished + Last Completed
+   ============================================================================= */
+
+/* Recently finished job — stays full opacity then fades */
+.pulse-active-job.pulse-job-finished {
+    animation: pulse-fade-out 8s ease-out forwards;
+}
+
+@keyframes pulse-fade-out {
+    0%   { opacity: 1; }
+    62%  { opacity: 1; }
+    100% { opacity: 0.3; }
+}
+
+/* Status colors for finished jobs in active queue */
+.pulse-job-status.completed { color: #34c759; }
+.pulse-job-status.failed    { color: #ff3b30; }
+
+.pulse-job-duration {
+    font-size: var(--font-size-sm);
+    color: var(--text-tertiary);
+    font-family: 'SF Mono', Monaco, monospace;
+}
+
+/* Persistent last-completed summary */
+.pulse-last-completed {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    border-top: 1px solid var(--border-light);
+    margin-top: 8px;
+}
+
+.pulse-last-completed-label {
+    font-weight: 500;
+    color: var(--text-tertiary);
+}
+
+.pulse-last-completed-status {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: var(--font-size-sm);
+}
+
+.pulse-last-completed-status.completed { color: #34c759; }
+.pulse-last-completed-status.failed    { color: #ff3b30; }
+
+.pulse-last-completed-command {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pulse-last-completed-time {
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
