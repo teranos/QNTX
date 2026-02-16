@@ -7,10 +7,12 @@
 
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
+import { apiFetch } from '../../api';
 import { uiState } from '../../state/ui';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { unmeldComposition } from './meld/meld-composition';
-import { makeDraggable } from './glyph-interaction';
+import { autoMeldResultBelow } from './meld/meld-system';
+import { makeDraggable, preventDrag, storeCleanup } from './glyph-interaction';
 
 /**
  * Glyph execution result data
@@ -24,12 +26,25 @@ export interface ExecutionResult {
     duration_ms: number;
 }
 
+export interface PromptConfig {
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    provider?: string;
+}
+
+export interface ResultGlyphContent {
+    result: ExecutionResult;
+    promptConfig?: PromptConfig;
+}
+
 /**
  * Create a result glyph showing execution output
  */
 export function createResultGlyph(
     glyph: Glyph,
-    result: ExecutionResult
+    result: ExecutionResult,
+    promptConfig?: PromptConfig
 ): HTMLElement {
     // Calculate height based on content
     const lineCount = (result.stdout + result.stderr + (result.error || '')).split('\n').length;
@@ -194,10 +209,142 @@ export function createResultGlyph(
 
     element.appendChild(outputContainer);
 
+    // Follow-up input zone — hidden until hover/focus
+    const followupZone = document.createElement('div');
+    followupZone.className = 'result-followup-zone';
+
+    const followupInput = document.createElement('textarea');
+    followupInput.placeholder = 'Follow up…';
+    followupInput.rows = 1;
+    preventDrag(followupInput);
+
+    const followupStatus = document.createElement('span');
+    followupStatus.className = 'followup-status';
+
+    followupInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            const text = followupInput.value.trim();
+            if (!text) return;
+
+            followupInput.disabled = true;
+            followupStatus.textContent = 'Running…';
+
+            const body: Record<string, unknown> = {
+                template: text,
+                system_prompt: result.stdout,
+                glyph_id: glyph.id,
+            };
+            if (promptConfig?.model) body.model = promptConfig.model;
+            if (promptConfig?.provider) body.provider = promptConfig.provider;
+
+            const startTime = Date.now();
+
+            apiFetch('/api/prompt/direct', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            })
+                .then(async (response) => {
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`API error: ${response.status} - ${errorText}`);
+                    }
+                    return response.json();
+                })
+                .then((data: any) => {
+                    const elapsedMs = Date.now() - startTime;
+                    followupStatus.textContent = `${(elapsedMs / 1000).toFixed(2)}s`;
+                    followupInput.value = '';
+                    followupInput.disabled = false;
+
+                    const followupResult: ExecutionResult = {
+                        success: !data.error,
+                        stdout: data.response ?? '',
+                        stderr: '',
+                        result: null,
+                        error: data.error ?? null,
+                        duration_ms: elapsedMs,
+                    };
+                    spawnFollowUpResult(element, glyph, followupResult, promptConfig);
+                })
+                .catch((err) => {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    followupStatus.textContent = `Failed: ${msg}`;
+                    followupInput.disabled = false;
+                    log.error(SEG.GLYPH, `[ResultGlyph] Follow-up failed for ${glyph.id}:`, err);
+                });
+        }
+    });
+
+    followupZone.appendChild(followupInput);
+    followupZone.appendChild(followupStatus);
+    element.appendChild(followupZone);
+
+    // Register cleanup
+    storeCleanup(element, () => {});
+
     // Ensure result data is attached to glyph object for drag persistence
-    (glyph as any).content = JSON.stringify(result);
+    const contentPayload: ResultGlyphContent = { result, ...(promptConfig && { promptConfig }) };
+    (glyph as any).content = JSON.stringify(contentPayload);
 
     return element;
+}
+
+/**
+ * Spawn a follow-up result glyph below a parent result glyph.
+ * Mirrors prompt-glyph's spawnResultGlyph pattern.
+ */
+function spawnFollowUpResult(
+    parentElement: HTMLElement,
+    parentGlyph: Glyph,
+    result: ExecutionResult,
+    promptConfig?: PromptConfig
+): void {
+    const parentRect = parentElement.getBoundingClientRect();
+    const canvas = parentElement.closest('.canvas-workspace') as HTMLElement;
+    if (!canvas) {
+        log.error(SEG.GLYPH, '[ResultGlyph] Cannot spawn follow-up: no canvas-workspace ancestor');
+        return;
+    }
+    const canvasRect = canvas.getBoundingClientRect();
+
+    const rx = parentRect.left - canvasRect.left;
+    const ry = parentRect.bottom - canvasRect.top;
+
+    const resultGlyphId = `result-${crypto.randomUUID()}`;
+    const resultGlyph: Glyph = {
+        id: resultGlyphId,
+        title: 'Follow-up Result',
+        symbol: 'result',
+        x: rx,
+        y: ry,
+        width: Math.round(parentRect.width),
+        renderContent: () => document.createElement('div')
+    };
+
+    const resultElement = createResultGlyph(resultGlyph, result, promptConfig);
+    canvas.appendChild(resultElement);
+
+    const resultRect = resultElement.getBoundingClientRect();
+    const contentPayload: ResultGlyphContent = { result, ...(promptConfig && { promptConfig }) };
+    uiState.addCanvasGlyph({
+        id: resultGlyphId,
+        symbol: 'result',
+        x: rx,
+        y: ry,
+        width: Math.round(resultRect.width),
+        height: Math.round(resultRect.height),
+        content: JSON.stringify(contentPayload),
+    });
+
+    // Auto-meld below parent result
+    const parentGlyphId = parentElement.dataset.glyphId;
+    if (parentGlyphId) {
+        autoMeldResultBelow(parentElement, parentGlyphId, 'result', 'Result', resultElement, resultGlyphId, 'ResultGlyph');
+    }
+
+    log.debug(SEG.GLYPH, `[ResultGlyph] Spawned follow-up ${resultGlyphId} below ${parentGlyph.id}`);
 }
 
 /**
@@ -264,12 +411,18 @@ export function updateResultGlyphContent(resultElement: HTMLElement, result: Exe
         }
     }
 
-    // Update persisted content
+    // Update persisted content (preserve promptConfig if present)
     const glyphId = resultElement.getAttribute('data-glyph-id');
     if (glyphId) {
         const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
         if (existing) {
-            uiState.addCanvasGlyph({ ...existing, content: JSON.stringify(result) });
+            let promptConfig: PromptConfig | undefined;
+            try {
+                const prev = JSON.parse(existing.content || '{}');
+                promptConfig = prev.promptConfig;
+            } catch { /* ignore */ }
+            const contentPayload: ResultGlyphContent = { result, ...(promptConfig && { promptConfig }) };
+            uiState.addCanvasGlyph({ ...existing, content: JSON.stringify(contentPayload) });
         }
     }
 
