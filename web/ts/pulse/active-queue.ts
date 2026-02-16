@@ -2,7 +2,7 @@
  * Active Queue Section - Currently running async jobs
  */
 
-import { formatRelativeTime, escapeHtml } from './panel.ts';
+import { formatRelativeTime, escapeHtml } from '../html-utils.ts';
 import { log, SEG } from '../logger';
 import { handleError } from '../error-handler';
 import { apiFetch } from '../api.ts';
