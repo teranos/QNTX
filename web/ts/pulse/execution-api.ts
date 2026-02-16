@@ -5,7 +5,7 @@
  */
 
 import { log, SEG } from "../logger";
-import { handleError } from "../error-handler";
+import { apiFetch } from "../api.ts";
 import type {
   Execution,
   ListExecutionsResponse,
@@ -14,37 +14,6 @@ import type {
   TaskLogsResponse,
   JobChildrenResponse,
 } from "./execution-types.ts";
-import { formatRelativeTime as formatRelativeTimeUtil } from "../html-utils.ts";
-
-// Time conversion constants
-const MS_PER_SECOND = 1000;
-const SECONDS_PER_MINUTE = 60;
-
-/**
- * Get base URL for Pulse API endpoints
- */
-function getBaseUrl(): string {
-  const backendUrl = (window as any).__BACKEND_URL__ || "";
-  return `${backendUrl}/api/pulse`;
-}
-
-/**
- * Wrapper for fetch with consistent error handling
- * @param url - URL to fetch
- * @param options - Fetch options
- * @returns Response object
- * @throws Error with user-friendly message on network or HTTP errors
- */
-async function safeFetch(url: string, options?: RequestInit): Promise<Response> {
-  try {
-    const response = await fetch(url, options);
-    return response;
-  } catch (error: unknown) {
-    // Network error (connection refused, DNS failure, etc.)
-    handleError(error, 'Network error: Unable to connect to server', { context: SEG.PULSE, silent: true });
-    throw new Error('Network error: Unable to connect to server. Please check your connection.');
-  }
-}
 
 /**
  * List executions for a scheduled job
@@ -68,10 +37,10 @@ export async function listExecutions(
     searchParams.set("status", status);
   }
 
-  const url = `${getBaseUrl()}/jobs/${jobId}/executions?${searchParams}`;
-  log.debug(SEG.PULSE, "Listing executions:", { jobId, params, url });
+  const path = `/api/pulse/jobs/${jobId}/executions?${searchParams}`;
+  log.debug(SEG.PULSE, "Listing executions:", { jobId, params });
 
-  const response = await safeFetch(url);
+  const response = await apiFetch(path);
 
   if (!response.ok) {
     const error = `Failed to list executions: ${response.statusText}`;
@@ -98,10 +67,9 @@ export async function listExecutions(
 export async function getExecution(
   executionId: string
 ): Promise<Execution> {
-  const url = `${getBaseUrl()}/executions/${executionId}`;
-  log.debug(SEG.PULSE, "Getting execution:", { executionId, url });
+  log.debug(SEG.PULSE, "Getting execution:", { executionId });
 
-  const response = await safeFetch(url);
+  const response = await apiFetch(`/api/pulse/executions/${executionId}`);
 
   if (!response.ok) {
     if (response.status === 404) {
@@ -131,10 +99,9 @@ export async function getExecution(
 export async function getExecutionLogs(
   executionId: string
 ): Promise<string> {
-  const url = `${getBaseUrl()}/executions/${executionId}/logs`;
-  log.debug(SEG.PULSE, "Getting logs:", { executionId, url });
+  log.debug(SEG.PULSE, "Getting logs:", { executionId });
 
-  const response = await safeFetch(url);
+  const response = await apiFetch(`/api/pulse/executions/${executionId}/logs`);
 
   if (!response.ok) {
     if (response.status === 404) {
@@ -150,33 +117,6 @@ export async function getExecutionLogs(
 
   return logs;
 }
-
-/**
- * Format execution duration for display
- *
- * @param durationMs - Duration in milliseconds
- * @returns Human-readable duration string
- */
-export function formatDuration(durationMs: number): string {
-  if (durationMs < MS_PER_SECOND) {
-    return `${durationMs}ms`;
-  }
-
-  const seconds = Math.floor(durationMs / MS_PER_SECOND);
-  if (seconds < SECONDS_PER_MINUTE) {
-    return `${seconds}s`;
-  }
-
-  const minutes = Math.floor(seconds / SECONDS_PER_MINUTE);
-  const remainingSeconds = seconds % SECONDS_PER_MINUTE;
-  return `${minutes}m ${remainingSeconds}s`;
-}
-
-/**
- * Format relative time for execution timestamps
- * Re-exported from html-utils for convenience
- */
-export const formatRelativeTime = formatRelativeTimeUtil;
 
 /**
  * Get status color class for styling
@@ -204,10 +144,9 @@ export function getStatusColorClass(status: string): string {
  * @returns Hierarchical stages and tasks with log counts
  */
 export async function getJobStages(jobId: string): Promise<JobStagesResponse> {
-  const url = `${getBaseUrl()}/jobs/${jobId}/stages`;
-  log.debug(SEG.PULSE, "Getting job stages:", { jobId, url });
+  log.debug(SEG.PULSE, "Getting job stages:", { jobId });
 
-  const response = await safeFetch(url);
+  const response = await apiFetch(`/api/pulse/jobs/${jobId}/stages`);
 
   if (!response.ok) {
     if (response.status === 404) {
@@ -236,10 +175,9 @@ export async function getJobStages(jobId: string): Promise<JobStagesResponse> {
  * @returns Log entries with timestamp, level, message, metadata
  */
 export async function getTaskLogs(taskId: string): Promise<TaskLogsResponse> {
-  const url = `${getBaseUrl()}/tasks/${taskId}/logs`;
-  log.debug(SEG.PULSE, "Getting task logs:", { taskId, url });
+  log.debug(SEG.PULSE, "Getting task logs:", { taskId });
 
-  const response = await safeFetch(url);
+  const response = await apiFetch(`/api/pulse/tasks/${taskId}/logs`);
 
   if (!response.ok) {
     if (response.status === 404) {
@@ -270,10 +208,9 @@ export async function getTaskLogsForJob(
   jobId: string,
   taskId: string
 ): Promise<TaskLogsResponse> {
-  const url = `${getBaseUrl()}/jobs/${jobId}/tasks/${taskId}/logs`;
-  log.debug(SEG.PULSE, "Getting task logs for job:", { jobId, taskId, url });
+  log.debug(SEG.PULSE, "Getting task logs for job:", { jobId, taskId });
 
-  const response = await safeFetch(url);
+  const response = await apiFetch(`/api/pulse/jobs/${jobId}/tasks/${taskId}/logs`);
 
   if (!response.ok) {
     if (response.status === 404) {
@@ -303,10 +240,9 @@ export async function getTaskLogsForJob(
 export async function getJobChildren(
   jobId: string
 ): Promise<JobChildrenResponse> {
-  const url = `${getBaseUrl()}/jobs/${jobId}/children`;
-  log.debug(SEG.PULSE, "Getting child jobs:", { jobId, url });
+  log.debug(SEG.PULSE, "Getting child jobs:", { jobId });
 
-  const response = await safeFetch(url);
+  const response = await apiFetch(`/api/pulse/jobs/${jobId}/children`);
 
   if (!response.ok) {
     if (response.status === 404) {

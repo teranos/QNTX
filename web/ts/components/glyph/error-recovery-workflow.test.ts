@@ -52,10 +52,10 @@ describe('Error Recovery Workflow - Jenny (Complex Scenarios)', () => {
         const resultElement = createResultGlyph(resultGlyph, executionResult);
         canvas.appendChild(resultElement);
 
-        // Verify execution data is attached as JSON string
+        // Verify execution data is attached as ResultGlyphContent JSON
         expect((resultGlyph as any).content).toBeDefined();
         const parsed = JSON.parse((resultGlyph as any).content);
-        expect(parsed.stdout).toContain('42 records');
+        expect(parsed.result.stdout).toContain('42 records');
 
         // 2. SIMULATE DATA LOSS (drag bug, page reload, etc.)
         // In real scenario, this happens when content field isn't preserved during drag

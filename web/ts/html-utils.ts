@@ -196,3 +196,18 @@ export function stripHtml(html: string): string {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     return doc.body.textContent || '';
 }
+
+/**
+ * Format duration in milliseconds to human-readable string
+ *
+ * @param durationMs - Duration in milliseconds
+ * @returns Human-readable duration (e.g., "150ms", "5s", "2m 30s")
+ */
+export function formatDuration(durationMs: number): string {
+    if (durationMs < 1000) return `${durationMs}ms`;
+    const seconds = Math.floor(durationMs / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}m ${remainingSeconds}s`;
+}
