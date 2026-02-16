@@ -60,6 +60,7 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("embeddings.name", "all-MiniLM-L6-v2")
 	v.SetDefault("embeddings.cluster_threshold", 0.5)        // Minimum cosine similarity for cluster prediction
 	v.SetDefault("embeddings.recluster_interval_seconds", 0) // 0 = disabled (QNTX LAW: zero means zero)
+	v.SetDefault("embeddings.reproject_interval_seconds", 0) // 0 = disabled (QNTX LAW: zero means zero)
 	v.SetDefault("embeddings.min_cluster_size", 5)           // Minimum cluster size for HDBSCAN
 
 	// Plugin configuration defaults
