@@ -236,6 +236,13 @@ export function createResultGlyph(
     followupInput.rows = 1;
     preventDrag(followupInput);
 
+    // Auto-resize textarea as content grows
+    function autoResize() {
+        followupInput.style.height = 'auto';
+        followupInput.style.height = `${followupInput.scrollHeight}px`;
+    }
+    followupInput.addEventListener('input', autoResize);
+
     const followupStatus = document.createElement('span');
     followupStatus.className = 'followup-status';
 
@@ -274,6 +281,7 @@ export function createResultGlyph(
                     const elapsedMs = Date.now() - startTime;
                     followupStatus.textContent = `${(elapsedMs / 1000).toFixed(2)}s`;
                     followupInput.value = '';
+                    followupInput.style.height = 'auto';
                     followupInput.disabled = false;
 
                     const followupResult: ExecutionResult = {
