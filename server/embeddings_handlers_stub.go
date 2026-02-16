@@ -54,6 +54,9 @@ func (s *QNTXServer) SetupEmbeddingService() {
 // setupEmbeddingReclusterSchedule is a no-op when embeddings are not available
 func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *am.Config) {}
 
+// setupEmbeddingReprojectSchedule is a no-op when embeddings are not available
+func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *am.Config) {}
+
 // hasRustEmbeddings returns false when compiled without rustembeddings build tag
 func hasRustEmbeddings() bool {
 	return false
