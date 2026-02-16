@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/errors"
+	id "github.com/teranos/vanity-id"
 )
 
 const (
@@ -785,4 +786,108 @@ func (s *Store) GetNextScheduledJob() (*Job, error) {
 	}
 
 	return &job, nil
+}
+
+// ForceTriggerParams contains the inputs needed to create a force-trigger execution.
+type ForceTriggerParams struct {
+	ATSCode     string // Original ATS code (empty for handler-only schedules)
+	HandlerName string // Resolved handler name
+	Payload     []byte // Pre-computed JSON payload
+	SourceURL   string // Source URL for deduplication
+	AsyncJobID  string // ID of the async job that will be enqueued
+}
+
+// ForceTriggerResult contains the IDs created by a force-trigger execution.
+type ForceTriggerResult struct {
+	ScheduledJobID string // Existing or newly created scheduled job ID
+	ExecutionID    string // Newly created execution record ID
+	CreatedNewJob  bool   // True if a new temporary scheduled job was created
+}
+
+// CreateForceTriggerExecution atomically finds-or-creates a scheduled job for tracking
+// and creates an execution record linked to the given async job.
+//
+// The transaction ensures that the scheduled job and execution record are created together.
+// The async job itself should be enqueued AFTER this method returns successfully.
+//
+// Lookup order:
+//  1. Active scheduled job matching ats_code or handler_name
+//  2. Existing __force_trigger__ temp job matching the same key
+//  3. Creates a new inactive temp job with __force_trigger__ marker
+func (s *Store) CreateForceTriggerExecution(params ForceTriggerParams) (*ForceTriggerResult, error) {
+	now := time.Now()
+	nowStr := now.Format(time.RFC3339)
+
+	// Determine lookup column and key
+	lookupCol := "ats_code"
+	lookupKey := params.ATSCode
+	if lookupKey == "" {
+		lookupCol = "handler_name"
+		lookupKey = params.HandlerName
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to begin force trigger transaction")
+	}
+	defer tx.Rollback()
+
+	// Step 1: Find existing active scheduled job
+	var scheduledJobID string
+	var createdNew bool
+
+	err = tx.QueryRow(
+		fmt.Sprintf(`SELECT id FROM scheduled_pulse_jobs WHERE %s = ? AND state = 'active' LIMIT 1`, lookupCol),
+		lookupKey,
+	).Scan(&scheduledJobID)
+
+	if err != nil || scheduledJobID == "" {
+		// Step 2: Try to reuse existing __force_trigger__ temp job
+		err = tx.QueryRow(
+			fmt.Sprintf(`SELECT id FROM scheduled_pulse_jobs WHERE %s = ? AND created_from_doc_id = '__force_trigger__' ORDER BY created_at DESC LIMIT 1`, lookupCol),
+			lookupKey,
+		).Scan(&scheduledJobID)
+
+		if err != nil || scheduledJobID == "" {
+			// Step 3: Create new temp scheduled job
+			if params.ATSCode != "" {
+				scheduledJobID, err = id.GenerateASID(params.ATSCode, "force-trigger", "pulse", "system")
+				if err != nil {
+					return nil, errors.Wrapf(err, "failed to generate tracking job ID for %s", params.ATSCode)
+				}
+			} else {
+				scheduledJobID = fmt.Sprintf("SPJ_force_%s_%d", params.HandlerName, now.Unix())
+			}
+
+			_, err = tx.Exec(`
+				INSERT INTO scheduled_pulse_jobs (id, ats_code, handler_name, payload, source_url, state, interval_seconds, created_at, updated_at, created_from_doc_id)
+				VALUES (?, ?, ?, ?, ?, 'inactive', 0, ?, ?, '__force_trigger__')
+			`, scheduledJobID, params.ATSCode, params.HandlerName, params.Payload, params.SourceURL, nowStr, nowStr)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to create tracking job for handler %s", params.HandlerName)
+			}
+			createdNew = true
+		}
+	}
+
+	// Step 4: Create execution record
+	executionID := id.GenerateExecutionID()
+
+	_, err = tx.Exec(`
+		INSERT INTO pulse_executions (id, scheduled_job_id, async_job_id, status, started_at, created_at, updated_at)
+		VALUES (?, ?, ?, 'running', ?, ?, ?)
+	`, executionID, scheduledJobID, params.AsyncJobID, nowStr, nowStr, nowStr)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create execution record for job %s", scheduledJobID)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, errors.Wrap(err, "failed to commit force trigger transaction")
+	}
+
+	return &ForceTriggerResult{
+		ScheduledJobID: scheduledJobID,
+		ExecutionID:    executionID,
+		CreatedNewJob:  createdNew,
+	}, nil
 }
