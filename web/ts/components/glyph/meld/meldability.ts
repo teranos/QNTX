@@ -20,8 +20,8 @@ export interface PortRule {
 /** All glyph classes that participate in melding */
 const ALL_GLYPH_CLASSES = [
     'canvas-ax-glyph', 'canvas-se-glyph', 'canvas-py-glyph',
-    'canvas-prompt-glyph', 'canvas-note-glyph', 'canvas-result-glyph',
-    'canvas-subcanvas-glyph',
+    'canvas-prompt-glyph', 'canvas-doc-glyph', 'canvas-note-glyph',
+    'canvas-result-glyph', 'canvas-subcanvas-glyph',
 ] as const;
 
 /**
@@ -41,6 +41,9 @@ export const MELDABILITY: Record<string, readonly PortRule[]> = {
     ],
     'canvas-prompt-glyph': [
         { direction: 'bottom', targets: ['canvas-result-glyph', 'canvas-subcanvas-glyph'] }
+    ],
+    'canvas-doc-glyph': [
+        { direction: 'bottom', targets: ['canvas-prompt-glyph', 'canvas-doc-glyph', 'canvas-subcanvas-glyph'] }
     ],
     'canvas-note-glyph': [
         { direction: 'bottom', targets: ['canvas-prompt-glyph', 'canvas-subcanvas-glyph'] }

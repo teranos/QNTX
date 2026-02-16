@@ -7,6 +7,16 @@ import (
 	"github.com/teranos/vanity-id"
 )
 
+// PromptResult is the type for LLM prompt execution results.
+// Created by Prompt glyphs after successful execution, making responses
+// discoverable in the attestation graph.
+var PromptResult = TypeDef{
+	Name:             "prompt-result",
+	Label:            "Prompt Result",
+	Color:            "#9b59b6",
+	RichStringFields: []string{"response"},
+}
+
 // AttestationStore defines the minimal storage interface needed for type attestations.
 // This avoids circular dependencies with the ats package.
 type AttestationStore interface {

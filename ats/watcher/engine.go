@@ -452,14 +452,21 @@ func scanAttestation(rows *sql.Rows) (*types.As, error) {
 	return &as, nil
 }
 
-// OnAttestationCreated is called when a new attestation is created
-// This is the main entry point for the watcher system
+// OnAttestationCreated is called when a new attestation is created.
+// Handles structural watchers only — semantic watchers are handled by
+// OnAttestationEmbedded after the embedding observer generates the vector.
 func (e *Engine) OnAttestationCreated(as *types.As) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
 	for _, watcher := range e.watchers {
 		if !watcher.Enabled {
+			continue
+		}
+
+		// Skip semantic watchers — handled by OnAttestationEmbedded
+		// to avoid redundant GenerateEmbedding FFI calls.
+		if watcher.SemanticQuery != "" {
 			continue
 		}
 
@@ -493,6 +500,95 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 		// Each goroutine gets its own copy of the attestation
 		asCopy := *as // Copy the struct
 		// Deep copy slices to prevent shared references
+		asCopy.Subjects = append([]string(nil), as.Subjects...)
+		asCopy.Predicates = append([]string(nil), as.Predicates...)
+		asCopy.Contexts = append([]string(nil), as.Contexts...)
+		asCopy.Actors = append([]string(nil), as.Actors...)
+		if as.Attributes != nil {
+			asCopy.Attributes = make(map[string]interface{})
+			for k, v := range as.Attributes {
+				asCopy.Attributes[k] = v
+			}
+		}
+		go e.executeAction(watcher, &asCopy)
+	}
+}
+
+// OnAttestationEmbedded is called by the embedding observer after an attestation
+// has been embedded and stored. It handles semantic watcher matching using the
+// pre-computed attestation embedding, avoiding redundant GenerateEmbedding FFI calls.
+func (e *Engine) OnAttestationEmbedded(as *types.As, attestationEmbedding []float32) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	if e.embeddingService == nil {
+		return
+	}
+
+	for _, watcher := range e.watchers {
+		if !watcher.Enabled {
+			continue
+		}
+
+		// Only process semantic watchers here
+		if watcher.SemanticQuery == "" {
+			continue
+		}
+
+		// Structural filter must also pass (semantic + structural are ANDed)
+		if !e.matchesFilter(as, watcher) {
+			continue
+		}
+
+		// Get cached query embedding for this watcher
+		queryEmbedding := e.queryEmbeddings[watcher.ID]
+		if queryEmbedding == nil {
+			continue
+		}
+
+		// Compute cosine similarity (cheap — pure math, no FFI)
+		similarity, err := e.embeddingService.ComputeSimilarity(queryEmbedding, attestationEmbedding)
+		if err != nil {
+			e.logger.Debugw("Failed to compute similarity",
+				"watcher_id", watcher.ID,
+				"attestation_id", as.ID,
+				"error", err)
+			continue
+		}
+
+		threshold := watcher.SemanticThreshold
+		if threshold <= 0 {
+			threshold = 0.3
+		}
+
+		if similarity < threshold {
+			continue
+		}
+
+		e.logger.Debugw("Semantic match via pre-computed embedding",
+			"watcher_id", watcher.ID,
+			"attestation_id", as.ID,
+			"similarity", similarity,
+			"threshold", threshold)
+
+		// Broadcast match to frontend
+		if e.broadcastMatch != nil {
+			e.broadcastMatch(watcher.ID, as, similarity)
+		}
+
+		// Rate-limited action execution (same logic as OnAttestationCreated)
+		if watcher.MaxFiresPerMinute == 0 {
+			continue
+		}
+		limiter := e.rateLimiters[watcher.ID]
+		if limiter != nil && !limiter.Allow() {
+			e.logger.Infow("Watcher rate limited",
+				"watcher_id", watcher.ID,
+				"attestation_id", as.ID)
+			continue
+		}
+
+		asCopy := *as
 		asCopy.Subjects = append([]string(nil), as.Subjects...)
 		asCopy.Predicates = append([]string(nil), as.Predicates...)
 		asCopy.Contexts = append([]string(nil), as.Contexts...)

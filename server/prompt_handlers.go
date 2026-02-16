@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/ai/provider"
@@ -16,6 +17,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
+	id "github.com/teranos/vanity-id"
 )
 
 const (
@@ -75,13 +77,15 @@ type PromptDirectRequest struct {
 	SystemPrompt        string    `json:"system_prompt,omitempty"`
 	Provider            string    `json:"provider,omitempty"` // "openrouter" or "local"
 	Model               string    `json:"model,omitempty"`
-	GlyphID             string    `json:"glyph_id,omitempty"`             // TODO(#458): create result attestation with actor "glyph:{id}" so prompt glyphs can be mid-chain producers
+	GlyphID             string    `json:"glyph_id,omitempty"`             // Glyph that initiated execution; used as actor for the result attestation
 	UpstreamAttestation *types.As `json:"upstream_attestation,omitempty"` // Triggering attestation — enables {{field}} interpolation
+	FileIDs             []string  `json:"file_ids,omitempty"`             // Attached document/image file IDs for multimodal prompts
 }
 
 // PromptDirectResponse represents the direct execution response
 type PromptDirectResponse struct {
 	Response         string `json:"response"`
+	AttestationID    string `json:"attestation_id,omitempty"`
 	PromptTokens     int    `json:"prompt_tokens,omitempty"`
 	CompletionTokens int    `json:"completion_tokens,omitempty"`
 	TotalTokens      int    `json:"total_tokens,omitempty"`
@@ -493,6 +497,43 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		chatReq.MaxTokens = doc.Metadata.MaxTokens
 	}
 
+	// Build multimodal attachments from file IDs (melded Doc glyphs)
+	if len(req.FileIDs) > 0 {
+		for _, fid := range req.FileIDs {
+			mime, b64, readErr := s.readFileBase64(fid)
+			if readErr != nil {
+				s.logger.Warnw("Skipping attached file",
+					"file_id", fid, "error", errors.Wrapf(readErr, "failed to read attachment %s", fid))
+				continue
+			}
+
+			switch {
+			case strings.HasPrefix(mime, "image/"):
+				chatReq.Attachments = append(chatReq.Attachments, openrouter.ContentPart{
+					Type: "image_url",
+					ImageURL: &openrouter.ContentPartImage{
+						URL: "data:" + mime + ";base64," + b64,
+					},
+				})
+			case mime == "application/pdf":
+				chatReq.Attachments = append(chatReq.Attachments, openrouter.ContentPart{
+					Type: "file",
+					File: &openrouter.ContentPartFile{
+						Filename: fid,
+						FileData: "data:" + mime + ";base64," + b64,
+					},
+				})
+			default:
+				s.logger.Warnw("Unsupported MIME type for LLM attachment, skipping",
+					"file_id", fid, "mime", mime)
+				continue
+			}
+
+			s.logger.Debugw("Attached file to prompt",
+				"file_id", fid, "mime", mime, "size_kb", len(b64)*3/4/1024)
+		}
+	}
+
 	// Execute prompt
 	resp, err := client.Chat(r.Context(), chatReq)
 	if err != nil {
@@ -504,9 +545,53 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Create prompt-result attestation so the response is discoverable in the graph
+	var attestationID string
+	if req.GlyphID != "" {
+		actor := "glyph:" + req.GlyphID
+		subject := modelName
+		if subject == "" {
+			subject = "unknown-model"
+		}
+
+		asid, asidErr := id.GenerateASID(subject, "prompt-result", req.GlyphID, actor)
+		if asidErr != nil {
+			s.logger.Warnw("Failed to generate ASID for prompt-result attestation",
+				"glyph_id", req.GlyphID, "error", asidErr)
+		} else {
+			now := time.Now()
+			attrs := map[string]interface{}{
+				"response": resp.Content,
+				"template": req.Template,
+			}
+			as := &types.As{
+				ID:         asid,
+				Subjects:   []string{subject},
+				Predicates: []string{"prompt-result"},
+				Contexts:   []string{req.GlyphID},
+				Actors:     []string{actor},
+				Timestamp:  now,
+				Source:     "prompt-direct",
+				Attributes: attrs,
+				CreatedAt:  now,
+			}
+
+			store := storage.NewSQLStore(s.db, s.logger)
+			if storeErr := store.CreateAttestation(as); storeErr != nil {
+				s.logger.Warnw("Failed to create prompt-result attestation",
+					"glyph_id", req.GlyphID, "asid", asid, "error", storeErr)
+			} else {
+				attestationID = asid
+				s.logger.Infow("Created prompt-result attestation",
+					"asid", asid, "subject", subject, "glyph_id", req.GlyphID)
+			}
+		}
+	}
+
 	// Return response
 	response := PromptDirectResponse{
 		Response:         resp.Content,
+		AttestationID:    attestationID,
 		PromptTokens:     resp.Usage.PromptTokens,
 		CompletionTokens: resp.Usage.CompletionTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
