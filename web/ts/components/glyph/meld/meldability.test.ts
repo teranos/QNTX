@@ -50,20 +50,20 @@ describe('Port-aware MELDABILITY registry', () => {
             expect(areClassesCompatible('canvas-prompt-glyph', 'canvas-result-glyph')).toBe('bottom');
         });
 
-        test('doc → prompt returns bottom (doc sits above prompt)', () => {
-            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-prompt-glyph')).toBe('bottom');
+        test('doc → prompt returns right (doc sits left of prompt)', () => {
+            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-prompt-glyph')).toBe('right');
         });
 
-        test('doc → doc returns bottom (stack multiple documents)', () => {
-            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-doc-glyph')).toBe('bottom');
+        test('doc → doc returns right (place documents side by side)', () => {
+            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-doc-glyph')).toBe('right');
         });
 
         test('note → prompt returns bottom (note sits above prompt)', () => {
             expect(areClassesCompatible('canvas-note-glyph', 'canvas-prompt-glyph')).toBe('bottom');
         });
 
-        test('doc → result returns null (docs cannot meld onto results)', () => {
-            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-result-glyph')).toBe(null);
+        test('doc → result returns right (doc sits left of result)', () => {
+            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-result-glyph')).toBe('right');
         });
 
         test('prompt → prompt returns null (incompatible)', () => {

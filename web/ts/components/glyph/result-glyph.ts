@@ -9,6 +9,8 @@ import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { apiFetch } from '../../api';
 import { uiState } from '../../state/ui';
+import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
+import { Doc, Prose } from '@generated/sym.js';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { unmeldComposition } from './meld/meld-composition';
 import { autoMeldResultBelow } from './meld/meld-system';
@@ -59,7 +61,7 @@ export function createResultGlyph(
     const header = document.createElement('div');
     header.className = 'result-glyph-header';
     header.style.padding = '4px 8px';
-    header.style.backgroundColor = '#333433';
+    header.style.backgroundColor = 'rgba(51, 52, 51, 0.9)';
     header.style.borderBottom = '1px solid var(--border-color)';
     header.style.display = 'flex';
     header.style.alignItems = 'flex-start';
@@ -183,6 +185,7 @@ export function createResultGlyph(
         logLabel: 'ResultGlyph',
     });
     element.style.minHeight = '80px';
+    element.style.backgroundColor = 'transparent';
     element.style.borderRadius = '0 0 2px 2px';
     element.style.border = '1px solid var(--border-on-dark)';
     element.style.borderTop = 'none';
@@ -269,13 +272,43 @@ export function createResultGlyph(
             followupInput.disabled = true;
             followupStatus.textContent = 'Running…';
 
+            // Collect attachments from melded glyphs (docs, notes)
+            const fileIds: string[] = [];
+            const noteTexts: string[] = [];
+            const comp = findCompositionByGlyph(glyph.id);
+            if (comp) {
+                const memberIds = extractGlyphIds(comp.edges);
+                for (const mid of memberIds) {
+                    if (mid === glyph.id) continue;
+                    const g = uiState.getCanvasGlyphs().find(cg => cg.id === mid);
+                    if (!g?.content) continue;
+
+                    if (g.symbol === Doc) {
+                        try {
+                            const meta = JSON.parse(g.content);
+                            if (meta.fileId && meta.ext) {
+                                fileIds.push(meta.fileId + meta.ext);
+                            }
+                        } catch { /* skip malformed */ }
+                    } else if (g.symbol === Prose) {
+                        noteTexts.push(g.content);
+                    }
+                }
+            }
+
+            let finalTemplate = text;
+            if (noteTexts.length > 0) {
+                finalTemplate = noteTexts.join('\n\n') + '\n\n' + text;
+            }
+
             const body: Record<string, unknown> = {
-                template: text,
+                template: finalTemplate,
                 system_prompt: result.stdout,
                 glyph_id: glyph.id,
             };
             if (promptConfig?.model) body.model = promptConfig.model;
             if (promptConfig?.provider) body.provider = promptConfig.provider;
+            if (fileIds.length > 0) body.file_ids = fileIds;
 
             const startTime = Date.now();
 
