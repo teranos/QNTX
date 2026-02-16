@@ -4,6 +4,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -1168,6 +1169,7 @@ const ReclusterHandlerName = "embeddings.recluster"
 
 // ReclusterHandler runs HDBSCAN re-clustering as a Pulse scheduled job
 type ReclusterHandler struct {
+	db             *sql.DB
 	store          *storage.EmbeddingStore
 	svc            EmbeddingServiceForClustering
 	invalidator    func()
@@ -1178,8 +1180,32 @@ type ReclusterHandler struct {
 func (h *ReclusterHandler) Name() string { return ReclusterHandlerName }
 
 func (h *ReclusterHandler) Execute(ctx context.Context, job *async.Job) error {
-	_, err := RunHDBSCANClustering(h.store, h.svc, h.invalidator, h.minClusterSize, h.logger)
-	return err
+	h.writeLog(job.ID, "clustering", "info", "Starting HDBSCAN re-clustering", fmt.Sprintf(`{"min_cluster_size":%d}`, h.minClusterSize))
+
+	result, err := RunHDBSCANClustering(h.store, h.svc, h.invalidator, h.minClusterSize, h.logger)
+	if err != nil {
+		h.writeLog(job.ID, "clustering", "error", fmt.Sprintf("Clustering failed: %s", err), "")
+		return err
+	}
+
+	h.writeLog(job.ID, "clustering", "info",
+		fmt.Sprintf("Clustering complete: %d points, %d clusters, %d noise, %.0fms",
+			result.Summary.NTotal, result.Summary.NClusters, result.Summary.NNoise, result.TimeMS),
+		fmt.Sprintf(`{"n_points":%d,"n_clusters":%d,"n_noise":%d,"time_ms":%.0f}`,
+			result.Summary.NTotal, result.Summary.NClusters, result.Summary.NNoise, result.TimeMS))
+	return nil
+}
+
+func (h *ReclusterHandler) writeLog(jobID, stage, level, message, metadata string) {
+	var metaPtr *string
+	if metadata != "" {
+		metaPtr = &metadata
+	}
+	_, err := h.db.Exec(`INSERT INTO task_logs (job_id, stage, timestamp, level, message, metadata) VALUES (?, ?, ?, ?, ?, ?)`,
+		jobID, stage, time.Now().Format(time.RFC3339), level, message, metaPtr)
+	if err != nil {
+		h.logger.Warnw("Failed to write task log", "job_id", jobID, "error", err)
+	}
 }
 
 // setupEmbeddingReclusterSchedule registers the recluster handler and auto-creates
@@ -1190,6 +1216,7 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 	}
 
 	handler := &ReclusterHandler{
+		db:             s.db,
 		store:          s.embeddingStore,
 		svc:            s.embeddingService,
 		invalidator:    s.embeddingClusterInvalidator,
