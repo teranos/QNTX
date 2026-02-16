@@ -261,27 +261,29 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 		"interval_seconds", interval)
 }
 
-// --- UMAP projection ---
+// --- Dimensionality reduction projection ---
 
 // ReducePluginCaller abstracts the reduce plugin gRPC call for testability.
 type ReducePluginCaller func(ctx context.Context, method, path string, body []byte) ([]byte, error)
 
-// UMAPProjectionResult holds the outcome of a UMAP projection run.
-type UMAPProjectionResult struct {
-	NPoints int
-	FitMS   int64
-	TimeMS  float64
+// ProjectionResult holds the outcome of a single-method projection run.
+type ProjectionResult struct {
+	Method  string  `json:"method"`
+	NPoints int     `json:"n_points"`
+	FitMS   int64   `json:"fit_ms"`
+	TimeMS  float64 `json:"time_ms"`
 }
 
-// RunUMAPProjection reads all embeddings, calls the reduce plugin /fit, and writes 2D projections to DB.
-// Shared by the HTTP handler and the Pulse reproject handler.
-func RunUMAPProjection(
+// RunProjection reads all embeddings, calls the reduce plugin /fit for the given method,
+// and writes 2D projections to DB.
+func RunProjection(
 	ctx context.Context,
+	method string,
 	store *storage.EmbeddingStore,
 	svc EmbeddingServiceForClustering,
 	callReduce ReducePluginCaller,
 	logger *zap.SugaredLogger,
-) (*UMAPProjectionResult, error) {
+) (*ProjectionResult, error) {
 	startTime := time.Now()
 
 	ids, blobs, err := store.GetAllEmbeddingVectors()
@@ -304,6 +306,7 @@ func RunUMAPProjection(
 
 	fitReq, err := json.Marshal(map[string]interface{}{
 		"embeddings": allEmbeddings,
+		"method":     method,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal fit request")
@@ -311,7 +314,7 @@ func RunUMAPProjection(
 
 	fitResp, err := callReduce(ctx, "POST", "/fit", fitReq)
 	if err != nil {
-		return nil, errors.Wrapf(err, "reduce plugin /fit failed for %d points", len(ids))
+		return nil, errors.Wrapf(err, "reduce plugin /fit failed for method %s (%d points)", method, len(ids))
 	}
 
 	var fitResult struct {
@@ -320,68 +323,110 @@ func RunUMAPProjection(
 		FitMS       int64       `json:"fit_ms"`
 	}
 	if err := json.Unmarshal(fitResp, &fitResult); err != nil {
-		return nil, errors.Wrap(err, "failed to parse reduce plugin response")
+		return nil, errors.Wrapf(err, "failed to parse reduce plugin response for method %s", method)
 	}
 
 	if len(fitResult.Projections) != len(ids) {
-		return nil, errors.Newf("projection count mismatch: got %d, expected %d",
-			len(fitResult.Projections), len(ids))
+		return nil, errors.Newf("projection count mismatch for %s: got %d, expected %d",
+			method, len(fitResult.Projections), len(ids))
 	}
 
 	assignments := make([]storage.ProjectionAssignment, len(ids))
 	for i, id := range ids {
 		assignments[i] = storage.ProjectionAssignment{
-			ID:          id,
-			ProjectionX: fitResult.Projections[i][0],
-			ProjectionY: fitResult.Projections[i][1],
+			ID: id,
+			X:  fitResult.Projections[i][0],
+			Y:  fitResult.Projections[i][1],
 		}
 	}
 
-	if err := store.UpdateProjections(assignments); err != nil {
-		return nil, errors.Wrapf(err, "failed to save projections for %d points", len(assignments))
+	if err := store.UpdateProjections(method, assignments); err != nil {
+		return nil, errors.Wrapf(err, "failed to save %s projections for %d points", method, len(assignments))
 	}
 
 	totalMS := float64(time.Since(startTime).Milliseconds())
 
-	logger.Infow("UMAP projection complete",
+	logger.Infow("Projection complete",
+		"method", method,
 		"n_points", len(ids),
 		"fit_ms", fitResult.FitMS,
 		"total_ms", totalMS)
 
-	return &UMAPProjectionResult{
+	return &ProjectionResult{
+		Method:  method,
 		NPoints: len(ids),
 		FitMS:   fitResult.FitMS,
 		TimeMS:  totalMS,
 	}, nil
 }
 
+// validProjectionMethods filters unknown methods, logging warnings for skipped ones.
+var knownMethods = map[string]bool{"umap": true, "tsne": true, "pca": true}
+
+func validProjectionMethods(methods []string, logger *zap.SugaredLogger) []string {
+	var valid []string
+	for _, m := range methods {
+		if knownMethods[m] {
+			valid = append(valid, m)
+		} else {
+			logger.Warnw("Skipping unknown projection method", "method", m)
+		}
+	}
+	return valid
+}
+
+// RunAllProjections runs projection sequentially for each configured method.
+func RunAllProjections(
+	ctx context.Context,
+	methods []string,
+	store *storage.EmbeddingStore,
+	svc EmbeddingServiceForClustering,
+	callReduce ReducePluginCaller,
+	logger *zap.SugaredLogger,
+) ([]ProjectionResult, error) {
+	var results []ProjectionResult
+	validated := validProjectionMethods(methods, logger)
+	for _, method := range validated {
+		result, err := RunProjection(ctx, method, store, svc, callReduce, logger)
+		if err != nil {
+			return results, errors.Wrapf(err, "projection failed for method %s", method)
+		}
+		results = append(results, *result)
+	}
+	return results, nil
+}
+
 const ReprojectHandlerName = "embeddings.reproject"
 
-// ReprojectHandler runs UMAP re-projection as a Pulse scheduled job
+// ReprojectHandler runs re-projection as a Pulse scheduled job for all configured methods.
 type ReprojectHandler struct {
 	db         *sql.DB
 	store      *storage.EmbeddingStore
 	svc        EmbeddingServiceForClustering
 	callReduce ReducePluginCaller
+	methods    []string
 	logger     *zap.SugaredLogger
 }
 
 func (h *ReprojectHandler) Name() string { return ReprojectHandlerName }
 
 func (h *ReprojectHandler) Execute(ctx context.Context, job *async.Job) error {
-	h.writeLog(job.ID, "projection", "info", "Starting UMAP re-projection", "")
+	h.writeLog(job.ID, "projection", "info",
+		fmt.Sprintf("Starting re-projection for methods: %v", h.methods), "")
 
-	result, err := RunUMAPProjection(ctx, h.store, h.svc, h.callReduce, h.logger)
+	results, err := RunAllProjections(ctx, h.methods, h.store, h.svc, h.callReduce, h.logger)
 	if err != nil {
 		h.writeLog(job.ID, "projection", "error", fmt.Sprintf("Projection failed: %s", err), "")
 		return err
 	}
 
-	h.writeLog(job.ID, "projection", "info",
-		fmt.Sprintf("Projection complete: %d points, fit %.0fms, total %.0fms",
-			result.NPoints, float64(result.FitMS), result.TimeMS),
-		fmt.Sprintf(`{"n_points":%d,"fit_ms":%d,"time_ms":%.0f}`,
-			result.NPoints, result.FitMS, result.TimeMS))
+	for _, r := range results {
+		h.writeLog(job.ID, "projection", "info",
+			fmt.Sprintf("%s complete: %d points, fit %dms, total %.0fms",
+				r.Method, r.NPoints, r.FitMS, r.TimeMS),
+			fmt.Sprintf(`{"method":"%s","n_points":%d,"fit_ms":%d,"time_ms":%.0f}`,
+				r.Method, r.NPoints, r.FitMS, r.TimeMS))
+	}
 	return nil
 }
 
@@ -404,17 +449,23 @@ func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
 		return
 	}
 
+	methods := cfg.Embeddings.ProjectionMethods
+	if len(methods) == 0 {
+		methods = []string{"umap"}
+	}
+
 	handler := &ReprojectHandler{
 		db:         s.db,
 		store:      s.embeddingStore,
 		svc:        s.embeddingService,
 		callReduce: s.callReducePlugin,
+		methods:    methods,
 		logger:     s.logger.Named("reproject"),
 	}
 
 	registry := s.daemon.Registry()
 	registry.Register(handler)
-	s.logger.Infow("Registered UMAP reproject handler")
+	s.logger.Infow("Registered reproject handler", "methods", methods)
 
 	interval := cfg.Embeddings.ReprojectIntervalSeconds
 	if interval <= 0 {
@@ -438,7 +489,7 @@ func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
 						"job_id", j.ID,
 						"error", err)
 				} else {
-					s.logger.Infow("Updated UMAP reproject schedule interval",
+					s.logger.Infow("Updated reproject schedule interval",
 						"job_id", j.ID,
 						"interval_seconds", interval)
 				}
@@ -456,12 +507,13 @@ func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
 		NextRunAt:       &now,
 	}
 	if err := schedStore.CreateJob(job); err != nil {
-		s.logger.Errorw("Failed to create UMAP reproject schedule",
+		s.logger.Errorw("Failed to create reproject schedule",
 			"interval_seconds", interval,
 			"error", err)
 		return
 	}
-	s.logger.Infow("Auto-created UMAP reproject schedule",
+	s.logger.Infow("Auto-created reproject schedule",
 		"job_id", job.ID,
-		"interval_seconds", interval)
+		"interval_seconds", interval,
+		"methods", methods)
 }
