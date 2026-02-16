@@ -36,6 +36,7 @@ export interface PromptConfig {
 export interface ResultGlyphContent {
     result: ExecutionResult;
     promptConfig?: PromptConfig;
+    prompt?: string;
 }
 
 /**
@@ -44,7 +45,8 @@ export interface ResultGlyphContent {
 export function createResultGlyph(
     glyph: Glyph,
     result: ExecutionResult,
-    promptConfig?: PromptConfig
+    promptConfig?: PromptConfig,
+    prompt?: string
 ): HTMLElement {
     // Calculate height based on content
     const lineCount = (result.stdout + result.stderr + (result.error || '')).split('\n').length;
@@ -67,8 +69,24 @@ export function createResultGlyph(
 
     // Duration label
     const durationLabel = document.createElement('span');
+    durationLabel.style.flexShrink = '0';
     durationLabel.textContent = `${result.duration_ms}ms`;
     header.appendChild(durationLabel);
+
+    // Prompt label — truncated text showing what generated this result
+    if (prompt) {
+        const promptLabel = document.createElement('span');
+        promptLabel.className = 'result-prompt-label';
+        promptLabel.style.flex = '1';
+        promptLabel.style.overflow = 'hidden';
+        promptLabel.style.textOverflow = 'ellipsis';
+        promptLabel.style.whiteSpace = 'nowrap';
+        promptLabel.style.padding = '0 8px';
+        promptLabel.style.opacity = '0.7';
+        promptLabel.textContent = prompt;
+        promptLabel.title = prompt;
+        header.appendChild(promptLabel);
+    }
 
     // Button container
     const buttonContainer = document.createElement('div');
@@ -266,7 +284,7 @@ export function createResultGlyph(
                         error: data.error ?? null,
                         duration_ms: elapsedMs,
                     };
-                    spawnFollowUpResult(element, glyph, followupResult, promptConfig);
+                    spawnFollowUpResult(element, glyph, followupResult, promptConfig, text);
                 })
                 .catch((err) => {
                     const msg = err instanceof Error ? err.message : String(err);
@@ -285,7 +303,7 @@ export function createResultGlyph(
     storeCleanup(element, () => {});
 
     // Ensure result data is attached to glyph object for drag persistence
-    const contentPayload: ResultGlyphContent = { result, ...(promptConfig && { promptConfig }) };
+    const contentPayload: ResultGlyphContent = { result, ...(promptConfig && { promptConfig }), ...(prompt && { prompt }) };
     (glyph as any).content = JSON.stringify(contentPayload);
 
     return element;
@@ -299,7 +317,8 @@ function spawnFollowUpResult(
     parentElement: HTMLElement,
     parentGlyph: Glyph,
     result: ExecutionResult,
-    promptConfig?: PromptConfig
+    promptConfig?: PromptConfig,
+    prompt?: string
 ): void {
     const parentRect = parentElement.getBoundingClientRect();
     const canvas = parentElement.closest('.canvas-workspace') as HTMLElement;
@@ -323,11 +342,11 @@ function spawnFollowUpResult(
         renderContent: () => document.createElement('div')
     };
 
-    const resultElement = createResultGlyph(resultGlyph, result, promptConfig);
+    const resultElement = createResultGlyph(resultGlyph, result, promptConfig, prompt);
     canvas.appendChild(resultElement);
 
     const resultRect = resultElement.getBoundingClientRect();
-    const contentPayload: ResultGlyphContent = { result, ...(promptConfig && { promptConfig }) };
+    const contentPayload: ResultGlyphContent = { result, ...(promptConfig && { promptConfig }), ...(prompt && { prompt }) };
     uiState.addCanvasGlyph({
         id: resultGlyphId,
         symbol: 'result',
