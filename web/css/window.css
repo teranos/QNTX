@@ -285,6 +285,21 @@
     color: #c0c0c0;
 }
 
+.glyph-content .panel-btn {
+    color: #e8e8e8;
+    border-color: #4b5563;
+    background: #1e293b;
+}
+
+.glyph-content .panel-btn:hover:not(:disabled) {
+    background: #334155;
+}
+
+.glyph-content .panel-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
 /* Database-specific styles */
 .db-path {
     cursor: pointer;

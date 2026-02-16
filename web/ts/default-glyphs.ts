@@ -51,6 +51,7 @@
  * symbols into true glyphs.
  */
 
+import * as d3 from 'd3';
 import { glyphRun } from './components/glyph/run';
 import { createCanvasGlyph } from './components/glyph/canvas/canvas-glyph';
 import { createChartGlyph } from './components/glyph/chart-glyph';
@@ -262,6 +263,8 @@ let embeddingsInfo: {
 } | null = null;
 let embeddingsReembedding = false;
 let embeddingsClustering = false;
+let embeddingsProjecting = false;
+let projectionsData: { id: string; source_id: string; x: number; y: number; cluster_id: number }[] = [];
 
 // Self diagnostics state
 let selfElement: HTMLElement | null = null;
@@ -436,10 +439,16 @@ function renderSelf(): void {
 
 export async function fetchEmbeddingsInfo(): Promise<void> {
     try {
-        const resp = await apiFetch('/api/embeddings/info');
-        embeddingsInfo = await resp.json();
+        const [infoResp, projResp] = await Promise.all([
+            apiFetch('/api/embeddings/info'),
+            apiFetch('/api/embeddings/projections'),
+        ]);
+        embeddingsInfo = await infoResp.json();
+        projectionsData = projResp.ok ? await projResp.json() : [];
+        if (!Array.isArray(projectionsData)) projectionsData = [];
     } catch {
         embeddingsInfo = null;
+        projectionsData = [];
     }
     renderEmbeddings();
 }
@@ -489,7 +498,7 @@ function renderEmbeddings(): void {
                 </div>
                 <div class="glyph-row">
                     <span class="glyph-label">Sizes:</span>
-                    <span class="glyph-value" style="font-size:11px">${clusterSizes}</span>
+                    <span class="glyph-value" style="font-size:11px;flex-wrap:wrap;display:flex;gap:2px 8px">${clusterSizes}</span>
                 </div>
             `;
         } else {
@@ -511,6 +520,41 @@ function renderEmbeddings(): void {
                 <div class="emb-cluster-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
             </div>
         `;
+    }
+
+    // Scatter section: project button or D3 scatter
+    let scatterSection = '';
+    if (available && embedding_count >= 2) {
+        if (projectionsData.length > 0) {
+            const nClusters = new Set(projectionsData.filter(p => p.cluster_id !== -1).map(p => p.cluster_id)).size;
+            scatterSection = `
+                <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
+                    <h3 class="glyph-section-title">Projection</h3>
+                    <div style="font-size:12px;color:#9ca3af;margin-bottom:6px">${projectionsData.length} points, ${nClusters} clusters</div>
+                    <div class="emb-scatter"></div>
+                    <button class="emb-project-btn panel-btn" style="width:100%;margin-top:6px"
+                        ${embeddingsProjecting ? 'disabled' : ''}>
+                        ${embeddingsProjecting ? 'Projecting...' : 'Re-project (UMAP)'}
+                    </button>
+                    <div class="emb-project-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
+                </div>
+            `;
+        } else {
+            scatterSection = `
+                <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
+                    <h3 class="glyph-section-title">Projection</h3>
+                    <div class="glyph-row">
+                        <span class="glyph-label">Status:</span>
+                        <span class="glyph-value" style="color:#6b7280">not computed</span>
+                    </div>
+                    <button class="emb-project-btn panel-btn" style="width:100%;margin-top:6px"
+                        ${embeddingsProjecting ? 'disabled' : ''}>
+                        ${embeddingsProjecting ? 'Projecting...' : 'Project (UMAP)'}
+                    </button>
+                    <div class="emb-project-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
+                </div>
+            `;
+        }
     }
 
     embeddingsElement.innerHTML = `
@@ -535,6 +579,7 @@ function renderEmbeddings(): void {
             </div>
             ${reembedSection}
             ${clusterSection}
+            ${scatterSection}
         </div>
     `;
 
@@ -546,6 +591,16 @@ function renderEmbeddings(): void {
     const clusterBtn = embeddingsElement.querySelector('.emb-cluster-btn');
     if (clusterBtn) {
         clusterBtn.addEventListener('click', recluster);
+    }
+
+    const projectBtn = embeddingsElement.querySelector('.emb-project-btn');
+    if (projectBtn) {
+        projectBtn.addEventListener('click', projectAll);
+    }
+
+    const scatterContainer = embeddingsElement.querySelector('.emb-scatter') as HTMLElement | null;
+    if (scatterContainer && projectionsData.length > 0) {
+        renderScatter(scatterContainer);
     }
 }
 
@@ -614,6 +669,67 @@ async function recluster(): Promise<void> {
     }
 }
 
+function renderScatter(container: HTMLElement): void {
+    const width = 340;
+    const height = 200;
+    const pad = 12;
+
+    const svg = d3.select(container)
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height)
+        .style('background', '#1e293b')
+        .style('border-radius', '4px');
+
+    const xExtent = d3.extent(projectionsData, d => d.x) as [number, number];
+    const yExtent = d3.extent(projectionsData, d => d.y) as [number, number];
+
+    const xScale = d3.scaleLinear().domain(xExtent).range([pad, width - pad]);
+    const yScale = d3.scaleLinear().domain(yExtent).range([height - pad, pad]);
+
+    const color = d3.scaleOrdinal(d3.schemeTableau10);
+
+    svg.selectAll('circle')
+        .data(projectionsData)
+        .join('circle')
+        .attr('cx', d => xScale(d.x))
+        .attr('cy', d => yScale(d.y))
+        .attr('r', 4)
+        .attr('fill', d => d.cluster_id === -1 ? '#6b7280' : color(String(d.cluster_id)))
+        .attr('opacity', d => d.cluster_id === -1 ? 0.35 : 0.85);
+}
+
+async function projectAll(): Promise<void> {
+    if (embeddingsProjecting || !embeddingsInfo?.available) return;
+
+    embeddingsProjecting = true;
+    renderEmbeddings();
+
+    const resultEl = embeddingsElement?.querySelector('.emb-project-result');
+
+    try {
+        const resp = await apiFetch('/api/embeddings/project', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+        });
+        const result = await resp.json();
+
+        if (resultEl) {
+            resultEl.textContent = `${result.n_points} points projected (${result.time_ms?.toFixed(0) ?? '?'}ms)`;
+        }
+
+        await fetchEmbeddingsInfo();
+    } catch (err) {
+        if (resultEl) {
+            resultEl.textContent = `Error: ${err}`;
+        }
+    } finally {
+        embeddingsProjecting = false;
+        renderEmbeddings();
+    }
+}
+
 // Register default system glyphs
 export function registerDefaultGlyphs(): void {
     // Canvas Glyph - Fractal container with spatial grid
@@ -646,8 +762,8 @@ export function registerDefaultGlyphs(): void {
             fetchEmbeddingsInfo();
             return content;
         },
-        initialWidth: '360px',
-        initialHeight: '200px' // TODO: Too small — content overflows when cluster info is present. Needs auto-sizing or a larger default.
+        initialWidth: '450px',
+        initialHeight: '520px',
     });
 
     // Sync Status Glyph
