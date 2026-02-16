@@ -978,6 +978,98 @@ func (s *QNTXServer) callReducePlugin(ctx context.Context, method, path string, 
 	return resp.Body, nil
 }
 
+// ReducePluginCaller abstracts the reduce plugin gRPC call for testability.
+type ReducePluginCaller func(ctx context.Context, method, path string, body []byte) ([]byte, error)
+
+// UMAPProjectionResult holds the outcome of a UMAP projection run.
+type UMAPProjectionResult struct {
+	NPoints int
+	FitMS   int64
+	TimeMS  float64
+}
+
+// RunUMAPProjection reads all embeddings, calls the reduce plugin /fit, and writes 2D projections to DB.
+// Shared by the HTTP handler and the Pulse reproject handler.
+func RunUMAPProjection(
+	ctx context.Context,
+	store *storage.EmbeddingStore,
+	svc EmbeddingServiceForClustering,
+	callReduce ReducePluginCaller,
+	logger *zap.SugaredLogger,
+) (*UMAPProjectionResult, error) {
+	startTime := time.Now()
+
+	ids, blobs, err := store.GetAllEmbeddingVectors()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read embedding vectors for projection")
+	}
+
+	if len(ids) < 2 {
+		return nil, errors.Newf("need at least 2 embeddings to project, have %d", len(ids))
+	}
+
+	allEmbeddings := make([][]float32, 0, len(blobs))
+	for i, blob := range blobs {
+		vec, err := svc.DeserializeEmbedding(blob)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to deserialize embedding %s", ids[i])
+		}
+		allEmbeddings = append(allEmbeddings, vec)
+	}
+
+	fitReq, err := json.Marshal(map[string]interface{}{
+		"embeddings": allEmbeddings,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal fit request")
+	}
+
+	fitResp, err := callReduce(ctx, "POST", "/fit", fitReq)
+	if err != nil {
+		return nil, errors.Wrapf(err, "reduce plugin /fit failed for %d points", len(ids))
+	}
+
+	var fitResult struct {
+		Projections [][]float64 `json:"projections"`
+		NPoints     int         `json:"n_points"`
+		FitMS       int64       `json:"fit_ms"`
+	}
+	if err := json.Unmarshal(fitResp, &fitResult); err != nil {
+		return nil, errors.Wrap(err, "failed to parse reduce plugin response")
+	}
+
+	if len(fitResult.Projections) != len(ids) {
+		return nil, errors.Newf("projection count mismatch: got %d, expected %d",
+			len(fitResult.Projections), len(ids))
+	}
+
+	assignments := make([]storage.ProjectionAssignment, len(ids))
+	for i, id := range ids {
+		assignments[i] = storage.ProjectionAssignment{
+			ID:          id,
+			ProjectionX: fitResult.Projections[i][0],
+			ProjectionY: fitResult.Projections[i][1],
+		}
+	}
+
+	if err := store.UpdateProjections(assignments); err != nil {
+		return nil, errors.Wrapf(err, "failed to save projections for %d points", len(assignments))
+	}
+
+	totalMS := float64(time.Since(startTime).Milliseconds())
+
+	logger.Infow("UMAP projection complete",
+		"n_points", len(ids),
+		"fit_ms", fitResult.FitMS,
+		"total_ms", totalMS)
+
+	return &UMAPProjectionResult{
+		NPoints: len(ids),
+		FitMS:   fitResult.FitMS,
+		TimeMS:  totalMS,
+	}, nil
+}
+
 // HandleEmbeddingProject runs UMAP on all embeddings and stores 2D projections.
 // POST /api/embeddings/project
 func (s *QNTXServer) HandleEmbeddingProject(w http.ResponseWriter, r *http.Request) {
@@ -991,96 +1083,18 @@ func (s *QNTXServer) HandleEmbeddingProject(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	startTime := time.Now()
-
-	// Read all embedding vectors
-	ids, blobs, err := s.embeddingStore.GetAllEmbeddingVectors()
+	result, err := RunUMAPProjection(r.Context(), s.embeddingStore, s.embeddingService, s.callReducePlugin, s.logger)
 	if err != nil {
-		s.logger.Errorw("Failed to read embedding vectors for projection", "error", err)
-		http.Error(w, "Failed to read embeddings", http.StatusInternalServerError)
+		s.logger.Errorw("UMAP projection failed", "error", err)
+		http.Error(w, fmt.Sprintf("UMAP projection failed: %s", err), http.StatusInternalServerError)
 		return
 	}
-
-	if len(ids) < 2 {
-		http.Error(w, fmt.Sprintf("Need at least 2 embeddings to project, have %d", len(ids)), http.StatusBadRequest)
-		return
-	}
-
-	// Deserialize blobs into float32 arrays
-	allEmbeddings := make([][]float32, 0, len(blobs))
-	for i, blob := range blobs {
-		vec, err := s.embeddingService.DeserializeEmbedding(blob)
-		if err != nil {
-			s.logger.Errorw("Failed to deserialize embedding for projection",
-				"embedding_id", ids[i], "error", err)
-			http.Error(w, fmt.Sprintf("Failed to deserialize embedding %s", ids[i]), http.StatusInternalServerError)
-			return
-		}
-		allEmbeddings = append(allEmbeddings, vec)
-	}
-
-	// Call reduce plugin /fit
-	fitReq, err := json.Marshal(map[string]interface{}{
-		"embeddings": allEmbeddings,
-	})
-	if err != nil {
-		http.Error(w, "Failed to marshal fit request", http.StatusInternalServerError)
-		return
-	}
-
-	fitResp, err := s.callReducePlugin(r.Context(), "POST", "/fit", fitReq)
-	if err != nil {
-		s.logger.Errorw("Reduce plugin /fit failed", "n_points", len(ids), "error", err)
-		http.Error(w, fmt.Sprintf("UMAP fit failed: %s", err), http.StatusInternalServerError)
-		return
-	}
-
-	// Parse projections
-	var fitResult struct {
-		Projections [][]float64 `json:"projections"`
-		NPoints     int         `json:"n_points"`
-		FitMS       int64       `json:"fit_ms"`
-	}
-	if err := json.Unmarshal(fitResp, &fitResult); err != nil {
-		s.logger.Errorw("Failed to parse reduce plugin response", "error", err)
-		http.Error(w, "Failed to parse UMAP response", http.StatusInternalServerError)
-		return
-	}
-
-	if len(fitResult.Projections) != len(ids) {
-		http.Error(w, fmt.Sprintf("Projection count mismatch: got %d, expected %d",
-			len(fitResult.Projections), len(ids)), http.StatusInternalServerError)
-		return
-	}
-
-	// Write projections to DB
-	assignments := make([]storage.ProjectionAssignment, len(ids))
-	for i, id := range ids {
-		assignments[i] = storage.ProjectionAssignment{
-			ID:          id,
-			ProjectionX: fitResult.Projections[i][0],
-			ProjectionY: fitResult.Projections[i][1],
-		}
-	}
-
-	if err := s.embeddingStore.UpdateProjections(assignments); err != nil {
-		s.logger.Errorw("Failed to save projections", "count", len(assignments), "error", err)
-		http.Error(w, "Failed to save projections", http.StatusInternalServerError)
-		return
-	}
-
-	totalMS := time.Since(startTime).Milliseconds()
-
-	s.logger.Infow("UMAP projection complete",
-		"n_points", len(ids),
-		"fit_ms", fitResult.FitMS,
-		"total_ms", totalMS)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"n_points": len(ids),
-		"fit_ms":   fitResult.FitMS,
-		"total_ms": totalMS,
+		"n_points": result.NPoints,
+		"fit_ms":   result.FitMS,
+		"total_ms": result.TimeMS,
 	})
 }
 
@@ -1278,6 +1292,119 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 		return
 	}
 	s.logger.Infow("Auto-created HDBSCAN recluster schedule",
+		"job_id", job.ID,
+		"interval_seconds", interval)
+}
+
+// --- Pulse UMAP re-projection handler ---
+
+const ReprojectHandlerName = "embeddings.reproject"
+
+// ReprojectHandler runs UMAP re-projection as a Pulse scheduled job
+type ReprojectHandler struct {
+	db         *sql.DB
+	store      *storage.EmbeddingStore
+	svc        EmbeddingServiceForClustering
+	callReduce ReducePluginCaller
+	logger     *zap.SugaredLogger
+}
+
+func (h *ReprojectHandler) Name() string { return ReprojectHandlerName }
+
+func (h *ReprojectHandler) Execute(ctx context.Context, job *async.Job) error {
+	h.writeLog(job.ID, "projection", "info", "Starting UMAP re-projection", "")
+
+	result, err := RunUMAPProjection(ctx, h.store, h.svc, h.callReduce, h.logger)
+	if err != nil {
+		h.writeLog(job.ID, "projection", "error", fmt.Sprintf("Projection failed: %s", err), "")
+		return err
+	}
+
+	h.writeLog(job.ID, "projection", "info",
+		fmt.Sprintf("Projection complete: %d points, fit %.0fms, total %.0fms",
+			result.NPoints, float64(result.FitMS), result.TimeMS),
+		fmt.Sprintf(`{"n_points":%d,"fit_ms":%d,"time_ms":%.0f}`,
+			result.NPoints, result.FitMS, result.TimeMS))
+	return nil
+}
+
+func (h *ReprojectHandler) writeLog(jobID, stage, level, message, metadata string) {
+	var metaPtr *string
+	if metadata != "" {
+		metaPtr = &metadata
+	}
+	_, err := h.db.Exec(`INSERT INTO task_logs (job_id, stage, timestamp, level, message, metadata) VALUES (?, ?, ?, ?, ?, ?)`,
+		jobID, stage, time.Now().Format(time.RFC3339), level, message, metaPtr)
+	if err != nil {
+		h.logger.Warnw("Failed to write task log", "job_id", jobID, "error", err)
+	}
+}
+
+// setupEmbeddingReprojectSchedule registers the reproject handler and auto-creates
+// a Pulse schedule if embeddings.reproject_interval_seconds > 0.
+func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
+	if s.embeddingService == nil || s.embeddingStore == nil {
+		return
+	}
+
+	handler := &ReprojectHandler{
+		db:         s.db,
+		store:      s.embeddingStore,
+		svc:        s.embeddingService,
+		callReduce: s.callReducePlugin,
+		logger:     s.logger.Named("reproject"),
+	}
+
+	registry := s.daemon.Registry()
+	registry.Register(handler)
+	s.logger.Infow("Registered UMAP reproject handler")
+
+	interval := cfg.Embeddings.ReprojectIntervalSeconds
+	if interval <= 0 {
+		return
+	}
+
+	// Check for existing schedule to avoid duplicates on restart
+	schedStore := schedule.NewStore(s.db)
+	existing, err := schedStore.ListAllScheduledJobs()
+	if err != nil {
+		s.logger.Errorw("Failed to list scheduled jobs for reproject idempotency check",
+			"handler_name", ReprojectHandlerName,
+			"error", err)
+		return
+	}
+	for _, j := range existing {
+		if j.HandlerName == ReprojectHandlerName && j.State == schedule.StateActive {
+			if j.IntervalSeconds != interval {
+				if err := schedStore.UpdateJobInterval(j.ID, interval); err != nil {
+					s.logger.Errorw("Failed to update reproject schedule interval",
+						"job_id", j.ID,
+						"error", err)
+				} else {
+					s.logger.Infow("Updated UMAP reproject schedule interval",
+						"job_id", j.ID,
+						"interval_seconds", interval)
+				}
+			}
+			return
+		}
+	}
+
+	now := time.Now()
+	job := &schedule.Job{
+		ID:              fmt.Sprintf("SPJ_reproject_%d", now.Unix()),
+		HandlerName:     ReprojectHandlerName,
+		IntervalSeconds: interval,
+		State:           schedule.StateActive,
+		NextRunAt:       &now,
+	}
+	if err := schedStore.CreateJob(job); err != nil {
+		s.logger.Errorw("Failed to create UMAP reproject schedule",
+			"interval_seconds", interval,
+			"error", err)
+		return
+	}
+	s.logger.Infow("Auto-created UMAP reproject schedule",
 		"job_id", job.ID,
 		"interval_seconds", interval)
 }
