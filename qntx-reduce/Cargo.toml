@@ -1,8 +1,8 @@
 [package]
 name = "qntx-reduce-plugin"
-version = "0.1.1"
+version = "0.2.0"
 edition.workspace = true
-description = "QNTX gRPC plugin for dimensionality reduction (UMAP)"
+description = "QNTX gRPC plugin for dimensionality reduction (UMAP, t-SNE, PCA)"
 license.workspace = true
 authors = ["QNTX Contributors"]
 
