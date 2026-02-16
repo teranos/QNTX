@@ -13,7 +13,7 @@ import { log, SEG } from '../../../logger';
 import { toast } from '../../../toast';
 import { getGlyphTypeBySymbol, getGlyphTypeByElement } from '../glyph-registry';
 import { createErrorGlyph } from '../error-glyph';
-import { createResultGlyph } from '../result-glyph';
+import { createResultGlyph, type PromptConfig } from '../result-glyph';
 import { uploadFile } from '../../../api/files';
 import { createDocGlyph, type DocGlyphContent } from '../doc-glyph';
 import { uiState } from '../../../state/ui';
@@ -193,8 +193,11 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
             );
         }
         try {
-            const result = JSON.parse(glyph.content);
-            return createResultGlyph(glyph, result);
+            const parsed = JSON.parse(glyph.content);
+            // Backwards-compatible: new format has .result, old is raw ExecutionResult
+            const result = parsed.result ?? parsed;
+            const promptConfig: PromptConfig | undefined = parsed.promptConfig;
+            return createResultGlyph(glyph, result, promptConfig);
         } catch (err) {
             log.error(SEG.GLYPH, `[Canvas] Result glyph ${glyph.id} has invalid JSON content`, err);
             return createErrorGlyph(

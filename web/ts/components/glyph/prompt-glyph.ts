@@ -18,7 +18,7 @@ import { log, SEG } from '../../logger';
 import { apiFetch } from '../../api';
 import { preventDrag, storeCleanup } from './glyph-interaction';
 import { canvasPlaced } from './manifestations/canvas-placed';
-import { createResultGlyph, type ExecutionResult } from './result-glyph';
+import { createResultGlyph, type ExecutionResult, type PromptConfig, type ResultGlyphContent } from './result-glyph';
 import { autoMeldResultBelow } from './meld/meld-system';
 import { uiState } from '../../state/ui';
 import { tooltip } from '../tooltip';
@@ -59,6 +59,28 @@ function loadPromptStatus(glyphId: string): PromptGlyphStatus | null {
 
 
 export const PROMPT_DEFAULT_TEMPLATE = '---\nmodel: "anthropic/claude-haiku-4.5"\ntemperature: 0.7\nmax_tokens: 1000\n---\nWrite a haiku about quantum computing.\n';
+
+/**
+ * Parse YAML frontmatter from a prompt template to extract model config.
+ */
+function parseFrontmatterConfig(template: string): PromptConfig | undefined {
+    const match = template.match(/^---\n([\s\S]*?)\n---/);
+    if (!match) return undefined;
+
+    const frontmatter = match[1];
+    const config: PromptConfig = {};
+
+    const modelMatch = frontmatter.match(/^model:\s*"?([^"\n]+)"?/m);
+    if (modelMatch) config.model = modelMatch[1].trim();
+
+    const tempMatch = frontmatter.match(/^temperature:\s*([0-9.]+)/m);
+    if (tempMatch) config.temperature = parseFloat(tempMatch[1]);
+
+    const tokensMatch = frontmatter.match(/^max_tokens:\s*(\d+)/m);
+    if (tokensMatch) config.maxTokens = parseInt(tokensMatch[1], 10);
+
+    return Object.keys(config).length > 0 ? config : undefined;
+}
 
 /**
  * Create a prompt glyph with template editor on canvas
@@ -266,6 +288,9 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
                 timestamp: Date.now(),
             });
 
+            // Extract prompt config from frontmatter for result inheritance
+            const promptConfig = parseFrontmatterConfig(template);
+
             // Spawn result glyph below the prompt
             const result: ExecutionResult = {
                 success: !data.error,
@@ -275,7 +300,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
                 error: data.error ?? null,
                 duration_ms: elapsedMs,
             };
-            spawnResultGlyph(element, result);
+            spawnResultGlyph(element, result, promptConfig);
 
         } catch (error) {
             log.error(SEG.GLYPH, '[Prompt] Execution failed:', error);
@@ -340,7 +365,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
      * Spawn a result glyph directly below this prompt glyph.
      * Composition-aware: extends existing composition or creates new meld.
      */
-    function spawnResultGlyph(promptEl: HTMLElement, result: ExecutionResult): void {
+    function spawnResultGlyph(promptEl: HTMLElement, result: ExecutionResult, promptConfig?: PromptConfig): void {
         const promptRect = promptEl.getBoundingClientRect();
         const canvas = promptEl.closest('.canvas-workspace') as HTMLElement;
         if (!canvas) {
@@ -363,10 +388,11 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
             renderContent: () => document.createElement('div')
         };
 
-        const resultElement = createResultGlyph(resultGlyph, result);
+        const resultElement = createResultGlyph(resultGlyph, result, promptConfig);
         canvas.appendChild(resultElement);
 
         const resultRect = resultElement.getBoundingClientRect();
+        const contentPayload: ResultGlyphContent = { result, ...(promptConfig && { promptConfig }) };
         uiState.addCanvasGlyph({
             id: resultGlyphId,
             symbol: 'result',
@@ -374,7 +400,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
             y: ry,
             width: Math.round(resultRect.width),
             height: Math.round(resultRect.height),
-            content: JSON.stringify(result),
+            content: JSON.stringify(contentPayload),
         });
 
         // Auto-meld result below prompt glyph (bottom port)

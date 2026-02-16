@@ -40,6 +40,9 @@ export const MELDABILITY: Record<string, readonly PortRule[]> = {
     ],
     'canvas-note-glyph': [
         { direction: 'bottom', targets: ['canvas-prompt-glyph'] }
+    ],
+    'canvas-result-glyph': [
+        { direction: 'bottom', targets: ['canvas-result-glyph'] }
     ]
 } as const;
 

@@ -49,11 +49,11 @@ describe('Result Glyph Drag Persistence - Tim (Happy Path)', () => {
         expect(element.classList.contains('canvas-result-glyph')).toBe(true);
         expect(element.dataset.glyphId).toBe('result-123');
 
-        // Execution data is attached to glyph object as JSON string
+        // Execution data is attached to glyph object as ResultGlyphContent JSON
         expect((glyph as any).content).toBeDefined();
         const parsed = JSON.parse((glyph as any).content);
-        expect(parsed.stdout).toBe('Hello from Python!');
-        expect(parsed.duration_ms).toBe(42);
+        expect(parsed.result.stdout).toBe('Hello from Python!');
+        expect(parsed.result.duration_ms).toBe(42);
     });
 
     test('Tim sees execution output in result glyph', () => {
@@ -154,6 +154,6 @@ describe('Result Glyph Drag Persistence - Spike (Edge Cases)', () => {
         // Result glyph handles large output
         expect(element.classList.contains('canvas-result-glyph')).toBe(true);
         const parsed = JSON.parse((glyph as any).content);
-        expect(parsed.stdout.length).toBe(longOutput.length);
+        expect(parsed.result.stdout.length).toBe(longOutput.length);
     });
 });
