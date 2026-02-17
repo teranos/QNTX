@@ -474,3 +474,153 @@ func TestEmbeddingStore_ProjectionRoundTrip(t *testing.T) {
 	assert.Equal(t, -7.77, projections[0].X)
 	assert.Equal(t, 3.14, projections[0].Y)
 }
+
+func TestEmbeddingStore_ClusterRunCRUD(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zap.NewNop()
+	store := NewEmbeddingStore(db, logger)
+
+	run := &ClusterRun{
+		ID:             "CR_test_001",
+		NPoints:        100,
+		NClusters:      5,
+		NNoise:         10,
+		MinClusterSize: 5,
+		DurationMS:     42,
+		CreatedAt:      time.Now().UTC(),
+	}
+	err := store.CreateClusterRun(run)
+	require.NoError(t, err)
+
+	// Duplicate insert should fail
+	err = store.CreateClusterRun(run)
+	assert.Error(t, err)
+}
+
+func TestEmbeddingStore_ClusterIdentityLifecycle(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zap.NewNop()
+	store := NewEmbeddingStore(db, logger)
+
+	// Create run first (foreign key)
+	run := &ClusterRun{
+		ID: "CR_lifecycle", NPoints: 10, NClusters: 2, NNoise: 1,
+		MinClusterSize: 5, DurationMS: 10, CreatedAt: time.Now().UTC(),
+	}
+	require.NoError(t, store.CreateClusterRun(run))
+
+	// Create two clusters
+	id0, err := store.CreateCluster("CR_lifecycle")
+	require.NoError(t, err)
+	assert.Equal(t, 0, id0)
+
+	id1, err := store.CreateCluster("CR_lifecycle")
+	require.NoError(t, err)
+	assert.Equal(t, 1, id1)
+
+	// Both should be active
+	active, err := store.GetActiveClusterIdentities()
+	require.NoError(t, err)
+	assert.Len(t, active, 2)
+
+	// Dissolve cluster 0
+	require.NoError(t, store.DissolveCluster(id0, "CR_lifecycle"))
+
+	// Only cluster 1 should be active
+	active, err = store.GetActiveClusterIdentities()
+	require.NoError(t, err)
+	assert.Len(t, active, 1)
+	assert.Equal(t, id1, active[0].ID)
+
+	// Update last seen for cluster 1
+	run2 := &ClusterRun{
+		ID: "CR_lifecycle_2", NPoints: 10, NClusters: 1, NNoise: 2,
+		MinClusterSize: 5, DurationMS: 15, CreatedAt: time.Now().UTC(),
+	}
+	require.NoError(t, store.CreateClusterRun(run2))
+	require.NoError(t, store.UpdateClusterLastSeen(id1, "CR_lifecycle_2"))
+
+	active, err = store.GetActiveClusterIdentities()
+	require.NoError(t, err)
+	assert.Equal(t, "CR_lifecycle_2", active[0].LastSeenRunID)
+}
+
+func TestEmbeddingStore_ClusterSnapshotsAndEvents(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zap.NewNop()
+	store := NewEmbeddingStore(db, logger)
+
+	// Create run and cluster
+	run := &ClusterRun{
+		ID: "CR_snap", NPoints: 10, NClusters: 1, NNoise: 0,
+		MinClusterSize: 5, DurationMS: 10, CreatedAt: time.Now().UTC(),
+	}
+	require.NoError(t, store.CreateClusterRun(run))
+
+	id0, err := store.CreateCluster("CR_snap")
+	require.NoError(t, err)
+
+	// Save snapshots
+	snapshots := []ClusterSnapshot{
+		{ClusterID: id0, RunID: "CR_snap", Centroid: createTestEmbedding(384), NMembers: 8},
+	}
+	require.NoError(t, store.SaveClusterSnapshots(snapshots))
+
+	// Record events
+	sim := 0.95
+	events := []ClusterEvent{
+		{RunID: "CR_snap", EventType: "birth", ClusterID: id0},
+		{RunID: "CR_snap", EventType: "stable", ClusterID: id0, Similarity: &sim},
+	}
+	require.NoError(t, store.RecordClusterEvents(events))
+
+	// Verify events were saved by counting
+	var count int
+	err = db.QueryRow(`SELECT COUNT(*) FROM cluster_events WHERE run_id = ?`, "CR_snap").Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 2, count)
+
+	// Verify snapshot was saved
+	err = db.QueryRow(`SELECT COUNT(*) FROM cluster_snapshots WHERE run_id = ?`, "CR_snap").Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+}
+
+func TestEmbeddingStore_GetClusterDetails(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zap.NewNop()
+	store := NewEmbeddingStore(db, logger)
+
+	// Create run, cluster, and some embeddings assigned to it
+	run := &ClusterRun{
+		ID: "CR_details", NPoints: 5, NClusters: 1, NNoise: 1,
+		MinClusterSize: 3, DurationMS: 5, CreatedAt: time.Now().UTC(),
+	}
+	require.NoError(t, store.CreateClusterRun(run))
+
+	cid, err := store.CreateCluster("CR_details")
+	require.NoError(t, err)
+
+	// Save some embeddings and assign them to the cluster
+	for i := 0; i < 3; i++ {
+		emb := &EmbeddingModel{
+			SourceType: "attestation",
+			SourceID:   generateTestID(),
+			Text:       fmt.Sprintf("detail test %d", i),
+			Embedding:  createTestEmbedding(384),
+			Model:      "all-MiniLM-L6-v2",
+			Dimensions: 384,
+		}
+		require.NoError(t, store.Save(emb))
+		require.NoError(t, store.UpdateClusterAssignments([]ClusterAssignment{
+			{ID: emb.ID, ClusterID: cid, Probability: 0.9},
+		}))
+	}
+
+	details, err := store.GetClusterDetails()
+	require.NoError(t, err)
+	require.Len(t, details, 1)
+	assert.Equal(t, cid, details[0].ID)
+	assert.Equal(t, 3, details[0].Members)
+	assert.Equal(t, "active", details[0].Status)
+}
