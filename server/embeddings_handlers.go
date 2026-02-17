@@ -535,6 +535,7 @@ func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Reque
 		s.embeddingService,
 		s.embeddingClusterInvalidator,
 		minClusterSize,
+		appcfg.GetFloat64("embeddings.cluster_match_threshold"),
 		s.logger,
 	)
 	if err != nil {
@@ -551,6 +552,53 @@ func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		s.logger.Errorw("Failed to encode cluster response", "error", err)
+	}
+}
+
+// ClusterListEntry represents a single cluster in the API response.
+type ClusterListEntry struct {
+	ID        int     `json:"id"`
+	Label     *string `json:"label"`
+	Members   int     `json:"members"`
+	Status    string  `json:"status"`
+	FirstSeen string  `json:"first_seen"`
+	LastSeen  string  `json:"last_seen"`
+}
+
+// HandleEmbeddingClusters returns active clusters with metadata (GET /api/embeddings/clusters)
+func (s *QNTXServer) HandleEmbeddingClusters(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.embeddingStore == nil {
+		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	details, err := s.embeddingStore.GetClusterDetails()
+	if err != nil {
+		s.logger.Errorw("Failed to get cluster details", "error", err)
+		http.Error(w, "Failed to retrieve cluster details", http.StatusInternalServerError)
+		return
+	}
+
+	entries := make([]ClusterListEntry, len(details))
+	for i, d := range details {
+		entries[i] = ClusterListEntry{
+			ID:        d.ID,
+			Label:     d.Label,
+			Members:   d.Members,
+			Status:    d.Status,
+			FirstSeen: d.FirstSeen.Format(time.RFC3339),
+			LastSeen:  d.LastSeen.Format(time.RFC3339),
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(entries); err != nil {
+		s.logger.Errorw("Failed to encode clusters response", "error", err)
 	}
 }
 
