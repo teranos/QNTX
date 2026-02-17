@@ -1,6 +1,6 @@
 # Mobile Canvas UX Analysis
 
-Tauri mobile (WKWebView on iOS, WebView on Android). Primary use case: viewer/monitor. Glyph tray is the main navigation surface.
+Tauri mobile (WKWebView on iOS, WebView on Android). A QNTX mobile app is a node in a decentralised mesh network — it can operate offline via WASM (query parsing, attestation storage in IndexedDB, fuzzy search, classification) and gains more capabilities by connecting to other QNTX nodes. The canvas is the primary workspace; the glyph tray is the main navigation surface.
 
 ## Glyph Tray: Touch Browse
 
@@ -47,9 +47,17 @@ For a viewer/monitor, the canvas needs to display the current state legibly and 
 
 Touch handlers are always set up (even on desktop) to support browser responsive design mode testing.
 
+### Canvas zoom — Pinch-to-zoom (mobile/touch)
+
+Two-finger pinch gesture zooms the canvas (0.25x–4x). Zoom origin tracks the pinch center so the point between your fingers stays stationary. Desktop uses Ctrl+wheel / Cmd+wheel. Both touch and desktop handlers are always registered regardless of viewport width.
+
+### Rectangle selection — Works at all viewport widths
+
+Rectangle selection (click-drag on canvas background) is registered unconditionally. Previously gated behind a one-time `isMobile` media query check that prevented it from working if the canvas was opened at narrow width.
+
 ### Canvas editing interactions are mouse-only
 
-**Glyph drag, resize, rectangle select, spawn menu, meld** — all use `mousedown`/`mousemove`/`mouseup` exclusively. On mobile/touch devices, these interactions are not currently available. Glyphs can be viewed and the canvas panned, but glyph manipulation requires desktop.
+**Glyph drag, resize, spawn menu, meld** — all use `mousedown`/`mousemove`/`mouseup` exclusively. On mobile/touch devices, these interactions are not currently available. Glyphs can be viewed, the canvas panned and zoomed, and rectangle selection works, but glyph manipulation requires desktop.
 
 Future work could add touch-based glyph editing via long-press, dedicated edit mode toggle, or gesture-based interactions.
 
@@ -90,12 +98,49 @@ All touch sizing is gated behind `@media (pointer: coarse)` — desktop unchange
 - **Fixed**: Touch-based canvas panning for mobile and responsive design mode
 - Single finger drag anywhere on canvas pans the viewport
 - Desktop uses two-finger trackpad scroll and middle mouse button drag
-- Touch handlers always active to support responsive design mode testing
+- Touch and desktop handlers always registered (no viewport-width gate)
 - Pan state persists per-canvas in localStorage
+- Stale gesture state (`isPanning`/`isPinching`) reset on canvas setup
+
+### Canvas Zoom (`canvas-pan.ts`)
+- **Fixed**: Two-finger pinch-to-zoom on mobile (0.25x–4x range)
+- Desktop: Ctrl+wheel / Cmd+wheel
+- Zoom origin math keeps point under cursor/pinch-center stationary
+
+### Canvas auto-open (`main.ts`)
+- **Fixed**: Canvas workspace opens immediately on app startup (desktop + mobile)
+- Canvas is the primary workspace — no manual click required to enter it
+
+### Safe areas (`responsive.css`)
+- **Fixed**: iOS notch/Dynamic Island handled via `env(safe-area-inset-top)` on system drawer, canvas, and minimize button
+
+### Responsive handler registration (`canvas-workspace-builder.ts`)
+- **Fixed**: Pan and rectangle selection handlers registered unconditionally
+- Previously gated behind one-time `isMobile` check — handlers were missing if canvas opened at narrow width
+
+## Offline Capability (WASM)
+
+The browser WASM module (`web/wasm/`, 488KB) provides local compute without a server connection:
+
+| Capability | Rust core | browser.rs | TS wrapper | UI wired |
+|---|---|---|---|---|
+| Query parsing | Yes | Yes | Yes | Yes (fuzzy search) |
+| Attestation CRUD | Yes | Yes (IndexedDB) | Yes | Yes (ax-glyph, ts-glyph) |
+| Fuzzy search | Yes | Yes | Yes | Yes |
+| Classification | Yes | Yes | No | No |
+| Merkle sync | Yes | Yes | No | No |
+| Cartesian expansion | Yes | No | No | No |
+| Claim grouping/dedup | Yes | No | No | No |
+
+See ADR-005 for the integration strategy. "Rust core" = the shared `qntx-core` crate. "browser.rs" = `#[wasm_bindgen]` exports. "TS wrapper" = `web/ts/qntx-wasm.ts`. Each column is a step in the wiring pipeline.
 
 ## Remaining Work
 
 | Gap | Priority | Notes |
 |---|---|---|
-| Canvas zoom for mobile viewer | Medium | Pan implemented; pinch-to-zoom would improve navigation |
-| Touch-based glyph editing | Low | Glyph manipulation currently desktop-only; acceptable for viewer use case |
+| Offline ax-glyph fallback | High | Use WASM `queryAttestations()` when server unreachable |
+| Unified search (SPACE to open) | High | Replace left-panel query bar with floating search overlay on canvas |
+| Light mode (#221) | Medium | UI is dark-mode first; light mode is a large feature |
+| Touch-based glyph editing | Low | Glyph manipulation currently desktop-only; acceptable for now |
+| Remove root canvas minimize | Low | Blocked on unified search — canvas becomes permanent background |
+| App Store packaging | Low | Icons, launch screen, privacy manifest — blocked on Apple Developer account |
