@@ -41,8 +41,8 @@ CREATE TABLE IF NOT EXISTS cluster_events (
     FOREIGN KEY (cluster_id) REFERENCES clusters(id)
 );
 
--- Bootstrap: if cluster_centroids has rows from a previous run, create
--- a synthetic run and seed clusters + snapshots so existing IDs are preserved.
+-- Bootstrap: if cluster_centroids (created in 030) has rows from a previous run,
+-- create a synthetic run and seed clusters + snapshots so existing IDs are preserved.
 INSERT INTO cluster_runs (id, n_points, n_clusters, n_noise, min_cluster_size, duration_ms, created_at)
 SELECT 'CR_bootstrap',
        (SELECT COUNT(*) FROM embeddings),
