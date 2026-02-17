@@ -38,6 +38,15 @@ The SE glyph feeds results into downstream glyphs:
 |-------------|--------|
 | SE → py | Matched attestations passed as input to Python glyph |
 | SE → prompt | Matched attestations injected into prompt template |
+| SE → SE | Intersection — downstream shows only attestations matching both queries |
+
+### SE → SE intersection
+
+When SE₁ melds rightward to SE₂, SE₂ switches from standalone mode to intersection mode. Its own watcher is disabled; a compound watcher takes over that requires both SE₁'s and SE₂'s queries to pass their respective thresholds. SE₁ continues showing its own results independently.
+
+On unmeld, SE₂'s standalone watcher is re-enabled and it reverts to its own query results.
+
+See [docs/vision/se-se-meldability.md](../vision/se-se-meldability.md) for the full vision including chaining (SE→SE→SE) and union (SE↓SE).
 
 ### Planned
 
