@@ -28,12 +28,25 @@
         display: none;
     }
 
-    /* System drawer - move to top */
+    /* System drawer - move to top, flip grab bar to bottom edge.
+       Pad for iOS notch / Dynamic Island via safe-area-inset-top. */
     #system-drawer {
-        top: 0;
+        top: env(safe-area-inset-top, 0px);
         bottom: auto;
         border-top: none;
         border-bottom: 1px solid var(--border-on-dark);
+        flex-direction: column-reverse;
+    }
+
+    /* Fullscreen canvases (root + subcanvas): start below drawer + safe area */
+    .canvas-fullscreen-adjusted {
+        top: calc(var(--drawer-height, 32px) + env(safe-area-inset-top, 0px)) !important;
+        height: calc(100dvh - var(--drawer-height, 32px) - env(safe-area-inset-top, 0px)) !important;
+    }
+
+    /* Canvas minimize button: below drawer + safe area */
+    .canvas-minimize-btn {
+        top: calc(var(--drawer-height, 32px) + env(safe-area-inset-top, 0px) + 16px) !important;
     }
 
     /* Hide build hash on mobile to save space */
