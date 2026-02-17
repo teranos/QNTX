@@ -81,10 +81,6 @@ export type {
 // Types from schedule
 export type {
   Execution,
-  LogEntry,
-  StageInfo,
-  TaskInfo,
-  TaskLogStore,
 } from './schedule';
 
 // Types from server
@@ -103,6 +99,7 @@ export type {
   LLMStreamMessage,
   ListExecutionsResponse,
   ListScheduledJobsResponse,
+  LogEntry,
   ParsedATSCode,
   PluginHealthMessage,
   PluginInfo,
@@ -123,8 +120,10 @@ export type {
   QueryMessage,
   Result,
   ScheduledJobResponse,
+  StageInfo,
   StatsMessage,
   StorageWarningMessage,
+  TaskInfo,
   TaskLogsResponse,
   UpdateScheduledJobRequest,
   UsageUpdateMessage,

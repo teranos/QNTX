@@ -103,7 +103,7 @@ func TestClient_Chat(t *testing.T) {
 				Model:   "test-model",
 				Choices: []Choice{
 					{
-						Index:        0,
+						Index: 0,
 						Message:      NewTextMessage("assistant", "Test response content"),
 						FinishReason: "stop",
 					},
