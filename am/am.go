@@ -141,6 +141,7 @@ type EmbeddingsConfig struct {
 	ReclusterIntervalSeconds int      `mapstructure:"recluster_interval_seconds"` // Pulse schedule interval for HDBSCAN re-clustering (0 = disabled)
 	ReprojectIntervalSeconds int      `mapstructure:"reproject_interval_seconds"` // Pulse schedule interval for UMAP re-projection (0 = disabled)
 	MinClusterSize           int      `mapstructure:"min_cluster_size"`           // Minimum cluster size for HDBSCAN (default: 5)
+	ClusterMatchThreshold    float64  `mapstructure:"cluster_match_threshold"`    // Cosine similarity threshold for stable cluster matching (default: 0.7)
 	ProjectionMethods        []string `mapstructure:"projection_methods"`         // Dimensionality reduction methods: umap, tsne, pca (default: ["umap"])
 }
 
