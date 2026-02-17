@@ -5,9 +5,11 @@ package server
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/ai/provider"
@@ -57,6 +59,10 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 
 	labeled := 0
 	for _, cluster := range eligible {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
 		samples, err := h.store.SampleClusterTexts(cluster.ID, sampleSize)
 		if err != nil {
 			h.logger.Warnw("Failed to sample texts for cluster",
@@ -97,10 +103,11 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 			continue
 		}
 
-		// Clean label: trim whitespace, enforce max length
+		// Clean label: trim whitespace, enforce max length (rune-safe)
 		label := strings.TrimSpace(resp.Content)
-		if len(label) > 100 {
-			label = label[:100]
+		if utf8.RuneCountInString(label) > 100 {
+			runes := []rune(label)
+			label = string(runes[:100])
 		}
 		if label == "" {
 			h.logger.Warnw("LLM returned empty label for cluster", "cluster_id", cluster.ID)
@@ -126,11 +133,12 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 		h.createLabelAttestation(cluster.ID, label, modelUsed, len(samples), cluster.Members)
 
 		labeled++
+		labelJSON, _ := json.Marshal(label)
 		h.writeLog(job.ID, "labeling", "info",
 			fmt.Sprintf("Labeled cluster %d: %q (%d members, %d samples)",
 				cluster.ID, label, cluster.Members, len(samples)),
-			fmt.Sprintf(`{"cluster_id":%d,"label":"%s","members":%d,"samples":%d}`,
-				cluster.ID, label, cluster.Members, len(samples)))
+			fmt.Sprintf(`{"cluster_id":%d,"label":%s,"members":%d,"samples":%d}`,
+				cluster.ID, labelJSON, cluster.Members, len(samples)))
 	}
 
 	h.writeLog(job.ID, "labeling", "info",

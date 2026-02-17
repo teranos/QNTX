@@ -985,7 +985,7 @@ func (s *EmbeddingStore) GetLabelEligibleClusters(minSize, cooldownDays, limit i
 		LEFT JOIN (SELECT cluster_id, COUNT(*) AS cnt FROM embeddings WHERE cluster_id >= 0 GROUP BY cluster_id) m ON m.cluster_id = c.id
 		WHERE c.status = 'active'
 		  AND COALESCE(m.cnt, 0) >= ?
-		  AND (c.labeled_at IS NULL OR c.labeled_at < datetime('now', '-' || ? || ' days'))
+		  AND (c.labeled_at IS NULL OR datetime(c.labeled_at) < datetime('now', '-' || ? || ' days'))
 		ORDER BY members DESC
 		LIMIT ?
 	`, minSize, cooldownDays, limit)
