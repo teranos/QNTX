@@ -1271,15 +1271,53 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 		return
 	}
 
-	// Check if watcher was successfully loaded (parsing succeeded)
-	// If parsing failed, the watcher won't be in the engine's in-memory map
+	// Check if watcher was successfully loaded (parsing succeeded).
+	// Engine-level suppression may have removed SE watchers that are compound
+	// targets — detect that before falling through to parse error handling.
 	reloadedWatcher, exists := c.server.watcherEngine.GetWatcher(watcherID)
 	if !exists || reloadedWatcher == nil {
+		// SE watchers absent from engine may be compound-suppressed (SE→SE meld):
+		// the engine removes standalone SE watchers whose glyph is a compound target.
+		if strings.HasPrefix(watcherID, "se-glyph-") {
+			glyphID := strings.TrimPrefix(watcherID, "se-glyph-")
+			compoundWatchers, err := c.server.watcherEngine.GetStore().FindCompoundWatchersForTarget(c.server.ctx, glyphID)
+			if err == nil && len(compoundWatchers) > 0 {
+				c.server.logger.Infow("SE watcher suppressed by engine (compound target)",
+					"watcher_id", watcherID,
+					"compound_watchers", len(compoundWatchers))
+				// Persist latest query to compound watchers (restart durability)
+				for _, cw := range compoundWatchers {
+					if cw.SemanticQuery != msg.SemanticQuery || cw.SemanticThreshold != msg.SemanticThreshold {
+						cw.SemanticQuery = msg.SemanticQuery
+						cw.SemanticThreshold = msg.SemanticThreshold
+						cw.SemanticClusterID = msg.SemanticClusterID
+						if err := c.server.watcherEngine.GetStore().Update(c.server.ctx, cw); err != nil {
+							c.server.logger.Warnw("Failed to propagate query to compound watcher",
+								"compound_watcher_id", cw.ID,
+								"error", err)
+						}
+					}
+				}
+				// Trigger historical query on compound watcher(s)
+				for _, cw := range compoundWatchers {
+					cwID := cw.ID
+					c.server.wg.Add(1)
+					go func() {
+						defer c.server.wg.Done()
+						if err := c.server.watcherEngine.QueryHistoricalMatches(cwID); err != nil {
+							c.server.logger.Errorw("Failed to query historical matches for compound watcher",
+								"watcher_id", cwID,
+								"error", err)
+						}
+					}()
+				}
+				return
+			}
+		}
+
 		// Watcher exists in DB but failed to load (likely parse error)
-		// Get the actual parse error from the engine
 		parseErr := c.server.watcherEngine.GetParseError(watcherID)
 		if parseErr != nil {
-			// Broadcast with full error details
 			c.server.logger.Warnw("Watcher parse failed",
 				"watcher_id", watcherID,
 				"query", msg.WatcherQuery,
@@ -1288,7 +1326,6 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 			severity := extractErrorSeverity(parseErr)
 			c.server.broadcastWatcherError(watcherID, parseErr.Error(), severity, errors.GetAllDetails(parseErr)...)
 		} else {
-			// Fallback if no parse error was stored (shouldn't happen)
 			errMsg := "Failed to parse AX query - watcher not activated"
 			c.server.logger.Warnw("Watcher parse failed (no error details)",
 				"watcher_id", watcherID,

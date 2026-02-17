@@ -2,6 +2,7 @@ package storage_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -546,5 +547,92 @@ func TestWatcherStore_CreateOrReplace_Validation(t *testing.T) {
 	err = store.CreateOrReplace(ctx, &storage.Watcher{ID: "x", Name: "X"})
 	if err == nil {
 		t.Error("Expected error for empty ActionType")
+	}
+}
+
+func TestWatcherStore_FindCompoundWatchersForTarget(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := storage.NewWatcherStore(db)
+	ctx := context.Background()
+
+	// Create a standalone SE watcher (should NOT be found)
+	standalone := &storage.Watcher{
+		ID:                "se-glyph-se-target-123",
+		Name:              "SE Standalone",
+		ActionType:        storage.ActionTypeSemanticMatch,
+		SemanticQuery:     "about teaching",
+		SemanticThreshold: 0.5,
+		Enabled:           true,
+	}
+	if err := store.Create(ctx, standalone); err != nil {
+		t.Fatalf("Create standalone failed: %v", err)
+	}
+
+	// Create a compound SE→SE meld-edge watcher targeting the same glyph
+	actionData, _ := json.Marshal(map[string]string{
+		"target_glyph_id": "se-target-123",
+		"composition_id":  "comp-1",
+		"source_glyph_id": "se-source-456",
+	})
+	compound := &storage.Watcher{
+		ID:                        "meld-edge-comp-1-se-source-456-se-target-123",
+		Name:                      "Meld: SE→SE",
+		ActionType:                storage.ActionTypeSemanticMatch,
+		ActionData:                string(actionData),
+		SemanticQuery:             "about teaching",
+		SemanticThreshold:         0.5,
+		UpstreamSemanticQuery:     "science",
+		UpstreamSemanticThreshold: 0.4,
+		MaxFiresPerMinute:         60,
+		Enabled:                   true,
+	}
+	if err := store.Create(ctx, compound); err != nil {
+		t.Fatalf("Create compound failed: %v", err)
+	}
+
+	// Create a non-compound meld-edge watcher (should NOT be found)
+	otherActionData, _ := json.Marshal(map[string]string{
+		"target_glyph_id":   "py-glyph-789",
+		"target_glyph_type": "py",
+		"composition_id":    "comp-2",
+		"source_glyph_id":   "se-source-456",
+	})
+	nonCompound := &storage.Watcher{
+		ID:                "meld-edge-comp-2-se-source-456-py-glyph-789",
+		Name:              "Meld: SE→py",
+		ActionType:        storage.ActionTypeGlyphExecute,
+		ActionData:        string(otherActionData),
+		SemanticQuery:     "science",
+		SemanticThreshold: 0.4,
+		MaxFiresPerMinute: 60,
+		Enabled:           true,
+	}
+	if err := store.Create(ctx, nonCompound); err != nil {
+		t.Fatalf("Create non-compound failed: %v", err)
+	}
+
+	// Find compound watchers for the target glyph
+	found, err := store.FindCompoundWatchersForTarget(ctx, "se-target-123")
+	if err != nil {
+		t.Fatalf("FindCompoundWatchersForTarget failed: %v", err)
+	}
+
+	if len(found) != 1 {
+		t.Fatalf("Expected 1 compound watcher, got %d", len(found))
+	}
+	if found[0].ID != compound.ID {
+		t.Errorf("Wrong watcher found: got %s, want %s", found[0].ID, compound.ID)
+	}
+	if found[0].UpstreamSemanticQuery != "science" {
+		t.Errorf("UpstreamSemanticQuery not preserved: got %s", found[0].UpstreamSemanticQuery)
+	}
+
+	// Find for non-existent target — should return empty
+	notFound, err := store.FindCompoundWatchersForTarget(ctx, "nonexistent")
+	if err != nil {
+		t.Fatalf("FindCompoundWatchersForTarget (nonexistent) failed: %v", err)
+	}
+	if len(notFound) != 0 {
+		t.Errorf("Expected 0 results for nonexistent target, got %d", len(notFound))
 	}
 }

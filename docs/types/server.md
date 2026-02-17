@@ -128,7 +128,7 @@ type ErrorResponse struct {
 
 ## GlyphFiredMessage {#glyphfiredmessage}
 
-**Source**: [`server/types.go:252`](https://github.com/teranos/QNTX/blob/main/server/types.go#L252)
+**Source**: [`server/types.go:253`](https://github.com/teranos/QNTX/blob/main/server/types.go#L253)
 
 
 ```go
@@ -675,7 +675,7 @@ type WatcherCreateRequest struct {
 
 ## WatcherErrorMessage {#watchererrormessage}
 
-**Source**: [`server/types.go:264`](https://github.com/teranos/QNTX/blob/main/server/types.go#L264)
+**Source**: [`server/types.go:265`](https://github.com/teranos/QNTX/blob/main/server/types.go#L265)
 
 
 ```go
@@ -700,6 +700,7 @@ type WatcherMatchMessage struct {
 	WatcherID string `json:"watcher_id"`
 	Attestation interface{} `json:"attestation"`
 	Score float32 `json:"score,omitempty"`
+	TargetGlyphID string `json:"target_glyph_id,omitempty"`
 	Timestamp int64 `json:"timestamp"`
 }
 ```

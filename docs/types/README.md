@@ -15,7 +15,7 @@ Auto-generated documentation showing Go source code alongside TypeScript type de
 
 - **[async](./async.md)** - Asynchronous job processing with Pulse (9 types)
 - **[budget](./budget.md)** - Cost tracking and budget management (5 types)
-- **[schedule](./schedule.md)** - Scheduled execution with cron (5 types)
+- **[schedule](./schedule.md)** - Scheduled execution with cron (7 types)
 
 ### Server
 

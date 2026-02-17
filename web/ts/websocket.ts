@@ -202,6 +202,11 @@ const MESSAGE_HANDLERS = {
             import('./components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphResults }) => {
                 updateSemanticGlyphResults(glyphId, data.attestation, data.score);
             });
+        } else if (data.watcher_id?.startsWith('meld-edge-') && data.target_glyph_id) {
+            // Meld-edge match with target glyph routing (e.g. SE→SE intersection)
+            import('./components/glyph/semantic-glyph.js').then(({ updateSemanticGlyphResults }) => {
+                updateSemanticGlyphResults(data.target_glyph_id!, data.attestation, data.score);
+            });
         } else {
             log.warn(SEG.WS, 'Received watcher_match with unexpected watcher_id format:', data.watcher_id);
         }
