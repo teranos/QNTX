@@ -296,6 +296,60 @@ func (x *Composition) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+// MinimizedWindow tracks a glyph that has been minimized to the tray.
+// Synced between frontend (IndexedDB) and backend (SQLite).
+type MinimizedWindow struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	GlyphId       string                 `protobuf:"bytes,1,opt,name=glyph_id,json=glyphId,proto3" json:"glyph_id,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MinimizedWindow) Reset() {
+	*x = MinimizedWindow{}
+	mi := &file_glyph_proto_canvas_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MinimizedWindow) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MinimizedWindow) ProtoMessage() {}
+
+func (x *MinimizedWindow) ProtoReflect() protoreflect.Message {
+	mi := &file_glyph_proto_canvas_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MinimizedWindow.ProtoReflect.Descriptor instead.
+func (*MinimizedWindow) Descriptor() ([]byte, []int) {
+	return file_glyph_proto_canvas_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *MinimizedWindow) GetGlyphId() string {
+	if x != nil {
+		return x.GlyphId
+	}
+	return ""
+}
+
+func (x *MinimizedWindow) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
 var File_glyph_proto_canvas_proto protoreflect.FileDescriptor
 
 const file_glyph_proto_canvas_proto_rawDesc = "" +
@@ -328,7 +382,11 @@ const file_glyph_proto_canvas_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAtJ\x04\b\x03\x10\x04B%Z#github.com/teranos/QNTX/glyph/protob\x06proto3"
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAtJ\x04\b\x03\x10\x04\"g\n" +
+	"\x0fMinimizedWindow\x12\x19\n" +
+	"\bglyph_id\x18\x01 \x01(\tR\aglyphId\x129\n" +
+	"\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAtB%Z#github.com/teranos/QNTX/glyph/protob\x06proto3"
 
 var (
 	file_glyph_proto_canvas_proto_rawDescOnce sync.Once
@@ -342,24 +400,26 @@ func file_glyph_proto_canvas_proto_rawDescGZIP() []byte {
 	return file_glyph_proto_canvas_proto_rawDescData
 }
 
-var file_glyph_proto_canvas_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_glyph_proto_canvas_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_glyph_proto_canvas_proto_goTypes = []any{
 	(*CanvasGlyph)(nil),           // 0: glyph.CanvasGlyph
 	(*CompositionEdge)(nil),       // 1: glyph.CompositionEdge
 	(*Composition)(nil),           // 2: glyph.Composition
-	(*timestamppb.Timestamp)(nil), // 3: google.protobuf.Timestamp
+	(*MinimizedWindow)(nil),       // 3: glyph.MinimizedWindow
+	(*timestamppb.Timestamp)(nil), // 4: google.protobuf.Timestamp
 }
 var file_glyph_proto_canvas_proto_depIdxs = []int32{
-	3, // 0: glyph.CanvasGlyph.created_at:type_name -> google.protobuf.Timestamp
-	3, // 1: glyph.CanvasGlyph.updated_at:type_name -> google.protobuf.Timestamp
+	4, // 0: glyph.CanvasGlyph.created_at:type_name -> google.protobuf.Timestamp
+	4, // 1: glyph.CanvasGlyph.updated_at:type_name -> google.protobuf.Timestamp
 	1, // 2: glyph.Composition.edges:type_name -> glyph.CompositionEdge
-	3, // 3: glyph.Composition.created_at:type_name -> google.protobuf.Timestamp
-	3, // 4: glyph.Composition.updated_at:type_name -> google.protobuf.Timestamp
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	4, // 3: glyph.Composition.created_at:type_name -> google.protobuf.Timestamp
+	4, // 4: glyph.Composition.updated_at:type_name -> google.protobuf.Timestamp
+	4, // 5: glyph.MinimizedWindow.created_at:type_name -> google.protobuf.Timestamp
+	6, // [6:6] is the sub-list for method output_type
+	6, // [6:6] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_glyph_proto_canvas_proto_init() }
@@ -373,7 +433,7 @@ func file_glyph_proto_canvas_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_glyph_proto_canvas_proto_rawDesc), len(file_glyph_proto_canvas_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
