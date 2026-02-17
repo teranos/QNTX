@@ -134,13 +134,14 @@ type PluginKeepaliveConfig struct {
 
 // EmbeddingsConfig configures the embedding service for semantic search
 type EmbeddingsConfig struct {
-	Enabled                  bool    `mapstructure:"enabled"`                    // Enable embedding service (default: false)
-	Path                     string  `mapstructure:"path"`                       // Path to ONNX model file
-	Name                     string  `mapstructure:"name"`                       // Model identifier for metadata
-	ClusterThreshold         float64 `mapstructure:"cluster_threshold"`          // Minimum similarity for cluster assignment (default: 0.5)
-	ReclusterIntervalSeconds int     `mapstructure:"recluster_interval_seconds"` // Pulse schedule interval for HDBSCAN re-clustering (0 = disabled)
-	ReprojectIntervalSeconds int     `mapstructure:"reproject_interval_seconds"` // Pulse schedule interval for UMAP re-projection (0 = disabled)
-	MinClusterSize           int     `mapstructure:"min_cluster_size"`           // Minimum cluster size for HDBSCAN (default: 5)
+	Enabled                  bool     `mapstructure:"enabled"`                    // Enable embedding service (default: false)
+	Path                     string   `mapstructure:"path"`                       // Path to ONNX model file
+	Name                     string   `mapstructure:"name"`                       // Model identifier for metadata
+	ClusterThreshold         float64  `mapstructure:"cluster_threshold"`          // Minimum similarity for cluster assignment (default: 0.5)
+	ReclusterIntervalSeconds int      `mapstructure:"recluster_interval_seconds"` // Pulse schedule interval for HDBSCAN re-clustering (0 = disabled)
+	ReprojectIntervalSeconds int      `mapstructure:"reproject_interval_seconds"` // Pulse schedule interval for UMAP re-projection (0 = disabled)
+	MinClusterSize           int      `mapstructure:"min_cluster_size"`           // Minimum cluster size for HDBSCAN (default: 5)
+	ProjectionMethods        []string `mapstructure:"projection_methods"`         // Dimensionality reduction methods: umap, tsne, pca (default: ["umap"])
 }
 
 // File system constants

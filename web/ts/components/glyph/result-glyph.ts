@@ -9,6 +9,8 @@ import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { apiFetch } from '../../api';
 import { uiState } from '../../state/ui';
+import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
+import { Doc, Prose } from '@generated/sym.js';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { unmeldComposition } from './meld/meld-composition';
 import { autoMeldResultBelow } from './meld/meld-system';
@@ -59,51 +61,60 @@ export function createResultGlyph(
     const header = document.createElement('div');
     header.className = 'result-glyph-header';
     header.style.padding = '4px 8px';
-    header.style.backgroundColor = 'var(--bg-tertiary)';
+    header.style.backgroundColor = 'rgba(51, 52, 51, 0.9)';
     header.style.borderBottom = '1px solid var(--border-color)';
     header.style.display = 'flex';
-    header.style.alignItems = 'center';
+    header.style.alignItems = 'flex-start';
     header.style.justifyContent = 'space-between';
     header.style.fontSize = '11px';
     header.style.color = 'var(--text-secondary)';
 
-    // Duration label
-    const durationLabel = document.createElement('span');
-    durationLabel.style.flexShrink = '0';
-    durationLabel.textContent = `${result.duration_ms}ms`;
-    header.appendChild(durationLabel);
-
-    // Prompt label — truncated text showing what generated this result
+    // Prompt label — full multiline prompt text
     if (prompt) {
         const promptLabel = document.createElement('span');
         promptLabel.className = 'result-prompt-label';
         promptLabel.style.flex = '1';
-        promptLabel.style.overflow = 'hidden';
-        promptLabel.style.textOverflow = 'ellipsis';
-        promptLabel.style.whiteSpace = 'nowrap';
+        promptLabel.style.whiteSpace = 'pre-wrap';
+        promptLabel.style.wordBreak = 'break-word';
         promptLabel.style.padding = '0 8px';
-        promptLabel.style.opacity = '0.7';
+        promptLabel.style.color = 'var(--text-on-dark)';
+        promptLabel.style.fontSize = '12px';
         promptLabel.textContent = prompt;
-        promptLabel.title = prompt;
         header.appendChild(promptLabel);
     }
 
     // Button container
     const buttonContainer = document.createElement('div');
     buttonContainer.style.display = 'flex';
-    buttonContainer.style.gap = '4px';
+    buttonContainer.style.gap = '3px';
+    buttonContainer.style.flexShrink = '0';
+
+    function headerBtn(label: string, title: string, fontSize = '11px'): HTMLButtonElement {
+        const btn = document.createElement('button');
+        btn.className = 'result-header-btn';
+        btn.textContent = label;
+        btn.title = title;
+        btn.style.fontSize = fontSize;
+        return btn;
+    }
+
+    // Copy button — copies prompt + result to clipboard
+    const copyBtn = headerBtn('⎘', 'Copy to clipboard', '12px');
+
+    copyBtn.addEventListener('click', () => {
+        let text = '';
+        if (prompt) text += `> ${prompt.replace(/\n/g, '\n> ')}\n\n`;
+        text += result.stdout || result.error || '(no output)';
+        navigator.clipboard.writeText(text).then(() => {
+            copyBtn.textContent = '✓';
+            setTimeout(() => { copyBtn.textContent = '⎘'; }, 1500);
+        });
+    });
+
+    buttonContainer.appendChild(copyBtn);
 
     // To window button
-    const toWindowBtn = document.createElement('button');
-    toWindowBtn.textContent = '⬆';
-    toWindowBtn.title = 'Expand to window';
-    toWindowBtn.style.background = 'var(--bg-hover)';
-    toWindowBtn.style.border = '1px solid var(--border-color)';
-    toWindowBtn.style.borderRadius = '3px';
-    toWindowBtn.style.padding = '2px 6px';
-    toWindowBtn.style.cursor = 'pointer';
-    toWindowBtn.style.fontSize = '10px';
-    toWindowBtn.style.color = 'var(--text-primary)';
+    const toWindowBtn = headerBtn('⬆', 'Expand to window', '10px');
 
     toWindowBtn.addEventListener('click', () => {
         // TODO: Implement window manifestation morphing (tracked in #440)
@@ -113,17 +124,7 @@ export function createResultGlyph(
     buttonContainer.appendChild(toWindowBtn);
 
     // Close button
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = '×';
-    closeBtn.title = 'Close result';
-    closeBtn.style.background = 'var(--bg-hover)';
-    closeBtn.style.border = '1px solid var(--border-color)';
-    closeBtn.style.borderRadius = '3px';
-    closeBtn.style.padding = '2px 6px';
-    closeBtn.style.cursor = 'pointer';
-    closeBtn.style.fontSize = '14px';
-    closeBtn.style.lineHeight = '1';
-    closeBtn.style.color = 'var(--text-primary)';
+    const closeBtn = headerBtn('×', 'Close result', '13px');
 
     closeBtn.addEventListener('click', () => {
         // Check if result is in a composition
@@ -169,7 +170,8 @@ export function createResultGlyph(
         logLabel: 'ResultGlyph',
     });
     element.style.minHeight = '80px';
-    element.style.borderRadius = '0 0 4px 4px';
+    element.style.backgroundColor = 'transparent';
+    element.style.borderRadius = '0 0 2px 2px';
     element.style.border = '1px solid var(--border-on-dark)';
     element.style.borderTop = 'none';
     element.style.zIndex = '1';
@@ -236,25 +238,64 @@ export function createResultGlyph(
     followupInput.rows = 1;
     preventDrag(followupInput);
 
+    // Auto-resize textarea as content grows
+    function autoResize() {
+        followupInput.style.height = 'auto';
+        followupInput.style.height = `${followupInput.scrollHeight}px`;
+    }
+    followupInput.addEventListener('input', autoResize);
+
     const followupStatus = document.createElement('span');
     followupStatus.className = 'followup-status';
 
+    let isExecuting = false;
     followupInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             const text = followupInput.value.trim();
-            if (!text) return;
+            if (!text || isExecuting) return;
 
+            isExecuting = true;
             followupInput.disabled = true;
             followupStatus.textContent = 'Running…';
 
+            // Collect attachments from melded glyphs (docs, notes)
+            const fileIds: string[] = [];
+            const noteTexts: string[] = [];
+            const comp = findCompositionByGlyph(glyph.id);
+            if (comp) {
+                const memberIds = extractGlyphIds(comp.edges);
+                for (const mid of memberIds) {
+                    if (mid === glyph.id) continue;
+                    const g = uiState.getCanvasGlyphs().find(cg => cg.id === mid);
+                    if (!g?.content) continue;
+
+                    if (g.symbol === Doc) {
+                        try {
+                            const meta = JSON.parse(g.content);
+                            if (meta.fileId && meta.ext) {
+                                fileIds.push(meta.fileId + meta.ext);
+                            }
+                        } catch { /* skip malformed */ }
+                    } else if (g.symbol === Prose) {
+                        noteTexts.push(g.content);
+                    }
+                }
+            }
+
+            let finalTemplate = text;
+            if (noteTexts.length > 0) {
+                finalTemplate = noteTexts.join('\n\n') + '\n\n' + text;
+            }
+
             const body: Record<string, unknown> = {
-                template: text,
+                template: finalTemplate,
                 system_prompt: result.stdout,
                 glyph_id: glyph.id,
             };
             if (promptConfig?.model) body.model = promptConfig.model;
             if (promptConfig?.provider) body.provider = promptConfig.provider;
+            if (fileIds.length > 0) body.file_ids = fileIds;
 
             const startTime = Date.now();
 
@@ -273,7 +314,9 @@ export function createResultGlyph(
                 .then((data: any) => {
                     const elapsedMs = Date.now() - startTime;
                     followupStatus.textContent = `${(elapsedMs / 1000).toFixed(2)}s`;
+                    isExecuting = false;
                     followupInput.value = '';
+                    followupInput.style.height = 'auto';
                     followupInput.disabled = false;
 
                     const followupResult: ExecutionResult = {
@@ -287,10 +330,12 @@ export function createResultGlyph(
                     spawnFollowUpResult(element, glyph, followupResult, promptConfig, text);
                 })
                 .catch((err) => {
+                    isExecuting = false;
                     const msg = err instanceof Error ? err.message : String(err);
-                    followupStatus.textContent = `Failed: ${msg}`;
+                    const attachmentInfo = fileIds.length > 0 ? ` (${fileIds.length} file${fileIds.length > 1 ? 's' : ''} attached)` : '';
+                    followupStatus.textContent = `Failed${attachmentInfo}: ${msg}`;
                     followupInput.disabled = false;
-                    log.error(SEG.GLYPH, `[ResultGlyph] Follow-up failed for ${glyph.id}:`, err);
+                    log.error(SEG.GLYPH, `[ResultGlyph] Follow-up failed for ${glyph.id}${attachmentInfo}:`, err);
                 });
         }
     });
@@ -323,7 +368,7 @@ function spawnFollowUpResult(
     const parentRect = parentElement.getBoundingClientRect();
     const canvas = parentElement.closest('.canvas-workspace') as HTMLElement;
     if (!canvas) {
-        log.error(SEG.GLYPH, '[ResultGlyph] Cannot spawn follow-up: no canvas-workspace ancestor');
+        log.error(SEG.GLYPH, `[ResultGlyph] Cannot spawn follow-up: no canvas-workspace ancestor for ${parentGlyph.id} (element: ${parentElement.dataset.glyphId})`);
         return;
     }
     const canvasRect = canvas.getBoundingClientRect();
@@ -421,16 +466,7 @@ export function updateResultGlyphContent(resultElement: HTMLElement, result: Exe
 
     renderOutput(output, result);
 
-    // Update duration label (first span in header)
-    const header = resultElement.querySelector('.result-glyph-header') as HTMLElement | null;
-    if (header) {
-        const durationLabel = header.querySelector('span');
-        if (durationLabel) {
-            durationLabel.textContent = result.duration_ms ? `${result.duration_ms}ms` : '';
-        }
-    }
-
-    // Update persisted content (preserve promptConfig if present)
+    // Update persisted content (preserve promptConfig and prompt if present)
     const glyphId = resultElement.getAttribute('data-glyph-id');
     if (glyphId) {
         const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
