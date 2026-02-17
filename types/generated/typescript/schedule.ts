@@ -64,3 +64,61 @@ export interface Execution {
   updated_at: string;
 }
 
+export interface ForceTriggerParams {
+  /**
+   * Original ATS code (empty for handler-only schedules)
+   */
+  ATSCode: string;
+  /**
+   * Resolved handler name
+   */
+  HandlerName: string;
+  /**
+   * Pre-computed JSON payload
+   */
+  Payload: number[];
+  /**
+   * Source URL for deduplication
+   */
+  SourceURL: string;
+  /**
+   * ID of the async job that will be enqueued
+   */
+  AsyncJobID: string;
+}
+
+export interface ForceTriggerResult {
+  /**
+   * Existing or newly created scheduled job ID
+   */
+  ScheduledJobID: string;
+  /**
+   * Newly created execution record ID
+   */
+  ExecutionID: string;
+  /**
+   * True if a new temporary scheduled job was created
+   */
+  CreatedNewJob: boolean;
+}
+
+export interface LogEntry {
+  timestamp: string;
+  level: string;
+  message: string;
+  metadata?: Record<string, any>;
+}
+
+export interface StageInfo {
+  stage: string;
+  tasks: TaskInfo[];
+}
+
+export interface TaskInfo {
+  task_id: string;
+  log_count?: number;
+}
+
+export interface TaskLogStore {
+}
+

@@ -15,11 +15,11 @@ Auto-generated documentation showing Go source code alongside TypeScript type de
 
 - **[async](./async.md)** - Asynchronous job processing with Pulse (9 types)
 - **[budget](./budget.md)** - Cost tracking and budget management (5 types)
-- **[schedule](./schedule.md)** - Scheduled execution with cron (1 types)
+- **[schedule](./schedule.md)** - Scheduled execution with cron (7 types)
 
 ### Server
 
-- **[server](./server.md)** - WebSocket message types for real-time updates (46 types)
+- **[server](./server.md)** - WebSocket message types for real-time updates (43 types)
 
 ## Usage
 
