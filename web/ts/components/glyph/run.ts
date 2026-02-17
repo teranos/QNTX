@@ -390,8 +390,6 @@ class GlyphRunImpl {
         // Only save state if not skipping (skip during restore from uiState)
         if (!skipSave) {
             uiState.addMinimizedWindow(item.id);
-            // TODO(#432): Sync minimized state to backend via POST /api/minimized-windows
-            // Currently only persists to localStorage, doesn't sync across devices
         }
     }
 

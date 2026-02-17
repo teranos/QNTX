@@ -16,8 +16,8 @@ import {
     getLastPosition,
     setLastPosition,
 } from '../dataset';
-import { beginMaximizeMorph, beginRestoreMorph } from '../morph-transaction';
-import { canvasToScreen, getTransform } from '../canvas/canvas-pan';
+import { beginMaximizeMorph, beginMinimizeMorph, beginRestoreMorph } from '../morph-transaction';
+import { canvasToScreen, screenToCanvas, getTransform } from '../canvas/canvas-pan';
 import {
     getMaximizeDuration,
     getMinimizeDuration,
@@ -41,6 +41,8 @@ export interface CanvasWindowConfig {
     title: string;
     canvasId: string;
     onClose?: () => void;
+    /** When provided, the − button minimizes to tray instead of returning to canvas. */
+    onMinimize?: () => void;
     onRestoreComplete: (element: HTMLElement) => void;
 }
 
@@ -95,8 +97,13 @@ export function morphCanvasPlacedToWindow(
 
     const minimizeBtn = document.createElement('button');
     minimizeBtn.textContent = '−';
-    minimizeBtn.title = 'Minimize back to canvas';
-    minimizeBtn.onclick = () => morphWindowToCanvasPlaced(element, config);
+    if (config.onMinimize) {
+        minimizeBtn.title = 'Minimize to tray';
+        minimizeBtn.onclick = () => minimizeCanvasWindowToTray(element, config);
+    } else {
+        minimizeBtn.title = 'Minimize back to canvas';
+        minimizeBtn.onclick = () => morphWindowToCanvasPlaced(element, config);
+    }
     titleBar.appendChild(minimizeBtn);
 
     if (onClose) {
@@ -164,9 +171,9 @@ export function morphCanvasPlacedToWindow(
  * Morph a floating window back to its canvas-placed position.
  * Unwraps children from content div — preserving DOM state.
  */
-function morphWindowToCanvasPlaced(
+export function morphWindowToCanvasPlaced(
     element: HTMLElement,
-    config: CanvasWindowConfig,
+    config: Pick<CanvasWindowConfig, 'onRestoreComplete'>,
 ): void {
     if (!isInWindowState(element)) return;
 
@@ -245,6 +252,148 @@ function morphWindowToCanvasPlaced(
         })
         .catch(err => {
             log.warn(SEG.GLYPH, `[CanvasWindow] Restore animation failed:`, err);
+        });
+}
+
+/**
+ * Minimize a canvas-morphed window to the tray.
+ * Animates toward the tray, cleans up the element, then calls onMinimize.
+ */
+function minimizeCanvasWindowToTray(
+    element: HTMLElement,
+    config: CanvasWindowConfig,
+): void {
+    if (!isInWindowState(element)) return;
+
+    // 1. Remember window position for next expand
+    const windowRect = element.getBoundingClientRect();
+    setLastPosition(element, windowRect.left, windowRect.top);
+
+    // 2. Tear down window drag
+    teardownWindowDrag(element);
+
+    // 3. Find tray target position
+    const tray = document.querySelector('.glyph-run');
+    let targetX = window.innerWidth - 50;
+    let targetY = window.innerHeight / 2;
+    if (tray) {
+        const trayRect = tray.getBoundingClientRect();
+        targetX = trayRect.right - 20;
+        targetY = trayRect.top + trayRect.height / 2;
+    }
+
+    // 4. Animate toward tray
+    beginMinimizeMorph(element, windowRect, { x: targetX, y: targetY }, getMinimizeDuration())
+        .then(() => {
+            // 5. Clear state and remove
+            setWindowState(element, false);
+            clearCanvasOrigin(element);
+            element.remove();
+            element.style.cssText = '';
+
+            // 6. Notify caller
+            config.onMinimize!();
+
+            log.debug(SEG.GLYPH, `[CanvasWindow] Minimized to tray`);
+        })
+        .catch(err => {
+            log.warn(SEG.GLYPH, `[CanvasWindow] Minimize to tray animation failed:`, err);
+        });
+}
+
+/**
+ * Place a canvas-morphed window back onto the currently visible canvas
+ * at the screen position where the window is — not at its original origin.
+ */
+export function placeWindowOnCanvas(
+    element: HTMLElement,
+    config: Pick<CanvasWindowConfig, 'onRestoreComplete'>,
+): void {
+    if (!isInWindowState(element)) return;
+
+    const { onRestoreComplete } = config;
+
+    // 1. Find the visible canvas
+    const canvasEl = document.querySelector('.canvas-workspace') as HTMLElement | null;
+    if (!canvasEl) {
+        log.warn(SEG.GLYPH, `[CanvasWindow] No canvas workspace found, aborting place`);
+        return;
+    }
+    const canvasId = canvasEl.dataset.canvasId ?? 'canvas-workspace';
+    const canvasRect = canvasEl.getBoundingClientRect();
+    const contentLayer = canvasEl.querySelector('.canvas-content-layer') as HTMLElement | null;
+    if (!contentLayer) {
+        log.warn(SEG.GLYPH, `[CanvasWindow] No content layer in canvas ${canvasId}`);
+        return;
+    }
+
+    // 2. Remember window position
+    const windowRect = element.getBoundingClientRect();
+    setLastPosition(element, windowRect.left, windowRect.top);
+
+    // 3. Tear down window drag
+    teardownWindowDrag(element);
+
+    // 4. Convert window position to canvas-local coordinates
+    const relX = windowRect.left - canvasRect.left;
+    const relY = windowRect.top - canvasRect.top;
+    const canvasPos = screenToCanvas(canvasId, relX, relY);
+
+    // 5. Glyph dimensions (from stored origin or default)
+    const origin = getCanvasOrigin(element);
+    const glyphW = origin?.width ?? 400;
+    const glyphH = origin?.height ?? 250;
+
+    // 6. Animation target: same screen position, glyph size scaled by canvas zoom
+    const scale = getTransform(canvasId).scale;
+    const toRect = {
+        x: windowRect.left,
+        y: windowRect.top,
+        width: glyphW * scale,
+        height: glyphH * scale,
+    };
+
+    // 7. Animate
+    beginRestoreMorph(element, windowRect, toRect, getMinimizeDuration())
+        .then(() => {
+            // 8. Unwrap content div and title bar
+            const contentDiv = element.querySelector('.canvas-window-content');
+            const titleBar = element.querySelector('.window-title-bar');
+            if (contentDiv) {
+                while (contentDiv.firstChild) {
+                    element.appendChild(contentDiv.firstChild);
+                }
+                contentDiv.remove();
+            }
+            if (titleBar) {
+                titleBar.remove();
+            }
+
+            // 9. Clear state
+            setWindowState(element, false);
+            clearCanvasOrigin(element);
+
+            // 10. Remove from body, clear inline styles
+            element.remove();
+            element.style.cssText = '';
+
+            // 11. Place at computed canvas-local position
+            element.style.position = 'absolute';
+            element.style.left = `${Math.round(canvasPos.x)}px`;
+            element.style.top = `${Math.round(canvasPos.y)}px`;
+            element.style.width = `${glyphW}px`;
+            element.style.height = `${glyphH}px`;
+
+            // 12. Reparent to canvas content layer
+            contentLayer.appendChild(element);
+
+            // 13. Notify caller
+            onRestoreComplete(element);
+
+            log.debug(SEG.GLYPH, `[CanvasWindow] Placed on canvas ${canvasId} at ${Math.round(canvasPos.x)},${Math.round(canvasPos.y)}`);
+        })
+        .catch(err => {
+            log.warn(SEG.GLYPH, `[CanvasWindow] Place on canvas animation failed:`, err);
         });
 }
 
