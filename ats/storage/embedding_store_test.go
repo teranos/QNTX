@@ -367,12 +367,14 @@ func TestEmbeddingStore_MultiMethodProjections(t *testing.T) {
 	umapProj, err := store.GetProjectionsByMethod("umap")
 	require.NoError(t, err)
 	assert.Len(t, umapProj, 2)
-	assert.Equal(t, 1.0, umapProj[0].X)
+	umapXs := []float64{umapProj[0].X, umapProj[1].X}
+	assert.ElementsMatch(t, []float64{1.0, 3.0}, umapXs)
 
 	pcaProj, err := store.GetProjectionsByMethod("pca")
 	require.NoError(t, err)
 	assert.Len(t, pcaProj, 2)
-	assert.Equal(t, -1.0, pcaProj[0].X)
+	pcaXs := []float64{pcaProj[0].X, pcaProj[1].X}
+	assert.ElementsMatch(t, []float64{-1.0, -3.0}, pcaXs)
 
 	// Empty method returns nothing
 	tsneProj, err := store.GetProjectionsByMethod("tsne")
