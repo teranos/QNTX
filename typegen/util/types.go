@@ -34,10 +34,6 @@ type TypeConverterConfig struct {
 func ConvertGoType(expr ast.Expr, config *TypeConverterConfig) string {
 	switch t := expr.(type) {
 	case *ast.Ident:
-		// Go's `any` is an alias for interface{} — map to UnknownType
-		if t.Name == "any" {
-			return config.UnknownType
-		}
 		// Basic type or type reference in same package
 		if mapped, ok := config.TypeMapping[t.Name]; ok {
 			return mapped
