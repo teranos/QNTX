@@ -36,6 +36,11 @@ func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Reque
 	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
 }
 
+// HandleEmbeddingClusters lists stable clusters (GET /api/embeddings/clusters)
+func (s *QNTXServer) HandleEmbeddingClusters(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
+}
+
 // HandleEmbeddingProject runs UMAP projection (POST /api/embeddings/project)
 func (s *QNTXServer) HandleEmbeddingProject(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)

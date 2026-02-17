@@ -12,6 +12,7 @@
 | GET | `/api/canvas/glyphs/` | canvasHandler |
 | GET | `/api/embeddings/batch` | HandleEmbeddingBatch |
 | GET | `/api/embeddings/cluster` | HandleEmbeddingCluster |
+| GET | `/api/embeddings/clusters` | HandleEmbeddingClusters |
 | GET | `/api/embeddings/generate` | HandleEmbeddingGenerate |
 | GET | `/api/embeddings/info` | HandleEmbeddingInfo |
 | GET | `/api/embeddings/project` | HandleEmbeddingProject |
@@ -78,6 +79,14 @@ HandleEmbeddingCluster runs HDBSCAN clustering (POST /api/embeddings/cluster)
 **Handler**: `HandleEmbeddingCluster`
 
 **Response**: [`ClusterResponse`](../types/server.md#clusterresponse)
+
+---
+
+### `GET` /api/embeddings/clusters
+
+HandleEmbeddingClusters lists stable clusters (GET /api/embeddings/clusters)
+
+**Handler**: `HandleEmbeddingClusters`
 
 ---
 

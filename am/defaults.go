@@ -62,6 +62,7 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("embeddings.recluster_interval_seconds", 0)        // 0 = disabled (QNTX LAW: zero means zero)
 	v.SetDefault("embeddings.reproject_interval_seconds", 0)        // 0 = disabled (QNTX LAW: zero means zero)
 	v.SetDefault("embeddings.min_cluster_size", 5)                  // Minimum cluster size for HDBSCAN
+	v.SetDefault("embeddings.cluster_match_threshold", 0.7)         // Cosine similarity for stable cluster matching
 	v.SetDefault("embeddings.projection_methods", []string{"umap"}) // Dimensionality reduction methods
 
 	// Plugin configuration defaults

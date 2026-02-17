@@ -7,6 +7,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
+	"sort"
 	"time"
 
 	appcfg "github.com/teranos/QNTX/am"
@@ -15,6 +17,7 @@ import (
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
+	vanity "github.com/teranos/vanity-id"
 	"go.uber.org/zap"
 )
 
@@ -32,13 +35,183 @@ type EmbeddingClusterResult struct {
 	TimeMS  float64
 }
 
-// RunHDBSCANClustering executes HDBSCAN on all stored embeddings and writes results to DB.
+// clusterMatchResult holds the output of stable cluster matching.
+type clusterMatchResult struct {
+	mapping map[int]int // hdbscan_label → stable_id
+	events  []storage.ClusterEvent
+}
+
+// cosineSimilarityF32 computes cosine similarity between two float32 slices.
+func cosineSimilarityF32(a, b []float32) float64 {
+	if len(a) != len(b) || len(a) == 0 {
+		return 0
+	}
+	var dot, normA, normB float64
+	for i := range a {
+		fa, fb := float64(a[i]), float64(b[i])
+		dot += fa * fb
+		normA += fa * fa
+		normB += fb * fb
+	}
+	denom := math.Sqrt(normA) * math.Sqrt(normB)
+	if denom == 0 {
+		return 0
+	}
+	return dot / denom
+}
+
+// matchClusters matches new HDBSCAN centroids against previous centroids by cosine similarity.
+// Returns a mapping from raw HDBSCAN label to stable cluster ID, plus lifecycle events.
+// The cluster_runs row for runID must already exist (FK constraint).
+func matchClusters(
+	runID string,
+	oldCentroids []storage.ClusterCentroid,
+	newCentroids [][]float32,
+	threshold float64,
+	store *storage.EmbeddingStore,
+	svc EmbeddingServiceForClustering,
+	logger *zap.SugaredLogger,
+) (*clusterMatchResult, error) {
+	result := &clusterMatchResult{
+		mapping: make(map[int]int, len(newCentroids)),
+	}
+
+	// First run or no old centroids: all births
+	if len(oldCentroids) == 0 {
+		for i := range newCentroids {
+			stableID, err := store.CreateCluster(runID)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to create cluster for HDBSCAN label %d", i)
+			}
+			result.mapping[i] = stableID
+			result.events = append(result.events, storage.ClusterEvent{
+				RunID:     runID,
+				EventType: "birth",
+				ClusterID: stableID,
+			})
+		}
+		logger.Infow("First clustering run: all births",
+			"run_id", runID,
+			"n_births", len(newCentroids))
+		return result, nil
+	}
+
+	// Deserialize old centroids
+	oldVecs := make([][]float32, len(oldCentroids))
+	for i, oc := range oldCentroids {
+		vec, err := svc.DeserializeEmbedding(oc.Centroid)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to deserialize old centroid for cluster %d", oc.ClusterID)
+		}
+		oldVecs[i] = vec
+	}
+
+	// Build similarity pairs
+	type simPair struct {
+		newIdx int
+		oldIdx int
+		sim    float64
+	}
+	var pairs []simPair
+	for ni, nv := range newCentroids {
+		for oi, ov := range oldVecs {
+			sim := cosineSimilarityF32(nv, ov)
+			if sim >= threshold {
+				pairs = append(pairs, simPair{ni, oi, sim})
+			}
+		}
+	}
+
+	// Greedy best-first matching
+	sort.Slice(pairs, func(i, j int) bool { return pairs[i].sim > pairs[j].sim })
+
+	usedNew := make(map[int]bool)
+	usedOld := make(map[int]bool)
+
+	for _, p := range pairs {
+		if usedNew[p.newIdx] || usedOld[p.oldIdx] {
+			continue
+		}
+		usedNew[p.newIdx] = true
+		usedOld[p.oldIdx] = true
+
+		stableID := oldCentroids[p.oldIdx].ClusterID
+		result.mapping[p.newIdx] = stableID
+
+		sim := p.sim
+		result.events = append(result.events, storage.ClusterEvent{
+			RunID:      runID,
+			EventType:  "stable",
+			ClusterID:  stableID,
+			Similarity: &sim,
+		})
+
+		if err := store.UpdateClusterLastSeen(stableID, runID); err != nil {
+			return nil, errors.Wrapf(err, "failed to update last_seen for cluster %d", stableID)
+		}
+	}
+
+	// Unmatched new → birth
+	for i := range newCentroids {
+		if usedNew[i] {
+			continue
+		}
+		stableID, err := store.CreateCluster(runID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create cluster for unmatched HDBSCAN label %d", i)
+		}
+		result.mapping[i] = stableID
+		result.events = append(result.events, storage.ClusterEvent{
+			RunID:     runID,
+			EventType: "birth",
+			ClusterID: stableID,
+		})
+	}
+
+	// Unmatched old → death
+	for i, oc := range oldCentroids {
+		if usedOld[i] {
+			continue
+		}
+		if err := store.DissolveCluster(oc.ClusterID, runID); err != nil {
+			return nil, errors.Wrapf(err, "failed to dissolve cluster %d", oc.ClusterID)
+		}
+		result.events = append(result.events, storage.ClusterEvent{
+			RunID:     runID,
+			EventType: "death",
+			ClusterID: oc.ClusterID,
+		})
+	}
+
+	var nStable, nBirth, nDeath int
+	for _, ev := range result.events {
+		switch ev.EventType {
+		case "stable":
+			nStable++
+		case "birth":
+			nBirth++
+		case "death":
+			nDeath++
+		}
+	}
+	logger.Infow("Cluster matching complete",
+		"run_id", runID,
+		"stable", nStable,
+		"births", nBirth,
+		"deaths", nDeath)
+
+	return result, nil
+}
+
+// RunHDBSCANClustering executes HDBSCAN on all stored embeddings, matches new clusters
+// against previous centroids for stable identity, and writes results to DB.
 // Shared by the HTTP handler and the Pulse recluster handler.
 func RunHDBSCANClustering(
 	store *storage.EmbeddingStore,
 	svc EmbeddingServiceForClustering,
 	invalidator func(),
 	minClusterSize int,
+	clusterMatchThreshold float64,
 	logger *zap.SugaredLogger,
 ) (*EmbeddingClusterResult, error) {
 	startTime := time.Now()
@@ -73,12 +246,50 @@ func RunHDBSCANClustering(
 		return nil, errors.Wrapf(err, "HDBSCAN failed (n_points=%d, dims=%d, min_cluster_size=%d)", len(ids), dims, minClusterSize)
 	}
 
-	// Build assignments and write to DB
+	// Create run record first — clusters and events reference it via FK
+	runID, _ := vanity.GenerateRandomID(12)
+	runID = "CR_" + runID
+	clusterRun := &storage.ClusterRun{
+		ID:             runID,
+		NPoints:        len(ids),
+		NClusters:      result.NClusters,
+		NNoise:         result.NNoise,
+		MinClusterSize: minClusterSize,
+		DurationMS:     0, // updated at end
+		CreatedAt:      time.Now().UTC(),
+	}
+	if err := store.CreateClusterRun(clusterRun); err != nil {
+		return nil, errors.Wrapf(err, "failed to create cluster run %s", runID)
+	}
+
+	// Load previous centroids for stable matching
+	oldCentroids, err := store.GetAllClusterCentroids()
+	if err != nil {
+		logger.Warnw("Failed to load old centroids for matching, treating as first run", "error", err)
+		oldCentroids = nil
+	}
+
+	// Match new centroids against old for stable identity
+	matchResult, err := matchClusters(runID, oldCentroids, result.Centroids, clusterMatchThreshold, store, svc, logger)
+	if err != nil {
+		return nil, errors.Wrap(err, "cluster matching failed")
+	}
+
+	// Build assignments using stable IDs (mapping[rawLabel] instead of raw labels)
 	assignments := make([]storage.ClusterAssignment, len(ids))
+	memberCounts := make(map[int]int) // stable_id → count
 	for i, id := range ids {
+		rawLabel := int(result.Labels[i])
+		stableID := rawLabel // default: keep raw (-1 stays -1)
+		if rawLabel >= 0 {
+			if mapped, ok := matchResult.mapping[rawLabel]; ok {
+				stableID = mapped
+			}
+			memberCounts[stableID]++
+		}
 		assignments[i] = storage.ClusterAssignment{
 			ID:          id,
-			ClusterID:   int(result.Labels[i]),
+			ClusterID:   stableID,
 			Probability: float64(result.Probabilities[i]),
 		}
 	}
@@ -87,28 +298,31 @@ func RunHDBSCANClustering(
 		return nil, errors.Wrapf(err, "failed to save %d cluster assignments", len(assignments))
 	}
 
-	// Save cluster centroids for incremental prediction
+	// Save cluster centroids with stable IDs (PredictCluster keeps working)
 	if len(result.Centroids) > 0 {
-		memberCounts := make(map[int]int)
-		for _, l := range result.Labels {
-			if l >= 0 {
-				memberCounts[int(l)]++
-			}
-		}
-
 		centroidModels := make([]storage.ClusterCentroid, 0, len(result.Centroids))
-		for i, centroid := range result.Centroids {
+		snapshots := make([]storage.ClusterSnapshot, 0, len(result.Centroids))
+
+		for rawLabel, centroid := range result.Centroids {
 			blob, err := svc.SerializeEmbedding(centroid)
 			if err != nil {
 				logger.Errorw("Failed to serialize centroid",
-					"cluster_id", i,
+					"raw_label", rawLabel,
 					"error", err)
 				continue
 			}
+
+			stableID := matchResult.mapping[rawLabel]
 			centroidModels = append(centroidModels, storage.ClusterCentroid{
-				ClusterID: i,
+				ClusterID: stableID,
 				Centroid:  blob,
-				NMembers:  memberCounts[i],
+				NMembers:  memberCounts[stableID],
+			})
+			snapshots = append(snapshots, storage.ClusterSnapshot{
+				ClusterID: stableID,
+				RunID:     runID,
+				Centroid:  blob,
+				NMembers:  memberCounts[stableID],
 			})
 		}
 
@@ -116,7 +330,12 @@ func RunHDBSCANClustering(
 			logger.Errorw("Failed to save cluster centroids",
 				"count", len(centroidModels),
 				"error", err)
-			// Non-fatal: clustering succeeded, just centroids not saved
+		}
+
+		if err := store.SaveClusterSnapshots(snapshots); err != nil {
+			logger.Errorw("Failed to save cluster snapshots",
+				"count", len(snapshots),
+				"error", err)
 		}
 
 		if invalidator != nil {
@@ -124,14 +343,24 @@ func RunHDBSCANClustering(
 		}
 	}
 
+	// Record events and update run duration
+	timeMS := float64(time.Since(startTime).Milliseconds())
+
+	if err := store.UpdateClusterRunDuration(runID, int(timeMS)); err != nil {
+		logger.Errorw("Failed to update cluster run duration", "run_id", runID, "error", err)
+	}
+
+	if err := store.RecordClusterEvents(matchResult.events); err != nil {
+		logger.Errorw("Failed to record cluster events", "run_id", runID, "error", err)
+	}
+
 	summary, err := store.GetClusterSummary()
 	if err != nil {
 		return nil, errors.Wrap(err, "clustering succeeded but failed to read summary")
 	}
 
-	timeMS := float64(time.Since(startTime).Milliseconds())
-
 	logger.Infow("HDBSCAN clustering complete",
+		"run_id", runID,
 		"n_points", len(ids),
 		"n_clusters", result.NClusters,
 		"n_noise", result.NNoise,
@@ -148,12 +377,13 @@ const ReclusterHandlerName = "embeddings.recluster"
 
 // ReclusterHandler runs HDBSCAN re-clustering as a Pulse scheduled job
 type ReclusterHandler struct {
-	db             *sql.DB
-	store          *storage.EmbeddingStore
-	svc            EmbeddingServiceForClustering
-	invalidator    func()
-	minClusterSize int
-	logger         *zap.SugaredLogger
+	db                    *sql.DB
+	store                 *storage.EmbeddingStore
+	svc                   EmbeddingServiceForClustering
+	invalidator           func()
+	minClusterSize        int
+	clusterMatchThreshold float64
+	logger                *zap.SugaredLogger
 }
 
 func (h *ReclusterHandler) Name() string { return ReclusterHandlerName }
@@ -161,7 +391,7 @@ func (h *ReclusterHandler) Name() string { return ReclusterHandlerName }
 func (h *ReclusterHandler) Execute(ctx context.Context, job *async.Job) error {
 	h.writeLog(job.ID, "clustering", "info", "Starting HDBSCAN re-clustering", fmt.Sprintf(`{"min_cluster_size":%d}`, h.minClusterSize))
 
-	result, err := RunHDBSCANClustering(h.store, h.svc, h.invalidator, h.minClusterSize, h.logger)
+	result, err := RunHDBSCANClustering(h.store, h.svc, h.invalidator, h.minClusterSize, h.clusterMatchThreshold, h.logger)
 	if err != nil {
 		h.writeLog(job.ID, "clustering", "error", fmt.Sprintf("Clustering failed: %s", err), "")
 		return err
@@ -195,12 +425,13 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 	}
 
 	handler := &ReclusterHandler{
-		db:             s.db,
-		store:          s.embeddingStore,
-		svc:            s.embeddingService,
-		invalidator:    s.embeddingClusterInvalidator,
-		minClusterSize: cfg.Embeddings.MinClusterSize,
-		logger:         s.logger.Named("recluster"),
+		db:                    s.db,
+		store:                 s.embeddingStore,
+		svc:                   s.embeddingService,
+		invalidator:           s.embeddingClusterInvalidator,
+		minClusterSize:        cfg.Embeddings.MinClusterSize,
+		clusterMatchThreshold: cfg.Embeddings.ClusterMatchThreshold,
+		logger:                s.logger.Named("recluster"),
 	}
 	if handler.minClusterSize <= 0 {
 		handler.minClusterSize = 5

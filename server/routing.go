@@ -89,6 +89,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/search/semantic", s.corsMiddleware(s.HandleSemanticSearch))                  // Semantic search (GET)
 	http.HandleFunc("/api/embeddings/generate", s.corsMiddleware(s.HandleEmbeddingGenerate))           // Generate embedding (POST)
 	http.HandleFunc("/api/embeddings/batch", s.corsMiddleware(s.HandleEmbeddingBatch))                 // Batch generate embeddings (POST)
+	http.HandleFunc("/api/embeddings/clusters", s.corsMiddleware(s.HandleEmbeddingClusters))           // List stable clusters (GET)
 	http.HandleFunc("/api/embeddings/cluster", s.corsMiddleware(s.HandleEmbeddingCluster))             // HDBSCAN clustering (POST)
 	http.HandleFunc("/api/embeddings/info", s.corsMiddleware(s.HandleEmbeddingInfo))                   // Embedding service status (GET)
 	http.HandleFunc("/api/embeddings/project", s.corsMiddleware(s.HandleEmbeddingProject))             // UMAP projection (POST)
