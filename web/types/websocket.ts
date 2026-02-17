@@ -416,6 +416,7 @@ export interface WatcherMatchMessage extends BaseMessage {
   watcher_id: string;
   attestation: Attestation;
   score?: number;
+  target_glyph_id?: string;
   timestamp: number;
 }
 

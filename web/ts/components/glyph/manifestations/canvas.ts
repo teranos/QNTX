@@ -82,6 +82,7 @@ export function morphToCanvas(
         // Set up as flex container (content fills entire viewport)
         glyphElement.style.display = 'flex';
         glyphElement.style.flexDirection = 'column';
+        glyphElement.classList.add('canvas-fullscreen-adjusted');
 
         // Add minimize button (floating, top-right corner)
         const minimizeBtn = document.createElement('button');

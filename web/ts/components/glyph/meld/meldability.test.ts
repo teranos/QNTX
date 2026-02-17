@@ -36,6 +36,10 @@ describe('Port-aware MELDABILITY registry', () => {
             expect(areClassesCompatible('canvas-se-glyph', 'canvas-prompt-glyph')).toBe('right');
         });
 
+        test('se → se returns right (semantic intersection)', () => {
+            expect(areClassesCompatible('canvas-se-glyph', 'canvas-se-glyph')).toBe('right');
+        });
+
         test('py → prompt returns right', () => {
             expect(areClassesCompatible('canvas-py-glyph', 'canvas-prompt-glyph')).toBe('right');
         });
@@ -137,12 +141,13 @@ describe('Port-aware MELDABILITY registry', () => {
             expect(targets.length).toBe(3);
         });
 
-        test('se can target prompt, py, and subcanvas (same as ax)', () => {
+        test('se can target prompt, py, se, and subcanvas', () => {
             const targets = getCompatibleTargets('canvas-se-glyph');
             expect(targets).toContain('canvas-prompt-glyph');
             expect(targets).toContain('canvas-py-glyph');
+            expect(targets).toContain('canvas-se-glyph');
             expect(targets).toContain('canvas-subcanvas-glyph');
-            expect(targets.length).toBe(3);
+            expect(targets.length).toBe(4);
         });
 
         test('unknown class returns empty', () => {

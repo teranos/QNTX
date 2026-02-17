@@ -251,6 +251,9 @@ async function init(): Promise<void> {
     // Register default system glyphs
     registerDefaultGlyphs();
 
+    // Canvas is the primary workspace — open it immediately
+    glyphRun.openGlyph('canvas-workspace');
+
     if (window.logLoaderStep) window.logLoaderStep('Setting up file upload...');
     initQueryFileDrop();
 
