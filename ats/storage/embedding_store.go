@@ -968,3 +968,80 @@ func (s *EmbeddingStore) PredictCluster(
 
 	return bestID, float64(bestSim), nil
 }
+
+// LabelEligibleCluster holds cluster info for the labeling job.
+type LabelEligibleCluster struct {
+	ID      int
+	Members int
+}
+
+// GetLabelEligibleClusters returns active clusters eligible for labeling:
+// member count >= minSize and (never labeled or labeled_at older than cooldownDays).
+// Ordered by member count descending (label biggest first), limited to `limit`.
+func (s *EmbeddingStore) GetLabelEligibleClusters(minSize, cooldownDays, limit int) ([]LabelEligibleCluster, error) {
+	rows, err := s.db.Query(`
+		SELECT c.id, COALESCE(m.cnt, 0) AS members
+		FROM clusters c
+		LEFT JOIN (SELECT cluster_id, COUNT(*) AS cnt FROM embeddings WHERE cluster_id >= 0 GROUP BY cluster_id) m ON m.cluster_id = c.id
+		WHERE c.status = 'active'
+		  AND COALESCE(m.cnt, 0) >= ?
+		  AND (c.labeled_at IS NULL OR c.labeled_at < datetime('now', '-' || ? || ' days'))
+		ORDER BY members DESC
+		LIMIT ?
+	`, minSize, cooldownDays, limit)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to query label-eligible clusters (minSize=%d, cooldown=%dd)", minSize, cooldownDays)
+	}
+	defer rows.Close()
+
+	var result []LabelEligibleCluster
+	for rows.Next() {
+		var c LabelEligibleCluster
+		if err := rows.Scan(&c.ID, &c.Members); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan eligible cluster at row %d", len(result)+1)
+		}
+		result = append(result, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate eligible clusters (read %d)", len(result))
+	}
+	return result, nil
+}
+
+// SampleClusterTexts returns random member texts from a cluster.
+func (s *EmbeddingStore) SampleClusterTexts(clusterID, sampleSize int) ([]string, error) {
+	rows, err := s.db.Query(
+		`SELECT text FROM embeddings WHERE cluster_id = ? ORDER BY RANDOM() LIMIT ?`,
+		clusterID, sampleSize,
+	)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to sample texts for cluster %d", clusterID)
+	}
+	defer rows.Close()
+
+	var texts []string
+	for rows.Next() {
+		var text string
+		if err := rows.Scan(&text); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan sample text for cluster %d at row %d", clusterID, len(texts)+1)
+		}
+		texts = append(texts, text)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate sample texts for cluster %d (read %d)", clusterID, len(texts))
+	}
+	return texts, nil
+}
+
+// UpdateClusterLabel sets the label and labeled_at timestamp for a cluster.
+func (s *EmbeddingStore) UpdateClusterLabel(clusterID int, label string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := s.db.Exec(
+		`UPDATE clusters SET label = ?, labeled_at = ? WHERE id = ?`,
+		label, now, clusterID,
+	)
+	if err != nil {
+		return errors.Wrapf(err, "failed to update label for cluster %d", clusterID)
+	}
+	return nil
+}
