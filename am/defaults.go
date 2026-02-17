@@ -65,6 +65,15 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("embeddings.cluster_match_threshold", 0.7)         // Cosine similarity for stable cluster matching
 	v.SetDefault("embeddings.projection_methods", []string{"umap"}) // Dimensionality reduction methods
 
+	// Cluster labeling via LLM
+	v.SetDefault("embeddings.cluster_label_interval_seconds", 0) // 0 = disabled (QNTX LAW: zero means zero)
+	v.SetDefault("embeddings.cluster_label_min_size", 15)
+	v.SetDefault("embeddings.cluster_label_sample_size", 5)
+	v.SetDefault("embeddings.cluster_label_max_per_cycle", 3)
+	v.SetDefault("embeddings.cluster_label_cooldown_days", 7)
+	v.SetDefault("embeddings.cluster_label_max_tokens", 2000)
+	v.SetDefault("embeddings.cluster_label_model", "") // empty = system default
+
 	// Plugin configuration defaults
 	v.SetDefault("plugin.enabled", []string{}) // No plugins enabled by default (explicit opt-in via am.toml)
 	v.SetDefault("plugin.paths", []string{

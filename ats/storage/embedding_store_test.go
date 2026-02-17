@@ -585,6 +585,158 @@ func TestEmbeddingStore_ClusterSnapshotsAndEvents(t *testing.T) {
 	assert.Equal(t, 1, count)
 }
 
+func TestEmbeddingStore_GetLabelEligibleClusters(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zap.NewNop()
+	store := NewEmbeddingStore(db, logger)
+
+	// Create run (FK target)
+	run := &ClusterRun{
+		ID: "CR_label_elig", NPoints: 30, NClusters: 3, NNoise: 0,
+		MinClusterSize: 3, DurationMS: 5, CreatedAt: time.Now().UTC(),
+	}
+	require.NoError(t, store.CreateClusterRun(run))
+
+	// Create 3 clusters
+	c1, err := store.CreateCluster("CR_label_elig")
+	require.NoError(t, err)
+	c2, err := store.CreateCluster("CR_label_elig")
+	require.NoError(t, err)
+	c3, err := store.CreateCluster("CR_label_elig")
+	require.NoError(t, err)
+
+	// Assign embeddings: c1=5, c2=10, c3=2
+	for i := 0; i < 5; i++ {
+		emb := &EmbeddingModel{
+			SourceType: "attestation", SourceID: generateTestID(),
+			Text: fmt.Sprintf("c1 text %d", i), Embedding: createTestEmbedding(384),
+			Model: "test", Dimensions: 384,
+		}
+		require.NoError(t, store.Save(emb))
+		require.NoError(t, store.UpdateClusterAssignments([]ClusterAssignment{{ID: emb.ID, ClusterID: c1, Probability: 0.9}}))
+	}
+	for i := 0; i < 10; i++ {
+		emb := &EmbeddingModel{
+			SourceType: "attestation", SourceID: generateTestID(),
+			Text: fmt.Sprintf("c2 text %d", i), Embedding: createTestEmbedding(384),
+			Model: "test", Dimensions: 384,
+		}
+		require.NoError(t, store.Save(emb))
+		require.NoError(t, store.UpdateClusterAssignments([]ClusterAssignment{{ID: emb.ID, ClusterID: c2, Probability: 0.9}}))
+	}
+	for i := 0; i < 2; i++ {
+		emb := &EmbeddingModel{
+			SourceType: "attestation", SourceID: generateTestID(),
+			Text: fmt.Sprintf("c3 text %d", i), Embedding: createTestEmbedding(384),
+			Model: "test", Dimensions: 384,
+		}
+		require.NoError(t, store.Save(emb))
+		require.NoError(t, store.UpdateClusterAssignments([]ClusterAssignment{{ID: emb.ID, ClusterID: c3, Probability: 0.9}}))
+	}
+
+	// minSize=5 should return c1 (5) and c2 (10), not c3 (2)
+	eligible, err := store.GetLabelEligibleClusters(5, 7, 10)
+	require.NoError(t, err)
+	assert.Len(t, eligible, 2)
+	// Ordered by member count desc: c2 (10) first, c1 (5) second
+	assert.Equal(t, c2, eligible[0].ID)
+	assert.Equal(t, 10, eligible[0].Members)
+	assert.Equal(t, c1, eligible[1].ID)
+	assert.Equal(t, 5, eligible[1].Members)
+
+	// Label c2 — it should be excluded by cooldown
+	require.NoError(t, store.UpdateClusterLabel(c2, "test label"))
+	eligible, err = store.GetLabelEligibleClusters(5, 7, 10)
+	require.NoError(t, err)
+	assert.Len(t, eligible, 1)
+	assert.Equal(t, c1, eligible[0].ID)
+
+	// Limit=1 should only return top cluster
+	eligible, err = store.GetLabelEligibleClusters(1, 7, 1)
+	require.NoError(t, err)
+	assert.Len(t, eligible, 1)
+}
+
+func TestEmbeddingStore_SampleClusterTexts(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zap.NewNop()
+	store := NewEmbeddingStore(db, logger)
+
+	// Create run and cluster
+	run := &ClusterRun{
+		ID: "CR_sample", NPoints: 10, NClusters: 1, NNoise: 0,
+		MinClusterSize: 3, DurationMS: 5, CreatedAt: time.Now().UTC(),
+	}
+	require.NoError(t, store.CreateClusterRun(run))
+
+	cid, err := store.CreateCluster("CR_sample")
+	require.NoError(t, err)
+
+	// Add 5 embeddings to the cluster
+	expectedTexts := map[string]bool{}
+	for i := 0; i < 5; i++ {
+		text := fmt.Sprintf("sample text %d", i)
+		expectedTexts[text] = true
+		emb := &EmbeddingModel{
+			SourceType: "attestation", SourceID: generateTestID(),
+			Text: text, Embedding: createTestEmbedding(384),
+			Model: "test", Dimensions: 384,
+		}
+		require.NoError(t, store.Save(emb))
+		require.NoError(t, store.UpdateClusterAssignments([]ClusterAssignment{{ID: emb.ID, ClusterID: cid, Probability: 0.9}}))
+	}
+
+	// Sample 3 — should get 3 texts that are all from the cluster
+	texts, err := store.SampleClusterTexts(cid, 3)
+	require.NoError(t, err)
+	assert.Len(t, texts, 3)
+	for _, text := range texts {
+		assert.True(t, expectedTexts[text], "unexpected text: %s", text)
+	}
+
+	// Sample more than available — should get all 5
+	texts, err = store.SampleClusterTexts(cid, 100)
+	require.NoError(t, err)
+	assert.Len(t, texts, 5)
+}
+
+func TestEmbeddingStore_UpdateClusterLabel(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zap.NewNop()
+	store := NewEmbeddingStore(db, logger)
+
+	run := &ClusterRun{
+		ID: "CR_label", NPoints: 5, NClusters: 1, NNoise: 0,
+		MinClusterSize: 3, DurationMS: 5, CreatedAt: time.Now().UTC(),
+	}
+	require.NoError(t, store.CreateClusterRun(run))
+
+	cid, err := store.CreateCluster("CR_label")
+	require.NoError(t, err)
+
+	// Label should initially be nil
+	active, err := store.GetActiveClusterIdentities()
+	require.NoError(t, err)
+	require.Len(t, active, 1)
+	assert.Nil(t, active[0].Label)
+
+	// Set label
+	require.NoError(t, store.UpdateClusterLabel(cid, "Technology & Software"))
+
+	// Verify label was set
+	active, err = store.GetActiveClusterIdentities()
+	require.NoError(t, err)
+	require.Len(t, active, 1)
+	require.NotNil(t, active[0].Label)
+	assert.Equal(t, "Technology & Software", *active[0].Label)
+
+	// Verify labeled_at was set
+	var labeledAt *string
+	err = db.QueryRow(`SELECT labeled_at FROM clusters WHERE id = ?`, cid).Scan(&labeledAt)
+	require.NoError(t, err)
+	require.NotNil(t, labeledAt)
+}
+
 func TestEmbeddingStore_GetClusterDetails(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
