@@ -569,15 +569,16 @@ func (s *EmbeddingStore) GetAllClusterCentroids() ([]ClusterCentroid, error) {
 	return centroids, nil
 }
 
-// ProjectionAssignment maps an embedding ID to its 2D projection coordinates.
+// ProjectionAssignment maps an embedding ID to its 2D projection coordinates for a given method.
 type ProjectionAssignment struct {
-	ID          string
-	ProjectionX float64
-	ProjectionY float64
+	ID     string
+	Method string
+	X      float64
+	Y      float64
 }
 
-// UpdateProjections batch-updates projection coordinates in a single transaction.
-func (s *EmbeddingStore) UpdateProjections(assignments []ProjectionAssignment) error {
+// UpdateProjections batch-upserts projection coordinates for a given method.
+func (s *EmbeddingStore) UpdateProjections(method string, assignments []ProjectionAssignment) error {
 	if len(assignments) == 0 {
 		return nil
 	}
@@ -594,15 +595,19 @@ func (s *EmbeddingStore) UpdateProjections(assignments []ProjectionAssignment) e
 		}
 	}()
 
-	stmt, err := tx.Prepare(`UPDATE embeddings SET projection_x = ?, projection_y = ? WHERE id = ?`)
+	stmt, err := tx.Prepare(`
+		INSERT OR REPLACE INTO embedding_projections (embedding_id, method, x, y, created_at)
+		VALUES (?, ?, ?, ?, ?)
+	`)
 	if err != nil {
-		return errors.Wrap(err, "failed to prepare projection update statement")
+		return errors.Wrap(err, "failed to prepare projection upsert statement")
 	}
 	defer stmt.Close()
 
+	now := time.Now().UTC().Format(time.RFC3339)
 	for _, a := range assignments {
-		if _, err = stmt.Exec(a.ProjectionX, a.ProjectionY, a.ID); err != nil {
-			return errors.Wrapf(err, "failed to update projection for embedding %s", a.ID)
+		if _, err = stmt.Exec(a.ID, method, a.X, a.Y, now); err != nil {
+			return errors.Wrapf(err, "failed to upsert projection for embedding %s method %s", a.ID, method)
 		}
 	}
 
@@ -610,45 +615,70 @@ func (s *EmbeddingStore) UpdateProjections(assignments []ProjectionAssignment) e
 		return errors.Wrap(err, "failed to commit projection updates")
 	}
 
-	s.logger.Info("updated projections", zap.Int("count", len(assignments)))
+	s.logger.Info("updated projections", zap.String("method", method), zap.Int("count", len(assignments)))
 	return nil
 }
 
 // ProjectionWithCluster holds a 2D projection along with its cluster assignment.
 type ProjectionWithCluster struct {
-	ID          string  `json:"id"`
-	SourceID    string  `json:"source_id"`
-	ProjectionX float64 `json:"x"`
-	ProjectionY float64 `json:"y"`
-	ClusterID   int     `json:"cluster_id"`
+	ID        string  `json:"id"`
+	SourceID  string  `json:"source_id"`
+	Method    string  `json:"method"`
+	X         float64 `json:"x"`
+	Y         float64 `json:"y"`
+	ClusterID int     `json:"cluster_id"`
 }
 
-// GetAllProjections returns all embeddings that have non-NULL projection coordinates.
-func (s *EmbeddingStore) GetAllProjections() ([]ProjectionWithCluster, error) {
+// GetProjectionsByMethod returns all projections for a given method, joined with cluster info.
+func (s *EmbeddingStore) GetProjectionsByMethod(method string) ([]ProjectionWithCluster, error) {
 	rows, err := s.db.Query(`
-		SELECT id, source_id, projection_x, projection_y, cluster_id
-		FROM embeddings
-		WHERE projection_x IS NOT NULL AND projection_y IS NOT NULL
-		ORDER BY id
-	`)
+		SELECT ep.embedding_id, e.source_id, ep.method, ep.x, ep.y, e.cluster_id
+		FROM embedding_projections ep
+		JOIN embeddings e ON ep.embedding_id = e.id
+		WHERE ep.method = ?
+		ORDER BY ep.embedding_id
+	`, method)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to query projections")
+		return nil, errors.Wrapf(err, "failed to query projections for method %s", method)
 	}
 	defer rows.Close()
 
 	var results []ProjectionWithCluster
 	for rows.Next() {
 		var p ProjectionWithCluster
-		if err := rows.Scan(&p.ID, &p.SourceID, &p.ProjectionX, &p.ProjectionY, &p.ClusterID); err != nil {
-			return nil, errors.Wrapf(err, "failed to scan projection row %d", len(results)+1)
+		if err := rows.Scan(&p.ID, &p.SourceID, &p.Method, &p.X, &p.Y, &p.ClusterID); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan projection row %d for method %s", len(results)+1, method)
 		}
 		results = append(results, p)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrapf(err, "failed to iterate projection rows (read %d)", len(results))
+		return nil, errors.Wrapf(err, "failed to iterate projection rows for method %s (read %d)", method, len(results))
 	}
 
 	return results, nil
+}
+
+// GetAllProjectionMethods returns distinct method names that have stored projections.
+func (s *EmbeddingStore) GetAllProjectionMethods() ([]string, error) {
+	rows, err := s.db.Query(`SELECT DISTINCT method FROM embedding_projections ORDER BY method`)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query projection methods")
+	}
+	defer rows.Close()
+
+	var methods []string
+	for rows.Next() {
+		var m string
+		if err := rows.Scan(&m); err != nil {
+			return nil, errors.Wrap(err, "failed to scan projection method")
+		}
+		methods = append(methods, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "failed to iterate projection methods")
+	}
+
+	return methods, nil
 }
 
 // PredictCluster assigns an embedding to the nearest cluster centroid using cosine similarity.
