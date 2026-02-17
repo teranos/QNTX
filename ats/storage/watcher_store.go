@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
@@ -517,7 +516,6 @@ func scanWatcherFields(scan func(dest ...interface{}) error) (*Watcher, error) {
 // standalone SE watcher should stay suppressed because a compound watcher
 // replaces it.
 func (ws *WatcherStore) FindCompoundWatchersForTarget(ctx context.Context, targetGlyphID string) ([]*Watcher, error) {
-	pattern := fmt.Sprintf(`%%"target_glyph_id":"%s"%%`, targetGlyphID)
 	rows, err := ws.db.QueryContext(ctx, `
 		SELECT id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
@@ -529,7 +527,7 @@ func (ws *WatcherStore) FindCompoundWatchersForTarget(ctx context.Context, targe
 		FROM watchers
 		WHERE id LIKE 'meld-edge-%'
 		AND upstream_semantic_query IS NOT NULL
-		AND action_data LIKE ?`, pattern)
+		AND json_extract(action_data, '$.target_glyph_id') = ?`, targetGlyphID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to find compound watchers for target %s", targetGlyphID)
 	}

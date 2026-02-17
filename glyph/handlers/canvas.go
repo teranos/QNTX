@@ -433,11 +433,16 @@ func (h *CanvasHandler) compileSubscriptions(ctx context.Context, comp *glyphsto
 	return nil
 }
 
-// reEnableDownstreamSEWatchers re-enables standalone SE watchers that were
-// disabled when an SE→SE meld edge was created. Called before composition deletion.
+// reEnableDownstreamSEWatchers logs which SE watchers will be restored when a
+// composition containing SE→SE meld edges is deleted. The actual restoration
+// happens via ReloadWatchers() after the compound meld-edge watcher is deleted
+// from the DB — the suppression loop in loadWatchers no longer finds a compound
+// watcher targeting the SE glyph, so the standalone SE watcher re-enters the
+// in-memory map naturally. No DB update is needed because engine-level
+// suppression never sets Enabled=false in the DB.
 func (h *CanvasHandler) reEnableDownstreamSEWatchers(ctx context.Context, compositionID string) {
 	store := h.watcherEngine.GetStore()
-	watchers, err := store.List(ctx, false) // include disabled
+	watchers, err := store.List(ctx, false)
 	if err != nil {
 		h.logWarn("Failed to list watchers for SE re-enable: %v", err)
 		return
@@ -448,7 +453,6 @@ func (h *CanvasHandler) reEnableDownstreamSEWatchers(ctx context.Context, compos
 		if w.ActionType != storage.ActionTypeSemanticMatch || !strings.HasPrefix(w.ID, prefix) {
 			continue
 		}
-		// Extract target glyph ID from action data
 		var actionData struct {
 			TargetGlyphID string `json:"target_glyph_id"`
 		}
@@ -459,20 +463,7 @@ func (h *CanvasHandler) reEnableDownstreamSEWatchers(ctx context.Context, compos
 		if actionData.TargetGlyphID == "" {
 			continue
 		}
-		// Re-enable the downstream SE's standalone watcher
-		seWatcherID := fmt.Sprintf("se-glyph-%s", actionData.TargetGlyphID)
-		seWatcher, err := store.Get(ctx, seWatcherID)
-		if err != nil {
-			continue
-		}
-		if !seWatcher.Enabled {
-			seWatcher.Enabled = true
-			if err := store.Update(ctx, seWatcher); err != nil {
-				h.logWarn("Failed to re-enable SE watcher %s: %v", seWatcherID, err)
-			} else {
-				h.logInfo("Re-enabled SE watcher %s after unmeld", seWatcherID)
-			}
-		}
+		h.logInfo("SE watcher se-glyph-%s will be restored after unmeld (compound %s removed)", actionData.TargetGlyphID, w.ID)
 	}
 }
 
