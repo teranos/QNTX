@@ -28,12 +28,24 @@
         display: none;
     }
 
-    /* System drawer - move to top */
+    /* System drawer - move to top, flip grab bar to bottom edge */
     #system-drawer {
         top: 0;
         bottom: auto;
         border-top: none;
         border-bottom: 1px solid var(--border-on-dark);
+        flex-direction: column-reverse;
+    }
+
+    /* Fullscreen canvases (root + subcanvas): start below top-anchored drawer */
+    .canvas-fullscreen-adjusted {
+        top: var(--drawer-height, 32px) !important;
+        height: calc(100vh - var(--drawer-height, 32px)) !important;
+    }
+
+    /* Canvas minimize button: below drawer */
+    .canvas-minimize-btn {
+        top: calc(var(--drawer-height, 32px) + 16px) !important;
     }
 
     /* Hide build hash on mobile to save space */

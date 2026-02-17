@@ -112,11 +112,9 @@ export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortC
     loadTransformState(canvasId);
     applyTransform(container, canvasId);
 
-    // Detect mobile for desktop-specific handlers
-    const isMobile = window.matchMedia('(max-width: 768px)').matches;
-
     // Desktop: Two-finger trackpad scroll (wheel event) and middle mouse drag
-    if (!isMobile) {
+    // Always register — user may resize browser between mobile/desktop widths
+    {
         container.addEventListener('wheel', (e: WheelEvent) => {
             e.preventDefault();
 
