@@ -66,3 +66,37 @@ pub struct Execution {
     /// RFC3339 timestamp
     pub updated_at: String,
 }
+
+/// LogEntry represents a single log entry from a task execution
+#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#logentry>"]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LogEntry {
+    pub timestamp: String,
+    pub level: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Map<String, serde_json::Value>>,
+}
+
+/// StageInfo represents a stage with its tasks
+#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#stageinfo>"]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct StageInfo {
+    pub stage: String,
+    pub tasks: Vec<TaskInfo>,
+}
+
+/// TaskInfo represents a task within a stage, with its log count
+#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#taskinfo>"]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TaskInfo {
+    pub task_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub log_count: Option<i64>,
+}
+
+/// TaskLogStore handles persistence of task-level execution logs.
+/// The task_logs table captures per-stage, per-task log output from async job executions.
+#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#tasklogstore>"]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TaskLogStore {}
