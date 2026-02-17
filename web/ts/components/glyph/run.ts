@@ -334,6 +334,19 @@ class GlyphRunImpl {
     }
 
     /**
+     * Programmatically open a glyph by ID (morph from dot to its manifestation)
+     */
+    public openGlyph(id: string): void {
+        const item = this.items.get(id);
+        const element = this.glyphElements.get(id);
+        if (!item || !element) {
+            log.warn(SEG.GLYPH, `[GlyphRun] openGlyph: glyph ${id} not found`);
+            return;
+        }
+        this.morphGlyph(element, item);
+    }
+
+    /**
      * Load tray state from uiState
      * Returns array of window IDs that were minimized
      */

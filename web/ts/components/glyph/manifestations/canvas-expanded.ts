@@ -81,7 +81,7 @@ export function morphCanvasPlacedToFullscreen(
             element.style.opacity = '1';
             element.style.display = 'flex';
             element.style.flexDirection = 'column';
-            element.className = 'canvas-subcanvas-glyph-expanded';
+            element.className = 'canvas-subcanvas-glyph-expanded canvas-fullscreen-adjusted';
 
             const doMinimize = (instant: boolean = false) => {
                 element.removeEventListener('keydown', escapeHandler);
