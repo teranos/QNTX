@@ -4,14 +4,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/watcher"
 	pb "github.com/teranos/QNTX/glyph/proto"
 	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/sym"
+	"go.uber.org/zap"
 )
 
 // Helper function to create edges for testing
@@ -694,6 +698,7 @@ func TestGlyphSymbolToType(t *testing.T) {
 	}{
 		{"py", "py"},
 		{sym.AX, "ax"},     // ⋈ → ax
+		{sym.SE, "semantic"}, // ⊨ → semantic
 		{sym.SO, "prompt"}, // ⟶ → prompt
 		{"note", "note"},   // Unknown passes through
 		{"result", "result"},
@@ -704,5 +709,303 @@ func TestGlyphSymbolToType(t *testing.T) {
 		if got != tt.expected {
 			t.Errorf("glyphSymbolToType(%q) = %q, want %q", tt.symbol, got, tt.expected)
 		}
+	}
+}
+
+// === SE→SE meldability tests ===
+
+// setupSEtoSE creates two SE glyphs with standalone watchers and returns a handler
+// with watcher engine wired up, ready for compileSubscriptions testing.
+func setupSEtoSE(t *testing.T) (*CanvasHandler, *storage.WatcherStore, context.Context) {
+	t.Helper()
+	db := qntxtest.CreateTestDB(t)
+	canvasStore := glyphstorage.NewCanvasStore(db)
+	logger := zap.NewNop().Sugar()
+	engine := watcher.NewEngine(db, "http://localhost:877", logger)
+	if err := engine.Start(); err != nil {
+		t.Fatalf("Engine start failed: %v", err)
+	}
+	t.Cleanup(engine.Stop)
+
+	handler := NewCanvasHandler(canvasStore, WithWatcherEngine(engine, logger))
+	watcherStore := engine.GetStore()
+	ctx := context.Background()
+
+	// Create SE₁ and SE₂ glyphs
+	if err := canvasStore.UpsertGlyph(ctx, &glyphstorage.CanvasGlyph{
+		ID: "se-1", Symbol: sym.SE, X: 100, Y: 100,
+	}); err != nil {
+		t.Fatalf("UpsertGlyph SE₁ failed: %v", err)
+	}
+	if err := canvasStore.UpsertGlyph(ctx, &glyphstorage.CanvasGlyph{
+		ID: "se-2", Symbol: sym.SE, X: 300, Y: 100,
+	}); err != nil {
+		t.Fatalf("UpsertGlyph SE₂ failed: %v", err)
+	}
+
+	// Create standalone watchers (simulating what the frontend does)
+	se1Watcher := &storage.Watcher{
+		ID:                "se-glyph-se-1",
+		Name:              "SE: science",
+		ActionType:        storage.ActionTypeSemanticMatch,
+		SemanticQuery:     "science",
+		SemanticThreshold: 0.4,
+		MaxFiresPerMinute: 60,
+		Enabled:           true,
+	}
+	se2Watcher := &storage.Watcher{
+		ID:                "se-glyph-se-2",
+		Name:              "SE: about teaching",
+		ActionType:        storage.ActionTypeSemanticMatch,
+		SemanticQuery:     "about teaching",
+		SemanticThreshold: 0.5,
+		MaxFiresPerMinute: 60,
+		Enabled:           true,
+	}
+	if err := watcherStore.Create(ctx, se1Watcher); err != nil {
+		t.Fatalf("Create SE₁ watcher failed: %v", err)
+	}
+	if err := watcherStore.Create(ctx, se2Watcher); err != nil {
+		t.Fatalf("Create SE₂ watcher failed: %v", err)
+	}
+
+	return handler, watcherStore, ctx
+}
+
+func TestCompileSubscriptions_SEtoSE_CreatesCompoundAndDisablesDownstream(t *testing.T) {
+	handler, watcherStore, ctx := setupSEtoSE(t)
+
+	// Create composition with SE₁→SE₂ edge
+	comp := &glyphstorage.CanvasComposition{
+		ID: "comp-se-se",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("se-1", "se-2", "right", 0),
+		},
+		X: 200, Y: 100,
+	}
+	if err := handler.store.UpsertComposition(ctx, comp); err != nil {
+		t.Fatalf("UpsertComposition failed: %v", err)
+	}
+
+	// Compile subscriptions
+	if err := handler.compileSubscriptions(ctx, comp); err != nil {
+		t.Fatalf("compileSubscriptions failed: %v", err)
+	}
+
+	// 1. Compound meld-edge watcher should exist with both queries
+	compoundID := fmt.Sprintf("meld-edge-%s-%s-%s", comp.ID, "se-1", "se-2")
+	compound, err := watcherStore.Get(ctx, compoundID)
+	if err != nil {
+		t.Fatalf("Compound watcher not created: %v", err)
+	}
+	if compound.SemanticQuery != "about teaching" {
+		t.Errorf("Compound downstream query wrong: got %q, want %q", compound.SemanticQuery, "about teaching")
+	}
+	if compound.UpstreamSemanticQuery != "science" {
+		t.Errorf("Compound upstream query wrong: got %q, want %q", compound.UpstreamSemanticQuery, "science")
+	}
+
+	// 2. SE₂'s standalone watcher stays enabled in DB (engine-level suppression)
+	se2, err := watcherStore.Get(ctx, "se-glyph-se-2")
+	if err != nil {
+		t.Fatalf("Get SE₂ watcher failed: %v", err)
+	}
+	if !se2.Enabled {
+		t.Error("SE₂ standalone watcher should stay enabled in DB (engine suppresses at load time)")
+	}
+
+	// 3. SE₁'s standalone watcher should remain enabled
+	se1, err := watcherStore.Get(ctx, "se-glyph-se-1")
+	if err != nil {
+		t.Fatalf("Get SE₁ watcher failed: %v", err)
+	}
+	if !se1.Enabled {
+		t.Error("SE₁ standalone watcher should remain enabled")
+	}
+}
+
+func TestCompileSubscriptions_SEtoSE_EngineSuppressesStandalone(t *testing.T) {
+	handler, watcherStore, ctx := setupSEtoSE(t)
+
+	// Create and compile SE₁→SE₂
+	comp := &glyphstorage.CanvasComposition{
+		ID: "comp-se-se",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("se-1", "se-2", "right", 0),
+		},
+		X: 200, Y: 100,
+	}
+	if err := handler.store.UpsertComposition(ctx, comp); err != nil {
+		t.Fatalf("UpsertComposition failed: %v", err)
+	}
+	if err := handler.compileSubscriptions(ctx, comp); err != nil {
+		t.Fatalf("compileSubscriptions failed: %v", err)
+	}
+
+	// Verify SE₂ stays enabled in DB (engine handles suppression, not DB)
+	se2, err := watcherStore.Get(ctx, "se-glyph-se-2")
+	if err != nil {
+		t.Fatalf("Get SE₂ failed: %v", err)
+	}
+	if !se2.Enabled {
+		t.Fatal("SE₂ should stay enabled in DB (engine-level suppression)")
+	}
+
+	// Verify compound watcher has both queries
+	compoundID := fmt.Sprintf("meld-edge-%s-%s-%s", comp.ID, "se-1", "se-2")
+	compound, err := watcherStore.Get(ctx, compoundID)
+	if err != nil {
+		t.Fatalf("Compound watcher not created: %v", err)
+	}
+	if compound.SemanticQuery != "about teaching" {
+		t.Errorf("Compound downstream query wrong: got %q, want %q", compound.SemanticQuery, "about teaching")
+	}
+	if compound.UpstreamSemanticQuery != "science" {
+		t.Errorf("Compound upstream query wrong: got %q, want %q", compound.UpstreamSemanticQuery, "science")
+	}
+
+	// After engine reload, SE₂ standalone should be suppressed in engine
+	// (not in the engine's in-memory map) because compound watcher targets it.
+	// We verify via GetWatcher — SE₂ should not be loaded.
+	engine := handler.watcherEngine
+	_, se2InEngine := engine.GetWatcher("se-glyph-se-2")
+	if se2InEngine {
+		t.Error("SE₂ standalone should be suppressed in engine when compound target exists")
+	}
+
+	// SE₁ should still be in the engine
+	_, se1InEngine := engine.GetWatcher("se-glyph-se-1")
+	if !se1InEngine {
+		t.Error("SE₁ standalone should remain in engine")
+	}
+
+	// Compound watcher should be in the engine
+	_, compoundInEngine := engine.GetWatcher(compoundID)
+	if !compoundInEngine {
+		t.Error("Compound watcher should be loaded in engine")
+	}
+}
+
+func TestCompileSubscriptions_SEtoSEtoPrompt_PropagatesUpstream(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	canvasStore := glyphstorage.NewCanvasStore(db)
+	logger := zap.NewNop().Sugar()
+	engine := watcher.NewEngine(db, "http://localhost:877", logger)
+	if err := engine.Start(); err != nil {
+		t.Fatalf("Engine start failed: %v", err)
+	}
+	t.Cleanup(engine.Stop)
+
+	handler := NewCanvasHandler(canvasStore, WithWatcherEngine(engine, logger))
+	watcherStore := engine.GetStore()
+	ctx := context.Background()
+
+	// Create SE₁, SE₂, and prompt glyphs
+	for _, g := range []*glyphstorage.CanvasGlyph{
+		{ID: "se-1", Symbol: sym.SE, X: 100, Y: 100},
+		{ID: "se-2", Symbol: sym.SE, X: 300, Y: 100},
+		{ID: "prompt-1", Symbol: sym.SO, X: 500, Y: 100},
+	} {
+		if err := canvasStore.UpsertGlyph(ctx, g); err != nil {
+			t.Fatalf("UpsertGlyph %s failed: %v", g.ID, err)
+		}
+	}
+
+	// Create standalone watchers
+	for _, w := range []*storage.Watcher{
+		{ID: "se-glyph-se-1", Name: "SE: science", ActionType: storage.ActionTypeSemanticMatch, SemanticQuery: "science", SemanticThreshold: 0.4, MaxFiresPerMinute: 60, Enabled: true},
+		{ID: "se-glyph-se-2", Name: "SE: teaching", ActionType: storage.ActionTypeSemanticMatch, SemanticQuery: "about teaching", SemanticThreshold: 0.5, MaxFiresPerMinute: 60, Enabled: true},
+	} {
+		if err := watcherStore.Create(ctx, w); err != nil {
+			t.Fatalf("Create watcher %s failed: %v", w.ID, err)
+		}
+	}
+
+	// Create composition: SE₁ → SE₂ → prompt
+	comp := &glyphstorage.CanvasComposition{
+		ID: "comp-se-se-prompt",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("se-1", "se-2", "right", 0),
+			makeEdge("se-2", "prompt-1", "right", 1),
+		},
+		X: 300, Y: 100,
+	}
+	if err := canvasStore.UpsertComposition(ctx, comp); err != nil {
+		t.Fatalf("UpsertComposition failed: %v", err)
+	}
+
+	// Compile subscriptions
+	if err := handler.compileSubscriptions(ctx, comp); err != nil {
+		t.Fatalf("compileSubscriptions failed: %v", err)
+	}
+
+	// The SE₂→prompt watcher should carry SE₁'s upstream query
+	// so the prompt only executes for attestations matching BOTH queries
+	promptWatcherID := fmt.Sprintf("meld-edge-%s-%s-%s", comp.ID, "se-2", "prompt-1")
+	promptWatcher, err := watcherStore.Get(ctx, promptWatcherID)
+	if err != nil {
+		t.Fatalf("SE₂→prompt watcher not created: %v", err)
+	}
+
+	// Downstream query = SE₂'s query
+	if promptWatcher.SemanticQuery != "about teaching" {
+		t.Errorf("SE₂→prompt downstream query wrong: got %q, want %q", promptWatcher.SemanticQuery, "about teaching")
+	}
+
+	// Upstream query = SE₁'s query (propagated from compound meld)
+	if promptWatcher.UpstreamSemanticQuery != "science" {
+		t.Errorf("SE₂→prompt upstream query not propagated: got %q, want %q", promptWatcher.UpstreamSemanticQuery, "science")
+	}
+	if promptWatcher.UpstreamSemanticThreshold != 0.4 {
+		t.Errorf("SE₂→prompt upstream threshold not propagated: got %f, want 0.4", promptWatcher.UpstreamSemanticThreshold)
+	}
+}
+
+func TestCompileSubscriptions_SEtoSE_UnmeldRestoresEngineState(t *testing.T) {
+	handler, watcherStore, ctx := setupSEtoSE(t)
+
+	// Create and compile SE₁→SE₂
+	comp := &glyphstorage.CanvasComposition{
+		ID: "comp-se-se",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("se-1", "se-2", "right", 0),
+		},
+		X: 200, Y: 100,
+	}
+	if err := handler.store.UpsertComposition(ctx, comp); err != nil {
+		t.Fatalf("UpsertComposition failed: %v", err)
+	}
+	if err := handler.compileSubscriptions(ctx, comp); err != nil {
+		t.Fatalf("compileSubscriptions failed: %v", err)
+	}
+
+	// Verify SE₂ is suppressed in engine
+	engine := handler.watcherEngine
+	_, se2InEngine := engine.GetWatcher("se-glyph-se-2")
+	if se2InEngine {
+		t.Fatal("SE₂ should be suppressed in engine while melded")
+	}
+
+	// Delete composition (unmeld)
+	req := httptest.NewRequest(http.MethodDelete, "/api/canvas/compositions/comp-se-se", nil)
+	w := httptest.NewRecorder()
+	handler.HandleCompositions(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("Delete composition failed: status %d", w.Code)
+	}
+
+	// After unmeld, SE₂ should be back in the engine (no compound to suppress it)
+	_, se2InEngineAfter := engine.GetWatcher("se-glyph-se-2")
+	if !se2InEngineAfter {
+		t.Error("SE₂ standalone should be restored in engine after unmeld")
+	}
+
+	// SE₂ is still enabled in DB (was never disabled)
+	se2, err := watcherStore.Get(ctx, "se-glyph-se-2")
+	if err != nil {
+		t.Fatalf("Get SE₂ failed: %v", err)
+	}
+	if !se2.Enabled {
+		t.Error("SE₂ should remain enabled in DB")
 	}
 }
