@@ -17,35 +17,47 @@ export interface PortRule {
     targets: readonly string[];
 }
 
+/** All glyph classes that participate in melding */
+const ALL_GLYPH_CLASSES = [
+    'canvas-ax-glyph', 'canvas-se-glyph', 'canvas-py-glyph',
+    'canvas-prompt-glyph', 'canvas-doc-glyph', 'canvas-note-glyph',
+    'canvas-result-glyph', 'canvas-subcanvas-glyph',
+] as const;
+
 /**
  * Port-aware meldability rules: maps glyph classes to their output ports
  * Each port specifies a direction and which target classes can connect there
  */
 export const MELDABILITY: Record<string, readonly PortRule[]> = {
     'canvas-ax-glyph': [
-        { direction: 'right', targets: ['canvas-prompt-glyph', 'canvas-py-glyph'] }
+        { direction: 'right', targets: ['canvas-prompt-glyph', 'canvas-py-glyph', 'canvas-subcanvas-glyph'] }
     ],
     'canvas-se-glyph': [
-        { direction: 'right', targets: ['canvas-prompt-glyph', 'canvas-py-glyph'] }
+        { direction: 'right', targets: ['canvas-prompt-glyph', 'canvas-py-glyph', 'canvas-subcanvas-glyph'] }
     ],
     'canvas-py-glyph': [
-        { direction: 'right', targets: ['canvas-prompt-glyph', 'canvas-py-glyph'] },
-        { direction: 'bottom', targets: ['canvas-result-glyph'] }
+        { direction: 'right', targets: ['canvas-prompt-glyph', 'canvas-py-glyph', 'canvas-subcanvas-glyph'] },
+        { direction: 'bottom', targets: ['canvas-result-glyph', 'canvas-subcanvas-glyph'] }
     ],
     'canvas-prompt-glyph': [
-        { direction: 'bottom', targets: ['canvas-result-glyph'] }
+        { direction: 'bottom', targets: ['canvas-result-glyph', 'canvas-subcanvas-glyph'] }
     ],
     'canvas-doc-glyph': [
         // Right-meld onto result chains targets topmost result (#521)
-        { direction: 'right', targets: ['canvas-result-glyph', 'canvas-prompt-glyph', 'canvas-doc-glyph'] },
-        { direction: 'bottom', targets: ['canvas-prompt-glyph', 'canvas-doc-glyph'] }
+        { direction: 'right', targets: ['canvas-result-glyph', 'canvas-prompt-glyph', 'canvas-doc-glyph', 'canvas-subcanvas-glyph'] },
+        { direction: 'bottom', targets: ['canvas-prompt-glyph', 'canvas-doc-glyph', 'canvas-subcanvas-glyph'] }
     ],
     'canvas-note-glyph': [
-        { direction: 'bottom', targets: ['canvas-prompt-glyph'] }
+        { direction: 'bottom', targets: ['canvas-prompt-glyph', 'canvas-subcanvas-glyph'] }
     ],
     'canvas-result-glyph': [
         { direction: 'bottom', targets: ['canvas-result-glyph'] }
-    ]
+    ],
+    'canvas-subcanvas-glyph': [
+        { direction: 'right', targets: ALL_GLYPH_CLASSES },
+        { direction: 'bottom', targets: ALL_GLYPH_CLASSES },
+        { direction: 'top', targets: ALL_GLYPH_CLASSES },
+    ],
 } as const;
 
 // Cached class lists — derived from static MELDABILITY registry
