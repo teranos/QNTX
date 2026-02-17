@@ -383,15 +383,13 @@ export function buildCanvasWorkspace(
     // Setup canvas pan (two-finger scroll on desktop, single finger drag on mobile)
     void setupCanvasPan(container, canvasId);
 
-    // Setup rectangle selection (desktop only)
-    const isMobile = window.matchMedia('(max-width: 768px)').matches;
-    if (!isMobile) {
-        void setupRectangleSelection(
-            container,
-            (glyphId, cont, shiftKey) => selectGlyph(canvasId, glyphId, cont, shiftKey),
-            (cont) => deselectAll(canvasId, cont)
-        );
-    }
+    // Setup rectangle selection
+    // Always register — user may resize browser between mobile/desktop widths
+    void setupRectangleSelection(
+        container,
+        (glyphId, cont, shiftKey) => selectGlyph(canvasId, glyphId, cont, shiftKey),
+        (cont) => deselectAll(canvasId, cont)
+    );
 
     // Clean up local glyphs array when a glyph is deleted
     container.addEventListener('glyph-deleted', ((e: CustomEvent<{ glyphId: string }>) => {
