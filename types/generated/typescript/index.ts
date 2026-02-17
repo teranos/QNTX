@@ -81,6 +81,8 @@ export type {
 // Types from schedule
 export type {
   Execution,
+  ForceTriggerParams,
+  ForceTriggerResult,
   LogEntry,
   StageInfo,
   TaskInfo,
