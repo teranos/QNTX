@@ -111,9 +111,9 @@ type ChatCompletionRequest struct {
 type ChatRequest struct {
 	SystemPrompt string
 	UserPrompt   string
-	Temperature  *float64      // Override default temperature
-	MaxTokens    *int          // Override default max tokens
-	Model        *string       // Override default model
+	Temperature  *float64 // Override default temperature
+	MaxTokens    *int     // Override default max tokens
+	Model        *string  // Override default model
 	Attachments  []ContentPart // Multimodal attachments (base64 documents/images) — not serialized to JSON
 }
 
