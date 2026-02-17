@@ -199,6 +199,25 @@ func (e *Engine) loadWatchers() error {
 				"watcher_id", w.ID,
 				"semantic_query", w.SemanticQuery,
 				"threshold", w.SemanticThreshold)
+
+			// Compound SE→SE watcher: cache upstream embedding too
+			if w.UpstreamSemanticQuery != "" {
+				upstreamEmbedding, err := e.embeddingService.GenerateEmbedding(w.UpstreamSemanticQuery)
+				if err != nil {
+					enrichedErr := errors.Wrapf(err, "failed to generate upstream embedding for compound watcher %s: %q", w.ID, w.UpstreamSemanticQuery)
+					e.logger.Warnw("Failed to generate upstream query embedding, skipping compound watcher",
+						"watcher_id", w.ID,
+						"upstream_query", w.UpstreamSemanticQuery,
+						"error", enrichedErr)
+					e.parseErrors[w.ID] = enrichedErr
+					continue
+				}
+				e.queryEmbeddings[w.ID+":upstream"] = upstreamEmbedding
+				e.logger.Debugw("Cached upstream query embedding for compound watcher",
+					"watcher_id", w.ID,
+					"upstream_query", w.UpstreamSemanticQuery,
+					"upstream_threshold", w.UpstreamSemanticThreshold)
+			}
 		}
 
 		// Apply edge cursor for meld-edge watchers: skip attestations already processed
@@ -210,6 +229,49 @@ func (e *Engine) loadWatchers() error {
 		// Create rate limiter: MaxFiresPerMinute/60 = fires per second
 		// If MaxFiresPerMinute is 0, rate is 0/60 = 0, which means no fires allowed (QNTX LAW: zero means zero)
 		e.rateLimiters[w.ID] = rate.NewLimiter(rate.Limit(float64(w.MaxFiresPerMinute)/60.0), 1)
+	}
+
+	// Suppress standalone SE watchers that are targets of compound SE→SE melds.
+	// The compound watcher handles intersection matching — the standalone must not
+	// fire independently or SE₂ would show unfiltered results alongside intersection.
+	for _, w := range e.watchers {
+		if !strings.HasPrefix(w.ID, "meld-edge-") || w.UpstreamSemanticQuery == "" {
+			continue
+		}
+		var ad struct {
+			TargetGlyphID string `json:"target_glyph_id"`
+		}
+		if err := json.Unmarshal([]byte(w.ActionData), &ad); err != nil {
+			e.logger.Debugw("Failed to unmarshal action data during SE suppression",
+				"watcher_id", w.ID,
+				"error", err)
+			continue
+		}
+		if ad.TargetGlyphID == "" {
+			continue
+		}
+		seID := "se-glyph-" + ad.TargetGlyphID
+		se, exists := e.watchers[seID]
+		if !exists {
+			continue
+		}
+		// Propagate latest downstream query from the standalone watcher to compound
+		if se.SemanticQuery != "" && se.SemanticQuery != w.SemanticQuery {
+			w.SemanticQuery = se.SemanticQuery
+			w.SemanticThreshold = se.SemanticThreshold
+			w.SemanticClusterID = se.SemanticClusterID
+			if e.embeddingService != nil {
+				if emb, err := e.embeddingService.GenerateEmbedding(se.SemanticQuery); err == nil {
+					e.queryEmbeddings[w.ID] = emb
+				}
+			}
+		}
+		delete(e.watchers, seID)
+		delete(e.queryEmbeddings, seID)
+		delete(e.rateLimiters, seID)
+		e.logger.Debugw("Suppressed standalone SE watcher (compound target)",
+			"se_watcher_id", seID,
+			"compound_watcher_id", w.ID)
 	}
 
 	return nil
@@ -283,19 +345,34 @@ func (e *Engine) QueryHistoricalMatches(watcherID string) error {
 
 // queryHistoricalSemantic queries pre-computed embeddings via vector similarity search.
 // Returns results sorted by similarity score (highest first).
+// For compound SE→SE watchers, searches by upstream query (broader) and post-filters by downstream.
 func (e *Engine) queryHistoricalSemantic(watcherID string, watcher *storage.Watcher, queryEmbedding []float32) error {
+	// For compound watchers, search by upstream (broader), post-filter by downstream
+	searchEmbedding := queryEmbedding
+	searchThreshold := watcher.SemanticThreshold
+	if searchThreshold <= 0 {
+		searchThreshold = 0.3
+	}
+
+	isCompound := watcher.UpstreamSemanticQuery != ""
+	if isCompound {
+		upstreamEmbedding := e.queryEmbeddings[watcherID+":upstream"]
+		if upstreamEmbedding != nil {
+			searchEmbedding = upstreamEmbedding
+			searchThreshold = watcher.UpstreamSemanticThreshold
+			if searchThreshold <= 0 {
+				searchThreshold = 0.3
+			}
+		}
+	}
+
 	// Serialize query embedding for sqlite-vec
-	queryBlob, err := e.embeddingService.SerializeEmbedding(queryEmbedding)
+	queryBlob, err := e.embeddingService.SerializeEmbedding(searchEmbedding)
 	if err != nil {
 		return errors.Wrapf(err, "failed to serialize query embedding for watcher %s", watcherID)
 	}
 
-	threshold := watcher.SemanticThreshold
-	if threshold <= 0 {
-		threshold = 0.3
-	}
-
-	results, err := e.embeddingSearcher.Search(queryBlob, 50, threshold, watcher.SemanticClusterID)
+	results, err := e.embeddingSearcher.Search(queryBlob, 50, searchThreshold, watcher.SemanticClusterID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to search embeddings for watcher %s", watcherID)
 	}
@@ -317,16 +394,39 @@ func (e *Engine) queryHistoricalSemantic(watcherID string, watcher *storage.Watc
 			continue
 		}
 
+		// For compound watchers, post-filter by downstream query
+		downstreamSimilarity := result.Similarity
+		if isCompound {
+			text := extractAttestationText(as)
+			attestationEmbedding, err := e.embeddingService.GenerateEmbedding(text)
+			if err != nil {
+				continue
+			}
+			sim, err := e.embeddingService.ComputeSimilarity(queryEmbedding, attestationEmbedding)
+			if err != nil {
+				continue
+			}
+			downstreamThreshold := watcher.SemanticThreshold
+			if downstreamThreshold <= 0 {
+				downstreamThreshold = 0.3
+			}
+			if sim < downstreamThreshold {
+				continue
+			}
+			downstreamSimilarity = sim
+		}
+
 		matchCount++
 		if e.broadcastMatch != nil {
-			e.broadcastMatch(watcherID, as, result.Similarity)
+			e.broadcastMatch(watcherID, as, downstreamSimilarity)
 		}
 	}
 
 	e.logger.Infow("Historical semantic query completed",
 		"watcher_id", watcherID,
 		"matches_found", matchCount,
-		"threshold", threshold)
+		"compound", isCompound,
+		"threshold", searchThreshold)
 
 	return nil
 }
@@ -565,13 +665,41 @@ func (e *Engine) OnAttestationEmbedded(as *types.As, attestationEmbedding []floa
 			continue
 		}
 
-		e.logger.Debugw("Semantic match via pre-computed embedding",
-			"watcher_id", watcher.ID,
-			"attestation_id", as.ID,
-			"similarity", similarity,
-			"threshold", threshold)
+		// Compound SE→SE watcher: upstream must also pass
+		if watcher.UpstreamSemanticQuery != "" {
+			upstreamEmbedding := e.queryEmbeddings[watcher.ID+":upstream"]
+			if upstreamEmbedding == nil {
+				continue
+			}
+			upstreamSimilarity, err := e.embeddingService.ComputeSimilarity(upstreamEmbedding, attestationEmbedding)
+			if err != nil {
+				e.logger.Debugw("Failed to compute upstream similarity",
+					"watcher_id", watcher.ID,
+					"attestation_id", as.ID,
+					"error", err)
+				continue
+			}
+			upstreamThreshold := watcher.UpstreamSemanticThreshold
+			if upstreamThreshold <= 0 {
+				upstreamThreshold = 0.3
+			}
+			if upstreamSimilarity < upstreamThreshold {
+				continue
+			}
+			e.logger.Debugw("Compound semantic match (both queries pass)",
+				"watcher_id", watcher.ID,
+				"attestation_id", as.ID,
+				"downstream_similarity", similarity,
+				"upstream_similarity", upstreamSimilarity)
+		} else {
+			e.logger.Debugw("Semantic match via pre-computed embedding",
+				"watcher_id", watcher.ID,
+				"attestation_id", as.ID,
+				"similarity", similarity,
+				"threshold", threshold)
+		}
 
-		// Broadcast match to frontend
+		// Broadcast match to frontend (downstream similarity as score)
 		if e.broadcastMatch != nil {
 			e.broadcastMatch(watcher.ID, as, similarity)
 		}

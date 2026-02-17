@@ -47,6 +47,34 @@ type Execution struct {
 }
 ```
 
+## ForceTriggerParams {#forcetriggerparams}
+
+**Source**: [`pulse/schedule/store.go:792`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/store.go#L792)
+
+
+```go
+type ForceTriggerParams struct {
+	ATSCode string
+	HandlerName string
+	Payload []byte
+	SourceURL string
+	AsyncJobID string
+}
+```
+
+## ForceTriggerResult {#forcetriggerresult}
+
+**Source**: [`pulse/schedule/store.go:801`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/store.go#L801)
+
+
+```go
+type ForceTriggerResult struct {
+	ScheduledJobID string
+	ExecutionID string
+	CreatedNewJob bool
+}
+```
+
 ## LogEntry {#logentry}
 
 **Source**: [`pulse/schedule/task_log_store.go:23`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/task_log_store.go#L23)

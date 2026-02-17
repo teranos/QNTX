@@ -151,6 +151,9 @@ function setDrawerHeight(panel: HTMLElement, height: number): void {
     const clamped = Math.max(DRAWER_MIN, Math.min(DRAWER_MAX, height));
     panel.style.height = `${clamped}px`;
 
+    // Publish drawer height so other fixed elements (canvas) can offset
+    document.documentElement.style.setProperty('--drawer-height', `${clamped}px`);
+
     if (clamped <= DRAWER_MIN) {
         panel.classList.add('drawer-hidden');
     } else {
@@ -170,7 +173,7 @@ export function initSystemDrawer(): void {
 
     // Restore height from IndexedDB, fall back to default
     const stored = getStorageItem(DRAWER_HEIGHT_KEY);
-    const initialHeight = stored ? parseInt(stored, 10) : DRAWER_DEFAULT;
+    const initialHeight = stored ? (parseInt(stored, 10) || DRAWER_DEFAULT) : DRAWER_DEFAULT;
     setDrawerHeight(panel, initialHeight);
 
     // Track last expanded height for click toggle
@@ -181,6 +184,14 @@ export function initSystemDrawer(): void {
     let pointerDown = false;
     let didDrag = false;
     let startY = 0;
+
+    // Detect if drawer is top-anchored (mobile responsive layout).
+    // Uses matchMedia to stay in sync with the CSS breakpoint — getComputedStyle
+    // breaks on iOS where env(safe-area-inset-top) makes top non-zero.
+    const topAnchorQuery = window.matchMedia('(max-width: 768px)');
+    function isTopAnchored(): boolean {
+        return topAnchorQuery.matches;
+    }
 
     grabBar.addEventListener('pointerdown', (e: PointerEvent) => {
         pointerDown = true;
@@ -194,7 +205,7 @@ export function initSystemDrawer(): void {
         if (!pointerDown) return;
         if (!didDrag && Math.abs(e.clientY - startY) < DRAG_THRESHOLD) return;
         didDrag = true;
-        const height = window.innerHeight - e.clientY;
+        const height = isTopAnchored() ? e.clientY : window.innerHeight - e.clientY;
         setDrawerHeight(panel, height);
     });
 
