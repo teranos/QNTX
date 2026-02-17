@@ -9,6 +9,7 @@
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
+import { isInWindowState } from './dataset';
 import {
     canInitiateMeld,
     canReceiveMeld,
@@ -426,6 +427,11 @@ export function makeDraggable(
 
     handle.addEventListener('mousedown', (e) => {
         if (ignoreButtons && (e.target as HTMLElement).tagName === 'BUTTON') {
+            return;
+        }
+
+        // Don't allow canvas drag when glyph is in window manifestation
+        if (isInWindowState(element)) {
             return;
         }
 
