@@ -781,7 +781,7 @@ func (s *QNTXServer) processBroadcastRequest(req *broadcastRequest) {
 // disconnecting the client. This prevents burst traffic (e.g. compound watcher
 // historical queries broadcasting 50+ matches) from killing slow connections.
 //
-// TODO: Instead of silently dropping messages, implement degraded-mode delivery
+// TODO(#534): Instead of silently dropping messages, implement degraded-mode delivery
 // that batches/summarizes updates for bandwidth-constrained clients. The goal is
 // for QNTX to remain functional even on extremely low-bandwidth links (GPRS-class).
 // See the degraded-mode branch for the broader connectivity resilience work.
