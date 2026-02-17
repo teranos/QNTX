@@ -681,6 +681,254 @@ func (s *EmbeddingStore) GetAllProjectionMethods() ([]string, error) {
 	return methods, nil
 }
 
+// ClusterRun records metadata about a single HDBSCAN clustering run.
+type ClusterRun struct {
+	ID             string
+	NPoints        int
+	NClusters      int
+	NNoise         int
+	MinClusterSize int
+	DurationMS     int
+	CreatedAt      time.Time
+}
+
+// ClusterIdentity tracks a stable cluster across runs.
+type ClusterIdentity struct {
+	ID             int
+	Label          *string
+	FirstSeenRunID string
+	LastSeenRunID  string
+	Status         string
+	CreatedAt      time.Time
+}
+
+// ClusterSnapshot records a cluster's centroid at a specific run.
+type ClusterSnapshot struct {
+	ClusterID int
+	RunID     string
+	Centroid  []byte
+	NMembers  int
+	CreatedAt time.Time
+}
+
+// ClusterEvent records birth/death/stable transitions.
+type ClusterEvent struct {
+	RunID      string
+	EventType  string // "birth", "death", "stable"
+	ClusterID  int
+	Similarity *float64
+}
+
+// CreateClusterRun inserts a clustering run record.
+func (s *EmbeddingStore) CreateClusterRun(run *ClusterRun) error {
+	_, err := s.db.Exec(
+		`INSERT INTO cluster_runs (id, n_points, n_clusters, n_noise, min_cluster_size, duration_ms, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		run.ID, run.NPoints, run.NClusters, run.NNoise, run.MinClusterSize, run.DurationMS,
+		run.CreatedAt.Format(time.RFC3339),
+	)
+	if err != nil {
+		return errors.Wrapf(err, "failed to insert cluster run %s", run.ID)
+	}
+	return nil
+}
+
+// UpdateClusterRunDuration sets the final duration_ms on a cluster run.
+func (s *EmbeddingStore) UpdateClusterRunDuration(runID string, durationMS int) error {
+	_, err := s.db.Exec(`UPDATE cluster_runs SET duration_ms = ? WHERE id = ?`, durationMS, runID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to update duration for cluster run %s", runID)
+	}
+	return nil
+}
+
+// CreateCluster inserts a new cluster identity and returns the allocated ID.
+// Uses SQLite's INTEGER PRIMARY KEY auto-assignment (atomic, no race condition).
+func (s *EmbeddingStore) CreateCluster(runID string) (int, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	res, err := s.db.Exec(
+		`INSERT INTO clusters (label, first_seen_run_id, last_seen_run_id, status, created_at) VALUES (NULL, ?, ?, 'active', ?)`,
+		runID, runID, now,
+	)
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to insert cluster for run %s", runID)
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to get allocated cluster ID for run %s", runID)
+	}
+	return int(id), nil
+}
+
+// UpdateClusterLastSeen bumps the last_seen_run_id for a cluster.
+func (s *EmbeddingStore) UpdateClusterLastSeen(clusterID int, runID string) error {
+	_, err := s.db.Exec(
+		`UPDATE clusters SET last_seen_run_id = ? WHERE id = ?`,
+		runID, clusterID,
+	)
+	if err != nil {
+		return errors.Wrapf(err, "failed to update last_seen for cluster %d", clusterID)
+	}
+	return nil
+}
+
+// DissolveCluster marks a cluster as dissolved and records the run.
+func (s *EmbeddingStore) DissolveCluster(clusterID int, runID string) error {
+	_, err := s.db.Exec(
+		`UPDATE clusters SET status = 'dissolved', last_seen_run_id = ? WHERE id = ?`,
+		runID, clusterID,
+	)
+	if err != nil {
+		return errors.Wrapf(err, "failed to dissolve cluster %d in run %s", clusterID, runID)
+	}
+	return nil
+}
+
+// SaveClusterSnapshots batch-inserts snapshots for a run.
+func (s *EmbeddingStore) SaveClusterSnapshots(snapshots []ClusterSnapshot) error {
+	if len(snapshots) == 0 {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return errors.Wrap(err, "failed to begin snapshot transaction")
+	}
+	defer func() {
+		if err != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				s.logger.Error("failed to rollback snapshot save", zap.Error(rbErr))
+			}
+		}
+	}()
+
+	stmt, err := tx.Prepare(`INSERT INTO cluster_snapshots (cluster_id, run_id, centroid, n_members, created_at) VALUES (?, ?, ?, ?, ?)`)
+	if err != nil {
+		return errors.Wrap(err, "failed to prepare snapshot insert")
+	}
+	defer stmt.Close()
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	for _, snap := range snapshots {
+		if _, err = stmt.Exec(snap.ClusterID, snap.RunID, snap.Centroid, snap.NMembers, now); err != nil {
+			return errors.Wrapf(err, "failed to insert snapshot for cluster %d run %s", snap.ClusterID, snap.RunID)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return errors.Wrap(err, "failed to commit snapshot save")
+	}
+	return nil
+}
+
+// RecordClusterEvents batch-inserts cluster events for a run.
+func (s *EmbeddingStore) RecordClusterEvents(events []ClusterEvent) error {
+	if len(events) == 0 {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return errors.Wrap(err, "failed to begin event transaction")
+	}
+	defer func() {
+		if err != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				s.logger.Error("failed to rollback event save", zap.Error(rbErr))
+			}
+		}
+	}()
+
+	stmt, err := tx.Prepare(`INSERT INTO cluster_events (run_id, event_type, cluster_id, similarity, created_at) VALUES (?, ?, ?, ?, ?)`)
+	if err != nil {
+		return errors.Wrap(err, "failed to prepare event insert")
+	}
+	defer stmt.Close()
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	for _, ev := range events {
+		if _, err = stmt.Exec(ev.RunID, ev.EventType, ev.ClusterID, ev.Similarity, now); err != nil {
+			return errors.Wrapf(err, "failed to insert %s event for cluster %d", ev.EventType, ev.ClusterID)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return errors.Wrap(err, "failed to commit event save")
+	}
+	return nil
+}
+
+// GetActiveClusterIdentities returns all clusters with status = 'active'.
+func (s *EmbeddingStore) GetActiveClusterIdentities() ([]ClusterIdentity, error) {
+	rows, err := s.db.Query(`SELECT id, label, first_seen_run_id, last_seen_run_id, status, created_at FROM clusters WHERE status = 'active' ORDER BY id`)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query active cluster identities")
+	}
+	defer rows.Close()
+
+	var result []ClusterIdentity
+	for rows.Next() {
+		var c ClusterIdentity
+		var createdAt string
+		if err := rows.Scan(&c.ID, &c.Label, &c.FirstSeenRunID, &c.LastSeenRunID, &c.Status, &createdAt); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan cluster identity at row %d", len(result)+1)
+		}
+		c.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+		result = append(result, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate cluster identities (read %d)", len(result))
+	}
+	return result, nil
+}
+
+// ClusterDetail holds a cluster identity with resolved timestamps and member count.
+type ClusterDetail struct {
+	ID        int
+	Label     *string
+	Members   int
+	Status    string
+	FirstSeen time.Time
+	LastSeen  time.Time
+}
+
+// GetClusterDetails returns active clusters with member counts and resolved run timestamps.
+func (s *EmbeddingStore) GetClusterDetails() ([]ClusterDetail, error) {
+	rows, err := s.db.Query(`
+		SELECT c.id, c.label, c.status,
+		       COALESCE(r1.created_at, c.created_at) AS first_seen,
+		       COALESCE(r2.created_at, c.created_at) AS last_seen,
+		       COALESCE(m.cnt, 0) AS members
+		FROM clusters c
+		LEFT JOIN cluster_runs r1 ON r1.id = c.first_seen_run_id
+		LEFT JOIN cluster_runs r2 ON r2.id = c.last_seen_run_id
+		LEFT JOIN (SELECT cluster_id, COUNT(*) AS cnt FROM embeddings WHERE cluster_id >= 0 GROUP BY cluster_id) m ON m.cluster_id = c.id
+		WHERE c.status = 'active'
+		ORDER BY c.id
+	`)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query cluster details")
+	}
+	defer rows.Close()
+
+	var result []ClusterDetail
+	for rows.Next() {
+		var d ClusterDetail
+		var firstSeen, lastSeen string
+		if err := rows.Scan(&d.ID, &d.Label, &d.Status, &firstSeen, &lastSeen, &d.Members); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan cluster detail at row %d", len(result)+1)
+		}
+		d.FirstSeen, _ = time.Parse(time.RFC3339, firstSeen)
+		d.LastSeen, _ = time.Parse(time.RFC3339, lastSeen)
+		result = append(result, d)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate cluster details (read %d)", len(result))
+	}
+	return result, nil
+}
+
 // PredictCluster assigns an embedding to the nearest cluster centroid using cosine similarity.
 // Returns cluster ID and similarity score, or ClusterNoise if below threshold.
 func (s *EmbeddingStore) PredictCluster(
