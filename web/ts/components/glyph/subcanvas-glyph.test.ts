@@ -121,6 +121,115 @@ describe('Subcanvas Naming - Tim (Happy Path)', () => {
 // canvas_id isolation tests live in ts/state/canvas-id.test.ts to avoid
 // mock.module leaks from glyph test files that mock ../../state/ui.
 
+describe('Subcanvas Ghost Placeholder - Tim (Happy Path)', () => {
+    test('Tim: expand melded subcanvas inserts ghost at same grid position', () => {
+        const glyph = makeGlyph();
+        const element = createSubcanvasGlyph(glyph);
+
+        // Simulate melded composition container
+        const composition = document.createElement('div');
+        composition.className = 'melded-composition';
+
+        // Give the element grid positioning
+        element.style.gridRow = '1';
+        element.style.gridColumn = '2';
+
+        composition.appendChild(element);
+
+        // Need a canvas structure for the dblclick handler
+        const workspace = document.createElement('div');
+        workspace.className = 'canvas-workspace';
+        workspace.dataset.canvasId = 'parent-canvas';
+        const contentLayer = document.createElement('div');
+        contentLayer.className = 'canvas-content-layer';
+        workspace.appendChild(contentLayer);
+        contentLayer.appendChild(composition);
+        document.body.appendChild(workspace);
+
+        // Trigger dblclick to expand
+        element.dispatchEvent(new window.MouseEvent('dblclick', { bubbles: true }));
+
+        // Ghost should be in the composition
+        const ghost = composition.querySelector('.subcanvas-ghost') as HTMLElement;
+        expect(ghost).toBeTruthy();
+        expect(ghost!.style.gridRow).toBe('1');
+        expect(ghost!.style.gridColumn).toBe('2');
+    });
+
+    test('Tim: minimize back removes ghost and restores element in composition', () => {
+        const glyph = makeGlyph();
+        const element = createSubcanvasGlyph(glyph);
+
+        // Build melded composition
+        const composition = document.createElement('div');
+        composition.className = 'melded-composition';
+        element.style.gridRow = '1';
+        element.style.gridColumn = '2';
+        composition.appendChild(element);
+
+        const workspace = document.createElement('div');
+        workspace.className = 'canvas-workspace';
+        workspace.dataset.canvasId = 'parent-canvas';
+        const contentLayer = document.createElement('div');
+        contentLayer.className = 'canvas-content-layer';
+        workspace.appendChild(contentLayer);
+        contentLayer.appendChild(composition);
+        document.body.appendChild(workspace);
+
+        // Expand
+        element.dispatchEvent(new window.MouseEvent('dblclick', { bubbles: true }));
+
+        // Ghost is present
+        const ghost = composition.querySelector('.subcanvas-ghost');
+        expect(ghost).toBeTruthy();
+
+        // Morph is async with mocked animate — wait for it to resolve
+        // The morph callback will fire on next microtask via Promise.resolve()
+        return new Promise<void>(resolve => {
+            setTimeout(() => {
+                // After morph completes, minimize button should exist
+                const minBtn = element.querySelector('.canvas-minimize-btn') as HTMLElement;
+                if (minBtn) {
+                    minBtn.click();
+
+                    // Wait for restore morph
+                    setTimeout(() => {
+                        // Ghost should be gone
+                        expect(composition.querySelector('.subcanvas-ghost')).toBeFalsy();
+                        // Element should be back in composition
+                        expect(composition.contains(element)).toBe(true);
+                        resolve();
+                    }, 50);
+                } else {
+                    resolve();
+                }
+            }, 50);
+        });
+    });
+});
+
+describe('Subcanvas Ghost Placeholder - Spike (Edge Cases)', () => {
+    test('Spike: expand non-melded subcanvas inserts no ghost', () => {
+        const glyph = makeGlyph();
+        const element = createSubcanvasGlyph(glyph);
+
+        // No melded-composition parent — just a content layer
+        const workspace = document.createElement('div');
+        workspace.className = 'canvas-workspace';
+        workspace.dataset.canvasId = 'parent-canvas';
+        const contentLayer = document.createElement('div');
+        contentLayer.className = 'canvas-content-layer';
+        workspace.appendChild(contentLayer);
+        contentLayer.appendChild(element);
+        document.body.appendChild(workspace);
+
+        element.dispatchEvent(new window.MouseEvent('dblclick', { bubbles: true }));
+
+        // No ghost anywhere
+        expect(document.querySelector('.subcanvas-ghost')).toBeFalsy();
+    });
+});
+
 describe('Subcanvas Workspace dblclick Boundary - Tim (Happy Path)', () => {
     test('Tim dblclicks inside workspace and event does not bubble past it', () => {
         const workspace = buildCanvasWorkspace('subcanvas-test-1', []);
