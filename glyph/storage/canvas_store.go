@@ -9,6 +9,9 @@ import (
 	pb "github.com/teranos/QNTX/glyph/proto"
 )
 
+// ErrNotFound is returned when a canvas entity (glyph, composition, minimized window) does not exist.
+var ErrNotFound = errors.New("not found")
+
 // CanvasGlyph represents a glyph on the canvas workspace
 // Field types align with proto CanvasGlyph (int32 coordinates, string content)
 type CanvasGlyph struct {
@@ -124,7 +127,7 @@ func (s *CanvasStore) GetGlyph(ctx context.Context, id string) (*CanvasGlyph, er
 		&createdAt, &updatedAt,
 	)
 	if err == sql.ErrNoRows {
-		return nil, errors.Newf("canvas glyph %s not found", id)
+		return nil, errors.Wrapf(ErrNotFound, "canvas glyph %s", id)
 	}
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get canvas glyph %s", id)
@@ -180,6 +183,10 @@ func (s *CanvasStore) ListGlyphs(ctx context.Context) ([]*CanvasGlyph, error) {
 		glyphs = append(glyphs, &glyph)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "error iterating canvas glyphs")
+	}
+
 	return glyphs, nil
 }
 
@@ -194,7 +201,7 @@ func (s *CanvasStore) DeleteGlyph(ctx context.Context, id string) error {
 
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
-		return errors.Newf("canvas glyph %s not found", id)
+		return errors.Wrapf(ErrNotFound, "canvas glyph %s", id)
 	}
 
 	return nil
@@ -274,7 +281,7 @@ func (s *CanvasStore) GetComposition(ctx context.Context, id string) (*CanvasCom
 		&createdAt, &updatedAt,
 	)
 	if err == sql.ErrNoRows {
-		return nil, errors.Newf("canvas composition %s not found", id)
+		return nil, errors.Wrapf(ErrNotFound, "canvas composition %s", id)
 	}
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get canvas composition %s", id)
@@ -404,7 +411,7 @@ func (s *CanvasStore) DeleteComposition(ctx context.Context, id string) error {
 
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
-		return errors.Newf("canvas composition %s not found", id)
+		return errors.Wrapf(ErrNotFound, "canvas composition %s", id)
 	}
 
 	return nil
@@ -456,6 +463,10 @@ func (s *CanvasStore) ListMinimizedWindows(ctx context.Context) ([]*MinimizedWin
 		windows = append(windows, &w)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "error iterating minimized windows")
+	}
+
 	return windows, nil
 }
 
@@ -469,7 +480,7 @@ func (s *CanvasStore) RemoveMinimizedWindow(ctx context.Context, glyphID string)
 
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
-		return errors.Newf("minimized window %s not found", glyphID)
+		return errors.Wrapf(ErrNotFound, "minimized window %s", glyphID)
 	}
 
 	return nil
