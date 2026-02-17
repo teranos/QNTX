@@ -1,7 +1,6 @@
 // System drawer for logs, progress, and system output
 
 import { appState, MAX_LOGS } from './state/app.ts';
-import { sendMessage } from './websocket.ts';
 import { CSS } from './css-classes.ts';
 import { formatTimestamp } from './html-utils.ts';
 import { log, SEG } from './logger.ts';
@@ -116,14 +115,6 @@ function updateLogCount(): void {
     }
 }
 
-export function clearLogs(): void {
-    const logContent = document.getElementById('log-content') as HTMLElement | null;
-    if (logContent) {
-        logContent.innerHTML = '';
-    }
-    appState.logBuffer = [];
-    updateLogCount();
-}
 
 // Toast notifications
 function showToast(msg: LogEntry): void {
@@ -155,19 +146,6 @@ function showToast(msg: LogEntry): void {
     }, 5000);
 }
 
-// Update download button state based on verbosity
-function updateDownloadButton(): void {
-    const downloadBtn = document.getElementById('download-logs') as HTMLButtonElement | null;
-    if (!downloadBtn) return;
-
-    if (appState.currentVerbosity < 2) {
-        downloadBtn.disabled = true;
-        downloadBtn.title = 'File logging disabled (verbosity < 2)';
-    } else {
-        downloadBtn.disabled = false;
-        downloadBtn.title = 'Download log file (tmp/graph-debug.log)';
-    }
-}
 
 function setDrawerHeight(panel: HTMLElement, height: number): void {
     const clamped = Math.max(DRAWER_MIN, Math.min(DRAWER_MAX, height));
@@ -239,23 +217,6 @@ export function initSystemDrawer(): void {
         pointerDown = false;
         grabBar.releasePointerCapture(e.pointerId);
     });
-
-    // --- Verbosity selector ---
-    const verbositySelect = document.getElementById('verbosity-select') as HTMLSelectElement | null;
-    if (verbositySelect) {
-        verbositySelect.addEventListener('change', function(e: Event) {
-            const target = e.target as HTMLSelectElement;
-            const verbosity = parseInt(target.value);
-            appState.currentVerbosity = verbosity;
-
-            sendMessage({
-                type: 'set_verbosity',
-                verbosity: verbosity
-            });
-
-            updateDownloadButton();
-        });
-    }
 
     // --- Click header to toggle ---
     const logHeader = document.getElementById('system-drawer-header') as HTMLElement | null;

@@ -10,6 +10,7 @@ import { sendMessage } from './websocket.ts';
 import { toast } from './toast.ts';
 import type { DaemonStatusMessage } from '../types/websocket';
 import { DB } from '@generated/sym.js';
+import { connectivityManager, type ConnectivityState } from './connectivity';
 
 interface StatusIndicator {
     id: string;
@@ -54,6 +55,36 @@ class StatusIndicatorManager {
         this.addConnectionIndicator();
         this.addPulseIndicator();
         this.addDatabaseIndicator();
+
+        // Subscribe to connectivity state for connection indicator
+        let firstCallback = true;
+        connectivityManager.subscribe((state: ConnectivityState) => {
+            // Skip first callback if offline (preserve "Connecting..." during initial load)
+            if (firstCallback) {
+                firstCallback = false;
+                if (state === 'offline') return;
+            }
+
+            switch (state) {
+                case 'online':
+                    this.updateIndicator('connection', 'connected', 'Connected');
+                    document.body.classList.remove('disconnected');
+                    break;
+                case 'degraded':
+                    this.updateIndicator('connection', 'degraded', 'Degraded');
+                    document.body.classList.remove('disconnected');
+                    break;
+                case 'offline':
+                    // Browser online but WS down → reconnecting; browser offline → truly disconnected
+                    if (navigator.onLine) {
+                        this.updateIndicator('connection', 'connecting', 'Connecting...');
+                    } else {
+                        this.updateIndicator('connection', 'disconnected', 'Disconnected');
+                    }
+                    document.body.classList.add('disconnected');
+                    break;
+            }
+        });
     }
 
     /**
@@ -243,24 +274,6 @@ class StatusIndicatorManager {
     private async showDatabaseInfo(): Promise<void> {
         const module = await import('./database-stats-window.js');
         module.databaseStatsWindow.toggle();
-    }
-
-    /**
-     * Handle connection status updates
-     */
-    handleConnectionStatus(connected: boolean): void {
-        this.updateIndicator(
-            'connection',
-            connected ? 'connected' : 'disconnected',
-            connected ? 'Connected' : 'Disconnected'
-        );
-
-        // Also update body class for global styling
-        if (connected) {
-            document.body.classList.remove('disconnected', 'connecting');
-        } else {
-            document.body.classList.add('disconnected');
-        }
     }
 
     /**

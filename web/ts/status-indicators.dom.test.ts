@@ -83,12 +83,6 @@ describe('Status Indicators DOM Lifecycle', () => {
         expect(pulseIndicator?.classList.contains('pulse-inactive')).toBe(true);
         expect(pulseText?.textContent).toBe('Pulse: OFF');
 
-        // Mock sendMessage to prevent actual WebSocket calls
-        const sendMessageMock = jest.fn();
-        jest.mock('./websocket', () => ({
-            sendMessage: sendMessageMock
-        }));
-
         // Click to start
         pulseIndicator?.click();
 
@@ -126,7 +120,7 @@ describe('Status Indicators DOM Lifecycle', () => {
         expect(pulseIndicator?.classList.contains('clickable')).toBe(true);
     });
 
-    test('Connection indicator updates with status changes', () => {
+    test('Connection indicator updates via updateIndicator', () => {
         document.body.innerHTML = `
             <div id="system-drawer-header">
                 <span id="system-version"></span>
@@ -140,22 +134,22 @@ describe('Status Indicators DOM Lifecycle', () => {
         const connectionText = connectionIndicator?.querySelector('.status-text') as HTMLElement;
 
         // Test connected state
-        statusIndicators.handleConnectionStatus(true);
+        statusIndicators.updateIndicator('connection', 'connected', 'Connected');
         expect(connectionIndicator?.classList.contains('connection-connected')).toBe(true);
         expect(connectionText?.textContent).toBe('Connected');
 
+        // Test degraded state
+        statusIndicators.updateIndicator('connection', 'degraded', 'Degraded');
+        expect(connectionIndicator?.classList.contains('connection-degraded')).toBe(true);
+        expect(connectionText?.textContent).toBe('Degraded');
+
         // Test disconnected state
-        statusIndicators.handleConnectionStatus(false);
+        statusIndicators.updateIndicator('connection', 'disconnected', 'Disconnected');
         expect(connectionIndicator?.classList.contains('connection-disconnected')).toBe(true);
         expect(connectionText?.textContent).toBe('Disconnected');
-
-        // Also check body class updates
-        expect(document.body.classList.contains('disconnected')).toBe(true);
     });
 
-    test('handleConnectionStatus before init() does not crash', () => {
-        // WebSocket may connect before status indicators are initialized.
-        // handleConnectionStatus must not throw — it silently no-ops.
+    test('updateIndicator before init() does not crash', () => {
         document.body.innerHTML = `
             <div id="system-drawer-header">
                 <span id="system-version"></span>
@@ -163,36 +157,13 @@ describe('Status Indicators DOM Lifecycle', () => {
             </div>
         `;
 
-        // Call before init — must not throw
-        expect(() => statusIndicators.handleConnectionStatus(true)).not.toThrow();
-        expect(() => statusIndicators.handleConnectionStatus(false)).not.toThrow();
+        // Call before init — must not throw (silently no-ops on missing DOM)
+        expect(() => statusIndicators.updateIndicator('connection', 'connected', 'Connected')).not.toThrow();
+        expect(() => statusIndicators.updateIndicator('connection', 'disconnected', 'Disconnected')).not.toThrow();
     });
 
-    test('handleConnectionStatus before init() leaves indicator stale after init()', () => {
-        // This test documents the ordering requirement: if handleConnectionStatus
-        // fires before init(), the indicator stays on "Connecting..." because the
-        // update silently no-ops on missing DOM elements.
-        // This is why main.ts must call statusIndicators.init() BEFORE connectWebSocket().
-        document.body.innerHTML = `
-            <div id="system-drawer-header">
-                <span id="system-version"></span>
-                <div class="controls"></div>
-            </div>
-        `;
-
-        // Simulate wrong ordering: WS connects before init()
-        statusIndicators.handleConnectionStatus(true);
-
-        // Now init — indicator gets created with default "Connecting..." state
-        statusIndicators.init();
-
-        const connectionText = document.getElementById('connection-text');
-        // Indicator is stuck on initial state — the earlier handleConnectionStatus was lost
-        expect(connectionText?.textContent).toBe('Connecting...');
-    });
-
-    test('init() then handleConnectionStatus() shows correct state', () => {
-        // Correct ordering: init creates DOM, then WS connect updates it
+    test('init() then updateIndicator() shows correct state', () => {
+        // Correct ordering: init creates DOM, then updates work
         document.body.innerHTML = `
             <div id="system-drawer-header">
                 <span id="system-version"></span>
@@ -201,7 +172,7 @@ describe('Status Indicators DOM Lifecycle', () => {
         `;
 
         statusIndicators.init();
-        statusIndicators.handleConnectionStatus(true);
+        statusIndicators.updateIndicator('connection', 'connected', 'Connected');
 
         const connectionText = document.getElementById('connection-text');
         expect(connectionText?.textContent).toBe('Connected');
