@@ -1,6 +1,6 @@
 # Mobile Canvas UX Analysis
 
-Tauri mobile (WKWebView on iOS, WebView on Android). Primary use case: viewer/monitor. Glyph tray is the main navigation surface.
+Tauri mobile (WKWebView on iOS, WebView on Android). A QNTX mobile app is a node in a decentralised mesh network — it can operate offline via WASM (query parsing, attestation storage in IndexedDB, fuzzy search, classification) and gains more capabilities by connecting to other QNTX nodes. The canvas is the primary workspace; the glyph tray is the main navigation surface.
 
 ## Glyph Tray: Touch Browse
 
@@ -118,10 +118,29 @@ All touch sizing is gated behind `@media (pointer: coarse)` — desktop unchange
 - **Fixed**: Pan and rectangle selection handlers registered unconditionally
 - Previously gated behind one-time `isMobile` check — handlers were missing if canvas opened at narrow width
 
+## Offline Capability (WASM)
+
+The browser WASM module (`web/wasm/`, 488KB) provides local compute without a server connection:
+
+| Capability | Rust core | browser.rs | TS wrapper | UI wired |
+|---|---|---|---|---|
+| Query parsing | Yes | Yes | Yes | Yes (fuzzy search) |
+| Attestation CRUD | Yes | Yes (IndexedDB) | Yes | Yes (ax-glyph, ts-glyph) |
+| Fuzzy search | Yes | Yes | Yes | Yes |
+| Classification | Yes | Yes | No | No |
+| Merkle sync | Yes | Yes | No | No |
+| Cartesian expansion | Yes | No | No | No |
+| Claim grouping/dedup | Yes | No | No | No |
+
+See ADR-005 for the integration strategy. "Rust core" = the shared `qntx-core` crate. "browser.rs" = `#[wasm_bindgen]` exports. "TS wrapper" = `web/ts/qntx-wasm.ts`. Each column is a step in the wiring pipeline.
+
 ## Remaining Work
 
 | Gap | Priority | Notes |
 |---|---|---|
+| Offline ax-glyph fallback | High | Use WASM `queryAttestations()` when server unreachable |
 | Unified search (SPACE to open) | High | Replace left-panel query bar with floating search overlay on canvas |
-| Touch-based glyph editing | Low | Glyph manipulation currently desktop-only; acceptable for viewer use case |
+| Light mode (#221) | Medium | UI is dark-mode first; light mode is a large feature |
+| Touch-based glyph editing | Low | Glyph manipulation currently desktop-only; acceptable for now |
 | Remove root canvas minimize | Low | Blocked on unified search — canvas becomes permanent background |
+| App Store packaging | Low | Icons, launch screen, privacy manifest — blocked on Apple Developer account |
