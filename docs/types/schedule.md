@@ -46,3 +46,79 @@ type Execution struct {
 	UpdatedAt string `json:"updated_at"`
 }
 ```
+
+## ForceTriggerParams {#forcetriggerparams}
+
+**Source**: [`pulse/schedule/store.go:792`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/store.go#L792)
+
+
+```go
+type ForceTriggerParams struct {
+	ATSCode string
+	HandlerName string
+	Payload []byte
+	SourceURL string
+	AsyncJobID string
+}
+```
+
+## ForceTriggerResult {#forcetriggerresult}
+
+**Source**: [`pulse/schedule/store.go:801`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/store.go#L801)
+
+
+```go
+type ForceTriggerResult struct {
+	ScheduledJobID string
+	ExecutionID string
+	CreatedNewJob bool
+}
+```
+
+## LogEntry {#logentry}
+
+**Source**: [`pulse/schedule/task_log_store.go:23`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/task_log_store.go#L23)
+
+
+```go
+type LogEntry struct {
+	Timestamp string `json:"timestamp"`
+	Level string `json:"level"`
+	Message string `json:"message"`
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+```
+
+## StageInfo {#stageinfo}
+
+**Source**: [`pulse/schedule/task_log_store.go:17`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/task_log_store.go#L17)
+
+
+```go
+type StageInfo struct {
+	Stage string `json:"stage"`
+	Tasks []TaskInfo `json:"tasks"`
+}
+```
+
+## TaskInfo {#taskinfo}
+
+**Source**: [`pulse/schedule/task_log_store.go:11`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/task_log_store.go#L11)
+
+
+```go
+type TaskInfo struct {
+	TaskID string `json:"task_id"`
+	LogCount int `json:"log_count,omitempty"`
+}
+```
+
+## TaskLogStore {#tasklogstore}
+
+**Source**: [`pulse/schedule/task_log_store.go:32`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/task_log_store.go#L32)
+
+
+```go
+type TaskLogStore struct {
+}
+```
