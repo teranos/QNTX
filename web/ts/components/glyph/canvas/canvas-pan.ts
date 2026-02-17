@@ -185,7 +185,7 @@ export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortC
         }, { signal });
 
         document.addEventListener('mouseup', (e: MouseEvent) => {
-            if (!state.isPanning) return;
+            if (!state.isPanning || touchIdentifier !== null) return;
             if (e.button !== 1) return;
 
             state.isPanning = false;

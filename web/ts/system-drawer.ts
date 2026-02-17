@@ -207,9 +207,12 @@ export function initSystemDrawer(): void {
     let didDrag = false;
     let startY = 0;
 
-    // Detect if drawer is top-anchored (mobile responsive layout)
+    // Detect if drawer is top-anchored (mobile responsive layout).
+    // Uses matchMedia to stay in sync with the CSS breakpoint — getComputedStyle
+    // breaks on iOS where env(safe-area-inset-top) makes top non-zero.
+    const topAnchorQuery = window.matchMedia('(max-width: 768px)');
     function isTopAnchored(): boolean {
-        return getComputedStyle(panel).top === '0px' && getComputedStyle(panel).bottom !== '0px';
+        return topAnchorQuery.matches;
     }
 
     grabBar.addEventListener('pointerdown', (e: PointerEvent) => {
