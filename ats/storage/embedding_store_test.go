@@ -655,6 +655,14 @@ func TestEmbeddingStore_GetLabelEligibleClusters(t *testing.T) {
 	eligible, err = store.GetLabelEligibleClusters(1, 7, 1)
 	require.NoError(t, err)
 	assert.Len(t, eligible, 1)
+
+	// Backdate c2's labeled_at beyond cooldown — should become eligible again
+	_, err = db.Exec(`UPDATE clusters SET labeled_at = datetime('now', '-10 days') WHERE id = ?`, c2)
+	require.NoError(t, err)
+	eligible, err = store.GetLabelEligibleClusters(5, 7, 10)
+	require.NoError(t, err)
+	assert.Len(t, eligible, 2, "cluster with expired cooldown should be eligible again")
+	assert.Equal(t, c2, eligible[0].ID, "c2 has more members, should be first")
 }
 
 func TestEmbeddingStore_SampleClusterTexts(t *testing.T) {
