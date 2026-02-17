@@ -226,10 +226,6 @@ async function init(): Promise<void> {
         if (window.logLoaderStep) window.logLoaderStep('Restoring session...', false, true);
         if (graphSession.verbosity !== undefined) {
             appState.currentVerbosity = graphSession.verbosity;
-            const verbositySelect = document.getElementById('verbosity-select') as HTMLSelectElement | null;
-            if (verbositySelect) {
-                verbositySelect.value = graphSession.verbosity.toString();
-            }
         }
 
         if (graphSession.query) {

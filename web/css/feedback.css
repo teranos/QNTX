@@ -53,27 +53,6 @@
     margin-left: auto;
 }
 
-#download-logs,
-#clear-logs {
-    background: var(--bg-dark-light);
-    border: 1px solid var(--border-on-dark);
-    color: var(--text-tertiary);
-    cursor: pointer;
-    padding: 2px 8px;
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-}
-
-#download-logs:hover,
-#clear-logs:hover {
-    background: var(--bg-dark-light);
-    color: #fff;
-}
-
-#download-logs:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
 
 /* Log panels container - side by side layout */
 #log-panels-container {
@@ -194,20 +173,6 @@
     margin-left: 8px;
 }
 
-/* Verbosity Selector */
-#verbosity-select {
-    padding: 2px 6px;
-    border: 1px solid var(--border-on-dark);
-    background: var(--bg-dark-light);
-    font-size: var(--font-size-sm);
-    color: var(--text-on-dark);
-    margin-right: 8px;
-}
-
-#verbosity-select:focus {
-    outline: 1px solid #666;
-    border-color: var(--text-secondary);
-}
 
 /* Progress Events (in log panel) */
 .progress-event {
@@ -400,6 +365,11 @@
     box-shadow: 0 0 4px rgba(255, 107, 107, 0.5);
 }
 
+.status-indicator.connection-degraded .status-dot {
+    background: #d48a2e;
+    box-shadow: 0 0 4px rgba(212, 138, 46, 0.5);
+}
+
 .status-indicator.connection-connecting .status-dot {
     background: #ffa502;
     box-shadow: 0 0 4px rgba(255, 165, 2, 0.5);
@@ -433,17 +403,17 @@
     transition: background 0.3s, box-shadow 0.3s;
 }
 
-/* Disconnected state */
-body.disconnected .status-dot {
-    background: #ff6b6b;
-    box-shadow: 0 0 4px rgba(255, 107, 107, 0.5);
+/* Disconnected state — mute non-connection indicators (stale data) */
+body.disconnected #pulse-status,
+body.disconnected #database-status {
+    opacity: 0.35;
+    pointer-events: none;
 }
 
-/* Connecting state */
-body.connecting .status-dot {
-    background: #ffa502;
-    box-shadow: 0 0 4px rgba(255, 165, 2, 0.5);
-    animation: fadeLoop 1.5s ease-in-out infinite;
+body.disconnected #pulse-status .status-dot,
+body.disconnected #database-status .status-dot {
+    background: #666;
+    box-shadow: none;
 }
 
 /* Reduced motion preference */

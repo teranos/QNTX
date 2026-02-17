@@ -1,14 +1,21 @@
 /**
  * Connectivity Detection System
  *
- * Monitors both browser network state and WebSocket connection to determine
- * overall connectivity to QNTX backend. Provides debounced state changes to
- * prevent UI flapping during unstable connections.
+ * Monitors browser network state, WebSocket connection, and HTTP reachability
+ * to determine overall connectivity to QNTX backend.
+ *
+ * Three states:
+ *   online   — browser online, WS connected, HTTP healthy
+ *   degraded — browser online, WS connected, HTTP unreachable (network-level failures)
+ *   offline  — browser offline OR WS disconnected
+ *
+ * Only network-level fetch failures (TypeError) count toward degraded.
+ * A 4xx/5xx response means the server responded — HTTP is healthy.
  */
 
 import { log, SEG } from './logger';
 
-export type ConnectivityState = 'online' | 'offline';
+export type ConnectivityState = 'online' | 'degraded' | 'offline';
 
 type ConnectivityCallback = (state: ConnectivityState) => void;
 
@@ -17,18 +24,28 @@ export interface ConnectivityManager {
     subscribe(callback: ConnectivityCallback): () => void;
 }
 
+/** Resolve backend base URL without importing api.ts (avoids import cycle) */
+function getBackendUrl(): string {
+    return (typeof window !== 'undefined' && (window as any).__BACKEND_URL__) || (typeof window !== 'undefined' ? window.location.origin : '');
+}
+
 class ConnectivityManagerImpl implements ConnectivityManager {
     private _state: ConnectivityState = 'online';
     private callbacks: Set<ConnectivityCallback> = new Set();
     private debounceTimer: number | null = null;
     private pendingState: ConnectivityState | null = null;
 
-    // Track both browser and WebSocket state
+    // Track browser, WebSocket, and HTTP state
     private browserOnline: boolean = typeof navigator !== 'undefined' ? navigator.onLine : true;
     private wsConnected: boolean = false;
+    private httpHealthy: boolean = true;
+    private consecutiveHttpFailures: number = 0;
+    private recoveryTimer: number | null = null;
 
-    // Debounce duration in milliseconds (equal for both directions)
+    // Thresholds
     private readonly DEBOUNCE_MS = 300;
+    private readonly FAILURE_THRESHOLD = 3;
+    private readonly RECOVERY_INTERVAL_MS = 15_000;
 
     constructor() {
         this.init();
@@ -68,14 +85,48 @@ class ConnectivityManagerImpl implements ConnectivityManager {
         if (this.wsConnected !== connected) {
             log.debug(SEG.UI, `[Connectivity] WebSocket ${connected ? 'connected' : 'disconnected'}`);
             this.wsConnected = connected;
+            // Fresh connection → reset HTTP health (stale failures from before disconnect)
+            if (connected) {
+                this.consecutiveHttpFailures = 0;
+                this.httpHealthy = true;
+            }
+            this.updateState();
+        }
+    }
+
+    /**
+     * Called by apiFetch on successful response (any HTTP status)
+     */
+    reportHttpSuccess(): void {
+        this.consecutiveHttpFailures = 0;
+        if (!this.httpHealthy) {
+            this.httpHealthy = true;
+            log.info(SEG.UI, '[Connectivity] HTTP recovered');
+            this.updateState();
+        }
+    }
+
+    /**
+     * Called by apiFetch on network-level failure (fetch TypeError)
+     */
+    reportHttpFailure(): void {
+        this.consecutiveHttpFailures++;
+        if (this.consecutiveHttpFailures >= this.FAILURE_THRESHOLD && this.httpHealthy) {
+            this.httpHealthy = false;
+            log.warn(SEG.UI, `[Connectivity] HTTP unreachable after ${this.consecutiveHttpFailures} consecutive failures`);
             this.updateState();
         }
     }
 
     private updateState(): void {
-        // Offline if EITHER browser OR WebSocket reports offline
-        // (navigator.onLine can report false positives, WebSocket is ground truth)
-        const newState: ConnectivityState = (this.browserOnline && this.wsConnected) ? 'online' : 'offline';
+        let newState: ConnectivityState;
+        if (!this.browserOnline || !this.wsConnected) {
+            newState = 'offline';
+        } else if (!this.httpHealthy) {
+            newState = 'degraded';
+        } else {
+            newState = 'online';
+        }
 
         if (newState === this._state) {
             // No change, cancel any pending transition
@@ -99,11 +150,41 @@ class ConnectivityManagerImpl implements ConnectivityManager {
                 const oldState = this._state;
                 this._state = this.pendingState;
                 log.info(SEG.UI, `[Connectivity] State changed: ${oldState} → ${this._state}`);
+
+                // Manage recovery timer only when state is committed
+                if (this._state === 'degraded') {
+                    this.startRecoveryTimer();
+                } else {
+                    this.stopRecoveryTimer();
+                }
+
                 this.notifyCallbacks();
             }
             this.debounceTimer = null;
             this.pendingState = null;
         }, this.DEBOUNCE_MS);
+    }
+
+    /**
+     * Ping /health every 15s while degraded to detect HTTP recovery
+     */
+    private startRecoveryTimer(): void {
+        if (this.recoveryTimer !== null) return; // already running
+
+        log.debug(SEG.UI, '[Connectivity] Starting HTTP recovery timer');
+        this.recoveryTimer = window.setInterval(() => {
+            fetch(getBackendUrl() + '/health').then(
+                () => { this.reportHttpSuccess(); },
+                () => { /* still unreachable, stay degraded */ }
+            );
+        }, this.RECOVERY_INTERVAL_MS);
+    }
+
+    private stopRecoveryTimer(): void {
+        if (this.recoveryTimer !== null) {
+            clearInterval(this.recoveryTimer);
+            this.recoveryTimer = null;
+        }
     }
 
     subscribe(callback: ConnectivityCallback): () => void {
