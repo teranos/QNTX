@@ -57,6 +57,7 @@ import { createCanvasGlyph } from './components/glyph/canvas/canvas-glyph';
 import { createChartGlyph } from './components/glyph/chart-glyph';
 import { sendMessage } from './websocket';
 import { apiFetch } from './api';
+import { escapeHtml } from './html-utils';
 import { DB } from '@generated/sym.js';
 import { log, SEG } from './logger.ts';
 import { formatBuildTime } from './components/tooltip.ts';
@@ -504,7 +505,7 @@ function renderEmbeddings(): void {
                 .sort(([a], [b]) => Number(a) - Number(b))
                 .map(([id, count]) => {
                     const label = clusterLabels.get(Number(id));
-                    const labelSpan = label ? ` <span style="color:#a0aec0;font-style:italic">${label}</span>` : '';
+                    const labelSpan = label ? ` <span style="color:#a0aec0;font-style:italic">${escapeHtml(label)}</span>` : '';
                     return `<span style="color:#60a5fa">#${id}</span>${labelSpan}:${count}`;
                 })
                 .join('  ');
