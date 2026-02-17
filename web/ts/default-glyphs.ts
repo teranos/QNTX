@@ -266,6 +266,7 @@ let embeddingsClustering = false;
 let embeddingsProjecting = false;
 type ProjectionPoint = { id: string; source_id: string; method: string; x: number; y: number; cluster_id: number };
 let projectionsData: Record<string, ProjectionPoint[]> = {};
+let clusterLabels: Map<number, string | null> = new Map();
 
 // Self diagnostics state
 let selfElement: HTMLElement | null = null;
@@ -440,9 +441,10 @@ function renderSelf(): void {
 
 export async function fetchEmbeddingsInfo(): Promise<void> {
     try {
-        const [infoResp, projResp] = await Promise.all([
+        const [infoResp, projResp, clustersResp] = await Promise.all([
             apiFetch('/api/embeddings/info'),
             apiFetch('/api/embeddings/projections'),
+            apiFetch('/api/embeddings/clusters'),
         ]);
         embeddingsInfo = await infoResp.json();
         const raw = projResp.ok ? await projResp.json() : {};
@@ -452,9 +454,18 @@ export async function fetchEmbeddingsInfo(): Promise<void> {
         } else {
             projectionsData = {};
         }
+        // Build cluster label map from /api/embeddings/clusters
+        clusterLabels = new Map();
+        if (clustersResp.ok) {
+            const clusters = await clustersResp.json() as Array<{ id: number; label: string | null }>;
+            for (const c of clusters) {
+                clusterLabels.set(c.id, c.label);
+            }
+        }
     } catch {
         embeddingsInfo = null;
         projectionsData = {};
+        clusterLabels = new Map();
     }
     renderEmbeddings();
 }
@@ -491,7 +502,11 @@ function renderEmbeddings(): void {
         if (ci && ci.n_clusters > 0) {
             const clusterSizes = Object.entries(ci.clusters)
                 .sort(([a], [b]) => Number(a) - Number(b))
-                .map(([id, count]) => `<span style="color:#60a5fa">#${id}</span>:${count}`)
+                .map(([id, count]) => {
+                    const label = clusterLabels.get(Number(id));
+                    const labelSpan = label ? ` <span style="color:#a0aec0;font-style:italic">${label}</span>` : '';
+                    return `<span style="color:#60a5fa">#${id}</span>${labelSpan}:${count}`;
+                })
                 .join('  ');
             clusterRows = `
                 <div class="glyph-row">
