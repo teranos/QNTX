@@ -195,7 +195,7 @@ export function initSystemDrawer(): void {
 
     // Restore height from IndexedDB, fall back to default
     const stored = getStorageItem(DRAWER_HEIGHT_KEY);
-    const initialHeight = stored ? parseInt(stored, 10) : DRAWER_DEFAULT;
+    const initialHeight = stored ? (parseInt(stored, 10) || DRAWER_DEFAULT) : DRAWER_DEFAULT;
     setDrawerHeight(panel, initialHeight);
 
     // Track last expanded height for click toggle

@@ -108,9 +108,18 @@ export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortC
     const signal = controller.signal;
     const state = getState(canvasId);
 
+    // Reset gesture flags — stale isPanning/isPinching from a previous session
+    // (e.g. subcanvas destroyed mid-gesture) must not leak into the new setup
+    state.isPanning = false;
+    state.isPinching = false;
+
     // Load persisted pan state
     loadTransformState(canvasId);
     applyTransform(container, canvasId);
+
+    // Touch identifier tracks active single-finger pan (null = no active touch pan).
+    // Shared with desktop mousemove guard to prevent touch→mouse state leakage.
+    let touchIdentifier: number | null = null;
 
     // Desktop: Two-finger trackpad scroll (wheel event) and middle mouse drag
     // Always register — user may resize browser between mobile/desktop widths
@@ -163,7 +172,8 @@ export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortC
         }, { signal });
 
         document.addEventListener('mousemove', (e: MouseEvent) => {
-            if (!state.isPanning) return;
+            // Only pan on middle-mouse drag (not touch-initiated panning)
+            if (!state.isPanning || touchIdentifier !== null) return;
 
             const deltaX = e.clientX - state.startX;
             const deltaY = e.clientY - state.startY;
@@ -187,8 +197,6 @@ export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortC
     }
 
     // Touch handlers: Always set up for mobile and responsive design mode support
-    let touchIdentifier: number | null = null;
-
     container.addEventListener('touchstart', (e: TouchEvent) => {
         if (e.touches.length === 2) {
             // Two-finger pinch zoom
