@@ -194,10 +194,10 @@ class CanvasSyncQueueImpl {
             body: JSON.stringify({
                 id: glyph.id,
                 symbol: glyph.symbol,
-                x: glyph.x,
-                y: glyph.y,
-                width: glyph.width,
-                height: glyph.height,
+                x: Math.round(glyph.x),
+                y: Math.round(glyph.y),
+                width: glyph.width != null ? Math.round(glyph.width) : undefined,
+                height: glyph.height != null ? Math.round(glyph.height) : undefined,
                 content: glyph.content,
             }),
         });
@@ -241,8 +241,8 @@ class CanvasSyncQueueImpl {
             body: JSON.stringify({
                 id: composition.id,
                 edges: composition.edges,
-                x: composition.x,
-                y: composition.y,
+                x: Math.round(composition.x),
+                y: Math.round(composition.y),
             }),
         });
 

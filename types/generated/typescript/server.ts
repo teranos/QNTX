@@ -958,6 +958,10 @@ export interface WatcherMatchMessage {
    */
   score?: number;
   /**
+   * Target glyph for meld-edge routed matches
+   */
+  target_glyph_id?: string;
+  /**
    * Unix timestamp
    */
   timestamp: number;
