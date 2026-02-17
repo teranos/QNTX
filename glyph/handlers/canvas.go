@@ -125,7 +125,7 @@ func (h *CanvasHandler) handleListGlyphs(w http.ResponseWriter, r *http.Request)
 func (h *CanvasHandler) handleGetGlyph(w http.ResponseWriter, r *http.Request, id string) {
 	glyph, err := h.store.GetGlyph(r.Context(), id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, glyphstorage.ErrNotFound) {
 			h.writeError(w, err, http.StatusNotFound)
 		} else {
 			h.writeError(w, err, http.StatusInternalServerError)
@@ -156,7 +156,7 @@ func (h *CanvasHandler) handleUpsertGlyph(w http.ResponseWriter, r *http.Request
 
 func (h *CanvasHandler) handleDeleteGlyph(w http.ResponseWriter, r *http.Request, id string) {
 	if err := h.store.DeleteGlyph(r.Context(), id); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, glyphstorage.ErrNotFound) {
 			h.writeError(w, err, http.StatusNotFound)
 		} else {
 			// TODO(#431): Queue deletion for retry when offline
@@ -183,7 +183,7 @@ func (h *CanvasHandler) handleListCompositions(w http.ResponseWriter, r *http.Re
 func (h *CanvasHandler) handleGetComposition(w http.ResponseWriter, r *http.Request, id string) {
 	comp, err := h.store.GetComposition(r.Context(), id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, glyphstorage.ErrNotFound) {
 			h.writeError(w, err, http.StatusNotFound)
 		} else {
 			h.writeError(w, err, http.StatusInternalServerError)
@@ -241,7 +241,7 @@ func (h *CanvasHandler) handleDeleteComposition(w http.ResponseWriter, r *http.R
 	}
 
 	if err := h.store.DeleteComposition(r.Context(), id); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, glyphstorage.ErrNotFound) {
 			h.writeError(w, err, http.StatusNotFound)
 		} else {
 			// TODO(#431): Queue deletion for retry when offline
@@ -314,7 +314,7 @@ func (h *CanvasHandler) handleAddMinimizedWindow(w http.ResponseWriter, r *http.
 
 func (h *CanvasHandler) handleRemoveMinimizedWindow(w http.ResponseWriter, r *http.Request, glyphID string) {
 	if err := h.store.RemoveMinimizedWindow(r.Context(), glyphID); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, glyphstorage.ErrNotFound) {
 			h.writeError(w, err, http.StatusNotFound)
 		} else {
 			h.writeError(w, err, http.StatusInternalServerError)
