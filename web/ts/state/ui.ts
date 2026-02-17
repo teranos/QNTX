@@ -697,11 +697,16 @@ class UIState {
         this.state = createDefaultState();
         this.clearStorage();
 
-        // Notify all subscribers
+        // Notify all subscribers (use safeNotify to prevent a throwing subscriber from breaking the loop)
         for (const key of Object.keys(this.state) as (keyof UIStateData)[]) {
-            this.subscribers.get(key)?.forEach(callback => {
-                callback(this.state[key], key);
-            });
+            const keySubscribers = this.subscribers.get(key);
+            if (keySubscribers) {
+                for (const callback of keySubscribers) {
+                    if (!this.safeNotify(callback, () => callback(this.state[key], key), `reset:${String(key)}`)) {
+                        keySubscribers.delete(callback);
+                    }
+                }
+            }
         }
     }
 }

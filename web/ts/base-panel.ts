@@ -71,6 +71,9 @@ export abstract class BasePanel {
         lastError: null
     };
 
+    /** In-flight guard: true while show() is executing */
+    private isShowing: boolean = false;
+
     private escapeHandler: ((e: KeyboardEvent) => void) | null = null;
     private clickOutsideHandler: ((e: Event) => void) | null = null;
     private tooltipCleanup: (() => void) | null = null;
@@ -229,29 +232,34 @@ export abstract class BasePanel {
     }
 
     public async show(): Promise<void> {
-        if (!this.panel) return;
+        if (!this.panel || this.isShowing) return;
 
-        // Error boundary: wrap beforeShow() to catch and display errors
+        this.isShowing = true;
         try {
-            // Allow subclass to prevent show (e.g., unsaved changes check)
-            if (!await this.beforeShow()) return;
-        } catch (error: unknown) {
-            const err = error instanceof Error ? error : new Error(String(error));
-            log.error(SEG.UI, `[${this.config.id}] Error in beforeShow():`, err);
-            this.showErrorState(err);
-            return;
-        }
+            // Error boundary: wrap beforeShow() to catch and display errors
+            try {
+                // Allow subclass to prevent show (e.g., unsaved changes check)
+                if (!await this.beforeShow()) return;
+            } catch (error: unknown) {
+                const err = error instanceof Error ? error : new Error(String(error));
+                log.error(SEG.UI, `[${this.config.id}] Error in beforeShow():`, err);
+                this.showErrorState(err);
+                return;
+            }
 
-        this.updateVisibility(true);
+            this.updateVisibility(true);
 
-        // Error boundary: wrap onShow() to catch and display errors
-        try {
-            this.clearError();
-            await this.onShow();
-        } catch (error: unknown) {
-            const err = error instanceof Error ? error : new Error(String(error));
-            log.error(SEG.UI, `[${this.config.id}] Error in onShow():`, err);
-            this.showErrorState(err);
+            // Error boundary: wrap onShow() to catch and display errors
+            try {
+                this.clearError();
+                await this.onShow();
+            } catch (error: unknown) {
+                const err = error instanceof Error ? error : new Error(String(error));
+                log.error(SEG.UI, `[${this.config.id}] Error in onShow():`, err);
+                this.showErrorState(err);
+            }
+        } finally {
+            this.isShowing = false;
         }
     }
 

@@ -9,6 +9,8 @@ import { formatRelativeTime } from './html-utils';
 
 let cachedBuildInfo: BuildInfo | null = null;
 
+const MAX_VISIBLE_TOASTS = 5;
+
 /**
  * Cache build info from version WebSocket message
  */
@@ -154,6 +156,11 @@ export function showToast(message: string, options: ToastOptions = {}): void {
     toast.appendChild(closeBtn);
 
     container.appendChild(toast);
+
+    // Cap visible toasts — remove oldest when limit exceeded
+    while (container.children.length > MAX_VISIBLE_TOASTS) {
+        container.firstElementChild?.remove();
+    }
 
     // Trigger animation
     setTimeout(() => toast.classList.add('toast-visible'), 10);

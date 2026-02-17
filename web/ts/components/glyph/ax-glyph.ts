@@ -304,8 +304,28 @@ function renderAttestation(attestation: Attestation): HTMLElement {
     text.style.overflow = 'hidden';
     text.style.textOverflow = 'ellipsis';
 
-    // Build formatted text with darker keywords
-    text.innerHTML = `<span style="color: #d4f0d4;">${subjects}</span> <span style="color: #6b7b6b;">is</span> <span style="color: #d4f0d4;">${predicates}</span> <span style="color: #6b7b6b;">of</span> <span style="color: #d4f0d4;">${contexts}</span>`;
+    // Build formatted text with darker keywords (textContent per span to prevent XSS)
+    const subjectSpan = document.createElement('span');
+    subjectSpan.style.color = '#d4f0d4';
+    subjectSpan.textContent = subjects;
+
+    const isSpan = document.createElement('span');
+    isSpan.style.color = '#6b7b6b';
+    isSpan.textContent = ' is ';
+
+    const predSpan = document.createElement('span');
+    predSpan.style.color = '#d4f0d4';
+    predSpan.textContent = predicates;
+
+    const ofSpan = document.createElement('span');
+    ofSpan.style.color = '#6b7b6b';
+    ofSpan.textContent = ' of ';
+
+    const ctxSpan = document.createElement('span');
+    ctxSpan.style.color = '#d4f0d4';
+    ctxSpan.textContent = contexts;
+
+    text.append(subjectSpan, isSpan, predSpan, ofSpan, ctxSpan);
 
     // Add attestation ID as tooltip using tooltip infrastructure
     item.dataset.tooltip = attestation.id || 'unknown';
