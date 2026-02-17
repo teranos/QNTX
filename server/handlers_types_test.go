@@ -263,7 +263,7 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 
 		// Should have complete restaurant domain model
 		// Note: health_inspection appears twice (initial + update)
-		require.Len(t, types, 7, "Should have restaurant, menu_item, city, food_review, health_inspection (2 versions), and prompt-result")
+		require.Len(t, types, 8, "Should have restaurant, menu_item, city, food_review, health_inspection (2 versions), prompt-result, and labeled")
 
 		// Map for easy verification
 		typeMap := make(map[string]map[string]interface{})
