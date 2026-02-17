@@ -5,6 +5,7 @@
 import { describe, test, expect } from 'bun:test';
 import {
     areClassesCompatible,
+    getCompatibleDirections,
     getInitiatorClasses,
     getTargetClasses,
     getCompatibleTargets,
@@ -50,20 +51,31 @@ describe('Port-aware MELDABILITY registry', () => {
             expect(areClassesCompatible('canvas-prompt-glyph', 'canvas-result-glyph')).toBe('bottom');
         });
 
-        test('doc → prompt returns bottom (doc sits above prompt)', () => {
-            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-prompt-glyph')).toBe('bottom');
+        test('doc → prompt returns right as first direction', () => {
+            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-prompt-glyph')).toBe('right');
         });
 
-        test('doc → doc returns bottom (stack multiple documents)', () => {
-            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-doc-glyph')).toBe('bottom');
+        test('doc → prompt supports both right and bottom', () => {
+            const dirs = getCompatibleDirections('canvas-doc-glyph', 'canvas-prompt-glyph');
+            expect(dirs).toContain('right');
+            expect(dirs).toContain('bottom');
+            expect(dirs.length).toBe(2);
+        });
+
+        test('doc → doc supports both right and bottom', () => {
+            const dirs = getCompatibleDirections('canvas-doc-glyph', 'canvas-doc-glyph');
+            expect(dirs).toContain('right');
+            expect(dirs).toContain('bottom');
+            expect(dirs.length).toBe(2);
         });
 
         test('note → prompt returns bottom (note sits above prompt)', () => {
             expect(areClassesCompatible('canvas-note-glyph', 'canvas-prompt-glyph')).toBe('bottom');
         });
 
-        test('doc → result returns null (docs cannot meld onto results)', () => {
-            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-result-glyph')).toBe(null);
+        test('doc → result returns right (doc sits left of result)', () => {
+            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-result-glyph')).toBe('right');
+            expect(getCompatibleDirections('canvas-doc-glyph', 'canvas-result-glyph')).toEqual(['right']);
         });
 
         test('prompt → prompt returns null (incompatible)', () => {

@@ -8,21 +8,42 @@
     height: 100%;
     position: relative;
     overflow: hidden;
-    background-color: #2a2b2a; /* Mid-dark gray between mid-gray and almost-black for night work */
+    background-color: var(--bg-canvas);
     background-image:
         repeating-linear-gradient(
             0deg,
             transparent,
-            transparent 19px,
-            rgba(255, 255, 255, 0.05) 19px,
-            rgba(255, 255, 255, 0.05) 20px
+            transparent 23px,
+            #2f353c 23px,
+            #2f353c 24px
         ),
         repeating-linear-gradient(
             90deg,
             transparent,
-            transparent 19px,
-            rgba(255, 255, 255, 0.05) 19px,
-            rgba(255, 255, 255, 0.05) 20px
+            transparent 23px,
+            #2f353c 23px,
+            #2f353c 24px
+        );
+    transition: background-color 0.8s ease, background-image 0.8s ease;
+}
+
+/* Offline: 14 darker, desaturated (no color tint) */
+[data-connectivity-mode="offline"] .canvas-workspace {
+    background-color: #222222;
+    background-image:
+        repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 23px,
+            #272727 23px,
+            #272727 24px
+        ),
+        repeating-linear-gradient(
+            90deg,
+            transparent,
+            transparent 23px,
+            #272727 23px,
+            #272727 24px
         );
 }
 
@@ -333,7 +354,7 @@
 .subcanvas-preview {
     flex: 1;
     overflow: hidden;
-    background-color: #2a2b2a;
+    background-color: var(--bg-canvas);
     background-image:
         repeating-linear-gradient(
             0deg,

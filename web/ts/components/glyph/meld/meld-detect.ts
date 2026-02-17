@@ -5,7 +5,7 @@
  * Bidirectional: checks both forward (dragged→nearby) and reverse (nearby→dragged).
  */
 
-import { getInitiatorClasses, getTargetClasses, areClassesCompatible, getGlyphClass, isPortFree, type EdgeDirection } from './meldability';
+import { getInitiatorClasses, getTargetClasses, getCompatibleDirections, getGlyphClass, isPortFree, type EdgeDirection } from './meldability';
 import { findCompositionByGlyph } from '../../../state/compositions';
 
 // Configuration
@@ -32,14 +32,13 @@ export function canReceiveMeld(element: HTMLElement): boolean {
 }
 
 /**
- * Check if two elements are compatible for melding
- * Returns the edge direction if compatible, null otherwise
+ * Get all compatible meld directions between two elements
  */
-function areCompatible(initiator: HTMLElement, target: HTMLElement): EdgeDirection | null {
+function getCompatible(initiator: HTMLElement, target: HTMLElement): EdgeDirection[] {
     const initiatorClass = getGlyphClass(initiator);
     const targetClass = getGlyphClass(target);
-    if (!initiatorClass || !targetClass) return null;
-    return areClassesCompatible(initiatorClass, targetClass);
+    if (!initiatorClass || !targetClass) return [];
+    return getCompatibleDirections(initiatorClass, targetClass);
 }
 
 /**
@@ -141,26 +140,29 @@ export function findMeldTarget(draggedElement: HTMLElement): {
                     if (draggedElement.closest('.melded-composition') === targetComp) return;
                 }
 
-                const direction = areCompatible(draggedElement, targetElement);
-                if (!direction) return;
-
-                // Axiom: one glyph per side — skip if target's incoming port is occupied
-                if (targetComp) {
-                    const targetId = targetElement.dataset.glyphId;
-                    if (targetId) {
-                        const comp = findCompositionByGlyph(targetId);
-                        if (comp && !isPortFree(targetId, direction, 'incoming', comp.edges)) return;
-                    }
-                }
+                const directions = getCompatible(draggedElement, targetElement);
+                if (directions.length === 0) return;
 
                 const targetRect = targetElement.getBoundingClientRect();
-                const distance = checkDirectionalProximity(draggedRect, targetRect, direction);
 
-                if (distance < PROXIMITY_THRESHOLD && distance < closestDistance) {
-                    closestDistance = distance;
-                    closestTarget = targetElement;
-                    closestDirection = direction;
-                    closestReversed = false;
+                for (const direction of directions) {
+                    // Axiom: one glyph per side — skip if target's incoming port is occupied
+                    if (targetComp) {
+                        const targetId = targetElement.dataset.glyphId;
+                        if (targetId) {
+                            const comp = findCompositionByGlyph(targetId);
+                            if (comp && !isPortFree(targetId, direction, 'incoming', comp.edges)) continue;
+                        }
+                    }
+
+                    const distance = checkDirectionalProximity(draggedRect, targetRect, direction);
+
+                    if (distance < PROXIMITY_THRESHOLD && distance < closestDistance) {
+                        closestDistance = distance;
+                        closestTarget = targetElement;
+                        closestDirection = direction;
+                        closestReversed = false;
+                    }
                 }
             });
         }
@@ -178,27 +180,30 @@ export function findMeldTarget(draggedElement: HTMLElement): {
                 }
 
                 // Check if the nearby element can initiate toward the dragged element
-                const direction = areCompatible(nearbyElement, draggedElement);
-                if (!direction) return;
+                const directions = getCompatible(nearbyElement, draggedElement);
+                if (directions.length === 0) return;
 
-                // Axiom: one glyph per side — skip if nearby's outgoing port is occupied
-                if (nearbyComp) {
-                    const nearbyId = nearbyElement.dataset.glyphId;
-                    if (nearbyId) {
-                        const comp = findCompositionByGlyph(nearbyId);
-                        if (comp && !isPortFree(nearbyId, direction, 'outgoing', comp.edges)) return;
-                    }
-                }
-
-                // Proximity: nearby is the meld initiator, dragged is the target
                 const nearbyRect = nearbyElement.getBoundingClientRect();
-                const distance = checkDirectionalProximity(nearbyRect, draggedRect, direction);
 
-                if (distance < PROXIMITY_THRESHOLD && distance < closestDistance) {
-                    closestDistance = distance;
-                    closestTarget = nearbyElement;
-                    closestDirection = direction;
-                    closestReversed = true;
+                for (const direction of directions) {
+                    // Axiom: one glyph per side — skip if nearby's outgoing port is occupied
+                    if (nearbyComp) {
+                        const nearbyId = nearbyElement.dataset.glyphId;
+                        if (nearbyId) {
+                            const comp = findCompositionByGlyph(nearbyId);
+                            if (comp && !isPortFree(nearbyId, direction, 'outgoing', comp.edges)) continue;
+                        }
+                    }
+
+                    // Proximity: nearby is the meld initiator, dragged is the target
+                    const distance = checkDirectionalProximity(nearbyRect, draggedRect, direction);
+
+                    if (distance < PROXIMITY_THRESHOLD && distance < closestDistance) {
+                        closestDistance = distance;
+                        closestTarget = nearbyElement;
+                        closestDirection = direction;
+                        closestReversed = true;
+                    }
                 }
             });
         }

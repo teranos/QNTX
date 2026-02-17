@@ -87,8 +87,9 @@ describe('Result Glyph Drag Persistence - Tim (Happy Path)', () => {
         expect(output?.textContent).toContain('Answer: 42');
         expect(output?.textContent).toContain('All tests passed');
 
-        // Duration is shown
-        expect(element.textContent).toContain('150ms');
+        // Copy button is present
+        const copyBtn = element.querySelector('button[title="Copy to clipboard"]');
+        expect(copyBtn).not.toBeNull();
     });
 
     test('Tim sees error output in red', () => {

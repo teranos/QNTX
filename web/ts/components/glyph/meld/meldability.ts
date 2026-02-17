@@ -36,6 +36,8 @@ export const MELDABILITY: Record<string, readonly PortRule[]> = {
         { direction: 'bottom', targets: ['canvas-result-glyph'] }
     ],
     'canvas-doc-glyph': [
+        // Right-meld onto result chains targets topmost result (#521)
+        { direction: 'right', targets: ['canvas-result-glyph', 'canvas-prompt-glyph', 'canvas-doc-glyph'] },
         { direction: 'bottom', targets: ['canvas-prompt-glyph', 'canvas-doc-glyph'] }
     ],
     'canvas-note-glyph': [
@@ -91,17 +93,27 @@ export function getCompatibleTargets(initiatorClass: string): string[] {
 
 /**
  * Check if two glyph classes are compatible for melding
- * Returns the edge direction if compatible, null if not
+ * Returns all compatible edge directions (empty array if incompatible)
  */
-export function areClassesCompatible(initiatorClass: string, targetClass: string): EdgeDirection | null {
+export function getCompatibleDirections(initiatorClass: string, targetClass: string): EdgeDirection[] {
     const ports = MELDABILITY[initiatorClass];
-    if (!ports) return null;
+    if (!ports) return [];
+    const directions: EdgeDirection[] = [];
     for (const port of ports) {
         if (port.targets.includes(targetClass)) {
-            return port.direction;
+            directions.push(port.direction);
         }
     }
-    return null;
+    return directions;
+}
+
+/**
+ * Check if two glyph classes are compatible for melding
+ * Returns the first edge direction if compatible, null if not
+ */
+export function areClassesCompatible(initiatorClass: string, targetClass: string): EdgeDirection | null {
+    const dirs = getCompatibleDirections(initiatorClass, targetClass);
+    return dirs.length > 0 ? dirs[0] : null;
 }
 
 /**
