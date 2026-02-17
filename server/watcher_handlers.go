@@ -385,6 +385,19 @@ func (s *QNTXServer) broadcastWatcherMatch(watcherID string, attestation *types.
 		Timestamp:   time.Now().Unix(),
 	}
 
+	// For meld-edge watchers, extract target glyph ID from action data
+	// so the frontend can route matches to the correct glyph
+	if strings.HasPrefix(watcherID, "meld-edge-") {
+		if w, exists := s.watcherEngine.GetWatcher(watcherID); exists {
+			var actionData struct {
+				TargetGlyphID string `json:"target_glyph_id"`
+			}
+			if json.Unmarshal([]byte(w.ActionData), &actionData) == nil && actionData.TargetGlyphID != "" {
+				msg.TargetGlyphID = actionData.TargetGlyphID
+			}
+		}
+	}
+
 	// Send to all clients via broadcast worker
 	req := &broadcastRequest{
 		reqType: "watcher_match",
