@@ -147,8 +147,7 @@ func matchClusters(
 		})
 
 		if err := store.UpdateClusterLastSeen(stableID, runID); err != nil {
-			logger.Warnw("Failed to update last_seen for matched cluster",
-				"cluster_id", stableID, "run_id", runID, "error", err)
+			return nil, errors.Wrapf(err, "failed to update last_seen for cluster %d", stableID)
 		}
 	}
 
@@ -175,8 +174,7 @@ func matchClusters(
 			continue
 		}
 		if err := store.DissolveCluster(oc.ClusterID, runID); err != nil {
-			logger.Warnw("Failed to dissolve unmatched cluster",
-				"cluster_id", oc.ClusterID, "run_id", runID, "error", err)
+			return nil, errors.Wrapf(err, "failed to dissolve cluster %d", oc.ClusterID)
 		}
 		result.events = append(result.events, storage.ClusterEvent{
 			RunID:     runID,
