@@ -4,6 +4,7 @@
  */
 
 import { typeDefinitionWindow } from './type-definition-window.ts';
+import { escapeHtml } from './html-utils.ts';
 
 // Search strategy constants — must match ats/storage/rich_search.go
 export const STRATEGY_SUBSTRING = 'substring';
@@ -192,24 +193,27 @@ export class SearchView {
      * Highlight the matching text in the excerpt
      */
     private highlightMatch(text: string, query: string, matchedWords?: string[]): string {
-        if (!query && !matchedWords) return text;
+        // Escape HTML entities first to prevent XSS from server-provided text
+        const safeText = escapeHtml(text);
+
+        if (!query && !matchedWords) return safeText;
 
         // If we have matched words from search, use those for highlighting
         if (matchedWords && matchedWords.length > 0) {
-            let highlightedText = text;
+            let highlightedText = safeText;
             // Sort by length descending to avoid replacing parts of longer words
             const sortedWords = [...matchedWords].sort((a, b) => b.length - a.length);
 
             for (const word of sortedWords) {
-                const regex = new RegExp(`\\b(${this.escapeRegex(word)})\\b`, 'gi');
+                const regex = new RegExp(`\\b(${this.escapeRegex(escapeHtml(word))})\\b`, 'gi');
                 highlightedText = highlightedText.replace(regex, '<mark class="search-highlight">$1</mark>');
             }
             return highlightedText;
         }
 
         // Fallback to exact query matching
-        const regex = new RegExp(`(${this.escapeRegex(query)})`, 'gi');
-        return text.replace(regex, '<mark class="search-highlight">$1</mark>');
+        const regex = new RegExp(`(${this.escapeRegex(escapeHtml(query))})`, 'gi');
+        return safeText.replace(regex, '<mark class="search-highlight">$1</mark>');
     }
 
     /**

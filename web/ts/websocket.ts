@@ -29,7 +29,11 @@ import { updateResultGlyphContent, type ExecutionResult } from './components/gly
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let reconnectAttempt = 0;
 let messageHandlers: MessageHandlers = {};
+
+const RECONNECT_BASE_MS = 3000;
+const RECONNECT_MAX_MS = 60000;
 
 /**
  * Find a result glyph melded below a parent glyph element.
@@ -361,6 +365,7 @@ export function connectWebSocket(handlers: MessageHandlers): void {
 
     ws.onopen = function(): void {
         log.info(SEG.WS, 'WebSocket connected');
+        reconnectAttempt = 0;
         updateConnectionStatus(true);
 
         // Request database stats on connect to populate DB indicator
@@ -368,17 +373,21 @@ export function connectWebSocket(handlers: MessageHandlers): void {
     };
 
     ws.onmessage = function(event: MessageEvent): void {
-        const data = JSON.parse(event.data) as WebSocketMessage;
+        try {
+            const data = JSON.parse(event.data) as WebSocketMessage;
 
-        // Debug: Log all WebSocket messages
-        log.debug(SEG.WS, 'Message:', data.type, data);
+            // Debug: Log all WebSocket messages
+            log.debug(SEG.WS, 'Message:', data.type, data);
 
-        // Route message to appropriate handler
-        const result = routeMessage(data, messageHandlers);
+            // Route message to appropriate handler
+            const result = routeMessage(data, messageHandlers);
 
-        // Warn if no handler was found
-        if (!result.handled) {
-            log.warn(SEG.WS, 'No handler for message type:', data.type);
+            // Warn if no handler was found
+            if (!result.handled) {
+                log.warn(SEG.WS, 'No handler for message type:', data.type);
+            }
+        } catch (err) {
+            log.error(SEG.WS, 'Failed to process WebSocket message:', err);
         }
     };
 
@@ -399,8 +408,13 @@ export function connectWebSocket(handlers: MessageHandlers): void {
         if (reconnectTimer) {
             clearTimeout(reconnectTimer);
         }
-        // Reconnect after 3 seconds
-        reconnectTimer = setTimeout(() => connectWebSocket(messageHandlers), 3000);
+        // Exponential backoff with jitter to avoid thundering herd
+        const backoff = Math.min(RECONNECT_BASE_MS * Math.pow(2, reconnectAttempt), RECONNECT_MAX_MS);
+        const jitter = backoff * 0.2 * Math.random();
+        const delay = Math.round(backoff + jitter);
+        reconnectAttempt++;
+        log.info(SEG.WS, `Reconnecting in ${delay}ms (attempt ${reconnectAttempt})`);
+        reconnectTimer = setTimeout(() => connectWebSocket(messageHandlers), delay);
     };
 }
 
