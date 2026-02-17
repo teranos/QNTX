@@ -45,7 +45,7 @@ import { VidStreamWindow } from './vidstream-window.js';
 import { toggleJobList } from './hixtory-panel.js';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
-type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'vidstream' | 'db' | 'ctp2';
+type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'vidstream' | 'db';
 
 /**
  * Get symbol for a command, with fallback for UI-only commands
@@ -78,8 +78,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeSymbolPalette();
     // Restore modality from persisted UI state
     setActiveModality(uiState.getActiveModality());
-    // Inject CTP2 SVG glyph
-    injectCTP2Glyph();
 });
 
 function initializeSymbolPalette(): void {
@@ -88,7 +86,7 @@ function initializeSymbolPalette(): void {
     // Populate symbols from generated sym.ts (single source of truth)
     cmdCells.forEach(cell => {
         const cmd = cell.getAttribute('data-cmd');
-        if (cmd && cmd !== 'ctp2') { // Skip ctp2, it uses SVG injection
+        if (cmd) {
             cell.textContent = getSymbol(cmd);
         }
     });
@@ -160,26 +158,6 @@ function initializeSymbolPalette(): void {
 }
 
 /**
- * Inject CTP2 SVG glyph into palette cell
- */
-async function injectCTP2Glyph(): Promise<void> {
-    try {
-        const { generateCTP2Glyph } = await import('../ctp2/glyph.js');
-        const cell = document.getElementById('ctp2-palette-cell');
-        if (cell) {
-            cell.innerHTML = generateCTP2Glyph();
-        }
-    } catch (error: unknown) {
-        log.warn(SEG.UI, '[Symbol Palette] Failed to load CTP2 glyph:', error);
-        // Fallback to text
-        const cell = document.getElementById('ctp2-palette-cell');
-        if (cell) {
-            cell.textContent = 'CTP2';
-        }
-    }
-}
-
-/**
  * Get initial tooltip text for a palette command
  * Will be updated with version info when system capabilities are received
  */
@@ -202,7 +180,6 @@ function getInitialTooltip(cmd: string): string {
         'py': 'py - Python editor',
         'plugins': '⚙ Plugins - domain extensions',
         'vidstream': '⮀ VidStream - video inference\n(version info loading...)',
-        'ctp2': 'CTP2',
     };
     return tooltips[cmd] || cmd;
 }
@@ -326,10 +303,6 @@ function handleSymbolClick(e: Event): void {
             log(SEG.VID, 'VidStream button clicked');
             showVidStreamWindow();
             break;
-        case 'ctp2':
-            // CTP2 - show CTP2 window
-            showCTP2Window();
-            break;
         default:
             log.warn(SEG.UI, `[Symbol Palette] Unknown command: ${cmd}`);
     }
@@ -418,27 +391,6 @@ function showPythonEditor(): void {
  */
 function showPluginPanel(): void {
     togglePluginPanel();
-}
-
-/**
- * Show CTP2 window
- */
-async function showCTP2Window(): Promise<void> {
-    // CTP2 is an optional/private module that may not exist in all environments
-    // Comment out the import to prevent build failures when the module is missing
-    log.info(SEG.UI, 'CTP2 module not available in this environment (optional/private feature)');
-    const statusEl = document.getElementById('status-message');
-    if (statusEl) {
-        statusEl.textContent = 'CTP2 module not available';
-        setTimeout(() => statusEl.textContent = '', 3000);
-    }
-
-    // Original implementation for when CTP2 is available:
-    // if (!ctp2WindowInstance) {
-    //     const module = await import('../ctp2/window.js');
-    //     ctp2WindowInstance = new module.CTP2Window();
-    // }
-    // ctp2WindowInstance.toggle();
 }
 
 /**
