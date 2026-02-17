@@ -75,8 +75,8 @@ The `server/pulse_*.go` handlers access data three ways:
 |---------|-------|------|
 | Store abstraction | `pulse_schedules.go`, `pulse_execution_handlers.go`, `pulse_execution_poller.go` | Clean |
 | Raw SQL on `task_logs` | ~~`pulse_task_stages.go`~~, ~~`pulse_task_logs.go`~~ | ✅ Fixed — now uses `TaskLogStore` |
-| Raw SQL on `pulse_executions` | `pulse_job_children.go` | Schema coupled |
-| Raw transaction in handler | `pulse_schedules.go:209-294` (force-trigger) | Worst: multi-step mutation with `__force_trigger__` sentinel |
+| Raw SQL on `pulse_executions` | ~~`pulse_job_children.go`~~ | ✅ Fixed — now uses `ExecutionStore.GetAsyncJobIDForScheduledJob` |
+| Raw transaction in handler | ~~`pulse_schedules.go:209-294`~~ | ✅ Fixed — now uses `Store.CreateForceTriggerExecution()` |
 
 ### `s.db` exposed to all handlers
 Every handler receives `*QNTXServer` which has a public `db` field. No compile-time enforcement that handlers use stores.
@@ -88,8 +88,8 @@ Some handlers call `s.newScheduleStore()`, others call `schedule.NewStore(s.db)`
 
 | Table | Store exists? | Gap |
 |-------|---------------|-----|
-| `scheduled_pulse_jobs` | ✅ `schedule.Store` | Force-trigger path bypasses it |
-| `pulse_executions` | ✅ `schedule.ExecutionStore` | `pulse_job_children.go` uses raw SQL to find `async_job_id` |
+| `scheduled_pulse_jobs` | ✅ `schedule.Store` | — |
+| `pulse_executions` | ✅ `schedule.ExecutionStore` | — |
 | `task_logs` | ✅ `schedule.TaskLogStore` | Write path (`embeddings_pulse.go`) still uses raw INSERT |
 | `async_ix_jobs` | ✅ `async.Queue` (store.go) | — |
 
@@ -98,11 +98,11 @@ Some handlers call `s.newScheduleStore()`, others call `schedule.NewStore(s.db)`
 ### Done
 1. ~~**Unify fetch pattern**~~ — ✅ #518: All modules use `apiFetch`
 2. ~~**Extract shared formatting**~~ — ✅ #518: `html-utils.ts` is canonical
-3. ~~**Create task_logs store**~~ — ✅ `schedule.TaskLogStore` replaces raw SQL in `pulse_task_stages.go` and `pulse_task_logs.go`
+3. ~~**Create task_logs store**~~ — ✅ #520: `schedule.TaskLogStore` replaces raw SQL in `pulse_task_stages.go` and `pulse_task_logs.go`
+4. ~~**Add `GetAsyncJobIDForScheduledJob` to ExecutionStore**~~ — ✅ #520: replaces raw SQL in `pulse_job_children.go`
+5. ~~**Extract force-trigger into `schedule.Store`**~~ — ✅ #524: `Store.CreateForceTriggerExecution()` replaces 85-line inline transaction
 
 ### Next steps
-4. **Add `GetAsyncJobIDForExecution` to ExecutionStore** — replaces raw SQL in `pulse_job_children.go` (~15 min)
-5. **Extract force-trigger into `schedule.Store`** — move 85-line transaction block from `pulse_schedules.go:209-294` into `Store.CreateForceTriggerExecution()` (~45 min)
 6. **Store as server field** — instantiate schedule/execution/task-log stores once, not per request
 7. **Validate handler at schedule creation** — check registry before persisting
 8. **Add jitter to poller** — `3s ± 500ms` prevents synchronized polling
