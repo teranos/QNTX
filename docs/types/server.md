@@ -12,7 +12,7 @@ This document shows Go type definitions from the codebase.
 
 ## ChildJobInfo {#childjobinfo}
 
-**Source**: [`server/pulse_types.go:70`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L70)
+**Source**: [`server/pulse_types.go:90`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L90)
 
 
 ```go
@@ -145,7 +145,7 @@ type GlyphFiredMessage struct {
 
 ## JobChildrenResponse {#jobchildrenresponse}
 
-**Source**: [`server/pulse_types.go:85`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L85)
+**Source**: [`server/pulse_types.go:105`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L105)
 
 
 ```go
@@ -157,13 +157,13 @@ type JobChildrenResponse struct {
 
 ## JobStagesResponse {#jobstagesresponse}
 
-**Source**: [`server/pulse_types.go:58`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L58)
+**Source**: [`server/pulse_types.go:70`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L70)
 
 
 ```go
 type JobStagesResponse struct {
 	JobID string `json:"job_id"`
-	Stages []schedule.StageInfo `json:"stages"`
+	Stages []StageInfo `json:"stages"`
 }
 ```
 
@@ -221,6 +221,20 @@ type ListExecutionsResponse struct {
 type ListScheduledJobsResponse struct {
 	Jobs []ScheduledJobResponse `json:"jobs"`
 	Count int `json:"count,omitempty"`
+}
+```
+
+## LogEntry {#logentry}
+
+**Source**: [`server/pulse_types.go:76`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L76)
+
+
+```go
+type LogEntry struct {
+	Timestamp string `json:"timestamp"`
+	Level string `json:"level"`
+	Message string `json:"message"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 ```
 
@@ -575,6 +589,18 @@ type ScheduledJobResponse struct {
 }
 ```
 
+## StageInfo {#stageinfo}
+
+**Source**: [`server/pulse_types.go:64`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L64)
+
+
+```go
+type StageInfo struct {
+	Stage string `json:"stage"`
+	Tasks []TaskInfo `json:"tasks"`
+}
+```
+
 ## StatsMessage {#statsmessage}
 
 **Source**: [`server/types.go:105`](https://github.com/teranos/QNTX/blob/main/server/types.go#L105)
@@ -607,15 +633,27 @@ type StorageWarningMessage struct {
 }
 ```
 
+## TaskInfo {#taskinfo}
+
+**Source**: [`server/pulse_types.go:58`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L58)
+
+
+```go
+type TaskInfo struct {
+	TaskID string `json:"task_id"`
+	LogCount int `json:"log_count,omitempty"`
+}
+```
+
 ## TaskLogsResponse {#tasklogsresponse}
 
-**Source**: [`server/pulse_types.go:64`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L64)
+**Source**: [`server/pulse_types.go:84`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L84)
 
 
 ```go
 type TaskLogsResponse struct {
 	TaskID string `json:"task_id"`
-	Logs []schedule.LogEntry `json:"logs"`
+	Logs []LogEntry `json:"logs"`
 }
 ```
 
