@@ -50,6 +50,11 @@ class CanvasSyncQueueImpl {
         return this.queue.length;
     }
 
+    /** Read-only snapshot of pending entries for diagnostics */
+    get entries(): readonly CanvasSyncEntry[] {
+        return this.queue;
+    }
+
     /** Subscribe to queue changes. Returns unsubscribe function. */
     onChange(cb: () => void): () => void {
         this.listeners.add(cb);

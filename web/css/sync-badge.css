@@ -7,8 +7,9 @@
     border-radius: var(--border-radius);
     font-size: var(--font-size-sm);
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', 'Source Code Pro', monospace;
-    color: var(--warning-color, #ffa502);
-    transition: all 0.2s;
+    color: var(--text-secondary, #999);
+    transition: color 0.2s;
     user-select: none;
     background: transparent;
+    cursor: default;
 }

@@ -54,7 +54,7 @@ describe('Sync Badge DOM', () => {
         const badge = document.getElementById('sync-badge');
         expect(badge).not.toBeNull();
         expect(badge!.hidden).toBe(true);
-        expect(badge!.className).toBe('sync-badge');
+        expect(badge!.classList.contains('sync-badge')).toBe(true);
     });
 
     test('Tim: badge shows count when items enqueued', () => {

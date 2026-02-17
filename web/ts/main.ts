@@ -182,6 +182,7 @@ async function init(): Promise<void> {
             const { loadCanvasState, mergeCanvasState, upsertCanvasGlyph, upsertComposition } = await import('./api/canvas.ts');
 
             // Merge backend state into local (skip if offline or slow)
+            let backendReachable = false;
             try {
                 const backendState = await Promise.race([
                     loadCanvasState(),
@@ -189,6 +190,7 @@ async function init(): Promise<void> {
                         setTimeout(() => reject(new Error('canvas state fetch timed out after 3s')), 3000)
                     ),
                 ]);
+                backendReachable = true;
                 const local = { glyphs: uiState.getCanvasGlyphs(), compositions: uiState.getCanvasCompositions() };
                 const merged = mergeCanvasState(local, backendState);
 
@@ -202,14 +204,18 @@ async function init(): Promise<void> {
                 log.warn(SEG.GLYPH, '[Init] Failed to load canvas state from backend, continuing with local state:', error);
             }
 
-            // Enqueue all local state for server sync (sync queue handles retry + dedup)
-            const localGlyphs = uiState.getCanvasGlyphs();
-            const localCompositions = uiState.getCanvasCompositions();
-            for (const glyph of localGlyphs) upsertCanvasGlyph(glyph);
-            for (const comp of localCompositions) upsertComposition(comp);
+            // Only enqueue local state when backend was unreachable — local may be ahead.
+            // When backend responded, merge already reconciled; re-enqueuing would just
+            // create phantom "pending" entries for items the server already has.
+            if (!backendReachable) {
+                const localGlyphs = uiState.getCanvasGlyphs();
+                const localCompositions = uiState.getCanvasCompositions();
+                for (const glyph of localGlyphs) upsertCanvasGlyph(glyph);
+                for (const comp of localCompositions) upsertComposition(comp);
 
-            if (localGlyphs.length > 0 || localCompositions.length > 0) {
-                log.info(SEG.GLYPH, `[Init] Enqueued ${localGlyphs.length} glyphs and ${localCompositions.length} compositions for sync`);
+                if (localGlyphs.length > 0 || localCompositions.length > 0) {
+                    log.info(SEG.GLYPH, `[Init] Backend unreachable, enqueued ${localGlyphs.length} glyphs and ${localCompositions.length} compositions for sync`);
+                }
             }
         })(),
     ]);
