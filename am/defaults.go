@@ -58,10 +58,11 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("embeddings.enabled", false) // Disabled by default - requires ONNX model
 	v.SetDefault("embeddings.path", "ats/embeddings/models/all-MiniLM-L6-v2/model.onnx")
 	v.SetDefault("embeddings.name", "all-MiniLM-L6-v2")
-	v.SetDefault("embeddings.cluster_threshold", 0.5)        // Minimum cosine similarity for cluster prediction
-	v.SetDefault("embeddings.recluster_interval_seconds", 0) // 0 = disabled (QNTX LAW: zero means zero)
-	v.SetDefault("embeddings.reproject_interval_seconds", 0) // 0 = disabled (QNTX LAW: zero means zero)
-	v.SetDefault("embeddings.min_cluster_size", 5)           // Minimum cluster size for HDBSCAN
+	v.SetDefault("embeddings.cluster_threshold", 0.5)               // Minimum cosine similarity for cluster prediction
+	v.SetDefault("embeddings.recluster_interval_seconds", 0)        // 0 = disabled (QNTX LAW: zero means zero)
+	v.SetDefault("embeddings.reproject_interval_seconds", 0)        // 0 = disabled (QNTX LAW: zero means zero)
+	v.SetDefault("embeddings.min_cluster_size", 5)                  // Minimum cluster size for HDBSCAN
+	v.SetDefault("embeddings.projection_methods", []string{"umap"}) // Dimensionality reduction methods
 
 	// Plugin configuration defaults
 	v.SetDefault("plugin.enabled", []string{}) // No plugins enabled by default (explicit opt-in via am.toml)

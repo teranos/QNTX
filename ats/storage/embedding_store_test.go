@@ -302,21 +302,21 @@ func TestEmbeddingStore_UpdateProjections(t *testing.T) {
 		require.NoError(t, store.Save(embeddings[i]))
 	}
 
-	// Update projections for all 3
+	// Update projections for all 3 with method "umap"
 	assignments := []ProjectionAssignment{
-		{ID: embeddings[0].ID, ProjectionX: 1.5, ProjectionY: -2.3},
-		{ID: embeddings[1].ID, ProjectionX: 0.0, ProjectionY: 4.7},
-		{ID: embeddings[2].ID, ProjectionX: -3.1, ProjectionY: 0.9},
+		{ID: embeddings[0].ID, X: 1.5, Y: -2.3},
+		{ID: embeddings[1].ID, X: 0.0, Y: 4.7},
+		{ID: embeddings[2].ID, X: -3.1, Y: 0.9},
 	}
-	err := store.UpdateProjections(assignments)
+	err := store.UpdateProjections("umap", assignments)
 	require.NoError(t, err)
 
-	// GetAllProjections should return all 3 with correct coordinates
-	projections, err := store.GetAllProjections()
+	// GetProjectionsByMethod should return all 3 with correct coordinates
+	projections, err := store.GetProjectionsByMethod("umap")
 	require.NoError(t, err)
 	assert.Len(t, projections, 3)
 
-	// Build a map for easy lookup (order is by ID, not insertion)
+	// Build a map for easy lookup
 	byID := make(map[string]ProjectionWithCluster)
 	for _, p := range projections {
 		byID[p.ID] = p
@@ -325,12 +325,69 @@ func TestEmbeddingStore_UpdateProjections(t *testing.T) {
 	for _, a := range assignments {
 		p, ok := byID[a.ID]
 		require.True(t, ok, "projection missing for %s", a.ID)
-		assert.Equal(t, a.ProjectionX, p.ProjectionX)
-		assert.Equal(t, a.ProjectionY, p.ProjectionY)
+		assert.Equal(t, a.X, p.X)
+		assert.Equal(t, a.Y, p.Y)
+		assert.Equal(t, "umap", p.Method)
 	}
 }
 
-func TestEmbeddingStore_GetAllProjections_ExcludesUnprojected(t *testing.T) {
+func TestEmbeddingStore_MultiMethodProjections(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zap.NewNop()
+	store := NewEmbeddingStore(db, logger)
+
+	// Save 2 embeddings
+	embeddings := make([]*EmbeddingModel, 2)
+	for i := range embeddings {
+		embeddings[i] = &EmbeddingModel{
+			SourceType: "attestation",
+			SourceID:   generateTestID(),
+			Text:       fmt.Sprintf("multi-method test %d", i),
+			Embedding:  createTestEmbedding(384),
+			Model:      "all-MiniLM-L6-v2",
+			Dimensions: 384,
+		}
+		require.NoError(t, store.Save(embeddings[i]))
+	}
+
+	// Store projections for umap and pca
+	umapAssignments := []ProjectionAssignment{
+		{ID: embeddings[0].ID, X: 1.0, Y: 2.0},
+		{ID: embeddings[1].ID, X: 3.0, Y: 4.0},
+	}
+	pcaAssignments := []ProjectionAssignment{
+		{ID: embeddings[0].ID, X: -1.0, Y: -2.0},
+		{ID: embeddings[1].ID, X: -3.0, Y: -4.0},
+	}
+
+	require.NoError(t, store.UpdateProjections("umap", umapAssignments))
+	require.NoError(t, store.UpdateProjections("pca", pcaAssignments))
+
+	// Each method returns its own coordinates
+	umapProj, err := store.GetProjectionsByMethod("umap")
+	require.NoError(t, err)
+	assert.Len(t, umapProj, 2)
+	umapXs := []float64{umapProj[0].X, umapProj[1].X}
+	assert.ElementsMatch(t, []float64{1.0, 3.0}, umapXs)
+
+	pcaProj, err := store.GetProjectionsByMethod("pca")
+	require.NoError(t, err)
+	assert.Len(t, pcaProj, 2)
+	pcaXs := []float64{pcaProj[0].X, pcaProj[1].X}
+	assert.ElementsMatch(t, []float64{-1.0, -3.0}, pcaXs)
+
+	// Empty method returns nothing
+	tsneProj, err := store.GetProjectionsByMethod("tsne")
+	require.NoError(t, err)
+	assert.Empty(t, tsneProj)
+
+	// GetAllProjectionMethods returns stored methods
+	methods, err := store.GetAllProjectionMethods()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"pca", "umap"}, methods) // alphabetical
+}
+
+func TestEmbeddingStore_GetProjectionsByMethod_ExcludesUnprojected(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
 	store := NewEmbeddingStore(db, logger)
@@ -350,13 +407,13 @@ func TestEmbeddingStore_GetAllProjections_ExcludesUnprojected(t *testing.T) {
 	}
 
 	// Project only the first 2
-	err := store.UpdateProjections([]ProjectionAssignment{
-		{ID: embeddings[0].ID, ProjectionX: 1.0, ProjectionY: 2.0},
-		{ID: embeddings[1].ID, ProjectionX: 3.0, ProjectionY: 4.0},
+	err := store.UpdateProjections("umap", []ProjectionAssignment{
+		{ID: embeddings[0].ID, X: 1.0, Y: 2.0},
+		{ID: embeddings[1].ID, X: 3.0, Y: 4.0},
 	})
 	require.NoError(t, err)
 
-	projections, err := store.GetAllProjections()
+	projections, err := store.GetProjectionsByMethod("umap")
 	require.NoError(t, err)
 	assert.Len(t, projections, 2)
 
@@ -371,11 +428,11 @@ func TestEmbeddingStore_UpdateProjections_Empty(t *testing.T) {
 	logger := zap.NewNop()
 	store := NewEmbeddingStore(db, logger)
 
-	err := store.UpdateProjections([]ProjectionAssignment{})
+	err := store.UpdateProjections("umap", []ProjectionAssignment{})
 	require.NoError(t, err)
 
 	// No projections should exist
-	projections, err := store.GetAllProjections()
+	projections, err := store.GetProjectionsByMethod("umap")
 	require.NoError(t, err)
 	assert.Empty(t, projections)
 }
@@ -396,8 +453,8 @@ func TestEmbeddingStore_ProjectionRoundTrip(t *testing.T) {
 	require.NoError(t, store.Save(embedding))
 
 	// Project it
-	err := store.UpdateProjections([]ProjectionAssignment{
-		{ID: embedding.ID, ProjectionX: -7.77, ProjectionY: 3.14},
+	err := store.UpdateProjections("umap", []ProjectionAssignment{
+		{ID: embedding.ID, X: -7.77, Y: 3.14},
 	})
 	require.NoError(t, err)
 
@@ -407,12 +464,13 @@ func TestEmbeddingStore_ProjectionRoundTrip(t *testing.T) {
 	require.NotNil(t, retrieved)
 	assert.Equal(t, embedding.Text, retrieved.Text)
 
-	// Retrieve projection via GetAllProjections — coordinates survive full cycle
-	projections, err := store.GetAllProjections()
+	// Retrieve projection via GetProjectionsByMethod — coordinates survive full cycle
+	projections, err := store.GetProjectionsByMethod("umap")
 	require.NoError(t, err)
 	require.Len(t, projections, 1)
 	assert.Equal(t, embedding.ID, projections[0].ID)
 	assert.Equal(t, embedding.SourceID, projections[0].SourceID)
-	assert.Equal(t, -7.77, projections[0].ProjectionX)
-	assert.Equal(t, 3.14, projections[0].ProjectionY)
+	assert.Equal(t, "umap", projections[0].Method)
+	assert.Equal(t, -7.77, projections[0].X)
+	assert.Equal(t, 3.14, projections[0].Y)
 }
