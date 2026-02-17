@@ -776,6 +776,15 @@ func (s *QNTXServer) processBroadcastRequest(req *broadcastRequest) {
 
 // sendMessageToClients sends a generic message to all clients (or specific client if clientID set).
 // Only called from broadcast worker - no concurrent access to client channels.
+//
+// When a client's message channel is full, the message is dropped rather than
+// disconnecting the client. This prevents burst traffic (e.g. compound watcher
+// historical queries broadcasting 50+ matches) from killing slow connections.
+//
+// TODO: Instead of silently dropping messages, implement degraded-mode delivery
+// that batches/summarizes updates for bandwidth-constrained clients. The goal is
+// for QNTX to remain functional even on extremely low-bandwidth links (GPRS-class).
+// See the degraded-mode branch for the broader connectivity resilience work.
 func (s *QNTXServer) sendMessageToClients(msg interface{}, targetClientID string) {
 	s.mu.RLock()
 	clients := make([]*Client, 0, len(s.clients))
@@ -792,8 +801,8 @@ func (s *QNTXServer) sendMessageToClients(msg interface{}, targetClientID string
 		case client.sendMsg <- msg:
 			sent++
 		default:
-			// Channel full - client can't keep up, will be removed
-			s.removeSlowClient(client)
+			s.logger.Debugw("Message dropped for slow client (channel full)",
+				"client_id", client.id)
 		}
 	}
 }
