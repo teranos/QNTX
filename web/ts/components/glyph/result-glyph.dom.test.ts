@@ -55,11 +55,12 @@ describe('ResultGlyph', () => {
             expect(element.dataset.glyphId).toBe('result-test-123');
         });
 
-        test('has header with duration', () => {
+        test('has header with copy button', () => {
             const element = createResultGlyph(glyph, result);
             const header = element.querySelector('.result-glyph-header');
             expect(header).not.toBeNull();
-            expect(header?.textContent).toContain('42ms');
+            const copyBtn = element.querySelector('button[title="Copy to clipboard"]');
+            expect(copyBtn).not.toBeNull();
         });
 
         test('has close button', () => {
