@@ -57,6 +57,19 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 		fmt.Sprintf("Found %d eligible clusters", len(eligible)),
 		fmt.Sprintf(`{"eligible":%d,"min_size":%d,"cooldown_days":%d}`, len(eligible), minSize, cooldownDays))
 
+	aiProvider := provider.DetermineProvider(h.cfg, "")
+	modelOverride := embCfg.ClusterLabelModel
+	asStore := storage.NewSQLStore(h.db, h.logger)
+
+	// Resolve model name once — used for attestation metadata
+	modelUsed := modelOverride
+	if modelUsed == "" {
+		modelUsed = h.cfg.OpenRouter.Model
+		if h.cfg.LocalInference.Enabled {
+			modelUsed = h.cfg.LocalInference.Model
+		}
+	}
+
 	labeled := 0
 	for _, cluster := range eligible {
 		if ctx.Err() != nil {
@@ -80,9 +93,6 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 			fmt.Fprintf(&userPrompt, "%d. %s\n", i+1, text)
 		}
 
-		// Create AI client
-		aiProvider := provider.DetermineProvider(h.cfg, "")
-		modelOverride := embCfg.ClusterLabelModel
 		client := provider.NewAIClientForProviderWithModel(
 			aiProvider, h.cfg, modelOverride, h.db, 0,
 			"cluster-labeling", "cluster", fmt.Sprintf("%d", cluster.ID),
@@ -120,17 +130,7 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 			continue
 		}
 
-		// Determine which model was actually used
-		modelUsed := modelOverride
-		if modelUsed == "" {
-			modelUsed = h.cfg.OpenRouter.Model
-			if h.cfg.LocalInference.Enabled {
-				modelUsed = h.cfg.LocalInference.Model
-			}
-		}
-
-		// Create attestation for the labeling event
-		h.createLabelAttestation(cluster.ID, label, modelUsed, len(samples), cluster.Members)
+		h.createLabelAttestation(asStore, cluster.ID, label, modelUsed, len(samples), cluster.Members)
 
 		labeled++
 		labelJSON, _ := json.Marshal(label)
@@ -147,7 +147,7 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 	return nil
 }
 
-func (h *ClusterLabelHandler) createLabelAttestation(clusterID int, label, model string, sampleSize, nMembers int) {
+func (h *ClusterLabelHandler) createLabelAttestation(asStore *storage.SQLStore, clusterID int, label, model string, sampleSize, nMembers int) {
 	subject := fmt.Sprintf("cluster:%d", clusterID)
 	asid, err := vanity.GenerateASID(subject, "labeled", "embeddings", "qntx@embeddings")
 	if err != nil {
@@ -174,8 +174,7 @@ func (h *ClusterLabelHandler) createLabelAttestation(clusterID int, label, model
 		CreatedAt: now,
 	}
 
-	store := storage.NewSQLStore(h.db, h.logger)
-	if err := store.CreateAttestation(as); err != nil {
+	if err := asStore.CreateAttestation(as); err != nil {
 		h.logger.Warnw("Failed to create label attestation",
 			"cluster_id", clusterID, "asid", asid, "error", err)
 	} else {
