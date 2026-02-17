@@ -21,7 +21,7 @@ import type { PanelState } from '../../types/core';
 import type { CanvasGlyph, CompositionEdge, Composition } from '../generated/proto/glyph/proto/canvas';
 import { getItem, setItem, removeItem } from './storage';
 import { log, SEG } from '../logger';
-import { upsertCanvasGlyph as apiUpsertGlyph, deleteCanvasGlyph as apiDeleteGlyph } from '../api/canvas';
+import { upsertCanvasGlyph as apiUpsertGlyph, deleteCanvasGlyph as apiDeleteGlyph, addMinimizedWindow as apiAddMinimized, deleteMinimizedWindow as apiDeleteMinimized } from '../api/canvas';
 
 // ============================================================================
 // State Types
@@ -397,6 +397,7 @@ class UIState {
         if (this.state.minimizedWindows.includes(id)) return;
         const updated = [...this.state.minimizedWindows, id];
         this.update('minimizedWindows', updated);
+        apiAddMinimized(id);
     }
 
     /**
@@ -405,6 +406,14 @@ class UIState {
     removeMinimizedWindow(id: string): void {
         const updated = this.state.minimizedWindows.filter(wid => wid !== id);
         this.update('minimizedWindows', updated);
+        apiDeleteMinimized(id);
+    }
+
+    /**
+     * Set minimized windows (full replace, no sync — used for page-load merge)
+     */
+    setMinimizedWindows(ids: string[]): void {
+        this.update('minimizedWindows', ids);
     }
 
     /**

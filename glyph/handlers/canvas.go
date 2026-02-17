@@ -253,6 +253,78 @@ func (h *CanvasHandler) handleDeleteComposition(w http.ResponseWriter, r *http.R
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// HandleMinimizedWindows handles minimized window CRUD operations
+// Routes:
+//
+//	GET    /api/canvas/minimized-windows       - List all minimized windows
+//	POST   /api/canvas/minimized-windows       - Add a minimized window
+//	DELETE /api/canvas/minimized-windows/{id}  - Remove a minimized window
+func (h *CanvasHandler) HandleMinimizedWindows(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/canvas/minimized-windows")
+	path = strings.TrimPrefix(path, "/")
+	glyphID := path
+
+	switch r.Method {
+	case http.MethodGet:
+		h.handleListMinimizedWindows(w, r)
+	case http.MethodPost:
+		h.handleAddMinimizedWindow(w, r)
+	case http.MethodDelete:
+		if glyphID == "" {
+			h.writeError(w, errors.New("glyph ID required for delete"), http.StatusBadRequest)
+			return
+		}
+		h.handleRemoveMinimizedWindow(w, r, glyphID)
+	default:
+		h.writeError(w, errors.New("method not allowed"), http.StatusMethodNotAllowed)
+	}
+}
+
+func (h *CanvasHandler) handleListMinimizedWindows(w http.ResponseWriter, r *http.Request) {
+	windows, err := h.store.ListMinimizedWindows(r.Context())
+	if err != nil {
+		h.writeError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	h.writeJSON(w, windows)
+}
+
+func (h *CanvasHandler) handleAddMinimizedWindow(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		GlyphID string `json:"glyph_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		h.writeError(w, errors.Wrap(err, "invalid request body"), http.StatusBadRequest)
+		return
+	}
+
+	if body.GlyphID == "" {
+		h.writeError(w, errors.New("glyph_id is required"), http.StatusBadRequest)
+		return
+	}
+
+	if err := h.store.AddMinimizedWindow(r.Context(), body.GlyphID); err != nil {
+		h.writeError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (h *CanvasHandler) handleRemoveMinimizedWindow(w http.ResponseWriter, r *http.Request, glyphID string) {
+	if err := h.store.RemoveMinimizedWindow(r.Context(), glyphID); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			h.writeError(w, err, http.StatusNotFound)
+		} else {
+			h.writeError(w, err, http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // === Subscription compilation ===
 
 // compileSubscriptions converts a composition's right-direction edges into watcher subscriptions.

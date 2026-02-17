@@ -78,10 +78,6 @@
     border-top-left-radius: 4px;
 }
 
-/* Hide resize handle when glyph is in window manifestation */
-[data-window-state="true"] .glyph-resize-handle {
-    display: none;
-}
 
 /* Smaller variant for note glyphs (sits over folded corner) */
 .glyph-resize-handle--small {

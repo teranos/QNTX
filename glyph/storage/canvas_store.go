@@ -409,3 +409,68 @@ func (s *CanvasStore) DeleteComposition(ctx context.Context, id string) error {
 
 	return nil
 }
+
+// === Minimized window operations ===
+
+// MinimizedWindow represents a glyph minimized to the tray
+type MinimizedWindow struct {
+	GlyphID   string    `json:"glyph_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// AddMinimizedWindow records a glyph as minimized
+func (s *CanvasStore) AddMinimizedWindow(ctx context.Context, glyphID string) error {
+	query := `INSERT OR IGNORE INTO minimized_windows (glyph_id) VALUES (?)`
+	_, err := s.db.ExecContext(ctx, query, glyphID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to add minimized window %s", glyphID)
+	}
+	return nil
+}
+
+// ListMinimizedWindows returns all minimized window glyph IDs
+func (s *CanvasStore) ListMinimizedWindows(ctx context.Context) ([]*MinimizedWindow, error) {
+	query := `SELECT glyph_id, created_at FROM minimized_windows ORDER BY created_at ASC`
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list minimized windows")
+	}
+	defer rows.Close()
+
+	var windows []*MinimizedWindow
+	for rows.Next() {
+		var w MinimizedWindow
+		var createdAt string
+		if err := rows.Scan(&w.GlyphID, &createdAt); err != nil {
+			return nil, errors.Wrap(err, "failed to scan minimized window")
+		}
+		var parseErr error
+		w.CreatedAt, parseErr = time.Parse(time.RFC3339Nano, createdAt)
+		if parseErr != nil {
+			// Fallback: SQLite default format uses fractional seconds without timezone
+			w.CreatedAt, parseErr = time.Parse("2006-01-02T15:04:05.000", createdAt)
+			if parseErr != nil {
+				return nil, errors.Wrapf(parseErr, "invalid created_at timestamp for minimized window %s: %s", w.GlyphID, createdAt)
+			}
+		}
+		windows = append(windows, &w)
+	}
+
+	return windows, nil
+}
+
+// RemoveMinimizedWindow removes a minimized window record
+func (s *CanvasStore) RemoveMinimizedWindow(ctx context.Context, glyphID string) error {
+	query := `DELETE FROM minimized_windows WHERE glyph_id = ?`
+	result, err := s.db.ExecContext(ctx, query, glyphID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to remove minimized window %s", glyphID)
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return errors.Newf("minimized window %s not found", glyphID)
+	}
+
+	return nil
+}

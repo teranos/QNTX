@@ -522,6 +522,105 @@ func TestCanvasStore_Timestamps(t *testing.T) {
 	}
 }
 
+// === Minimized window tests ===
+
+func TestCanvasStore_AddMinimizedWindow(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := NewCanvasStore(db)
+	ctx := context.Background()
+
+	err := store.AddMinimizedWindow(ctx, "glyph-1")
+	if err != nil {
+		t.Fatalf("AddMinimizedWindow failed: %v", err)
+	}
+
+	windows, err := store.ListMinimizedWindows(ctx)
+	if err != nil {
+		t.Fatalf("ListMinimizedWindows failed: %v", err)
+	}
+
+	if len(windows) != 1 {
+		t.Fatalf("Expected 1 minimized window, got %d", len(windows))
+	}
+	if windows[0].GlyphID != "glyph-1" {
+		t.Errorf("GlyphID mismatch: got %s, want glyph-1", windows[0].GlyphID)
+	}
+}
+
+func TestCanvasStore_AddMinimizedWindow_Idempotent(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := NewCanvasStore(db)
+	ctx := context.Background()
+
+	// Add same ID twice — INSERT OR IGNORE should succeed silently
+	if err := store.AddMinimizedWindow(ctx, "glyph-1"); err != nil {
+		t.Fatalf("First AddMinimizedWindow failed: %v", err)
+	}
+	if err := store.AddMinimizedWindow(ctx, "glyph-1"); err != nil {
+		t.Fatalf("Second AddMinimizedWindow failed: %v", err)
+	}
+
+	windows, err := store.ListMinimizedWindows(ctx)
+	if err != nil {
+		t.Fatalf("ListMinimizedWindows failed: %v", err)
+	}
+
+	if len(windows) != 1 {
+		t.Errorf("Expected 1 minimized window (idempotent), got %d", len(windows))
+	}
+}
+
+func TestCanvasStore_ListMinimizedWindows_Empty(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := NewCanvasStore(db)
+	ctx := context.Background()
+
+	windows, err := store.ListMinimizedWindows(ctx)
+	if err != nil {
+		t.Fatalf("ListMinimizedWindows failed: %v", err)
+	}
+
+	if len(windows) != 0 {
+		t.Errorf("Expected 0 minimized windows, got %d", len(windows))
+	}
+}
+
+func TestCanvasStore_RemoveMinimizedWindow(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := NewCanvasStore(db)
+	ctx := context.Background()
+
+	if err := store.AddMinimizedWindow(ctx, "glyph-1"); err != nil {
+		t.Fatalf("AddMinimizedWindow failed: %v", err)
+	}
+
+	if err := store.RemoveMinimizedWindow(ctx, "glyph-1"); err != nil {
+		t.Fatalf("RemoveMinimizedWindow failed: %v", err)
+	}
+
+	windows, err := store.ListMinimizedWindows(ctx)
+	if err != nil {
+		t.Fatalf("ListMinimizedWindows failed: %v", err)
+	}
+	if len(windows) != 0 {
+		t.Errorf("Expected 0 minimized windows after removal, got %d", len(windows))
+	}
+}
+
+func TestCanvasStore_RemoveMinimizedWindow_NotFound(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := NewCanvasStore(db)
+	ctx := context.Background()
+
+	err := store.RemoveMinimizedWindow(ctx, "nonexistent")
+	if err == nil {
+		t.Error("Expected error when removing nonexistent minimized window, got nil")
+	}
+	if err != nil && !strings.Contains(err.Error(), "not found") {
+		t.Errorf("Expected 'not found' error, got: %v", err)
+	}
+}
+
 func TestCanvasStore_ForeignKeyConstraints(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := NewCanvasStore(db)
