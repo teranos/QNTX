@@ -11,6 +11,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	id "github.com/teranos/vanity-id"
 )
 
 // HandleCreateAttestation accepts a browser-created attestation and stores it server-side.
@@ -36,10 +37,6 @@ func (s *QNTXServer) HandleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Validate required fields
-	if req.ID == "" {
-		writeError(w, http.StatusBadRequest, "attestation id is required")
-		return
-	}
 	if len(req.Subjects) == 0 {
 		writeError(w, http.StatusBadRequest, "subjects must not be empty")
 		return
@@ -49,8 +46,30 @@ func (s *QNTXServer) HandleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Idempotent: if already exists, return success
 	store := storage.NewBoundedStore(s.db, s.logger.Named("attestation-sync"))
+
+	// Auto-generate vanity ASID when client omits ID
+	if req.ID == "" {
+		subject := req.Subjects[0]
+		predicate := req.Predicates[0]
+		context := "_"
+		if len(req.Contexts) > 0 {
+			context = req.Contexts[0]
+		}
+		checkExists := func(asid string) bool {
+			return store.AttestationExists(asid)
+		}
+		generated, err := id.GenerateASIDWithVanityAndRetry(subject, predicate, context, "", checkExists)
+		if err != nil {
+			writeWrappedError(w, s.logger, err,
+				fmt.Sprintf("failed to generate ASID for subjects %v", req.Subjects),
+				http.StatusInternalServerError)
+			return
+		}
+		req.ID = generated
+	}
+
+	// Idempotent: if already exists, return success
 	if store.AttestationExists(req.ID) {
 		writeJSON(w, http.StatusOK, map[string]string{"id": req.ID, "status": "exists"})
 		return
