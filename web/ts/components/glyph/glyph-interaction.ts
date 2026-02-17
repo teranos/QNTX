@@ -21,7 +21,7 @@ import {
     PROXIMITY_THRESHOLD,
     MELD_THRESHOLD
 } from './meld/meld-system';
-import { getMeldOptions, getGlyphClass } from './meld/meldability';
+import { getMeldOptions, selectPreferredMeldOption, getGlyphClass } from './meld/meldability';
 import { isGlyphSelected, getSelectedGlyphIds } from './canvas/selection';
 import { getTransform } from './canvas/canvas-pan.js';
 import { addComposition, findCompositionByGlyph } from '../../state/compositions';
@@ -294,8 +294,8 @@ export function makeDraggable(
 
                     if (existingComp && standaloneClass) {
                         const options = getMeldOptions(standaloneClass, compositionElement, existingComp.edges);
-                        if (options.length > 0) {
-                            const option = options[0];
+                        const option = selectPreferredMeldOption(options, anchorId);
+                        if (option) {
                             extendComposition(compositionElement, standaloneElement, standaloneId, option.glyphId, option.direction, option.incomingRole);
 
                             const updatedId = compositionElement.getAttribute('data-glyph-id') || '';
