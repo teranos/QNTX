@@ -64,3 +64,23 @@ export interface Execution {
   updated_at: string;
 }
 
+export interface LogEntry {
+  timestamp: string;
+  level: string;
+  message: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface StageInfo {
+  stage: string;
+  tasks: TaskInfo[];
+}
+
+export interface TaskInfo {
+  task_id: string;
+  log_count?: number;
+}
+
+export interface TaskLogStore {
+}
+
