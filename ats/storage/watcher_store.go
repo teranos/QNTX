@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
@@ -34,6 +35,11 @@ type Watcher struct {
 	SemanticQuery     string  `json:"semantic_query,omitempty"`      // Natural language query for embedding comparison
 	SemanticThreshold float32 `json:"semantic_threshold,omitempty"`  // Minimum similarity score (0-1) to fire
 	SemanticClusterID *int    `json:"semantic_cluster_id,omitempty"` // Cluster scope (nil = all clusters)
+
+	// Upstream semantic query — set when SE₁ → SE₂ meld creates a compound watcher.
+	// Both upstream and downstream queries must pass for a match (intersection).
+	UpstreamSemanticQuery     string  `json:"upstream_semantic_query,omitempty"`
+	UpstreamSemanticThreshold float32 `json:"upstream_semantic_threshold,omitempty"`
 
 	// Action - what to do when matched
 	ActionType ActionType `json:"action_type"`
@@ -120,13 +126,15 @@ func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
 			id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
 			semantic_query, semantic_threshold, semantic_cluster_id,
+			upstream_semantic_query, upstream_semantic_threshold,
 			action_type, action_data,
 			max_fires_per_minute, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		w.ID, w.Name,
 		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd, w.AxQuery,
 		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold), w.SemanticClusterID,
+		nullIfEmpty(w.UpstreamSemanticQuery), nullIfZero(w.UpstreamSemanticThreshold),
 		w.ActionType, w.ActionData,
 		w.MaxFiresPerMinute, w.Enabled,
 		w.CreatedAt.Format(time.RFC3339Nano), w.UpdatedAt.Format(time.RFC3339Nano), nil, 0, 0, nil,
@@ -189,13 +197,15 @@ func (ws *WatcherStore) CreateOrReplace(ctx context.Context, w *Watcher) error {
 			id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
 			semantic_query, semantic_threshold, semantic_cluster_id,
+			upstream_semantic_query, upstream_semantic_threshold,
 			action_type, action_data,
 			max_fires_per_minute, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		w.ID, w.Name,
 		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd, w.AxQuery,
 		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold), w.SemanticClusterID,
+		nullIfEmpty(w.UpstreamSemanticQuery), nullIfZero(w.UpstreamSemanticThreshold),
 		w.ActionType, w.ActionData,
 		w.MaxFiresPerMinute, w.Enabled,
 		w.CreatedAt.Format(time.RFC3339Nano), w.UpdatedAt.Format(time.RFC3339Nano), nil, 0, 0, nil,
@@ -212,6 +222,7 @@ func (ws *WatcherStore) Get(ctx context.Context, id string) (*Watcher, error) {
 		SELECT id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
 			semantic_query, semantic_threshold, semantic_cluster_id,
+			upstream_semantic_query, upstream_semantic_threshold,
 			action_type, action_data,
 			max_fires_per_minute, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
@@ -226,6 +237,7 @@ func (ws *WatcherStore) List(ctx context.Context, enabledOnly bool) ([]*Watcher,
 		SELECT id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
 			semantic_query, semantic_threshold, semantic_cluster_id,
+			upstream_semantic_query, upstream_semantic_threshold,
 			action_type, action_data,
 			max_fires_per_minute, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
@@ -299,6 +311,7 @@ func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
 			name = ?,
 			subjects = ?, predicates = ?, contexts = ?, actors = ?, time_start = ?, time_end = ?, ax_query = ?,
 			semantic_query = ?, semantic_threshold = ?, semantic_cluster_id = ?,
+			upstream_semantic_query = ?, upstream_semantic_threshold = ?,
 			action_type = ?, action_data = ?,
 			max_fires_per_minute = ?, enabled = ?,
 			fire_count = ?, error_count = ?, last_error = ?, last_fired_at = ?,
@@ -307,6 +320,7 @@ func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
 		w.Name,
 		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd, w.AxQuery,
 		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold), w.SemanticClusterID,
+		nullIfEmpty(w.UpstreamSemanticQuery), nullIfZero(w.UpstreamSemanticThreshold),
 		w.ActionType, w.ActionData,
 		w.MaxFiresPerMinute, w.Enabled,
 		w.FireCount, w.ErrorCount, w.LastError, lastFiredAt,
@@ -392,6 +406,8 @@ func scanWatcherFields(scan func(dest ...interface{}) error) (*Watcher, error) {
 	var semanticQuery sql.NullString
 	var semanticThreshold sql.NullFloat64
 	var semanticClusterID sql.NullInt64
+	var upstreamSemanticQuery sql.NullString
+	var upstreamSemanticThreshold sql.NullFloat64
 	var createdAt, updatedAt string
 	var lastFiredAt sql.NullString
 	var lastError sql.NullString
@@ -401,6 +417,7 @@ func scanWatcherFields(scan func(dest ...interface{}) error) (*Watcher, error) {
 		&w.ID, &w.Name,
 		&subjectsJSON, &predicatesJSON, &contextsJSON, &actorsJSON, &timeStart, &timeEnd, &axQuery,
 		&semanticQuery, &semanticThreshold, &semanticClusterID,
+		&upstreamSemanticQuery, &upstreamSemanticThreshold,
 		&actionType, &w.ActionData,
 		&w.MaxFiresPerMinute, &w.Enabled,
 		&createdAt, &updatedAt, &lastFiredAt, &w.FireCount, &w.ErrorCount, &lastError,
@@ -463,6 +480,12 @@ func scanWatcherFields(scan func(dest ...interface{}) error) (*Watcher, error) {
 		v := int(semanticClusterID.Int64)
 		w.SemanticClusterID = &v
 	}
+	if upstreamSemanticQuery.Valid {
+		w.UpstreamSemanticQuery = upstreamSemanticQuery.String
+	}
+	if upstreamSemanticThreshold.Valid {
+		w.UpstreamSemanticThreshold = float32(upstreamSemanticThreshold.Float64)
+	}
 
 	w.CreatedAt, err = time.Parse(time.RFC3339Nano, createdAt)
 	if err != nil {
@@ -486,6 +509,41 @@ func scanWatcherFields(scan func(dest ...interface{}) error) (*Watcher, error) {
 	}
 
 	return &w, nil
+}
+
+// FindCompoundWatchersForTarget finds SE→SE compound meld-edge watchers
+// that target a specific glyph ID. Returns watchers with UpstreamSemanticQuery
+// set whose action_data references the target glyph. Used to detect when a
+// standalone SE watcher should stay suppressed because a compound watcher
+// replaces it.
+func (ws *WatcherStore) FindCompoundWatchersForTarget(ctx context.Context, targetGlyphID string) ([]*Watcher, error) {
+	pattern := fmt.Sprintf(`%%"target_glyph_id":"%s"%%`, targetGlyphID)
+	rows, err := ws.db.QueryContext(ctx, `
+		SELECT id, name,
+			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
+			semantic_query, semantic_threshold, semantic_cluster_id,
+			upstream_semantic_query, upstream_semantic_threshold,
+			action_type, action_data,
+			max_fires_per_minute, enabled,
+			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
+		FROM watchers
+		WHERE id LIKE 'meld-edge-%'
+		AND upstream_semantic_query IS NOT NULL
+		AND action_data LIKE ?`, pattern)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to find compound watchers for target %s", targetGlyphID)
+	}
+	defer rows.Close()
+
+	var watchers []*Watcher
+	for rows.Next() {
+		w, err := ws.scanWatcherRows(rows)
+		if err != nil {
+			return nil, err
+		}
+		watchers = append(watchers, w)
+	}
+	return watchers, rows.Err()
 }
 
 // nullIfZero returns nil for zero values, allowing SQL NULL storage.
