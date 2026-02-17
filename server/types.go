@@ -241,11 +241,12 @@ type PluginHealthMessage struct {
 // WatcherMatchMessage represents a watcher match event
 // Sent when an attestation matches a watcher's filter
 type WatcherMatchMessage struct {
-	Type        string      `json:"type"`            // "watcher_match"
-	WatcherID   string      `json:"watcher_id"`      // ID of watcher that matched
-	Attestation interface{} `json:"attestation"`     // The matching attestation (types.As)
-	Score       float32     `json:"score,omitempty"` // Semantic similarity score (0-1), 0 for structural matches
-	Timestamp   int64       `json:"timestamp"`       // Unix timestamp
+	Type          string      `json:"type"`                      // "watcher_match"
+	WatcherID     string      `json:"watcher_id"`                // ID of watcher that matched
+	Attestation   interface{} `json:"attestation"`               // The matching attestation (types.As)
+	Score         float32     `json:"score,omitempty"`           // Semantic similarity score (0-1), 0 for structural matches
+	TargetGlyphID string      `json:"target_glyph_id,omitempty"` // Target glyph for meld-edge routed matches
+	Timestamp     int64       `json:"timestamp"`                 // Unix timestamp
 }
 
 // GlyphFiredMessage wraps proto.GlyphFired with WebSocket type discriminator
