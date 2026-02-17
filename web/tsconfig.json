@@ -41,7 +41,6 @@
     "node_modules",
     "ts/vendor",
     "**/*.test.ts",
-    "ctp2/**/*",
     "ctpm1/**/*"
   ]
 }
