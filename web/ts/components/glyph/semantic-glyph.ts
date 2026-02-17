@@ -161,19 +161,38 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
                 return;
             }
 
-            if (info.cluster_info?.clusters) {
-                const clusters = info.cluster_info.clusters as Record<string, number>;
-                for (const [id, count] of Object.entries(clusters)) {
-                    if (parseInt(id) < 0) continue; // Skip noise (-1)
-                    const opt = document.createElement('option');
-                    opt.value = id;
-                    opt.textContent = `#${id} (${count})`;
-                    clusterSelect.appendChild(opt);
-                }
-                if (currentClusterId !== null) {
-                    clusterSelect.value = String(currentClusterId);
-                }
-            }
+            // Fetch full cluster details (with labels) for the selector
+            apiFetch('/api/embeddings/clusters')
+                .then(r => r.ok ? r.json() : [])
+                .then((clusters: Array<{ id: number; label: string | null; members: number }>) => {
+                    for (const c of clusters) {
+                        const opt = document.createElement('option');
+                        opt.value = String(c.id);
+                        opt.textContent = c.label
+                            ? `#${c.id} ${c.label} (${c.members})`
+                            : `#${c.id} (${c.members})`;
+                        clusterSelect.appendChild(opt);
+                    }
+                    if (currentClusterId !== null) {
+                        clusterSelect.value = String(currentClusterId);
+                    }
+                })
+                .catch(() => {
+                    // Fallback to cluster_info from /info if /clusters fails
+                    if (info.cluster_info?.clusters) {
+                        const clusters = info.cluster_info.clusters as Record<string, number>;
+                        for (const [id, count] of Object.entries(clusters)) {
+                            if (parseInt(id) < 0) continue;
+                            const opt = document.createElement('option');
+                            opt.value = id;
+                            opt.textContent = `#${id} (${count})`;
+                            clusterSelect.appendChild(opt);
+                        }
+                        if (currentClusterId !== null) {
+                            clusterSelect.value = String(currentClusterId);
+                        }
+                    }
+                });
         })
         .catch(err => log.debug(SEG.GLYPH, `[SeGlyph] Failed to fetch embedding info:`, err));
 
