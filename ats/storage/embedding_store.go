@@ -742,24 +742,23 @@ func (s *EmbeddingStore) UpdateClusterRunDuration(runID string, durationMS int) 
 }
 
 // CreateCluster inserts a new cluster identity and returns the allocated ID.
+// Uses SQLite's INTEGER PRIMARY KEY auto-assignment (atomic, no race condition).
 func (s *EmbeddingStore) CreateCluster(runID string) (int, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 
-	// Allocate next ID: COALESCE(MAX(id), -1) + 1 so first cluster is 0
-	var id int
-	err := s.db.QueryRow(`SELECT COALESCE(MAX(id), -1) + 1 FROM clusters`).Scan(&id)
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to allocate cluster ID")
-	}
-
-	_, err = s.db.Exec(
-		`INSERT INTO clusters (id, label, first_seen_run_id, last_seen_run_id, status, created_at) VALUES (?, NULL, ?, ?, 'active', ?)`,
-		id, runID, runID, now,
+	res, err := s.db.Exec(
+		`INSERT INTO clusters (label, first_seen_run_id, last_seen_run_id, status, created_at) VALUES (NULL, ?, ?, 'active', ?)`,
+		runID, runID, now,
 	)
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed to insert cluster %d for run %s", id, runID)
+		return 0, errors.Wrapf(err, "failed to insert cluster for run %s", runID)
 	}
-	return id, nil
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to get allocated cluster ID for run %s", runID)
+	}
+	return int(id), nil
 }
 
 // UpdateClusterLastSeen bumps the last_seen_run_id for a cluster.

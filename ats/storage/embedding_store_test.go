@@ -509,14 +509,13 @@ func TestEmbeddingStore_ClusterIdentityLifecycle(t *testing.T) {
 	}
 	require.NoError(t, store.CreateClusterRun(run))
 
-	// Create two clusters
+	// Create two clusters (SQLite INTEGER PRIMARY KEY auto-assigns starting at 1)
 	id0, err := store.CreateCluster("CR_lifecycle")
 	require.NoError(t, err)
-	assert.Equal(t, 0, id0)
 
 	id1, err := store.CreateCluster("CR_lifecycle")
 	require.NoError(t, err)
-	assert.Equal(t, 1, id1)
+	assert.NotEqual(t, id0, id1, "cluster IDs must be unique")
 
 	// Both should be active
 	active, err := store.GetActiveClusterIdentities()
