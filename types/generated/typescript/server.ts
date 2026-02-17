@@ -5,7 +5,7 @@
 // TODO: Migrate to proto generation (web/ts/generated/proto/)
 
 import { Job } from './async';
-import { Execution } from './schedule';
+import { Execution, LogEntry, StageInfo } from './schedule';
 import { As } from './types';
 
 export interface ChildJobInfo {
@@ -257,13 +257,6 @@ export interface ListExecutionsResponse {
 export interface ListScheduledJobsResponse {
   jobs: ScheduledJobResponse[];
   count?: number;
-}
-
-export interface LogEntry {
-  timestamp: string;
-  level: string;
-  message: string;
-  metadata?: Record<string, unknown>;
 }
 
 export interface ParsedATSCode {
@@ -783,11 +776,6 @@ export interface ScheduledJobResponse {
   updated_at: string;
 }
 
-export interface StageInfo {
-  stage: string;
-  tasks: TaskInfo[];
-}
-
 export interface StatsMessage {
   /**
    * "import_stats"
@@ -840,11 +828,6 @@ export interface StorageWarningMessage {
    * Unix timestamp
    */
   timestamp: number;
-}
-
-export interface TaskInfo {
-  task_id: string;
-  log_count?: number;
 }
 
 export interface TaskLogsResponse {
