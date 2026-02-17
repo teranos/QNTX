@@ -43,6 +43,8 @@ export const MELDABILITY: Record<string, readonly PortRule[]> = {
         { direction: 'bottom', targets: ['canvas-result-glyph', 'canvas-subcanvas-glyph'] }
     ],
     'canvas-doc-glyph': [
+        // Right-meld onto result chains targets topmost result (#521)
+        { direction: 'right', targets: ['canvas-result-glyph', 'canvas-prompt-glyph', 'canvas-doc-glyph', 'canvas-subcanvas-glyph'] },
         { direction: 'bottom', targets: ['canvas-prompt-glyph', 'canvas-doc-glyph', 'canvas-subcanvas-glyph'] }
     ],
     'canvas-note-glyph': [
@@ -103,17 +105,27 @@ export function getCompatibleTargets(initiatorClass: string): string[] {
 
 /**
  * Check if two glyph classes are compatible for melding
- * Returns the edge direction if compatible, null if not
+ * Returns all compatible edge directions (empty array if incompatible)
  */
-export function areClassesCompatible(initiatorClass: string, targetClass: string): EdgeDirection | null {
+export function getCompatibleDirections(initiatorClass: string, targetClass: string): EdgeDirection[] {
     const ports = MELDABILITY[initiatorClass];
-    if (!ports) return null;
+    if (!ports) return [];
+    const directions: EdgeDirection[] = [];
     for (const port of ports) {
         if (port.targets.includes(targetClass)) {
-            return port.direction;
+            directions.push(port.direction);
         }
     }
-    return null;
+    return directions;
+}
+
+/**
+ * Check if two glyph classes are compatible for melding
+ * Returns the first edge direction if compatible, null if not
+ */
+export function areClassesCompatible(initiatorClass: string, targetClass: string): EdgeDirection | null {
+    const dirs = getCompatibleDirections(initiatorClass, targetClass);
+    return dirs.length > 0 ? dirs[0] : null;
 }
 
 /**
@@ -260,9 +272,25 @@ export function getMeldOptions(
 }
 
 /**
+ * Select the best meld option, preferring the one matching the anchor glyph
+ * (the spatially nearest glyph from drag detection). Falls back to first option.
+ */
+export function selectPreferredMeldOption(
+    options: MeldOption[],
+    anchorGlyphId: string
+): MeldOption | null {
+    if (options.length === 0) return null;
+    return options.find(o => o.glyphId === anchorGlyphId) ?? options[0];
+}
+
+/**
  * Compute grid row/col for each glyph in an edge DAG.
  * BFS from roots: 'right' → same row, next col; 'bottom' → next row, same col.
  * Single source of truth for composition spatial layout.
+ *
+ * Roots are processed sequentially, deepest chains first. Lateral roots
+ * (those whose targets are already positioned by a longer chain) derive
+ * their position from the connection rather than starting at row 1.
  */
 export function computeGridPositions(
     edges: Array<{ from: string; to: string; direction: string }>
@@ -280,37 +308,107 @@ export function computeGridPositions(
         adjacency.get(edge.from)!.push({ to: edge.to, direction: edge.direction });
     }
 
-    // BFS from roots
-    const queue: string[] = [];
-    for (let i = 0; i < roots.length; i++) {
-        positions.set(roots[i], { row: 1, col: 1 + i });
-        queue.push(roots[i]);
+    // Sort roots: deepest chains first so they establish positions before lateral roots
+    function countReachable(id: string): number {
+        let count = 0;
+        const visited = new Set<string>();
+        const q = [id];
+        while (q.length > 0) {
+            const n = q.shift()!;
+            for (const { to } of adjacency.get(n) || []) {
+                if (!visited.has(to)) {
+                    visited.add(to);
+                    count++;
+                    q.push(to);
+                }
+            }
+        }
+        return count;
+    }
+    roots.sort((a, b) => countReachable(b) - countReachable(a));
+
+    // Process each root sequentially: place + full BFS before next root
+    let nextRootCol = 1;
+    for (const root of roots) {
+        if (positions.has(root)) continue;
+
+        // Lateral root: target already positioned → derive position from connection
+        let derived = false;
+        const rootNeighbors = adjacency.get(root);
+        if (rootNeighbors) {
+            for (const { to, direction } of rootNeighbors) {
+                const targetPos = positions.get(to);
+                if (!targetPos) continue;
+
+                let candidate: { row: number; col: number } | null = null;
+                if (direction === 'right') {
+                    candidate = { row: targetPos.row, col: targetPos.col - 1 };
+                } else if (direction === 'bottom') {
+                    candidate = { row: targetPos.row - 1, col: targetPos.col };
+                } else if (direction === 'top') {
+                    candidate = { row: targetPos.row + 1, col: targetPos.col };
+                }
+
+                // Only use derived position if it doesn't collide with an existing glyph
+                if (candidate) {
+                    const occupied = [...positions.values()].some(
+                        p => p.row === candidate!.row && p.col === candidate!.col
+                    );
+                    if (!occupied) {
+                        positions.set(root, candidate);
+                        derived = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!derived) {
+            positions.set(root, { row: 1, col: nextRootCol });
+            nextRootCol++;
+        }
+
+        // BFS from this root
+        const queue = [root];
+        while (queue.length > 0) {
+            const current = queue.shift()!;
+            const pos = positions.get(current)!;
+            const neighbors = adjacency.get(current);
+            if (!neighbors) continue;
+
+            const dirOffset = new Map<string, number>();
+
+            for (const { to, direction } of neighbors) {
+                if (positions.has(to)) continue; // first assignment wins
+
+                const offset = dirOffset.get(direction) || 0;
+
+                if (direction === 'right') {
+                    positions.set(to, { row: pos.row, col: pos.col + 1 + offset });
+                } else if (direction === 'bottom') {
+                    positions.set(to, { row: pos.row + 1 + offset, col: pos.col });
+                } else if (direction === 'top') {
+                    positions.set(to, { row: pos.row - 1 - offset, col: pos.col });
+                }
+
+                dirOffset.set(direction, offset + 1);
+                queue.push(to);
+            }
+        }
     }
 
-    while (queue.length > 0) {
-        const current = queue.shift()!;
-        const pos = positions.get(current)!;
-        const neighbors = adjacency.get(current);
-        if (!neighbors) continue;
-
-        // Track offset for multiple children in the same direction (e.g., two results below py)
-        const dirOffset = new Map<string, number>();
-
-        for (const { to, direction } of neighbors) {
-            if (positions.has(to)) continue; // first assignment wins
-
-            const offset = dirOffset.get(direction) || 0;
-
-            if (direction === 'right') {
-                positions.set(to, { row: pos.row, col: pos.col + 1 + offset });
-            } else if (direction === 'bottom') {
-                positions.set(to, { row: pos.row + 1 + offset, col: pos.col });
-            } else if (direction === 'top') {
-                positions.set(to, { row: pos.row - 1 - offset, col: pos.col });
-            }
-
-            dirOffset.set(direction, offset + 1);
-            queue.push(to);
+    // Normalize: shift all positions so minimum row and col are both 1
+    let minRow = Infinity, minCol = Infinity;
+    for (const pos of positions.values()) {
+        minRow = Math.min(minRow, pos.row);
+        minCol = Math.min(minCol, pos.col);
+    }
+    if (minRow < 1 || minCol < 1) {
+        const rowShift = 1 - minRow;
+        const colShift = 1 - minCol;
+        for (const [, pos] of positions) {
+            pos.row += rowShift;
+            pos.col += colShift;
         }
     }
 

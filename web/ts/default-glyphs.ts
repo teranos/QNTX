@@ -264,7 +264,8 @@ let embeddingsInfo: {
 let embeddingsReembedding = false;
 let embeddingsClustering = false;
 let embeddingsProjecting = false;
-let projectionsData: { id: string; source_id: string; x: number; y: number; cluster_id: number }[] = [];
+type ProjectionPoint = { id: string; source_id: string; method: string; x: number; y: number; cluster_id: number };
+let projectionsData: Record<string, ProjectionPoint[]> = {};
 
 // Self diagnostics state
 let selfElement: HTMLElement | null = null;
@@ -444,11 +445,16 @@ export async function fetchEmbeddingsInfo(): Promise<void> {
             apiFetch('/api/embeddings/projections'),
         ]);
         embeddingsInfo = await infoResp.json();
-        projectionsData = projResp.ok ? await projResp.json() : [];
-        if (!Array.isArray(projectionsData)) projectionsData = [];
+        const raw = projResp.ok ? await projResp.json() : {};
+        // Backend returns Record<string, ProjectionPoint[]> — validate shape
+        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+            projectionsData = raw as Record<string, ProjectionPoint[]>;
+        } else {
+            projectionsData = {};
+        }
     } catch {
         embeddingsInfo = null;
-        projectionsData = [];
+        projectionsData = {};
     }
     renderEmbeddings();
 }
@@ -522,19 +528,29 @@ function renderEmbeddings(): void {
         `;
     }
 
-    // Scatter section: project button or D3 scatter
+    // Scatter section: side-by-side projections or project button
+    const methodNames = Object.keys(projectionsData);
+    const hasProjections = methodNames.some(m => projectionsData[m]?.length > 0);
     let scatterSection = '';
     if (available && embedding_count >= 2) {
-        if (projectionsData.length > 0) {
-            const nClusters = new Set(projectionsData.filter(p => p.cluster_id !== -1).map(p => p.cluster_id)).size;
+        if (hasProjections) {
+            const scatterSlots = methodNames
+                .filter(m => projectionsData[m]?.length > 0)
+                .map(m => {
+                    const pts = projectionsData[m];
+                    const nClusters = new Set(pts.filter(p => p.cluster_id !== -1).map(p => p.cluster_id)).size;
+                    return `<div style="flex:1;min-width:0">
+                        <div style="font-size:11px;color:#9ca3af;text-align:center;margin-bottom:4px">${m.toUpperCase()} (${pts.length}pts, ${nClusters}cl)</div>
+                        <div class="emb-scatter" data-method="${m}"></div>
+                    </div>`;
+                }).join('');
             scatterSection = `
                 <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
-                    <h3 class="glyph-section-title">Projection</h3>
-                    <div style="font-size:12px;color:#9ca3af;margin-bottom:6px">${projectionsData.length} points, ${nClusters} clusters</div>
-                    <div class="emb-scatter"></div>
+                    <h3 class="glyph-section-title">Projections</h3>
+                    <div style="display:flex;gap:6px">${scatterSlots}</div>
                     <button class="emb-project-btn panel-btn" style="width:100%;margin-top:6px"
                         ${embeddingsProjecting ? 'disabled' : ''}>
-                        ${embeddingsProjecting ? 'Projecting...' : 'Re-project (UMAP)'}
+                        ${embeddingsProjecting ? 'Projecting...' : 'Re-project'}
                     </button>
                     <div class="emb-project-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
                 </div>
@@ -542,14 +558,14 @@ function renderEmbeddings(): void {
         } else {
             scatterSection = `
                 <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
-                    <h3 class="glyph-section-title">Projection</h3>
+                    <h3 class="glyph-section-title">Projections</h3>
                     <div class="glyph-row">
                         <span class="glyph-label">Status:</span>
                         <span class="glyph-value" style="color:#6b7280">not computed</span>
                     </div>
                     <button class="emb-project-btn panel-btn" style="width:100%;margin-top:6px"
                         ${embeddingsProjecting ? 'disabled' : ''}>
-                        ${embeddingsProjecting ? 'Projecting...' : 'Project (UMAP)'}
+                        ${embeddingsProjecting ? 'Projecting...' : 'Project'}
                     </button>
                     <div class="emb-project-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
                 </div>
@@ -598,10 +614,14 @@ function renderEmbeddings(): void {
         projectBtn.addEventListener('click', projectAll);
     }
 
-    const scatterContainer = embeddingsElement.querySelector('.emb-scatter') as HTMLElement | null;
-    if (scatterContainer && projectionsData.length > 0) {
-        renderScatter(scatterContainer);
-    }
+    embeddingsElement.querySelectorAll('.emb-scatter[data-method]').forEach(el => {
+        const container = el as HTMLElement;
+        const method = container.dataset.method!;
+        const data = projectionsData[method];
+        if (data?.length > 0) {
+            renderScatter(container, data);
+        }
+    });
 }
 
 async function reembedAll(): Promise<void> {
@@ -669,10 +689,10 @@ async function recluster(): Promise<void> {
     }
 }
 
-function renderScatter(container: HTMLElement): void {
-    const width = 340;
-    const height = 200;
-    const pad = 12;
+function renderScatter(container: HTMLElement, data: ProjectionPoint[]): void {
+    const width = 155;
+    const height = 180;
+    const pad = 8;
 
     const svg = d3.select(container)
         .append('svg')
@@ -681,8 +701,8 @@ function renderScatter(container: HTMLElement): void {
         .style('background', '#1e293b')
         .style('border-radius', '4px');
 
-    const xExtent = d3.extent(projectionsData, d => d.x) as [number, number];
-    const yExtent = d3.extent(projectionsData, d => d.y) as [number, number];
+    const xExtent = d3.extent(data, d => d.x) as [number, number];
+    const yExtent = d3.extent(data, d => d.y) as [number, number];
 
     const xScale = d3.scaleLinear().domain(xExtent).range([pad, width - pad]);
     const yScale = d3.scaleLinear().domain(yExtent).range([height - pad, pad]);
@@ -690,11 +710,11 @@ function renderScatter(container: HTMLElement): void {
     const color = d3.scaleOrdinal(d3.schemeTableau10);
 
     svg.selectAll('circle')
-        .data(projectionsData)
+        .data(data)
         .join('circle')
         .attr('cx', d => xScale(d.x))
         .attr('cy', d => yScale(d.y))
-        .attr('r', 4)
+        .attr('r', 3)
         .attr('fill', d => d.cluster_id === -1 ? '#6b7280' : color(String(d.cluster_id)))
         .attr('opacity', d => d.cluster_id === -1 ? 0.35 : 0.85);
 }
@@ -716,7 +736,8 @@ async function projectAll(): Promise<void> {
         const result = await resp.json();
 
         if (resultEl) {
-            resultEl.textContent = `${result.n_points} points projected (${result.time_ms?.toFixed(0) ?? '?'}ms)`;
+            const methods = (result.results || []).map((r: any) => `${r.method}:${r.n_points}pts`).join(', ');
+            resultEl.textContent = `${methods} (${result.total_ms?.toFixed(0) ?? '?'}ms)`;
         }
 
         await fetchEmbeddingsInfo();
@@ -762,8 +783,8 @@ export function registerDefaultGlyphs(): void {
             fetchEmbeddingsInfo();
             return content;
         },
-        initialWidth: '450px',
-        initialHeight: '520px',
+        initialWidth: '540px',
+        initialHeight: '620px',
     });
 
     // Sync Status Glyph

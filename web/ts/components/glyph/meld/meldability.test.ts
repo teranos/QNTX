@@ -5,6 +5,7 @@
 import { describe, test, expect } from 'bun:test';
 import {
     areClassesCompatible,
+    getCompatibleDirections,
     getInitiatorClasses,
     getTargetClasses,
     getCompatibleTargets,
@@ -12,6 +13,7 @@ import {
     getLeafGlyphIds,
     getRootGlyphIds,
     getMeldOptions,
+    selectPreferredMeldOption,
     computeGridPositions,
     type EdgeDirection
 } from './meldability';
@@ -50,20 +52,31 @@ describe('Port-aware MELDABILITY registry', () => {
             expect(areClassesCompatible('canvas-prompt-glyph', 'canvas-result-glyph')).toBe('bottom');
         });
 
-        test('doc → prompt returns bottom (doc sits above prompt)', () => {
-            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-prompt-glyph')).toBe('bottom');
+        test('doc → prompt returns right as first direction', () => {
+            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-prompt-glyph')).toBe('right');
         });
 
-        test('doc → doc returns bottom (stack multiple documents)', () => {
-            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-doc-glyph')).toBe('bottom');
+        test('doc → prompt supports both right and bottom', () => {
+            const dirs = getCompatibleDirections('canvas-doc-glyph', 'canvas-prompt-glyph');
+            expect(dirs).toContain('right');
+            expect(dirs).toContain('bottom');
+            expect(dirs.length).toBe(2);
+        });
+
+        test('doc → doc supports both right and bottom', () => {
+            const dirs = getCompatibleDirections('canvas-doc-glyph', 'canvas-doc-glyph');
+            expect(dirs).toContain('right');
+            expect(dirs).toContain('bottom');
+            expect(dirs.length).toBe(2);
         });
 
         test('note → prompt returns bottom (note sits above prompt)', () => {
             expect(areClassesCompatible('canvas-note-glyph', 'canvas-prompt-glyph')).toBe('bottom');
         });
 
-        test('doc → result returns null (docs cannot meld onto results)', () => {
-            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-result-glyph')).toBe(null);
+        test('doc → result returns right (doc sits left of result)', () => {
+            expect(areClassesCompatible('canvas-doc-glyph', 'canvas-result-glyph')).toBe('right');
+            expect(getCompatibleDirections('canvas-doc-glyph', 'canvas-result-glyph')).toEqual(['right']);
         });
 
         test('prompt → prompt returns null (incompatible)', () => {
@@ -292,6 +305,41 @@ describe('Port-aware MELDABILITY registry', () => {
             expect(appendOption).toBeDefined();
         });
 
+        test('doc right-meld onto result chain returns options for all results (#521)', () => {
+            const composition = document.createElement('div');
+            const r1 = document.createElement('div');
+            r1.className = 'canvas-result-glyph';
+            r1.setAttribute('data-glyph-id', 'result1');
+            const r2 = document.createElement('div');
+            r2.className = 'canvas-result-glyph';
+            r2.setAttribute('data-glyph-id', 'result2');
+            const r3 = document.createElement('div');
+            r3.className = 'canvas-result-glyph';
+            r3.setAttribute('data-glyph-id', 'result3');
+            composition.appendChild(r1);
+            composition.appendChild(r2);
+            composition.appendChild(r3);
+
+            const edges = [
+                { from: 'result1', to: 'result2', direction: 'bottom' },
+                { from: 'result2', to: 'result3', direction: 'bottom' }
+            ];
+
+            const options = getMeldOptions('canvas-doc-glyph', composition, edges);
+
+            // All three results have free right-incoming ports → doc can meld onto any
+            const rightOptions = options.filter(o => o.direction === 'right');
+            expect(rightOptions.length).toBe(3);
+
+            // The preferred option should match the anchor (spatially nearest) glyph
+            const preferredOption = selectPreferredMeldOption(options, 'result3');
+            expect(preferredOption!.glyphId).toBe('result3');
+
+            // Falls back to first option when anchor has no match
+            const fallbackOption = selectPreferredMeldOption(options, 'nonexistent');
+            expect(fallbackOption).toBeDefined();
+        });
+
         test('incompatible glyph returns no options', () => {
             const composition = document.createElement('div');
             const ax = document.createElement('div');
@@ -405,13 +453,45 @@ describe('Port-aware MELDABILITY registry', () => {
             expect(positions.get('note1')).toBeDefined();
         });
 
-        test('top direction edge → row above parent', () => {
+        test('lateral root right-melded onto mid-chain preserves vertical layout (#521)', () => {
+            // doc melds right onto r3 in a vertical chain r1→r2→r3→r4
+            // Expected: chain stays vertical, doc sits left of r3
+            const edges = [
+                { from: 'r1', to: 'r2', direction: 'bottom' },
+                { from: 'r2', to: 'r3', direction: 'bottom' },
+                { from: 'r3', to: 'r4', direction: 'bottom' },
+                { from: 'doc1', to: 'r3', direction: 'right' }
+            ];
+            const positions = computeGridPositions(edges);
+
+            // Chain remains vertical in one column
+            const r1 = positions.get('r1')!;
+            const r2 = positions.get('r2')!;
+            const r3 = positions.get('r3')!;
+            const r4 = positions.get('r4')!;
+            const doc = positions.get('doc1')!;
+
+            // Vertical chain: same column, ascending rows
+            expect(r1.col).toBe(r2.col);
+            expect(r2.col).toBe(r3.col);
+            expect(r3.col).toBe(r4.col);
+            expect(r1.row).toBeLessThan(r2.row);
+            expect(r2.row).toBeLessThan(r3.row);
+            expect(r3.row).toBeLessThan(r4.row);
+
+            // Doc sits left of r3 (same row, earlier column)
+            expect(doc.row).toBe(r3.row);
+            expect(doc.col).toBeLessThan(r3.col);
+        });
+
+        test('top direction edge → target above parent, normalized', () => {
             const edges = [
                 { from: 'note1', to: 'prompt1', direction: 'top' }
             ];
             const positions = computeGridPositions(edges);
-            expect(positions.get('note1')).toEqual({ row: 1, col: 1 });
-            expect(positions.get('prompt1')).toEqual({ row: 0, col: 1 });
+            // note1 at row 1 → prompt1 at row 0 → normalized: prompt1=1, note1=2
+            expect(positions.get('prompt1')).toEqual({ row: 1, col: 1 });
+            expect(positions.get('note1')).toEqual({ row: 2, col: 1 });
         });
     });
 

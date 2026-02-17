@@ -246,7 +246,7 @@ export function buildCanvasWorkspace(
     container.style.height = '100%';
     container.style.position = 'relative';
     container.style.overflow = 'hidden';
-    container.style.backgroundColor = 'var(--bg-dark-hover)';
+    // background-color set via CSS (.canvas-workspace in canvas.css)
     container.style.outline = 'none';
 
     // Inner content layer that gets transformed (for pan)
