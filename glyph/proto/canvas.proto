@@ -42,3 +42,10 @@ message Composition {
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
 }
+
+// MinimizedWindow tracks a glyph that has been minimized to the tray.
+// Synced between frontend (IndexedDB) and backend (SQLite).
+message MinimizedWindow {
+  string glyph_id = 1;
+  google.protobuf.Timestamp created_at = 2;
+}

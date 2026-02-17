@@ -14,8 +14,10 @@ import { Doc, Prose } from '@generated/sym.js';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { unmeldComposition } from './meld/meld-composition';
 import { autoMeldResultBelow } from './meld/meld-system';
-import { makeDraggable, preventDrag, storeCleanup } from './glyph-interaction';
-import { morphCanvasPlacedToWindow } from './manifestations/canvas-window';
+import { makeDraggable, makeResizable, preventDrag, storeCleanup } from './glyph-interaction';
+import { morphCanvasPlacedToWindow, placeWindowOnCanvas } from './manifestations/canvas-window';
+import { isInWindowState } from './dataset';
+import { glyphRun } from './run';
 
 /**
  * Glyph execution result data
@@ -114,31 +116,99 @@ export function createResultGlyph(
 
     buttonContainer.appendChild(copyBtn);
 
-    // To window button
+    // To window / back to canvas toggle button
     const toWindowBtn = headerBtn('⬆', 'Expand to window', '10px');
 
     toWindowBtn.addEventListener('click', () => {
-        const canvas = element.closest('.canvas-workspace') as HTMLElement | null;
-        const canvasId = (canvas?.closest('[data-canvas-id]') as HTMLElement | null)?.dataset?.canvasId ?? 'canvas-workspace';
+        if (isInWindowState(element)) {
+            // Place on currently visible canvas at the window's screen position
+            placeWindowOnCanvas(element, {
+                onRestoreComplete: (el) => {
+                    const cleanupDrag = makeDraggable(el, header, glyph, {
+                        logLabel: 'ResultGlyph',
+                        ignoreButtons: true,
+                    });
+                    storeCleanup(el, cleanupDrag);
 
-        morphCanvasPlacedToWindow(element, {
-            title: prompt || 'Result',
-            canvasId,
-            onClose: () => {
-                element.remove();
-                uiState.removeCanvasGlyph(glyph.id);
-                log.debug(SEG.GLYPH, `[ResultGlyph] Closed from window ${glyph.id}`);
-            },
-            onRestoreComplete: (el) => {
-                // Re-attach canvas drag handler
-                const cleanupDrag = makeDraggable(el, header, glyph, {
-                    logLabel: 'ResultGlyph',
-                    ignoreButtons: true,
-                });
-                storeCleanup(el, cleanupDrag);
-                log.debug(SEG.GLYPH, `[ResultGlyph] Restored to canvas ${glyph.id}`);
-            },
-        });
+                    // Re-attach resize handler (torn down by morph)
+                    const resizeHandle = el.querySelector('.glyph-resize-handle') as HTMLElement | null;
+                    if (resizeHandle) {
+                        const cleanupResize = makeResizable(el, resizeHandle, glyph, {
+                            logLabel: 'ResultGlyph',
+                            minWidth: 200,
+                            minHeight: 80,
+                        });
+                        storeCleanup(el, cleanupResize);
+                    }
+
+                    // Update canvas state with new position
+                    const contentStr = (glyph as any).content
+                        || uiState.getCanvasGlyphs().find(g => g.id === glyph.id)?.content;
+                    uiState.addCanvasGlyph({
+                        id: glyph.id,
+                        symbol: 'result',
+                        x: parseInt(el.style.left),
+                        y: parseInt(el.style.top),
+                        width: parseInt(el.style.width),
+                        height: parseInt(el.style.height),
+                        content: contentStr,
+                    });
+
+                    toWindowBtn.textContent = '⬆';
+                    toWindowBtn.title = 'Expand to window';
+                    log.debug(SEG.GLYPH, `[ResultGlyph] Placed on canvas ${glyph.id}`);
+                },
+            });
+        } else {
+            const canvas = element.closest('.canvas-workspace') as HTMLElement | null;
+            const canvasId = (canvas?.closest('[data-canvas-id]') as HTMLElement | null)?.dataset?.canvasId ?? 'canvas-workspace';
+
+            morphCanvasPlacedToWindow(element, {
+                title: prompt || 'Result',
+                canvasId,
+                onClose: () => {
+                    element.remove();
+                    uiState.removeCanvasGlyph(glyph.id);
+                    log.debug(SEG.GLYPH, `[ResultGlyph] Closed from window ${glyph.id}`);
+                },
+                onMinimize: () => {
+                    // Keep glyph data in uiState (needed for tray restoration on refresh)
+                    glyphRun.add({
+                        id: glyph.id,
+                        title: prompt || 'Result',
+                        symbol: 'result',
+                        renderContent: () => renderResultContent(result, promptConfig, prompt),
+                        onClose: () => {
+                            log.debug(SEG.GLYPH, `[ResultGlyph] Closed from tray ${glyph.id}`);
+                        },
+                    });
+                    log.debug(SEG.GLYPH, `[ResultGlyph] Minimized to tray ${glyph.id}`);
+                },
+                onRestoreComplete: (el) => {
+                    const cleanupDrag = makeDraggable(el, header, glyph, {
+                        logLabel: 'ResultGlyph',
+                        ignoreButtons: true,
+                    });
+                    storeCleanup(el, cleanupDrag);
+
+                    // Re-attach resize handler (torn down by morph)
+                    const resizeHandle = el.querySelector('.glyph-resize-handle') as HTMLElement | null;
+                    if (resizeHandle) {
+                        const cleanupResize = makeResizable(el, resizeHandle, glyph, {
+                            logLabel: 'ResultGlyph',
+                            minWidth: 200,
+                            minHeight: 80,
+                        });
+                        storeCleanup(el, cleanupResize);
+                    }
+
+                    log.debug(SEG.GLYPH, `[ResultGlyph] Restored to canvas ${glyph.id}`);
+                },
+            });
+
+            toWindowBtn.textContent = '↩';
+            toWindowBtn.title = 'Return to canvas';
+        }
     });
 
     buttonContainer.appendChild(toWindowBtn);
@@ -474,6 +544,36 @@ function renderOutput(container: HTMLElement, result: ExecutionResult): void {
         container.style.color = 'var(--text-secondary)';
         container.style.fontStyle = 'italic';
     }
+}
+
+/**
+ * Build window content for a result glyph reopened from the tray.
+ * Used as renderContent() when a canvas result is minimized to tray.
+ */
+export function renderResultContent(execResult: ExecutionResult, config?: PromptConfig, promptText?: string): HTMLElement {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'glyph-content';
+
+    if (promptText) {
+        const promptDiv = document.createElement('div');
+        promptDiv.style.padding = '0 0 8px';
+        promptDiv.style.borderBottom = '1px solid var(--border-on-dark)';
+        promptDiv.style.marginBottom = '8px';
+        promptDiv.style.color = 'var(--text-secondary)';
+        promptDiv.style.fontSize = '12px';
+        promptDiv.textContent = promptText;
+        wrapper.appendChild(promptDiv);
+    }
+
+    const outputDiv = document.createElement('div');
+    outputDiv.style.fontFamily = 'monospace';
+    outputDiv.style.fontSize = '12px';
+    outputDiv.style.whiteSpace = 'pre-wrap';
+    outputDiv.style.wordBreak = 'break-word';
+    renderOutput(outputDiv, execResult);
+    wrapper.appendChild(outputDiv);
+
+    return wrapper;
 }
 
 /**

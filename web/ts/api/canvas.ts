@@ -6,7 +6,7 @@
  */
 
 import type { CanvasGlyphState, CompositionState } from '../state/ui';
-import type { CanvasGlyph, Composition } from '../generated/proto/glyph/proto/canvas';
+import type { CanvasGlyph, Composition, MinimizedWindow } from '../generated/proto/glyph/proto/canvas';
 import { log, SEG } from '../logger';
 import { apiFetch } from '../api';
 import { canvasSyncQueue } from './canvas-sync';
@@ -64,6 +64,42 @@ export function deleteComposition(id: string): void {
 }
 
 /**
+ * Add a minimized window.
+ * Enqueues for server sync — never throws.
+ */
+export function addMinimizedWindow(id: string): void {
+    canvasSyncQueue.add({ id, op: 'minimized_add' });
+}
+
+/**
+ * Delete a minimized window.
+ * Enqueues for server sync — never throws.
+ */
+export function deleteMinimizedWindow(id: string): void {
+    canvasSyncQueue.add({ id, op: 'minimized_delete' });
+}
+
+/**
+ * List all minimized windows
+ */
+export async function listMinimizedWindows(): Promise<MinimizedWindow[]> {
+    try {
+        const response = await apiFetch('/api/canvas/minimized-windows');
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to list minimized windows');
+        }
+
+        const windows = await response.json();
+        log.debug(SEG.GLYPH, `[CanvasAPI] Listed ${windows.length} minimized windows`);
+        return windows;
+    } catch (error) {
+        log.error(SEG.GLYPH, '[CanvasAPI] Failed to list minimized windows:', error);
+        throw error;
+    }
+}
+
+/**
  * List all canvas compositions
  */
 export async function listCompositions(): Promise<Composition[]> {
@@ -84,26 +120,29 @@ export async function listCompositions(): Promise<Composition[]> {
 }
 
 /**
- * Load all canvas state from backend (glyphs + compositions)
+ * Load all canvas state from backend (glyphs + compositions + minimized windows)
  * Converts backend format to frontend state format
  */
 export async function loadCanvasState(): Promise<{
     glyphs: CanvasGlyphState[];
     compositions: CompositionState[];
+    minimizedWindows: string[];
 }> {
     try {
-        const [glyphsResponse, compositionsResponse] = await Promise.all([
+        const [glyphsResponse, compositionsResponse, minimizedResponse] = await Promise.all([
             listCanvasGlyphs(),
             listCompositions(),
+            listMinimizedWindows(),
         ]);
 
         // Proto types flow through directly — CanvasGlyphState and CompositionState derive from proto
         const glyphs: CanvasGlyphState[] = glyphsResponse;
         const compositions: CompositionState[] = compositionsResponse;
+        const minimizedWindows = (minimizedResponse || []).map(w => w.glyph_id);
 
-        log.info(SEG.GLYPH, `[CanvasAPI] Loaded canvas state: ${glyphs.length} glyphs, ${compositions.length} compositions`);
+        log.info(SEG.GLYPH, `[CanvasAPI] Loaded canvas state: ${glyphs.length} glyphs, ${compositions.length} compositions, ${minimizedWindows.length} minimized windows`);
 
-        return { glyphs, compositions };
+        return { glyphs, compositions, minimizedWindows };
     } catch (error) {
         log.error(SEG.GLYPH, '[CanvasAPI] Failed to load canvas state:', error);
         throw error;
@@ -116,19 +155,23 @@ export async function loadCanvasState(): Promise<{
  * Pure function -- no side effects.
  */
 export function mergeCanvasState(
-    local: { glyphs: CanvasGlyphState[]; compositions: CompositionState[] },
-    backend: { glyphs: CanvasGlyphState[]; compositions: CompositionState[] },
-): { glyphs: CanvasGlyphState[]; compositions: CompositionState[]; mergedGlyphs: number; mergedComps: number } {
+    local: { glyphs: CanvasGlyphState[]; compositions: CompositionState[]; minimizedWindows: string[] },
+    backend: { glyphs: CanvasGlyphState[]; compositions: CompositionState[]; minimizedWindows: string[] },
+): { glyphs: CanvasGlyphState[]; compositions: CompositionState[]; minimizedWindows: string[]; mergedGlyphs: number; mergedComps: number; mergedMinimized: number } {
     const localGlyphIds = new Set(local.glyphs.map(g => g.id));
     const localCompIds = new Set(local.compositions.map(c => c.id));
+    const localMinIds = new Set(local.minimizedWindows);
 
     const newGlyphs = backend.glyphs.filter(g => !localGlyphIds.has(g.id));
     const newComps = backend.compositions.filter(c => !localCompIds.has(c.id));
+    const newMinimized = backend.minimizedWindows.filter(id => !localMinIds.has(id));
 
     return {
         glyphs: newGlyphs.length > 0 ? [...local.glyphs, ...newGlyphs] : local.glyphs,
         compositions: newComps.length > 0 ? [...local.compositions, ...newComps] : local.compositions,
+        minimizedWindows: newMinimized.length > 0 ? [...local.minimizedWindows, ...newMinimized] : local.minimizedWindows,
         mergedGlyphs: newGlyphs.length,
         mergedComps: newComps.length,
+        mergedMinimized: newMinimized.length,
     };
 }

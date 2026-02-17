@@ -179,7 +179,7 @@ async function init(): Promise<void> {
 
         // Canvas state sync (with timeout — never block init for more than 3s)
         (async () => {
-            const { loadCanvasState, mergeCanvasState, upsertCanvasGlyph, upsertComposition } = await import('./api/canvas.ts');
+            const { loadCanvasState, mergeCanvasState, upsertCanvasGlyph, upsertComposition, addMinimizedWindow } = await import('./api/canvas.ts');
 
             // Merge backend state into local (skip if offline or slow)
             let backendReachable = false;
@@ -191,14 +191,19 @@ async function init(): Promise<void> {
                     ),
                 ]);
                 backendReachable = true;
-                const local = { glyphs: uiState.getCanvasGlyphs(), compositions: uiState.getCanvasCompositions() };
+                const local = {
+                    glyphs: uiState.getCanvasGlyphs(),
+                    compositions: uiState.getCanvasCompositions(),
+                    minimizedWindows: uiState.getMinimizedWindows(),
+                };
                 const merged = mergeCanvasState(local, backendState);
 
                 if (merged.mergedGlyphs > 0) uiState.setCanvasGlyphs(merged.glyphs);
                 if (merged.mergedComps > 0) uiState.setCanvasCompositions(merged.compositions);
+                if (merged.mergedMinimized > 0) uiState.setMinimizedWindows(merged.minimizedWindows);
 
-                if (merged.mergedGlyphs > 0 || merged.mergedComps > 0) {
-                    log.info(SEG.GLYPH, `[Init] Merged ${merged.mergedGlyphs} glyphs and ${merged.mergedComps} compositions from backend`);
+                if (merged.mergedGlyphs > 0 || merged.mergedComps > 0 || merged.mergedMinimized > 0) {
+                    log.info(SEG.GLYPH, `[Init] Merged ${merged.mergedGlyphs} glyphs, ${merged.mergedComps} compositions, ${merged.mergedMinimized} minimized windows from backend`);
                 }
             } catch (error: unknown) {
                 log.warn(SEG.GLYPH, '[Init] Failed to load canvas state from backend, continuing with local state:', error);
@@ -210,11 +215,13 @@ async function init(): Promise<void> {
             if (!backendReachable) {
                 const localGlyphs = uiState.getCanvasGlyphs();
                 const localCompositions = uiState.getCanvasCompositions();
+                const localMinimized = uiState.getMinimizedWindows();
                 for (const glyph of localGlyphs) upsertCanvasGlyph(glyph);
                 for (const comp of localCompositions) upsertComposition(comp);
+                for (const id of localMinimized) addMinimizedWindow(id);
 
-                if (localGlyphs.length > 0 || localCompositions.length > 0) {
-                    log.info(SEG.GLYPH, `[Init] Backend unreachable, enqueued ${localGlyphs.length} glyphs and ${localCompositions.length} compositions for sync`);
+                if (localGlyphs.length > 0 || localCompositions.length > 0 || localMinimized.length > 0) {
+                    log.info(SEG.GLYPH, `[Init] Backend unreachable, enqueued ${localGlyphs.length} glyphs, ${localCompositions.length} compositions, ${localMinimized.length} minimized windows for sync`);
                 }
             }
         })(),
@@ -251,6 +258,42 @@ async function init(): Promise<void> {
     // Initialize glyph run FIRST (before any glyphs are created)
     // This ensures the run is ready to receive glyphs
     glyphRun.init();
+
+    // Restore minimized glyphs to the tray from persisted state.
+    // Glyph data stays in canvas state (not removed on minimize) so we can
+    // reconstruct tray entries from content on page load.
+    const minimizedIds = uiState.getMinimizedWindows();
+    if (minimizedIds.length > 0) {
+        const canvasGlyphs = uiState.getCanvasGlyphs();
+        for (const id of minimizedIds) {
+            const glyph = canvasGlyphs.find(g => g.id === id);
+            if (!glyph || !glyph.content) {
+                log.warn(SEG.GLYPH, `[Init] Minimized glyph ${id} has no stored content, skipping tray restore`);
+                continue;
+            }
+            try {
+                const parsed = JSON.parse(glyph.content);
+                const result = parsed.result ?? parsed;
+                const promptConfig = parsed.promptConfig;
+                const prompt = parsed.prompt;
+                const { renderResultContent } = await import('./components/glyph/result-glyph.ts');
+                glyphRun.add({
+                    id: glyph.id,
+                    title: prompt || 'Result',
+                    symbol: glyph.symbol || 'result',
+                    renderContent: () => renderResultContent(result, promptConfig, prompt),
+                    onClose: () => {
+                        uiState.removeMinimizedWindow(id);
+                        uiState.removeCanvasGlyph(id);
+                        log.debug(SEG.GLYPH, `[Init] Closed restored tray glyph ${id}`);
+                    },
+                });
+                log.debug(SEG.GLYPH, `[Init] Restored minimized glyph ${id} to tray`);
+            } catch (err) {
+                log.warn(SEG.GLYPH, `[Init] Failed to restore minimized glyph ${id}:`, err);
+            }
+        }
+    }
 
     // Register default system glyphs
     registerDefaultGlyphs();
