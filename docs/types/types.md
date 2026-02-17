@@ -158,7 +158,7 @@ type OverFilter struct {
 
 ## RelationshipTypeDef {#relationshiptypedef}
 
-**Source**: [`ats/types/type_definitions.go:42`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L42)
+**Source**: [`ats/types/type_definitions.go:51`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L51)
 
 
 ```go
@@ -174,7 +174,7 @@ type RelationshipTypeDef struct {
 
 ## TypeDef {#typedef}
 
-**Source**: [`ats/types/type_definitions.go:29`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L29)
+**Source**: [`ats/types/type_definitions.go:38`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L38)
 
 
 ```go
