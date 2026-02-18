@@ -65,8 +65,8 @@ func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.Suga
 		// Configure WebSocket settings from am.Config
 		keepaliveCfg := NewKeepaliveConfigFromSettings(
 			cfg.Plugin.WebSocket.Keepalive.Enabled,
-			cfg.Plugin.WebSocket.Keepalive.PingIntervalSecs,
-			cfg.Plugin.WebSocket.Keepalive.PongTimeoutSecs,
+			cfg.Plugin.WebSocket.Keepalive.PingIntervalSeconds,
+			cfg.Plugin.WebSocket.Keepalive.PongTimeoutSeconds,
 			cfg.Plugin.WebSocket.Keepalive.ReconnectAttempts,
 		)
 

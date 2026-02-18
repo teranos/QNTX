@@ -56,8 +56,8 @@ type RichFieldInfo struct {
 // SearchRichStringFields searches for matches in RichStringFields across attestations
 // Now with Rust fuzzy matching for typo tolerance!
 // Returns results with potential warnings about degraded functionality
-func (bs *BoundedStore) SearchRichStringFields(ctx context.Context, query string, limit int) ([]RichSearchMatch, error) {
-	result, err := bs.SearchRichStringFieldsWithResult(ctx, query, limit)
+func (s *BoundedStore) SearchRichStringFields(ctx context.Context, query string, limit int) ([]RichSearchMatch, error) {
+	result, err := s.SearchRichStringFieldsWithResult(ctx, query, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (bs *BoundedStore) SearchRichStringFields(ctx context.Context, query string
 }
 
 // SearchRichStringFieldsWithResult searches and returns full result with warnings
-func (bs *BoundedStore) SearchRichStringFieldsWithResult(ctx context.Context, query string, limit int) (*RichSearchResult, error) {
+func (s *BoundedStore) SearchRichStringFieldsWithResult(ctx context.Context, query string, limit int) (*RichSearchResult, error) {
 	if query == "" {
 		return nil, errors.New("empty search query")
 	}
@@ -85,10 +85,10 @@ func (bs *BoundedStore) SearchRichStringFieldsWithResult(ctx context.Context, qu
 	// For single-word queries, try exact match first
 	queryWords := strings.Fields(query)
 	if len(queryWords) == 1 {
-		matches, err := bs.searchExactSQL(ctx, query, limit)
+		matches, err := s.searchExactSQL(ctx, query, limit)
 		if err == nil && len(matches) > 0 {
 			result.Matches = matches
-			result.SearchedFields = bs.buildDynamicRichStringFields(ctx)
+			result.SearchedFields = s.buildDynamicRichStringFields(ctx)
 			return result, nil
 		}
 	}
@@ -96,41 +96,41 @@ func (bs *BoundedStore) SearchRichStringFieldsWithResult(ctx context.Context, qu
 	// For multi-word queries or when no exact matches, use fuzzy matching
 	backend := ax.DetectBackend()
 	if backend == ax.MatcherBackendWasm {
-		if bs.logger != nil {
-			bs.logger.Debugw("Using fuzzy search for query", "query", query, "wordCount", len(queryWords), "backend", backend)
+		if s.logger != nil {
+			s.logger.Debugw("Using fuzzy search for query", "query", query, "wordCount", len(queryWords), "backend", backend)
 		}
-		fuzzyMatches, err := bs.searchFuzzyWithEngine(ctx, query, limit)
+		fuzzyMatches, err := s.searchFuzzyWithEngine(ctx, query, limit)
 		if err != nil {
-			if bs.logger != nil {
-				bs.logger.Warnw("Fuzzy search error, trying fallback", "error", err, "query", query)
+			if s.logger != nil {
+				s.logger.Warnw("Fuzzy search error, trying fallback", "error", err, "query", query)
 			}
 			result.Warnings = append(result.Warnings, "Fuzzy search error: "+err.Error())
 			result.Degraded = true
 		} else if len(fuzzyMatches) > 0 {
-			if bs.logger != nil {
-				bs.logger.Debugw("Fuzzy search found matches", "count", len(fuzzyMatches))
+			if s.logger != nil {
+				s.logger.Debugw("Fuzzy search found matches", "count", len(fuzzyMatches))
 			}
 			result.Matches = fuzzyMatches
-			result.SearchedFields = bs.buildDynamicRichStringFields(ctx)
+			result.SearchedFields = s.buildDynamicRichStringFields(ctx)
 			return result, nil
 		}
 	} else {
-		if bs.logger != nil {
-			bs.logger.Debugw("Fuzzy matcher not available")
+		if s.logger != nil {
+			s.logger.Debugw("Fuzzy matcher not available")
 		}
 		result.Warnings = append(result.Warnings, "Fuzzy search unavailable (WASM or Rust backend required)")
 		result.Degraded = true
 	}
 
 	// Fallback to exact SQL search
-	matches, err := bs.searchExactSQL(ctx, query, limit)
+	matches, err := s.searchExactSQL(ctx, query, limit)
 	if err != nil {
 		// If even fallback fails, return error
 		return nil, errors.Wrap(err, "search failed")
 	}
 
 	result.Matches = matches
-	result.SearchedFields = bs.buildDynamicRichStringFields(ctx)
+	result.SearchedFields = s.buildDynamicRichStringFields(ctx)
 	if result.Degraded && len(matches) > 0 {
 		result.Warnings = append(result.Warnings, "Using exact match (typo tolerance disabled)")
 	}
@@ -139,14 +139,14 @@ func (bs *BoundedStore) SearchRichStringFieldsWithResult(ctx context.Context, qu
 }
 
 // searchExactSQL performs exact substring matching using SQL
-func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit int) ([]RichSearchMatch, error) {
+func (s *BoundedStore) searchExactSQL(ctx context.Context, query string, limit int) ([]RichSearchMatch, error) {
 	// Get dynamic fields from type definitions
-	richStringFields := bs.buildDynamicRichStringFields(ctx)
+	richStringFields := s.buildDynamicRichStringFields(ctx)
 
 	// If no rich fields are discovered, return empty results
 	if len(richStringFields) == 0 {
-		if bs.logger != nil {
-			bs.logger.Debugw("No rich string fields discovered, returning empty results")
+		if s.logger != nil {
+			s.logger.Debugw("No rich string fields discovered, returning empty results")
 		}
 		return []RichSearchMatch{}, nil
 	}
@@ -172,7 +172,7 @@ func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit 
 		LIMIT 500
 	`, strings.Join(whereClauses, "\n\t\t\t\tOR "))
 
-	rows, err := bs.db.QueryContext(ctx, sqlQuery, queryParams...)
+	rows, err := s.db.QueryContext(ctx, sqlQuery, queryParams...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query attestations with RichStringFields")
 	}
@@ -189,8 +189,8 @@ func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit 
 		)
 
 		if err := rows.Scan(&id, &subjectsJSON, &attributesJSON); err != nil {
-			if bs.logger != nil {
-				bs.logger.Warnw("Failed to scan attestation row", "error", err)
+			if s.logger != nil {
+				s.logger.Warnw("Failed to scan attestation row", "error", err)
 			}
 			continue
 		}
@@ -364,19 +364,19 @@ const typeFieldsCacheTTL = 5 * time.Minute
 // getTypeDefinitions queries type definition attestations and extracts RichStringFields.
 // Returns a map of type name -> list of rich string fields.
 // Results are cached for performance.
-func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (map[string][]string, error) {
+func (s *BoundedStore) getTypeDefinitions(ctx context.Context) (map[string][]string, error) {
 	// Check cache first
-	bs.typeFieldsCacheLock.RLock()
-	if bs.typeFieldsCache != nil && time.Since(bs.typeFieldsCacheTime) < typeFieldsCacheTTL {
-		defer bs.typeFieldsCacheLock.RUnlock()
-		if bs.logger != nil {
-			bs.logger.Debugw("Using cached type definitions",
-				"type_count", len(bs.typeFieldsCache),
-				"cache_age", time.Since(bs.typeFieldsCacheTime))
+	s.typeFieldsCacheLock.RLock()
+	if s.typeFieldsCache != nil && time.Since(s.typeFieldsCacheTime) < typeFieldsCacheTTL {
+		defer s.typeFieldsCacheLock.RUnlock()
+		if s.logger != nil {
+			s.logger.Debugw("Using cached type definitions",
+				"type_count", len(s.typeFieldsCache),
+				"cache_age", time.Since(s.typeFieldsCacheTime))
 		}
-		return bs.typeFieldsCache, nil
+		return s.typeFieldsCache, nil
 	}
-	bs.typeFieldsCacheLock.RUnlock()
+	s.typeFieldsCacheLock.RUnlock()
 
 	// Query for type definition attestations (predicate="type", context="graph")
 	filter := ats.AttestationFilter{
@@ -385,7 +385,7 @@ func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (map[string][]st
 		Limit:      1000, // Reasonable upper bound on number of types
 	}
 
-	attestations, err := bs.GetAttestations(filter)
+	attestations, err := s.GetAttestations(filter)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query type definitions")
 	}
@@ -410,8 +410,8 @@ func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (map[string][]st
 				}
 				if len(fields) > 0 {
 					typeFields[typeName] = fields
-					if bs.logger != nil {
-						bs.logger.Debugw("Found type with rich fields",
+					if s.logger != nil {
+						s.logger.Debugw("Found type with rich fields",
 							"type", typeName,
 							"fields", fields)
 					}
@@ -421,13 +421,13 @@ func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (map[string][]st
 	}
 
 	// Update cache
-	bs.typeFieldsCacheLock.Lock()
-	bs.typeFieldsCache = typeFields
-	bs.typeFieldsCacheTime = time.Now()
-	bs.typeFieldsCacheLock.Unlock()
+	s.typeFieldsCacheLock.Lock()
+	s.typeFieldsCache = typeFields
+	s.typeFieldsCacheTime = time.Now()
+	s.typeFieldsCacheLock.Unlock()
 
-	if bs.logger != nil {
-		bs.logger.Debugw("Cached type definitions",
+	if s.logger != nil {
+		s.logger.Debugw("Cached type definitions",
 			"type_count", len(typeFields),
 			"total_attestations", len(attestations))
 	}
@@ -437,18 +437,18 @@ func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (map[string][]st
 
 // GetDiscoveredRichFields returns the list of searchable rich string fields
 // discovered from type definitions in the database.
-func (bs *BoundedStore) GetDiscoveredRichFields() []string {
+func (s *BoundedStore) GetDiscoveredRichFields() []string {
 	ctx := context.Background()
-	return bs.buildDynamicRichStringFields(ctx)
+	return s.buildDynamicRichStringFields(ctx)
 }
 
 // GetRichFieldsWithStats returns detailed information about rich string fields
 // including usage counts and source types.
-func (bs *BoundedStore) GetRichFieldsWithStats() ([]RichFieldInfo, error) {
+func (s *BoundedStore) GetRichFieldsWithStats() ([]RichFieldInfo, error) {
 	ctx := context.Background()
 
 	// Get type definitions with their fields
-	typeFields, err := bs.getTypeDefinitions(ctx)
+	typeFields, err := s.getTypeDefinitions(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get type definitions")
 	}
@@ -482,11 +482,11 @@ func (bs *BoundedStore) GetRichFieldsWithStats() ([]RichFieldInfo, error) {
 			  AND json_extract(attributes, '$.%s') != 'null'
 		`, field, field, field)
 
-		err := bs.db.QueryRowContext(ctx, query).Scan(&count)
+		err := s.db.QueryRowContext(ctx, query).Scan(&count)
 		if err != nil {
 			// Log but don't fail - field might not exist in any attestation
-			if bs.logger != nil {
-				bs.logger.Debugw("Failed to count field usage", "field", field, "error", err)
+			if s.logger != nil {
+				s.logger.Debugw("Failed to count field usage", "field", field, "error", err)
 			}
 			count = 0
 		}
@@ -515,11 +515,11 @@ func (bs *BoundedStore) GetRichFieldsWithStats() ([]RichFieldInfo, error) {
 // buildDynamicRichStringFields creates a list of searchable fields
 // by aggregating RichStringFields from type definitions in the database.
 // Returns empty slice if no type definitions with rich fields are found.
-func (bs *BoundedStore) buildDynamicRichStringFields(ctx context.Context) []string {
-	typeFields, err := bs.getTypeDefinitions(ctx)
+func (s *BoundedStore) buildDynamicRichStringFields(ctx context.Context) []string {
+	typeFields, err := s.getTypeDefinitions(ctx)
 	if err != nil {
-		if bs.logger != nil {
-			bs.logger.Warnw("Failed to query type definitions, no fields available", "error", err)
+		if s.logger != nil {
+			s.logger.Warnw("Failed to query type definitions, no fields available", "error", err)
 		}
 		return []string{} // No fallback - purely attested
 	}
@@ -531,8 +531,8 @@ func (bs *BoundedStore) buildDynamicRichStringFields(ctx context.Context) []stri
 	for typeName, fields := range typeFields {
 		for _, field := range fields {
 			fieldSet[field] = true
-			if bs.logger != nil {
-				bs.logger.Debugw("Added rich field from type",
+			if s.logger != nil {
+				s.logger.Debugw("Added rich field from type",
 					"type", typeName,
 					"field", field)
 			}
@@ -546,8 +546,8 @@ func (bs *BoundedStore) buildDynamicRichStringFields(ctx context.Context) []stri
 	}
 	sort.Strings(result)
 
-	if bs.logger != nil {
-		bs.logger.Debugw("Built dynamic rich string fields",
+	if s.logger != nil {
+		s.logger.Debugw("Built dynamic rich string fields",
 			"field_count", len(result),
 			"type_count", len(typeFields),
 			"fields", result)

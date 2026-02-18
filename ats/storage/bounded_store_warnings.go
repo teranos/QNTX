@@ -21,7 +21,7 @@ type StorageWarning struct {
 // CheckStorageStatus checks bounded storage status for an attestation
 // Returns warnings for any (actor, context) pairs approaching limits (80-95% full)
 // Also logs warnings to storage_events table for UI notification
-func (bs *BoundedStore) CheckStorageStatus(as *types.As) []*StorageWarning {
+func (s *BoundedStore) CheckStorageStatus(as *types.As) []*StorageWarning {
 	// Skip self-certifying attestations (bypass 64-actor limit)
 	if len(as.Actors) > 0 && as.Actors[0] == as.ID {
 		return nil
@@ -32,10 +32,10 @@ func (bs *BoundedStore) CheckStorageStatus(as *types.As) []*StorageWarning {
 	// Check each (actor, context) pair
 	for _, actor := range as.Actors {
 		for _, context := range as.Contexts {
-			if warning := bs.checkActorContext(actor, context); warning != nil {
+			if warning := s.checkActorContext(actor, context); warning != nil {
 				warnings = append(warnings, warning)
 				// Log warning to storage_events for UI notification
-				bs.logStorageWarning(actor, context, warning.Current, warning.Limit)
+				s.logStorageWarning(actor, context, warning.Current, warning.Limit)
 			}
 		}
 	}
@@ -44,12 +44,12 @@ func (bs *BoundedStore) CheckStorageStatus(as *types.As) []*StorageWarning {
 }
 
 // checkActorContext checks a specific (actor, context) pair for approaching limits
-func (bs *BoundedStore) checkActorContext(actor, context string) *StorageWarning {
-	limit := bs.config.ActorContextLimit
+func (s *BoundedStore) checkActorContext(actor, context string) *StorageWarning {
+	limit := s.config.ActorContextLimit
 
 	// Count current attestations
 	var count int
-	err := bs.db.QueryRow(`
+	err := s.db.QueryRow(`
 		SELECT COUNT(*)
 		FROM attestations,
 		json_each(actors) as a,
@@ -70,7 +70,7 @@ func (bs *BoundedStore) checkActorContext(actor, context string) *StorageWarning
 
 	// Calculate creation rates
 	var lastHour, lastDay, lastWeek int
-	err = bs.db.QueryRow(`
+	err = s.db.QueryRow(`
 		SELECT
 			SUM(CASE WHEN timestamp > datetime('now', '-1 hour') THEN 1 ELSE 0 END),
 			SUM(CASE WHEN timestamp > datetime('now', '-1 day') THEN 1 ELSE 0 END),

@@ -23,7 +23,7 @@ func NewAliasStore(db *sql.DB) *AliasStore {
 
 // CreateAlias creates a simple bidirectional alias (implements ats.AliasResolver)
 // Aliases use case-insensitive lookups but preserve original values
-func (as *AliasStore) CreateAlias(ctx context.Context, alias, target, createdBy string) error {
+func (s *AliasStore) CreateAlias(ctx context.Context, alias, target, createdBy string) error {
 	// Validate inputs to prevent empty or meaningless aliases
 	if alias == "" {
 		return errors.New("alias cannot be empty")
@@ -36,7 +36,7 @@ func (as *AliasStore) CreateAlias(ctx context.Context, alias, target, createdBy 
 	}
 
 	// Use transaction to ensure atomicity of bidirectional alias creation
-	tx, err := as.db.BeginTx(ctx, nil)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to begin transaction")
 	}
@@ -73,7 +73,7 @@ func (as *AliasStore) CreateAlias(ctx context.Context, alias, target, createdBy 
 
 // ResolveAlias returns all identifiers that should be included when searching for the given identifier (implements ats.AliasResolver)
 // Uses case-insensitive matching via COLLATE NOCASE
-func (as *AliasStore) ResolveAlias(ctx context.Context, identifier string) ([]string, error) {
+func (s *AliasStore) ResolveAlias(ctx context.Context, identifier string) ([]string, error) {
 	query := `
 		SELECT target
 		FROM aliases
@@ -81,7 +81,7 @@ func (as *AliasStore) ResolveAlias(ctx context.Context, identifier string) ([]st
 		UNION
 		SELECT ?`
 
-	rows, err := as.db.QueryContext(ctx, query, identifier, identifier)
+	rows, err := s.db.QueryContext(ctx, query, identifier, identifier)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to resolve alias for %s", identifier)
 	}
@@ -101,10 +101,10 @@ func (as *AliasStore) ResolveAlias(ctx context.Context, identifier string) ([]st
 }
 
 // GetAllAliases returns all alias mappings (implements ats.AliasResolver)
-func (as *AliasStore) GetAllAliases(ctx context.Context) (map[string][]string, error) {
+func (s *AliasStore) GetAllAliases(ctx context.Context) (map[string][]string, error) {
 	query := `SELECT alias, target FROM aliases ORDER BY alias`
 
-	rows, err := as.db.QueryContext(ctx, query)
+	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get all aliases")
 	}
@@ -124,7 +124,7 @@ func (as *AliasStore) GetAllAliases(ctx context.Context) (map[string][]string, e
 
 // RemoveAlias removes an alias mapping (implements ats.AliasResolver)
 // Uses case-insensitive matching via COLLATE NOCASE
-func (as *AliasStore) RemoveAlias(ctx context.Context, alias, target string) error {
+func (s *AliasStore) RemoveAlias(ctx context.Context, alias, target string) error {
 	// Validate inputs
 	if alias == "" {
 		return errors.New("alias cannot be empty")
@@ -134,7 +134,7 @@ func (as *AliasStore) RemoveAlias(ctx context.Context, alias, target string) err
 	}
 
 	// Remove both directions with case-insensitive matching
-	_, err := as.db.ExecContext(ctx, `
+	_, err := s.db.ExecContext(ctx, `
 		DELETE FROM aliases
 		WHERE (alias = ? COLLATE NOCASE AND target = ? COLLATE NOCASE)
 		   OR (alias = ? COLLATE NOCASE AND target = ? COLLATE NOCASE)`,

@@ -44,8 +44,8 @@ func TestNewKeepaliveConfigFromSettings(t *testing.T) {
 	tests := []struct {
 		name              string
 		enabled           bool
-		pingIntervalSecs  *int
-		pongTimeoutSecs   *int
+		pingIntervalSeconds *int
+		pongTimeoutSeconds  *int
 		reconnectAttempts *int
 		wantPingInterval  time.Duration
 		wantPongTimeout   time.Duration
@@ -54,8 +54,8 @@ func TestNewKeepaliveConfigFromSettings(t *testing.T) {
 		{
 			name:              "all defaults (nil)",
 			enabled:           true,
-			pingIntervalSecs:  nil,
-			pongTimeoutSecs:   nil,
+			pingIntervalSeconds:  nil,
+			pongTimeoutSeconds:   nil,
 			reconnectAttempts: nil,
 			wantPingInterval:  DefaultPingInterval,
 			wantPongTimeout:   DefaultPongTimeout,
@@ -64,8 +64,8 @@ func TestNewKeepaliveConfigFromSettings(t *testing.T) {
 		{
 			name:              "explicit zero means zero",
 			enabled:           true,
-			pingIntervalSecs:  intPtr(0),
-			pongTimeoutSecs:   intPtr(0),
+			pingIntervalSeconds:  intPtr(0),
+			pongTimeoutSeconds:   intPtr(0),
 			reconnectAttempts: intPtr(0),
 			wantPingInterval:  0,
 			wantPongTimeout:   0,
@@ -74,8 +74,8 @@ func TestNewKeepaliveConfigFromSettings(t *testing.T) {
 		{
 			name:              "custom values",
 			enabled:           false,
-			pingIntervalSecs:  intPtr(15),
-			pongTimeoutSecs:   intPtr(45),
+			pingIntervalSeconds:  intPtr(15),
+			pongTimeoutSeconds:   intPtr(45),
 			reconnectAttempts: intPtr(5),
 			wantPingInterval:  15 * time.Second,
 			wantPongTimeout:   45 * time.Second,
@@ -84,8 +84,8 @@ func TestNewKeepaliveConfigFromSettings(t *testing.T) {
 		{
 			name:              "mixed custom and defaults",
 			enabled:           true,
-			pingIntervalSecs:  intPtr(20),
-			pongTimeoutSecs:   nil,
+			pingIntervalSeconds:  intPtr(20),
+			pongTimeoutSeconds:   nil,
 			reconnectAttempts: nil,
 			wantPingInterval:  20 * time.Second,
 			wantPongTimeout:   DefaultPongTimeout,
@@ -97,8 +97,8 @@ func TestNewKeepaliveConfigFromSettings(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			config := NewKeepaliveConfigFromSettings(
 				tt.enabled,
-				tt.pingIntervalSecs,
-				tt.pongTimeoutSecs,
+				tt.pingIntervalSeconds,
+				tt.pongTimeoutSeconds,
 				tt.reconnectAttempts,
 			)
 

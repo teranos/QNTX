@@ -49,7 +49,7 @@ const (
 
 // SavePrompt stores a prompt as an attestation
 // If a prompt with the same name and filename exists, a new version is created
-func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, actor string) (*StoredPrompt, error) {
+func (s *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, actor string) (*StoredPrompt, error) {
 	if prompt.Name == "" {
 		return nil, errors.New("prompt name is required")
 	}
@@ -67,7 +67,7 @@ func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, act
 	}
 
 	// Get current version if exists (by filename)
-	existing, err := ps.GetPromptByFilename(ctx, prompt.Filename)
+	existing, err := s.GetPromptByFilename(ctx, prompt.Filename)
 	version := 1
 	if err == nil && existing != nil {
 		version = existing.Version + 1
@@ -113,7 +113,7 @@ func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, act
 	}
 
 	// TODO(issue #346): Pass ctx to CreateAttestation once storage layer supports context
-	if err := ps.store.CreateAttestation(as); err != nil {
+	if err := s.store.CreateAttestation(as); err != nil {
 		return nil, errors.Wrap(err, "failed to store prompt")
 	}
 
@@ -133,7 +133,7 @@ func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, act
 }
 
 // GetPromptByFilename returns the latest version of a prompt by filename
-func (ps *PromptStore) GetPromptByFilename(ctx context.Context, filename string) (*StoredPrompt, error) {
+func (s *PromptStore) GetPromptByFilename(ctx context.Context, filename string) (*StoredPrompt, error) {
 	query := `
 		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at
 		FROM attestations
@@ -143,7 +143,7 @@ func (ps *PromptStore) GetPromptByFilename(ctx context.Context, filename string)
 		LIMIT 1
 	`
 
-	rows, err := ps.db.QueryContext(ctx, query, PredicatePromptTemplate, filename)
+	rows, err := s.db.QueryContext(ctx, query, PredicatePromptTemplate, filename)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query prompt by filename")
 	}
@@ -158,12 +158,12 @@ func (ps *PromptStore) GetPromptByFilename(ctx context.Context, filename string)
 		return nil, errors.Wrap(err, "failed to scan attestation")
 	}
 
-	return ps.attestationToPrompt(as), nil
+	return s.attestationToPrompt(as), nil
 }
 
 // GetPromptByName returns the latest version of a prompt by name
 // Note: Since prompts are now keyed by filename, this searches across all files
-func (ps *PromptStore) GetPromptByName(ctx context.Context, name string) (*StoredPrompt, error) {
+func (s *PromptStore) GetPromptByName(ctx context.Context, name string) (*StoredPrompt, error) {
 	query := `
 		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at
 		FROM attestations
@@ -173,7 +173,7 @@ func (ps *PromptStore) GetPromptByName(ctx context.Context, name string) (*Store
 		LIMIT 1
 	`
 
-	rows, err := ps.db.QueryContext(ctx, query, name, PredicatePromptTemplate)
+	rows, err := s.db.QueryContext(ctx, query, name, PredicatePromptTemplate)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query prompt by name")
 	}
@@ -188,18 +188,18 @@ func (ps *PromptStore) GetPromptByName(ctx context.Context, name string) (*Store
 		return nil, errors.Wrap(err, "failed to scan attestation")
 	}
 
-	return ps.attestationToPrompt(as), nil
+	return s.attestationToPrompt(as), nil
 }
 
 // GetPromptByID returns a specific prompt by ID
-func (ps *PromptStore) GetPromptByID(ctx context.Context, promptID string) (*StoredPrompt, error) {
+func (s *PromptStore) GetPromptByID(ctx context.Context, promptID string) (*StoredPrompt, error) {
 	query := `
 		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at
 		FROM attestations
 		WHERE id = ?
 	`
 
-	rows, err := ps.db.QueryContext(ctx, query, promptID)
+	rows, err := s.db.QueryContext(ctx, query, promptID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query prompt")
 	}
@@ -214,11 +214,11 @@ func (ps *PromptStore) GetPromptByID(ctx context.Context, promptID string) (*Sto
 		return nil, errors.Wrap(err, "failed to scan attestation")
 	}
 
-	return ps.attestationToPrompt(as), nil
+	return s.attestationToPrompt(as), nil
 }
 
 // ListPrompts returns all prompts, most recent first
-func (ps *PromptStore) ListPrompts(ctx context.Context, limit int) ([]*StoredPrompt, error) {
+func (s *PromptStore) ListPrompts(ctx context.Context, limit int) ([]*StoredPrompt, error) {
 	if limit <= 0 {
 		limit = 100
 	}
@@ -231,7 +231,7 @@ func (ps *PromptStore) ListPrompts(ctx context.Context, limit int) ([]*StoredPro
 		LIMIT ?
 	`
 
-	rows, err := ps.db.QueryContext(ctx, query, PredicatePromptTemplate, limit)
+	rows, err := s.db.QueryContext(ctx, query, PredicatePromptTemplate, limit)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list prompts")
 	}
@@ -243,14 +243,14 @@ func (ps *PromptStore) ListPrompts(ctx context.Context, limit int) ([]*StoredPro
 		if err != nil {
 			continue // Skip malformed entries
 		}
-		prompts = append(prompts, ps.attestationToPrompt(as))
+		prompts = append(prompts, s.attestationToPrompt(as))
 	}
 
 	return prompts, nil
 }
 
 // GetPromptVersions returns all versions of a prompt by filename
-func (ps *PromptStore) GetPromptVersions(ctx context.Context, filename string, limit int) ([]*StoredPrompt, error) {
+func (s *PromptStore) GetPromptVersions(ctx context.Context, filename string, limit int) ([]*StoredPrompt, error) {
 	if limit <= 0 {
 		limit = 16 // Bounded storage default
 	}
@@ -264,7 +264,7 @@ func (ps *PromptStore) GetPromptVersions(ctx context.Context, filename string, l
 		LIMIT ?
 	`
 
-	rows, err := ps.db.QueryContext(ctx, query, PredicatePromptTemplate, filename, limit)
+	rows, err := s.db.QueryContext(ctx, query, PredicatePromptTemplate, filename, limit)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list prompt versions")
 	}
@@ -276,14 +276,14 @@ func (ps *PromptStore) GetPromptVersions(ctx context.Context, filename string, l
 		if err != nil {
 			continue
 		}
-		prompts = append(prompts, ps.attestationToPrompt(as))
+		prompts = append(prompts, s.attestationToPrompt(as))
 	}
 
 	return prompts, nil
 }
 
 // attestationToPrompt converts an attestation into a StoredPrompt
-func (ps *PromptStore) attestationToPrompt(as *types.As) *StoredPrompt {
+func (s *PromptStore) attestationToPrompt(as *types.As) *StoredPrompt {
 	name := ""
 	if len(as.Subjects) > 0 {
 		name = as.Subjects[0]
