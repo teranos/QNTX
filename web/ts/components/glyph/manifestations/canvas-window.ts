@@ -56,7 +56,7 @@ export function morphCanvasPlacedToWindow(
 ): void {
     if (isInWindowState(element)) return;
 
-    const { title, canvasId, onClose, onRestoreComplete } = config;
+    const { title, canvasId, onClose } = config;
 
     // 1. Save canvas-local position for morph-back
     setCanvasOrigin(element, {
@@ -400,14 +400,6 @@ export function placeWindowOnCanvas(
 // ── Window drag (private) ────────────────────────────────────────────
 
 const DRAG_KEY = '__canvasWindowDrag';
-
-interface DragState {
-    isDragging: boolean;
-    offsetX: number;
-    offsetY: number;
-    handleMouseDown: (e: MouseEvent) => void;
-    handleTouchStart: (e: TouchEvent) => void;
-}
 
 function setupWindowDrag(windowElement: HTMLElement, handle: HTMLElement): void {
     let isDragging = false;

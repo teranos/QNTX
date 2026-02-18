@@ -550,7 +550,7 @@ function renderOutput(container: HTMLElement, result: ExecutionResult): void {
  * Build window content for a result glyph reopened from the tray.
  * Used as renderContent() when a canvas result is minimized to tray.
  */
-export function renderResultContent(execResult: ExecutionResult, config?: PromptConfig, promptText?: string): HTMLElement {
+export function renderResultContent(execResult: ExecutionResult, _config?: PromptConfig, promptText?: string): HTMLElement {
     const wrapper = document.createElement('div');
     wrapper.className = 'glyph-content';
 
