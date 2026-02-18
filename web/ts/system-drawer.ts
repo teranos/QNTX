@@ -11,9 +11,8 @@ import { spawnGlyphByCommand } from './components/glyph/canvas/spawn-menu.ts';
 
 const DRAWER_HEIGHT_KEY = 'system-drawer-height';
 const DRAWER_MIN = 6;     // Hidden: just the grab bar
-const DRAWER_HEADER = 32; // Header-only height
+const DRAWER_HEADER = 36; // Header-only height (10px grab + ~26px header)
 const DRAWER_MAX = 300;
-const DRAWER_DEFAULT = DRAWER_HEADER;
 
 let searchView: SearchView | null = null;
 let drawerPanel: HTMLElement | null = null;
@@ -144,11 +143,11 @@ export function initSystemDrawer(): void {
     grabBar.className = 'drawer-grab-bar';
     panel.prepend(grabBar);
 
-    // Restore height from IndexedDB, fall back to default
+    // Always start collapsed; use stored height only for expand target
     const stored = getStorageItem(DRAWER_HEIGHT_KEY);
-    const initialHeight = stored ? (parseInt(stored, 10) || DRAWER_DEFAULT) : DRAWER_DEFAULT;
-    setDrawerHeight(panel, initialHeight);
-    lastExpandedHeight = initialHeight > DRAWER_HEADER ? initialHeight : DRAWER_MAX;
+    const storedHeight = stored ? (parseInt(stored, 10) || DRAWER_HEADER) : DRAWER_HEADER;
+    lastExpandedHeight = storedHeight > DRAWER_HEADER ? storedHeight : DRAWER_MAX;
+    setDrawerHeight(panel, DRAWER_HEADER);
 
     // --- Search input in header ---
     const header = document.getElementById('system-drawer-header') as HTMLElement | null;
