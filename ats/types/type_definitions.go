@@ -17,6 +17,15 @@ var PromptResult = TypeDef{
 	RichStringFields: []string{"response"},
 }
 
+// ClusterLabeled is the type for LLM-generated cluster labels.
+// Created by the cluster labeling Pulse job (qntx@embeddings actor).
+var ClusterLabeled = TypeDef{
+	Name:             "labeled",
+	Label:            "Cluster Label",
+	Color:            "#60a5fa",
+	RichStringFields: []string{"label"},
+}
+
 // AttestationStore defines the minimal storage interface needed for type attestations.
 // This avoids circular dependencies with the ats package.
 type AttestationStore interface {
