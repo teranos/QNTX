@@ -8,6 +8,7 @@ import (
 
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/qntx-code/vcs/github"
 )
 
@@ -69,7 +70,7 @@ func runCodePr(cmd *cobra.Command, args []string) error {
 		// Auto-detect from current branch
 		detected, err := github.DetectCurrentPR()
 		if err != nil {
-			return fmt.Errorf("failed to auto-detect PR (use --pr to specify manually): %w", err)
+			return errors.Wrap(err, "failed to auto-detect PR (use --pr to specify manually)")
 		}
 		prNumber = detected
 		pterm.Info.Printf("Auto-detected PR #%d from current branch\n", prNumber)
@@ -81,11 +82,11 @@ func runCodePr(cmd *cobra.Command, args []string) error {
 	branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
 	branchOutput, err := branchCmd.Output()
 	if err != nil {
-		return fmt.Errorf("failed to get current branch: %w", err)
+		return errors.Wrap(err, "failed to get current branch via git rev-parse")
 	}
 	currentBranch := strings.TrimSpace(string(branchOutput))
 	if currentBranch == "" {
-		return fmt.Errorf("failed to determine current branch")
+		return errors.New("git rev-parse returned empty branch name")
 	}
 
 	// Trigger workflow via gh CLI
@@ -95,7 +96,7 @@ func runCodePr(cmd *cobra.Command, args []string) error {
 
 	output, err := workflowCmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to trigger workflow: %w\nOutput: %s", err, string(output))
+		return errors.Wrapf(err, "failed to trigger workflow %s on branch %s (output: %s)", codePrWorkflow, currentBranch, string(output))
 	}
 
 	pterm.Success.Printf("Workflow triggered successfully!\n")
@@ -119,7 +120,7 @@ func runCodePr(cmd *cobra.Command, args []string) error {
 
 	// Monitor workflow completion
 	if err := github.MonitorWorkflowCompletion(runID); err != nil {
-		return fmt.Errorf("workflow monitoring failed: %w", err)
+		return errors.Wrapf(err, "workflow monitoring failed for run %d", runID)
 	}
 
 	pterm.Success.Println("✓ Workflow completed successfully!")
@@ -140,7 +141,7 @@ func displayPRFixSuggestions(prNumber int) error {
 	// Fetch suggestions
 	suggestions, err := github.FetchFixSuggestions(prNumber)
 	if err != nil {
-		return fmt.Errorf("failed to fetch suggestions: %w", err)
+		return errors.Wrapf(err, "failed to fetch suggestions for PR #%d", prNumber)
 	}
 
 	if len(suggestions) == 0 {

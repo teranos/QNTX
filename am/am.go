@@ -28,7 +28,7 @@ type DatabaseConfig struct {
 }
 
 // BoundedStorageConfig configures storage limits for attestations.
-// Values <= 0 default to: ActorContextLimit=16, ActorContextsLimit=64, EntityActorsLimit=64.
+// Omit fields for defaults (16/64/64 via am/defaults.go). Zero means zero: 0 = no attestations retained.
 type BoundedStorageConfig struct {
 	ActorContextLimit  int `mapstructure:"actor_context_limit"`  // attestations per (actor, context) pair (default: 16)
 	ActorContextsLimit int `mapstructure:"actor_contexts_limit"` // contexts per actor (default: 64)

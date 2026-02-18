@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/qntx-code/langserver/gopls"
 )
@@ -153,7 +154,7 @@ func (p *Plugin) Pause(ctx context.Context) error {
 	logger := p.services.Logger("code")
 
 	if p.paused {
-		return fmt.Errorf("code plugin is already paused")
+		return errors.New("code plugin is already paused")
 	}
 
 	// Pause gopls service if available
@@ -174,7 +175,7 @@ func (p *Plugin) Resume(ctx context.Context) error {
 	logger := p.services.Logger("code")
 
 	if !p.paused {
-		return fmt.Errorf("code plugin is not paused")
+		return errors.New("code plugin is not paused")
 	}
 
 	p.paused = false

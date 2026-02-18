@@ -65,7 +65,7 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Bounded storage limits: 0 = use default (per struct docs), negative = invalid
+	// Bounded storage limits: 0 = no attestations retained (QNTX LAW: zero means zero), negative = invalid
 	if c.Database.BoundedStorage.ActorContextLimit < 0 {
 		return errors.Newf("database.bounded_storage.actor_context_limit must be >= 0, got %d", c.Database.BoundedStorage.ActorContextLimit)
 	}
