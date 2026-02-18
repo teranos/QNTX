@@ -19,7 +19,7 @@ globalThis.ResizeObserver = class ResizeObserver {
 mock.module('../../connectivity', () => ({
     connectivityManager: {
         get state() { return 'offline' as const; },
-        subscribe(cb: (s: 'online' | 'offline') => void) {
+        subscribe(cb: (s: 'online' | 'degraded' | 'offline') => void) {
             cb('offline');
             return () => {};
         },

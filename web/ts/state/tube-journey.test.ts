@@ -27,12 +27,12 @@ import { syncStateManager, type GlyphSyncState } from './sync-state';
 import { uiState, type CanvasGlyphState, type CompositionState } from './ui';
 
 // Mock connectivity — offline by default (tunnel)
-let mockConnectivity: 'online' | 'offline' = 'offline';
+let mockConnectivity: 'online' | 'degraded' | 'offline' = 'offline';
 
 mock.module('../connectivity', () => ({
     connectivityManager: {
         get state() { return mockConnectivity; },
-        subscribe(cb: (s: 'online' | 'offline') => void) {
+        subscribe(cb: (s: 'online' | 'degraded' | 'offline') => void) {
             cb(mockConnectivity);
             return () => {};
         },
@@ -62,7 +62,7 @@ const SYNC_QUEUE_KEY = 'qntx-canvas-sync-queue';
  * Mirrors the actual CSS rules from canvas.css and core.css
  */
 interface VisualState {
-    rootAttribute: 'online' | 'offline';
+    rootAttribute: 'online' | 'degraded' | 'offline';
     glyphAttribute: GlyphSyncState;
     expectedFilter: string;
     expectedBorderOpacity: string;
@@ -70,7 +70,7 @@ interface VisualState {
 }
 
 function getExpectedVisualState(
-    connectivity: 'online' | 'offline',
+    connectivity: 'online' | 'degraded' | 'offline',
     syncState: GlyphSyncState,
     localActive = false
 ): VisualState {
@@ -441,7 +441,7 @@ describe('London Tube Journey: Gene Network Analysis', () => {
     test('Visual state mapping: All connectivity and sync combinations', () => {
         // Test all combinations of connectivity and sync state
         const testCases: Array<{
-            connectivity: 'online' | 'offline';
+            connectivity: 'online' | 'degraded' | 'offline';
             syncState: GlyphSyncState;
             localActive?: boolean;
             expectedFilter: string;
@@ -477,7 +477,7 @@ describe('London Tube Journey: Gene Network Analysis', () => {
 
     test('Segment 1: Morden → Balham with multiple tunnel cycles', async () => {
         // Simulate first 5 stations (10 minutes)
-        const journey: Array<{ time: string; location: string; connectivity: 'online' | 'offline'; action: string }> = [];
+        const journey: Array<{ time: string; location: string; connectivity: 'online' | 'degraded' | 'offline'; action: string }> = [];
 
         // 08:31 STATION: Morden
         journey.push({ time: '08:31', location: 'Morden', connectivity: 'online', action: 'Board train, identify novel cluster' });
@@ -638,7 +638,7 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         const journey: Array<{
             time: string;
             location: string;
-            connectivity: 'online' | 'offline';
+            connectivity: 'online' | 'degraded' | 'offline';
             event: string;
         }> = [];
 

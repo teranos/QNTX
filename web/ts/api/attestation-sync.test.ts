@@ -10,13 +10,13 @@ import { describe, test, expect, beforeEach, mock } from 'bun:test';
 import { syncStateManager } from '../state/sync-state';
 
 // Mock connectivity — start offline so add() doesn't auto-flush
-let mockConnectivity: 'online' | 'offline' = 'offline';
-const connectivitySubscribers = new Set<(s: 'online' | 'offline') => void>();
+let mockConnectivity: 'online' | 'degraded' | 'offline' = 'offline';
+const connectivitySubscribers = new Set<(s: 'online' | 'degraded' | 'offline') => void>();
 
 mock.module('../connectivity', () => ({
     connectivityManager: {
         get state() { return mockConnectivity; },
-        subscribe(cb: (s: 'online' | 'offline') => void) {
+        subscribe(cb: (s: 'online' | 'degraded' | 'offline') => void) {
             connectivitySubscribers.add(cb);
             cb(mockConnectivity);
             return () => { connectivitySubscribers.delete(cb); };

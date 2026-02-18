@@ -8,12 +8,12 @@
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
 
-let mockConnectivity: 'online' | 'offline' = 'offline';
+let mockConnectivity: 'online' | 'degraded' | 'offline' = 'offline';
 
 mock.module('../connectivity', () => ({
     connectivityManager: {
         get state() { return mockConnectivity; },
-        subscribe(cb: (s: 'online' | 'offline') => void) {
+        subscribe(cb: (s: 'online' | 'degraded' | 'offline') => void) {
             cb(mockConnectivity);
             return () => {};
         },

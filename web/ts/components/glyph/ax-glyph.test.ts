@@ -19,13 +19,13 @@ globalThis.ResizeObserver = class ResizeObserver {
 } as any;
 
 // Connectivity mock — tests need to control online/offline transitions
-let mockState: 'online' | 'offline' = 'offline';
-const subscribers = new Set<(s: 'online' | 'offline') => void>();
+let mockState: 'online' | 'degraded' | 'offline' = 'offline';
+const subscribers = new Set<(s: 'online' | 'degraded' | 'offline') => void>();
 
 mock.module('../../connectivity', () => ({
     connectivityManager: {
         get state() { return mockState; },
-        subscribe(cb: (s: 'online' | 'offline') => void) {
+        subscribe(cb: (s: 'online' | 'degraded' | 'offline') => void) {
             subscribers.add(cb);
             cb(mockState);
             return () => { subscribers.delete(cb); };
@@ -91,7 +91,7 @@ function makeGlyph(id: string, extras: Partial<Glyph> = {}): Glyph {
     };
 }
 
-function setConnectivity(state: 'online' | 'offline') {
+function setConnectivity(state: 'online' | 'degraded' | 'offline') {
     mockState = state;
     for (const cb of subscribers) cb(state);
 }
