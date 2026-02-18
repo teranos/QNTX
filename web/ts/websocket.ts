@@ -429,24 +429,14 @@ export function connectWebSocket(handlers: MessageHandlers): void {
  */
 function updateConnectionStatus(connected: boolean): void {
     // Notify connectivity manager of WebSocket state change
+    // (status indicator subscribes to connectivity manager directly)
     connectivityManager.setWebSocketConnected(connected);
 
-    // Update status indicator using the new system
-    import('./status-indicators.ts').then(({ statusIndicators }) => {
-        statusIndicators.handleConnectionStatus(connected);
-    });
-
+    // Expand/collapse system drawer based on WS state (useful for debugging)
+    const systemDrawer = document.getElementById('system-drawer');
     if (connected) {
-        // Remove desaturation/dimming from entire UI
-        document.body.classList.remove('disconnected');
-        // Collapse system drawer when connected
-        const systemDrawer = document.getElementById('system-drawer');
         systemDrawer?.classList.add('collapsed');
     } else {
-        // Apply desaturation/dimming to entire UI
-        document.body.classList.add('disconnected');
-        // Expand system drawer when disconnected (useful for debugging)
-        const systemDrawer = document.getElementById('system-drawer');
         systemDrawer?.classList.remove('collapsed');
     }
 }
