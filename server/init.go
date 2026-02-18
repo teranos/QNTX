@@ -192,11 +192,14 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	// Configure log transport to route sends through broadcast worker (thread-safe)
 	wsTransport.SetSendFunc(server.sendLogBatch)
 
-	// Register prompt-result type so prompt glyph attestations render in the graph
+	// Register system type definitions so attestations render in the graph
 	{
 		store := storage.NewSQLStore(db, serverLogger)
 		if err := types.EnsureTypes(store, "prompt-direct", types.PromptResult); err != nil {
 			serverLogger.Warnw("Failed to register prompt-result type", "error", err)
+		}
+		if err := types.EnsureTypes(store, "cluster-labeling", types.ClusterLabeled); err != nil {
+			serverLogger.Warnw("Failed to register cluster-labeled type", "error", err)
 		}
 	}
 
@@ -306,6 +309,7 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	server.SetupEmbeddingService()
 	server.setupEmbeddingReclusterSchedule(deps.config)
 	server.setupEmbeddingReprojectSchedule(deps.config)
+	server.setupClusterLabelSchedule(deps.config)
 
 	// Wire embedding service into watcher engine now that it's available
 	// (watcher engine starts before embeddings — reconnect and reload)
