@@ -18,7 +18,10 @@ import { languageServer } from 'codemirror-languageserver';
 import { sendMessage, validateBackendURL } from './websocket.ts';
 import { requestParse } from './ats-semantic-tokens-client.ts';
 import type { Diagnostic, SemanticToken } from '../types/lsp';
-import { SearchView } from './search-view.ts';
+import { SearchView, STRATEGY_FUZZY } from './search-view.ts';
+import type { SearchMatch, SearchResultsMessage } from './search-view.ts';
+import { connectivityManager } from './connectivity.ts';
+import { fuzzySearch } from './qntx-wasm.ts';
 import { log, SEG } from './logger.ts';
 
 let editorView: EditorView | null = null;
@@ -154,22 +157,74 @@ function handleDocumentChange(update: any): void {
 }
 
 /**
- * Send search query
+ * Send search query — uses server when online, WASM fuzzy search when offline
  */
 function sendSearch(text: string): void {
     if (!text.trim()) {
-        // Clear results if empty
         if (searchView) {
             searchView.clear();
         }
         return;
     }
 
-    // Send as rich_search message type
-    sendMessage({
-        type: 'rich_search',
-        query: text
-    });
+    if (connectivityManager.state === 'online') {
+        sendMessage({
+            type: 'rich_search',
+            query: text
+        });
+    } else {
+        searchOffline(text);
+    }
+}
+
+/**
+ * Offline search via WASM fuzzy engine (predicates + contexts vocabulary)
+ */
+function searchOffline(query: string): void {
+    if (!searchView) return;
+
+    const predicateMatches = fuzzySearch(query, 'predicates', 20, 0.3);
+    const contextMatches = fuzzySearch(query, 'contexts', 20, 0.3);
+
+    const matches: SearchMatch[] = [
+        ...predicateMatches.map(m => ({
+            node_id: '',
+            type_name: 'predicate',
+            type_label: 'P',
+            field_name: 'predicate',
+            field_value: m.value,
+            excerpt: m.value,
+            score: m.score,
+            strategy: STRATEGY_FUZZY,
+            display_label: m.value,
+            attributes: {},
+        })),
+        ...contextMatches.map(m => ({
+            node_id: '',
+            type_name: 'context',
+            type_label: 'C',
+            field_name: 'context',
+            field_value: m.value,
+            excerpt: m.value,
+            score: m.score,
+            strategy: STRATEGY_FUZZY,
+            display_label: m.value,
+            attributes: {},
+        })),
+    ];
+
+    // Sort combined results by score descending, take top 20
+    matches.sort((a, b) => b.score - a.score);
+    const top = matches.slice(0, 20);
+
+    const message: SearchResultsMessage = {
+        type: 'rich_search_results',
+        query,
+        matches: top,
+        total: top.length,
+    };
+
+    searchView.updateResults(message);
 }
 
 /**
