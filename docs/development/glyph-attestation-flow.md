@@ -10,11 +10,13 @@ See [AXIOMS.md](../AXIOMS.md) for the attestation flow axioms.
 
 ```
 [ax: contact] → [py: enrich] → [prompt: summarize {{subject}}]
+[se: contact] → [py: enrich] → [prompt: summarize {{subject}}]
+[se: raw] → [se: filtered] → [py: process]
 ```
 
 When the user melds these three glyphs, two subscriptions compile eagerly:
 
-1. `ax→py`: AX is a filter, always live. Its query (`subjects: contact`) becomes the subscription filter. Any new attestation matching that filter triggers py.
+1. `ax→py` / `se→py`: AX and SE are filters, always live. Their query becomes the subscription filter. Any new attestation matching that filter triggers py.
 2. `py→prompt`: Py is a producer. The subscription filter is `actor == glyph:{py_glyph_id}`. When py calls `attest()`, the resulting attestation triggers prompt.
 
 ### Two edge types
@@ -42,7 +44,7 @@ When the user melds these three glyphs, two subscriptions compile eagerly:
 7. prompt glyph executes with that ONE attestation
 8. {{subject}}, {{predicate}}, etc. resolve from the attestation
 9. LLM runs, result attestation created
-10. Result glyph appears below prompt
+10. Attestation glyph appears below prompt
 ```
 
 Each step is one attestation in, one execution, zero or more attestations out.
@@ -93,7 +95,7 @@ The prompt glyph has no user code. Variable resolution is automatic. The incomin
 
 Same delivery mechanism (one attestation triggers one execution), different interface (template interpolation vs code).
 
-### Cursor / deduplication
+### Cursor / dedup
 
 The watcher engine's existing `OnAttestationCreated` hook fires once per new attestation. Since each attestation has a unique ASID and is immutable, the natural deduplication is: fire once per ASID per edge. The edge either has or hasn't seen a given ASID.
 
@@ -101,11 +103,12 @@ A `(composition_id, edge_from, edge_to, last_processed_asid, last_processed_time
 
 On system restart or composition reconstruction, the cursor ensures we don't re-fire for attestations already processed.
 
-### AX is a pure filter, not a producer
+### AX/SE are pure filters
 
 AX doesn't create attestations. It queries existing ones. When AX is the root of a meld, its query filter becomes the subscription filter for the outgoing edge. The attestations that flow downstream are the original attestations from the store — not copies, not wrappers.
 
 This means:
+
 - No "ax-result" intermediate attestations cluttering the store
 - The downstream glyph receives the real attestation with its original subjects, predicates, contexts, actors
 - AX is stateless: it defines *what to watch for*, not *what to produce*
@@ -115,4 +118,3 @@ This means:
 
 - [#544](https://github.com/teranos/QNTX/issues/544) — Prompt glyph `{{variable}}` resolution from upstream attestation
 - [#543](https://github.com/teranos/QNTX/issues/543) — py→py reactive meld chaining
-
