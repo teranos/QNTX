@@ -58,21 +58,21 @@ func NewStdioClient() (*StdioClient, error) {
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create stdin pipe: %w", err)
+		return nil, errors.Wrap(err, "failed to create gopls stdin pipe")
 	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
+		return nil, errors.Wrap(err, "failed to create gopls stdout pipe")
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
+		return nil, errors.Wrap(err, "failed to create gopls stderr pipe")
 	}
 
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start gopls: %w", err)
+		return nil, errors.Wrap(err, "failed to start gopls process")
 	}
 
 	client := &StdioClient{
@@ -110,12 +110,12 @@ func (c *StdioClient) Initialize(ctx context.Context, workspaceRoot string) erro
 
 	var result json.RawMessage
 	if err := c.call(ctx, "initialize", params, &result); err != nil {
-		return fmt.Errorf("initialize failed: %w", err)
+		return errors.Wrapf(err, "gopls initialize failed for workspace %s", workspaceRoot)
 	}
 
 	// Send initialized notification
 	if err := c.notify("initialized", map[string]interface{}{}); err != nil {
-		return fmt.Errorf("initialized notification failed: %w", err)
+		return errors.Wrap(err, "gopls initialized notification failed")
 	}
 
 	return nil
@@ -128,11 +128,11 @@ func (c *StdioClient) Shutdown(ctx context.Context) error {
 	c.mu.Unlock()
 
 	if err := c.call(ctx, "shutdown", nil, nil); err != nil {
-		return fmt.Errorf("shutdown RPC failed: %w", err)
+		return errors.Wrap(err, "gopls shutdown RPC failed")
 	}
 
 	if err := c.notify("exit", nil); err != nil {
-		return fmt.Errorf("exit notification failed: %w", err)
+		return errors.Wrap(err, "gopls exit notification failed")
 	}
 
 	// Close stdin and mark as closed
@@ -150,11 +150,11 @@ func (c *StdioClient) Shutdown(ctx context.Context) error {
 	select {
 	case err := <-done:
 		if err != nil {
-			return fmt.Errorf("gopls process exited with error: %w", err)
+			return errors.Wrap(err, "gopls process exited with error")
 		}
 		return nil
 	case <-ctx.Done():
-		return fmt.Errorf("timeout waiting for gopls process to exit: %w", ctx.Err())
+		return errors.Wrap(ctx.Err(), "timeout waiting for gopls process to exit")
 	}
 }
 
@@ -169,7 +169,7 @@ func (c *StdioClient) ForceKill() error {
 	c.shutdown = true
 
 	if c.cmd == nil || c.cmd.Process == nil {
-		return fmt.Errorf("no process to kill")
+		return errors.New("no gopls process to kill")
 	}
 
 	// Close stdin to signal process (check if not already closed)
@@ -182,7 +182,7 @@ func (c *StdioClient) ForceKill() error {
 
 	// Kill the process
 	if err := c.cmd.Process.Kill(); err != nil {
-		return fmt.Errorf("failed to kill process: %w", err)
+		return errors.Wrapf(err, "failed to kill gopls process (pid %d)", c.cmd.Process.Pid)
 	}
 
 	return nil
@@ -199,7 +199,7 @@ func (c *StdioClient) GoToDefinition(ctx context.Context, uri string, pos Positi
 
 	var result []Location
 	if err := c.call(ctx, "textDocument/definition", params, &result); err != nil {
-		return nil, fmt.Errorf("definition at %s:%d:%d: %w", uri, pos.Line, pos.Character, err)
+		return nil, errors.Wrapf(err, "gopls definition at %s:%d:%d", uri, pos.Line, pos.Character)
 	}
 
 	return result, nil
@@ -219,7 +219,7 @@ func (c *StdioClient) FindReferences(ctx context.Context, uri string, pos Positi
 
 	var result []Location
 	if err := c.call(ctx, "textDocument/references", params, &result); err != nil {
-		return nil, fmt.Errorf("references at %s:%d:%d: %w", uri, pos.Line, pos.Character, err)
+		return nil, errors.Wrapf(err, "gopls references at %s:%d:%d", uri, pos.Line, pos.Character)
 	}
 
 	return result, nil
@@ -236,7 +236,7 @@ func (c *StdioClient) GetHover(ctx context.Context, uri string, pos Position) (*
 
 	var result Hover
 	if err := c.call(ctx, "textDocument/hover", params, &result); err != nil {
-		return nil, fmt.Errorf("hover at %s:%d:%d: %w", uri, pos.Line, pos.Character, err)
+		return nil, errors.Wrapf(err, "gopls hover at %s:%d:%d", uri, pos.Line, pos.Character)
 	}
 
 	return &result, nil
@@ -297,7 +297,7 @@ func (c *StdioClient) Rename(ctx context.Context, uri string, pos Position, newN
 
 	var result WorkspaceEdit
 	if err := c.call(ctx, "textDocument/rename", params, &result); err != nil {
-		return nil, fmt.Errorf("rename at %s:%d:%d to %q: %w", uri, pos.Line, pos.Character, newName, err)
+		return nil, errors.Wrapf(err, "gopls rename at %s:%d:%d to %q", uri, pos.Line, pos.Character, newName)
 	}
 
 	return &result, nil
@@ -335,7 +335,7 @@ func (c *StdioClient) GetCodeActions(ctx context.Context, uri string, rng Range,
 
 	var result []CodeAction
 	if err := c.call(ctx, "textDocument/codeAction", params, &result); err != nil {
-		return nil, fmt.Errorf("code actions at %s:%d:%d-%d:%d: %w", uri, rng.Start.Line, rng.Start.Character, rng.End.Line, rng.End.Character, err)
+		return nil, errors.Wrapf(err, "gopls code actions at %s:%d:%d-%d:%d", uri, rng.Start.Line, rng.Start.Character, rng.End.Line, rng.End.Character)
 	}
 
 	return result, nil
@@ -376,7 +376,7 @@ func (c *StdioClient) ApplyEdit(ctx context.Context, edit *WorkspaceEdit) error 
 		edits := edit.Changes[uri]
 		fmt.Fprintf(os.Stderr, "[gopls] Applying %d edit(s) to %s\n", len(edits), uri)
 		if err := applyTextEdits(uri, edits); err != nil {
-			return fmt.Errorf("failed to apply %d edit(s) to %s: %w", len(edits), uri, err)
+			return errors.Wrapf(err, "failed to apply %d edit(s) to %s", len(edits), uri)
 		}
 	}
 
@@ -384,7 +384,7 @@ func (c *StdioClient) ApplyEdit(ctx context.Context, edit *WorkspaceEdit) error 
 	for _, docEdit := range edit.DocumentChanges {
 		fmt.Fprintf(os.Stderr, "[gopls] Applying %d document change(s) to %s\n", len(docEdit.Edits), docEdit.TextDocument.URI)
 		if err := applyTextEdits(docEdit.TextDocument.URI, docEdit.Edits); err != nil {
-			return fmt.Errorf("failed to apply %d document change(s) to %s: %w", len(docEdit.Edits), docEdit.TextDocument.URI, err)
+			return errors.Wrapf(err, "failed to apply %d document change(s) to %s", len(docEdit.Edits), docEdit.TextDocument.URI)
 		}
 	}
 
@@ -477,7 +477,7 @@ func (c *StdioClient) call(ctx context.Context, method string, params, result in
 	c.mu.Lock()
 	if c.shutdown {
 		c.mu.Unlock()
-		return fmt.Errorf("client is shutdown")
+		return errors.New("gopls client is shutdown")
 	}
 
 	id := c.nextID.Add(1)

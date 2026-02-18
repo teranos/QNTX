@@ -2,11 +2,14 @@ package gopls
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
+	"github.com/teranos/QNTX/errors"
 	"go.uber.org/zap"
 )
+
+// ErrServiceNotInitialized is returned when gopls operations are called before Initialize
+var ErrServiceNotInitialized = errors.New("gopls service not initialized (call Initialize first)")
 
 // Service provides gopls language intelligence for Go code
 // Wraps the gopls client with lifecycle management and LSP-oriented API
@@ -27,12 +30,12 @@ type Config struct {
 // NewService creates a new gopls service
 func NewService(cfg Config) (*Service, error) {
 	if cfg.Logger == nil {
-		return nil, fmt.Errorf("logger is required")
+		return nil, errors.New("gopls service requires a logger")
 	}
 
 	client, err := NewStdioClient()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create gopls client: %w", err)
+		return nil, errors.Wrap(err, "failed to create gopls stdio client")
 	}
 
 	return &Service{
@@ -52,7 +55,7 @@ func (s *Service) Initialize(ctx context.Context) error {
 	}
 
 	if err := s.client.Initialize(ctx, s.workspaceRoot); err != nil {
-		return fmt.Errorf("failed to initialize gopls: %w", err)
+		return errors.Wrapf(err, "failed to initialize gopls for workspace %s", s.workspaceRoot)
 	}
 
 	s.initialized = true
@@ -86,14 +89,14 @@ func (s *Service) Shutdown(ctx context.Context) error {
 					"shutdown_error", shutdownErr,
 					"kill_error", killErr,
 				)
-				return fmt.Errorf("gopls shutdown failed and force kill failed: shutdown=%w, kill=%v", shutdownErr, killErr)
+				return errors.Wrapf(shutdownErr, "gopls shutdown failed and force kill also failed (kill err: %v)", killErr)
 			}
 			s.logger.Infow("gopls process force killed after failed graceful shutdown")
 		}
 
 		// Mark as not initialized even if shutdown failed
 		s.initialized = false
-		return fmt.Errorf("gopls required force kill: %w", shutdownErr)
+		return errors.Wrap(shutdownErr, "gopls required force kill after failed graceful shutdown")
 	}
 
 	s.initialized = false
@@ -114,7 +117,7 @@ func (s *Service) GoToDefinition(ctx context.Context, uri string, pos Position) 
 	defer s.mu.RUnlock()
 
 	if !s.initialized {
-		return nil, fmt.Errorf("service not initialized")
+		return nil, ErrServiceNotInitialized
 	}
 
 	return s.client.GoToDefinition(ctx, uri, pos)
@@ -126,7 +129,7 @@ func (s *Service) FindReferences(ctx context.Context, uri string, pos Position, 
 	defer s.mu.RUnlock()
 
 	if !s.initialized {
-		return nil, fmt.Errorf("service not initialized")
+		return nil, ErrServiceNotInitialized
 	}
 
 	return s.client.FindReferences(ctx, uri, pos, includeDeclaration)
@@ -138,7 +141,7 @@ func (s *Service) GetHover(ctx context.Context, uri string, pos Position) (*Hove
 	defer s.mu.RUnlock()
 
 	if !s.initialized {
-		return nil, fmt.Errorf("service not initialized")
+		return nil, ErrServiceNotInitialized
 	}
 
 	return s.client.GetHover(ctx, uri, pos)
@@ -150,7 +153,7 @@ func (s *Service) GetDiagnostics(ctx context.Context, uri string) ([]Diagnostic,
 	defer s.mu.RUnlock()
 
 	if !s.initialized {
-		return nil, fmt.Errorf("service not initialized")
+		return nil, ErrServiceNotInitialized
 	}
 
 	return s.client.GetDiagnostics(ctx, uri)
@@ -162,7 +165,7 @@ func (s *Service) ListDocumentSymbols(ctx context.Context, uri string) ([]Docume
 	defer s.mu.RUnlock()
 
 	if !s.initialized {
-		return nil, fmt.Errorf("service not initialized")
+		return nil, ErrServiceNotInitialized
 	}
 
 	return s.client.ListDocumentSymbols(ctx, uri)
@@ -174,7 +177,7 @@ func (s *Service) FormatDocument(ctx context.Context, uri string) ([]TextEdit, e
 	defer s.mu.RUnlock()
 
 	if !s.initialized {
-		return nil, fmt.Errorf("service not initialized")
+		return nil, ErrServiceNotInitialized
 	}
 
 	return s.client.FormatDocument(ctx, uri)
