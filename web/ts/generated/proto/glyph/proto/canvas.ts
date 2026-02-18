@@ -60,3 +60,12 @@ export interface Composition {
   created_at: string | undefined;
   updated_at: string | undefined;
 }
+
+/**
+ * MinimizedWindow tracks a glyph that has been minimized to the tray.
+ * Synced between frontend (IndexedDB) and backend (SQLite).
+ */
+export interface MinimizedWindow {
+  glyph_id: string;
+  created_at: string | undefined;
+}

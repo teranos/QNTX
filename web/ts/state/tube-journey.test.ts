@@ -138,7 +138,7 @@ function composition(id: string, overrides: Partial<CompositionState> = {}): Com
     return { id, edges: [], x: 0, y: 0, ...overrides };
 }
 
-const emptyCanvas = { glyphs: [] as CanvasGlyphState[], compositions: [] as CompositionState[] };
+const emptyCanvas = { glyphs: [] as CanvasGlyphState[], compositions: [] as CompositionState[], minimizedWindows: [] as string[] };
 
 describe('mergeCanvasState', () => {
     test('backend-only items appended to local state', () => {
@@ -177,10 +177,11 @@ describe('mergeCanvasState', () => {
     });
 
     test('glyphs and compositions merge independently', () => {
-        const local = { glyphs: [glyph('g1')], compositions: [composition('c1')] };
+        const local = { glyphs: [glyph('g1')], compositions: [composition('c1')], minimizedWindows: [] as string[] };
         const backend = {
             glyphs: [glyph('g1'), glyph('g2')],
             compositions: [composition('c1'), composition('c2'), composition('c3')],
+            minimizedWindows: [] as string[],
         };
         const result = mergeCanvasState(local, backend);
 
@@ -208,6 +209,7 @@ describe('08:29 Morden: Jenny opens QNTX and receives Parbattie\'s overnight fie
     const jennyLocal = {
         glyphs: [glyph('ax-jenny', { symbol: 'ax', x: 120, y: 80 })],
         compositions: [],
+        minimizedWindows: [] as string[],
     };
 
     const backendAfterParbattie = {
@@ -224,6 +226,7 @@ describe('08:29 Morden: Jenny opens QNTX and receives Parbattie\'s overnight fie
                 ],
             }),
         ],
+        minimizedWindows: [] as string[],
     };
 
     test('Jenny sees her glyph plus Parbattie\'s overnight field notes', () => {
@@ -273,10 +276,11 @@ describe('08:29 Morden: Jenny opens QNTX and receives Parbattie\'s overnight fie
                 }),
             ],
             compositions: [],
+            minimizedWindows: [] as string[],
         };
 
         // Jenny's local has no field notes yet
-        const jennyEmpty = { glyphs: [], compositions: [] };
+        const jennyEmpty = { glyphs: [], compositions: [], minimizedWindows: [] as string[] };
 
         const merged = mergeCanvasState(jennyEmpty, backendWithCode);
 
