@@ -12,7 +12,7 @@ import { syncStateManager } from '../state/sync-state';
 import { connectivityManager } from '../connectivity';
 import { uiState } from '../state/ui';
 
-export type CanvasSyncOp = 'glyph_upsert' | 'glyph_delete' | 'composition_upsert' | 'composition_delete';
+export type CanvasSyncOp = 'glyph_upsert' | 'glyph_delete' | 'composition_upsert' | 'composition_delete' | 'minimized_add' | 'minimized_delete';
 
 export interface CanvasSyncEntry {
     id: string;
@@ -24,6 +24,13 @@ export interface CanvasSyncEntry {
 const STORAGE_KEY = 'qntx-canvas-sync-queue';
 const MAX_RETRIES = 3;
 const BASE_BACKOFF_MS = 1000;
+
+/** Classify sync op into entity type for dedup (same ID + same type → collapse) */
+function entityTypeOf(op: string): string {
+    if (op.startsWith('glyph')) return 'glyph';
+    if (op.startsWith('composition')) return 'composition';
+    return 'minimized';
+}
 
 class CanvasSyncQueueImpl {
     private flushing = false;
@@ -72,15 +79,14 @@ class CanvasSyncQueueImpl {
         // Dedup: for same ID and entity type, latest op wins.
         // delete supersedes pending upsert; duplicate upserts collapse.
         // Fresh add resets retry state (user edited again → no backoff).
-        const entityType = entry.op.startsWith('glyph') ? 'glyph' : 'composition';
+        const entityType = entityTypeOf(entry.op);
         const filtered = q.filter(e => {
-            const eType = e.op.startsWith('glyph') ? 'glyph' : 'composition';
-            return !(e.id === entry.id && eType === entityType);
+            return !(e.id === entry.id && entityTypeOf(e.op) === entityType);
         });
         filtered.push({ id: entry.id, op: entry.op });
         this.queue = filtered;
 
-        if (entry.op.endsWith('upsert')) {
+        if (entry.op.endsWith('upsert') && !entry.op.startsWith('minimized')) {
             syncStateManager.setState(entry.id, 'unsynced');
         }
 
@@ -143,10 +149,9 @@ class CanvasSyncQueueImpl {
             const additions = this.flushAdditions;
             this.flushAdditions = [];
             for (const entry of additions) {
-                const entityType = entry.op.startsWith('glyph') ? 'glyph' : 'composition';
+                const entityType = entityTypeOf(entry.op);
                 const idx = survived.findIndex(e => {
-                    const eType = e.op.startsWith('glyph') ? 'glyph' : 'composition';
-                    return e.id === entry.id && eType === entityType;
+                    return e.id === entry.id && entityTypeOf(e.op) === entityType;
                 });
                 if (idx >= 0) survived[idx] = entry;
                 else survived.push(entry);
@@ -177,6 +182,10 @@ class CanvasSyncQueueImpl {
                 return this.syncCompositionUpsert(entry.id);
             case 'composition_delete':
                 return this.syncCompositionDelete(entry.id);
+            case 'minimized_add':
+                return this.syncMinimizedAdd(entry.id);
+            case 'minimized_delete':
+                return this.syncMinimizedDelete(entry.id);
         }
     }
 
@@ -268,6 +277,34 @@ class CanvasSyncQueueImpl {
 
         syncStateManager.setState(id, 'failed');
         log.warn(SEG.GLYPH, `[CanvasSync] Failed to delete composition ${id}: ${response.status}`);
+        return false;
+    }
+
+    private async syncMinimizedAdd(id: string): Promise<boolean> {
+        const response = await apiFetch('/api/canvas/minimized-windows', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ glyph_id: id }),
+        });
+
+        if (response.ok) {
+            log.debug(SEG.GLYPH, `[CanvasSync] Synced minimized window ${id}`);
+            return true;
+        }
+
+        log.warn(SEG.GLYPH, `[CanvasSync] Failed to sync minimized window ${id}: ${response.status}`);
+        return false;
+    }
+
+    private async syncMinimizedDelete(id: string): Promise<boolean> {
+        const response = await apiFetch(`/api/canvas/minimized-windows/${id}`, { method: 'DELETE' });
+
+        if (response.ok || response.status === 404) {
+            log.debug(SEG.GLYPH, `[CanvasSync] Deleted minimized window ${id}`);
+            return true;
+        }
+
+        log.warn(SEG.GLYPH, `[CanvasSync] Failed to delete minimized window ${id}: ${response.status}`);
         return false;
     }
 }

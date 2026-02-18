@@ -691,6 +691,138 @@ func TestCanvasHandler_HandleCompositions_POST_FourGlyphChain(t *testing.T) {
 	}
 }
 
+// === Minimized window handler tests ===
+
+func TestCanvasHandler_HandleMinimizedWindows_POST(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := glyphstorage.NewCanvasStore(db)
+	handler := NewCanvasHandler(store)
+
+	body := []byte(`{"glyph_id": "glyph-1"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/canvas/minimized-windows", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.HandleMinimizedWindows(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Errorf("Expected status 201, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCanvasHandler_HandleMinimizedWindows_POST_MissingGlyphID(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := glyphstorage.NewCanvasStore(db)
+	handler := NewCanvasHandler(store)
+
+	body := []byte(`{}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/canvas/minimized-windows", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.HandleMinimizedWindows(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400, got %d", w.Code)
+	}
+}
+
+func TestCanvasHandler_HandleMinimizedWindows_GET(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := glyphstorage.NewCanvasStore(db)
+	handler := NewCanvasHandler(store)
+
+	// Add two minimized windows
+	if err := store.AddMinimizedWindow(context.Background(), "glyph-1"); err != nil {
+		t.Fatalf("AddMinimizedWindow failed: %v", err)
+	}
+	if err := store.AddMinimizedWindow(context.Background(), "glyph-2"); err != nil {
+		t.Fatalf("AddMinimizedWindow failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/canvas/minimized-windows", nil)
+	w := httptest.NewRecorder()
+
+	handler.HandleMinimizedWindows(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	var response []glyphstorage.MinimizedWindow
+	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if len(response) != 2 {
+		t.Errorf("Expected 2 minimized windows, got %d", len(response))
+	}
+}
+
+func TestCanvasHandler_HandleMinimizedWindows_DELETE(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := glyphstorage.NewCanvasStore(db)
+	handler := NewCanvasHandler(store)
+
+	if err := store.AddMinimizedWindow(context.Background(), "glyph-1"); err != nil {
+		t.Fatalf("AddMinimizedWindow failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/canvas/minimized-windows/glyph-1", nil)
+	w := httptest.NewRecorder()
+
+	handler.HandleMinimizedWindows(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Errorf("Expected status 204, got %d", w.Code)
+	}
+}
+
+func TestCanvasHandler_HandleMinimizedWindows_DELETE_NotFound(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := glyphstorage.NewCanvasStore(db)
+	handler := NewCanvasHandler(store)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/canvas/minimized-windows/nonexistent", nil)
+	w := httptest.NewRecorder()
+
+	handler.HandleMinimizedWindows(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("Expected status 404, got %d", w.Code)
+	}
+}
+
+func TestCanvasHandler_HandleMinimizedWindows_DELETE_MissingID(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := glyphstorage.NewCanvasStore(db)
+	handler := NewCanvasHandler(store)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/canvas/minimized-windows", nil)
+	w := httptest.NewRecorder()
+
+	handler.HandleMinimizedWindows(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected status 400, got %d", w.Code)
+	}
+}
+
+func TestCanvasHandler_HandleMinimizedWindows_InvalidMethod(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := glyphstorage.NewCanvasStore(db)
+	handler := NewCanvasHandler(store)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/canvas/minimized-windows", nil)
+	w := httptest.NewRecorder()
+
+	handler.HandleMinimizedWindows(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Errorf("Expected status 405, got %d", w.Code)
+	}
+}
+
 func TestGlyphSymbolToType(t *testing.T) {
 	tests := []struct {
 		symbol   string

@@ -78,6 +78,7 @@
     border-top-left-radius: 4px;
 }
 
+
 /* Smaller variant for note glyphs (sits over folded corner) */
 .glyph-resize-handle--small {
     width: 10px;
