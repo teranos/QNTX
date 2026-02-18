@@ -24,14 +24,32 @@
 }
 
 #system-drawer .drawer-grab-bar {
-    height: 6px;
+    height: 10px;
     cursor: ns-resize;
     flex-shrink: 0;
     background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 1; /* Above sibling content within drawer */
+}
+
+#system-drawer .drawer-grab-bar::after {
+    content: '';
+    width: 32px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.15);
+    transition: background 0.15s;
 }
 
 #system-drawer .drawer-grab-bar:hover {
     background: rgba(255, 255, 255, 0.06);
+}
+
+#system-drawer .drawer-grab-bar:hover::after {
+    background: rgba(255, 255, 255, 0.35);
 }
 
 #system-drawer-header {
