@@ -21,3 +21,7 @@ Each side of a glyph accepts at most one meld connection. Enforced at detection,
 **The edge is the watcher.** A composition edge `from→to` declares a reactive subscription. The meld DAG compiles down to watcher subscriptions. Each edge IS a watcher definition scoped to the composition.
 
 **Subscriptions compile eagerly.** The moment two glyphs meld, the subscription activates. Not on play. On meld. The DAG is live from the moment it's assembled.
+
+## DAG Axiom
+
+Compositions are DAGs. Cycles cannot form.
