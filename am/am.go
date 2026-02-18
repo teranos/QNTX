@@ -143,6 +143,15 @@ type EmbeddingsConfig struct {
 	MinClusterSize           int      `mapstructure:"min_cluster_size"`           // Minimum cluster size for HDBSCAN (default: 5)
 	ClusterMatchThreshold    float64  `mapstructure:"cluster_match_threshold"`    // Cosine similarity threshold for stable cluster matching (default: 0.7)
 	ProjectionMethods        []string `mapstructure:"projection_methods"`         // Dimensionality reduction methods: umap, tsne, pca (default: ["umap"])
+
+	// Cluster labeling via LLM
+	ClusterLabelIntervalSeconds int    `mapstructure:"cluster_label_interval_seconds"` // Pulse schedule interval (0 = disabled)
+	ClusterLabelMinSize         int    `mapstructure:"cluster_label_min_size"`         // Min members to be eligible for labeling
+	ClusterLabelSampleSize      int    `mapstructure:"cluster_label_sample_size"`      // Random samples sent to LLM
+	ClusterLabelMaxPerCycle     int    `mapstructure:"cluster_label_max_per_cycle"`    // Max clusters labeled per run
+	ClusterLabelCooldownDays    int    `mapstructure:"cluster_label_cooldown_days"`    // Min days between re-labels
+	ClusterLabelMaxTokens       int    `mapstructure:"cluster_label_max_tokens"`       // LLM max_tokens
+	ClusterLabelModel           string `mapstructure:"cluster_label_model"`            // Model override (empty = system default)
 }
 
 // File system constants

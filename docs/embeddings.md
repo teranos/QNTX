@@ -37,6 +37,33 @@ When `enabled = false` (default), `SetupEmbeddingService` skips initialization e
 
 When `recluster_interval_seconds > 0`, a Pulse scheduled job is auto-created on startup to periodically re-run HDBSCAN clustering. The schedule is idempotent — restarting the server won't duplicate it. Changing the interval in config updates the existing schedule.
 
+### Cluster Labeling
+
+An LLM labels unlabeled clusters by sampling member attestation texts. Labels are attested by `qntx@embeddings` — the label, evidence (sampled texts), and model become part of the attestation graph.
+
+```toml
+[embeddings]
+cluster_label_interval_seconds = 300  # label every 5 min (0 = disabled)
+cluster_label_min_size = 15           # skip small clusters
+cluster_label_sample_size = 5         # random texts sent to LLM
+cluster_label_max_per_cycle = 3       # don't label everything at once
+cluster_label_cooldown_days = 7       # min days between re-labels per cluster
+cluster_label_max_tokens = 2000       # LLM response budget
+cluster_label_model = ""              # empty = system default provider/model
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `embeddings.cluster_label_interval_seconds` | int | `0` | Pulse schedule interval (0 = disabled) |
+| `embeddings.cluster_label_min_size` | int | `15` | Minimum members for a cluster to be eligible |
+| `embeddings.cluster_label_sample_size` | int | `5` | Random texts sampled from the cluster and sent to the LLM |
+| `embeddings.cluster_label_max_per_cycle` | int | `3` | Max clusters labeled per scheduled run |
+| `embeddings.cluster_label_cooldown_days` | int | `7` | Minimum days before re-labeling a cluster |
+| `embeddings.cluster_label_max_tokens` | int | `2000` | LLM max_tokens for the labeling request |
+| `embeddings.cluster_label_model` | string | `""` | Model override (empty = system default from OpenRouter/local config) |
+
+Re-labeling is purely time-gated (per-cluster cooldown). Membership-change-ratio triggers are deferred until more usage data informs the heuristic.
+
 Config can also be updated at runtime via the REST API:
 
 ```
@@ -77,6 +104,7 @@ Located at `ats/embeddings/models/all-MiniLM-L6-v2/` (not in git). See [ats/embe
 - **Unified search**: Text + semantic results merged and deduplicated (#485)
 - **Semantic Search Glyph (⊨)**: Live canvas glyph with historical + live matching (#496, #499)
 - **Scheduled re-clustering**: HDBSCAN runs on a Pulse schedule so cluster topology stays current as data grows (#506)
+- **Cluster labeling**: LLM labels unlabeled clusters on a Pulse schedule, attested by `qntx@embeddings`
 
 ## Open Work
 
