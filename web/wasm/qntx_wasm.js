@@ -484,6 +484,17 @@ function __wbg_get_imports() {
             const ret = arg0.error;
             return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
         }, arguments); },
+        __wbg_error_7534b8e9a36f1ab4: function(arg0, arg1) {
+            let deferred0_0;
+            let deferred0_1;
+            try {
+                deferred0_0 = arg0;
+                deferred0_1 = arg1;
+                console.error(getStringFromWasm0(arg0, arg1));
+            } finally {
+                wasm.__wbindgen_free(deferred0_0, deferred0_1, 1);
+            }
+        },
         __wbg_error_bf9fa99d609a0ce7: function(arg0) {
             const ret = arg0.error;
             return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
@@ -545,6 +556,10 @@ function __wbg_get_imports() {
         },
         __wbg_new_361308b2356cecd0: function() {
             const ret = new Object();
+            return ret;
+        },
+        __wbg_new_8a6f238a6ece86ea: function() {
+            const ret = new Error();
             return ret;
         },
         __wbg_new_b5d9e2fb389fef91: function(arg0, arg1) {
@@ -622,6 +637,13 @@ function __wbg_get_imports() {
         __wbg_set_onupgradeneeded_c887b74722b6ce77: function(arg0, arg1) {
             arg0.onupgradeneeded = arg1;
         },
+        __wbg_stack_0ed75d68575b0f3c: function(arg0, arg1) {
+            const ret = arg1.stack;
+            const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len1 = WASM_VECTOR_LEN;
+            getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
+            getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
+        },
         __wbg_static_accessor_GLOBAL_12837167ad935116: function() {
             const ret = typeof global === 'undefined' ? null : global;
             return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
@@ -655,17 +677,17 @@ function __wbg_get_imports() {
             return ret;
         }, arguments); },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { dtor_idx: 103, function: Function { arguments: [Externref], shim_idx: 104, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { dtor_idx: 111, function: Function { arguments: [Externref], shim_idx: 112, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h622d11ff1c80a730, wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { dtor_idx: 84, function: Function { arguments: [NamedExternref("Event")], shim_idx: 85, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { dtor_idx: 92, function: Function { arguments: [NamedExternref("Event")], shim_idx: 93, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h63454322f75c3832, wasm_bindgen__convert__closures_____invoke__h857fdb0c9bdea0c8);
             return ret;
         },
         __wbindgen_cast_0000000000000003: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { dtor_idx: 84, function: Function { arguments: [NamedExternref("IDBVersionChangeEvent")], shim_idx: 85, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { dtor_idx: 92, function: Function { arguments: [NamedExternref("IDBVersionChangeEvent")], shim_idx: 93, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h63454322f75c3832, wasm_bindgen__convert__closures_____invoke__h857fdb0c9bdea0c8);
             return ret;
         },
