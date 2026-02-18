@@ -158,7 +158,7 @@ When a meld edge triggers a py glyph, the triggering attestation is injected as 
 - **Present** (meld-triggered): `upstream = {"id": "...", "subjects": [...], "predicates": [...], ...}`
 - **Absent** (standalone, user clicks play): `upstream = None`
 
-The name `upstream` reflects that the attestation comes from the upstream glyph in the meld DAG. Injected by the Rust runtime (`qntx-python/src/execution.rs`) alongside `attest()`. See [vision/glyph-attestation-flow.md](vision/glyph-attestation-flow.md) for the full model.
+The name `upstream` reflects that the attestation comes from the upstream glyph in the meld DAG. Injected by the Rust runtime (`qntx-python/src/execution.rs`) alongside `attest()`. See [development/glyph-attestation-flow.md](development/glyph-attestation-flow.md) for the full model.
 
 ### `attest()` (Python builtin)
 Creates an attestation from within a py glyph. Injected into the Python execution context by the Rust runtime (`qntx-python/src/atsstore.rs`) — not a library import, just available as a global function.
