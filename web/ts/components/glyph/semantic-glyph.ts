@@ -17,6 +17,7 @@ import { sendMessage } from '../../websocket';
 import { apiFetch } from '../../api';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { tooltip } from '../tooltip';
+import { spawnAttestationGlyph } from './attestation-glyph';
 import { uiState } from '../../state/ui';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
@@ -462,7 +463,7 @@ function renderAttestation(attestation: Attestation, score?: number): HTMLElemen
     item.style.marginBottom = '2px';
     item.style.backgroundColor = 'rgba(31, 61, 31, 0.35)';
     item.style.borderRadius = '2px';
-    item.style.cursor = 'default';
+    item.style.cursor = 'pointer';
     item.style.display = 'flex';
     item.style.alignItems = 'center';
     item.style.gap = '8px';
@@ -472,6 +473,13 @@ function renderAttestation(attestation: Attestation, score?: number): HTMLElemen
     if (score !== undefined) {
         item.dataset.score = String(score);
     }
+
+    // Store full attestation for double-click spawn
+    item.dataset.attestation = JSON.stringify(attestation);
+    item.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        spawnAttestationGlyph(attestation, e.clientX, e.clientY);
+    });
 
     const text = document.createElement('div');
     text.style.fontSize = '11px';

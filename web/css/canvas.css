@@ -208,6 +208,18 @@
  * Glyph Sync State Visual Feedback
  * ============================================================================ */
 
+/* Canvas is a spatial workspace, not a document — suppress text selection.
+   Re-enable on editable elements so typing still works. */
+.canvas-workspace {
+    user-select: none;
+}
+.canvas-workspace input,
+.canvas-workspace textarea,
+.canvas-workspace [contenteditable="true"],
+.canvas-workspace .cm-editor {
+    user-select: text;
+}
+
 /* Base glyph - applies saturation and hue shift based on connectivity mode */
 .canvas-glyph:not(.canvas-error-glyph) {
     filter: saturate(var(--mode-glyph-saturation)) hue-rotate(var(--mode-glyph-hue));
@@ -295,6 +307,21 @@
 .canvas-action-delete:hover {
     background: #3d1a0a;
     color: #d45030;
+}
+
+/* ============================================================================
+ * Attestation Glyph (+)
+ * ============================================================================ */
+
+.canvas-attestation-glyph {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-almost-black);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+    color: rgba(255, 255, 255, 0.85);
 }
 
 /* ============================================================================
