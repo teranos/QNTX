@@ -1,6 +1,5 @@
-/* Feedback Styles - Logs, Toasts, Progress */
+/* Search Drawer + Status Indicators */
 
-/* System Drawer (formerly Log Panel) */
 #system-drawer {
     position: fixed;
     bottom: 0;
@@ -72,7 +71,6 @@
     margin-left: auto;
 }
 
-
 /* Search results container in drawer */
 #search-results-container {
     flex: 1;
@@ -101,102 +99,6 @@
 
 #drawer-search-input::placeholder {
     color: var(--text-secondary);
-}
-
-
-/* Progress Events (in log panel) */
-.progress-event {
-    margin: 3px 0;
-    padding: 5px 8px;
-    border-radius: var(--border-radius);
-    background: var(--bg-almost-black);
-    border-left: 3px solid #666;
-}
-
-.progress-event.stage {
-    border-left-color: #4ecdc4;
-}
-
-.progress-event.attestations {
-    border-left-color: #2ecc71;
-}
-
-.progress-event.complete {
-    border-left-color: #9b59b6;
-    background: rgba(155, 89, 182, 0.05);
-}
-
-.progress-event.error {
-    border-left-color: #ff6b6b;
-    background: rgba(255, 107, 107, 0.1);
-}
-
-.progress-event-header {
-    display: flex;
-    align-items: center;
-    gap: var(--gap);
-    margin-bottom: 2px;
-}
-
-.progress-event-icon {
-    font-size: var(--font-size-md);
-}
-
-.progress-event-type {
-    font-weight: 600;
-    color: var(--text-on-dark);
-    font-size: var(--font-size-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.progress-event-timestamp {
-    color: var(--text-secondary);
-    font-size: var(--font-size-sm);
-    margin-left: auto;
-}
-
-.progress-event-message {
-    color: #bbb;
-    font-size: var(--font-size-sm);
-    margin-top: 2px;
-}
-
-.progress-event-details {
-    margin-top: 4px;
-    padding-top: 4px;
-    border-top: 1px solid var(--border-on-dark);
-    font-size: var(--font-size-sm);
-    color: var(--text-tertiary);
-}
-
-.progress-event-detail {
-    margin: 1px 0;
-}
-
-.progress-event-detail strong {
-    color: #ccc;
-    margin-right: 4px;
-}
-
-/* Attestation triple styling */
-.progress-event-detail.attestation-triple {
-    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-    padding: 2px 0;
-}
-
-.att-entity {
-    color: #7eb3ff;
-    font-weight: 600;
-}
-
-.att-relation {
-    color: var(--text-on-dark-secondary);
-    font-style: italic;
-}
-
-.att-value {
-    color: #88c999;
 }
 
 /* Hixtory - IX operation history */
