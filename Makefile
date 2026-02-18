@@ -230,7 +230,12 @@ wasm: ## Build qntx-core as WASM module (for wazero integration + browser)
 	@echo "  [1/2] Building Go/wazero WASM..."
 	@cargo build --release --target wasm32-unknown-unknown --package qntx-wasm
 	@cp target/wasm32-unknown-unknown/release/qntx_wasm.wasm ats/wasm/qntx_core.wasm
-	@echo "  ✓ qntx_core.wasm built and copied to ats/wasm/"
+	@if command -v wasm-opt >/dev/null 2>&1; then \
+		wasm-opt -Os --strip-debug -o ats/wasm/qntx_core.wasm ats/wasm/qntx_core.wasm; \
+		echo "  ✓ qntx_core.wasm built, optimized with wasm-opt, copied to ats/wasm/"; \
+	else \
+		echo "  ✓ qntx_core.wasm built and copied to ats/wasm/ (install wasm-opt for ~15% smaller binary)"; \
+	fi
 	@ls -lh ats/wasm/qntx_core.wasm | awk '{print "    Size: " $$5}'
 	@echo "  [2/2] Building browser WASM with wasm-bindgen..."
 	@if ! command -v wasm-pack >/dev/null 2>&1; then \
@@ -239,7 +244,12 @@ wasm: ## Build qntx-core as WASM module (for wazero integration + browser)
 	fi
 	@cd crates/qntx-wasm && wasm-pack build --target web --features browser
 	@cp -r crates/qntx-wasm/pkg/* web/wasm/
-	@echo "  ✓ Browser WASM built and copied to web/wasm/"
+	@if command -v wasm-opt >/dev/null 2>&1; then \
+		for f in web/wasm/*.wasm; do wasm-opt -Os --strip-debug -o "$$f" "$$f"; done; \
+		echo "  ✓ Browser WASM built, optimized with wasm-opt, copied to web/wasm/"; \
+	else \
+		echo "  ✓ Browser WASM built and copied to web/wasm/ (install wasm-opt for ~15% smaller binary)"; \
+	fi
 	@ls -lh web/wasm/*.wasm 2>/dev/null | awk '{print "    Size: " $$5 " - " $$9}' || (echo "    ERROR: wasm-pack ran but produced no .wasm files"; exit 1)
 
 rust-embeddings: ## Build Rust embeddings library with ONNX support (for CGO integration)

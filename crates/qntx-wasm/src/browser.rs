@@ -36,6 +36,9 @@ const DEFAULT_DB_NAME: &str = "qntx";
 /// Returns a Promise that resolves when initialization is complete.
 #[wasm_bindgen]
 pub async fn init_store(db_name: Option<String>) -> Result<(), JsValue> {
+    // Route Rust panics to console.error instead of "RuntimeError: unreachable"
+    console_error_panic_hook::set_once();
+
     let name = db_name.unwrap_or_else(|| DEFAULT_DB_NAME.to_string());
 
     let store = IndexedDbStore::open(&name)

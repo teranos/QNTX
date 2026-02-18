@@ -11,7 +11,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = []
-browser = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:qntx-indexeddb"]
+browser = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:qntx-indexeddb", "dep:console_error_panic_hook"]
 
 [dependencies]
 # Proto types - demonstrates WASM can use proto without gRPC dependencies (ADR-006)
@@ -25,6 +25,13 @@ wasm-bindgen = { version = "0.2", optional = true }
 wasm-bindgen-futures = { version = "0.4", optional = true }
 js-sys = { version = "0.3", optional = true }
 qntx-indexeddb = { path = "../qntx-indexeddb", optional = true }
+
+# Browser panic debugging: routes panic messages to console.error
+# Without this, panics show as "RuntimeError: unreachable" with no useful info
+console_error_panic_hook = { version = "0.1", optional = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
 
 [profile.release]
 opt-level = "s"
