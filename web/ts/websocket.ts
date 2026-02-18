@@ -182,8 +182,8 @@ const MESSAGE_HANDLERS = {
     rich_search_results: (data: RichSearchResultsMessage) => {
         log.info(SEG.QUERY, 'Rich search results:', data.total, 'matches');
 
-        // Pass results to the CodeMirror editor's search view
-        import('./codemirror-editor.js').then(({ handleSearchResults }) => {
+        // Pass results to the unified search drawer
+        import('./system-drawer.js').then(({ handleSearchResults }) => {
             handleSearchResults(data);
         });
     },
