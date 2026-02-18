@@ -4,18 +4,6 @@ How attestations flow through meld compositions. The meld edge is both spatial g
 
 See [AXIOMS.md](../AXIOMS.md) for the attestation flow axioms.
 
-## What Exists Today
-
-### Creation (complete)
-
-- `attest()` builtin in the python glyph creates attestations via gRPC (`qntx-python/src/atsstore.rs`). Only builtin. No query/read functions in the python runtime.
-- AX executor (`ats/ax/executor.go`) — full query engine with fuzzy matching, alias expansion, conflict detection.
-- Prompt handler (`ats/so/actions/prompt/handler.go`) — backend "so" action with `TemporalCursor` for incremental processing and `SourceAttestationID` lineage.
-
-### Glyph execution (isolated)
-
-- Prompt glyph detects `{{variables}}` but shows "connect to AX glyph (coming soon)" error. Direct (no-variable) prompts work.
-
 ## The Model
 
 ### Meld edge = reactive subscription
@@ -123,35 +111,8 @@ This means:
 - AX is stateless: it defines *what to watch for*, not *what to produce*
 - Standalone AX behavior is unchanged: query, display results in UI
 
-## What Needs Building
+## Open
 
-### Prompt glyph template interpolation from upstream attestation
+- [#544](https://github.com/teranos/QNTX/issues/544) — Prompt glyph `{{variable}}` resolution from upstream attestation
+- [#543](https://github.com/teranos/QNTX/issues/543) — py→py reactive meld chaining
 
-- Replace "coming soon" error with actual `{{variable}}` resolution from the incoming attestation
-- Same delivery mechanism as py glyph (one attestation triggers one execution), different interface (template interpolation vs code)
-
-## Relationship to Watcher System
-
-The watcher engine's execution kernel (`OnAttestationCreated` → filter match → rate limit → dispatch) is reusable. The watcher *registry* (user-created watchers with their own filters) remains a separate, global concept for server-side automation.
-
-Meld edges are canvas-scoped, visual, spatial watchers. They compile to the same filter-match-dispatch pattern but are defined by dragging glyphs together rather than writing filter JSON.
-
-Long-term, the watcher registry UI could itself become a meld composition: a glyph that watches, melded to a glyph that acts. But that's later.
-
-## Infinite Loop Prevention
-
-Since downstream glyphs produce attestations, and edges watch for attestations, cycles are possible if the DAG has loops. Prevention:
-
-1. **DAG enforcement at meld time** — the composition is a DAG by construction (meldability rules + port constraints prevent cycles today). `computeGridPositions` does BFS from roots, which only works on DAGs.
-
-2. **Actor scoping on producer edges** — py→downstream and prompt→downstream subscriptions filter on `actor: glyph:{upstream_id}`. A glyph's own attestations don't match its incoming edge (different actor). Loops require an explicit cycle in the DAG, which (1) prevents.
-
-3. **Edge cursor** — even if somehow retriggered, the cursor ensures each ASID is processed at most once per edge. This is the final safety net for all edge types including AX filter edges.
-
-## What This Unlocks
-
-- `[ax: customer] → [py: score] → [prompt: summarize]` — attestation-driven enrichment pipelines on the canvas
-- `[py: sensor] → [py: transform] → [py: alert]` — chained python processing, each step attested
-- `[ax: new-tickets] → [prompt: triage]` — reactive LLM triage as tickets enter the system
-- `[py: ingest] → [py: validate] → [py: enrich] → [prompt: classify]` — multi-stage data pipelines
-- Canvas compositions become runnable, attestable, inspectable workflows with full provenance
