@@ -127,8 +127,8 @@ type PluginWebSocketConfig struct {
 // PluginKeepaliveConfig configures WebSocket keepalive behavior
 type PluginKeepaliveConfig struct {
 	Enabled           bool `mapstructure:"enabled"`            // Enable keepalive (default: true)
-	PingIntervalSecs  *int `mapstructure:"ping_interval_secs"` // Seconds between PING messages (nil = default 30)
-	PongTimeoutSecs   *int `mapstructure:"pong_timeout_secs"`  // Seconds to wait for PONG (nil = default 60)
+	PingIntervalSeconds *int `mapstructure:"ping_interval_seconds"` // Seconds between PING messages (nil = default 30)
+	PongTimeoutSeconds  *int `mapstructure:"pong_timeout_seconds"`  // Seconds to wait for PONG (nil = default 60)
 	ReconnectAttempts *int `mapstructure:"reconnect_attempts"` // Number of reconnect attempts (nil = default 3)
 }
 

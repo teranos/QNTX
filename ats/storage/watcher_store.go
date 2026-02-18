@@ -73,7 +73,7 @@ func NewWatcherStore(db *sql.DB) *WatcherStore {
 }
 
 // Create creates a new watcher
-func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
+func (s *WatcherStore) Create(ctx context.Context, w *Watcher) error {
 	if w.ID == "" {
 		return errors.New("watcher ID cannot be empty")
 	}
@@ -120,7 +120,7 @@ func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
 		timeEnd = &s
 	}
 
-	_, err = ws.db.ExecContext(ctx, `
+	_, err = s.db.ExecContext(ctx, `
 		INSERT INTO watchers (
 			id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
@@ -146,7 +146,7 @@ func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
 
 // CreateOrReplace creates a watcher or replaces it if one with the same ID exists.
 // Unlike Create, this is idempotent — safe for concurrent calls.
-func (ws *WatcherStore) CreateOrReplace(ctx context.Context, w *Watcher) error {
+func (s *WatcherStore) CreateOrReplace(ctx context.Context, w *Watcher) error {
 	if w.ID == "" {
 		return errors.New("watcher ID cannot be empty")
 	}
@@ -191,7 +191,7 @@ func (ws *WatcherStore) CreateOrReplace(ctx context.Context, w *Watcher) error {
 		timeEnd = &s
 	}
 
-	_, err = ws.db.ExecContext(ctx, `
+	_, err = s.db.ExecContext(ctx, `
 		INSERT OR REPLACE INTO watchers (
 			id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
@@ -216,8 +216,8 @@ func (ws *WatcherStore) CreateOrReplace(ctx context.Context, w *Watcher) error {
 }
 
 // Get retrieves a watcher by ID
-func (ws *WatcherStore) Get(ctx context.Context, id string) (*Watcher, error) {
-	row := ws.db.QueryRowContext(ctx, `
+func (s *WatcherStore) Get(ctx context.Context, id string) (*Watcher, error) {
+	row := s.db.QueryRowContext(ctx, `
 		SELECT id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
 			semantic_query, semantic_threshold, semantic_cluster_id,
@@ -227,11 +227,11 @@ func (ws *WatcherStore) Get(ctx context.Context, id string) (*Watcher, error) {
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
 		FROM watchers WHERE id = ?`, id)
 
-	return ws.scanWatcher(row)
+	return s.scanWatcher(row)
 }
 
 // List returns all watchers, optionally filtered by enabled status
-func (ws *WatcherStore) List(ctx context.Context, enabledOnly bool) ([]*Watcher, error) {
+func (s *WatcherStore) List(ctx context.Context, enabledOnly bool) ([]*Watcher, error) {
 	query := `
 		SELECT id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
@@ -246,7 +246,7 @@ func (ws *WatcherStore) List(ctx context.Context, enabledOnly bool) ([]*Watcher,
 	}
 	query += " ORDER BY created_at DESC"
 
-	rows, err := ws.db.QueryContext(ctx, query)
+	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list watchers")
 	}
@@ -254,7 +254,7 @@ func (ws *WatcherStore) List(ctx context.Context, enabledOnly bool) ([]*Watcher,
 
 	var watchers []*Watcher
 	for rows.Next() {
-		w, err := ws.scanWatcherRows(rows)
+		w, err := s.scanWatcherRows(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -264,7 +264,7 @@ func (ws *WatcherStore) List(ctx context.Context, enabledOnly bool) ([]*Watcher,
 }
 
 // Update updates a watcher
-func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
+func (s *WatcherStore) Update(ctx context.Context, w *Watcher) error {
 	// Validate MaxFiresPerMinute
 	if w.MaxFiresPerMinute < 0 {
 		return errors.Newf("max_fires_per_minute must be >= 0, got %d", w.MaxFiresPerMinute)
@@ -305,7 +305,7 @@ func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
 		lastFiredAt = &s
 	}
 
-	_, err = ws.db.ExecContext(ctx, `
+	_, err = s.db.ExecContext(ctx, `
 		UPDATE watchers SET
 			name = ?,
 			subjects = ?, predicates = ?, contexts = ?, actors = ?, time_start = ?, time_end = ?, ax_query = ?,
@@ -333,8 +333,8 @@ func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
 }
 
 // Delete removes a watcher
-func (ws *WatcherStore) Delete(ctx context.Context, id string) error {
-	_, err := ws.db.ExecContext(ctx, "DELETE FROM watchers WHERE id = ?", id)
+func (s *WatcherStore) Delete(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM watchers WHERE id = ?", id)
 	if err != nil {
 		return errors.Wrap(err, "failed to delete watcher")
 	}
@@ -342,8 +342,8 @@ func (ws *WatcherStore) Delete(ctx context.Context, id string) error {
 }
 
 // DeleteByPrefix deletes all watchers whose ID starts with the given prefix
-func (ws *WatcherStore) DeleteByPrefix(ctx context.Context, prefix string) (int64, error) {
-	result, err := ws.db.ExecContext(ctx, "DELETE FROM watchers WHERE id LIKE ?", prefix+"%")
+func (s *WatcherStore) DeleteByPrefix(ctx context.Context, prefix string) (int64, error) {
+	result, err := s.db.ExecContext(ctx, "DELETE FROM watchers WHERE id LIKE ?", prefix+"%")
 	if err != nil {
 		return 0, errors.Wrapf(err, "failed to delete watchers with prefix %s", prefix)
 	}
@@ -351,9 +351,9 @@ func (ws *WatcherStore) DeleteByPrefix(ctx context.Context, prefix string) (int6
 }
 
 // RecordFire updates the watcher stats after a successful fire
-func (ws *WatcherStore) RecordFire(ctx context.Context, id string) error {
+func (s *WatcherStore) RecordFire(ctx context.Context, id string) error {
 	now := time.Now().Format(time.RFC3339Nano)
-	_, err := ws.db.ExecContext(ctx, `
+	_, err := s.db.ExecContext(ctx, `
 		UPDATE watchers SET
 			last_fired_at = ?,
 			fire_count = fire_count + 1,
@@ -366,9 +366,9 @@ func (ws *WatcherStore) RecordFire(ctx context.Context, id string) error {
 }
 
 // RecordError updates the watcher stats after a failed execution
-func (ws *WatcherStore) RecordError(ctx context.Context, id string, errMsg string) error {
+func (s *WatcherStore) RecordError(ctx context.Context, id string, errMsg string) error {
 	now := time.Now().Format(time.RFC3339Nano)
-	_, err := ws.db.ExecContext(ctx, `
+	_, err := s.db.ExecContext(ctx, `
 		UPDATE watchers SET
 			error_count = error_count + 1,
 			last_error = ?,
@@ -381,7 +381,7 @@ func (ws *WatcherStore) RecordError(ctx context.Context, id string, errMsg strin
 }
 
 // scanWatcher scans a single row into a Watcher
-func (ws *WatcherStore) scanWatcher(row *sql.Row) (*Watcher, error) {
+func (s *WatcherStore) scanWatcher(row *sql.Row) (*Watcher, error) {
 	w, err := scanWatcherFields(func(dest ...interface{}) error {
 		return row.Scan(dest...)
 	})
@@ -392,7 +392,7 @@ func (ws *WatcherStore) scanWatcher(row *sql.Row) (*Watcher, error) {
 }
 
 // scanWatcherRows scans a rows result into a Watcher
-func (ws *WatcherStore) scanWatcherRows(rows *sql.Rows) (*Watcher, error) {
+func (s *WatcherStore) scanWatcherRows(rows *sql.Rows) (*Watcher, error) {
 	return scanWatcherFields(rows.Scan)
 }
 
@@ -515,8 +515,8 @@ func scanWatcherFields(scan func(dest ...interface{}) error) (*Watcher, error) {
 // set whose action_data references the target glyph. Used to detect when a
 // standalone SE watcher should stay suppressed because a compound watcher
 // replaces it.
-func (ws *WatcherStore) FindCompoundWatchersForTarget(ctx context.Context, targetGlyphID string) ([]*Watcher, error) {
-	rows, err := ws.db.QueryContext(ctx, `
+func (s *WatcherStore) FindCompoundWatchersForTarget(ctx context.Context, targetGlyphID string) ([]*Watcher, error) {
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
 			semantic_query, semantic_threshold, semantic_cluster_id,
@@ -535,7 +535,7 @@ func (ws *WatcherStore) FindCompoundWatchersForTarget(ctx context.Context, targe
 
 	var watchers []*Watcher
 	for rows.Next() {
-		w, err := ws.scanWatcherRows(rows)
+		w, err := s.scanWatcherRows(rows)
 		if err != nil {
 			return nil, err
 		}

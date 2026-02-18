@@ -52,15 +52,15 @@ func DefaultKeepaliveConfig() KeepaliveConfig {
 // NewKeepaliveConfigFromSettings creates a KeepaliveConfig from configuration values.
 // This is useful for creating config from am.PluginKeepaliveConfig settings.
 // Nil values use defaults; explicit values (including 0) are used literally.
-func NewKeepaliveConfigFromSettings(enabled bool, pingIntervalSecs, pongTimeoutSecs, reconnectAttempts *int) KeepaliveConfig {
+func NewKeepaliveConfigFromSettings(enabled bool, pingIntervalSeconds, pongTimeoutSeconds, reconnectAttempts *int) KeepaliveConfig {
 	config := DefaultKeepaliveConfig()
 	config.Enabled = enabled
 
-	if pingIntervalSecs != nil {
-		config.PingInterval = time.Duration(*pingIntervalSecs) * time.Second
+	if pingIntervalSeconds != nil {
+		config.PingInterval = time.Duration(*pingIntervalSeconds) * time.Second
 	}
-	if pongTimeoutSecs != nil {
-		config.PongTimeout = time.Duration(*pongTimeoutSecs) * time.Second
+	if pongTimeoutSeconds != nil {
+		config.PongTimeout = time.Duration(*pongTimeoutSeconds) * time.Second
 	}
 	if reconnectAttempts != nil {
 		config.ReconnectAttempts = *reconnectAttempts

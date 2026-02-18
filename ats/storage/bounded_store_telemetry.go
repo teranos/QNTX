@@ -15,12 +15,12 @@ type EvictionDetails struct {
 }
 
 // logStorageEvent records a bounded storage enforcement event for observability
-func (bs *BoundedStore) logStorageEvent(eventType, actor, context, entity string, deletionsCount, limitValue int) {
-	bs.logStorageEventWithDetails(eventType, actor, context, entity, deletionsCount, limitValue, nil)
+func (s *BoundedStore) logStorageEvent(eventType, actor, context, entity string, deletionsCount, limitValue int) {
+	s.logStorageEventWithDetails(eventType, actor, context, entity, deletionsCount, limitValue, nil)
 }
 
 // logStorageEventWithDetails records a storage event with detailed eviction information
-func (bs *BoundedStore) logStorageEventWithDetails(eventType, actor, context, entity string, deletionsCount, limitValue int, details *EvictionDetails) {
+func (s *BoundedStore) logStorageEventWithDetails(eventType, actor, context, entity string, deletionsCount, limitValue int, details *EvictionDetails) {
 	timestamp := time.Now().Format(time.RFC3339)
 
 	// Serialize details to JSON if provided
@@ -32,7 +32,7 @@ func (bs *BoundedStore) logStorageEventWithDetails(eventType, actor, context, en
 	}
 
 	// Log to database for historical tracking
-	_, err := bs.db.Exec(`
+	_, err := s.db.Exec(`
 		INSERT INTO storage_events (event_type, actor, context, entity, deletions_count, limit_value, timestamp, eviction_details)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		eventType,
@@ -46,8 +46,8 @@ func (bs *BoundedStore) logStorageEventWithDetails(eventType, actor, context, en
 	)
 	if err != nil {
 		// Don't fail the operation if logging fails, but warn
-		if bs.logger != nil {
-			bs.logger.Warnw("Failed to log storage event",
+		if s.logger != nil {
+			s.logger.Warnw("Failed to log storage event",
 				"event_type", eventType,
 				"error", err,
 			)
@@ -55,7 +55,7 @@ func (bs *BoundedStore) logStorageEventWithDetails(eventType, actor, context, en
 	}
 
 	// Also log to structured logger for real-time visibility
-	if bs.logger != nil {
+	if s.logger != nil {
 		// Build human-readable message with key details
 		msg := "Bounded storage limit enforced"
 
@@ -92,7 +92,7 @@ func (bs *BoundedStore) logStorageEventWithDetails(eventType, actor, context, en
 			msg += " (deleted oldest)"
 		}
 
-		bs.logger.Debugw(msg,
+		s.logger.Debugw(msg,
 			"event_type", eventType,
 			"actor", actor,
 			"context", context,
@@ -104,11 +104,11 @@ func (bs *BoundedStore) logStorageEventWithDetails(eventType, actor, context, en
 }
 
 // logStorageWarning records a storage warning (approaching limit) for observability
-func (bs *BoundedStore) logStorageWarning(actor, context string, current, limit int) {
+func (s *BoundedStore) logStorageWarning(actor, context string, current, limit int) {
 	timestamp := time.Now().Format(time.RFC3339)
 
 	// Log to database for historical tracking and UI notification
-	_, err := bs.db.Exec(`
+	_, err := s.db.Exec(`
 		INSERT INTO storage_events (event_type, actor, context, entity, deletions_count, limit_value, timestamp)
 		VALUES (?, ?, ?, NULL, ?, ?, ?)`,
 		"storage_warning",
@@ -120,8 +120,8 @@ func (bs *BoundedStore) logStorageWarning(actor, context string, current, limit 
 	)
 	if err != nil {
 		// Don't fail the operation if logging fails, but warn
-		if bs.logger != nil {
-			bs.logger.Warnw("Failed to log storage warning",
+		if s.logger != nil {
+			s.logger.Warnw("Failed to log storage warning",
 				"actor", actor,
 				"context", context,
 				"error", err,

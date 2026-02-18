@@ -30,10 +30,10 @@ const (
 )
 
 // enforceLimits applies the configurable storage limits
-func (bs *BoundedStore) enforceLimits(as *types.As) {
+func (s *BoundedStore) enforceLimits(as *types.As) {
 	if as == nil {
-		if bs.logger != nil {
-			bs.logger.Warn("enforceLimits called with nil attestation")
+		if s.logger != nil {
+			s.logger.Warn("enforceLimits called with nil attestation")
 		}
 		return
 	}
@@ -41,10 +41,10 @@ func (bs *BoundedStore) enforceLimits(as *types.As) {
 	// 1. Enforce N attestations per (actor, context) - remove oldest
 	for _, actor := range as.Actors {
 		for _, context := range as.Contexts {
-			if err := bs.enforceActorContextLimit(actor, context); err != nil {
+			if err := s.enforceActorContextLimit(actor, context); err != nil {
 				// Log error but don't fail the operation
-				if bs.logger != nil {
-					bs.logger.Warnw("Failed to enforce actor-context limit",
+				if s.logger != nil {
+					s.logger.Warnw("Failed to enforce actor-context limit",
 						"actor", actor,
 						"context", context,
 						"error", err,
@@ -56,9 +56,9 @@ func (bs *BoundedStore) enforceLimits(as *types.As) {
 
 	// 2. Enforce N contexts per actor - remove least used
 	for _, actor := range as.Actors {
-		if err := bs.enforceActorContextsLimit(actor); err != nil {
-			if bs.logger != nil {
-				bs.logger.Warnw("Failed to enforce actor contexts limit",
+		if err := s.enforceActorContextsLimit(actor); err != nil {
+			if s.logger != nil {
+				s.logger.Warnw("Failed to enforce actor contexts limit",
 					"actor", actor,
 					"error", err,
 				)
@@ -68,9 +68,9 @@ func (bs *BoundedStore) enforceLimits(as *types.As) {
 
 	// 3. Enforce N actors per entity - remove least recent
 	for _, subject := range as.Subjects {
-		if err := bs.enforceEntityActorsLimit(subject); err != nil {
-			if bs.logger != nil {
-				bs.logger.Warnw("Failed to enforce entity actors limit",
+		if err := s.enforceEntityActorsLimit(subject); err != nil {
+			if s.logger != nil {
+				s.logger.Warnw("Failed to enforce entity actors limit",
 					"subject", subject,
 					"error", err,
 				)
@@ -80,12 +80,12 @@ func (bs *BoundedStore) enforceLimits(as *types.As) {
 }
 
 // enforceActorContextLimit keeps only N most recent attestations for this actor+context
-func (bs *BoundedStore) enforceActorContextLimit(actor, context string) error {
-	limit := bs.config.ActorContextLimit
+func (s *BoundedStore) enforceActorContextLimit(actor, context string) error {
+	limit := s.config.ActorContextLimit
 
 	// Count current attestations for this actor+context
 	var count int
-	err := bs.db.QueryRow(AttestationCountByActorContextQuery, actor, context).Scan(&count)
+	err := s.db.QueryRow(AttestationCountByActorContextQuery, actor, context).Scan(&count)
 	if err != nil {
 		return errors.Wrap(err, "failed to count attestations")
 	}
@@ -100,7 +100,7 @@ func (bs *BoundedStore) enforceActorContextLimit(actor, context string) error {
 			SamplePredicates: make([]string, 0),
 			SampleSubjects:   make([]string, 0),
 		}
-		sampleRows, _ := bs.db.Query(
+		sampleRows, _ := s.db.Query(
 			`SELECT predicates, subjects, timestamp FROM attestations, json_each(actors) as a, json_each(contexts) as c
 			WHERE a.value = ? AND c.value = ?
 			ORDER BY timestamp ASC
@@ -121,24 +121,24 @@ func (bs *BoundedStore) enforceActorContextLimit(actor, context string) error {
 			sampleRows.Close()
 		}
 
-		_, err = bs.db.Exec(AttestationDeleteOldestByActorContextQuery, actor, context, deleteCount)
+		_, err = s.db.Exec(AttestationDeleteOldestByActorContextQuery, actor, context, deleteCount)
 		if err != nil {
 			return errors.Wrap(err, "failed to delete old attestations")
 		}
 
 		// Log enforcement event with details
-		bs.logStorageEventWithDetails("actor_context_limit", actor, context, "", deleteCount, limit, evictionDetails)
+		s.logStorageEventWithDetails("actor_context_limit", actor, context, "", deleteCount, limit, evictionDetails)
 	}
 
 	return nil
 }
 
 // enforceActorContextsLimit keeps only N most used contexts for this actor
-func (bs *BoundedStore) enforceActorContextsLimit(actor string) error {
-	limit := bs.config.ActorContextsLimit
+func (s *BoundedStore) enforceActorContextsLimit(actor string) error {
+	limit := s.config.ActorContextsLimit
 
 	// Get all contexts for this actor with usage counts
-	rows, err := bs.db.Query(queryActorContexts, actor)
+	rows, err := s.db.Query(queryActorContexts, actor)
 	if err != nil {
 		return errors.Wrap(err, "failed to query actor contexts")
 	}
@@ -180,7 +180,7 @@ func (bs *BoundedStore) enforceActorContextsLimit(actor string) error {
 
 			// Collect sample data from first context being evicted
 			if len(evictionDetails.SamplePredicates) == 0 {
-				sampleRows, _ := bs.db.Query(
+				sampleRows, _ := s.db.Query(
 					`SELECT predicates, subjects, timestamp FROM attestations
 					WHERE EXISTS (
 						SELECT 1 FROM json_each(attestations.actors)
@@ -205,7 +205,7 @@ func (bs *BoundedStore) enforceActorContextsLimit(actor string) error {
 			}
 
 			// Delete all attestations with this context array
-			result, err := bs.db.Exec(
+			result, err := s.db.Exec(
 				`DELETE FROM attestations
 				WHERE EXISTS (
 					SELECT 1 FROM json_each(attestations.actors)
@@ -225,7 +225,7 @@ func (bs *BoundedStore) enforceActorContextsLimit(actor string) error {
 
 		// Log enforcement event with details
 		if totalDeleted > 0 {
-			bs.logStorageEventWithDetails("actor_contexts_limit", actor, "", "", totalDeleted, limit, evictionDetails)
+			s.logStorageEventWithDetails("actor_contexts_limit", actor, "", "", totalDeleted, limit, evictionDetails)
 		}
 	}
 
@@ -233,11 +233,11 @@ func (bs *BoundedStore) enforceActorContextsLimit(actor string) error {
 }
 
 // enforceEntityActorsLimit keeps only N most recent actors for this entity
-func (bs *BoundedStore) enforceEntityActorsLimit(entity string) error {
-	limit := bs.config.EntityActorsLimit
+func (s *BoundedStore) enforceEntityActorsLimit(entity string) error {
+	limit := s.config.EntityActorsLimit
 
 	// Get all actors for this entity with most recent timestamps
-	rows, err := bs.db.Query(queryEntityActors, entity)
+	rows, err := s.db.Query(queryEntityActors, entity)
 	if err != nil {
 		return errors.Wrap(err, "failed to query entity actors")
 	}
@@ -282,7 +282,7 @@ func (bs *BoundedStore) enforceEntityActorsLimit(entity string) error {
 
 			// Collect sample data from attestations being evicted (first actor only, to limit output)
 			if len(evictionDetails.SamplePredicates) == 0 {
-				sampleRows, _ := bs.db.Query(
+				sampleRows, _ := s.db.Query(
 					`SELECT predicates, subjects FROM attestations
 					WHERE EXISTS (
 						SELECT 1 FROM json_each(attestations.actors)
@@ -306,7 +306,7 @@ func (bs *BoundedStore) enforceEntityActorsLimit(entity string) error {
 			}
 
 			// Delete all attestations by this actor that mention this entity
-			result, err := bs.db.Exec(
+			result, err := s.db.Exec(
 				`DELETE FROM attestations
 				WHERE EXISTS (
 					SELECT 1 FROM json_each(attestations.actors)
@@ -329,7 +329,7 @@ func (bs *BoundedStore) enforceEntityActorsLimit(entity string) error {
 
 		// Log enforcement event with detailed eviction data
 		if totalDeleted > 0 {
-			bs.logStorageEventWithDetails("entity_actors_limit", "", "", entity, totalDeleted, limit, evictionDetails)
+			s.logStorageEventWithDetails("entity_actors_limit", "", "", entity, totalDeleted, limit, evictionDetails)
 		}
 	}
 

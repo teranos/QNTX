@@ -84,17 +84,17 @@ func NewFileStore(path string) (*RustStore, error) {
 
 // Close frees the underlying Rust store.
 // Safe to call multiple times.
-func (rs *RustStore) Close() error {
-	if rs.store != nil {
-		C.storage_free(rs.store)
-		rs.store = nil
+func (s *RustStore) Close() error {
+	if s.store != nil {
+		C.storage_free(s.store)
+		s.store = nil
 	}
 	return nil
 }
 
 // CreateAttestation stores a new attestation (implements ats.AttestationStore).
-func (rs *RustStore) CreateAttestation(as *types.As) error {
-	if rs.store == nil {
+func (s *RustStore) CreateAttestation(as *types.As) error {
+	if s.store == nil {
 		return errors.New("store is closed")
 	}
 
@@ -107,7 +107,7 @@ func (rs *RustStore) CreateAttestation(as *types.As) error {
 	cJSON := C.CString(string(jsonBytes))
 	defer C.free(unsafe.Pointer(cJSON))
 
-	result := C.storage_put(rs.store, cJSON)
+	result := C.storage_put(s.store, cJSON)
 	defer C.storage_result_free(result)
 
 	if !result.success {
@@ -119,15 +119,15 @@ func (rs *RustStore) CreateAttestation(as *types.As) error {
 }
 
 // GetAttestation retrieves an attestation by ID (implements ats.AttestationStore).
-func (rs *RustStore) GetAttestation(id string) (*types.As, error) {
-	if rs.store == nil {
+func (s *RustStore) GetAttestation(id string) (*types.As, error) {
+	if s.store == nil {
 		return nil, errors.New("store is closed")
 	}
 
 	cID := C.CString(id)
 	defer C.free(unsafe.Pointer(cID))
 
-	result := C.storage_get(rs.store, cID)
+	result := C.storage_get(s.store, cID)
 	defer C.attestation_result_free(result)
 
 	if !result.success {
@@ -149,23 +149,23 @@ func (rs *RustStore) GetAttestation(id string) (*types.As, error) {
 }
 
 // AttestationExists checks if an attestation exists.
-func (rs *RustStore) AttestationExists(id string) bool {
-	if rs.store == nil {
+func (s *RustStore) AttestationExists(id string) bool {
+	if s.store == nil {
 		return false
 	}
 
 	cID := C.CString(id)
 	defer C.free(unsafe.Pointer(cID))
 
-	result := C.storage_exists(rs.store, cID)
+	result := C.storage_exists(s.store, cID)
 	defer C.storage_result_free(result)
 
 	return bool(result.success)
 }
 
 // UpdateAttestation updates an existing attestation.
-func (rs *RustStore) UpdateAttestation(as *types.As) error {
-	if rs.store == nil {
+func (s *RustStore) UpdateAttestation(as *types.As) error {
+	if s.store == nil {
 		return errors.New("store is closed")
 	}
 
@@ -178,7 +178,7 @@ func (rs *RustStore) UpdateAttestation(as *types.As) error {
 	cJSON := C.CString(string(jsonBytes))
 	defer C.free(unsafe.Pointer(cJSON))
 
-	result := C.storage_update(rs.store, cJSON)
+	result := C.storage_update(s.store, cJSON)
 	defer C.storage_result_free(result)
 
 	if !result.success {
@@ -190,12 +190,12 @@ func (rs *RustStore) UpdateAttestation(as *types.As) error {
 }
 
 // ListAttestationIDs returns all attestation IDs.
-func (rs *RustStore) ListAttestationIDs() ([]string, error) {
-	if rs.store == nil {
+func (s *RustStore) ListAttestationIDs() ([]string, error) {
+	if s.store == nil {
 		return nil, errors.New("store is closed")
 	}
 
-	result := C.storage_ids(rs.store)
+	result := C.storage_ids(s.store)
 	defer C.string_array_result_free(result)
 
 	if !result.success {
@@ -218,12 +218,12 @@ func (rs *RustStore) ListAttestationIDs() ([]string, error) {
 }
 
 // CountAttestations returns the total count of attestations.
-func (rs *RustStore) CountAttestations() (int, error) {
-	if rs.store == nil {
+func (s *RustStore) CountAttestations() (int, error) {
+	if s.store == nil {
 		return 0, errors.New("store is closed")
 	}
 
-	result := C.storage_count(rs.store)
+	result := C.storage_count(s.store)
 	defer C.count_result_free(result)
 
 	if !result.success {
@@ -235,14 +235,14 @@ func (rs *RustStore) CountAttestations() (int, error) {
 }
 
 // GenerateAndCreateAttestation generates a vanity ASID and creates a self-certifying attestation (implements ats.AttestationStore).
-func (rs *RustStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As, error) {
-	if rs.store == nil {
+func (s *RustStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As, error) {
+	if s.store == nil {
 		return nil, errors.New("store is closed")
 	}
 
 	// Generate vanity ASID with collision detection (uses Go id package)
 	checkExists := func(asid string) bool {
-		return rs.AttestationExists(asid)
+		return s.AttestationExists(asid)
 	}
 
 	// Use first subject, predicate, and context for vanity generation
@@ -272,7 +272,7 @@ func (rs *RustStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.
 	as.Actors = []string{asid}
 
 	// Store via Rust backend
-	if err := rs.CreateAttestation(as); err != nil {
+	if err := s.CreateAttestation(as); err != nil {
 		return nil, errors.Wrap(err, "failed to store attestation")
 	}
 
@@ -280,8 +280,8 @@ func (rs *RustStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.
 }
 
 // GetAttestations retrieves attestations based on filters (implements ats.AttestationStore).
-func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
-	if rs.store == nil {
+func (s *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
+	if s.store == nil {
 		return nil, errors.New("store is closed")
 	}
 
@@ -320,7 +320,7 @@ func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As,
 	cFilterJSON := C.CString(string(filterJSON))
 	defer C.free(unsafe.Pointer(cFilterJSON))
 
-	result := C.storage_query(rs.store, cFilterJSON)
+	result := C.storage_query(s.store, cFilterJSON)
 	defer C.attestation_result_free(result)
 
 	if !result.success {

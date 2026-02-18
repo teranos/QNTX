@@ -81,7 +81,7 @@ func SetDefaults(v *viper.Viper) {
 		"./plugins",       // Project-level plugins
 	})
 	v.SetDefault("plugin.websocket.keepalive.enabled", true)
-	// ping_interval_secs, pong_timeout_secs, reconnect_attempts are optional: nil = defaults (30, 60, 3) in plugin/grpc/websocket_keepalive.go
+	// ping_interval_seconds, pong_timeout_seconds, reconnect_attempts are optional: nil = defaults (30, 60, 3) in plugin/grpc/websocket_keepalive.go
 }
 
 // BindSensitiveEnvVars explicitly binds sensitive configuration to environment variables
