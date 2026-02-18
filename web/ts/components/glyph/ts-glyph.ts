@@ -22,13 +22,14 @@ import { canvasPlaced } from './manifestations/canvas-placed';
 import { putAttestation, queryAttestations, parseQuery } from '../../qntx-wasm';
 import type { Attestation } from '../../qntx-wasm';
 
-export const TS_DEFAULT_CODE = `// TypeScript editor
+export const TS_DEFAULT_CODE = `// Create a local attestation — searchable offline via WASM fuzzy search
 await qntx.attest({
-      subjects: ["teranos"],
-      predicates: ["maintainer"],
-      contexts: ["QNTX11"]
-  })
-  qntx.log("Attested!")
+    subjects: ["teranos"],
+    predicates: ["develops"],
+    contexts: ["decentralised attestation network"],
+    attributes: { description: "QNTX node running locally in browser" }
+})
+qntx.log("Attested!")
 `;
 
 /** AsyncFunction constructor — supports `await` in user code */
@@ -66,6 +67,11 @@ function buildQntxApi(outputLines: string[]) {
             };
 
             await putAttestation(attestation);
+
+            // Rebuild fuzzy index so new predicates/contexts are searchable immediately
+            import('../../qntx-wasm').then(({ rebuildFuzzyIndex }) =>
+                rebuildFuzzyIndex()
+            ).catch(() => {});
 
             // Enqueue for server sync (lazy import to avoid circular deps)
             try {
