@@ -638,3 +638,45 @@ function spawnSubcanvasGlyph(
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned Subcanvas glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
+
+/** Command → spawn function lookup (lowercase keys) */
+type SpawnFn = (x: number, y: number, canvas: HTMLElement, glyphs: Glyph[], canvasId: string) => void | Promise<void>;
+
+const COMMAND_MAP: Record<string, SpawnFn> = {
+    'ix':        spawnIxGlyph,
+    'ax':        spawnAxGlyph,
+    'se':        spawnSemanticGlyph,
+    'py':        spawnPyGlyph,
+    'ts':        spawnTsGlyph,
+    'prompt':    spawnPromptGlyph,
+    'so':        spawnPromptGlyph,
+    'prose':     spawnNoteGlyph,
+    'note':      spawnNoteGlyph,
+    'subcanvas': spawnSubcanvasGlyph,
+};
+
+/**
+ * Spawn a glyph on the active canvas by command name.
+ * Returns true if a glyph was spawned.
+ */
+export function spawnGlyphByCommand(command: string): boolean {
+    const fn = COMMAND_MAP[command.toLowerCase().trim()];
+    if (!fn) return false;
+
+    const workspace = document.querySelector('.canvas-workspace') as HTMLElement | null;
+    if (!workspace) return false;
+
+    const contentLayer = workspace.querySelector('.canvas-content-layer') as HTMLElement | null;
+    if (!contentLayer) return false;
+
+    const glyphs: Glyph[] = (workspace as any).__glyphs || [];
+    const canvasId = workspace.dataset.canvasId || 'canvas-workspace';
+
+    // Spawn at center of visible canvas
+    const rect = workspace.getBoundingClientRect();
+    const x = Math.round(rect.width / 2);
+    const y = Math.round(rect.height / 2);
+
+    fn(x, y, contentLayer, glyphs, canvasId);
+    return true;
+}

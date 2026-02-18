@@ -1,38 +1,12 @@
 /**
- * Search View - Compact dark overlay for search results
+ * Search Results — styled for use inside the unified search drawer
  */
 
-/* Main overlay — fills area right of left-panel */
-.search-view {
-    position: fixed;
-    top: 0;
-    left: 360px;
-    right: 0;
-    bottom: 0;
-    background: var(--bg-almost-black);
-    border: 1px solid var(--border-on-dark);
-    box-shadow: var(--shadow-xl);
-    z-index: 100;
-    display: none;
-    overflow: hidden;
-}
-
-/* Mobile: fill viewport above bottom bar */
-@media (max-width: 768px) {
-    .search-view {
-        left: 0;
-        bottom: 140px;
-    }
-}
-
-/* Results container */
 .search-results {
-    height: 100%;
-    padding: 20px;
-    overflow-y: auto;
+    padding: 8px;
     font-family: var(--font-mono);
-    font-size: var(--font-size-md);
-    line-height: 1.6;
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
     color: var(--text-on-dark);
 }
 

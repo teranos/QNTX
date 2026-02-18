@@ -15,18 +15,12 @@ import { languageServer } from 'codemirror-languageserver';
 
 // DISABLED: LSP WebSocket transport conflicts with main WebSocket
 // import { createLSPClient } from './lsp-websocket-transport.js';
-import { sendMessage, validateBackendURL } from './websocket.ts';
+import { validateBackendURL } from './websocket.ts';
 import { requestParse } from './ats-semantic-tokens-client.ts';
 import type { Diagnostic, SemanticToken } from '../types/lsp';
-import { SearchView, STRATEGY_FUZZY } from './search-view.ts';
-import type { SearchMatch, SearchResultsMessage } from './search-view.ts';
-import { connectivityManager } from './connectivity.ts';
-import { fuzzySearch } from './qntx-wasm.ts';
 import { log, SEG } from './logger.ts';
 
 let editorView: EditorView | null = null;
-let queryTimeout: ReturnType<typeof setTimeout> | null = null;
-let searchView: SearchView | null = null;
 
 // Syntax highlighting via LSP semantic tokens
 // TODO(issue #13): codemirror-languageserver doesn't support semantic tokens yet (v1.18.1)
@@ -63,10 +57,6 @@ export function initCodeMirrorEditor(): EditorView | null {
         log.error(SEG.ERROR, 'CodeMirror container not found');
         return null;
     }
-
-    // Initialize search view (always-on, renders results in overlay)
-    searchView = new SearchView();
-    searchView.show();
 
     // LSP configuration (async connection, won't block page load)
     // Use backend URL from injected global with validation
@@ -136,7 +126,7 @@ export function initCodeMirrorEditor(): EditorView | null {
 }
 
 /**
- * Handle document changes - notify LSP server AND execute query
+ * Handle document changes — request parse for syntax highlighting
  */
 function handleDocumentChange(update: any): void {
     const doc = update.state.doc.toString();
@@ -146,85 +136,6 @@ function handleDocumentChange(update: any): void {
         const cursorPos = editorView.state.selection.main.head;
         requestParse(doc, 1, cursorPos);
     }
-
-    // Execute search with debounce
-    if (queryTimeout) {
-        clearTimeout(queryTimeout);
-    }
-    queryTimeout = setTimeout(() => {
-        sendSearch(doc.trim());
-    }, 300);
-}
-
-/**
- * Send search query — uses server when online, WASM fuzzy search when offline
- */
-function sendSearch(text: string): void {
-    if (!text.trim()) {
-        if (searchView) {
-            searchView.clear();
-        }
-        return;
-    }
-
-    if (connectivityManager.state === 'online') {
-        sendMessage({
-            type: 'rich_search',
-            query: text
-        });
-    } else {
-        searchOffline(text);
-    }
-}
-
-/**
- * Offline search via WASM fuzzy engine (predicates + contexts vocabulary)
- */
-function searchOffline(query: string): void {
-    if (!searchView) return;
-
-    const predicateMatches = fuzzySearch(query, 'predicates', 20, 0.3);
-    const contextMatches = fuzzySearch(query, 'contexts', 20, 0.3);
-
-    const matches: SearchMatch[] = [
-        ...predicateMatches.map(m => ({
-            node_id: '',
-            type_name: 'predicate',
-            type_label: 'P',
-            field_name: 'predicate',
-            field_value: m.value,
-            excerpt: m.value,
-            score: m.score,
-            strategy: STRATEGY_FUZZY,
-            display_label: m.value,
-            attributes: {},
-        })),
-        ...contextMatches.map(m => ({
-            node_id: '',
-            type_name: 'context',
-            type_label: 'C',
-            field_name: 'context',
-            field_value: m.value,
-            excerpt: m.value,
-            score: m.score,
-            strategy: STRATEGY_FUZZY,
-            display_label: m.value,
-            attributes: {},
-        })),
-    ];
-
-    // Sort combined results by score descending, take top 20
-    matches.sort((a, b) => b.score - a.score);
-    const top = matches.slice(0, 20);
-
-    const message: SearchResultsMessage = {
-        type: 'rich_search_results',
-        query,
-        matches: top,
-        total: top.length,
-    };
-
-    searchView.updateResults(message);
 }
 
 /**
@@ -296,23 +207,12 @@ export function setEditorContent(content: string): void {
 }
 
 /**
- * Handle search results from WebSocket
- */
-export function handleSearchResults(message: any): void {
-    if (!searchView) return;
-    searchView.updateResults(message);
-}
-
-/**
  * Cleanup editor and LSP client
  */
 export function destroyEditor(): void {
     if (editorView) {
         editorView.destroy();
         editorView = null;
-    }
-    if (searchView) {
-        searchView = null;
     }
     // LSP client is managed by languageServer() extension, no manual cleanup needed
 }
