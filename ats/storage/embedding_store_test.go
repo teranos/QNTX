@@ -745,6 +745,74 @@ func TestEmbeddingStore_UpdateClusterLabel(t *testing.T) {
 	require.NotNil(t, labeledAt)
 }
 
+func TestEmbeddingStore_GetClusterTimeline(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zap.NewNop()
+	store := NewEmbeddingStore(db, logger)
+
+	// Create two runs
+	run1 := &ClusterRun{
+		ID: "CR_tl_1", NPoints: 20, NClusters: 2, NNoise: 3,
+		MinClusterSize: 5, DurationMS: 10, CreatedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+	}
+	run2 := &ClusterRun{
+		ID: "CR_tl_2", NPoints: 25, NClusters: 2, NNoise: 5,
+		MinClusterSize: 5, DurationMS: 12, CreatedAt: time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC),
+	}
+	require.NoError(t, store.CreateClusterRun(run1))
+	require.NoError(t, store.CreateClusterRun(run2))
+
+	// Create two clusters
+	c1, err := store.CreateCluster("CR_tl_1")
+	require.NoError(t, err)
+	c2, err := store.CreateCluster("CR_tl_1")
+	require.NoError(t, err)
+
+	// Snapshots for run 1
+	require.NoError(t, store.SaveClusterSnapshots([]ClusterSnapshot{
+		{ClusterID: c1, RunID: "CR_tl_1", Centroid: createTestEmbedding(384), NMembers: 8},
+		{ClusterID: c2, RunID: "CR_tl_1", Centroid: createTestEmbedding(384), NMembers: 9},
+	}))
+	// Snapshots for run 2
+	require.NoError(t, store.SaveClusterSnapshots([]ClusterSnapshot{
+		{ClusterID: c1, RunID: "CR_tl_2", Centroid: createTestEmbedding(384), NMembers: 10},
+		{ClusterID: c2, RunID: "CR_tl_2", Centroid: createTestEmbedding(384), NMembers: 10},
+	}))
+
+	// Events
+	require.NoError(t, store.RecordClusterEvents([]ClusterEvent{
+		{RunID: "CR_tl_1", EventType: "birth", ClusterID: c1},
+		{RunID: "CR_tl_1", EventType: "birth", ClusterID: c2},
+		{RunID: "CR_tl_2", EventType: "stable", ClusterID: c1},
+		{RunID: "CR_tl_2", EventType: "stable", ClusterID: c2},
+	}))
+
+	// Query timeline
+	timeline, err := store.GetClusterTimeline()
+	require.NoError(t, err)
+	require.Len(t, timeline, 4) // 2 clusters × 2 runs
+
+	// Ordering: run1 first (earlier), then within run by cluster ID
+	assert.Equal(t, "CR_tl_1", timeline[0].RunID)
+	assert.Equal(t, c1, timeline[0].ClusterID)
+	assert.Equal(t, 8, timeline[0].NMembers)
+	assert.Equal(t, "birth", timeline[0].EventType)
+	assert.Equal(t, 3, timeline[0].NNoise)
+
+	assert.Equal(t, "CR_tl_1", timeline[1].RunID)
+	assert.Equal(t, c2, timeline[1].ClusterID)
+	assert.Equal(t, 9, timeline[1].NMembers)
+
+	assert.Equal(t, "CR_tl_2", timeline[2].RunID)
+	assert.Equal(t, c1, timeline[2].ClusterID)
+	assert.Equal(t, 10, timeline[2].NMembers)
+	assert.Equal(t, "stable", timeline[2].EventType)
+	assert.Equal(t, 5, timeline[2].NNoise)
+
+	assert.Equal(t, "CR_tl_2", timeline[3].RunID)
+	assert.Equal(t, c2, timeline[3].ClusterID)
+}
+
 func TestEmbeddingStore_GetClusterDetails(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop()
