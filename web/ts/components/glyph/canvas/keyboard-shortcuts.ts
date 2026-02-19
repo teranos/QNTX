@@ -13,6 +13,7 @@
  */
 
 import { log, SEG } from '../../../logger';
+import { isInputFocused } from '../../../keyboard';
 
 /**
  * Callback to check if any glyphs are selected
@@ -34,11 +35,7 @@ export function setupKeyboardShortcuts(
     const controller = new AbortController();
 
     const handleKeydown = (e: KeyboardEvent) => {
-        // Ignore if user is typing in an input/textarea
-        const target = e.target as HTMLElement;
-        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-            return;
-        }
+        if (isInputFocused(e.target)) return;
 
         // ESC to deselect
         if (e.key === 'Escape') {

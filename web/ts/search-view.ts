@@ -1,6 +1,7 @@
 /**
  * Search Results View Component
  * Displays search results in an fzf-style list format
+ * Supports local results (commands, subcanvas navigation) alongside server search results
  */
 
 import { typeDefinitionWindow } from './type-definition-window.ts';
@@ -10,6 +11,10 @@ import { escapeHtml } from './html-utils.ts';
 export const STRATEGY_SUBSTRING = 'substring';
 export const STRATEGY_FUZZY = 'fuzzy';
 export const STRATEGY_SEMANTIC = 'semantic';
+
+// Local result type constants
+export const TYPE_COMMAND = 'command';
+export const TYPE_SUBCANVAS = 'subcanvas';
 
 export interface SearchMatch {
     node_id: string;
@@ -36,6 +41,10 @@ export class SearchView {
     private resultsElement: HTMLElement | null = null;
     private currentQuery: string = '';
     private parented: boolean = false;
+    private selectedIndex: number = -1;
+    private localResults: SearchMatch[] = [];
+    private serverResults: SearchMatch[] = [];
+    private allResults: SearchMatch[] = [];
 
     constructor(parent?: HTMLElement) {
         this.createElements(parent);
@@ -80,45 +89,115 @@ export class SearchView {
         return container?.style.display !== 'none';
     }
 
-    /**
-     * Update the search results
-     */
+    /** Set local results (commands, subcanvases) — rendered above server results */
+    public setLocalResults(matches: SearchMatch[]): void {
+        this.localResults = matches;
+        this.render();
+    }
+
+    /** Update server search results */
     public updateResults(message: SearchResultsMessage): void {
         if (!this.resultsElement) return;
-
         this.currentQuery = message.query;
+        this.serverResults = message.matches;
+        this.render();
+    }
 
-        // Clear existing results
+    /** Select next result (ArrowDown / Tab) */
+    public selectNext(): void {
+        if (this.allResults.length === 0) return;
+        this.selectedIndex = this.selectedIndex < this.allResults.length - 1
+            ? this.selectedIndex + 1
+            : 0; // wrap
+        this.applySelection();
+    }
+
+    /** Select previous result (ArrowUp / Shift+Tab) */
+    public selectPrev(): void {
+        if (this.allResults.length === 0) return;
+        this.selectedIndex = this.selectedIndex > 0
+            ? this.selectedIndex - 1
+            : this.allResults.length - 1; // wrap
+        this.applySelection();
+    }
+
+    /** Get the currently selected match, or null */
+    public getSelectedMatch(): SearchMatch | null {
+        if (this.selectedIndex < 0 || this.selectedIndex >= this.allResults.length) return null;
+        return this.allResults[this.selectedIndex];
+    }
+
+    /** Clear selection without clearing results */
+    public clearSelection(): void {
+        this.selectedIndex = -1;
+        this.applySelection();
+    }
+
+    public clear(): void {
+        if (this.resultsElement) {
+            this.resultsElement.innerHTML = '';
+        }
+        this.currentQuery = '';
+        this.localResults = [];
+        this.serverResults = [];
+        this.allResults = [];
+        this.selectedIndex = -1;
+    }
+
+    // --- Rendering ---
+
+    private render(): void {
+        if (!this.resultsElement) return;
+
         this.resultsElement.innerHTML = '';
+        this.allResults = [...this.localResults, ...this.serverResults];
+        this.selectedIndex = -1;
 
-        // Add header with match count and type definition shortcut
-        const header = document.createElement('div');
-        header.className = 'search-header';
+        // Local results section
+        if (this.localResults.length > 0) {
+            for (let i = 0; i < this.localResults.length; i++) {
+                const line = this.createResultLine(this.localResults[i], i);
+                this.resultsElement.appendChild(line);
+            }
+        }
 
-        const headerText = document.createElement('span');
-        headerText.textContent = `Found ${message.total} matches for "${message.query}"`;
-        header.appendChild(headerText);
+        // Divider between local and server results
+        if (this.localResults.length > 0 && this.serverResults.length > 0) {
+            const divider = document.createElement('div');
+            divider.className = 'search-section-divider';
+            this.resultsElement.appendChild(divider);
+        }
 
-        const newTypeBtn = document.createElement('button');
-        newTypeBtn.className = 'search-new-type-btn';
-        newTypeBtn.textContent = '+';
-        newTypeBtn.title = 'Define new type';
-        newTypeBtn.onclick = (e) => {
-            e.stopPropagation();
-            typeDefinitionWindow.createNewType();
-        };
-        header.appendChild(newTypeBtn);
+        // Server results section
+        if (this.serverResults.length > 0) {
+            const header = document.createElement('div');
+            header.className = 'search-header';
 
-        this.resultsElement.appendChild(header);
+            const headerText = document.createElement('span');
+            headerText.textContent = `Found ${this.serverResults.length} matches`;
+            header.appendChild(headerText);
 
-        // Add each match as a result line
-        message.matches.forEach((match) => {
-            const resultLine = this.createResultLine(match);
-            this.resultsElement!.appendChild(resultLine);
-        });
+            const newTypeBtn = document.createElement('button');
+            newTypeBtn.className = 'search-new-type-btn';
+            newTypeBtn.textContent = '+';
+            newTypeBtn.title = 'Define new type';
+            newTypeBtn.onclick = (e) => {
+                e.stopPropagation();
+                typeDefinitionWindow.createNewType();
+            };
+            header.appendChild(newTypeBtn);
 
-        // If no matches
-        if (message.matches.length === 0) {
+            this.resultsElement.appendChild(header);
+
+            const offset = this.localResults.length;
+            for (let i = 0; i < this.serverResults.length; i++) {
+                const line = this.createResultLine(this.serverResults[i], offset + i);
+                this.resultsElement.appendChild(line);
+            }
+        }
+
+        // No results at all
+        if (this.allResults.length === 0 && this.currentQuery) {
             const noResults = document.createElement('div');
             noResults.className = 'search-no-results';
             noResults.textContent = 'No matches found';
@@ -126,54 +205,79 @@ export class SearchView {
         }
     }
 
-    private createResultLine(match: SearchMatch): HTMLElement {
+    private createResultLine(match: SearchMatch, index: number): HTMLElement {
         const line = document.createElement('div');
         line.className = 'search-result-line';
+        line.dataset.resultIndex = String(index);
+        line.dataset.resultType = match.type_name;
 
         line.onclick = () => {
             this.handleResultClick(match);
         };
 
-        // Node ID/Label (shortened hash)
-        const nodeLabel = document.createElement('span');
-        nodeLabel.className = 'search-node-id';
-        const shortId = (match.node_id || '').substring(0, 7);
-        nodeLabel.textContent = shortId;
+        const isLocal = match.type_name === TYPE_COMMAND || match.type_name === TYPE_SUBCANVAS;
 
         // Type badge
         const typeBadge = document.createElement('span');
         typeBadge.className = 'search-type-badge';
         typeBadge.textContent = match.type_label || match.type_name;
 
-        // Field name
-        const fieldName = document.createElement('span');
-        fieldName.className = 'search-field-name';
-        fieldName.textContent = `[${match.field_name}]`;
-
-        // Excerpt with highlighting
+        // Excerpt
         const excerpt = document.createElement('span');
         excerpt.className = 'search-excerpt';
-        excerpt.innerHTML = this.highlightMatch(match.excerpt, this.currentQuery, match.matched_words);
+        if (isLocal) {
+            // Local results: bold, no highlighting
+            excerpt.textContent = match.excerpt;
+            excerpt.style.fontWeight = '600';
+        } else {
+            excerpt.innerHTML = this.highlightMatch(match.excerpt, this.currentQuery, match.matched_words);
+        }
 
-        // Score indicator
-        const score = document.createElement('span');
-        score.className = 'search-score';
-        score.textContent = `${Math.round(match.score * 100)}%`;
+        if (isLocal) {
+            // Minimal layout for commands/subcanvases: badge + excerpt
+            line.appendChild(typeBadge);
+            line.appendChild(excerpt);
+        } else {
+            // Full layout for search results
+            const nodeLabel = document.createElement('span');
+            nodeLabel.className = 'search-node-id';
+            nodeLabel.textContent = (match.node_id || '').substring(0, 7);
 
-        // Strategy badge (⊨ semantic, ≡ text)
-        const strategy = document.createElement('span');
-        strategy.className = 'search-strategy';
-        strategy.textContent = match.strategy === STRATEGY_SEMANTIC ? '⊨' : '≡';
-        strategy.title = match.strategy;
+            const fieldName = document.createElement('span');
+            fieldName.className = 'search-field-name';
+            fieldName.textContent = `[${match.field_name}]`;
 
-        line.appendChild(nodeLabel);
-        line.appendChild(typeBadge);
-        line.appendChild(fieldName);
-        line.appendChild(excerpt);
-        line.appendChild(score);
-        line.appendChild(strategy);
+            const score = document.createElement('span');
+            score.className = 'search-score';
+            score.textContent = `${Math.round(match.score * 100)}%`;
+
+            const strategy = document.createElement('span');
+            strategy.className = 'search-strategy';
+            strategy.textContent = match.strategy === STRATEGY_SEMANTIC ? '⊨' : '≡';
+            strategy.title = match.strategy;
+
+            line.appendChild(nodeLabel);
+            line.appendChild(typeBadge);
+            line.appendChild(fieldName);
+            line.appendChild(excerpt);
+            line.appendChild(score);
+            line.appendChild(strategy);
+        }
 
         return line;
+    }
+
+    private applySelection(): void {
+        if (!this.resultsElement) return;
+        const lines = this.resultsElement.querySelectorAll('.search-result-line');
+        lines.forEach((el, i) => {
+            el.classList.toggle('search-result-selected', i === this.selectedIndex);
+        });
+
+        // Scroll selected into view
+        if (this.selectedIndex >= 0 && lines[this.selectedIndex]) {
+            lines[this.selectedIndex].scrollIntoView({ block: 'nearest' });
+        }
     }
 
     private highlightMatch(text: string, query: string, matchedWords?: string[]): string {
@@ -217,12 +321,5 @@ export class SearchView {
             }
         });
         document.dispatchEvent(event);
-    }
-
-    public clear(): void {
-        if (this.resultsElement) {
-            this.resultsElement.innerHTML = '';
-        }
-        this.currentQuery = '';
     }
 }
