@@ -264,6 +264,8 @@ func (c *Client) routeMessage(msg *QueryMessage) {
 		c.handleGetSyncStatus()
 	case "watcher_upsert":
 		c.handleWatcherUpsert(*msg)
+	case "browser_sync_hello":
+		c.handleBrowserSyncHello(msg.SyncRoot)
 	case "ping":
 		// Just update deadline, handled by pong handler
 	default:
@@ -569,8 +571,16 @@ func (c *Client) handleHoverRequest(msg QueryMessage) {
 	return
 }
 
-// sendJSON is a helper to send JSON messages to the client
+// sendJSON is a helper to send JSON messages to the client.
+// Safe to call from goroutines — recovers if the client disconnected and the channel was closed.
 func (c *Client) sendJSON(data interface{}) {
+	defer func() {
+		if r := recover(); r != nil {
+			c.server.logger.Debugw("Client gone, dropped message",
+				"client_id", c.id)
+		}
+	}()
+
 	select {
 	case c.sendMsg <- data:
 		// Message queued successfully
@@ -1336,6 +1346,11 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 			)
 		}
 		return
+	}
+
+	// Send query embedding to browser for offline SE search
+	if msg.SemanticQuery != "" {
+		c.sendQueryEmbeddingToBrowser(watcherID, msg.SemanticQuery)
 	}
 
 	// Query historical matches for the watcher (in goroutine to avoid blocking)

@@ -101,6 +101,13 @@ export function put_attestation(json: string): Promise<void>;
 export function query_attestations(filter_json: string): Promise<string>;
 
 /**
+ * Compute cosine similarity between two embedding vectors.
+ * Input: `{"a":[f32,...], "b":[f32,...]}`
+ * Returns: `{"similarity": f32}` or `{"error":"..."}`
+ */
+export function semantic_similarity(input: string): string;
+
+/**
  * Compute content hash for an attestation.
  * Input: JSON-serialized Attestation
  * Returns: `{"hash":"<64-char hex>"}` or `{"error":"..."}`
@@ -176,6 +183,7 @@ export interface InitOutput {
     readonly parse_query: (a: number, b: number) => [number, number];
     readonly put_attestation: (a: number, b: number) => any;
     readonly query_attestations: (a: number, b: number) => any;
+    readonly semantic_similarity: (a: number, b: number) => [number, number];
     readonly sync_content_hash: (a: number, b: number) => [number, number];
     readonly sync_merkle_contains: (a: number, b: number) => [number, number];
     readonly sync_merkle_diff: (a: number, b: number) => [number, number];

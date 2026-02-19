@@ -81,7 +81,10 @@ export type MessageType =
   | 'vidstream_init_success'
   | 'vidstream_init_error'
   | 'vidstream_detections'
-  | 'vidstream_frame_error';
+  | 'vidstream_frame_error'
+  | 'browser_sync_attestations'
+  | 'browser_sync_done'
+  | 'se_query_embedding';
 
 // ============================================================================
 // Base Message Interface
@@ -522,6 +525,45 @@ export interface VidStreamFrameErrorMessage extends BaseMessage {
   error: string;
 }
 
+/**
+ * Browser sync: batch of attestations + embeddings from server
+ */
+export interface BrowserSyncAttestationsMessage extends BaseMessage {
+  type: 'browser_sync_attestations';
+  attestations: Attestation[];
+  embeddings: BrowserSyncEmbedding[];
+  done: boolean;
+  stored: number;
+  total: number;
+}
+
+/**
+ * A single embedding sent during browser sync
+ */
+export interface BrowserSyncEmbedding {
+  attestation_id: string;
+  vector: number[];
+  model: string;
+}
+
+/**
+ * Browser sync: roots match, nothing to sync
+ */
+export interface BrowserSyncDoneMessage extends BaseMessage {
+  type: 'browser_sync_done';
+  message: string;
+}
+
+/**
+ * SE query embedding — sent when server computes embedding for a semantic watcher query.
+ * Cached by the browser for offline local search.
+ */
+export interface SEQueryEmbeddingMessage extends BaseMessage {
+  type: 'se_query_embedding';
+  watcher_id: string;
+  embedding: number[];
+}
+
 // ============================================================================
 // Type Definitions for Parse Components
 // ============================================================================
@@ -618,7 +660,10 @@ export type WebSocketMessage =
   | VidStreamInitSuccessMessage
   | VidStreamInitErrorMessage
   | VidStreamDetectionsMessage
-  | VidStreamFrameErrorMessage;
+  | VidStreamFrameErrorMessage
+  | BrowserSyncAttestationsMessage
+  | BrowserSyncDoneMessage
+  | SEQueryEmbeddingMessage;
 
 // ============================================================================
 // Message Handler Types
@@ -669,6 +714,9 @@ export interface MessageHandlers {
   vidstream_init_error?: MessageHandler<VidStreamInitErrorMessage>;
   vidstream_detections?: MessageHandler<VidStreamDetectionsMessage>;
   vidstream_frame_error?: MessageHandler<VidStreamFrameErrorMessage>;
+  browser_sync_attestations?: MessageHandler<BrowserSyncAttestationsMessage>;
+  browser_sync_done?: MessageHandler<BrowserSyncDoneMessage>;
+  se_query_embedding?: MessageHandler<SEQueryEmbeddingMessage>;
 }
 
 // ============================================================================
