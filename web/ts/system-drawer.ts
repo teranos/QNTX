@@ -125,10 +125,13 @@ export function focusDrawerSearch(): void {
     searchInput.focus();
 }
 
-/** Handle search results from WebSocket */
-export function handleSearchResults(message: SearchResultsMessage): void {
+/** Handle search results from WebSocket.
+ *  Accepts any object — the WS layer passes RichSearchResultsMessage which
+ *  carries the same runtime shape (query, matches, total) but a different TS type.
+ *  TODO: replace with proto-generated type per ADR-006. */
+export function handleSearchResults(message: SearchResultsMessage | Record<string, unknown>): void {
     if (!searchView) return;
-    searchView.updateResults(message);
+    searchView.updateResults(message as SearchResultsMessage);
 }
 
 // --- Init ---
