@@ -34,12 +34,10 @@ Watch knowledge evolution - how the system's understanding developed over time t
 - Future: semantic-aware temporal queries using ML-derived relatedness scores
 
 ## Technical Foundation
-- History depth managed by bounded storage (already implemented)
-- Temporal aggregation via GROUP BY queries over attestation metadata
-- Duration predicates enable accumulation across time windows
-- Alternate timelines possible through attestation abstraction
-- Navigate via timestamp indexes and parent_id chains
-- Integrates with time-series data management for metrics and performance data
+- History depth managed by bounded storage
+- Temporal aggregation across time windows
+- Duration predicates enable accumulation
+- Alternate timelines through attestation abstraction
 - Rolling window filters for continuous monitoring
 
 ## Future: Self-Describing Temporal Schemas
@@ -77,40 +75,18 @@ This extends the attestation abstraction to time itself, completing QNTX's domai
 - [Glyphs](./glyphs.md) - Attestable glyph state enables time-travel UI
 - [Fractal Workspace](./fractal-workspace.md) - Visualize time-travel through glyph manifestations
 
-## Implementation Roadmap
+## Roadmap
 
-**Phase 1: Temporal Aggregation** ✅ **COMPLETE**
+**Phase 1: Temporal Aggregation** ✅
 - Duration accumulation across time windows
-  - Test: [TestTemporalAggregation_SimpleSum](../../ats/storage/temporal_aggregation_test.go#L241)
-- Metadata-based temporal filtering with `since`
-  - Test: [TestTemporalAggregation_WithSinceFilter](../../ats/storage/temporal_aggregation_test.go#L370)
+- Metadata-based temporal filtering
 - Domain-agnostic query predicates (seconds, minutes, hours, months, years)
-- SQL injection protection via whitelisted duration fields
-- Multiple test domains: [neural activity](../../ats/storage/temporal_aggregation_test.go), [meetings](../../ats/storage/temporal_aggregation_meetings_test.go)
 
 **Phase 2: Semantic Awareness** (planned)
 - Weighted aggregation via relatedness scores
-  - Test: [TestTemporalAggregation_SemanticWeightedSum](../../ats/storage/temporal_aggregation_test.go#L497) (skipped)
 - Combined temporal + semantic filtering
-  - Test: [TestTemporalAggregation_CombinedTemporalAndSemantic](../../ats/storage/temporal_aggregation_test.go#L638) (skipped)
 - Multiple predicate AND logic
-  - Test: [TestTemporalAggregation_MultiplePredicatesAND](../../ats/storage/temporal_aggregation_test.go#L1061) (skipped)
 
 **Phase 3: Temporal Overlap Detection** (planned)
 - Concurrent period merging to prevent double-counting
-  - Test: [TestTemporalAggregation_OverlapDetection](../../ats/storage/temporal_aggregation_test.go#L781) (skipped)
-  - Meeting example: [TestMeetingTemporalAggregation_OverlapDetection](../../ats/storage/temporal_aggregation_meetings_test.go#L398) (skipped)
-- Ongoing activity duration calculation (missing end_time)
-  - Test: [TestTemporalAggregation_OngoingActivity](../../ats/storage/temporal_aggregation_test.go#L922) (skipped)
-
-## Prerequisites
-
-**Implemented:**
-- ✅ Stable attestation system
-- ✅ Temporal indexing via timestamp fields
-- ✅ Metadata query infrastructure (JSON extraction)
-
-**Planned:**
-- 🚧 Semantic embedding models (for Phase 2)
-- 🚧 Visual timeline scrubbing UI
-- 🚧 Z-axis temporal layering
+- Ongoing activity duration calculation
