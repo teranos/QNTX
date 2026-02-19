@@ -104,25 +104,7 @@ impl<'a> Lexer<'a> {
             return Token::new(kind, text, start);
         }
 
-        // TODO: Natural predicate detection is not very sophisticated. Currently it just
-        // checks for underscores or common prefixes. A more advanced implementation could:
-        // - Use NLP to detect verb phrases vs nouns
-        // - Support camelCase predicates (isAuthorOf)
-        // - Handle multi-word predicates without underscores
-        // - Detect semantic patterns like "X of Y" relationships
-        //
-        // NOTE: The user correctly points out this is inelegant. We're matching Go's arbitrary
-        // heuristics that treat "has_experience" as a predicate just because it contains an
-        // underscore. This is fragile and unprincipled. A proper redesign would have explicit
-        // predicate markers or use actual linguistic analysis, not string pattern matching.
-        // But for now we need bug-for-bug compatibility with the Go parser's quirks.
-        let kind = if text.contains('_') || text.starts_with("has") || text.starts_with("is") {
-            TokenKind::NaturalPredicate
-        } else {
-            TokenKind::Identifier
-        };
-
-        Token::new(kind, text, start)
+        Token::new(TokenKind::Identifier, text, start)
     }
 
     fn next_token(&mut self) -> Token<'a> {
@@ -235,13 +217,6 @@ mod tests {
         let tokens = collect_tokens("'hello world'");
         assert_eq!(tokens[0].kind, TokenKind::QuotedString);
         assert_eq!(tokens[0].text, "hello world");
-    }
-
-    #[test]
-    fn test_natural_predicate() {
-        let tokens = collect_tokens("is_author_of");
-        assert_eq!(tokens[0].kind, TokenKind::NaturalPredicate);
-        assert_eq!(tokens[0].text, "is_author_of");
     }
 
     #[test]
