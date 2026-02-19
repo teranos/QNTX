@@ -1,5 +1,7 @@
 package sync
 
+import "github.com/teranos/QNTX/plugin/grpc/protocol"
+
 // Sync protocol message types exchanged between QNTX peers.
 //
 // The reconciliation protocol is symmetric — both sides run the same
@@ -51,8 +53,8 @@ type Msg struct {
 	// Need: list of hex-encoded group key hashes the sender wants
 	Need []string `json:"need,omitempty"`
 
-	// Attestations: serialized attestations grouped by hex group key hash
-	Attestations map[string][]AttestationWire `json:"attestations,omitempty"`
+	// Attestations: proto attestations grouped by hex group key hash
+	Attestations map[string][]*protocol.Attestation `json:"attestations,omitempty"`
 
 	// Stats (on Done): how many attestations were exchanged
 	Sent     int `json:"sent,omitempty"`
@@ -69,17 +71,4 @@ type Msg struct {
 	ClusterDailyLimitUSD   *float64 `json:"cluster_daily_limit_usd,omitempty"`
 	ClusterWeeklyLimitUSD  *float64 `json:"cluster_weekly_limit_usd,omitempty"`
 	ClusterMonthlyLimitUSD *float64 `json:"cluster_monthly_limit_usd,omitempty"`
-}
-
-// AttestationWire is the over-the-wire representation of an attestation.
-// Mirrors types.As but with string timestamps for JSON transport.
-type AttestationWire struct {
-	ID         string                 `json:"id"`
-	Subjects   []string               `json:"subjects"`
-	Predicates []string               `json:"predicates"`
-	Contexts   []string               `json:"contexts"`
-	Actors     []string               `json:"actors"`
-	Timestamp  string                 `json:"timestamp"`
-	Source     string                 `json:"source"`
-	Attributes map[string]interface{} `json:"attributes,omitempty"`
 }

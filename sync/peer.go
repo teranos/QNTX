@@ -13,8 +13,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const timestampFormat = time.RFC3339Nano
-
 // Sync protocol limits. Sufficient for trusted/manual peering today.
 // For public-facing endpoints or automatic discovery, these need research:
 // rate limiting at the connection level, pagination, and per-peer quotas.
@@ -258,7 +256,7 @@ func (p *Peer) Reconcile(ctx context.Context) (sent, received int, err error) {
 // sendRequestedAttestations looks up attestations for the groups the peer
 // requested and sends them.
 func (p *Peer) sendRequestedAttestations(ctx context.Context, requestedHexKeys []string) error {
-	atts := make(map[string][]AttestationWire)
+	atts := make(map[string][]*protocol.Attestation)
 	total := 0
 
 	for _, hexKey := range requestedHexKeys {
@@ -282,7 +280,7 @@ func (p *Peer) sendRequestedAttestations(ctx context.Context, requestedHexKeys [
 			continue
 		}
 
-		wires := make([]AttestationWire, 0, len(results))
+		wires := make([]*protocol.Attestation, 0, len(results))
 		for _, as := range results {
 			if total >= maxAttestationsPerSync {
 				p.logger.Warnw("Attestation limit reached, stopping send",
@@ -325,7 +323,7 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 			as, err := fromWire(w)
 			if err != nil {
 				p.logger.Warnw("Failed to parse synced attestation",
-					"id", w.ID,
+					"id", w.Id,
 					"error", err,
 				)
 				continue
@@ -448,37 +446,50 @@ func (p *Peer) recvDone() error {
 	return nil
 }
 
-// toWire converts an attestation to its wire format.
-func toWire(as *types.As) AttestationWire {
-	return AttestationWire{
-		ID:         as.ID,
+// toWire converts a types.As to a proto Attestation for sync transport.
+func toWire(as *types.As) *protocol.Attestation {
+	attributesJSON := ""
+	if as.Attributes != nil {
+		ab, err := json.Marshal(as.Attributes)
+		if err == nil {
+			attributesJSON = string(ab)
+		}
+	}
+	return &protocol.Attestation{
+		Id:         as.ID,
 		Subjects:   as.Subjects,
 		Predicates: as.Predicates,
 		Contexts:   as.Contexts,
 		Actors:     as.Actors,
-		Timestamp:  as.Timestamp.Format(timestampFormat),
+		Timestamp:  as.Timestamp.UnixMilli(),
 		Source:     as.Source,
-		Attributes: as.Attributes,
+		Attributes: attributesJSON,
+		CreatedAt:  as.CreatedAt.UnixMilli(),
 	}
 }
 
-// fromWire converts a wire attestation back to a types.As.
-func fromWire(w AttestationWire) (*types.As, error) {
-	ts, err := time.Parse(timestampFormat, w.Timestamp)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse timestamp %q for attestation %s", w.Timestamp, w.ID)
+// fromWire converts a proto Attestation back to a types.As.
+func fromWire(w *protocol.Attestation) (*types.As, error) {
+	var attributes map[string]interface{}
+	if w.Attributes != "" {
+		if err := json.Unmarshal([]byte(w.Attributes), &attributes); err != nil {
+			return nil, errors.Wrapf(err, "failed to parse attributes for attestation %s", w.Id)
+		}
+	}
+	if attributes == nil {
+		attributes = make(map[string]interface{})
 	}
 
 	return &types.As{
-		ID:         w.ID,
+		ID:         w.Id,
 		Subjects:   w.Subjects,
 		Predicates: w.Predicates,
 		Contexts:   w.Contexts,
 		Actors:     w.Actors,
-		Timestamp:  ts,
+		Timestamp:  time.UnixMilli(w.Timestamp),
 		Source:     w.Source,
-		Attributes: w.Attributes,
-		CreatedAt:  time.Now(),
+		Attributes: attributes,
+		CreatedAt:  time.UnixMilli(w.CreatedAt),
 	}, nil
 }
 
