@@ -28,7 +28,7 @@ An attestation is a verifiable claim, not a fact.
 At its simplest, an attestation is a statement of the form:
 
 ```
-as [Subject] is [Predicate] of [Context] by [⌬ Actor] on [✦ Temporal]
+as [Subject] is [Predicate] of [Context] by [⌬ Actor] at [✦ Temporal]
 ```
 
 This pattern captures:
