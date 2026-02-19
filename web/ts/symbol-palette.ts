@@ -27,6 +27,7 @@ import {
     SO,
     Pulse, Prose, DB,
     CommandToSymbol,
+    CommandDescriptions,
 } from '@generated/sym.js';
 import { uiState } from './state/ui.ts';
 import { log, SEG } from './logger';
@@ -162,26 +163,25 @@ function initializeSymbolPalette(): void {
  * Will be updated with version info when system capabilities are received
  */
 function getInitialTooltip(cmd: string): string {
-    const tooltips: Record<string, string> = {
-        'i': '⍟ Self - system diagnostic',
-        'am': '≡ Config - system configuration',
-        'ix': '⨳ Ingest - import data',
-        'ax': '⋈ Expand - contextual query\n(version info loading...)',
-        'as': '+ Assert - emit attestation',
-        'is': '= Identity - equivalence',
-        'of': '∈ Membership - belonging',
-        'by': '⌬ Actor - origin of action',
-        'at': '✦ Event - temporal marker',
-        'so': '⟶ Therefore - consequent action',
-        'pulse': '꩜ Pulse - async operations',
-        'db': '⊔ Database - storage layer',
-        'prose': '⚇ Prose - documentation',
-        'go': 'Go - code editor',
-        'py': 'py - Python editor',
-        'plugins': '⚙ Plugins - domain extensions',
-        'vidstream': '⮀ VidStream - video inference\n(version info loading...)',
+    // SEG operators: derive from canonical CommandDescriptions (single source of truth)
+    const description = CommandDescriptions[cmd];
+    if (description) {
+        const symbol = getSymbol(cmd);
+        const extra = cmd === 'ax' ? '\n(version info loading...)' : '';
+        return `${symbol} ${description}${extra}`;
+    }
+
+    // UI-only commands (not SEG operators)
+    const uiTooltips: Record<string, string> = {
+        'pulse': '꩜ Pulse — Async operations',
+        'db': '⊔ Database — Storage layer',
+        'prose': '⚇ Prose — Documentation',
+        'go': 'Go — Code editor',
+        'py': 'py — Python editor',
+        'plugins': '⚙ Plugins — Domain extensions',
+        'vidstream': '⮀ VidStream — Video inference\n(version info loading...)',
     };
-    return tooltips[cmd] || cmd;
+    return uiTooltips[cmd] || cmd;
 }
 
 /**

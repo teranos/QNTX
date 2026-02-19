@@ -4,7 +4,7 @@
 
 Clusters are visible on the canvas as a live updating map. As new attestations are embedded and assigned, the map reflects the current state of the cluster topology.
 
-Individual clusters can appear as their own glyph, melded with the semantic search glyph. When you select a cluster in ⊨, the cluster glyph shows that cluster's shape and where the semantic matches land within it — so you can see how reliable a match actually is.
+Individual clusters can appear as their own [glyph](./glyphs.md), [melded](./glyph-melding.md) with the semantic search glyph. When you select a cluster in ⊨, the cluster glyph shows that cluster's shape and where the semantic matches land within it — so you can see how reliable a match actually is.
 
 ## Cluster Labeling
 
