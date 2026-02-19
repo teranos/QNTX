@@ -43,7 +43,7 @@
 
     <!-- UI components -->
     <link rel="stylesheet" href="/css/config-panel.css">
-    <link rel="stylesheet" href="/css/feedback.css">
+    <link rel="stylesheet" href="/css/drawer.css">
     <link rel="stylesheet" href="/css/filetree.css">
     <link rel="stylesheet" href="/css/components/base-panel.css">
     <link rel="stylesheet" href="/css/loading.css">
@@ -362,22 +362,15 @@
         </div>
     </div>
 
-    <!-- Combined Log Panel (Server + ix Progress side by side) -->
+    <!-- Unified Search Drawer -->
     <div id="system-drawer">
         <div id="system-drawer-header">
-            <!-- Usage badge and status indicators will be inserted here dynamically by TypeScript -->
+            <!-- Status indicators and search input inserted dynamically by TypeScript -->
             <div class="controls">
                 <span id="system-version" style="font-size: 9px; color: #555; margin-right: 8px;"></span>
             </div>
         </div>
-        <div id="log-panels-container">
-            <div class="log-column">
-                <div class="log-column-header">
-                    Server <span id="log-count" class="count">(0)</span>
-                </div>
-                <div id="log-content" class="log-column-content"></div>
-            </div>
-        </div>
+        <div id="search-results-container"></div>
     </div>
 
     <!-- Panel skeleton - cloned by BasePanel for all standard panels -->

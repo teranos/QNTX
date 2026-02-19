@@ -4,13 +4,11 @@
 
 import { describe, test, expect } from 'bun:test';
 import { UI_TEXT } from './config';
-import { appState, MAX_LOGS } from './state/app';
+import { appState } from './state/app';
 
 describe('appState', () => {
     test('has correct default values', () => {
         expect(appState.currentVerbosity).toBe(2); // Debug level
-        expect(appState.logBuffer).toEqual([]);
-        expect(appState.progressBuffer).toEqual([]);
         expect(appState.currentQuery).toBe('');
     });
 
@@ -23,11 +21,6 @@ describe('appState', () => {
 });
 
 describe('Constants', () => {
-    test('MAX_LOGS is a reasonable limit', () => {
-        expect(MAX_LOGS).toBeGreaterThan(0);
-        expect(MAX_LOGS).toBeLessThanOrEqual(10000);
-    });
-
     test('UI_TEXT has required strings', () => {
         expect(UI_TEXT.LOADING).toBeTruthy();
         expect(UI_TEXT.CONNECTION_LOST).toBeTruthy();

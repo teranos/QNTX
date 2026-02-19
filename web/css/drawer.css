@@ -1,6 +1,5 @@
-/* Feedback Styles - Logs, Toasts, Progress */
+/* Search Drawer + Status Indicators */
 
-/* System Drawer (formerly Log Panel) */
 #system-drawer {
     position: fixed;
     bottom: 0;
@@ -12,6 +11,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    transition: height 0.15s ease-out;
 }
 
 #system-drawer.drawer-hidden #system-drawer-header {
@@ -19,19 +19,37 @@
     pointer-events: none;
 }
 
-#system-drawer.drawer-hidden #log-panels-container {
+#system-drawer.drawer-hidden #search-results-container {
     display: none;
 }
 
 #system-drawer .drawer-grab-bar {
-    height: 6px;
+    height: 10px;
     cursor: ns-resize;
     flex-shrink: 0;
     background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 1; /* Above sibling content within drawer */
+}
+
+#system-drawer .drawer-grab-bar::after {
+    content: '';
+    width: 32px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.15);
+    transition: background 0.15s;
 }
 
 #system-drawer .drawer-grab-bar:hover {
     background: rgba(255, 255, 255, 0.06);
+}
+
+#system-drawer .drawer-grab-bar:hover::after {
+    background: rgba(255, 255, 255, 0.35);
 }
 
 #system-drawer-header {
@@ -53,220 +71,34 @@
     margin-left: auto;
 }
 
-
-/* Log panels container - side by side layout */
-#log-panels-container {
-    display: flex;
-    flex: 1;
-    gap: 1px;
-    background: var(--bg-dark-light);
-    overflow: hidden;
-}
-
-/* When drawer height is at header-only (32px), content hidden via overflow: hidden on parent */
-
-.log-column {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    background: var(--bg-almost-black);
-    overflow: hidden;
-}
-
-.log-column-header {
-    padding: 4px 8px;
-    background: var(--bg-dark);
-    border-bottom: 1px solid var(--border-on-dark);
-    font-size: 9px;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-    letter-spacing: 0.5px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.log-column-header .count {
-    color: #555;
-    margin-left: 4px;
-}
-
-.log-column-header .mini-btn {
-    background: var(--bg-dark);
-    border: 1px solid var(--border-on-dark);
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 1px 6px;
-    font-size: 9px;
-    font-weight: 500;
-}
-
-.log-column-header .mini-btn:hover {
-    background: var(--bg-dark-light);
-    color: var(--text-tertiary);
-}
-
-.log-column-content {
+/* Search results container in drawer */
+#search-results-container {
     flex: 1;
     overflow-y: auto;
-    padding: 6px 8px;
+    overflow-x: hidden;
+    background: var(--bg-almost-black);
+}
+
+/* Drawer search input */
+#drawer-search-input {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg-almost-black);
+    border: 1px solid var(--border-on-dark);
+    border-radius: var(--border-radius);
+    color: var(--text-on-dark);
     font-family: 'SF Mono', Monaco, 'Courier New', monospace;
     font-size: var(--font-size-sm);
-    line-height: 1.4;
-    overflow-wrap: break-word;
-    word-wrap: break-word;
-    word-break: break-word;
+    padding: 4px 8px;
+    outline: none;
 }
 
-/* Legacy IDs for backward compatibility */
-#log-content, #progress-content {
-    flex: 1;
-    overflow-y: auto;
+#drawer-search-input:focus {
+    border-color: var(--accent-color, #4a9eff);
 }
 
-.log-line {
-    margin: 1px 0;
-    padding: 2px 4px;
-    border-radius: 2px;
-}
-
-.log-error {
-    color: #ff6b6b;
-    background: rgba(255, 107, 107, 0.1);
-    border-left: 2px solid #ff6b6b;
-    padding-left: 6px;
-}
-
-.log-warn {
-    color: #ffa502;
-    background: rgba(255, 165, 2, 0.1);
-    border-left: 2px solid #ffa502;
-    padding-left: 6px;
-}
-
-.log-info {
-    color: #4ecdc4;
-}
-
-.log-debug {
-    color: #95afc0;
-}
-
-.log-timestamp {
+#drawer-search-input::placeholder {
     color: var(--text-secondary);
-    margin-right: 8px;
-}
-
-.log-logger {
-    color: var(--text-on-dark-tertiary);
-    margin-right: 8px;
-}
-
-.log-message {
-    color: var(--text-on-dark);
-}
-
-.log-fields {
-    color: var(--text-on-dark-tertiary);
-    font-style: italic;
-    margin-left: 8px;
-}
-
-
-/* Progress Events (in log panel) */
-.progress-event {
-    margin: 3px 0;
-    padding: 5px 8px;
-    border-radius: var(--border-radius);
-    background: var(--bg-almost-black);
-    border-left: 3px solid #666;
-}
-
-.progress-event.stage {
-    border-left-color: #4ecdc4;
-}
-
-.progress-event.attestations {
-    border-left-color: #2ecc71;
-}
-
-.progress-event.complete {
-    border-left-color: #9b59b6;
-    background: rgba(155, 89, 182, 0.05);
-}
-
-.progress-event.error {
-    border-left-color: #ff6b6b;
-    background: rgba(255, 107, 107, 0.1);
-}
-
-.progress-event-header {
-    display: flex;
-    align-items: center;
-    gap: var(--gap);
-    margin-bottom: 2px;
-}
-
-.progress-event-icon {
-    font-size: var(--font-size-md);
-}
-
-.progress-event-type {
-    font-weight: 600;
-    color: var(--text-on-dark);
-    font-size: var(--font-size-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.progress-event-timestamp {
-    color: var(--text-secondary);
-    font-size: var(--font-size-sm);
-    margin-left: auto;
-}
-
-.progress-event-message {
-    color: #bbb;
-    font-size: var(--font-size-sm);
-    margin-top: 2px;
-}
-
-.progress-event-details {
-    margin-top: 4px;
-    padding-top: 4px;
-    border-top: 1px solid var(--border-on-dark);
-    font-size: var(--font-size-sm);
-    color: var(--text-tertiary);
-}
-
-.progress-event-detail {
-    margin: 1px 0;
-}
-
-.progress-event-detail strong {
-    color: #ccc;
-    margin-right: 4px;
-}
-
-/* Attestation triple styling */
-.progress-event-detail.attestation-triple {
-    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-    padding: 2px 0;
-}
-
-.att-entity {
-    color: #7eb3ff;
-    font-weight: 600;
-}
-
-.att-relation {
-    color: var(--text-on-dark-secondary);
-    font-style: italic;
-}
-
-.att-value {
-    color: #88c999;
 }
 
 /* Hixtory - IX operation history */

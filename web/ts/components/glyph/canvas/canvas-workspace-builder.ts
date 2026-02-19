@@ -240,6 +240,7 @@ export function buildCanvasWorkspace(
     const container = document.createElement('div');
     container.className = 'canvas-workspace';
     container.dataset.canvasId = canvasId;
+    (container as any).__glyphs = glyphs;
     container.tabIndex = 0;
 
     container.style.width = '100%';
