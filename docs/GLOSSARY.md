@@ -22,7 +22,14 @@ A verifiable claim in the form: `[Subject] is [Predicate] of [Context] by [Actor
 ### ASID (Attestation System ID)
 Unique identifier for attestations. Always random for uniqueness, ensuring no collisions.
 
-## Symbol System
+## SEG / Symbol / Glyph
+
+### SEG (Segment)
+An atomic unit of the attestation grammar. The operators (`i`, `am`, `ix`, `ax`, `by`, `at`, `so`, `se`, `as`, `is`, `of`) are all segments. Each segment has three layers:
+
+- **seg** — the grammatical unit (what it IS)
+- **sym** — the visual expression (how it LOOKS: `⋈`, `⨳`, `+`, `=`, `∈`, `⌬`, `✦`)
+- **glyph** — the interactive manifestation (how you INTERACT with it)
 
 ### Primary SEG Operators (UI/Command Symbols)
 These symbols have UI components and keyboard shortcuts (user-configurable):
@@ -61,6 +68,9 @@ Infrastructure and lifecycle markers:
 | `▣` | Prose | Documentation and prose content |
 | `▤` | Doc | Document/file content (PDF, etc.) |
 | `⌗` | Subcanvas | Nested canvas workspace |
+
+### Manifestation
+The visual form a glyph takes when it morphs beyond the GlyphRun. A glyph can manifest as a window, canvas, fullscreen overlay, modal, tooltip, or any other interactive surface. The same DOM element, the same identity — different manifestations. See [glyphs.md](vision/glyphs.md) for the full vision.
 
 ## Configuration
 

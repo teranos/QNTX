@@ -2,7 +2,7 @@
 
 ## Vision
 
-Instead of the traditional node-and-wire paradigm of visual programming languages (VPLs), QNTX introduces **glyph melding** - a direct manipulation interface where glyphs physically fuse together through spatial proximity.
+Instead of the traditional node-and-wire paradigm of visual programming languages (VPLs), QNTX introduces **glyph melding** - a direct manipulation interface where [glyphs](./glyphs.md) physically fuse together through spatial proximity.
 
 Glyphs don't connect via explicit wires or lines. They meld together like magnetic pieces, forming compositions through adjacency. Data flows implicitly through the melded structure, left to right, creating readable pipelines without visual clutter.
 
