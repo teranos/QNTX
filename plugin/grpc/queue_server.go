@@ -144,7 +144,10 @@ func (s *QueueServer) ListJobs(ctx context.Context, req *protocol.ListJobsReques
 		}, nil
 	}
 
-	limit := int(req.Limit)
+	limit := 0
+	if req.Limit != nil {
+		limit = int(*req.Limit)
+	}
 	if limit == 0 {
 		limit = 100 // Default limit
 	}

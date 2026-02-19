@@ -68,7 +68,8 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*ty
 	}
 
 	if !cmd.Timestamp.IsZero() {
-		protoCmd.Timestamp = cmd.Timestamp.Unix()
+		ts := cmd.Timestamp.UnixMilli()
+		protoCmd.Timestamp = &ts
 	}
 
 	req := &protocol.GenerateAttestationRequest{
@@ -92,20 +93,20 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*ty
 		Predicates: resp.Attestation.Predicates,
 		Contexts:   resp.Attestation.Contexts,
 		Actors:     resp.Attestation.Actors,
-		Timestamp:  time.Unix(resp.Attestation.Timestamp, 0),
+		Timestamp:  time.UnixMilli(resp.Attestation.Timestamp),
 		Source:     resp.Attestation.Source,
 		Attributes: make(map[string]interface{}),
-		CreatedAt:  time.Unix(resp.Attestation.CreatedAt, 0),
+		CreatedAt:  time.UnixMilli(resp.Attestation.CreatedAt),
 	}
 
 	// Unmarshal attributes from JSON
-	if resp.Attestation.AttributesJson != "" {
-		attributes, err := attributesFromJSON(resp.Attestation.AttributesJson)
+	if resp.Attestation.Attributes != "" {
+		attributes, err := attributesFromJSON(resp.Attestation.Attributes)
 		if err != nil {
 			// Surface attribute parsing error to caller via special key
-			r.logger.Warnw("Failed to unmarshal attributes", "error", err, "json", resp.Attestation.AttributesJson)
+			r.logger.Warnw("Failed to unmarshal attributes", "error", err, "json", resp.Attestation.Attributes)
 			attestation.Attributes["_attribute_parse_error"] = err.Error()
-			attestation.Attributes["_attribute_parse_json"] = resp.Attestation.AttributesJson
+			attestation.Attributes["_attribute_parse_json"] = resp.Attestation.Attributes
 		} else {
 			attestation.Attributes = attributes
 		}
@@ -132,18 +133,19 @@ func (r *RemoteATSStore) AttestationExists(asid string) bool {
 
 // GetAttestations retrieves attestations via gRPC.
 func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
+	limit := int32(filter.Limit)
 	protoFilter := &protocol.AttestationFilter{
 		Actors:     filter.Actors,
 		Subjects:   filter.Subjects,
 		Predicates: filter.Predicates,
 		Contexts:   filter.Contexts,
-		Limit:      int32(filter.Limit),
+		Limit:      &limit,
 	}
 	if filter.TimeStart != nil {
-		protoFilter.TimeStart = filter.TimeStart.Unix()
+		protoFilter.TimeStart = filter.TimeStart.UnixMilli()
 	}
 	if filter.TimeEnd != nil {
-		protoFilter.TimeEnd = filter.TimeEnd.Unix()
+		protoFilter.TimeEnd = filter.TimeEnd.UnixMilli()
 	}
 
 	req := &protocol.GetAttestationsRequest{
@@ -165,20 +167,20 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 			Predicates: protoAtt.Predicates,
 			Contexts:   protoAtt.Contexts,
 			Actors:     protoAtt.Actors,
-			Timestamp:  time.Unix(protoAtt.Timestamp, 0),
+			Timestamp:  time.UnixMilli(protoAtt.Timestamp),
 			Source:     protoAtt.Source,
 			Attributes: make(map[string]interface{}),
-			CreatedAt:  time.Unix(protoAtt.CreatedAt, 0),
+			CreatedAt:  time.UnixMilli(protoAtt.CreatedAt),
 		}
 
 		// Unmarshal attributes from JSON
-		if protoAtt.AttributesJson != "" {
-			attributes, err := attributesFromJSON(protoAtt.AttributesJson)
+		if protoAtt.Attributes != "" {
+			attributes, err := attributesFromJSON(protoAtt.Attributes)
 			if err != nil {
 				// Surface attribute parsing error to caller via special key
 				r.logger.Warnw("Failed to unmarshal attributes", "error", err, "id", protoAtt.Id)
 				attestations[i].Attributes["_attribute_parse_error"] = err.Error()
-				attestations[i].Attributes["_attribute_parse_json"] = protoAtt.AttributesJson
+				attestations[i].Attributes["_attribute_parse_json"] = protoAtt.Attributes
 			} else {
 				attestations[i].Attributes = attributes
 			}
@@ -201,15 +203,15 @@ func (r *RemoteATSStore) CreateAttestation(a *types.As) error {
 	}
 
 	protoAtt := &protocol.Attestation{
-		Id:             a.ID,
-		Subjects:       a.Subjects,
-		Predicates:     a.Predicates,
-		Contexts:       a.Contexts,
-		Actors:         a.Actors,
-		Timestamp:      a.Timestamp.Unix(),
-		Source:         a.Source,
-		AttributesJson: attributesJSON,
-		CreatedAt:      a.CreatedAt.Unix(),
+		Id:         a.ID,
+		Subjects:   a.Subjects,
+		Predicates: a.Predicates,
+		Contexts:   a.Contexts,
+		Actors:     a.Actors,
+		Timestamp:  a.Timestamp.UnixMilli(),
+		Source:     a.Source,
+		Attributes: attributesJSON,
+		CreatedAt:  a.CreatedAt.UnixMilli(),
 	}
 
 	req := &protocol.CreateAttestationRequest{
