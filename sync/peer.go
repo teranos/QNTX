@@ -8,6 +8,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 
 	"go.uber.org/zap"
 )
@@ -485,26 +486,26 @@ func fromWire(w AttestationWire) (*types.As, error) {
 // Critical: timestamp is i64 milliseconds (UnixMilli), not nanoseconds or RFC3339.
 // This JSON is passed to SyncTree.ContentHash() which delegates to Rust.
 func attestationJSON(as *types.As) (string, error) {
-	v := struct {
-		ID         string                 `json:"id"`
-		Subjects   []string               `json:"subjects"`
-		Predicates []string               `json:"predicates"`
-		Contexts   []string               `json:"contexts"`
-		Actors     []string               `json:"actors"`
-		Timestamp  int64                  `json:"timestamp"`
-		Source     string                 `json:"source"`
-		Attributes map[string]interface{} `json:"attributes,omitempty"`
-	}{
-		ID:         as.ID,
+	attributesJSON := ""
+	if as.Attributes != nil {
+		ab, err := json.Marshal(as.Attributes)
+		if err != nil {
+			return "", errors.Wrapf(err, "failed to marshal attributes for %s", as.ID)
+		}
+		attributesJSON = string(ab)
+	}
+	proto := &protocol.Attestation{
+		Id:         as.ID,
 		Subjects:   as.Subjects,
 		Predicates: as.Predicates,
 		Contexts:   as.Contexts,
 		Actors:     as.Actors,
 		Timestamp:  as.Timestamp.UnixMilli(),
 		Source:     as.Source,
-		Attributes: as.Attributes,
+		Attributes: attributesJSON,
+		CreatedAt:  as.CreatedAt.UnixMilli(),
 	}
-	b, err := json.Marshal(v)
+	b, err := json.Marshal(proto)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to marshal attestation %s to JSON", as.ID)
 	}
