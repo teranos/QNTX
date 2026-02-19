@@ -887,6 +887,35 @@ func extractRichTextFromAttributes(attrs map[string]interface{}, richFields []st
 	return strings.Join(parts, " ")
 }
 
+// HandleClusterTimeline serves cluster evolution data across runs (GET /api/embeddings/cluster-timeline).
+func (s *QNTXServer) HandleClusterTimeline(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.embeddingStore == nil {
+		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	timeline, err := s.embeddingStore.GetClusterTimeline()
+	if err != nil {
+		s.logger.Errorw("Failed to get cluster timeline", "error", err)
+		http.Error(w, "Failed to retrieve cluster timeline", http.StatusInternalServerError)
+		return
+	}
+
+	if timeline == nil {
+		timeline = []storage.ClusterTimelinePoint{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(timeline); err != nil {
+		s.logger.Errorw("Failed to encode cluster timeline response", "error", err)
+	}
+}
+
 // callReducePlugin sends an HTTP request to the reduce plugin via gRPC.
 // Returns the response body or an error.
 func (s *QNTXServer) callReducePlugin(ctx context.Context, method, path string, body []byte) ([]byte, error) {

@@ -41,6 +41,12 @@ func (s *QNTXServer) HandleEmbeddingClusters(w http.ResponseWriter, r *http.Requ
 	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
 }
 
+// HandleClusterTimeline serves cluster evolution data (GET /api/embeddings/cluster-timeline)
+func (s *QNTXServer) HandleClusterTimeline(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`[]`))
+}
+
 // HandleEmbeddingProject runs UMAP projection (POST /api/embeddings/project)
 func (s *QNTXServer) HandleEmbeddingProject(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
