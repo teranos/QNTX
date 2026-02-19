@@ -1017,9 +1017,6 @@ func (c *Client) searchSemantic(query string) []storage.RichSearchMatch {
 		}
 
 		excerpt := result.Text
-		if len(excerpt) > 150 {
-			excerpt = excerpt[:150] + "..."
-		}
 
 		matches = append(matches, storage.RichSearchMatch{
 			NodeID:       nodeID,
