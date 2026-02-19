@@ -5,7 +5,8 @@
  * Difference: AX sends structured AX query syntax; SE sends natural language matched
  * by cosine similarity against attestation embeddings on the server.
  *
- * No local WASM query — semantic matching requires server-side embeddings.
+ * Offline fallback: when disconnected, uses cached query embedding + local IndexedDB
+ * embeddings for brute-force cosine similarity search via WASM.
  */
 
 import type { Glyph } from './glyph';
@@ -24,6 +25,73 @@ import {
     CANVAS_GLYPH_TITLE_BAR_HEIGHT,
     MAX_VIEWPORT_HEIGHT_RATIO
 } from './glyph';
+
+// ============================================================================
+// Query Embedding Cache (for offline fallback)
+// ============================================================================
+
+/** Cached query embeddings keyed by watcher ID */
+const queryEmbeddingCache = new Map<string, number[]>();
+
+/**
+ * Cache a query embedding received from the server.
+ * Persists to IndexedDB so it survives page reloads and timing gaps.
+ * Called by the WebSocket handler for se_query_embedding messages.
+ */
+export function cacheQueryEmbedding(watcherId: string, embedding: number[]): void {
+    queryEmbeddingCache.set(watcherId, embedding);
+    // Persist to IndexedDB (fire-and-forget)
+    import('../../browser-sync.js').then(({ storeQueryEmbedding }) => {
+        storeQueryEmbedding(watcherId, embedding).catch(() => {});
+    });
+    log.debug(SEG.GLYPH, `[SeGlyph] Cached query embedding for ${watcherId} (${embedding.length}d)`);
+}
+
+/**
+ * Run local semantic search using cached query embedding and IndexedDB embeddings.
+ * Returns attestations from local storage that match above threshold.
+ */
+async function runLocalSemanticSearch(
+    glyphId: string,
+    watcherId: string,
+    threshold: number,
+): Promise<void> {
+    // Try in-memory cache first, then IndexedDB
+    let queryEmb = queryEmbeddingCache.get(watcherId);
+    if (!queryEmb) {
+        try {
+            const { getQueryEmbedding } = await import('../../browser-sync.js');
+            queryEmb = await getQueryEmbedding(watcherId) ?? undefined;
+            if (queryEmb) {
+                queryEmbeddingCache.set(watcherId, queryEmb);
+                log.debug(SEG.GLYPH, `[SeGlyph] Loaded query embedding from IndexedDB for ${watcherId}`);
+            }
+        } catch { /* IndexedDB unavailable */ }
+    }
+    if (!queryEmb) {
+        log.debug(SEG.GLYPH, `[SeGlyph] No cached query embedding for ${watcherId}, cannot search offline`);
+        return;
+    }
+
+    try {
+        const { localSemanticSearch } = await import('../../local-semantic-search.js');
+        const { getAttestation } = await import('../../qntx-wasm.js');
+        const results = await localSemanticSearch(queryEmb, threshold, 50);
+
+        for (const match of results) {
+            const att = await getAttestation(match.attestation_id);
+            if (att) {
+                updateSemanticGlyphResults(glyphId, att, match.similarity);
+            }
+        }
+
+        if (results.length > 0) {
+            log.info(SEG.GLYPH, `[SeGlyph] Local search for ${glyphId}: ${results.length} results`);
+        }
+    } catch (err) {
+        log.debug(SEG.GLYPH, `[SeGlyph] Local search failed for ${glyphId}:`, err);
+    }
+}
 
 function appendEmptyState(container: HTMLElement): void {
     const empty = document.createElement('div');
@@ -288,10 +356,11 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
             return;
         }
 
+        const watcherId = `se-glyph-${glyphId}`;
         if (connectivityManager.state === 'online') {
             sendMessage({
                 type: 'watcher_upsert',
-                watcher_id: `se-glyph-${glyphId}`,
+                watcher_id: watcherId,
                 semantic_query: query,
                 semantic_threshold: currentThreshold,
                 semantic_cluster_id: currentClusterId,
@@ -300,7 +369,9 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
             });
             setColorState('teal');
         } else {
+            // Offline: run local semantic search using cached query embedding
             setColorState('orange');
+            runLocalSemanticSearch(glyphId, watcherId, currentThreshold);
         }
     }
 

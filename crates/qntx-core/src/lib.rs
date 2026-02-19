@@ -32,6 +32,7 @@ pub mod classify;
 pub mod expand;
 pub mod fuzzy;
 pub mod parser;
+pub mod similarity;
 pub mod storage;
 pub mod sync;
 

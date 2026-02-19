@@ -14,6 +14,7 @@ export const list_attestation_ids: () => any;
 export const parse_query: (a: number, b: number) => [number, number];
 export const put_attestation: (a: number, b: number) => any;
 export const query_attestations: (a: number, b: number) => any;
+export const semantic_similarity: (a: number, b: number) => [number, number];
 export const sync_content_hash: (a: number, b: number) => [number, number];
 export const sync_merkle_contains: (a: number, b: number) => [number, number];
 export const sync_merkle_diff: (a: number, b: number) => [number, number];

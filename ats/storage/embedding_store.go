@@ -149,6 +149,68 @@ func (s *EmbeddingStore) GetBySource(sourceType, sourceID string) (*EmbeddingMod
 	return &embedding, nil
 }
 
+// GetBySourceIDs batch-fetches embeddings for multiple source IDs.
+// Returns a map from sourceID → EmbeddingModel (only found entries).
+func (s *EmbeddingStore) GetBySourceIDs(sourceType string, sourceIDs []string) (map[string]*EmbeddingModel, error) {
+	if len(sourceIDs) == 0 {
+		return make(map[string]*EmbeddingModel), nil
+	}
+
+	// Build placeholder string for IN clause
+	placeholders := make([]string, len(sourceIDs))
+	args := make([]interface{}, 0, len(sourceIDs)+1)
+	args = append(args, sourceType)
+	for i, id := range sourceIDs {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+
+	query := `
+		SELECT id, source_type, source_id, text, embedding,
+		       model, dimensions, created_at, updated_at
+		FROM embeddings
+		WHERE source_type = ? AND source_id IN (` + joinStrings(placeholders, ",") + `)
+	`
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to batch-fetch embeddings for %s (%d IDs)", sourceType, len(sourceIDs))
+	}
+	defer rows.Close()
+
+	result := make(map[string]*EmbeddingModel, len(sourceIDs))
+	for rows.Next() {
+		var emb EmbeddingModel
+		var createdAt, updatedAt string
+		if err := rows.Scan(
+			&emb.ID, &emb.SourceType, &emb.SourceID, &emb.Text, &emb.Embedding,
+			&emb.Model, &emb.Dimensions, &createdAt, &updatedAt,
+		); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan embedding row at index %d", len(result))
+		}
+		emb.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+		emb.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+		result[emb.SourceID] = &emb
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate embedding rows (read %d)", len(result))
+	}
+
+	return result, nil
+}
+
+// joinStrings joins a slice of strings with a separator (avoids importing strings package).
+func joinStrings(parts []string, sep string) string {
+	if len(parts) == 0 {
+		return ""
+	}
+	result := parts[0]
+	for _, p := range parts[1:] {
+		result += sep + p
+	}
+	return result
+}
+
 // SearchResult represents a semantic search result
 type SearchResult struct {
 	EmbeddingID string  `json:"embedding_id"`

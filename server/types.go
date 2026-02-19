@@ -59,7 +59,7 @@ type cachedUsageStats struct {
 
 // QueryMessage represents a client message
 type QueryMessage struct {
-	Type          string  `json:"type"`           // "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility", "vidstream_init", "vidstream_frame", "rich_search"
+	Type          string  `json:"type"`           // "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility", "vidstream_init", "vidstream_frame", "rich_search", "browser_sync_hello"
 	Query         string  `json:"query"`          // The Ax query text (can be multi-line)
 	Line          int     `json:"line"`           // Current line number (for multi-line support)
 	Cursor        int     `json:"cursor"`         // Cursor position
@@ -91,6 +91,8 @@ type QueryMessage struct {
 	SemanticQuery     string  `json:"semantic_query"`      // For watcher_upsert: Natural language query for semantic matching
 	SemanticThreshold float32 `json:"semantic_threshold"`  // For watcher_upsert: Minimum similarity score (0-1)
 	SemanticClusterID *int    `json:"semantic_cluster_id"` // For watcher_upsert: Cluster scope (nil = all clusters)
+	// Browser sync fields (for browser_sync_hello messages)
+	SyncRoot string `json:"sync_root,omitempty"` // Browser Merkle root for incremental sync
 }
 
 // ProgressMessage represents an import progress message
@@ -269,4 +271,37 @@ type WatcherErrorMessage struct {
 	Details   []string `json:"details,omitempty"` // Structured error context from errors.GetAllDetails()
 	Severity  string   `json:"severity"`          // "error" or "warning"
 	Timestamp int64    `json:"timestamp"`         // Unix timestamp
+}
+
+// BrowserSyncAttestationsMessage sends a batch of attestations + embeddings to the browser
+type BrowserSyncAttestationsMessage struct {
+	Type         string                    `json:"type"`         // "browser_sync_attestations"
+	Attestations []interface{}             `json:"attestations"` // Proto-format attestations
+	Embeddings   []BrowserSyncEmbedding    `json:"embeddings"`   // Embeddings for the batch
+	Done         bool                      `json:"done"`         // True on final batch
+	Stored       int                       `json:"stored"`       // Running total of attestations sent
+	Total        int                       `json:"total"`        // Total attestations to sync
+	Timestamp    int64                     `json:"timestamp"`
+}
+
+// BrowserSyncEmbedding is a single embedding sent to the browser during sync
+type BrowserSyncEmbedding struct {
+	AttestationID string    `json:"attestation_id"`
+	Vector        []float32 `json:"vector"`
+	Model         string    `json:"model"`
+}
+
+// BrowserSyncDoneMessage indicates the browser is already in sync
+type BrowserSyncDoneMessage struct {
+	Type      string `json:"type"`      // "browser_sync_done"
+	Message   string `json:"message"`
+	Timestamp int64  `json:"timestamp"`
+}
+
+// SEQueryEmbeddingMessage sends the query embedding for an SE watcher to the browser
+type SEQueryEmbeddingMessage struct {
+	Type      string    `json:"type"`       // "se_query_embedding"
+	WatcherID string    `json:"watcher_id"`
+	Embedding []float32 `json:"embedding"`
+	Timestamp int64     `json:"timestamp"`
 }
