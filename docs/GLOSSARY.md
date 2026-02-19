@@ -36,6 +36,7 @@ These symbols have UI components and keyboard shortcuts (user-configurable):
 | `⌬` | by | Actor | All forms: creator, source, authenticated user |
 | `✦` | at | Temporal | Time marker/moment |
 | `⟶` | so | Therefore | Consequent action/trigger |
+| `⊨` | se | Semantic | Meaning-based search and entailment |
 
 ### Attestation Building Blocks
 Fundamental components of attestations (not UI elements):
@@ -58,6 +59,8 @@ Infrastructure and lifecycle markers:
 | `❀` | PulseClose | Graceful shutdown with checkpoint preservation. See [Opening & Closing](development/grace.md) |
 | `⊔` | DB | Database/storage layer |
 | `▣` | Prose | Documentation and prose content |
+| `▤` | Doc | Document/file content (PDF, etc.) |
+| `⌗` | Subcanvas | Nested canvas workspace |
 
 ## Configuration
 
