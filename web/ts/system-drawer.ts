@@ -75,6 +75,7 @@ function computeLocalResults(query: string): SearchMatch[] {
             strategy: 'local',
             display_label: cmd,
             attributes: {},
+            matched_words: [],
         });
     }
 
@@ -96,6 +97,7 @@ function computeLocalResults(query: string): SearchMatch[] {
             strategy: 'local',
             display_label: name,
             attributes: {},
+            matched_words: [],
         });
     }
 
@@ -141,6 +143,7 @@ function searchOffline(query: string): void {
             strategy: STRATEGY_FUZZY,
             display_label: m.value,
             attributes: {},
+            matched_words: [],
         })),
         ...contextMatches.map(m => ({
             node_id: '',
@@ -153,6 +156,7 @@ function searchOffline(query: string): void {
             strategy: STRATEGY_FUZZY,
             display_label: m.value,
             attributes: {},
+            matched_words: [],
         })),
     ];
 
@@ -160,7 +164,6 @@ function searchOffline(query: string): void {
     const top = matches.slice(0, 20);
 
     const message: SearchResultsMessage = {
-        type: 'rich_search_results',
         query,
         matches: top,
         total: top.length,
@@ -211,13 +214,10 @@ export function focusDrawerSearch(): void {
     searchInput.focus();
 }
 
-/** Handle search results from WebSocket.
- *  Accepts any object — the WS layer passes RichSearchResultsMessage which
- *  carries the same runtime shape (query, matches, total) but a different TS type.
- *  TODO: replace with proto-generated type per ADR-006. */
-export function handleSearchResults(message: SearchResultsMessage | Record<string, unknown>): void {
+/** Handle search results from WebSocket (proto: RichSearchResultsMessage). */
+export function handleSearchResults(message: SearchResultsMessage): void {
     if (!searchView) return;
-    searchView.updateResults(message as SearchResultsMessage);
+    searchView.updateResults(message);
 }
 
 // --- Init ---

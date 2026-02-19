@@ -48,3 +48,26 @@ message StorageWarningMessage {
   string time_until_full = 7;      // Human-readable time until hitting limit
   int64 timestamp = 8;             // Unix timestamp
 }
+
+// RichSearchMatch represents a single match from rich string field search.
+// Mirrors storage.RichSearchMatch in ats/storage/rich_search.go.
+message RichSearchMatch {
+  string node_id = 1;             // Subject ID from the attestation
+  string type_name = 2;           // Entity type name
+  string type_label = 3;          // Display label for the type
+  string field_name = 4;          // Name of the matched field
+  string field_value = 5;         // Full value of the matched field
+  string excerpt = 6;             // Excerpt showing the match in context
+  double score = 7;               // Match score (0.0–1.0)
+  string strategy = 8;            // Matching strategy: substring, fuzzy, semantic
+  string display_label = 9;       // Display name for this entity
+  map<string, string> attributes = 10; // Entity attributes (flat key-value)
+  repeated string matched_words = 11;  // Words matched (for highlighting)
+}
+
+// RichSearchResultsMessage is the server→client response for rich_search_results.
+message RichSearchResultsMessage {
+  string query = 1;               // Original search query
+  repeated RichSearchMatch matches = 2; // Matched results
+  int32 total = 3;                // Total number of matches
+}
