@@ -214,12 +214,15 @@ func (s *QNTXServer) setupClusterLabelSchedule(cfg *appcfg.Config) {
 	s.logger.Infow("Registered cluster label handler")
 
 	interval := cfg.Embeddings.ClusterLabelIntervalSeconds
+	schedStore := schedule.NewStore(s.db)
+
+	// If interval is disabled, pause any existing active schedule
 	if interval <= 0 {
+		s.pauseExistingSchedule(schedStore, ClusterLabelHandlerName)
 		return
 	}
 
 	// Check for existing schedule to avoid duplicates on restart
-	schedStore := schedule.NewStore(s.db)
 	existing, err := schedStore.ListAllScheduledJobs()
 	if err != nil {
 		s.logger.Errorw("Failed to list scheduled jobs for cluster-label idempotency check",

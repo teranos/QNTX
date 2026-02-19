@@ -442,12 +442,14 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 	s.logger.Infow("Registered HDBSCAN recluster handler")
 
 	interval := cfg.Embeddings.ReclusterIntervalSeconds
+	schedStore := schedule.NewStore(s.db)
+
 	if interval <= 0 {
+		s.pauseExistingSchedule(schedStore, ReclusterHandlerName)
 		return
 	}
 
 	// Check for existing schedule to avoid duplicates on restart
-	schedStore := schedule.NewStore(s.db)
 	existing, err := schedStore.ListAllScheduledJobs()
 	if err != nil {
 		s.logger.Errorw("Failed to list scheduled jobs for recluster idempotency check",
@@ -699,12 +701,14 @@ func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
 	s.logger.Infow("Registered reproject handler", "methods", methods)
 
 	interval := cfg.Embeddings.ReprojectIntervalSeconds
+	schedStore := schedule.NewStore(s.db)
+
 	if interval <= 0 {
+		s.pauseExistingSchedule(schedStore, ReprojectHandlerName)
 		return
 	}
 
 	// Check for existing schedule to avoid duplicates on restart
-	schedStore := schedule.NewStore(s.db)
 	existing, err := schedStore.ListAllScheduledJobs()
 	if err != nil {
 		s.logger.Errorw("Failed to list scheduled jobs for reproject idempotency check",
@@ -747,4 +751,26 @@ func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
 		"job_id", job.ID,
 		"interval_seconds", interval,
 		"methods", methods)
+}
+
+// pauseExistingSchedule pauses any active scheduled jobs for the given handler.
+// Called when the config interval is 0 or missing, so stale jobs don't keep running.
+func (s *QNTXServer) pauseExistingSchedule(schedStore *schedule.Store, handlerName string) {
+	existing, err := schedStore.ListAllScheduledJobs()
+	if err != nil {
+		s.logger.Errorw("Failed to list scheduled jobs for pause check",
+			"handler_name", handlerName, "error", err)
+		return
+	}
+	for _, j := range existing {
+		if j.HandlerName == handlerName && j.State == schedule.StateActive {
+			if err := schedStore.UpdateJobState(j.ID, schedule.StatePaused); err != nil {
+				s.logger.Errorw("Failed to pause orphaned schedule",
+					"job_id", j.ID, "handler_name", handlerName, "error", err)
+			} else {
+				s.logger.Infow("Paused schedule (interval disabled in config)",
+					"job_id", j.ID, "handler_name", handlerName)
+			}
+		}
+	}
 }
