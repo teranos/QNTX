@@ -33,59 +33,51 @@ export interface SearchResultsMessage {
 }
 
 export class SearchView {
-    private container: HTMLElement | null = null;
     private resultsElement: HTMLElement | null = null;
     private currentQuery: string = '';
-    private isVisible: boolean = false;
+    private parented: boolean = false;
 
-    /**
-     * Initialize the search view
-     */
-    constructor() {
-        this.createElements();
+    constructor(parent?: HTMLElement) {
+        this.createElements(parent);
     }
 
-    /**
-     * Create the DOM elements for the search view
-     */
-    private createElements(): void {
-        this.container = document.createElement('div');
-        this.container.id = 'search-view';
-        this.container.className = 'search-view';
-
-        // Create results container
+    private createElements(parent?: HTMLElement): void {
         this.resultsElement = document.createElement('div');
         this.resultsElement.className = 'search-results';
 
-        this.container.appendChild(this.resultsElement);
-        document.body.appendChild(this.container);
+        if (parent) {
+            this.parented = true;
+            parent.appendChild(this.resultsElement);
+        } else {
+            // Legacy: standalone overlay on body
+            const container = document.createElement('div');
+            container.id = 'search-view';
+            container.className = 'search-view';
+            container.appendChild(this.resultsElement);
+            document.body.appendChild(container);
+        }
     }
 
-    /**
-     * Show the search view
-     */
     public show(): void {
-        if (this.container) {
-            this.container.style.display = 'block';
-            this.isVisible = true;
+        if (this.parented) return;
+        const container = this.resultsElement?.parentElement;
+        if (container) {
+            container.style.display = 'block';
         }
     }
 
-    /**
-     * Hide the search view
-     */
     public hide(): void {
-        if (this.container) {
-            this.container.style.display = 'none';
-            this.isVisible = false;
+        if (this.parented) return;
+        const container = this.resultsElement?.parentElement;
+        if (container) {
+            container.style.display = 'none';
         }
     }
 
-    /**
-     * Check if the view is currently visible
-     */
     public getIsVisible(): boolean {
-        return this.isVisible;
+        if (this.parented) return true;
+        const container = this.resultsElement?.parentElement;
+        return container?.style.display !== 'none';
     }
 
     /**
@@ -134,14 +126,10 @@ export class SearchView {
         }
     }
 
-    /**
-     * Create a single result line
-     */
     private createResultLine(match: SearchMatch): HTMLElement {
         const line = document.createElement('div');
         line.className = 'search-result-line';
 
-        // Click handler to focus on node
         line.onclick = () => {
             this.handleResultClick(match);
         };
@@ -178,7 +166,6 @@ export class SearchView {
         strategy.textContent = match.strategy === STRATEGY_SEMANTIC ? '⊨' : '≡';
         strategy.title = match.strategy;
 
-        // Assemble the line
         line.appendChild(nodeLabel);
         line.appendChild(typeBadge);
         line.appendChild(fieldName);
@@ -189,9 +176,6 @@ export class SearchView {
         return line;
     }
 
-    /**
-     * Highlight the matching text in the excerpt
-     */
     private highlightMatch(text: string, query: string, matchedWords?: string[]): string {
         // Escape HTML entities first to prevent XSS from server-provided text
         const safeText = escapeHtml(text);
@@ -201,7 +185,6 @@ export class SearchView {
         // If we have matched words from search, use those for highlighting
         if (matchedWords && matchedWords.length > 0) {
             let highlightedText = safeText;
-            // Sort by length descending to avoid replacing parts of longer words
             const sortedWords = [...matchedWords].sort((a, b) => b.length - a.length);
 
             for (const word of sortedWords) {
@@ -216,27 +199,17 @@ export class SearchView {
         return safeText.replace(regex, '<mark class="search-highlight">$1</mark>');
     }
 
-    /**
-     * Escape special regex characters
-     */
     private escapeRegex(str: string): string {
         return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
-    /**
-     * Handle clicking on a result
-     */
     private handleResultClick(match: SearchMatch): void {
-        // Import log dynamically to avoid circular dependency
         import('./logger.ts').then(({ log, SEG }) => {
             log.debug(SEG.QUERY, 'Focusing on node:', match.node_id);
         });
 
-        // Hide the search view
         this.hide();
 
-        // Send a message to focus on this node in the graph
-        // This will be handled by the graph module
         const event = new CustomEvent('search-select', {
             detail: {
                 nodeId: match.node_id,
@@ -246,9 +219,6 @@ export class SearchView {
         document.dispatchEvent(event);
     }
 
-    /**
-     * Clear all results
-     */
     public clear(): void {
         if (this.resultsElement) {
             this.resultsElement.innerHTML = '';
