@@ -2,6 +2,8 @@ changelog:
   categories:
     - title: Features
       labels: [feature, enhancement]
+    - title: Pulse
+      labels: [pulse]
     - title: Fixes
       labels: [bug, fix]
     - title: Other
