@@ -11,13 +11,13 @@ import (
 type mockItem struct {
 	subject   string
 	predicate string
-	object    string
+	context   string
 	meta      map[string]string
 }
 
 func (m *mockItem) GetSubject() string         { return m.subject }
 func (m *mockItem) GetPredicate() string       { return m.predicate }
-func (m *mockItem) GetObject() string          { return m.object }
+func (m *mockItem) GetContext() string         { return m.context }
 func (m *mockItem) GetMeta() map[string]string { return m.meta }
 
 // Ensure mockItem implements AttestationItem
@@ -65,17 +65,17 @@ func TestPersistItems_Success(t *testing.T) {
 		&mockItem{
 			subject:   "alice",
 			predicate: "knows",
-			object:    "bob",
+			context:   "bob",
 		},
 		&mockItem{
 			subject:   "bob",
 			predicate: "works-at",
-			object:    "acme-corp",
+			context:   "acme-corp",
 		},
 		&mockItem{
 			subject:   "carol",
 			predicate: "lives-in",
-			object:    "seattle",
+			context:   "seattle",
 		},
 	}
 
@@ -110,7 +110,7 @@ func TestPersistItems_WithMetadata(t *testing.T) {
 		&mockItem{
 			subject:   "alice",
 			predicate: "age",
-			object:    "30",
+			context:   "30",
 			meta: map[string]string{
 				"source_file": "data.csv",
 				"row_number":  "42",
@@ -164,7 +164,7 @@ func TestPersistItems_NilDatabase(t *testing.T) {
 		&mockItem{
 			subject:   "alice",
 			predicate: "test",
-			object:    "value",
+			context:   "value",
 		},
 	}
 
@@ -201,17 +201,17 @@ func TestPersistItems_EmptySubject(t *testing.T) {
 		&mockItem{
 			subject:   "alice",
 			predicate: "knows",
-			object:    "bob",
+			context:   "bob",
 		},
 		&mockItem{
 			subject:   "", // Empty subject is accepted by ASID generation
 			predicate: "valid",
-			object:    "item",
+			context:   "item",
 		},
 		&mockItem{
 			subject:   "carol",
 			predicate: "works-at",
-			object:    "acme",
+			context:   "acme",
 		},
 	}
 
@@ -248,7 +248,7 @@ func TestPersistItems_LargeBatch(t *testing.T) {
 		items[i] = &mockItem{
 			subject:   "alice",
 			predicate: "test-predicate",
-			object:    "test-object",
+			context:   "test-object",
 		}
 	}
 
@@ -276,9 +276,9 @@ func TestPersistItems_UniqueASIDs(t *testing.T) {
 
 	// Create items with different subjects/predicates
 	items := []AttestationItem{
-		&mockItem{subject: "alice", predicate: "knows", object: "bob"},
-		&mockItem{subject: "alice", predicate: "works-at", object: "acme"},
-		&mockItem{subject: "bob", predicate: "knows", object: "alice"},
+		&mockItem{subject: "alice", predicate: "knows", context: "bob"},
+		&mockItem{subject: "alice", predicate: "works-at", context: "acme"},
+		&mockItem{subject: "bob", predicate: "knows", context: "alice"},
 	}
 
 	result := bp.PersistItems(items, "test-prefix")
