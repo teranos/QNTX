@@ -86,10 +86,8 @@
 .prose-tree,
 .prose-editor-container,
 .prose-recent,
-.log-column-content,
-.stream-content,
-#log-content,
-#progress-content {
+#search-results-container,
+.stream-content {
     scrollbar-width: thin;
     scrollbar-color: var(--scrollbar-dark-thumb) transparent;
 }
@@ -99,10 +97,8 @@
 .prose-tree::-webkit-scrollbar,
 .prose-editor-container::-webkit-scrollbar,
 .prose-recent::-webkit-scrollbar,
-.log-column-content::-webkit-scrollbar,
-.stream-content::-webkit-scrollbar,
-#log-content::-webkit-scrollbar,
-#progress-content::-webkit-scrollbar {
+#search-results-container::-webkit-scrollbar,
+.stream-content::-webkit-scrollbar {
     width: 5px;
 }
 
@@ -110,10 +106,8 @@
 .prose-tree::-webkit-scrollbar-track,
 .prose-editor-container::-webkit-scrollbar-track,
 .prose-recent::-webkit-scrollbar-track,
-.log-column-content::-webkit-scrollbar-track,
-.stream-content::-webkit-scrollbar-track,
-#log-content::-webkit-scrollbar-track,
-#progress-content::-webkit-scrollbar-track {
+#search-results-container::-webkit-scrollbar-track,
+.stream-content::-webkit-scrollbar-track {
     background: transparent;
 }
 
@@ -121,10 +115,8 @@
 .prose-tree::-webkit-scrollbar-thumb,
 .prose-editor-container::-webkit-scrollbar-thumb,
 .prose-recent::-webkit-scrollbar-thumb,
-.log-column-content::-webkit-scrollbar-thumb,
-.stream-content::-webkit-scrollbar-thumb,
-#log-content::-webkit-scrollbar-thumb,
-#progress-content::-webkit-scrollbar-thumb {
+#search-results-container::-webkit-scrollbar-thumb,
+.stream-content::-webkit-scrollbar-thumb {
     background: var(--scrollbar-dark-thumb);
 }
 
@@ -132,10 +124,8 @@
 .prose-tree::-webkit-scrollbar-thumb:hover,
 .prose-editor-container::-webkit-scrollbar-thumb:hover,
 .prose-recent::-webkit-scrollbar-thumb:hover,
-.log-column-content::-webkit-scrollbar-thumb:hover,
-.stream-content::-webkit-scrollbar-thumb:hover,
-#log-content::-webkit-scrollbar-thumb:hover,
-#progress-content::-webkit-scrollbar-thumb:hover {
+#search-results-container::-webkit-scrollbar-thumb:hover,
+.stream-content::-webkit-scrollbar-thumb:hover {
     background: var(--scrollbar-dark-thumb-hover);
 }
 
