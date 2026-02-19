@@ -165,7 +165,7 @@ func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetA
 // Helper functions for conversion
 
 func protoToAttestation(proto *protocol.Attestation) (*types.As, error) {
-	attributes, err := attributesFromJSON(proto.AttributesJson)
+	attributes, err := attributesFromJSON(proto.Attributes)
 	if err != nil {
 		return nil, err
 	}
@@ -176,10 +176,10 @@ func protoToAttestation(proto *protocol.Attestation) (*types.As, error) {
 		Predicates: proto.Predicates,
 		Contexts:   proto.Contexts,
 		Actors:     proto.Actors,
-		Timestamp:  time.Unix(proto.Timestamp, 0),
+		Timestamp:  time.UnixMilli(proto.Timestamp),
 		Source:     proto.Source,
 		Attributes: attributes,
-		CreatedAt:  time.Unix(proto.CreatedAt, 0),
+		CreatedAt:  time.UnixMilli(proto.CreatedAt),
 	}, nil
 }
 
@@ -190,15 +190,15 @@ func attestationToProto(as *types.As) (*protocol.Attestation, error) {
 	}
 
 	return &protocol.Attestation{
-		Id:             as.ID,
-		Subjects:       as.Subjects,
-		Predicates:     as.Predicates,
-		Contexts:       as.Contexts,
-		Actors:         as.Actors,
-		Timestamp:      as.Timestamp.Unix(),
-		Source:         as.Source,
-		AttributesJson: attributesJSON,
-		CreatedAt:      as.CreatedAt.Unix(),
+		Id:         as.ID,
+		Subjects:   as.Subjects,
+		Predicates: as.Predicates,
+		Contexts:   as.Contexts,
+		Actors:     as.Actors,
+		Timestamp:  as.Timestamp.UnixMilli(),
+		Source:     as.Source,
+		Attributes: attributesJSON,
+		CreatedAt:  as.CreatedAt.UnixMilli(),
 	}, nil
 }
 
@@ -209,8 +209,8 @@ func protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error
 	}
 
 	timestamp := time.Now()
-	if proto.Timestamp != 0 {
-		timestamp = time.Unix(proto.Timestamp, 0)
+	if proto.Timestamp != nil && *proto.Timestamp != 0 {
+		timestamp = time.UnixMilli(*proto.Timestamp)
 	}
 
 	return &types.AsCommand{
@@ -224,8 +224,12 @@ func protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error
 }
 
 func protoToFilter(proto *protocol.AttestationFilter) ats.AttestationFilter {
+	limit := 0
+	if proto.Limit != nil {
+		limit = int(*proto.Limit)
+	}
 	filter := ats.AttestationFilter{
-		Limit:      int(proto.Limit),
+		Limit:      limit,
 		Actors:     proto.Actors,
 		Subjects:   proto.Subjects,
 		Predicates: proto.Predicates,
@@ -233,12 +237,12 @@ func protoToFilter(proto *protocol.AttestationFilter) ats.AttestationFilter {
 	}
 
 	if proto.TimeStart != 0 {
-		t := time.Unix(proto.TimeStart, 0)
+		t := time.UnixMilli(proto.TimeStart)
 		filter.TimeStart = &t
 	}
 
 	if proto.TimeEnd != 0 {
-		t := time.Unix(proto.TimeEnd, 0)
+		t := time.UnixMilli(proto.TimeEnd)
 		filter.TimeEnd = &t
 	}
 

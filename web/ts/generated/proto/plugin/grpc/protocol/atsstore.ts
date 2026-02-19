@@ -15,12 +15,12 @@ export interface Attestation {
   predicates: string[];
   contexts: string[];
   actors: string[];
-  /** Unix timestamp in seconds */
+  /** Unix timestamp in milliseconds */
   timestamp: number;
   source: string;
   /** map[string]interface{} as JSON string */
   attributes: string;
-  /** Unix timestamp in seconds */
+  /** Unix timestamp in milliseconds */
   created_at: number;
 }
 
@@ -30,7 +30,7 @@ export interface AttestationCommand {
   predicates: string[];
   contexts: string[];
   actors: string[];
-  /** Unix timestamp in seconds. If not set, server uses current time. */
+  /** Unix timestamp in milliseconds. If not set, server uses current time. */
   timestamp?:
     | number
     | undefined;
@@ -44,9 +44,9 @@ export interface AttestationFilter {
   predicates: string[];
   contexts: string[];
   actors: string[];
-  /** Unix timestamp in seconds (0 = no filter) */
+  /** Unix timestamp in milliseconds (0 = no filter) */
   time_start: number;
-  /** Unix timestamp in seconds (0 = no filter) */
+  /** Unix timestamp in milliseconds (0 = no filter) */
   time_end: number;
   /** Maximum results. If not set, no limit applied. */
   limit?: number | undefined;
