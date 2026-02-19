@@ -26,12 +26,10 @@ pub fn from_proto(proto: ProtoAttestation) -> CoreAttestation {
         predicates: proto.predicates,
         contexts: proto.contexts,
         actors: proto.actors,
-        // Both proto and core use i64 (Unix seconds)
         timestamp: proto.timestamp,
         source: proto.source,
         // Proto uses JSON string, core uses HashMap
         attributes: serde_json::from_str(&proto.attributes).unwrap_or_default(),
-        // Both proto and core use i64 (Unix seconds)
         created_at: proto.created_at,
     }
 }
@@ -47,12 +45,10 @@ pub fn to_proto(core: CoreAttestation) -> ProtoAttestation {
         predicates: core.predicates,
         contexts: core.contexts,
         actors: core.actors,
-        // Both core and proto use i64 (Unix seconds)
         timestamp: core.timestamp,
         source: core.source,
         // Core uses HashMap, proto uses JSON string
         attributes: serde_json::to_string(&core.attributes).unwrap_or_else(|_| "{}".to_string()),
-        // Both core and proto use i64 (Unix seconds)
         created_at: core.created_at,
     }
 }

@@ -45,7 +45,8 @@ pub fn content_hash_hex(attestation: &Attestation) -> String {
 
 /// JSON entry point for WASM bridge: takes JSON attestation, returns hex hash.
 ///
-/// Input: JSON-serialized Attestation
+/// Input: JSON-serialized core Attestation (attributes as object).
+/// For proto-format input, convert to core first via `proto_convert::from_proto`.
 /// Output: `{"hash":"<64-char hex>"}` or `{"error":"..."}`
 pub fn content_hash_json(input: &str) -> String {
     match serde_json::from_str::<Attestation>(input) {
