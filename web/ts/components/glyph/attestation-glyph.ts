@@ -1,10 +1,12 @@
 /**
- * Attestation Glyph (+) — view a single attestation's full structure on canvas
+ * Attestation Glyph (+) — view a single attestation on canvas
  *
  * Opened via double-click on attestation result items in AX or SE glyphs.
- * Title bar IS the triple (subjects is predicates of contexts), draggable.
- * Content area shows metadata and attributes.
- * Read-only — no editing, no drag-from-results (v1).
+ * Title bar IS the triple (subjects is predicates of contexts).
+ * Attributes shown below title bar only when present.
+ * No attributes → compact title-bar-only glyph.
+ * Metadata (actors, source, timestamps, id) hidden by default —
+ * revealed via hover pill at bottom center of title bar.
  */
 
 import type { Glyph } from './glyph';
@@ -22,11 +24,49 @@ const AZURE_KEYWORD = '#919599';
 const AZURE_VALUE = '#d7dee3';
 
 /**
- * Create an Attestation glyph using canvasPlaced().
- * Title bar is the triple itself — entire bar is draggable.
+ * Parse attributes from attestation, returns non-empty object or null.
+ */
+function parseAttributes(attestation: Attestation): Record<string, unknown> | null {
+    if (!attestation.attributes) return null;
+    try {
+        const attrs = typeof attestation.attributes === 'string'
+            ? JSON.parse(attestation.attributes)
+            : attestation.attributes;
+        if (typeof attrs === 'object' && attrs !== null && Object.keys(attrs).length > 0) {
+            return attrs;
+        }
+    } catch { /* ignore */ }
+    return null;
+}
+
+/**
+ * Build metadata lines from attestation fields.
+ */
+function buildMetaLines(attestation: Attestation): string[] {
+    const lines: string[] = [];
+    if (attestation.actors && attestation.actors.length > 0) {
+        lines.push(`actors: ${attestation.actors.join(', ')}`);
+    }
+    if (attestation.source) {
+        lines.push(`source: ${attestation.source}`);
+    }
+    if (attestation.timestamp) {
+        lines.push(`timestamp: ${formatTimestamp(attestation.timestamp)}`);
+    }
+    if (attestation.created_at) {
+        lines.push(`created: ${formatTimestamp(attestation.created_at)}`);
+    }
+    if (attestation.id) {
+        lines.push(`id: ${attestation.id}`);
+    }
+    return lines;
+}
+
+/**
+ * Create an Attestation glyph.
+ * Title bar = triple. Attributes below if present. Metadata behind hover pill.
  */
 export function createAttestationGlyph(glyph: Glyph): HTMLElement {
-    // Parse attestation early — needed for the title bar triple
     let attestation: Attestation | null = null;
     try {
         if (glyph.content) {
@@ -36,7 +76,13 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
         log.warn(SEG.GLYPH, `[AsGlyph] Failed to parse attestation content for ${glyph.id}:`, err);
     }
 
-    // Title bar: + symbol + triple text — whole bar is the drag handle
+    const attrs = attestation ? parseAttributes(attestation) : null;
+
+    // Title bar wrapper — positions the metadata pill relative to the bar
+    const titleBarWrapper = document.createElement('div');
+    titleBarWrapper.style.position = 'relative';
+
+    // Title bar: + symbol + triple
     const titleBar = document.createElement('div');
     titleBar.className = 'canvas-glyph-title-bar';
     titleBar.style.padding = '3px 8px';
@@ -50,7 +96,6 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
     symbol.style.fontWeight = 'bold';
     symbol.style.flexShrink = '0';
     symbol.style.color = AZURE;
-
     titleBar.appendChild(symbol);
 
     if (attestation) {
@@ -89,122 +134,91 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
         titleBar.appendChild(tripleText);
     }
 
-    const { element } = canvasPlaced({
-        glyph,
-        className: 'canvas-attestation-glyph',
-        defaults: { x: 200, y: 200, width: 420, height: 300 },
-        resizable: true,
-        logLabel: 'AsGlyph',
-    });
-    element.style.minWidth = '280px';
-    element.style.minHeight = '120px';
+    titleBarWrapper.appendChild(titleBar);
 
-    element.appendChild(titleBar);
+    // Metadata pill — appears on hover at bottom center of title bar
+    if (attestation) {
+        const metaLines = buildMetaLines(attestation);
+        if (metaLines.length > 0) {
+            const pill = document.createElement('div');
+            pill.className = 'as-meta-pill';
 
-    // Content container: metadata + attributes
-    const content = document.createElement('div');
-    content.style.flex = '1';
-    content.style.overflow = 'auto';
-    content.style.padding = '4px 8px';
-    content.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
-    content.style.borderTop = '1px solid var(--border-color)';
-    content.style.fontSize = '12px';
-    content.style.fontFamily = 'monospace';
+            const metaPopover = document.createElement('div');
+            metaPopover.className = 'as-meta-popover';
+            metaPopover.textContent = metaLines.join('\n');
 
-    if (!attestation) {
-        const empty = document.createElement('div');
-        empty.style.color = 'var(--text-secondary)';
-        empty.style.textAlign = 'center';
-        empty.style.padding = '20px';
-        empty.textContent = 'No attestation data';
-        content.appendChild(empty);
-        element.appendChild(content);
-        return element;
-    }
-
-    // Metadata section
-    const metaSection = document.createElement('div');
-    metaSection.style.fontSize = '11px';
-    metaSection.style.color = 'var(--text-secondary)';
-    metaSection.style.marginBottom = '4px';
-    metaSection.style.paddingBottom = '4px';
-    metaSection.style.borderBottom = '1px solid var(--border-color)';
-    metaSection.style.lineHeight = '1.6';
-
-    const metaLines: string[] = [];
-    if (attestation.actors && attestation.actors.length > 0) {
-        metaLines.push(`actors: ${attestation.actors.join(', ')}`);
-    }
-    if (attestation.source) {
-        metaLines.push(`source: ${attestation.source}`);
-    }
-    if (attestation.timestamp) {
-        metaLines.push(`timestamp: ${formatTimestamp(attestation.timestamp)}`);
-    }
-    if (attestation.created_at) {
-        metaLines.push(`created: ${formatTimestamp(attestation.created_at)}`);
-    }
-    if (attestation.id) {
-        metaLines.push(`id: ${attestation.id}`);
-    }
-    metaSection.textContent = metaLines.join('\n');
-    metaSection.style.whiteSpace = 'pre-wrap';
-    content.appendChild(metaSection);
-
-    // Attributes section
-    if (attestation.attributes) {
-        try {
-            const attrs = typeof attestation.attributes === 'string'
-                ? JSON.parse(attestation.attributes)
-                : attestation.attributes;
-
-            if (typeof attrs === 'object' && attrs !== null && Object.keys(attrs).length > 0) {
-                for (const [key, value] of Object.entries(attrs)) {
-                    const attrRow = document.createElement('div');
-                    attrRow.style.marginBottom = '4px';
-
-                    const keyLabel = document.createElement('div');
-                    keyLabel.style.fontSize = '10px';
-                    keyLabel.style.color = 'var(--text-secondary)';
-                    keyLabel.style.marginBottom = '2px';
-                    keyLabel.textContent = key;
-                    attrRow.appendChild(keyLabel);
-
-                    const valueEl = document.createElement('div');
-                    valueEl.style.fontSize = '12px';
-
-                    if (typeof value === 'string') {
-                        valueEl.style.color = AZURE_VALUE;
-                        valueEl.style.whiteSpace = 'pre-wrap';
-                        valueEl.style.wordBreak = 'break-word';
-                        valueEl.style.lineHeight = '1.5';
-                        valueEl.textContent = value;
-                    } else {
-                        valueEl.style.color = 'var(--text-secondary)';
-                        valueEl.style.whiteSpace = 'pre-wrap';
-                        valueEl.style.wordBreak = 'break-word';
-                        valueEl.textContent = JSON.stringify(value, null, 2);
-                    }
-
-                    attrRow.appendChild(valueEl);
-                    content.appendChild(attrRow);
-                }
-            }
-        } catch {
-            // Ignore parse errors for attributes
+            pill.appendChild(metaPopover);
+            titleBarWrapper.appendChild(pill);
         }
     }
 
-    element.appendChild(content);
+    // Compact when no attributes, expanded when attributes present
+    const hasContent = !!attrs;
 
-    log.debug(SEG.GLYPH, `[AsGlyph] Created attestation glyph ${glyph.id}`);
+    const { element } = canvasPlaced({
+        glyph,
+        className: 'canvas-attestation-glyph',
+        defaults: { x: 200, y: 200, width: 420, height: hasContent ? 200 : 28 },
+        resizable: hasContent,
+        useMinHeight: true,
+        logLabel: 'AsGlyph',
+    });
+    element.style.minWidth = '200px';
+
+    element.appendChild(titleBarWrapper);
+
+    // Attributes content — only when there are attributes to show
+    if (attestation && attrs) {
+        const content = document.createElement('div');
+        content.style.flex = '1';
+        content.style.overflow = 'auto';
+        content.style.padding = '4px 8px';
+        content.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
+        content.style.borderTop = '1px solid var(--border-color)';
+        content.style.fontSize = '12px';
+        content.style.fontFamily = 'monospace';
+
+        for (const [key, value] of Object.entries(attrs)) {
+            const attrRow = document.createElement('div');
+            attrRow.style.marginBottom = '4px';
+
+            const keyLabel = document.createElement('div');
+            keyLabel.style.fontSize = '10px';
+            keyLabel.style.color = 'var(--text-secondary)';
+            keyLabel.style.marginBottom = '1px';
+            keyLabel.textContent = key;
+            attrRow.appendChild(keyLabel);
+
+            const valueEl = document.createElement('div');
+            valueEl.style.fontSize = '12px';
+
+            if (typeof value === 'string') {
+                valueEl.style.color = AZURE_VALUE;
+                valueEl.style.whiteSpace = 'pre-wrap';
+                valueEl.style.wordBreak = 'break-word';
+                valueEl.style.lineHeight = '1.5';
+                valueEl.textContent = value;
+            } else {
+                valueEl.style.color = 'var(--text-secondary)';
+                valueEl.style.whiteSpace = 'pre-wrap';
+                valueEl.style.wordBreak = 'break-word';
+                valueEl.textContent = JSON.stringify(value, null, 2);
+            }
+
+            attrRow.appendChild(valueEl);
+            content.appendChild(attrRow);
+        }
+
+        element.appendChild(content);
+    }
+
+    log.debug(SEG.GLYPH, `[AsGlyph] Created attestation glyph ${glyph.id} (attrs: ${hasContent})`);
 
     return element;
 }
 
 /**
  * Spawn an attestation glyph on the canvas from an attestation object.
- * Called by double-click handlers in AX and SE glyphs.
  */
 export function spawnAttestationGlyph(attestation: Attestation, mouseX?: number, mouseY?: number): void {
     const contentLayer = document.querySelector('.canvas-content-layer') as HTMLElement;
@@ -214,8 +228,8 @@ export function spawnAttestationGlyph(attestation: Attestation, mouseX?: number,
     }
 
     const glyphId = `as-${crypto.randomUUID()}`;
+    const attrs = parseAttributes(attestation);
 
-    // Position near the double-click location, offset so glyph doesn't cover the source
     const layerRect = contentLayer.getBoundingClientRect();
     const x = mouseX !== undefined ? Math.round(mouseX - layerRect.left + 20) : Math.round(window.innerWidth / 2 - 210);
     const y = mouseY !== undefined ? Math.round(mouseY - layerRect.top - 20) : Math.round(window.innerHeight / 2 - 150);
@@ -239,7 +253,6 @@ export function spawnAttestationGlyph(attestation: Attestation, mouseX?: number,
     const glyphElement = entry.render(glyph) as HTMLElement;
     contentLayer.appendChild(glyphElement);
 
-    // Persist
     const rect = glyphElement.getBoundingClientRect();
     uiState.addCanvasGlyph({
         id: glyphId,
@@ -247,7 +260,7 @@ export function spawnAttestationGlyph(attestation: Attestation, mouseX?: number,
         x,
         y,
         width: Math.round(rect.width) || 420,
-        height: Math.round(rect.height) || 300,
+        height: Math.round(rect.height) || (attrs ? 200 : 28),
         content: JSON.stringify(attestation),
     });
 
