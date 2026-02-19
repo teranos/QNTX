@@ -10,8 +10,11 @@
 | GET | `/api/canvas/compositions/` | canvasHandler |
 | GET | `/api/canvas/glyphs` | canvasHandler |
 | GET | `/api/canvas/glyphs/` | canvasHandler |
+| GET | `/api/canvas/minimized-windows` | canvasHandler |
+| GET | `/api/canvas/minimized-windows/` | canvasHandler |
 | GET | `/api/embeddings/batch` | HandleEmbeddingBatch |
 | GET | `/api/embeddings/cluster` | HandleEmbeddingCluster |
+| GET | `/api/embeddings/cluster-timeline` | HandleClusterTimeline |
 | GET | `/api/embeddings/clusters` | HandleEmbeddingClusters |
 | GET | `/api/embeddings/generate` | HandleEmbeddingGenerate |
 | GET | `/api/embeddings/info` | HandleEmbeddingInfo |
@@ -62,6 +65,18 @@ POST /api/attestations — idempotent (returns 200 if already exists).
 
 ---
 
+### `GET` /api/canvas/minimized-windows
+
+**Handler**: `canvasHandler`
+
+---
+
+### `GET` /api/canvas/minimized-windows/
+
+**Handler**: `canvasHandler`
+
+---
+
 ### `GET` /api/embeddings/batch
 
 HandleEmbeddingBatch handles batch embedding generation (POST /api/embeddings/batch)
@@ -79,6 +94,14 @@ HandleEmbeddingCluster runs HDBSCAN clustering (POST /api/embeddings/cluster)
 **Handler**: `HandleEmbeddingCluster`
 
 **Response**: [`ClusterResponse`](../types/server.md#clusterresponse)
+
+---
+
+### `GET` /api/embeddings/cluster-timeline
+
+HandleClusterTimeline serves cluster evolution data (GET /api/embeddings/cluster-timeline)
+
+**Handler**: `HandleClusterTimeline`
 
 ---
 
