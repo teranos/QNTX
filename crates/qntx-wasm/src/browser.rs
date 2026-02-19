@@ -371,6 +371,30 @@ pub fn sync_merkle_find_group_key(input: &str) -> String {
 }
 
 // ============================================================================
+// Similarity
+// ============================================================================
+
+/// Compute cosine similarity between two embedding vectors.
+/// Input: `{"a":[f32,...], "b":[f32,...]}`
+/// Returns: `{"similarity": f32}` or `{"error":"..."}`
+#[wasm_bindgen]
+pub fn semantic_similarity(input: &str) -> String {
+    #[derive(serde::Deserialize)]
+    struct Input {
+        a: Vec<f32>,
+        b: Vec<f32>,
+    }
+
+    let parsed: Input = match serde_json::from_str(input) {
+        Ok(v) => v,
+        Err(e) => return format!(r#"{{"error":"{}"}}"#, e),
+    };
+
+    let sim = qntx_core::similarity::cosine_similarity(&parsed.a, &parsed.b);
+    format!(r#"{{"similarity":{}}}"#, sim)
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 

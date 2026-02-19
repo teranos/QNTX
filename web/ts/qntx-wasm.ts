@@ -234,6 +234,67 @@ export function getFuzzyStatus(): FuzzyStatus {
 }
 
 // ============================================================================
+// Similarity
+// ============================================================================
+
+/**
+ * Compute cosine similarity between two embedding vectors.
+ * Returns a value between -1 and 1 (1 = identical direction).
+ */
+export function semanticSimilarity(a: number[], b: number[]): number {
+    const json = wasm.semantic_similarity(JSON.stringify({ a, b }));
+    const result = JSON.parse(json);
+    if ('error' in result) {
+        throw new Error(result.error);
+    }
+    return result.similarity;
+}
+
+// ============================================================================
+// Sync (Merkle Tree)
+// ============================================================================
+
+/** Merkle tree root info */
+export interface MerkleRootInfo {
+    root: string;
+    size: number;
+    groups: number;
+}
+
+/**
+ * Get the browser Merkle tree root hash and stats.
+ */
+export function syncMerkleRoot(): MerkleRootInfo {
+    return JSON.parse(wasm.sync_merkle_root());
+}
+
+/**
+ * Insert an attestation into the browser Merkle tree.
+ * Input: { actor, context, content_hash }
+ */
+export function syncMerkleInsert(actor: string, context: string, contentHash: string): void {
+    const result = JSON.parse(wasm.sync_merkle_insert(JSON.stringify({
+        actor,
+        context,
+        content_hash: contentHash,
+    })));
+    if (result.error) {
+        throw new Error(result.error);
+    }
+}
+
+/**
+ * Compute content hash for an attestation JSON string.
+ */
+export function syncContentHash(attestationJson: string): string {
+    const result = JSON.parse(wasm.sync_content_hash(attestationJson));
+    if (result.error) {
+        throw new Error(result.error);
+    }
+    return result.hash;
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 
