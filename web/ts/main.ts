@@ -3,6 +3,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { connectWebSocket } from './websocket.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
+import { initGlobalKeyboard } from './keyboard.ts';
 import { initCodeMirrorEditor } from './codemirror-editor.ts';
 import { formatDateTime } from './html-utils.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
@@ -313,7 +314,7 @@ async function init(): Promise<void> {
         });
 
         // Kept for backwards compatibility - not used by menu system
-        // Keyboard shortcuts use toggleConfig() directly (see Cmd+, handler below)
+        // Keyboard shortcut (Cmd+,) is in keyboard.ts
         listen('toggle-config-panel', () => {
             toggleConfig();
         });
@@ -370,21 +371,8 @@ async function init(): Promise<void> {
         });
     }
 
-    // Register Cmd+, keyboard shortcut (standard macOS preferences shortcut)
-    // Note: Keyboard shortcuts toggle (show/hide), while menu items always show (macOS convention)
-    document.addEventListener('keydown', (e: KeyboardEvent) => {
-        // Cmd+, on Mac, Ctrl+, on Windows/Linux
-        if ((e.metaKey || e.ctrlKey) && e.key === ',') {
-            e.preventDefault();
-            toggleConfig();
-        }
-
-        // SPACE opens unified search when nothing is focused
-        if (e.key === ' ' && !isInputFocused(e.target)) {
-            e.preventDefault();
-            focusDrawerSearch();
-        }
-    });
+    // Global keyboard shortcuts (SPACE → search, Cmd+, → config)
+    initGlobalKeyboard();
 
     if (window.logLoaderStep) window.logLoaderStep('Finalizing startup...');
 }
@@ -405,15 +393,6 @@ if (document.readyState === 'loading') {
     if (window.hideLoadingScreen) window.hideLoadingScreen();
     // Restore window visibility after loading screen completes
     Window.finishWindowRestore();
-}
-
-/** Check if an input element is focused (skip SPACE shortcut when typing) */
-function isInputFocused(target: EventTarget | null): boolean {
-    if (!target || !(target instanceof HTMLElement)) return false;
-    return target.tagName === 'INPUT'
-        || target.tagName === 'TEXTAREA'
-        || target.isContentEditable
-        || target.closest('.cm-editor') !== null;
 }
 
 // Make this a module

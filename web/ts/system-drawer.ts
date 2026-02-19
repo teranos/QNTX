@@ -5,9 +5,11 @@ import { getStorageItem, setStorageItem } from './indexeddb-storage.ts';
 import { sendMessage } from './websocket.ts';
 import { connectivityManager } from './connectivity.ts';
 import { fuzzySearch } from './qntx-wasm.ts';
-import { SearchView, STRATEGY_FUZZY } from './search-view.ts';
+import { SearchView, STRATEGY_FUZZY, TYPE_COMMAND, TYPE_SUBCANVAS } from './search-view.ts';
 import type { SearchMatch, SearchResultsMessage } from './search-view.ts';
-import { spawnGlyphByCommand } from './components/glyph/canvas/spawn-menu.ts';
+import { spawnGlyphByCommand, getMatchingCommands, COMMAND_LABELS } from './components/glyph/canvas/spawn-menu.ts';
+import { uiState } from './state/ui.ts';
+import { Subcanvas } from '@generated/sym.js';
 
 const DRAWER_HEIGHT_KEY = 'system-drawer-height';
 const DRAWER_MIN = 6;     // Hidden: just the grab bar
@@ -53,6 +55,53 @@ function collapseDrawer(): void {
     setStorageItem(DRAWER_HEIGHT_KEY, String(DRAWER_HEADER));
 }
 
+// --- Local result computation ---
+
+function computeLocalResults(query: string): SearchMatch[] {
+    const results: SearchMatch[] = [];
+    if (!query) return results;
+
+    // Command matches (prefix match against COMMAND_MAP keys)
+    const commands = getMatchingCommands(query);
+    for (const cmd of commands) {
+        results.push({
+            node_id: '',
+            type_name: TYPE_COMMAND,
+            type_label: '⌘',
+            field_name: 'spawn',
+            field_value: cmd,
+            excerpt: COMMAND_LABELS[cmd] || cmd,
+            score: 1,
+            strategy: 'local',
+            display_label: cmd,
+            attributes: {},
+        });
+    }
+
+    // Subcanvas matches (name contains query)
+    const q = query.toLowerCase();
+    const allGlyphs = uiState.getCanvasGlyphs();
+    for (const glyph of allGlyphs) {
+        if (glyph.symbol !== Subcanvas) continue;
+        const name = glyph.content || '';
+        if (!name.toLowerCase().includes(q)) continue;
+        results.push({
+            node_id: glyph.id,
+            type_name: TYPE_SUBCANVAS,
+            type_label: '⌗',
+            field_name: 'navigate',
+            field_value: glyph.id,
+            excerpt: name || 'Untitled',
+            score: 1,
+            strategy: 'local',
+            display_label: name,
+            attributes: {},
+        });
+    }
+
+    return results;
+}
+
 // --- Search dispatch ---
 
 function dispatchSearch(text: string): void {
@@ -61,6 +110,12 @@ function dispatchSearch(text: string): void {
         return;
     }
 
+    // Inject local results immediately (commands + subcanvases)
+    if (searchView) {
+        searchView.setLocalResults(computeLocalResults(text.trim()));
+    }
+
+    // Fire async search
     if (connectivityManager.state === 'online') {
         sendMessage({ type: 'rich_search', query: text });
     } else {
@@ -112,6 +167,37 @@ function searchOffline(query: string): void {
     };
 
     searchView.updateResults(message);
+}
+
+// --- Subcanvas navigation ---
+
+function navigateToSubcanvas(glyphId: string): void {
+    const el = document.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+    if (!el) return;
+    el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+}
+
+// --- Action dispatch for selected result ---
+
+function actOnSelectedResult(match: SearchMatch): void {
+    if (match.type_name === TYPE_COMMAND) {
+        spawnGlyphByCommand(match.field_value);
+    } else if (match.type_name === TYPE_SUBCANVAS) {
+        navigateToSubcanvas(match.node_id);
+    } else {
+        // Regular search result — dispatch search-select event
+        document.dispatchEvent(new CustomEvent('search-select', {
+            detail: { nodeId: match.node_id, match }
+        }));
+    }
+
+    // Clear and collapse
+    if (searchInput) {
+        searchInput.value = '';
+        searchInput.blur();
+    }
+    if (searchView) searchView.clear();
+    collapseDrawer();
 }
 
 // --- Public API ---
@@ -177,12 +263,31 @@ export function initSystemDrawer(): void {
         });
 
         searchInput.addEventListener('keydown', (e: KeyboardEvent) => {
+            // Arrow/Tab navigation through results
+            if (e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey)) {
+                e.preventDefault();
+                if (searchView) searchView.selectNext();
+                return;
+            }
+            if (e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey)) {
+                e.preventDefault();
+                if (searchView) searchView.selectPrev();
+                return;
+            }
+
             if (e.key === 'Enter') {
                 e.preventDefault();
                 const text = searchInput!.value.trim();
                 if (!text) return;
 
-                // Try glyph spawn command first
+                // If a result is selected, act on it
+                const selected = searchView?.getSelectedMatch();
+                if (selected) {
+                    actOnSelectedResult(selected);
+                    return;
+                }
+
+                // No selection — try exact glyph command, then submit search
                 if (spawnGlyphByCommand(text)) {
                     searchInput!.value = '';
                     if (searchView) searchView.clear();
@@ -191,7 +296,7 @@ export function initSystemDrawer(): void {
                     return;
                 }
 
-                // Otherwise submit search immediately
+                // Submit search immediately
                 if (queryTimeout) clearTimeout(queryTimeout);
                 dispatchSearch(text);
             }
