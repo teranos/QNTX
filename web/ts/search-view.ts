@@ -6,6 +6,11 @@
 
 import { typeDefinitionWindow } from './type-definition-window.ts';
 import { escapeHtml } from './html-utils.ts';
+import type { RichSearchMatch, RichSearchResultsMessage } from './generated/proto/plugin/grpc/protocol/server.ts';
+
+// Re-export proto types under local names used throughout the codebase
+export type SearchMatch = RichSearchMatch;
+export type SearchResultsMessage = RichSearchResultsMessage;
 
 // Search strategy constants — must match ats/storage/rich_search.go
 export const STRATEGY_SUBSTRING = 'substring';
@@ -15,27 +20,6 @@ export const STRATEGY_SEMANTIC = 'semantic';
 // Local result type constants
 export const TYPE_COMMAND = 'command';
 export const TYPE_SUBCANVAS = 'subcanvas';
-
-export interface SearchMatch {
-    node_id: string;
-    type_name: string;
-    type_label: string;
-    field_name: string;
-    field_value: string;
-    excerpt: string;
-    score: number;
-    strategy: string;
-    display_label: string;
-    attributes: Record<string, any>;
-    matched_words?: string[];  // The actual words that were matched for highlighting
-}
-
-export interface SearchResultsMessage {
-    type: 'rich_search_results';
-    query: string;
-    matches: SearchMatch[];
-    total: number;
-}
 
 export class SearchView {
     private resultsElement: HTMLElement | null = null;
