@@ -3,12 +3,12 @@
 // without tight coupling to specific domain models.
 package ingestion
 
-// Item represents a triple (subject-predicate-object) from a data source.
+// Item represents a triple (subject-predicate-context) from a data source.
 // Data producers implement this interface to provide attestation-ready data.
 type Item interface {
 	GetSubject() string
 	GetPredicate() string
-	GetObject() string
+	GetContext() string
 	GetMeta() map[string]string
 }
 

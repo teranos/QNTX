@@ -15,9 +15,9 @@ func (adapter ItemAttestationAdapter) GetPredicate() string {
 	return adapter.Pred
 }
 
-// GetObject returns the object of the item
-func (adapter ItemAttestationAdapter) GetObject() string {
-	return adapter.Obj
+// GetContext returns the context of the item
+func (adapter ItemAttestationAdapter) GetContext() string {
+	return adapter.Obj // TODO: rename Obj field to Ctx (breaking JSON change: "obj" → "ctx")
 }
 
 // GetMeta returns the metadata of the item

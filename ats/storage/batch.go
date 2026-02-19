@@ -80,8 +80,8 @@ func (bp *BatchPersister) PersistItems(items []AttestationItem, sourcePrefix str
 			ID:         asid,
 			Subjects:   []string{item.GetSubject()},
 			Predicates: []string{item.GetPredicate()}, // Predicate is the verb/relationship
-			Contexts:   []string{item.GetObject()},    // Context holds the value/object
-			Actors:     []string{actor},               // Self-certifying: ASID vouches for itself
+			Contexts:   []string{item.GetContext()},
+			Actors:     []string{actor}, // Self-certifying: ASID vouches for itself
 			Timestamp:  time.Now(),
 			Source:     bp.source,
 			Attributes: make(map[string]interface{}),
@@ -99,7 +99,7 @@ func (bp *BatchPersister) PersistItems(items []AttestationItem, sourcePrefix str
 		if err := bp.store.CreateAttestation(&attestation); err != nil {
 			result.FailureCount++
 			errorMsg := fmt.Sprintf("Failed to persist attestation %s %s %s: %v",
-				item.GetSubject(), item.GetPredicate(), item.GetObject(), err)
+				item.GetSubject(), item.GetPredicate(), item.GetContext(), err)
 			result.Errors = append(result.Errors, errorMsg)
 			continue
 		}
