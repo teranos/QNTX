@@ -18,8 +18,6 @@ export interface BuildInfo {
 
 export interface AppState {
   currentVerbosity: number;
-  logBuffer: (LogEntry | HTMLDivElement)[];
-  progressBuffer: (ProgressEvent | HTMLDivElement)[];
   currentQuery: string;
 }
 
