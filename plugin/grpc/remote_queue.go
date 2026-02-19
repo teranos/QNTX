@@ -129,9 +129,10 @@ func (r *RemoteQueue) UpdateJob(job *async.Job) error {
 
 // ListJobs lists jobs with optional status filter via gRPC.
 func (r *RemoteQueue) ListJobs(status *async.JobStatus, limit int) ([]*async.Job, error) {
+	protoLimit := int32(limit)
 	req := &protocol.ListJobsRequest{
 		AuthToken: r.authToken,
-		Limit:     int32(limit),
+		Limit:     &protoLimit,
 	}
 
 	// Add status filter if provided
