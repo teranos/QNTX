@@ -2,7 +2,7 @@
 
 import { listen } from '@tauri-apps/api/event';
 import { connectWebSocket } from './websocket.ts';
-import { handleLogBatch, initSystemDrawer } from './system-drawer.ts';
+import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initCodeMirrorEditor } from './codemirror-editor.ts';
 import { formatDateTime } from './html-utils.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
@@ -132,7 +132,6 @@ async function init(): Promise<void> {
 
     const handlers: MessageHandlers = {
         'version': handleVersion,
-        'logs': handleLogBatch,
         'import_progress': handleImportProgress,
         'import_stats': handleImportStats,
         'import_complete': handleImportComplete,
@@ -362,11 +361,7 @@ async function init(): Promise<void> {
         });
 
         listen('toggle-logs', () => {
-            // Toggle system drawer by simulating a click on the header
-            const header = document.getElementById('system-drawer-header');
-            if (header) {
-                header.click();
-            }
+            focusDrawerSearch();
         });
 
         listen('open-url', (event: any) => {
@@ -382,6 +377,12 @@ async function init(): Promise<void> {
         if ((e.metaKey || e.ctrlKey) && e.key === ',') {
             e.preventDefault();
             toggleConfig();
+        }
+
+        // SPACE opens unified search when nothing is focused
+        if (e.key === ' ' && !isInputFocused(e.target)) {
+            e.preventDefault();
+            focusDrawerSearch();
         }
     });
 
@@ -404,6 +405,15 @@ if (document.readyState === 'loading') {
     if (window.hideLoadingScreen) window.hideLoadingScreen();
     // Restore window visibility after loading screen completes
     Window.finishWindowRestore();
+}
+
+/** Check if an input element is focused (skip SPACE shortcut when typing) */
+function isInputFocused(target: EventTarget | null): boolean {
+    if (!target || !(target instanceof HTMLElement)) return false;
+    return target.tagName === 'INPUT'
+        || target.tagName === 'TEXTAREA'
+        || target.isContentEditable
+        || target.closest('.cm-editor') !== null;
 }
 
 // Make this a module

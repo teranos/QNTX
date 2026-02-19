@@ -132,7 +132,7 @@ export function showSpawnMenu(
     seBtn.title = 'Spawn Semantic Search glyph';
 
     seBtn.addEventListener('click', () => {
-        spawnSemanticGlyph(x, y, canvas, glyphs);
+        spawnSemanticGlyph(x, y, canvas, glyphs, canvasId);
         removeMenu();
     });
 
@@ -371,7 +371,8 @@ function spawnSemanticGlyph(
     x: number,
     y: number,
     canvas: HTMLElement,
-    glyphs: Glyph[]
+    glyphs: Glyph[],
+    canvasId: string
 ): void {
     const seGlyph: Glyph = {
         id: `se-${crypto.randomUUID()}`,
@@ -401,7 +402,8 @@ function spawnSemanticGlyph(
         x,
         y,
         width,
-        height
+        height,
+        canvas_id: storageCanvasId(canvasId),
     });
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned SE glyph at (${x}, ${y}) with size ${width}x${height}`);
@@ -637,4 +639,50 @@ function spawnSubcanvasGlyph(
     });
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned Subcanvas glyph at (${x}, ${y}) with size ${width}x${height}`);
+}
+
+/** Command → spawn function lookup (lowercase keys) */
+type SpawnFn = (x: number, y: number, canvas: HTMLElement, glyphs: Glyph[], canvasId: string) => void | Promise<void>;
+
+const COMMAND_MAP: Record<string, SpawnFn> = {
+    'ix':        spawnIxGlyph,
+    'ax':        spawnAxGlyph,
+    'se':        spawnSemanticGlyph,
+    'py':        spawnPyGlyph,
+    'ts':        spawnTsGlyph,
+    'prompt':    spawnPromptGlyph,
+    'so':        spawnPromptGlyph,
+    'prose':     spawnNoteGlyph,
+    'note':      spawnNoteGlyph,
+    'subcanvas': spawnSubcanvasGlyph,
+};
+
+/**
+ * Spawn a glyph on the active canvas by command name.
+ * Returns true if a glyph was spawned.
+ */
+export function spawnGlyphByCommand(command: string): boolean {
+    const fn = COMMAND_MAP[command.toLowerCase().trim()];
+    if (!fn) return false;
+
+    const workspace = document.querySelector('.canvas-workspace') as HTMLElement | null;
+    if (!workspace) return false;
+
+    const contentLayer = workspace.querySelector('.canvas-content-layer') as HTMLElement | null;
+    if (!contentLayer) return false;
+
+    const glyphs: Glyph[] = (workspace as any).__glyphs || [];
+    const canvasId = workspace.dataset.canvasId || 'canvas-workspace';
+
+    // Spawn at center of visible canvas
+    const rect = workspace.getBoundingClientRect();
+    const x = Math.round(rect.width / 2);
+    const y = Math.round(rect.height / 2);
+
+    // TODO(#547): Glyph spawning from search bar needs refinement — ghost preview under cursor, click-to-place, visual distinction in search results
+    const result = fn(x, y, contentLayer, glyphs, canvasId);
+    if (result instanceof Promise) {
+        result.catch(err => log.error(SEG.GLYPH, `Failed to spawn glyph "${command}": ${err}`));
+    }
+    return true;
 }
