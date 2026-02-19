@@ -132,7 +132,7 @@ export function showSpawnMenu(
     seBtn.title = 'Spawn Semantic Search glyph';
 
     seBtn.addEventListener('click', () => {
-        spawnSemanticGlyph(x, y, canvas, glyphs);
+        spawnSemanticGlyph(x, y, canvas, glyphs, canvasId);
         removeMenu();
     });
 
