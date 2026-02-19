@@ -3,7 +3,6 @@ package sync
 import (
 	"context"
 	"encoding/json"
-	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
@@ -320,14 +319,7 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 
 	for _, wires := range msg.Attestations {
 		for _, w := range wires {
-			as, err := fromWire(w)
-			if err != nil {
-				p.logger.Warnw("Failed to parse synced attestation",
-					"id", w.Id,
-					"error", err,
-				)
-				continue
-			}
+			as := fromWire(w)
 
 			// Skip if we already have this attestation by ASID
 			if p.store.AttestationExists(as.ID) {
@@ -446,77 +438,19 @@ func (p *Peer) recvDone() error {
 	return nil
 }
 
-// toWire converts a types.As to a proto Attestation for sync transport.
 func toWire(as *types.As) *protocol.Attestation {
-	attributesJSON := ""
-	if as.Attributes != nil {
-		ab, err := json.Marshal(as.Attributes)
-		if err == nil {
-			attributesJSON = string(ab)
-		}
-	}
-	return &protocol.Attestation{
-		Id:         as.ID,
-		Subjects:   as.Subjects,
-		Predicates: as.Predicates,
-		Contexts:   as.Contexts,
-		Actors:     as.Actors,
-		Timestamp:  as.Timestamp.UnixMilli(),
-		Source:     as.Source,
-		Attributes: attributesJSON,
-		CreatedAt:  as.CreatedAt.UnixMilli(),
-	}
+	return protocol.AttestationFromTypes(as)
 }
 
-// fromWire converts a proto Attestation back to a types.As.
-func fromWire(w *protocol.Attestation) (*types.As, error) {
-	var attributes map[string]interface{}
-	if w.Attributes != "" {
-		if err := json.Unmarshal([]byte(w.Attributes), &attributes); err != nil {
-			return nil, errors.Wrapf(err, "failed to parse attributes for attestation %s", w.Id)
-		}
-	}
-	if attributes == nil {
-		attributes = make(map[string]interface{})
-	}
-
-	return &types.As{
-		ID:         w.Id,
-		Subjects:   w.Subjects,
-		Predicates: w.Predicates,
-		Contexts:   w.Contexts,
-		Actors:     w.Actors,
-		Timestamp:  time.UnixMilli(w.Timestamp),
-		Source:     w.Source,
-		Attributes: attributes,
-		CreatedAt:  time.UnixMilli(w.CreatedAt),
-	}, nil
+func fromWire(w *protocol.Attestation) *types.As {
+	return w.ToTypes()
 }
 
 // attestationJSON serializes a types.As to JSON matching Rust's Attestation struct.
 // Critical: timestamp is i64 milliseconds (UnixMilli), not nanoseconds or RFC3339.
 // This JSON is passed to SyncTree.ContentHash() which delegates to Rust.
 func attestationJSON(as *types.As) (string, error) {
-	attributesJSON := ""
-	if as.Attributes != nil {
-		ab, err := json.Marshal(as.Attributes)
-		if err != nil {
-			return "", errors.Wrapf(err, "failed to marshal attributes for %s", as.ID)
-		}
-		attributesJSON = string(ab)
-	}
-	proto := &protocol.Attestation{
-		Id:         as.ID,
-		Subjects:   as.Subjects,
-		Predicates: as.Predicates,
-		Contexts:   as.Contexts,
-		Actors:     as.Actors,
-		Timestamp:  as.Timestamp.UnixMilli(),
-		Source:     as.Source,
-		Attributes: attributesJSON,
-		CreatedAt:  as.CreatedAt.UnixMilli(),
-	}
-	b, err := json.Marshal(proto)
+	b, err := json.Marshal(protocol.AttestationFromTypes(as))
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to marshal attestation %s to JSON", as.ID)
 	}

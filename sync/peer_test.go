@@ -499,10 +499,7 @@ func TestWireRoundtrip(t *testing.T) {
 	as.Attributes = map[string]interface{}{"color": "blue"}
 
 	wire := toWire(as)
-	back, err := fromWire(wire)
-	if err != nil {
-		t.Fatalf("fromWire failed: %v", err)
-	}
+	back := fromWire(wire)
 
 	if back.ID != as.ID {
 		t.Fatalf("ID mismatch: %s vs %s", back.ID, as.ID)
