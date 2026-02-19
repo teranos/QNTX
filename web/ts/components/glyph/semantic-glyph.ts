@@ -485,9 +485,8 @@ function renderAttestation(attestation: Attestation, score?: number): HTMLElemen
     text.style.fontSize = '11px';
     text.style.color = '#d4f0d4';
     text.style.fontFamily = 'monospace';
-    text.style.whiteSpace = 'nowrap';
-    text.style.overflow = 'hidden';
-    text.style.textOverflow = 'ellipsis';
+    text.style.wordBreak = 'break-word';
+    text.style.overflowWrap = 'break-word';
     text.style.flex = '1';
     text.textContent = extractRichText(attestation);
 

@@ -306,56 +306,9 @@ func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit 
 	return matches, nil
 }
 
-// extractExcerpt extracts a snippet of text around the match
-func extractExcerpt(text, query string, maxLength int) string {
-	textLower := strings.ToLower(text)
-	queryLower := strings.ToLower(query)
-
-	// Find the match position
-	idx := strings.Index(textLower, queryLower)
-	if idx < 0 {
-		// If no match, return beginning of text
-		if len(text) <= maxLength {
-			return text
-		}
-		return text[:maxLength] + "..."
-	}
-
-	// Calculate excerpt bounds
-	start := idx - maxLength/2
-	if start < 0 {
-		start = 0
-	} else {
-		// Find word boundary
-		for start > 0 && text[start] != ' ' {
-			start--
-		}
-		if start > 0 {
-			start++ // Move past the space
-		}
-	}
-
-	end := idx + len(query) + maxLength/2
-	if end > len(text) {
-		end = len(text)
-	} else {
-		// Find word boundary
-		for end < len(text) && text[end] != ' ' {
-			end++
-		}
-	}
-
-	// Build excerpt
-	excerpt := ""
-	if start > 0 {
-		excerpt = "..."
-	}
-	excerpt += text[start:end]
-	if end < len(text) {
-		excerpt += "..."
-	}
-
-	return excerpt
+// extractExcerpt returns the full text — no truncation, no hidden data.
+func extractExcerpt(text, _ string, _ int) string {
+	return text
 }
 
 // Cache TTL for type definitions

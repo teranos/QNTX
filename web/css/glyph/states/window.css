@@ -28,9 +28,8 @@
     font-size: var(--font-size-sm);
     font-weight: 500;
     color: var(--text-on-dark);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 .window-title-bar button {

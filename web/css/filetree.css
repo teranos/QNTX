@@ -63,9 +63,8 @@
     font-size: var(--font-size-sm);
     border-radius: var(--border-radius);
     transition: all 0.2s;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 .prose-recent-label:hover {

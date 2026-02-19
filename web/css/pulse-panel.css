@@ -227,9 +227,8 @@
 
 .child-source {
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .child-error {
@@ -673,9 +672,8 @@
 
 .pulse-last-completed-command {
     flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 .pulse-last-completed-time {
