@@ -8,7 +8,6 @@ pub enum TokenKind {
     // Identifiers and literals
     Identifier,
     QuotedString,
-    NaturalPredicate,
 
     // Clause keywords
     Is,
@@ -71,7 +70,6 @@ impl fmt::Display for TokenKind {
         match self {
             TokenKind::Identifier => write!(f, "identifier"),
             TokenKind::QuotedString => write!(f, "quoted string"),
-            TokenKind::NaturalPredicate => write!(f, "natural predicate"),
             TokenKind::Is => write!(f, "'is'"),
             TokenKind::Are => write!(f, "'are'"),
             TokenKind::Of => write!(f, "'of'"),

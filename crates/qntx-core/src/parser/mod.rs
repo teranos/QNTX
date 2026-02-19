@@ -194,16 +194,6 @@ impl<'a> Parser<'a> {
             TokenKind::Pipe => {
                 return Err(ParseError::PipeNotSupported);
             }
-            // NOTE: User dissatisfaction - this is terrible design. We're routing tokens to
-            // different states based on fragile string patterns. A bare word like "has_experience"
-            // becomes a predicate just because it has an underscore, while "ALICE" is a subject.
-            // A proper parser would have explicit syntax or use actual NLP, not these hacks.
-            TokenKind::NaturalPredicate => {
-                // Bare natural predicates (has_experience, is_member) go directly to predicates
-                let token = self.next().unwrap();
-                self.query.predicates.push(token.text);
-                self.state = ParserState::Start;
-            }
             TokenKind::Identifier | TokenKind::QuotedString => self.state = ParserState::Subjects,
             TokenKind::Unknown | TokenKind::And => {
                 self.next();
@@ -236,7 +226,7 @@ impl<'a> Parser<'a> {
                 TokenKind::Pipe => {
                     return Err(ParseError::PipeNotSupported);
                 }
-                TokenKind::Identifier | TokenKind::QuotedString | TokenKind::NaturalPredicate => {
+                TokenKind::Identifier | TokenKind::QuotedString => {
                     let t = self.next().unwrap();
                     self.query.subjects.push(t.text);
                 }
@@ -311,7 +301,7 @@ impl<'a> Parser<'a> {
                 TokenKind::Pipe => {
                     return Err(ParseError::PipeNotSupported);
                 }
-                TokenKind::Identifier | TokenKind::QuotedString | TokenKind::NaturalPredicate => {
+                TokenKind::Identifier | TokenKind::QuotedString => {
                     let t = self.next().unwrap();
                     self.query.predicates.push(t.text);
                     found = true;
@@ -387,7 +377,7 @@ impl<'a> Parser<'a> {
                 TokenKind::Pipe => {
                     return Err(ParseError::PipeNotSupported);
                 }
-                TokenKind::Identifier | TokenKind::QuotedString | TokenKind::NaturalPredicate => {
+                TokenKind::Identifier | TokenKind::QuotedString => {
                     let t = self.next().unwrap();
                     self.query.contexts.push(t.text);
                     found = true;
@@ -462,7 +452,7 @@ impl<'a> Parser<'a> {
                 TokenKind::Pipe => {
                     return Err(ParseError::PipeNotSupported);
                 }
-                TokenKind::Identifier | TokenKind::QuotedString | TokenKind::NaturalPredicate => {
+                TokenKind::Identifier | TokenKind::QuotedString => {
                     let t = self.next().unwrap();
                     self.query.actors.push(t.text);
                     found = true;
@@ -626,7 +616,7 @@ impl<'a> Parser<'a> {
             };
 
             match token.kind {
-                TokenKind::Identifier | TokenKind::QuotedString | TokenKind::NaturalPredicate => {
+                TokenKind::Identifier | TokenKind::QuotedString => {
                     let t = self.next().unwrap();
                     self.query.actions.push(t.text);
                     found = true;
@@ -650,6 +640,29 @@ impl<'a> Parser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_single_word_is_subject() {
+        // Issue #2: single words must parse as subjects, not predicates
+        let query = Parser::parse("engineer").unwrap();
+        assert_eq!(query.subjects, vec!["engineer"]);
+        assert!(query.predicates.is_empty());
+    }
+
+    #[test]
+    fn test_is_prefix_word_is_subject() {
+        // "island" was misclassified as a predicate by starts_with("is")
+        let query = Parser::parse("island").unwrap();
+        assert_eq!(query.subjects, vec!["island"]);
+        assert!(query.predicates.is_empty());
+    }
+
+    #[test]
+    fn test_explicit_is_keyword_makes_predicate() {
+        let query = Parser::parse("ALICE is engineer").unwrap();
+        assert_eq!(query.subjects, vec!["ALICE"]);
+        assert_eq!(query.predicates, vec!["engineer"]);
+    }
 
     #[test]
     fn test_subjects_only() {
