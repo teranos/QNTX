@@ -69,6 +69,9 @@ Infrastructure and lifecycle markers:
 | `▤` | Doc | Document/file content (PDF, etc.) |
 | `⌗` | Subcanvas | Nested canvas workspace |
 
+### Manifestation
+The visual form a glyph takes when it morphs beyond the GlyphRun. A glyph can manifest as a window, canvas, fullscreen overlay, modal, tooltip, or any other interactive surface. The same DOM element, the same identity — different manifestations. See [glyphs.md](vision/glyphs.md) for the full vision.
+
 ## Configuration
 
 ### Configuration Files
