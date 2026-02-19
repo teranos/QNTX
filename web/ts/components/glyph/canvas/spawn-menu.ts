@@ -371,7 +371,8 @@ function spawnSemanticGlyph(
     x: number,
     y: number,
     canvas: HTMLElement,
-    glyphs: Glyph[]
+    glyphs: Glyph[],
+    canvasId: string
 ): void {
     const seGlyph: Glyph = {
         id: `se-${crypto.randomUUID()}`,
@@ -401,7 +402,8 @@ function spawnSemanticGlyph(
         x,
         y,
         width,
-        height
+        height,
+        canvas_id: storageCanvasId(canvasId),
     });
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned SE glyph at (${x}, ${y}) with size ${width}x${height}`);
@@ -677,6 +679,10 @@ export function spawnGlyphByCommand(command: string): boolean {
     const x = Math.round(rect.width / 2);
     const y = Math.round(rect.height / 2);
 
-    fn(x, y, contentLayer, glyphs, canvasId);
+    // TODO(#547): Glyph spawning from search bar needs refinement — ghost preview under cursor, click-to-place, visual distinction in search results
+    const result = fn(x, y, contentLayer, glyphs, canvasId);
+    if (result instanceof Promise) {
+        result.catch(err => log.error(SEG.GLYPH, `Failed to spawn glyph "${command}": ${err}`));
+    }
     return true;
 }
