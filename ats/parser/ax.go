@@ -30,9 +30,6 @@ var (
 
 	// ActorTransitionKeywords specifically transition to actor information
 	ActorTransitionKeywords = []string{"by", "via"}
-
-	// NaturalPredicates support both singular and plural forms of natural language predicates
-	NaturalPredicates = []string{"speak", "speaks", "know", "knows", "work", "worked", "study", "studied", "has_experience", "occupation"}
 )
 
 // ParseAxCommand parses natural language ax queries with flexible grammar
