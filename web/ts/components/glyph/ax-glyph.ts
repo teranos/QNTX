@@ -29,6 +29,7 @@ import { sendMessage } from '../../websocket';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { queryAttestations, parseQuery } from '../../qntx-wasm';
 import { tooltip } from '../tooltip';
+import { spawnAttestationGlyph } from './attestation-glyph';
 import { uiState } from '../../state/ui';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
@@ -288,7 +289,14 @@ function renderAttestation(attestation: Attestation): HTMLElement {
     item.style.marginBottom = '4px';
     item.style.backgroundColor = 'rgba(31, 61, 31, 0.35)'; // 20% greener tint
     item.style.borderRadius = '2px';
-    item.style.cursor = 'default';
+    item.style.cursor = 'pointer';
+
+    // Store full attestation for double-click spawn
+    item.dataset.attestation = JSON.stringify(attestation);
+    item.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        spawnAttestationGlyph(attestation, e.clientX, e.clientY);
+    });
 
     // Format attestation data as natural language: "SUBJECTS is PREDICATES of CONTEXTS"
     const subjects = attestation.subjects?.join(', ') || 'N/A';
