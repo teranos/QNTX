@@ -268,6 +268,8 @@ let embeddingsProjecting = false;
 type ProjectionPoint = { id: string; source_id: string; method: string; x: number; y: number; cluster_id: number };
 let projectionsData: Record<string, ProjectionPoint[]> = {};
 let clusterLabels: Map<number, string | null> = new Map();
+type TimelinePoint = { run_id: string; run_time: string; n_points: number; n_noise: number; cluster_id: number; label: string | null; n_members: number; event_type: string };
+let timelineData: TimelinePoint[] = [];
 
 // Self diagnostics state
 let selfElement: HTMLElement | null = null;
@@ -442,10 +444,11 @@ function renderSelf(): void {
 
 export async function fetchEmbeddingsInfo(): Promise<void> {
     try {
-        const [infoResp, projResp, clustersResp] = await Promise.all([
+        const [infoResp, projResp, clustersResp, timelineResp] = await Promise.all([
             apiFetch('/api/embeddings/info'),
             apiFetch('/api/embeddings/projections'),
             apiFetch('/api/embeddings/clusters'),
+            apiFetch('/api/embeddings/cluster-timeline'),
         ]);
         embeddingsInfo = await infoResp.json();
         const raw = projResp.ok ? await projResp.json() : {};
@@ -463,10 +466,13 @@ export async function fetchEmbeddingsInfo(): Promise<void> {
                 clusterLabels.set(c.id, c.label);
             }
         }
+        // Timeline data for cluster evolution chart
+        timelineData = timelineResp.ok ? await timelineResp.json() as TimelinePoint[] : [];
     } catch {
         embeddingsInfo = null;
         projectionsData = {};
         clusterLabels = new Map();
+        timelineData = [];
     }
     renderEmbeddings();
 }
@@ -589,6 +595,25 @@ function renderEmbeddings(): void {
         }
     }
 
+    // Timeline section: stacked area chart showing cluster evolution across runs
+    const runIDs = new Set(timelineData.map(p => p.run_id));
+    let timelineSection = '';
+    if (available && runIDs.size >= 2) {
+        timelineSection = `
+            <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
+                <h3 class="glyph-section-title">Cluster Timeline</h3>
+                <div class="emb-timeline"></div>
+            </div>
+        `;
+    } else if (available && runIDs.size === 1) {
+        timelineSection = `
+            <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
+                <h3 class="glyph-section-title">Cluster Timeline</h3>
+                <div style="font-size:12px;color:#6b7280">Need 2+ clustering runs for timeline</div>
+            </div>
+        `;
+    }
+
     embeddingsElement.innerHTML = `
         <div class="glyph-content">
             <div class="glyph-row">
@@ -612,6 +637,7 @@ function renderEmbeddings(): void {
             ${reembedSection}
             ${clusterSection}
             ${scatterSection}
+            ${timelineSection}
         </div>
     `;
 
@@ -638,6 +664,11 @@ function renderEmbeddings(): void {
             renderScatter(container, data);
         }
     });
+
+    const timelineContainer = embeddingsElement.querySelector('.emb-timeline') as HTMLElement | null;
+    if (timelineContainer && timelineData.length > 0) {
+        renderTimeline(timelineContainer, timelineData);
+    }
 }
 
 async function reembedAll(): Promise<void> {
@@ -735,6 +766,195 @@ function renderScatter(container: HTMLElement, data: ProjectionPoint[]): void {
         .attr('opacity', d => d.cluster_id === -1 ? 0.35 : 0.85);
 }
 
+function renderTimeline(container: HTMLElement, data: TimelinePoint[]): void {
+    const width = container.clientWidth || 680;
+    const height = 320;
+    const margin = { top: 12, right: 12, bottom: 28, left: 42 };
+    const innerW = width - margin.left - margin.right;
+    const innerH = height - margin.top - margin.bottom;
+
+    // Group data by run → { runTime, noise, clusters: {id → n_members} }
+    const runMap = new Map<string, { time: Date; noise: number; clusters: Map<number, number>; events: Map<number, string> }>();
+    for (const p of data) {
+        let entry = runMap.get(p.run_id);
+        if (!entry) {
+            entry = { time: new Date(p.run_time), noise: p.n_noise, clusters: new Map(), events: new Map() };
+            runMap.set(p.run_id, entry);
+        }
+        entry.clusters.set(p.cluster_id, p.n_members);
+        if (p.event_type) entry.events.set(p.cluster_id, p.event_type);
+    }
+
+    const runs = Array.from(runMap.entries())
+        .sort((a, b) => a[1].time.getTime() - b[1].time.getTime());
+
+    // Collect all cluster IDs
+    const allClusterIDs = Array.from(new Set(data.map(p => p.cluster_id))).sort((a, b) => a - b);
+
+    // Build stacked data: each run is a row with noise + per-cluster member counts
+    type StackRow = { time: Date; noise: number; [key: string]: number | Date };
+    const stackData: StackRow[] = runs.map(([, entry]) => {
+        const row: StackRow = { time: entry.time, noise: entry.noise };
+        for (const cid of allClusterIDs) {
+            row[`c${cid}`] = entry.clusters.get(cid) ?? 0;
+        }
+        return row;
+    });
+
+    const keys = ['noise', ...allClusterIDs.map(id => `c${id}`)];
+    const stack = d3.stack<StackRow>().keys(keys).value((d, key) => {
+        if (key === 'noise') return d.noise as number;
+        return (d[key] as number) ?? 0;
+    });
+    const series = stack(stackData);
+
+    const color = d3.scaleOrdinal(d3.schemeTableau10);
+    const colorFn = (key: string) => key === 'noise' ? '#4b5563' : color(key);
+
+    const xScale = d3.scaleTime()
+        .domain(d3.extent(stackData, d => d.time) as [Date, Date])
+        .range([0, innerW]);
+
+    const yMax = d3.max(series, s => d3.max(s, d => d[1])) ?? 0;
+    const yScale = d3.scaleLinear().domain([0, yMax]).nice().range([innerH, 0]);
+
+    const svg = d3.select(container)
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height)
+        .style('background', '#1e293b')
+        .style('border-radius', '4px');
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    // Area generator
+    const area = d3.area<d3.SeriesPoint<StackRow>>()
+        .x(d => xScale(d.data.time))
+        .y0(d => yScale(d[0]))
+        .y1(d => yScale(d[1]))
+        .curve(d3.curveMonotoneX);
+
+    // Draw stacked areas
+    g.selectAll('.area')
+        .data(series)
+        .join('path')
+        .attr('class', 'area')
+        .attr('d', area)
+        .attr('fill', d => colorFn(d.key))
+        .attr('opacity', d => d.key === 'noise' ? 0.4 : 0.75);
+
+    // X axis
+    g.append('g')
+        .attr('transform', `translate(0,${innerH})`)
+        .call(d3.axisBottom(xScale).ticks(Math.min(runs.length, 6)).tickFormat(d => {
+            const date = d as Date;
+            return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+        }))
+        .selectAll('text')
+        .style('fill', '#9ca3af')
+        .style('font-size', '9px');
+
+    g.selectAll('.tick line').attr('stroke', '#374151');
+    g.select('.domain').attr('stroke', '#374151');
+
+    // Y axis
+    g.append('g')
+        .call(d3.axisLeft(yScale).ticks(4))
+        .selectAll('text')
+        .style('fill', '#9ca3af')
+        .style('font-size', '9px');
+
+    g.selectAll('.tick line').attr('stroke', '#374151');
+    g.selectAll('.domain').attr('stroke', '#374151');
+
+    // Birth/death markers
+    for (const [, entry] of runs) {
+        for (const [cid, eventType] of entry.events) {
+            const key = `c${cid}`;
+            const seriesIdx = keys.indexOf(key);
+            if (seriesIdx < 0) continue;
+            const s = series[seriesIdx];
+            const pt = s.find(d => d.data.time.getTime() === entry.time.getTime());
+            if (!pt) continue;
+            const cx = xScale(entry.time);
+            const cy = yScale((pt[0] + pt[1]) / 2);
+
+            if (eventType === 'birth') {
+                g.append('path')
+                    .attr('d', d3.symbol().type(d3.symbolTriangle).size(30)())
+                    .attr('transform', `translate(${cx},${cy})`)
+                    .attr('fill', '#4ade80')
+                    .attr('opacity', 0.8);
+            } else if (eventType === 'death') {
+                g.append('path')
+                    .attr('d', d3.symbol().type(d3.symbolCross).size(30)())
+                    .attr('transform', `translate(${cx},${cy})`)
+                    .attr('fill', '#f87171')
+                    .attr('opacity', 0.8);
+            }
+        }
+    }
+
+    // Tooltip — invisible overlay rects per run column
+    const tooltip = d3.select(container)
+        .append('div')
+        .style('position', 'absolute')
+        .style('background', '#0f172a')
+        .style('border', '1px solid #374151')
+        .style('border-radius', '4px')
+        .style('padding', '4px 8px')
+        .style('font-size', '11px')
+        .style('color', '#e2e8f0')
+        .style('pointer-events', 'none')
+        .style('opacity', '0')
+        .style('z-index', '10');
+
+    container.style.position = 'relative';
+
+    // Compute per-run hover bands using midpoints between adjacent runs
+    const runXs = runs.map(([, entry]) => xScale(entry.time));
+    g.selectAll('.hover-rect')
+        .data(runs)
+        .join('rect')
+        .attr('class', 'hover-rect')
+        .attr('x', (_, i) => {
+            const left = i === 0 ? 0 : (runXs[i - 1] + runXs[i]) / 2;
+            return left;
+        })
+        .attr('y', 0)
+        .attr('width', (_, i) => {
+            const left = i === 0 ? 0 : (runXs[i - 1] + runXs[i]) / 2;
+            const right = i === runs.length - 1 ? innerW : (runXs[i] + runXs[i + 1]) / 2;
+            return right - left;
+        })
+        .attr('height', innerH)
+        .attr('fill', 'transparent')
+        .on('mouseover', (event: MouseEvent, [, entry]) => {
+            const lines: string[] = [];
+            for (const cid of allClusterIDs) {
+                const n = entry.clusters.get(cid) ?? 0;
+                if (n === 0) continue;
+                const label = clusterLabels.get(cid);
+                const name = label ? `${label} (#${cid})` : `Cluster #${cid}`;
+                const ev = entry.events.get(cid);
+                lines.push(`${name}: ${n}${ev && ev !== 'stable' ? ` (${ev})` : ''}`);
+            }
+            lines.push(`<span style="color:#6b7280">Noise: ${entry.noise}</span>`);
+            tooltip.html(lines.join('<br>'))
+                .style('opacity', '1')
+                .style('left', `${(event as MouseEvent).offsetX + 10}px`)
+                .style('top', `${(event as MouseEvent).offsetY - 10}px`);
+        })
+        .on('mousemove', (event: MouseEvent) => {
+            tooltip
+                .style('left', `${event.offsetX + 10}px`)
+                .style('top', `${event.offsetY - 10}px`);
+        })
+        .on('mouseout', () => {
+            tooltip.style('opacity', '0');
+        });
+}
+
 async function projectAll(): Promise<void> {
     if (embeddingsProjecting || !embeddingsInfo?.available) return;
 
@@ -799,8 +1019,8 @@ export function registerDefaultGlyphs(): void {
             fetchEmbeddingsInfo();
             return content;
         },
-        initialWidth: '540px',
-        initialHeight: '620px',
+        initialWidth: '720px',
+        initialHeight: '820px',
     });
 
     // Sync Status Glyph
