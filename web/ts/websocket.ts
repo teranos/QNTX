@@ -19,6 +19,9 @@ import type {
     WatcherMatchMessage,
     WatcherErrorMessage,
     GlyphFiredMessage,
+    BrowserSyncAttestationsMessage,
+    BrowserSyncDoneMessage,
+    SEQueryEmbeddingMessage,
 } from '../types/websocket';
 import { handleJobNotification, notifyStorageWarning, handleDaemonStatusNotification } from './tauri-notifications';
 import { handlePluginHealth } from './websocket-handlers/plugin-health';
@@ -270,6 +273,27 @@ const MESSAGE_HANDLERS = {
         messageHandlers['glyph_fired']?.(data);
     },
 
+    browser_sync_attestations: (data: BrowserSyncAttestationsMessage) => {
+        log.debug(SEG.WS, 'Browser sync batch:', data.stored, '/', data.total, data.done ? '(done)' : '');
+        import('./browser-sync.js').then(({ handleSyncAttestations }) => {
+            handleSyncAttestations(data);
+        });
+    },
+
+    browser_sync_done: (data: BrowserSyncDoneMessage) => {
+        log.info(SEG.WS, 'Browser sync done:', data.message);
+        import('./browser-sync.js').then(({ handleSyncDone }) => {
+            handleSyncDone(data);
+        });
+    },
+
+    se_query_embedding: (data: SEQueryEmbeddingMessage) => {
+        log.debug(SEG.WS, 'SE query embedding:', data.watcher_id, `${data.embedding.length}d`);
+        import('./components/glyph/semantic-glyph.js').then(({ cacheQueryEmbedding }) => {
+            cacheQueryEmbedding(data.watcher_id, data.embedding);
+        });
+    },
+
     watcher_error: (data: WatcherErrorMessage) => {
         log.warn(SEG.WS, 'Watcher error:', data.watcher_id, data.error, `(${data.severity})`);
         if (data.details?.length) {
@@ -375,6 +399,13 @@ export function connectWebSocket(handlers: MessageHandlers): void {
 
         // Request database stats on connect to populate DB indicator
         sendMessage({ type: 'get_database_stats' });
+
+        // Initiate browser sync (attestation + embedding replication)
+        import('./browser-sync.js').then(({ initiateBrowserSync }) => {
+            initiateBrowserSync().catch(err => {
+                log.warn(SEG.WS, 'Browser sync initiation failed:', err);
+            });
+        });
     };
 
     ws.onmessage = function(event: MessageEvent): void {
