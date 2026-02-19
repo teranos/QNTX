@@ -113,22 +113,41 @@ fmt.Printf("%+v\n", err)
 
 ## Sentinel Errors
 
-Define package-level sentinel errors:
+The errors package provides common sentinels — use these instead of defining your own:
+
+| Sentinel | Meaning |
+|----------|---------|
+| `errors.ErrNotFound` | Requested resource does not exist |
+| `errors.ErrInvalidRequest` | Malformed or invalid request |
+| `errors.ErrUnauthorized` | Missing authentication |
+| `errors.ErrForbidden` | Authenticated but not allowed |
+| `errors.ErrServiceUnavailable` | Required service is down |
+| `errors.ErrTimeout` | Operation timed out |
+| `errors.ErrConflict` | Resource conflict (e.g. duplicate key) |
+
+### Checking
 
 ```go
-package db
-
-import "github.com/teranos/QNTX/errors"
-
-var (
-    ErrNotFound = errors.New("not found")
-    ErrClosed   = errors.New("database closed")
-)
-
-// Usage
-if errors.Is(err, db.ErrNotFound) {
+if errors.Is(err, errors.ErrNotFound) {
     // handle not found
 }
+
+// Convenience checkers (also handle legacy string-based errors):
+if errors.IsNotFoundError(err) { ... }
+if errors.IsInvalidRequestError(err) { ... }
+if errors.IsServiceUnavailableError(err) { ... }
+```
+
+### Creating
+
+```go
+// Wrap sentinel with context
+return errors.WrapNotFound(err, "user lookup failed")
+return errors.WrapInvalidRequest(err, "bad filter parameter")
+
+// Create directly with formatted message
+return errors.NewNotFoundError("attestation %s not found", asid)
+return errors.NewInvalidRequestError("workers must be > 0, got %d", n)
 ```
 
 ## Best Practices
@@ -197,10 +216,10 @@ decoded := errors.DecodeError(ctx, encoded)
 
 ### Domains
 
-Mark errors with package domains:
+Tag errors with an origin domain for triage:
 
 ```go
-err = errors.WithDomain(err, errors.PackageDomain())
+err = errors.WithDomain(err, "pulse")
 domain := errors.GetDomain(err)
 ```
 

@@ -39,7 +39,7 @@ The developer always uses `make dev` to start the development environment with h
 
 ## Glyphs
 
-Glyphs ⧉  are the universal UI primitive. Currently defined in the `sym` package (will become `glyph`).
+Glyphs ⧉  are the universal UI primitive. Symbols (`sym` package) are the visual expression of a glyph — through a sym, a glyph can be expressed. The `sym` package will become a subpackage of `glyph/` (`glyph/sym`).
 
 See [GLOSSARY.md](docs/GLOSSARY.md) for symbol definitions and [glyphs.md](docs/vision/glyphs.md) for the architectural vision.
 
@@ -96,4 +96,4 @@ db.Exec("CREATE INDEX ...")
 
 **Pattern used throughout:**
 
-- `ats/storage/*_test.go` - All tests use `qntxtest.CreateTestDB(t)`
+- `ats/storage/*_test.go` - Tests use either `qntxtest.CreateTestDB(t)` or `testutil.SetupTestDB(t)` (both migration-based)

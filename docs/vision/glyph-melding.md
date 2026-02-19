@@ -118,6 +118,14 @@ Unlike these systems which use:
 
 Glyph melding uses **proximity-based fusion** - a more organic, fluid interaction that eliminates connection management while maintaining clear data flow semantics.
 
+## Semantic Query Composition (SE → SE)
+
+When SE₁ melds rightward to SE₂, the downstream glyph narrows the upstream search space. SE₁ ("science") defines a broad semantic region; SE₂ ("about teaching") intersects it. Only attestations matching **both** queries appear in SE₂. SE₁ continues to show its own unfiltered results independently. The downstream similarity score is reported to the user.
+
+**Chaining** (future): Currently supports pairwise intersection. For chains of 3+ (SE₁→SE₂→SE₃), true transitive intersection (SE₁∩SE₂∩SE₃) requires propagating the full ancestor chain through the meld graph.
+
+**Union** (future): Vertical SE composition would merge disjoint semantic regions — "machine learning" ↓ "gardening" shows attestations matching either. The dual of intersection: spatial union rather than refinement.
+
 ## Future Directions
 
 ### Advanced Melding Patterns

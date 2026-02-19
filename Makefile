@@ -31,7 +31,7 @@ dev: web cli ## Build frontend and CLI, then start development servers (backend 
 	@# Read ports from am.toml if exists, otherwise use defaults
 	@TOML_BACKEND_PORT=$$(grep -E '^port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
 	TOML_FRONTEND_PORT=$$(grep -E '^frontend_port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
-	BACKEND_PORT=$${BACKEND_PORT:-$${TOML_BACKEND_PORT:-8773}}; \
+	BACKEND_PORT=$${BACKEND_PORT:-$${TOML_BACKEND_PORT:-877}}; \
 	FRONTEND_PORT=$${FRONTEND_PORT:-$${TOML_FRONTEND_PORT:-8820}}; \
 	echo "🚀 Starting development environment..."; \
 	echo "  Backend:  http://localhost:$$BACKEND_PORT"; \

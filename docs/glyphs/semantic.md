@@ -46,7 +46,7 @@ When SE₁ melds rightward to SE₂, SE₂ switches from standalone mode to inte
 
 On unmeld, SE₂'s standalone watcher is re-enabled and it reverts to its own query results.
 
-See [docs/vision/se-se-meldability.md](../vision/se-se-meldability.md) for the full vision including chaining (SE→SE→SE) and union (SE↓SE).
+See [Glyph Melding: Semantic Query Composition](../vision/glyph-melding.md#semantic-query-composition-se--se) for the full vision including chaining (SE→SE→SE) and union (SE↓SE).
 
 ### Planned
 

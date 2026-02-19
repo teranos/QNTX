@@ -23,7 +23,7 @@ ts/prose-navigation.test.ts
 
 ## Key Patterns
 
-**DOM Testing** — `test-setup.ts` creates happy-dom or JSDOM based on `USE_JSDOM=1`. Gate DOM tests with the skip pattern in `*.dom.test.ts` files.
+**DOM Testing** — `test-setup.ts` provides happy-dom by default or JSDOM when `USE_JSDOM=1` is set. Tests using basic DOM APIs (document.createElement, etc.) work as regular `.test.ts` files with happy-dom. Tests requiring full browser APIs (Web Animations API, ResizeObserver) use `.dom.test.ts` with the JSDOM skip pattern.
 
 **localStorage Mocking** (see `prose-navigation.test.ts`):
 ```typescript

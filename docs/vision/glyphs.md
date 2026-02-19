@@ -21,7 +21,7 @@ A single entity that exists in three visual states, morphing between them throug
 - The transformation is proximity-based: closer = larger ✓
 - Text fades in showing what the glyph represents (e.g., "VidStream", "Database Statistics") ✓
 - Background color transitions from gray to darker as it expands ✓
-- The existing window-tray.ts already implements this perfectly (lines 164-285) ✓
+- The existing run.ts already implements this perfectly ✓
 - Carefully tuned easing curves, thresholds, and baseline boost logic ✓
 
 #### 3. Full Window State ✓
@@ -110,7 +110,7 @@ The GlyphRun position is configurable - it can dock to either the left or right 
    - Background transitions to window background
    - Title bar and controls fade in
    - Content fades in as window reaches final size
-4. Animation duration: ~600ms for smooth but snappy feel
+4. Animation feels smooth but snappy
 5. Glyph is removed from tray (it has become the window)
 
 ### Collapse (Window → Glyph)
@@ -142,92 +142,6 @@ Users SEE the transformation. There's no teleportation, no sudden appearance/dis
 
 Users know where their windows "live" when minimized - they can see them as glyphs. When they expand a glyph, they're not launching something new, they're revealing what was always there.
 
-## Implementation Approach
-
-### Use Existing Infrastructure
-
-- **Keep window-tray.ts proximity morphing** - it's already perfect for states 1 & 2
-- **Extend the click handler** - instead of `item.onRestore()`, morph the glyph into window
-- **Add to TrayItem interface** - add `renderContent?: () => HTMLElement` for window content
-
-### What Changes in window-tray.ts
-
-1. **Extend TrayItem interface:**
-
-```typescript
-export interface TrayItem {
-    id: string;
-    title: string;
-    onRestore?: (sourceRect?: DOMRect) => void;  // Keep for backward compat
-    renderContent?: () => HTMLElement;            // NEW: For glyph-primitive
-    initialWidth?: string;                        // NEW: Window dimensions
-    initialHeight?: string;
-    defaultX?: number;                            // NEW: Window position
-    defaultY?: number;
-}
-```
-
-2. **Modify click handler (around line 371):**
-
-- Check if item has `renderContent` (new glyph-primitive path)
-- If yes: morph glyph into window
-- If no: use existing `onRestore` (backward compatible)
-
-3. **Add morphing methods:**
-
-- `morphToWindow(glyph, item)` - handles expansion animation
-- `morphToGlyph(window, item)` - handles collapse animation
-
-### CSS for Smooth Animations
-
-```css
-.glyph-morphing-to-window {
-    transition: all 600ms cubic-bezier(0.4, 0, 0.2, 1);
-    transition-property: transform, width, height, border-radius, background-color, opacity;
-}
-
-.window-morphing-to-glyph {
-    transition: all 600ms cubic-bezier(0.4, 0, 0.2, 1);
-    transition-property: transform, width, height, border-radius, background-color, opacity;
-}
-```
-
-## What We're NOT Doing
-
-### NOT Creating Separate Systems
-
-- Not making a new type of glyph
-- Not creating a parallel window system
-- Not duplicating the proximity morphing logic
-
-### NOT Breaking Existing Functionality
-
-- Existing minimized windows still work with `onRestore`
-- Window component remains for apps that need it
-- Backward compatibility maintained
-
-### NOT Overengineering
-
-- Simple CSS transitions for animations
-- Reuse existing DOM elements where possible
-- Minimal new code - mostly extending what exists
-
-## Success Criteria
-
-1. **Visual**: The transformation is smooth and obvious - users can clearly see the glyph becoming the window
-2. **Conceptual**: Users understand glyphs and windows are the same entity in different states
-3. **Technical**: Minimal code changes, maximum reuse of existing infrastructure
-4. **Performance**: Animations are smooth at 60fps
-5. **Compatibility**: Existing window minimize/restore still works
-
-## Test Scenarios
-
-1. **Basic Morph**: Click glyph → morphs to window → click minimize → morphs back to glyph
-2. **Proximity During Morph**: Mouse near tray during collapse animation shouldn't interfere
-3. **Multiple Glyphs**: Multiple glyphs can be expanded simultaneously
-4. **State Persistence**: Window positions saved, glyphs reappear in tray after refresh
-5. **Dragging**: Windows are draggable, position updates saved
-
 ## The End Goal
 
 When complete, users will experience a seamless transformation where glyphs in the tray literally grow into windows and shrink back. The animation makes the relationship unmistakable - the glyph IS the window, just in different visual states based on user needs.
@@ -253,12 +167,12 @@ This enables:
 - **Time-travel UI**: Navigate to how your workspace looked at any point in time
 - **Auditable interactions**: Track how users interact with the interface
 
-### Replacing Seg and Sym
+### Sym as Glyph Expression
 
-The backend will migrate from `seg` (Segment) and `sym` (Symbol) to `glyph`:
+Symbols (`sym`) are the visual expression of a glyph — through a sym, a glyph can be expressed. The `sym` package becomes a subpackage of `glyph/` (`glyph/sym`):
 
-- Rename `sym` package → `glyph` package
-- All references to segments and symbols become glyphs
+- Symbols remain the visual language through which glyphs manifest
+- The `glyph` package is the parent primitive, `sym` its visual expression layer
 - Frontend and backend share the same fundamental primitive: **Glyph**
 - Complete coherence between frontend visualization and backend data model
 
