@@ -135,9 +135,9 @@ func (item IxItem) GetPredicate() string {
 	return item.Pred
 }
 
-// GetObject returns the object of the attestation
-func (item IxItem) GetObject() string {
-	return item.Obj
+// GetContext returns the context of the attestation
+func (item IxItem) GetContext() string {
+	return item.Obj // TODO: rename Obj field to Ctx (breaking JSON change: "obj" → "ctx")
 }
 
 // GetMeta returns the metadata of the attestation

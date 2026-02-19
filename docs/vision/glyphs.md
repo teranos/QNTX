@@ -196,6 +196,18 @@ The current Symbol Palette will be absorbed into the GlyphRun:
 4. **User Mental Model**: Users learn ONE interaction pattern that applies everywhere
 5. **Future Extensibility**: New features become new glyph types with consistent behavior
 
+### Attestable Grammar: Self-Describing SEGs
+
+The final step of the glyph migration: the grammar itself becomes attestable. Today, segments (`i`, `am`, `ax`, `ix`, etc.) are hardcoded constants. In the future, a SEG, its symbol, and its glyph manifestation are all attested:
+
+```
+SEG "ax" is segment of grammar by system at bootstrap
+SYM "⋈" is symbol of SEG "ax" by system at bootstrap
+GLYPH "ax-glyph" is manifestation of SEG "ax" by system at bootstrap
+```
+
+This makes the system fully self-describing. A plugin can attest a new segment, give it a symbol, and define its glyph manifestation — the system discovers it through the attestation graph rather than through imports. The operators that create attestations are themselves attestations.
+
 ### The Vision: Glyph as Universal Primitive
 
 Glyphs are the atoms of the QNTX interface. Every visual element that can transform, morph, or contain information is a glyph. They can be:

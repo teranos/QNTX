@@ -5,7 +5,7 @@
 //
 // ATS implements a flexible attestation model based on the pattern:
 //
-//	[Subject] [Predicate] [Object] by [Actor] on [Temporal]
+//	[Subject] [Predicate] [Context] by [Actor] at [Temporal]
 //
 // For example:
 //   - ENTITY-A is member of ORG-1 by hr-system@company on 2025-01-15
@@ -17,7 +17,7 @@
 // Attestations (As) are structured claims with:
 //   - Subjects: entities being described (can be multiple for compound statements)
 //   - Predicates: relationships or attributes
-//   - Contexts (Objects): values or related entities
+//   - Contexts: values or related entities
 //   - Actors: entities making the claim
 //   - Temporal: when the claim was made
 //   - Attributes: additional metadata
