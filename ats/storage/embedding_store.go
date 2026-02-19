@@ -1033,6 +1033,58 @@ func (s *EmbeddingStore) SampleClusterTexts(clusterID, sampleSize int) ([]string
 	return texts, nil
 }
 
+// ClusterTimelinePoint represents one cluster's state at one run.
+type ClusterTimelinePoint struct {
+	RunID     string  `json:"run_id"`
+	RunTime   string  `json:"run_time"`
+	NPoints   int     `json:"n_points"`
+	NNoise    int     `json:"n_noise"`
+	ClusterID int     `json:"cluster_id"`
+	Label     *string `json:"label"`
+	NMembers  int     `json:"n_members"`
+	EventType string  `json:"event_type"`
+}
+
+// GetClusterTimeline returns per-cluster member counts across all runs,
+// ordered by run time ASC then cluster ID ASC.
+func (s *EmbeddingStore) GetClusterTimeline() ([]ClusterTimelinePoint, error) {
+	rows, err := s.db.Query(`
+		SELECT cr.id, cr.created_at, cr.n_points, cr.n_noise,
+		       cs.cluster_id, c.label, cs.n_members, ce.event_type
+		FROM cluster_runs cr
+		JOIN cluster_snapshots cs ON cs.run_id = cr.id
+		JOIN clusters c ON c.id = cs.cluster_id
+		LEFT JOIN (
+			SELECT run_id, cluster_id, MIN(event_type) AS event_type
+			FROM cluster_events
+			GROUP BY run_id, cluster_id
+		) ce ON ce.run_id = cr.id AND ce.cluster_id = cs.cluster_id
+		ORDER BY cr.created_at ASC, cs.cluster_id ASC
+	`)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query cluster timeline")
+	}
+	defer rows.Close()
+
+	var result []ClusterTimelinePoint
+	for rows.Next() {
+		var p ClusterTimelinePoint
+		var eventType *string
+		if err := rows.Scan(&p.RunID, &p.RunTime, &p.NPoints, &p.NNoise,
+			&p.ClusterID, &p.Label, &p.NMembers, &eventType); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan timeline row %d", len(result)+1)
+		}
+		if eventType != nil {
+			p.EventType = *eventType
+		}
+		result = append(result, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate timeline rows (read %d)", len(result))
+	}
+	return result, nil
+}
+
 // UpdateClusterLabel sets the label and labeled_at timestamp for a cluster.
 func (s *EmbeddingStore) UpdateClusterLabel(clusterID int, label string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
