@@ -23,19 +23,6 @@ export const CSS = {
         DISCONNECTED: 'disconnected',
     },
 
-    /** Log panel classes */
-    LOG: {
-        LINE: 'log-line',
-        ERROR: 'log-error',
-        WARN: 'log-warn',
-        INFO: 'log-info',
-        DEBUG: 'log-debug',
-        TIMESTAMP: 'log-timestamp',
-        LOGGER: 'log-logger',
-        MESSAGE: 'log-message',
-        FIELDS: 'log-fields',
-    },
-
     /** Toast notification classes */
     TOAST: {
         CONTAINER: 'toast-container',
@@ -80,7 +67,6 @@ export const CSS = {
 
 /** TypeScript types for compile-time checking */
 export type StateClass = typeof CSS.STATE[keyof typeof CSS.STATE];
-export type LogClass = typeof CSS.LOG[keyof typeof CSS.LOG];
 export type ToastClass = typeof CSS.TOAST[keyof typeof CSS.TOAST];
 export type PanelClass = typeof CSS.PANEL[keyof typeof CSS.PANEL];
 export type StreamClass = typeof CSS.STREAM[keyof typeof CSS.STREAM];
