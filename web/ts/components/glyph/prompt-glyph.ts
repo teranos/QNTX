@@ -13,16 +13,23 @@
  */
 
 import type { Glyph } from './glyph';
-import { SO, Doc, Prose } from '@generated/sym.js';
+import { SO, AS, Doc, Prose } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { apiFetch } from '../../api';
 import { preventDrag, storeCleanup } from './glyph-interaction';
 import { canvasPlaced } from './manifestations/canvas-placed';
-import { createResultGlyph, type ExecutionResult, type PromptConfig, type ResultGlyphContent } from './result-glyph';
 import { autoMeldResultBelow } from './meld/meld-system';
 import { uiState } from '../../state/ui';
+
+interface PromptConfig {
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+}
 import { tooltip } from '../tooltip';
 import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
+import { createAttestationGlyph } from './attestation-glyph';
+import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 
 /**
  * Prompt glyph execution status
@@ -288,22 +295,30 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
                 timestamp: Date.now(),
             });
 
-            // Extract prompt config from frontmatter for result inheritance
+            if (data.error) return;
+
+            // Parse frontmatter for model name
             const promptConfig = parseFrontmatterConfig(template);
-
-            // Extract prompt body (sans frontmatter) for display in result header
             const promptBody = template.replace(/^---\n[\s\S]*?\n---\n?/, '').trim();
+            const modelName = promptConfig?.model ?? 'unknown-model';
 
-            // Spawn result glyph below the prompt
-            const result: ExecutionResult = {
-                success: !data.error,
-                stdout: data.response ?? '',
-                stderr: '',
-                result: null,
-                error: data.error ?? null,
-                duration_ms: elapsedMs,
+            // Build attestation from the API response — mirrors what the backend created
+            const attestation: Attestation = {
+                id: data.attestation_id ?? '',
+                subjects: [modelName],
+                predicates: ['prompt-result'],
+                contexts: [glyph.id],
+                actors: ['glyph:' + glyph.id],
+                timestamp: Math.floor(Date.now() / 1000),
+                source: 'prompt-direct',
+                attributes: JSON.stringify({
+                    response: data.response ?? '',
+                    template: promptBody,
+                }),
+                created_at: Math.floor(Date.now() / 1000),
             };
-            spawnResultGlyph(element, result, promptConfig, promptBody);
+
+            spawnAttestationBelow(element, attestation);
 
         } catch (error) {
             log.error(SEG.GLYPH, '[Prompt] Execution failed:', error);
@@ -365,14 +380,14 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     tooltip.attach(element);
 
     /**
-     * Spawn a result glyph directly below this prompt glyph.
+     * Spawn an attestation glyph directly below this prompt glyph.
      * Composition-aware: extends existing composition or creates new meld.
      */
-    function spawnResultGlyph(promptEl: HTMLElement, result: ExecutionResult, promptConfig?: PromptConfig, prompt?: string): void {
+    function spawnAttestationBelow(promptEl: HTMLElement, attestation: Attestation): void {
         const promptRect = promptEl.getBoundingClientRect();
         const canvas = promptEl.closest('.canvas-workspace') as HTMLElement;
         if (!canvas) {
-            log.error(SEG.GLYPH, '[Prompt] Cannot spawn result glyph: no canvas-workspace ancestor');
+            log.error(SEG.GLYPH, '[Prompt] Cannot spawn attestation glyph: no canvas-workspace ancestor');
             return;
         }
         const canvasRect = canvas.getBoundingClientRect();
@@ -380,36 +395,36 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
         const rx = promptRect.left - canvasRect.left;
         const ry = promptRect.bottom - canvasRect.top;
 
-        const resultGlyphId = `result-${crypto.randomUUID()}`;
-        const resultGlyph: Glyph = {
-            id: resultGlyphId,
-            title: 'Prompt Result',
-            symbol: 'result',
+        const asGlyphId = `as-${crypto.randomUUID()}`;
+        const asGlyph: Glyph = {
+            id: asGlyphId,
+            title: 'Attestation',
+            symbol: AS,
             x: rx,
             y: ry,
             width: Math.round(promptRect.width),
-            renderContent: () => document.createElement('div')
+            content: JSON.stringify(attestation),
+            renderContent: () => document.createElement('div'),
         };
 
-        const resultElement = createResultGlyph(resultGlyph, result, promptConfig, prompt);
-        canvas.appendChild(resultElement);
+        const asElement = createAttestationGlyph(asGlyph);
+        canvas.appendChild(asElement);
 
-        const resultRect = resultElement.getBoundingClientRect();
-        const contentPayload: ResultGlyphContent = { result, ...(promptConfig && { promptConfig }), ...(prompt && { prompt }) };
+        const asRect = asElement.getBoundingClientRect();
         uiState.addCanvasGlyph({
-            id: resultGlyphId,
-            symbol: 'result',
+            id: asGlyphId,
+            symbol: AS,
             x: rx,
             y: ry,
-            width: Math.round(resultRect.width),
-            height: Math.round(resultRect.height),
-            content: JSON.stringify(contentPayload),
+            width: Math.round(asRect.width) || Math.round(promptRect.width),
+            height: Math.round(asRect.height) || 200,
+            content: JSON.stringify(attestation),
         });
 
-        // Auto-meld result below prompt glyph (bottom port)
+        // Auto-meld attestation below prompt glyph
         const promptGlyphId = promptEl.dataset.glyphId;
         if (promptGlyphId) {
-            autoMeldResultBelow(promptEl, promptGlyphId, 'prompt', 'Prompt', resultElement, resultGlyphId, 'Prompt');
+            autoMeldResultBelow(promptEl, promptGlyphId, 'prompt', 'Prompt', asElement, asGlyphId, 'Prompt');
         }
     }
 }
