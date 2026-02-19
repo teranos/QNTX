@@ -207,11 +207,6 @@ body.disconnected #container {
 }
 
 /* LLM Streaming Styles */
-.progress-event.llm-stream {
-    background: var(--bg-dark);
-    border-left: 3px solid #4ade80;
-}
-
 .llm-stream-content {
     font-family: var(--font-mono);
     font-size: var(--font-size-sm);

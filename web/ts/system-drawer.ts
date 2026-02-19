@@ -1,157 +1,29 @@
-// System drawer for logs, progress, and system output
+// Unified search drawer — search input + results in the system drawer shell
 
-import { appState, MAX_LOGS } from './state/app.ts';
-import { CSS } from './css-classes.ts';
-import { formatTimestamp } from './html-utils.ts';
 import { log, SEG } from './logger.ts';
 import { getStorageItem, setStorageItem } from './indexeddb-storage.ts';
-import type { LogsMessage, LogEntry } from '../types/websocket';
-
-// Make this a module
-export {};
+import { sendMessage } from './websocket.ts';
+import { connectivityManager } from './connectivity.ts';
+import { fuzzySearch } from './qntx-wasm.ts';
+import { SearchView, STRATEGY_FUZZY } from './search-view.ts';
+import type { SearchMatch, SearchResultsMessage } from './search-view.ts';
+import { spawnGlyphByCommand } from './components/glyph/canvas/spawn-menu.ts';
 
 const DRAWER_HEIGHT_KEY = 'system-drawer-height';
 const DRAWER_MIN = 6;     // Hidden: just the grab bar
-const DRAWER_HEADER = 32; // Header-only height
+const DRAWER_HEADER = 36; // Header-only height (10px grab + ~26px header)
 const DRAWER_MAX = 300;
-const DRAWER_DEFAULT = DRAWER_HEADER;
 
-// Type-safe log level to CSS class mapping
-const LOG_LEVEL_MAP: Record<string, string> = {
-    ERROR: CSS.LOG.ERROR,
-    WARN: CSS.LOG.WARN,
-    INFO: CSS.LOG.INFO,
-    DEBUG: CSS.LOG.DEBUG,
-} as const;
-
-// Log handling - accepts the full WebSocket message type
-export function handleLogBatch(data: LogsMessage): void {
-    log.info(SEG.WS, '📋 handleLogBatch called:', data);
-
-    if (!data.data || !data.data.messages) {
-        log.warn(SEG.WS, '⚠️  No data.data.messages in log batch:', data);
-        return;
-    }
-
-    log.info(SEG.WS, `📝 Processing ${data.data.messages.length} log messages`);
-
-    data.data.messages.forEach(msg => {
-        appendLog(msg);
-
-        // Show toast for errors at verbosity 0
-        if (appState.currentVerbosity === 0 && (msg.level === 'ERROR' || msg.level === 'WARN')) {
-            showToast(msg);
-        }
-    });
-
-    updateLogCount();
-}
-
-function appendLog(msg: LogEntry): void {
-    const logContent = document.getElementById('log-content') as HTMLElement | null;
-    if (!logContent) return;
-
-    const logLine = document.createElement('div');
-    logLine.className = `${CSS.LOG.LINE} ${LOG_LEVEL_MAP[msg.level] || CSS.LOG.INFO}`;
-
-    // Format timestamp
-    const timestamp = formatTimestamp(msg.timestamp);
-
-    // Build log line safely using DOM API
-    const timestampEl = document.createElement('span');
-    timestampEl.className = 'log-timestamp';
-    timestampEl.textContent = timestamp;
-
-    const loggerEl = document.createElement('span');
-    loggerEl.className = 'log-logger';
-    loggerEl.textContent = `[${msg.logger}]`;
-
-    const messageEl = document.createElement('span');
-    messageEl.className = 'log-message';
-    messageEl.textContent = msg.message;  // Safe - auto-escapes HTML
-
-    logLine.appendChild(timestampEl);
-    logLine.appendChild(loggerEl);
-    logLine.appendChild(messageEl);
-
-    // Add fields if present
-    if (msg.fields && Object.keys(msg.fields).length > 0) {
-        const fieldsEl = document.createElement('span');
-        fieldsEl.className = 'log-fields';
-        fieldsEl.textContent = JSON.stringify(msg.fields);
-        logLine.appendChild(fieldsEl);
-    }
-
-    // Add to buffer
-    appState.logBuffer.push(logLine);
-
-    // Maintain circular buffer
-    if (appState.logBuffer.length > MAX_LOGS) {
-        appState.logBuffer.shift();
-    }
-
-    // Append to DOM
-    logContent.appendChild(logLine);
-
-    // Remove old lines from DOM
-    while (logContent.children.length > MAX_LOGS) {
-        logContent.removeChild(logContent.firstChild!);
-    }
-
-    // Auto-scroll if panel is expanded and user is at bottom
-    const panel = document.getElementById('log-panel') as HTMLElement | null;
-    if (panel && !panel.classList.contains('collapsed')) {
-        const isAtBottom = logContent.scrollHeight - logContent.scrollTop <= logContent.clientHeight + 50;
-        if (isAtBottom) {
-            logContent.scrollTop = logContent.scrollHeight;
-        }
-    }
-}
-
-function updateLogCount(): void {
-    const count = document.getElementById('log-count') as HTMLElement | null;
-    if (count) {
-        count.textContent = '(' + appState.logBuffer.length + ')';
-    }
-}
-
-
-// Toast notifications
-function showToast(msg: LogEntry): void {
-    const container = document.getElementById('toast-container') as HTMLElement | null;
-    if (!container) return;
-
-    const toast = document.createElement('div');
-    toast.className = 'toast ' + msg.level.toLowerCase();
-
-    const title = document.createElement('div');
-    title.className = 'toast-title';
-    title.textContent = msg.level === 'ERROR' ? 'Error' : 'Warning';
-
-    const message = document.createElement('div');
-    message.textContent = msg.message;
-
-    toast.appendChild(title);
-    toast.appendChild(message);
-    container.appendChild(toast);
-
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-        toast.classList.add('u-animate-fadeout');
-        setTimeout(() => {
-            if (container.contains(toast)) {
-                container.removeChild(toast);
-            }
-        }, 300);
-    }, 5000);
-}
-
+let searchView: SearchView | null = null;
+let drawerPanel: HTMLElement | null = null;
+let searchInput: HTMLInputElement | null = null;
+let queryTimeout: ReturnType<typeof setTimeout> | null = null;
+let lastExpandedHeight = DRAWER_MAX;
 
 function setDrawerHeight(panel: HTMLElement, height: number): void {
     const clamped = Math.max(DRAWER_MIN, Math.min(DRAWER_MAX, height));
     panel.style.height = `${clamped}px`;
 
-    // Publish drawer height so other fixed elements (canvas) can offset
     document.documentElement.style.setProperty('--drawer-height', `${clamped}px`);
 
     if (clamped <= DRAWER_MIN) {
@@ -161,33 +33,201 @@ function setDrawerHeight(panel: HTMLElement, height: number): void {
     }
 }
 
-// Initialize log panel event listeners
+function expandDrawer(): void {
+    if (!drawerPanel) return;
+    const current = drawerPanel.offsetHeight;
+    if (current <= DRAWER_HEADER) {
+        const target = lastExpandedHeight > DRAWER_HEADER ? lastExpandedHeight : DRAWER_MAX;
+        setDrawerHeight(drawerPanel, target);
+        setStorageItem(DRAWER_HEIGHT_KEY, String(target));
+    }
+}
+
+function collapseDrawer(): void {
+    if (!drawerPanel) return;
+    const current = drawerPanel.offsetHeight;
+    if (current > DRAWER_HEADER) {
+        lastExpandedHeight = current;
+    }
+    setDrawerHeight(drawerPanel, DRAWER_HEADER);
+    setStorageItem(DRAWER_HEIGHT_KEY, String(DRAWER_HEADER));
+}
+
+// --- Search dispatch ---
+
+function dispatchSearch(text: string): void {
+    if (!text.trim()) {
+        if (searchView) searchView.clear();
+        return;
+    }
+
+    if (connectivityManager.state === 'online') {
+        sendMessage({ type: 'rich_search', query: text });
+    } else {
+        searchOffline(text);
+    }
+}
+
+function searchOffline(query: string): void {
+    if (!searchView) return;
+
+    const predicateMatches = fuzzySearch(query, 'predicates', 20, 0.3);
+    const contextMatches = fuzzySearch(query, 'contexts', 20, 0.3);
+
+    const matches: SearchMatch[] = [
+        ...predicateMatches.map(m => ({
+            node_id: '',
+            type_name: 'predicate',
+            type_label: 'P',
+            field_name: 'predicate',
+            field_value: m.value,
+            excerpt: m.value,
+            score: m.score,
+            strategy: STRATEGY_FUZZY,
+            display_label: m.value,
+            attributes: {},
+        })),
+        ...contextMatches.map(m => ({
+            node_id: '',
+            type_name: 'context',
+            type_label: 'C',
+            field_name: 'context',
+            field_value: m.value,
+            excerpt: m.value,
+            score: m.score,
+            strategy: STRATEGY_FUZZY,
+            display_label: m.value,
+            attributes: {},
+        })),
+    ];
+
+    matches.sort((a, b) => b.score - a.score);
+    const top = matches.slice(0, 20);
+
+    const message: SearchResultsMessage = {
+        type: 'rich_search_results',
+        query,
+        matches: top,
+        total: top.length,
+    };
+
+    searchView.updateResults(message);
+}
+
+// --- Public API ---
+
+/** Focus the drawer search input and expand to full height */
+export function focusDrawerSearch(): void {
+    if (!searchInput || !drawerPanel) return;
+    // Always expand to full height — the user is requesting search
+    setDrawerHeight(drawerPanel, DRAWER_MAX);
+    setStorageItem(DRAWER_HEIGHT_KEY, String(DRAWER_MAX));
+    searchInput.focus();
+}
+
+/** Handle search results from WebSocket.
+ *  Accepts any object — the WS layer passes RichSearchResultsMessage which
+ *  carries the same runtime shape (query, matches, total) but a different TS type.
+ *  TODO: replace with proto-generated type per ADR-006. */
+export function handleSearchResults(message: SearchResultsMessage | Record<string, unknown>): void {
+    if (!searchView) return;
+    searchView.updateResults(message as SearchResultsMessage);
+}
+
+// --- Init ---
+
 export function initSystemDrawer(): void {
     const panel = document.getElementById('system-drawer') as HTMLElement | null;
     if (!panel) return;
+    drawerPanel = panel;
 
     // Insert grab bar as first child of drawer
     const grabBar = document.createElement('div');
     grabBar.className = 'drawer-grab-bar';
     panel.prepend(grabBar);
 
-    // Restore height from IndexedDB, fall back to default
+    // Always start collapsed; use stored height only for expand target
     const stored = getStorageItem(DRAWER_HEIGHT_KEY);
-    const initialHeight = stored ? (parseInt(stored, 10) || DRAWER_DEFAULT) : DRAWER_DEFAULT;
-    setDrawerHeight(panel, initialHeight);
+    const storedHeight = stored ? (parseInt(stored, 10) || DRAWER_HEADER) : DRAWER_HEADER;
+    lastExpandedHeight = storedHeight > DRAWER_HEADER ? storedHeight : DRAWER_MAX;
+    setDrawerHeight(panel, DRAWER_HEADER);
 
-    // Track last expanded height for click toggle
-    let lastExpandedHeight = initialHeight > DRAWER_HEADER ? initialHeight : DRAWER_MAX;
+    // --- Search input in header ---
+    const header = document.getElementById('system-drawer-header') as HTMLElement | null;
+    if (header) {
+        searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.id = 'drawer-search-input';
+        searchInput.placeholder = 'Search or command...';
+        searchInput.autocomplete = 'off';
+
+        const controls = header.querySelector('.controls');
+        if (controls) {
+            header.insertBefore(searchInput, controls);
+        } else {
+            header.appendChild(searchInput);
+        }
+
+        // Wire search input events
+        searchInput.addEventListener('input', () => {
+            if (queryTimeout) clearTimeout(queryTimeout);
+            queryTimeout = setTimeout(() => {
+                dispatchSearch(searchInput!.value.trim());
+            }, 300);
+        });
+
+        searchInput.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const text = searchInput!.value.trim();
+                if (!text) return;
+
+                // Try glyph spawn command first
+                if (spawnGlyphByCommand(text)) {
+                    searchInput!.value = '';
+                    if (searchView) searchView.clear();
+                    collapseDrawer();
+                    searchInput!.blur();
+                    return;
+                }
+
+                // Otherwise submit search immediately
+                if (queryTimeout) clearTimeout(queryTimeout);
+                dispatchSearch(text);
+            }
+
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                searchInput!.value = '';
+                if (searchView) searchView.clear();
+                collapseDrawer();
+                searchInput!.blur();
+            }
+        });
+
+        // Auto-expand on focus
+        searchInput.addEventListener('focus', () => {
+            expandDrawer();
+        });
+
+        // Prevent header click-toggle when interacting with input
+        searchInput.addEventListener('click', (e: Event) => {
+            e.stopPropagation();
+        });
+    }
+
+    // --- Search results view ---
+    const resultsContainer = document.getElementById('search-results-container');
+    if (resultsContainer) {
+        searchView = new SearchView(resultsContainer);
+    }
 
     // --- Drag to resize ---
-    const DRAG_THRESHOLD = 4; // px — below this, treat as click not drag
+    const DRAG_THRESHOLD = 4;
     let pointerDown = false;
     let didDrag = false;
     let startY = 0;
 
-    // Detect if drawer is top-anchored (mobile responsive layout).
-    // Uses matchMedia to stay in sync with the CSS breakpoint — getComputedStyle
-    // breaks on iOS where env(safe-area-inset-top) makes top non-zero.
     const topAnchorQuery = window.matchMedia('(max-width: 768px)');
     function isTopAnchored(): boolean {
         return topAnchorQuery.matches;
@@ -221,6 +261,11 @@ export function initSystemDrawer(): void {
             }
             setStorageItem(DRAWER_HEIGHT_KEY, String(finalHeight));
         }
+
+        // Reset after a tick — header click handler in the same event loop
+        // tick still sees didDrag=true (prevents drag→click double-fire),
+        // but future clicks aren't permanently blocked.
+        setTimeout(() => { didDrag = false; }, 0);
     });
 
     grabBar.addEventListener('pointercancel', (e: PointerEvent) => {
@@ -230,25 +275,21 @@ export function initSystemDrawer(): void {
     });
 
     // --- Click header to toggle ---
-    const logHeader = document.getElementById('system-drawer-header') as HTMLElement | null;
-    if (logHeader) {
-        logHeader.addEventListener('click', function(e: Event) {
+    if (header) {
+        header.addEventListener('click', function(e: Event) {
             if (didDrag) return;
             const target = e.target as HTMLElement;
-            if (target.tagName === 'BUTTON' || target.tagName === 'SELECT') return;
+            if (target.tagName === 'BUTTON' || target.tagName === 'SELECT' || target.tagName === 'INPUT') return;
 
             const currentHeight = panel.offsetHeight;
             let newHeight: number;
 
             if (currentHeight > DRAWER_HEADER) {
-                // Collapse to header
                 lastExpandedHeight = currentHeight;
                 newHeight = DRAWER_HEADER;
             } else if (currentHeight <= DRAWER_MIN) {
-                // From hidden → header
                 newHeight = DRAWER_HEADER;
             } else {
-                // From header → expand
                 newHeight = lastExpandedHeight > DRAWER_HEADER ? lastExpandedHeight : DRAWER_MAX;
             }
 
@@ -256,4 +297,6 @@ export function initSystemDrawer(): void {
             setStorageItem(DRAWER_HEIGHT_KEY, String(newHeight));
         });
     }
+
+    log.debug(SEG.UI, 'System drawer initialized (unified search mode)');
 }
