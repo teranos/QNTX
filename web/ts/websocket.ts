@@ -432,13 +432,6 @@ function updateConnectionStatus(connected: boolean): void {
     // (status indicator subscribes to connectivity manager directly)
     connectivityManager.setWebSocketConnected(connected);
 
-    // Expand/collapse system drawer based on WS state (useful for debugging)
-    const systemDrawer = document.getElementById('system-drawer');
-    if (connected) {
-        systemDrawer?.classList.add('collapsed');
-    } else {
-        systemDrawer?.classList.remove('collapsed');
-    }
 }
 
 /**
