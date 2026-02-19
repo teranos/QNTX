@@ -3,16 +3,14 @@ package sync
 import (
 	"context"
 	"encoding/json"
-	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 
 	"go.uber.org/zap"
 )
-
-const timestampFormat = time.RFC3339Nano
 
 // Sync protocol limits. Sufficient for trusted/manual peering today.
 // For public-facing endpoints or automatic discovery, these need research:
@@ -257,7 +255,7 @@ func (p *Peer) Reconcile(ctx context.Context) (sent, received int, err error) {
 // sendRequestedAttestations looks up attestations for the groups the peer
 // requested and sends them.
 func (p *Peer) sendRequestedAttestations(ctx context.Context, requestedHexKeys []string) error {
-	atts := make(map[string][]AttestationWire)
+	atts := make(map[string][]*protocol.Attestation)
 	total := 0
 
 	for _, hexKey := range requestedHexKeys {
@@ -281,7 +279,7 @@ func (p *Peer) sendRequestedAttestations(ctx context.Context, requestedHexKeys [
 			continue
 		}
 
-		wires := make([]AttestationWire, 0, len(results))
+		wires := make([]*protocol.Attestation, 0, len(results))
 		for _, as := range results {
 			if total >= maxAttestationsPerSync {
 				p.logger.Warnw("Attestation limit reached, stopping send",
@@ -321,14 +319,7 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 
 	for _, wires := range msg.Attestations {
 		for _, w := range wires {
-			as, err := fromWire(w)
-			if err != nil {
-				p.logger.Warnw("Failed to parse synced attestation",
-					"id", w.ID,
-					"error", err,
-				)
-				continue
-			}
+			as := fromWire(w)
 
 			// Skip if we already have this attestation by ASID
 			if p.store.AttestationExists(as.ID) {
@@ -447,64 +438,19 @@ func (p *Peer) recvDone() error {
 	return nil
 }
 
-// toWire converts an attestation to its wire format.
-func toWire(as *types.As) AttestationWire {
-	return AttestationWire{
-		ID:         as.ID,
-		Subjects:   as.Subjects,
-		Predicates: as.Predicates,
-		Contexts:   as.Contexts,
-		Actors:     as.Actors,
-		Timestamp:  as.Timestamp.Format(timestampFormat),
-		Source:     as.Source,
-		Attributes: as.Attributes,
-	}
+func toWire(as *types.As) *protocol.Attestation {
+	return protocol.AttestationFromTypes(as)
 }
 
-// fromWire converts a wire attestation back to a types.As.
-func fromWire(w AttestationWire) (*types.As, error) {
-	ts, err := time.Parse(timestampFormat, w.Timestamp)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse timestamp %q for attestation %s", w.Timestamp, w.ID)
-	}
-
-	return &types.As{
-		ID:         w.ID,
-		Subjects:   w.Subjects,
-		Predicates: w.Predicates,
-		Contexts:   w.Contexts,
-		Actors:     w.Actors,
-		Timestamp:  ts,
-		Source:     w.Source,
-		Attributes: w.Attributes,
-		CreatedAt:  time.Now(),
-	}, nil
+func fromWire(w *protocol.Attestation) *types.As {
+	return w.ToTypes()
 }
 
 // attestationJSON serializes a types.As to JSON matching Rust's Attestation struct.
 // Critical: timestamp is i64 milliseconds (UnixMilli), not nanoseconds or RFC3339.
 // This JSON is passed to SyncTree.ContentHash() which delegates to Rust.
 func attestationJSON(as *types.As) (string, error) {
-	v := struct {
-		ID         string                 `json:"id"`
-		Subjects   []string               `json:"subjects"`
-		Predicates []string               `json:"predicates"`
-		Contexts   []string               `json:"contexts"`
-		Actors     []string               `json:"actors"`
-		Timestamp  int64                  `json:"timestamp"`
-		Source     string                 `json:"source"`
-		Attributes map[string]interface{} `json:"attributes,omitempty"`
-	}{
-		ID:         as.ID,
-		Subjects:   as.Subjects,
-		Predicates: as.Predicates,
-		Contexts:   as.Contexts,
-		Actors:     as.Actors,
-		Timestamp:  as.Timestamp.UnixMilli(),
-		Source:     as.Source,
-		Attributes: as.Attributes,
-	}
-	b, err := json.Marshal(v)
+	b, err := json.Marshal(protocol.AttestationFromTypes(as))
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to marshal attestation %s to JSON", as.ID)
 	}

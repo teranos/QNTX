@@ -309,11 +309,21 @@ pub fn classify_claims(input: &str) -> String {
 // ============================================================================
 
 /// Compute content hash for an attestation.
-/// Input: JSON-serialized Attestation
+/// Input: JSON-serialized proto Attestation
 /// Returns: `{"hash":"<64-char hex>"}` or `{"error":"..."}`
 #[wasm_bindgen]
 pub fn sync_content_hash(attestation_json: &str) -> String {
-    qntx_core::sync::content_hash_json(attestation_json)
+    match serde_json::from_str::<ProtoAttestation>(attestation_json) {
+        Ok(proto) => {
+            let core = qntx_proto::proto_convert::from_proto(proto);
+            let hash = qntx_core::sync::content_hash_hex(&core);
+            format!(r#"{{"hash":"{}"}}"#, hash)
+        }
+        Err(e) => format!(
+            r#"{{"error":"invalid attestation JSON: {}"}}"#,
+            e.to_string().replace('"', "\\\"")
+        ),
+    }
 }
 
 /// Insert into the global Merkle tree.

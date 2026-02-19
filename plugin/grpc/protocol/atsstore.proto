@@ -26,10 +26,10 @@ message Attestation {
   repeated string predicates = 3;
   repeated string contexts = 4;
   repeated string actors = 5;
-  int64 timestamp = 6;       // Unix timestamp in seconds
+  int64 timestamp = 6;       // Unix timestamp in milliseconds
   string source = 7;
   string attributes = 8;      // map[string]interface{} as JSON string
-  int64 created_at = 9;       // Unix timestamp in seconds
+  int64 created_at = 9;       // Unix timestamp in milliseconds
 }
 
 // AttestationCommand is used for creating attestations
@@ -38,7 +38,7 @@ message AttestationCommand {
   repeated string predicates = 2;
   repeated string contexts = 3;
   repeated string actors = 4;
-  optional int64 timestamp = 5;  // Unix timestamp in seconds. If not set, server uses current time.
+  optional int64 timestamp = 5;  // Unix timestamp in milliseconds. If not set, server uses current time.
   string attributes_json = 6;    // JSON-encoded map[string]interface{}
 }
 
@@ -48,8 +48,8 @@ message AttestationFilter {
   repeated string predicates = 2;
   repeated string contexts = 3;
   repeated string actors = 4;
-  int64 time_start = 5;          // Unix timestamp in seconds (0 = no filter)
-  int64 time_end = 6;            // Unix timestamp in seconds (0 = no filter)
+  int64 time_start = 5;          // Unix timestamp in milliseconds (0 = no filter)
+  int64 time_end = 6;            // Unix timestamp in milliseconds (0 = no filter)
   optional int32 limit = 7;      // Maximum results. If not set, no limit applied.
 }
 

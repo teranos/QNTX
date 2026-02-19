@@ -39,16 +39,8 @@ func (s *ATSStoreServer) CreateAttestation(ctx context.Context, req *protocol.Cr
 		}, nil
 	}
 
-	// Convert protobuf attestation to types.As
-	as, err := protoToAttestation(req.Attestation)
-	if err != nil {
-		return &protocol.CreateAttestationResponse{
-			Success: false,
-			Error:   fmt.Sprintf("failed to convert attestation: %v", err),
-		}, nil
-	}
+	as := req.Attestation.ToTypes()
 
-	// Create the attestation
 	if err := s.store.CreateAttestation(as); err != nil {
 		return &protocol.CreateAttestationResponse{
 			Success: false,
@@ -107,18 +99,9 @@ func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *
 
 	s.logger.Infow("Attestation generated and created via gRPC", "id", as.ID, "subjects", as.Subjects)
 
-	// Convert back to protobuf
-	protoAs, err := attestationToProto(as)
-	if err != nil {
-		return &protocol.GenerateAttestationResponse{
-			Success: false,
-			Error:   fmt.Sprintf("failed to convert attestation to proto: %v", err),
-		}, nil
-	}
-
 	return &protocol.GenerateAttestationResponse{
 		Success:     true,
-		Attestation: protoAs,
+		Attestation: protocol.AttestationFromTypes(as),
 	}, nil
 }
 
@@ -143,62 +126,14 @@ func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetA
 		}, nil
 	}
 
-	// Convert results to protobuf
 	protoAttestations := make([]*protocol.Attestation, len(attestations))
 	for i, as := range attestations {
-		protoAs, err := attestationToProto(as)
-		if err != nil {
-			return &protocol.GetAttestationsResponse{
-				Success: false,
-				Error:   fmt.Sprintf("failed to convert attestation: %v", err),
-			}, nil
-		}
-		protoAttestations[i] = protoAs
+		protoAttestations[i] = protocol.AttestationFromTypes(as)
 	}
 
 	return &protocol.GetAttestationsResponse{
 		Success:      true,
 		Attestations: protoAttestations,
-	}, nil
-}
-
-// Helper functions for conversion
-
-func protoToAttestation(proto *protocol.Attestation) (*types.As, error) {
-	attributes, err := attributesFromJSON(proto.AttributesJson)
-	if err != nil {
-		return nil, err
-	}
-
-	return &types.As{
-		ID:         proto.Id,
-		Subjects:   proto.Subjects,
-		Predicates: proto.Predicates,
-		Contexts:   proto.Contexts,
-		Actors:     proto.Actors,
-		Timestamp:  time.Unix(proto.Timestamp, 0),
-		Source:     proto.Source,
-		Attributes: attributes,
-		CreatedAt:  time.Unix(proto.CreatedAt, 0),
-	}, nil
-}
-
-func attestationToProto(as *types.As) (*protocol.Attestation, error) {
-	attributesJSON, err := attributesToJSON(as.Attributes)
-	if err != nil {
-		return nil, err
-	}
-
-	return &protocol.Attestation{
-		Id:             as.ID,
-		Subjects:       as.Subjects,
-		Predicates:     as.Predicates,
-		Contexts:       as.Contexts,
-		Actors:         as.Actors,
-		Timestamp:      as.Timestamp.Unix(),
-		Source:         as.Source,
-		AttributesJson: attributesJSON,
-		CreatedAt:      as.CreatedAt.Unix(),
 	}, nil
 }
 
@@ -209,8 +144,8 @@ func protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error
 	}
 
 	timestamp := time.Now()
-	if proto.Timestamp != 0 {
-		timestamp = time.Unix(proto.Timestamp, 0)
+	if proto.Timestamp != nil && *proto.Timestamp != 0 {
+		timestamp = time.UnixMilli(*proto.Timestamp)
 	}
 
 	return &types.AsCommand{
@@ -224,8 +159,12 @@ func protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error
 }
 
 func protoToFilter(proto *protocol.AttestationFilter) ats.AttestationFilter {
+	limit := 0
+	if proto.Limit != nil {
+		limit = int(*proto.Limit)
+	}
 	filter := ats.AttestationFilter{
-		Limit:      int(proto.Limit),
+		Limit:      limit,
 		Actors:     proto.Actors,
 		Subjects:   proto.Subjects,
 		Predicates: proto.Predicates,
@@ -233,12 +172,12 @@ func protoToFilter(proto *protocol.AttestationFilter) ats.AttestationFilter {
 	}
 
 	if proto.TimeStart != 0 {
-		t := time.Unix(proto.TimeStart, 0)
+		t := time.UnixMilli(proto.TimeStart)
 		filter.TimeStart = &t
 	}
 
 	if proto.TimeEnd != 0 {
-		t := time.Unix(proto.TimeEnd, 0)
+		t := time.UnixMilli(proto.TimeEnd)
 		filter.TimeEnd = &t
 	}
 

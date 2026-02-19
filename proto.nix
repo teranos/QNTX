@@ -13,7 +13,10 @@
         --plugin=${pkgs.protoc-gen-go-grpc}/bin/protoc-gen-go-grpc \
         --go_out=. --go_opt=paths=source_relative \
         --go-grpc_out=. --go-grpc_opt=paths=source_relative \
-        plugin/grpc/protocol/domain.proto
+        plugin/grpc/protocol/domain.proto \
+        plugin/grpc/protocol/atsstore.proto \
+        plugin/grpc/protocol/queue.proto \
+        plugin/grpc/protocol/server.proto
 
       echo "✓ Plugin proto files generated in plugin/grpc/protocol/"
 
@@ -27,19 +30,7 @@
 
       echo "✓ Glyph proto files generated in glyph/proto/"
 
-      # TODO: Generate proto for atsstore.proto and queue.proto (currently only domain.proto)
-
-      # TODO: Rust proto generation
-      # See ADR-006 for strategy: Protocol Buffers as Single Source of Truth
-      # - Create qntx-proto crate at crates/qntx-proto/
-      # - Use prost for Rust generation
-      # - Follow TypeScript pattern from ADR-007 (interfaces only if possible)
-
-      # TODO: Go type migration
-      # See ADR-006 for gradual migration approach
-      # - Currently generates in plugin/grpc/protocol/
-      # - Need to make generated types available as primary types
-      # - Handle timestamp format differences (time.Time vs int64)
+      # Rust proto types are generated at build time via prost (see crates/qntx-proto/build.rs)
     '');
   };
 

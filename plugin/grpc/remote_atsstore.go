@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
@@ -68,7 +67,8 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*ty
 	}
 
 	if !cmd.Timestamp.IsZero() {
-		protoCmd.Timestamp = cmd.Timestamp.Unix()
+		ts := cmd.Timestamp.UnixMilli()
+		protoCmd.Timestamp = &ts
 	}
 
 	req := &protocol.GenerateAttestationRequest{
@@ -85,33 +85,7 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*ty
 		return nil, errors.Newf("failed to generate attestation: %s", resp.Error)
 	}
 
-	// Convert response to types.As
-	attestation := &types.As{
-		ID:         resp.Attestation.Id,
-		Subjects:   resp.Attestation.Subjects,
-		Predicates: resp.Attestation.Predicates,
-		Contexts:   resp.Attestation.Contexts,
-		Actors:     resp.Attestation.Actors,
-		Timestamp:  time.Unix(resp.Attestation.Timestamp, 0),
-		Source:     resp.Attestation.Source,
-		Attributes: make(map[string]interface{}),
-		CreatedAt:  time.Unix(resp.Attestation.CreatedAt, 0),
-	}
-
-	// Unmarshal attributes from JSON
-	if resp.Attestation.AttributesJson != "" {
-		attributes, err := attributesFromJSON(resp.Attestation.AttributesJson)
-		if err != nil {
-			// Surface attribute parsing error to caller via special key
-			r.logger.Warnw("Failed to unmarshal attributes", "error", err, "json", resp.Attestation.AttributesJson)
-			attestation.Attributes["_attribute_parse_error"] = err.Error()
-			attestation.Attributes["_attribute_parse_json"] = resp.Attestation.AttributesJson
-		} else {
-			attestation.Attributes = attributes
-		}
-	}
-
-	return attestation, nil
+	return resp.Attestation.ToTypes(), nil
 }
 
 // AttestationExists checks if an attestation exists via gRPC.
@@ -132,18 +106,19 @@ func (r *RemoteATSStore) AttestationExists(asid string) bool {
 
 // GetAttestations retrieves attestations via gRPC.
 func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
+	limit := int32(filter.Limit)
 	protoFilter := &protocol.AttestationFilter{
 		Actors:     filter.Actors,
 		Subjects:   filter.Subjects,
 		Predicates: filter.Predicates,
 		Contexts:   filter.Contexts,
-		Limit:      int32(filter.Limit),
+		Limit:      &limit,
 	}
 	if filter.TimeStart != nil {
-		protoFilter.TimeStart = filter.TimeStart.Unix()
+		protoFilter.TimeStart = filter.TimeStart.UnixMilli()
 	}
 	if filter.TimeEnd != nil {
-		protoFilter.TimeEnd = filter.TimeEnd.Unix()
+		protoFilter.TimeEnd = filter.TimeEnd.UnixMilli()
 	}
 
 	req := &protocol.GetAttestationsRequest{
@@ -156,33 +131,9 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 		return nil, errors.Wrap(err, "gRPC GetAttestations failed")
 	}
 
-	// Convert response attestations
 	attestations := make([]*types.As, len(resp.Attestations))
 	for i, protoAtt := range resp.Attestations {
-		attestations[i] = &types.As{
-			ID:         protoAtt.Id,
-			Subjects:   protoAtt.Subjects,
-			Predicates: protoAtt.Predicates,
-			Contexts:   protoAtt.Contexts,
-			Actors:     protoAtt.Actors,
-			Timestamp:  time.Unix(protoAtt.Timestamp, 0),
-			Source:     protoAtt.Source,
-			Attributes: make(map[string]interface{}),
-			CreatedAt:  time.Unix(protoAtt.CreatedAt, 0),
-		}
-
-		// Unmarshal attributes from JSON
-		if protoAtt.AttributesJson != "" {
-			attributes, err := attributesFromJSON(protoAtt.AttributesJson)
-			if err != nil {
-				// Surface attribute parsing error to caller via special key
-				r.logger.Warnw("Failed to unmarshal attributes", "error", err, "id", protoAtt.Id)
-				attestations[i].Attributes["_attribute_parse_error"] = err.Error()
-				attestations[i].Attributes["_attribute_parse_json"] = protoAtt.AttributesJson
-			} else {
-				attestations[i].Attributes = attributes
-			}
-		}
+		attestations[i] = protoAtt.ToTypes()
 	}
 
 	return attestations, nil
@@ -190,31 +141,9 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 
 // CreateAttestation creates an attestation with a pre-generated ID via gRPC.
 func (r *RemoteATSStore) CreateAttestation(a *types.As) error {
-	// Marshal attributes to JSON string
-	attributesJSON := ""
-	if a.Attributes != nil {
-		json, err := attributesToJSON(a.Attributes)
-		if err != nil {
-			return errors.Wrap(err, "failed to marshal attributes")
-		}
-		attributesJSON = json
-	}
-
-	protoAtt := &protocol.Attestation{
-		Id:             a.ID,
-		Subjects:       a.Subjects,
-		Predicates:     a.Predicates,
-		Contexts:       a.Contexts,
-		Actors:         a.Actors,
-		Timestamp:      a.Timestamp.Unix(),
-		Source:         a.Source,
-		AttributesJson: attributesJSON,
-		CreatedAt:      a.CreatedAt.Unix(),
-	}
-
 	req := &protocol.CreateAttestationRequest{
 		AuthToken:   r.authToken,
-		Attestation: protoAtt,
+		Attestation: protocol.AttestationFromTypes(a),
 	}
 
 	resp, err := r.client.CreateAttestation(r.ctx, req)
