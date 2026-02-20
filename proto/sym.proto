@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package qntx.sym;
+
+option go_package = "github.com/teranos/QNTX/sym/sympb";
+
+// SymbolCategory classifies symbols by their role in the system.
+enum SymbolCategory {
+  SYMBOL_CATEGORY_UNSPECIFIED = 0;
+  SYMBOL_CATEGORY_SEG_PRIMARY = 1;      // Primary SEG operators — have UI components and commands
+  SYMBOL_CATEGORY_BUILDING_BLOCK = 2;   // Attestation building blocks — structural, not UI elements
+  SYMBOL_CATEGORY_SYSTEM = 3;           // System infrastructure markers
+}
+
+// Symbol identifies a canonical QNTX symbol.
+//
+// Each symbol has three layers (SEG model):
+//   seg — the grammatical unit (what it IS)
+//   sym — the visual expression (how it LOOKS)
+//   glyph — the interactive manifestation (how you INTERACT with it)
+//
+// The glyph value (Unicode visual) is encoded in each variant's comment
+// as the source of truth for all code generation targets.
+enum Symbol {
+  SYMBOL_UNSPECIFIED = 0;
+
+  // ---- Primary SEG operators ----
+  // These have UI components, keyboard shortcuts, and CLI commands.
+
+  SYMBOL_I = 1;    // glyph:"⍟" command:"i"  — Self: your vantage point into QNTX
+  SYMBOL_AM = 2;   // glyph:"≡" command:"am" — Configuration: system settings and state
+  SYMBOL_IX = 3;   // glyph:"⨳" command:"ix" — Ingest: import external data
+  SYMBOL_AX = 4;   // glyph:"⋈" command:"ax" — Expand: query and surface related context
+  SYMBOL_BY = 5;   // glyph:"⌬" command:"by" — Actor: origin of action (creator, source, user)
+  SYMBOL_AT = 6;   // glyph:"✦" command:"at" — Temporal: time marker/moment
+  SYMBOL_SO = 7;   // glyph:"⟶" command:"so" — Therefore: consequent action/trigger
+  SYMBOL_SE = 8;   // glyph:"⊨" command:"se" — Semantic: meaning-based search and entailment
+
+  // ---- Attestation building blocks ----
+  // Fundamental components of the attestation pattern:
+  // "subject IS predicate OF context BY actor AT time"
+
+  SYMBOL_AS = 9;   // glyph:"+" command:"as" — Assert: emit an attestation
+  SYMBOL_IS = 10;  // glyph:"=" command:"is" — Identity: subject/equivalence in attestations
+  SYMBOL_OF = 11;  // glyph:"∈" command:"of" — Membership: element-of/belonging in attestations
+
+  // ---- System infrastructure ----
+
+  SYMBOL_PULSE = 12;       // glyph:"꩜" — Async jobs, rate limiting, budget management
+  SYMBOL_PULSE_OPEN = 13;  // glyph:"✿" — Graceful startup with orphaned job recovery
+  SYMBOL_PULSE_CLOSE = 14; // glyph:"❀" — Graceful shutdown with checkpoint preservation
+  SYMBOL_DB = 15;          // glyph:"⊔" — Database/storage layer
+  SYMBOL_PROSE = 16;       // glyph:"▣" — Documentation and prose content
+  SYMBOL_DOC = 17;         // glyph:"▤" — Document/file content (PDF, etc.)
+  SYMBOL_SUBCANVAS = 18;   // glyph:"⌗" — Nested canvas workspace
+}
+
+// SymbolDef carries the full metadata for a single symbol.
+// Used for runtime symbol registries and cross-language lookup tables.
+message SymbolDef {
+  Symbol symbol = 1;
+  string glyph = 2;              // Unicode visual expression (e.g. "⍟")
+  string command = 3;            // Text command name (e.g. "i"), empty for system symbols
+  string label = 4;              // Short label (e.g. "Self", "Ingest")
+  string description = 5;       // Full description (e.g. "Your vantage point into QNTX")
+  SymbolCategory category = 6;
+  int32 palette_position = 7;   // Position in UI palette (0 = not in palette)
+}
+
+// SymbolRegistry is a collection of symbol definitions.
+// Transmitted as a single message for bulk operations (e.g. initial sync).
+message SymbolRegistry {
+  repeated SymbolDef symbols = 1;
+}

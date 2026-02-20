@@ -2,6 +2,8 @@
 
 Canonical symbols for QNTX SEG operations and system markers.
 
+**Source of truth:** [`proto/sym.proto`](../proto/sym.proto). The proto enum defines which symbols exist; Go, Rust, and TypeScript types are generated from it.
+
 ## Why Symbols?
 
 **Visual grep.** Scan code, UI, or logs and instantly know which domain you're in. Symbols are stable across CLI, web UI, and documentation.
