@@ -415,6 +415,88 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// EmbeddingsBySourceRequest represents a request for embeddings by source IDs
+type EmbeddingsBySourceRequest struct {
+	SourceIDs []string `json:"source_ids"`
+}
+
+// EmbeddingsBySourceEntry represents a single embedding in the response
+type EmbeddingsBySourceEntry struct {
+	SourceID   string    `json:"source_id"`
+	Vector     []float32 `json:"vector"`
+	Model      string    `json:"model"`
+	Dimensions int       `json:"dimensions"`
+}
+
+// EmbeddingsBySourceResponse represents the response for embeddings by source
+type EmbeddingsBySourceResponse struct {
+	Embeddings []EmbeddingsBySourceEntry `json:"embeddings"`
+}
+
+// HandleEmbeddingsBySource returns embeddings for the given attestation source IDs.
+// POST /api/embeddings/by-source
+func (s *QNTXServer) HandleEmbeddingsBySource(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.embeddingStore == nil || s.embeddingService == nil {
+		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	var req EmbeddingsBySourceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.SourceIDs) == 0 {
+		http.Error(w, "source_ids field is required", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.SourceIDs) > 500 {
+		http.Error(w, "Maximum 500 source_ids per request", http.StatusBadRequest)
+		return
+	}
+
+	models, err := s.embeddingStore.GetBySourceIDs(req.SourceIDs)
+	if err != nil {
+		s.logger.Errorw("Failed to get embeddings by source IDs",
+			"count", len(req.SourceIDs),
+			"error", err)
+		http.Error(w, "Failed to retrieve embeddings", http.StatusInternalServerError)
+		return
+	}
+
+	entries := make([]EmbeddingsBySourceEntry, 0, len(models))
+	for _, m := range models {
+		vec, err := s.embeddingService.DeserializeEmbedding(m.Embedding)
+		if err != nil {
+			s.logger.Warnw("Failed to deserialize embedding",
+				"source_id", m.SourceID,
+				"error", err)
+			continue
+		}
+		entries = append(entries, EmbeddingsBySourceEntry{
+			SourceID:   m.SourceID,
+			Vector:     vec,
+			Model:      m.Model,
+			Dimensions: m.Dimensions,
+		})
+	}
+
+	resp := EmbeddingsBySourceResponse{Embeddings: entries}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		s.logger.Errorw("Failed to encode embeddings by-source response",
+			"count", len(entries),
+			"error", err)
+	}
+}
+
 // EmbeddingInfoResponse represents embedding service status
 type EmbeddingInfoResponse struct {
 	Available        bool                    `json:"available"`

@@ -34,6 +34,22 @@ export function classify_claims(input) {
 }
 
 /**
+ * Compute cosine similarity between two f32 vectors.
+ * Uses typed arrays directly from JavaScript (no JSON overhead).
+ * @param {Float32Array} query
+ * @param {Float32Array} candidate
+ * @returns {number}
+ */
+export function cosine_similarity_f32(query, candidate) {
+    const ptr0 = passArrayF32ToWasm0(query, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF32ToWasm0(candidate, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ret = wasm.cosine_similarity_f32(ptr0, len0, ptr1, len1);
+    return ret;
+}
+
+/**
  * Delete an attestation by ID from IndexedDB.
  * Returns a Promise that resolves to true if deleted, false if not found.
  * @param {string} id
@@ -249,7 +265,11 @@ export function query_attestations(filter_json) {
 
 /**
  * Compute content hash for an attestation.
+<<<<<<< HEAD
  * Input: JSON-serialized proto Attestation (attributes as JSON object)
+=======
+ * Input: JSON-serialized proto Attestation
+>>>>>>> dc6606c4... Browser attestation sync and offline semantic search
  * Returns: `{"hash":"<64-char hex>"}` or `{"error":"..."}`
  * @param {string} attestation_json
  * @returns {string}
@@ -841,6 +861,14 @@ function getDataViewMemory0() {
     return cachedDataViewMemory0;
 }
 
+let cachedFloat32ArrayMemory0 = null;
+function getFloat32ArrayMemory0() {
+    if (cachedFloat32ArrayMemory0 === null || cachedFloat32ArrayMemory0.byteLength === 0) {
+        cachedFloat32ArrayMemory0 = new Float32Array(wasm.memory.buffer);
+    }
+    return cachedFloat32ArrayMemory0;
+}
+
 function getStringFromWasm0(ptr, len) {
     ptr = ptr >>> 0;
     return decodeText(ptr, len);
@@ -893,6 +921,13 @@ function makeMutClosure(arg0, arg1, dtor, f) {
     };
     CLOSURE_DTORS.register(real, state, state);
     return real;
+}
+
+function passArrayF32ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 4, 4) >>> 0;
+    getFloat32ArrayMemory0().set(arg, ptr / 4);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
 }
 
 function passStringToWasm0(arg, malloc, realloc) {
@@ -972,6 +1007,7 @@ function __wbg_finalize_init(instance, module) {
     wasm = instance.exports;
     wasmModule = module;
     cachedDataViewMemory0 = null;
+    cachedFloat32ArrayMemory0 = null;
     cachedUint8ArrayMemory0 = null;
     wasm.__wbindgen_start();
     return wasm;
