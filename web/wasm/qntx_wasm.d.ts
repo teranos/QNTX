@@ -33,21 +33,21 @@ export function exists_attestation(id: string): Promise<boolean>;
 
 /**
  * Rebuild the fuzzy search index from current IndexedDB vocabulary.
- * Pulls distinct predicates and contexts from the attestation store.
- * Returns JSON: {"predicates": N, "contexts": N, "hash": "..."}
+ * Pulls distinct subjects, predicates, contexts, and actors from the attestation store.
+ * Returns JSON: {"subjects": N, "predicates": N, "contexts": N, "actors": N, "hash": "..."}
  */
 export function fuzzy_rebuild_index(): Promise<string>;
 
 /**
  * Search the fuzzy index for matching vocabulary.
- * vocab_type: "predicates" or "contexts"
+ * vocab_type: "subjects", "predicates", "contexts", or "actors"
  * Returns JSON array: [{"value":"...", "score":0.95, "strategy":"exact"}, ...]
  */
 export function fuzzy_search(query: string, vocab_type: string, limit: number, min_score: number): string;
 
 /**
  * Get fuzzy engine status.
- * Returns JSON: {"ready": bool, "predicates": N, "contexts": N, "hash": "..."}
+ * Returns JSON: {"ready": bool, "subjects": N, "predicates": N, "contexts": N, "actors": N, "hash": "..."}
  */
 export function fuzzy_status(): string;
 
@@ -59,6 +59,16 @@ export function fuzzy_status(): string;
  * Converts from internal core::Attestation format before serialization.
  */
 export function get_attestation(id: string): Promise<string | undefined>;
+
+/**
+ * Get context-aware completions for a partial AX query.
+ *
+ * Parses the partial query to determine which AX slot the cursor is in,
+ * then fuzzy-matches the trailing word against the appropriate vocabulary.
+ *
+ * Returns JSON: `{"slot":"predicates","prefix":"auth","items":[{"value":"...","score":0.95,"strategy":"exact"},...]}`
+ */
+export function get_completions(partial_query: string, limit: number): string;
 
 /**
  * Initialize the IndexedDB store. Must be called before any storage operations.
@@ -170,6 +180,7 @@ export interface InitOutput {
     readonly fuzzy_search: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly fuzzy_status: () => [number, number];
     readonly get_attestation: (a: number, b: number) => any;
+    readonly get_completions: (a: number, b: number, c: number) => [number, number];
     readonly init_store: (a: number, b: number) => any;
     readonly is_store_initialized: () => number;
     readonly list_attestation_ids: () => any;

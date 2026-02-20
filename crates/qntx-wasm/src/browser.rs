@@ -15,7 +15,7 @@
 //! - Converted to qntx_core::Attestation for internal storage operations
 
 use qntx_core::fuzzy::{FuzzyEngine, VocabularyType};
-use qntx_core::parser::Parser;
+use qntx_core::parser::{Lexer, Parser, TokenKind};
 use qntx_indexeddb::IndexedDbStore;
 use qntx_proto::Attestation as ProtoAttestation;
 use std::cell::RefCell;
@@ -211,11 +211,15 @@ pub async fn list_attestation_ids() -> Result<String, JsValue> {
 // ============================================================================
 
 /// Rebuild the fuzzy search index from current IndexedDB vocabulary.
-/// Pulls distinct predicates and contexts from the attestation store.
-/// Returns JSON: {"predicates": N, "contexts": N, "hash": "..."}
+/// Pulls distinct subjects, predicates, contexts, and actors from the attestation store.
+/// Returns JSON: {"subjects": N, "predicates": N, "contexts": N, "actors": N, "hash": "..."}
 #[wasm_bindgen]
 pub async fn fuzzy_rebuild_index() -> Result<String, JsValue> {
     let store = get_store();
+
+    let subjects = store.subjects().await.map_err(|e| {
+        JsValue::from_str(&format!("Failed to load subjects from IndexedDB: {:?}", e))
+    })?;
 
     let predicates = store.predicates().await.map_err(|e| {
         JsValue::from_str(&format!(
@@ -228,17 +232,23 @@ pub async fn fuzzy_rebuild_index() -> Result<String, JsValue> {
         JsValue::from_str(&format!("Failed to load contexts from IndexedDB: {:?}", e))
     })?;
 
-    let (pred_count, ctx_count, hash) =
-        FUZZY.with(|f| f.borrow_mut().rebuild_index(predicates, contexts));
+    let actors = store.actors().await.map_err(|e| {
+        JsValue::from_str(&format!("Failed to load actors from IndexedDB: {:?}", e))
+    })?;
+
+    let (sub_count, pred_count, ctx_count, act_count, hash) = FUZZY.with(|f| {
+        f.borrow_mut()
+            .rebuild_index(subjects, predicates, contexts, actors)
+    });
 
     Ok(format!(
-        r#"{{"predicates":{},"contexts":{},"hash":"{}"}}"#,
-        pred_count, ctx_count, hash
+        r#"{{"subjects":{},"predicates":{},"contexts":{},"actors":{},"hash":"{}"}}"#,
+        sub_count, pred_count, ctx_count, act_count, hash
     ))
 }
 
 /// Search the fuzzy index for matching vocabulary.
-/// vocab_type: "predicates" or "contexts"
+/// vocab_type: "subjects", "predicates", "contexts", or "actors"
 /// Returns JSON array: [{"value":"...", "score":0.95, "strategy":"exact"}, ...]
 #[wasm_bindgen]
 pub fn fuzzy_search(
@@ -248,13 +258,15 @@ pub fn fuzzy_search(
     min_score: f64,
 ) -> Result<String, JsValue> {
     let vtype = match vocab_type {
+        "subjects" => VocabularyType::Subjects,
         "predicates" => VocabularyType::Predicates,
         "contexts" => VocabularyType::Contexts,
+        "actors" => VocabularyType::Actors,
         _ => {
             return Err(JsValue::from_str(&format!(
-                "Invalid vocab_type '{}', expected 'predicates' or 'contexts'",
-                vocab_type
-            )))
+            "Invalid vocab_type '{}', expected 'subjects', 'predicates', 'contexts', or 'actors'",
+            vocab_type
+        )))
         }
     };
 
@@ -265,20 +277,116 @@ pub fn fuzzy_search(
 }
 
 /// Get fuzzy engine status.
-/// Returns JSON: {"ready": bool, "predicates": N, "contexts": N, "hash": "..."}
+/// Returns JSON: {"ready": bool, "subjects": N, "predicates": N, "contexts": N, "actors": N, "hash": "..."}
 #[wasm_bindgen]
 pub fn fuzzy_status() -> String {
     FUZZY.with(|f| {
         let engine = f.borrow();
-        let (pred_count, ctx_count) = engine.get_counts();
+        let (sub_count, pred_count, ctx_count, act_count) = engine.get_counts();
         format!(
-            r#"{{"ready":{},"predicates":{},"contexts":{},"hash":"{}"}}"#,
+            r#"{{"ready":{},"subjects":{},"predicates":{},"contexts":{},"actors":{},"hash":"{}"}}"#,
             engine.is_ready(),
+            sub_count,
             pred_count,
             ctx_count,
+            act_count,
             engine.get_index_hash()
         )
     })
+}
+
+// ============================================================================
+// Completions (parser-aware fuzzy matching)
+// ============================================================================
+
+/// Get context-aware completions for a partial AX query.
+///
+/// Parses the partial query to determine which AX slot the cursor is in,
+/// then fuzzy-matches the trailing word against the appropriate vocabulary.
+///
+/// Returns JSON: `{"slot":"predicates","prefix":"auth","items":[{"value":"...","score":0.95,"strategy":"exact"},...]}`
+#[wasm_bindgen]
+pub fn get_completions(partial_query: &str, limit: usize) -> String {
+    let trimmed = partial_query.trim();
+    if trimmed.is_empty() {
+        return r#"{"slot":"subjects","prefix":"","items":[]}"#.to_string();
+    }
+
+    // Determine which slot we're completing and what the prefix is.
+    // Strategy: scan tokens to find the last keyword, which tells us the slot.
+    // The trailing partial word (if not a keyword) is the prefix to fuzzy-match.
+    let (slot, prefix) = infer_completion_slot(trimmed);
+
+    let vocab_type = match slot {
+        "subjects" => VocabularyType::Subjects,
+        "predicates" => VocabularyType::Predicates,
+        "contexts" => VocabularyType::Contexts,
+        "actors" => VocabularyType::Actors,
+        _ => VocabularyType::Subjects,
+    };
+
+    let items = if prefix.is_empty() {
+        Vec::new()
+    } else {
+        FUZZY.with(|f| f.borrow().find_matches(&prefix, vocab_type, limit, 0.3))
+    };
+
+    match serde_json::to_string(&items) {
+        Ok(items_json) => format!(
+            r#"{{"slot":"{}","prefix":"{}","items":{}}}"#,
+            slot,
+            prefix.replace('"', "\\\""),
+            items_json
+        ),
+        Err(e) => format!(r#"{{"error":"serialization failed: {}"}}"#, e),
+    }
+}
+
+/// Determine the AX slot and prefix from a partial query string.
+///
+/// Walks tokens left-to-right. The last keyword (`is`/`are` → predicates,
+/// `of`/`from` → contexts, `by`/`via` → actors) determines the slot.
+/// No keyword means subjects. The final word (if not a keyword) is the prefix.
+fn infer_completion_slot(input: &str) -> (&'static str, String) {
+    let mut slot = "subjects";
+    let mut last_word = String::new();
+    let mut ends_with_keyword = false;
+
+    for token in Lexer::new(input) {
+        ends_with_keyword = false;
+
+        match token.kind {
+            TokenKind::Is | TokenKind::Are => {
+                slot = "predicates";
+                last_word.clear();
+                ends_with_keyword = true;
+            }
+            TokenKind::Of | TokenKind::From => {
+                slot = "contexts";
+                last_word.clear();
+                ends_with_keyword = true;
+            }
+            TokenKind::By | TokenKind::Via => {
+                slot = "actors";
+                last_word.clear();
+                ends_with_keyword = true;
+            }
+            TokenKind::Identifier | TokenKind::QuotedString => {
+                last_word = token.text.to_string();
+            }
+            TokenKind::Eof => break,
+            _ => {}
+        }
+    }
+
+    // If query ends with trailing whitespace after a keyword, the user hasn't
+    // started typing the next word yet — return empty prefix so the UI can
+    // show a placeholder like "type a predicate...".
+    if ends_with_keyword && input.ends_with(' ') {
+        return (slot, String::new());
+    }
+
+    (slot, last_word)
 }
 
 // ============================================================================
