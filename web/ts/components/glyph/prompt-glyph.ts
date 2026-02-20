@@ -311,10 +311,10 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
                 actors: ['glyph:' + glyph.id],
                 timestamp: Math.floor(Date.now() / 1000),
                 source: 'prompt-direct',
-                attributes: JSON.stringify({
+                attributes: {
                     response: data.response ?? '',
                     template: promptBody,
-                }),
+                },
                 created_at: Math.floor(Date.now() / 1000),
             };
 

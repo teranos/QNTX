@@ -14,6 +14,9 @@ pub mod protocol {
 // Re-export commonly used types at crate root for convenience
 pub use protocol::*;
 
+// Custom serde for prost_types::Struct ↔ JSON object
+pub mod serde_struct;
+
 // Proto conversion utilities for attestations
 pub mod proto_convert;
 

@@ -12,7 +12,7 @@ mod tests {
             actors: vec![],
             timestamp: 1234567890,
             source: "test".to_string(),
-            attributes: "{}".to_string(), // Changed from attributes_json
+            attributes: None,
             created_at: 1234567890,
         };
 

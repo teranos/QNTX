@@ -11,7 +11,7 @@
 //!
 //! This module implements proto conversion at the WASM↔TypeScript boundary:
 //! - TypeScript uses proto-generated `Attestation` interface
-//! - JSON matches proto schema (timestamps as numbers, attributes as string)
+//! - JSON matches proto schema (timestamps as numbers, attributes as object)
 //! - Converted to qntx_core::Attestation for internal storage operations
 
 use qntx_core::fuzzy::{FuzzyEngine, VocabularyType};
@@ -100,7 +100,7 @@ pub fn parse_query(input: &str) -> String {
 /// Store an attestation in IndexedDB.
 /// Returns a Promise that resolves to null on success or error message on failure.
 ///
-/// Expects JSON matching proto schema (timestamps as numbers, attributes as JSON string).
+/// Expects JSON matching proto schema (timestamps as numbers, attributes as JSON object).
 /// Converts to internal core::Attestation format before storage.
 #[wasm_bindgen]
 pub async fn put_attestation(json: &str) -> Result<(), JsValue> {
@@ -123,7 +123,7 @@ pub async fn put_attestation(json: &str) -> Result<(), JsValue> {
 /// Retrieve an attestation by ID from IndexedDB.
 /// Returns a Promise that resolves to JSON-serialized attestation or null if not found.
 ///
-/// Returns JSON matching proto schema (timestamps as numbers, attributes as JSON string).
+/// Returns JSON matching proto schema (timestamps as numbers, attributes as JSON object).
 /// Converts from internal core::Attestation format before serialization.
 #[wasm_bindgen]
 pub async fn get_attestation(id: &str) -> Result<Option<String>, JsValue> {
@@ -309,7 +309,7 @@ pub fn classify_claims(input: &str) -> String {
 // ============================================================================
 
 /// Compute content hash for an attestation.
-/// Input: JSON-serialized proto Attestation
+/// Input: JSON-serialized proto Attestation (attributes as JSON object)
 /// Returns: `{"hash":"<64-char hex>"}` or `{"error":"..."}`
 #[wasm_bindgen]
 pub fn sync_content_hash(attestation_json: &str) -> String {

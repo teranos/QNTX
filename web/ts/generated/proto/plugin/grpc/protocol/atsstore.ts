@@ -18,8 +18,9 @@ export interface Attestation {
   /** Unix timestamp in milliseconds */
   timestamp: number;
   source: string;
-  /** map[string]interface{} as JSON string */
-  attributes: string;
+  attributes:
+    | { [key: string]: any }
+    | undefined;
   /** Unix timestamp in milliseconds */
   created_at: number;
 }
@@ -31,11 +32,8 @@ export interface AttestationCommand {
   contexts: string[];
   actors: string[];
   /** Unix timestamp in milliseconds. If not set, server uses current time. */
-  timestamp?:
-    | number
-    | undefined;
-  /** JSON-encoded map[string]interface{} */
-  attributes_json: string;
+  timestamp?: number | undefined;
+  attributes: { [key: string]: any } | undefined;
 }
 
 /** AttestationFilter for querying attestations */

@@ -1,24 +1,14 @@
 //! Proto type conversion utilities
 //!
-//! PROTO MIGRATION NOTE (see ADR-006):
-//! This module demonstrates using proto-generated types from qntx-proto
-//! as the canonical source of truth for type definitions. We convert
-//! between proto types and internal representations as needed.
-//!
-//! Benefits of using proto types directly:
-//! - Single source of truth across Go, Rust, and TypeScript
-//! - No heavy gRPC dependencies (qntx-proto is types-only)
-//! - Automatic serialization with serde support
-//!
-//! This is part of the gradual migration from typegen to proto.
+//! Converts between proto-generated types (prost + custom serde) and
+//! qntx_core internal types. The proto types use google.protobuf.Struct
+//! for attributes; core types use HashMap<String, serde_json::Value>.
 
+use crate::serde_struct;
 use crate::Attestation as ProtoAttestation;
 use qntx_core::attestation::Attestation as CoreAttestation;
 
 /// Convert a proto Attestation to core Attestation
-///
-/// This demonstrates the proto → internal type conversion pattern.
-/// As we migrate fully to proto, this conversion layer will become unnecessary.
 pub fn from_proto(proto: ProtoAttestation) -> CoreAttestation {
     CoreAttestation {
         id: proto.id,
@@ -28,17 +18,23 @@ pub fn from_proto(proto: ProtoAttestation) -> CoreAttestation {
         actors: proto.actors,
         timestamp: proto.timestamp,
         source: proto.source,
-        // Proto uses JSON string, core uses HashMap
-        attributes: serde_json::from_str(&proto.attributes).unwrap_or_default(),
+        attributes: proto
+            .attributes
+            .as_ref()
+            .map(serde_struct::struct_to_json_map)
+            .unwrap_or_default(),
         created_at: proto.created_at,
     }
 }
 
 /// Convert a core Attestation to proto Attestation
-///
-/// This demonstrates the internal → proto type conversion pattern.
-/// Proto types are used for wire format and cross-language compatibility.
 pub fn to_proto(core: CoreAttestation) -> ProtoAttestation {
+    let attributes = if core.attributes.is_empty() {
+        None
+    } else {
+        Some(serde_struct::json_map_to_struct(&core.attributes))
+    };
+
     ProtoAttestation {
         id: core.id,
         subjects: core.subjects,
@@ -47,8 +43,7 @@ pub fn to_proto(core: CoreAttestation) -> ProtoAttestation {
         actors: core.actors,
         timestamp: core.timestamp,
         source: core.source,
-        // Core uses HashMap, proto uses JSON string
-        attributes: serde_json::to_string(&core.attributes).unwrap_or_else(|_| "{}".to_string()),
+        attributes,
         created_at: core.created_at,
     }
 }
@@ -60,9 +55,9 @@ mod tests {
 
     #[test]
     fn test_proto_roundtrip() {
-        // Create a core attestation
         let mut attributes = HashMap::new();
         attributes.insert("key".to_string(), serde_json::json!("value"));
+        attributes.insert("count".to_string(), serde_json::json!(42));
 
         let core = CoreAttestation {
             id: "test-123".to_string(),
@@ -70,28 +65,29 @@ mod tests {
             predicates: vec!["created".to_string()],
             contexts: vec!["test".to_string()],
             actors: vec!["system".to_string()],
-            timestamp: 1234567890, // Unix timestamp
+            timestamp: 1234567890,
             source: "test".to_string(),
             attributes,
-            created_at: 1234567890, // Unix timestamp
+            created_at: 1234567890,
         };
 
-        // Convert to proto and back
         let proto = to_proto(core.clone());
         let back = from_proto(proto);
 
-        // Check key fields match
         assert_eq!(back.id, core.id);
         assert_eq!(back.subjects, core.subjects);
         assert_eq!(back.predicates, core.predicates);
         assert_eq!(back.timestamp, core.timestamp);
         assert_eq!(back.created_at, core.created_at);
+        assert_eq!(back.attributes["key"], "value");
+        // f64 roundtrip: integer becomes float in protobuf Struct
+        assert_eq!(back.attributes["count"], 42.0);
     }
 
     #[test]
-    fn test_proto_json_format_matches_typescript_expectations() {
-        // CRITICAL: This test validates the JSON format matches what TypeScript expects
-        // at the WASM→TypeScript boundary (web/ts/qntx-wasm.ts uses proto-generated types)
+    fn test_proto_json_attributes_are_object() {
+        // With google.protobuf.Struct + custom serde, attributes serialize as a
+        // plain JSON object — NOT a JSON string. This prevents double-encoding.
         let mut attributes = HashMap::new();
         attributes.insert("status".to_string(), serde_json::json!("active"));
         attributes.insert("count".to_string(), serde_json::json!(42));
@@ -102,47 +98,71 @@ mod tests {
             predicates: vec!["logged_in".to_string()],
             contexts: vec!["web_app".to_string()],
             actors: vec!["auth_service".to_string()],
-            timestamp: 1704067200, // 2024-01-01 00:00:00 UTC
+            timestamp: 1704067200,
             source: "wasm_boundary_test".to_string(),
             attributes,
             created_at: 1704067200,
         };
 
-        // Convert to proto and serialize to JSON (what WASM does)
         let proto = to_proto(core);
         let json = serde_json::to_string(&proto).expect("serialization should succeed");
-
-        // Parse as JSON value to inspect structure
         let parsed: serde_json::Value = serde_json::from_str(&json).expect("should be valid JSON");
 
-        // CRITICAL: Timestamps must be numbers (i64), NOT ISO strings
+        // Attributes must be a JSON object, not a string
         assert!(
-            parsed["timestamp"].is_i64(),
-            "timestamp must be a number for TypeScript compatibility"
+            parsed["attributes"].is_object(),
+            "attributes must be a JSON object, got: {}",
+            parsed["attributes"]
         );
+        assert_eq!(parsed["attributes"]["status"], "active");
+        assert_eq!(parsed["attributes"]["count"], 42.0);
+
+        // Timestamps remain numbers
+        assert!(parsed["timestamp"].is_i64());
         assert_eq!(parsed["timestamp"].as_i64().unwrap(), 1704067200);
-        assert!(
-            parsed["created_at"].is_i64(),
-            "created_at must be a number for TypeScript compatibility"
-        );
+    }
 
-        // CRITICAL: Attributes must be a JSON string, NOT an object
-        assert!(
-            parsed["attributes"].is_string(),
-            "attributes must be a JSON string (proto schema requirement)"
-        );
-        let attributes_json = parsed["attributes"].as_str().unwrap();
-        let attributes_parsed: serde_json::Value =
-            serde_json::from_str(attributes_json).expect("attributes should contain valid JSON");
-        assert_eq!(attributes_parsed["status"], "active");
-        assert_eq!(attributes_parsed["count"], 42);
+    #[test]
+    fn test_empty_attributes_roundtrip() {
+        let core = CoreAttestation {
+            id: "test-empty".to_string(),
+            subjects: vec!["s".to_string()],
+            predicates: vec!["p".to_string()],
+            contexts: vec!["c".to_string()],
+            actors: vec!["a".to_string()],
+            timestamp: 1000,
+            source: "test".to_string(),
+            attributes: HashMap::new(),
+            created_at: 0,
+        };
 
-        // Verify all required fields are present
-        assert_eq!(parsed["id"].as_str().unwrap(), "AS-boundary-test");
-        assert_eq!(parsed["subjects"].as_array().unwrap().len(), 1);
-        assert_eq!(parsed["predicates"].as_array().unwrap().len(), 1);
-        assert_eq!(parsed["contexts"].as_array().unwrap().len(), 1);
-        assert_eq!(parsed["actors"].as_array().unwrap().len(), 1);
-        assert_eq!(parsed["source"].as_str().unwrap(), "wasm_boundary_test");
+        let proto = to_proto(core.clone());
+        assert!(proto.attributes.is_none());
+
+        let back = from_proto(proto);
+        assert!(back.attributes.is_empty());
+    }
+
+    #[test]
+    fn test_json_deserialize_with_object_attributes() {
+        // Simulate JSON coming from TypeScript with attributes as plain object
+        let json = r#"{
+            "id": "AS-from-ts",
+            "subjects": ["USER-1"],
+            "predicates": ["active"],
+            "contexts": ["web"],
+            "actors": ["system"],
+            "timestamp": 1000,
+            "source": "browser",
+            "attributes": {"theme": "dark", "version": 2},
+            "created_at": 2000
+        }"#;
+
+        let proto: ProtoAttestation =
+            serde_json::from_str(json).expect("should deserialize with object attributes");
+        let core = from_proto(proto);
+
+        assert_eq!(core.attributes["theme"], "dark");
+        assert_eq!(core.attributes["version"], 2.0);
     }
 }
