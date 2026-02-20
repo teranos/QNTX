@@ -15,11 +15,11 @@ import type {
     SystemCapabilitiesMessage,
     DatabaseStatsMessage,
     SyncStatusMessage,
-    RichSearchResultsMessage,
     WatcherMatchMessage,
     WatcherErrorMessage,
     GlyphFiredMessage,
 } from '../types/websocket';
+import type { RichSearchResultsMessage } from './generated/proto/plugin/grpc/protocol/server.ts';
 import { handleJobNotification, notifyStorageWarning, handleDaemonStatusNotification } from './tauri-notifications';
 import { handlePluginHealth } from './websocket-handlers/plugin-health';
 import { handleSystemCapabilities } from './websocket-handlers/system-capabilities';
