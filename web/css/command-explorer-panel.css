@@ -184,9 +184,8 @@
     border: var(--panel-border);
     border-radius: 2px;
     display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 /* TODO: Add styles for action buttons within command items (retry, stop, view details)

@@ -308,9 +308,8 @@ function renderAttestation(attestation: Attestation): HTMLElement {
     text.style.fontSize = '11px';
     text.style.color = '#d4f0d4'; // 20% greener and whiter
     text.style.fontFamily = 'monospace';
-    text.style.whiteSpace = 'nowrap';
-    text.style.overflow = 'hidden';
-    text.style.textOverflow = 'ellipsis';
+    text.style.wordBreak = 'break-word';
+    text.style.overflowWrap = 'break-word';
 
     // Build formatted text with darker keywords (textContent per span to prevent XSS)
     const subjectSpan = document.createElement('span');
