@@ -55,7 +55,7 @@ export function fuzzy_status(): string;
  * Retrieve an attestation by ID from IndexedDB.
  * Returns a Promise that resolves to JSON-serialized attestation or null if not found.
  *
- * Returns JSON matching proto schema (timestamps as numbers, attributes as JSON string).
+ * Returns JSON matching proto schema (timestamps as numbers, attributes as JSON object).
  * Converts from internal core::Attestation format before serialization.
  */
 export function get_attestation(id: string): Promise<string | undefined>;
@@ -99,7 +99,7 @@ export function parse_query(input: string): string;
  * Store an attestation in IndexedDB.
  * Returns a Promise that resolves to null on success or error message on failure.
  *
- * Expects JSON matching proto schema (timestamps as numbers, attributes as JSON string).
+ * Expects JSON matching proto schema (timestamps as numbers, attributes as JSON object).
  * Converts to internal core::Attestation format before storage.
  */
 export function put_attestation(json: string): Promise<void>;
@@ -112,7 +112,7 @@ export function query_attestations(filter_json: string): Promise<string>;
 
 /**
  * Compute content hash for an attestation.
- * Input: JSON-serialized proto Attestation
+ * Input: JSON-serialized proto Attestation (attributes as JSON object)
  * Returns: `{"hash":"<64-char hex>"}` or `{"error":"..."}`
  */
 export function sync_content_hash(attestation_json: string): string;

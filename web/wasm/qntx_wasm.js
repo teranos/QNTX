@@ -125,7 +125,7 @@ export function fuzzy_status() {
  * Retrieve an attestation by ID from IndexedDB.
  * Returns a Promise that resolves to JSON-serialized attestation or null if not found.
  *
- * Returns JSON matching proto schema (timestamps as numbers, attributes as JSON string).
+ * Returns JSON matching proto schema (timestamps as numbers, attributes as JSON object).
  * Converts from internal core::Attestation format before serialization.
  * @param {string} id
  * @returns {Promise<string | undefined>}
@@ -222,7 +222,7 @@ export function parse_query(input) {
  * Store an attestation in IndexedDB.
  * Returns a Promise that resolves to null on success or error message on failure.
  *
- * Expects JSON matching proto schema (timestamps as numbers, attributes as JSON string).
+ * Expects JSON matching proto schema (timestamps as numbers, attributes as JSON object).
  * Converts to internal core::Attestation format before storage.
  * @param {string} json
  * @returns {Promise<void>}
@@ -249,7 +249,7 @@ export function query_attestations(filter_json) {
 
 /**
  * Compute content hash for an attestation.
- * Input: JSON-serialized proto Attestation
+ * Input: JSON-serialized proto Attestation (attributes as JSON object)
  * Returns: `{"hash":"<64-char hex>"}` or `{"error":"..."}`
  * @param {string} attestation_json
  * @returns {string}
@@ -703,17 +703,17 @@ function __wbg_get_imports() {
             return ret;
         }, arguments); },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { dtor_idx: 101, function: Function { arguments: [NamedExternref("Event")], shim_idx: 102, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { dtor_idx: 102, function: Function { arguments: [NamedExternref("Event")], shim_idx: 103, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h63454322f75c3832, wasm_bindgen__convert__closures_____invoke__h857fdb0c9bdea0c8);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { dtor_idx: 101, function: Function { arguments: [NamedExternref("IDBVersionChangeEvent")], shim_idx: 102, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { dtor_idx: 102, function: Function { arguments: [NamedExternref("IDBVersionChangeEvent")], shim_idx: 103, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h63454322f75c3832, wasm_bindgen__convert__closures_____invoke__h857fdb0c9bdea0c8);
             return ret;
         },
         __wbindgen_cast_0000000000000003: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { dtor_idx: 120, function: Function { arguments: [Externref], shim_idx: 121, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { dtor_idx: 121, function: Function { arguments: [Externref], shim_idx: 122, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h622d11ff1c80a730, wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea);
             return ret;
         },
