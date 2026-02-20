@@ -4,7 +4,7 @@ import { log, SEG } from './logger.ts';
 import { getStorageItem, setStorageItem } from './indexeddb-storage.ts';
 import { sendMessage } from './websocket.ts';
 import { connectivityManager } from './connectivity.ts';
-import { fuzzySearch } from './qntx-wasm.ts';
+import { getCompletions } from './qntx-wasm.ts';
 import { SearchView, STRATEGY_FUZZY, TYPE_COMMAND, TYPE_SUBCANVAS } from './search-view.ts';
 import type { SearchMatch, SearchResultsMessage } from './search-view.ts';
 import { spawnGlyphByCommand, getMatchingCommands, COMMAND_LABELS } from './components/glyph/canvas/spawn-menu.ts';
@@ -125,48 +125,37 @@ function dispatchSearch(text: string): void {
     }
 }
 
+/** Slot display labels */
+const SLOT_LABELS: Record<string, string> = {
+    subjects: 'S',
+    predicates: 'P',
+    contexts: 'C',
+    actors: 'A',
+};
+
 function searchOffline(query: string): void {
     if (!searchView) return;
 
-    const predicateMatches = fuzzySearch(query, 'predicates', 20, 0.3);
-    const contextMatches = fuzzySearch(query, 'contexts', 20, 0.3);
+    const completion = getCompletions(query, 20);
 
-    const matches: SearchMatch[] = [
-        ...predicateMatches.map(m => ({
-            node_id: '',
-            type_name: 'predicate',
-            type_label: 'P',
-            field_name: 'predicate',
-            field_value: m.value,
-            excerpt: m.value,
-            score: m.score,
-            strategy: STRATEGY_FUZZY,
-            display_label: m.value,
-            attributes: {},
-            matched_words: [],
-        })),
-        ...contextMatches.map(m => ({
-            node_id: '',
-            type_name: 'context',
-            type_label: 'C',
-            field_name: 'context',
-            field_value: m.value,
-            excerpt: m.value,
-            score: m.score,
-            strategy: STRATEGY_FUZZY,
-            display_label: m.value,
-            attributes: {},
-            matched_words: [],
-        })),
-    ];
-
-    matches.sort((a, b) => b.score - a.score);
-    const top = matches.slice(0, 20);
+    const matches: SearchMatch[] = completion.items.map(m => ({
+        node_id: '',
+        type_name: completion.slot,
+        type_label: SLOT_LABELS[completion.slot] || completion.slot,
+        field_name: completion.slot,
+        field_value: m.value,
+        excerpt: m.value,
+        score: m.score,
+        strategy: STRATEGY_FUZZY,
+        display_label: m.value,
+        attributes: {},
+        matched_words: [],
+    }));
 
     const message: SearchResultsMessage = {
         query,
-        matches: top,
-        total: top.length,
+        matches,
+        total: matches.length,
     };
 
     searchView.updateResults(message);

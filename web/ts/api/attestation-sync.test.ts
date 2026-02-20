@@ -39,6 +39,7 @@ mock.module('../qntx-wasm', () => ({
     putAttestation: async (a: unknown) => a,
     queryAttestations: () => [],
     parseQuery: () => ({ ok: false, error: 'no wasm in test' }),
+    getCompletions: () => ({ slot: 'subjects', prefix: '', items: [] }),
 }));
 
 const { syncQueue } = await import('./attestation-sync');
