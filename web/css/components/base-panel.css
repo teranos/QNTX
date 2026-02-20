@@ -14,7 +14,7 @@
   background: var(--bg-primary);
   border-right: 1px solid #ddd;
   box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
+  z-index: 10003;
   display: flex;
   flex-direction: column;
   transition: transform 0.3s ease, opacity 0.3s ease, width 0.3s ease;
@@ -37,7 +37,7 @@
   width: 100%;
   left: 0;
   right: 0;
-  z-index: 2000; /* Higher than normal panels */
+  z-index: 100000;
   border-right: none;
   box-shadow: none;
 }
@@ -55,7 +55,7 @@
   background: transparent;
   border: none;
   cursor: pointer;
-  z-index: 1001;
+  z-index: 10004;
   opacity: 0.6;
   transition: opacity 0.15s ease;
   /* Create arrow pointing right (to expand rightward) */
@@ -101,7 +101,7 @@
   width: 33.33%;
   height: 100%;
   background: rgba(0, 0, 0, 0.3);
-  z-index: 999;
+  z-index: 10002;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s ease;

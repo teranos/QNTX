@@ -117,6 +117,30 @@
     font-weight: 600;
 }
 
+/* Selected result (keyboard navigation) */
+.search-result-line.search-result-selected {
+    background: rgba(255, 255, 255, 0.08);
+    border-left-color: var(--accent-on-dark);
+}
+
+/* Command result badge */
+.search-result-line[data-result-type="command"] .search-type-badge {
+    background: rgba(210, 160, 255, 0.2);
+    color: var(--accent-lavender);
+}
+
+/* Subcanvas result badge */
+.search-result-line[data-result-type="subcanvas"] .search-type-badge {
+    background: rgba(100, 200, 150, 0.2);
+    color: var(--accent-on-dark);
+}
+
+/* Section divider between local and server results */
+.search-section-divider {
+    border-top: 1px solid var(--border-on-dark);
+    margin: 4px 8px;
+}
+
 /* No results */
 .search-no-results {
     margin-top: 50px;
