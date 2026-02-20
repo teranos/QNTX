@@ -23,7 +23,7 @@
 //!
 //! // Fuzzy search
 //! let mut engine = FuzzyEngine::new();
-//! engine.rebuild_index(vec!["author_of".into(), "maintainer_of".into()], vec![]);
+//! engine.rebuild_index(vec![], vec!["author_of".into(), "maintainer_of".into()], vec![], vec![]);
 //! let matches = engine.search_predicates("author", 10, 0.6);
 //! ```
 
@@ -48,5 +48,5 @@ pub use expand::{
     GroupInput, GroupOutput, IndividualClaim,
 };
 pub use fuzzy::{FuzzyEngine, FuzzyMatch};
-pub use parser::{AxQuery, ParseError, Parser, TemporalClause};
+pub use parser::{AxQuery, Lexer, ParseError, Parser, TemporalClause, Token, TokenKind};
 pub use storage::{AttestationStore, MemoryStore, QueryStore, StoreError};

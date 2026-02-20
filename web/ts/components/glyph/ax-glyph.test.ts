@@ -75,7 +75,8 @@ mock.module('../../qntx-wasm', () => ({
     putAttestation: async (a: unknown) => a,
     queryAttestations: () => [],
     parseQuery: () => ({ ok: false, error: 'no wasm in test' }),
-    rebuildFuzzyIndex: async () => ({ predicates: 0, contexts: 0, hash: '' }),
+    rebuildFuzzyIndex: async () => ({ subjects: 0, predicates: 0, contexts: 0, actors: 0, hash: '' }),
+    getCompletions: () => ({ slot: 'subjects', prefix: '', items: [] }),
 }));
 
 const { createAxGlyph, updateAxGlyphError } = await import('./ax-glyph');
