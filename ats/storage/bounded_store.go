@@ -53,14 +53,15 @@ func NewBoundedStoreWithConfig(db *sql.DB, logger *zap.SugaredLogger, config *Bo
 		config = DefaultBoundedStoreConfig()
 	}
 
-	// Validate config: zero or negative limits are invalid (use positive limits)
-	if config.ActorContextLimit <= 0 {
+	// Negative limits are invalid; default via am/defaults.go handles "omit = use default".
+	// Zero means zero (QNTX LAW): 0 limit = no attestations retained for that dimension.
+	if config.ActorContextLimit < 0 {
 		config.ActorContextLimit = DefaultActorContextLimit
 	}
-	if config.ActorContextsLimit <= 0 {
+	if config.ActorContextsLimit < 0 {
 		config.ActorContextsLimit = DefaultActorContextsLimit
 	}
-	if config.EntityActorsLimit <= 0 {
+	if config.EntityActorsLimit < 0 {
 		config.EntityActorsLimit = DefaultEntityActorsLimit
 	}
 
@@ -74,54 +75,54 @@ func NewBoundedStoreWithConfig(db *sql.DB, logger *zap.SugaredLogger, config *Bo
 
 // CreateAttestation inserts a new attestation into the database with quota enforcement (implements ats.AttestationStore)
 // Note: Observer notification is handled by SQLStore.CreateAttestation
-func (bs *BoundedStore) CreateAttestation(as *types.As) error {
-	if err := bs.store.CreateAttestation(as); err != nil {
+func (s *BoundedStore) CreateAttestation(as *types.As) error {
+	if err := s.store.CreateAttestation(as); err != nil {
 		return errors.Wrap(err, "failed to create attestation")
 	}
 
 	// Enforce bounded storage limits after insertion
-	bs.enforceLimits(as)
+	s.enforceLimits(as)
 
 	return nil
 }
 
 // AttestationExists checks if an attestation with the given ID exists (implements ats.AttestationStore)
-func (bs *BoundedStore) AttestationExists(asid string) bool {
-	return bs.store.AttestationExists(asid)
+func (s *BoundedStore) AttestationExists(asid string) bool {
+	return s.store.AttestationExists(asid)
 }
 
 // GenerateAndCreateAttestation generates a vanity ASID and creates a self-certifying attestation (implements ats.AttestationStore)
 // Note: Observer notification is handled by SQLStore.CreateAttestation (called internally)
-func (bs *BoundedStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As, error) {
-	return bs.store.GenerateAndCreateAttestation(cmd)
+func (s *BoundedStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As, error) {
+	return s.store.GenerateAndCreateAttestation(cmd)
 }
 
 // GetAttestations retrieves attestations based on filters (implements ats.AttestationStore)
-func (bs *BoundedStore) GetAttestations(filters ats.AttestationFilter) ([]*types.As, error) {
-	return bs.store.GetAttestations(filters)
+func (s *BoundedStore) GetAttestations(filters ats.AttestationFilter) ([]*types.As, error) {
+	return s.store.GetAttestations(filters)
 }
 
 // CreateAttestationWithLimits creates an attestation and enforces storage limits (implements ats.BoundedStore)
 // Note: Observer notification is handled by SQLStore.CreateAttestation (called internally)
-func (bs *BoundedStore) CreateAttestationWithLimits(cmd *types.AsCommand) (*types.As, error) {
+func (s *BoundedStore) CreateAttestationWithLimits(cmd *types.AsCommand) (*types.As, error) {
 	// First create the attestation (observer notification happens in SQLStore)
-	as, err := bs.store.GenerateAndCreateAttestation(cmd)
+	as, err := s.store.GenerateAndCreateAttestation(cmd)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create attestation")
 	}
 
 	// Then enforce limits synchronously to avoid database connection issues
-	bs.enforceLimits(as)
+	s.enforceLimits(as)
 
 	return as, nil
 }
 
 // GetStorageStats returns current storage statistics (implements ats.BoundedStore)
-func (bs *BoundedStore) GetStorageStats() (*ats.StorageStats, error) {
+func (s *BoundedStore) GetStorageStats() (*ats.StorageStats, error) {
 	stats := &ats.StorageStats{}
 
 	// Combine all counts into a single query to reduce database round trips
-	err := bs.db.QueryRow(queryStorageStats).Scan(
+	err := s.db.QueryRow(queryStorageStats).Scan(
 		&stats.TotalAttestations,
 		&stats.UniqueActors,
 		&stats.UniqueSubjects,

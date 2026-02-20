@@ -19,9 +19,9 @@ const (
 )
 
 // searchFuzzyWithEngine performs fuzzy matching using the WASM fuzzy engine
-func (bs *BoundedStore) searchFuzzyWithEngine(ctx context.Context, query string, limit int) ([]RichSearchMatch, error) {
-	if bs.logger != nil {
-		bs.logger.Debugw("Using WASM fuzzy engine", "query", query)
+func (s *BoundedStore) searchFuzzyWithEngine(ctx context.Context, query string, limit int) ([]RichSearchMatch, error) {
+	if s.logger != nil {
+		s.logger.Debugw("Using WASM fuzzy engine", "query", query)
 	}
 
 	engine, err := wasm.GetEngine()
@@ -30,12 +30,12 @@ func (bs *BoundedStore) searchFuzzyWithEngine(ctx context.Context, query string,
 	}
 
 	// Get dynamic fields from type definitions once at the start
-	richStringFields := bs.buildDynamicRichStringFields(ctx)
+	richStringFields := s.buildDynamicRichStringFields(ctx)
 
 	// If no rich fields are discovered, return empty results
 	if len(richStringFields) == 0 {
-		if bs.logger != nil {
-			bs.logger.Debugw("No rich string fields discovered for fuzzy search, returning empty results")
+		if s.logger != nil {
+			s.logger.Debugw("No rich string fields discovered for fuzzy search, returning empty results")
 		}
 		return []RichSearchMatch{}, nil
 	}
@@ -59,7 +59,7 @@ func (bs *BoundedStore) searchFuzzyWithEngine(ctx context.Context, query string,
 		LIMIT 500
 	`, strings.Join(whereClauses, "\n\t\t\t\tOR "))
 
-	rows, err := bs.db.QueryContext(ctx, sqlQuery)
+	rows, err := s.db.QueryContext(ctx, sqlQuery)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query attestations")
 	}
@@ -80,8 +80,8 @@ func (bs *BoundedStore) searchFuzzyWithEngine(ctx context.Context, query string,
 		)
 
 		if err := rows.Scan(&id, &subjectsJSON, &attributesJSON); err != nil {
-			if bs.logger != nil {
-				bs.logger.Warnw("Failed to scan row", "error", err)
+			if s.logger != nil {
+				s.logger.Warnw("Failed to scan row", "error", err)
 			}
 			continue
 		}
@@ -97,8 +97,8 @@ func (bs *BoundedStore) searchFuzzyWithEngine(ctx context.Context, query string,
 		}
 
 		// Debug first row
-		if rowCount == 1 && bs.logger != nil {
-			bs.logger.Debugw("First row attributes", "attributes", attributes)
+		if rowCount == 1 && s.logger != nil {
+			s.logger.Debugw("First row attributes", "attributes", attributes)
 		}
 
 		for _, nodeID := range subjects {
@@ -148,8 +148,8 @@ func (bs *BoundedStore) searchFuzzyWithEngine(ctx context.Context, query string,
 	// Check vocabulary size limit (Rust has MAX_VOCABULARY_SIZE = 100_000)
 	const maxVocabularySize = 100000
 	if len(vocabSlice) > maxVocabularySize {
-		if bs.logger != nil {
-			bs.logger.Warnw("Vocabulary size exceeds maximum, truncating",
+		if s.logger != nil {
+			s.logger.Warnw("Vocabulary size exceeds maximum, truncating",
 				"size", len(vocabSlice),
 				"max", maxVocabularySize)
 		}
@@ -162,7 +162,7 @@ func (bs *BoundedStore) searchFuzzyWithEngine(ctx context.Context, query string,
 		return nil, errors.Wrap(err, "failed to rebuild fuzzy index")
 	}
 
-	if bs.logger != nil {
+	if s.logger != nil {
 		hasCommit := false
 		for _, word := range vocabSlice {
 			if word == "commit" {
@@ -170,9 +170,9 @@ func (bs *BoundedStore) searchFuzzyWithEngine(ctx context.Context, query string,
 				break
 			}
 		}
-		bs.logger.Debugw("Vocabulary built", "rows_processed", rowCount, "vocab_size", len(vocabSlice), "has_commit", hasCommit)
+		s.logger.Debugw("Vocabulary built", "rows_processed", rowCount, "vocab_size", len(vocabSlice), "has_commit", hasCommit)
 		if len(vocabSlice) > 0 && len(vocabSlice) < 10 {
-			bs.logger.Debugw("Sample vocabulary", "words", vocabSlice)
+			s.logger.Debugw("Sample vocabulary", "words", vocabSlice)
 		}
 	}
 
@@ -192,8 +192,8 @@ func (bs *BoundedStore) searchFuzzyWithEngine(ctx context.Context, query string,
 					score float64
 				}{word: match.Value, score: match.Score})
 			}
-			if bs.logger != nil {
-				bs.logger.Debugw("Fuzzy matched word", "query_word", queryWord, "matched", fuzzyMatches[0].Value, "score", fuzzyMatches[0].Score)
+			if s.logger != nil {
+				s.logger.Debugw("Fuzzy matched word", "query_word", queryWord, "matched", fuzzyMatches[0].Value, "score", fuzzyMatches[0].Score)
 			}
 		} else {
 			if vocabulary[queryWord] {
@@ -212,8 +212,8 @@ func (bs *BoundedStore) searchFuzzyWithEngine(ctx context.Context, query string,
 	}
 
 	if len(queryWordMatches) == 0 {
-		if bs.logger != nil {
-			bs.logger.Debugw("No matches found", "query", query)
+		if s.logger != nil {
+			s.logger.Debugw("No matches found", "query", query)
 		}
 		return []RichSearchMatch{}, nil
 	}

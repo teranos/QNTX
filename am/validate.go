@@ -54,18 +54,18 @@ func (c *Config) Validate() error {
 
 	// Plugin keepalive: validate when enabled (nil = default, 0 is invalid per "zero means zero")
 	if c.Plugin.WebSocket.Keepalive.Enabled {
-		if c.Plugin.WebSocket.Keepalive.PingIntervalSecs != nil && *c.Plugin.WebSocket.Keepalive.PingIntervalSecs <= 0 {
-			return errors.Newf("plugin.websocket.keepalive.ping_interval_secs must be > 0, got %d (omit for default)", *c.Plugin.WebSocket.Keepalive.PingIntervalSecs)
+		if c.Plugin.WebSocket.Keepalive.PingIntervalSeconds != nil && *c.Plugin.WebSocket.Keepalive.PingIntervalSeconds <= 0 {
+			return errors.Newf("plugin.websocket.keepalive.ping_interval_seconds must be > 0, got %d (omit for default)", *c.Plugin.WebSocket.Keepalive.PingIntervalSeconds)
 		}
-		if c.Plugin.WebSocket.Keepalive.PongTimeoutSecs != nil && *c.Plugin.WebSocket.Keepalive.PongTimeoutSecs <= 0 {
-			return errors.Newf("plugin.websocket.keepalive.pong_timeout_secs must be > 0, got %d (omit for default)", *c.Plugin.WebSocket.Keepalive.PongTimeoutSecs)
+		if c.Plugin.WebSocket.Keepalive.PongTimeoutSeconds != nil && *c.Plugin.WebSocket.Keepalive.PongTimeoutSeconds <= 0 {
+			return errors.Newf("plugin.websocket.keepalive.pong_timeout_seconds must be > 0, got %d (omit for default)", *c.Plugin.WebSocket.Keepalive.PongTimeoutSeconds)
 		}
 		if c.Plugin.WebSocket.Keepalive.ReconnectAttempts != nil && *c.Plugin.WebSocket.Keepalive.ReconnectAttempts < 0 {
 			return errors.Newf("plugin.websocket.keepalive.reconnect_attempts must be >= 0, got %d (omit for default)", *c.Plugin.WebSocket.Keepalive.ReconnectAttempts)
 		}
 	}
 
-	// Bounded storage limits: 0 = use default (per struct docs), negative = invalid
+	// Bounded storage limits: 0 = no attestations retained (QNTX LAW: zero means zero), negative = invalid
 	if c.Database.BoundedStorage.ActorContextLimit < 0 {
 		return errors.Newf("database.bounded_storage.actor_context_limit must be >= 0, got %d", c.Database.BoundedStorage.ActorContextLimit)
 	}

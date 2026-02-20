@@ -28,7 +28,7 @@ type DatabaseConfig struct {
 }
 
 // BoundedStorageConfig configures storage limits for attestations.
-// Values <= 0 default to: ActorContextLimit=16, ActorContextsLimit=64, EntityActorsLimit=64.
+// Omit fields for defaults (16/64/64 via am/defaults.go). Zero means zero: 0 = no attestations retained.
 type BoundedStorageConfig struct {
 	ActorContextLimit  int `mapstructure:"actor_context_limit"`  // attestations per (actor, context) pair (default: 16)
 	ActorContextsLimit int `mapstructure:"actor_contexts_limit"` // contexts per actor (default: 64)
@@ -127,8 +127,8 @@ type PluginWebSocketConfig struct {
 // PluginKeepaliveConfig configures WebSocket keepalive behavior
 type PluginKeepaliveConfig struct {
 	Enabled           bool `mapstructure:"enabled"`            // Enable keepalive (default: true)
-	PingIntervalSecs  *int `mapstructure:"ping_interval_secs"` // Seconds between PING messages (nil = default 30)
-	PongTimeoutSecs   *int `mapstructure:"pong_timeout_secs"`  // Seconds to wait for PONG (nil = default 60)
+	PingIntervalSeconds *int `mapstructure:"ping_interval_seconds"` // Seconds between PING messages (nil = default 30)
+	PongTimeoutSeconds  *int `mapstructure:"pong_timeout_seconds"`  // Seconds to wait for PONG (nil = default 60)
 	ReconnectAttempts *int `mapstructure:"reconnect_attempts"` // Number of reconnect attempts (nil = default 3)
 }
 

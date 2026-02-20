@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/cmd/qntx/commands"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/plugin"
@@ -45,7 +46,7 @@ Examples:
 		// Skip for commands that don't need logging output (like 'am show')
 		if cmd.Name() != "show" {
 			if err := logger.Initialize(false); err != nil {
-				return fmt.Errorf("failed to initialize logger: %w", err)
+				return errors.Wrap(err, "failed to initialize logger")
 			}
 		}
 		return nil
