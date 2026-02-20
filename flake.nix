@@ -144,7 +144,7 @@
 
           # Hash of vendored Go dependencies (computed from go.sum)
           # To update: set to `pkgs.lib.fakeHash`, run `nix build .#qntx`, copy the hash from error
-          vendorHash = "sha256-Ix5m8m578Jj5mEUy/K1zSWy/wJK9zBO9bGHacPrwOoA=";
+          vendorHash = "sha256-8SQTmPih1ALPjFM6a6zM4o1Bfi/47H9n7NIdDqxFXg0=";
 
           # sqlite3.h needed by sqlite-vec CGO bindings (db/connection.go)
           buildInputs = [ pkgs.sqlite ];
