@@ -62,7 +62,7 @@ function buildQntxApi(outputLines: string[]) {
                 actors: opts.actors ?? ['ts-glyph'],
                 timestamp: now,
                 source: 'ts-glyph',
-                attributes: opts.attributes ? JSON.stringify(opts.attributes) : '{}',
+                attributes: opts.attributes ?? {},
                 created_at: now,
             };
 

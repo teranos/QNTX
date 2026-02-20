@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // RemoteATSStore is a gRPC client wrapper for storage.SQLStore.
@@ -57,13 +58,12 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*ty
 		Actors:     cmd.Actors,
 	}
 
-	// Marshal attributes to JSON string
-	if cmd.Attributes != nil {
-		attributesJSON, err := attributesToJSON(cmd.Attributes)
+	if len(cmd.Attributes) > 0 {
+		attrs, err := structpb.NewStruct(cmd.Attributes)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to marshal attributes")
+			return nil, errors.Wrap(err, "failed to convert attributes to Struct")
 		}
-		protoCmd.AttributesJson = attributesJSON
+		protoCmd.Attributes = attrs
 	}
 
 	if !cmd.Timestamp.IsZero() {
