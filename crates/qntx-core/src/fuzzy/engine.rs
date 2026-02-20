@@ -29,8 +29,10 @@ impl FuzzyMatch {
 /// Vocabulary type for searching
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VocabularyType {
+    Subjects,
     Predicates,
     Contexts,
+    Actors,
 }
 
 /// Engine configuration
@@ -65,10 +67,14 @@ impl Default for EngineConfig {
 /// On native with `parallel` feature, uses rayon for large vocabularies.
 /// On WASM, uses sequential matching.
 pub struct FuzzyEngine {
+    subjects: Vec<String>,
     predicates: Vec<String>,
     contexts: Vec<String>,
+    actors: Vec<String>,
+    subjects_lower: Vec<String>,
     predicates_lower: Vec<String>,
     contexts_lower: Vec<String>,
+    actors_lower: Vec<String>,
     index_hash: String,
     config: EngineConfig,
 }
@@ -88,48 +94,72 @@ impl FuzzyEngine {
     /// Create with custom configuration
     pub fn with_config(config: EngineConfig) -> Self {
         Self {
+            subjects: Vec::new(),
             predicates: Vec::new(),
             contexts: Vec::new(),
+            actors: Vec::new(),
+            subjects_lower: Vec::new(),
             predicates_lower: Vec::new(),
             contexts_lower: Vec::new(),
+            actors_lower: Vec::new(),
             index_hash: String::new(),
             config,
         }
     }
 
-    /// Rebuild the index with new vocabulary
-    /// Returns (predicate_count, context_count, hash)
+    /// Rebuild the index with new vocabulary.
+    /// Returns (subject_count, predicate_count, context_count, actor_count, hash)
     pub fn rebuild_index(
         &mut self,
+        subjects: Vec<String>,
         predicates: Vec<String>,
         contexts: Vec<String>,
-    ) -> (usize, usize, String) {
-        // Deduplicate and sort
-        let mut predicates = predicates;
-        predicates.sort();
-        predicates.dedup();
+        actors: Vec<String>,
+    ) -> (usize, usize, usize, usize, String) {
+        fn dedup_sorted(mut v: Vec<String>) -> Vec<String> {
+            v.sort();
+            v.dedup();
+            v
+        }
 
-        let mut contexts = contexts;
-        contexts.sort();
-        contexts.dedup();
+        let subjects = dedup_sorted(subjects);
+        let predicates = dedup_sorted(predicates);
+        let contexts = dedup_sorted(contexts);
+        let actors = dedup_sorted(actors);
 
         // Pre-compute lowercase versions
+        let subjects_lower: Vec<String> = subjects.iter().map(|s| s.to_lowercase()).collect();
         let predicates_lower: Vec<String> = predicates.iter().map(|s| s.to_lowercase()).collect();
         let contexts_lower: Vec<String> = contexts.iter().map(|s| s.to_lowercase()).collect();
+        let actors_lower: Vec<String> = actors.iter().map(|s| s.to_lowercase()).collect();
 
-        // Compute hash
-        let hash = self.compute_hash(&predicates, &contexts);
+        // Compute hash over all vocabularies
+        let hash = self.compute_hash(&subjects, &predicates, &contexts, &actors);
 
-        let pred_count = predicates.len();
-        let ctx_count = contexts.len();
+        let counts = (
+            subjects.len(),
+            predicates.len(),
+            contexts.len(),
+            actors.len(),
+            hash.clone(),
+        );
 
+        self.subjects = subjects;
         self.predicates = predicates;
         self.contexts = contexts;
+        self.actors = actors;
+        self.subjects_lower = subjects_lower;
         self.predicates_lower = predicates_lower;
         self.contexts_lower = contexts_lower;
-        self.index_hash = hash.clone();
+        self.actors_lower = actors_lower;
+        self.index_hash = hash;
 
-        (pred_count, ctx_count, hash)
+        counts
+    }
+
+    /// Search subjects vocabulary
+    pub fn search_subjects(&self, query: &str, limit: usize, min_score: f64) -> Vec<FuzzyMatch> {
+        self.find_matches(query, VocabularyType::Subjects, limit, min_score)
     }
 
     /// Search predicates vocabulary
@@ -140,6 +170,11 @@ impl FuzzyEngine {
     /// Search contexts vocabulary
     pub fn search_contexts(&self, query: &str, limit: usize, min_score: f64) -> Vec<FuzzyMatch> {
         self.find_matches(query, VocabularyType::Contexts, limit, min_score)
+    }
+
+    /// Search actors vocabulary
+    pub fn search_actors(&self, query: &str, limit: usize, min_score: f64) -> Vec<FuzzyMatch> {
+        self.find_matches(query, VocabularyType::Actors, limit, min_score)
     }
 
     /// Find matches in the specified vocabulary
@@ -156,8 +191,10 @@ impl FuzzyEngine {
         }
 
         let (vocabulary, vocabulary_lower) = match vocab_type {
+            VocabularyType::Subjects => (&self.subjects, &self.subjects_lower),
             VocabularyType::Predicates => (&self.predicates, &self.predicates_lower),
             VocabularyType::Contexts => (&self.contexts, &self.contexts_lower),
+            VocabularyType::Actors => (&self.actors, &self.actors_lower),
         };
 
         // Platform-specific matching
@@ -253,23 +290,43 @@ impl FuzzyEngine {
         &self.index_hash
     }
 
-    /// Get vocabulary counts
-    pub fn get_counts(&self) -> (usize, usize) {
-        (self.predicates.len(), self.contexts.len())
+    /// Get vocabulary counts: (subjects, predicates, contexts, actors)
+    pub fn get_counts(&self) -> (usize, usize, usize, usize) {
+        (
+            self.subjects.len(),
+            self.predicates.len(),
+            self.contexts.len(),
+            self.actors.len(),
+        )
     }
 
     /// Check if index has vocabulary
     pub fn is_ready(&self) -> bool {
-        !self.predicates.is_empty() || !self.contexts.is_empty()
+        !self.subjects.is_empty()
+            || !self.predicates.is_empty()
+            || !self.contexts.is_empty()
+            || !self.actors.is_empty()
     }
 
-    fn compute_hash(&self, predicates: &[String], contexts: &[String]) -> String {
+    fn compute_hash(
+        &self,
+        subjects: &[String],
+        predicates: &[String],
+        contexts: &[String],
+        actors: &[String],
+    ) -> String {
         let mut hasher = AHasher::default();
+        for s in subjects {
+            s.hash(&mut hasher);
+        }
         for p in predicates {
             p.hash(&mut hasher);
         }
         for c in contexts {
             c.hash(&mut hasher);
+        }
+        for a in actors {
+            a.hash(&mut hasher);
         }
         format!("{:016x}", hasher.finish())
     }
@@ -282,12 +339,14 @@ mod tests {
     fn test_engine() -> FuzzyEngine {
         let mut engine = FuzzyEngine::new();
         engine.rebuild_index(
+            vec!["ALICE".to_string(), "BOB".to_string()],
             vec![
                 "is_author_of".to_string(),
                 "is_maintainer_of".to_string(),
                 "works_at".to_string(),
             ],
             vec!["GitHub".to_string(), "GitLab".to_string()],
+            vec!["human:alice".to_string(), "system:ci".to_string()],
         );
         engine
     }
@@ -336,5 +395,31 @@ mod tests {
         let engine = test_engine();
         let matches = engine.search_predicates("xyz123", 10, 0.9);
         assert!(matches.is_empty());
+    }
+
+    #[test]
+    fn test_subject_search() {
+        let engine = test_engine();
+        let matches = engine.search_subjects("alice", 10, 0.6);
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].value, "ALICE");
+    }
+
+    #[test]
+    fn test_actor_search() {
+        let engine = test_engine();
+        let matches = engine.search_actors("alice", 10, 0.5);
+        assert!(!matches.is_empty());
+        assert!(matches.iter().any(|m| m.value == "human:alice"));
+    }
+
+    #[test]
+    fn test_get_counts_all_four() {
+        let engine = test_engine();
+        let (s, p, c, a) = engine.get_counts();
+        assert_eq!(s, 2);
+        assert_eq!(p, 3);
+        assert_eq!(c, 2);
+        assert_eq!(a, 2);
     }
 }
