@@ -371,6 +371,193 @@ func (x *StorageWarningMessage) GetTimestamp() int64 {
 	return 0
 }
 
+// RichSearchMatch represents a single match from rich string field search.
+// Mirrors storage.RichSearchMatch in ats/storage/rich_search.go.
+type RichSearchMatch struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`                                                                      // Subject ID from the attestation
+	TypeName      string                 `protobuf:"bytes,2,opt,name=type_name,json=typeName,proto3" json:"type_name,omitempty"`                                                                // Entity type name
+	TypeLabel     string                 `protobuf:"bytes,3,opt,name=type_label,json=typeLabel,proto3" json:"type_label,omitempty"`                                                             // Display label for the type
+	FieldName     string                 `protobuf:"bytes,4,opt,name=field_name,json=fieldName,proto3" json:"field_name,omitempty"`                                                             // Name of the matched field
+	FieldValue    string                 `protobuf:"bytes,5,opt,name=field_value,json=fieldValue,proto3" json:"field_value,omitempty"`                                                          // Full value of the matched field
+	Excerpt       string                 `protobuf:"bytes,6,opt,name=excerpt,proto3" json:"excerpt,omitempty"`                                                                                  // Excerpt showing the match in context
+	Score         float64                `protobuf:"fixed64,7,opt,name=score,proto3" json:"score,omitempty"`                                                                                    // Match score (0.0–1.0)
+	Strategy      string                 `protobuf:"bytes,8,opt,name=strategy,proto3" json:"strategy,omitempty"`                                                                                // Matching strategy: substring, fuzzy, semantic
+	DisplayLabel  string                 `protobuf:"bytes,9,opt,name=display_label,json=displayLabel,proto3" json:"display_label,omitempty"`                                                    // Display name for this entity
+	Attributes    map[string]string      `protobuf:"bytes,10,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Entity attributes (flat key-value)
+	MatchedWords  []string               `protobuf:"bytes,11,rep,name=matched_words,json=matchedWords,proto3" json:"matched_words,omitempty"`                                                   // Words matched (for highlighting)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RichSearchMatch) Reset() {
+	*x = RichSearchMatch{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RichSearchMatch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RichSearchMatch) ProtoMessage() {}
+
+func (x *RichSearchMatch) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RichSearchMatch.ProtoReflect.Descriptor instead.
+func (*RichSearchMatch) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *RichSearchMatch) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *RichSearchMatch) GetTypeName() string {
+	if x != nil {
+		return x.TypeName
+	}
+	return ""
+}
+
+func (x *RichSearchMatch) GetTypeLabel() string {
+	if x != nil {
+		return x.TypeLabel
+	}
+	return ""
+}
+
+func (x *RichSearchMatch) GetFieldName() string {
+	if x != nil {
+		return x.FieldName
+	}
+	return ""
+}
+
+func (x *RichSearchMatch) GetFieldValue() string {
+	if x != nil {
+		return x.FieldValue
+	}
+	return ""
+}
+
+func (x *RichSearchMatch) GetExcerpt() string {
+	if x != nil {
+		return x.Excerpt
+	}
+	return ""
+}
+
+func (x *RichSearchMatch) GetScore() float64 {
+	if x != nil {
+		return x.Score
+	}
+	return 0
+}
+
+func (x *RichSearchMatch) GetStrategy() string {
+	if x != nil {
+		return x.Strategy
+	}
+	return ""
+}
+
+func (x *RichSearchMatch) GetDisplayLabel() string {
+	if x != nil {
+		return x.DisplayLabel
+	}
+	return ""
+}
+
+func (x *RichSearchMatch) GetAttributes() map[string]string {
+	if x != nil {
+		return x.Attributes
+	}
+	return nil
+}
+
+func (x *RichSearchMatch) GetMatchedWords() []string {
+	if x != nil {
+		return x.MatchedWords
+	}
+	return nil
+}
+
+// RichSearchResultsMessage is the server→client response for rich_search_results.
+type RichSearchResultsMessage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Query         string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`     // Original search query
+	Matches       []*RichSearchMatch     `protobuf:"bytes,2,rep,name=matches,proto3" json:"matches,omitempty"` // Matched results
+	Total         int32                  `protobuf:"varint,3,opt,name=total,proto3" json:"total,omitempty"`    // Total number of matches
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RichSearchResultsMessage) Reset() {
+	*x = RichSearchResultsMessage{}
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RichSearchResultsMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RichSearchResultsMessage) ProtoMessage() {}
+
+func (x *RichSearchResultsMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_server_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RichSearchResultsMessage.ProtoReflect.Descriptor instead.
+func (*RichSearchResultsMessage) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_server_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *RichSearchResultsMessage) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *RichSearchResultsMessage) GetMatches() []*RichSearchMatch {
+	if x != nil {
+		return x.Matches
+	}
+	return nil
+}
+
+func (x *RichSearchResultsMessage) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
 var File_plugin_grpc_protocol_server_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
@@ -407,7 +594,32 @@ const file_plugin_grpc_protocol_server_proto_rawDesc = "" +
 	"\x05limit\x18\x05 \x01(\x05R\x05limit\x12'\n" +
 	"\x0ffill_percentage\x18\x06 \x01(\x05R\x0efillPercentage\x12&\n" +
 	"\x0ftime_until_full\x18\a \x01(\tR\rtimeUntilFull\x12\x1c\n" +
-	"\ttimestamp\x18\b \x01(\x03R\ttimestamp*\x8a\x01\n" +
+	"\ttimestamp\x18\b \x01(\x03R\ttimestamp\"\xc6\x03\n" +
+	"\x0fRichSearchMatch\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
+	"\ttype_name\x18\x02 \x01(\tR\btypeName\x12\x1d\n" +
+	"\n" +
+	"type_label\x18\x03 \x01(\tR\ttypeLabel\x12\x1d\n" +
+	"\n" +
+	"field_name\x18\x04 \x01(\tR\tfieldName\x12\x1f\n" +
+	"\vfield_value\x18\x05 \x01(\tR\n" +
+	"fieldValue\x12\x18\n" +
+	"\aexcerpt\x18\x06 \x01(\tR\aexcerpt\x12\x14\n" +
+	"\x05score\x18\a \x01(\x01R\x05score\x12\x1a\n" +
+	"\bstrategy\x18\b \x01(\tR\bstrategy\x12#\n" +
+	"\rdisplay_label\x18\t \x01(\tR\fdisplayLabel\x12I\n" +
+	"\n" +
+	"attributes\x18\n" +
+	" \x03(\v2).protocol.RichSearchMatch.AttributesEntryR\n" +
+	"attributes\x12#\n" +
+	"\rmatched_words\x18\v \x03(\tR\fmatchedWords\x1a=\n" +
+	"\x0fAttributesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"{\n" +
+	"\x18RichSearchResultsMessage\x12\x14\n" +
+	"\x05query\x18\x01 \x01(\tR\x05query\x123\n" +
+	"\amatches\x18\x02 \x03(\v2\x19.protocol.RichSearchMatchR\amatches\x12\x14\n" +
+	"\x05total\x18\x03 \x01(\x05R\x05total*\x8a\x01\n" +
 	"\vMessageType\x12\x1c\n" +
 	"\x18MESSAGE_TYPE_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aMESSAGE_TYPE_DAEMON_STATUS\x10\x01\x12\x1b\n" +
@@ -427,24 +639,29 @@ func file_plugin_grpc_protocol_server_proto_rawDescGZIP() []byte {
 }
 
 var file_plugin_grpc_protocol_server_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_plugin_grpc_protocol_server_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_plugin_grpc_protocol_server_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_plugin_grpc_protocol_server_proto_goTypes = []any{
-	(MessageType)(0),              // 0: protocol.MessageType
-	(*DaemonStatusMessage)(nil),   // 1: protocol.DaemonStatusMessage
-	(*JobUpdateMessage)(nil),      // 2: protocol.JobUpdateMessage
-	(*StorageWarningMessage)(nil), // 3: protocol.StorageWarningMessage
-	nil,                           // 4: protocol.JobUpdateMessage.MetadataEntry
+	(MessageType)(0),                 // 0: protocol.MessageType
+	(*DaemonStatusMessage)(nil),      // 1: protocol.DaemonStatusMessage
+	(*JobUpdateMessage)(nil),         // 2: protocol.JobUpdateMessage
+	(*StorageWarningMessage)(nil),    // 3: protocol.StorageWarningMessage
+	(*RichSearchMatch)(nil),          // 4: protocol.RichSearchMatch
+	(*RichSearchResultsMessage)(nil), // 5: protocol.RichSearchResultsMessage
+	nil,                              // 6: protocol.JobUpdateMessage.MetadataEntry
+	nil,                              // 7: protocol.RichSearchMatch.AttributesEntry
 }
 var file_plugin_grpc_protocol_server_proto_depIdxs = []int32{
 	0, // 0: protocol.DaemonStatusMessage.type:type_name -> protocol.MessageType
 	0, // 1: protocol.JobUpdateMessage.type:type_name -> protocol.MessageType
-	4, // 2: protocol.JobUpdateMessage.metadata:type_name -> protocol.JobUpdateMessage.MetadataEntry
+	6, // 2: protocol.JobUpdateMessage.metadata:type_name -> protocol.JobUpdateMessage.MetadataEntry
 	0, // 3: protocol.StorageWarningMessage.type:type_name -> protocol.MessageType
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	7, // 4: protocol.RichSearchMatch.attributes:type_name -> protocol.RichSearchMatch.AttributesEntry
+	4, // 5: protocol.RichSearchResultsMessage.matches:type_name -> protocol.RichSearchMatch
+	6, // [6:6] is the sub-list for method output_type
+	6, // [6:6] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_server_proto_init() }
@@ -458,7 +675,7 @@ func file_plugin_grpc_protocol_server_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_server_proto_rawDesc), len(file_plugin_grpc_protocol_server_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

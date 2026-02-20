@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package protocol;
 
+import "google/protobuf/struct.proto";
+
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
 // ATSStoreService provides attestation storage operations for gRPC plugins
@@ -28,7 +30,7 @@ message Attestation {
   repeated string actors = 5;
   int64 timestamp = 6;       // Unix timestamp in milliseconds
   string source = 7;
-  string attributes = 8;      // map[string]interface{} as JSON string
+  google.protobuf.Struct attributes = 8;
   int64 created_at = 9;       // Unix timestamp in milliseconds
 }
 
@@ -39,7 +41,7 @@ message AttestationCommand {
   repeated string contexts = 3;
   repeated string actors = 4;
   optional int64 timestamp = 5;  // Unix timestamp in milliseconds. If not set, server uses current time.
-  string attributes_json = 6;    // JSON-encoded map[string]interface{}
+  google.protobuf.Struct attributes = 6;
 }
 
 // AttestationFilter for querying attestations

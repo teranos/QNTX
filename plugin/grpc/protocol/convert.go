@@ -1,20 +1,17 @@
 package protocol
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // ToTypes converts a proto Attestation to types.As.
 func (p *Attestation) ToTypes() *types.As {
-	var attributes map[string]interface{}
-	if p.Attributes != "" {
-		_ = json.Unmarshal([]byte(p.Attributes), &attributes)
-	}
-	if attributes == nil {
-		attributes = make(map[string]interface{})
+	attributes := make(map[string]interface{})
+	if p.Attributes != nil {
+		attributes = p.Attributes.AsMap()
 	}
 
 	return &types.As{
@@ -32,12 +29,11 @@ func (p *Attestation) ToTypes() *types.As {
 
 // AttestationFromTypes converts a types.As to a proto Attestation.
 func AttestationFromTypes(as *types.As) *Attestation {
-	attributesJSON := ""
+	var attrs *structpb.Struct
 	if len(as.Attributes) > 0 {
-		b, err := json.Marshal(as.Attributes)
-		if err == nil {
-			attributesJSON = string(b)
-		}
+		// structpb.NewStruct handles map[string]interface{} → Struct conversion.
+		// Errors only on unsupported value types (e.g. channels), safe to ignore here.
+		attrs, _ = structpb.NewStruct(as.Attributes)
 	}
 
 	return &Attestation{
@@ -48,7 +44,7 @@ func AttestationFromTypes(as *types.As) *Attestation {
 		Actors:     as.Actors,
 		Timestamp:  as.Timestamp.UnixMilli(),
 		Source:     as.Source,
-		Attributes: attributesJSON,
+		Attributes: attrs,
 		CreatedAt:  as.CreatedAt.UnixMilli(),
 	}
 }

@@ -447,10 +447,35 @@ func fromWire(w *protocol.Attestation) *types.As {
 }
 
 // attestationJSON serializes a types.As to JSON matching Rust's Attestation struct.
-// Critical: timestamp is i64 milliseconds (UnixMilli), not nanoseconds or RFC3339.
+// Critical: timestamp and created_at are i64 milliseconds (UnixMilli), not RFC3339.
+// Attributes must be a JSON object, not a string (Rust expects HashMap<String, Value>).
 // This JSON is passed to SyncTree.ContentHash() which delegates to Rust.
 func attestationJSON(as *types.As) (string, error) {
-	b, err := json.Marshal(protocol.AttestationFromTypes(as))
+	// Build a struct that matches Rust's Attestation layout exactly:
+	// - timestamps as i64 millis (not time.Time which marshals to RFC3339)
+	// - attributes as map (not pre-serialized string like the proto struct)
+	wire := struct {
+		ID         string                 `json:"id"`
+		Subjects   []string               `json:"subjects"`
+		Predicates []string               `json:"predicates"`
+		Contexts   []string               `json:"contexts"`
+		Actors     []string               `json:"actors"`
+		Timestamp  int64                  `json:"timestamp"`
+		Source     string                 `json:"source"`
+		Attributes map[string]interface{} `json:"attributes,omitempty"`
+		CreatedAt  int64                  `json:"created_at"`
+	}{
+		ID:         as.ID,
+		Subjects:   as.Subjects,
+		Predicates: as.Predicates,
+		Contexts:   as.Contexts,
+		Actors:     as.Actors,
+		Timestamp:  as.Timestamp.UnixMilli(),
+		Source:     as.Source,
+		Attributes: as.Attributes,
+		CreatedAt:  as.CreatedAt.UnixMilli(),
+	}
+	b, err := json.Marshal(wire)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to marshal attestation %s to JSON", as.ID)
 	}
