@@ -641,6 +641,20 @@ function spawnSubcanvasGlyph(
     log.debug(SEG.GLYPH, `[Canvas] Spawned Subcanvas glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
 
+/** Human-readable labels for spawn commands */
+export const COMMAND_LABELS: Record<string, string> = {
+    'ix': 'IX — Ingest',
+    'ax': 'AX — Query',
+    'se': 'SE — Semantic Search',
+    'py': 'Python',
+    'ts': 'TypeScript',
+    'prompt': 'Prompt',
+    'so': 'Prompt',
+    'prose': 'Prose',
+    'note': 'Note',
+    'subcanvas': 'Subcanvas',
+};
+
 /** Command → spawn function lookup (lowercase keys) */
 type SpawnFn = (x: number, y: number, canvas: HTMLElement, glyphs: Glyph[], canvasId: string) => void | Promise<void>;
 
@@ -685,4 +699,11 @@ export function spawnGlyphByCommand(command: string): boolean {
         result.catch(err => log.error(SEG.GLYPH, `Failed to spawn glyph "${command}": ${err}`));
     }
     return true;
+}
+
+/** Return command names that prefix-match the query (for search result injection) */
+export function getMatchingCommands(query: string): string[] {
+    if (!query) return [];
+    const q = query.toLowerCase();
+    return Object.keys(COMMAND_MAP).filter(cmd => cmd.startsWith(q));
 }

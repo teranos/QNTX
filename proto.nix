@@ -69,7 +69,8 @@
         --ts_proto_opt=onlyTypes=true \
         --ts_proto_opt=snakeToCamel=false \
         --ts_proto_out=web/ts/generated/proto \
-        plugin/grpc/protocol/atsstore.proto
+        plugin/grpc/protocol/atsstore.proto \
+        plugin/grpc/protocol/server.proto
 
       echo "✓ Plugin proto files generated in web/ts/generated/proto/"
 
