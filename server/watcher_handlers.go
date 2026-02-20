@@ -488,6 +488,7 @@ func (s *QNTXServer) initWatcherEngine() error {
 	apiBaseURL := fmt.Sprintf("http://127.0.0.1:%d", am.GetServerPort())
 
 	s.watcherEngine = watcher.NewEngine(s.db, apiBaseURL, s.logger)
+	s.reloadCoalescer = newWatcherReloadCoalescer(s, 50*time.Millisecond)
 
 	// Set broadcast callback for live results
 	s.watcherEngine.SetBroadcastCallback(s.broadcastWatcherMatch)
