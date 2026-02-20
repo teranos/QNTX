@@ -899,16 +899,25 @@ func (c *Client) handleGetSyncStatus() {
 	})
 }
 
+// richSearchResponse is the typed WS response for rich_search_results.
+// Mirrors proto: protocol.RichSearchResultsMessage (server.proto)
+type richSearchResponse struct {
+	Type    string                    `json:"type"`
+	Query   string                    `json:"query"`
+	Matches []storage.RichSearchMatch `json:"matches"`
+	Total   int                       `json:"total"`
+}
+
 // handleRichSearch performs unified search: text search + semantic search
 func (c *Client) handleRichSearch(query string) {
 	// Trim and validate query
 	query = strings.TrimSpace(query)
 	if query == "" {
-		c.sendJSON(map[string]interface{}{
-			"type":    "rich_search_results",
-			"query":   query,
-			"matches": []interface{}{},
-			"total":   0,
+		c.sendJSON(richSearchResponse{
+			Type:    "rich_search_results",
+			Query:   query,
+			Matches: []storage.RichSearchMatch{},
+			Total:   0,
 		})
 		return
 	}
@@ -949,11 +958,11 @@ func (c *Client) handleRichSearch(query string) {
 		matches = []storage.RichSearchMatch{}
 	}
 
-	c.sendJSON(map[string]interface{}{
-		"type":    "rich_search_results",
-		"query":   query,
-		"matches": matches,
-		"total":   len(matches),
+	c.sendJSON(richSearchResponse{
+		Type:    "rich_search_results",
+		Query:   query,
+		Matches: matches,
+		Total:   len(matches),
 	})
 
 	c.server.logger.Infow("Unified search results sent",
