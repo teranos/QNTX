@@ -94,6 +94,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/embeddings/clusters", s.corsMiddleware(s.HandleEmbeddingClusters))                    // List stable clusters (GET)
 	http.HandleFunc("/api/embeddings/cluster-timeline", s.corsMiddleware(s.HandleClusterTimeline))              // Cluster evolution timeline (GET)
 	http.HandleFunc("/api/embeddings/cluster", s.corsMiddleware(s.HandleEmbeddingCluster))                      // HDBSCAN clustering (POST)
+	http.HandleFunc("/api/embeddings/by-source", s.corsMiddleware(s.HandleEmbeddingsBySource))                  // Embeddings by attestation source IDs (POST)
 	http.HandleFunc("/api/embeddings/info", s.corsMiddleware(s.HandleEmbeddingInfo))                            // Embedding service status (GET)
 	http.HandleFunc("/api/embeddings/project", s.corsMiddleware(s.HandleEmbeddingProject))                      // UMAP projection (POST)
 	http.HandleFunc("/api/embeddings/projections", s.corsMiddleware(s.HandleEmbeddingProjections))              // Get 2D projections (GET)

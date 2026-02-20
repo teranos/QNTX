@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/errors"
@@ -389,6 +390,53 @@ func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingM
 		zap.Int("count", len(embeddings)))
 
 	return nil
+}
+
+// GetBySourceIDs retrieves embeddings by a list of source IDs (source_type = 'attestation').
+func (s *EmbeddingStore) GetBySourceIDs(sourceIDs []string) ([]EmbeddingModel, error) {
+	if len(sourceIDs) == 0 {
+		return nil, nil
+	}
+
+	// Build IN clause with placeholders
+	placeholders := make([]string, len(sourceIDs))
+	args := make([]interface{}, len(sourceIDs))
+	for i, id := range sourceIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := `
+		SELECT id, source_type, source_id, text, embedding,
+		       model, dimensions, created_at, updated_at
+		FROM embeddings
+		WHERE source_type = 'attestation' AND source_id IN (` + strings.Join(placeholders, ",") + `)`
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to query embeddings for %d source IDs", len(sourceIDs))
+	}
+	defer rows.Close()
+
+	var results []EmbeddingModel
+	for rows.Next() {
+		var emb EmbeddingModel
+		var createdAt, updatedAt string
+		if err := rows.Scan(
+			&emb.ID, &emb.SourceType, &emb.SourceID, &emb.Text, &emb.Embedding,
+			&emb.Model, &emb.Dimensions, &createdAt, &updatedAt,
+		); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan embedding row %d", len(results)+1)
+		}
+		emb.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+		emb.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+		results = append(results, emb)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate embeddings (read %d)", len(results))
+	}
+
+	return results, nil
 }
 
 // GetAllEmbeddingVectors reads all embedding IDs and blobs for HDBSCAN input.
