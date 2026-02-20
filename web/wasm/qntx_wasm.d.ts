@@ -20,6 +20,12 @@
 export function classify_claims(input: string): string;
 
 /**
+ * Compute cosine similarity between two f32 vectors.
+ * Uses typed arrays directly from JavaScript (no JSON overhead).
+ */
+export function cosine_similarity_f32(query: Float32Array, candidate: Float32Array): number;
+
+/**
  * Delete an attestation by ID from IndexedDB.
  * Returns a Promise that resolves to true if deleted, false if not found.
  */
@@ -102,7 +108,7 @@ export function query_attestations(filter_json: string): Promise<string>;
 
 /**
  * Compute content hash for an attestation.
- * Input: JSON-serialized Attestation
+ * Input: JSON-serialized proto Attestation
  * Returns: `{"hash":"<64-char hex>"}` or `{"error":"..."}`
  */
 export function sync_content_hash(attestation_json: string): string;
@@ -164,6 +170,7 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly classify_claims: (a: number, b: number) => [number, number];
+    readonly cosine_similarity_f32: (a: number, b: number, c: number, d: number) => number;
     readonly delete_attestation: (a: number, b: number) => any;
     readonly exists_attestation: (a: number, b: number) => any;
     readonly fuzzy_rebuild_index: () => any;
@@ -185,11 +192,11 @@ export interface InitOutput {
     readonly sync_merkle_remove: (a: number, b: number) => [number, number];
     readonly sync_merkle_root: () => [number, number];
     readonly version: () => [number, number];
-    readonly wasm_bindgen__closure__destroy__h622d11ff1c80a730: (a: number, b: number) => void;
     readonly wasm_bindgen__closure__destroy__h63454322f75c3832: (a: number, b: number) => void;
+    readonly wasm_bindgen__closure__destroy__h622d11ff1c80a730: (a: number, b: number) => void;
     readonly wasm_bindgen__convert__closures_____invoke__h0970674685b3ee7c: (a: number, b: number, c: any, d: any) => void;
-    readonly wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea: (a: number, b: number, c: any) => void;
     readonly wasm_bindgen__convert__closures_____invoke__h857fdb0c9bdea0c8: (a: number, b: number, c: any) => void;
+    readonly wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;
