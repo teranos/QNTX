@@ -2,6 +2,7 @@
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
 export const classify_claims: (a: number, b: number) => [number, number];
+export const cosine_similarity_f32: (a: number, b: number, c: number, d: number) => number;
 export const delete_attestation: (a: number, b: number) => any;
 export const exists_attestation: (a: number, b: number) => any;
 export const fuzzy_rebuild_index: () => any;
