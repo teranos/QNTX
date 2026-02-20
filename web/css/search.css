@@ -104,9 +104,8 @@
 .search-excerpt {
     flex: 1;
     color: var(--text-on-dark);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 /* Highlight matched text */
