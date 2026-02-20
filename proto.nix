@@ -30,6 +30,16 @@
 
       echo "✓ Glyph proto files generated in glyph/proto/"
 
+      # Generate core proto (sym — canonical symbol definitions)
+      # Uses module= mode because sym.proto lives in proto/ but generates to sym/sympb/
+      ${pkgs.protobuf}/bin/protoc \
+        --plugin=${pkgs.protoc-gen-go}/bin/protoc-gen-go \
+        --go_out=. --go_opt=module=github.com/teranos/QNTX \
+        --proto_path=proto \
+        proto/sym.proto
+
+      echo "✓ Core proto files generated (sym/sympb/)"
+
       # Rust proto types are generated at build time via prost (see crates/qntx-proto/build.rs)
     '');
   };
@@ -92,6 +102,22 @@
         glyph/proto/files.proto
 
       echo "✓ Glyph proto TypeScript files generated in web/ts/generated/proto/"
+
+      # Generate TypeScript for core proto (sym — canonical symbol definitions)
+      ${pkgs.protobuf}/bin/protoc \
+        --plugin=protoc-gen-ts_proto=web/node_modules/.bin/protoc-gen-ts_proto \
+        --ts_proto_opt=esModuleInterop=true \
+        --ts_proto_opt=outputEncodeMethods=false \
+        --ts_proto_opt=outputJsonMethods=false \
+        --ts_proto_opt=outputClientImpl=false \
+        --ts_proto_opt=outputServices=false \
+        --ts_proto_opt=onlyTypes=true \
+        --ts_proto_opt=snakeToCamel=false \
+        --ts_proto_out=web/ts/generated/proto \
+        --proto_path=proto \
+        proto/sym.proto
+
+      echo "✓ Core proto TypeScript files generated (web/ts/generated/proto/sym.ts)"
     '');
   };
 

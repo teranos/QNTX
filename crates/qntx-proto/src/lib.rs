@@ -11,6 +11,11 @@ pub mod protocol {
     include!(concat!(env!("OUT_DIR"), "/protocol.rs"));
 }
 
+// Canonical symbol definitions from proto/sym.proto
+pub mod sym {
+    include!(concat!(env!("OUT_DIR"), "/qntx.sym.rs"));
+}
+
 // Re-export commonly used types at crate root for convenience
 pub use protocol::*;
 
