@@ -39,6 +39,10 @@ The developer always uses `make dev` to start the development environment with h
 
 **NEVER manually edit files in `types/generated/`.** Fix the generator in `typegen/` instead, then run `make types`. See [typegen.md](docs/typegen.md) for struct tags and troubleshooting.
 
+## UI: No Ellipsis
+
+**NEVER use `text-overflow: ellipsis`.** All text wraps — data is never hidden behind truncation. Use `word-break: break-word` and `overflow-wrap: break-word` for wrapping. This applies everywhere: CSS, inline styles, all UI components.
+
 ## Glyphs
 
 Glyphs ⧉  are the universal UI primitive. Symbols (`sym` package) are the visual expression of a glyph — through a sym, a glyph can be expressed. The `sym` package will become a subpackage of `glyph/` (`glyph/sym`).

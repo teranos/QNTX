@@ -15,9 +15,8 @@
     align-items: center;
     justify-content: flex-start;
     padding: 6px 10px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 /* Proximity-based color shifts are handled in JavaScript */
