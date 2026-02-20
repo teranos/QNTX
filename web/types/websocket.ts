@@ -7,6 +7,7 @@
 
 import type { Attestation } from '../ts/generated/proto/plugin/grpc/protocol/atsstore';
 import type { GlyphFired } from '../ts/generated/proto/glyph/proto/events';
+import type { RichSearchResultsMessage as ProtoRichSearchResultsMessage } from '../ts/generated/proto/plugin/grpc/protocol/server';
 // Import LSP types for parse-related messages to ensure consistency
 import type {
   SemanticToken as LSPSemanticToken,
@@ -470,12 +471,10 @@ export interface SyncStatusMessage extends BaseMessage {
 }
 
 /**
- * Rich search results response
+ * Rich search results response — extends proto-generated type with WS discriminator (ADR-006)
  */
-export interface RichSearchResultsMessage extends BaseMessage {
+export interface RichSearchResultsMessage extends ProtoRichSearchResultsMessage, BaseMessage {
   type: 'rich_search_results';
-  total: number;
-  results?: unknown[];
 }
 
 /**
