@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"database/sql"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -69,6 +70,9 @@ type QNTXServer struct {
 	// Plugin HTTP routing (lazy initialization for async plugin loading)
 	pluginMuxes   sync.Map // map[string]*http.ServeMux - plugin name -> dedicated mux
 	pluginMuxInit sync.Map // map[string]*sync.Once - ensures thread-safe one-time initialization per plugin
+
+	// HTTP server with timeouts
+	httpServer *http.Server
 
 	// Lifecycle management (defensive programming)
 	ctx            context.Context    // Cancellation context for graceful shutdown

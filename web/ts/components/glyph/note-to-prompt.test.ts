@@ -21,6 +21,7 @@ globalThis.ResizeObserver = class ResizeObserver {
 // Mock uiState for conversions
 const mockCanvasGlyphs: any[] = [];
 const mockCanvasCompositions: any[] = [];
+const mockCanvasPan: Record<string, any> = {};
 mock.module('../../state/ui', () => ({
     uiState: {
         getCanvasGlyphs: () => mockCanvasGlyphs,
@@ -57,8 +58,8 @@ mock.module('../../state/ui', () => ({
         clearCanvasCompositions: () => mockCanvasCompositions.length = 0,
         loadPersistedState: () => {},
         // Superset-complete stubs (mock.module is process-global, leaks into other test files)
-        getCanvasPan: () => null,
-        setCanvasPan: () => {},
+        getCanvasPan: (id: string) => mockCanvasPan[id] ?? null,
+        setCanvasPan: (id: string, pan: any) => { mockCanvasPan[id] = pan; },
         getMinimizedWindows: () => [],
         addMinimizedWindow: () => {},
         removeMinimizedWindow: () => {},

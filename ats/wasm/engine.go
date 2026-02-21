@@ -108,42 +108,66 @@ type FuzzyMatch struct {
 	Strategy string  `json:"strategy"`
 }
 
+// FuzzyIndexResult holds the counts from a fuzzy index rebuild.
+type FuzzyIndexResult struct {
+	Subjects   int    `json:"subjects"`
+	Predicates int    `json:"predicates"`
+	Contexts   int    `json:"contexts"`
+	Actors     int    `json:"actors"`
+	Hash       string `json:"hash"`
+}
+
 // RebuildFuzzyIndex rebuilds the fuzzy engine's vocabulary index.
 // Returns predicate count, context count, index hash, and any error.
 func (e *Engine) RebuildFuzzyIndex(predicates, contexts []string) (int, int, string, error) {
-	if predicates == nil {
-		predicates = []string{}
+	result, err := e.RebuildFuzzyIndex4(nil, predicates, contexts, nil)
+	if err != nil {
+		return 0, 0, "", err
 	}
-	if contexts == nil {
-		contexts = []string{}
+	return result.Predicates, result.Contexts, result.Hash, nil
+}
+
+// RebuildFuzzyIndex4 rebuilds the fuzzy engine with all 4 vocabulary types.
+func (e *Engine) RebuildFuzzyIndex4(subjects, predicates, contexts, actors []string) (FuzzyIndexResult, error) {
+	nilToEmpty := func(s []string) []string {
+		if s == nil {
+			return []string{}
+		}
+		return s
 	}
+
 	input, err := json.Marshal(struct {
+		Subjects   []string `json:"subjects"`
 		Predicates []string `json:"predicates"`
 		Contexts   []string `json:"contexts"`
-	}{Predicates: predicates, Contexts: contexts})
+		Actors     []string `json:"actors"`
+	}{
+		Subjects:   nilToEmpty(subjects),
+		Predicates: nilToEmpty(predicates),
+		Contexts:   nilToEmpty(contexts),
+		Actors:     nilToEmpty(actors),
+	})
 	if err != nil {
-		return 0, 0, "", errors.Wrap(err, "marshal fuzzy_rebuild_index input")
+		return FuzzyIndexResult{}, errors.Wrap(err, "marshal fuzzy_rebuild_index input")
 	}
 
 	raw, err := e.Call("fuzzy_rebuild_index", string(input))
 	if err != nil {
-		return 0, 0, "", err
+		return FuzzyIndexResult{}, err
 	}
 
 	var result struct {
-		Predicates int    `json:"predicates"`
-		Contexts   int    `json:"contexts"`
-		Hash       string `json:"hash"`
-		Error      string `json:"error,omitempty"`
+		FuzzyIndexResult
+		Error string `json:"error,omitempty"`
 	}
 	if err := json.Unmarshal([]byte(raw), &result); err != nil {
-		return 0, 0, "", errors.Wrapf(err, "unmarshal fuzzy_rebuild_index result: %s", raw)
+		return FuzzyIndexResult{}, errors.Wrapf(err, "unmarshal fuzzy_rebuild_index result: %s", raw)
 	}
 	if result.Error != "" {
-		return 0, 0, "", errors.Newf("fuzzy_rebuild_index: %s", result.Error)
+		return FuzzyIndexResult{}, errors.Newf("fuzzy_rebuild_index: %s", result.Error)
 	}
 
-	return result.Predicates, result.Contexts, result.Hash, nil
+	return result.FuzzyIndexResult, nil
 }
 
 // FindFuzzyMatches finds vocabulary items matching a query via the WASM fuzzy engine.

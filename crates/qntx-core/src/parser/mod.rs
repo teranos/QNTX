@@ -32,7 +32,7 @@ mod token;
 
 pub use ast::{AxQuery, DurationExpr, DurationUnit, TemporalClause};
 pub use lexer::Lexer;
-use token::{Token, TokenKind};
+pub use token::{Token, TokenKind};
 
 use thiserror::Error;
 

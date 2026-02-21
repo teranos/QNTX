@@ -481,12 +481,9 @@ func encodeSemanticTokens(tokens []parser.SemanticToken) []uint32 {
 	return data
 }
 
-// WebSocket upgrader
+// WebSocket upgrader — uses the same origin check as all other endpoints.
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		// TODO: If exposing server externally, validate Origin header
-		return true // Allow all origins for local development
-	},
+	CheckOrigin: checkOrigin,
 }
 
 // HandleGLSPWebSocket upgrades HTTP to WebSocket and serves LSP protocol

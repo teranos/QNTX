@@ -36,6 +36,7 @@ mock.module('../../connectivity', () => ({
 // Mock uiState — mock.module is process-global so every mock must be superset-complete
 const mockCanvasGlyphs: any[] = [];
 const mockCanvasCompositions: any[] = [];
+const mockCanvasPan: Record<string, any> = {};
 mock.module('../../state/ui', () => ({
     uiState: {
         getCanvasGlyphs: () => mockCanvasGlyphs,
@@ -58,8 +59,8 @@ mock.module('../../state/ui', () => ({
         clearCanvasCompositions: () => mockCanvasCompositions.length = 0,
         loadPersistedState: () => {},
         // Superset-complete stubs (mock.module is process-global, leaks into other test files)
-        getCanvasPan: () => null,
-        setCanvasPan: () => {},
+        getCanvasPan: (id: string) => mockCanvasPan[id] ?? null,
+        setCanvasPan: (id: string, pan: any) => { mockCanvasPan[id] = pan; },
         getMinimizedWindows: () => [],
         addMinimizedWindow: () => {},
         removeMinimizedWindow: () => {},
@@ -106,7 +107,8 @@ mock.module('../../qntx-wasm', () => ({
     putAttestation: async (a: unknown) => a,
     queryAttestations: () => [],
     parseQuery: () => ({ ok: false, error: 'no wasm in test' }),
-    rebuildFuzzyIndex: async () => ({ predicates: 0, contexts: 0, hash: '' }),
+    rebuildFuzzyIndex: async () => ({ subjects: 0, predicates: 0, contexts: 0, actors: 0, hash: '' }),
+    getCompletions: () => ({ slot: 'subjects', prefix: '', items: [] }),
 }));
 
 const { createAxGlyph, updateAxGlyphError } = await import('./ax-glyph');

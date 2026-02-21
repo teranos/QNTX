@@ -6,6 +6,7 @@
 import { Window } from './components/window.js';
 import { apiFetch } from './api.js';
 import { log, SEG } from './logger.ts';
+import { escapeHtml } from './html-utils.js';
 
 interface TypeDefinition {
     name: string;
@@ -154,11 +155,14 @@ export class TypeDefinitionWindow {
         // Type header
         const header = document.createElement('div');
         header.className = 'type-def-header';
+        // Sanitize color to prevent CSS injection (only allow hex colors)
+        const safeColor = /^#[0-9A-Fa-f]{3,8}$/.test(this.currentType.color)
+            ? this.currentType.color : '#888888';
         header.innerHTML = `
             <div class="type-def-title">
-                <span class="type-def-name">${this.currentType.name}</span>
-                <span class="type-def-label">${this.currentType.label}</span>
-                <span class="type-def-color" style="background-color: ${this.currentType.color}"></span>
+                <span class="type-def-name">${escapeHtml(this.currentType.name)}</span>
+                <span class="type-def-label">${escapeHtml(this.currentType.label)}</span>
+                <span class="type-def-color" style="background-color: ${safeColor}"></span>
             </div>
         `;
         content.appendChild(header);
@@ -255,7 +259,7 @@ export class TypeDefinitionWindow {
         }
 
         fieldEl.innerHTML = `
-            <span class="field-name">${field.name}</span>
+            <span class="field-name">${escapeHtml(field.name)}</span>
             <div class="field-indicators">
                 ${field.isRichString ? '<span class="indicator search-indicator" title="Searchable">🔍</span>' : ''}
                 ${field.isArray ? '<span class="indicator array-indicator" title="Array Field">📦</span>' : ''}

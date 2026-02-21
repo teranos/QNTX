@@ -34,6 +34,7 @@ if (USE_JSDOM) {
 // Mock uiState (process-global, superset-complete)
 const mockCanvasGlyphs: any[] = [];
 const mockCanvasCompositions: any[] = [];
+const mockCanvasPan: Record<string, any> = {};
 import { mock } from 'bun:test';
 mock.module('../../state/ui', () => ({
     uiState: {
@@ -60,8 +61,8 @@ mock.module('../../state/ui', () => ({
         getMinimizedWindows: () => [],
         isWindowMinimized: () => false,
         loadPersistedState: () => {},
-        getCanvasPan: () => null,
-        setCanvasPan: () => {},
+        getCanvasPan: (id: string) => mockCanvasPan[id] ?? null,
+        setCanvasPan: (id: string, pan: any) => { mockCanvasPan[id] = pan; },
         // Superset-complete stubs (mock.module is process-global, leaks into other test files)
         setMinimizedWindows: () => {},
         clearMinimizedWindows: () => {},
