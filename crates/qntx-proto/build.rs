@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let vec_default = "#[serde(default)]";
     for msg in &["Attestation", "AttestationCommand", "AttestationFilter"] {
         for field in &["subjects", "predicates", "contexts", "actors"] {
-            config.field_attribute(&format!("protocol.{}.{}", msg, field), vec_default);
+            config.field_attribute(format!("protocol.{}.{}", msg, field), vec_default);
         }
     }
 
