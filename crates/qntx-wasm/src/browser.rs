@@ -19,6 +19,7 @@ use qntx_core::parser::{Lexer, Parser, TokenKind};
 use qntx_indexeddb::IndexedDbStore;
 use qntx_proto::Attestation as ProtoAttestation;
 use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 
@@ -27,6 +28,7 @@ use wasm_bindgen::prelude::*;
 thread_local! {
     static STORE: RefCell<Option<Rc<IndexedDbStore>>> = RefCell::new(None);
     static FUZZY: RefCell<FuzzyEngine> = RefCell::new(FuzzyEngine::new());
+    static RICH_FUZZY: RefCell<FuzzyEngine> = RefCell::new(FuzzyEngine::new());
 }
 
 /// Default database name for browser IndexedDB storage
@@ -387,6 +389,344 @@ fn infer_completion_slot(input: &str) -> (&'static str, String) {
     }
 
     (slot, last_word)
+}
+
+// ============================================================================
+// Rich Search (browser-side, mirrors Go ats/storage/rich_search_qntx.go)
+// ============================================================================
+
+/// A single rich search match, serialized to match the proto RichSearchMatch schema.
+#[derive(serde::Serialize)]
+struct RichSearchMatch {
+    node_id: String,
+    type_name: String,
+    type_label: String,
+    field_name: String,
+    field_value: String,
+    excerpt: String,
+    score: f64,
+    strategy: String,
+    display_label: String,
+    attributes: HashMap<String, serde_json::Value>,
+    matched_words: Vec<String>,
+}
+
+/// Results envelope matching RichSearchResultsMessage proto.
+#[derive(serde::Serialize)]
+struct RichSearchResponse {
+    query: String,
+    matches: Vec<RichSearchMatch>,
+    total: usize,
+}
+
+const MAX_RICH_ATTESTATIONS: usize = 500;
+const MAX_VOCABULARY_SIZE: usize = 100_000;
+const MAX_WORD_GAP: usize = 50;
+const SEQUENTIAL_MATCH_BOOST: f64 = 1.5;
+
+/// Perform rich text search over IndexedDB attestations.
+///
+/// Algorithm (mirrors Go rich_search_qntx.go):
+/// 1. Discover rich_string_fields from type definition attestations
+/// 2. Load recent attestations that have those fields
+/// 3. Tokenize field values into a word vocabulary
+/// 4. Rebuild RICH_FUZZY engine with that vocabulary
+/// 5. Fuzzy-match each query word against vocabulary
+/// 6. Map matched words back to attestation nodes, score, rank
+///
+/// Returns JSON: `{"query":"...","matches":[...],"total":N}`
+#[wasm_bindgen]
+pub async fn rich_search(query: &str, limit: usize) -> Result<String, JsValue> {
+    let query = query.trim();
+    if query.is_empty() {
+        return empty_response("");
+    }
+
+    let store = get_store();
+    let mut all = store
+        .get_all()
+        .await
+        .map_err(|e| JsValue::from_str(&format!("Failed to load attestations: {:?}", e)))?;
+
+    // Step 1: discover rich_string_fields from type definitions
+    let rich_fields = discover_rich_string_fields(&all);
+    if rich_fields.is_empty() {
+        return empty_response(query);
+    }
+
+    // Step 2: build vocabulary from attestations with rich fields
+    // Sort by timestamp desc, take most recent MAX_RICH_ATTESTATIONS
+    all.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+
+    let mut vocabulary: HashSet<String> = HashSet::new();
+    let mut node_word_map: HashMap<String, HashMap<String, Vec<String>>> = HashMap::new();
+    let mut node_attributes: HashMap<String, HashMap<String, serde_json::Value>> = HashMap::new();
+    let mut count = 0;
+
+    for attestation in &all {
+        if attestation.attributes.is_empty() {
+            continue;
+        }
+        let has_rich = rich_fields
+            .iter()
+            .any(|f| matches!(attestation.attributes.get(f), Some(v) if !v.is_null()));
+        if !has_rich {
+            continue;
+        }
+        count += 1;
+        if count > MAX_RICH_ATTESTATIONS {
+            break;
+        }
+
+        for node_id in &attestation.subjects {
+            node_attributes
+                .entry(node_id.clone())
+                .or_insert_with(|| attestation.attributes.clone());
+            let field_words = node_word_map.entry(node_id.clone()).or_default();
+
+            for field_name in &rich_fields {
+                if let Some(serde_json::Value::String(s)) = attestation.attributes.get(field_name) {
+                    if s.is_empty() {
+                        continue;
+                    }
+                    let words: Vec<String> = s
+                        .split_whitespace()
+                        .map(|w| {
+                            w.trim_matches(|c: char| {
+                                ".,!?;:\"'()[]{}/*&^%$#@".contains(c)
+                            })
+                            .to_lowercase()
+                        })
+                        .filter(|w| w.len() > 1)
+                        .collect();
+                    for word in &words {
+                        vocabulary.insert(word.clone());
+                    }
+                    field_words
+                        .entry(field_name.clone())
+                        .or_default()
+                        .extend(words);
+                }
+            }
+        }
+    }
+
+    if vocabulary.is_empty() {
+        return empty_response(query);
+    }
+
+    // Step 3: rebuild RICH_FUZZY with vocabulary (predicates slot, same as Go)
+    let mut vocab_vec: Vec<String> = vocabulary.into_iter().collect();
+    if vocab_vec.len() > MAX_VOCABULARY_SIZE {
+        vocab_vec.truncate(MAX_VOCABULARY_SIZE);
+    }
+
+    RICH_FUZZY.with(|f| {
+        f.borrow_mut()
+            .rebuild_index(vec![], vocab_vec, vec![], vec![])
+    });
+
+    // Step 4: fuzzy-match each query word
+    let query_lower = query.to_lowercase();
+    let query_words: Vec<&str> = query_lower.split_whitespace().collect();
+
+    let mut query_word_matches: HashMap<String, Vec<(String, f64)>> = HashMap::new();
+    for qw in &query_words {
+        let fuzzy = RICH_FUZZY
+            .with(|f| f.borrow().find_matches(qw, VocabularyType::Predicates, 10, 0.3));
+        if !fuzzy.is_empty() {
+            for m in fuzzy {
+                query_word_matches
+                    .entry(qw.to_string())
+                    .or_default()
+                    .push((m.value, m.score));
+            }
+        } else {
+            query_word_matches
+                .entry(qw.to_string())
+                .or_default()
+                .push((qw.to_string(), 0.7));
+        }
+    }
+
+    if query_word_matches.is_empty() {
+        return empty_response(query);
+    }
+
+    // Step 5: score nodes
+    let mut matches: Vec<RichSearchMatch> = Vec::new();
+    let mut processed: HashSet<String> = HashSet::new();
+
+    for (node_id, field_words) in &node_word_map {
+        if processed.contains(node_id) {
+            continue;
+        }
+        let attributes = match node_attributes.get(node_id) {
+            Some(a) => a,
+            None => continue,
+        };
+
+        let mut words_found: HashMap<String, f64> = HashMap::new();
+        let mut matched_field_name = String::new();
+        let mut matched_field_value = String::new();
+
+        // Fuzzy word matching
+        for (field_name, words) in field_words {
+            for word in words {
+                for (qw, possible) in &query_word_matches {
+                    for (matched_word, score) in possible {
+                        if word == matched_word {
+                            let current = words_found.get(qw).copied().unwrap_or(0.0);
+                            if *score > current {
+                                words_found.insert(qw.clone(), *score);
+                            }
+                            if matched_field_name.is_empty() {
+                                matched_field_name = field_name.clone();
+                                if let Some(serde_json::Value::String(s)) =
+                                    attributes.get(field_name)
+                                {
+                                    matched_field_value = s.clone();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Substring fallback
+        for field_name in &rich_fields {
+            if let Some(serde_json::Value::String(s)) = attributes.get(field_name) {
+                if s.is_empty() {
+                    continue;
+                }
+                let lower = s.to_lowercase();
+                let mut found_in_field = false;
+                for qw in query_word_matches.keys() {
+                    if !words_found.contains_key(qw) && lower.contains(qw.as_str()) {
+                        words_found.insert(qw.clone(), 0.6);
+                        found_in_field = true;
+                    }
+                }
+                if found_in_field && matched_field_name.is_empty() {
+                    matched_field_name = field_name.clone();
+                    matched_field_value = s.clone();
+                }
+            }
+        }
+
+        if words_found.is_empty() {
+            continue;
+        }
+
+        // Score
+        let total_score: f64 = words_found.values().sum();
+        let match_ratio = words_found.len() as f64 / query_word_matches.len() as f64;
+        let mut final_score = (total_score / words_found.len() as f64) * match_ratio;
+
+        // Sequential proximity boost
+        if !matched_field_value.is_empty() && query_words.len() > 1 {
+            let lower = matched_field_value.to_lowercase();
+            let mut positions: Vec<usize> = words_found
+                .keys()
+                .filter_map(|qw| lower.find(qw.as_str()))
+                .collect();
+            if positions.len() > 1 {
+                positions.sort();
+                let sequential = positions.windows(2).all(|w| w[1] - w[0] <= MAX_WORD_GAP);
+                if sequential {
+                    final_score = (final_score * SEQUENTIAL_MATCH_BOOST).min(1.0);
+                }
+            }
+        }
+
+        let display_label = attributes
+            .get("label")
+            .and_then(|v| v.as_str())
+            .or_else(|| attributes.get("name").and_then(|v| v.as_str()))
+            .unwrap_or(node_id)
+            .to_string();
+
+        let type_name = attributes
+            .get("type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Document")
+            .to_string();
+
+        let strategy = if words_found.len() == query_word_matches.len() {
+            "fuzzy:all-words"
+        } else {
+            "fuzzy:partial"
+        };
+
+        let matched_words: Vec<String> = words_found.keys().cloned().collect();
+
+        matches.push(RichSearchMatch {
+            node_id: node_id.clone(),
+            type_name: type_name.clone(),
+            type_label: type_name,
+            field_name: matched_field_name,
+            field_value: matched_field_value.clone(),
+            excerpt: matched_field_value,
+            score: final_score,
+            strategy: strategy.to_string(),
+            display_label,
+            attributes: attributes.clone(),
+            matched_words,
+        });
+        processed.insert(node_id.clone());
+
+        if matches.len() >= limit {
+            break;
+        }
+    }
+
+    matches.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    matches.truncate(limit);
+
+    let total = matches.len();
+    let resp = RichSearchResponse {
+        query: query.to_string(),
+        matches,
+        total,
+    };
+    serde_json::to_string(&resp)
+        .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+}
+
+/// Discover rich_string_fields from type definition attestations.
+/// Mirrors Go's buildDynamicRichStringFields.
+fn discover_rich_string_fields(
+    attestations: &[qntx_core::attestation::Attestation],
+) -> Vec<String> {
+    let mut fields: HashSet<String> = HashSet::new();
+    for a in attestations {
+        let is_type_def = a.predicates.iter().any(|p| p == "type")
+            && a.contexts.iter().any(|c| c == "graph");
+        if !is_type_def {
+            continue;
+        }
+        if let Some(serde_json::Value::Array(arr)) = a.attributes.get("rich_string_fields") {
+            for v in arr {
+                if let serde_json::Value::String(s) = v {
+                    fields.insert(s.clone());
+                }
+            }
+        }
+    }
+    let mut result: Vec<String> = fields.into_iter().collect();
+    result.sort();
+    result
+}
+
+fn empty_response(query: &str) -> Result<String, JsValue> {
+    let resp = RichSearchResponse {
+        query: query.to_string(),
+        matches: vec![],
+        total: 0,
+    };
+    serde_json::to_string(&resp)
+        .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
 }
 
 // ============================================================================
