@@ -18,10 +18,13 @@ import { log, SEG } from './logger';
 export type ConnectivityState = 'online' | 'degraded' | 'offline';
 
 type ConnectivityCallback = (state: ConnectivityState) => void;
+type AuthCallback = (authenticated: boolean) => void;
 
 export interface ConnectivityManager {
     readonly state: ConnectivityState;
+    readonly authenticated: boolean;
     subscribe(callback: ConnectivityCallback): () => void;
+    subscribeAuth(callback: AuthCallback): () => void;
 }
 
 /** Resolve backend base URL without importing api.ts (avoids import cycle) */
@@ -31,7 +34,9 @@ function getBackendUrl(): string {
 
 class ConnectivityManagerImpl implements ConnectivityManager {
     private _state: ConnectivityState = 'online';
+    private _authenticated: boolean = true; // assume authenticated until told otherwise
     private callbacks: Set<ConnectivityCallback> = new Set();
+    private authCallbacks: Set<AuthCallback> = new Set();
     private debounceTimer: number | null = null;
     private pendingState: ConnectivityState | null = null;
 
@@ -55,6 +60,10 @@ class ConnectivityManagerImpl implements ConnectivityManager {
         return this._state;
     }
 
+    get authenticated(): boolean {
+        return this._authenticated;
+    }
+
     private init(): void {
         // Guard against non-browser environments (e.g., test runners)
         if (typeof window === 'undefined') {
@@ -72,6 +81,18 @@ class ConnectivityManagerImpl implements ConnectivityManager {
             log.debug(SEG.UI, '[Connectivity] Browser reports offline');
             this.browserOnline = false;
             this.updateState();
+        });
+
+        // When the tab becomes visible and we're unauthenticated,
+        // probe the backend — the user may have authenticated in another tab.
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && !this._authenticated) {
+                fetch(getBackendUrl() + '/auth/status', { credentials: 'include' }).then(res => {
+                    if (res.status !== 401) {
+                        this.reportAuthenticated();
+                    }
+                }).catch(() => { /* server unreachable, ignore */ });
+            }
         });
 
         // Initial state based on browser
@@ -104,6 +125,42 @@ class ConnectivityManagerImpl implements ConnectivityManager {
             log.info(SEG.UI, '[Connectivity] HTTP recovered');
             this.updateState();
         }
+    }
+
+    /**
+     * Called when backend returns 401 — node requires authentication.
+     * Does NOT redirect. WASM keeps running. UI surfaces a login prompt.
+     */
+    reportUnauthenticated(): void {
+        if (this._authenticated) {
+            this._authenticated = false;
+            log.info(SEG.UI, '[Connectivity] Backend requires authentication');
+            this.authCallbacks.forEach(cb => {
+                try { cb(false); } catch (e) { log.error(SEG.UI, '[Connectivity] Auth callback error:', e); }
+            });
+        }
+    }
+
+    /**
+     * Called after successful authentication to restore full connectivity.
+     */
+    reportAuthenticated(): void {
+        if (!this._authenticated) {
+            this._authenticated = true;
+            log.info(SEG.UI, '[Connectivity] Authenticated');
+            this.authCallbacks.forEach(cb => {
+                try { cb(true); } catch (e) { log.error(SEG.UI, '[Connectivity] Auth callback error:', e); }
+            });
+        }
+    }
+
+    /**
+     * Subscribe to authentication state changes.
+     */
+    subscribeAuth(callback: AuthCallback): () => void {
+        this.authCallbacks.add(callback);
+        callback(this._authenticated);
+        return () => { this.authCallbacks.delete(callback); };
     }
 
     /**
