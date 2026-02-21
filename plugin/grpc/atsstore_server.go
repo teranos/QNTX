@@ -29,7 +29,6 @@ func NewATSStoreServer(store *storage.SQLStore, authToken string, logger *zap.Su
 	}
 }
 
-
 // CreateAttestation creates a new attestation
 func (s *ATSStoreServer) CreateAttestation(ctx context.Context, req *protocol.CreateAttestationRequest) (*protocol.CreateAttestationResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
@@ -138,9 +137,9 @@ func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetA
 }
 
 func protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error) {
-	attributes, err := attributesFromJSON(proto.AttributesJson)
-	if err != nil {
-		return nil, err
+	attributes := make(map[string]interface{})
+	if proto.Attributes != nil {
+		attributes = proto.Attributes.AsMap()
 	}
 
 	timestamp := time.Now()

@@ -9,6 +9,7 @@ package protocol
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -31,7 +32,7 @@ type Attestation struct {
 	Actors        []string               `protobuf:"bytes,5,rep,name=actors,proto3" json:"actors,omitempty"`
 	Timestamp     int64                  `protobuf:"varint,6,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Unix timestamp in milliseconds
 	Source        string                 `protobuf:"bytes,7,opt,name=source,proto3" json:"source,omitempty"`
-	Attributes    string                 `protobuf:"bytes,8,opt,name=attributes,proto3" json:"attributes,omitempty"`                 // map[string]interface{} as JSON string
+	Attributes    *structpb.Struct       `protobuf:"bytes,8,opt,name=attributes,proto3" json:"attributes,omitempty"`
 	CreatedAt     int64                  `protobuf:"varint,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"` // Unix timestamp in milliseconds
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -116,11 +117,11 @@ func (x *Attestation) GetSource() string {
 	return ""
 }
 
-func (x *Attestation) GetAttributes() string {
+func (x *Attestation) GetAttributes() *structpb.Struct {
 	if x != nil {
 		return x.Attributes
 	}
-	return ""
+	return nil
 }
 
 func (x *Attestation) GetCreatedAt() int64 {
@@ -132,15 +133,15 @@ func (x *Attestation) GetCreatedAt() int64 {
 
 // AttestationCommand is used for creating attestations
 type AttestationCommand struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Subjects       []string               `protobuf:"bytes,1,rep,name=subjects,proto3" json:"subjects,omitempty"`
-	Predicates     []string               `protobuf:"bytes,2,rep,name=predicates,proto3" json:"predicates,omitempty"`
-	Contexts       []string               `protobuf:"bytes,3,rep,name=contexts,proto3" json:"contexts,omitempty"`
-	Actors         []string               `protobuf:"bytes,4,rep,name=actors,proto3" json:"actors,omitempty"`
-	Timestamp      *int64                 `protobuf:"varint,5,opt,name=timestamp,proto3,oneof" json:"timestamp,omitempty"`                          // Unix timestamp in milliseconds. If not set, server uses current time.
-	AttributesJson string                 `protobuf:"bytes,6,opt,name=attributes_json,json=attributesJson,proto3" json:"attributes_json,omitempty"` // JSON-encoded map[string]interface{}
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Subjects      []string               `protobuf:"bytes,1,rep,name=subjects,proto3" json:"subjects,omitempty"`
+	Predicates    []string               `protobuf:"bytes,2,rep,name=predicates,proto3" json:"predicates,omitempty"`
+	Contexts      []string               `protobuf:"bytes,3,rep,name=contexts,proto3" json:"contexts,omitempty"`
+	Actors        []string               `protobuf:"bytes,4,rep,name=actors,proto3" json:"actors,omitempty"`
+	Timestamp     *int64                 `protobuf:"varint,5,opt,name=timestamp,proto3,oneof" json:"timestamp,omitempty"` // Unix timestamp in milliseconds. If not set, server uses current time.
+	Attributes    *structpb.Struct       `protobuf:"bytes,6,opt,name=attributes,proto3" json:"attributes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AttestationCommand) Reset() {
@@ -208,11 +209,11 @@ func (x *AttestationCommand) GetTimestamp() int64 {
 	return 0
 }
 
-func (x *AttestationCommand) GetAttributesJson() string {
+func (x *AttestationCommand) GetAttributes() *structpb.Struct {
 	if x != nil {
-		return x.AttributesJson
+		return x.Attributes
 	}
-	return ""
+	return nil
 }
 
 // AttestationFilter for querying attestations
@@ -736,7 +737,7 @@ var File_plugin_grpc_protocol_atsstore_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_atsstore_proto_rawDesc = "" +
 	"\n" +
-	"#plugin/grpc/protocol/atsstore.proto\x12\bprotocol\"\x82\x02\n" +
+	"#plugin/grpc/protocol/atsstore.proto\x12\bprotocol\x1a\x1cgoogle/protobuf/struct.proto\"\x9b\x02\n" +
 	"\vAttestation\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
 	"\bsubjects\x18\x02 \x03(\tR\bsubjects\x12\x1e\n" +
@@ -746,12 +747,12 @@ const file_plugin_grpc_protocol_atsstore_proto_rawDesc = "" +
 	"\bcontexts\x18\x04 \x03(\tR\bcontexts\x12\x16\n" +
 	"\x06actors\x18\x05 \x03(\tR\x06actors\x12\x1c\n" +
 	"\ttimestamp\x18\x06 \x01(\x03R\ttimestamp\x12\x16\n" +
-	"\x06source\x18\a \x01(\tR\x06source\x12\x1e\n" +
+	"\x06source\x18\a \x01(\tR\x06source\x127\n" +
 	"\n" +
-	"attributes\x18\b \x01(\tR\n" +
+	"attributes\x18\b \x01(\v2\x17.google.protobuf.StructR\n" +
 	"attributes\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\t \x01(\x03R\tcreatedAt\"\xde\x01\n" +
+	"created_at\x18\t \x01(\x03R\tcreatedAt\"\xee\x01\n" +
 	"\x12AttestationCommand\x12\x1a\n" +
 	"\bsubjects\x18\x01 \x03(\tR\bsubjects\x12\x1e\n" +
 	"\n" +
@@ -759,8 +760,10 @@ const file_plugin_grpc_protocol_atsstore_proto_rawDesc = "" +
 	"predicates\x12\x1a\n" +
 	"\bcontexts\x18\x03 \x03(\tR\bcontexts\x12\x16\n" +
 	"\x06actors\x18\x04 \x03(\tR\x06actors\x12!\n" +
-	"\ttimestamp\x18\x05 \x01(\x03H\x00R\ttimestamp\x88\x01\x01\x12'\n" +
-	"\x0fattributes_json\x18\x06 \x01(\tR\x0eattributesJsonB\f\n" +
+	"\ttimestamp\x18\x05 \x01(\x03H\x00R\ttimestamp\x88\x01\x01\x127\n" +
+	"\n" +
+	"attributes\x18\x06 \x01(\v2\x17.google.protobuf.StructR\n" +
+	"attributesB\f\n" +
 	"\n" +
 	"_timestamp\"\xe2\x01\n" +
 	"\x11AttestationFilter\x12\x1a\n" +
@@ -835,26 +838,29 @@ var file_plugin_grpc_protocol_atsstore_proto_goTypes = []any{
 	(*GenerateAttestationResponse)(nil), // 8: protocol.GenerateAttestationResponse
 	(*GetAttestationsRequest)(nil),      // 9: protocol.GetAttestationsRequest
 	(*GetAttestationsResponse)(nil),     // 10: protocol.GetAttestationsResponse
+	(*structpb.Struct)(nil),             // 11: google.protobuf.Struct
 }
 var file_plugin_grpc_protocol_atsstore_proto_depIdxs = []int32{
-	0,  // 0: protocol.CreateAttestationRequest.attestation:type_name -> protocol.Attestation
-	1,  // 1: protocol.GenerateAttestationRequest.command:type_name -> protocol.AttestationCommand
-	0,  // 2: protocol.GenerateAttestationResponse.attestation:type_name -> protocol.Attestation
-	2,  // 3: protocol.GetAttestationsRequest.filter:type_name -> protocol.AttestationFilter
-	0,  // 4: protocol.GetAttestationsResponse.attestations:type_name -> protocol.Attestation
-	3,  // 5: protocol.ATSStoreService.CreateAttestation:input_type -> protocol.CreateAttestationRequest
-	5,  // 6: protocol.ATSStoreService.AttestationExists:input_type -> protocol.AttestationExistsRequest
-	7,  // 7: protocol.ATSStoreService.GenerateAndCreateAttestation:input_type -> protocol.GenerateAttestationRequest
-	9,  // 8: protocol.ATSStoreService.GetAttestations:input_type -> protocol.GetAttestationsRequest
-	4,  // 9: protocol.ATSStoreService.CreateAttestation:output_type -> protocol.CreateAttestationResponse
-	6,  // 10: protocol.ATSStoreService.AttestationExists:output_type -> protocol.AttestationExistsResponse
-	8,  // 11: protocol.ATSStoreService.GenerateAndCreateAttestation:output_type -> protocol.GenerateAttestationResponse
-	10, // 12: protocol.ATSStoreService.GetAttestations:output_type -> protocol.GetAttestationsResponse
-	9,  // [9:13] is the sub-list for method output_type
-	5,  // [5:9] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	11, // 0: protocol.Attestation.attributes:type_name -> google.protobuf.Struct
+	11, // 1: protocol.AttestationCommand.attributes:type_name -> google.protobuf.Struct
+	0,  // 2: protocol.CreateAttestationRequest.attestation:type_name -> protocol.Attestation
+	1,  // 3: protocol.GenerateAttestationRequest.command:type_name -> protocol.AttestationCommand
+	0,  // 4: protocol.GenerateAttestationResponse.attestation:type_name -> protocol.Attestation
+	2,  // 5: protocol.GetAttestationsRequest.filter:type_name -> protocol.AttestationFilter
+	0,  // 6: protocol.GetAttestationsResponse.attestations:type_name -> protocol.Attestation
+	3,  // 7: protocol.ATSStoreService.CreateAttestation:input_type -> protocol.CreateAttestationRequest
+	5,  // 8: protocol.ATSStoreService.AttestationExists:input_type -> protocol.AttestationExistsRequest
+	7,  // 9: protocol.ATSStoreService.GenerateAndCreateAttestation:input_type -> protocol.GenerateAttestationRequest
+	9,  // 10: protocol.ATSStoreService.GetAttestations:input_type -> protocol.GetAttestationsRequest
+	4,  // 11: protocol.ATSStoreService.CreateAttestation:output_type -> protocol.CreateAttestationResponse
+	6,  // 12: protocol.ATSStoreService.AttestationExists:output_type -> protocol.AttestationExistsResponse
+	8,  // 13: protocol.ATSStoreService.GenerateAndCreateAttestation:output_type -> protocol.GenerateAttestationResponse
+	10, // 14: protocol.ATSStoreService.GetAttestations:output_type -> protocol.GetAttestationsResponse
+	11, // [11:15] is the sub-list for method output_type
+	7,  // [7:11] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_atsstore_proto_init() }

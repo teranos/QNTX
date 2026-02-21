@@ -33,32 +33,10 @@ mock.module('../../connectivity', () => ({
     },
 }));
 
-// Mock uiState — mock.module is process-global so every mock must be superset-complete
-const mockCanvasGlyphs: any[] = [];
-const mockCanvasCompositions: any[] = [];
-mock.module('../../state/ui', () => ({
-    uiState: {
-        getCanvasGlyphs: () => mockCanvasGlyphs,
-        setCanvasGlyphs: (glyphs: any[]) => { mockCanvasGlyphs.length = 0; mockCanvasGlyphs.push(...glyphs); },
-        upsertCanvasGlyph: (glyph: any) => {
-            const index = mockCanvasGlyphs.findIndex(g => g.id === glyph.id);
-            if (index >= 0) { mockCanvasGlyphs[index] = glyph; } else { mockCanvasGlyphs.push(glyph); }
-        },
-        addCanvasGlyph: (glyph: any) => {
-            const index = mockCanvasGlyphs.findIndex(g => g.id === glyph.id);
-            if (index >= 0) { mockCanvasGlyphs[index] = glyph; } else { mockCanvasGlyphs.push(glyph); }
-        },
-        removeCanvasGlyph: (id: string) => {
-            const index = mockCanvasGlyphs.findIndex(g => g.id === id);
-            if (index >= 0) mockCanvasGlyphs.splice(index, 1);
-        },
-        getCanvasCompositions: () => mockCanvasCompositions,
-        setCanvasCompositions: (comps: any[]) => { mockCanvasCompositions.length = 0; mockCanvasCompositions.push(...comps); },
-        clearCanvasGlyphs: () => mockCanvasGlyphs.length = 0,
-        clearCanvasCompositions: () => mockCanvasCompositions.length = 0,
-        loadPersistedState: () => {},
-    },
-}));
+// Mock uiState — process-global, must be superset-complete (see test/mock-ui-state.ts)
+import { createMockUiState } from '../../test/mock-ui-state';
+const { uiState, glyphs: mockCanvasGlyphs } = createMockUiState();
+mock.module('../../state/ui', () => ({ uiState }));
 
 mock.module('../../state/sync-state', () => ({
     syncStateManager: {
@@ -75,7 +53,8 @@ mock.module('../../qntx-wasm', () => ({
     putAttestation: async (a: unknown) => a,
     queryAttestations: () => [],
     parseQuery: () => ({ ok: false, error: 'no wasm in test' }),
-    rebuildFuzzyIndex: async () => ({ predicates: 0, contexts: 0, hash: '' }),
+    rebuildFuzzyIndex: async () => ({ subjects: 0, predicates: 0, contexts: 0, actors: 0, hash: '' }),
+    getCompletions: () => ({ slot: 'subjects', prefix: '', items: [] }),
 }));
 
 const { createAxGlyph, updateAxGlyphError } = await import('./ax-glyph');

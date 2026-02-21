@@ -39,21 +39,32 @@ export interface FuzzyMatch {
 
 /** Fuzzy index rebuild statistics */
 export interface FuzzyIndexStats {
+    subjects: number;
     predicates: number;
     contexts: number;
+    actors: number;
     hash: string;
 }
 
 /** Fuzzy engine status */
 export interface FuzzyStatus {
     ready: boolean;
+    subjects: number;
     predicates: number;
     contexts: number;
+    actors: number;
     hash: string;
 }
 
 /** Vocabulary type for fuzzy search */
-export type FuzzyVocabType = 'predicates' | 'contexts';
+export type FuzzyVocabType = 'subjects' | 'predicates' | 'contexts' | 'actors';
+
+/** Completion result from parser-aware fuzzy matching */
+export interface CompletionResult {
+    slot: FuzzyVocabType;
+    prefix: string;
+    items: FuzzyMatch[];
+}
 
 /** Promise that resolves when WASM is initialized */
 let initPromise: Promise<void> | null = null;
@@ -103,7 +114,7 @@ export async function initialize(dbName: string = DEFAULT_DB_NAME): Promise<void
         // Build fuzzy index from existing IndexedDB vocabulary
         const statsJson = await wasm.fuzzy_rebuild_index();
         const stats: FuzzyIndexStats = JSON.parse(statsJson);
-        log.info(SEG.WASM, `[qntx-wasm] Initialized (v${wasm.version()}) fuzzy: ${stats.predicates}P/${stats.contexts}C`);
+        log.info(SEG.WASM, `[qntx-wasm] Initialized (v${wasm.version()}) fuzzy: ${stats.subjects}S/${stats.predicates}P/${stats.contexts}C/${stats.actors}A`);
     })();
 
     return initPromise;
@@ -231,6 +242,16 @@ export function fuzzySearch(
  */
 export function getFuzzyStatus(): FuzzyStatus {
     return JSON.parse(wasm.fuzzy_status());
+}
+
+/**
+ * Get context-aware completions for a partial AX query.
+ * Parses the query to determine which slot the cursor is in,
+ * then fuzzy-matches against the appropriate vocabulary.
+ */
+export function getCompletions(partialQuery: string, limit: number = 10): CompletionResult {
+    const json = wasm.get_completions(partialQuery, limit);
+    return JSON.parse(json);
 }
 
 // ============================================================================

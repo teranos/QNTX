@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"database/sql"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -70,6 +71,9 @@ type QNTXServer struct {
 	pluginMuxes   sync.Map // map[string]*http.ServeMux - plugin name -> dedicated mux
 	pluginMuxInit sync.Map // map[string]*sync.Once - ensures thread-safe one-time initialization per plugin
 
+	// HTTP server with timeouts
+	httpServer *http.Server
+
 	// Lifecycle management (defensive programming)
 	ctx            context.Context    // Cancellation context for graceful shutdown
 	cancel         context.CancelFunc // Cancels all goroutines
@@ -78,16 +82,17 @@ type QNTXServer struct {
 	state          atomic.Int32       // Opening/Closing Phase 4: Server state (Running/Draining/Stopped)
 
 	// Watcher engine for reactive attestation triggers
-	watcherEngine *watcher.Engine
+	watcherEngine   *watcher.Engine
+	reloadCoalescer *watcherReloadCoalescer
 
 	// Canvas state handlers
 	canvasHandler *handlers.CanvasHandler
 
 	// Sync: Merkle tree observer for content-addressed attestation sync
-	syncTree       syncPkg.SyncTree      // nil if WASM unavailable
-	syncObserver   *syncPkg.TreeObserver // nil if WASM unavailable
-	syncPeerStatus sync.Map              // map[string]string — peer name → "ok", "unreachable", or "self"
-	syncPeerRemoteName sync.Map          // map[string]string — peer name → advertised name from hello
+	syncTree           syncPkg.SyncTree      // nil if WASM unavailable
+	syncObserver       *syncPkg.TreeObserver // nil if WASM unavailable
+	syncPeerStatus     sync.Map              // map[string]string — peer name → "ok", "unreachable", or "self"
+	syncPeerRemoteName sync.Map              // map[string]string — peer name → advertised name from hello
 
 	// Embedding service for semantic search (optional, requires rustembeddings build tag)
 	embeddingService interface {
