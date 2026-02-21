@@ -10,6 +10,7 @@ import { log, SEG } from './logger';
 import { connectivityManager } from './connectivity';
 import { embeddingStore } from './embedding-store';
 import { apiFetch } from './api';
+import { validateBackendURL } from './websocket';
 import {
     listAttestationIds,
     getAttestation,
@@ -354,7 +355,14 @@ export class BrowserSync {
 
     private connectSyncWebSocket(): Promise<WebSocket> {
         return new Promise((resolve, reject) => {
-            const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
+            const rawUrl = (window as any).__BACKEND_URL__ || window.location.origin;
+            const validatedUrl = validateBackendURL(rawUrl);
+
+            if (!validatedUrl) {
+                log.warn(SEG.WS, `[BrowserSync] Invalid backend URL: ${rawUrl}, falling back to same-origin`);
+            }
+
+            const backendUrl = validatedUrl || window.location.origin;
             const backendHost = backendUrl.replace(/^https?:\/\//, '');
             const protocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${backendHost}/ws/sync`;
