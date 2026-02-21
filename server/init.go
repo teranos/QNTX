@@ -22,6 +22,7 @@ import (
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/wslogs"
 	syncPkg "github.com/teranos/QNTX/sync"
 	"go.uber.org/zap"
@@ -191,6 +192,23 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 
 	// Configure log transport to route sends through broadcast worker (thread-safe)
 	wsTransport.SetSendFunc(server.sendLogBatch)
+
+	// Initialize WebAuthn auth gate (if enabled in config)
+	if deps.config.Auth.Enabled {
+		serverPort := appcfg.DefaultServerPort
+		if deps.config.Server.Port != nil {
+			serverPort = *deps.config.Server.Port
+		}
+		authHandler, err := auth.New(db, serverPort, deps.config.Server.FrontendPort, deps.config.Auth.SessionExpiryHours, serverLogger, server.corsMiddleware)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to initialize WebAuthn auth")
+		}
+		server.authHandler = authHandler
+		server.authEnabled = true
+		serverLogger.Infow("WebAuthn authentication enabled",
+			"session_expiry_hours", deps.config.Auth.SessionExpiryHours,
+		)
+	}
 
 	// Register system type definitions so attestations render in the graph
 	{

@@ -4,6 +4,7 @@ package am
 type Config struct {
 	Database       DatabaseConfig       `mapstructure:"database"`
 	Server         ServerConfig         `mapstructure:"server"`
+	Auth           AuthConfig           `mapstructure:"auth"`
 	Pulse          PulseConfig          `mapstructure:"pulse"`
 	Code           CodeConfig           `mapstructure:"code"`
 	LocalInference LocalInferenceConfig `mapstructure:"local_inference"`
@@ -12,6 +13,12 @@ type Config struct {
 	Plugin         PluginConfig         `mapstructure:"plugin"`
 	Embeddings     EmbeddingsConfig     `mapstructure:"embeddings"`
 	Sync           SyncConfig           `mapstructure:"sync"`
+}
+
+// AuthConfig configures biometric authentication (WebAuthn)
+type AuthConfig struct {
+	Enabled            bool `mapstructure:"enabled"`              // Enable biometric auth gate (default: false)
+	SessionExpiryHours int  `mapstructure:"session_expiry_hours"` // Session lifetime in hours (default: 24)
 }
 
 // SyncConfig configures peer-to-peer attestation sync

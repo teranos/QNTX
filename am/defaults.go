@@ -42,6 +42,10 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("pulse.monthly_budget_usd", 15.0)  // Default $15/month limit
 	v.SetDefault("pulse.cost_per_score_usd", 0.002) // Default $0.002 per operation
 
+	// Auth defaults (disabled by default — zero auth code runs when disabled)
+	v.SetDefault("auth.enabled", false)
+	v.SetDefault("auth.session_expiry_hours", 24)
+
 	// Server configuration defaults
 	v.SetDefault("server.port", DefaultServerPort)
 	v.SetDefault("server.frontend_port", 8820) // Frontend dev server port
