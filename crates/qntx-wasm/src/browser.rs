@@ -494,9 +494,10 @@ pub fn sync_merkle_find_group_key(input: &str) -> String {
 
 /// Compute cosine similarity between two f32 vectors.
 /// Uses typed arrays directly from JavaScript (no JSON overhead).
+/// Throws JS exception if vectors have different dimensions.
 #[wasm_bindgen]
-pub fn cosine_similarity_f32(query: &[f32], candidate: &[f32]) -> f32 {
-    qntx_core::similarity::cosine_similarity(query, candidate)
+pub fn cosine_similarity_f32(query: &[f32], candidate: &[f32]) -> Result<f32, JsValue> {
+    qntx_core::similarity::cosine_similarity(query, candidate).map_err(|e| JsValue::from_str(&e))
 }
 
 // ============================================================================

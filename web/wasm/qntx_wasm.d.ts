@@ -22,6 +22,7 @@ export function classify_claims(input: string): string;
 /**
  * Compute cosine similarity between two f32 vectors.
  * Uses typed arrays directly from JavaScript (no JSON overhead).
+ * Throws JS exception if vectors have different dimensions.
  */
 export function cosine_similarity_f32(query: Float32Array, candidate: Float32Array): number;
 
@@ -180,7 +181,7 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly classify_claims: (a: number, b: number) => [number, number];
-    readonly cosine_similarity_f32: (a: number, b: number, c: number, d: number) => number;
+    readonly cosine_similarity_f32: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly delete_attestation: (a: number, b: number) => any;
     readonly exists_attestation: (a: number, b: number) => any;
     readonly fuzzy_rebuild_index: () => any;
