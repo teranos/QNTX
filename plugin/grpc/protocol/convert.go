@@ -24,6 +24,8 @@ func (p *Attestation) ToTypes() *types.As {
 		Source:     p.Source,
 		Attributes: attributes,
 		CreatedAt:  time.UnixMilli(p.CreatedAt),
+		Signature:  p.Signature,
+		SignerDID:  p.SignerDid,
 	}
 }
 
@@ -46,5 +48,7 @@ func AttestationFromTypes(as *types.As) *Attestation {
 		Source:     as.Source,
 		Attributes: attrs,
 		CreatedAt:  as.CreatedAt.UnixMilli(),
+		Signature:  as.Signature,
+		SignerDid:  as.SignerDID,
 	}
 }

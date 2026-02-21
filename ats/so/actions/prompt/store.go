@@ -15,7 +15,7 @@ import (
 type StoredPrompt struct {
 	ID           string    `json:"id"`
 	Name         string    `json:"name"`
-	Filename     string    `json:"filename"`        // Source file (used as context)
+	Filename     string    `json:"filename"` // Source file (used as context)
 	Template     string    `json:"template"`
 	SystemPrompt string    `json:"system_prompt,omitempty"`
 	AxPattern    string    `json:"ax_pattern,omitempty"` // Optional linked ax query
@@ -135,7 +135,7 @@ func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, act
 // GetPromptByFilename returns the latest version of a prompt by filename
 func (ps *PromptStore) GetPromptByFilename(ctx context.Context, filename string) (*StoredPrompt, error) {
 	query := `
-		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at
+		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
 		FROM attestations
 		WHERE EXISTS (SELECT 1 FROM json_each(predicates) WHERE value = ?)
 		  AND EXISTS (SELECT 1 FROM json_each(contexts) WHERE value = ?)
@@ -165,7 +165,7 @@ func (ps *PromptStore) GetPromptByFilename(ctx context.Context, filename string)
 // Note: Since prompts are now keyed by filename, this searches across all files
 func (ps *PromptStore) GetPromptByName(ctx context.Context, name string) (*StoredPrompt, error) {
 	query := `
-		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at
+		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
 		FROM attestations
 		WHERE EXISTS (SELECT 1 FROM json_each(subjects) WHERE value = ?)
 		  AND EXISTS (SELECT 1 FROM json_each(predicates) WHERE value = ?)
@@ -194,7 +194,7 @@ func (ps *PromptStore) GetPromptByName(ctx context.Context, name string) (*Store
 // GetPromptByID returns a specific prompt by ID
 func (ps *PromptStore) GetPromptByID(ctx context.Context, promptID string) (*StoredPrompt, error) {
 	query := `
-		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at
+		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
 		FROM attestations
 		WHERE id = ?
 	`
@@ -224,7 +224,7 @@ func (ps *PromptStore) ListPrompts(ctx context.Context, limit int) ([]*StoredPro
 	}
 
 	query := `
-		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at
+		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
 		FROM attestations
 		WHERE EXISTS (SELECT 1 FROM json_each(predicates) WHERE value = ?)
 		ORDER BY timestamp DESC
@@ -256,7 +256,7 @@ func (ps *PromptStore) GetPromptVersions(ctx context.Context, filename string, l
 	}
 
 	query := `
-		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at
+		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
 		FROM attestations
 		WHERE EXISTS (SELECT 1 FROM json_each(predicates) WHERE value = ?)
 		  AND EXISTS (SELECT 1 FROM json_each(contexts) WHERE value = ?)
