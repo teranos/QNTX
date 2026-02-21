@@ -59,6 +59,12 @@ func (s *QNTXServer) startBackgroundServices() {
 		}
 	}
 
+	// Start auth session sweep (if auth is enabled)
+	if s.authHandler != nil {
+		s.wg.Add(1)
+		s.authHandler.StartSessionSweep(s.wg.Done, s.ctx.Done())
+	}
+
 	// Broadcast worker is started in Run() method
 	// Start usage update broadcaster
 	s.startUsageUpdateTicker()

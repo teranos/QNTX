@@ -30,7 +30,19 @@ import { updateResultGlyphContent, type ExecutionResult } from './components/gly
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempt = 0;
+let authStopped = false; // true when reconnect was stopped due to 401
 let messageHandlers: MessageHandlers = {};
+
+// When authentication is restored (e.g. user logged in via another tab),
+// resume WebSocket reconnection if it was stopped by a 401.
+connectivityManager.subscribeAuth((authenticated: boolean) => {
+    if (authenticated && authStopped) {
+        authStopped = false;
+        reconnectAttempt = 0;
+        log.info(SEG.WS, 'Auth restored, reconnecting WebSocket');
+        connectWebSocket(messageHandlers);
+    }
+});
 
 const RECONNECT_BASE_MS = 3000;
 const RECONNECT_MAX_MS = 60000;
@@ -420,7 +432,24 @@ export function connectWebSocket(handlers: MessageHandlers): void {
         const delay = Math.round(backoff + jitter);
         reconnectAttempt++;
         log.info(SEG.WS, `Reconnecting in ${delay}ms (attempt ${reconnectAttempt})`);
-        reconnectTimer = setTimeout(() => connectWebSocket(messageHandlers), delay);
+        reconnectTimer = setTimeout(() => {
+            // Before reconnecting, check if we're unauthenticated.
+            // WebSocket API doesn't expose HTTP status on failed upgrades,
+            // so probe /auth/status — a 401 means stop hammering and report state.
+            const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
+            fetch(backendUrl + '/auth/status').then(res => {
+                if (res.status === 401) {
+                    log.info(SEG.WS, 'Not authenticated, stopping WebSocket reconnect');
+                    authStopped = true;
+                    connectivityManager.reportUnauthenticated();
+                    return;
+                }
+                connectWebSocket(messageHandlers);
+            }).catch(() => {
+                // Network error — server might be down, try reconnecting anyway
+                connectWebSocket(messageHandlers);
+            });
+        }, delay);
     };
 }
 
