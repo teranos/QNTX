@@ -9,10 +9,22 @@ import (
 
 // setupHTTPRoutes configures all HTTP handlers
 func (s *QNTXServer) setupHTTPRoutes() {
+	// wrap applies CORS + auth middleware. When auth is disabled, identical to corsMiddleware.
+	// Resolved at registration time — zero per-request branching.
+	wrap := s.corsMiddleware
+	if s.authEnabled {
+		inner := s.authHandler.Middleware
+		wrap = func(handler http.HandlerFunc) http.HandlerFunc {
+			return s.corsMiddleware(inner(handler))
+		}
+		// Register auth routes (CORS only, no auth middleware)
+		s.authHandler.RegisterRoutes()
+	}
+
 	// Register plugin routes with dynamic handler that waits for plugins to load
 	// This allows routes to be registered immediately while plugins load asynchronously
 	if s.pluginRegistry != nil {
-		pluginHandler := s.corsMiddleware(s.handlePluginRequest)
+		pluginHandler := wrap(s.handlePluginRequest)
 		for _, name := range s.pluginRegistry.ListEnabled() {
 			// Register exact match for /api/{plugin} (e.g., /api/code)
 			exactPattern := "/api/" + name
@@ -48,7 +60,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 				for path, handler := range wsHandlers {
 					// Capture handler in local variable for closure
 					wsHandler := handler
-					http.HandleFunc(path, s.corsMiddleware(wsHandler.ServeWS))
+					http.HandleFunc(path, wrap(wsHandler.ServeWS))
 					s.logger.Infow("Registered WebSocket handler", "plugin", name, "path", path)
 				}
 			}
@@ -56,51 +68,51 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	}
 
 	// Core QNTX handlers
-	http.HandleFunc("/ws", s.corsMiddleware(s.HandleWebSocket))      // Custom WebSocket protocol (graph updates, logs, etc.)
-	http.HandleFunc("/lsp", s.corsMiddleware(s.HandleGLSPWebSocket)) // ATS LSP protocol (completions, hover, semantic tokens)
-	http.HandleFunc("/health", s.corsMiddleware(s.HandleHealth))
-	http.HandleFunc("/logs/download", s.corsMiddleware(s.HandleLogDownload))
-	http.HandleFunc("/api/timeseries/usage", s.corsMiddleware(s.HandleUsageTimeSeries))
-	http.HandleFunc("/api/config", s.corsMiddleware(s.HandleConfig))
-	http.HandleFunc("/api/dev", s.corsMiddleware(s.HandleDevMode))                                              // Dev mode status
-	http.HandleFunc("/api/debug", s.corsMiddleware(s.HandleDebug))                                              // Browser console debugging (dev mode only)
-	http.HandleFunc("/api/prose", s.corsMiddleware(s.HandleProse))                                              // Prose content tree
-	http.HandleFunc("/api/prose/", s.corsMiddleware(s.HandleProseContent))                                      // Individual prose files
-	http.HandleFunc("/api/pulse/executions/", s.corsMiddleware(s.HandlePulseExecution))                         // Individual execution (GET) and logs (GET /logs)
-	http.HandleFunc("/api/pulse/schedules/", s.corsMiddleware(s.HandlePulseSchedule))                           // Individual schedule (GET/PATCH/DELETE)
-	http.HandleFunc("/api/pulse/schedules", s.corsMiddleware(s.HandlePulseSchedules))                           // List/create schedules (GET/POST)
-	http.HandleFunc("/api/pulse/jobs/", s.corsMiddleware(s.HandlePulseJob))                                     // Individual async job and sub-resources (GET)
-	http.HandleFunc("/api/pulse/jobs", s.corsMiddleware(s.HandlePulseJobs))                                     // List async jobs (GET)
-	http.HandleFunc("/api/prompt/", s.corsMiddleware(s.HandlePrompt))                                           // Prompt operations (preview/execute/list/save/get/versions)
-	http.HandleFunc("/api/plugins/{name}/config", s.corsMiddleware(s.HandlePluginConfig))                       // Plugin configuration (GET/PUT)
-	http.HandleFunc("/api/plugins/", s.corsMiddleware(s.HandlePluginAction))                                    // Plugin actions: pause/resume (POST)
-	http.HandleFunc("/api/plugins", s.corsMiddleware(s.HandlePlugins))                                          // List installed plugins (GET)
-	http.HandleFunc("/api/types/", s.corsMiddleware(s.HandleTypes))                                             // Get specific type (GET /api/types/{typename})
-	http.HandleFunc("/api/types", s.corsMiddleware(s.HandleTypes))                                              // List/create types (GET/POST)
-	http.HandleFunc("/api/watchers/", s.corsMiddleware(s.HandleWatchers))                                       // Watcher CRUD (GET/PUT/DELETE /api/watchers/{id})
-	http.HandleFunc("/api/watchers", s.corsMiddleware(s.HandleWatchers))                                        // List/create watchers (GET/POST)
-	http.HandleFunc("/api/attestations", s.corsMiddleware(s.HandleCreateAttestation))                           // Sync browser-created attestations (POST)
-	http.HandleFunc("/api/canvas/glyphs/", s.corsMiddleware(s.canvasHandler.HandleGlyphs))                      // Glyph CRUD (GET/POST/DELETE /api/canvas/glyphs/{id})
-	http.HandleFunc("/api/canvas/glyphs", s.corsMiddleware(s.canvasHandler.HandleGlyphs))                       // List/create glyphs (GET/POST)
-	http.HandleFunc("/api/canvas/compositions/", s.corsMiddleware(s.canvasHandler.HandleCompositions))          // Composition CRUD (GET/POST/DELETE /api/canvas/compositions/{id})
-	http.HandleFunc("/api/canvas/compositions", s.corsMiddleware(s.canvasHandler.HandleCompositions))           // List/create compositions (GET/POST)
-	http.HandleFunc("/api/canvas/minimized-windows/", s.corsMiddleware(s.canvasHandler.HandleMinimizedWindows)) // Minimized window CRUD (DELETE /api/canvas/minimized-windows/{id})
-	http.HandleFunc("/api/canvas/minimized-windows", s.corsMiddleware(s.canvasHandler.HandleMinimizedWindows))  // List/add minimized windows (GET/POST)
-	http.HandleFunc("/api/files/", s.corsMiddleware(s.HandleFiles))                                             // Serve stored file (GET /api/files/{id})
-	http.HandleFunc("/api/files", s.corsMiddleware(s.HandleFiles))                                              // Upload file (POST)
-	http.HandleFunc("/api/search/semantic", s.corsMiddleware(s.HandleSemanticSearch))                           // Semantic search (GET)
-	http.HandleFunc("/api/embeddings/generate", s.corsMiddleware(s.HandleEmbeddingGenerate))                    // Generate embedding (POST)
-	http.HandleFunc("/api/embeddings/batch", s.corsMiddleware(s.HandleEmbeddingBatch))                          // Batch generate embeddings (POST)
-	http.HandleFunc("/api/embeddings/clusters", s.corsMiddleware(s.HandleEmbeddingClusters))                    // List stable clusters (GET)
-	http.HandleFunc("/api/embeddings/cluster-timeline", s.corsMiddleware(s.HandleClusterTimeline))              // Cluster evolution timeline (GET)
-	http.HandleFunc("/api/embeddings/cluster", s.corsMiddleware(s.HandleEmbeddingCluster))                      // HDBSCAN clustering (POST)
-	http.HandleFunc("/api/embeddings/info", s.corsMiddleware(s.HandleEmbeddingInfo))                            // Embedding service status (GET)
-	http.HandleFunc("/api/embeddings/project", s.corsMiddleware(s.HandleEmbeddingProject))                      // UMAP projection (POST)
-	http.HandleFunc("/api/embeddings/projections", s.corsMiddleware(s.HandleEmbeddingProjections))              // Get 2D projections (GET)
-	http.HandleFunc("/ws/sync", s.corsMiddleware(s.HandleSyncWebSocket))                                        // Sync peer WebSocket (incoming reconciliation)
-	http.HandleFunc("/api/sync/status", s.corsMiddleware(s.HandleSyncStatus))                                   // Sync tree status (GET)
-	http.HandleFunc("/api/sync", s.corsMiddleware(s.HandleSync))                                                // Initiate sync with peer (POST)
-	http.HandleFunc("/", s.corsMiddleware(s.HandleStatic))
+	http.HandleFunc("/ws", wrap(s.HandleWebSocket))              // Custom WebSocket protocol (graph updates, logs, etc.)
+	http.HandleFunc("/lsp", wrap(s.HandleGLSPWebSocket))         // ATS LSP protocol (completions, hover, semantic tokens)
+	http.HandleFunc("/health", s.corsMiddleware(s.HandleHealth)) // Health check always public
+	http.HandleFunc("/logs/download", wrap(s.HandleLogDownload))
+	http.HandleFunc("/api/timeseries/usage", wrap(s.HandleUsageTimeSeries))
+	http.HandleFunc("/api/config", wrap(s.HandleConfig))
+	http.HandleFunc("/api/dev", wrap(s.HandleDevMode))                                              // Dev mode status
+	http.HandleFunc("/api/debug", wrap(s.HandleDebug))                                              // Browser console debugging (dev mode only)
+	http.HandleFunc("/api/prose", wrap(s.HandleProse))                                              // Prose content tree
+	http.HandleFunc("/api/prose/", wrap(s.HandleProseContent))                                      // Individual prose files
+	http.HandleFunc("/api/pulse/executions/", wrap(s.HandlePulseExecution))                         // Individual execution (GET) and logs (GET /logs)
+	http.HandleFunc("/api/pulse/schedules/", wrap(s.HandlePulseSchedule))                           // Individual schedule (GET/PATCH/DELETE)
+	http.HandleFunc("/api/pulse/schedules", wrap(s.HandlePulseSchedules))                           // List/create schedules (GET/POST)
+	http.HandleFunc("/api/pulse/jobs/", wrap(s.HandlePulseJob))                                     // Individual async job and sub-resources (GET)
+	http.HandleFunc("/api/pulse/jobs", wrap(s.HandlePulseJobs))                                     // List async jobs (GET)
+	http.HandleFunc("/api/prompt/", wrap(s.HandlePrompt))                                           // Prompt operations (preview/execute/list/save/get/versions)
+	http.HandleFunc("/api/plugins/{name}/config", wrap(s.HandlePluginConfig))                       // Plugin configuration (GET/PUT)
+	http.HandleFunc("/api/plugins/", wrap(s.HandlePluginAction))                                    // Plugin actions: pause/resume (POST)
+	http.HandleFunc("/api/plugins", wrap(s.HandlePlugins))                                          // List installed plugins (GET)
+	http.HandleFunc("/api/types/", wrap(s.HandleTypes))                                             // Get specific type (GET /api/types/{typename})
+	http.HandleFunc("/api/types", wrap(s.HandleTypes))                                              // List/create types (GET/POST)
+	http.HandleFunc("/api/watchers/", wrap(s.HandleWatchers))                                       // Watcher CRUD (GET/PUT/DELETE /api/watchers/{id})
+	http.HandleFunc("/api/watchers", wrap(s.HandleWatchers))                                        // List/create watchers (GET/POST)
+	http.HandleFunc("/api/attestations", wrap(s.HandleCreateAttestation))                           // Sync browser-created attestations (POST)
+	http.HandleFunc("/api/canvas/glyphs/", wrap(s.canvasHandler.HandleGlyphs))                      // Glyph CRUD (GET/POST/DELETE /api/canvas/glyphs/{id})
+	http.HandleFunc("/api/canvas/glyphs", wrap(s.canvasHandler.HandleGlyphs))                       // List/create glyphs (GET/POST)
+	http.HandleFunc("/api/canvas/compositions/", wrap(s.canvasHandler.HandleCompositions))          // Composition CRUD (GET/POST/DELETE /api/canvas/compositions/{id})
+	http.HandleFunc("/api/canvas/compositions", wrap(s.canvasHandler.HandleCompositions))           // List/create compositions (GET/POST)
+	http.HandleFunc("/api/canvas/minimized-windows/", wrap(s.canvasHandler.HandleMinimizedWindows)) // Minimized window CRUD (DELETE /api/canvas/minimized-windows/{id})
+	http.HandleFunc("/api/canvas/minimized-windows", wrap(s.canvasHandler.HandleMinimizedWindows))  // List/add minimized windows (GET/POST)
+	http.HandleFunc("/api/files/", wrap(s.HandleFiles))                                             // Serve stored file (GET /api/files/{id})
+	http.HandleFunc("/api/files", wrap(s.HandleFiles))                                              // Upload file (POST)
+	http.HandleFunc("/api/search/semantic", wrap(s.HandleSemanticSearch))                           // Semantic search (GET)
+	http.HandleFunc("/api/embeddings/generate", wrap(s.HandleEmbeddingGenerate))                    // Generate embedding (POST)
+	http.HandleFunc("/api/embeddings/batch", wrap(s.HandleEmbeddingBatch))                          // Batch generate embeddings (POST)
+	http.HandleFunc("/api/embeddings/clusters", wrap(s.HandleEmbeddingClusters))                    // List stable clusters (GET)
+	http.HandleFunc("/api/embeddings/cluster-timeline", wrap(s.HandleClusterTimeline))              // Cluster evolution timeline (GET)
+	http.HandleFunc("/api/embeddings/cluster", wrap(s.HandleEmbeddingCluster))                      // HDBSCAN clustering (POST)
+	http.HandleFunc("/api/embeddings/info", wrap(s.HandleEmbeddingInfo))                            // Embedding service status (GET)
+	http.HandleFunc("/api/embeddings/project", wrap(s.HandleEmbeddingProject))                      // UMAP projection (POST)
+	http.HandleFunc("/api/embeddings/projections", wrap(s.HandleEmbeddingProjections))              // Get 2D projections (GET)
+	http.HandleFunc("/ws/sync", wrap(s.HandleSyncWebSocket))                                        // Sync peer WebSocket (incoming reconciliation)
+	http.HandleFunc("/api/sync/status", wrap(s.HandleSyncStatus))                                   // Sync tree status (GET)
+	http.HandleFunc("/api/sync", wrap(s.HandleSync))                                                // Initiate sync with peer (POST)
+	http.HandleFunc("/", wrap(s.HandleStatic))
 }
 
 // corsMiddleware adds CORS headers to HTTP responses using configured allowed origins
@@ -115,16 +127,10 @@ func (s *QNTXServer) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
 
-		// Configure allowed methods based on environment
-		if s.isDevMode() {
-			// Dev mode: Allow all methods for rapid development
-			w.Header().Set("Access-Control-Allow-Methods", "*")
-			w.Header().Set("Access-Control-Allow-Headers", "*")
-		} else {
-			// Production: Restrict to explicitly required methods
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		}
+		// Explicit methods and headers required — wildcard (*) is forbidden
+		// when credentials: 'include' is used (cross-origin with cookies).
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		// Handle preflight requests
 		if r.Method == "OPTIONS" {

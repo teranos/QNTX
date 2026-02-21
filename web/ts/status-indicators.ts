@@ -11,6 +11,8 @@ import { toast } from './toast.ts';
 import type { DaemonStatusMessage } from '../types/websocket';
 import { DB } from '@generated/sym.js';
 import { connectivityManager, type ConnectivityState } from './connectivity';
+import { spawnAuthGlyph } from './components/glyph/auth-glyph';
+import { apiFetch } from './api';
 
 interface StatusIndicator {
     id: string;
@@ -55,6 +57,9 @@ class StatusIndicatorManager {
         this.addConnectionIndicator();
         this.addPulseIndicator();
         this.addDatabaseIndicator();
+
+        // Auth: spawn auth glyph when unauthenticated, add logout to connection context menu
+        this.setupAuthIntegration();
 
         // Subscribe to connectivity state for connection indicator
         let firstCallback = true;
@@ -185,6 +190,38 @@ class StatusIndicatorManager {
             clickable: true,
             onClick: () => this.showDatabaseInfo(),
             initialState: 'active'
+        });
+    }
+
+    /**
+     * Wire auth state into the connection indicator.
+     * Unauthenticated → spawn auth glyph in tray.
+     * Right-click "Connected" → log out.
+     */
+    private setupAuthIntegration(): void {
+        // Right-click on connection indicator → log out (when authenticated)
+        const connEl = this.indicators.get('connection');
+        if (connEl) {
+            connEl.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                if (!connectivityManager.authenticated) return;
+                apiFetch('/auth/logout', { method: 'POST' }).then(() => {
+                    connectivityManager.reportUnauthenticated();
+                }).catch(() => {});
+            });
+        }
+
+        // Spawn auth glyph automatically when unauthenticated
+        let hasSeenAuth = false;
+        connectivityManager.subscribeAuth((authenticated: boolean) => {
+            if (authenticated && !hasSeenAuth) {
+                // Never got a 401 — auth probably disabled, do nothing
+                return;
+            }
+            hasSeenAuth = true;
+            if (!authenticated) {
+                spawnAuthGlyph();
+            }
         });
     }
 
