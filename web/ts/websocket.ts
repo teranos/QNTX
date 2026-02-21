@@ -75,7 +75,10 @@ const MESSAGE_HANDLERS = {
     },
 
     job_update: (data: JobUpdateMessage) => {
-        log.info(SEG.PULSE, 'Job update:', data.job.id, data.job.status);
+        // Only log non-completed jobs — completed jobs are too noisy (e.g. embedding bulk on sync)
+        if (data.job.status !== 'completed') {
+            log.info(SEG.PULSE, 'Job update:', data.job.id, data.job.status);
+        }
 
         // Send native desktop notification if in Tauri
         handleJobNotification({

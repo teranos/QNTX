@@ -28,6 +28,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     config.field_attribute("protocol.Attestation.attributes", struct_serde);
     config.field_attribute("protocol.AttestationCommand.attributes", struct_serde);
 
+    // Repeated string fields: accept JSON null as empty vec (Go nil slices marshal to null)
+    let vec_default = "#[serde(default)]";
+    for msg in &["Attestation", "AttestationCommand", "AttestationFilter"] {
+        for field in &["subjects", "predicates", "contexts", "actors"] {
+            config.field_attribute(format!("protocol.{}.{}", msg, field), vec_default);
+        }
+    }
+
     config.compile_protos(&protos, &[&proto_dir])?;
     Ok(())
 }

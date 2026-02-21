@@ -15,7 +15,7 @@ Data → Graph → Knowledge → Intelligence → Action
 
 ## What is QNTX?
 
-QNTX provides a **domain-agnostic foundation** for building knowledge systems. At its core is the **[Attestation Type System (ATS)](ats/README.md)** - a way to track who said what, when, and in what context. For architecture and philosophy, see [Understanding QNTX](docs/understanding-qntx.md).
+QNTX provides a **domain-agnostic foundation** for building knowledge systems. At its core is the **[Attestation Type System (ATS)](ats/README.md)** - a way to track who said what, when, and in what context. For architecture and philosophy, see [Understanding QNTX](docs/understanding-qntx.md). For the full architectural overview, see [Architecture (arc42)](docs/arc42.md).
 
 ### Quick Example
 ```bash
