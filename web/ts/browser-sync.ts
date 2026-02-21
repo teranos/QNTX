@@ -227,6 +227,9 @@ export class BrowserSync {
     // ========================================================================
 
     private async doReconcile(): Promise<{ sent: number; received: number }> {
+        // TODO: Persistent sync connection — currently opens new WebSocket per round.
+        // Multi-round syncs (large deltas) open many connections in sequence.
+        // Requires protocol changes: persistent WS, message framing, health checks.
         const ws = await this.connectSyncWebSocket();
         let sent = 0;
         let received = 0;
