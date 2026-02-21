@@ -21,6 +21,9 @@ func (s *QNTXServer) setupHTTPRoutes() {
 		s.authHandler.RegisterRoutes()
 	}
 
+	// Node DID document (public, no auth)
+	http.HandleFunc("/.well-known/did.json", s.corsMiddleware(s.nodeDID.HandleDIDDocument))
+
 	// Register plugin routes with dynamic handler that waits for plugins to load
 	// This allows routes to be registered immediately while plugins load asynchronously
 	if s.pluginRegistry != nil {

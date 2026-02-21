@@ -23,6 +23,7 @@ import (
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/nodedid"
 	"github.com/teranos/QNTX/server/wslogs"
 	syncPkg "github.com/teranos/QNTX/sync"
 	"go.uber.org/zap"
@@ -209,6 +210,13 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 			"session_expiry_hours", deps.config.Auth.SessionExpiryHours,
 		)
 	}
+
+	// Initialize node DID (decentralized identity for this node)
+	nodeDIDHandler, err := nodedid.New(db, serverLogger)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to initialize node DID")
+	}
+	server.nodeDID = nodeDIDHandler
 
 	// Register system type definitions so attestations render in the graph
 	{
