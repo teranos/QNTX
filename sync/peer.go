@@ -459,6 +459,13 @@ func attestationJSON(as *types.As) (string, error) {
 	// Build a struct that matches Rust's Attestation layout exactly:
 	// - timestamps as i64 millis (not time.Time which marshals to RFC3339)
 	// - attributes as map (not pre-serialized string like the proto struct)
+	nilToEmpty := func(s []string) []string {
+		if s == nil {
+			return []string{}
+		}
+		return s
+	}
+
 	wire := struct {
 		ID         string                 `json:"id"`
 		Subjects   []string               `json:"subjects"`
@@ -471,10 +478,10 @@ func attestationJSON(as *types.As) (string, error) {
 		CreatedAt  int64                  `json:"created_at"`
 	}{
 		ID:         as.ID,
-		Subjects:   as.Subjects,
-		Predicates: as.Predicates,
-		Contexts:   as.Contexts,
-		Actors:     as.Actors,
+		Subjects:   nilToEmpty(as.Subjects),
+		Predicates: nilToEmpty(as.Predicates),
+		Contexts:   nilToEmpty(as.Contexts),
+		Actors:     nilToEmpty(as.Actors),
 		Timestamp:  as.Timestamp.UnixMilli(),
 		Source:     as.Source,
 		Attributes: as.Attributes,
