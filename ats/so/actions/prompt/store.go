@@ -133,6 +133,7 @@ func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, act
 }
 
 // GetPromptByFilename returns the latest version of a prompt by filename
+// TODO(#585): Use storage.AttestationSelectQuery instead of hardcoded column list
 func (ps *PromptStore) GetPromptByFilename(ctx context.Context, filename string) (*StoredPrompt, error) {
 	query := `
 		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
