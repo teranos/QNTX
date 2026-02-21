@@ -448,17 +448,33 @@ func (p *Peer) recvDone() error {
 		return errors.Newf("expected sync_done, got %s", msg.Type)
 	}
 	if msg.BudgetDailyUSD != nil {
-		pb := &PeerBudget{
-			DailyUSD:   *msg.BudgetDailyUSD,
-			WeeklyUSD:  *msg.BudgetWeeklyUSD,
-			MonthlyUSD: *msg.BudgetMonthlyUSD,
+		// Budget fields must all be present or none — partial budget is malformed
+		if msg.BudgetWeeklyUSD == nil || msg.BudgetMonthlyUSD == nil {
+			p.logger.Warnw("Peer sent partial budget data, ignoring",
+				"has_daily", msg.BudgetDailyUSD != nil,
+				"has_weekly", msg.BudgetWeeklyUSD != nil,
+				"has_monthly", msg.BudgetMonthlyUSD != nil)
+		} else {
+			pb := &PeerBudget{
+				DailyUSD:   *msg.BudgetDailyUSD,
+				WeeklyUSD:  *msg.BudgetWeeklyUSD,
+				MonthlyUSD: *msg.BudgetMonthlyUSD,
+			}
+			if msg.ClusterDailyLimitUSD != nil {
+				// Cluster limits also all-or-nothing
+				if msg.ClusterWeeklyLimitUSD == nil || msg.ClusterMonthlyLimitUSD == nil {
+					p.logger.Warnw("Peer sent partial cluster budget data, ignoring cluster limits",
+						"has_cluster_daily", msg.ClusterDailyLimitUSD != nil,
+						"has_cluster_weekly", msg.ClusterWeeklyLimitUSD != nil,
+						"has_cluster_monthly", msg.ClusterMonthlyLimitUSD != nil)
+				} else {
+					pb.ClusterDailyLimitUSD = *msg.ClusterDailyLimitUSD
+					pb.ClusterWeeklyLimitUSD = *msg.ClusterWeeklyLimitUSD
+					pb.ClusterMonthlyLimitUSD = *msg.ClusterMonthlyLimitUSD
+				}
+			}
+			p.RemoteBudget = pb
 		}
-		if msg.ClusterDailyLimitUSD != nil {
-			pb.ClusterDailyLimitUSD = *msg.ClusterDailyLimitUSD
-			pb.ClusterWeeklyLimitUSD = *msg.ClusterWeeklyLimitUSD
-			pb.ClusterMonthlyLimitUSD = *msg.ClusterMonthlyLimitUSD
-		}
-		p.RemoteBudget = pb
 	}
 	return nil
 }
