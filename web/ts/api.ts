@@ -16,12 +16,21 @@ function getBackendUrl(): string {
  * Reports HTTP health to connectivity manager:
  *   - Any response (including 4xx/5xx) = HTTP healthy
  *   - Network-level failure (fetch throws) = HTTP failure
+ * Reports 401 responses to connectivity manager as unauthenticated state.
  */
 export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
     const url = getBackendUrl() + path;
-    return fetch(url, init).then(
+    // credentials: 'include' ensures cookies are sent on cross-origin requests
+    // (dev mode: frontend on :8826, backend on :8776 — different origin, same site)
+    const fetchInit: RequestInit = { credentials: 'include', ...init };
+    return fetch(url, fetchInit).then(
         response => {
             connectivityManager.reportHttpSuccess();
+            if (response.status === 401 && !path.startsWith('/auth/')) {
+                connectivityManager.reportUnauthenticated();
+            } else if (response.status !== 401) {
+                connectivityManager.reportAuthenticated();
+            }
             return response;
         },
         error => {
@@ -29,4 +38,11 @@ export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
             throw error;
         }
     );
+}
+
+/**
+ * Get the backend auth login URL for explicit user-initiated navigation.
+ */
+export function getAuthLoginUrl(): string {
+    return getBackendUrl() + '/auth/login';
 }
