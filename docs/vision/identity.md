@@ -37,11 +37,11 @@ This answers the open question from [reticulum.md](./reticulum.md): yes, a QNTX 
 ## Implementation Path
 
 1. **Node DID** — every node generates a `did:key` on first boot, serves it at `/.well-known/did.json` ([#575](https://github.com/teranos/QNTX/pull/575))
-2. **Signed attestations** — every attestation carries a DID signature from the authoring node, verifiable without contacting the origin
-3. **User DID** — WebAuthn PRF extension derives a stable keypair from biometrics
-4. **Delegations** — user DID signs short-lived authority grants to node DIDs
-5. **Peer auth** — nodes verify each other's delegations before accepting sync
-6. **Name attestations** — vanity names attested by peers, propagated through sync
+2. **Signed attestations** — every attestation carries a DID signature from the authoring node, verifiable without contacting the origin ([#576](https://github.com/teranos/QNTX/issues/576))
+3. **User DID** — WebAuthn PRF extension derives a stable keypair from biometrics ([#577](https://github.com/teranos/QNTX/issues/577))
+4. **Delegations** — user DID signs short-lived authority grants to node DIDs ([#578](https://github.com/teranos/QNTX/issues/578))
+5. **Peer auth** — nodes verify each other's delegations before accepting sync ([#579](https://github.com/teranos/QNTX/issues/579))
+6. **Name attestations** — vanity names attested by peers, propagated through sync ([#580](https://github.com/teranos/QNTX/issues/580))
 
 ## Related
 
