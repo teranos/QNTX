@@ -3,18 +3,19 @@ package graph
 import (
 	"sort"
 
+	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/ats/types"
 )
 
 // RelationshipDefinition holds physics and display metadata for a relationship type from attestations.
 // Relationship type definitions use the "relationship_type" predicate in typespace.
 type RelationshipDefinition struct {
-	PredicateName string   `json:"predicate_name"`          // e.g., "is_child_of", "points_to"
-	DisplayLabel  string   `json:"display_label"`           // Human-readable label
-	Color         string   `json:"color,omitempty"`         // Optional link color override
-	LinkDistance  *float64 `json:"link_distance,omitempty"` // D3 force distance (nil = use default)
-	LinkStrength  *float64 `json:"link_strength,omitempty"` // D3 force strength (nil = use default)
-	Deprecated    bool     `json:"deprecated"`              // Whether this relationship type is deprecated
+	PredicateName string   `json:"predicate_name"`                                         // e.g., "is_child_of", "points_to"
+	DisplayLabel  string   `json:"display_label" attr:"display_label"`                     // Human-readable label
+	Color         string   `json:"color,omitempty" attr:"color,omitempty"`                 // Optional link color override
+	LinkDistance  *float64 `json:"link_distance,omitempty" attr:"link_distance,omitempty"` // D3 force distance (nil = use default)
+	LinkStrength  *float64 `json:"link_strength,omitempty" attr:"link_strength,omitempty"` // D3 force strength (nil = use default)
+	Deprecated    bool     `json:"deprecated" attr:"deprecated"`                           // Whether this relationship type is deprecated
 }
 
 // extractRelationshipTypeDefinitions extracts relationship type definitions from attestations with physics metadata.
@@ -47,29 +48,8 @@ func (b *AxGraphBuilder) extractRelationshipTypeDefinitions(attestations []types
 			if claim.Predicate == "relationship_type" && claim.Context == "graph" {
 				predicateName := claim.Subject
 
-				// Extract physics and display metadata from Attributes
-				def := RelationshipDefinition{
-					PredicateName: predicateName,
-				}
-
-				// Parse Attributes if present
-				if attestation.Attributes != nil {
-					if label, ok := attestation.Attributes["display_label"].(string); ok {
-						def.DisplayLabel = label
-					}
-					if color, ok := attestation.Attributes["color"].(string); ok {
-						def.Color = color
-					}
-					if distance, ok := attestation.Attributes["link_distance"].(float64); ok {
-						def.LinkDistance = &distance
-					}
-					if strength, ok := attestation.Attributes["link_strength"].(float64); ok {
-						def.LinkStrength = &strength
-					}
-					if deprecated, ok := attestation.Attributes["deprecated"].(bool); ok {
-						def.Deprecated = deprecated
-					}
-				}
+				def := RelationshipDefinition{PredicateName: predicateName}
+				attrs.Scan(attestation.Attributes, &def)
 
 				// Later attestations override earlier ones (natural evolution)
 				relationshipDefinitions[predicateName] = def

@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/ats/ax"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 )
 
@@ -352,23 +354,14 @@ func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (map[string][]st
 		}
 		typeName := attestation.Subjects[0]
 
-		// Extract rich_string_fields from attributes
-		if attestation.Attributes != nil {
-			if richFields, ok := attestation.Attributes["rich_string_fields"].([]interface{}); ok {
-				fields := make([]string, 0, len(richFields))
-				for _, field := range richFields {
-					if fieldStr, ok := field.(string); ok {
-						fields = append(fields, fieldStr)
-					}
-				}
-				if len(fields) > 0 {
-					typeFields[typeName] = fields
-					if bs.logger != nil {
-						bs.logger.Debugw("Found type with rich fields",
-							"type", typeName,
-							"fields", fields)
-					}
-				}
+		var def types.TypeDef
+		attrs.Scan(attestation.Attributes, &def)
+		if len(def.RichStringFields) > 0 {
+			typeFields[typeName] = def.RichStringFields
+			if bs.logger != nil {
+				bs.logger.Debugw("Found type with rich fields",
+					"type", typeName,
+					"fields", def.RichStringFields)
 			}
 		}
 	}

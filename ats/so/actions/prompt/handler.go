@@ -12,6 +12,7 @@ import (
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/alias"
+	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/ats/ax"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
@@ -22,6 +23,14 @@ import (
 
 // HandlerName is the registered name for the prompt handler
 const HandlerName = "prompt.execute"
+
+// promptResultAttrs defines the attribute schema for prompt result attestations.
+type promptResultAttrs struct {
+	Response      string `attr:"response"`
+	SourceID      string `attr:"source_id"`
+	Template      string `attr:"template"`
+	PromptHandler string `attr:"prompt_handler"`
+}
 
 // Payload represents the job payload for prompt execution
 type Payload struct {
@@ -399,12 +408,12 @@ func (h *Handler) createResultAttestation(
 		Actors:     []string{actor},
 		Timestamp:  now,
 		Source:     "prompt",
-		Attributes: map[string]interface{}{
-			"response":       response,
-			"source_id":      sourceAs.ID,
-			"template":       payload.Template,
-			"prompt_handler": HandlerName,
-		},
+		Attributes: attrs.From(promptResultAttrs{
+			Response:      response,
+			SourceID:      sourceAs.ID,
+			Template:      payload.Template,
+			PromptHandler: HandlerName,
+		}),
 	}
 
 	// Store the attestation
