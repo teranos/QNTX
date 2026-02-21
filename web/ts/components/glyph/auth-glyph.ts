@@ -40,22 +40,32 @@ function renderAuthContent(): HTMLElement {
     container.style.padding = '16px';
     container.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
 
-    const subtitle = document.createElement('p');
-    subtitle.style.color = 'var(--text-secondary)';
-    subtitle.style.fontSize = '13px';
-    subtitle.style.margin = '0';
-    subtitle.textContent = 'Checking...';
-
     const btn = document.createElement('button');
-    btn.style.background = '#3a3a5c';
+    btn.style.background = '#4a4470';
     btn.style.color = 'var(--text-on-dark)';
-    btn.style.border = '1px solid #4a4a6a';
-    btn.style.padding = '8px 24px';
-    btn.style.fontSize = '13px';
-    btn.style.borderRadius = '6px';
+    btn.style.border = '1px solid #5c5488';
+    btn.style.padding = '0';
+    btn.style.borderRadius = '50%';
     btn.style.cursor = 'pointer';
+    btn.style.width = '68px';
+    btn.style.height = '68px';
+    btn.style.flexShrink = '0';
+    btn.style.display = 'flex';
+    btn.style.alignItems = 'center';
+    btn.style.justifyContent = 'center';
+    btn.style.transition = 'background 0.15s ease';
     btn.disabled = true;
-    btn.textContent = 'Authenticate';
+    btn.innerHTML = `<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.14 21C10.81 19.54 9.25 16.95 9.25 14c0-1.52 1.23-2.75 2.75-2.75s2.75 1.23 2.75 2.75c0 1.52 1.23 2.75 2.75 2.75s2.75-1.23 2.75-2.75C20.25 9.44 16.55 5.75 12 5.75S3.76 9.44 3.76 14c0 1.02.11 2 .32 2.95M8.49 20.3C7.24 18.51 6.5 16.34 6.5 14c0-3.04 2.46-5.5 5.5-5.5s5.5 2.46 5.5 5.5M17.79 19.48c-.1.01-.2.01-.3.01-3.04 0-5.5-2.46-5.5-5.5M19.67 6.48C17.8 4.35 15.06 3 12 3S6.2 4.35 4.33 6.48"/></svg>`;
+
+
+    const server = document.createElement('p');
+    server.style.fontSize = '11px';
+    server.style.color = 'var(--text-on-dark)';
+    server.style.margin = '0';
+    server.style.padding = '3px 10px';
+    server.style.background = 'rgba(0, 0, 0, 0.3)';
+    server.style.borderRadius = '10px';
+    server.textContent = (window as any).__BACKEND_URL__ || window.location.origin;
 
     const status = document.createElement('p');
     status.style.fontSize = '12px';
@@ -63,26 +73,39 @@ function renderAuthContent(): HTMLElement {
     status.style.margin = '0';
     status.style.minHeight = '1.2em';
 
-    container.append(subtitle, btn, status);
+    container.append(btn, server, status);
 
-    let mode: 'register' | 'login' | null = null;
+    let mode: 'register' | 'login' | 'authenticated' | null = null;
+
+    const fingerprintSvg = btn.innerHTML;
 
     async function checkStatus() {
         try {
+            // If already authenticated, show logout UI
+            if (connectivityManager.authenticated) {
+                mode = 'authenticated';
+                btn.innerHTML = '';
+                btn.textContent = 'Log out';
+                btn.style.borderRadius = '6px';
+                btn.style.width = 'auto';
+                btn.style.height = 'auto';
+                btn.style.padding = '8px 24px';
+                btn.style.fontSize = '13px';
+                btn.style.background = '#4a4470';
+                btn.style.border = '1px solid #5c5488';
+                btn.disabled = false;
+                return;
+            }
+
             const res = await apiFetch('/auth/status');
             const data = await res.json();
             if (data.registered) {
                 mode = 'login';
-                subtitle.textContent = 'Biometric authentication required';
-                btn.textContent = 'Authenticate';
             } else {
                 mode = 'register';
-                subtitle.textContent = 'Register your biometric credential';
-                btn.textContent = 'Register';
             }
             btn.disabled = false;
         } catch (e) {
-            subtitle.textContent = 'Cannot reach server';
             status.textContent = e instanceof Error ? e.message : String(e);
             status.style.color = '#e06060';
         }
@@ -178,6 +201,21 @@ function renderAuthContent(): HTMLElement {
         }
     }
 
+    async function logout() {
+        btn.disabled = true;
+        status.textContent = 'Logging out...';
+        status.style.color = 'var(--text-secondary)';
+        try {
+            await apiFetch('/auth/logout', { method: 'POST' });
+            connectivityManager.reportUnauthenticated();
+            setTimeout(() => glyphRun.remove(AUTH_GLYPH_ID), 600);
+        } catch (e: any) {
+            status.textContent = e.message;
+            status.style.color = '#e06060';
+            btn.disabled = false;
+        }
+    }
+
     function onSuccess() {
         status.textContent = 'Authenticated';
         status.style.color = '#2ecc71';
@@ -189,10 +227,11 @@ function renderAuthContent(): HTMLElement {
     btn.addEventListener('click', () => {
         if (mode === 'register') register();
         else if (mode === 'login') login();
+        else if (mode === 'authenticated') logout();
     });
 
-    btn.addEventListener('mouseenter', () => { btn.style.background = '#4a4a6a'; });
-    btn.addEventListener('mouseleave', () => { btn.style.background = '#3a3a5c'; });
+    btn.addEventListener('mouseenter', () => { btn.style.background = '#564e82'; });
+    btn.addEventListener('mouseleave', () => { btn.style.background = '#4a4470'; });
 
     checkStatus();
     return container;
@@ -209,7 +248,7 @@ export function spawnAuthGlyph(): void {
 
     const glyph: Glyph = {
         id: AUTH_GLYPH_ID,
-        title: 'Authenticate',
+        title: 'Auth',
         renderContent: renderAuthContent,
         initialWidth: '280px',
         initialHeight: '160px',
