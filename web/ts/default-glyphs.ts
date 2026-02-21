@@ -62,10 +62,12 @@ import { DB } from '@generated/sym.js';
 import { log, SEG } from './logger.ts';
 import { formatBuildTime } from './components/tooltip.ts';
 import type { VersionMessage, SystemCapabilitiesMessage, SyncStatusMessage } from '../types/websocket';
+import { browserSync, type BrowserSyncState } from './browser-sync';
 
 // Sync status state
 let syncElement: HTMLElement | null = null;
 let syncStatus: SyncStatusMessage | null = null;
+let browserState: BrowserSyncState | null = null;
 
 export function updateSyncStatus(data: SyncStatusMessage): void {
     syncStatus = data;
@@ -130,6 +132,19 @@ function renderSync(): void {
         : 'empty';
     const rootColor = syncStatus.root && syncStatus.root !== '0'.repeat(64) ? '#4ade80' : '#9ca3af';
 
+    // Browser convergence
+    const browserRoot = browserState?.root || '';
+    const browserRootShort = browserRoot
+        ? `${browserRoot.substring(0, 8)}...${browserRoot.substring(56)}`
+        : 'not initialized';
+    const converged = browserRoot && syncStatus.root && browserRoot === syncStatus.root;
+    const convergenceLabel = !browserRoot ? 'initializing'
+        : browserState?.syncing ? `syncing (round ${browserState.round})`
+        : converged ? 'converged' : 'divergent';
+    const convergenceColor = !browserRoot ? '#9ca3af'
+        : browserState?.syncing ? '#fbbf24'
+        : converged ? '#4ade80' : '#f87171';
+
     // Peers section
     const peers = syncStatus.peers || [];
     let peersSection = '';
@@ -143,11 +158,11 @@ function renderSync(): void {
                     padding: 2px 8px; border-radius: 3px; cursor: pointer;
                     font-family: monospace; font-size: 11px; margin-left: 8px;
                 ">Sync</button>`;
-            const advertisedName = p.advertised_name ? ` <span style="color: #9ca3af;">(${p.advertised_name})</span>` : '';
+            const advertisedName = p.advertised_name ? ` <span style="color: #9ca3af;">(${escapeHtml(p.advertised_name)})</span>` : '';
             return `
             <div class="glyph-row" style="align-items: center;">
-                ${statusDot}<span class="glyph-label">${p.name}${advertisedName}:</span>
-                <span class="glyph-value" style="font-size: 11px; flex: 1;">${p.url}</span>
+                ${statusDot}<span class="glyph-label">${escapeHtml(p.name)}${advertisedName}:</span>
+                <span class="glyph-value" style="font-size: 11px; flex: 1;">${escapeHtml(p.url)}</span>
                 ${syncBtn}
             </div>`;
         }).join('');
@@ -187,18 +202,61 @@ phone = "http://phone.local:877"</pre>
             <div class="glyph-section">
                 <h3 class="glyph-section-title">Merkle Tree</h3>
                 <div class="glyph-row">
-                    <span class="glyph-label">Root:</span>
+                    <span class="glyph-label">Server:</span>
                     <span class="glyph-value" style="color: ${rootColor}; font-family: monospace; font-size: 12px;">${rootShort}</span>
                 </div>
                 <div class="glyph-row">
+                    <span class="glyph-label">Browser:</span>
+                    <span class="glyph-value" style="color: ${browserRoot ? rootColor : '#9ca3af'}; font-family: monospace; font-size: 12px;">${browserRootShort}</span>
+                </div>
+                <div class="glyph-row" style="align-items: center;">
+                    <span class="glyph-label">Status:</span>
+                    <span class="glyph-value" style="color: ${convergenceColor}; flex: 1;"><span style="margin-right: 4px;">${converged ? '\u25CF' : browserState?.syncing ? '\u25CB' : '\u25CF'}</span>${convergenceLabel}</span>
+                    <button class="browser-sync-btn" style="
+                        background: transparent; border: 1px solid #60a5fa; color: #60a5fa;
+                        padding: 2px 8px; border-radius: 3px; cursor: pointer;
+                        font-family: monospace; font-size: 11px; margin-left: 8px;
+                    " ${browserState?.syncing ? 'disabled' : ''}>Sync</button>
+                </div>
+                <div class="glyph-row">
                     <span class="glyph-label">Groups:</span>
-                    <span class="glyph-value">${(syncStatus.groups ?? 0).toLocaleString()} <span style="color: #6b7280;">(actor, context) pairs</span></span>
+                    <span class="glyph-value">${(syncStatus.groups ?? 0).toLocaleString()} <span style="color: #6b7280;">server</span> / ${(browserState?.groups ?? 0).toLocaleString()} <span style="color: #6b7280;">browser</span></span>
                 </div>
             </div>
             ${peersSection}
             ${visionSection}
         </div>
     `;
+
+    // Browser sync button — triggers manual reconciliation
+    const browserSyncBtn = syncElement.querySelector('.browser-sync-btn');
+    if (browserSyncBtn) {
+        browserSyncBtn.addEventListener('click', async () => {
+            const button = browserSyncBtn as HTMLButtonElement;
+            button.textContent = 'Syncing\u2026';
+            button.disabled = true;
+            button.style.borderColor = '#fbbf24';
+            button.style.color = '#fbbf24';
+
+            try {
+                const { sent, received } = await browserSync.reconcile();
+                button.textContent = `\u2191${sent} \u2193${received}`;
+                button.style.borderColor = '#4ade80';
+                button.style.color = '#4ade80';
+            } catch {
+                button.textContent = 'Failed';
+                button.style.borderColor = '#f87171';
+                button.style.color = '#f87171';
+            }
+
+            setTimeout(() => {
+                button.textContent = 'Sync';
+                button.disabled = false;
+                button.style.borderColor = '#60a5fa';
+                button.style.color = '#60a5fa';
+            }, 3000);
+        });
+    }
 
     // Attach per-peer sync button handlers
     syncElement.querySelectorAll('.sync-peer-btn').forEach(btn => {
@@ -1024,6 +1082,11 @@ export function registerDefaultGlyphs(): void {
     });
 
     // Sync Status Glyph
+    browserSync.onStateChange((state) => {
+        browserState = state;
+        if (syncElement) renderSync();
+    });
+
     glyphRun.add({
         id: 'sync-glyph',
         title: '↔ Sync',
