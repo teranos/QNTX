@@ -104,6 +104,7 @@ export class EmbeddingStore {
                     if (completed === sourceIds.length) resolve(result);
                 };
                 request.onerror = () => {
+                    log.warn(SEG.WASM, `Failed to get embedding for ${id}: ${request.error?.message || 'unknown error'}`);
                     completed++;
                     if (completed === sourceIds.length) resolve(result);
                 };
