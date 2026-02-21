@@ -31,6 +31,8 @@ export async function localSemanticSearch(
     threshold: number,
 ): Promise<LocalSearchResult[]> {
     await embeddingStore.open();
+    // TODO: Performance — getAll() loads all embeddings into memory on every call.
+    // For large stores (>1000 embeddings), consider caching or IndexedDB index-based filtering.
     const allEmbeddings = await embeddingStore.getAll();
 
     const results: LocalSearchResult[] = [];
