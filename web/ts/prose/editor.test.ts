@@ -1,15 +1,26 @@
 /**
  * Regression test: ensure save functionality continues to work
+ *
+ * Mocks ../api directly — global.fetch won't work because mock.module
+ * for ../api leaks from canvas-sync test files (process-global in Bun).
  */
 
 import { test, expect, mock } from 'bun:test';
-import { ProseEditor } from './editor.ts';
+
+let mockApiFetch: (path: string, init?: RequestInit) => Promise<Response>;
+
+mock.module('../api', () => ({
+    apiFetch: (path: string, init?: RequestInit) => mockApiFetch(path, init),
+}));
+
+// Dynamic import after mock.module to ensure mock is in place
+const { ProseEditor } = await import('./editor.ts');
 
 test('can save document', async () => {
     const panel = document.createElement('div');
     panel.innerHTML = '<div id="prose-editor"></div>';
 
-    global.fetch = mock(() =>
+    mockApiFetch = mock(() =>
         Promise.resolve({
             ok: true,
             text: () => Promise.resolve('# Test'),

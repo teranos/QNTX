@@ -4,9 +4,10 @@
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
 
-// We need to test the class, not the singleton, so we'll import the module fresh
-// For now, test the singleton behavior
-import { uiState, type PanelId } from './ui';
+// Import from ui-impl.ts directly to bypass process-global mock.module
+// that replaces ./ui in other test files (mock.module is process-global in Bun).
+import { UIState, type PanelId } from './ui-impl';
+const uiState = new UIState();
 
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
