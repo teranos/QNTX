@@ -22,8 +22,10 @@
 //!
 //! let mut engine = FuzzyEngine::new();
 //! engine.rebuild_index(
+//!     vec!["ALICE".into()],
 //!     vec!["is_author_of".into(), "is_maintainer_of".into()],
 //!     vec!["GitHub".into(), "GitLab".into()],
+//!     vec!["human:alice".into()],
 //! );
 //!
 //! let matches = engine.search_predicates("author", 10, 0.6);

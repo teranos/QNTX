@@ -8,6 +8,7 @@ export const fuzzy_rebuild_index: () => any;
 export const fuzzy_search: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
 export const fuzzy_status: () => [number, number];
 export const get_attestation: (a: number, b: number) => any;
+export const get_completions: (a: number, b: number, c: number) => [number, number];
 export const init_store: (a: number, b: number) => any;
 export const is_store_initialized: () => number;
 export const list_attestation_ids: () => any;

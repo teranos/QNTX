@@ -61,8 +61,8 @@ export function exists_attestation(id) {
 
 /**
  * Rebuild the fuzzy search index from current IndexedDB vocabulary.
- * Pulls distinct predicates and contexts from the attestation store.
- * Returns JSON: {"predicates": N, "contexts": N, "hash": "..."}
+ * Pulls distinct subjects, predicates, contexts, and actors from the attestation store.
+ * Returns JSON: {"subjects": N, "predicates": N, "contexts": N, "actors": N, "hash": "..."}
  * @returns {Promise<string>}
  */
 export function fuzzy_rebuild_index() {
@@ -72,7 +72,7 @@ export function fuzzy_rebuild_index() {
 
 /**
  * Search the fuzzy index for matching vocabulary.
- * vocab_type: "predicates" or "contexts"
+ * vocab_type: "subjects", "predicates", "contexts", or "actors"
  * Returns JSON array: [{"value":"...", "score":0.95, "strategy":"exact"}, ...]
  * @param {string} query
  * @param {string} vocab_type
@@ -105,7 +105,7 @@ export function fuzzy_search(query, vocab_type, limit, min_score) {
 
 /**
  * Get fuzzy engine status.
- * Returns JSON: {"ready": bool, "predicates": N, "contexts": N, "hash": "..."}
+ * Returns JSON: {"ready": bool, "subjects": N, "predicates": N, "contexts": N, "actors": N, "hash": "..."}
  * @returns {string}
  */
 export function fuzzy_status() {
@@ -125,7 +125,7 @@ export function fuzzy_status() {
  * Retrieve an attestation by ID from IndexedDB.
  * Returns a Promise that resolves to JSON-serialized attestation or null if not found.
  *
- * Returns JSON matching proto schema (timestamps as numbers, attributes as JSON string).
+ * Returns JSON matching proto schema (timestamps as numbers, attributes as JSON object).
  * Converts from internal core::Attestation format before serialization.
  * @param {string} id
  * @returns {Promise<string | undefined>}
@@ -135,6 +135,32 @@ export function get_attestation(id) {
     const len0 = WASM_VECTOR_LEN;
     const ret = wasm.get_attestation(ptr0, len0);
     return ret;
+}
+
+/**
+ * Get context-aware completions for a partial AX query.
+ *
+ * Parses the partial query to determine which AX slot the cursor is in,
+ * then fuzzy-matches the trailing word against the appropriate vocabulary.
+ *
+ * Returns JSON: `{"slot":"predicates","prefix":"auth","items":[{"value":"...","score":0.95,"strategy":"exact"},...]}`
+ * @param {string} partial_query
+ * @param {number} limit
+ * @returns {string}
+ */
+export function get_completions(partial_query, limit) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        const ptr0 = passStringToWasm0(partial_query, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.get_completions(ptr0, len0, limit);
+        deferred2_0 = ret[0];
+        deferred2_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+    }
 }
 
 /**
@@ -196,7 +222,7 @@ export function parse_query(input) {
  * Store an attestation in IndexedDB.
  * Returns a Promise that resolves to null on success or error message on failure.
  *
- * Expects JSON matching proto schema (timestamps as numbers, attributes as JSON string).
+ * Expects JSON matching proto schema (timestamps as numbers, attributes as JSON object).
  * Converts to internal core::Attestation format before storage.
  * @param {string} json
  * @returns {Promise<void>}
@@ -223,7 +249,7 @@ export function query_attestations(filter_json) {
 
 /**
  * Compute content hash for an attestation.
- * Input: JSON-serialized proto Attestation
+ * Input: JSON-serialized proto Attestation (attributes as JSON object)
  * Returns: `{"hash":"<64-char hex>"}` or `{"error":"..."}`
  * @param {string} attestation_json
  * @returns {string}
@@ -677,17 +703,17 @@ function __wbg_get_imports() {
             return ret;
         }, arguments); },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { dtor_idx: 101, function: Function { arguments: [NamedExternref("Event")], shim_idx: 102, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { dtor_idx: 102, function: Function { arguments: [NamedExternref("Event")], shim_idx: 103, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h63454322f75c3832, wasm_bindgen__convert__closures_____invoke__h857fdb0c9bdea0c8);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { dtor_idx: 101, function: Function { arguments: [NamedExternref("IDBVersionChangeEvent")], shim_idx: 102, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { dtor_idx: 102, function: Function { arguments: [NamedExternref("IDBVersionChangeEvent")], shim_idx: 103, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h63454322f75c3832, wasm_bindgen__convert__closures_____invoke__h857fdb0c9bdea0c8);
             return ret;
         },
         __wbindgen_cast_0000000000000003: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { dtor_idx: 120, function: Function { arguments: [Externref], shim_idx: 121, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { dtor_idx: 121, function: Function { arguments: [Externref], shim_idx: 122, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h622d11ff1c80a730, wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea);
             return ret;
         },

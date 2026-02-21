@@ -42,7 +42,7 @@ pub use browser::*;
 #[cfg(not(feature = "browser"))]
 use qntx_core::fuzzy::{FuzzyEngine, VocabularyType};
 #[cfg(not(feature = "browser"))]
-use qntx_core::parser::Parser;
+use qntx_core::parser::{Lexer, Parser, TokenKind};
 
 #[cfg(not(feature = "browser"))]
 mod wazero {
@@ -178,8 +178,14 @@ mod wazero {
 
     #[derive(serde::Deserialize)]
     struct RebuildInput {
+        #[serde(default)]
+        subjects: Vec<String>,
+        #[serde(default)]
         predicates: Vec<String>,
+        #[serde(default)]
         contexts: Vec<String>,
+        #[serde(default)]
+        actors: Vec<String>,
     }
 
     #[derive(serde::Deserialize)]
@@ -197,14 +203,18 @@ mod wazero {
             Err(e) => return error_json(&format!("invalid JSON: {}", e)),
         };
 
-        let (pred_count, ctx_count, hash) = FUZZY.with(|f| {
-            f.borrow_mut()
-                .rebuild_index(parsed.predicates, parsed.contexts)
+        let (sub_count, pred_count, ctx_count, act_count, hash) = FUZZY.with(|f| {
+            f.borrow_mut().rebuild_index(
+                parsed.subjects,
+                parsed.predicates,
+                parsed.contexts,
+                parsed.actors,
+            )
         });
 
         format!(
-            r#"{{"predicates":{},"contexts":{},"hash":"{}"}}"#,
-            pred_count, ctx_count, hash
+            r#"{{"subjects":{},"predicates":{},"contexts":{},"actors":{},"hash":"{}"}}"#,
+            sub_count, pred_count, ctx_count, act_count, hash
         )
     }
 
@@ -216,11 +226,13 @@ mod wazero {
         };
 
         let vtype = match parsed.vocab_type.as_str() {
+            "subjects" => VocabularyType::Subjects,
             "predicates" => VocabularyType::Predicates,
             "contexts" => VocabularyType::Contexts,
+            "actors" => VocabularyType::Actors,
             other => {
                 return error_json(&format!(
-                    "invalid vocab_type '{}', expected 'predicates' or 'contexts'",
+                    "invalid vocab_type '{}', expected 'subjects', 'predicates', 'contexts', or 'actors'",
                     other
                 ))
             }
@@ -257,6 +269,113 @@ mod wazero {
     pub extern "C" fn fuzzy_find_matches(ptr: u32, len: u32) -> u64 {
         let input = unsafe { read_str(ptr, len) };
         write_result(&fuzzy_find_matches_impl(input))
+    }
+
+    // ============================================================================
+    // Completions (parser-aware fuzzy matching)
+    // ============================================================================
+
+    #[derive(serde::Deserialize)]
+    struct CompletionsInput {
+        partial_query: String,
+        #[serde(default = "default_completions_limit")]
+        limit: usize,
+    }
+
+    fn default_completions_limit() -> usize {
+        10
+    }
+
+    fn get_completions_impl(input: &str) -> String {
+        let parsed: CompletionsInput = match serde_json::from_str(input) {
+            Ok(v) => v,
+            Err(e) => return error_json(&format!("invalid JSON: {}", e)),
+        };
+
+        let trimmed = parsed.partial_query.trim();
+        if trimmed.is_empty() {
+            return r#"{"slot":"subjects","prefix":"","items":[]}"#.to_string();
+        }
+
+        let (slot, prefix) = infer_completion_slot(trimmed);
+
+        let vocab_type = match slot {
+            "subjects" => VocabularyType::Subjects,
+            "predicates" => VocabularyType::Predicates,
+            "contexts" => VocabularyType::Contexts,
+            "actors" => VocabularyType::Actors,
+            _ => VocabularyType::Subjects,
+        };
+
+        let items = if prefix.is_empty() {
+            Vec::new()
+        } else {
+            FUZZY.with(|f| {
+                f.borrow()
+                    .find_matches(&prefix, vocab_type, parsed.limit, 0.3)
+            })
+        };
+
+        match serde_json::to_string(&items) {
+            Ok(items_json) => format!(
+                r#"{{"slot":"{}","prefix":"{}","items":{}}}"#,
+                slot,
+                prefix.replace('"', "\\\""),
+                items_json
+            ),
+            Err(e) => error_json(&format!("serialization failed: {}", e)),
+        }
+    }
+
+    fn infer_completion_slot(input: &str) -> (&'static str, String) {
+        let mut slot = "subjects";
+        let mut last_word = String::new();
+        let mut ends_with_keyword = false;
+
+        for token in Lexer::new(input) {
+            ends_with_keyword = false;
+
+            match token.kind {
+                TokenKind::Is | TokenKind::Are => {
+                    slot = "predicates";
+                    last_word.clear();
+                    ends_with_keyword = true;
+                }
+                TokenKind::Of | TokenKind::From => {
+                    slot = "contexts";
+                    last_word.clear();
+                    ends_with_keyword = true;
+                }
+                TokenKind::By | TokenKind::Via => {
+                    slot = "actors";
+                    last_word.clear();
+                    ends_with_keyword = true;
+                }
+                TokenKind::Identifier | TokenKind::QuotedString => {
+                    last_word = token.text.to_string();
+                }
+                TokenKind::Eof => break,
+                _ => {}
+            }
+        }
+
+        if ends_with_keyword && input.ends_with(' ') {
+            return (slot, String::new());
+        }
+
+        (slot, last_word)
+    }
+
+    /// Get context-aware completions for a partial AX query.
+    /// Takes (ptr, len) pointing to a JSON string:
+    /// `{"partial_query":"ALICE is auth","limit":10}`
+    ///
+    /// Returns packed u64 pointing to JSON:
+    /// `{"slot":"predicates","prefix":"auth","items":[...]}`
+    #[no_mangle]
+    pub extern "C" fn get_completions(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&get_completions_impl(input))
     }
 
     // ============================================================================
@@ -571,6 +690,135 @@ mod wazero {
             let result = fuzzy_find_matches_impl("broken");
             let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
             assert!(parsed["error"].as_str().unwrap().contains("invalid JSON"));
+        }
+
+        #[test]
+        fn rebuild_index_all_four_vocab_types() {
+            let input = serde_json::json!({
+                "subjects": ["ALICE", "BOB"],
+                "predicates": ["works_at"],
+                "contexts": ["GitHub"],
+                "actors": ["human:alice"],
+            });
+            let result = fuzzy_rebuild_index_impl(&input.to_string());
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert_eq!(parsed["subjects"], 2);
+            assert_eq!(parsed["predicates"], 1);
+            assert_eq!(parsed["contexts"], 1);
+            assert_eq!(parsed["actors"], 1);
+        }
+
+        #[test]
+        fn find_matches_subjects() {
+            let input = serde_json::json!({
+                "subjects": ["ALICE", "ALFRED"],
+                "predicates": [],
+                "contexts": [],
+                "actors": [],
+            });
+            fuzzy_rebuild_index_impl(&input.to_string());
+            let matches = find("al", "subjects", 10, 0.5);
+            let arr = matches.as_array().unwrap();
+            assert!(arr.len() >= 2);
+        }
+
+        #[test]
+        fn find_matches_actors() {
+            let input = serde_json::json!({
+                "subjects": [],
+                "predicates": [],
+                "contexts": [],
+                "actors": ["human:alice", "system:ci"],
+            });
+            fuzzy_rebuild_index_impl(&input.to_string());
+            let matches = find("alice", "actors", 10, 0.5);
+            let arr = matches.as_array().unwrap();
+            assert!(!arr.is_empty());
+            assert_eq!(arr[0]["value"], "human:alice");
+        }
+
+        #[test]
+        fn completions_subjects_slot() {
+            let input = serde_json::json!({
+                "subjects": ["ALICE", "ALFRED"],
+                "predicates": ["works_at"],
+                "contexts": ["GitHub"],
+                "actors": ["human:alice"],
+            });
+            fuzzy_rebuild_index_impl(&input.to_string());
+
+            let result = get_completions_impl(r#"{"partial_query":"al","limit":10}"#);
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert_eq!(parsed["slot"], "subjects");
+            assert_eq!(parsed["prefix"], "al");
+            let items = parsed["items"].as_array().unwrap();
+            assert!(items.len() >= 2);
+        }
+
+        #[test]
+        fn completions_predicates_slot() {
+            let input = serde_json::json!({
+                "subjects": ["ALICE"],
+                "predicates": ["works_at", "writes_for"],
+                "contexts": [],
+                "actors": [],
+            });
+            fuzzy_rebuild_index_impl(&input.to_string());
+
+            let result = get_completions_impl(r#"{"partial_query":"ALICE is work","limit":10}"#);
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert_eq!(parsed["slot"], "predicates");
+            assert_eq!(parsed["prefix"], "work");
+            let items = parsed["items"].as_array().unwrap();
+            assert!(!items.is_empty());
+            assert_eq!(items[0]["value"], "works_at");
+        }
+
+        #[test]
+        fn completions_contexts_slot() {
+            let input = serde_json::json!({
+                "subjects": [],
+                "predicates": [],
+                "contexts": ["GitHub", "GitLab"],
+                "actors": [],
+            });
+            fuzzy_rebuild_index_impl(&input.to_string());
+
+            let result =
+                get_completions_impl(r#"{"partial_query":"ALICE is author of git","limit":10}"#);
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert_eq!(parsed["slot"], "contexts");
+            assert_eq!(parsed["prefix"], "git");
+            let items = parsed["items"].as_array().unwrap();
+            assert!(items.len() >= 2);
+        }
+
+        #[test]
+        fn completions_actors_slot() {
+            let input = serde_json::json!({
+                "subjects": [],
+                "predicates": [],
+                "contexts": [],
+                "actors": ["human:alice", "system:ci"],
+            });
+            fuzzy_rebuild_index_impl(&input.to_string());
+
+            let result =
+                get_completions_impl(r#"{"partial_query":"ALICE is author by hum","limit":10}"#);
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert_eq!(parsed["slot"], "actors");
+            assert_eq!(parsed["prefix"], "hum");
+            let items = parsed["items"].as_array().unwrap();
+            assert!(!items.is_empty());
+        }
+
+        #[test]
+        fn completions_empty_query() {
+            let result = get_completions_impl(r#"{"partial_query":"","limit":10}"#);
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert_eq!(parsed["slot"], "subjects");
+            assert_eq!(parsed["prefix"], "");
+            assert!(parsed["items"].as_array().unwrap().is_empty());
         }
 
         #[test]

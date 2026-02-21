@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -126,9 +127,15 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 		}()
 	}
 
-	addr := fmt.Sprintf(":%d", actualPort)
+	s.httpServer = &http.Server{
+		Addr:              fmt.Sprintf(":%d", actualPort),
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		// ReadTimeout and WriteTimeout must be 0 — non-zero values kill
+		// long-lived WebSocket connections (graph, sync, LSP, VidStream).
+	}
 	s.logger.Infow(fmt.Sprintf("HTTP server listening on port %d", actualPort))
-	return http.ListenAndServe(addr, nil)
+	return s.httpServer.ListenAndServe()
 }
 
 // monitorBrowserConnection warns if no clients connect within 5 seconds
@@ -182,6 +189,16 @@ func (s *QNTXServer) Stop() error {
 		s.logger.Infow("Shutting down plugin services")
 		s.servicesManager.Shutdown()
 		s.logger.Infow("Plugin services shut down")
+	}
+
+	// Gracefully shut down the HTTP server — stops accepting new connections
+	// while allowing in-flight requests to complete.
+	if s.httpServer != nil {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutdownCancel()
+		if err := s.httpServer.Shutdown(shutdownCtx); err != nil {
+			s.logger.Warnw("HTTP server shutdown error", "error", err)
+		}
 	}
 
 	// Close all client connections BEFORE cancelling context
