@@ -10,6 +10,7 @@
 
 import { embeddingStore } from './embedding-store';
 import { cosineSimilarity } from './qntx-wasm';
+import { log, SEG } from './logger';
 
 export interface LocalSearchResult {
     attestationId: string;
@@ -35,9 +36,14 @@ export async function localSemanticSearch(
     const results: LocalSearchResult[] = [];
 
     for (const [sourceId, vector] of allEmbeddings) {
-        const similarity = cosineSimilarity(queryVector, vector);
-        if (similarity >= threshold) {
-            results.push({ attestationId: sourceId, similarity });
+        try {
+            const similarity = cosineSimilarity(queryVector, vector);
+            if (similarity >= threshold) {
+                results.push({ attestationId: sourceId, similarity });
+            }
+        } catch (err) {
+            // Dimension mismatch — likely different embedding model
+            log.warn(SEG.WASM, `Skipping ${sourceId}: ${err instanceof Error ? err.message : String(err)}`);
         }
     }
 
