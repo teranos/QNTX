@@ -255,6 +255,111 @@ export function getCompletions(partialQuery: string, limit: number = 10): Comple
 }
 
 // ============================================================================
+// Sync: Merkle tree operations
+// ============================================================================
+
+/** Merkle tree root info */
+export interface MerkleRootInfo {
+    root: string;
+    size: number;
+    groups: number;
+}
+
+/** Merkle diff result */
+export interface MerkleDiff {
+    local_only: string[];
+    remote_only: string[];
+    divergent: string[];
+}
+
+/** Group key (actor, context) pair */
+export interface GroupKey {
+    actor: string;
+    context: string;
+}
+
+/**
+ * Compute content hash for an attestation (proto JSON).
+ * Returns hex-encoded hash string.
+ */
+export function syncContentHash(attestationJson: string): string {
+    const result = JSON.parse(wasm.sync_content_hash(attestationJson));
+    if (result.error) throw new Error(result.error);
+    return result.hash;
+}
+
+/**
+ * Insert an attestation into the Merkle tree.
+ */
+export function syncMerkleInsert(actor: string, context: string, contentHash: string): void {
+    const result = JSON.parse(wasm.sync_merkle_insert(JSON.stringify({ actor, context, content_hash: contentHash })));
+    if (result.error) throw new Error(result.error);
+}
+
+/**
+ * Remove an attestation from the Merkle tree.
+ */
+export function syncMerkleRemove(actor: string, context: string, contentHash: string): void {
+    const result = JSON.parse(wasm.sync_merkle_remove(JSON.stringify({ actor, context, content_hash: contentHash })));
+    if (result.error) throw new Error(result.error);
+}
+
+/**
+ * Check if a content hash exists in the Merkle tree.
+ */
+export function syncMerkleContains(contentHash: string): boolean {
+    const result = JSON.parse(wasm.sync_merkle_contains(JSON.stringify({ content_hash: contentHash })));
+    return result.exists;
+}
+
+/**
+ * Get the Merkle tree root hash and stats.
+ */
+export function syncMerkleRoot(): MerkleRootInfo {
+    return JSON.parse(wasm.sync_merkle_root());
+}
+
+/**
+ * Get all group hashes from the Merkle tree.
+ * Returns map of group key hash → group hash.
+ */
+export function syncMerkleGroupHashes(): Record<string, string> {
+    const result = JSON.parse(wasm.sync_merkle_group_hashes());
+    return result.groups;
+}
+
+/**
+ * Diff local Merkle tree against remote group hashes.
+ */
+export function syncMerkleDiff(remoteGroups: Record<string, string>): MerkleDiff {
+    return JSON.parse(wasm.sync_merkle_diff(JSON.stringify({ remote: remoteGroups })));
+}
+
+/**
+ * Reverse-lookup a group key hash to its (actor, context) pair.
+ * Returns null if not found.
+ */
+export function syncMerkleFindGroupKey(groupKeyHash: string): GroupKey | null {
+    const result = JSON.parse(wasm.sync_merkle_find_group_key(JSON.stringify({ group_key_hash: groupKeyHash })));
+    if (result.error) return null;
+    return { actor: result.actor, context: result.context };
+}
+
+// ============================================================================
+// Cosine Similarity
+// ============================================================================
+
+/**
+ * Compute cosine similarity between two vectors via WASM.
+ * Uses f32 typed arrays directly (no JSON serialization overhead).
+ *
+ * @throws {Error} If vectors have different dimensions (e.g., "vector dimension mismatch: 384 vs 768")
+ */
+export function cosineSimilarity(query: Float32Array, candidate: Float32Array): number {
+    return wasm.cosine_similarity_f32(query, candidate);
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 

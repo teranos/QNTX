@@ -159,29 +159,17 @@ impl PythonPluginService {
                     let mut handlers = HashMap::new();
                     for attestation in response.attestations {
                         if let Some(handler_name) = attestation.subjects.first() {
-                            // Parse JSON attributes to extract Python code
-                            if !attestation.attributes.is_empty() {
-                                match serde_json::from_str::<HashMap<String, serde_json::Value>>(
-                                    &attestation.attributes,
-                                ) {
-                                    Ok(attrs) => {
-                                        if let Some(serde_json::Value::String(code)) =
-                                            attrs.get("code")
-                                        {
-                                            handlers.insert(handler_name.clone(), code.clone());
-                                        } else {
-                                            warn!(
-                                                "Handler {} attributes missing 'code' field, skipping",
-                                                handler_name
-                                            );
-                                        }
-                                    }
-                                    Err(e) => {
-                                        warn!(
-                                            "Failed to parse attributes JSON for {}: {}",
-                                            handler_name, e
-                                        );
-                                    }
+                            // Extract Python code from attributes Struct
+                            if let Some(ref attrs_struct) = attestation.attributes {
+                                let attrs =
+                                    qntx_proto::serde_struct::struct_to_json_map(attrs_struct);
+                                if let Some(serde_json::Value::String(code)) = attrs.get("code") {
+                                    handlers.insert(handler_name.clone(), code.clone());
+                                } else {
+                                    warn!(
+                                        "Handler {} attributes missing 'code' field, skipping",
+                                        handler_name
+                                    );
                                 }
                             } else {
                                 warn!("Handler {} has no attributes, skipping", handler_name);
