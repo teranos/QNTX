@@ -3,6 +3,7 @@ package graph
 import (
 	"sort"
 
+	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/ats/types"
 )
 
@@ -52,45 +53,11 @@ func (b *AxGraphBuilder) extractTypeDefinitions(attestations []types.As) map[str
 			if claim.Predicate == "type" && claim.Context == "graph" {
 				typeName := claim.Subject
 
-				// Create TypeDef from attestation attributes
-				opacity := 1.0 // Default full opacity
-				def := types.TypeDef{
-					Name:    typeName,
-					Opacity: &opacity,
-				}
-
-				// Parse Attributes if present
-				if attestation.Attributes != nil {
-					if color, ok := attestation.Attributes["display_color"].(string); ok {
-						def.Color = color
-					}
-					if label, ok := attestation.Attributes["display_label"].(string); ok {
-						def.Label = label
-					}
-					if deprecated, ok := attestation.Attributes["deprecated"].(bool); ok {
-						def.Deprecated = deprecated
-					}
-					if opacityVal, ok := attestation.Attributes["opacity"].(float64); ok {
-						def.Opacity = &opacityVal
-					}
-					// Extract rich_string_fields array if present
-					if richFields, ok := attestation.Attributes["rich_string_fields"].([]interface{}); ok {
-						def.RichStringFields = make([]string, 0, len(richFields))
-						for _, field := range richFields {
-							if fieldStr, ok := field.(string); ok {
-								def.RichStringFields = append(def.RichStringFields, fieldStr)
-							}
-						}
-					}
-					// Extract array_fields array if present
-					if arrayFields, ok := attestation.Attributes["array_fields"].([]interface{}); ok {
-						def.ArrayFields = make([]string, 0, len(arrayFields))
-						for _, field := range arrayFields {
-							if fieldStr, ok := field.(string); ok {
-								def.ArrayFields = append(def.ArrayFields, fieldStr)
-							}
-						}
-					}
+				def := types.TypeDef{Name: typeName}
+				attrs.Scan(attestation.Attributes, &def)
+				if def.Opacity == nil {
+					defaultOpacity := 1.0
+					def.Opacity = &defaultOpacity
 				}
 
 				// Later attestations override earlier ones (natural evolution)

@@ -14,6 +14,7 @@ import (
 	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/ai/provider"
 	appcfg "github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/pulse/async"
@@ -147,6 +148,14 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 	return nil
 }
 
+// clusterLabelAttrs defines the attribute schema for cluster label attestations.
+type clusterLabelAttrs struct {
+	Label      string `attr:"label"`
+	Model      string `attr:"model"`
+	SampleSize int    `attr:"sample_size"`
+	NMembers   int    `attr:"n_members"`
+}
+
 func (h *ClusterLabelHandler) createLabelAttestation(asStore *storage.SQLStore, clusterID int, label, model string, sampleSize, nMembers int) {
 	subject := fmt.Sprintf("cluster:%d", clusterID)
 	asid, err := vanity.GenerateASID(subject, "labeled", "embeddings", "qntx@embeddings")
@@ -165,12 +174,12 @@ func (h *ClusterLabelHandler) createLabelAttestation(asStore *storage.SQLStore, 
 		Actors:     []string{"qntx@embeddings"},
 		Timestamp:  now,
 		Source:     "cluster-labeling",
-		Attributes: map[string]interface{}{
-			"label":       label,
-			"model":       model,
-			"sample_size": sampleSize,
-			"n_members":   nMembers,
-		},
+		Attributes: attrs.From(clusterLabelAttrs{
+			Label:      label,
+			Model:      model,
+			SampleSize: sampleSize,
+			NMembers:   nMembers,
+		}),
 		CreatedAt: now,
 	}
 

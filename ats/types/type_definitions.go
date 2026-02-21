@@ -3,6 +3,7 @@ package types
 import (
 	"time"
 
+	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/vanity-id"
 )
@@ -36,25 +37,25 @@ type AttestationStore interface {
 // Types are richer than single predicates - they represent semantic categories with
 // multiple identifying patterns, relationships, and behavioral rules.
 type TypeDef struct {
-	Name             string   `json:"name"`                         // Type identifier (e.g., "commit", "author")
-	Label            string   `json:"label"`                        // Human-readable label for UI (e.g., "Commit", "Author")
-	Color            string   `json:"color"`                        // Hex color code for graph visualization (e.g., "#34495e")
-	Opacity          *float64 `json:"opacity,omitempty"`            // Visual opacity (0.0-1.0), nil defaults to 1.0
-	Deprecated       bool     `json:"deprecated"`                   // Whether this type is being phased out
-	RichStringFields []string `json:"rich_string_fields,omitempty"` // Metadata field names containing rich text for semantic search (e.g., ["notes", "description"])
-	ArrayFields      []string `json:"array_fields,omitempty"`       // Field names that should be flattened into arrays (e.g., ["skills", "languages", "certifications"])
+	Name             string   `json:"name"`                                                             // Type identifier (e.g., "commit", "author")
+	Label            string   `json:"label" attr:"display_label"`                                       // Human-readable label for UI (e.g., "Commit", "Author")
+	Color            string   `json:"color" attr:"display_color"`                                       // Hex color code for graph visualization (e.g., "#34495e")
+	Opacity          *float64 `json:"opacity,omitempty" attr:"opacity,omitempty"`                       // Visual opacity (0.0-1.0), nil defaults to 1.0
+	Deprecated       bool     `json:"deprecated" attr:"deprecated"`                                     // Whether this type is being phased out
+	RichStringFields []string `json:"rich_string_fields,omitempty" attr:"rich_string_fields,omitempty"` // Metadata field names containing rich text for semantic search (e.g., ["notes", "description"])
+	ArrayFields      []string `json:"array_fields,omitempty" attr:"array_fields,omitempty"`             // Field names that should be flattened into arrays (e.g., ["skills", "languages", "certifications"])
 }
 
 // RelationshipTypeDef defines a relationship type with physics and display metadata.
 // Relationship types represent predicates with their own visualization behavior,
 // allowing domains to control how their relationships render in force-directed graphs.
 type RelationshipTypeDef struct {
-	Name         string   `json:"name"`                    // Predicate name (e.g., "is_child_of", "points_to")
-	Label        string   `json:"label"`                   // Human-readable label for UI (e.g., "Child Of", "Points To")
-	Color        string   `json:"color,omitempty"`         // Optional link color override (hex code)
-	LinkDistance *float64 `json:"link_distance,omitempty"` // D3 force distance override (nil = use default)
-	LinkStrength *float64 `json:"link_strength,omitempty"` // D3 force strength override (nil = use default)
-	Deprecated   bool     `json:"deprecated"`              // Whether this relationship type is being phased out
+	Name         string   `json:"name"`                                                   // Predicate name (e.g., "is_child_of", "points_to")
+	Label        string   `json:"label" attr:"display_label"`                             // Human-readable label for UI (e.g., "Child Of", "Points To")
+	Color        string   `json:"color,omitempty" attr:"color,omitempty"`                 // Optional link color override (hex code)
+	LinkDistance *float64 `json:"link_distance,omitempty" attr:"link_distance,omitempty"` // D3 force distance override (nil = use default)
+	LinkStrength *float64 `json:"link_strength,omitempty" attr:"link_strength,omitempty"` // D3 force strength override (nil = use default)
+	Deprecated   bool     `json:"deprecated" attr:"deprecated"`                           // Whether this relationship type is being phased out
 }
 
 // AttestType creates a type definition attestation with arbitrary attributes.
@@ -140,29 +141,12 @@ func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) err
 
 	for _, def := range typeDefs {
 		// Default opacity to 1.0 if not explicitly set
-		opacity := 1.0
-		if def.Opacity != nil {
-			opacity = *def.Opacity
+		if def.Opacity == nil {
+			defaultOpacity := 1.0
+			def.Opacity = &defaultOpacity
 		}
 
-		attrs := map[string]interface{}{
-			"display_color": def.Color,
-			"display_label": def.Label,
-			"deprecated":    def.Deprecated,
-			"opacity":       opacity,
-		}
-
-		// Include rich_string_fields if specified
-		if len(def.RichStringFields) > 0 {
-			attrs["rich_string_fields"] = def.RichStringFields
-		}
-
-		// Include array_fields if specified
-		if len(def.ArrayFields) > 0 {
-			attrs["array_fields"] = def.ArrayFields
-		}
-
-		if err := AttestType(store, def.Name, source, attrs); err != nil {
+		if err := AttestType(store, def.Name, source, attrs.From(def)); err != nil {
 			errs = append(errs, errors.Wrapf(err, "failed to attest type %s", def.Name))
 		}
 	}
@@ -255,23 +239,7 @@ func EnsureRelationshipTypes(store AttestationStore, source string, relationship
 	var errs []error
 
 	for _, def := range relationshipDefs {
-		attrs := map[string]interface{}{
-			"display_label": def.Label,
-			"deprecated":    def.Deprecated,
-		}
-
-		// Only include optional fields if set
-		if def.Color != "" {
-			attrs["color"] = def.Color
-		}
-		if def.LinkDistance != nil {
-			attrs["link_distance"] = *def.LinkDistance
-		}
-		if def.LinkStrength != nil {
-			attrs["link_strength"] = *def.LinkStrength
-		}
-
-		if err := AttestRelationshipType(store, def.Name, source, attrs); err != nil {
+		if err := AttestRelationshipType(store, def.Name, source, attrs.From(def)); err != nil {
 			errs = append(errs, errors.Wrapf(err, "failed to attest relationship type %s", def.Name))
 		}
 	}
