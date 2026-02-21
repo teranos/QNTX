@@ -31,39 +31,11 @@ if (USE_JSDOM) {
     };
 }
 
-// Mock uiState (process-global, superset-complete)
-const mockCanvasGlyphs: any[] = [];
-const mockCanvasCompositions: any[] = [];
+// Mock uiState — process-global, must be superset-complete (see test/mock-ui-state.ts)
 import { mock } from 'bun:test';
-mock.module('../../state/ui', () => ({
-    uiState: {
-        getCanvasGlyphs: () => mockCanvasGlyphs,
-        setCanvasGlyphs: (g: any[]) => { mockCanvasGlyphs.length = 0; mockCanvasGlyphs.push(...g); },
-        addCanvasGlyph: (g: any) => {
-            const i = mockCanvasGlyphs.findIndex(x => x.id === g.id);
-            if (i >= 0) mockCanvasGlyphs[i] = g; else mockCanvasGlyphs.push(g);
-        },
-        removeCanvasGlyph: (id: string) => {
-            const i = mockCanvasGlyphs.findIndex(g => g.id === id);
-            if (i >= 0) mockCanvasGlyphs.splice(i, 1);
-        },
-        upsertCanvasGlyph: (g: any) => {
-            const i = mockCanvasGlyphs.findIndex(x => x.id === g.id);
-            if (i >= 0) mockCanvasGlyphs[i] = g; else mockCanvasGlyphs.push(g);
-        },
-        clearCanvasGlyphs: () => mockCanvasGlyphs.length = 0,
-        getCanvasCompositions: () => mockCanvasCompositions,
-        setCanvasCompositions: (c: any[]) => { mockCanvasCompositions.length = 0; mockCanvasCompositions.push(...c); },
-        clearCanvasCompositions: () => mockCanvasCompositions.length = 0,
-        addMinimizedWindow: () => {},
-        removeMinimizedWindow: () => {},
-        getMinimizedWindows: () => [],
-        isWindowMinimized: () => false,
-        loadPersistedState: () => {},
-        getCanvasPan: () => null,
-        setCanvasPan: () => {},
-    },
-}));
+import { createMockUiState } from '../../test/mock-ui-state';
+const { uiState, glyphs: mockCanvasGlyphs } = createMockUiState();
+mock.module('../../state/ui', () => ({ uiState }));
 
 // Import after mocks
 const { morphCanvasPlacedToWindow } = await import('./manifestations/canvas-window');
