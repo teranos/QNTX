@@ -24,6 +24,7 @@ import (
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/auth"
+	"github.com/teranos/QNTX/server/nodedid"
 	"github.com/teranos/QNTX/server/wslogs"
 	syncPkg "github.com/teranos/QNTX/sync"
 	"go.uber.org/zap"
@@ -34,9 +35,10 @@ import (
 // QNTXServer provides live-updating graph visualization for Ax queries
 type QNTXServer struct {
 	db                  *sql.DB
-	dbPath              string        // Database file path (for display in banner)
-	authHandler         *auth.Handler // nil when auth.enabled = false
-	authEnabled         bool          // resolved at init, never changes
+	dbPath              string           // Database file path (for display in banner)
+	authHandler         *auth.Handler    // nil when auth.enabled = false
+	authEnabled         bool             // resolved at init, never changes
+	nodeDID             *nodedid.Handler // node's decentralized identity
 	builder             *graph.AxGraphBuilder
 	langService         *lsp.Service          // Language service for ATS LSP features
 	usageTracker        *tracker.UsageTracker // Cached usage tracker (eliminates 172k+ allocations/day)

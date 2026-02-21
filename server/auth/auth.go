@@ -63,6 +63,7 @@ func New(db *sql.DB, serverPort, frontendPort int, sessionExpiryHours int, logge
 // API/WS requests without a valid session get 401.
 // Page requests get redirected to /auth/login.
 func (h *Handler) Middleware(next http.HandlerFunc) http.HandlerFunc {
+	// TODO(#578): Verify user DID → node DID delegation instead of session cookie
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(sessionCookieName)
 		if err != nil || !h.sessions.validate(cookie.Value) {

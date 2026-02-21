@@ -321,6 +321,7 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 		return errors.Newf("expected sync_attestations, got %s", msg.Type)
 	}
 
+	// TODO(#579): Verify peer DID delegation before accepting attestations
 	for _, wires := range msg.Attestations {
 		for _, w := range wires {
 			as := fromWire(w)

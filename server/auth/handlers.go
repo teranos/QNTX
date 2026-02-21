@@ -97,6 +97,7 @@ func (h *Handler) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO(#577): Derive user DID from WebAuthn PRF extension
 	if err := h.creds.save(*credential); err != nil {
 		h.logger.Errorw("Failed to save credential", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to save credential")
