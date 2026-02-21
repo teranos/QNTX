@@ -1,3 +1,5 @@
+// Sunset candidate: serves CodeMirror AX editor, being superseded by canvas.
+// See ats/lsp/service.go.
 package server
 
 import (
