@@ -9,7 +9,11 @@
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { uiState } from './ui';
+
+// Import from ui-impl.ts directly to bypass process-global mock.module
+// that replaces ./ui in other test files (mock.module is process-global in Bun).
+import { UIState } from './ui-impl';
+const uiState = new UIState();
 
 beforeEach(() => {
     uiState.setCanvasGlyphs([]);
