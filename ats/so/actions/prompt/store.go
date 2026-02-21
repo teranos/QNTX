@@ -5,25 +5,27 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	id "github.com/teranos/vanity-id"
 )
 
-// StoredPrompt represents a prompt stored as an attestation
+// StoredPrompt represents a prompt stored as an attestation.
+// Fields sourced from attestation attributes carry `attr` tags.
 type StoredPrompt struct {
 	ID           string    `json:"id"`
 	Name         string    `json:"name"`
 	Filename     string    `json:"filename"` // Source file (used as context)
-	Template     string    `json:"template"`
-	SystemPrompt string    `json:"system_prompt,omitempty"`
-	AxPattern    string    `json:"ax_pattern,omitempty"` // Optional linked ax query
-	Provider     string    `json:"provider,omitempty"`
-	Model        string    `json:"model,omitempty"`
+	Template     string    `json:"template" attr:"template"`
+	SystemPrompt string    `json:"system_prompt,omitempty" attr:"system_prompt,omitempty"`
+	AxPattern    string    `json:"ax_pattern,omitempty" attr:"ax_pattern,omitempty"` // Optional linked ax query
+	Provider     string    `json:"provider,omitempty" attr:"provider,omitempty"`
+	Model        string    `json:"model,omitempty" attr:"model,omitempty"`
 	CreatedBy    string    `json:"created_by"`
 	CreatedAt    time.Time `json:"created_at"`
-	Version      int       `json:"version"`
+	Version      int       `json:"version" attr:"version"`
 }
 
 // PromptStore handles prompt persistence as attestations
@@ -80,24 +82,7 @@ func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, act
 	}
 
 	now := time.Now()
-
-	// Build attributes
-	attrs := map[string]interface{}{
-		"template": prompt.Template,
-		"version":  version,
-	}
-	if prompt.SystemPrompt != "" {
-		attrs["system_prompt"] = prompt.SystemPrompt
-	}
-	if prompt.AxPattern != "" {
-		attrs["ax_pattern"] = prompt.AxPattern
-	}
-	if prompt.Provider != "" {
-		attrs["provider"] = prompt.Provider
-	}
-	if prompt.Model != "" {
-		attrs["model"] = prompt.Model
-	}
+	prompt.Version = version
 
 	// Create the attestation
 	as := &types.As{
@@ -108,7 +93,7 @@ func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, act
 		Actors:     []string{actor},
 		Timestamp:  now,
 		Source:     "prompt-editor",
-		Attributes: attrs,
+		Attributes: attrs.From(prompt),
 		CreatedAt:  now,
 	}
 
@@ -285,50 +270,19 @@ func (ps *PromptStore) GetPromptVersions(ctx context.Context, filename string, l
 
 // attestationToPrompt converts an attestation into a StoredPrompt
 func (ps *PromptStore) attestationToPrompt(as *types.As) *StoredPrompt {
-	name := ""
-	if len(as.Subjects) > 0 {
-		name = as.Subjects[0]
-	}
-
-	filename := ""
-	if len(as.Contexts) > 0 {
-		filename = as.Contexts[0]
-	}
-
-	createdBy := ""
-	if len(as.Actors) > 0 {
-		createdBy = as.Actors[0]
-	}
-
 	prompt := &StoredPrompt{
 		ID:        as.ID,
-		Name:      name,
-		Filename:  filename,
-		CreatedBy: createdBy,
 		CreatedAt: as.Timestamp,
 	}
-
-	// Extract attributes
-	if as.Attributes != nil {
-		if template, ok := as.Attributes["template"].(string); ok {
-			prompt.Template = template
-		}
-		if systemPrompt, ok := as.Attributes["system_prompt"].(string); ok {
-			prompt.SystemPrompt = systemPrompt
-		}
-		if axPattern, ok := as.Attributes["ax_pattern"].(string); ok {
-			prompt.AxPattern = axPattern
-		}
-		if provider, ok := as.Attributes["provider"].(string); ok {
-			prompt.Provider = provider
-		}
-		if model, ok := as.Attributes["model"].(string); ok {
-			prompt.Model = model
-		}
-		if version, ok := as.Attributes["version"].(float64); ok {
-			prompt.Version = int(version)
-		}
+	if len(as.Subjects) > 0 {
+		prompt.Name = as.Subjects[0]
 	}
-
+	if len(as.Contexts) > 0 {
+		prompt.Filename = as.Contexts[0]
+	}
+	if len(as.Actors) > 0 {
+		prompt.CreatedBy = as.Actors[0]
+	}
+	attrs.Scan(as.Attributes, prompt)
 	return prompt
 }
