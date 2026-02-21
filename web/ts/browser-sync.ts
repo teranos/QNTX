@@ -47,10 +47,34 @@ interface SyncMsg {
 
 const EMBEDDING_BATCH_SIZE = 100;
 
+export interface BrowserSyncState {
+    root: string;
+    groups: number;
+    attestations: number;
+    syncing: boolean;
+    round: number;
+}
+
+type BrowserSyncListener = (state: BrowserSyncState) => void;
+
 export class BrowserSync {
     private periodicTimer: number | null = null;
     private connectivityUnsub: (() => void) | null = null;
     private reconciling = false;
+    private listeners: BrowserSyncListener[] = [];
+    private lastState: BrowserSyncState = { root: '', groups: 0, attestations: 0, syncing: false, round: 0 };
+
+    /** Subscribe to browser sync state changes. Returns unsubscribe function. */
+    onStateChange(fn: BrowserSyncListener): () => void {
+        this.listeners.push(fn);
+        fn(this.lastState); // emit current state immediately
+        return () => { this.listeners = this.listeners.filter(l => l !== fn); };
+    }
+
+    private emitState(partial: Partial<BrowserSyncState>): void {
+        Object.assign(this.lastState, partial);
+        for (const fn of this.listeners) fn(this.lastState);
+    }
 
     /**
      * Rebuild the Merkle tree from all attestations in IndexedDB.
@@ -99,6 +123,7 @@ export class BrowserSync {
 
         const root = syncMerkleRoot();
         log.info(SEG.WASM, `[BrowserSync] Tree rebuilt: ${inserted} attestations, ${root.groups} groups, root=${root.root.slice(0, 12)}... (${errors} errors)`);
+        this.emitState({ root: root.root, groups: root.groups, attestations: inserted });
 
         // Subscribe to connectivity changes for auto-sync
         this.connectivityUnsub = connectivityManager.subscribe((state) => {
@@ -111,8 +136,13 @@ export class BrowserSync {
     }
 
     /**
-     * Run one reconciliation cycle with the server.
-     * Returns count of attestations sent and received.
+     * Run reconciliation rounds until no new data flows in.
+     * Each round is capped at 100 groups server-side (maxGroupsPerSync),
+     * so large deltas need multiple rounds.
+     *
+     * Stops when received === 0: we got nothing new from the server.
+     * We may still send data (server requested divergent groups), but
+     * the browser is a peer, not a replica — different roots are normal.
      */
     async reconcile(): Promise<{ sent: number; received: number }> {
         if (this.reconciling) {
@@ -121,11 +151,36 @@ export class BrowserSync {
         }
 
         this.reconciling = true;
+        let totalSent = 0;
+        let totalReceived = 0;
+        let round = 0;
+        this.emitState({ syncing: true, round: 0 });
+
         try {
-            return await this.doReconcile();
+            while (true) {
+                round++;
+                this.emitState({ round });
+                const { sent, received } = await this.doReconcile();
+                totalSent += sent;
+                totalReceived += received;
+
+                // Update root after each round
+                const root = syncMerkleRoot();
+                this.emitState({ root: root.root, groups: root.groups });
+
+                // Stop when we received nothing new. Sent-only rounds mean the
+                // server is pulling data from us — that's fine, but we're done
+                // from our side once there's nothing left to receive.
+                if (received === 0) break;
+
+                log.debug(SEG.WASM, `[BrowserSync] Round ${round} complete (sent=${sent} received=${received}), continuing...`);
+            }
         } finally {
             this.reconciling = false;
+            this.emitState({ syncing: false, round: 0 });
         }
+
+        return { sent: totalSent, received: totalReceived };
     }
 
     startPeriodicSync(intervalMs: number): void {
@@ -251,7 +306,9 @@ export class BrowserSync {
             for (const [, attestations] of Object.entries(attMsg.attestations ?? {})) {
                 for (const attestation of attestations) {
                     try {
-                        // Store in IndexedDB via WASM
+                        // Skip duplicates (group-level diff doesn't dedup per-attestation)
+                        if (attestation.id && await getAttestation(attestation.id)) continue;
+
                         await putAttestation(attestation);
 
                         // Insert into Merkle tree

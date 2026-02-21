@@ -47,8 +47,16 @@ func (o *TreeObserver) OnAttestationCreated(as *types.As) {
 		return
 	}
 
-	for _, actor := range as.Actors {
-		for _, ctx := range as.Contexts {
+	actors := as.Actors
+	if len(actors) == 0 {
+		actors = []string{""}
+	}
+	contexts := as.Contexts
+	if len(contexts) == 0 {
+		contexts = []string{""}
+	}
+	for _, actor := range actors {
+		for _, ctx := range contexts {
 			if err := o.tree.Insert(actor, ctx, chHex); err != nil {
 				o.logger.Warnw("Failed to insert attestation into sync tree",
 					"id", as.ID,
