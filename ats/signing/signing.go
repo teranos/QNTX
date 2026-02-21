@@ -40,6 +40,7 @@ func (s *Signer) Sign(as *types.As) error {
 // Returns nil if the signature is valid or the attestation is unsigned.
 // Returns an error if the signature is present but invalid.
 func Verify(as *types.As) error {
+	// TODO(#583): Reject unsigned attestations once all nodes sign
 	if len(as.Signature) == 0 {
 		return nil // unsigned — backward compat
 	}
