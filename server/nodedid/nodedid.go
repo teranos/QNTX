@@ -46,6 +46,7 @@ func New(db *sql.DB, logger *zap.SugaredLogger) (*Handler, error) {
 		return nil, errors.Wrap(err, "failed to build DID document")
 	}
 
+	// TODO(#580): Resolve peer-attested vanity name for this node DID
 	return &Handler{
 		DID:         id.did,
 		PublicKey:   id.publicKey,
