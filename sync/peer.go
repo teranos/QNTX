@@ -331,7 +331,7 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 				continue
 			}
 
-			// Check by content hash too — same claim might have different ASID
+			// Compute content hash for dedup and tree insert
 			aj, err := attestationJSON(as)
 			if err != nil {
 				p.logger.Warnw("Failed to serialize attestation for content hash",
@@ -349,6 +349,7 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 				continue
 			}
 
+			// Check by content hash too — same claim might have different ASID
 			exists, err := p.tree.Contains(chHex)
 			if err != nil {
 				p.logger.Warnw("Failed to check content hash existence",
@@ -358,10 +359,6 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 				continue
 			}
 			if exists {
-				p.logger.Debugw("Skipping duplicate attestation by content hash",
-					"id", as.ID,
-					"content_hash", chHex,
-				)
 				continue
 			}
 
@@ -376,6 +373,29 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 					"error", err,
 				)
 				continue
+			}
+
+			// Insert into Merkle tree synchronously so the tree reflects
+			// this attestation before the round's done message.
+			actors := as.Actors
+			if len(actors) == 0 {
+				actors = []string{""}
+			}
+			contexts := as.Contexts
+			if len(contexts) == 0 {
+				contexts = []string{""}
+			}
+			for _, actor := range actors {
+				for _, ctx := range contexts {
+					if err := p.tree.Insert(actor, ctx, chHex); err != nil {
+						p.logger.Warnw("Failed to insert synced attestation into tree",
+							"id", as.ID,
+							"actor", actor,
+							"context", ctx,
+							"error", err,
+						)
+					}
+				}
 			}
 
 			p.received++
