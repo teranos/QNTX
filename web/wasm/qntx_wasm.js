@@ -265,11 +265,7 @@ export function query_attestations(filter_json) {
 
 /**
  * Compute content hash for an attestation.
-<<<<<<< HEAD
  * Input: JSON-serialized proto Attestation (attributes as JSON object)
-=======
- * Input: JSON-serialized proto Attestation
->>>>>>> dc6606c4... Browser attestation sync and offline semantic search
  * Returns: `{"hash":"<64-char hex>"}` or `{"error":"..."}`
  * @param {string} attestation_json
  * @returns {string}
