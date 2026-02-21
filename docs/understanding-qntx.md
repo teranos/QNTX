@@ -43,20 +43,29 @@ This is **visual grep**. You can scan code/UI and instantly know which domain yo
 
 Each layer has a clear contract. You can work on graph rendering without touching attestation storage.
 
-### 3. Real-Time Everything
+### 3. WASM as the Runtime
 
-The WebSocket architecture reveals intent (see [WebSocket API](api/websocket.md) for protocol details):
+Core ATS intelligence — parser, fuzzy search, Merkle sync, completions — is implemented in Rust (`crates/qntx-core`) and compiled to WASM. The same code runs in two places:
 
-- Custom `/ws` endpoint for parse_response (semantic tokens, diagnostics)
-- Standard `/lsp` endpoint for LSP protocol (completions, hover)
-- Pulse execution updates via WebSocket
-- Usage tracking streamed in real-time
+- **Browser** (via wasm-bindgen) — ATS parsing, completions, semantic search, and sync happen locally in the browser. No server round-trip needed.
+- **Server** (via wazero) — the Go backend loads the same WASM module for server-side operations.
 
-**Pattern**: The system assumes you want to see changes *as they happen*. Not on refresh, not on save—on keystroke, on schedule tick, on data arrival.
+This means the browser is not a thin client. It runs the same attestation logic the server does. The server provides persistence, sync coordination, and plugin hosting — but the intelligence layer runs wherever you are.
 
-### 4. Editor as First-Class Citizen
+### 4. Real-Time Updates
 
-Most systems treat their query language as an afterthought. QNTX treats ATS as a **programming language**:
+When a server is present, WebSocket connections provide live updates (see [WebSocket API](api/websocket.md)):
+
+- Semantic tokens and diagnostics via custom protocol
+- LSP protocol (completions, hover)
+- ꩜ Pulse execution updates
+- Sync status
+
+The server is not required for core ATS operations — those run in WASM. The server adds persistence, sync between nodes, and plugin execution.
+
+### 5. ATS as a Language
+
+QNTX treats ATS as a **programming language**, not a query box:
 
 - Full LSP server implementation
 - Semantic token highlighting
@@ -64,7 +73,7 @@ Most systems treat their query language as an afterthought. QNTX treats ATS as a
 - Completion support
 - Hover documentation
 
-The CodeMirror + LSP + ProseMirror integration is **expensive to build**. You don't do this unless the query language is central to the user experience.
+The current editor surface is CodeMirror 6 with LSP integration. This is transitional — the canvas (glyphs ⧉) is the primary interaction surface, and the editor becomes one glyph manifestation within it. The LSP and language tooling persist; the dedicated editor view does not.
 
 ## Core Philosophical Stance
 
