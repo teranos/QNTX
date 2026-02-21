@@ -34,70 +34,10 @@ if (USE_JSDOM) {
     };
 }
 
-// Mock uiState — mock.module is process-global so every mock must be superset-complete
-const mockMinimizedWindows: string[] = [];
-const mockCanvasGlyphs: any[] = [];
-const mockCanvasCompositions: any[] = [];
-const mockCanvasPan: Record<string, any> = {};
-mock.module('../../state/ui', () => ({
-    uiState: {
-        addMinimizedWindow: (id: string) => {
-            if (!mockMinimizedWindows.includes(id)) mockMinimizedWindows.push(id);
-        },
-        removeMinimizedWindow: (id: string) => {
-            const idx = mockMinimizedWindows.indexOf(id);
-            if (idx >= 0) mockMinimizedWindows.splice(idx, 1);
-        },
-        getMinimizedWindows: () => mockMinimizedWindows,
-        isWindowMinimized: (id: string) => mockMinimizedWindows.includes(id),
-        getCanvasGlyphs: () => mockCanvasGlyphs,
-        setCanvasGlyphs: (glyphs: any[]) => { mockCanvasGlyphs.length = 0; mockCanvasGlyphs.push(...glyphs); },
-        upsertCanvasGlyph: (glyph: any) => {
-            const index = mockCanvasGlyphs.findIndex(g => g.id === glyph.id);
-            if (index >= 0) { mockCanvasGlyphs[index] = glyph; } else { mockCanvasGlyphs.push(glyph); }
-        },
-        addCanvasGlyph: (glyph: any) => {
-            const index = mockCanvasGlyphs.findIndex(g => g.id === glyph.id);
-            if (index >= 0) { mockCanvasGlyphs[index] = glyph; } else { mockCanvasGlyphs.push(glyph); }
-        },
-        removeCanvasGlyph: (id: string) => {
-            const index = mockCanvasGlyphs.findIndex(g => g.id === id);
-            if (index >= 0) mockCanvasGlyphs.splice(index, 1);
-        },
-        getCanvasCompositions: () => mockCanvasCompositions,
-        setCanvasCompositions: (comps: any[]) => { mockCanvasCompositions.length = 0; mockCanvasCompositions.push(...comps); },
-        clearCanvasGlyphs: () => mockCanvasGlyphs.length = 0,
-        clearCanvasCompositions: () => mockCanvasCompositions.length = 0,
-        loadPersistedState: () => {},
-        // Superset-complete stubs (mock.module is process-global, leaks into other test files)
-        getCanvasPan: (id: string) => mockCanvasPan[id] ?? null,
-        setCanvasPan: (id: string, pan: any) => { mockCanvasPan[id] = pan; },
-        setMinimizedWindows: () => {},
-        clearMinimizedWindows: () => {},
-        isPanelVisible: () => false,
-        setPanelVisible: () => {},
-        togglePanel: () => false,
-        closeAllPanels: () => {},
-        getActiveModality: () => 'ax',
-        setActiveModality: () => {},
-        getBudgetWarnings: () => ({ daily: false, weekly: false, monthly: false }),
-        setBudgetWarning: () => {},
-        resetBudgetWarnings: () => {},
-        getUsageView: () => 'week',
-        setUsageView: () => {},
-        getGraphSession: () => ({}),
-        setGraphSession: () => {},
-        setGraphQuery: () => {},
-        setGraphVerbosity: () => {},
-        clearGraphSession: () => {},
-        subscribe: () => () => {},
-        subscribeAll: () => () => {},
-        getState: () => ({}),
-        get: () => undefined,
-        clearStorage: () => {},
-        reset: () => {},
-    },
-}));
+// Mock uiState — process-global, must be superset-complete (see test/mock-ui-state.ts)
+import { createMockUiState } from '../../test/mock-ui-state';
+const { uiState } = createMockUiState();
+mock.module('../../state/ui', () => ({ uiState }));
 
 // Import after JSDOM + mock setup
 const { glyphRun } = await import('./run.ts');
