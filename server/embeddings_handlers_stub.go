@@ -25,6 +25,11 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
 }
 
+// HandleEmbeddingsBySource returns embeddings by source IDs (POST /api/embeddings/by-source)
+func (s *QNTXServer) HandleEmbeddingsBySource(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
+}
+
 // HandleEmbeddingInfo returns embedding service status (GET /api/embeddings/info)
 func (s *QNTXServer) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")

@@ -331,7 +331,7 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 				continue
 			}
 
-			// Check by content hash too — same claim might have different ASID
+			// Compute content hash for dedup and tree insert
 			aj, err := attestationJSON(as)
 			if err != nil {
 				p.logger.Warnw("Failed to serialize attestation for content hash",
@@ -349,6 +349,7 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 				continue
 			}
 
+			// Check by content hash too — same claim might have different ASID
 			exists, err := p.tree.Contains(chHex)
 			if err != nil {
 				p.logger.Warnw("Failed to check content hash existence",
@@ -358,10 +359,6 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 				continue
 			}
 			if exists {
-				p.logger.Debugw("Skipping duplicate attestation by content hash",
-					"id", as.ID,
-					"content_hash", chHex,
-				)
 				continue
 			}
 
@@ -376,6 +373,29 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 					"error", err,
 				)
 				continue
+			}
+
+			// Insert into Merkle tree synchronously so the tree reflects
+			// this attestation before the round's done message.
+			actors := as.Actors
+			if len(actors) == 0 {
+				actors = []string{""}
+			}
+			contexts := as.Contexts
+			if len(contexts) == 0 {
+				contexts = []string{""}
+			}
+			for _, actor := range actors {
+				for _, ctx := range contexts {
+					if err := p.tree.Insert(actor, ctx, chHex); err != nil {
+						p.logger.Warnw("Failed to insert synced attestation into tree",
+							"id", as.ID,
+							"actor", actor,
+							"context", ctx,
+							"error", err,
+						)
+					}
+				}
 			}
 
 			p.received++
@@ -428,17 +448,33 @@ func (p *Peer) recvDone() error {
 		return errors.Newf("expected sync_done, got %s", msg.Type)
 	}
 	if msg.BudgetDailyUSD != nil {
-		pb := &PeerBudget{
-			DailyUSD:   *msg.BudgetDailyUSD,
-			WeeklyUSD:  *msg.BudgetWeeklyUSD,
-			MonthlyUSD: *msg.BudgetMonthlyUSD,
+		// Budget fields must all be present or none — partial budget is malformed
+		if msg.BudgetWeeklyUSD == nil || msg.BudgetMonthlyUSD == nil {
+			p.logger.Warnw("Peer sent partial budget data, ignoring",
+				"has_daily", msg.BudgetDailyUSD != nil,
+				"has_weekly", msg.BudgetWeeklyUSD != nil,
+				"has_monthly", msg.BudgetMonthlyUSD != nil)
+		} else {
+			pb := &PeerBudget{
+				DailyUSD:   *msg.BudgetDailyUSD,
+				WeeklyUSD:  *msg.BudgetWeeklyUSD,
+				MonthlyUSD: *msg.BudgetMonthlyUSD,
+			}
+			if msg.ClusterDailyLimitUSD != nil {
+				// Cluster limits also all-or-nothing
+				if msg.ClusterWeeklyLimitUSD == nil || msg.ClusterMonthlyLimitUSD == nil {
+					p.logger.Warnw("Peer sent partial cluster budget data, ignoring cluster limits",
+						"has_cluster_daily", msg.ClusterDailyLimitUSD != nil,
+						"has_cluster_weekly", msg.ClusterWeeklyLimitUSD != nil,
+						"has_cluster_monthly", msg.ClusterMonthlyLimitUSD != nil)
+				} else {
+					pb.ClusterDailyLimitUSD = *msg.ClusterDailyLimitUSD
+					pb.ClusterWeeklyLimitUSD = *msg.ClusterWeeklyLimitUSD
+					pb.ClusterMonthlyLimitUSD = *msg.ClusterMonthlyLimitUSD
+				}
+			}
+			p.RemoteBudget = pb
 		}
-		if msg.ClusterDailyLimitUSD != nil {
-			pb.ClusterDailyLimitUSD = *msg.ClusterDailyLimitUSD
-			pb.ClusterWeeklyLimitUSD = *msg.ClusterWeeklyLimitUSD
-			pb.ClusterMonthlyLimitUSD = *msg.ClusterMonthlyLimitUSD
-		}
-		p.RemoteBudget = pb
 	}
 	return nil
 }
@@ -459,6 +495,13 @@ func attestationJSON(as *types.As) (string, error) {
 	// Build a struct that matches Rust's Attestation layout exactly:
 	// - timestamps as i64 millis (not time.Time which marshals to RFC3339)
 	// - attributes as map (not pre-serialized string like the proto struct)
+	nilToEmpty := func(s []string) []string {
+		if s == nil {
+			return []string{}
+		}
+		return s
+	}
+
 	wire := struct {
 		ID         string                 `json:"id"`
 		Subjects   []string               `json:"subjects"`
@@ -471,10 +514,10 @@ func attestationJSON(as *types.As) (string, error) {
 		CreatedAt  int64                  `json:"created_at"`
 	}{
 		ID:         as.ID,
-		Subjects:   as.Subjects,
-		Predicates: as.Predicates,
-		Contexts:   as.Contexts,
-		Actors:     as.Actors,
+		Subjects:   nilToEmpty(as.Subjects),
+		Predicates: nilToEmpty(as.Predicates),
+		Contexts:   nilToEmpty(as.Contexts),
+		Actors:     nilToEmpty(as.Actors),
 		Timestamp:  as.Timestamp.UnixMilli(),
 		Source:     as.Source,
 		Attributes: as.Attributes,

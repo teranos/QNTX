@@ -1,6 +1,6 @@
 [package]
 name = "qntx-python-plugin"
-version = "0.5.2"
+version = "0.5.3"
 edition.workspace = true
 description = "QNTX gRPC plugin for running Python code"
 license.workspace = true
@@ -13,6 +13,7 @@ path = "src/main.rs"
 [dependencies]
 # QNTX gRPC infrastructure
 qntx-grpc = { path = "../crates/qntx-grpc", features = ["plugin"] }
+qntx-proto = { path = "../crates/qntx-proto" }
 
 # gRPC and async
 tonic.workspace = true
