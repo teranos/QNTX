@@ -112,7 +112,7 @@ export function morphToWindow(
         glyphElement.style.width = `${windowWidth}px`;
         glyphElement.style.height = `${windowHeight}px`;
         glyphElement.style.borderRadius = WINDOW_BORDER_RADIUS;
-        glyphElement.style.backgroundColor = 'var(--bg-almost-black)';
+        glyphElement.style.backgroundColor = 'rgba(58, 59, 58, 0.90)';
         glyphElement.style.boxShadow = WINDOW_BOX_SHADOW;
         glyphElement.style.padding = '0';
         glyphElement.style.opacity = '1';
@@ -126,7 +126,7 @@ export function morphToWindow(
         const titleBar = document.createElement('div');
         titleBar.className = 'window-title-bar';
         titleBar.style.width = '100%';
-        titleBar.style.backgroundColor = 'var(--bg-almost-black)';
+        titleBar.style.backgroundColor = 'rgba(58, 59, 58, 0.90)';
         titleBar.style.borderBottom = '1px solid var(--border-on-dark)';
         titleBar.style.borderRadius = '8px 8px 0 0';
         titleBar.style.display = 'flex';
