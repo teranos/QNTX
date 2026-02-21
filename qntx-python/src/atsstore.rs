@@ -57,12 +57,9 @@ impl AtsStoreClient {
         let endpoint = self.config.endpoint.clone();
         let auth_token = self.config.auth_token.clone();
 
-        // Serialize attributes to JSON if provided
-        let attributes_json = match attributes {
-            Some(attrs) => serde_json::to_string(&attrs)
-                .map_err(|e| format!("failed to serialize attributes: {}", e))?,
-            None => String::new(),
-        };
+        // Convert attributes to prost Struct if provided
+        let attributes =
+            attributes.map(|attrs| qntx_proto::serde_struct::json_map_to_struct(&attrs));
 
         let command = AttestationCommand {
             subjects,
@@ -70,7 +67,7 @@ impl AtsStoreClient {
             contexts,
             actors: actors.unwrap_or_default(),
             timestamp: None, // Server will use current time
-            attributes_json,
+            attributes,
         };
 
         let request = GenerateAttestationRequest {
