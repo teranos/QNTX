@@ -360,6 +360,40 @@ export function cosineSimilarity(query: Float32Array, candidate: Float32Array): 
 }
 
 // ============================================================================
+// Rich Search
+// ============================================================================
+
+/** Result from rich_search — matches RichSearchResultsMessage proto shape. */
+export interface RichSearchResult {
+    query: string;
+    matches: Array<{
+        node_id: string;
+        type_name: string;
+        type_label: string;
+        field_name: string;
+        field_value: string;
+        excerpt: string;
+        score: number;
+        strategy: string;
+        display_label: string;
+        attributes: Record<string, unknown>;
+        matched_words: string[];
+    }>;
+    total: number;
+}
+
+/**
+ * Perform browser-side rich text search over IndexedDB attestations.
+ * Fuzzy-matches query against attribute values discovered via type definition
+ * rich_string_fields. Mirrors server-side ats/storage/rich_search_qntx.go.
+ */
+export async function richSearch(query: string, limit: number = 50): Promise<RichSearchResult> {
+    await ensureInit();
+    const json = await wasm.rich_search(query, limit);
+    return JSON.parse(json);
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 

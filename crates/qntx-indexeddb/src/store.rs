@@ -325,7 +325,7 @@ impl IndexedDbStore {
     // ========================================================================
 
     /// Retrieve all attestations from the store.
-    async fn get_all(&self) -> StoreResult<Vec<Attestation>> {
+    pub async fn get_all(&self) -> StoreResult<Vec<Attestation>> {
         let (tx, store) = idb::begin_transaction(&self.db, IdbTransactionMode::Readonly)
             .map_err(StoreError::from)?;
 
