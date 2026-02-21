@@ -20,7 +20,7 @@
 
           # Same vendorHash as qntx (shared go.mod)
           # To update: set to `pkgs.lib.fakeHash`, run `nix build ./typegen`, copy the hash from error
-          vendorHash = "sha256-VokOng4oIx9t8qn6BGg+GKhv1FJqCdV0GctgW+NUvG0=";
+          vendorHash = "sha256-WjzqBFBy1E404t6cb5y6J4VZ0PFMLUok7d2Om6RMswU=";
 
           subPackages = [ "cmd/typegen" ];
         };
