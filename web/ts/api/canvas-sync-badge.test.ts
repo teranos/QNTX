@@ -26,52 +26,10 @@ mock.module('../api', () => ({
     apiFetch: (path: string, init?: RequestInit) => mockApiFetch(path, init),
 }));
 
-let mockGlyphs: Array<{ id: string; symbol: string; x: number; y: number }> = [];
-
-mock.module('../state/ui', () => ({
-    uiState: {
-        getCanvasGlyphs: () => mockGlyphs,
-        setCanvasGlyphs: (g: any[]) => { mockGlyphs.length = 0; mockGlyphs.push(...g); },
-        addCanvasGlyph: (g: any) => { const i = mockGlyphs.findIndex((x: any) => x.id === g.id); if (i >= 0) mockGlyphs[i] = g; else mockGlyphs.push(g); },
-        upsertCanvasGlyph: (g: any) => { const i = mockGlyphs.findIndex((x: any) => x.id === g.id); if (i >= 0) mockGlyphs[i] = g; else mockGlyphs.push(g); },
-        removeCanvasGlyph: (id: string) => { const i = mockGlyphs.findIndex((g: any) => g.id === id); if (i >= 0) mockGlyphs.splice(i, 1); },
-        clearCanvasGlyphs: () => { mockGlyphs.length = 0; },
-        getCanvasCompositions: () => [],
-        setCanvasCompositions: () => {},
-        clearCanvasCompositions: () => {},
-        getCanvasPan: () => null,
-        setCanvasPan: () => {},
-        loadPersistedState: () => {},
-        getMinimizedWindows: () => [],
-        addMinimizedWindow: () => {},
-        removeMinimizedWindow: () => {},
-        setMinimizedWindows: () => {},
-        isWindowMinimized: () => false,
-        clearMinimizedWindows: () => {},
-        isPanelVisible: () => false,
-        setPanelVisible: () => {},
-        togglePanel: () => false,
-        closeAllPanels: () => {},
-        getActiveModality: () => 'ax',
-        setActiveModality: () => {},
-        getBudgetWarnings: () => ({ daily: false, weekly: false, monthly: false }),
-        setBudgetWarning: () => {},
-        resetBudgetWarnings: () => {},
-        getUsageView: () => 'week',
-        setUsageView: () => {},
-        getGraphSession: () => ({}),
-        setGraphSession: () => {},
-        setGraphQuery: () => {},
-        setGraphVerbosity: () => {},
-        clearGraphSession: () => {},
-        subscribe: () => () => {},
-        subscribeAll: () => () => {},
-        getState: () => ({}),
-        get: () => undefined,
-        clearStorage: () => {},
-        reset: () => {},
-    },
-}));
+// Mock UIState — process-global, must be superset-complete (see test/mock-ui-state.ts)
+import { createMockUiState } from '../test/mock-ui-state';
+const { uiState, glyphs: mockGlyphs } = createMockUiState();
+mock.module('../state/ui', () => ({ uiState }));
 
 const { canvasSyncQueue } = await import('./canvas-sync');
 
@@ -80,10 +38,11 @@ describe('Canvas Sync Queue - size and onChange', () => {
         localStorage.clear();
         mockConnectivity = 'offline';
         mockApiFetch = async () => new Response(null, { status: 200 });
-        mockGlyphs = [
+        mockGlyphs.length = 0;
+        mockGlyphs.push(
             { id: 'g-1', symbol: 'ax', x: 100, y: 200 },
             { id: 'g-2', symbol: 'py', x: 300, y: 400 },
-        ];
+        );
     });
 
     test('Tim: size returns 0 for empty queue', () => {
