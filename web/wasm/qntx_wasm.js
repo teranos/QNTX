@@ -36,6 +36,7 @@ export function classify_claims(input) {
 /**
  * Compute cosine similarity between two f32 vectors.
  * Uses typed arrays directly from JavaScript (no JSON overhead).
+ * Throws JS exception if vectors have different dimensions.
  * @param {Float32Array} query
  * @param {Float32Array} candidate
  * @returns {number}
@@ -46,7 +47,10 @@ export function cosine_similarity_f32(query, candidate) {
     const ptr1 = passArrayF32ToWasm0(candidate, wasm.__wbindgen_malloc);
     const len1 = WASM_VECTOR_LEN;
     const ret = wasm.cosine_similarity_f32(ptr0, len0, ptr1, len1);
-    return ret;
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return ret[0];
 }
 
 /**

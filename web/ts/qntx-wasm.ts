@@ -352,6 +352,8 @@ export function syncMerkleFindGroupKey(groupKeyHash: string): GroupKey | null {
 /**
  * Compute cosine similarity between two vectors via WASM.
  * Uses f32 typed arrays directly (no JSON serialization overhead).
+ *
+ * @throws {Error} If vectors have different dimensions (e.g., "vector dimension mismatch: 384 vs 768")
  */
 export function cosineSimilarity(query: Float32Array, candidate: Float32Array): number {
     return wasm.cosine_similarity_f32(query, candidate);
