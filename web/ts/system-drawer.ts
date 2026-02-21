@@ -10,6 +10,7 @@ import type { SearchMatch, SearchResultsMessage } from './search-view.ts';
 import { spawnGlyphByCommand, getMatchingCommands, COMMAND_LABELS } from './components/glyph/canvas/spawn-menu.ts';
 import { uiState } from './state/ui.ts';
 import { Subcanvas } from '@generated/sym.js';
+import { openP2PSyncWindow } from './components/glyph/p2p-sync-glyph.ts';
 
 const DRAWER_HEIGHT_KEY = 'system-drawer-height';
 const DRAWER_MIN = 6;     // Hidden: just the grab bar
@@ -238,6 +239,24 @@ export function initSystemDrawer(): void {
 
         const controls = header.querySelector('.controls');
         if (controls) {
+            // Add P2P sync button to controls
+            const p2pBtn = document.createElement('button');
+            p2pBtn.textContent = 'P2P';
+            p2pBtn.title = 'Peer-to-Peer Sync';
+            p2pBtn.style.cssText = `
+                padding: 4px 8px;
+                margin-right: 8px;
+                background: #3b82f6;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-family: monospace;
+                font-size: 11px;
+            `;
+            p2pBtn.onclick = () => openP2PSyncWindow();
+            controls.prepend(p2pBtn);
+
             header.insertBefore(searchInput, controls);
         } else {
             header.appendChild(searchInput);
