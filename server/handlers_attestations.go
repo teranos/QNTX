@@ -4,7 +4,6 @@ package server
 // and persists them to the server-side SQLite store.
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -14,6 +13,18 @@ import (
 	id "github.com/teranos/vanity-id"
 )
 
+// Attestation size limits.
+const (
+	// maxAttestationBody matches the WebSocket message limit (client.go:maxMessageSize).
+	// An attestation that can't survive the WebSocket shouldn't enter the store.
+	// TODO: Make configurable via am.toml when image-carrying attestations ship.
+	maxAttestationBody = 10 * 1024 * 1024 // 10 MB
+
+	// Semantic field limits — these fields are short identifiers, not free text.
+	maxArrayElements = 100
+	maxStringLength  = 1000
+)
+
 // HandleCreateAttestation accepts a browser-created attestation and stores it server-side.
 // POST /api/attestations — idempotent (returns 200 if already exists).
 func (s *QNTXServer) HandleCreateAttestation(w http.ResponseWriter, r *http.Request) {
@@ -21,15 +32,18 @@ func (s *QNTXServer) HandleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// Cap request body to prevent unbounded memory allocation.
+	r.Body = http.MaxBytesReader(w, r.Body, maxAttestationBody)
+
 	var req struct {
-		ID         string   `json:"id"`
-		Subjects   []string `json:"subjects"`
-		Predicates []string `json:"predicates"`
-		Contexts   []string `json:"contexts"`
-		Actors     []string `json:"actors"`
-		Timestamp  int64    `json:"timestamp"`
-		Source     string   `json:"source"`
-		Attributes string   `json:"attributes"`
+		ID         string                 `json:"id"`
+		Subjects   []string               `json:"subjects"`
+		Predicates []string               `json:"predicates"`
+		Contexts   []string               `json:"contexts"`
+		Actors     []string               `json:"actors"`
+		Timestamp  int64                  `json:"timestamp"`
+		Source     string                 `json:"source"`
+		Attributes map[string]interface{} `json:"attributes"`
 	}
 
 	if err := readJSON(w, r, &req); err != nil {
@@ -43,6 +57,24 @@ func (s *QNTXServer) HandleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	}
 	if len(req.Predicates) == 0 {
 		writeError(w, http.StatusBadRequest, "predicates must not be empty")
+		return
+	}
+
+	// Validate semantic field sizes
+	if err := validateStringArray("subjects", req.Subjects); err != "" {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := validateStringArray("predicates", req.Predicates); err != "" {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := validateStringArray("contexts", req.Contexts); err != "" {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := validateStringArray("actors", req.Actors); err != "" {
+		writeError(w, http.StatusBadRequest, err)
 		return
 	}
 
@@ -75,9 +107,6 @@ func (s *QNTXServer) HandleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Parse attributes JSON string to map
-	attrs := parseAttributesJSON(req.Attributes)
-
 	ts := time.Unix(req.Timestamp, 0)
 	if req.Timestamp == 0 {
 		ts = time.Now()
@@ -91,7 +120,7 @@ func (s *QNTXServer) HandleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		Actors:     req.Actors,
 		Timestamp:  ts,
 		Source:     req.Source,
-		Attributes: attrs,
+		Attributes: req.Attributes,
 		CreatedAt:  time.Now(),
 	}
 
@@ -113,16 +142,16 @@ func (s *QNTXServer) HandleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusCreated, map[string]string{"id": req.ID, "status": "created"})
 }
 
-// parseAttributesJSON safely parses a JSON string into a map.
-// Returns nil on empty/invalid input (attributes are optional metadata).
-func parseAttributesJSON(raw string) map[string]any {
-	if raw == "" || raw == "{}" || raw == "null" {
-		return nil
+// validateStringArray checks that an array doesn't exceed element count or string length limits.
+// Returns an error message, or empty string if valid.
+func validateStringArray(field string, values []string) string {
+	if len(values) > maxArrayElements {
+		return fmt.Sprintf("%s: too many elements (%d, max %d)", field, len(values), maxArrayElements)
 	}
-
-	var attrs map[string]any
-	if err := json.Unmarshal([]byte(raw), &attrs); err != nil {
-		return nil
+	for _, v := range values {
+		if len(v) > maxStringLength {
+			return fmt.Sprintf("%s: element too long (%d bytes, max %d)", field, len(v), maxStringLength)
+		}
 	}
-	return attrs
+	return ""
 }
