@@ -256,7 +256,9 @@ rust-python: ## Build Rust Python plugin binary (via Nix)
 	@echo "Building qntx-python-plugin via Nix..."
 	@nix build ./qntx-python#qntx-python-plugin
 	@mkdir -p bin
+	@rm -f bin/qntx-python-plugin
 	@cp -L result/bin/qntx-python-plugin bin/
+	@chmod +x bin/qntx-python-plugin
 	@echo "✓ qntx-python-plugin built in bin/"
 
 # Rust Reduce plugin (PyO3-based UMAP dimensionality reduction)
