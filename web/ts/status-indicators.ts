@@ -12,7 +12,6 @@ import type { DaemonStatusMessage } from '../types/websocket';
 import { DB } from '@generated/sym.js';
 import { connectivityManager, type ConnectivityState } from './connectivity';
 import { spawnAuthGlyph } from './components/glyph/auth-glyph';
-import { apiFetch } from './api';
 
 interface StatusIndicator {
     id: string;
@@ -199,15 +198,13 @@ class StatusIndicatorManager {
      * Right-click "Connected" → log out.
      */
     private setupAuthIntegration(): void {
-        // Right-click on connection indicator → log out (when authenticated)
+        // Right-click on connection indicator → open auth glyph
         const connEl = this.indicators.get('connection');
         if (connEl) {
             connEl.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
                 if (!connectivityManager.authenticated) return;
-                apiFetch('/auth/logout', { method: 'POST' }).then(() => {
-                    connectivityManager.reportUnauthenticated();
-                }).catch(() => {});
+                spawnAuthGlyph();
             });
         }
 
