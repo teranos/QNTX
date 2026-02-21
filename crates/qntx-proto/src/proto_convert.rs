@@ -45,6 +45,8 @@ pub fn to_proto(core: CoreAttestation) -> ProtoAttestation {
         source: core.source,
         attributes,
         created_at: core.created_at,
+        signature: Vec::new(),
+        signer_did: String::new(),
     }
 }
 
