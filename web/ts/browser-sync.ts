@@ -157,6 +157,12 @@ export class BrowserSync {
         let round = 0;
         this.emitState({ syncing: true, round: 0 });
 
+        // TODO: Replace with Pulse-based sync orchestration.
+        // Current loop has no round cap — if server always returns ≥1 attestation,
+        // browser loops indefinitely. Guard added for safety but long-term solution
+        // is moving sync scheduling to Pulse.
+        const MAX_ROUNDS = 100;
+
         try {
             while (true) {
                 round++;
@@ -173,6 +179,11 @@ export class BrowserSync {
                 // server is pulling data from us — that's fine, but we're done
                 // from our side once there's nothing left to receive.
                 if (received === 0) break;
+
+                if (round >= MAX_ROUNDS) {
+                    log.warn(SEG.WASM, `[BrowserSync] Hit max rounds (${MAX_ROUNDS}) — sync may be incomplete`);
+                    break;
+                }
 
                 log.debug(SEG.WASM, `[BrowserSync] Round ${round} complete (sent=${sent} received=${received}), continuing...`);
             }
