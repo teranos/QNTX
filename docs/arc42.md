@@ -1,6 +1,6 @@
 # QNTX Architecture Documentation
 
-Based on the [arc42](https://arc42.org) template. This document is the entrypoint — it links to existing docs where content lives and fills gaps inline.
+Based on the [arc42](https://arc42.org) template. This document is an entrypoint — it links to existing docs where content lives and fills gaps inline.
 
 ---
 
@@ -8,7 +8,7 @@ Based on the [arc42](https://arc42.org) template. This document is the entrypoin
 
 ### Requirements Overview
 
-QNTX stores and queries attestations — structured claims of the form:
+QNTX stores and retrieves attestations — structured claims of the form:
 
 ```
 [Subject] = [Predicate] ∈ [Context] ⌬ [Actor] ✦ [Time]
@@ -18,8 +18,8 @@ Building blocks: `+` (as/assert), `=` (is/identity), `∈` (of/membership), `⌬
 
 Current subsystems:
 
-- **ATS** — Attestation Type System: attest your own types, store and query them (⋈ ax)
-- **꩜ Pulse** — intelligent async execution with resource-aware scheduling
+- **ATS** — Attestation Type System: attest your own types, store and retrieve them (⋈ ax/ask)
+- **꩜ Pulse** — provides async execution with resource-aware scheduling
 - **Glyphs ⧉** — persistent interactive UI primitive
 - **Plugins** — domain logic via gRPC, isolated from core (e.g. local AI via Ollama/ONNX)
 
@@ -42,9 +42,9 @@ See [Design Philosophy](design-philosophy.md).
 | Creator / steward | System works, vision intact, honest documentation |
 | Community (forming) | Participation, transparency, shared governance |
 | Organizations wanting local AI | Private LLM capabilities, no cloud dependency, Ollama integration |
-| The public | A public good — intelligence tooling that isn't VC-captured |
+| The public | A public good — intelligence tooling |
 
-QNTX is not venture-funded. The intent is public good. Governance is centralized now, with decentralized stakeholdership as a future direction.
+The intent is public good. Governance is centralized now, with decentralized stakeholdership as a future direction.
 
 ---
 
@@ -120,12 +120,10 @@ See [Understanding QNTX](understanding-qntx.md).
 
 Key technical decisions and why:
 
-- **Attestations as the universal primitive** — not documents, not rows, not objects. Structured claims that compose, sync, and verify.
+- **Attestations as the primitive** — not documents, not rows, not objects. Structured claims that compose, sync, and verify.
 - **Local-first** — SQLite on your machine, Ollama on your machine. Cloud is opt-in, not required.
 - **Core is minimal** — ATS, DB, ≡ am, ꩜ Pulse, ⋈ ax. Everything else is a plugin over gRPC.
 - **Rust/WASM for cross-runtime logic** — parser, fuzzy engine, Merkle tree. One implementation, three runtimes (server via wazero, browser via wasm-bindgen, native tests via cargo).
-- **Conviction over consensus** — opinionated choices about real-time, data-first UI, semantic clarity. Not "best practices."
-
 See [Design Philosophy](design-philosophy.md) and [Distribution Strategy](distribution-strategy.md).
 
 ---
@@ -154,6 +152,7 @@ See [Design Philosophy](design-philosophy.md) and [Distribution Strategy](distri
 ```
 
 Architecture deep-dives:
+
 - [Bounded Storage](architecture/bounded-storage.md)
 - [Config System](architecture/config-system.md)
 - [Pulse Async](architecture/pulse-async.md)
@@ -188,6 +187,7 @@ WebSocket: semantic tokens, LSP protocol, ꩜ Pulse updates.
 REST: CRUD, sync triggers, status.
 
 Detailed flows:
+
 - [Glyph Attestation Flow](development/glyph-attestation-flow.md)
 - [Grace: Opening & Closing](development/grace.md) (✿ PulseOpen / ❀ PulseClose)
 - [API Reference](api/)
@@ -199,11 +199,13 @@ Detailed flows:
 Single Go binary, embedded web UI. Zero configuration required.
 
 Same binary everywhere:
+
 - **Raspberry Pi** — personal node
 - **Desktop** — development or team use
 - **Server** — always-on sync peer
 
 Clients:
+
 - **Browser** (any) — connects via WebSocket + REST
 - **Tauri** — desktop/mobile wrapper around the web UI
 - **CLI**
@@ -221,6 +223,7 @@ See [Installation](installation.md), [Nix Development](nix-development.md), [Dis
 ### SEG / Sym / Glyph
 
 Every operator has three layers:
+
 - **seg** — the grammatical unit (what it IS)
 - **sym** — the visual expression (how it LOOKS)
 - **glyph** — the interactive manifestation (how you INTERACT with it)
@@ -231,7 +234,7 @@ Full definitions: [GLOSSARY.md](GLOSSARY.md)
 
 ### Continuous Intelligence
 
-Not a database you query. A system that is always ingesting (⨳), always processing (꩜), always queryable (⋈).
+A system that is always ingesting (⨳), always processing (꩜), always queryable (⋈).
 
 See [vision/continuous-intelligence.md](vision/continuous-intelligence.md).
 
@@ -243,7 +246,7 @@ See [sync.md](sync.md), [vision/reticulum.md](vision/reticulum.md).
 
 ### Vision Documents
 
-- [Glyphs](vision/glyphs.md) — universal UI primitive
+- [Glyphs](vision/glyphs.md) — persistent interactive UI primitive
 - [Fractal Workspace](vision/fractal-workspace.md) — nested canvas navigation
 - [Glyph Melding](vision/glyph-melding.md) — reactive DAG composition
 - [Time-Travel](vision/time-travel.md) — attestation state across time
