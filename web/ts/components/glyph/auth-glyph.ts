@@ -58,14 +58,40 @@ function renderAuthContent(): HTMLElement {
     btn.innerHTML = `<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.14 21C10.81 19.54 9.25 16.95 9.25 14c0-1.52 1.23-2.75 2.75-2.75s2.75 1.23 2.75 2.75c0 1.52 1.23 2.75 2.75 2.75s2.75-1.23 2.75-2.75C20.25 9.44 16.55 5.75 12 5.75S3.76 9.44 3.76 14c0 1.02.11 2 .32 2.95M8.49 20.3C7.24 18.51 6.5 16.34 6.5 14c0-3.04 2.46-5.5 5.5-5.5s5.5 2.46 5.5 5.5M17.79 19.48c-.1.01-.2.01-.3.01-3.04 0-5.5-2.46-5.5-5.5M19.67 6.48C17.8 4.35 15.06 3 12 3S6.2 4.35 4.33 6.48"/></svg>`;
 
 
-    const server = document.createElement('p');
-    server.style.fontSize = '11px';
-    server.style.color = 'var(--text-on-dark)';
-    server.style.margin = '0';
-    server.style.padding = '3px 10px';
-    server.style.background = 'rgba(0, 0, 0, 0.3)';
-    server.style.borderRadius = '10px';
-    server.textContent = (window as any).__BACKEND_URL__ || window.location.origin;
+    const identity = document.createElement('div');
+    identity.style.display = 'flex';
+    identity.style.flexDirection = 'column';
+    identity.style.alignItems = 'center';
+    identity.style.gap = '2px';
+    identity.style.padding = '4px 10px';
+    identity.style.background = 'rgba(0, 0, 0, 0.3)';
+    identity.style.borderRadius = '10px';
+
+    const serverLine = document.createElement('span');
+    serverLine.style.fontSize = '11px';
+    serverLine.style.color = 'var(--text-on-dark)';
+    serverLine.textContent = (window as any).__BACKEND_URL__ || window.location.origin;
+
+    const didLine = document.createElement('span');
+    didLine.style.fontSize = '10px';
+    didLine.style.color = 'var(--text-on-dark)';
+    didLine.style.fontFamily = 'monospace';
+    didLine.style.cursor = 'pointer';
+    didLine.style.opacity = '0.7';
+    didLine.title = 'Click to copy full DID';
+    didLine.style.display = 'none';
+
+    let fullDID = '';
+    didLine.addEventListener('click', () => {
+        if (fullDID) {
+            navigator.clipboard.writeText(fullDID);
+            const prev = didLine.textContent;
+            didLine.textContent = 'copied';
+            setTimeout(() => { didLine.textContent = prev; }, 1000);
+        }
+    });
+
+    identity.append(serverLine, didLine);
 
     const status = document.createElement('p');
     status.style.fontSize = '12px';
@@ -73,11 +99,25 @@ function renderAuthContent(): HTMLElement {
     status.style.margin = '0';
     status.style.minHeight = '1.2em';
 
-    container.append(btn, server, status);
+    container.append(btn, identity, status);
 
     let mode: 'register' | 'login' | 'authenticated' | null = null;
 
-    const fingerprintSvg = btn.innerHTML;
+    async function fetchNodeDID() {
+        try {
+            const res = await apiFetch('/.well-known/did.json');
+            const doc = await res.json();
+            if (doc.id) {
+                fullDID = doc.id;
+                const prefix = fullDID.slice(0, 16);
+                const suffix = fullDID.slice(-4);
+                didLine.textContent = `${prefix}…${suffix}`;
+                didLine.style.display = '';
+            }
+        } catch {
+            // Node DID not available — not critical
+        }
+    }
 
     async function checkStatus() {
         try {
@@ -94,6 +134,7 @@ function renderAuthContent(): HTMLElement {
                 btn.style.background = '#4a4470';
                 btn.style.border = '1px solid #5c5488';
                 btn.disabled = false;
+                fetchNodeDID();
                 return;
             }
 
@@ -105,6 +146,7 @@ function renderAuthContent(): HTMLElement {
                 mode = 'register';
             }
             btn.disabled = false;
+            fetchNodeDID();
         } catch (e) {
             status.textContent = e instanceof Error ? e.message : String(e);
             status.style.color = '#e06060';
