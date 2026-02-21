@@ -32,16 +32,10 @@ mock.module('../api', () => ({
     apiFetch: (path: string, init?: RequestInit) => mockApiFetch(path, init),
 }));
 
-// Mock UIState — controlled glyph/composition data per test
-let mockGlyphs: Array<{ id: string; symbol: string; x: number; y: number; width?: number; height?: number; content?: string }> = [];
-let mockCompositions: Array<{ id: string; edges: Array<{ from: string; to: string; direction: string; position: number }>; x: number; y: number }> = [];
-
-mock.module('../state/ui', () => ({
-    uiState: {
-        getCanvasGlyphs: () => mockGlyphs,
-        getCanvasCompositions: () => mockCompositions,
-    },
-}));
+// Mock UIState — process-global, must be superset-complete (see test/mock-ui-state.ts)
+import { createMockUiState } from '../test/mock-ui-state';
+const { uiState, glyphs: mockGlyphs, compositions: mockCompositions } = createMockUiState();
+mock.module('../state/ui', () => ({ uiState }));
 
 const { canvasSyncQueue } = await import('./canvas-sync');
 
@@ -53,13 +47,15 @@ describe('Canvas Sync - Tim (Happy Path)', () => {
         mockConnectivity = 'offline';
         connectivitySubscribers.clear();
         mockApiFetch = async () => new Response(null, { status: 200 });
-        mockGlyphs = [
+        mockGlyphs.length = 0;
+        mockGlyphs.push(
             { id: 'g-1', symbol: 'ax', x: 100, y: 200 },
             { id: 'g-2', symbol: 'py', x: 300, y: 400 },
-        ];
-        mockCompositions = [
+        );
+        mockCompositions.length = 0;
+        mockCompositions.push(
             { id: 'c-1', edges: [{ from: 'g-1', to: 'g-2', direction: 'right', position: 0 }], x: 100, y: 200 },
-        ];
+        );
         syncStateManager.clearState('g-1');
         syncStateManager.clearState('g-2');
         syncStateManager.clearState('c-1');
@@ -192,13 +188,15 @@ describe('Canvas Sync - Spike (Edge Cases)', () => {
         mockConnectivity = 'offline';
         connectivitySubscribers.clear();
         mockApiFetch = async () => new Response(null, { status: 200 });
-        mockGlyphs = [
+        mockGlyphs.length = 0;
+        mockGlyphs.push(
             { id: 'g-1', symbol: 'ax', x: 100, y: 200 },
             { id: 'g-2', symbol: 'py', x: 300, y: 400 },
-        ];
-        mockCompositions = [
+        );
+        mockCompositions.length = 0;
+        mockCompositions.push(
             { id: 'c-1', edges: [{ from: 'g-1', to: 'g-2', direction: 'right', position: 0 }], x: 100, y: 200 },
-        ];
+        );
         syncStateManager.clearState('g-1');
         syncStateManager.clearState('g-2');
         syncStateManager.clearState('c-1');
