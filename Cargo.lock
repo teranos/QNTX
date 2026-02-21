@@ -3739,13 +3739,14 @@ dependencies = [
 
 [[package]]
 name = "qntx-python-plugin"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "clap",
  "parking_lot",
  "prost",
  "pyo3",
  "qntx-grpc",
+ "qntx-proto",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
