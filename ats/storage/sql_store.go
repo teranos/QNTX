@@ -136,6 +136,7 @@ func NewSQLStore(db *sql.DB, logger *zap.SugaredLogger) *SQLStore {
 //
 // TODO(QNTX #67): Add comprehensive tests for bounded storage enforcement
 // Focus: 16 attestations per actor/context, 64 contexts per actor, 64 actors per entity
+// TODO(#576): Sign attestation with node DID before persisting
 func (s *SQLStore) CreateAttestation(as *types.As) error {
 	fields, err := MarshalAttestationFields(as)
 	if err != nil {
