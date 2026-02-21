@@ -169,7 +169,7 @@ export class BrowserSync {
             // Phase 1: Exchange root hashes
             const localRoot = syncMerkleRoot();
 
-            await wsSend(ws, {
+            wsSend(ws, {
                 type: 'sync_hello',
                 root_hash: localRoot.root,
                 name: 'browser',
@@ -183,7 +183,7 @@ export class BrowserSync {
             // Roots match — already in sync
             if (hello.root_hash === localRoot.root) {
                 log.debug(SEG.WASM, '[BrowserSync] Roots match, already in sync');
-                await wsSend(ws, { type: 'sync_done', sent: 0, received: 0 });
+                wsSend(ws, { type: 'sync_done', sent: 0, received: 0 });
                 await wsRecv(ws); // recv server's sync_done
                 return { sent: 0, received: 0 };
             }
@@ -193,7 +193,7 @@ export class BrowserSync {
             // Phase 2: Exchange group hashes
             const localGroups = syncMerkleGroupHashes();
 
-            await wsSend(ws, {
+            wsSend(ws, {
                 type: 'sync_group_hashes',
                 groups: localGroups,
             });
@@ -207,7 +207,7 @@ export class BrowserSync {
             const diff = syncMerkleDiff(remoteGroupsMsg.groups ?? {});
             const needed = [...diff.remote_only, ...diff.divergent];
 
-            await wsSend(ws, {
+            wsSend(ws, {
                 type: 'sync_need',
                 need: needed,
             });
@@ -236,7 +236,7 @@ export class BrowserSync {
                 }
             }
 
-            await wsSend(ws, {
+            wsSend(ws, {
                 type: 'sync_attestations',
                 attestations: outgoing,
             });
@@ -277,7 +277,7 @@ export class BrowserSync {
             }
 
             // Phase 5: Exchange done
-            await wsSend(ws, { type: 'sync_done', sent, received });
+            wsSend(ws, { type: 'sync_done', sent, received });
             await wsRecv(ws); // recv server's sync_done
 
             if (sent > 0 || received > 0) {
@@ -385,23 +385,28 @@ export class BrowserSync {
 // WebSocket Helpers
 // ============================================================================
 
-function wsSend(ws: WebSocket, msg: SyncMsg): Promise<void> {
-    return new Promise((resolve, reject) => {
-        try {
-            ws.send(JSON.stringify(msg));
-            resolve();
-        } catch (err) {
-            reject(err);
-        }
-    });
+function wsSend(ws: WebSocket, msg: SyncMsg): void {
+    ws.send(JSON.stringify(msg));
 }
+
+const RECV_TIMEOUT_MS = 30_000;
 
 function wsRecv(ws: WebSocket): Promise<SyncMsg> {
     return new Promise((resolve, reject) => {
-        const onMessage = (event: MessageEvent) => {
+        const cleanup = () => {
+            clearTimeout(timer);
             ws.removeEventListener('message', onMessage);
             ws.removeEventListener('close', onClose);
             ws.removeEventListener('error', onError);
+        };
+
+        const timer = window.setTimeout(() => {
+            cleanup();
+            reject(new Error(`Sync WebSocket recv timeout (${RECV_TIMEOUT_MS}ms)`));
+        }, RECV_TIMEOUT_MS);
+
+        const onMessage = (event: MessageEvent) => {
+            cleanup();
             try {
                 resolve(JSON.parse(event.data));
             } catch (err) {
@@ -410,16 +415,12 @@ function wsRecv(ws: WebSocket): Promise<SyncMsg> {
         };
 
         const onClose = () => {
-            ws.removeEventListener('message', onMessage);
-            ws.removeEventListener('close', onClose);
-            ws.removeEventListener('error', onError);
+            cleanup();
             reject(new Error('Sync WebSocket closed unexpectedly'));
         };
 
         const onError = () => {
-            ws.removeEventListener('message', onMessage);
-            ws.removeEventListener('close', onClose);
-            ws.removeEventListener('error', onError);
+            cleanup();
             reject(new Error('Sync WebSocket error'));
         };
 
