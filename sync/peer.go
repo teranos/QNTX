@@ -15,6 +15,10 @@ import (
 // Sync protocol limits. Sufficient for trusted/manual peering today.
 // For public-facing endpoints or automatic discovery, these need research:
 // rate limiting at the connection level, pagination, and per-peer quotas.
+//
+// When image-carrying attestations land, these limits need revisiting:
+// the count cap alone doesn't bound transfer size. Peers may need a way
+// to negotiate a byte budget or defer large payloads.
 const (
 	maxGroupsPerSync       = 100
 	maxAttestationsPerSync = 1000
