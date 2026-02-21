@@ -6,10 +6,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	"go.uber.org/zap"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/signing"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/vanity-id"
@@ -85,8 +87,8 @@ func MarshalAttestationFields(as *types.As) (*AttestationFields, error) {
 // Query constants
 const (
 	AttestationInsertQuery = `
-		INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	AttestationExistsQuery = `
 		SELECT EXISTS(SELECT 1 FROM attestations WHERE id = ?)`
@@ -117,6 +119,28 @@ const (
 		)`
 )
 
+// Global signer set once after node DID is initialized.
+// All SQLStore instances use this to sign locally-created attestations.
+var (
+	globalSignerMu sync.RWMutex
+	globalSigner   *signing.Signer
+)
+
+// SetDefaultSigner sets the package-level signer used by all SQLStore instances.
+// Call once after node DID initialization.
+func SetDefaultSigner(signer *signing.Signer) {
+	globalSignerMu.Lock()
+	defer globalSignerMu.Unlock()
+	globalSigner = signer
+}
+
+// getDefaultSigner returns the current global signer (may be nil).
+func getDefaultSigner() *signing.Signer {
+	globalSignerMu.RLock()
+	defer globalSignerMu.RUnlock()
+	return globalSigner
+}
+
 // SQLStore implements the ats.AttestationStore interface with SQLite backend
 type SQLStore struct {
 	db     *sql.DB
@@ -132,12 +156,19 @@ func NewSQLStore(db *sql.DB, logger *zap.SugaredLogger) *SQLStore {
 }
 
 // CreateAttestation inserts a new attestation into the database
-// and enforces bounded storage limits (16/64/64 strategy)
+// and enforces bounded storage limits (16/64/64 strategy).
+// If a global signer is configured and the attestation is unsigned, it is signed before INSERT.
 //
 // TODO(QNTX #67): Add comprehensive tests for bounded storage enforcement
 // Focus: 16 attestations per actor/context, 64 contexts per actor, 64 actors per entity
-// TODO(#576): Sign attestation with node DID before persisting
 func (s *SQLStore) CreateAttestation(as *types.As) error {
+	// Sign if we have a signer and the attestation isn't already signed
+	if signer := getDefaultSigner(); signer != nil {
+		if err := signer.Sign(as); err != nil {
+			return errors.Wrapf(err, "failed to sign attestation %s", as.ID)
+		}
+	}
+
 	fields, err := MarshalAttestationFields(as)
 	if err != nil {
 		err = errors.Wrap(err, "failed to marshal attestation fields")
@@ -145,6 +176,16 @@ func (s *SQLStore) CreateAttestation(as *types.As) error {
 		err = errors.WithDetail(err, fmt.Sprintf("Source: %s", as.Source))
 		err = errors.WithDetail(err, fmt.Sprintf("Timestamp: %s", as.Timestamp.Format("2006-01-02 15:04:05")))
 		return err
+	}
+
+	// Normalize empty signature to nil for clean NULL storage
+	var sig []byte
+	if len(as.Signature) > 0 {
+		sig = as.Signature
+	}
+	var signerDID *string
+	if as.SignerDID != "" {
+		signerDID = &as.SignerDID
 	}
 
 	_, err = s.db.Exec(
@@ -158,6 +199,8 @@ func (s *SQLStore) CreateAttestation(as *types.As) error {
 		as.Source,
 		fields.AttributesJSON,
 		as.CreatedAt,
+		sig,
+		signerDID,
 	)
 
 	if err != nil {

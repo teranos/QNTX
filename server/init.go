@@ -10,6 +10,7 @@ import (
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/lsp"
+	"github.com/teranos/QNTX/ats/signing"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
@@ -217,6 +218,12 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		return nil, errors.Wrap(err, "failed to initialize node DID")
 	}
 	server.nodeDID = nodeDIDHandler
+
+	// Set global signer so all attestations are signed with the node's DID key
+	storage.SetDefaultSigner(&signing.Signer{
+		PrivateKey: nodeDIDHandler.PrivateKey,
+		DID:        nodeDIDHandler.DID,
+	})
 
 	// Register system type definitions so attestations render in the graph
 	{

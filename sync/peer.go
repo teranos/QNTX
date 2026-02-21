@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/signing"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -325,6 +326,16 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 	for _, wires := range msg.Attestations {
 		for _, w := range wires {
 			as := fromWire(w)
+
+			// Verify signature if present — reject tampered attestations
+			if err := signing.Verify(as); err != nil {
+				p.logger.Warnw("Rejecting synced attestation with invalid signature",
+					"id", as.ID,
+					"signer_did", as.SignerDID,
+					"error", err,
+				)
+				continue
+			}
 
 			// Skip if we already have this attestation by ASID
 			if p.store.AttestationExists(as.ID) {
