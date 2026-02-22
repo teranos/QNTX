@@ -75,8 +75,8 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 
 	// Get schema from plugin if available
 	var schema map[string]interface{}
-	if s.pluginManager != nil {
-		if pluginClient, ok := s.pluginManager.GetPlugin(pluginName); ok {
+	if pm := s.getPluginManager(); pm != nil {
+		if pluginClient, ok := pm.GetPlugin(pluginName); ok {
 			// Try to get schema from plugin
 			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 			defer cancel()
@@ -160,11 +160,11 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 	}
 
 	// Validate config against plugin schema before writing to disk
-	if s.pluginManager != nil {
+	if pm := s.getPluginManager(); pm != nil {
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
-		proxy, ok := s.pluginManager.GetPlugin(pluginName)
+		proxy, ok := pm.GetPlugin(pluginName)
 		if !ok {
 			s.writeRichError(w, errors.Newf("plugin not found: %s", pluginName), http.StatusNotFound)
 			return
@@ -200,11 +200,11 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 	}
 
 	// Reinitialize the plugin with new config if it's running
-	if s.pluginManager != nil {
+	if pm := s.getPluginManager(); pm != nil {
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
 
-		if err := s.pluginManager.ReinitializePlugin(ctx, pluginName, s.services); err != nil {
+		if err := pm.ReinitializePlugin(ctx, pluginName, s.services); err != nil {
 			s.logger.Errorw("Failed to reinitialize plugin", "error", err, "plugin", pluginName)
 
 			// Config was written but reinitialization failed
