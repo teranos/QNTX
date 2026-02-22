@@ -146,17 +146,32 @@ export async function exportCanvasStatic(): Promise<void> {
 }
 
 /**
- * Publish the canvas to IPFS via Pinata.
- * Returns the CID and gateway URL.
+ * Publish result from POST /api/canvas/publish.
  */
-export async function publishCanvas(): Promise<{ cid: string; url: string }> {
+export interface PublishResult {
+    cid?: string;
+    url?: string;
+    git_path?: string;
+    git_commit?: string;
+}
+
+/**
+ * Publish the canvas — renders static HTML, pins to IPFS (if Pinata configured),
+ * commits to docs/demo/index.html in git.
+ */
+export async function publishCanvas(): Promise<PublishResult> {
     const response = await apiFetch('/api/canvas/publish', { method: 'POST' });
     if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Failed to publish canvas');
     }
-    const result = await response.json();
-    log.info(SEG.GLYPH, `[CanvasAPI] Published canvas to IPFS: ${result.cid}`);
+    const result: PublishResult = await response.json();
+    if (result.cid) {
+        log.info(SEG.GLYPH, `[CanvasAPI] Published canvas to IPFS: ${result.cid}`);
+    }
+    if (result.git_commit) {
+        log.info(SEG.GLYPH, `[CanvasAPI] Published canvas to git: ${result.git_path} (${result.git_commit.substring(0, 7)})`);
+    }
     return result;
 }
 

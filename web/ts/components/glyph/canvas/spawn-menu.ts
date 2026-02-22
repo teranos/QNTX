@@ -245,8 +245,13 @@ export function showSpawnMenu(
         publishBtn.textContent = '…';
         publishBtn.disabled = true;
         publishCanvas().then(result => {
-            toast.success(`Published: ${result.cid}`);
-            navigator.clipboard.writeText(result.url).catch(() => {});
+            const parts: string[] = [];
+            if (result.cid) parts.push(result.cid);
+            if (result.git_commit) parts.push(`git:${result.git_commit.substring(0, 7)}`);
+            toast.success(`Published: ${parts.join(' + ')}`);
+            if (result.url) {
+                navigator.clipboard.writeText(result.url).catch(() => {});
+            }
         }).catch(err => {
             const message = err instanceof Error ? err.message : String(err);
             log.error(SEG.GLYPH, `[Canvas] Publish failed: ${message}`);
