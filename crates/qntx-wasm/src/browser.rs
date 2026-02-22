@@ -695,15 +695,16 @@ pub async fn rich_search(query: &str, limit: usize) -> Result<String, JsValue> {
 }
 
 /// Discover rich_string_fields from type definition attestations.
-/// Mirrors Go's buildDynamicRichStringFields.
+/// Based on Go's buildDynamicRichStringFields but relaxed for offline use:
+/// Go requires predicates=["type"] AND contexts=["graph"] because the server
+/// has a proper type registry. Browser-side only requires predicates=["type"]
+/// so offline-created type defs (any context) contribute their fields.
 fn discover_rich_string_fields(
     attestations: &[qntx_core::attestation::Attestation],
 ) -> Vec<String> {
     let mut fields: HashSet<String> = HashSet::new();
     for a in attestations {
-        let is_type_def = a.predicates.iter().any(|p| p == "type")
-            && a.contexts.iter().any(|c| c == "graph");
-        if !is_type_def {
+        if !a.predicates.iter().any(|p| p == "type") {
             continue;
         }
         if let Some(serde_json::Value::Array(arr)) = a.attributes.get("rich_string_fields") {
