@@ -41,6 +41,7 @@ mock.module('../../qntx-wasm', () => ({
     parseQuery: () => ({ ok: true, query: {} }),
     rebuildFuzzyIndex: async () => ({ subjects: 0, predicates: 0, contexts: 0, actors: 0, hash: '' }),
     getCompletions: () => ({ slot: 'subjects', prefix: '', items: [] }),
+    richSearch: async () => ({ query: '', matches: [], total: 0 }),
 }));
 
 // Mock CodeMirror (heavy dependency, not needed for DOM structure tests)

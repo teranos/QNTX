@@ -4,7 +4,7 @@ import { log, SEG } from './logger.ts';
 import { getStorageItem, setStorageItem } from './indexeddb-storage.ts';
 import { sendMessage } from './websocket.ts';
 import { connectivityManager } from './connectivity.ts';
-import { getCompletions } from './qntx-wasm.ts';
+import { getCompletions, richSearch } from './qntx-wasm.ts';
 import { SearchView, STRATEGY_FUZZY, TYPE_COMMAND, TYPE_SUBCANVAS } from './search-view.ts';
 import type { SearchMatch, SearchResultsMessage } from './search-view.ts';
 import { spawnGlyphByCommand, getMatchingCommands, COMMAND_LABELS } from './components/glyph/canvas/spawn-menu.ts';
@@ -117,11 +117,22 @@ function dispatchSearch(text: string): void {
         searchView.setLocalResults(computeLocalResults(text.trim()));
     }
 
-    // Fire async search
+    // WASM rich search — instant results from IndexedDB
+    searchLocal(text.trim());
+
+    // Server enrichment when online (semantic search, full DB coverage)
     if (connectivityManager.state === 'online') {
         sendMessage({ type: 'rich_search', query: text });
-    } else {
-        searchOffline(text);
+    }
+}
+
+async function searchLocal(query: string): Promise<void> {
+    if (!searchView) return;
+    try {
+        const results = await richSearch(query, 50);
+        searchView.updateResults(results as unknown as SearchResultsMessage);
+    } catch {
+        searchOffline(query);
     }
 }
 
