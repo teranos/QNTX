@@ -146,6 +146,21 @@ export async function exportCanvasStatic(): Promise<void> {
 }
 
 /**
+ * Publish the canvas to IPFS via Pinata.
+ * Returns the CID and gateway URL.
+ */
+export async function publishCanvas(): Promise<{ cid: string; url: string }> {
+    const response = await apiFetch('/api/canvas/publish', { method: 'POST' });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to publish canvas');
+    }
+    const result = await response.json();
+    log.info(SEG.GLYPH, `[CanvasAPI] Published canvas to IPFS: ${result.cid}`);
+    return result;
+}
+
+/**
  * Load all canvas state from backend (glyphs + compositions + minimized windows)
  * Converts backend format to frontend state format
  */

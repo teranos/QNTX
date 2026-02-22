@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"html"
 	"net/http"
 	"strings"
 
 	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/glyph/ipfs"
 	"github.com/teranos/QNTX/glyph/storage"
 	"github.com/teranos/QNTX/sym"
 )
@@ -36,6 +38,54 @@ func (h *CanvasHandler) HandleExportStatic(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="canvas.html"`)
 	fmt.Fprint(w, htmlContent)
+}
+
+// HandlePublish renders the canvas as static HTML, pins it to IPFS via Pinata,
+// and returns the CID.
+// POST /api/canvas/publish — returns {"cid": "...", "url": "..."}.
+func (h *CanvasHandler) HandlePublish(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		h.writeError(w, errors.New("method not allowed"), http.StatusMethodNotAllowed)
+		return
+	}
+
+	if h.pinataJWT == "" {
+		h.writeError(w, errors.New("pinata.jwt not configured — set QNTX_PINATA_JWT or pinata.jwt in am.toml"), http.StatusServiceUnavailable)
+		return
+	}
+
+	glyphs, err := h.store.ListGlyphs(r.Context())
+	if err != nil {
+		h.writeError(w, errors.Wrap(err, "failed to list glyphs for publish"), http.StatusInternalServerError)
+		return
+	}
+
+	compositions, err := h.store.ListCompositions(r.Context())
+	if err != nil {
+		h.writeError(w, errors.Wrap(err, "failed to list compositions for publish"), http.StatusInternalServerError)
+		return
+	}
+
+	htmlContent := renderStaticCanvas(glyphs, compositions)
+
+	pinResp, err := ipfs.PinFile(h.pinataJWT, "canvas.html", []byte(htmlContent))
+	if err != nil {
+		h.writeError(w, errors.Wrap(err, "failed to pin canvas to IPFS"), http.StatusBadGateway)
+		return
+	}
+
+	gateway := h.pinataGateway
+	if gateway == "" {
+		gateway = "https://gateway.pinata.cloud"
+	}
+
+	resp := map[string]string{
+		"cid": pinResp.IpfsHash,
+		"url": gateway + "/ipfs/" + pinResp.IpfsHash,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 // renderStaticCanvas produces a self-contained HTML document from canvas state.

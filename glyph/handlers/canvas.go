@@ -17,9 +17,11 @@ import (
 
 // CanvasHandler handles HTTP requests for canvas state
 type CanvasHandler struct {
-	store         *glyphstorage.CanvasStore
-	watcherEngine *watcher.Engine
-	logger        *zap.SugaredLogger
+	store          *glyphstorage.CanvasStore
+	watcherEngine  *watcher.Engine
+	logger         *zap.SugaredLogger
+	pinataJWT      string
+	pinataGateway  string
 }
 
 // NewCanvasHandler creates a new canvas handler
@@ -41,6 +43,14 @@ func WithWatcherEngine(engine *watcher.Engine, logger *zap.SugaredLogger) Canvas
 	return func(h *CanvasHandler) {
 		h.watcherEngine = engine
 		h.logger = logger
+	}
+}
+
+// WithPinata enables IPFS publishing via Pinata
+func WithPinata(jwt, gateway string) CanvasHandlerOption {
+	return func(h *CanvasHandler) {
+		h.pinataJWT = jwt
+		h.pinataGateway = gateway
 	}
 }
 
