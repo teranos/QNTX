@@ -18,7 +18,7 @@ import { createNoteGlyph } from '../note-glyph';
 import { createTsGlyph, TS_DEFAULT_CODE } from '../ts-glyph';
 import { createSubcanvasGlyph } from '../subcanvas-glyph';
 import { uiState } from '../../../state/ui';
-import { exportCanvasStatic } from '../../../api/canvas';
+import { exportCanvasStatic, publishCanvas } from '../../../api/canvas';
 import { toast } from '../../../toast';
 
 /** Duration multiplier for spawn menu animation */
@@ -233,6 +233,30 @@ export function showSpawnMenu(
     });
 
     menu.appendChild(exportBtn);
+
+    // Publish button (IPFS)
+    const publishBtn = document.createElement('button');
+    publishBtn.className = 'canvas-spawn-button';
+    publishBtn.textContent = '⧉';
+    publishBtn.title = 'Publish canvas to IPFS';
+    publishBtn.style.fontSize = '16px';
+
+    publishBtn.addEventListener('click', () => {
+        publishBtn.textContent = '…';
+        publishBtn.disabled = true;
+        publishCanvas().then(result => {
+            toast.success(`Published: ${result.cid}`);
+            navigator.clipboard.writeText(result.url).catch(() => {});
+        }).catch(err => {
+            const message = err instanceof Error ? err.message : String(err);
+            log.error(SEG.GLYPH, `[Canvas] Publish failed: ${message}`);
+            toast.error(`Publish failed: ${message}`);
+        }).finally(() => {
+            removeMenu();
+        });
+    });
+
+    menu.appendChild(publishBtn);
 
     document.body.appendChild(menu);
 

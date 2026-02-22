@@ -324,6 +324,9 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	if server.watcherEngine != nil {
 		canvasOpts = append(canvasOpts, handlers.WithWatcherEngine(server.watcherEngine, serverLogger))
 	}
+	if deps.config.Pinata.JWT != "" {
+		canvasOpts = append(canvasOpts, handlers.WithPinata(deps.config.Pinata.JWT, deps.config.Pinata.Gateway))
+	}
 	server.canvasHandler = handlers.NewCanvasHandler(canvasStore, canvasOpts...)
 	serverLogger.Infow("Canvas state handlers initialized")
 

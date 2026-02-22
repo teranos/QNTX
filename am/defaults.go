@@ -78,6 +78,10 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("embeddings.cluster_label_max_tokens", 2000)
 	v.SetDefault("embeddings.cluster_label_model", "") // empty = system default
 
+	// Pinata IPFS pinning defaults
+	v.SetDefault("pinata.gateway", "https://gateway.pinata.cloud")
+	// jwt: no default — must be set via config or QNTX_PINATA_JWT
+
 	// Plugin configuration defaults
 	v.SetDefault("plugin.enabled", []string{}) // No plugins enabled by default (explicit opt-in via am.toml)
 	v.SetDefault("plugin.paths", []string{
@@ -100,6 +104,9 @@ func BindSensitiveEnvVars(v *viper.Viper) {
 	v.BindEnv("local_inference.enabled", "QNTX_LOCAL_INFERENCE_ENABLED")
 	v.BindEnv("local_inference.base_url", "QNTX_LOCAL_INFERENCE_BASE_URL")
 	v.BindEnv("local_inference.model", "QNTX_LOCAL_INFERENCE_MODEL")
+
+	// Pinata IPFS pinning
+	v.BindEnv("pinata.jwt", "QNTX_PINATA_JWT")
 }
 
 // GetServerPort returns the configured QNTX server port
