@@ -1,0 +1,52 @@
+[package]
+name = "qntx-imagegen-plugin"
+version = "0.1.0"
+edition.workspace = true
+description = "QNTX gRPC plugin for local Stable Diffusion image generation via ONNX Runtime"
+license.workspace = true
+authors = ["QNTX Contributors"]
+
+[[bin]]
+name = "qntx-imagegen-plugin"
+path = "src/main.rs"
+
+[dependencies]
+# QNTX gRPC infrastructure
+qntx-grpc = { path = "../crates/qntx-grpc", features = ["plugin"] }
+qntx-proto = { path = "../crates/qntx-proto" }
+
+# gRPC and async
+tonic.workspace = true
+prost.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+
+# ONNX Runtime for Stable Diffusion inference
+ort = { version = "2.0.0-rc.11", features = ["download-binaries", "copy-dylibs"] }
+ndarray = "0.16"
+
+# CLIP tokenizer
+tokenizers = "0.22.2"
+
+# Image encoding
+image = "0.25"
+
+# Random number generation for latent noise
+rand = "0.8"
+rand_distr = "0.4"
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Utilities
+thiserror.workspace = true
+parking_lot.workspace = true
+sha2 = "0.10"
