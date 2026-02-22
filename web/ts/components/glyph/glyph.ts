@@ -17,7 +17,7 @@ export interface Glyph {
     renderContent: () => HTMLElement;    // Function to render content
 
     // Manifestation configuration
-    manifestationType?: 'window' | 'fullscreen' | 'canvas' | 'modal' | 'ix' | 'ax';  // Default: 'window'
+    manifestationType?: 'window' | 'fullscreen' | 'canvas' | 'modal' | 'panel' | 'ix' | 'ax';  // Default: 'window'
     // NOTE: 'ix' currently renders inline on canvas (like py), but reserved for future state-specific manifestations
     // Rationale: IX has unique fail/success states (queued, running, preview, error) that may need special UI
     // NOTE: 'ax' renders inline on canvas for query editing
@@ -80,6 +80,11 @@ export const TITLE_BAR_HEIGHT = '32px';
 export const TITLE_BAR_PADDING = '0 12px';
 export const WINDOW_BUTTON_SIZE = '24px';
 export const CONTENT_PADDING = '16px';
+
+// Panel manifestation constants (used by manifestations/panel.ts)
+export const PANEL_BORDER_RADIUS = '0 0 12px 12px';  // Rounded bottom when sliding from top
+export const PANEL_BORDER_RADIUS_BOTTOM = '12px 12px 0 0';  // Rounded top when sliding from bottom
+export const PANEL_OVERLAY_BG = 'rgba(0, 0, 0, 0.4)';
 
 // Canvas glyph dimensions
 export const CANVAS_GLYPH_TITLE_BAR_HEIGHT = 32; // Height in pixels for AX/IX glyphs

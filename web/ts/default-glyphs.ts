@@ -63,6 +63,7 @@ import { log, SEG } from './logger.ts';
 import { formatBuildTime } from './components/tooltip.ts';
 import type { VersionMessage, SystemCapabilitiesMessage, SyncStatusMessage } from '../types/websocket';
 import { browserSync, type BrowserSyncState } from './browser-sync';
+import { createPluginGlyph } from './plugin-panel.ts';
 
 // Sync status state
 let syncElement: HTMLElement | null = null;
@@ -1142,12 +1143,16 @@ export function registerDefaultGlyphs(): void {
         }
     ));
 
+    // Plugin Panel Glyph — panel manifestation
+    glyphRun.add(createPluginGlyph());
+
     log.debug(SEG.UI, 'Default glyphs registered:', {
         canvas: 'Spatial canvas grid',
         database: 'Database statistics',
         embeddings: 'Embedding service status',
         sync: 'Attestation sync status',
         self: 'Self diagnostics',
-        usage: 'API usage and costs'
+        usage: 'API usage and costs',
+        plugins: 'Domain plugin panel'
     });
 }
