@@ -18,6 +18,8 @@ import { createNoteGlyph } from '../note-glyph';
 import { createTsGlyph, TS_DEFAULT_CODE } from '../ts-glyph';
 import { createSubcanvasGlyph } from '../subcanvas-glyph';
 import { uiState } from '../../../state/ui';
+import { exportCanvasStatic } from '../../../api/canvas';
+import { toast } from '../../../toast';
 
 /** Duration multiplier for spawn menu animation */
 const SPAWN_MENU_ANIMATION_SPEED = 0.5;
@@ -206,6 +208,31 @@ export function showSpawnMenu(
     });
 
     menu.appendChild(subcanvasBtn);
+
+    // Separator
+    const separator = document.createElement('div');
+    separator.style.width = '1px';
+    separator.style.background = 'rgba(255, 255, 255, 0.15)';
+    separator.style.alignSelf = 'stretch';
+    menu.appendChild(separator);
+
+    // Export button
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'canvas-spawn-button';
+    exportBtn.textContent = '↓';
+    exportBtn.title = 'Export canvas as static HTML';
+    exportBtn.style.fontSize = '16px';
+
+    exportBtn.addEventListener('click', () => {
+        exportCanvasStatic().catch(err => {
+            const message = err instanceof Error ? err.message : String(err);
+            log.error(SEG.GLYPH, `[Canvas] Export failed: ${message}`);
+            toast.error(`Export failed: ${message}`);
+        });
+        removeMenu();
+    });
+
+    menu.appendChild(exportBtn);
 
     document.body.appendChild(menu);
 
