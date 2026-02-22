@@ -8,6 +8,7 @@ members = [
     "crates/qntx-proto",
     "crates/qntx-sqlite",
     "crates/qntx-wasm",
+    "qntx-imagegen",
     "qntx-python",
     "qntx-reduce",
     "web/src-tauri",
