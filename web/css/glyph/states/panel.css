@@ -1,0 +1,53 @@
+/**
+ * Glyph Panel State - Full-width slide-in panel
+ *
+ * Panel slides from the opposite edge of the system drawer:
+ * - Desktop (drawer at bottom): panel from top
+ * - Mobile (drawer at top): panel from bottom
+ */
+
+/* Panel container - full width, fixed position */
+.glyph-panel {
+    position: fixed;
+    left: 0;
+    width: 100vw;
+    background-color: rgba(58, 59, 58, 0.95);
+    color: var(--text-on-dark);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    z-index: 10003;
+}
+
+/* Direction variants */
+.glyph-panel--from-top {
+    top: 0;
+    border-radius: 0 0 12px 12px;
+}
+
+.glyph-panel--from-bottom {
+    bottom: 0;
+    border-radius: 12px 12px 0 0;
+}
+
+/* Panel title bar - reuses window-title-bar but not draggable */
+.glyph-panel .window-title-bar {
+    cursor: default;
+}
+
+/* Semi-transparent overlay backdrop */
+.glyph-panel-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0);
+    z-index: 10002;
+    transition: background 200ms ease;
+    pointer-events: auto;
+}
+
+.glyph-panel-overlay--visible {
+    background: rgba(0, 0, 0, 0.4);
+}
