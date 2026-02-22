@@ -45,7 +45,7 @@ export class WebRTCPeer {
 
         // Log connection state changes
         this.pc.onconnectionstatechange = () => {
-            log.debug(SEG.WS, `[WebRTC] Connection state: ${this.pc.connectionState}`);
+            log.info(SEG.WS, `[WebRTC] Connection state: ${this.pc.connectionState}`);
 
             if (this.pc.connectionState === 'failed' || this.pc.connectionState === 'closed') {
                 this.onCloseCallback?.();
@@ -53,7 +53,19 @@ export class WebRTCPeer {
         };
 
         this.pc.oniceconnectionstatechange = () => {
-            log.debug(SEG.WS, `[WebRTC] ICE connection state: ${this.pc.iceConnectionState}`);
+            log.info(SEG.WS, `[WebRTC] ICE connection state: ${this.pc.iceConnectionState}`);
+        };
+
+        this.pc.onicegatheringstatechange = () => {
+            log.info(SEG.WS, `[WebRTC] ICE gathering state: ${this.pc.iceGatheringState}`);
+        };
+
+        this.pc.onicecandidate = (event) => {
+            if (event.candidate) {
+                log.debug(SEG.WS, `[WebRTC] ICE candidate: ${event.candidate.candidate}`);
+            } else {
+                log.info(SEG.WS, '[WebRTC] ICE gathering complete (null candidate)');
+            }
         };
     }
 
