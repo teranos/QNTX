@@ -20,6 +20,8 @@ type As struct {
 	Source     string                 `db:"source" json:"source" validate:"required"`               // How attestation was created
 	Attributes map[string]interface{} `db:"attributes" json:"attributes,omitempty"`                 // Arbitrary JSON
 	CreatedAt  time.Time              `db:"created_at" json:"created_at"`                           // Database creation time
+	Signature  []byte                 `db:"signature" json:"signature,omitempty"`                   // Ed25519 signature over canonical JSON
+	SignerDID  string                 `db:"signer_did" json:"signer_did,omitempty"`                 // did:key of the signing node
 }
 
 // AsCommand represents the parsed CLI command for creating attestations

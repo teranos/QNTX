@@ -32,6 +32,8 @@ message Attestation {
   string source = 7;
   google.protobuf.Struct attributes = 8;
   int64 created_at = 9;       // Unix timestamp in milliseconds
+  bytes signature = 10;       // Ed25519 signature over canonical JSON (optional)
+  string signer_did = 11;     // did:key of the signing node (optional)
 }
 
 // AttestationCommand is used for creating attestations
