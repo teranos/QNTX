@@ -27,7 +27,10 @@ export interface P2PConnection {
  * Returns a JSON string containing SDP offer. Peer pastes this to connect.
  */
 export async function generateInviteLink(): Promise<string> {
-    const peer = new WebRTCPeer();
+    // For localhost testing, use empty ICE servers (local connection only)
+    const peer = new WebRTCPeer({
+        iceServers: window.location.hostname === 'localhost' ? [] : undefined,
+    });
     const offer = await peer.createOffer();
 
     const inviteData: InviteLink = {
@@ -55,7 +58,9 @@ export async function connectToInvite(inviteLinkJson: string): Promise<{ answerJ
 
     const offer = JSON.parse(atob(inviteData.offer));
 
-    const peer = new WebRTCPeer();
+    const peer = new WebRTCPeer({
+        iceServers: window.location.hostname === 'localhost' ? [] : undefined,
+    });
     const answer = await peer.createAnswer(offer);
 
     const answerData = {
