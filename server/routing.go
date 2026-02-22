@@ -95,6 +95,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/watchers/", wrap(s.HandleWatchers))                                       // Watcher CRUD (GET/PUT/DELETE /api/watchers/{id})
 	http.HandleFunc("/api/watchers", wrap(s.HandleWatchers))                                        // List/create watchers (GET/POST)
 	http.HandleFunc("/api/attestations", wrap(s.HandleCreateAttestation))                           // Sync browser-created attestations (POST)
+	http.HandleFunc("/api/canvas/export/static", wrap(s.canvasHandler.HandleExportStatic))           // Static HTML export (GET)
 	http.HandleFunc("/api/canvas/glyphs/", wrap(s.canvasHandler.HandleGlyphs))                      // Glyph CRUD (GET/POST/DELETE /api/canvas/glyphs/{id})
 	http.HandleFunc("/api/canvas/glyphs", wrap(s.canvasHandler.HandleGlyphs))                       // List/create glyphs (GET/POST)
 	http.HandleFunc("/api/canvas/compositions/", wrap(s.canvasHandler.HandleCompositions))          // Composition CRUD (GET/POST/DELETE /api/canvas/compositions/{id})

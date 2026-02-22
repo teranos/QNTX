@@ -120,6 +120,32 @@ export async function listCompositions(): Promise<Composition[]> {
 }
 
 /**
+ * Export the canvas as a self-contained static HTML page.
+ * Triggers a file download in the browser.
+ */
+export async function exportCanvasStatic(): Promise<void> {
+    const response = await apiFetch('/api/canvas/export/static');
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to export canvas');
+    }
+
+    const htmlContent = await response.text();
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'canvas.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    log.info(SEG.GLYPH, '[CanvasAPI] Exported canvas as static HTML');
+}
+
+/**
  * Load all canvas state from backend (glyphs + compositions + minimized windows)
  * Converts backend format to frontend state format
  */
