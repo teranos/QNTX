@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/signing"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -326,6 +327,16 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 		for _, w := range wires {
 			as := fromWire(w)
 
+			// Verify signature if present — reject tampered attestations
+			if err := signing.Verify(as); err != nil {
+				p.logger.Warnw("Rejecting synced attestation with invalid signature",
+					"id", as.ID,
+					"signer_did", as.SignerDID,
+					"error", err,
+				)
+				continue
+			}
+
 			// Skip if we already have this attestation by ASID
 			if p.store.AttestationExists(as.ID) {
 				continue
@@ -363,10 +374,10 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 			}
 
 			// TODO: Synced attestations bypass server-side observers (auto-embedding,
-			// cluster prediction, watcher evaluation). This store.CreateAttestation
+			// cluster prediction, watcher evaluation). This store.CreateAttestationInbound
 			// writes directly to SQLite. Should route through the server's observer-aware
 			// path or fire observers post-insert, same issue as cmd/qntx/commands/as.go.
-			if err := p.store.CreateAttestation(as); err != nil {
+			if err := p.store.CreateAttestationInbound(as); err != nil {
 				p.logger.Warnw("Failed to persist synced attestation",
 					"id", as.ID,
 					"subjects", as.Subjects,
