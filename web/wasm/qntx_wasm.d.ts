@@ -118,6 +118,21 @@ export function put_attestation(json: string): Promise<void>;
 export function query_attestations(filter_json: string): Promise<string>;
 
 /**
+ * Perform rich text search over IndexedDB attestations.
+ *
+ * Algorithm (mirrors Go rich_search_qntx.go):
+ * 1. Discover rich_string_fields from type definition attestations
+ * 2. Load recent attestations that have those fields
+ * 3. Tokenize field values into a word vocabulary
+ * 4. Rebuild RICH_FUZZY engine with that vocabulary
+ * 5. Fuzzy-match each query word against vocabulary
+ * 6. Map matched words back to attestation nodes, score, rank
+ *
+ * Returns JSON: `{"query":"...","matches":[...],"total":N}`
+ */
+export function rich_search(query: string, limit: number): Promise<string>;
+
+/**
  * Compute content hash for an attestation.
  * Input: JSON-serialized proto Attestation (attributes as JSON object)
  * Returns: `{"hash":"<64-char hex>"}` or `{"error":"..."}`
@@ -195,6 +210,7 @@ export interface InitOutput {
     readonly parse_query: (a: number, b: number) => [number, number];
     readonly put_attestation: (a: number, b: number) => any;
     readonly query_attestations: (a: number, b: number) => any;
+    readonly rich_search: (a: number, b: number, c: number) => any;
     readonly sync_content_hash: (a: number, b: number) => [number, number];
     readonly sync_merkle_contains: (a: number, b: number) => [number, number];
     readonly sync_merkle_diff: (a: number, b: number) => [number, number];

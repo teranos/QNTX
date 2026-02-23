@@ -1,5 +1,8 @@
 /**
  * CodeMirror 6 Editor with LSP Integration
+ *
+ * Sunset candidate: serves the pre-canvas AX editor. Search and completions
+ * moved to browser WASM (PR #566, #584). Canvas replaces this editor surface.
  */
 
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, Decoration, DecorationSet } from '@codemirror/view';

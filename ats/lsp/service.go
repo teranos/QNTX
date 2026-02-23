@@ -2,6 +2,11 @@
 // for ATS queries. Unlike standard LSP servers (stdio/JSON-RPC), this implementation
 // uses WebSocket transport for browser integration, but maintains LSP concepts
 // for semantic tokens, completions, and hover information.
+//
+// Sunset candidate: this serves the CodeMirror AX editor which is being
+// superseded by the canvas. Search completions and rich search already run
+// in-browser via WASM (PR #566, #584). Once canvas replaces all editor
+// surfaces, this package and server/lsp_handler.go can be removed.
 package lsp
 
 import (
