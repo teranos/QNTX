@@ -15,7 +15,7 @@ cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments wit
 	@CGO_ENABLED=0 go build -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
 typegen: ## Build standalone typegen binary (pure Go, no plugins/CGO)
-	@go build -o bin/typegen ./cmd/typegen
+	@cd typegen && go build -o ../bin/typegen ./cmd/typegen
 
 types: proto ## Generate TypeScript, Python, Rust types, CSS symbols, and markdown docs from Go source (via Nix)
 	@nix run .#generate-types

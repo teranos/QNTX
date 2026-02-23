@@ -4,9 +4,10 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    qntx.url = "path:..";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, qntx }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -26,9 +27,8 @@
           version = self.rev or "dev";
           src = ../.; # Root of QNTX repo (needs parent code for imports)
 
-          # Must match rootVendorHash in main flake.nix (builds from same root go.mod)
-          # When updating: set main flake's rootVendorHash, then copy here
-          vendorHash = "sha256-7r1EjXKs6GCG1wxQdLdFgZ9FPF8E5ZuE0gVXc2lkk3o=";
+          # Inherit vendorHash from parent flake (builds from same root go.mod)
+          vendorHash = qntx.rootVendorHash;
 
           # Disable workspace for Nix vendoring
           preBuild = ''
