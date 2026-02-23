@@ -114,6 +114,10 @@ type Author struct {
 }
 
 // GetEvents fetches recent events for a repository.
+// TODO: Add ETag/If-None-Match support for 304 Not Modified responses.
+// Without conditional requests, every poll consumes rate limit even when nothing changed.
+// GitHub Events API supports ETags - store ETag from response, send If-None-Match on next request.
+// Also parse X-RateLimit-Remaining and X-RateLimit-Reset headers for rate limit awareness.
 func (c *GitHubClient) GetEvents(ctx context.Context, owner, repo string) ([]Event, error) {
 	url := fmt.Sprintf("%s/repos/%s/%s/events", githubAPIBase, owner, repo)
 

@@ -11,7 +11,8 @@ import (
 )
 
 // HandlePulseJob handles Pulse job execution for GitHub event polling.
-func (p *Plugin) HandlePulseJob(ctx context.Context, jobID string) error {
+// Returns the number of attestations created.
+func (p *Plugin) HandlePulseJob(ctx context.Context, jobID string) (int, error) {
 	logger := p.services.Logger("github")
 
 	// Skip if paused
@@ -21,14 +22,14 @@ func (p *Plugin) HandlePulseJob(ctx context.Context, jobID string) error {
 
 	if paused {
 		logger.Debug("GitHub event polling skipped (plugin paused)")
-		return nil
+		return 0, nil
 	}
 
 	config := p.services.Config("github")
 	repos := config.GetStringSlice("repos")
 	if len(repos) == 0 {
 		logger.Debug("No repositories configured, skipping event poll")
-		return nil
+		return 0, nil
 	}
 
 	logger.Infow("Polling GitHub events", "repos", repos)
@@ -57,10 +58,10 @@ func (p *Plugin) HandlePulseJob(ctx context.Context, jobID string) error {
 	logger.Infow("GitHub event poll complete", "total_events", totalEvents, "errors", len(errs))
 
 	if len(errs) > 0 && totalEvents == 0 {
-		return errors.Newf("all repository polls failed (%d errors)", len(errs))
+		return 0, errors.Newf("all repository polls failed (%d errors)", len(errs))
 	}
 
-	return nil
+	return totalEvents, nil
 }
 
 // pollRepository polls a single repository for events and creates attestations.
