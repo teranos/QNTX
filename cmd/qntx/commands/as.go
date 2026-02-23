@@ -114,7 +114,7 @@ func runAsCommand(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return errors.Wrap(err, "failed to generate ASID")
 		}
-		as = asCommand.ToAs(asid)
+		as = asCommand.ToAs(asid, "cli")
 		// Keep the user's specified actor (don't override with ASID)
 		err = boundedStore.CreateAttestation(as)
 		if err != nil {

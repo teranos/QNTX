@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -15,7 +15,7 @@ cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments wit
 	@CGO_ENABLED=0 go build -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
 typegen: ## Build standalone typegen binary (pure Go, no plugins/CGO)
-	@go build -o bin/typegen ./cmd/typegen
+	@cd typegen && go build -o ../bin/typegen ./cmd/typegen
 
 types: proto ## Generate TypeScript, Python, Rust types, CSS symbols, and markdown docs from Go source (via Nix)
 	@nix run .#generate-types
@@ -208,6 +208,9 @@ code-plugin: ## Build and install code plugin to ~/.qntx/plugins/
 
 atproto-plugin: ## Build and install AT Protocol plugin to ~/.qntx/plugins/
 	@$(MAKE) -C qntx-atproto install PREFIX=$(PREFIX)
+
+github-plugin: ## Build and install GitHub plugin to ~/.qntx/plugins/
+	@$(MAKE) -C qntx-github install PREFIX=$(PREFIX)
 
 rust-vidstream: ## Build Rust vidstream library with ONNX support (for CGO integration)
 	@echo "Building Rust vidstream library with ONNX..."

@@ -267,7 +267,7 @@ func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *type
 	}
 
 	// Convert to As struct
-	as := cmd.ToAs(asid)
+	as := cmd.ToAs(asid, "")
 
 	// Make attestation self-certifying: use ASID as its own actor
 	as.Actors = []string{asid}

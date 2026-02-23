@@ -11,7 +11,7 @@ on:
       - '**.go'
       - 'go.mod'
       - 'go.sum'
-      - 'cmd/typegen/**'
+      - 'typegen/**'
       - '.github/workflows/nix.yml'
 
 jobs:

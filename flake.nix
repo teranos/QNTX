@@ -25,7 +25,10 @@
   };
 
   outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix }:
-    flake-utils.lib.eachDefaultSystem (system:
+    {
+      # Shared vendorHash imported from single source of truth
+      rootVendorHash = import ./nix/vendor-hash.nix;
+    } // (flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
@@ -61,6 +64,7 @@
 
         # Common preBuild hook for Go derivations: copy WASM module for go:embed
         goWasmPreBuild = ''
+          export GOWORK=off  # Build without workspace (use go.mod only)
           cp ${qntx-wasm}/lib/qntx_core.wasm ats/wasm/qntx_core.wasm
         '';
 
@@ -142,9 +146,8 @@
           version = self.rev or "dev";
           src = ./.;
 
-          # Hash of vendored Go dependencies (computed from go.sum)
-          # To update: set to `pkgs.lib.fakeHash`, run `nix build .#qntx`, copy the hash from error
-          vendorHash = "sha256-Zx/7+k5z7qnkhnL9cC8v+WAPZnuKPx4HlDtQOZgMr30=";
+          # Hash of vendored Go dependencies (uses shared rootVendorHash)
+          vendorHash = self.rootVendorHash;
 
           # sqlite3.h needed by sqlite-vec CGO bindings (db/connection.go)
           buildInputs = [ pkgs.sqlite ];
@@ -380,7 +383,7 @@
                 if [ ! -e ./result/bin/typegen ]; then
                   echo "Typegen binary not found, building..."
                   REBUILD_NEEDED=1
-                elif [ cmd/typegen/main.go -nt ./result/bin/typegen ] || [ typegen -nt ./result/bin/typegen ]; then
+                elif [ typegen/cmd/typegen/main.go -nt ./result/bin/typegen ] || [ typegen -nt ./result/bin/typegen ]; then
                   echo "Typegen source changed, rebuilding..."
                   REBUILD_NEEDED=1
                 fi
@@ -428,7 +431,9 @@
                 # More proper solution: Wrap the typegen binary with makeWrapper to
                 # include Go in its runtime closure. This would make the binary truly
                 # self-contained but requires changes to the typegen package definition.
-                ${pkgs.nix}/bin/nix develop .#default --command bash -c "go run ./cmd/typegen check"
+                #
+                # Note: Run from repo root so typegen can access server/routing.go for API docs
+                ${pkgs.nix}/bin/nix develop .#default --command bash -c "go run ./typegen/cmd/typegen check"
               '');
             };
 
@@ -437,5 +442,5 @@
             generate-proto-typescript = protoApps.generate-proto-typescript;
           };
       }
-    );
+    ));
 }

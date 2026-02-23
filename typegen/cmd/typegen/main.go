@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/teranos/QNTX/typegen/cli"
+	"github.com/teranos/typegen/cli"
 )
 
 func main() {
