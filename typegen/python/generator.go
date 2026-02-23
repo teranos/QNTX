@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/teranos/QNTX/typegen"
-	"github.com/teranos/QNTX/typegen/util"
+	"github.com/teranos/typegen"
+	"github.com/teranos/typegen/util"
 )
 
 // ParseFieldTags extracts json and pytype tags from a struct field tag.
