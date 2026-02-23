@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/teranos/QNTX/typegen/util"
+	"github.com/teranos/typegen/util"
 )
 
 // =============================================================================

@@ -492,10 +492,8 @@ pub async fn rich_search(query: &str, limit: usize) -> Result<String, JsValue> {
                     let words: Vec<String> = s
                         .split_whitespace()
                         .map(|w| {
-                            w.trim_matches(|c: char| {
-                                ".,!?;:\"'()[]{}/*&^%$#@".contains(c)
-                            })
-                            .to_lowercase()
+                            w.trim_matches(|c: char| ".,!?;:\"'()[]{}/*&^%$#@".contains(c))
+                                .to_lowercase()
                         })
                         .filter(|w| w.len() > 1)
                         .collect();
@@ -532,8 +530,10 @@ pub async fn rich_search(query: &str, limit: usize) -> Result<String, JsValue> {
 
     let mut query_word_matches: HashMap<String, Vec<(String, f64)>> = HashMap::new();
     for qw in &query_words {
-        let fuzzy = RICH_FUZZY
-            .with(|f| f.borrow().find_matches(qw, VocabularyType::Predicates, 10, 0.3));
+        let fuzzy = RICH_FUZZY.with(|f| {
+            f.borrow()
+                .find_matches(qw, VocabularyType::Predicates, 10, 0.3)
+        });
         if !fuzzy.is_empty() {
             for m in fuzzy {
                 query_word_matches
@@ -672,7 +672,11 @@ pub async fn rich_search(query: &str, limit: usize) -> Result<String, JsValue> {
         });
     }
 
-    matches.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    matches.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     matches.truncate(limit);
 
     let total = matches.len();

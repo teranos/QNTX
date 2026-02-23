@@ -91,6 +91,10 @@ export interface AsCommand {
    */
   timestamp: string;
   /**
+   * Source of attestation (e.g., "cli", "github", "atproto")
+   */
+  source?: string;
+  /**
    * Arbitrary JSON
    */
   attributes?: Record<string, unknown>;

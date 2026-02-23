@@ -2,8 +2,8 @@
 // Regenerate with: make types
 // TODO: Migrate to proto generation
 // Source package: types
-// Source last modified: 2026-02-21T20:54:56+01:00
-// Source version: bb90f2c3
+// Source last modified: 2026-02-23T23:40:13+01:00
+// Source version: 0dd76e61
 
 //! # types module
 //!
@@ -20,6 +20,7 @@
 /// This is Go's native representation with struct tags for JSON/DB mapping.
 /// Proto definitions (plugin/grpc/protocol/atsstore.proto) are used for gRPC
 /// and cross-language boundaries, with manual conversion at boundaries.
+/// TODO(#605): Rename to Attestation (and AsCommand → As) for clarity.
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#as>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct As {
@@ -62,6 +63,7 @@ pub struct As {
 }
 
 /// AsCommand represents the parsed CLI command for creating attestations
+/// TODO(#605): Rename to As (and As → Attestation) for clarity.
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#ascommand>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AsCommand {
@@ -75,6 +77,9 @@ pub struct AsCommand {
     pub actors: Vec<String>,
     /// When attestation was made (optional, uses now)
     pub timestamp: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Source of attestation (e.g., "cli", "github", "atproto")
+    pub source: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Arbitrary JSON
     pub attributes: Option<serde_json::Map<String, serde_json::Value>>,
