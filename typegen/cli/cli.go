@@ -8,12 +8,12 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/errors"
-	"github.com/teranos/QNTX/typegen"
-	"github.com/teranos/QNTX/typegen/api"
-	"github.com/teranos/QNTX/typegen/css"
-	"github.com/teranos/QNTX/typegen/markdown"
-	"github.com/teranos/QNTX/typegen/rust"
-	"github.com/teranos/QNTX/typegen/typescript"
+	"github.com/teranos/typegen"
+	"github.com/teranos/typegen/api"
+	"github.com/teranos/typegen/css"
+	"github.com/teranos/typegen/markdown"
+	"github.com/teranos/typegen/rust"
+	"github.com/teranos/typegen/typescript"
 )
 
 // Package lists per language target

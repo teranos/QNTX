@@ -10,6 +10,8 @@ import (
 // This is Go's native representation with struct tags for JSON/DB mapping.
 // Proto definitions (plugin/grpc/protocol/atsstore.proto) are used for gRPC
 // and cross-language boundaries, with manual conversion at boundaries.
+//
+// TODO(#605): Rename to Attestation (and AsCommand → As) for clarity.
 type As struct {
 	ID         string                 `db:"id" json:"id" validate:"required"`                       // ASID: AS + UUID
 	Subjects   []string               `db:"subjects" json:"subjects" validate:"required,min=1"`     // Entities being attested about
@@ -25,6 +27,8 @@ type As struct {
 }
 
 // AsCommand represents the parsed CLI command for creating attestations
+//
+// TODO(#605): Rename to As (and As → Attestation) for clarity.
 type AsCommand struct {
 	Subjects   []string               `json:"subjects"`             // Entities being attested about
 	Predicates []string               `json:"predicates"`           // What is being claimed (optional, defaults to ["_"])

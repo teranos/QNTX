@@ -35,6 +35,10 @@ func (h *PluginProxyHandler) Name() string {
 }
 
 // Execute forwards the job to the plugin for execution.
+//
+// TODO(#606): Capture plugin stdout/stderr during execution and attach to job logs
+// for display in Pulse UI. Currently logs go to plugin logger but aren't visible
+// in execution history.
 func (h *PluginProxyHandler) Execute(ctx context.Context, job *async.Job) error {
 	// Create ExecuteJob request
 	req := &protocol.ExecuteJobRequest{
