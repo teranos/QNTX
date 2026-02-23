@@ -295,7 +295,7 @@ async function init(): Promise<void> {
     registerDefaultGlyphs();
 
     // Load plugin glyphs (non-blocking)
-    import('./components/glyph/plugin-glyphs.ts').then(({ loadPluginGlyphs }) => {
+    import('./components/glyph/plugin-provided-glyphs.ts').then(({ loadPluginGlyphs }) => {
         loadPluginGlyphs().catch(err => {
             log.warn(SEG.UI, '[Init] Failed to load plugin glyphs:', err);
         });
