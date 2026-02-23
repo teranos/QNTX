@@ -14,6 +14,13 @@
         };
 
         # Build qntx-github plugin binary
+        #
+        # TODO: Move to published QNTX model (see main flake.nix rootVendorHash comment)
+        # Current: Builds from repo root (src = ../.), tightly coupled to monorepo
+        # Target: Depend on published QNTX version (require github.com/teranos/QNTX v0.X.Y)
+        #         then build standalone (src = ./.) with independent hash
+        #
+        # This follows typegen pattern: typegen depends on published v0.23.0 and builds standalone.
         qntx-github = pkgs.buildGoModule {
           pname = "qntx-github-plugin";
           version = self.rev or "dev";
