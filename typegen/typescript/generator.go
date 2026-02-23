@@ -96,6 +96,8 @@ var TypeMapping = map[string]string{
 	"NullString":     "string | null",
 	"NullInt64":      "number | null",
 	"NullTime":       "string | null",
+	// Cross-package struct references
+	"protocol.Attestation": "As",
 }
 
 // typeConverterConfig is the TypeScript-specific type conversion configuration
