@@ -28,7 +28,7 @@
           src = ./..; # Root of QNTX repo (needs parent code for imports)
 
           # Inherit vendorHash from parent flake (builds from same root go.mod)
-          vendorHash = qntx.rootVendorHash;
+          vendorHash = qntx.outputs.${system}.rootVendorHash;
 
           # Disable workspace for Nix vendoring
           preBuild = ''
