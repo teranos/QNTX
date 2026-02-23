@@ -406,6 +406,39 @@ func (s *PluginServer) ConfigSchema(ctx context.Context, _ *protocol.Empty) (*pr
 	}, nil
 }
 
+// RegisterGlyphs returns custom glyph type definitions from the plugin.
+// If the plugin implements UIPlugin, returns its glyph definitions; otherwise empty.
+func (s *PluginServer) RegisterGlyphs(ctx context.Context, _ *protocol.Empty) (*protocol.GlyphDefResponse, error) {
+	// Check if plugin implements UIPlugin
+	uiPlugin, ok := s.plugin.(plugin.UIPlugin)
+	if !ok {
+		// Plugin doesn't provide custom glyphs - return empty
+		return &protocol.GlyphDefResponse{
+			Glyphs: []*protocol.GlyphDef{},
+		}, nil
+	}
+
+	// Get glyph definitions from plugin and convert to protocol format
+	glyphDefs := uiPlugin.RegisterGlyphs()
+	protoGlyphs := make([]*protocol.GlyphDef, len(glyphDefs))
+
+	for i, def := range glyphDefs {
+		protoGlyphs[i] = &protocol.GlyphDef{
+			Symbol:        def.Symbol,
+			Title:         def.Title,
+			Label:         def.Label,
+			ContentPath:   def.ContentPath,
+			CssPath:       def.CSSPath,
+			DefaultWidth:  int32(def.DefaultWidth),
+			DefaultHeight: int32(def.DefaultHeight),
+		}
+	}
+
+	return &protocol.GlyphDefResponse{
+		Glyphs: protoGlyphs,
+	}, nil
+}
+
 // ExecuteJob executes an async job routed from Pulse.
 func (s *PluginServer) ExecuteJob(ctx context.Context, req *protocol.ExecuteJobRequest) (*protocol.ExecuteJobResponse, error) {
 	// Check if plugin implements job execution

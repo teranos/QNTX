@@ -33,9 +33,9 @@ type Plugin struct {
 	services plugin.ServiceRegistry
 
 	mu     sync.RWMutex
-	paused bool          // Protected by mu
-	client *xrpc.Client  // Protected by mu
-	did    string        // Protected by mu
+	paused bool         // Protected by mu
+	client *xrpc.Client // Protected by mu
+	did    string       // Protected by mu
 }
 
 // NewPlugin creates a new AT Protocol domain plugin.
@@ -294,6 +294,23 @@ func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID strin
 	}
 }
 
+// RegisterGlyphs returns custom glyph type definitions provided by this plugin.
+// Implements the UIPlugin interface.
+func (p *Plugin) RegisterGlyphs() []plugin.GlyphDef {
+	return []plugin.GlyphDef{
+		{
+			Symbol:        "🦋",
+			Title:         "AT Protocol Feed",
+			Label:         "atproto-feed",
+			ContentPath:   "/feed-glyph",
+			CSSPath:       "/feed-glyph.css",
+			DefaultWidth:  500,
+			DefaultHeight: 600,
+		},
+	}
+}
+
 // Verify Plugin implements all optional interfaces at compile time.
 var _ plugin.ConfigurablePlugin = (*Plugin)(nil)
 var _ plugin.PausablePlugin = (*Plugin)(nil)
+var _ plugin.UIPlugin = (*Plugin)(nil)

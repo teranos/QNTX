@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"sort"
 	"sync"
 	"testing"
@@ -981,4 +982,96 @@ func TestPortAutoIncrement_MaxAttempts(t *testing.T) {
 	t.Logf("✓ Server successfully navigated %d occupied ports and bound to %d", len(occupiedListeners), expectedPort)
 
 	cancel()
+}
+
+func TestUIPlugin_RegisterGlyphs(t *testing.T) {
+	logger := zaptest.NewLogger(t).Sugar()
+	ctx := context.Background()
+
+	// Create book plugin
+	bookPlugin := NewBookPlugin()
+	pluginServer := NewPluginServer(bookPlugin, logger)
+
+	// Start plugin gRPC server
+	pluginAddr := "localhost:0"
+	listener, err := net.Listen("tcp", pluginAddr)
+	require.NoError(t, err)
+	actualPluginAddr := listener.Addr().String()
+	defer listener.Close()
+
+	grpcServer := grpc.NewServer()
+	protocol.RegisterDomainPluginServiceServer(grpcServer, pluginServer)
+
+	go func() {
+		grpcServer.Serve(listener)
+	}()
+	defer grpcServer.Stop()
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Connect as client
+	proxy, err := NewExternalDomainProxy(actualPluginAddr, logger)
+	require.NoError(t, err)
+	defer proxy.Close()
+
+	// Test RegisterGlyphs RPC
+	resp, err := proxy.RegisterGlyphs(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+
+	// Verify glyph definition
+	assert.Len(t, resp.Glyphs, 1)
+	glyph := resp.Glyphs[0]
+	assert.Equal(t, "📚", glyph.Symbol)
+	assert.Equal(t, "Book Auction", glyph.Title)
+	assert.Equal(t, "book-auction", glyph.Label)
+	assert.Equal(t, "/auction", glyph.ContentPath)
+	assert.Equal(t, "/auction.css", glyph.CssPath)
+	assert.Equal(t, int32(600), glyph.DefaultWidth)
+	assert.Equal(t, int32(400), glyph.DefaultHeight)
+
+	t.Log("✓ RegisterGlyphs RPC returned correct glyph definition")
+}
+
+func TestUIPlugin_AuctionGlyphContent(t *testing.T) {
+	logger := zaptest.NewLogger(t).Sugar()
+
+	// Create and initialize book plugin
+	bookPlugin := NewBookPlugin()
+	ctx := context.Background()
+	mockServices := &mockServiceRegistry{logger: logger}
+	err := bookPlugin.Initialize(ctx, mockServices)
+	require.NoError(t, err)
+
+	// Register HTTP handlers
+	mux := http.NewServeMux()
+	err = bookPlugin.RegisterHTTP(mux)
+	require.NoError(t, err)
+
+	// Test HTML rendering
+	req := httptest.NewRequest("GET", "/api/book-plugin/auction?glyph_id=test-123", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	assert.Equal(t, 200, rec.Code)
+	html := rec.Body.String()
+	assert.Contains(t, html, "book-auction-content")
+	assert.Contains(t, html, "Select Book")
+	assert.Contains(t, html, "Strike Price")
+	assert.Contains(t, html, "test-123") // glyph_id appears in element IDs
+
+	t.Log("✓ Auction glyph renders HTML correctly")
+
+	// Test CSS rendering
+	cssReq := httptest.NewRequest("GET", "/api/book-plugin/auction.css", nil)
+	cssRec := httptest.NewRecorder()
+	mux.ServeHTTP(cssRec, cssReq)
+
+	assert.Equal(t, 200, cssRec.Code)
+	css := cssRec.Body.String()
+	assert.Contains(t, css, ".book-auction-content")
+	assert.Contains(t, css, ".auction-field")
+	assert.Contains(t, css, ".auction-actions")
+
+	t.Log("✓ Auction glyph CSS renders correctly")
 }
