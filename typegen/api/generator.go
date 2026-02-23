@@ -103,7 +103,7 @@ func (g *Generator) parseRouting() error {
 		return fmt.Errorf("failed to read routing.go: %w", err)
 	}
 
-	// TODO: Replace regex-based endpoint detection with AST parsing (go/ast).
+	// TODO(#596): Replace regex-based endpoint detection with AST parsing (go/ast).
 	// Regex is fragile — any change to the routing pattern silently breaks detection.
 	// Match http.HandleFunc("/pattern", wrap(s.HandlerName))
 	// Also matches s.corsMiddleware(s.HandlerName) and s.receiver.HandlerName
