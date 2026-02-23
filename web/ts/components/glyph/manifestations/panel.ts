@@ -24,7 +24,8 @@ import { beginMaximizeMorph, beginMinimizeMorph } from '../morph-transaction';
 import {
     getMaximizeDuration,
     getMinimizeDuration,
-    CANVAS_GLYPH_CONTENT_PADDING
+    CANVAS_GLYPH_CONTENT_PADDING,
+    PANEL_Z_INDEX
 } from '../glyph';
 
 /**
@@ -83,7 +84,7 @@ export function morphToPanel(
 
     glyphElement.className = 'glyph-morphing-to-panel';
     glyphElement.style.position = 'fixed';
-    glyphElement.style.zIndex = '10003'; // Above system drawer (10002)
+    glyphElement.style.zIndex = PANEL_Z_INDEX; // Above system drawer (10002)
 
     document.body.appendChild(glyphElement);
     setWindowState(glyphElement, true);
@@ -131,7 +132,7 @@ export function morphToPanel(
         glyphElement.style.top = `${targetY}px`;
         glyphElement.style.width = `${panelWidth}px`;
         glyphElement.style.height = `${panelHeight}px`;
-        glyphElement.style.zIndex = '10003';
+        glyphElement.style.zIndex = PANEL_Z_INDEX;
 
         // Title bar
         const titleBar = document.createElement('div');
@@ -197,6 +198,18 @@ export function morphToPanel(
     }).catch(error => {
         log.warn(SEG.GLYPH, `[Panel] Animation failed for ${glyph.id}:`, error);
         removeOverlay(glyph.id);
+        const handler = (glyphElement as any).__panelEscapeHandler;
+        if (handler) {
+            document.removeEventListener('keydown', handler);
+            delete (glyphElement as any).__panelEscapeHandler;
+        }
+        // Reattach to tray so the glyph isn't orphaned
+        setWindowState(glyphElement, false);
+        glyphElement.remove();
+        glyphElement.style.cssText = '';
+        glyphElement.className = 'glyph-run-glyph';
+        setGlyphId(glyphElement, glyph.id);
+        onMinimize(glyphElement, glyph);
     });
 }
 
@@ -209,6 +222,10 @@ export function morphFromPanel(
     verifyElement: (id: string, element: HTMLElement) => void,
     onMorphComplete: (element: HTMLElement, glyph: Glyph) => void
 ): void {
+    // Re-entrance guard: overlay click + Escape can fire in quick succession
+    if ((panelElement as any).__panelMinimizing) return;
+    (panelElement as any).__panelMinimizing = true;
+
     verifyElement(glyph.id, panelElement);
     log.debug(SEG.GLYPH, `[Panel] Minimizing ${glyph.id}`);
 
@@ -241,6 +258,7 @@ export function morphFromPanel(
     beginMinimizeMorph(panelElement, currentRect, { x: targetX, y: targetY }, getMinimizeDuration())
         .then(() => {
             log.debug(SEG.GLYPH, `[Panel] Animation complete for ${glyph.id}`);
+            delete (panelElement as any).__panelMinimizing;
             setWindowState(panelElement, false);
             setProximityText(panelElement, false);
             panelElement.remove();
@@ -251,6 +269,7 @@ export function morphFromPanel(
         })
         .catch(error => {
             log.warn(SEG.GLYPH, `[Panel] Animation failed for ${glyph.id}:`, error);
+            delete (panelElement as any).__panelMinimizing;
         });
 }
 

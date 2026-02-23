@@ -85,6 +85,7 @@ export const CONTENT_PADDING = '16px';
 export const PANEL_BORDER_RADIUS = '0 0 12px 12px';  // Rounded bottom when sliding from top
 export const PANEL_BORDER_RADIUS_BOTTOM = '12px 12px 0 0';  // Rounded top when sliding from bottom
 export const PANEL_OVERLAY_BG = 'rgba(0, 0, 0, 0.4)';
+export const PANEL_Z_INDEX = '10003';  // Above system drawer (10002)
 
 // Canvas glyph dimensions
 export const CANVAS_GLYPH_TITLE_BAR_HEIGHT = 32; // Height in pixels for AX/IX glyphs

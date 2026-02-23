@@ -160,7 +160,7 @@ function render(): void {
                 </div>
             </div>
         `;
-        attachEventDelegation();
+        refreshTooltips();
         return;
     }
 
@@ -193,27 +193,22 @@ function render(): void {
     // Hydrate plugin control buttons
     hydratePluginButtons(contentElement);
 
-    // Attach event delegation and tooltips
-    attachEventDelegation();
+    // Rebind tooltips for new DOM content
+    refreshTooltips();
+}
+
+function refreshTooltips(): void {
+    if (!contentElement) return;
+    if (tooltipCleanup) {
+        tooltipCleanup();
+    }
+    tooltipCleanup = tooltip.attach(contentElement, '.has-tooltip');
 }
 
 function attachEventDelegation(): void {
     if (!contentElement) return;
 
-    // Clean up previous tooltip bindings
-    if (tooltipCleanup) {
-        tooltipCleanup();
-    }
-    tooltipCleanup = tooltip.attach(contentElement, '.has-tooltip');
-
-    // Search input
-    const searchInput = contentElement.querySelector<HTMLInputElement>('.plugin-search-input');
-    searchInput?.addEventListener('input', (e: Event) => {
-        const target = e.target as HTMLInputElement;
-        filterPlugins(target.value);
-    });
-
-    // Click delegation
+    // Click delegation — attached once, works with dynamic content via .closest()
     contentElement.addEventListener('click', async (e: Event) => {
         const target = e.target as HTMLElement;
 
@@ -293,6 +288,11 @@ function attachEventDelegation(): void {
                 validateField(fieldName, target.value);
                 updateSaveButtonState();
             }
+        }
+
+        // Search input filtering
+        if (target.classList.contains('plugin-search-input')) {
+            filterPlugins(target.value);
         }
     });
 }
@@ -840,6 +840,9 @@ export function createPluginGlyph(): Glyph {
         renderContent: () => {
             const content = document.createElement('div');
             contentElement = content;
+
+            // Attach delegated listeners once — they survive innerHTML replacements
+            attachEventDelegation();
 
             // Show loading, then fetch data
             content.innerHTML = '<div class="glyph-loading">Loading plugins...</div>';
