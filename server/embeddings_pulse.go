@@ -444,14 +444,6 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 	interval := cfg.Embeddings.ReclusterIntervalSeconds
 	schedStore := schedule.NewStore(s.db)
 
-	// Deprecation warning if config-based schedule is used
-	if interval > 0 {
-		s.logger.Warnw("DEPRECATED: embeddings.recluster_interval_seconds in config",
-			"message", "Plugin should announce this schedule instead",
-			"interval", interval,
-		)
-	}
-
 	if interval <= 0 {
 		s.pauseExistingSchedule(schedStore, ReclusterHandlerName)
 		return
@@ -710,14 +702,6 @@ func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
 
 	interval := cfg.Embeddings.ReprojectIntervalSeconds
 	schedStore := schedule.NewStore(s.db)
-
-	// Deprecation warning if config-based schedule is used
-	if interval > 0 {
-		s.logger.Warnw("DEPRECATED: embeddings.reproject_interval_seconds in config",
-			"message", "Plugin should announce this schedule instead",
-			"interval", interval,
-		)
-	}
 
 	if interval <= 0 {
 		s.pauseExistingSchedule(schedStore, ReprojectHandlerName)
