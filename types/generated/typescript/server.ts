@@ -7,6 +7,7 @@
 import { Job } from './async';
 import { Execution, LogEntry, StageInfo } from './schedule';
 import { As } from './types';
+import type { Attestation } from '../../../web/ts/generated/proto/plugin/grpc/protocol/atsstore';
 
 export interface ChildJobInfo {
   id: string;
