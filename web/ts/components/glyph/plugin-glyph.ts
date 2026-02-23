@@ -6,9 +6,9 @@
  */
 
 import type { Glyph } from './glyph';
-import type { PluginGlyphDef } from './plugin-glyphs';
+import type { PluginGlyphDef } from './plugin-provided-glyphs';
 import { canvasPlaced } from './manifestations/canvas-placed';
-import { loadPluginCSS } from './plugin-glyphs';
+import { loadPluginCSS } from './plugin-provided-glyphs';
 import { apiFetch } from '../../api';
 import { log, SEG } from '../../logger';
 
