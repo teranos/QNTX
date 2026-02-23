@@ -11,7 +11,9 @@
     position: fixed;
     left: 0;
     width: 100vw;
-    background-color: rgba(58, 59, 58, 0.95);
+    background-color: rgba(58, 59, 58, 0.92);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
     color: var(--text-on-dark);
     display: flex;
     flex-direction: column;

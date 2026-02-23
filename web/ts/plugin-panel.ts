@@ -135,10 +135,24 @@ function render(): void {
     if (!contentElement) return;
 
     if (plugins.length === 0) {
+        // Server unreachable — both fetches failed
+        if (serverHealth === null) {
+            contentElement.innerHTML = `
+                <div class="glyph-content plugin-offline">
+                    <div class="plugin-offline-message">
+                        <div class="plugin-offline-title">Server offline</div>
+                        <p>gRPC plugins require a running QNTX server</p>
+                        <div class="plugin-offline-roadmap">WASM plugins are on the roadmap</div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
         contentElement.innerHTML = `
             <div class="glyph-content">
                 <div class="plugin-search-container" style="padding: 8px 0;">
-                    <input type="text" class="plugin-search-input panel-code" placeholder="Filter plugins..." style="width: 100%; padding: 6px 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-on-dark, #555); border-radius: 4px; color: var(--text-on-dark); font-size: 13px;">
+                    <input type="text" class="plugin-search-input plugin-mono" placeholder="Filter plugins..." style="width: 100%; padding: 6px 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-on-dark, #555); border-radius: 4px; color: var(--text-on-dark); font-size: 13px;">
                 </div>
                 <div class="panel-empty plugin-empty">
                     <p>No plugins installed</p>
@@ -155,9 +169,9 @@ function render(): void {
     contentElement.innerHTML = `
         <div class="glyph-content">
             <div class="plugin-search-container" style="padding: 8px 0;">
-                <input type="text" class="plugin-search-input panel-code" placeholder="Filter plugins..." style="width: 100%; padding: 6px 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-on-dark, #555); border-radius: 4px; color: var(--text-on-dark); font-size: 13px;">
+                <input type="text" class="plugin-search-input plugin-mono" placeholder="Filter plugins..." style="width: 100%; padding: 6px 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-on-dark, #555); border-radius: 4px; color: var(--text-on-dark); font-size: 13px;">
             </div>
-            <div class="plugin-summary panel-card">
+            <div class="plugin-summary">
                 <div class="plugin-summary-stats">
                     <span class="plugin-count">${plugins.length} plugin${plugins.length !== 1 ? 's' : ''} installed</span>
                     <span class="plugin-health-summary">${getHealthSummary()}</span>
@@ -165,12 +179,12 @@ function render(): void {
                 ${serverBuildTime ? `
                     <div class="plugin-server-info">
                         <span class="plugin-server-label">QNTX Server Built:</span>
-                        <span class="plugin-server-value panel-code">${serverBuildTime}</span>
+                        <span class="plugin-server-value plugin-mono">${serverBuildTime}</span>
                     </div>
                 ` : ''}
-                <button class="panel-btn panel-btn-sm plugin-refresh-btn has-tooltip" data-tooltip="Refresh">&#8635; Refresh</button>
+                <button class="plugin-refresh-btn has-tooltip" data-tooltip="Refresh">&#8635; Refresh</button>
             </div>
-            <div class="panel-list plugin-list">
+            <div class="plugin-list">
                 ${plugins.map(plugin => renderPlugin(plugin)).join('')}
             </div>
         </div>
@@ -411,18 +425,18 @@ function renderPlugin(plugin: PluginInfo): string {
     let controls = '';
     if (plugin.pausable) {
         if (plugin.state === 'running') {
-            controls = buttonPlaceholder(`btn:plugin-pause:${plugin.name}`, '\u275A\u275A Pause', 'panel-btn panel-btn-sm plugin-pause-btn');
+            controls = buttonPlaceholder(`btn:plugin-pause:${plugin.name}`, '\u275A\u275A Pause', 'plugin-pause-btn');
         } else if (plugin.state === 'paused') {
-            controls = buttonPlaceholder(`btn:plugin-resume:${plugin.name}`, '\u25B6 Resume', 'panel-btn panel-btn-sm plugin-resume-btn');
+            controls = buttonPlaceholder(`btn:plugin-resume:${plugin.name}`, '\u25B6 Resume', 'plugin-resume-btn');
         }
     }
 
     return `
-        <div class="panel-card plugin-card ${isExpanded ? 'plugin-card-expanded' : ''}" data-plugin="${plugin.name}">
+        <div class="plugin-card ${isExpanded ? 'plugin-card-expanded' : ''}" data-plugin="${plugin.name}">
             <div class="plugin-card-header">
                 <div class="plugin-name-row">
                     <span class="plugin-name has-tooltip" data-tooltip="${escapeHtml(nameTooltip)}">${escapeHtml(plugin.name)}</span>
-                    <span class="plugin-version has-tooltip panel-code" data-tooltip="${escapeHtml(versionTooltip)}">${escapeHtml(plugin.version)}</span>
+                    <span class="plugin-version has-tooltip plugin-mono" data-tooltip="${escapeHtml(versionTooltip)}">${escapeHtml(plugin.version)}</span>
                 </div>
                 <div class="plugin-badges">
                     <div class="plugin-state ${stateClass}">
@@ -605,7 +619,7 @@ function renderConfigForm(): string {
                     <input type="${getInputType(schema.type)}"
                            value="${escapeHtml(newValue)}"
                            data-field="${escapeHtml(fieldName)}"
-                           class="plugin-config-value-new panel-code"
+                           class="plugin-config-value-new plugin-mono"
                            ${schema.min_value ? `min="${escapeHtml(schema.min_value)}"` : ''}
                            ${schema.max_value ? `max="${escapeHtml(schema.max_value)}"` : ''}
                            ${schema.pattern ? `pattern="${escapeHtml(schema.pattern)}"` : ''}
@@ -650,8 +664,8 @@ function renderConfigForm(): string {
             ${(hasChanges || isEditing) ? `
                 <div class="plugin-config-actions">
                     <div class="plugin-config-actions-buttons">
-                        <button class="panel-btn plugin-config-cancel-btn">Cancel</button>
-                        <button class="panel-btn ${configState.needsConfirmation ? 'panel-btn-warning' : 'panel-btn-primary'} plugin-config-save-btn"
+                        <button class="plugin-config-cancel-btn">Cancel</button>
+                        <button class="${configState.needsConfirmation ? 'panel-btn-warning' : ''} plugin-config-save-btn"
                                 ${hasErrors ? 'disabled' : ''}>
                             ${configState.needsConfirmation ? 'Confirm Restart' : 'Save Changes'}
                         </button>
