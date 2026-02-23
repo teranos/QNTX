@@ -5,6 +5,7 @@ package grpc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"sync"
 
@@ -384,6 +385,12 @@ func (p *BookPlugin) RegisterHTTP(mux *http.ServeMux) error {
 	// GET /api/book-plugin/authors - List all authors
 	mux.HandleFunc("GET /api/book-plugin/authors", p.handleListAuthors)
 
+	// GET /api/book-plugin/auction - Book auction glyph content
+	mux.HandleFunc("GET /api/book-plugin/auction", p.handleAuctionGlyph)
+
+	// GET /api/book-plugin/auction.css - Book auction glyph styles
+	mux.HandleFunc("GET /api/book-plugin/auction.css", p.handleAuctionCSS)
+
 	return nil
 }
 
@@ -415,6 +422,107 @@ func (p *BookPlugin) handleListAuthors(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(authors)
 }
 
+// handleAuctionGlyph renders the book auction glyph HTML content.
+func (p *BookPlugin) handleAuctionGlyph(w http.ResponseWriter, r *http.Request) {
+	glyphID := r.URL.Query().Get("glyph_id")
+	content := r.URL.Query().Get("content")
+
+	// Parse content for current state (optional)
+	var state struct {
+		SelectedBook string `json:"selected_book"`
+		StrikePrice  int    `json:"strike_price"`
+	}
+	if content != "" {
+		json.Unmarshal([]byte(content), &state)
+	}
+
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	// Generate HTML
+	w.Header().Set("Content-Type", "text/html")
+	html := fmt.Sprintf(`
+<div class="book-auction-content">
+	<div class="auction-field">
+		<label>Select Book:</label>
+		<select id="book-select-%s">
+			<option value="">Choose a book...</option>
+			%s
+		</select>
+	</div>
+	<div class="auction-field">
+		<label>Strike Price (min bid):</label>
+		<input type="number" id="strike-price-%s" value="%d" min="0">
+	</div>
+	<div class="auction-actions">
+		<button onclick="alert('Set alert for book')">Set Alert</button>
+		<button onclick="alert('View book details')">View Details</button>
+	</div>
+</div>
+`, glyphID, p.renderBookOptions(state.SelectedBook), glyphID, state.StrikePrice)
+	w.Write([]byte(html))
+}
+
+// renderBookOptions generates HTML options for book dropdown.
+func (p *BookPlugin) renderBookOptions(selected string) string {
+	options := ""
+	for _, book := range p.books {
+		sel := ""
+		if book.ID == selected {
+			sel = " selected"
+		}
+		options += fmt.Sprintf(`<option value="%s"%s>%s (%d)</option>`, book.ID, sel, book.Title, book.Year)
+	}
+	return options
+}
+
+// handleAuctionCSS returns the CSS styles for the book auction glyph.
+func (p *BookPlugin) handleAuctionCSS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/css")
+	css := `
+.book-auction-content {
+	padding: 12px;
+	font-family: system-ui, -apple-system, sans-serif;
+}
+.auction-field {
+	margin-bottom: 12px;
+}
+.auction-field label {
+	display: block;
+	font-size: 11px;
+	color: #888;
+	margin-bottom: 4px;
+}
+.auction-field select,
+.auction-field input {
+	width: 100%;
+	padding: 6px;
+	border: 1px solid #444;
+	background: #2a2a2a;
+	color: #ddd;
+	border-radius: 4px;
+}
+.auction-actions {
+	margin-top: 12px;
+	display: flex;
+	gap: 8px;
+}
+.auction-actions button {
+	flex: 1;
+	padding: 8px;
+	background: #3a3a3a;
+	border: 1px solid #555;
+	color: #ddd;
+	border-radius: 4px;
+	cursor: pointer;
+}
+.auction-actions button:hover {
+	background: #4a4a4a;
+}
+`
+	w.Write([]byte(css))
+}
+
 // RegisterWebSocket registers WebSocket handlers for the books domain.
 func (p *BookPlugin) RegisterWebSocket() (map[string]plugin.WebSocketHandler, error) {
 	handlers := make(map[string]plugin.WebSocketHandler)
@@ -430,6 +538,22 @@ func (p *BookPlugin) Health(ctx context.Context) plugin.HealthStatus {
 		Details: map[string]interface{}{
 			"books":   len(p.books),
 			"authors": len(p.authors),
+		},
+	}
+}
+
+// RegisterGlyphs returns custom glyph type definitions provided by this plugin.
+// Implements the UIPlugin interface.
+func (p *BookPlugin) RegisterGlyphs() []plugin.GlyphDef {
+	return []plugin.GlyphDef{
+		{
+			Symbol:        "📚",
+			Title:         "Book Auction",
+			Label:         "book-auction",
+			ContentPath:   "/auction",
+			CSSPath:       "/auction.css",
+			DefaultWidth:  600,
+			DefaultHeight: 400,
 		},
 	}
 }

@@ -39,6 +39,10 @@ func (p *Plugin) registerHTTPHandlers(mux *http.ServeMux) error {
 	// Timeline sync (for Pulse scheduling or manual triggering)
 	mux.HandleFunc("POST /sync-timeline", p.handleSyncTimeline)
 
+	// AT Protocol feed glyph
+	mux.HandleFunc("GET /feed-glyph", p.handleFeedGlyph)
+	mux.HandleFunc("GET /feed-glyph.css", p.handleFeedGlyphCSS)
+
 	return nil
 }
 
@@ -423,7 +427,6 @@ func (p *Plugin) handleLike(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-
 // handleSyncTimeline triggers a timeline sync (for Pulse scheduling or manual invocation).
 func (p *Plugin) handleSyncTimeline(w http.ResponseWriter, r *http.Request) {
 	if p.checkPaused(w) {
@@ -442,4 +445,313 @@ func (p *Plugin) handleSyncTimeline(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status": "Timeline sync completed successfully",
 	})
+}
+
+// handleFeedGlyph renders an AT Protocol feed as HTML.
+// Query params: glyph_id (for client tracking), content (actor handle/DID), cursor (pagination)
+func (p *Plugin) handleFeedGlyph(w http.ResponseWriter, r *http.Request) {
+	if p.checkPaused(w) {
+		return
+	}
+	if !p.requireAuth(w) {
+		return
+	}
+
+	glyphID := r.URL.Query().Get("glyph_id")
+	content := r.URL.Query().Get("content") // actor handle or DID
+	cursor := r.URL.Query().Get("cursor")   // pagination
+
+	// Default to authenticated user's feed if no actor specified
+	actor := content
+	if actor == "" {
+		actor = p.getDID()
+	}
+
+	// Fetch feed from AT Protocol
+	limit := int64(20) // posts per page
+	ctx := r.Context()
+
+	feedResp, err := appbsky.FeedGetAuthorFeed(ctx, p.getClient(), actor, cursor, "", false, limit)
+	if err != nil {
+		err = errors.WithDetail(err, fmt.Sprintf("Actor: %s, cursor: %s", actor, cursor))
+		p.services.Logger("atproto").Errorw("Failed to fetch feed", "actor", actor, "error", err)
+		http.Error(w, fmt.Sprintf("Failed to fetch feed: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Render HTML
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	html := p.renderFeedHTML(glyphID, actor, feedResp.Feed, feedResp.Cursor)
+	w.Write([]byte(html))
+}
+
+func (p *Plugin) renderFeedHTML(glyphID, actor string, feed []*appbsky.FeedDefs_FeedViewPost, cursor *string) string {
+	var html strings.Builder
+
+	html.WriteString(fmt.Sprintf(`<div class="atproto-feed-content" data-glyph-id="%s" data-actor="%s">`, escapeHTMLAttr(glyphID), escapeHTMLAttr(actor)))
+
+	// Header with refresh button
+	html.WriteString(`<div class="feed-header">`)
+	html.WriteString(fmt.Sprintf(`<div class="feed-actor">@%s</div>`, escapeHTML(actor)))
+	html.WriteString(`<button class="feed-refresh" onclick="location.reload()">↻</button>`)
+	html.WriteString(`</div>`)
+
+	// Post list
+	html.WriteString(`<div class="feed-posts">`)
+
+	if len(feed) == 0 {
+		html.WriteString(`<div class="feed-empty">No posts found</div>`)
+	} else {
+		for _, item := range feed {
+			post := item.Post
+			record, ok := post.Record.Val.(*appbsky.FeedPost)
+			if !ok {
+				continue // Skip non-post records
+			}
+
+			// Extract author info
+			authorHandle := post.Author.Handle
+			authorDID := post.Author.Did
+			displayName := authorHandle
+			if post.Author.DisplayName != nil && *post.Author.DisplayName != "" {
+				displayName = *post.Author.DisplayName
+			}
+
+			// Format timestamp
+			createdAt, _ := time.Parse(time.RFC3339, record.CreatedAt)
+			timeAgo := formatTimeAgo(createdAt)
+
+			// Post card
+			html.WriteString(`<div class="feed-post">`)
+			html.WriteString(fmt.Sprintf(`<div class="post-author">
+				<span class="author-name">%s</span>
+				<span class="author-handle">@%s</span>
+				<span class="post-time">%s</span>
+			</div>`, escapeHTML(displayName), escapeHTML(authorHandle), escapeHTML(timeAgo)))
+
+			html.WriteString(fmt.Sprintf(`<div class="post-text">%s</div>`, escapeHTML(record.Text)))
+
+			// Engagement metrics
+			likeCount := int64(0)
+			if post.LikeCount != nil {
+				likeCount = *post.LikeCount
+			}
+			replyCount := int64(0)
+			if post.ReplyCount != nil {
+				replyCount = *post.ReplyCount
+			}
+			repostCount := int64(0)
+			if post.RepostCount != nil {
+				repostCount = *post.RepostCount
+			}
+
+			html.WriteString(fmt.Sprintf(`<div class="post-engagement">
+				<span class="metric">❤️ %d</span>
+				<span class="metric">💬 %d</span>
+				<span class="metric">🔁 %d</span>
+			</div>`, likeCount, replyCount, repostCount))
+
+			// Link to open in Bluesky
+			postID := extractPostID(post.Uri)
+			html.WriteString(fmt.Sprintf(`<div class="post-actions">
+				<a href="https://bsky.app/profile/%s/post/%s" target="_blank" class="post-link">Open in Bluesky →</a>
+			</div>`, escapeHTMLAttr(authorDID), escapeHTMLAttr(postID)))
+
+			html.WriteString(`</div>`) // end post
+		}
+	}
+
+	html.WriteString(`</div>`) // end posts
+
+	// Pagination
+	if cursor != nil && *cursor != "" {
+		html.WriteString(fmt.Sprintf(`<div class="feed-pagination">
+			<a href="?glyph_id=%s&content=%s&cursor=%s" class="load-more">Load More</a>
+		</div>`, escapeHTMLAttr(glyphID), escapeHTMLAttr(actor), escapeHTMLAttr(*cursor)))
+	}
+
+	html.WriteString(`</div>`) // end feed-content
+
+	return html.String()
+}
+
+func formatTimeAgo(t time.Time) string {
+	diff := time.Since(t)
+	if diff < time.Minute {
+		return "just now"
+	} else if diff < time.Hour {
+		return fmt.Sprintf("%dm ago", int(diff.Minutes()))
+	} else if diff < 24*time.Hour {
+		return fmt.Sprintf("%dh ago", int(diff.Hours()))
+	} else {
+		return fmt.Sprintf("%dd ago", int(diff.Hours()/24))
+	}
+}
+
+func extractPostID(atURI string) string {
+	// at://did:plc:xxx/app.bsky.feed.post/abc123 -> abc123
+	parts := strings.Split(atURI, "/")
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return ""
+}
+
+func escapeHTML(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	s = strings.ReplaceAll(s, "\"", "&quot;")
+	s = strings.ReplaceAll(s, "'", "&#39;")
+	return s
+}
+
+func escapeHTMLAttr(s string) string {
+	return escapeHTML(s)
+}
+
+// handleFeedGlyphCSS returns the CSS stylesheet for the feed glyph.
+func (p *Plugin) handleFeedGlyphCSS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/css; charset=utf-8")
+
+	css := `
+.atproto-feed-content {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	background: var(--background, #fff);
+	color: var(--foreground, #000);
+}
+
+.feed-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--border-color, #e0e0e0);
+	background: var(--header-bg, #f5f5f5);
+}
+
+.feed-actor {
+	font-weight: 600;
+	font-size: 14px;
+}
+
+.feed-refresh {
+	background: none;
+	border: 1px solid var(--border-color, #ccc);
+	border-radius: 4px;
+	padding: 4px 8px;
+	cursor: pointer;
+	font-size: 16px;
+}
+
+.feed-refresh:hover {
+	background: var(--hover-bg, #e0e0e0);
+}
+
+.feed-posts {
+	flex: 1;
+	overflow-y: auto;
+	padding: 8px;
+}
+
+.feed-empty {
+	padding: 24px;
+	text-align: center;
+	color: var(--muted-foreground, #666);
+}
+
+.feed-post {
+	background: var(--card-bg, #fff);
+	border: 1px solid var(--border-color, #e0e0e0);
+	border-radius: 8px;
+	padding: 12px;
+	margin-bottom: 8px;
+}
+
+.feed-post:hover {
+	background: var(--card-hover-bg, #f9f9f9);
+}
+
+.post-author {
+	display: flex;
+	gap: 8px;
+	align-items: baseline;
+	margin-bottom: 8px;
+	font-size: 14px;
+}
+
+.author-name {
+	font-weight: 600;
+}
+
+.author-handle {
+	color: var(--muted-foreground, #666);
+}
+
+.post-time {
+	color: var(--muted-foreground, #999);
+	font-size: 12px;
+	margin-left: auto;
+}
+
+.post-text {
+	margin-bottom: 12px;
+	line-height: 1.5;
+	word-break: break-word;
+	overflow-wrap: break-word;
+}
+
+.post-engagement {
+	display: flex;
+	gap: 16px;
+	margin-bottom: 8px;
+	font-size: 13px;
+	color: var(--muted-foreground, #666);
+}
+
+.metric {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.post-actions {
+	display: flex;
+	justify-content: flex-end;
+}
+
+.post-link {
+	color: var(--link-color, #0066cc);
+	text-decoration: none;
+	font-size: 13px;
+}
+
+.post-link:hover {
+	text-decoration: underline;
+}
+
+.feed-pagination {
+	padding: 16px;
+	text-align: center;
+	border-top: 1px solid var(--border-color, #e0e0e0);
+}
+
+.load-more {
+	display: inline-block;
+	padding: 8px 16px;
+	background: var(--primary, #0066cc);
+	color: #fff;
+	text-decoration: none;
+	border-radius: 4px;
+	font-weight: 500;
+}
+
+.load-more:hover {
+	background: var(--primary-hover, #0052a3);
+}
+`
+
+	w.Write([]byte(css))
 }
