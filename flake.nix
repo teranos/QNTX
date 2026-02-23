@@ -26,11 +26,8 @@
 
   outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix }:
     {
-      # Shared vendorHash for all Go builds from repo root with GOWORK=off
-      # Defined at flake level (not per-system) so plugin flakes can reference it
-      # When root go.mod dependencies change, update this hash once for all builds
-      # To update: set to `pkgs.lib.fakeHash`, run `nix build .#qntx`, copy hash from error
-      rootVendorHash = "sha256-7r1EjXKs6GCG1wxQdLdFgZ9FPF8E5ZuE0gVXc2lkk3o=";
+      # Shared vendorHash imported from single source of truth
+      rootVendorHash = import ./nix/vendor-hash.nix;
     } // (flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
