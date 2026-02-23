@@ -28,6 +28,10 @@ import {
     PANEL_Z_INDEX
 } from '../glyph';
 
+// Type-safe element state — avoids `as any` on DOM elements
+const escapeHandlers = new WeakMap<HTMLElement, (e: KeyboardEvent) => void>();
+const minimizing = new WeakSet<HTMLElement>();
+
 /**
  * Detect whether panel should slide from top or bottom.
  * If system drawer is at the bottom of viewport -> panel from top.
@@ -113,8 +117,7 @@ export function morphToPanel(
         }
     };
     document.addEventListener('keydown', escapeHandler);
-    // Store for cleanup
-    (glyphElement as any).__panelEscapeHandler = escapeHandler;
+    escapeHandlers.set(glyphElement, escapeHandler);
 
     beginMaximizeMorph(
         glyphElement,
@@ -161,8 +164,11 @@ export function morphToPanel(
             closeBtn.onclick = () => {
                 // Clean up overlay and escape handler
                 removeOverlay(glyph.id);
-                const handler = (glyphElement as any).__panelEscapeHandler;
-                if (handler) document.removeEventListener('keydown', handler);
+                const handler = escapeHandlers.get(glyphElement);
+                if (handler) {
+                    document.removeEventListener('keydown', handler);
+                    escapeHandlers.delete(glyphElement);
+                }
                 onRemove(glyph.id);
                 glyphElement.remove();
                 try { glyph.onClose!(); } catch (error) {
@@ -198,10 +204,10 @@ export function morphToPanel(
     }).catch(error => {
         log.warn(SEG.GLYPH, `[Panel] Animation failed for ${glyph.id}:`, error);
         removeOverlay(glyph.id);
-        const handler = (glyphElement as any).__panelEscapeHandler;
+        const handler = escapeHandlers.get(glyphElement);
         if (handler) {
             document.removeEventListener('keydown', handler);
-            delete (glyphElement as any).__panelEscapeHandler;
+            escapeHandlers.delete(glyphElement);
         }
         // Reattach to tray so the glyph isn't orphaned
         setWindowState(glyphElement, false);
@@ -223,8 +229,8 @@ export function morphFromPanel(
     onMorphComplete: (element: HTMLElement, glyph: Glyph) => void
 ): void {
     // Re-entrance guard: overlay click + Escape can fire in quick succession
-    if ((panelElement as any).__panelMinimizing) return;
-    (panelElement as any).__panelMinimizing = true;
+    if (minimizing.has(panelElement)) return;
+    minimizing.add(panelElement);
 
     verifyElement(glyph.id, panelElement);
     log.debug(SEG.GLYPH, `[Panel] Minimizing ${glyph.id}`);
@@ -232,10 +238,10 @@ export function morphFromPanel(
     const currentRect = panelElement.getBoundingClientRect();
 
     // Clean up escape handler
-    const escapeHandler = (panelElement as any).__panelEscapeHandler;
-    if (escapeHandler) {
-        document.removeEventListener('keydown', escapeHandler);
-        delete (panelElement as any).__panelEscapeHandler;
+    const handler = escapeHandlers.get(panelElement);
+    if (handler) {
+        document.removeEventListener('keydown', handler);
+        escapeHandlers.delete(panelElement);
     }
 
     // Fade out overlay
@@ -243,7 +249,6 @@ export function morphFromPanel(
 
     // Clear content
     panelElement.innerHTML = '';
-    panelElement.textContent = '';
 
     // Calculate target position (tray dot)
     const trayElement = document.querySelector('.glyph-run');
@@ -258,7 +263,7 @@ export function morphFromPanel(
     beginMinimizeMorph(panelElement, currentRect, { x: targetX, y: targetY }, getMinimizeDuration())
         .then(() => {
             log.debug(SEG.GLYPH, `[Panel] Animation complete for ${glyph.id}`);
-            delete (panelElement as any).__panelMinimizing;
+            minimizing.delete(panelElement);
             setWindowState(panelElement, false);
             setProximityText(panelElement, false);
             panelElement.remove();
@@ -269,7 +274,7 @@ export function morphFromPanel(
         })
         .catch(error => {
             log.warn(SEG.GLYPH, `[Panel] Animation failed for ${glyph.id}:`, error);
-            delete (panelElement as any).__panelMinimizing;
+            minimizing.delete(panelElement);
         });
 }
 
