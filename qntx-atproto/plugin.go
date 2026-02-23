@@ -15,12 +15,14 @@ package qntxatproto
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
 
 	"github.com/bluesky-social/indigo/xrpc"
 	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 )
 
 // Plugin is the AT Protocol domain plugin implementation.
@@ -43,9 +45,9 @@ func NewPlugin() *Plugin {
 func (p *Plugin) Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name:        "atproto",
-		Version:     "0.2.6",
+		Version:     "0.2.9",
 		QNTXVersion: ">= 0.1.0",
-		Description: "AT Protocol integration (Bluesky) with timeline sync",
+		Description: "AT Protocol integration (Bluesky) with auto-scheduled timeline sync",
 		Author:      "QNTX Team",
 		License:     "MIT",
 	}
@@ -200,8 +202,14 @@ func (p *Plugin) ConfigSchema() map[string]plugin.ConfigField {
 		},
 		"timeline_sync_limit": {
 			Type:         "int",
-			Description:  "Number of posts to fetch per timeline sync (1-100). Used when POST /sync-timeline is called.",
+			Description:  "Number of posts to fetch per timeline sync (1-100).",
 			DefaultValue: "50",
+			Required:     false,
+		},
+		"timeline_sync_interval_seconds": {
+			Type:         "int",
+			Description:  "Timeline sync interval in seconds (0 = disabled). Plugin auto-creates schedule.",
+			DefaultValue: "0",
 			Required:     false,
 		},
 	}
@@ -219,6 +227,59 @@ func (p *Plugin) getDID() string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.did
+}
+
+// GetSchedules returns the schedules this plugin wants QNTX to create.
+// Called during initialization to auto-create Pulse scheduled jobs.
+func (p *Plugin) GetSchedules() []*protocol.ScheduleInfo {
+	config := p.services.Config("atproto")
+	interval := int32(config.GetInt("timeline_sync_interval_seconds"))
+
+	logger := p.services.Logger("atproto")
+	logger.Infow("GetSchedules called",
+		"interval", interval,
+		"all_keys", config.GetKeys(),
+	)
+
+	// If interval is 0, don't create schedule (disabled)
+	if interval <= 0 {
+		logger.Warnw("Timeline sync disabled (interval <= 0)", "interval", interval)
+		return nil
+	}
+
+	return []*protocol.ScheduleInfo{
+		{
+			HandlerName:      "atproto.timeline-sync",
+			IntervalSeconds:  interval,
+			EnabledByDefault: true,
+			Description:      "Sync Bluesky timeline to local attestations",
+		},
+	}
+}
+
+// GetHandlerNames returns the async handler names this plugin can execute.
+func (p *Plugin) GetHandlerNames() []string {
+	return []string{"atproto.timeline-sync"}
+}
+
+// ExecuteJob executes an async job routed from Pulse.
+func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID string, payload []byte) (result []byte, err error) {
+	switch handlerName {
+	case "atproto.timeline-sync":
+		// Execute timeline sync
+		if err := p.syncTimeline(ctx, jobID); err != nil {
+			return nil, err
+		}
+
+		// Return success result
+		resultData := map[string]string{
+			"status": "Timeline sync completed",
+		}
+		return json.Marshal(resultData)
+
+	default:
+		return nil, fmt.Errorf("unknown handler: %s", handlerName)
+	}
 }
 
 // Verify Plugin implements all optional interfaces at compile time.

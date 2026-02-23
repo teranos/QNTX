@@ -20,12 +20,16 @@ enabled = ["atproto"]
 paths = ["~/.qntx/plugins"]
 
 [atproto]
-pds_host = "https://bsky.social"      # Optional, defaults to bsky.social
-identifier = "you.bsky.social"         # Handle or DID
-app_password = "xxxx-xxxx-xxxx-xxxx"   # Generate at Settings > App Passwords
+pds_host = "https://bsky.social"                # Optional, defaults to bsky.social
+identifier = "you.bsky.social"                   # Handle or DID
+app_password = "xxxx-xxxx-xxxx-xxxx"             # Generate at Settings > App Passwords
+timeline_sync_interval_seconds = 7200            # Auto-sync timeline every 2 hours (0 = disabled)
+timeline_sync_limit = 50                         # Posts per sync (1-100)
 ```
 
 The plugin works without credentials for handle resolution. Authentication is required for timeline, posting, follows, likes, and notifications.
+
+**Timeline Auto-Sync:** The plugin automatically creates a Pulse schedule when `timeline_sync_interval_seconds > 0`. No manual schedule creation needed!
 
 ## Endpoints
 
@@ -77,33 +81,35 @@ post-uri     appeared-in-timeline atproto  {author_did, author_handle, text, cid
 
 Timeline sync creates attestations for posts appearing in your home feed. This enables:
 - Local indexing of your Bluesky timeline
-- Semantic search over posts you've seen
+- Full-text search over posts you've seen
 - Content pattern analysis and clustering
 - Automatic knowledge graph from your feed
+
+**Automatic scheduling (recommended):**
+
+Configure in `am.toml`:
+```toml
+[atproto]
+timeline_sync_interval_seconds = 7200  # Sync every 2 hours (0 = disabled)
+timeline_sync_limit = 50               # Posts per sync (1-100)
+```
+
+The plugin automatically creates a Pulse schedule when `timeline_sync_interval_seconds > 0`. No API calls needed!
 
 **Manual trigger:**
 ```bash
 curl -X POST http://localhost:8775/api/atproto/sync-timeline
 ```
 
-**Scheduled via Pulse (recommended):**
-
-Create a recurring job that syncs your timeline every 2 hours:
-
+**View the auto-created schedule:**
 ```bash
-curl -X POST http://localhost:8775/api/pulse/schedules \
-  -H "Content-Type: application/json" \
-  -d '{
-    "handler_name": "http",
-    "interval_seconds": 7200,
-    "ats_code": "http POST http://localhost:8775/api/atproto/sync-timeline"
-  }'
-```
+# List all schedules
+curl http://localhost:8775/api/pulse/schedules
 
-Configure sync limit in `am.toml`:
-```toml
-[atproto]
-timeline_sync_limit = 50  # Posts per sync (default: 50, max: 100)
+# Pause/resume the timeline sync schedule
+curl -X PATCH http://localhost:8775/api/pulse/schedules/<schedule-id> \
+  -H "Content-Type: application/json" \
+  -d '{"state":"paused"}'
 ```
 
 Bounded storage naturally manages timeline attestations — old posts age out as new ones arrive.

@@ -203,11 +203,78 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 			}
 			pluginLogger.Infow("Plugin async handler registration complete")
 		} else {
-			pluginLogger.Warnw("Cannot register handlers - Pulse daemon not available")
+			pluginLogger.Warnw("Cannot register handlers - Pulse daemon not available, will retry")
+			// Retry schedule setup after Pulse starts
+			go retryScheduleSetup(loadedPlugins, pluginLogger)
 		}
 	} else {
-		pluginLogger.Warnw("Cannot initialize plugins - server or services not available yet")
+		pluginLogger.Warnw("Cannot initialize plugins - server or services not available yet, will retry")
+		// Retry when server becomes available
+		go retryScheduleSetup(loadedPlugins, pluginLogger)
 	}
+}
+
+// retryScheduleSetup waits for Pulse daemon to be ready, then sets up plugin schedules
+func retryScheduleSetup(plugins []plugin.DomainPlugin, logger *zap.SugaredLogger) {
+	// Wait for server and Pulse daemon to be ready
+	for i := 0; i < 30; i++ {
+		time.Sleep(1 * time.Second)
+
+		defaultServer := server.GetDefaultServer()
+		if defaultServer == nil {
+			continue
+		}
+
+		daemon := defaultServer.GetDaemon()
+		if daemon == nil {
+			continue
+		}
+
+		// Daemon is ready, register handlers and set up schedules
+		logger.Infow("Pulse daemon ready, registering handlers and setting up schedules")
+		handlerRegistry := daemon.Registry()
+		db := defaultServer.GetDB()
+
+		for _, p := range plugins {
+			externalPlugin, ok := p.(*grpc.ExternalDomainProxy)
+			if !ok {
+				continue
+			}
+
+			// Register handlers first
+			handlerNames := externalPlugin.GetHandlerNames()
+			for _, handlerName := range handlerNames {
+				logger.Infow("Registering plugin async handler",
+					"plugin", p.Metadata().Name,
+					"handler", handlerName,
+				)
+				proxyHandler := grpc.NewPluginProxyHandler(handlerName, externalPlugin)
+				handlerRegistry.Register(proxyHandler)
+			}
+
+			// Then set up schedules
+			schedules := externalPlugin.GetSchedules()
+			if len(schedules) > 0 {
+				logger.Infow("Setting up schedules for plugin",
+					"plugin", p.Metadata().Name,
+					"count", len(schedules),
+				)
+				if err := grpc.SetupPluginSchedules(db, p.Metadata().Name, schedules, logger); err != nil {
+					logger.Errorw("Failed to setup plugin schedules",
+						"plugin", p.Metadata().Name,
+						"error", err,
+					)
+				} else {
+					logger.Infow("Successfully set up schedules",
+						"plugin", p.Metadata().Name,
+					)
+				}
+			}
+		}
+		return
+	}
+
+	logger.Errorw("Gave up waiting for Pulse daemon after 30 seconds")
 }
 
 func main() {
