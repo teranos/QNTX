@@ -740,20 +740,100 @@ func (x *ConfigFieldSchema) GetElementType() string {
 	return ""
 }
 
+// ScheduleInfo describes a schedule that a plugin wants QNTX to create
+type ScheduleInfo struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	HandlerName      string                 `protobuf:"bytes,1,opt,name=handler_name,json=handlerName,proto3" json:"handler_name,omitempty"`                   // Handler to invoke
+	IntervalSeconds  int32                  `protobuf:"varint,2,opt,name=interval_seconds,json=intervalSeconds,proto3" json:"interval_seconds,omitempty"`      // Execution interval (0 = disabled)
+	EnabledByDefault bool                   `protobuf:"varint,3,opt,name=enabled_by_default,json=enabledByDefault,proto3" json:"enabled_by_default,omitempty"` // Whether schedule starts active
+	Description      string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`                                      // Human-readable description
+	AtsCode          string                 `protobuf:"bytes,5,opt,name=ats_code,json=atsCode,proto3" json:"ats_code,omitempty"`                               // Optional ATS code
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ScheduleInfo) Reset() {
+	*x = ScheduleInfo{}
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScheduleInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScheduleInfo) ProtoMessage() {}
+
+func (x *ScheduleInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScheduleInfo.ProtoReflect.Descriptor instead.
+func (*ScheduleInfo) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ScheduleInfo) GetHandlerName() string {
+	if x != nil {
+		return x.HandlerName
+	}
+	return ""
+}
+
+func (x *ScheduleInfo) GetIntervalSeconds() int32 {
+	if x != nil {
+		return x.IntervalSeconds
+	}
+	return 0
+}
+
+func (x *ScheduleInfo) GetEnabledByDefault() bool {
+	if x != nil {
+		return x.EnabledByDefault
+	}
+	return false
+}
+
+func (x *ScheduleInfo) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *ScheduleInfo) GetAtsCode() string {
+	if x != nil {
+		return x.AtsCode
+	}
+	return ""
+}
+
 // InitializeResponse is returned by Initialize RPC
 type InitializeResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Handler names this plugin can execute
 	// Examples: ["python.script", "python.webhook", "ixgest.git"]
 	// Empty list means plugin provides no async handlers (backward compatible)
-	HandlerNames  []string `protobuf:"bytes,1,rep,name=handler_names,json=handlerNames,proto3" json:"handler_names,omitempty"`
+	HandlerNames []string `protobuf:"bytes,1,rep,name=handler_names,json=handlerNames,proto3" json:"handler_names,omitempty"`
+	// Schedules this plugin wants QNTX to create
+	// QNTX will auto-create schedule.Job entries for these
+	Schedules     []*ScheduleInfo `protobuf:"bytes,2,rep,name=schedules,proto3" json:"schedules,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *InitializeResponse) Reset() {
 	*x = InitializeResponse{}
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[10]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -765,7 +845,7 @@ func (x *InitializeResponse) String() string {
 func (*InitializeResponse) ProtoMessage() {}
 
 func (x *InitializeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[10]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -778,12 +858,19 @@ func (x *InitializeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InitializeResponse.ProtoReflect.Descriptor instead.
 func (*InitializeResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{10}
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *InitializeResponse) GetHandlerNames() []string {
 	if x != nil {
 		return x.HandlerNames
+	}
+	return nil
+}
+
+func (x *InitializeResponse) GetSchedules() []*ScheduleInfo {
+	if x != nil {
+		return x.Schedules
 	}
 	return nil
 }
@@ -801,7 +888,7 @@ type ExecuteJobRequest struct {
 
 func (x *ExecuteJobRequest) Reset() {
 	*x = ExecuteJobRequest{}
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[11]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -813,7 +900,7 @@ func (x *ExecuteJobRequest) String() string {
 func (*ExecuteJobRequest) ProtoMessage() {}
 
 func (x *ExecuteJobRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[11]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -826,7 +913,7 @@ func (x *ExecuteJobRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecuteJobRequest.ProtoReflect.Descriptor instead.
 func (*ExecuteJobRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{11}
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ExecuteJobRequest) GetJobId() string {
@@ -874,7 +961,7 @@ type ExecuteJobResponse struct {
 
 func (x *ExecuteJobResponse) Reset() {
 	*x = ExecuteJobResponse{}
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[12]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -886,7 +973,7 @@ func (x *ExecuteJobResponse) String() string {
 func (*ExecuteJobResponse) ProtoMessage() {}
 
 func (x *ExecuteJobResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[12]
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -899,7 +986,7 @@ func (x *ExecuteJobResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecuteJobResponse.ProtoReflect.Descriptor instead.
 func (*ExecuteJobResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{12}
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ExecuteJobResponse) GetSuccess() bool {
@@ -1015,9 +1102,16 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\tmin_value\x18\x05 \x01(\tR\bminValue\x12\x1b\n" +
 	"\tmax_value\x18\x06 \x01(\tR\bmaxValue\x12\x18\n" +
 	"\apattern\x18\a \x01(\tR\apattern\x12!\n" +
-	"\felement_type\x18\b \x01(\tR\velementType\"9\n" +
+	"\felement_type\x18\b \x01(\tR\velementType\"\xc7\x01\n" +
+	"\fScheduleInfo\x12!\n" +
+	"\fhandler_name\x18\x01 \x01(\tR\vhandlerName\x12)\n" +
+	"\x10interval_seconds\x18\x02 \x01(\x05R\x0fintervalSeconds\x12,\n" +
+	"\x12enabled_by_default\x18\x03 \x01(\bR\x10enabledByDefault\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x19\n" +
+	"\bats_code\x18\x05 \x01(\tR\aatsCode\"o\n" +
 	"\x12InitializeResponse\x12#\n" +
-	"\rhandler_names\x18\x01 \x03(\tR\fhandlerNames\"\x8a\x01\n" +
+	"\rhandler_names\x18\x01 \x03(\tR\fhandlerNames\x124\n" +
+	"\tschedules\x18\x02 \x03(\v2\x16.protocol.ScheduleInfoR\tschedules\"\x8a\x01\n" +
 	"\x11ExecuteJobRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12!\n" +
 	"\fhandler_name\x18\x02 \x01(\tR\vhandlerName\x12\x18\n" +
@@ -1057,7 +1151,7 @@ func file_plugin_grpc_protocol_domain_proto_rawDescGZIP() []byte {
 }
 
 var file_plugin_grpc_protocol_domain_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_plugin_grpc_protocol_domain_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_plugin_grpc_protocol_domain_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_plugin_grpc_protocol_domain_proto_goTypes = []any{
 	(WebSocketMessage_Type)(0),   // 0: protocol.WebSocketMessage.Type
 	(*Empty)(nil),                // 1: protocol.Empty
@@ -1070,44 +1164,46 @@ var file_plugin_grpc_protocol_domain_proto_goTypes = []any{
 	(*HealthResponse)(nil),       // 8: protocol.HealthResponse
 	(*ConfigSchemaResponse)(nil), // 9: protocol.ConfigSchemaResponse
 	(*ConfigFieldSchema)(nil),    // 10: protocol.ConfigFieldSchema
-	(*InitializeResponse)(nil),   // 11: protocol.InitializeResponse
-	(*ExecuteJobRequest)(nil),    // 12: protocol.ExecuteJobRequest
-	(*ExecuteJobResponse)(nil),   // 13: protocol.ExecuteJobResponse
-	nil,                          // 14: protocol.InitializeRequest.ConfigEntry
-	nil,                          // 15: protocol.WebSocketMessage.HeadersEntry
-	nil,                          // 16: protocol.HealthResponse.DetailsEntry
-	nil,                          // 17: protocol.ConfigSchemaResponse.FieldsEntry
+	(*ScheduleInfo)(nil),         // 11: protocol.ScheduleInfo
+	(*InitializeResponse)(nil),   // 12: protocol.InitializeResponse
+	(*ExecuteJobRequest)(nil),    // 13: protocol.ExecuteJobRequest
+	(*ExecuteJobResponse)(nil),   // 14: protocol.ExecuteJobResponse
+	nil,                          // 15: protocol.InitializeRequest.ConfigEntry
+	nil,                          // 16: protocol.WebSocketMessage.HeadersEntry
+	nil,                          // 17: protocol.HealthResponse.DetailsEntry
+	nil,                          // 18: protocol.ConfigSchemaResponse.FieldsEntry
 }
 var file_plugin_grpc_protocol_domain_proto_depIdxs = []int32{
-	14, // 0: protocol.InitializeRequest.config:type_name -> protocol.InitializeRequest.ConfigEntry
+	15, // 0: protocol.InitializeRequest.config:type_name -> protocol.InitializeRequest.ConfigEntry
 	6,  // 1: protocol.HTTPRequest.headers:type_name -> protocol.HTTPHeader
 	6,  // 2: protocol.HTTPResponse.headers:type_name -> protocol.HTTPHeader
 	0,  // 3: protocol.WebSocketMessage.type:type_name -> protocol.WebSocketMessage.Type
-	15, // 4: protocol.WebSocketMessage.headers:type_name -> protocol.WebSocketMessage.HeadersEntry
-	16, // 5: protocol.HealthResponse.details:type_name -> protocol.HealthResponse.DetailsEntry
-	17, // 6: protocol.ConfigSchemaResponse.fields:type_name -> protocol.ConfigSchemaResponse.FieldsEntry
-	10, // 7: protocol.ConfigSchemaResponse.FieldsEntry.value:type_name -> protocol.ConfigFieldSchema
-	1,  // 8: protocol.DomainPluginService.Metadata:input_type -> protocol.Empty
-	3,  // 9: protocol.DomainPluginService.Initialize:input_type -> protocol.InitializeRequest
-	1,  // 10: protocol.DomainPluginService.Shutdown:input_type -> protocol.Empty
-	4,  // 11: protocol.DomainPluginService.HandleHTTP:input_type -> protocol.HTTPRequest
-	7,  // 12: protocol.DomainPluginService.HandleWebSocket:input_type -> protocol.WebSocketMessage
-	1,  // 13: protocol.DomainPluginService.Health:input_type -> protocol.Empty
-	1,  // 14: protocol.DomainPluginService.ConfigSchema:input_type -> protocol.Empty
-	12, // 15: protocol.DomainPluginService.ExecuteJob:input_type -> protocol.ExecuteJobRequest
-	2,  // 16: protocol.DomainPluginService.Metadata:output_type -> protocol.MetadataResponse
-	11, // 17: protocol.DomainPluginService.Initialize:output_type -> protocol.InitializeResponse
-	1,  // 18: protocol.DomainPluginService.Shutdown:output_type -> protocol.Empty
-	5,  // 19: protocol.DomainPluginService.HandleHTTP:output_type -> protocol.HTTPResponse
-	7,  // 20: protocol.DomainPluginService.HandleWebSocket:output_type -> protocol.WebSocketMessage
-	8,  // 21: protocol.DomainPluginService.Health:output_type -> protocol.HealthResponse
-	9,  // 22: protocol.DomainPluginService.ConfigSchema:output_type -> protocol.ConfigSchemaResponse
-	13, // 23: protocol.DomainPluginService.ExecuteJob:output_type -> protocol.ExecuteJobResponse
-	16, // [16:24] is the sub-list for method output_type
-	8,  // [8:16] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	16, // 4: protocol.WebSocketMessage.headers:type_name -> protocol.WebSocketMessage.HeadersEntry
+	17, // 5: protocol.HealthResponse.details:type_name -> protocol.HealthResponse.DetailsEntry
+	18, // 6: protocol.ConfigSchemaResponse.fields:type_name -> protocol.ConfigSchemaResponse.FieldsEntry
+	11, // 7: protocol.InitializeResponse.schedules:type_name -> protocol.ScheduleInfo
+	10, // 8: protocol.ConfigSchemaResponse.FieldsEntry.value:type_name -> protocol.ConfigFieldSchema
+	1,  // 9: protocol.DomainPluginService.Metadata:input_type -> protocol.Empty
+	3,  // 10: protocol.DomainPluginService.Initialize:input_type -> protocol.InitializeRequest
+	1,  // 11: protocol.DomainPluginService.Shutdown:input_type -> protocol.Empty
+	4,  // 12: protocol.DomainPluginService.HandleHTTP:input_type -> protocol.HTTPRequest
+	7,  // 13: protocol.DomainPluginService.HandleWebSocket:input_type -> protocol.WebSocketMessage
+	1,  // 14: protocol.DomainPluginService.Health:input_type -> protocol.Empty
+	1,  // 15: protocol.DomainPluginService.ConfigSchema:input_type -> protocol.Empty
+	13, // 16: protocol.DomainPluginService.ExecuteJob:input_type -> protocol.ExecuteJobRequest
+	2,  // 17: protocol.DomainPluginService.Metadata:output_type -> protocol.MetadataResponse
+	12, // 18: protocol.DomainPluginService.Initialize:output_type -> protocol.InitializeResponse
+	1,  // 19: protocol.DomainPluginService.Shutdown:output_type -> protocol.Empty
+	5,  // 20: protocol.DomainPluginService.HandleHTTP:output_type -> protocol.HTTPResponse
+	7,  // 21: protocol.DomainPluginService.HandleWebSocket:output_type -> protocol.WebSocketMessage
+	8,  // 22: protocol.DomainPluginService.Health:output_type -> protocol.HealthResponse
+	9,  // 23: protocol.DomainPluginService.ConfigSchema:output_type -> protocol.ConfigSchemaResponse
+	14, // 24: protocol.DomainPluginService.ExecuteJob:output_type -> protocol.ExecuteJobResponse
+	17, // [17:25] is the sub-list for method output_type
+	9,  // [9:17] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_domain_proto_init() }
@@ -1121,7 +1217,7 @@ func file_plugin_grpc_protocol_domain_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_domain_proto_rawDesc), len(file_plugin_grpc_protocol_domain_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   17,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
