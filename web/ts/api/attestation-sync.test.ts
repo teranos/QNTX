@@ -40,6 +40,7 @@ mock.module('../qntx-wasm', () => ({
     queryAttestations: () => [],
     parseQuery: () => ({ ok: false, error: 'no wasm in test' }),
     getCompletions: () => ({ slot: 'subjects', prefix: '', items: [] }),
+    richSearch: async () => ({ query: '', matches: [], total: 0 }),
 }));
 
 const { syncQueue } = await import('./attestation-sync');
