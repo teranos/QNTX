@@ -50,7 +50,7 @@ func (r *RemoteATSStore) Close() error {
 }
 
 // GenerateAndCreateAttestation creates an attestation via gRPC.
-func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As, error) {
+func (r *RemoteATSStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
 	protoCmd := &protocol.AttestationCommand{
 		Subjects:   cmd.Subjects,
 		Predicates: cmd.Predicates,
@@ -76,7 +76,7 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*ty
 		Command:   protoCmd,
 	}
 
-	resp, err := r.client.GenerateAndCreateAttestation(r.ctx, req)
+	resp, err := r.client.GenerateAndCreateAttestation(ctx, req)
 	if err != nil {
 		return nil, errors.Wrap(err, "gRPC GenerateAndCreateAttestation failed")
 	}
@@ -141,9 +141,14 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 
 // CreateAttestation creates an attestation with a pre-generated ID via gRPC.
 func (r *RemoteATSStore) CreateAttestation(a *types.As) error {
+	protoAtt, err := protocol.AttestationFromTypes(a)
+	if err != nil {
+		return errors.Wrapf(err, "failed to convert attestation %s to proto", a.ID)
+	}
+
 	req := &protocol.CreateAttestationRequest{
 		AuthToken:   r.authToken,
-		Attestation: protocol.AttestationFromTypes(a),
+		Attestation: protoAtt,
 	}
 
 	resp, err := r.client.CreateAttestation(r.ctx, req)
@@ -157,4 +162,11 @@ func (r *RemoteATSStore) CreateAttestation(a *types.As) error {
 
 	r.logger.Infow("Attestation created via gRPC", "id", a.ID)
 	return nil
+}
+
+// CreateAttestationInbound sends a synced attestation to the remote store.
+// For remote stores, this currently maps to CreateAttestation - the remote
+// server is responsible for deciding whether to sign based on its context.
+func (r *RemoteATSStore) CreateAttestationInbound(a *types.As) error {
+	return r.CreateAttestation(a)
 }

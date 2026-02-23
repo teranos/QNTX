@@ -5,14 +5,16 @@
 
 | Method | Endpoint | Handler |
 |--------|----------|----------|
+| GET | `/.well-known/did.json` | nodeDID.HandleDIDDocument |
 | GET | `/api/attestations` | HandleCreateAttestation |
-| GET | `/api/canvas/compositions` | canvasHandler |
-| GET | `/api/canvas/compositions/` | canvasHandler |
-| GET | `/api/canvas/glyphs` | canvasHandler |
-| GET | `/api/canvas/glyphs/` | canvasHandler |
-| GET | `/api/canvas/minimized-windows` | canvasHandler |
-| GET | `/api/canvas/minimized-windows/` | canvasHandler |
+| GET | `/api/canvas/compositions` | canvasHandler.HandleCompositions |
+| GET | `/api/canvas/compositions/` | canvasHandler.HandleCompositions |
+| GET | `/api/canvas/glyphs` | canvasHandler.HandleGlyphs |
+| GET | `/api/canvas/glyphs/` | canvasHandler.HandleGlyphs |
+| GET | `/api/canvas/minimized-windows` | canvasHandler.HandleMinimizedWindows |
+| GET | `/api/canvas/minimized-windows/` | canvasHandler.HandleMinimizedWindows |
 | GET | `/api/embeddings/batch` | HandleEmbeddingBatch |
+| GET | `/api/embeddings/by-source` | HandleEmbeddingsBySource |
 | GET | `/api/embeddings/cluster` | HandleEmbeddingCluster |
 | GET | `/api/embeddings/cluster-timeline` | HandleClusterTimeline |
 | GET | `/api/embeddings/clusters` | HandleEmbeddingClusters |
@@ -32,6 +34,12 @@
 
 ---
 
+### `GET` /.well-known/did.json
+
+**Handler**: `nodeDID.HandleDIDDocument`
+
+---
+
 ### `GET` /api/attestations
 
 HandleCreateAttestation accepts a browser-created attestation and stores it server-side.
@@ -43,37 +51,37 @@ POST /api/attestations — idempotent (returns 200 if already exists).
 
 ### `GET` /api/canvas/compositions
 
-**Handler**: `canvasHandler`
+**Handler**: `canvasHandler.HandleCompositions`
 
 ---
 
 ### `GET` /api/canvas/compositions/
 
-**Handler**: `canvasHandler`
+**Handler**: `canvasHandler.HandleCompositions`
 
 ---
 
 ### `GET` /api/canvas/glyphs
 
-**Handler**: `canvasHandler`
+**Handler**: `canvasHandler.HandleGlyphs`
 
 ---
 
 ### `GET` /api/canvas/glyphs/
 
-**Handler**: `canvasHandler`
+**Handler**: `canvasHandler.HandleGlyphs`
 
 ---
 
 ### `GET` /api/canvas/minimized-windows
 
-**Handler**: `canvasHandler`
+**Handler**: `canvasHandler.HandleMinimizedWindows`
 
 ---
 
 ### `GET` /api/canvas/minimized-windows/
 
-**Handler**: `canvasHandler`
+**Handler**: `canvasHandler.HandleMinimizedWindows`
 
 ---
 
@@ -84,6 +92,16 @@ HandleEmbeddingBatch handles batch embedding generation (POST /api/embeddings/ba
 **Handler**: `HandleEmbeddingBatch`
 
 **Response**: [`EmbeddingBatchResponse`](../types/server.md#embeddingbatchresponse)
+
+---
+
+### `GET` /api/embeddings/by-source
+
+HandleEmbeddingsBySource returns embeddings by source IDs (POST /api/embeddings/by-source)
+
+**Handler**: `HandleEmbeddingsBySource`
+
+**Response**: [`EmbeddingsBySourceResponse`](../types/server.md#embeddingsbysourceresponse)
 
 ---
 

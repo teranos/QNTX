@@ -333,11 +333,11 @@ func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (map[string][]st
 	}
 	bs.typeFieldsCacheLock.RUnlock()
 
-	// Query for type definition attestations (predicate="type", context="graph")
+	// Query for type definition attestations (predicate="type", any context)
 	filter := ats.AttestationFilter{
 		Predicates: []string{"type"},
-		Contexts:   []string{"graph"},
-		Limit:      1000, // Reasonable upper bound on number of types
+		// No context filter - allow types from any domain context
+		Limit: 1000, // Reasonable upper bound on number of types
 	}
 
 	attestations, err := bs.GetAttestations(filter)

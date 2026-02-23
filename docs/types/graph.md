@@ -116,17 +116,17 @@ type NodeTypeInfo struct {
 
 ## RelationshipDefinition {#relationshipdefinition}
 
-**Source**: [`graph/relationship_types.go:11`](https://github.com/teranos/QNTX/blob/main/graph/relationship_types.go#L11)
+**Source**: [`graph/relationship_types.go:12`](https://github.com/teranos/QNTX/blob/main/graph/relationship_types.go#L12)
 
 
 ```go
 type RelationshipDefinition struct {
 	PredicateName string `json:"predicate_name"`
-	DisplayLabel string `json:"display_label"`
-	Color string `json:"color,omitempty"`
-	LinkDistance *float64 `json:"link_distance,omitempty"`
-	LinkStrength *float64 `json:"link_strength,omitempty"`
-	Deprecated bool `json:"deprecated"`
+	DisplayLabel string `json:"display_label" attr:"display_label"`
+	Color string `json:"color,omitempty" attr:"color,omitempty"`
+	LinkDistance *float64 `json:"link_distance,omitempty" attr:"link_distance,omitempty"`
+	LinkStrength *float64 `json:"link_strength,omitempty" attr:"link_strength,omitempty"`
+	Deprecated bool `json:"deprecated" attr:"deprecated"`
 }
 ```
 
