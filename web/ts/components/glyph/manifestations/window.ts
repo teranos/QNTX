@@ -367,6 +367,8 @@ function makeWindowDraggable(windowElement: HTMLElement, handle: HTMLElement): v
         const finalRect = windowElement.getBoundingClientRect();
         setLastPosition(windowElement, finalRect.left, finalRect.top);
 
+        // TODO(#609): Detect proximity to viewport edges and snap to panel manifestation
+
         // Remove all event handlers
         window.removeEventListener('mousemove', drag);
         window.removeEventListener('mouseup', stopDrag);

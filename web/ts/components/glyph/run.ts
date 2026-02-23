@@ -36,6 +36,7 @@ import { type Glyph, getMaximizeDuration } from './glyph';
 import { isInWindowState, setGlyphId } from './dataset';
 import { morphToWindow } from './manifestations/window';
 import { morphToCanvas } from './manifestations/canvas';
+import { morphToPanel } from './manifestations/panel';
 
 // Re-export Glyph interface for external use
 export type { Glyph } from './glyph';
@@ -297,7 +298,15 @@ class GlyphRunImpl {
         this.isRestoring = true;
 
         const manifestationType = item.manifestationType || 'window';
-        if (manifestationType === 'fullscreen' || manifestationType === 'canvas') {
+        if (manifestationType === 'panel') {
+            morphToPanel(
+                glyphElement,
+                item,
+                (id, element) => this.verifyElementTracking(id, element),
+                (id) => this.remove(id),
+                (element, g) => this.reattachGlyphToIndicator(element, g)
+            );
+        } else if (manifestationType === 'fullscreen' || manifestationType === 'canvas') {
             morphToCanvas(
                 glyphElement,
                 item,

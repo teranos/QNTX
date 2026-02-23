@@ -47,6 +47,8 @@ The developer always uses `make dev` to start the development environment with h
 
 Glyphs ⧉  are the universal UI primitive. Symbols (`sym` package) are the visual expression of a glyph — through a sym, a glyph can be expressed. The `sym` package will become a subpackage of `glyph/` (`glyph/sym`).
 
+The symbol palette is being migrated to the GlyphRun tray — each palette action becomes a glyph with its own manifestation type.
+
 See [GLOSSARY.md](docs/GLOSSARY.md) for symbol definitions and [glyphs.md](docs/vision/glyphs.md) for the architectural vision.
 
 ## Go Development Standards
