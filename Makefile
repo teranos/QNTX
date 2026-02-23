@@ -76,7 +76,7 @@ demo: web cli ## Start QNTX with persistent demo canvas for editing and publishi
 		test -n \"\$$FRONTEND_PID\" && kill -9 -\$$FRONTEND_PID 2>/dev/null || true; \
 		echo '✓ Demo servers stopped'" EXIT INT TERM; \
 	set -m; \
-	./bin/qntx server --dev --no-browser --db-path demo.db -vvv & \
+	QNTX_DEMO=1 ./bin/qntx server --dev --no-browser --db-path demo.db -vvv & \
 	BACKEND_PID=$$!; \
 	cd web && QNTX_DEMO=1 bun run dev & \
 	FRONTEND_PID=$$!; \

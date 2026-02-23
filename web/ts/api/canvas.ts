@@ -120,11 +120,11 @@ export async function listCompositions(): Promise<Composition[]> {
 }
 
 /**
- * Export the canvas as a self-contained static HTML page.
+ * Export a subcanvas as a self-contained static HTML page.
  * Triggers a file download in the browser.
  */
-export async function exportCanvasStatic(): Promise<void> {
-    const response = await apiFetch('/api/canvas/export/static');
+export async function exportCanvasStatic(canvasId: string): Promise<void> {
+    const response = await apiFetch(`/api/canvas/export/static?canvas_id=${encodeURIComponent(canvasId)}`);
     if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Failed to export canvas');
@@ -142,7 +142,7 @@ export async function exportCanvasStatic(): Promise<void> {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    log.info(SEG.GLYPH, '[CanvasAPI] Exported canvas as static HTML');
+    log.info(SEG.GLYPH, `[CanvasAPI] Exported canvas ${canvasId} as static HTML`);
 }
 
 /**
@@ -151,26 +151,29 @@ export async function exportCanvasStatic(): Promise<void> {
 export interface PublishResult {
     cid?: string;
     url?: string;
-    git_path?: string;
-    git_commit?: string;
+    path?: string;
 }
 
 /**
- * Publish the canvas — renders static HTML, pins to IPFS (if Pinata configured),
- * commits to docs/demo/index.html in git.
+ * Publish a subcanvas — renders static HTML, pins to IPFS (if Pinata configured),
+ * writes docs/demo/index.html.
  */
-export async function publishCanvas(): Promise<PublishResult> {
-    const response = await apiFetch('/api/canvas/publish', { method: 'POST' });
+export async function publishCanvas(canvasId: string): Promise<PublishResult> {
+    const response = await apiFetch('/api/canvas/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ canvas_id: canvasId }),
+    });
     if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Failed to publish canvas');
     }
     const result: PublishResult = await response.json();
     if (result.cid) {
-        log.info(SEG.GLYPH, `[CanvasAPI] Published canvas to IPFS: ${result.cid}`);
+        log.info(SEG.GLYPH, `[CanvasAPI] Published canvas ${canvasId} to IPFS: ${result.cid}`);
     }
-    if (result.git_commit) {
-        log.info(SEG.GLYPH, `[CanvasAPI] Published canvas to git: ${result.git_path} (${result.git_commit.substring(0, 7)})`);
+    if (result.path) {
+        log.info(SEG.GLYPH, `[CanvasAPI] Published canvas ${canvasId} to ${result.path}`);
     }
     return result;
 }

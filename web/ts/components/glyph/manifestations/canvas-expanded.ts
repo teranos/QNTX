@@ -24,6 +24,8 @@ import { uiState } from '../../../state/ui';
 import { getGlyphTypeBySymbol } from '../glyph-registry';
 import { destroyCanvasSelection } from '../canvas/selection';
 import { pushBreadcrumb, popBreadcrumb, buildBreadcrumbBar } from '../canvas/breadcrumb';
+import { exportCanvasStatic, publishCanvas } from '../../../api/canvas';
+import { toast } from '../../../toast';
 
 /**
  * Morph a canvas-placed glyph to fullscreen workspace
@@ -107,6 +109,47 @@ export function morphCanvasPlacedToFullscreen(
 
             // Build breadcrumb bar with minimize button inside it
             const breadcrumbBar = buildBreadcrumbBar();
+
+            // Export button — download subcanvas as static HTML
+            const exportBtn = document.createElement('button');
+            exportBtn.textContent = '↓';
+            exportBtn.className = 'canvas-breadcrumb-action';
+            exportBtn.title = 'Export subcanvas as static HTML';
+            exportBtn.onclick = () => {
+                exportCanvasStatic(glyph.id).catch(err => {
+                    const message = err instanceof Error ? err.message : String(err);
+                    log.error(SEG.GLYPH, `[Canvas] Export failed: ${message}`);
+                    toast.error(`Export failed: ${message}`);
+                });
+            };
+            breadcrumbBar.appendChild(exportBtn);
+
+            // Publish button — pin to IPFS + write demo HTML
+            const publishBtn = document.createElement('button');
+            publishBtn.textContent = '⧉';
+            publishBtn.className = 'canvas-breadcrumb-action';
+            publishBtn.title = 'Publish subcanvas';
+            publishBtn.onclick = () => {
+                publishBtn.textContent = '…';
+                publishBtn.disabled = true;
+                publishCanvas(glyph.id).then(result => {
+                    const parts: string[] = [];
+                    if (result.cid) parts.push(result.cid);
+                    if (result.path) parts.push(result.path);
+                    toast.success(`Published: ${parts.join(' + ')}`);
+                    if (result.url) {
+                        navigator.clipboard.writeText(result.url).catch(() => {});
+                    }
+                }).catch(err => {
+                    const message = err instanceof Error ? err.message : String(err);
+                    log.error(SEG.GLYPH, `[Canvas] Publish failed: ${message}`);
+                    toast.error(`Publish failed: ${message}`);
+                }).finally(() => {
+                    publishBtn.textContent = '⧉';
+                    publishBtn.disabled = false;
+                });
+            };
+            breadcrumbBar.appendChild(publishBtn);
 
             const minimizeBtn = document.createElement('button');
             minimizeBtn.textContent = '−';

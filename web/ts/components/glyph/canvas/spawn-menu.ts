@@ -18,8 +18,6 @@ import { createNoteGlyph } from '../note-glyph';
 import { createTsGlyph, TS_DEFAULT_CODE } from '../ts-glyph';
 import { createSubcanvasGlyph } from '../subcanvas-glyph';
 import { uiState } from '../../../state/ui';
-import { exportCanvasStatic, publishCanvas } from '../../../api/canvas';
-import { toast } from '../../../toast';
 
 /** Duration multiplier for spawn menu animation */
 const SPAWN_MENU_ANIMATION_SPEED = 0.5;
@@ -56,6 +54,8 @@ export function showSpawnMenu(
     glyphs: Glyph[],
     canvasId: string = 'canvas-workspace'
 ): void {
+    log.debug(SEG.GLYPH, `[Canvas] showSpawnMenu called with canvasId: "${canvasId}"`);
+
     // Remove any existing menu
     const existingMenu = document.querySelector('.canvas-spawn-menu');
     if (existingMenu) {
@@ -208,60 +208,6 @@ export function showSpawnMenu(
     });
 
     menu.appendChild(subcanvasBtn);
-
-    // Separator
-    const separator = document.createElement('div');
-    separator.style.width = '1px';
-    separator.style.background = 'rgba(255, 255, 255, 0.15)';
-    separator.style.alignSelf = 'stretch';
-    menu.appendChild(separator);
-
-    // Export button
-    const exportBtn = document.createElement('button');
-    exportBtn.className = 'canvas-spawn-button';
-    exportBtn.textContent = '↓';
-    exportBtn.title = 'Export canvas as static HTML';
-    exportBtn.style.fontSize = '16px';
-
-    exportBtn.addEventListener('click', () => {
-        exportCanvasStatic().catch(err => {
-            const message = err instanceof Error ? err.message : String(err);
-            log.error(SEG.GLYPH, `[Canvas] Export failed: ${message}`);
-            toast.error(`Export failed: ${message}`);
-        });
-        removeMenu();
-    });
-
-    menu.appendChild(exportBtn);
-
-    // Publish button (IPFS)
-    const publishBtn = document.createElement('button');
-    publishBtn.className = 'canvas-spawn-button';
-    publishBtn.textContent = '⧉';
-    publishBtn.title = 'Publish canvas to IPFS';
-    publishBtn.style.fontSize = '16px';
-
-    publishBtn.addEventListener('click', () => {
-        publishBtn.textContent = '…';
-        publishBtn.disabled = true;
-        publishCanvas().then(result => {
-            const parts: string[] = [];
-            if (result.cid) parts.push(result.cid);
-            if (result.git_commit) parts.push(`git:${result.git_commit.substring(0, 7)}`);
-            toast.success(`Published: ${parts.join(' + ')}`);
-            if (result.url) {
-                navigator.clipboard.writeText(result.url).catch(() => {});
-            }
-        }).catch(err => {
-            const message = err instanceof Error ? err.message : String(err);
-            log.error(SEG.GLYPH, `[Canvas] Publish failed: ${message}`);
-            toast.error(`Publish failed: ${message}`);
-        }).finally(() => {
-            removeMenu();
-        });
-    });
-
-    menu.appendChild(publishBtn);
 
     document.body.appendChild(menu);
 
@@ -638,6 +584,9 @@ async function spawnNoteGlyph(
     const width = Math.round(rect.width);
     const height = Math.round(rect.height);
 
+    const finalCanvasId = storageCanvasId(canvasId);
+    log.debug(SEG.GLYPH, `[Canvas] Spawning Note glyph - canvasId: "${canvasId}" → storageCanvasId: "${finalCanvasId}"`);
+
     uiState.addCanvasGlyph({
         id: noteGlyph.id,
         symbol: Prose,
@@ -646,10 +595,10 @@ async function spawnNoteGlyph(
         width,
         height,
         content: 'Write here — select and click ⟶ to convert to a prompt glyph.',
-        canvas_id: storageCanvasId(canvasId),
+        canvas_id: finalCanvasId,
     });
 
-    log.debug(SEG.GLYPH, `[Canvas] Spawned Note glyph at (${x}, ${y}) with size ${width}x${height}`);
+    log.debug(SEG.GLYPH, `[Canvas] Spawned Note glyph at (${x}, ${y}) with size ${width}x${height} with canvas_id="${finalCanvasId}"`);
 }
 
 /**
