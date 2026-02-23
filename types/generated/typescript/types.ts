@@ -59,6 +59,14 @@ export interface As {
    * Database creation time
    */
   created_at: string;
+  /**
+   * Ed25519 signature over canonical JSON
+   */
+  signature?: number[];
+  /**
+   * did:key of the signing node
+   */
+  signer_did?: string;
 }
 
 export interface AsCommand {

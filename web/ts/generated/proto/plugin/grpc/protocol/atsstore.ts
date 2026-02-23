@@ -23,6 +23,10 @@ export interface Attestation {
     | undefined;
   /** Unix timestamp in milliseconds */
   created_at: number;
+  /** Ed25519 signature over canonical JSON (optional) */
+  signature: Uint8Array;
+  /** did:key of the signing node (optional) */
+  signer_did: string;
 }
 
 /** AttestationCommand is used for creating attestations */
