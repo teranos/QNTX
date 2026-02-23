@@ -29,11 +29,15 @@ export function loadPluginCSS(url: string): void {
     if (loadedCSS.has(url)) return;
     loadedCSS.add(url);
 
+    // Use absolute URL to backend (dev mode: frontend on :8826, backend on :8776)
+    const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
+    const absoluteUrl = backendUrl + url;
+
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = url;
+    link.href = absoluteUrl;
     document.head.appendChild(link);
-    log.debug(SEG.GLYPH, `[PluginGlyphs] Loaded CSS: ${url}`);
+    log.debug(SEG.GLYPH, `[PluginGlyphs] Loaded CSS: ${absoluteUrl}`);
 }
 
 /** Fetch plugin glyph definitions and register them */
