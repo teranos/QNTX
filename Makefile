@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile demo types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -55,6 +55,33 @@ dev: web cli ## Build frontend and CLI, then start development servers (backend 
 	FRONTEND_PID=$$!; \
 	echo "✨ Development servers running"; \
 	echo "Press Ctrl+C to stop both servers"; \
+	wait
+
+demo: web cli ## Start QNTX with persistent demo canvas for editing and publishing
+	@BACKEND_PORT=$${BACKEND_PORT:-877}; \
+	FRONTEND_PORT=$${FRONTEND_PORT:-8820}; \
+	echo "📋 Starting demo canvas environment..."; \
+	echo "  Backend:  http://localhost:$$BACKEND_PORT"; \
+	echo "  Frontend: http://localhost:$$FRONTEND_PORT (with live reload)"; \
+	echo "  Database: demo.db (persistent demo state)"; \
+	echo "  Edit the demo canvas, then publish to IPFS + git"; \
+	echo ""; \
+	lsof -ti:$$BACKEND_PORT | xargs kill -9 2>/dev/null || true; \
+	lsof -ti:$$FRONTEND_PORT | xargs kill -9 2>/dev/null || true; \
+	trap "echo ''; echo 'Shutting down demo servers...'; \
+		test -n \"\$$BACKEND_PID\" && kill -TERM -\$$BACKEND_PID 2>/dev/null || true; \
+		test -n \"\$$FRONTEND_PID\" && kill -TERM -\$$FRONTEND_PID 2>/dev/null || true; \
+		sleep 1; \
+		test -n \"\$$BACKEND_PID\" && kill -9 -\$$BACKEND_PID 2>/dev/null || true; \
+		test -n \"\$$FRONTEND_PID\" && kill -9 -\$$FRONTEND_PID 2>/dev/null || true; \
+		echo '✓ Demo servers stopped'" EXIT INT TERM; \
+	set -m; \
+	./bin/qntx server --dev --no-browser --db-path demo.db -vvv & \
+	BACKEND_PID=$$!; \
+	cd web && QNTX_DEMO=1 bun run dev & \
+	FRONTEND_PID=$$!; \
+	echo "✨ Demo environment running"; \
+	echo "Press Ctrl+C to stop"; \
 	wait
 
 dev-mobile: web cli ## Start dev servers and run iOS app in simulator

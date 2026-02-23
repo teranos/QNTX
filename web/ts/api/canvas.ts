@@ -120,6 +120,62 @@ export async function listCompositions(): Promise<Composition[]> {
 }
 
 /**
+ * Export the canvas as a self-contained static HTML page.
+ * Triggers a file download in the browser.
+ */
+export async function exportCanvasStatic(): Promise<void> {
+    const response = await apiFetch('/api/canvas/export/static');
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to export canvas');
+    }
+
+    const htmlContent = await response.text();
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'canvas.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    log.info(SEG.GLYPH, '[CanvasAPI] Exported canvas as static HTML');
+}
+
+/**
+ * Publish result from POST /api/canvas/publish.
+ */
+export interface PublishResult {
+    cid?: string;
+    url?: string;
+    git_path?: string;
+    git_commit?: string;
+}
+
+/**
+ * Publish the canvas — renders static HTML, pins to IPFS (if Pinata configured),
+ * commits to docs/demo/index.html in git.
+ */
+export async function publishCanvas(): Promise<PublishResult> {
+    const response = await apiFetch('/api/canvas/publish', { method: 'POST' });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to publish canvas');
+    }
+    const result: PublishResult = await response.json();
+    if (result.cid) {
+        log.info(SEG.GLYPH, `[CanvasAPI] Published canvas to IPFS: ${result.cid}`);
+    }
+    if (result.git_commit) {
+        log.info(SEG.GLYPH, `[CanvasAPI] Published canvas to git: ${result.git_path} (${result.git_commit.substring(0, 7)})`);
+    }
+    return result;
+}
+
+/**
  * Load all canvas state from backend (glyphs + compositions + minimized windows)
  * Converts backend format to frontend state format
  */

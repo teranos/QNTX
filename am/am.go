@@ -13,6 +13,7 @@ type Config struct {
 	Plugin         PluginConfig         `mapstructure:"plugin"`
 	Embeddings     EmbeddingsConfig     `mapstructure:"embeddings"`
 	Sync           SyncConfig           `mapstructure:"sync"`
+	Pinata         PinataConfig         `mapstructure:"pinata"`
 }
 
 // AuthConfig configures biometric authentication (WebAuthn)
@@ -159,6 +160,12 @@ type EmbeddingsConfig struct {
 	ClusterLabelCooldownDays    int    `mapstructure:"cluster_label_cooldown_days"`    // Min days between re-labels
 	ClusterLabelMaxTokens       int    `mapstructure:"cluster_label_max_tokens"`       // LLM max_tokens
 	ClusterLabelModel           string `mapstructure:"cluster_label_model"`            // Model override (empty = system default)
+}
+
+// PinataConfig configures Pinata IPFS pinning for canvas publish
+type PinataConfig struct {
+	JWT     string `mapstructure:"jwt"`     // Pinata JWT token for authentication
+	Gateway string `mapstructure:"gateway"` // IPFS gateway URL (default: https://gateway.pinata.cloud)
 }
 
 // File system constants
