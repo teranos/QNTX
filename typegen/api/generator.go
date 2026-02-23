@@ -103,9 +103,11 @@ func (g *Generator) parseRouting() error {
 		return fmt.Errorf("failed to read routing.go: %w", err)
 	}
 
-	// Match http.HandleFunc("/pattern", s.HandlerName)
-	// Also matches http.HandleFunc("/pattern", s.corsMiddleware(s.HandlerName))
-	re := regexp.MustCompile(`http\.HandleFunc\("([^"]+)",\s*s\.(?:corsMiddleware\()?s\.(\w+)`)
+	// TODO(#596): Replace regex-based endpoint detection with AST parsing (go/ast).
+	// Regex is fragile — any change to the routing pattern silently breaks detection.
+	// Match http.HandleFunc("/pattern", wrap(s.HandlerName))
+	// Also matches s.corsMiddleware(s.HandlerName) and s.receiver.HandlerName
+	re := regexp.MustCompile(`http\.HandleFunc\("([^"]+)",\s*(?:wrap|s\.corsMiddleware)\(s\.(\w+(?:\.\w+)?)\)`)
 	matches := re.FindAllStringSubmatch(string(content), -1)
 
 	for _, match := range matches {

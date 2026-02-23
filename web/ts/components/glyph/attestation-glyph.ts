@@ -56,6 +56,13 @@ function buildMetaLines(attestation: Attestation): string[] {
     if (attestation.created_at) {
         lines.push(`created: ${formatTimestamp(attestation.created_at)}`);
     }
+    if (attestation.signer_did) {
+        // Cyan color for signer (between green and purple)
+        lines.push(`<span style="color: #00d4aa">signer: ${attestation.signer_did}</span>`);
+    }
+    if (attestation.signature && attestation.signature.length > 0) {
+        lines.push(`signature: ${attestation.signature.length} bytes`);
+    }
     if (attestation.id) {
         lines.push(`id: ${attestation.id}`);
     }
@@ -146,7 +153,7 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
 
             const metaPopover = document.createElement('div');
             metaPopover.className = 'as-meta-popover';
-            metaPopover.textContent = metaLines.join('\n');
+            metaPopover.innerHTML = metaLines.join('<br>');
 
             pill.appendChild(metaPopover);
             titleBarWrapper.appendChild(pill);

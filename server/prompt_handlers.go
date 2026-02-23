@@ -17,6 +17,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	id "github.com/teranos/vanity-id"
 )
 
@@ -84,12 +85,13 @@ type PromptDirectRequest struct {
 
 // PromptDirectResponse represents the direct execution response
 type PromptDirectResponse struct {
-	Response         string `json:"response"`
-	AttestationID    string `json:"attestation_id,omitempty"`
-	PromptTokens     int    `json:"prompt_tokens,omitempty"`
-	CompletionTokens int    `json:"completion_tokens,omitempty"`
-	TotalTokens      int    `json:"total_tokens,omitempty"`
-	Error            string `json:"error,omitempty"`
+	Response         string                `json:"response"`
+	AttestationID    string                `json:"attestation_id,omitempty"`
+	Attestation      *protocol.Attestation `json:"attestation,omitempty"` // Full attestation with signature
+	PromptTokens     int                   `json:"prompt_tokens,omitempty"`
+	CompletionTokens int                   `json:"completion_tokens,omitempty"`
+	TotalTokens      int                   `json:"total_tokens,omitempty"`
+	Error            string                `json:"error,omitempty"`
 }
 
 // Result represents the output of a prompt execution
@@ -547,6 +549,7 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 
 	// Create prompt-result attestation so the response is discoverable in the graph
 	var attestationID string
+	var createdAttestation *protocol.Attestation
 	if req.GlyphID != "" {
 		actor := "glyph:" + req.GlyphID
 		subject := modelName
@@ -582,6 +585,7 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 					"glyph_id", req.GlyphID, "asid", asid, "error", storeErr)
 			} else {
 				attestationID = asid
+				createdAttestation = protocol.AttestationFromTypes(as)
 				s.logger.Infow("Created prompt-result attestation",
 					"asid", asid, "subject", subject, "glyph_id", req.GlyphID)
 			}
@@ -592,6 +596,7 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 	response := PromptDirectResponse{
 		Response:         resp.Content,
 		AttestationID:    attestationID,
+		Attestation:      createdAttestation,
 		PromptTokens:     resp.Usage.PromptTokens,
 		CompletionTokens: resp.Usage.CompletionTokens,
 		TotalTokens:      resp.Usage.TotalTokens,

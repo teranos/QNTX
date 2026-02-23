@@ -64,6 +64,8 @@ function buildQntxApi(outputLines: string[]) {
                 source: 'ts-glyph',
                 attributes: opts.attributes ?? {},
                 created_at: now,
+                signature: new Uint8Array(),
+                signer_did: '',
             };
 
             await putAttestation(attestation);
