@@ -10,7 +10,7 @@ require (
 	github.com/bluesky-social/indigo v0.0.0-20251010013709-8f2296eee90f
 	github.com/cockroachdb/errors v1.12.0
 	github.com/fsnotify/fsnotify v1.9.0
-	github.com/go-git/go-git/v5 v5.16.4
+	github.com/go-git/go-git/v5 v5.16.5
 	github.com/go-webauthn/webauthn v0.15.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
