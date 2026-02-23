@@ -20,12 +20,6 @@ import { preventDrag, storeCleanup } from './glyph-interaction';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { autoMeldResultBelow } from './meld/meld-system';
 import { uiState } from '../../state/ui';
-
-interface PromptConfig {
-    model?: string;
-    temperature?: number;
-    maxTokens?: number;
-}
 import { tooltip } from '../tooltip';
 import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
 import { createAttestationGlyph } from './attestation-glyph';
@@ -66,28 +60,6 @@ function loadPromptStatus(glyphId: string): PromptGlyphStatus | null {
 
 
 export const PROMPT_DEFAULT_TEMPLATE = '---\nmodel: "anthropic/claude-haiku-4.5"\ntemperature: 0.7\nmax_tokens: 1000\n---\nWrite a haiku about quantum computing.\n';
-
-/**
- * Parse YAML frontmatter from a prompt template to extract model config.
- */
-function parseFrontmatterConfig(template: string): PromptConfig | undefined {
-    const match = template.match(/^---\n([\s\S]*?)\n---/);
-    if (!match) return undefined;
-
-    const frontmatter = match[1];
-    const config: PromptConfig = {};
-
-    const modelMatch = frontmatter.match(/^model:\s*"?([^"\n]+)"?/m);
-    if (modelMatch) config.model = modelMatch[1].trim();
-
-    const tempMatch = frontmatter.match(/^temperature:\s*([0-9.]+)/m);
-    if (tempMatch) config.temperature = parseFloat(tempMatch[1]);
-
-    const tokensMatch = frontmatter.match(/^max_tokens:\s*(\d+)/m);
-    if (tokensMatch) config.maxTokens = parseInt(tokensMatch[1], 10);
-
-    return Object.keys(config).length > 0 ? config : undefined;
-}
 
 /**
  * Create a prompt glyph with template editor on canvas
@@ -297,28 +269,10 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
 
             if (data.error) return;
 
-            // Parse frontmatter for model name
-            const promptConfig = parseFrontmatterConfig(template);
-            const promptBody = template.replace(/^---\n[\s\S]*?\n---\n?/, '').trim();
-            const modelName = promptConfig?.model ?? 'unknown-model';
-
-            // Build attestation from the API response — mirrors what the backend created
-            const attestation: Attestation = {
-                id: data.attestation_id ?? '',
-                subjects: [modelName],
-                predicates: ['prompt-result'],
-                contexts: [glyph.id],
-                actors: ['glyph:' + glyph.id],
-                timestamp: Math.floor(Date.now() / 1000),
-                source: 'prompt-direct',
-                attributes: {
-                    response: data.response ?? '',
-                    template: promptBody,
-                },
-                created_at: Math.floor(Date.now() / 1000),
-            };
-
-            spawnAttestationBelow(element, attestation);
+            // Use the attestation from the API response (includes signature fields)
+            if (data.attestation) {
+                spawnAttestationBelow(element, data.attestation);
+            }
 
         } catch (error) {
             log.error(SEG.GLYPH, '[Prompt] Execution failed:', error);
