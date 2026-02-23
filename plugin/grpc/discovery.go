@@ -180,7 +180,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 			config.Name, process.Pid, port, addr)
 
 		// Wait for plugin to be ready (5 second timeout for faster failure detection)
-		if err := m.waitForPlugin(ctx, addr, 5*time.Second); err != nil {
+		if err := m.waitForPlugin(ctx, config.Name, addr, 5*time.Second); err != nil {
 			process.Kill()
 			return errors.Wrapf(err, "plugin %s failed to start (binary=%s, addr=%s, pid=%d)",
 				config.Name, config.Binary, addr, process.Pid)
@@ -343,7 +343,8 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 // waitForPlugin waits for a plugin's gRPC server to become ready.
 // This polls the gRPC metadata endpoint rather than just checking TCP connectivity
 // to ensure the plugin is actually ready to handle requests.
-func (m *PluginManager) waitForPlugin(ctx context.Context, addr string, timeout time.Duration) error {
+// It also verifies that the correct plugin (by name) is responding at the given address.
+func (m *PluginManager) waitForPlugin(ctx context.Context, expectedName string, addr string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 
 	for time.Now().Before(deadline) {
@@ -365,22 +366,31 @@ func (m *PluginManager) waitForPlugin(ctx context.Context, addr string, timeout 
 			// Connection succeeded, verify gRPC service is ready by calling metadata
 			client := protocol.NewDomainPluginServiceClient(conn)
 			metaCtx, metaCancel := context.WithTimeout(ctx, time.Second)
-			_, metaErr := client.Metadata(metaCtx, &protocol.Empty{})
+			metaResp, metaErr := client.Metadata(metaCtx, &protocol.Empty{})
 			metaCancel()
 			conn.Close()
 
 			if metaErr == nil {
-				// gRPC service is ready
-				return nil
+				// gRPC service is ready, but is it the right plugin?
+				if metaResp.Name == expectedName {
+					// Correct plugin is responding
+					return nil
+				}
+				// Wrong plugin at this address (likely from another QNTX instance)
+				m.logger.Debugw("Found different plugin at address, waiting for correct one",
+					"expected", expectedName,
+					"found", metaResp.Name,
+					"addr", addr,
+				)
 			}
-			// gRPC service not ready yet, continue waiting
+			// gRPC service not ready yet or wrong plugin, continue waiting
 		}
 
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	err := errors.Newf("timeout waiting for plugin gRPC service at %s", addr)
-	return errors.WithHint(err, "check plugin logs for startup errors, increase timeout, or verify the plugin binary is compatible")
+	err := errors.Newf("timeout waiting for plugin '%s' gRPC service at %s", expectedName, addr)
+	return errors.WithHint(err, "check plugin logs for startup errors, verify no other plugin is using this port, or increase timeout")
 }
 
 // GetPlugin returns a connected plugin as a DomainPlugin.

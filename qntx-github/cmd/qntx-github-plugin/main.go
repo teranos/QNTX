@@ -1,13 +1,13 @@
-// qntx-atproto-plugin is an external gRPC plugin for the AT Protocol domain.
+// qntx-github-plugin is an external gRPC plugin for the GitHub domain.
 //
 // This binary runs as a standalone process, communicating with QNTX
-// via gRPC. It provides Bluesky/AT Protocol integration including
-// authentication, social graph operations, and feed access.
+// via gRPC. It provides GitHub integration including event polling,
+// PR tracking, and repository activity monitoring.
 //
 // Usage:
 //
-//	qntx-atproto-plugin --port 9001
-//	qntx-atproto-plugin --address localhost:9001
+//	qntx-github-plugin --port 9002
+//	qntx-github-plugin --address localhost:9002
 //
 // The plugin will start a gRPC server and wait for QNTX to connect.
 package main
@@ -21,13 +21,13 @@ import (
 	"syscall"
 
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
-	qntxatproto "github.com/teranos/QNTX/qntx-atproto"
+	qntxgithub "github.com/teranos/qntx-github"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 var (
-	port     = flag.Int("port", 9001, "gRPC server port")
+	port     = flag.Int("port", 9002, "gRPC server port")
 	address  = flag.String("address", "", "gRPC server address (overrides port)")
 	logLevel = flag.String("log-level", "info", "Log level (debug, info, warn, error)")
 	version  = flag.Bool("version", false, "Print version and exit")
@@ -37,9 +37,9 @@ func main() {
 	flag.Parse()
 
 	if *version {
-		plugin := qntxatproto.NewPlugin()
+		plugin := qntxgithub.NewPlugin()
 		meta := plugin.Metadata()
-		fmt.Printf("qntx-atproto-plugin %s\n", meta.Version)
+		fmt.Printf("qntx-github-plugin %s\n", meta.Version)
 		fmt.Printf("QNTX Version: %s\n", meta.QNTXVersion)
 		os.Exit(0)
 	}
@@ -52,7 +52,7 @@ func main() {
 		addr = fmt.Sprintf("127.0.0.1:%d", *port)
 	}
 
-	plugin := qntxatproto.NewPlugin()
+	plugin := qntxgithub.NewPlugin()
 
 	server := plugingrpc.NewPluginServer(plugin, logger)
 
@@ -68,7 +68,7 @@ func main() {
 		cancel()
 	}()
 
-	logger.Infow("Starting QNTX AT Protocol Domain Plugin",
+	logger.Infow("Starting QNTX GitHub Domain Plugin",
 		"version", plugin.Metadata().Version,
 		"address", addr,
 	)
