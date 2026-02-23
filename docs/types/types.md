@@ -26,12 +26,14 @@ type As struct {
 	Source string `db:"source" json:"source" validate:"required"`
 	Attributes map[string]interface{} `db:"attributes" json:"attributes,omitempty"`
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
+	Signature []byte `db:"signature" json:"signature,omitempty"`
+	SignerDID string `db:"signer_did" json:"signer_did,omitempty"`
 }
 ```
 
 ## AsCommand {#ascommand}
 
-**Source**: [`ats/types/attestation.go:26`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L26)
+**Source**: [`ats/types/attestation.go:28`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L28)
 
 
 ```go
@@ -47,7 +49,7 @@ type AsCommand struct {
 
 ## AxDebug {#axdebug}
 
-**Source**: [`ats/types/attestation.go:108`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L108)
+**Source**: [`ats/types/attestation.go:110`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L110)
 
 
 ```go
@@ -64,7 +66,7 @@ type AxDebug struct {
 
 ## AxFilter {#axfilter}
 
-**Source**: [`ats/types/attestation.go:85`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L85)
+**Source**: [`ats/types/attestation.go:87`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L87)
 
 
 ```go
@@ -84,7 +86,7 @@ type AxFilter struct {
 
 ## AxResult {#axresult}
 
-**Source**: [`ats/types/attestation.go:99`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L99)
+**Source**: [`ats/types/attestation.go:101`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L101)
 
 
 ```go
@@ -99,7 +101,7 @@ type AxResult struct {
 
 ## AxSummary {#axsummary}
 
-**Source**: [`ats/types/attestation.go:119`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L119)
+**Source**: [`ats/types/attestation.go:121`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L121)
 
 
 ```go
@@ -130,7 +132,7 @@ type CompletionItem struct {
 
 ## Conflict {#conflict}
 
-**Source**: [`ats/types/attestation.go:128`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L128)
+**Source**: [`ats/types/attestation.go:130`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L130)
 
 
 ```go
@@ -145,7 +147,7 @@ type Conflict struct {
 
 ## OverFilter {#overfilter}
 
-**Source**: [`ats/types/attestation.go:78`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L78)
+**Source**: [`ats/types/attestation.go:80`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L80)
 
 
 ```go
@@ -158,33 +160,33 @@ type OverFilter struct {
 
 ## RelationshipTypeDef {#relationshiptypedef}
 
-**Source**: [`ats/types/type_definitions.go:51`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L51)
+**Source**: [`ats/types/type_definitions.go:52`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L52)
 
 
 ```go
 type RelationshipTypeDef struct {
 	Name string `json:"name"`
-	Label string `json:"label"`
-	Color string `json:"color,omitempty"`
-	LinkDistance *float64 `json:"link_distance,omitempty"`
-	LinkStrength *float64 `json:"link_strength,omitempty"`
-	Deprecated bool `json:"deprecated"`
+	Label string `json:"label" attr:"display_label"`
+	Color string `json:"color,omitempty" attr:"color,omitempty"`
+	LinkDistance *float64 `json:"link_distance,omitempty" attr:"link_distance,omitempty"`
+	LinkStrength *float64 `json:"link_strength,omitempty" attr:"link_strength,omitempty"`
+	Deprecated bool `json:"deprecated" attr:"deprecated"`
 }
 ```
 
 ## TypeDef {#typedef}
 
-**Source**: [`ats/types/type_definitions.go:38`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L38)
+**Source**: [`ats/types/type_definitions.go:39`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L39)
 
 
 ```go
 type TypeDef struct {
 	Name string `json:"name"`
-	Label string `json:"label"`
-	Color string `json:"color"`
-	Opacity *float64 `json:"opacity,omitempty"`
-	Deprecated bool `json:"deprecated"`
-	RichStringFields []string `json:"rich_string_fields,omitempty"`
-	ArrayFields []string `json:"array_fields,omitempty"`
+	Label string `json:"label" attr:"display_label"`
+	Color string `json:"color" attr:"display_color"`
+	Opacity *float64 `json:"opacity,omitempty" attr:"opacity,omitempty"`
+	Deprecated bool `json:"deprecated" attr:"deprecated"`
+	RichStringFields []string `json:"rich_string_fields,omitempty" attr:"rich_string_fields,omitempty"`
+	ArrayFields []string `json:"array_fields,omitempty" attr:"array_fields,omitempty"`
 }
 ```
