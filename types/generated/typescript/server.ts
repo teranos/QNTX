@@ -384,6 +384,10 @@ export interface PromptDirectRequest {
 export interface PromptDirectResponse {
   response: string;
   attestation_id?: string;
+  /**
+   * Full attestation with signature
+   */
+  attestation?: Attestation | null;
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
