@@ -220,10 +220,7 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	server.nodeDID = nodeDIDHandler
 
 	// Set global signer so all attestations are signed with the node's DID key
-	storage.SetDefaultSigner(&signing.Signer{
-		PrivateKey: nodeDIDHandler.PrivateKey,
-		DID:        nodeDIDHandler.DID,
-	})
+	storage.SetDefaultSigner(signing.NewSigner(nodeDIDHandler.PrivateKey, nodeDIDHandler.DID))
 
 	// Register system type definitions so attestations render in the graph
 	{
