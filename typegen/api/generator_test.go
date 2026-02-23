@@ -15,10 +15,12 @@ func TestParseRouting(t *testing.T) {
 import "net/http"
 
 func (s *QNTXServer) setupHTTPRoutes() {
+	wrap := s.corsMiddleware
 	http.HandleFunc("/health", s.corsMiddleware(s.HandleHealth))
-	http.HandleFunc("/api/config", s.corsMiddleware(s.HandleConfig))
-	http.HandleFunc("/api/pulse/schedules", s.corsMiddleware(s.HandlePulseSchedules))
-	http.HandleFunc("/ws", s.corsMiddleware(s.HandleWebSocket))
+	http.HandleFunc("/api/config", wrap(s.HandleConfig))
+	http.HandleFunc("/api/pulse/schedules", wrap(s.HandlePulseSchedules))
+	http.HandleFunc("/ws", wrap(s.HandleWebSocket))
+	http.HandleFunc("/api/canvas/glyphs", wrap(s.canvasHandler.HandleGlyphs))
 }
 `
 	if err := os.WriteFile(filepath.Join(tmpDir, "routing.go"), []byte(routingContent), 0644); err != nil {
@@ -30,8 +32,8 @@ func (s *QNTXServer) setupHTTPRoutes() {
 		t.Fatalf("parseRouting failed: %v", err)
 	}
 
-	if len(gen.endpoints) != 4 {
-		t.Errorf("expected 4 endpoints, got %d", len(gen.endpoints))
+	if len(gen.endpoints) != 5 {
+		t.Errorf("expected 5 endpoints, got %d", len(gen.endpoints))
 	}
 
 	// Check specific endpoints
@@ -46,11 +48,21 @@ func (s *QNTXServer) setupHTTPRoutes() {
 		}
 	}
 
+	foundGlyphs := false
+	for _, ep := range gen.endpoints {
+		if ep.Pattern == "/api/canvas/glyphs" && ep.Handler == "canvasHandler.HandleGlyphs" {
+			foundGlyphs = true
+		}
+	}
+
 	if !foundHealth {
 		t.Error("expected to find /health endpoint")
 	}
 	if !foundSchedules {
 		t.Error("expected to find /api/pulse/schedules endpoint")
+	}
+	if !foundGlyphs {
+		t.Error("expected to find /api/canvas/glyphs endpoint with dotted handler")
 	}
 }
 
