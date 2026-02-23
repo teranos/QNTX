@@ -72,7 +72,16 @@ func Verify(as *types.As) error {
 //
 // Go's json.Marshal produces deterministic output for structs (field order is
 // declaration order per the Go spec).
+//
+// Normalizes nil slices to empty slices for consistency with sync representation.
 func CanonicalJSON(as *types.As) ([]byte, error) {
+	nilToEmpty := func(s []string) []string {
+		if s == nil {
+			return []string{}
+		}
+		return s
+	}
+
 	wire := struct {
 		ID         string                 `json:"id"`
 		Subjects   []string               `json:"subjects"`
@@ -84,10 +93,10 @@ func CanonicalJSON(as *types.As) ([]byte, error) {
 		Attributes map[string]interface{} `json:"attributes,omitempty"`
 	}{
 		ID:         as.ID,
-		Subjects:   as.Subjects,
-		Predicates: as.Predicates,
-		Contexts:   as.Contexts,
-		Actors:     as.Actors,
+		Subjects:   nilToEmpty(as.Subjects),
+		Predicates: nilToEmpty(as.Predicates),
+		Contexts:   nilToEmpty(as.Contexts),
+		Actors:     nilToEmpty(as.Actors),
 		Timestamp:  as.Timestamp.UnixMilli(),
 		Source:     as.Source,
 		Attributes: as.Attributes,
