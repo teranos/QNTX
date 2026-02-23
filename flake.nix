@@ -61,6 +61,7 @@
 
         # Common preBuild hook for Go derivations: copy WASM module for go:embed
         goWasmPreBuild = ''
+          export GOWORK=off  # Build without workspace (use go.mod only)
           cp ${qntx-wasm}/lib/qntx_core.wasm ats/wasm/qntx_core.wasm
         '';
 
@@ -144,7 +145,7 @@
 
           # Hash of vendored Go dependencies (computed from go.sum)
           # To update: set to `pkgs.lib.fakeHash`, run `nix build .#qntx`, copy the hash from error
-          vendorHash = "sha256-Zx/7+k5z7qnkhnL9cC8v+WAPZnuKPx4HlDtQOZgMr30=";
+          vendorHash = "sha256-7r1EjXKs6GCG1wxQdLdFgZ9FPF8E5ZuE0gVXc2lkk3o=";
 
           # sqlite3.h needed by sqlite-vec CGO bindings (db/connection.go)
           buildInputs = [ pkgs.sqlite ];
