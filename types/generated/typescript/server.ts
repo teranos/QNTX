@@ -387,7 +387,7 @@ export interface PromptDirectResponse {
   /**
    * Full attestation with signature
    */
-  attestation?: Attestation | null;
+  attestation?: As | null;
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
