@@ -2,8 +2,8 @@
 // Regenerate with: make types
 // TODO: Migrate to proto generation
 // Source package: types
-// Source last modified: 2026-02-04T18:45:39+01:00
-// Source version: 77467218
+// Source last modified: 2026-02-21T20:54:56+01:00
+// Source version: bb90f2c3
 
 //! # types module
 //!
@@ -53,6 +53,12 @@ pub struct As {
     pub attributes: Option<serde_json::Map<String, serde_json::Value>>,
     /// Database creation time
     pub created_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Ed25519 signature over canonical JSON
+    pub signature: Option<Vec<u8>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// did:key of the signing node
+    pub signer_did: Option<String>,
 }
 
 /// AsCommand represents the parsed CLI command for creating attestations

@@ -6,6 +6,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"sync"
 	"time"
@@ -92,8 +93,8 @@ func (bs *BoundedStore) AttestationExists(asid string) bool {
 
 // GenerateAndCreateAttestation generates a vanity ASID and creates a self-certifying attestation (implements ats.AttestationStore)
 // Note: Observer notification is handled by SQLStore.CreateAttestation (called internally)
-func (bs *BoundedStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As, error) {
-	return bs.store.GenerateAndCreateAttestation(cmd)
+func (bs *BoundedStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
+	return bs.store.GenerateAndCreateAttestation(ctx, cmd)
 }
 
 // GetAttestations retrieves attestations based on filters (implements ats.AttestationStore)
@@ -105,7 +106,7 @@ func (bs *BoundedStore) GetAttestations(filters ats.AttestationFilter) ([]*types
 // Note: Observer notification is handled by SQLStore.CreateAttestation (called internally)
 func (bs *BoundedStore) CreateAttestationWithLimits(cmd *types.AsCommand) (*types.As, error) {
 	// First create the attestation (observer notification happens in SQLStore)
-	as, err := bs.store.GenerateAndCreateAttestation(cmd)
+	as, err := bs.store.GenerateAndCreateAttestation(context.Background(), cmd)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create attestation")
 	}

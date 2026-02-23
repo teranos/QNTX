@@ -4,12 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/ai/tracker"
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/lsp"
+	"github.com/teranos/QNTX/ats/signing"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
@@ -217,6 +219,9 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		return nil, errors.Wrap(err, "failed to initialize node DID")
 	}
 	server.nodeDID = nodeDIDHandler
+
+	// Set global signer so all attestations are signed with the node's DID key
+	storage.SetDefaultSigner(signing.NewSigner(nodeDIDHandler.PrivateKey, nodeDIDHandler.DID))
 
 	// Register system type definitions so attestations render in the graph
 	{
@@ -602,8 +607,24 @@ func (c *simpleConfig) Set(key string, value interface{}) {
 }
 
 func (c *simpleConfig) GetKeys() []string {
-	// Return empty list for now - could be enhanced to return actual keys from viper
-	return []string{}
+	v := appcfg.GetViper()
+	if v == nil {
+		return []string{}
+	}
+
+	allKeys := v.AllKeys()
+	prefix := c.domain + "."
+	var keys []string
+
+	for _, key := range allKeys {
+		if strings.HasPrefix(key, prefix) {
+			// Strip the domain prefix to get the plugin-specific key
+			pluginKey := strings.TrimPrefix(key, prefix)
+			keys = append(keys, pluginKey)
+		}
+	}
+
+	return keys
 }
 
 // pluginConfigProvider wraps a base config provider to inject service endpoints

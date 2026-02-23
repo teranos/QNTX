@@ -78,12 +78,17 @@ func (s *memStore) CreateAttestation(as *types.As) error {
 	return nil
 }
 
+func (s *memStore) CreateAttestationInbound(as *types.As) error {
+	s.attestations[as.ID] = as
+	return nil
+}
+
 func (s *memStore) AttestationExists(asid string) bool {
 	_, ok := s.attestations[asid]
 	return ok
 }
 
-func (s *memStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As, error) {
+func (s *memStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
 	as := cmd.ToAs(fmt.Sprintf("as-test-%d", time.Now().UnixNano()))
 	if err := s.CreateAttestation(as); err != nil {
 		return nil, err
@@ -498,7 +503,10 @@ func TestWireRoundtrip(t *testing.T) {
 	as := makeAs("as-roundtrip", "user-1", "member", "team", "hr")
 	as.Attributes = map[string]interface{}{"color": "blue"}
 
-	wire := toWire(as)
+	wire, err := toWire(as)
+	if err != nil {
+		t.Fatalf("toWire failed: %v", err)
+	}
 	back := fromWire(wire)
 
 	if back.ID != as.ID {

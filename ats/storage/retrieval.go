@@ -14,7 +14,7 @@ import (
 const (
 	// AttestationSelectQuery is the base SELECT query for retrieving attestations
 	AttestationSelectQuery = `
-		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at
+		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
 		FROM attestations`
 
 	// MaxAttestationLimit is the maximum number of attestations that can be retrieved in a single query
@@ -96,6 +96,8 @@ func ScanAttestation(rows *sql.Rows) (*types.As, error) {
 	var as types.As
 	var subjectsJSON, predicatesJSON, contextsJSON, actorsJSON string
 	var attributesJSON sql.NullString
+	var signature []byte
+	var signerDID sql.NullString
 
 	err := rows.Scan(
 		&as.ID,
@@ -107,6 +109,8 @@ func ScanAttestation(rows *sql.Rows) (*types.As, error) {
 		&as.Source,
 		&attributesJSON,
 		&as.CreatedAt,
+		&signature,
+		&signerDID,
 	)
 	if err != nil {
 		return nil, err
@@ -149,6 +153,11 @@ func ScanAttestation(rows *sql.Rows) (*types.As, error) {
 			err = errors.WithDetail(err, fmt.Sprintf("JSON length: %d bytes", len(attributesJSON.String)))
 			return nil, err
 		}
+	}
+
+	as.Signature = signature
+	if signerDID.Valid {
+		as.SignerDID = signerDID.String
 	}
 
 	return &as, nil

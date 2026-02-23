@@ -22,11 +22,14 @@ type AttestationStore interface {
 	// CreateAttestation inserts a new attestation into storage
 	CreateAttestation(as *types.As) error
 
+	// CreateAttestationInbound inserts a synced attestation without signing (preserves provenance)
+	CreateAttestationInbound(as *types.As) error
+
 	// AttestationExists checks if an attestation with the given ID exists
 	AttestationExists(asid string) bool
 
 	// GenerateAndCreateAttestation generates a vanity ASID and creates a self-certifying attestation
-	GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As, error)
+	GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error)
 
 	// GetAttestations retrieves attestations based on filters
 	GetAttestations(filters AttestationFilter) ([]*types.As, error)

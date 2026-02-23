@@ -34,6 +34,8 @@ type Attestation struct {
 	Source        string                 `protobuf:"bytes,7,opt,name=source,proto3" json:"source,omitempty"`
 	Attributes    *structpb.Struct       `protobuf:"bytes,8,opt,name=attributes,proto3" json:"attributes,omitempty"`
 	CreatedAt     int64                  `protobuf:"varint,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"` // Unix timestamp in milliseconds
+	Signature     []byte                 `protobuf:"bytes,10,opt,name=signature,proto3" json:"signature,omitempty"`                  // Ed25519 signature over canonical JSON (optional)
+	SignerDid     string                 `protobuf:"bytes,11,opt,name=signer_did,json=signerDid,proto3" json:"signer_did,omitempty"` // did:key of the signing node (optional)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -129,6 +131,20 @@ func (x *Attestation) GetCreatedAt() int64 {
 		return x.CreatedAt
 	}
 	return 0
+}
+
+func (x *Attestation) GetSignature() []byte {
+	if x != nil {
+		return x.Signature
+	}
+	return nil
+}
+
+func (x *Attestation) GetSignerDid() string {
+	if x != nil {
+		return x.SignerDid
+	}
+	return ""
 }
 
 // AttestationCommand is used for creating attestations
@@ -737,7 +753,7 @@ var File_plugin_grpc_protocol_atsstore_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_atsstore_proto_rawDesc = "" +
 	"\n" +
-	"#plugin/grpc/protocol/atsstore.proto\x12\bprotocol\x1a\x1cgoogle/protobuf/struct.proto\"\x9b\x02\n" +
+	"#plugin/grpc/protocol/atsstore.proto\x12\bprotocol\x1a\x1cgoogle/protobuf/struct.proto\"\xd8\x02\n" +
 	"\vAttestation\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
 	"\bsubjects\x18\x02 \x03(\tR\bsubjects\x12\x1e\n" +
@@ -752,7 +768,11 @@ const file_plugin_grpc_protocol_atsstore_proto_rawDesc = "" +
 	"attributes\x18\b \x01(\v2\x17.google.protobuf.StructR\n" +
 	"attributes\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\t \x01(\x03R\tcreatedAt\"\xee\x01\n" +
+	"created_at\x18\t \x01(\x03R\tcreatedAt\x12\x1c\n" +
+	"\tsignature\x18\n" +
+	" \x01(\fR\tsignature\x12\x1d\n" +
+	"\n" +
+	"signer_did\x18\v \x01(\tR\tsignerDid\"\xee\x01\n" +
 	"\x12AttestationCommand\x12\x1a\n" +
 	"\bsubjects\x18\x01 \x03(\tR\bsubjects\x12\x1e\n" +
 	"\n" +

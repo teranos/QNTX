@@ -170,6 +170,18 @@ HTTPHeader represents an HTTP header with support for multiple values. HTTP head
 | pattern | string | For string types: validation pattern (regex, optional) |
 | element_type | string | For array types: element type (optional) |
 
+### ScheduleInfo
+
+ScheduleInfo describes a schedule that a plugin wants QNTX to create
+
+| Field | Type | Description |
+|-------|------|-------------|
+| handler_name | string | - |
+| interval_seconds | int32 | - |
+| enabled_by_default | bool | - |
+| description | string | - |
+| ats_code | string | - |
+
 ### InitializeResponse
 
 InitializeResponse is returned by Initialize RPC
@@ -177,6 +189,7 @@ InitializeResponse is returned by Initialize RPC
 | Field | Type | Description |
 |-------|------|-------------|
 | handler_names | string | Handler names this plugin can execute Examples: ["python.script", "python.webhook", "ixgest.git"] Empty list means plugin provides no async handlers (backward compatible) |
+| schedules | ScheduleInfo | Schedules this plugin wants QNTX to create QNTX will auto-create schedule.Job entries for these |
 
 ### ExecuteJobRequest
 

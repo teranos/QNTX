@@ -36,6 +36,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // Signature fields: optional in JSON (backward compat with unsigned attestations)
+    config.field_attribute("protocol.Attestation.signature", "#[serde(default)]");
+    config.field_attribute("protocol.Attestation.signer_did", "#[serde(default)]");
+
     config.compile_protos(&protos, &[&proto_dir])?;
     Ok(())
 }
