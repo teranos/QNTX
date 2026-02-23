@@ -403,7 +403,7 @@
                 if [ ! -e ./result/bin/typegen ]; then
                   echo "Typegen binary not found, building..."
                   REBUILD_NEEDED=1
-                elif [ cmd/typegen/main.go -nt ./result/bin/typegen ] || [ typegen -nt ./result/bin/typegen ]; then
+                elif [ typegen/cmd/typegen/main.go -nt ./result/bin/typegen ] || [ typegen -nt ./result/bin/typegen ]; then
                   echo "Typegen source changed, rebuilding..."
                   REBUILD_NEEDED=1
                 fi
@@ -451,7 +451,7 @@
                 # More proper solution: Wrap the typegen binary with makeWrapper to
                 # include Go in its runtime closure. This would make the binary truly
                 # self-contained but requires changes to the typegen package definition.
-                ${pkgs.nix}/bin/nix develop .#default --command bash -c "go run ./cmd/typegen check"
+                ${pkgs.nix}/bin/nix develop .#default --command bash -c "cd typegen && go run ./cmd/typegen check"
               '');
             };
 
@@ -459,6 +459,9 @@
             generate-proto-go = protoApps.generate-proto-go;
             generate-proto-typescript = protoApps.generate-proto-typescript;
           };
+
+        # Expose rootVendorHash for plugin flakes to reference
+        inherit rootVendorHash;
       }
     );
 }

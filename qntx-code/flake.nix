@@ -4,9 +4,10 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    qntx.url = "path:..";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, qntx }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -14,13 +15,25 @@
         };
 
         # Build qntx-code plugin binary
+        #
+        # TODO: Move to published QNTX model (see main flake.nix rootVendorHash comment)
+        # Current: Builds from repo root (src = ../.), tightly coupled to monorepo
+        # Target: Depend on published QNTX version (require github.com/teranos/QNTX v0.X.Y)
+        #         then build standalone (src = ./.) with independent hash
+        #
+        # This follows typegen pattern: typegen depends on published v0.23.0 and builds standalone.
         qntx-code = pkgs.buildGoModule {
           pname = "qntx-code-plugin";
           version = self.rev or "dev";
-          src = ./..; # Root of QNTX repo
+          src = ./..; # Root of QNTX repo (needs parent code for imports)
 
-          # Same vendorHash as main QNTX
-          vendorHash = "sha256-Zx/7+k5z7qnkhnL9cC8v+WAPZnuKPx4HlDtQOZgMr30=";
+          # Inherit vendorHash from parent flake (builds from same root go.mod)
+          vendorHash = qntx.rootVendorHash;
+
+          # Disable workspace for Nix vendoring
+          preBuild = ''
+            export GOWORK=off
+          '';
 
           buildInputs = with pkgs; [
             openssl
