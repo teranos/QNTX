@@ -12,7 +12,7 @@ This document shows Go type definitions from the codebase.
 
 ## As {#as}
 
-**Source**: [`ats/types/attestation.go:13`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L13)
+**Source**: [`ats/types/attestation.go:15`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L15)
 
 
 ```go
@@ -33,7 +33,7 @@ type As struct {
 
 ## AsCommand {#ascommand}
 
-**Source**: [`ats/types/attestation.go:28`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L28)
+**Source**: [`ats/types/attestation.go:32`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L32)
 
 
 ```go
@@ -49,7 +49,7 @@ type AsCommand struct {
 
 ## AxDebug {#axdebug}
 
-**Source**: [`ats/types/attestation.go:110`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L110)
+**Source**: [`ats/types/attestation.go:114`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L114)
 
 
 ```go
@@ -66,7 +66,7 @@ type AxDebug struct {
 
 ## AxFilter {#axfilter}
 
-**Source**: [`ats/types/attestation.go:87`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L87)
+**Source**: [`ats/types/attestation.go:91`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L91)
 
 
 ```go
@@ -86,7 +86,7 @@ type AxFilter struct {
 
 ## AxResult {#axresult}
 
-**Source**: [`ats/types/attestation.go:101`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L101)
+**Source**: [`ats/types/attestation.go:105`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L105)
 
 
 ```go
@@ -101,7 +101,7 @@ type AxResult struct {
 
 ## AxSummary {#axsummary}
 
-**Source**: [`ats/types/attestation.go:121`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L121)
+**Source**: [`ats/types/attestation.go:125`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L125)
 
 
 ```go
@@ -132,7 +132,7 @@ type CompletionItem struct {
 
 ## Conflict {#conflict}
 
-**Source**: [`ats/types/attestation.go:130`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L130)
+**Source**: [`ats/types/attestation.go:134`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L134)
 
 
 ```go
@@ -147,7 +147,7 @@ type Conflict struct {
 
 ## OverFilter {#overfilter}
 
-**Source**: [`ats/types/attestation.go:80`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L80)
+**Source**: [`ats/types/attestation.go:84`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L84)
 
 
 ```go
