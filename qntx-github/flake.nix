@@ -26,8 +26,8 @@
           version = self.rev or "dev";
           src = ../.; # Root of QNTX repo (needs parent code for imports)
 
-          # Must match rootVendorHash in main flake.nix (builds from same root go.mod)
-          vendorHash = "sha256-7r1EjXKs6GCG1wxQdLdFgZ9FPF8E5ZuE0gVXc2lkk3o=";
+          # Import shared vendorHash (builds from same root go.mod)
+          vendorHash = import ../nix/vendor-hash.nix;
 
           # Disable workspace for Nix vendoring
           preBuild = ''
