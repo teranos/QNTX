@@ -374,10 +374,10 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 			}
 
 			// TODO: Synced attestations bypass server-side observers (auto-embedding,
-			// cluster prediction, watcher evaluation). This store.CreateAttestation
+			// cluster prediction, watcher evaluation). This store.CreateAttestationInbound
 			// writes directly to SQLite. Should route through the server's observer-aware
 			// path or fire observers post-insert, same issue as cmd/qntx/commands/as.go.
-			if err := p.store.CreateAttestation(as); err != nil {
+			if err := p.store.CreateAttestationInbound(as); err != nil {
 				p.logger.Warnw("Failed to persist synced attestation",
 					"id", as.ID,
 					"subjects", as.Subjects,
