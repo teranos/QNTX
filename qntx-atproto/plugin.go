@@ -45,7 +45,7 @@ func NewPlugin() *Plugin {
 func (p *Plugin) Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name:        "atproto",
-		Version:     "0.2.10",
+		Version:     "0.2.11",
 		QNTXVersion: ">= 0.1.0",
 		Description: "AT Protocol integration (Bluesky) with auto-scheduled timeline sync",
 		Author:      "QNTX Team",
@@ -82,7 +82,8 @@ func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry
 			p.did = did
 			p.mu.Unlock()
 
-			logger.Infow(fmt.Sprintf("Authenticated with PDS (did=%s)", did),
+			logger.Infow("Authenticated with PDS",
+				"did", did,
 				"pds_host", pdsHost,
 			)
 			p.attestSessionStatus("authenticated", pdsHost, did, "")

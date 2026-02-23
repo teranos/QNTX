@@ -9,7 +9,11 @@ import (
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		// Can't change status code after WriteHeader, log the error
+		// Client receives partial JSON with 200/whatever status was set
+		http.Error(w, "JSON encoding failed", http.StatusInternalServerError)
+	}
 }
 
 // readJSON reads and decodes a JSON request body.
@@ -25,5 +29,8 @@ func readJSON(w http.ResponseWriter, r *http.Request, v interface{}) error {
 func writeError(w http.ResponseWriter, status int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
+		// Can't change status code after WriteHeader
+		http.Error(w, "JSON encoding failed", http.StatusInternalServerError)
+	}
 }
