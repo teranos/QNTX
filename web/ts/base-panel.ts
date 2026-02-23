@@ -1,4 +1,7 @@
 /**
+ * @deprecated Use glyph panel manifestation instead.
+ * See https://github.com/teranos/QNTX/pull/598 for the migration pattern.
+ *
  * BasePanel - Abstract base class for slide-in panels
  *
  * Handles common lifecycle, visibility, and event patterns:
