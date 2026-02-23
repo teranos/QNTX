@@ -43,9 +43,9 @@ func NewPlugin() *Plugin {
 func (p *Plugin) Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name:        "atproto",
-		Version:     "0.1.0",
+		Version:     "0.2.6",
 		QNTXVersion: ">= 0.1.0",
-		Description: "AT Protocol integration (Bluesky)",
+		Description: "AT Protocol integration (Bluesky) with timeline sync",
 		Author:      "QNTX Team",
 		License:     "MIT",
 	}
@@ -89,6 +89,14 @@ func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry
 		logger.Infow("No credentials configured, running unauthenticated",
 			"pds_host", pdsHost,
 		)
+	}
+
+	// Attest type definitions for searchable fields
+	store := services.ATSStore()
+	if store != nil {
+		if err := EnsureTypes(store, "atproto", TimelinePost); err != nil {
+			logger.Warnw("Failed to attest type definitions", "error", err)
+		}
 	}
 
 	logger.Info("AT Protocol domain plugin initialized")
@@ -189,6 +197,12 @@ func (p *Plugin) ConfigSchema() map[string]plugin.ConfigField {
 			Type:        "string",
 			Description: "App password for authentication. Generate at Settings > App Passwords.",
 			Required:    true,
+		},
+		"timeline_sync_limit": {
+			Type:         "int",
+			Description:  "Number of posts to fetch per timeline sync (1-100). Used when POST /sync-timeline is called.",
+			DefaultValue: "50",
+			Required:     false,
 		},
 	}
 }

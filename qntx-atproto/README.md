@@ -66,11 +66,47 @@ Mounted at `/api/atproto/*`:
 All write operations and handle resolutions create attestations:
 
 ```
-did:plc:xyz  posted      atproto  {uri, cid, text}
-did:plc:xyz  following   atproto  {subject, uri}
-did:plc:xyz  liked       atproto  {subject_uri, uri}
-handle       resolved-to atproto  {did}
+did:plc:xyz  posted              atproto  {uri, cid, text}
+did:plc:xyz  following           atproto  {subject, uri}
+did:plc:xyz  liked               atproto  {subject_uri, uri}
+handle       resolved-to         atproto  {did}
+post-uri     appeared-in-timeline atproto  {author_did, author_handle, text, cid}
 ```
+
+### Timeline Sync
+
+Timeline sync creates attestations for posts appearing in your home feed. This enables:
+- Local indexing of your Bluesky timeline
+- Semantic search over posts you've seen
+- Content pattern analysis and clustering
+- Automatic knowledge graph from your feed
+
+**Manual trigger:**
+```bash
+curl -X POST http://localhost:8775/api/atproto/sync-timeline
+```
+
+**Scheduled via Pulse (recommended):**
+
+Create a recurring job that syncs your timeline every 2 hours:
+
+```bash
+curl -X POST http://localhost:8775/api/pulse/schedules \
+  -H "Content-Type: application/json" \
+  -d '{
+    "handler_name": "http",
+    "interval_seconds": 7200,
+    "ats_code": "http POST http://localhost:8775/api/atproto/sync-timeline"
+  }'
+```
+
+Configure sync limit in `am.toml`:
+```toml
+[atproto]
+timeline_sync_limit = 50  # Posts per sync (default: 50, max: 100)
+```
+
+Bounded storage naturally manages timeline attestations — old posts age out as new ones arrive.
 
 ## Running as gRPC process
 

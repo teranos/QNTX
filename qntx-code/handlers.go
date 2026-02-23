@@ -1,6 +1,7 @@
 package qntxcode
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -495,7 +496,7 @@ func (p *Plugin) attestFileAccess(filePath, operation string) {
 		Predicates: []string{operation},
 		Contexts:   []string{"code-domain"},
 	}
-	if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.services.Logger("code")
 		logger.Debugw("Failed to create file access attestation", "path", filePath, "op", operation, "error", err)
 	}
@@ -517,7 +518,7 @@ func (p *Plugin) attestPRAction(prNumber int, action string, count int) {
 			"count": count,
 		},
 	}
-	if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.services.Logger("code")
 		logger.Debugw("Failed to create PR attestation", "pr", prNumber, "action", action, "error", err)
 	}
@@ -538,7 +539,7 @@ func (p *Plugin) attestPRListFetch(count int) {
 			"count": count,
 		},
 	}
-	if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.services.Logger("code")
 		logger.Debugw("Failed to create PR list attestation", "error", err)
 	}
@@ -560,7 +561,7 @@ func (p *Plugin) attestIxgestCompleted(repoPath string, commits, attestations in
 			"attestations": attestations,
 		},
 	}
-	if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.services.Logger("code")
 		logger.Debugw("Failed to create ixgest completion attestation", "error", err)
 	}

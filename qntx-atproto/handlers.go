@@ -36,6 +36,9 @@ func (p *Plugin) registerHTTPHandlers(mux *http.ServeMux) error {
 	// Notifications
 	mux.HandleFunc("GET /notifications", p.handleNotifications)
 
+	// Timeline sync (for Pulse scheduling or manual triggering)
+	mux.HandleFunc("POST /sync-timeline", p.handleSyncTimeline)
+
 	return nil
 }
 
@@ -405,3 +408,23 @@ func (p *Plugin) handleLike(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+
+// handleSyncTimeline triggers a timeline sync (for Pulse scheduling or manual invocation).
+func (p *Plugin) handleSyncTimeline(w http.ResponseWriter, r *http.Request) {
+	if p.checkPaused(w) {
+		return
+	}
+	if !p.requireAuth(w) {
+		return
+	}
+
+	if err := p.syncTimeline(r.Context(), "manual"); err != nil {
+		p.services.Logger("atproto").Errorw("Timeline sync failed", "error", err)
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Timeline sync failed: %v", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status": "Timeline sync completed successfully",
+	})
+}

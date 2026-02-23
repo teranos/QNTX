@@ -1,6 +1,8 @@
 package qntxatproto
 
 import (
+	"context"
+
 	"github.com/teranos/QNTX/ats/types"
 )
 
@@ -26,7 +28,7 @@ func (p *Plugin) attestSessionStatus(status, pdsHost, identity, errMsg string) {
 		Contexts:   []string{atprotoContext},
 		Attributes: attrs,
 	}
-	if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.services.Logger("atproto")
 		logger.Debugw("Failed to create session attestation", "status", status, "error", err)
 	}
@@ -51,7 +53,7 @@ func (p *Plugin) attestPost(did, uri, cid, text string) {
 		Contexts:   []string{atprotoContext},
 		Attributes: attrs,
 	}
-	if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.services.Logger("atproto")
 		logger.Debugw("Failed to create post attestation", "uri", uri, "error", err)
 	}
@@ -73,7 +75,7 @@ func (p *Plugin) attestFollow(actorDID, subjectDID, uri string) {
 			"uri":     uri,
 		},
 	}
-	if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.services.Logger("atproto")
 		logger.Debugw("Failed to create follow attestation", "subject", subjectDID, "error", err)
 	}
@@ -95,7 +97,7 @@ func (p *Plugin) attestLike(actorDID, subjectURI, uri string) {
 			"uri":         uri,
 		},
 	}
-	if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.services.Logger("atproto")
 		logger.Debugw("Failed to create like attestation", "subject_uri", subjectURI, "error", err)
 	}
@@ -116,8 +118,37 @@ func (p *Plugin) attestResolve(handle, did string) {
 			"did": did,
 		},
 	}
-	if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.services.Logger("atproto")
 		logger.Debugw("Failed to create resolve attestation", "handle", handle, "error", err)
 	}
+}
+
+// attestTimelinePost records a post appearing in the authenticated user's timeline.
+func (p *Plugin) attestTimelinePost(ctx context.Context, uri, authorDID, authorHandle, text, cid string) error {
+	store := p.services.ATSStore()
+	if store == nil {
+		return nil // Store not available
+	}
+
+	attrs := map[string]interface{}{
+		"uri":           uri,
+		"author_did":    authorDID,
+		"author_handle": authorHandle,
+		"cid":           cid,
+	}
+	if text != "" {
+		attrs["text"] = text
+	}
+
+	cmd := &types.AsCommand{
+		Subjects:   []string{uri},
+		Predicates: []string{"appeared-in-timeline"},
+		Contexts:   []string{atprotoContext},
+		Attributes: attrs,
+	}
+	if _, err := store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
+		return err
+	}
+	return nil
 }
