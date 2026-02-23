@@ -14,9 +14,18 @@ import (
 )
 
 // Signer holds the node's signing identity.
+// PrivateKey is unexported to prevent accidental logging/exposure.
 type Signer struct {
-	PrivateKey ed25519.PrivateKey
+	privateKey ed25519.PrivateKey
 	DID        string
+}
+
+// NewSigner creates a new Signer with the given private key and DID.
+func NewSigner(privateKey ed25519.PrivateKey, did string) *Signer {
+	return &Signer{
+		privateKey: privateKey,
+		DID:        did,
+	}
 }
 
 // Sign populates Signature and SignerDID on the attestation.
@@ -31,7 +40,7 @@ func (s *Signer) Sign(as *types.As) error {
 		return errors.Wrapf(err, "failed to produce canonical JSON for %s", as.ID)
 	}
 
-	as.Signature = ed25519.Sign(s.PrivateKey, canonical)
+	as.Signature = ed25519.Sign(s.privateKey, canonical)
 	as.SignerDID = s.DID
 	return nil
 }
