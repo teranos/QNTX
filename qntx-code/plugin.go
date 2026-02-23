@@ -244,7 +244,7 @@ func (p *Plugin) attestGoplsStatus(status, workspace, errMsg string) {
 		Contexts:   []string{"code-domain"},
 		Attributes: attrs,
 	}
-	if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.services.Logger("code")
 		logger.Debugw("Failed to create gopls status attestation", "status", status, "error", err)
 	}

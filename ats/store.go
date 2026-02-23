@@ -29,7 +29,7 @@ type AttestationStore interface {
 	AttestationExists(asid string) bool
 
 	// GenerateAndCreateAttestation generates a vanity ASID and creates a self-certifying attestation
-	GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As, error)
+	GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error)
 
 	// GetAttestations retrieves attestations based on filters
 	GetAttestations(filters AttestationFilter) ([]*types.As, error)
