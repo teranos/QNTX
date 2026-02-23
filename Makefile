@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -204,11 +204,10 @@ proto-rust: ## Rust proto types are now generated automatically at build time
 	@echo "   See: crates/qntx-proto/build.rs"
 
 code-plugin: ## Build and install code plugin to ~/.qntx/plugins/
-	@echo "Building code plugin..."
-	@mkdir -p $(PREFIX)/plugins
-	@go build -o $(PREFIX)/plugins/qntx-code-plugin ./qntx-code/cmd/qntx-code-plugin
-	@chmod +x $(PREFIX)/plugins/qntx-code-plugin
-	@echo "✓ qntx-code-plugin → $(PREFIX)/plugins/qntx-code-plugin"
+	@$(MAKE) -C qntx-code install PREFIX=$(PREFIX)
+
+atproto-plugin: ## Build and install AT Protocol plugin to ~/.qntx/plugins/
+	@$(MAKE) -C qntx-atproto install PREFIX=$(PREFIX)
 
 rust-vidstream: ## Build Rust vidstream library with ONNX support (for CGO integration)
 	@echo "Building Rust vidstream library with ONNX..."

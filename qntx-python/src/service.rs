@@ -322,7 +322,10 @@ impl DomainPluginService for PythonPluginService {
 
         info!("Announcing async handlers: {:?}", handler_names);
 
-        Ok(Response::new(InitializeResponse { handler_names }))
+        Ok(Response::new(InitializeResponse {
+            handler_names,
+            schedules: vec![], // Python plugin doesn't announce schedules yet
+        }))
     }
 
     /// Shutdown the plugin
