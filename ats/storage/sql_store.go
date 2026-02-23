@@ -3,6 +3,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -296,7 +297,7 @@ func (s *SQLStore) AttestationExists(asid string) bool {
 
 // GenerateAndCreateAttestation generates a vanity ASID and creates a self-certifying attestation
 // The attestation uses its own ASID as its actor to avoid bounded storage limits
-func (s *SQLStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As, error) {
+func (s *SQLStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
 	// Generate vanity ASID with collision detection
 	checkExists := func(asid string) bool {
 		return s.AttestationExists(asid)

@@ -585,7 +585,12 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 					"glyph_id", req.GlyphID, "asid", asid, "error", storeErr)
 			} else {
 				attestationID = asid
-				createdAttestation = protocol.AttestationFromTypes(as)
+				var convErr error
+				createdAttestation, convErr = protocol.AttestationFromTypes(as)
+				if convErr != nil {
+					s.logger.Warnw("Failed to convert attestation to protocol format",
+						"asid", asid, "error", convErr)
+				}
 				s.logger.Infow("Created prompt-result attestation",
 					"asid", asid, "subject", subject, "glyph_id", req.GlyphID)
 			}

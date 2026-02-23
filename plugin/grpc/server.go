@@ -198,10 +198,29 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		return nil, s.initErr
 	}
 
-	// Phase 1: Return empty handler list (no plugins announce handlers yet)
-	// Phase 2+: Plugins will implement optional interface to announce handlers
+	// Check if plugin announces schedules and handlers
+	var handlerNames []string
+	var schedules []*protocol.ScheduleInfo
+
+	// Use type assertion to check for optional interfaces
+	type scheduleAnnouncer interface {
+		GetSchedules() []*protocol.ScheduleInfo
+	}
+	type handlerAnnouncer interface {
+		GetHandlerNames() []string
+	}
+
+	if sa, ok := s.plugin.(scheduleAnnouncer); ok {
+		schedules = sa.GetSchedules()
+	}
+
+	if ha, ok := s.plugin.(handlerAnnouncer); ok {
+		handlerNames = ha.GetHandlerNames()
+	}
+
 	return &protocol.InitializeResponse{
-		HandlerNames: []string{},
+		HandlerNames: handlerNames,
+		Schedules:    schedules,
 	}, nil
 }
 
@@ -387,10 +406,32 @@ func (s *PluginServer) ConfigSchema(ctx context.Context, _ *protocol.Empty) (*pr
 	}, nil
 }
 
-// ExecuteJob executes an async job (Phase 1: stub implementation).
-// Phase 2+: Plugins will implement optional interface to handle async jobs.
+// ExecuteJob executes an async job routed from Pulse.
 func (s *PluginServer) ExecuteJob(ctx context.Context, req *protocol.ExecuteJobRequest) (*protocol.ExecuteJobResponse, error) {
-	// Phase 1: Return unimplemented
-	// This allows the protocol to be updated without breaking existing functionality
-	return nil, errors.New("ExecuteJob not yet implemented - Phase 1 protocol update only")
+	// Check if plugin implements job execution
+	type jobExecutor interface {
+		ExecuteJob(ctx context.Context, handlerName string, jobID string, payload []byte) (result []byte, err error)
+	}
+
+	executor, ok := s.plugin.(jobExecutor)
+	if !ok {
+		return &protocol.ExecuteJobResponse{
+			Success: false,
+			Error:   fmt.Sprintf("plugin %s does not implement job execution", s.plugin.Metadata().Name),
+		}, nil
+	}
+
+	// Execute the job
+	result, err := executor.ExecuteJob(ctx, req.HandlerName, req.JobId, req.Payload)
+	if err != nil {
+		return &protocol.ExecuteJobResponse{
+			Success: false,
+			Error:   err.Error(),
+		}, nil
+	}
+
+	return &protocol.ExecuteJobResponse{
+		Success: true,
+		Result:  result,
+	}, nil
 }

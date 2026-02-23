@@ -293,7 +293,15 @@ func (p *Peer) sendRequestedAttestations(ctx context.Context, requestedHexKeys [
 				)
 				break
 			}
-			wires = append(wires, toWire(as))
+			wire, err := toWire(as)
+			if err != nil {
+				p.logger.Warnw("Failed to convert attestation to wire format",
+					"id", as.ID,
+					"error", err,
+				)
+				continue
+			}
+			wires = append(wires, wire)
 			total++
 		}
 		atts[hexKey] = wires
@@ -490,7 +498,7 @@ func (p *Peer) recvDone() error {
 	return nil
 }
 
-func toWire(as *types.As) *protocol.Attestation {
+func toWire(as *types.As) (*protocol.Attestation, error) {
 	return protocol.AttestationFromTypes(as)
 }
 

@@ -26,7 +26,7 @@ func NewExecutionHelper(dryRun bool) *ExecutionHelper {
 // ExecuteAttestations processes a list of attestation strings
 // Each attestation is self-certifying: the generated ASID is used as its own actor
 // This avoids bounded storage limits (configurable, default 64 actors per entity)
-func (h *ExecutionHelper) ExecuteAttestations(store ats.AttestationStore, attestations []string, showDetails bool) error {
+func (h *ExecutionHelper) ExecuteAttestations(ctx context.Context, store ats.AttestationStore, attestations []string, showDetails bool) error {
 	for _, attestationText := range attestations {
 		if h.dryRun && showDetails {
 			pterm.Printf("  %s %s\n",
@@ -47,7 +47,7 @@ func (h *ExecutionHelper) ExecuteAttestations(store ats.AttestationStore, attest
 
 		// Generate ASID without actor seed (self-certifying)
 		// The generated ASID will be used as its own actor
-		_, err = store.GenerateAndCreateAttestation(asCommand)
+		_, err = store.GenerateAndCreateAttestation(ctx, asCommand)
 		if err != nil {
 			return fmt.Errorf("failed to create attestation '%s': %w", attestationText, err)
 		}

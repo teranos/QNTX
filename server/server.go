@@ -329,3 +329,8 @@ func (s *QNTXServer) GetServices() plugin.ServiceRegistry {
 func (s *QNTXServer) GetDaemon() *async.WorkerPool {
 	return s.daemon
 }
+
+// GetDB returns the database connection for schedule setup
+func (s *QNTXServer) GetDB() *sql.DB {
+	return s.db
+}

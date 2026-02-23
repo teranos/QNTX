@@ -29,6 +29,7 @@ package sqlitecgo
 import "C"
 
 import (
+	"context"
 	"encoding/json"
 	"runtime"
 	"unsafe"
@@ -235,7 +236,7 @@ func (rs *RustStore) CountAttestations() (int, error) {
 }
 
 // GenerateAndCreateAttestation generates a vanity ASID and creates a self-certifying attestation (implements ats.AttestationStore).
-func (rs *RustStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As, error) {
+func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
 	if rs.store == nil {
 		return nil, errors.New("store is closed")
 	}
