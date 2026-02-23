@@ -65,6 +65,11 @@
           cp ${qntx-wasm}/lib/qntx_core.wasm ats/wasm/qntx_core.wasm
         '';
 
+        # Shared vendorHash for all Go builds from repo root with GOWORK=off
+        # When root go.mod dependencies change, update this hash once for all builds
+        # To update: set to `pkgs.lib.fakeHash`, run `nix build .#qntx`, copy hash from error
+        rootVendorHash = "sha256-7r1EjXKs6GCG1wxQdLdFgZ9FPF8E5ZuE0gVXc2lkk3o=";
+
         # Pre-commit hooks configuration
         pre-commit-check = pre-commit-hooks.lib.${system}.run {
           src = ./.;
@@ -143,9 +148,8 @@
           version = self.rev or "dev";
           src = ./.;
 
-          # Hash of vendored Go dependencies (computed from go.sum)
-          # To update: set to `pkgs.lib.fakeHash`, run `nix build .#qntx`, copy the hash from error
-          vendorHash = "sha256-7r1EjXKs6GCG1wxQdLdFgZ9FPF8E5ZuE0gVXc2lkk3o=";
+          # Hash of vendored Go dependencies (uses shared rootVendorHash)
+          vendorHash = rootVendorHash;
 
           # sqlite3.h needed by sqlite-vec CGO bindings (db/connection.go)
           buildInputs = [ pkgs.sqlite ];
