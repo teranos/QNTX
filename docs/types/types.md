@@ -12,7 +12,7 @@ This document shows Go type definitions from the codebase.
 
 ## As {#as}
 
-**Source**: [`ats/types/attestation.go:15`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L15)
+**Source**: [`ats/types/attestation.go:16`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L16)
 
 
 ```go
@@ -33,7 +33,7 @@ type As struct {
 
 ## AsCommand {#ascommand}
 
-**Source**: [`ats/types/attestation.go:32`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L32)
+**Source**: [`ats/types/attestation.go:33`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L33)
 
 
 ```go
@@ -43,13 +43,14 @@ type AsCommand struct {
 	Contexts []string `json:"contexts"`
 	Actors []string `json:"actors"`
 	Timestamp time.Time `json:"timestamp"`
+	Source string `json:"source,omitempty"`
 	Attributes map[string]interface{} `json:"attributes,omitempty"`
 }
 ```
 
 ## AxDebug {#axdebug}
 
-**Source**: [`ats/types/attestation.go:114`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L114)
+**Source**: [`ats/types/attestation.go:128`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L128)
 
 
 ```go
@@ -66,7 +67,7 @@ type AxDebug struct {
 
 ## AxFilter {#axfilter}
 
-**Source**: [`ats/types/attestation.go:91`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L91)
+**Source**: [`ats/types/attestation.go:105`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L105)
 
 
 ```go
@@ -86,7 +87,7 @@ type AxFilter struct {
 
 ## AxResult {#axresult}
 
-**Source**: [`ats/types/attestation.go:105`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L105)
+**Source**: [`ats/types/attestation.go:119`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L119)
 
 
 ```go
@@ -101,7 +102,7 @@ type AxResult struct {
 
 ## AxSummary {#axsummary}
 
-**Source**: [`ats/types/attestation.go:125`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L125)
+**Source**: [`ats/types/attestation.go:139`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L139)
 
 
 ```go
@@ -132,7 +133,7 @@ type CompletionItem struct {
 
 ## Conflict {#conflict}
 
-**Source**: [`ats/types/attestation.go:134`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L134)
+**Source**: [`ats/types/attestation.go:148`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L148)
 
 
 ```go
@@ -147,7 +148,7 @@ type Conflict struct {
 
 ## OverFilter {#overfilter}
 
-**Source**: [`ats/types/attestation.go:84`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L84)
+**Source**: [`ats/types/attestation.go:98`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L98)
 
 
 ```go
