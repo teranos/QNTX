@@ -18,6 +18,7 @@ import { createNoteGlyph } from '../note-glyph';
 import { createTsGlyph, TS_DEFAULT_CODE } from '../ts-glyph';
 import { createSubcanvasGlyph } from '../subcanvas-glyph';
 import { uiState } from '../../../state/ui';
+import { getAllGlyphTypes, type GlyphTypeEntry } from '../glyph-registry';
 
 /** Duration multiplier for spawn menu animation */
 const SPAWN_MENU_ANIMATION_SPEED = 0.5;
@@ -206,6 +207,61 @@ export function showSpawnMenu(
     });
 
     menu.appendChild(subcanvasBtn);
+
+    // Add plugin glyphs grouped by plugin name
+    const pluginGlyphs = getAllGlyphTypes().filter(g =>
+        g.className.includes('canvas-plugin-glyph')
+    );
+
+    if (pluginGlyphs.length > 0) {
+        // Add divider
+        const divider = document.createElement('div');
+        divider.className = 'canvas-spawn-menu-divider';
+        divider.style.height = '1px';
+        divider.style.backgroundColor = 'var(--border-color)';
+        divider.style.margin = '4px 0';
+        menu.appendChild(divider);
+
+        // Group by plugin name (extract from className: plugin-{name})
+        const grouped = new Map<string, GlyphTypeEntry[]>();
+        for (const glyph of pluginGlyphs) {
+            const match = glyph.className.match(/plugin-(\w+)/);
+            const pluginName = match ? match[1] : 'unknown';
+            if (!grouped.has(pluginName)) {
+                grouped.set(pluginName, []);
+            }
+            grouped.get(pluginName)!.push(glyph);
+        }
+
+        // Render grouped plugin glyphs
+        for (const [pluginName, glyphs] of grouped) {
+            // Plugin header
+            const header = document.createElement('div');
+            header.className = 'canvas-spawn-menu-header';
+            header.textContent = pluginName;
+            header.style.padding = '4px 8px';
+            header.style.fontSize = '10px';
+            header.style.textTransform = 'uppercase';
+            header.style.color = 'var(--text-muted)';
+            header.style.fontWeight = '600';
+            menu.appendChild(header);
+
+            // Plugin glyph buttons
+            for (const glyphType of glyphs) {
+                const btn = document.createElement('button');
+                btn.className = 'canvas-spawn-button';
+                btn.textContent = glyphType.symbol;
+                btn.title = `Spawn ${glyphType.title} glyph`;
+
+                btn.addEventListener('click', () => {
+                    void spawnPluginGlyph(x, y, canvas, glyphs, canvasId, glyphType);
+                    removeMenu();
+                });
+
+                menu.appendChild(btn);
+            }
+        }
+    }
 
     document.body.appendChild(menu);
 
@@ -706,4 +762,53 @@ export function getMatchingCommands(query: string): string[] {
     if (!query) return [];
     const q = query.toLowerCase();
     return Object.keys(COMMAND_MAP).filter(cmd => cmd.startsWith(q));
+}
+
+/**
+ * Spawn a plugin glyph at pixel position
+ */
+async function spawnPluginGlyph(
+    x: number,
+    y: number,
+    canvas: HTMLElement,
+    glyphs: Glyph[],
+    canvasId: string,
+    glyphType: GlyphTypeEntry
+): Promise<void> {
+    const pluginGlyph: Glyph = {
+        id: `${glyphType.label}-${crypto.randomUUID()}`,
+        title: glyphType.title,
+        symbol: glyphType.symbol,
+        x,
+        y,
+        renderContent: () => {
+            const content = document.createElement('div');
+            content.textContent = `${glyphType.title} glyph`;
+            return content;
+        }
+    };
+
+    // Add to glyphs array
+    glyphs.push(pluginGlyph);
+
+    // Render plugin glyph
+    const glyphElement = await glyphType.render(pluginGlyph);
+    canvas.appendChild(glyphElement);
+
+    // Get actual rendered size and persist
+    const rect = glyphElement.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+
+    uiState.addCanvasGlyph({
+        id: pluginGlyph.id,
+        symbol: glyphType.symbol,
+        x,
+        y,
+        width,
+        height,
+        canvas_id: storageCanvasId(canvasId),
+    });
+
+    log.debug(SEG.GLYPH, `[Canvas] Spawned ${glyphType.label} plugin glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
