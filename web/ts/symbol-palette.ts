@@ -41,7 +41,7 @@ import { togglePulsePanel } from './pulse-panel.js';
 import { toggleProsePanel } from './prose/panel.js';
 import { toggleGoEditor } from './code/panel.js';
 import { togglePythonEditor } from './python/panel.js';
-import { togglePluginPanel } from './plugin-panel.js';
+import { glyphRun } from './components/glyph/run.ts';
 import { VidStreamWindow } from './vidstream-window.js';
 import { toggleJobList } from './hixtory-panel.js';
 
@@ -390,7 +390,7 @@ function showPythonEditor(): void {
  * Show plugin panel - displays installed domain plugins and their status
  */
 function showPluginPanel(): void {
-    togglePluginPanel();
+    glyphRun.openGlyph('plugin-glyph');
 }
 
 /**

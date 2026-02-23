@@ -4,7 +4,7 @@
 
 A glyph is exactly ONE DOM element for its entire lifetime. FORBIDDEN: cloneNode, createElement for existing glyph, re-rendering via diffing, two elements with same data-glyph-id. ALLOWED: reparenting, transform changes, delaying content mount until morph completes.
 
-All creation via `createGlyphElement` factory in `glyph/run.ts`. Register new types in `glyph/glyph-registry.ts`.
+All creation via `createGlyphElement` factory in `glyph/run.ts`. Register new types in `glyph/glyph-registry.ts`. The symbol palette is being migrated to the GlyphRun tray.
 
 ## WASM
 

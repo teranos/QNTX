@@ -32,7 +32,7 @@ import './command-explorer-panel.ts';
 // to avoid unused import warnings. Menu items use "show" events with dynamic imports,
 // while keyboard shortcuts in individual panels use the toggle functions directly.
 import './prose/panel.ts';
-import './plugin-panel.ts';
+// plugin-panel.ts is now a glyph module registered via default-glyphs.ts
 import { initDebugInterceptor } from './dev-debug-interceptor.ts';
 import { glyphRun } from './components/glyph/run.ts';
 import { registerDefaultGlyphs } from './default-glyphs.ts';
@@ -356,9 +356,7 @@ async function init(): Promise<void> {
         });
 
         listen('show-plugin-panel', () => {
-            import('./plugin-panel.ts').then(({ showPluginPanel }) => {
-                showPluginPanel();
-            });
+            glyphRun.openGlyph('plugin-glyph');
         });
 
         listen('toggle-logs', () => {
