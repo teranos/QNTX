@@ -86,17 +86,20 @@ type RelationshipTypeDef struct {
 //	    "array_fields": []string{"tags", "categories"},
 //	}
 //	err := types.AttestType(store, "document", "ix-content", attrs)
-func AttestType(store AttestationStore, typeName, source string, attributes map[string]interface{}) error {
+func AttestType(store AttestationStore, typeName, source, context string, attributes map[string]interface{}) error {
 	if typeName == "" {
 		return errors.New("typeName cannot be empty")
 	}
 	if source == "" {
 		return errors.New("source cannot be empty")
 	}
+	if context == "" {
+		return errors.New("context cannot be empty")
+	}
 
 	// Generate ASID for the type definition
 	// Empty actor seed creates self-certifying ASID
-	asid, err := id.GenerateASID(typeName, "type", "graph", "")
+	asid, err := id.GenerateASID(typeName, "type", context, "")
 	if err != nil {
 		return errors.Wrapf(err, "failed to generate ASID for type %s", typeName)
 	}
@@ -107,7 +110,7 @@ func AttestType(store AttestationStore, typeName, source string, attributes map[
 		ID:         asid,
 		Subjects:   []string{typeName},
 		Predicates: []string{"type"},
-		Contexts:   []string{"graph"},
+		Contexts:   []string{context},
 		Actors:     []string{typeName}, // Self-certifying: type IS its own actor
 		Timestamp:  time.Now(),
 		Source:     source,
@@ -146,7 +149,7 @@ func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) err
 			def.Opacity = &defaultOpacity
 		}
 
-		if err := AttestType(store, def.Name, source, attrs.From(def)); err != nil {
+		if err := AttestType(store, def.Name, source, "graph", attrs.From(def)); err != nil {
 			errs = append(errs, errors.Wrapf(err, "failed to attest type %s", def.Name))
 		}
 	}

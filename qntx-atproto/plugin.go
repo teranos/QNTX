@@ -45,7 +45,7 @@ func NewPlugin() *Plugin {
 func (p *Plugin) Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name:        "atproto",
-		Version:     "0.2.11",
+		Version:     "0.2.12",
 		QNTXVersion: ">= 0.1.0",
 		Description: "AT Protocol integration (Bluesky) with auto-scheduled timeline sync",
 		Author:      "QNTX Team",
