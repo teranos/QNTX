@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"html"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/teranos/QNTX/errors"
@@ -11,17 +13,29 @@ import (
 	"github.com/teranos/QNTX/sym"
 )
 
-// HandleExportStatic renders the canvas as a self-contained static HTML page.
-// GET /api/canvas/export/static — returns text/html with Content-Disposition attachment.
+// HandleExportStatic renders a subcanvas as a self-contained static HTML page.
+// GET /api/canvas/export/static?canvas_id=<id> — returns text/html with Content-Disposition attachment.
+// Only available in demo mode (QNTX_DEMO=1).
 func (h *CanvasHandler) HandleExportStatic(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("QNTX_DEMO") != "1" {
+		h.writeError(w, errors.New("canvas export only available in demo mode (make demo)"), http.StatusForbidden)
+		return
+	}
+
 	if r.Method != http.MethodGet {
 		h.writeError(w, errors.New("method not allowed"), http.StatusMethodNotAllowed)
 		return
 	}
 
-	glyphs, err := h.store.ListGlyphs(r.Context())
+	canvasID := r.URL.Query().Get("canvas_id")
+	if canvasID == "" {
+		h.writeError(w, errors.New("canvas_id query parameter is required"), http.StatusBadRequest)
+		return
+	}
+
+	glyphs, err := h.store.ListGlyphsByCanvas(r.Context(), canvasID)
 	if err != nil {
-		h.writeError(w, errors.Wrap(err, "failed to list glyphs for export"), http.StatusInternalServerError)
+		h.writeError(w, errors.Wrapf(err, "failed to list glyphs for canvas %s", canvasID), http.StatusInternalServerError)
 		return
 	}
 
@@ -31,7 +45,30 @@ func (h *CanvasHandler) HandleExportStatic(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	htmlContent := renderStaticCanvas(glyphs, compositions)
+	// Filter compositions to only those whose members all belong to this canvas
+	glyphIDs := make(map[string]bool, len(glyphs))
+	for _, g := range glyphs {
+		glyphIDs[g.ID] = true
+	}
+	var canvasComps []*storage.CanvasComposition
+	for _, comp := range compositions {
+		allLocal := true
+		for _, edge := range comp.Edges {
+			if !glyphIDs[edge.From] || !glyphIDs[edge.To] {
+				allLocal = false
+				break
+			}
+		}
+		if allLocal {
+			canvasComps = append(canvasComps, comp)
+		}
+	}
+
+	htmlContent, err := renderStaticCanvas(glyphs, canvasComps)
+	if err != nil {
+		h.writeError(w, errors.Wrap(err, "failed to render static canvas"), http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="canvas.html"`)
@@ -39,7 +76,18 @@ func (h *CanvasHandler) HandleExportStatic(w http.ResponseWriter, r *http.Reques
 }
 
 // renderStaticCanvas produces a self-contained HTML document from canvas state.
-func renderStaticCanvas(glyphs []*storage.CanvasGlyph, compositions []*storage.CanvasComposition) string {
+func renderStaticCanvas(glyphs []*storage.CanvasGlyph, compositions []*storage.CanvasComposition) (string, error) {
+	// Read CSS files from web directory
+	coreCSS, err := os.ReadFile(filepath.Join("web", "css", "core.css"))
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to read core.css")
+	}
+	canvasCSS, err := os.ReadFile(filepath.Join("web", "css", "canvas.css"))
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to read canvas.css")
+	}
+	combinedCSS := string(coreCSS) + "\n" + string(canvasCSS)
+
 	// Build glyph ID → composition membership map
 	glyphToComp := make(map[string]*storage.CanvasComposition)
 	for _, comp := range compositions {
@@ -83,7 +131,7 @@ func renderStaticCanvas(glyphs []*storage.CanvasGlyph, compositions []*storage.C
 </div>
 </div>
 </body>
-</html>`, staticCSS, glyphsHTML.String())
+</html>`, combinedCSS, glyphsHTML.String()), nil
 }
 
 // renderComposition renders a melded composition container with its member glyphs.
@@ -321,187 +369,3 @@ func noteInlineStyle() string {
 
 // staticCSS contains all styles needed to render the canvas snapshot.
 // Inlined to produce a fully self-contained HTML file.
-const staticCSS = `
-/* Reset */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-    font-family: system-ui, -apple-system, sans-serif;
-    margin: 0;
-    padding: 0;
-    background: #1a1b1a;
-    color: #dfe1e0;
-}
-
-/* Canvas workspace */
-.canvas-workspace {
-    width: 100%;
-    min-height: 100vh;
-    position: relative;
-    overflow: auto;
-    background-color: #2d2e36;
-    background-image:
-        repeating-linear-gradient(0deg, transparent, transparent 23px, #2f353c 23px, #2f353c 24px),
-        repeating-linear-gradient(90deg, transparent, transparent 23px, #2f353c 23px, #2f353c 24px);
-}
-
-.canvas-content-layer {
-    position: relative;
-    min-height: 100vh;
-}
-
-/* Glyph base */
-.canvas-glyph {
-    position: absolute;
-    display: flex;
-    flex-direction: column;
-    background-color: #252625;
-    border: 1px solid #3f4140;
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-/* Title bar */
-.canvas-glyph-title-bar {
-    height: 32px;
-    background-color: #2e2f2e;
-    border-bottom: 1px solid #3f4140;
-    display: flex;
-    align-items: center;
-    padding: 0 8px;
-    gap: 8px;
-    flex-shrink: 0;
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.7);
-}
-
-/* Content */
-.glyph-content {
-    flex: 1;
-    padding: 8px;
-    overflow: auto;
-    font-size: 13px;
-}
-
-.glyph-content pre {
-    margin: 0;
-    white-space: pre-wrap;
-    word-break: break-word;
-    overflow-wrap: break-word;
-    font-family: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Fira Code', 'Consolas', monospace;
-    font-size: 13px;
-    line-height: 1.5;
-    color: #d4d4d4;
-}
-
-.glyph-content code {
-    font-family: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Fira Code', 'Consolas', monospace;
-    font-size: 13px;
-}
-
-/* Query glyphs (AX, SE) */
-.glyph-query {
-    display: flex;
-    align-items: center;
-    padding: 6px 8px;
-    font-family: 'JetBrains Mono', 'SF Mono', monospace;
-    font-size: 13px;
-    color: #d4d4d4;
-}
-
-/* Note glyph (post-it) */
-.note-content {
-    padding: 4px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    font-size: 14px;
-    line-height: 1.2;
-    white-space: pre-wrap;
-    word-break: break-word;
-    overflow-wrap: break-word;
-}
-
-/* Attestation glyph */
-.canvas-attestation-glyph {
-    background: #1a1b1a;
-    border: 1px solid #3f4140;
-    border-radius: 3px;
-    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.2);
-    color: rgba(255, 255, 255, 0.85);
-}
-
-.attestation-content {
-    font-family: monospace;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.85);
-}
-
-/* Document glyph */
-.canvas-doc-glyph {
-    border: 1px solid #3f4140;
-    border-radius: 3px;
-    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.2);
-    color: rgba(255, 255, 255, 0.85);
-}
-
-.doc-placeholder {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    color: #999;
-    font-size: 14px;
-}
-
-/* Subcanvas glyph */
-.canvas-subcanvas-glyph .canvas-glyph-title-bar {
-    background: #3a2d5a;
-    color: #c0a0e8;
-}
-
-.subcanvas-preview {
-    flex: 1;
-    overflow: hidden;
-    background-color: #2d2e36;
-    background-image:
-        repeating-linear-gradient(0deg, transparent, transparent 9px, rgba(160, 120, 200, 0.08) 9px, rgba(160, 120, 200, 0.08) 10px),
-        repeating-linear-gradient(90deg, transparent, transparent 9px, rgba(160, 120, 200, 0.08) 9px, rgba(160, 120, 200, 0.08) 10px);
-    min-height: 60px;
-}
-
-/* Python glyph title bar accent */
-.canvas-py-glyph .canvas-glyph-title-bar {
-    background: #2a5578;
-}
-
-/* TypeScript glyph title bar accent */
-.canvas-ts-glyph .canvas-glyph-title-bar {
-    background: #2d4f7c;
-}
-
-/* Prompt glyph title bar accent */
-.canvas-prompt-glyph .canvas-glyph-title-bar {
-    background: #3d2e2e;
-}
-
-/* Melded composition */
-.melded-composition {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: auto;
-    gap: 0;
-    position: absolute;
-    background: transparent;
-}
-
-.melded-composition .canvas-glyph {
-    position: relative;
-}
-
-/* Responsive: scroll on small screens */
-@media (max-width: 768px) {
-    .canvas-workspace {
-        overflow: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-}
-`

@@ -208,6 +208,7 @@ class CanvasSyncQueueImpl {
                 width: glyph.width != null ? Math.round(glyph.width) : undefined,
                 height: glyph.height != null ? Math.round(glyph.height) : undefined,
                 content: glyph.content,
+                canvas_id: glyph.canvas_id ?? '',
             }),
         });
 

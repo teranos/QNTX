@@ -237,6 +237,8 @@ export function buildCanvasWorkspace(
     canvasId: string,
     glyphs: Glyph[]
 ): HTMLElement {
+    log.debug(SEG.GLYPH, `[Canvas] buildCanvasWorkspace called with canvasId: "${canvasId}", ${glyphs.length} glyphs`);
+
     const container = document.createElement('div');
     container.className = 'canvas-workspace';
     container.dataset.canvasId = canvasId;

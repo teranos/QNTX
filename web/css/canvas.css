@@ -145,11 +145,45 @@
     transition: all 0.15s ease;
 }
 
-/* Inside breadcrumb bar: static positioning, right-aligned via auto margin */
+/* Inside breadcrumb bar: static positioning */
 .canvas-breadcrumb-bar .canvas-minimize-btn {
     position: static;
-    margin-left: auto;
     z-index: auto;
+}
+
+/* Breadcrumb action buttons (export, publish) — same appearance as minimize */
+.canvas-breadcrumb-action {
+    position: static;
+    z-index: auto;
+    width: 32px;
+    height: 32px;
+    background: var(--bg-tertiary);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    color: rgba(255, 255, 255, 0.85);
+    opacity: 0.95;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.canvas-breadcrumb-action:first-of-type {
+    margin-left: auto;
+}
+
+.canvas-breadcrumb-action:hover {
+    background: #3a3b3a;
+    border-color: rgba(255, 255, 255, 0.45);
+    color: rgba(255, 255, 255, 1);
+    opacity: 1;
+}
+
+.canvas-breadcrumb-action:active {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(0.95);
 }
 
 .canvas-minimize-btn:hover {
