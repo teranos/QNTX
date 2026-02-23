@@ -17,10 +17,14 @@
         qntx-github = pkgs.buildGoModule {
           pname = "qntx-github-plugin";
           version = self.rev or "dev";
-          src = ../.; # Root of QNTX repo (parent of qntx-github/)
+          src = ../.; # Root of QNTX repo (needs parent code for imports)
 
-          # Same vendorHash as main QNTX
-          vendorHash = "sha256-Zx/7+k5z7qnkhnL9cC8v+WAPZnuKPx4HlDtQOZgMr30=";
+          vendorHash = "sha256-7r1EjXKs6GCG1wxQdLdFgZ9FPF8E5ZuE0gVXc2lkk3o=";
+
+          # Disable workspace for Nix vendoring
+          preBuild = ''
+            export GOWORK=off
+          '';
 
           subPackages = [ "qntx-github/cmd/qntx-github-plugin" ];
         };
