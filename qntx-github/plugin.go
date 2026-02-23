@@ -29,7 +29,7 @@ func NewPlugin() *Plugin {
 func (p *Plugin) Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name:        "github",
-		Version:     "0.1.4",
+		Version:     "0.1.5",
 		QNTXVersion: ">= 0.1.0",
 		Description: "GitHub integration for repository events and automation",
 		Author:      "QNTX Team",
@@ -200,13 +200,14 @@ func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID strin
 	switch handlerName {
 	case "github.poll-events":
 		// Execute GitHub event polling
-		if err := p.HandlePulseJob(ctx, jobID); err != nil {
+		count, err := p.HandlePulseJob(ctx, jobID)
+		if err != nil {
 			return nil, err
 		}
 
-		// Return success result
-		resultData := map[string]string{
-			"status": "GitHub event poll completed",
+		// Return success result with attestation count
+		resultData := map[string]interface{}{
+			"attestations_created": count,
 		}
 		return json.Marshal(resultData)
 
