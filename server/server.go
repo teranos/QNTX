@@ -311,6 +311,15 @@ func GetDefaultServer() *QNTXServer {
 	return defaultServer
 }
 
+// getPluginManager returns the plugin manager, falling back to the global default
+// if the server's field is nil (happens when plugins load asynchronously after server creation).
+func (s *QNTXServer) getPluginManager() *grpcplugin.PluginManager {
+	if s.pluginManager != nil {
+		return s.pluginManager
+	}
+	return grpcplugin.GetDefaultPluginManager()
+}
+
 // GetServices returns the service registry for plugins
 func (s *QNTXServer) GetServices() plugin.ServiceRegistry {
 	return s.services
