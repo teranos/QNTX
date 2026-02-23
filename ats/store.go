@@ -22,6 +22,9 @@ type AttestationStore interface {
 	// CreateAttestation inserts a new attestation into storage
 	CreateAttestation(as *types.As) error
 
+	// CreateAttestationInbound inserts a synced attestation without signing (preserves provenance)
+	CreateAttestationInbound(as *types.As) error
+
 	// AttestationExists checks if an attestation with the given ID exists
 	AttestationExists(asid string) bool
 
