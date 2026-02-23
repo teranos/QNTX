@@ -553,14 +553,10 @@ pub async fn rich_search(query: &str, limit: usize) -> Result<String, JsValue> {
         return empty_response(query);
     }
 
-    // Step 5: score nodes
+    // Step 5: score all nodes, then sort and truncate
     let mut matches: Vec<RichSearchMatch> = Vec::new();
-    let mut processed: HashSet<String> = HashSet::new();
 
     for (node_id, field_words) in &node_word_map {
-        if processed.contains(node_id) {
-            continue;
-        }
         let attributes = match node_attributes.get(node_id) {
             Some(a) => a,
             None => continue,
@@ -674,11 +670,6 @@ pub async fn rich_search(query: &str, limit: usize) -> Result<String, JsValue> {
             attributes: attributes.clone(),
             matched_words,
         });
-        processed.insert(node_id.clone());
-
-        if matches.len() >= limit {
-            break;
-        }
     }
 
     matches.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
