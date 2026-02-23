@@ -11,6 +11,8 @@
 //	go build ./qntx-atproto/cmd/qntx-atproto-plugin
 //
 // Then install to ~/.qntx/plugins/ or add to plugin.paths in am.toml.
+//
+// TODO(#611): Separate into own Go module (currently uses root go.mod)
 package qntxatproto
 
 import (

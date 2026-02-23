@@ -11,6 +11,8 @@
 //	go build ./qntx-code/cmd/qntx-code-plugin
 //
 // Then install to ~/.qntx/plugins/ or add to plugin.paths in am.toml.
+//
+// TODO(#610): Separate into own Go module (currently uses root go.mod)
 package qntxcode
 
 import (
