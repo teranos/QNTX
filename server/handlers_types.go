@@ -230,7 +230,7 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 
 	// Use AttestType function from the types package
 	store := &dbAttestationStore{db: s.db}
-	if err := types.AttestType(store, req.Name, "web-ui", attributes); err != nil {
+	if err := types.AttestType(store, req.Name, "web-ui", "graph", attributes); err != nil {
 		s.logger.Errorw("Failed to create type attestation",
 			"error", err,
 			"type", req.Name,
