@@ -25,7 +25,13 @@
   };
 
   outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix }:
-    flake-utils.lib.eachDefaultSystem (system:
+    {
+      # Shared vendorHash for all Go builds from repo root with GOWORK=off
+      # Defined at flake level (not per-system) so plugin flakes can reference it
+      # When root go.mod dependencies change, update this hash once for all builds
+      # To update: set to `pkgs.lib.fakeHash`, run `nix build .#qntx`, copy hash from error
+      rootVendorHash = "sha256-7r1EjXKs6GCG1wxQdLdFgZ9FPF8E5ZuE0gVXc2lkk3o=";
+    } // (flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
@@ -64,29 +70,6 @@
           export GOWORK=off  # Build without workspace (use go.mod only)
           cp ${qntx-wasm}/lib/qntx_core.wasm ats/wasm/qntx_core.wasm
         '';
-
-        # Shared vendorHash for all Go builds from repo root with GOWORK=off
-        # When root go.mod dependencies change, update this hash once for all builds
-        # To update: set to `pkgs.lib.fakeHash`, run `nix build .#qntx`, copy hash from error
-        #
-        # TODO: Move to published code model (like typegen)
-        # Current approach: Plugins (qntx-github, etc.) build from repo root, tightly coupled
-        # Target approach: Plugins depend on published QNTX version (e.g., v0.23.0), truly standalone
-        #
-        # Benefits of published model:
-        # - True plugin independence (own dependencies, own hash)
-        # - Proper versioning (plugins can target specific QNTX version)
-        # - External plugins possible (no monorepo access needed)
-        # - Changes to QNTX don't break all plugins simultaneously
-        #
-        # Migration path:
-        # 1. Publish QNTX as versioned module
-        # 2. Update plugin go.mod: require github.com/teranos/QNTX v0.X.Y
-        # 3. Change plugin flake src from ../. to ./.
-        # 4. Each plugin gets independent vendorHash
-        #
-        # Until then, rootVendorHash provides single update point for coupled builds.
-        rootVendorHash = "sha256-7r1EjXKs6GCG1wxQdLdFgZ9FPF8E5ZuE0gVXc2lkk3o=";
 
         # Pre-commit hooks configuration
         pre-commit-check = pre-commit-hooks.lib.${system}.run {
@@ -167,7 +150,7 @@
           src = ./.;
 
           # Hash of vendored Go dependencies (uses shared rootVendorHash)
-          vendorHash = rootVendorHash;
+          vendorHash = self.rootVendorHash;
 
           # sqlite3.h needed by sqlite-vec CGO bindings (db/connection.go)
           buildInputs = [ pkgs.sqlite ];
@@ -461,9 +444,6 @@
             generate-proto-go = protoApps.generate-proto-go;
             generate-proto-typescript = protoApps.generate-proto-typescript;
           };
-
-        # Expose rootVendorHash for plugin flakes to reference
-        inherit rootVendorHash;
       }
-    );
+    ));
 }
