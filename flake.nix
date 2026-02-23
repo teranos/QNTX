@@ -451,7 +451,9 @@
                 # More proper solution: Wrap the typegen binary with makeWrapper to
                 # include Go in its runtime closure. This would make the binary truly
                 # self-contained but requires changes to the typegen package definition.
-                ${pkgs.nix}/bin/nix develop .#default --command bash -c "cd typegen && go run ./cmd/typegen check"
+                #
+                # Note: Run from repo root so typegen can access server/routing.go for API docs
+                ${pkgs.nix}/bin/nix develop .#default --command bash -c "go run ./typegen/cmd/typegen check"
               '');
             };
 
