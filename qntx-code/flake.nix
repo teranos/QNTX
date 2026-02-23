@@ -20,7 +20,7 @@
           src = ./..; # Root of QNTX repo
 
           # Same vendorHash as main QNTX
-          vendorHash = "sha256-WjzqBFBy1E404t6cb5y6J4VZ0PFMLUok7d2Om6RMswU=";
+          vendorHash = "sha256-Zx/7+k5z7qnkhnL9cC8v+WAPZnuKPx4HlDtQOZgMr30=";
 
           buildInputs = with pkgs; [
             openssl
