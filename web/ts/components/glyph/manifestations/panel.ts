@@ -24,8 +24,6 @@ import { beginMaximizeMorph, beginMinimizeMorph } from '../morph-transaction';
 import {
     getMaximizeDuration,
     getMinimizeDuration,
-    TITLE_BAR_HEIGHT,
-    TITLE_BAR_PADDING,
     CANVAS_GLYPH_CONTENT_PADDING
 } from '../glyph';
 
