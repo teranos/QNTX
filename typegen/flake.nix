@@ -16,11 +16,18 @@
         typegen = pkgs.buildGoModule {
           pname = "typegen";
           version = self.rev or "dev";
-          src = ./..;
 
-          # Same vendorHash as qntx (shared go.mod)
+          # Typegen is now fully standalone (github.com/teranos/typegen)
+          src = pkgs.lib.cleanSource ./.;
+
+          # Disable workspace mode for Nix build
+          preBuild = ''
+            export GOWORK=off
+          '';
+
+          # Separate go.mod with minimal dependencies (87 lines in go.sum)
           # To update: set to `pkgs.lib.fakeHash`, run `nix build ./typegen`, copy the hash from error
-          vendorHash = "sha256-Zx/7+k5z7qnkhnL9cC8v+WAPZnuKPx4HlDtQOZgMr30=";
+          vendorHash = "sha256-ssxQmTp1uSLvEqr8ixiUqaajgNH8JIE8DObVOgPFIq4=";
 
           subPackages = [ "cmd/typegen" ];
         };

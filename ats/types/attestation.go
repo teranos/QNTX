@@ -1,6 +1,7 @@
 package types
 
 import (
+	"log"
 	"time"
 )
 
@@ -10,6 +11,8 @@ import (
 // This is Go's native representation with struct tags for JSON/DB mapping.
 // Proto definitions (plugin/grpc/protocol/atsstore.proto) are used for gRPC
 // and cross-language boundaries, with manual conversion at boundaries.
+//
+// TODO(#605): Rename to Attestation (and AsCommand → As) for clarity.
 type As struct {
 	ID         string                 `db:"id" json:"id" validate:"required"`                       // ASID: AS + UUID
 	Subjects   []string               `db:"subjects" json:"subjects" validate:"required,min=1"`     // Entities being attested about
@@ -25,17 +28,20 @@ type As struct {
 }
 
 // AsCommand represents the parsed CLI command for creating attestations
+//
+// TODO(#605): Rename to As (and As → Attestation) for clarity.
 type AsCommand struct {
 	Subjects   []string               `json:"subjects"`             // Entities being attested about
 	Predicates []string               `json:"predicates"`           // What is being claimed (optional, defaults to ["_"])
 	Contexts   []string               `json:"contexts"`             // Optional "of" context (defaults to ["_"])
 	Actors     []string               `json:"actors"`               // Who made the attestation (optional, uses default)
 	Timestamp  time.Time              `json:"timestamp"`            // When attestation was made (optional, uses now)
+	Source     string                 `json:"source,omitempty"`     // Source of attestation (e.g., "cli", "github", "atproto")
 	Attributes map[string]interface{} `json:"attributes,omitempty"` // Arbitrary JSON
 }
 
-// ToAs converts an AsCommand to an As struct with generated ASID
-func (cmd *AsCommand) ToAs(asid string) *As {
+// ToAs converts an AsCommand to an As struct with generated ASID and source
+func (cmd *AsCommand) ToAs(asid, source string) *As {
 	// Set defaults for empty arrays
 	predicates := cmd.Predicates
 	if len(predicates) == 0 {
@@ -47,6 +53,18 @@ func (cmd *AsCommand) ToAs(asid string) *As {
 		contexts = []string{"_"}
 	}
 
+	// Determine source: prefer cmd.Source, then parameter, then deprecated fallback
+	effectiveSource := cmd.Source
+	if effectiveSource == "" {
+		effectiveSource = source
+	}
+	if effectiveSource == "" {
+		// DEPRECATED: Source should be explicitly provided by all callers
+		// This fallback exists for backwards compatibility but will be removed
+		log.Printf("DEPRECATION WARNING: ToAs() called without source (neither cmd.Source nor parameter set), falling back to 'cli'. Set AsCommand.Source explicitly.")
+		effectiveSource = "cli"
+	}
+
 	return &As{
 		ID:         asid,
 		Subjects:   cmd.Subjects,
@@ -54,7 +72,7 @@ func (cmd *AsCommand) ToAs(asid string) *As {
 		Contexts:   contexts,
 		Actors:     cmd.Actors,
 		Timestamp:  cmd.Timestamp,
-		Source:     "cli",
+		Source:     effectiveSource,
 		Attributes: cmd.Attributes,
 		CreatedAt:  time.Now(),
 	}

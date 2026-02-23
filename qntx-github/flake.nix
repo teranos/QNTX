@@ -1,5 +1,5 @@
 {
-  description = "QNTX Code Plugin - Code analysis plugin for QNTX";
+  description = "QNTX GitHub Plugin - GitHub integration for repository events";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -13,7 +13,7 @@
           inherit system;
         };
 
-        # Build qntx-code plugin binary
+        # Build qntx-github plugin binary
         #
         # TODO: Move to published QNTX model (see main flake.nix rootVendorHash comment)
         # Current: Builds from repo root (src = ../.), tightly coupled to monorepo
@@ -21,10 +21,10 @@
         #         then build standalone (src = ./.) with independent hash
         #
         # This follows typegen pattern: typegen depends on published v0.23.0 and builds standalone.
-        qntx-code = pkgs.buildGoModule {
-          pname = "qntx-code-plugin";
+        qntx-github = pkgs.buildGoModule {
+          pname = "qntx-github-plugin";
           version = self.rev or "dev";
-          src = ./..; # Root of QNTX repo (needs parent code for imports)
+          src = ../.; # Root of QNTX repo (needs parent code for imports)
 
           # Import shared vendorHash (builds from same root go.mod)
           vendorHash = import ../nix/vendor-hash.nix;
@@ -34,21 +34,17 @@
             export GOWORK=off
           '';
 
-          buildInputs = with pkgs; [
-            openssl
-          ];
-
-          subPackages = [ "qntx-code/cmd/qntx-code-plugin" ];
+          subPackages = [ "qntx-github/cmd/qntx-github-plugin" ];
         };
 
-        # Helper function to build qntx-code plugin image for specific architecture
-        mkCodeImage = arch: pkgs.dockerTools.buildLayeredImage {
-          name = "ghcr.io/teranos/qntx-code-plugin";
+        # Helper function to build qntx-github plugin image for specific architecture
+        mkGitHubImage = arch: pkgs.dockerTools.buildLayeredImage {
+          name = "ghcr.io/teranos/qntx-github-plugin";
           tag = "latest";
           architecture = arch;
 
           contents = [
-            qntx-code
+            qntx-github
             # Minimal runtime dependencies
             pkgs.cacert
             pkgs.dockerTools.fakeNss
@@ -61,13 +57,13 @@
           '';
 
           config = {
-            Entrypoint = [ "${qntx-code}/bin/qntx-code-plugin" ];
-            Cmd = [ "--port" "9000" ];
+            Entrypoint = [ "${qntx-github}/bin/qntx-github-plugin" ];
+            Cmd = [ "--port" "9002" ];
             Env = [
               "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
             ];
             ExposedPorts = {
-              "9000/tcp" = { };
+              "9002/tcp" = { };
             };
             WorkingDir = "/";
           };
@@ -82,22 +78,22 @@
           else if system == "aarch64-linux" then "arm64"
           else "amd64";
 
-        codeImage = mkCodeImage dockerArch;
+        githubImage = mkGitHubImage dockerArch;
       in
       {
         packages = {
-          default = qntx-code;
-          qntx-code-plugin = qntx-code;
+          default = qntx-github;
+          qntx-github-plugin = qntx-github;
 
           # Docker images (Linux-only)
-          qntx-code-plugin-image = codeImage;
-          qntx-code-plugin-image-amd64 = mkCodeImage "amd64";
-          qntx-code-plugin-image-arm64 = mkCodeImage "arm64";
+          qntx-github-plugin-image = githubImage;
+          qntx-github-plugin-image-amd64 = mkGitHubImage "amd64";
+          qntx-github-plugin-image-arm64 = mkGitHubImage "arm64";
         };
 
         apps.default = {
           type = "app";
-          program = "${qntx-code}/bin/qntx-code-plugin";
+          program = "${qntx-github}/bin/qntx-github-plugin";
         };
       });
 }

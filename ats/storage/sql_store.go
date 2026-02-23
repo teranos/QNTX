@@ -329,7 +329,7 @@ func (s *SQLStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.
 	}
 
 	// Convert to As struct
-	as := cmd.ToAs(asid)
+	as := cmd.ToAs(asid, "")
 
 	// Make attestation self-certifying: use ASID as its own actor
 	// This avoids bounded storage limits (64 actors per entity)

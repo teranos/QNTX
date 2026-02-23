@@ -18,7 +18,7 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/errors"
-	"github.com/teranos/QNTX/typegen"
+	"github.com/teranos/typegen"
 )
 
 // pluralize returns singular or plural form based on count
