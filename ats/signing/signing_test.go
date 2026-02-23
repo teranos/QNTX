@@ -25,7 +25,7 @@ func testAttestation() *types.As {
 func testSigner() *Signer {
 	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
 	did := encodeDIDKeyForTest(pub)
-	return &Signer{PrivateKey: priv, DID: did}
+	return NewSigner(priv, did)
 }
 
 // encodeDIDKeyForTest mirrors nodedid.encodeDIDKey
