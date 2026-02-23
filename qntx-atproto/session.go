@@ -34,29 +34,6 @@ func createSession(ctx context.Context, pdsHost, identifier, appPassword string)
 	return client, session.Did, nil
 }
 
-// refreshSession refreshes an existing XRPC session.
-func refreshSession(ctx context.Context, client *xrpc.Client) error {
-	if client.Auth == nil {
-		return errors.New("no auth session to refresh")
-	}
-
-	// Use refresh token
-	refreshClient := &xrpc.Client{
-		Host: client.Host,
-		Auth: &xrpc.AuthInfo{
-			AccessJwt: client.Auth.RefreshJwt,
-		},
-	}
-
-	session, err := comatproto.ServerRefreshSession(ctx, refreshClient)
-	if err != nil {
-		return errors.Wrapf(err, "failed to refresh session at %s", client.Host)
-	}
-
-	client.Auth.AccessJwt = session.AccessJwt
-	client.Auth.RefreshJwt = session.RefreshJwt
-	client.Auth.Handle = session.Handle
-	client.Auth.Did = session.Did
-
-	return nil
-}
+// TODO: Implement session refresh to handle token expiry (~2 hours).
+// Options: (a) retry on 401 with refresh token, or (b) background goroutine.
+// Without this, plugin breaks on token expiry until restart.

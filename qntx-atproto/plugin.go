@@ -29,11 +29,11 @@ import (
 // Implements plugin.PausablePlugin and plugin.ConfigurablePlugin.
 type Plugin struct {
 	services plugin.ServiceRegistry
-	paused   bool
 
 	mu     sync.RWMutex
-	client *xrpc.Client // Authenticated XRPC client
-	did    string       // Authenticated user's DID
+	paused bool          // Protected by mu
+	client *xrpc.Client  // Protected by mu
+	did    string        // Protected by mu
 }
 
 // NewPlugin creates a new AT Protocol domain plugin.
@@ -45,7 +45,7 @@ func NewPlugin() *Plugin {
 func (p *Plugin) Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name:        "atproto",
-		Version:     "0.2.9",
+		Version:     "0.2.10",
 		QNTXVersion: ">= 0.1.0",
 		Description: "AT Protocol integration (Bluesky) with auto-scheduled timeline sync",
 		Author:      "QNTX Team",
@@ -134,10 +134,11 @@ func (p *Plugin) Health(ctx context.Context) plugin.HealthStatus {
 	p.mu.RLock()
 	authenticated := p.client != nil
 	did := p.did
+	paused := p.paused
 	p.mu.RUnlock()
 
 	message := "AT Protocol domain operational"
-	if p.paused {
+	if paused {
 		message = "AT Protocol domain paused"
 	}
 
@@ -150,7 +151,7 @@ func (p *Plugin) Health(ctx context.Context) plugin.HealthStatus {
 
 	return plugin.HealthStatus{
 		Healthy: true,
-		Paused:  p.paused,
+		Paused:  paused,
 		Message: message,
 		Details: details,
 	}
@@ -158,6 +159,9 @@ func (p *Plugin) Health(ctx context.Context) plugin.HealthStatus {
 
 // Pause temporarily suspends the atproto domain plugin operations.
 func (p *Plugin) Pause(ctx context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	if p.paused {
 		return fmt.Errorf("atproto plugin is already paused")
 	}
@@ -168,6 +172,9 @@ func (p *Plugin) Pause(ctx context.Context) error {
 
 // Resume restores the atproto domain plugin to active operation.
 func (p *Plugin) Resume(ctx context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	if !p.paused {
 		return fmt.Errorf("atproto plugin is not paused")
 	}
@@ -178,6 +185,8 @@ func (p *Plugin) Resume(ctx context.Context) error {
 
 // IsPaused returns whether the plugin is currently paused.
 func (p *Plugin) IsPaused() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 	return p.paused
 }
 

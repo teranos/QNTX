@@ -44,7 +44,11 @@ func (p *Plugin) registerHTTPHandlers(mux *http.ServeMux) error {
 
 // checkPaused returns true and writes 503 if plugin is paused.
 func (p *Plugin) checkPaused(w http.ResponseWriter) bool {
-	if p.paused {
+	p.mu.RLock()
+	paused := p.paused
+	p.mu.RUnlock()
+
+	if paused {
 		writeError(w, http.StatusServiceUnavailable, "AT Protocol plugin is paused")
 		return true
 	}
@@ -241,8 +245,10 @@ func (p *Plugin) handleResolve(w http.ResponseWriter, r *http.Request) {
 // CreatePostRequest is the request body for creating a post.
 type CreatePostRequest struct {
 	Text     string `json:"text"`
-	ReplyTo  string `json:"reply_to,omitempty"`  // AT URI of post to reply to
-	ReplyCID string `json:"reply_cid,omitempty"` // CID of post to reply to
+	ReplyTo  string `json:"reply_to,omitempty"`  // AT URI of immediate parent post
+	ReplyCID string `json:"reply_cid,omitempty"` // CID of immediate parent post
+	RootURI  string `json:"root_uri,omitempty"`  // AT URI of thread root (required for deep replies)
+	RootCID  string `json:"root_cid,omitempty"`  // CID of thread root (required for deep replies)
 }
 
 // handleCreatePost creates a new post.
@@ -273,15 +279,24 @@ func (p *Plugin) handleCreatePost(w http.ResponseWriter, r *http.Request) {
 
 	// Set reply reference if provided
 	if req.ReplyTo != "" && req.ReplyCID != "" {
+		// Parent is always the immediate parent
+		parent := &comatproto.RepoStrongRef{
+			Uri: req.ReplyTo,
+			Cid: req.ReplyCID,
+		}
+
+		// Root is either explicitly provided (for deep replies) or same as parent (depth-1 replies)
+		root := parent
+		if req.RootURI != "" && req.RootCID != "" {
+			root = &comatproto.RepoStrongRef{
+				Uri: req.RootURI,
+				Cid: req.RootCID,
+			}
+		}
+
 		post.Reply = &appbsky.FeedPost_ReplyRef{
-			Parent: &comatproto.RepoStrongRef{
-				Uri: req.ReplyTo,
-				Cid: req.ReplyCID,
-			},
-			Root: &comatproto.RepoStrongRef{
-				Uri: req.ReplyTo,
-				Cid: req.ReplyCID,
-			},
+			Parent: parent,
+			Root:   root,
 		}
 	}
 
