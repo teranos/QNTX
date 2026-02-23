@@ -20,6 +20,7 @@ let searchView: SearchView | null = null;
 let drawerPanel: HTMLElement | null = null;
 let searchInput: HTMLInputElement | null = null;
 let queryTimeout: ReturnType<typeof setTimeout> | null = null;
+let searchVersion = 0;
 let lastExpandedHeight = DRAWER_MAX;
 
 function setDrawerHeight(panel: HTMLElement, height: number): void {
@@ -128,10 +129,13 @@ function dispatchSearch(text: string): void {
 
 async function searchLocal(query: string): Promise<void> {
     if (!searchView) return;
+    const version = ++searchVersion;
     try {
         const results = await richSearch(query, 50);
+        if (version !== searchVersion) return; // stale result, newer search in flight
         searchView.updateResults(results as unknown as SearchResultsMessage);
     } catch {
+        if (version !== searchVersion) return;
         searchOffline(query);
     }
 }
