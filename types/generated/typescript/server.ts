@@ -7,6 +7,7 @@
 import { Job } from './async';
 import { Execution, LogEntry, StageInfo } from './schedule';
 import { As } from './types';
+import type { Attestation } from '../../../web/ts/generated/proto/plugin/grpc/protocol/atsstore';
 
 export interface ChildJobInfo {
   id: string;
@@ -384,6 +385,10 @@ export interface PromptDirectRequest {
 export interface PromptDirectResponse {
   response: string;
   attestation_id?: string;
+  /**
+   * Full attestation with signature
+   */
+  attestation?: Attestation | null;
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;

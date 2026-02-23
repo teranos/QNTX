@@ -78,6 +78,11 @@ func (s *memStore) CreateAttestation(as *types.As) error {
 	return nil
 }
 
+func (s *memStore) CreateAttestationInbound(as *types.As) error {
+	s.attestations[as.ID] = as
+	return nil
+}
+
 func (s *memStore) AttestationExists(asid string) bool {
 	_, ok := s.attestations[asid]
 	return ok
