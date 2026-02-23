@@ -18,10 +18,3 @@ repos = [
 # GitHub API rate limit: 5,000 requests/hour with token
 # Recommended: 60-900 seconds (1-15 minutes)
 poll_interval = 300
-
-# Plugin paths
-[plugin]
-paths = [
-  "~/.qntx/plugins/qntx-github-plugin",
-  # Or use absolute path to built binary
-]

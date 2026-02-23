@@ -76,19 +76,3 @@ make install
 # Or use Nix
 nix build ./qntx-github#qntx-github-plugin
 ```
-
-## Configuration
-
-Add to `am.toml`:
-
-```toml
-[github]
-token = "ghp_..."         # GitHub PAT (repo scope)
-repos = ["teranos/qntx"]  # Repos to watch
-poll_interval = 300       # Poll every 5 minutes
-
-[plugin]
-paths = [
-  "~/.qntx/plugins/qntx-github-plugin"
-]
-```

@@ -89,7 +89,7 @@ func (s *memStore) AttestationExists(asid string) bool {
 }
 
 func (s *memStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
-	as := cmd.ToAs(fmt.Sprintf("as-test-%d", time.Now().UnixNano()))
+	as := cmd.ToAs(fmt.Sprintf("as-test-%d", time.Now().UnixNano()), "test")
 	if err := s.CreateAttestation(as); err != nil {
 		return nil, err
 	}
