@@ -30,6 +30,9 @@ type ExternalDomainProxy struct {
 	// Handler names this plugin can execute (populated during Initialize)
 	handlerNames []string
 
+	// Schedules this plugin wants QNTX to create (populated during Initialize)
+	schedules []*protocol.ScheduleInfo
+
 	// WebSocket configuration (set via SetWebSocketConfig)
 	keepaliveConfig *KeepaliveConfig
 	wsConfig        *WebSocketConfig
@@ -109,6 +112,12 @@ func (c *ExternalDomainProxy) Metadata() plugin.Metadata {
 // Returns empty slice if plugin provides no async handlers (Phase 1: all plugins return empty).
 func (c *ExternalDomainProxy) GetHandlerNames() []string {
 	return c.handlerNames
+}
+
+// GetSchedules returns the schedules this plugin announced during Initialize.
+// Returns empty slice if plugin provides no schedules.
+func (c *ExternalDomainProxy) GetSchedules() []*protocol.ScheduleInfo {
+	return c.schedules
 }
 
 // Client returns the underlying gRPC client for making RPC calls to the plugin.
@@ -206,6 +215,15 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 		c.logger.Infow("Plugin announced async handlers",
 			"plugin", c.metadata.Name,
 			"handlers", c.handlerNames,
+		)
+	}
+
+	// Store schedules announced by plugin
+	c.schedules = resp.GetSchedules()
+	if len(c.schedules) > 0 {
+		c.logger.Infow("Plugin announced schedules",
+			"plugin", c.metadata.Name,
+			"count", len(c.schedules),
 		)
 	}
 

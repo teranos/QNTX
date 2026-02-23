@@ -88,7 +88,7 @@ func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *
 	}
 
 	// Generate and create the attestation
-	as, err := s.store.GenerateAndCreateAttestation(cmd)
+	as, err := s.store.GenerateAndCreateAttestation(ctx, cmd)
 	if err != nil {
 		return &protocol.GenerateAttestationResponse{
 			Success: false,
@@ -98,9 +98,17 @@ func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *
 
 	s.logger.Infow("Attestation generated and created via gRPC", "id", as.ID, "subjects", as.Subjects)
 
+	protoAtt, err := protocol.AttestationFromTypes(as)
+	if err != nil {
+		return &protocol.GenerateAttestationResponse{
+			Success: false,
+			Error:   fmt.Sprintf("failed to convert attestation to proto: %v", err),
+		}, nil
+	}
+
 	return &protocol.GenerateAttestationResponse{
 		Success:     true,
-		Attestation: protocol.AttestationFromTypes(as),
+		Attestation: protoAtt,
 	}, nil
 }
 
@@ -127,7 +135,14 @@ func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetA
 
 	protoAttestations := make([]*protocol.Attestation, len(attestations))
 	for i, as := range attestations {
-		protoAttestations[i] = protocol.AttestationFromTypes(as)
+		protoAtt, err := protocol.AttestationFromTypes(as)
+		if err != nil {
+			return &protocol.GetAttestationsResponse{
+				Success: false,
+				Error:   fmt.Sprintf("failed to convert attestation %s to proto: %v", as.ID, err),
+			}, nil
+		}
+		protoAttestations[i] = protoAtt
 	}
 
 	return &protocol.GetAttestationsResponse{

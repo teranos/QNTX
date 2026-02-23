@@ -264,7 +264,7 @@ func (p *BookPlugin) setupBookCollector(ctx context.Context) error {
 			Predicates: []string{"wants"},
 			Contexts:   []string{bookID},
 		}
-		if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+		if _, err := store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
 			return err
 		}
 	}
@@ -285,7 +285,7 @@ func (p *BookPlugin) setupBookCollector(ctx context.Context) error {
 			Predicates: []string{"offers"},
 			Contexts:   []string{bookID},
 		}
-		if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+		if _, err := store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
 			return err
 		}
 	}

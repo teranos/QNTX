@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/ai/tracker"
@@ -606,8 +607,24 @@ func (c *simpleConfig) Set(key string, value interface{}) {
 }
 
 func (c *simpleConfig) GetKeys() []string {
-	// Return empty list for now - could be enhanced to return actual keys from viper
-	return []string{}
+	v := appcfg.GetViper()
+	if v == nil {
+		return []string{}
+	}
+
+	allKeys := v.AllKeys()
+	prefix := c.domain + "."
+	var keys []string
+
+	for _, key := range allKeys {
+		if strings.HasPrefix(key, prefix) {
+			// Strip the domain prefix to get the plugin-specific key
+			pluginKey := strings.TrimPrefix(key, prefix)
+			keys = append(keys, pluginKey)
+		}
+	}
+
+	return keys
 }
 
 // pluginConfigProvider wraps a base config provider to inject service endpoints
