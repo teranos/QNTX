@@ -31,6 +31,8 @@ export interface GlyphTypeEntry {
     label: string;
     /** Create the DOM element for this glyph type */
     render: (glyph: Glyph) => Promise<HTMLElement> | HTMLElement;
+    /** Plugin name for plugin-provided glyphs (undefined for built-in glyphs) */
+    pluginName?: string;
 }
 
 const GLYPH_TYPES: GlyphTypeEntry[] = [
@@ -74,12 +76,6 @@ export function registerGlyphType(entry: GlyphTypeEntry): void {
 /** Get all registered glyph types */
 export function getAllGlyphTypes(): readonly GlyphTypeEntry[] {
     return GLYPH_TYPES;
-}
-
-/** Check if a symbol is a built-in (not plugin) glyph */
-export function isBuiltinSymbol(symbol: string): boolean {
-    const builtins = [AX, IX, SO, SE, AS, Prose, Doc, Subcanvas, 'py', 'ts'];
-    return builtins.includes(symbol);
 }
 
 /** Look up glyph type by symbol (e.g., AX, 'py', SO) */
