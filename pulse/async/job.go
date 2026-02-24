@@ -67,23 +67,24 @@ func (p Progress) Percentage() float64 {
 // - Payload contains handler-specific data (domain logic controls structure)
 // - This type will eventually migrate to proto generation
 type Job struct {
-	ID           string          `json:"id"`
-	HandlerName  string          `json:"handler_name"`      // "data.batch-import", "bio.sequence-align"
-	Payload      json.RawMessage `json:"payload,omitempty"` // Handler-specific data (domain-owned)
-	Source       string          `json:"source"`            // For deduplication and logging
-	Status       JobStatus       `json:"status"`
-	Progress     Progress        `json:"progress,omitempty"`
-	CostEstimate float64         `json:"cost_estimate,omitempty"`
-	CostActual   float64         `json:"cost_actual,omitempty"`
-	PulseState   *PulseState     `json:"pulse_state,omitempty"`
-	Error        string          `json:"error,omitempty"`
-	ErrorDetails []string        `json:"error_details,omitempty"` // Structured error context from errors.GetAllDetails()
-	ParentJobID  string          `json:"parent_job_id,omitempty"` // For tasks grouped under parent job
-	RetryCount   int             `json:"retry_count,omitempty"`   // Number of retry attempts (max 2)
-	CreatedAt    time.Time       `json:"created_at"`
-	StartedAt    *time.Time      `json:"started_at,omitempty"`
-	CompletedAt  *time.Time      `json:"completed_at,omitempty"`
-	UpdatedAt    time.Time       `json:"updated_at"`
+	ID            string          `json:"id"`
+	HandlerName   string          `json:"handler_name"`      // "data.batch-import", "bio.sequence-align"
+	Payload       json.RawMessage `json:"payload,omitempty"` // Handler-specific data (domain-owned)
+	Source        string          `json:"source"`            // For deduplication and logging
+	Status        JobStatus       `json:"status"`
+	Progress      Progress        `json:"progress,omitempty"`
+	CostEstimate  float64         `json:"cost_estimate,omitempty"`
+	CostActual    float64         `json:"cost_actual,omitempty"`
+	PulseState    *PulseState     `json:"pulse_state,omitempty"`
+	Error         string          `json:"error,omitempty"`
+	ErrorDetails  []string        `json:"error_details,omitempty"`  // Structured error context from errors.GetAllDetails()
+	PluginVersion string          `json:"plugin_version,omitempty"` // Version of plugin that executed this job
+	ParentJobID   string          `json:"parent_job_id,omitempty"`  // For tasks grouped under parent job
+	RetryCount    int             `json:"retry_count,omitempty"`    // Number of retry attempts (max 2)
+	CreatedAt     time.Time       `json:"created_at"`
+	StartedAt     *time.Time      `json:"started_at,omitempty"`
+	CompletedAt   *time.Time      `json:"completed_at,omitempty"`
+	UpdatedAt     time.Time       `json:"updated_at"`
 }
 
 // NewJobWithPayload creates a new generic job with handler name and typed payload.

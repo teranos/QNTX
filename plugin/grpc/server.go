@@ -443,7 +443,7 @@ func (s *PluginServer) RegisterGlyphs(ctx context.Context, _ *protocol.Empty) (*
 func (s *PluginServer) ExecuteJob(ctx context.Context, req *protocol.ExecuteJobRequest) (*protocol.ExecuteJobResponse, error) {
 	// Check if plugin implements job execution
 	type jobExecutor interface {
-		ExecuteJob(ctx context.Context, handlerName string, jobID string, payload []byte) (result []byte, err error)
+		ExecuteJob(ctx context.Context, handlerName string, jobID string, payload []byte) (result []byte, logs []*protocol.JobLogEntry, err error)
 	}
 
 	executor, ok := s.plugin.(jobExecutor)
@@ -454,17 +454,23 @@ func (s *PluginServer) ExecuteJob(ctx context.Context, req *protocol.ExecuteJobR
 		}, nil
 	}
 
+	version := s.plugin.Metadata().Version
+
 	// Execute the job
-	result, err := executor.ExecuteJob(ctx, req.HandlerName, req.JobId, req.Payload)
+	result, logs, err := executor.ExecuteJob(ctx, req.HandlerName, req.JobId, req.Payload)
 	if err != nil {
 		return &protocol.ExecuteJobResponse{
-			Success: false,
-			Error:   err.Error(),
+			Success:       false,
+			Error:         err.Error(),
+			LogEntries:    logs,
+			PluginVersion: version,
 		}, nil
 	}
 
 	return &protocol.ExecuteJobResponse{
-		Success: true,
-		Result:  result,
+		Success:       true,
+		Result:        result,
+		LogEntries:    logs,
+		PluginVersion: version,
 	}, nil
 }
