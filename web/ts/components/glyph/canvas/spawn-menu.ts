@@ -213,54 +213,19 @@ export function showSpawnMenu(
         g.className.includes('canvas-plugin-glyph')
     );
 
-    if (pluginGlyphs.length > 0) {
-        // Add divider
-        const divider = document.createElement('div');
-        divider.className = 'canvas-spawn-menu-divider';
-        divider.style.height = '1px';
-        divider.style.backgroundColor = 'var(--border-color)';
-        divider.style.margin = '4px 0';
-        menu.appendChild(divider);
+    // Add plugin glyphs (no grouping, just buttons)
+    for (const glyphType of pluginGlyphs) {
+        const btn = document.createElement('button');
+        btn.className = 'canvas-spawn-button';
+        btn.textContent = glyphType.symbol;
+        btn.title = `Spawn ${glyphType.title} glyph`;
 
-        // Group by plugin name (extract from className: plugin-{name})
-        const grouped = new Map<string, GlyphTypeEntry[]>();
-        for (const glyph of pluginGlyphs) {
-            const match = glyph.className.match(/plugin-(\w+)/);
-            const pluginName = match ? match[1] : 'unknown';
-            if (!grouped.has(pluginName)) {
-                grouped.set(pluginName, []);
-            }
-            grouped.get(pluginName)!.push(glyph);
-        }
+        btn.addEventListener('click', () => {
+            void spawnPluginGlyph(x, y, canvas, glyphs, canvasId, glyphType);
+            removeMenu();
+        });
 
-        // Render grouped plugin glyphs
-        for (const [pluginName, glyphs] of grouped) {
-            // Plugin header
-            const header = document.createElement('div');
-            header.className = 'canvas-spawn-menu-header';
-            header.textContent = pluginName;
-            header.style.padding = '4px 8px';
-            header.style.fontSize = '10px';
-            header.style.textTransform = 'uppercase';
-            header.style.color = 'var(--text-muted)';
-            header.style.fontWeight = '600';
-            menu.appendChild(header);
-
-            // Plugin glyph buttons
-            for (const glyphType of glyphs) {
-                const btn = document.createElement('button');
-                btn.className = 'canvas-spawn-button';
-                btn.textContent = glyphType.symbol;
-                btn.title = `Spawn ${glyphType.title} glyph`;
-
-                btn.addEventListener('click', () => {
-                    void spawnPluginGlyph(x, y, canvas, glyphs, canvasId, glyphType);
-                    removeMenu();
-                });
-
-                menu.appendChild(btn);
-            }
-        }
+        menu.appendChild(btn);
     }
 
     document.body.appendChild(menu);
