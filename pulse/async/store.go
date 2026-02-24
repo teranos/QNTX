@@ -45,8 +45,9 @@ func (s *Store) CreateJob(job *Job) error {
 			cost_estimate, cost_actual,
 			pulse_state, error, error_details, payload,
 			parent_job_id, retry_count,
+			plugin_version,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	parentJobID := sql.NullString{String: job.ParentJobID, Valid: job.ParentJobID != ""}
@@ -69,6 +70,7 @@ func (s *Store) CreateJob(job *Job) error {
 		payload,
 		parentJobID,
 		job.RetryCount,
+		job.PluginVersion,
 		job.CreatedAt,
 		job.UpdatedAt,
 	)
@@ -135,6 +137,7 @@ func (s *Store) UpdateJob(job *Job) error {
 		    error = ?,
 		    error_details = ?,
 		    retry_count = ?,
+		    plugin_version = ?,
 		    started_at = ?,
 		    completed_at = ?,
 		    updated_at = ?
@@ -155,6 +158,7 @@ func (s *Store) UpdateJob(job *Job) error {
 		job.Error,
 		errorDetailsJSON,
 		job.RetryCount,
+		job.PluginVersion,
 		job.StartedAt,
 		job.CompletedAt,
 		job.UpdatedAt,

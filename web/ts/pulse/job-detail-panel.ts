@@ -352,6 +352,7 @@ class JobDetailPanel {
         <div class="execution-header" data-action="toggle-expand">
           <span class="execution-expand-icon">${isExpanded ? '▼' : '▶'}</span>
           <span class="panel-badge execution-status execution-status-${escapeHtml(exec.status)}">${escapeHtml(exec.status)}</span>
+          ${stages?.plugin_version ? `<span class="execution-plugin-version">v${escapeHtml(stages.plugin_version)}</span>` : ''}
           <span class="execution-time">${timeAgo}</span>
           <span class="execution-duration">${duration}</span>
         </div>
