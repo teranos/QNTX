@@ -27,7 +27,7 @@ type WatcherCreateRequest struct {
 	TimeEnd           string   `json:"time_end,omitempty"`   // RFC3339
 	ActionType        string   `json:"action_type"`          // "python", "webhook", or "semantic_match"
 	ActionData        string   `json:"action_data"`          // Python code or webhook URL (not required for semantic_match)
-	MaxFiresPerMinute int      `json:"max_fires_per_minute,omitempty"`
+	MaxFiresPerSecond int      `json:"max_fires_per_second,omitempty"`
 	Enabled           *bool    `json:"enabled,omitempty"`
 	// Semantic matching fields (for ⊨ glyphs)
 	SemanticQuery     string  `json:"semantic_query,omitempty"`
@@ -48,7 +48,7 @@ type WatcherResponse struct {
 	ActionData        string   `json:"action_data"`
 	SemanticQuery     string   `json:"semantic_query,omitempty"`
 	SemanticThreshold float32  `json:"semantic_threshold,omitempty"`
-	MaxFiresPerMinute int      `json:"max_fires_per_minute"`
+	MaxFiresPerSecond int      `json:"max_fires_per_second"`
 	Enabled           bool     `json:"enabled"`
 	CreatedAt         string   `json:"created_at"`
 	UpdatedAt         string   `json:"updated_at"`
@@ -186,12 +186,12 @@ func (s *QNTXServer) handleCreateWatcher(w http.ResponseWriter, r *http.Request)
 		ActionData:        req.ActionData,
 		SemanticQuery:     req.SemanticQuery,
 		SemanticThreshold: req.SemanticThreshold,
-		MaxFiresPerMinute: 105, // Default
+		MaxFiresPerSecond: am.GetInt("watcher.max_fires_per_second"),
 		Enabled:           true,
 	}
 
-	if req.MaxFiresPerMinute > 0 {
-		watcher.MaxFiresPerMinute = req.MaxFiresPerMinute
+	if req.MaxFiresPerSecond > 0 {
+		watcher.MaxFiresPerSecond = req.MaxFiresPerSecond
 	}
 	if req.Enabled != nil {
 		watcher.Enabled = *req.Enabled
@@ -271,8 +271,8 @@ func (s *QNTXServer) handleUpdateWatcher(w http.ResponseWriter, r *http.Request,
 	if req.ActionData != "" {
 		existing.ActionData = req.ActionData
 	}
-	if req.MaxFiresPerMinute > 0 {
-		existing.MaxFiresPerMinute = req.MaxFiresPerMinute
+	if req.MaxFiresPerSecond > 0 {
+		existing.MaxFiresPerSecond = req.MaxFiresPerSecond
 	}
 	if req.Enabled != nil {
 		existing.Enabled = *req.Enabled
@@ -340,6 +340,27 @@ func (s *QNTXServer) handleDeleteWatcher(w http.ResponseWriter, r *http.Request,
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// HandleWatcherQueueStats returns execution queue statistics
+func (s *QNTXServer) HandleWatcherQueueStats(w http.ResponseWriter, r *http.Request) {
+	if s.watcherEngine == nil {
+		s.writeRichError(w, errors.New("watcher engine not initialized"), http.StatusServiceUnavailable)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	stats, err := s.watcherEngine.GetQueueStore().Stats()
+	if err != nil {
+		s.writeRichError(w, errors.Wrap(err, "failed to get queue stats"), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(stats)
+}
+
 // watcherToResponse converts a storage.Watcher to a WatcherResponse
 func watcherToResponse(w *storage.Watcher) WatcherResponse {
 	resp := WatcherResponse{
@@ -353,7 +374,7 @@ func watcherToResponse(w *storage.Watcher) WatcherResponse {
 		ActionData:        w.ActionData,
 		SemanticQuery:     w.SemanticQuery,
 		SemanticThreshold: w.SemanticThreshold,
-		MaxFiresPerMinute: w.MaxFiresPerMinute,
+		MaxFiresPerSecond: w.MaxFiresPerSecond,
 		Enabled:           w.Enabled,
 		CreatedAt:         w.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:         w.UpdatedAt.Format(time.RFC3339),

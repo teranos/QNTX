@@ -732,6 +732,49 @@ func (s *QNTXServer) BroadcastPluginHealth(name string, healthy bool, state, mes
 	)
 }
 
+// startWatcherQueueBroadcaster periodically broadcasts queue status when the queue is non-empty
+func (s *QNTXServer) startWatcherQueueBroadcaster() {
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-ticker.C:
+				if s.watcherEngine == nil {
+					continue
+				}
+
+				s.mu.RLock()
+				hasClients := len(s.clients) > 0
+				s.mu.RUnlock()
+				if !hasClients {
+					continue
+				}
+
+				stats, err := s.watcherEngine.GetQueueStore().Stats()
+				if err != nil || stats.TotalQueued == 0 {
+					continue
+				}
+
+				msg := WatcherQueueStatusMessage{
+					Type:             "watcher_queue_status",
+					TotalQueued:      stats.TotalQueued,
+					PerWatcher:       stats.PerWatcher,
+					OldestAgeSeconds: stats.OldestAgeSeconds,
+					Timestamp:        time.Now().Unix(),
+				}
+				s.broadcastMessage(msg)
+			}
+		}
+	}()
+}
+
 // runBroadcastWorker is the dedicated worker goroutine that owns all client channel sends.
 // This eliminates race conditions by ensuring only one goroutine ever sends to client channels.
 // The worker processes broadcast requests and handles client channel closure.

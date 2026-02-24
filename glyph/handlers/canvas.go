@@ -406,7 +406,7 @@ func (h *CanvasHandler) compileSubscriptions(ctx context.Context, comp *glyphsto
 				Name:                      fmt.Sprintf("Meld: %s → %s", truncate(edge.From, 8), truncate(edge.To, 8)),
 				ActionType:                storage.ActionTypeSemanticMatch,
 				ActionData:                string(actionData),
-				MaxFiresPerMinute:         60,
+				MaxFiresPerSecond:         1,
 				Enabled:                   true,
 				SemanticQuery:             downstreamWatcher.SemanticQuery,
 				SemanticThreshold:         downstreamWatcher.SemanticThreshold,
@@ -447,7 +447,7 @@ func (h *CanvasHandler) compileSubscriptions(ctx context.Context, comp *glyphsto
 			Name:              fmt.Sprintf("Meld: %s → %s", truncate(edge.From, 8), truncate(edge.To, 8)),
 			ActionType:        storage.ActionTypeGlyphExecute,
 			ActionData:        string(actionData),
-			MaxFiresPerMinute: 60,
+			MaxFiresPerSecond: 1,
 			Enabled:           true,
 		}
 
