@@ -1031,6 +1031,151 @@ func (x *ExecuteJobResponse) GetCostActual() float64 {
 	return 0
 }
 
+// GlyphDefResponse contains custom glyph type definitions from a plugin
+type GlyphDefResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Glyphs        []*GlyphDef            `protobuf:"bytes,1,rep,name=glyphs,proto3" json:"glyphs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GlyphDefResponse) Reset() {
+	*x = GlyphDefResponse{}
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GlyphDefResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GlyphDefResponse) ProtoMessage() {}
+
+func (x *GlyphDefResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GlyphDefResponse.ProtoReflect.Descriptor instead.
+func (*GlyphDefResponse) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *GlyphDefResponse) GetGlyphs() []*GlyphDef {
+	if x != nil {
+		return x.Glyphs
+	}
+	return nil
+}
+
+// GlyphDef defines a custom glyph type provided by a plugin
+type GlyphDef struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Symbol is the glyph identifier (e.g., "⚗" for a chemistry plugin)
+	Symbol string `protobuf:"bytes,1,opt,name=symbol,proto3" json:"symbol,omitempty"`
+	// Title is the human-readable name shown in the title bar
+	Title string `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	// Label is a short identifier for logs and the spawn menu
+	Label string `protobuf:"bytes,3,opt,name=label,proto3" json:"label,omitempty"`
+	// ContentPath is the HTTP path (relative to /api/{plugin}/) that
+	// returns the HTML fragment for this glyph's content area
+	ContentPath string `protobuf:"bytes,4,opt,name=content_path,json=contentPath,proto3" json:"content_path,omitempty"`
+	// CSSPath is an optional HTTP path to a stylesheet for this glyph type
+	CssPath string `protobuf:"bytes,5,opt,name=css_path,json=cssPath,proto3" json:"css_path,omitempty"`
+	// DefaultWidth and DefaultHeight in pixels (0 = use system default)
+	DefaultWidth  int32 `protobuf:"varint,6,opt,name=default_width,json=defaultWidth,proto3" json:"default_width,omitempty"`
+	DefaultHeight int32 `protobuf:"varint,7,opt,name=default_height,json=defaultHeight,proto3" json:"default_height,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GlyphDef) Reset() {
+	*x = GlyphDef{}
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GlyphDef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GlyphDef) ProtoMessage() {}
+
+func (x *GlyphDef) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_domain_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GlyphDef.ProtoReflect.Descriptor instead.
+func (*GlyphDef) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_domain_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *GlyphDef) GetSymbol() string {
+	if x != nil {
+		return x.Symbol
+	}
+	return ""
+}
+
+func (x *GlyphDef) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *GlyphDef) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *GlyphDef) GetContentPath() string {
+	if x != nil {
+		return x.ContentPath
+	}
+	return ""
+}
+
+func (x *GlyphDef) GetCssPath() string {
+	if x != nil {
+		return x.CssPath
+	}
+	return ""
+}
+
+func (x *GlyphDef) GetDefaultWidth() int32 {
+	if x != nil {
+		return x.DefaultWidth
+	}
+	return 0
+}
+
+func (x *GlyphDef) GetDefaultHeight() int32 {
+	if x != nil {
+		return x.DefaultHeight
+	}
+	return 0
+}
+
 var File_plugin_grpc_protocol_domain_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
@@ -1124,7 +1269,17 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x10progress_current\x18\x04 \x01(\x05R\x0fprogressCurrent\x12%\n" +
 	"\x0eprogress_total\x18\x05 \x01(\x05R\rprogressTotal\x12\x1f\n" +
 	"\vcost_actual\x18\x06 \x01(\x01R\n" +
-	"costActual2\x90\x04\n" +
+	"costActual\">\n" +
+	"\x10GlyphDefResponse\x12*\n" +
+	"\x06glyphs\x18\x01 \x03(\v2\x12.protocol.GlyphDefR\x06glyphs\"\xd8\x01\n" +
+	"\bGlyphDef\x12\x16\n" +
+	"\x06symbol\x18\x01 \x01(\tR\x06symbol\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12\x14\n" +
+	"\x05label\x18\x03 \x01(\tR\x05label\x12!\n" +
+	"\fcontent_path\x18\x04 \x01(\tR\vcontentPath\x12\x19\n" +
+	"\bcss_path\x18\x05 \x01(\tR\acssPath\x12#\n" +
+	"\rdefault_width\x18\x06 \x01(\x05R\fdefaultWidth\x12%\n" +
+	"\x0edefault_height\x18\a \x01(\x05R\rdefaultHeight2\xcf\x04\n" +
 	"\x13DomainPluginService\x127\n" +
 	"\bMetadata\x12\x0f.protocol.Empty\x1a\x1a.protocol.MetadataResponse\x12G\n" +
 	"\n" +
@@ -1134,7 +1289,8 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"HandleHTTP\x12\x15.protocol.HTTPRequest\x1a\x16.protocol.HTTPResponse\x12M\n" +
 	"\x0fHandleWebSocket\x12\x1a.protocol.WebSocketMessage\x1a\x1a.protocol.WebSocketMessage(\x010\x01\x123\n" +
 	"\x06Health\x12\x0f.protocol.Empty\x1a\x18.protocol.HealthResponse\x12?\n" +
-	"\fConfigSchema\x12\x0f.protocol.Empty\x1a\x1e.protocol.ConfigSchemaResponse\x12G\n" +
+	"\fConfigSchema\x12\x0f.protocol.Empty\x1a\x1e.protocol.ConfigSchemaResponse\x12=\n" +
+	"\x0eRegisterGlyphs\x12\x0f.protocol.Empty\x1a\x1a.protocol.GlyphDefResponse\x12G\n" +
 	"\n" +
 	"ExecuteJob\x12\x1b.protocol.ExecuteJobRequest\x1a\x1c.protocol.ExecuteJobResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
@@ -1151,7 +1307,7 @@ func file_plugin_grpc_protocol_domain_proto_rawDescGZIP() []byte {
 }
 
 var file_plugin_grpc_protocol_domain_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_plugin_grpc_protocol_domain_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_plugin_grpc_protocol_domain_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_plugin_grpc_protocol_domain_proto_goTypes = []any{
 	(WebSocketMessage_Type)(0),   // 0: protocol.WebSocketMessage.Type
 	(*Empty)(nil),                // 1: protocol.Empty
@@ -1168,42 +1324,47 @@ var file_plugin_grpc_protocol_domain_proto_goTypes = []any{
 	(*InitializeResponse)(nil),   // 12: protocol.InitializeResponse
 	(*ExecuteJobRequest)(nil),    // 13: protocol.ExecuteJobRequest
 	(*ExecuteJobResponse)(nil),   // 14: protocol.ExecuteJobResponse
-	nil,                          // 15: protocol.InitializeRequest.ConfigEntry
-	nil,                          // 16: protocol.WebSocketMessage.HeadersEntry
-	nil,                          // 17: protocol.HealthResponse.DetailsEntry
-	nil,                          // 18: protocol.ConfigSchemaResponse.FieldsEntry
+	(*GlyphDefResponse)(nil),     // 15: protocol.GlyphDefResponse
+	(*GlyphDef)(nil),             // 16: protocol.GlyphDef
+	nil,                          // 17: protocol.InitializeRequest.ConfigEntry
+	nil,                          // 18: protocol.WebSocketMessage.HeadersEntry
+	nil,                          // 19: protocol.HealthResponse.DetailsEntry
+	nil,                          // 20: protocol.ConfigSchemaResponse.FieldsEntry
 }
 var file_plugin_grpc_protocol_domain_proto_depIdxs = []int32{
-	15, // 0: protocol.InitializeRequest.config:type_name -> protocol.InitializeRequest.ConfigEntry
+	17, // 0: protocol.InitializeRequest.config:type_name -> protocol.InitializeRequest.ConfigEntry
 	6,  // 1: protocol.HTTPRequest.headers:type_name -> protocol.HTTPHeader
 	6,  // 2: protocol.HTTPResponse.headers:type_name -> protocol.HTTPHeader
 	0,  // 3: protocol.WebSocketMessage.type:type_name -> protocol.WebSocketMessage.Type
-	16, // 4: protocol.WebSocketMessage.headers:type_name -> protocol.WebSocketMessage.HeadersEntry
-	17, // 5: protocol.HealthResponse.details:type_name -> protocol.HealthResponse.DetailsEntry
-	18, // 6: protocol.ConfigSchemaResponse.fields:type_name -> protocol.ConfigSchemaResponse.FieldsEntry
+	18, // 4: protocol.WebSocketMessage.headers:type_name -> protocol.WebSocketMessage.HeadersEntry
+	19, // 5: protocol.HealthResponse.details:type_name -> protocol.HealthResponse.DetailsEntry
+	20, // 6: protocol.ConfigSchemaResponse.fields:type_name -> protocol.ConfigSchemaResponse.FieldsEntry
 	11, // 7: protocol.InitializeResponse.schedules:type_name -> protocol.ScheduleInfo
-	10, // 8: protocol.ConfigSchemaResponse.FieldsEntry.value:type_name -> protocol.ConfigFieldSchema
-	1,  // 9: protocol.DomainPluginService.Metadata:input_type -> protocol.Empty
-	3,  // 10: protocol.DomainPluginService.Initialize:input_type -> protocol.InitializeRequest
-	1,  // 11: protocol.DomainPluginService.Shutdown:input_type -> protocol.Empty
-	4,  // 12: protocol.DomainPluginService.HandleHTTP:input_type -> protocol.HTTPRequest
-	7,  // 13: protocol.DomainPluginService.HandleWebSocket:input_type -> protocol.WebSocketMessage
-	1,  // 14: protocol.DomainPluginService.Health:input_type -> protocol.Empty
-	1,  // 15: protocol.DomainPluginService.ConfigSchema:input_type -> protocol.Empty
-	13, // 16: protocol.DomainPluginService.ExecuteJob:input_type -> protocol.ExecuteJobRequest
-	2,  // 17: protocol.DomainPluginService.Metadata:output_type -> protocol.MetadataResponse
-	12, // 18: protocol.DomainPluginService.Initialize:output_type -> protocol.InitializeResponse
-	1,  // 19: protocol.DomainPluginService.Shutdown:output_type -> protocol.Empty
-	5,  // 20: protocol.DomainPluginService.HandleHTTP:output_type -> protocol.HTTPResponse
-	7,  // 21: protocol.DomainPluginService.HandleWebSocket:output_type -> protocol.WebSocketMessage
-	8,  // 22: protocol.DomainPluginService.Health:output_type -> protocol.HealthResponse
-	9,  // 23: protocol.DomainPluginService.ConfigSchema:output_type -> protocol.ConfigSchemaResponse
-	14, // 24: protocol.DomainPluginService.ExecuteJob:output_type -> protocol.ExecuteJobResponse
-	17, // [17:25] is the sub-list for method output_type
-	9,  // [9:17] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	16, // 8: protocol.GlyphDefResponse.glyphs:type_name -> protocol.GlyphDef
+	10, // 9: protocol.ConfigSchemaResponse.FieldsEntry.value:type_name -> protocol.ConfigFieldSchema
+	1,  // 10: protocol.DomainPluginService.Metadata:input_type -> protocol.Empty
+	3,  // 11: protocol.DomainPluginService.Initialize:input_type -> protocol.InitializeRequest
+	1,  // 12: protocol.DomainPluginService.Shutdown:input_type -> protocol.Empty
+	4,  // 13: protocol.DomainPluginService.HandleHTTP:input_type -> protocol.HTTPRequest
+	7,  // 14: protocol.DomainPluginService.HandleWebSocket:input_type -> protocol.WebSocketMessage
+	1,  // 15: protocol.DomainPluginService.Health:input_type -> protocol.Empty
+	1,  // 16: protocol.DomainPluginService.ConfigSchema:input_type -> protocol.Empty
+	1,  // 17: protocol.DomainPluginService.RegisterGlyphs:input_type -> protocol.Empty
+	13, // 18: protocol.DomainPluginService.ExecuteJob:input_type -> protocol.ExecuteJobRequest
+	2,  // 19: protocol.DomainPluginService.Metadata:output_type -> protocol.MetadataResponse
+	12, // 20: protocol.DomainPluginService.Initialize:output_type -> protocol.InitializeResponse
+	1,  // 21: protocol.DomainPluginService.Shutdown:output_type -> protocol.Empty
+	5,  // 22: protocol.DomainPluginService.HandleHTTP:output_type -> protocol.HTTPResponse
+	7,  // 23: protocol.DomainPluginService.HandleWebSocket:output_type -> protocol.WebSocketMessage
+	8,  // 24: protocol.DomainPluginService.Health:output_type -> protocol.HealthResponse
+	9,  // 25: protocol.DomainPluginService.ConfigSchema:output_type -> protocol.ConfigSchemaResponse
+	15, // 26: protocol.DomainPluginService.RegisterGlyphs:output_type -> protocol.GlyphDefResponse
+	14, // 27: protocol.DomainPluginService.ExecuteJob:output_type -> protocol.ExecuteJobResponse
+	19, // [19:28] is the sub-list for method output_type
+	10, // [10:19] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_domain_proto_init() }
@@ -1217,7 +1378,7 @@ func file_plugin_grpc_protocol_domain_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_domain_proto_rawDesc), len(file_plugin_grpc_protocol_domain_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   18,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

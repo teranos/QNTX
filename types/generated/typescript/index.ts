@@ -106,6 +106,7 @@ export type {
   ListExecutionsResponse,
   ListScheduledJobsResponse,
   ParsedATSCode,
+  PluginGlyphDef,
   PluginHealthMessage,
   PluginInfo,
   PreviewSample,
