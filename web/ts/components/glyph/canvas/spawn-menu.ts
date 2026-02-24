@@ -765,11 +765,6 @@ async function spawnPluginGlyph(
     const width = Math.round(rect.width);
     const height = Math.round(rect.height);
 
-    // Extract plugin name from className (e.g., "canvas-plugin-glyph plugin-atproto" → "atproto")
-    const parts = glyphType.className.split(' ');
-    const pluginClass = parts.find(p => p.startsWith('plugin-') && p !== 'canvas-plugin-glyph');
-    const pluginName = pluginClass ? pluginClass.slice('plugin-'.length) : '';
-
     uiState.addCanvasGlyph({
         id: pluginGlyph.id,
         symbol: glyphType.symbol,
@@ -778,7 +773,7 @@ async function spawnPluginGlyph(
         width,
         height,
         canvas_id: storageCanvasId(canvasId),
-        plugin_name: pluginName,
+        plugin_name: glyphType.pluginName ?? '',
     });
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned ${glyphType.label} plugin glyph at (${x}, ${y}) with size ${width}x${height}`);

@@ -78,6 +78,7 @@ function registerPluginGlyphType(def: PluginGlyphDef): void {
         className: `canvas-plugin-glyph plugin-${def.plugin}`,
         title: def.title,
         label: def.label,
+        pluginName: def.plugin,
         render: (glyph: Glyph) => createPluginGlyph(glyph, def),
     });
 }
