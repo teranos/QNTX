@@ -2,8 +2,8 @@
 // Regenerate with: make types
 // TODO: Migrate to proto generation
 // Source package: types
-// Source last modified: 2026-02-23T23:40:13+01:00
-// Source version: 0dd76e61
+// Source last modified: 2026-02-24T00:00:33+01:00
+// Source version: 12553ce0
 
 //! # types module
 //!

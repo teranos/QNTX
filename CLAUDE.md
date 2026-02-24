@@ -43,6 +43,10 @@ The developer always uses `make dev` to start the development environment with h
 
 **NEVER use `text-overflow: ellipsis`.** All text wraps — data is never hidden behind truncation. Use `word-break: break-word` and `overflow-wrap: break-word` for wrapping. This applies everywhere: CSS, inline styles, all UI components.
 
+## Regex
+
+**FORBIDDEN.** Regex is banned. Use string methods (`split`, `indexOf`, `includes`, `startsWith`, `endsWith`, `slice`) instead. Regex patterns are unreadable, untestable, and error-prone.
+
 ## Glyphs
 
 Glyphs ⧉  are the universal UI primitive. Symbols (`sym` package) are the visual expression of a glyph — through a sym, a glyph can be expressed. The `sym` package will become a subpackage of `glyph/` (`glyph/sym`).

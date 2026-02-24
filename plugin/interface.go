@@ -137,3 +137,42 @@ type ConfigField struct {
 	Pattern      string // For strings: regex validation pattern
 	ElementType  string // For arrays: element type
 }
+
+// UIPlugin is an optional interface for plugins that provide custom glyph types.
+// Plugins implementing this interface can extend the QNTX frontend with custom
+// UI components rendered as glyphs on the canvas.
+type UIPlugin interface {
+	DomainPlugin
+
+	// RegisterGlyphs returns glyph type definitions this plugin provides.
+	// Each definition includes symbol, title, label, and the HTTP path
+	// that renders the glyph's HTML content.
+	RegisterGlyphs() []GlyphDef
+}
+
+// GlyphDef defines a custom glyph type provided by a plugin.
+type GlyphDef struct {
+	// Symbol is the glyph identifier (e.g., "⚗" for a chemistry plugin).
+	// Must not collide with built-in symbols from sym package.
+	Symbol string
+
+	// Title is the human-readable name shown in the title bar.
+	Title string
+
+	// Label is a short identifier for logs and the spawn menu.
+	Label string
+
+	// ContentPath is the HTTP path (relative to /api/{plugin}/) that
+	// returns the HTML fragment for this glyph's content area.
+	// The frontend GETs this path with ?glyph_id={id}&content={encoded}
+	// and mounts the response HTML into the glyph element.
+	ContentPath string
+
+	// CSSPath is an optional HTTP path to a stylesheet for this glyph type.
+	// Loaded once when the first glyph of this type is created.
+	CSSPath string
+
+	// DefaultWidth and DefaultHeight in pixels. 0 = use system default.
+	DefaultWidth  int
+	DefaultHeight int
+}

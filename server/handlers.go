@@ -10,6 +10,7 @@ package server
 // - Configuration API (HandleConfig, GET/PUT)
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -23,6 +24,7 @@ import (
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/wslogs"
 	"go.uber.org/zap"
@@ -701,6 +703,84 @@ func (s *QNTXServer) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, response)
+}
+
+// HandlePluginGlyphs returns custom glyph type definitions from all plugins.
+// GET /api/plugins/glyphs
+func (s *QNTXServer) HandlePluginGlyphs(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+
+	if s.pluginRegistry == nil {
+		writeJSON(w, http.StatusOK, []interface{}{})
+		return
+	}
+
+	type PluginGlyphDef struct {
+		Plugin        string `json:"plugin"`
+		Symbol        string `json:"symbol"`
+		Title         string `json:"title"`
+		Label         string `json:"label"`
+		ContentURL    string `json:"content_url"`
+		CSSURL        string `json:"css_url,omitempty"`
+		DefaultWidth  int    `json:"default_width,omitempty"`
+		DefaultHeight int    `json:"default_height,omitempty"`
+	}
+
+	glyphs := make([]PluginGlyphDef, 0)
+	ctx := r.Context()
+
+	// Iterate through all plugins and get their glyph definitions
+	for _, name := range s.pluginRegistry.List() {
+		plugin, ok := s.pluginRegistry.Get(name)
+		if !ok {
+			continue
+		}
+
+		// Check if plugin supports custom UI
+		// Use the client proxy to call RegisterGlyphs
+		type glyphProvider interface {
+			RegisterGlyphs(ctx context.Context) (*protocol.GlyphDefResponse, error)
+		}
+
+		provider, ok := plugin.(glyphProvider)
+		if !ok {
+			// Plugin doesn't implement RegisterGlyphs - skip
+			continue
+		}
+
+		// Get glyph definitions from plugin
+		resp, err := provider.RegisterGlyphs(ctx)
+		if err != nil {
+			s.logger.Warnw("Failed to get glyph definitions from plugin",
+				"plugin", name,
+				"error", err)
+			continue
+		}
+
+		// Convert to response format
+		for _, def := range resp.Glyphs {
+			contentURL := fmt.Sprintf("/api/%s%s", name, def.ContentPath)
+			cssURL := ""
+			if def.CssPath != "" {
+				cssURL = fmt.Sprintf("/api/%s%s", name, def.CssPath)
+			}
+
+			glyphs = append(glyphs, PluginGlyphDef{
+				Plugin:        name,
+				Symbol:        def.Symbol,
+				Title:         def.Title,
+				Label:         def.Label,
+				ContentURL:    contentURL,
+				CSSURL:        cssURL,
+				DefaultWidth:  int(def.DefaultWidth),
+				DefaultHeight: int(def.DefaultHeight),
+			})
+		}
+	}
+
+	writeJSON(w, http.StatusOK, glyphs)
 }
 
 // HandlePluginAction handles pause/resume actions for plugins

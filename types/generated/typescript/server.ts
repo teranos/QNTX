@@ -274,6 +274,17 @@ export interface ParsedATSCode {
   SourceURL: string;
 }
 
+export interface PluginGlyphDef {
+  plugin: string;
+  symbol: string;
+  title: string;
+  label: string;
+  content_url: string;
+  css_url?: string;
+  default_width?: number;
+  default_height?: number;
+}
+
 export interface PluginHealthMessage {
   /**
    * "plugin_health"

@@ -13,6 +13,7 @@ import { log, SEG } from '../../../logger';
 import { toast } from '../../../toast';
 import { getGlyphTypeBySymbol, getGlyphTypeByElement } from '../glyph-registry';
 import { createErrorGlyph } from '../error-glyph';
+import { createPluginPlaceholderGlyph } from '../plugin-glyph';
 import { createResultGlyph, type PromptConfig } from '../result-glyph';
 import { uploadFile } from '../../../api/files';
 import { createDocGlyph, type DocGlyphContent } from '../doc-glyph';
@@ -215,7 +216,19 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     const entry = glyph.symbol ? getGlyphTypeBySymbol(glyph.symbol) : undefined;
     if (entry) return await entry.render(glyph);
 
-    // Unknown glyph type → diagnostic error glyph
+    // Unknown glyph type - check if it's a plugin glyph (has plugin_name field)
+    const persistedGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+    const pluginName = persistedGlyph?.plugin_name;
+
+    if (pluginName) {
+        // Plugin glyph unavailable (plugin disabled or disconnected)
+        log.warn(SEG.GLYPH, `[Canvas] Plugin glyph unavailable: ${pluginName}`, {
+            glyphId: glyph.id, symbol: glyph.symbol, pluginName
+        });
+        return createPluginPlaceholderGlyph(glyph, pluginName);
+    }
+
+    // Unknown non-plugin glyph type → diagnostic error glyph
     log.error(SEG.GLYPH, `[Canvas] Unsupported glyph type: ${glyph.symbol}`, {
         glyphId: glyph.id, symbol: glyph.symbol, position: { x: glyph.x, y: glyph.y }
     });

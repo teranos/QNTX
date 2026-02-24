@@ -244,6 +244,15 @@ func (c *ExternalDomainProxy) ConfigSchema(ctx context.Context) (*protocol.Confi
 	return resp, nil
 }
 
+// RegisterGlyphs returns custom glyph type definitions from the remote plugin.
+func (c *ExternalDomainProxy) RegisterGlyphs(ctx context.Context) (*protocol.GlyphDefResponse, error) {
+	resp, err := c.client.RegisterGlyphs(ctx, &protocol.Empty{})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get glyph definitions from plugin %s at %s", c.metadata.Name, c.addr)
+	}
+	return resp, nil
+}
+
 // Shutdown shuts down the remote plugin.
 func (c *ExternalDomainProxy) Shutdown(ctx context.Context) error {
 	_, err := c.client.Shutdown(ctx, &protocol.Empty{})
