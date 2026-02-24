@@ -36,6 +36,7 @@ type CanvasGlyph struct {
 	CanvasId      string                 `protobuf:"bytes,11,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"` // which canvas this glyph belongs to ("" = root)
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	PluginName    string                 `protobuf:"bytes,12,opt,name=plugin_name,json=pluginName,proto3" json:"plugin_name,omitempty"` // plugin that provides this glyph (empty for built-in glyphs)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -138,6 +139,13 @@ func (x *CanvasGlyph) GetUpdatedAt() *timestamppb.Timestamp {
 		return x.UpdatedAt
 	}
 	return nil
+}
+
+func (x *CanvasGlyph) GetPluginName() string {
+	if x != nil {
+		return x.PluginName
+	}
+	return ""
 }
 
 // CompositionEdge represents a directed edge in the composition DAG
@@ -354,7 +362,7 @@ var File_glyph_proto_canvas_proto protoreflect.FileDescriptor
 
 const file_glyph_proto_canvas_proto_rawDesc = "" +
 	"\n" +
-	"\x18glyph/proto/canvas.proto\x12\x05glyph\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb2\x02\n" +
+	"\x18glyph/proto/canvas.proto\x12\x05glyph\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd3\x02\n" +
 	"\vCanvasGlyph\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06symbol\x18\x02 \x01(\tR\x06symbol\x12\f\n" +
@@ -368,7 +376,9 @@ const file_glyph_proto_canvas_proto_rawDesc = "" +
 	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAtJ\x04\b\b\x10\t\"o\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x1f\n" +
+	"\vplugin_name\x18\f \x01(\tR\n" +
+	"pluginNameJ\x04\b\b\x10\t\"o\n" +
 	"\x0fCompositionEdge\x12\x12\n" +
 	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x02 \x01(\tR\x02to\x12\x1c\n" +

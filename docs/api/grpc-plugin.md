@@ -18,6 +18,7 @@ gRPC interface for external QNTX domain plugins.
 | HandleWebSocket | WebSocketMessage | WebSocketMessage | Bidirectional |
 | Health | Empty | HealthResponse | No |
 | ConfigSchema | Empty | ConfigSchemaResponse | No |
+| RegisterGlyphs | Empty | GlyphDefResponse | No |
 | ExecuteJob | ExecuteJobRequest | ExecuteJobResponse | No |
 
 ### Metadata
@@ -81,6 +82,15 @@ ConfigSchema returns the configuration schema for this plugin
 
 - **Request**: `Empty`
 - **Response**: `ConfigSchemaResponse`
+
+---
+
+### RegisterGlyphs
+
+RegisterGlyphs returns custom glyph type definitions provided by this plugin
+
+- **Request**: `Empty`
+- **Response**: `GlyphDefResponse`
 
 ---
 
@@ -214,5 +224,27 @@ ExecuteJobResponse is returned after job execution
 | progress_current | int32 | Progress tracking (optional) - Pulse updates job.Progress |
 | progress_total | int32 | - |
 | cost_actual | double | Cost tracking (optional) - Pulse updates job.CostActual |
+
+### GlyphDefResponse
+
+GlyphDefResponse contains custom glyph type definitions from a plugin
+
+| Field | Type | Description |
+|-------|------|-------------|
+| glyphs | GlyphDef | - |
+
+### GlyphDef
+
+GlyphDef defines a custom glyph type provided by a plugin
+
+| Field | Type | Description |
+|-------|------|-------------|
+| symbol | string | Symbol is the glyph identifier (e.g., "⚗" for a chemistry plugin) |
+| title | string | Title is the human-readable name shown in the title bar |
+| label | string | Label is a short identifier for logs and the spawn menu |
+| content_path | string | ContentPath is the HTTP path (relative to /api/{plugin}/) that returns the HTML fragment for this glyph's content area |
+| css_path | string | CSSPath is an optional HTTP path to a stylesheet for this glyph type |
+| default_width | int32 | DefaultWidth and DefaultHeight in pixels (0 = use system default) |
+| default_height | int32 | - |
 
 [← Back to API Index](./README.md)
