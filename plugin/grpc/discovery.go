@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -53,12 +54,12 @@ type PluginConfig struct {
 
 // PluginManager manages plugin processes and connections.
 type PluginManager struct {
-	mu           sync.RWMutex
-	plugins      map[string]*managedPlugin
-	logger       *zap.SugaredLogger
-	basePort     int
-	nextPort     int // Track the next port to allocate
-	portMu       sync.Mutex // Separate mutex for port allocation
+	mu       sync.RWMutex
+	plugins  map[string]*managedPlugin
+	logger   *zap.SugaredLogger
+	basePort int
+	nextPort int        // Track the next port to allocate
+	portMu   sync.Mutex // Separate mutex for port allocation
 }
 
 // managedPlugin tracks a running plugin.
@@ -243,16 +244,35 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 }
 
 // allocatePort finds the next available port for a plugin.
-// Uses a simple counter to ensure each plugin gets a unique port.
+// Probes each port to ensure it's actually free before returning it.
+// This prevents connecting to orphaned plugin processes from previous runs.
 // Thread-safe for concurrent plugin loading.
 func (m *PluginManager) allocatePort() int {
 	m.portMu.Lock()
 	defer m.portMu.Unlock()
 
-	port := m.nextPort
-	m.nextPort++ // Increment for next allocation
+	const maxAttempts = 1000
+	for i := 0; i < maxAttempts; i++ {
+		port := m.nextPort
+		m.nextPort++
 
-	m.logger.Debugw("Allocated port for plugin", "port", port, "next_port", m.nextPort)
+		// Probe: try to listen on the port to verify it's free
+		addr := fmt.Sprintf("127.0.0.1:%d", port)
+		ln, err := net.Listen("tcp", addr)
+		if err != nil {
+			m.logger.Debugw("Port in use, skipping", "port", port)
+			continue
+		}
+		ln.Close()
+
+		m.logger.Debugw("Allocated port for plugin", "port", port, "next_port", m.nextPort)
+		return port
+	}
+
+	// Fallback: return next port and let the plugin handle conflicts
+	port := m.nextPort
+	m.nextPort++
+	m.logger.Warnw("Could not find free port after probing, using next available", "port", port)
 	return port
 }
 
@@ -495,7 +515,7 @@ type pluginLogger struct {
 	name     string
 	level    string
 	buf      strings.Builder
-	portChan chan int // Optional channel to send discovered port
+	portChan chan int     // Optional channel to send discovered port
 	mu       sync.RWMutex // Protects name field for dynamic updates
 }
 
