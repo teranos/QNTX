@@ -199,8 +199,8 @@ func TestSearchRichStringFields(t *testing.T) {
 		for _, match := range matches {
 			if match.NodeID == "note-long" {
 				assert.Contains(t, match.Excerpt, "fuzzy")
-				assert.Contains(t, match.Excerpt, "...")
-				assert.Less(t, len(match.Excerpt), len(longText))
+				// Excerpt is full text - no truncation by design (CLAUDE.md: No Ellipsis)
+				assert.Equal(t, longText, match.Excerpt)
 				break
 			}
 		}
