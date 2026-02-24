@@ -31,6 +31,8 @@ export interface GlyphTypeEntry {
     label: string;
     /** Create the DOM element for this glyph type */
     render: (glyph: Glyph) => Promise<HTMLElement> | HTMLElement;
+    /** Plugin name for plugin-provided glyphs (undefined for built-in glyphs) */
+    pluginName?: string;
 }
 
 const GLYPH_TYPES: GlyphTypeEntry[] = [
