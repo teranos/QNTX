@@ -46,7 +46,7 @@ func TestEdgeCursor_AppliedOnReload(t *testing.T) {
 		Enabled:           true,
 		ActionType:        storage.ActionTypeGlyphExecute,
 		ActionData:        string(actionData),
-		MaxFiresPerMinute: 60,
+		MaxFiresPerSecond: 60,
 	}
 	w.Filter.Actors = []string{"glyph:ax-source"}
 

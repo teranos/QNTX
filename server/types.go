@@ -270,3 +270,12 @@ type WatcherErrorMessage struct {
 	Severity  string   `json:"severity"`          // "error" or "warning"
 	Timestamp int64    `json:"timestamp"`         // Unix timestamp
 }
+
+// WatcherQueueStatusMessage represents the execution queue status broadcast
+type WatcherQueueStatusMessage struct {
+	Type             string         `json:"type"`               // "watcher_queue_status"
+	TotalQueued      int            `json:"total_queued"`
+	PerWatcher       map[string]int `json:"per_watcher"`
+	OldestAgeSeconds float64        `json:"oldest_age_seconds"`
+	Timestamp        int64          `json:"timestamp"`
+}

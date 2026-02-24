@@ -48,7 +48,7 @@ func TestEngine_RetryLogic(t *testing.T) {
 		Name:              "Retry Test",
 		ActionType:        storage.ActionTypePython,
 		ActionData:        "pass",
-		MaxFiresPerMinute: 105,
+		MaxFiresPerSecond: 105,
 		Enabled:           true,
 		Filter:            types.AxFilter{}, // Match all
 	}
