@@ -186,6 +186,21 @@ message ExecuteJobResponse {
 
   // Cost tracking (optional) - Pulse updates job.CostActual
   double cost_actual = 6;
+
+  // Execution logs — written to task_logs table by PluginProxyHandler
+  repeated JobLogEntry log_entries = 7;
+
+  // Plugin version that produced this result (e.g., "0.2.14")
+  string plugin_version = 8;
+}
+
+// JobLogEntry is a single log line from plugin job execution
+message JobLogEntry {
+  string timestamp = 1;  // RFC3339
+  string level = 2;      // "info", "warn", "error", "debug"
+  string message = 3;
+  string stage = 4;      // optional execution phase grouping
+  string metadata = 5;   // optional JSON blob
 }
 
 // GlyphDefResponse contains custom glyph type definitions from a plugin

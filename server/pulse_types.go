@@ -56,8 +56,9 @@ type ErrorResponse struct {
 
 // JobStagesResponse represents the response for GET /jobs/:job_id/stages
 type JobStagesResponse struct {
-	JobID  string               `json:"job_id"`
-	Stages []schedule.StageInfo `json:"stages"`
+	JobID         string               `json:"job_id"`
+	Stages        []schedule.StageInfo `json:"stages"`
+	PluginVersion string               `json:"plugin_version,omitempty"` // Version of plugin that executed this job
 }
 
 // TaskLogsResponse represents the response for GET /tasks/:task_id/logs
