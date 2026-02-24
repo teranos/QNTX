@@ -63,6 +63,7 @@ type Job struct {
 	PulseState *PulseState `json:"pulse_state,omitempty"`
 	Error string `json:"error,omitempty"`
 	ErrorDetails []string `json:"error_details,omitempty"`
+	PluginVersion string `json:"plugin_version,omitempty"`
 	ParentJobID string `json:"parent_job_id,omitempty"`
 	RetryCount int `json:"retry_count,omitempty"`
 	CreatedAt time.Time `json:"created_at"`

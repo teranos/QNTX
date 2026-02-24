@@ -114,11 +114,13 @@
 
 .execution-time {
   color: var(--panel-text-secondary);
+  font-size: var(--font-size-xs);
   font-variant-numeric: tabular-nums;
 }
 
 .execution-duration {
   color: var(--panel-text-secondary);
+  font-size: var(--font-size-xs);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
@@ -192,6 +194,13 @@
   color: var(--color-scheduled);
   font-size: var(--font-size-sm);
   font-style: italic;
+}
+
+.execution-plugin-version {
+  font-size: var(--font-size-xs);
+  color: var(--panel-text-secondary);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Empty state */

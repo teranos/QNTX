@@ -192,6 +192,10 @@ export interface JobChildrenResponse {
 export interface JobStagesResponse {
   job_id: string;
   stages: StageInfo[];
+  /**
+   * Version of plugin that executed this job
+   */
+  plugin_version?: string;
 }
 
 export interface JobUpdateMessage {

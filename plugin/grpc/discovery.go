@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -53,12 +54,12 @@ type PluginConfig struct {
 
 // PluginManager manages plugin processes and connections.
 type PluginManager struct {
-	mu           sync.RWMutex
-	plugins      map[string]*managedPlugin
-	logger       *zap.SugaredLogger
-	basePort     int
-	nextPort     int // Track the next port to allocate
-	portMu       sync.Mutex // Separate mutex for port allocation
+	mu       sync.RWMutex
+	plugins  map[string]*managedPlugin
+	logger   *zap.SugaredLogger
+	basePort int
+	nextPort int        // Track the next port to allocate
+	portMu   sync.Mutex // Separate mutex for port allocation
 }
 
 // managedPlugin tracks a running plugin.
@@ -69,6 +70,7 @@ type managedPlugin struct {
 	port         int
 	stdoutLogger *pluginLogger
 	stderrLogger *pluginLogger
+	logBuffer    *LogBuffer
 }
 
 const (
@@ -150,6 +152,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 	var port int
 	var stdoutLogger *pluginLogger
 	var stderrLogger *pluginLogger
+	var logBuf *LogBuffer
 
 	if config.Address != "" {
 		// Plugin is already running at the specified address
@@ -163,7 +166,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 
 		var err error
 		var actualPort int
-		process, actualPort, stdoutLogger, stderrLogger, err = m.launchPlugin(ctx, config, port)
+		process, actualPort, stdoutLogger, stderrLogger, logBuf, err = m.launchPlugin(ctx, config, port)
 		if err != nil {
 			return errors.Wrapf(err, "failed to launch plugin %s (binary=%s, port=%d)",
 				config.Name, config.Binary, port)
@@ -234,6 +237,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		port:         port,
 		stdoutLogger: stdoutLogger,
 		stderrLogger: stderrLogger,
+		logBuffer:    logBuf,
 	}
 
 	m.logger.Infof("Plugin '%s' v%s loaded and ready - %s",
@@ -243,29 +247,48 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 }
 
 // allocatePort finds the next available port for a plugin.
-// Uses a simple counter to ensure each plugin gets a unique port.
+// Probes each port to ensure it's actually free before returning it.
+// This prevents connecting to orphaned plugin processes from previous runs.
 // Thread-safe for concurrent plugin loading.
 func (m *PluginManager) allocatePort() int {
 	m.portMu.Lock()
 	defer m.portMu.Unlock()
 
-	port := m.nextPort
-	m.nextPort++ // Increment for next allocation
+	const maxAttempts = 1000
+	for i := 0; i < maxAttempts; i++ {
+		port := m.nextPort
+		m.nextPort++
 
-	m.logger.Debugw("Allocated port for plugin", "port", port, "next_port", m.nextPort)
+		// Probe: try to listen on the port to verify it's free
+		addr := fmt.Sprintf("127.0.0.1:%d", port)
+		ln, err := net.Listen("tcp", addr)
+		if err != nil {
+			m.logger.Debugw("Port in use, skipping", "port", port)
+			continue
+		}
+		ln.Close()
+
+		m.logger.Debugw("Allocated port for plugin", "port", port, "next_port", m.nextPort)
+		return port
+	}
+
+	// Fallback: return next port and let the plugin handle conflicts
+	port := m.nextPort
+	m.nextPort++
+	m.logger.Warnw("Could not find free port after probing, using next available", "port", port)
 	return port
 }
 
-// launchPlugin starts a plugin binary and returns the process, actual port, and loggers.
+// launchPlugin starts a plugin binary and returns the process, actual port, loggers, and log buffer.
 // If the plugin outputs QNTX_PLUGIN_PORT=XXXX, that port is returned instead of the requested port.
-func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, port int) (*os.Process, int, *pluginLogger, *pluginLogger, error) {
+func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, port int) (*os.Process, int, *pluginLogger, *pluginLogger, *LogBuffer, error) {
 	binary := config.Binary
 
 	// Resolve relative paths
 	if !filepath.IsAbs(binary) {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return nil, 0, nil, nil, errors.Wrapf(err, "failed to get home directory for plugin %s", config.Name)
+			return nil, 0, nil, nil, nil, errors.Wrapf(err, "failed to get home directory for plugin %s", config.Name)
 		}
 		binary = filepath.Join(home, ".qntx", "plugins", binary)
 	}
@@ -273,7 +296,7 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	// Check if binary exists
 	if _, err := os.Stat(binary); os.IsNotExist(err) {
 		err := errors.Newf("plugin binary not found for %s: %s", config.Name, binary)
-		return nil, 0, nil, nil, errors.WithHint(err, "install the plugin binary to ~/.qntx/plugins/ or specify the full path in config")
+		return nil, 0, nil, nil, nil, errors.WithHint(err, "install the plugin binary to ~/.qntx/plugins/ or specify the full path in config")
 	}
 
 	// Build command arguments
@@ -297,17 +320,22 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	// Create a channel to receive the actual port from plugin output
 	portChan := make(chan int, 1)
 
+	// Create shared log buffer for live streaming
+	logBuf := NewLogBuffer(200)
+
 	// Capture output for debugging and port discovery
 	stdoutLogger := &pluginLogger{
-		logger:   m.logger,
-		name:     config.Name,
-		level:    "info",
-		portChan: portChan,
+		logger:    m.logger,
+		name:      config.Name,
+		level:     "info",
+		portChan:  portChan,
+		logBuffer: logBuf,
 	}
 	stderrLogger := &pluginLogger{
-		logger: m.logger,
-		name:   config.Name,
-		level:  "error",
+		logger:    m.logger,
+		name:      config.Name,
+		level:     "error",
+		logBuffer: logBuf,
 		// Don't pass portChan to stderr - port announcement should be on stdout
 	}
 
@@ -315,7 +343,7 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	cmd.Stderr = stderrLogger
 
 	if err := cmd.Start(); err != nil {
-		return nil, 0, nil, nil, errors.Wrapf(err, "failed to start plugin %s (binary=%s, args=%v)",
+		return nil, 0, nil, nil, nil, errors.Wrapf(err, "failed to start plugin %s (binary=%s, args=%v)",
 			config.Name, binary, args)
 	}
 
@@ -337,7 +365,7 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 			"port", port)
 	}
 
-	return cmd.Process, actualPort, stdoutLogger, stderrLogger, nil
+	return cmd.Process, actualPort, stdoutLogger, stderrLogger, logBuf, nil
 }
 
 // waitForPlugin waits for a plugin's gRPC server to become ready.
@@ -403,6 +431,18 @@ func (m *PluginManager) GetPlugin(name string) (plugin.DomainPlugin, bool) {
 		return p.client, true
 	}
 	return nil, false
+}
+
+// GetLogBuffer returns the log buffer for a managed plugin.
+// Returns nil if the plugin doesn't exist or has no log buffer (e.g., remote plugins).
+func (m *PluginManager) GetLogBuffer(name string) *LogBuffer {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if p, ok := m.plugins[name]; ok {
+		return p.logBuffer
+	}
+	return nil
 }
 
 // GetAllPlugins returns all connected plugins as DomainPlugin instances.
@@ -491,12 +531,13 @@ func (m *PluginManager) Shutdown(ctx context.Context) error {
 
 // pluginLogger logs plugin output and captures port announcements.
 type pluginLogger struct {
-	logger   *zap.SugaredLogger
-	name     string
-	level    string
-	buf      strings.Builder
-	portChan chan int // Optional channel to send discovered port
-	mu       sync.RWMutex // Protects name field for dynamic updates
+	logger    *zap.SugaredLogger
+	name      string
+	level     string
+	buf       strings.Builder
+	portChan  chan int     // Optional channel to send discovered port
+	logBuffer *LogBuffer   // Optional ring buffer for log streaming
+	mu        sync.RWMutex // Protects name field for dynamic updates
 }
 
 // updateName safely updates the logger's name with version info
@@ -546,6 +587,20 @@ func (l *pluginLogger) Write(p []byte) (n int, err error) {
 			actualLevel := l.level // Default to configured level (stdout=info, stderr=error)
 			if err := json.Unmarshal([]byte(line), &logEntry); err == nil && logEntry.Level != "" {
 				actualLevel = logEntry.Level
+			}
+
+			// Write to log buffer for live streaming
+			if l.logBuffer != nil {
+				source := "stdout"
+				if l.level == "error" {
+					source = "stderr"
+				}
+				l.logBuffer.Write(LogEntry{
+					Timestamp: time.Now(),
+					Level:     actualLevel,
+					Line:      line,
+					Source:    source,
+				})
 			}
 
 			// Log at the actual level from JSON, or fallback to configured level for non-JSON
