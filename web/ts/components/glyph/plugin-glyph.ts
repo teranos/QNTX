@@ -22,7 +22,7 @@ export async function createPluginGlyph(
         loadPluginCSS(def.css_url);
     }
 
-    // Create canvas-placed wrapper
+    // Create canvas-placed wrapper without title bar
     const { element } = canvasPlaced({
         glyph,
         className: `canvas-plugin-glyph plugin-${def.plugin}`,
@@ -32,13 +32,37 @@ export async function createPluginGlyph(
             width: def.default_width ?? 400,
             height: def.default_height ?? 300,
         },
-        titleBar: {
-            label: def.title,
-            actions: [],
-        },
         resizable: true,
         logLabel: 'PluginGlyph',
     });
+
+    // Custom title bar (attestation glyph style)
+    const titleBar = document.createElement('div');
+    titleBar.className = 'canvas-glyph-title-bar';
+    titleBar.style.height = 'auto';
+    titleBar.style.minHeight = '0';
+    titleBar.style.padding = '3px 8px';
+    titleBar.style.backgroundColor = '#10161d';
+    titleBar.style.display = 'flex';
+    titleBar.style.alignItems = 'baseline';
+    titleBar.style.gap = '6px';
+
+    const symbol = document.createElement('span');
+    symbol.textContent = def.symbol;
+    symbol.style.fontWeight = 'bold';
+    symbol.style.flexShrink = '0';
+    symbol.style.color = '#adbcc1';
+    titleBar.appendChild(symbol);
+
+    const titleText = document.createElement('span');
+    titleText.style.fontSize = '12px';
+    titleText.style.fontFamily = 'monospace';
+    titleText.style.lineHeight = '1.4';
+    titleText.style.color = '#d7dee3';
+    titleText.textContent = def.title;
+    titleBar.appendChild(titleText);
+
+    element.appendChild(titleBar);
 
     // Content container
     const content = document.createElement('div');
