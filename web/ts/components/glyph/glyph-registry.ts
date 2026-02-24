@@ -49,6 +49,39 @@ const GLYPH_TYPES: GlyphTypeEntry[] = [
 const _bySymbol = new Map(GLYPH_TYPES.map(e => [e.symbol, e]));
 const _byClassName = new Map(GLYPH_TYPES.map(e => [e.className, e]));
 
+/** Register a new glyph type at runtime (for plugin glyphs) */
+export function registerGlyphType(entry: GlyphTypeEntry): void {
+    // Check for symbol collision with built-in glyphs
+    if (_bySymbol.has(entry.symbol)) {
+        console.warn(`[GlyphRegistry] Symbol ${entry.symbol} already registered, skipping`);
+        return;
+    }
+
+    // Check for className collision
+    if (_byClassName.has(entry.className)) {
+        console.warn(`[GlyphRegistry] Class ${entry.className} already registered, skipping`);
+        return;
+    }
+
+    // Add to array and Maps
+    GLYPH_TYPES.push(entry);
+    _bySymbol.set(entry.symbol, entry);
+    _byClassName.set(entry.className, entry);
+
+    console.debug(`[GlyphRegistry] Registered glyph type: ${entry.symbol} (${entry.label})`);
+}
+
+/** Get all registered glyph types */
+export function getAllGlyphTypes(): readonly GlyphTypeEntry[] {
+    return GLYPH_TYPES;
+}
+
+/** Check if a symbol is a built-in (not plugin) glyph */
+export function isBuiltinSymbol(symbol: string): boolean {
+    const builtins = [AX, IX, SO, SE, AS, Prose, Doc, Subcanvas, 'py', 'ts'];
+    return builtins.includes(symbol);
+}
+
 /** Look up glyph type by symbol (e.g., AX, 'py', SO) */
 export function getGlyphTypeBySymbol(symbol: string): GlyphTypeEntry | undefined {
     return _bySymbol.get(symbol);

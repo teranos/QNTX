@@ -294,6 +294,14 @@ async function init(): Promise<void> {
     // Register default system glyphs
     registerDefaultGlyphs();
 
+    // Load plugin glyphs (blocking — canvas needs plugin types registered before restoring glyphs)
+    try {
+        const { loadPluginGlyphs } = await import('./components/glyph/plugin-provided-glyphs.ts');
+        await loadPluginGlyphs();
+    } catch (err) {
+        log.warn(SEG.UI, '[Init] Failed to load plugin glyphs:', err);
+    }
+
     // Canvas is the primary workspace — open it immediately
     glyphRun.openGlyph('canvas-workspace');
 
