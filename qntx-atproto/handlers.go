@@ -12,6 +12,7 @@ import (
 	"github.com/bluesky-social/indigo/lex/util"
 	"github.com/bluesky-social/indigo/xrpc"
 	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/plugin/httputil"
 )
 
 // registerHTTPHandlers registers all HTTP handlers for the atproto domain.
@@ -48,12 +49,8 @@ func (p *Plugin) registerHTTPHandlers(mux *http.ServeMux) error {
 
 // checkPaused returns true and writes 503 if plugin is paused.
 func (p *Plugin) checkPaused(w http.ResponseWriter) bool {
-	p.mu.RLock()
-	paused := p.paused
-	p.mu.RUnlock()
-
-	if paused {
-		writeError(w, http.StatusServiceUnavailable, "AT Protocol plugin is paused")
+	if p.IsPaused() {
+		httputil.WriteError(w, http.StatusServiceUnavailable, "AT Protocol plugin is paused")
 		return true
 	}
 	return false
@@ -62,7 +59,7 @@ func (p *Plugin) checkPaused(w http.ResponseWriter) bool {
 // requireAuth returns the authenticated client, or writes 401 and returns nil.
 func (p *Plugin) requireAuth(w http.ResponseWriter) bool {
 	if p.getClient() == nil {
-		writeError(w, http.StatusUnauthorized, "Not authenticated — configure identifier and app_password")
+		httputil.WriteError(w, http.StatusUnauthorized, "Not authenticated — configure identifier and app_password")
 		return false
 	}
 	return true
@@ -83,11 +80,11 @@ func (p *Plugin) handleProfile(w http.ResponseWriter, r *http.Request) {
 	profile, err := appbsky.ActorGetProfile(r.Context(), client, client.Auth.Did)
 	if err != nil {
 		p.services.Logger("atproto").Errorw("Failed to get profile", "did", client.Auth.Did, "error", err)
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to get profile: %v", err))
+		httputil.WriteError(w, http.StatusBadGateway, fmt.Sprintf("Failed to get profile: %v", err))
 		return
 	}
 
-	writeJSON(w, http.StatusOK, profile)
+	httputil.WriteJSON(w,http.StatusOK, profile)
 }
 
 // handleActorProfile returns any actor's profile.
@@ -102,18 +99,18 @@ func (p *Plugin) handleActorProfile(w http.ResponseWriter, r *http.Request) {
 
 	actor := strings.TrimPrefix(r.URL.Path, "/profile/")
 	if actor == "" {
-		writeError(w, http.StatusBadRequest, "Actor handle or DID required")
+		httputil.WriteError(w,http.StatusBadRequest, "Actor handle or DID required")
 		return
 	}
 
 	profile, err := appbsky.ActorGetProfile(r.Context(), p.getClient(), actor)
 	if err != nil {
 		p.services.Logger("atproto").Errorw("Failed to get actor profile", "actor", actor, "error", err)
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to get profile for %s: %v", actor, err))
+		httputil.WriteError(w,http.StatusBadGateway, fmt.Sprintf("Failed to get profile for %s: %v", actor, err))
 		return
 	}
 
-	writeJSON(w, http.StatusOK, profile)
+	httputil.WriteJSON(w,http.StatusOK, profile)
 }
 
 // handleTimeline returns the authenticated user's home timeline.
@@ -136,11 +133,11 @@ func (p *Plugin) handleTimeline(w http.ResponseWriter, r *http.Request) {
 	resp, err := appbsky.FeedGetTimeline(r.Context(), p.getClient(), "", cursor, limit)
 	if err != nil {
 		p.services.Logger("atproto").Errorw("Failed to get timeline", "error", err)
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to get timeline: %v", err))
+		httputil.WriteError(w,http.StatusBadGateway, fmt.Sprintf("Failed to get timeline: %v", err))
 		return
 	}
 
-	writeJSON(w, http.StatusOK, resp)
+	httputil.WriteJSON(w,http.StatusOK, resp)
 }
 
 // handleAuthorFeed returns an actor's feed.
@@ -155,7 +152,7 @@ func (p *Plugin) handleAuthorFeed(w http.ResponseWriter, r *http.Request) {
 
 	actor := strings.TrimPrefix(r.URL.Path, "/feed/")
 	if actor == "" {
-		writeError(w, http.StatusBadRequest, "Actor handle or DID required")
+		httputil.WriteError(w,http.StatusBadRequest, "Actor handle or DID required")
 		return
 	}
 
@@ -170,11 +167,11 @@ func (p *Plugin) handleAuthorFeed(w http.ResponseWriter, r *http.Request) {
 	resp, err := appbsky.FeedGetAuthorFeed(r.Context(), p.getClient(), actor, cursor, "", false, limit)
 	if err != nil {
 		p.services.Logger("atproto").Errorw("Failed to get author feed", "actor", actor, "error", err)
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to get feed for %s: %v", actor, err))
+		httputil.WriteError(w,http.StatusBadGateway, fmt.Sprintf("Failed to get feed for %s: %v", actor, err))
 		return
 	}
 
-	writeJSON(w, http.StatusOK, resp)
+	httputil.WriteJSON(w,http.StatusOK, resp)
 }
 
 // handleNotifications returns the authenticated user's notifications.
@@ -197,11 +194,11 @@ func (p *Plugin) handleNotifications(w http.ResponseWriter, r *http.Request) {
 	resp, err := appbsky.NotificationListNotifications(r.Context(), p.getClient(), cursor, limit, false, nil, "")
 	if err != nil {
 		p.services.Logger("atproto").Errorw("Failed to get notifications", "error", err)
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to get notifications: %v", err))
+		httputil.WriteError(w,http.StatusBadGateway, fmt.Sprintf("Failed to get notifications: %v", err))
 		return
 	}
 
-	writeJSON(w, http.StatusOK, resp)
+	httputil.WriteJSON(w,http.StatusOK, resp)
 }
 
 // handleResolve resolves a handle to a DID.
@@ -213,7 +210,7 @@ func (p *Plugin) handleResolve(w http.ResponseWriter, r *http.Request) {
 
 	handle := strings.TrimPrefix(r.URL.Path, "/resolve/")
 	if handle == "" {
-		writeError(w, http.StatusBadRequest, "Handle required")
+		httputil.WriteError(w,http.StatusBadRequest, "Handle required")
 		return
 	}
 
@@ -232,13 +229,13 @@ func (p *Plugin) handleResolve(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		err = errors.WithDetail(err, fmt.Sprintf("Handle: %s", handle))
 		p.services.Logger("atproto").Errorw("Failed to resolve handle", "handle", handle, "error", err)
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to resolve handle %s: %v", handle, err))
+		httputil.WriteError(w,http.StatusBadGateway, fmt.Sprintf("Failed to resolve handle %s: %v", handle, err))
 		return
 	}
 
 	p.attestResolve(handle, did)
 
-	writeJSON(w, http.StatusOK, map[string]string{
+	httputil.WriteJSON(w,http.StatusOK, map[string]string{
 		"handle": handle,
 		"did":    did,
 	})
@@ -265,12 +262,12 @@ func (p *Plugin) handleCreatePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req CreatePostRequest
-	if err := readJSON(w, r, &req); err != nil {
+	if err := httputil.ReadJSON(w, r,&req); err != nil {
 		return
 	}
 
 	if req.Text == "" {
-		writeError(w, http.StatusBadRequest, "Text is required")
+		httputil.WriteError(w,http.StatusBadRequest, "Text is required")
 		return
 	}
 
@@ -311,13 +308,13 @@ func (p *Plugin) handleCreatePost(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		p.services.Logger("atproto").Errorw("Failed to create post", "error", err)
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to create post: %v", err))
+		httputil.WriteError(w,http.StatusBadGateway, fmt.Sprintf("Failed to create post: %v", err))
 		return
 	}
 
 	p.attestPost(client.Auth.Did, resp.Uri, resp.Cid, req.Text)
 
-	writeJSON(w, http.StatusCreated, map[string]string{
+	httputil.WriteJSON(w,http.StatusCreated, map[string]string{
 		"uri": resp.Uri,
 		"cid": resp.Cid,
 	})
@@ -338,12 +335,12 @@ func (p *Plugin) handleFollow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req FollowRequest
-	if err := readJSON(w, r, &req); err != nil {
+	if err := httputil.ReadJSON(w, r,&req); err != nil {
 		return
 	}
 
 	if req.Subject == "" {
-		writeError(w, http.StatusBadRequest, "Subject DID is required")
+		httputil.WriteError(w,http.StatusBadRequest, "Subject DID is required")
 		return
 	}
 
@@ -361,13 +358,13 @@ func (p *Plugin) handleFollow(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		p.services.Logger("atproto").Errorw("Failed to follow actor", "subject", req.Subject, "error", err)
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to follow %s: %v", req.Subject, err))
+		httputil.WriteError(w,http.StatusBadGateway, fmt.Sprintf("Failed to follow %s: %v", req.Subject, err))
 		return
 	}
 
 	p.attestFollow(client.Auth.Did, req.Subject, resp.Uri)
 
-	writeJSON(w, http.StatusCreated, map[string]string{
+	httputil.WriteJSON(w,http.StatusCreated, map[string]string{
 		"uri": resp.Uri,
 		"cid": resp.Cid,
 	})
@@ -389,12 +386,12 @@ func (p *Plugin) handleLike(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req LikeRequest
-	if err := readJSON(w, r, &req); err != nil {
+	if err := httputil.ReadJSON(w, r,&req); err != nil {
 		return
 	}
 
 	if req.URI == "" || req.CID == "" {
-		writeError(w, http.StatusBadRequest, "URI and CID are required")
+		httputil.WriteError(w,http.StatusBadRequest, "URI and CID are required")
 		return
 	}
 
@@ -415,13 +412,13 @@ func (p *Plugin) handleLike(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		p.services.Logger("atproto").Errorw("Failed to like post", "uri", req.URI, "error", err)
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to like post: %v", err))
+		httputil.WriteError(w,http.StatusBadGateway, fmt.Sprintf("Failed to like post: %v", err))
 		return
 	}
 
 	p.attestLike(client.Auth.Did, req.URI, resp.Uri)
 
-	writeJSON(w, http.StatusCreated, map[string]string{
+	httputil.WriteJSON(w,http.StatusCreated, map[string]string{
 		"uri": resp.Uri,
 		"cid": resp.Cid,
 	})
@@ -438,11 +435,11 @@ func (p *Plugin) handleSyncTimeline(w http.ResponseWriter, r *http.Request) {
 
 	if err := p.syncTimeline(r.Context(), "manual"); err != nil {
 		p.services.Logger("atproto").Errorw("Timeline sync failed", "error", err)
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Timeline sync failed: %v", err))
+		httputil.WriteError(w,http.StatusInternalServerError, fmt.Sprintf("Timeline sync failed: %v", err))
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{
+	httputil.WriteJSON(w,http.StatusOK, map[string]string{
 		"status": "Timeline sync completed successfully",
 	})
 }

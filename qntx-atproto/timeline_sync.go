@@ -13,11 +13,7 @@ func (p *Plugin) syncTimeline(ctx context.Context, jobID string) error {
 	logger := p.services.Logger("atproto")
 
 	// Skip if paused
-	p.mu.RLock()
-	paused := p.paused
-	p.mu.RUnlock()
-
-	if paused {
+	if p.IsPaused() {
 		logger.Debug("Timeline sync skipped (plugin paused)")
 		return nil
 	}
