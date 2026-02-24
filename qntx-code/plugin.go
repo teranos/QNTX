@@ -26,34 +26,29 @@ import (
 	"github.com/teranos/QNTX/qntx-code/langserver/gopls"
 )
 
-// Plugin is the code domain plugin implementation
-// Implements plugin.PausablePlugin for runtime pause/resume support
+// Plugin is the code domain plugin implementation.
 type Plugin struct {
-	services     plugin.ServiceRegistry
+	plugin.Base
 	goplsService *gopls.Service // Go language server for code intelligence
-	paused       bool           // Whether the plugin is currently paused
 }
 
-// NewPlugin creates a new code domain plugin
+// NewPlugin creates a new code domain plugin.
 func NewPlugin() *Plugin {
-	return &Plugin{}
-}
-
-// Metadata returns information about the code domain plugin
-func (p *Plugin) Metadata() plugin.Metadata {
-	return plugin.Metadata{
-		Name:        "code",
-		Version:     "0.2.1",
-		QNTXVersion: ">= 0.1.0",
-		Description: "Software development domain (git, GitHub, gopls, code editor)",
-		Author:      "QNTX Team",
-		License:     "MIT",
+	return &Plugin{
+		Base: plugin.NewBase(plugin.Metadata{
+			Name:        "code",
+			Version:     "0.2.1",
+			QNTXVersion: ">= 0.1.0",
+			Description: "Software development domain (git, GitHub, gopls, code editor)",
+			Author:      "QNTX Team",
+			License:     "MIT",
+		}),
 	}
 }
 
-// Initialize initializes the code domain plugin
+// Initialize initializes the code domain plugin.
 func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
-	p.services = services
+	p.Init(services)
 	logger := services.Logger("code")
 
 	// Initialize gopls service for Go code intelligence
@@ -91,9 +86,9 @@ func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry
 	return nil
 }
 
-// Shutdown shuts down the code domain plugin
+// Shutdown shuts down the code domain plugin.
 func (p *Plugin) Shutdown(ctx context.Context) error {
-	logger := p.services.Logger("code")
+	logger := p.Services().Logger("code")
 
 	// Shutdown gopls service
 	if p.goplsService != nil {
@@ -108,16 +103,15 @@ func (p *Plugin) Shutdown(ctx context.Context) error {
 		}
 	}
 
-	logger.Info("Code domain plugin shutting down")
-	return nil
+	return p.Base.Shutdown(ctx)
 }
 
-// RegisterHTTP registers HTTP handlers for the code domain
+// RegisterHTTP registers HTTP handlers for the code domain.
 func (p *Plugin) RegisterHTTP(mux *http.ServeMux) error {
 	return p.registerHTTPHandlers(mux)
 }
 
-// RegisterWebSocket registers WebSocket handlers for the code domain
+// RegisterWebSocket registers WebSocket handlers for the code domain.
 func (p *Plugin) RegisterWebSocket() (map[string]plugin.WebSocketHandler, error) {
 	handlers := make(map[string]plugin.WebSocketHandler)
 
@@ -127,70 +121,18 @@ func (p *Plugin) RegisterWebSocket() (map[string]plugin.WebSocketHandler, error)
 	return handlers, nil
 }
 
-// Health returns the health status of the code domain plugin
+// Health returns the health status of the code domain plugin.
 func (p *Plugin) Health(ctx context.Context) plugin.HealthStatus {
-	// Issue #131: Implement health checks for code domain plugin
-	// Should verify: gopls service, database connectivity, optional GitHub API
+	status := p.Base.Health(ctx)
 
-	message := "Code domain operational"
-	if p.paused {
-		message = "Code domain paused"
-	}
-
-	details := map[string]interface{}{
+	status.Details = map[string]interface{}{
 		"gopls_available": p.goplsService != nil,
 	}
 
-	return plugin.HealthStatus{
-		Healthy: true,     // Paused is intentional, not a failure
-		Paused:  p.paused, // Separate field for pause state
-		Message: message,
-		Details: details,
-	}
-}
-
-// Pause temporarily suspends the code domain plugin operations
-// Implements plugin.PausablePlugin
-func (p *Plugin) Pause(ctx context.Context) error {
-	logger := p.services.Logger("code")
-
-	if p.paused {
-		return fmt.Errorf("code plugin is already paused")
-	}
-
-	// Pause gopls service if available
-	if p.goplsService != nil {
-		logger.Info("Pausing gopls service")
-		// gopls doesn't have a pause method, so we just mark as paused
-		// HTTP handlers will check p.paused and return 503
-	}
-
-	p.paused = true
-	logger.Info("Code domain plugin paused")
-	return nil
-}
-
-// Resume restores the code domain plugin to active operation
-// Implements plugin.PausablePlugin
-func (p *Plugin) Resume(ctx context.Context) error {
-	logger := p.services.Logger("code")
-
-	if !p.paused {
-		return fmt.Errorf("code plugin is not paused")
-	}
-
-	p.paused = false
-	logger.Info("Code domain plugin resumed")
-	return nil
-}
-
-// IsPaused returns whether the plugin is currently paused
-func (p *Plugin) IsPaused() bool {
-	return p.paused
+	return status
 }
 
 // ConfigSchema returns the configuration schema for UI-based configuration.
-// Implements plugin.ConfigurablePlugin.
 func (p *Plugin) ConfigSchema() map[string]plugin.ConfigField {
 	return map[string]plugin.ConfigField{
 		"gopls.workspace_root": {
@@ -228,7 +170,7 @@ var _ plugin.ConfigurablePlugin = (*Plugin)(nil)
 
 // attestGoplsStatus creates an attestation for gopls initialization status
 func (p *Plugin) attestGoplsStatus(status, workspace, errMsg string) {
-	store := p.services.ATSStore()
+	store := p.Services().ATSStore()
 	if store == nil {
 		return
 	}
@@ -247,13 +189,7 @@ func (p *Plugin) attestGoplsStatus(status, workspace, errMsg string) {
 		Attributes: attrs,
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
-		logger := p.services.Logger("code")
+		logger := p.Services().Logger("code")
 		logger.Debugw("Failed to create gopls status attestation", "status", status, "error", err)
 	}
-}
-
-// Register the code domain plugin on import
-func init() {
-	// Plugin will be registered when the registry is initialized
-	// This is done in main.go after creating the registry
 }

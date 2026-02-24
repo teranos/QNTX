@@ -28,36 +28,31 @@ import (
 )
 
 // Plugin is the AT Protocol domain plugin implementation.
-// Implements plugin.PausablePlugin and plugin.ConfigurablePlugin.
 type Plugin struct {
-	services plugin.ServiceRegistry
+	plugin.Base
 
 	mu     sync.RWMutex
-	paused bool         // Protected by mu
 	client *xrpc.Client // Protected by mu
 	did    string       // Protected by mu
 }
 
 // NewPlugin creates a new AT Protocol domain plugin.
 func NewPlugin() *Plugin {
-	return &Plugin{}
-}
-
-// Metadata returns information about the atproto domain plugin.
-func (p *Plugin) Metadata() plugin.Metadata {
-	return plugin.Metadata{
-		Name:        "atproto",
-		Version:     "0.2.13",
-		QNTXVersion: ">= 0.1.0",
-		Description: "AT Protocol integration (Bluesky) with auto-scheduled timeline sync",
-		Author:      "QNTX Team",
-		License:     "MIT",
+	return &Plugin{
+		Base: plugin.NewBase(plugin.Metadata{
+			Name:        "atproto",
+			Version:     "0.2.13",
+			QNTXVersion: ">= 0.1.0",
+			Description: "AT Protocol integration (Bluesky) with auto-scheduled timeline sync",
+			Author:      "QNTX Team",
+			License:     "MIT",
+		}),
 	}
 }
 
 // Initialize initializes the AT Protocol domain plugin.
 func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
-	p.services = services
+	p.Init(services)
 	logger := services.Logger("atproto")
 
 	config := services.Config("atproto")
@@ -110,15 +105,12 @@ func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry
 
 // Shutdown shuts down the AT Protocol domain plugin.
 func (p *Plugin) Shutdown(ctx context.Context) error {
-	logger := p.services.Logger("atproto")
-
 	p.mu.Lock()
 	p.client = nil
 	p.did = ""
 	p.mu.Unlock()
 
-	logger.Info("AT Protocol domain plugin shutting down")
-	return nil
+	return p.Base.Shutdown(ctx)
 }
 
 // RegisterHTTP registers HTTP handlers for the atproto domain.
@@ -126,24 +118,14 @@ func (p *Plugin) RegisterHTTP(mux *http.ServeMux) error {
 	return p.registerHTTPHandlers(mux)
 }
 
-// RegisterWebSocket registers WebSocket handlers for the atproto domain.
-func (p *Plugin) RegisterWebSocket() (map[string]plugin.WebSocketHandler, error) {
-	// No WebSocket handlers yet — firehose subscription is future work
-	return nil, nil
-}
-
 // Health returns the health status of the atproto domain plugin.
 func (p *Plugin) Health(ctx context.Context) plugin.HealthStatus {
+	status := p.Base.Health(ctx)
+
 	p.mu.RLock()
 	authenticated := p.client != nil
 	did := p.did
-	paused := p.paused
 	p.mu.RUnlock()
-
-	message := "AT Protocol domain operational"
-	if paused {
-		message = "AT Protocol domain paused"
-	}
 
 	details := map[string]interface{}{
 		"authenticated": authenticated,
@@ -151,46 +133,9 @@ func (p *Plugin) Health(ctx context.Context) plugin.HealthStatus {
 	if did != "" {
 		details["did"] = did
 	}
+	status.Details = details
 
-	return plugin.HealthStatus{
-		Healthy: true,
-		Paused:  paused,
-		Message: message,
-		Details: details,
-	}
-}
-
-// Pause temporarily suspends the atproto domain plugin operations.
-func (p *Plugin) Pause(ctx context.Context) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if p.paused {
-		return fmt.Errorf("atproto plugin is already paused")
-	}
-	p.paused = true
-	p.services.Logger("atproto").Info("AT Protocol domain plugin paused")
-	return nil
-}
-
-// Resume restores the atproto domain plugin to active operation.
-func (p *Plugin) Resume(ctx context.Context) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if !p.paused {
-		return fmt.Errorf("atproto plugin is not paused")
-	}
-	p.paused = false
-	p.services.Logger("atproto").Info("AT Protocol domain plugin resumed")
-	return nil
-}
-
-// IsPaused returns whether the plugin is currently paused.
-func (p *Plugin) IsPaused() bool {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return p.paused
+	return status
 }
 
 // ConfigSchema returns the configuration schema for UI-based configuration.
@@ -244,10 +189,10 @@ func (p *Plugin) getDID() string {
 // GetSchedules returns the schedules this plugin wants QNTX to create.
 // Called during initialization to auto-create Pulse scheduled jobs.
 func (p *Plugin) GetSchedules() []*protocol.ScheduleInfo {
-	config := p.services.Config("atproto")
+	config := p.Services().Config("atproto")
 	interval := int32(config.GetInt("timeline_sync_interval_seconds"))
 
-	logger := p.services.Logger("atproto")
+	logger := p.Services().Logger("atproto")
 	logger.Infow("GetSchedules called",
 		"interval", interval,
 		"all_keys", config.GetKeys(),
