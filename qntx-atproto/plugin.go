@@ -30,10 +30,10 @@ import (
 // Plugin is the AT Protocol domain plugin implementation.
 // Implements plugin.PausablePlugin and plugin.ConfigurablePlugin.
 type Plugin struct {
+	plugin.PauseController
 	services plugin.ServiceRegistry
 
 	mu     sync.RWMutex
-	paused bool         // Protected by mu
 	client *xrpc.Client // Protected by mu
 	did    string       // Protected by mu
 }
@@ -58,6 +58,7 @@ func (p *Plugin) Metadata() plugin.Metadata {
 // Initialize initializes the AT Protocol domain plugin.
 func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
 	p.services = services
+	p.InitPauseController("atproto")
 	logger := services.Logger("atproto")
 
 	config := services.Config("atproto")
@@ -137,13 +138,7 @@ func (p *Plugin) Health(ctx context.Context) plugin.HealthStatus {
 	p.mu.RLock()
 	authenticated := p.client != nil
 	did := p.did
-	paused := p.paused
 	p.mu.RUnlock()
-
-	message := "AT Protocol domain operational"
-	if paused {
-		message = "AT Protocol domain paused"
-	}
 
 	details := map[string]interface{}{
 		"authenticated": authenticated,
@@ -154,43 +149,28 @@ func (p *Plugin) Health(ctx context.Context) plugin.HealthStatus {
 
 	return plugin.HealthStatus{
 		Healthy: true,
-		Paused:  paused,
-		Message: message,
+		Paused:  p.IsPaused(),
+		Message: p.HealthMessage("AT Protocol domain"),
 		Details: details,
 	}
 }
 
 // Pause temporarily suspends the atproto domain plugin operations.
 func (p *Plugin) Pause(ctx context.Context) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if p.paused {
-		return fmt.Errorf("atproto plugin is already paused")
+	if err := p.PauseController.Pause(); err != nil {
+		return err
 	}
-	p.paused = true
 	p.services.Logger("atproto").Info("AT Protocol domain plugin paused")
 	return nil
 }
 
 // Resume restores the atproto domain plugin to active operation.
 func (p *Plugin) Resume(ctx context.Context) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if !p.paused {
-		return fmt.Errorf("atproto plugin is not paused")
+	if err := p.PauseController.Resume(); err != nil {
+		return err
 	}
-	p.paused = false
 	p.services.Logger("atproto").Info("AT Protocol domain plugin resumed")
 	return nil
-}
-
-// IsPaused returns whether the plugin is currently paused.
-func (p *Plugin) IsPaused() bool {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return p.paused
 }
 
 // ConfigSchema returns the configuration schema for UI-based configuration.

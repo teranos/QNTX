@@ -15,6 +15,7 @@ import (
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/plugin/httputil"
 	"github.com/teranos/QNTX/qntx-code/ixgest/git"
 	"github.com/teranos/QNTX/qntx-code/vcs/github"
 )
@@ -107,8 +108,8 @@ func (p *Plugin) handleCode(w http.ResponseWriter, r *http.Request) {
 
 // checkPaused returns true and writes 503 response if plugin is paused
 func (p *Plugin) checkPaused(w http.ResponseWriter) bool {
-	if p.paused {
-		http.Error(w, "Code plugin is paused", http.StatusServiceUnavailable)
+	if p.IsPaused() {
+		httputil.WriteError(w, http.StatusServiceUnavailable, "Code plugin is paused")
 		return true
 	}
 	return false
@@ -120,7 +121,7 @@ func (p *Plugin) handleCodeTree(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !requireMethod(w, r, http.MethodGet) {
+	if !httputil.RequireMethod(w, r,http.MethodGet) {
 		return
 	}
 
@@ -130,7 +131,7 @@ func (p *Plugin) handleCodeTree(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, tree)
+	httputil.WriteJSON(w,http.StatusOK, tree)
 }
 
 // handleCodeContent serves or updates code file content
@@ -196,7 +197,7 @@ func (p *Plugin) handlePRSuggestions(w http.ResponseWriter, r *http.Request) {
 
 	logger := p.services.Logger("code")
 
-	if !requireMethod(w, r, http.MethodGet) {
+	if !httputil.RequireMethod(w, r,http.MethodGet) {
 		return
 	}
 
@@ -227,7 +228,7 @@ func (p *Plugin) handlePRSuggestions(w http.ResponseWriter, r *http.Request) {
 	// Create attestation for PR suggestions fetch
 	p.attestPRAction(prNumber, "fetched-suggestions", len(suggestions))
 
-	writeJSON(w, http.StatusOK, suggestions)
+	httputil.WriteJSON(w,http.StatusOK, suggestions)
 }
 
 // handlePRList returns list of open PRs
@@ -238,7 +239,7 @@ func (p *Plugin) handlePRList(w http.ResponseWriter, r *http.Request) {
 
 	logger := p.services.Logger("code")
 
-	if !requireMethod(w, r, http.MethodGet) {
+	if !httputil.RequireMethod(w, r,http.MethodGet) {
 		return
 	}
 
@@ -254,7 +255,7 @@ func (p *Plugin) handlePRList(w http.ResponseWriter, r *http.Request) {
 	// Create attestation for PR list fetch
 	p.attestPRListFetch(len(prs))
 
-	writeJSON(w, http.StatusOK, prs)
+	httputil.WriteJSON(w,http.StatusOK, prs)
 }
 
 // GitIxgestRequest represents a git ingestion request
@@ -272,7 +273,7 @@ func (p *Plugin) handleGitIxgest(w http.ResponseWriter, r *http.Request) {
 
 	// Parse request body
 	var req GitIxgestRequest
-	if err := readJSON(w, r, &req); err != nil {
+	if err := httputil.ReadJSON(w, r,&req); err != nil {
 		return
 	}
 
@@ -347,7 +348,7 @@ func (p *Plugin) handleGitIxgest(w http.ResponseWriter, r *http.Request) {
 		"branches", result.BranchesProcessed,
 		"attestations", result.TotalAttestations)
 
-	writeJSON(w, http.StatusOK, result)
+	httputil.WriteJSON(w,http.StatusOK, result)
 }
 
 // buildCodeTree builds the code file tree

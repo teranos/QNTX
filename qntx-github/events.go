@@ -16,11 +16,7 @@ func (p *Plugin) HandlePulseJob(ctx context.Context, jobID string) (int, error) 
 	logger := p.services.Logger("github")
 
 	// Skip if paused
-	p.mu.RLock()
-	paused := p.paused
-	p.mu.RUnlock()
-
-	if paused {
+	if p.IsPaused() {
 		logger.Debug("GitHub event polling skipped (plugin paused)")
 		return 0, nil
 	}

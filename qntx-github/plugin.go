@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sync"
 
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -13,10 +12,9 @@ import (
 
 // Plugin is the GitHub domain plugin implementation.
 type Plugin struct {
+	plugin.PauseController
 	services plugin.ServiceRegistry
 
-	mu     sync.RWMutex
-	paused bool
 	client *GitHubClient // GitHub API client
 }
 
@@ -40,6 +38,7 @@ func (p *Plugin) Metadata() plugin.Metadata {
 // Initialize initializes the GitHub domain plugin.
 func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
 	p.services = services
+	p.InitPauseController("github")
 	logger := services.Logger("github")
 
 	config := services.Config("github")
@@ -90,57 +89,29 @@ func (p *Plugin) RegisterWebSocket() (map[string]plugin.WebSocketHandler, error)
 
 // Health returns the health status of the GitHub domain plugin.
 func (p *Plugin) Health(ctx context.Context) plugin.HealthStatus {
-	p.mu.RLock()
-	paused := p.paused
-	p.mu.RUnlock()
-
-	message := "GitHub plugin operational"
-	if paused {
-		message = "GitHub plugin paused"
-	}
-
 	return plugin.HealthStatus{
 		Healthy: true,
-		Paused:  paused,
-		Message: message,
+		Paused:  p.IsPaused(),
+		Message: p.HealthMessage("GitHub plugin"),
 	}
 }
 
 // Pause temporarily suspends the GitHub plugin operations.
 func (p *Plugin) Pause(ctx context.Context) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if p.paused {
-		return fmt.Errorf("github plugin is already paused")
+	if err := p.PauseController.Pause(); err != nil {
+		return err
 	}
-
-	p.paused = true
-	logger := p.services.Logger("github")
-	logger.Info("GitHub plugin paused")
+	p.services.Logger("github").Info("GitHub plugin paused")
 	return nil
 }
 
 // Resume restores the GitHub plugin to active operation.
 func (p *Plugin) Resume(ctx context.Context) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if !p.paused {
-		return fmt.Errorf("github plugin is not paused")
+	if err := p.PauseController.Resume(); err != nil {
+		return err
 	}
-
-	p.paused = false
-	logger := p.services.Logger("github")
-	logger.Info("GitHub plugin resumed")
+	p.services.Logger("github").Info("GitHub plugin resumed")
 	return nil
-}
-
-// IsPaused returns whether the plugin is currently paused.
-func (p *Plugin) IsPaused() bool {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return p.paused
 }
 
 // ConfigSchema returns the configuration schema for the GitHub plugin.
