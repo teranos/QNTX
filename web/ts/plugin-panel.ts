@@ -94,6 +94,9 @@ let contentElement: HTMLElement | null = null;
 // Tooltip cleanup function
 let tooltipCleanup: (() => void) | null = null;
 
+// Log stream state
+let activeLogStream: EventSource | null = null;
+
 async function fetchServerHealth(): Promise<void> {
     try {
         const response = await apiFetch('/health');
@@ -231,6 +234,7 @@ function attachEventDelegation(): void {
             e.stopPropagation();
             expandedPlugin = null;
             configState = null;
+            disconnectLogStream();
             render();
             return;
         }
@@ -451,7 +455,7 @@ function renderPlugin(plugin: PluginInfo): string {
             </div>
             ${controls ? `<div class="plugin-controls">${controls}</div>` : ''}
             ${!plugin.healthy && plugin.message ? `<div class="plugin-message plugin-message-error">${escapeHtml(plugin.message)}</div>` : ''}
-            ${isExpanded ? renderConfigForm() : ''}
+            ${isExpanded ? renderExpandedContent(plugin) : ''}
         </div>
     `;
 }
@@ -518,11 +522,17 @@ async function togglePluginConfig(pluginName: string): Promise<void> {
     if (expandedPlugin === pluginName) {
         expandedPlugin = null;
         configState = null;
+        disconnectLogStream();
     } else {
         expandedPlugin = pluginName;
         await fetchPluginConfig(pluginName);
     }
     render();
+
+    // Connect log stream after render so the container DOM exists
+    if (expandedPlugin) {
+        connectLogStream(expandedPlugin);
+    }
 }
 
 async function fetchPluginConfig(pluginName: string): Promise<void> {
@@ -583,6 +593,16 @@ async function fetchPluginConfig(pluginName: string): Promise<void> {
         };
         render();
     }
+}
+
+function renderExpandedContent(plugin: PluginInfo): string {
+    return `
+        <div class="plugin-log-viewer">
+            <div class="plugin-log-header">Activity Log</div>
+            <div class="plugin-log-container" data-plugin="${escapeHtml(plugin.name)}"></div>
+        </div>
+        ${renderConfigForm()}
+    `;
 }
 
 function renderConfigForm(): string {
@@ -806,6 +826,81 @@ async function savePluginConfig(): Promise<void> {
             configState.needsConfirmation = false;
             render();
         }
+    }
+}
+
+interface LogEntryData {
+    timestamp: string;
+    level: string;
+    line: string;
+    source: string;
+}
+
+function connectLogStream(pluginName: string): void {
+    disconnectLogStream();
+
+    const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
+    const url = `${backendUrl}/api/plugins/${pluginName}/logs`;
+    const es = new EventSource(url, { withCredentials: true });
+
+    es.onmessage = (event: MessageEvent) => {
+        try {
+            const entry: LogEntryData = JSON.parse(event.data);
+            appendLogEntry(pluginName, entry);
+        } catch {
+            // Ignore malformed entries
+        }
+    };
+
+    es.onerror = () => {
+        // EventSource auto-reconnects; nothing to do
+    };
+
+    activeLogStream = es;
+}
+
+function disconnectLogStream(): void {
+    if (activeLogStream) {
+        activeLogStream.close();
+        activeLogStream = null;
+    }
+}
+
+function appendLogEntry(pluginName: string, entry: LogEntryData): void {
+    if (!contentElement) return;
+
+    const container = contentElement.querySelector(`.plugin-log-container[data-plugin="${pluginName}"]`);
+    if (!container) return;
+
+    const row = document.createElement('div');
+    row.className = `plugin-log-entry plugin-log-level-${entry.level}`;
+
+    const time = document.createElement('span');
+    time.className = 'plugin-log-time';
+    const date = new Date(entry.timestamp);
+    const hh = String(date.getHours()).padStart(2, '0');
+    const mm = String(date.getMinutes()).padStart(2, '0');
+    const ss = String(date.getSeconds()).padStart(2, '0');
+    time.textContent = `${hh}:${mm}:${ss}`;
+
+    const level = document.createElement('span');
+    level.className = 'plugin-log-level';
+    level.textContent = entry.level.toUpperCase();
+
+    const line = document.createElement('span');
+    line.className = 'plugin-log-line';
+    line.textContent = entry.line;
+
+    row.appendChild(time);
+    row.appendChild(level);
+    row.appendChild(line);
+    container.appendChild(row);
+
+    // Auto-scroll if near bottom
+    const scrollThreshold = 40;
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < scrollThreshold;
+    if (isNearBottom) {
+        container.scrollTop = container.scrollHeight;
     }
 }
 
