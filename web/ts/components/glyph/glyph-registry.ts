@@ -76,12 +76,6 @@ export function getAllGlyphTypes(): readonly GlyphTypeEntry[] {
     return GLYPH_TYPES;
 }
 
-/** Check if a symbol is a built-in (not plugin) glyph */
-export function isBuiltinSymbol(symbol: string): boolean {
-    const builtins = [AX, IX, SO, SE, AS, Prose, Doc, Subcanvas, 'py', 'ts'];
-    return builtins.includes(symbol);
-}
-
 /** Look up glyph type by symbol (e.g., AX, 'py', SO) */
 export function getGlyphTypeBySymbol(symbol: string): GlyphTypeEntry | undefined {
     return _bySymbol.get(symbol);
