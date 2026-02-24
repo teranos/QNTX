@@ -2,8 +2,9 @@ package plugin
 
 import (
 	"context"
-	"fmt"
 	"sync"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // Base provides default implementations for common plugin boilerplate.
@@ -60,10 +61,12 @@ func (b *Base) Pause(ctx context.Context) error {
 	defer b.mu.Unlock()
 
 	if b.paused {
-		return fmt.Errorf("%s plugin is already paused", b.meta.Name)
+		return errors.Newf("%s plugin is already paused", b.meta.Name)
 	}
 	b.paused = true
-	b.services.Logger(b.meta.Name).Infof("%s plugin paused", b.meta.Name)
+	if b.services != nil {
+		b.services.Logger(b.meta.Name).Infof("%s plugin paused", b.meta.Name)
+	}
 	return nil
 }
 
@@ -73,10 +76,12 @@ func (b *Base) Resume(ctx context.Context) error {
 	defer b.mu.Unlock()
 
 	if !b.paused {
-		return fmt.Errorf("%s plugin is not paused", b.meta.Name)
+		return errors.Newf("%s plugin is not paused", b.meta.Name)
 	}
 	b.paused = false
-	b.services.Logger(b.meta.Name).Infof("%s plugin resumed", b.meta.Name)
+	if b.services != nil {
+		b.services.Logger(b.meta.Name).Infof("%s plugin resumed", b.meta.Name)
+	}
 	return nil
 }
 
@@ -108,7 +113,9 @@ func (b *Base) Health(ctx context.Context) HealthStatus {
 
 // Shutdown is a no-op default. Override if your plugin needs cleanup.
 func (b *Base) Shutdown(ctx context.Context) error {
-	b.services.Logger(b.meta.Name).Infof("%s plugin shutting down", b.meta.Name)
+	if b.services != nil {
+		b.services.Logger(b.meta.Name).Infof("%s plugin shutting down", b.meta.Name)
+	}
 	return nil
 }
 
