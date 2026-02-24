@@ -7,6 +7,7 @@
 |--------|----------|----------|
 | GET | `/api/plugins` | HandlePlugins |
 | POST | `/api/plugins/` | HandlePluginAction |
+| GET | `/api/plugins/glyphs` | HandlePluginGlyphs |
 | GET, PUT | `/api/plugins/{name}/config` | HandlePluginConfig |
 
 ---
@@ -27,6 +28,15 @@ POST /api/plugins/{name}/pause - Pause a plugin
 POST /api/plugins/{name}/resume - Resume a plugin
 
 **Handler**: `HandlePluginAction`
+
+---
+
+### `GET` /api/plugins/glyphs
+
+HandlePluginGlyphs returns custom glyph type definitions from all plugins.
+GET /api/plugins/glyphs
+
+**Handler**: `HandlePluginGlyphs`
 
 ---
 

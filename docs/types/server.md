@@ -237,6 +237,24 @@ type ParsedATSCode struct {
 }
 ```
 
+## PluginGlyphDef {#pluginglyphdef}
+
+**Source**: [`server/handlers.go:720`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L720)
+
+
+```go
+type PluginGlyphDef struct {
+	Plugin string `json:"plugin"`
+	Symbol string `json:"symbol"`
+	Title string `json:"title"`
+	Label string `json:"label"`
+	ContentURL string `json:"content_url"`
+	CSSURL string `json:"css_url,omitempty"`
+	DefaultWidth int `json:"default_width,omitempty"`
+	DefaultHeight int `json:"default_height,omitempty"`
+}
+```
+
 ## PluginHealthMessage {#pluginhealthmessage}
 
 **Source**: [`server/types.go:232`](https://github.com/teranos/QNTX/blob/main/server/types.go#L232)
@@ -255,7 +273,7 @@ type PluginHealthMessage struct {
 
 ## PluginInfo {#plugininfo}
 
-**Source**: [`server/handlers.go:659`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L659)
+**Source**: [`server/handlers.go:661`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L661)
 
 
 ```go

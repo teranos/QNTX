@@ -24,6 +24,14 @@ export interface PluginGlyphDef {
 
 const loadedCSS = new Set<string>();
 
+// Track which symbols belong to which plugins (for placeholder fallback)
+const pluginSymbols = new Map<string, string>(); // symbol → plugin name
+
+/** Get plugin name for a given symbol, or null if not a plugin glyph */
+export function getPluginNameBySymbol(symbol: string): string | null {
+    return pluginSymbols.get(symbol) ?? null;
+}
+
 /** Load CSS stylesheet for plugin glyph (cached globally) */
 export function loadPluginCSS(url: string): void {
     if (loadedCSS.has(url)) return;
@@ -62,6 +70,9 @@ export async function loadPluginGlyphs(): Promise<void> {
 }
 
 function registerPluginGlyphType(def: PluginGlyphDef): void {
+    // Track symbol → plugin name mapping for placeholder fallback
+    pluginSymbols.set(def.symbol, def.plugin);
+
     registerGlyphType({
         symbol: def.symbol,
         className: `canvas-plugin-glyph plugin-${def.plugin}`,
