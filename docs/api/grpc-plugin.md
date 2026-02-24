@@ -224,6 +224,20 @@ ExecuteJobResponse is returned after job execution
 | progress_current | int32 | Progress tracking (optional) - Pulse updates job.Progress |
 | progress_total | int32 | - |
 | cost_actual | double | Cost tracking (optional) - Pulse updates job.CostActual |
+| log_entries | JobLogEntry | Execution logs — written to task_logs table by PluginProxyHandler |
+| plugin_version | string | Plugin version that produced this result (e.g., "0.2.14") |
+
+### JobLogEntry
+
+JobLogEntry is a single log line from plugin job execution
+
+| Field | Type | Description |
+|-------|------|-------------|
+| timestamp | string | - |
+| level | string | - |
+| message | string | - |
+| stage | string | - |
+| metadata | string | - |
 
 ### GlyphDefResponse
 
