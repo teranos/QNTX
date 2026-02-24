@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>QNTX Canvas Export</title>
 <style>
 .ͼ1.cm-focused { outline: rgb(33, 33, 33) dotted 1px; }
@@ -1659,6 +1659,186 @@ body.disconnected #pulse-status .status-dot, body.disconnected #database-status 
 html, body { width: 100%; height: 100%; overflow: hidden; }
 body { display: flex !important; flex-direction: column !important; }
 </style>
+<script>
+// Canvas pan/zoom (extracted from canvas-pan.ts, dependencies stripped)
+(function() {
+    const ZOOM_MIN = 0.25;
+    const ZOOM_MAX = 4.0;
+    const ZOOM_SPEED = 0.001;
+
+    const state = {
+        panX: 0,
+        panY: 0,
+        scale: 1.0,
+        isPanning: false,
+        isPinching: false,
+        startX: 0,
+        startY: 0,
+        startPanX: 0,
+        startPanY: 0,
+        startDistance: 0,
+        startScale: 1.0
+    };
+
+    let touchIdentifier = null;
+    let container = null;
+    let contentLayer = null;
+
+    function applyTransform() {
+        if (contentLayer) {
+            contentLayer.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.scale})`;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        container = document.querySelector('.canvas-workspace');
+        contentLayer = document.querySelector('.canvas-content-layer');
+        if (!container || !contentLayer) return;
+
+        // Desktop: wheel (two-finger scroll = pan, ctrl+wheel = zoom)
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+
+            if (e.ctrlKey || e.metaKey) {
+                // Pinch zoom
+                const delta = -e.deltaY * ZOOM_SPEED;
+                const oldScale = state.scale;
+                const newScale = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, oldScale * (1 + delta)));
+
+                const rect = container.getBoundingClientRect();
+                const cursorX = e.clientX - rect.left;
+                const cursorY = e.clientY - rect.top;
+
+                const scaleFactor = newScale / oldScale;
+                state.panX = cursorX - (cursorX - state.panX) * scaleFactor;
+                state.panY = cursorY - (cursorY - state.panY) * scaleFactor;
+                state.scale = newScale;
+
+                applyTransform();
+            } else {
+                // Two-finger scroll = pan
+                state.panX -= e.deltaX;
+                state.panY -= e.deltaY;
+                applyTransform();
+            }
+        }, { passive: false });
+
+        // Desktop: middle mouse button drag
+        container.addEventListener('mousedown', (e) => {
+            if (e.button !== 1) return;
+            e.preventDefault();
+            state.isPanning = true;
+            state.startX = e.clientX;
+            state.startY = e.clientY;
+            state.startPanX = state.panX;
+            state.startPanY = state.panY;
+            container.style.cursor = 'grabbing';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!state.isPanning || touchIdentifier !== null) return;
+            const deltaX = e.clientX - state.startX;
+            const deltaY = e.clientY - state.startY;
+            state.panX = state.startPanX + deltaX;
+            state.panY = state.startPanY + deltaY;
+            applyTransform();
+        });
+
+        document.addEventListener('mouseup', (e) => {
+            if (!state.isPanning || touchIdentifier !== null) return;
+            if (e.button !== 1) return;
+            state.isPanning = false;
+            container.style.cursor = '';
+        });
+
+        // Touch: single-finger pan, two-finger pinch
+        container.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 2) {
+                // Two-finger pinch zoom
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+
+                state.isPinching = true;
+                state.isPanning = false;
+                touchIdentifier = null;
+
+                state.startDistance = Math.hypot(
+                    touch2.clientX - touch1.clientX,
+                    touch2.clientY - touch1.clientY
+                );
+                state.startScale = state.scale;
+                state.startX = (touch1.clientX + touch2.clientX) / 2;
+                state.startY = (touch1.clientY + touch2.clientY) / 2;
+            } else if (e.touches.length === 1) {
+                // Single touch pan
+                const touch = e.touches[0];
+                touchIdentifier = touch.identifier;
+                state.isPanning = true;
+                state.isPinching = false;
+                state.startX = touch.clientX;
+                state.startY = touch.clientY;
+                state.startPanX = state.panX;
+                state.startPanY = state.panY;
+            }
+        }, { passive: true });
+
+        container.addEventListener('touchmove', (e) => {
+            if (state.isPinching && e.touches.length === 2) {
+                e.preventDefault();
+
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+
+                const currentDistance = Math.hypot(
+                    touch2.clientX - touch1.clientX,
+                    touch2.clientY - touch1.clientY
+                );
+
+                const scaleChange = currentDistance / state.startDistance;
+                const oldScale = state.startScale;
+                const newScale = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, oldScale * scaleChange));
+
+                const rect = container.getBoundingClientRect();
+                const centerX = (touch1.clientX + touch2.clientX) / 2 - rect.left;
+                const centerY = (touch1.clientY + touch2.clientY) / 2 - rect.top;
+
+                const scaleFactor = newScale / oldScale;
+                state.panX = centerX - (centerX - state.panX) * scaleFactor;
+                state.panY = centerY - (centerY - state.panY) * scaleFactor;
+                state.scale = newScale;
+
+                applyTransform();
+            } else if (state.isPanning && touchIdentifier !== null) {
+                const touch = Array.from(e.touches).find(t => t.identifier === touchIdentifier);
+                if (!touch) return;
+
+                e.preventDefault();
+
+                const deltaX = touch.clientX - state.startX;
+                const deltaY = touch.clientY - state.startY;
+
+                state.panX = state.startPanX + deltaX;
+                state.panY = state.startPanY + deltaY;
+
+                applyTransform();
+            }
+        }, { passive: false });
+
+        container.addEventListener('touchend', (e) => {
+            if (state.isPinching) {
+                if (e.touches.length < 2) {
+                    state.isPinching = false;
+                }
+            } else if (state.isPanning && touchIdentifier !== null) {
+                const ended = Array.from(e.changedTouches).some(t => t.identifier === touchIdentifier);
+                if (!ended) return;
+                state.isPanning = false;
+                touchIdentifier = null;
+            }
+        });
+    });
+})();
+</script>
 </head>
 <body>
 <div class="canvas-workspace" data-canvas-id="subcanvas-f63a0e8d-2362-4bdb-88c5-1ca5c546270e" tabindex="0" style="width: 100%; height: 100%; position: relative; overflow: hidden; outline: none; flex: 1 1 0%;"><div class="canvas-content-layer" style="position: absolute; top: 0px; left: 0px; width: 100%; height: 100%; transform: translate(77.2667px, -26.6px) scale(1);"><div style="left: 32px; top: 40px; width: 239px; height: 184px; background-color: rgb(245, 237, 184); border: 1px solid rgb(212, 197, 154); border-radius: 2px; box-shadow: rgba(0, 0, 0, 0.15) 2px 2px 8px; cursor: move; clip-path: polygon(0% 0.5%, 1% 0.46827%, 2% 0.477771%, 3% 0.380848%, 4% 0.348049%, 5% 0.411283%, 6% 0.421022%, 7% 0.279292%, 8% 0.103697%, 9% 0.0771721%, 10% 0.198178%, 11% 0.292846%, 12% 0.268863%, 13% 0.239356%, 14% 0.338065%, 15% 0.501254%, 16% 0.541283%, 17% 0.408909%, 18% 0.263126%, 19% 0.246791%, 20% 0.294653%, 21% 0.250778%, 22% 0.118007%, 23% 0.0688327%, 24% 0.198089%, 25% 0.378439%, 26% 0.431737%, 27% 0.368941%, 28% 0.352259%, 29% 0.440323%, 30% 0.493923%, 31% 0.382444%, 32% 0.187973%, 33% 0.104928%, 34% 0.177389%, 35% 0.253515%, 36% 0.219178%, 37% 0.165795%, 38% 0.246341%, 39% 0.432928%, 40% 0.535605%, 41% 0.460212%, 42% 0.332553%, 43% 0.310333%, 44% 0.359297%, 45% 0.31977%, 46% 0.162115%, 47% 0.0515819%, 48% 0.122308%, 49% 0.28761%, 50% 0.36283%, 51% 0.321781%, 52% 0.314539%, 53% 0.425565%, 54% 0.531885%, 55% 0.473534%, 56% 0.288934%, 57% 0.170129%, 58% 0.200633%, 59% 0.255248%, 60% 0.203193%, 61% 0.112125%, 62% 0.151132%, 63% 0.334282%, 64% 0.482578%, 65% 0.464322%, 66% 0.367105%, 67% 0.354588%, 68% 0.42154%, 69% 0.407271%, 70% 0.246371%, 71% 0.0856693%, 72% 0.0908914%, 73% 0.220938%, 74% 0.296283%, 75% 0.25929%, 76% 0.245735%, 77% 0.365921%, 78% 0.52094%, 79% 0.52868%, 80% 0.379605%, 81% 0.250283%, 82% 0.254955%, 83% 0.296586%, 84% 0.231105%, 85% 0.0988088%, 86% 0.0789496%, 87% 0.230694%, 88% 0.399082%, 89% 0.425554%, 90% 0.358666%, 91% 0.361568%, 92% 0.45704%, 93% 0.487498%, 94% 0.350193%, 95% 0.161972%, 96% 0.108736%, 97% 0.195092%, 98% 0.255571%, 99% 0.206578%, 100% 0.5%, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0% 100%); min-height: 161.433px;" class="canvas-note-glyph canvas-glyph" data-glyph-id="note-84c6b7f8-70e2-4933-a9e3-667a8793780d" data-glyph-symbol="▣"><div class="glyph-resize-handle glyph-resize-handle--small"></div><div class="note-editor-container" style="flex: 1 1 0%; padding: 4px; overflow: auto; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif; color: rgb(42, 42, 42); line-height: 1.2; box-sizing: border-box; cursor: move; --note-strong-color: #1a1a1a; --note-em-color: #3a3a3a; --note-code-bg: #f0e5a8; --note-code-color: #5a4a3a; --note-heading-color: #4a3a2a;"><style>
@@ -1703,7 +1883,7 @@ body { display: flex !important; flex-direction: column !important; }
         .note-editor-container .ProseMirror li {
             margin: 0;
         }
-    </style><div contenteditable="true" spellcheck="false" translate="no" class="ProseMirror"><h1>QNTX Notes</h1><p>Some ideas/direction</p><p>- better .md support in notes</p><p>- ax-ax / ax-se</p><p>- go/rs support</p><p>- WASM plugins</p><p>- meld everything to everything</p><p>- drag glyphs into subcanvas</p></div></div></div><div class="canvas-se-glyph canvas-glyph" data-glyph-id="se-78e51c32-6d63-4ddb-942a-0a0153c247bb" data-glyph-symbol="⊨" style="left: 692px; top: 43px; width: 471px; height: 193px; min-width: 200px; min-height: 167.733px; background-color: rgba(30, 30, 35, 0.92);" data-sync-state="unsynced" data-connectivity-mode="online"><div class="glyph-resize-handle"></div><div class="canvas-glyph-title-bar" style="padding: 4px 4px 4px 8px; background-color: var(--bg-tertiary);"><span style="cursor: move; font-weight: bold; flex-shrink: 0; color: var(--glyph-status-running-text);">⊨</span><input type="text" class="se-query-input" placeholder="Embedding service unavailable" style="flex: 1 1 0%; padding: 4px 8px; font-size: 13px; font-family: monospace; border: medium; outline: none; background-color: rgba(25, 25, 30, 0.95); color: rgb(212, 240, 212); border-radius: 2px;" disabled=""><select class="se-cluster-select" style="padding: 2px 4px; font-size: 11px; font-family: monospace; border: medium; outline: none; background-color: rgba(25, 25, 30, 0.95); color: var(--text-secondary); border-radius: 2px; cursor: pointer; flex-shrink: 0;" disabled=""><option value="">All</option></select><div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;"><input type="range" min="0.1" max="1.0" step="0.05" style="width: 60px; cursor: pointer;" disabled=""><span style="font-size: 11px; color: var(--text-secondary); font-family: monospace; min-width: 28px;">0.50</span></div></div><div class="se-glyph-results" style="flex: 1 1 0%; overflow: auto; padding: 8px; background-color: rgba(25, 25, 30, 0.95); border-top: 1px solid var(--border-color); font-size: 12px; font-family: monospace;" data-connectivity-mode="online"><div class="se-glyph-unavailable" style="padding: 16px; color: var(--text-secondary); font-size: 12px; font-family: monospace; text-align: center; line-height: 1.6;">Embedding service is not enabled.<br><br>Enable in <code style="color: #d4f0d4;">am.toml</code>:<br><code style="color: #d4f0d4;">[embeddings]<br>enabled = true</code></div></div></div><div class="canvas-ts-glyph canvas-glyph" data-glyph-id="ts-d77a738b-8d97-4377-b008-bab2ce0abe6a" data-glyph-symbol="ts" style="left: 319px; top: 40px; width: 323px; height: 260px; min-width: 200px; min-height: 120px; z-index: 1; background-color: rgba(61, 45, 20, 0.92);" data-local-active="true" data-sync-state="synced" data-connectivity-mode="online"><div class="canvas-glyph-title-bar" style="background-color: rgb(92, 61, 26);"><span style="color: rgb(240, 200, 120); font-weight: bold; flex: 1 1 0%;">ts</span><button class="glyph-play-btn" title="Run JavaScript code">▶</button></div><div class="glyph-resize-handle"></div><div class="ts-glyph-editor" style="flex: 1 1 0%; overflow: hidden;"><div class="cm-editor ͼ1 ͼ3 ͼo"><div class="cm-announced" aria-live="polite"></div><div tabindex="-1" class="cm-scroller"><div style="tab-size: 4;" spellcheck="false" autocorrect="off" autocapitalize="none" writingsuggestions="false" translate="no" contenteditable="true" class="cm-content cm-lineWrapping" role="textbox" aria-multiline="true" data-language="typescript"><div class="cm-line">// Create a local attestation</div><div class="cm-line"><br></div><div class="cm-line">await qntx.attest({</div><div class="cm-line">    subjects: ["teranos"],</div><div class="cm-line">    predicates: ["develops"],</div><div class="cm-line">    contexts: ["decentralised attestation network"],</div><div class="cm-line">    attributes: { description: "QNTX!" }</div><div class="cm-line">})</div><div class="cm-line">qntx.log("Attested!")</div><div class="cm-line"><br></div></div></div></div></div></div><div class="canvas-py-glyph canvas-glyph" data-glyph-id="py-9f4633a7-bd98-4b22-b107-a7f8649531bf" data-glyph-symbol="py" style="left: 17px; top: 426px; width: 535px; height: 294px; min-width: 200px; min-height: 120px; z-index: 1;" data-sync-state="unsynced" data-connectivity-mode="online"><div class="canvas-glyph-title-bar" style="background-color: rgb(42, 85, 120);"><span style="color: rgb(255, 212, 59); font-weight: bold; flex: 1 1 0%;">py</span><button class="glyph-play-btn" title="Run Python code">▶</button></div><div class="glyph-resize-handle"></div><div class="py-glyph-editor" style="flex: 1 1 0%; overflow: hidden;"><div class="cm-editor ͼ1 ͼ3 ͼo"><div class="cm-announced" aria-live="polite"></div><div tabindex="-1" class="cm-scroller"><div style="tab-size: 4;" spellcheck="false" autocorrect="off" autocapitalize="none" writingsuggestions="false" translate="no" contenteditable="true" class="cm-content cm-lineWrapping" role="textbox" aria-multiline="true" data-language="python"><div class="cm-line">import time</div><div class="cm-line">import secrets</div><div class="cm-line"><br></div><div class="cm-line">foo = ['teach', 'meld', 'attach', 'developer', 'test', 'glyph']</div><div class="cm-line"><br></div><div class="cm-line">attest(</div><div class="cm-line">  subjects=["python"],</div><div class="cm-line">  predicates=[secrets.choice(foo)],</div><div class="cm-line">  contexts=["qntx"],</div><div class="cm-line">  attributes={"key": secrets.choice(foo)}</div><div class="cm-line">)</div><div class="cm-line"><br></div><div class="cm-line">print("No upstream — ran manually")</div><div class="cm-line"><br></div></div></div></div></div></div><div style="left: 673px; top: 300px; width: 142px; height: 115px; background-color: rgb(245, 237, 184); border: 1px solid rgb(212, 197, 154); border-radius: 2px; box-shadow: rgba(0, 0, 0, 0.15) 2px 2px 8px; cursor: move; clip-path: polygon(0% 0.5%, 1% 0.46827%, 2% 0.477771%, 3% 0.380848%, 4% 0.348049%, 5% 0.411283%, 6% 0.421022%, 7% 0.279292%, 8% 0.103697%, 9% 0.0771721%, 10% 0.198178%, 11% 0.292846%, 12% 0.268863%, 13% 0.239356%, 14% 0.338065%, 15% 0.501254%, 16% 0.541283%, 17% 0.408909%, 18% 0.263126%, 19% 0.246791%, 20% 0.294653%, 21% 0.250778%, 22% 0.118007%, 23% 0.0688327%, 24% 0.198089%, 25% 0.378439%, 26% 0.431737%, 27% 0.368941%, 28% 0.352259%, 29% 0.440323%, 30% 0.493923%, 31% 0.382444%, 32% 0.187973%, 33% 0.104928%, 34% 0.177389%, 35% 0.253515%, 36% 0.219178%, 37% 0.165795%, 38% 0.246341%, 39% 0.432928%, 40% 0.535605%, 41% 0.460212%, 42% 0.332553%, 43% 0.310333%, 44% 0.359297%, 45% 0.31977%, 46% 0.162115%, 47% 0.0515819%, 48% 0.122308%, 49% 0.28761%, 50% 0.36283%, 51% 0.321781%, 52% 0.314539%, 53% 0.425565%, 54% 0.531885%, 55% 0.473534%, 56% 0.288934%, 57% 0.170129%, 58% 0.200633%, 59% 0.255248%, 60% 0.203193%, 61% 0.112125%, 62% 0.151132%, 63% 0.334282%, 64% 0.482578%, 65% 0.464322%, 66% 0.367105%, 67% 0.354588%, 68% 0.42154%, 69% 0.407271%, 70% 0.246371%, 71% 0.0856693%, 72% 0.0908914%, 73% 0.220938%, 74% 0.296283%, 75% 0.25929%, 76% 0.245735%, 77% 0.365921%, 78% 0.52094%, 79% 0.52868%, 80% 0.379605%, 81% 0.250283%, 82% 0.254955%, 83% 0.296586%, 84% 0.231105%, 85% 0.0988088%, 86% 0.0789496%, 87% 0.230694%, 88% 0.399082%, 89% 0.425554%, 90% 0.358666%, 91% 0.361568%, 92% 0.45704%, 93% 0.487498%, 94% 0.350193%, 95% 0.161972%, 96% 0.108736%, 97% 0.195092%, 98% 0.255571%, 99% 0.206578%, 100% 0.5%, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0% 100%); min-height: 102.633px;" class="canvas-note-glyph canvas-glyph" data-glyph-id="note-4c89a578-b757-420a-8e85-cf2bf6589023" data-glyph-symbol="▣"><div class="glyph-resize-handle glyph-resize-handle--small"></div><div class="note-editor-container" style="flex: 1 1 0%; padding: 4px; overflow: auto; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif; color: rgb(42, 42, 42); line-height: 1.2; box-sizing: border-box; cursor: move; --note-strong-color: #1a1a1a; --note-em-color: #3a3a3a; --note-code-bg: #f0e5a8; --note-code-color: #5a4a3a; --note-heading-color: #4a3a2a;"><style>
+    </style><div contenteditable="true" spellcheck="false" translate="no" class="ProseMirror"><h1>QNTX Notes</h1><p>Some ideas/direction</p><p>- better .md support in notes</p><p>- ax-ax / ax-se</p><p>- go/rs support</p><p>- WASM plugins</p><p>- meld everything to everything</p><p>- drag glyphs into subcanvas</p></div></div></div><div class="canvas-se-glyph canvas-glyph" data-glyph-id="se-78e51c32-6d63-4ddb-942a-0a0153c247bb" data-glyph-symbol="⊨" style="left: 692px; top: 43px; width: 471px; height: 193px; min-width: 200px; min-height: 167.733px; background-color: rgba(30, 30, 35, 0.92);" data-sync-state="unsynced" data-connectivity-mode="online"><div class="glyph-resize-handle"></div><div class="canvas-glyph-title-bar" style="padding: 4px 4px 4px 8px; background-color: var(--bg-tertiary);"><span style="cursor: move; font-weight: bold; flex-shrink: 0; color: var(--glyph-status-running-text);">⊨</span><input type="text" class="se-query-input" placeholder="Embedding service unavailable" style="flex: 1 1 0%; padding: 4px 8px; font-size: 13px; font-family: monospace; border: medium; outline: none; background-color: rgba(25, 25, 30, 0.95); color: rgb(212, 240, 212); border-radius: 2px;" disabled=""><select class="se-cluster-select" style="padding: 2px 4px; font-size: 11px; font-family: monospace; border: medium; outline: none; background-color: rgba(25, 25, 30, 0.95); color: var(--text-secondary); border-radius: 2px; cursor: pointer; flex-shrink: 0;" disabled=""><option value="">All</option></select><div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;"><input type="range" min="0.1" max="1.0" step="0.05" style="width: 60px; cursor: pointer;" disabled=""><span style="font-size: 11px; color: var(--text-secondary); font-family: monospace; min-width: 28px;">0.50</span></div></div><div class="se-glyph-results" style="flex: 1 1 0%; overflow: auto; padding: 8px; background-color: rgba(25, 25, 30, 0.95); border-top: 1px solid var(--border-color); font-size: 12px; font-family: monospace;" data-connectivity-mode="online"><div class="se-glyph-unavailable" style="padding: 16px; color: var(--text-secondary); font-size: 12px; font-family: monospace; text-align: center; line-height: 1.6;">Embedding service is not enabled.<br><br>Enable in <code style="color: #d4f0d4;">am.toml</code>:<br><code style="color: #d4f0d4;">[embeddings]<br>enabled = true</code></div></div></div><div class="canvas-ts-glyph canvas-glyph" data-glyph-id="ts-d77a738b-8d97-4377-b008-bab2ce0abe6a" data-glyph-symbol="ts" style="left: 319px; top: 40px; width: 323px; height: 260px; min-width: 200px; min-height: 120px; z-index: 1; background-color: rgba(61, 45, 20, 0.92);" data-local-active="true" data-sync-state="unsynced" data-connectivity-mode="online"><div class="canvas-glyph-title-bar" style="background-color: rgb(92, 61, 26);"><span style="color: rgb(240, 200, 120); font-weight: bold; flex: 1 1 0%;">ts</span><button class="glyph-play-btn" title="Run JavaScript code">▶</button></div><div class="glyph-resize-handle"></div><div class="ts-glyph-editor" style="flex: 1 1 0%; overflow: hidden;"><div class="cm-editor ͼ1 ͼ3 ͼo"><div class="cm-announced" aria-live="polite"></div><div tabindex="-1" class="cm-scroller"><div style="tab-size: 4;" spellcheck="false" autocorrect="off" autocapitalize="none" writingsuggestions="false" translate="no" contenteditable="true" class="cm-content cm-lineWrapping" role="textbox" aria-multiline="true" data-language="typescript"><div class="cm-line">// Create a local attestation</div><div class="cm-line"><br></div><div class="cm-line">await qntx.attest({</div><div class="cm-line">    subjects: ["teranos"],</div><div class="cm-line">    predicates: ["develops"],</div><div class="cm-line">    contexts: ["decentralised attestation network"],</div><div class="cm-line">    attributes: { description: "QNTX!" }</div><div class="cm-line">})</div><div class="cm-line">qntx.log("Attested!")</div><div class="cm-line"><br></div></div></div></div></div></div><div class="canvas-py-glyph canvas-glyph" data-glyph-id="py-9f4633a7-bd98-4b22-b107-a7f8649531bf" data-glyph-symbol="py" style="left: 17px; top: 426px; width: 535px; height: 294px; min-width: 200px; min-height: 120px; z-index: 1;" data-sync-state="unsynced" data-connectivity-mode="online"><div class="canvas-glyph-title-bar" style="background-color: rgb(42, 85, 120);"><span style="color: rgb(255, 212, 59); font-weight: bold; flex: 1 1 0%;">py</span><button class="glyph-play-btn" title="Run Python code">▶</button></div><div class="glyph-resize-handle"></div><div class="py-glyph-editor" style="flex: 1 1 0%; overflow: hidden;"><div class="cm-editor ͼ1 ͼ3 ͼo"><div class="cm-announced" aria-live="polite"></div><div tabindex="-1" class="cm-scroller"><div style="tab-size: 4;" spellcheck="false" autocorrect="off" autocapitalize="none" writingsuggestions="false" translate="no" contenteditable="true" class="cm-content cm-lineWrapping" role="textbox" aria-multiline="true" data-language="python"><div class="cm-line">import time</div><div class="cm-line">import secrets</div><div class="cm-line"><br></div><div class="cm-line">foo = ['teach', 'meld', 'attach', 'developer', 'test', 'glyph']</div><div class="cm-line"><br></div><div class="cm-line">attest(</div><div class="cm-line">  subjects=["python"],</div><div class="cm-line">  predicates=[secrets.choice(foo)],</div><div class="cm-line">  contexts=["qntx"],</div><div class="cm-line">  attributes={"key": secrets.choice(foo)}</div><div class="cm-line">)</div><div class="cm-line"><br></div><div class="cm-line">print("No upstream — ran manually")</div><div class="cm-line"><br></div></div></div></div></div></div><div style="left: 673px; top: 300px; width: 142px; height: 115px; background-color: rgb(245, 237, 184); border: 1px solid rgb(212, 197, 154); border-radius: 2px; box-shadow: rgba(0, 0, 0, 0.15) 2px 2px 8px; cursor: move; clip-path: polygon(0% 0.5%, 1% 0.46827%, 2% 0.477771%, 3% 0.380848%, 4% 0.348049%, 5% 0.411283%, 6% 0.421022%, 7% 0.279292%, 8% 0.103697%, 9% 0.0771721%, 10% 0.198178%, 11% 0.292846%, 12% 0.268863%, 13% 0.239356%, 14% 0.338065%, 15% 0.501254%, 16% 0.541283%, 17% 0.408909%, 18% 0.263126%, 19% 0.246791%, 20% 0.294653%, 21% 0.250778%, 22% 0.118007%, 23% 0.0688327%, 24% 0.198089%, 25% 0.378439%, 26% 0.431737%, 27% 0.368941%, 28% 0.352259%, 29% 0.440323%, 30% 0.493923%, 31% 0.382444%, 32% 0.187973%, 33% 0.104928%, 34% 0.177389%, 35% 0.253515%, 36% 0.219178%, 37% 0.165795%, 38% 0.246341%, 39% 0.432928%, 40% 0.535605%, 41% 0.460212%, 42% 0.332553%, 43% 0.310333%, 44% 0.359297%, 45% 0.31977%, 46% 0.162115%, 47% 0.0515819%, 48% 0.122308%, 49% 0.28761%, 50% 0.36283%, 51% 0.321781%, 52% 0.314539%, 53% 0.425565%, 54% 0.531885%, 55% 0.473534%, 56% 0.288934%, 57% 0.170129%, 58% 0.200633%, 59% 0.255248%, 60% 0.203193%, 61% 0.112125%, 62% 0.151132%, 63% 0.334282%, 64% 0.482578%, 65% 0.464322%, 66% 0.367105%, 67% 0.354588%, 68% 0.42154%, 69% 0.407271%, 70% 0.246371%, 71% 0.0856693%, 72% 0.0908914%, 73% 0.220938%, 74% 0.296283%, 75% 0.25929%, 76% 0.245735%, 77% 0.365921%, 78% 0.52094%, 79% 0.52868%, 80% 0.379605%, 81% 0.250283%, 82% 0.254955%, 83% 0.296586%, 84% 0.231105%, 85% 0.0988088%, 86% 0.0789496%, 87% 0.230694%, 88% 0.399082%, 89% 0.425554%, 90% 0.358666%, 91% 0.361568%, 92% 0.45704%, 93% 0.487498%, 94% 0.350193%, 95% 0.161972%, 96% 0.108736%, 97% 0.195092%, 98% 0.255571%, 99% 0.206578%, 100% 0.5%, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0% 100%); min-height: 102.633px;" class="canvas-note-glyph canvas-glyph" data-glyph-id="note-4c89a578-b757-420a-8e85-cf2bf6589023" data-glyph-symbol="▣"><div class="glyph-resize-handle glyph-resize-handle--small"></div><div class="note-editor-container" style="flex: 1 1 0%; padding: 4px; overflow: auto; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif; color: rgb(42, 42, 42); line-height: 1.2; box-sizing: border-box; cursor: move; --note-strong-color: #1a1a1a; --note-em-color: #3a3a3a; --note-code-bg: #f0e5a8; --note-code-color: #5a4a3a; --note-heading-color: #4a3a2a;"><style>
         .note-editor-container .ProseMirror {
             padding: 0;
             margin: 0;
@@ -1745,7 +1925,7 @@ body { display: flex !important; flex-direction: column !important; }
         .note-editor-container .ProseMirror li {
             margin: 0;
         }
-    </style><div contenteditable="true" spellcheck="false" translate="no" class="ProseMirror"><h1>ax</h1><p>Meld an ax onto a prompt, it will trigger the prompt execution.</p></div></div></div><div class="melded-composition" data-melded="true" data-glyph-id="melded-ax-2e4fc9f8-5152-44f7-a0d9-f763bdf79520-prompt-5aad0fea-112c-48db-a28d-e503f9abcb24" style="position: absolute; left: 605px; top: 346px; display: grid; grid-auto-rows: auto; grid-auto-columns: auto; gap: 0px;"><div style="left: 0px; top: 0px; width: 172px; height: 101px; background-color: rgb(245, 237, 184); border: 1px solid rgb(212, 197, 154); border-radius: 2px; box-shadow: rgba(0, 0, 0, 0.15) 2px 2px 8px; cursor: move; clip-path: polygon(0% 0.5%, 1% 0.46827%, 2% 0.477771%, 3% 0.380848%, 4% 0.348049%, 5% 0.411283%, 6% 0.421022%, 7% 0.279292%, 8% 0.103697%, 9% 0.0771721%, 10% 0.198178%, 11% 0.292846%, 12% 0.268863%, 13% 0.239356%, 14% 0.338065%, 15% 0.501254%, 16% 0.541283%, 17% 0.408909%, 18% 0.263126%, 19% 0.246791%, 20% 0.294653%, 21% 0.250778%, 22% 0.118007%, 23% 0.0688327%, 24% 0.198089%, 25% 0.378439%, 26% 0.431737%, 27% 0.368941%, 28% 0.352259%, 29% 0.440323%, 30% 0.493923%, 31% 0.382444%, 32% 0.187973%, 33% 0.104928%, 34% 0.177389%, 35% 0.253515%, 36% 0.219178%, 37% 0.165795%, 38% 0.246341%, 39% 0.432928%, 40% 0.535605%, 41% 0.460212%, 42% 0.332553%, 43% 0.310333%, 44% 0.359297%, 45% 0.31977%, 46% 0.162115%, 47% 0.0515819%, 48% 0.122308%, 49% 0.28761%, 50% 0.36283%, 51% 0.321781%, 52% 0.314539%, 53% 0.425565%, 54% 0.531885%, 55% 0.473534%, 56% 0.288934%, 57% 0.170129%, 58% 0.200633%, 59% 0.255248%, 60% 0.203193%, 61% 0.112125%, 62% 0.151132%, 63% 0.334282%, 64% 0.482578%, 65% 0.464322%, 66% 0.367105%, 67% 0.354588%, 68% 0.42154%, 69% 0.407271%, 70% 0.246371%, 71% 0.0856693%, 72% 0.0908914%, 73% 0.220938%, 74% 0.296283%, 75% 0.25929%, 76% 0.245735%, 77% 0.365921%, 78% 0.52094%, 79% 0.52868%, 80% 0.379605%, 81% 0.250283%, 82% 0.254955%, 83% 0.296586%, 84% 0.231105%, 85% 0.0988088%, 86% 0.0789496%, 87% 0.230694%, 88% 0.399082%, 89% 0.425554%, 90% 0.358666%, 91% 0.361568%, 92% 0.45704%, 93% 0.487498%, 94% 0.350193%, 95% 0.161972%, 96% 0.108736%, 97% 0.195092%, 98% 0.255571%, 99% 0.206578%, 100% 0.5%, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0% 100%); position: relative; grid-area: 1 / 2; min-height: 69.0333px;" class="canvas-note-glyph canvas-glyph" data-glyph-id="note-fb198346-b25c-43c4-bbca-ef46e421728b" data-glyph-symbol="▣"><div class="glyph-resize-handle glyph-resize-handle--small"></div><div class="note-editor-container" style="flex: 1 1 0%; padding: 4px; overflow: auto; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif; color: rgb(42, 42, 42); line-height: 1.2; box-sizing: border-box; cursor: move; --note-strong-color: #1a1a1a; --note-em-color: #3a3a3a; --note-code-bg: #f0e5a8; --note-code-color: #5a4a3a; --note-heading-color: #4a3a2a;"><style>
+    </style><div contenteditable="true" spellcheck="false" translate="no" class="ProseMirror"><h1>ax</h1><p>Meld an ax onto a prompt, it will trigger the prompt execution.</p></div></div></div><div class="canvas-ix-glyph canvas-glyph" data-glyph-id="ix-8603f33d-0448-4650-9394-4ddb6d46f841" data-glyph-symbol="⨳" style="left: 113px; top: 349px; width: 425.842px; height: auto; overflow: visible; background-color: var(--bg-secondary);"><div class="canvas-glyph-title-bar"><span style="cursor: move; font-weight: bold; flex-shrink: 0; color: var(--accent-lavender);">⨳</span><input type="text" placeholder="Enter URL, file path, or data source..." style="flex: 1 1 0%; padding: 4px 8px; font-size: 13px; font-family: monospace; background-color: rgba(25, 25, 30, 0.95); color: var(--accent-lavender); border: medium; outline: none; border-radius: 2px;"><button class="glyph-play-btn" title="Execute" style="flex-shrink: 0;">▶</button></div><div class="ix-status-section" style="display: none; margin-top: 8px; padding: 8px; border-radius: 4px; font-size: 12px; font-family: monospace; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;"></div></div><div class="melded-composition" data-melded="true" data-glyph-id="melded-ax-2e4fc9f8-5152-44f7-a0d9-f763bdf79520-prompt-5aad0fea-112c-48db-a28d-e503f9abcb24" style="position: absolute; left: 605px; top: 346px; display: grid; grid-auto-rows: auto; grid-auto-columns: auto; gap: 0px;"><div style="left: 0px; top: 0px; width: 172px; height: 101px; background-color: rgb(245, 237, 184); border: 1px solid rgb(212, 197, 154); border-radius: 2px; box-shadow: rgba(0, 0, 0, 0.15) 2px 2px 8px; cursor: move; clip-path: polygon(0% 0.5%, 1% 0.46827%, 2% 0.477771%, 3% 0.380848%, 4% 0.348049%, 5% 0.411283%, 6% 0.421022%, 7% 0.279292%, 8% 0.103697%, 9% 0.0771721%, 10% 0.198178%, 11% 0.292846%, 12% 0.268863%, 13% 0.239356%, 14% 0.338065%, 15% 0.501254%, 16% 0.541283%, 17% 0.408909%, 18% 0.263126%, 19% 0.246791%, 20% 0.294653%, 21% 0.250778%, 22% 0.118007%, 23% 0.0688327%, 24% 0.198089%, 25% 0.378439%, 26% 0.431737%, 27% 0.368941%, 28% 0.352259%, 29% 0.440323%, 30% 0.493923%, 31% 0.382444%, 32% 0.187973%, 33% 0.104928%, 34% 0.177389%, 35% 0.253515%, 36% 0.219178%, 37% 0.165795%, 38% 0.246341%, 39% 0.432928%, 40% 0.535605%, 41% 0.460212%, 42% 0.332553%, 43% 0.310333%, 44% 0.359297%, 45% 0.31977%, 46% 0.162115%, 47% 0.0515819%, 48% 0.122308%, 49% 0.28761%, 50% 0.36283%, 51% 0.321781%, 52% 0.314539%, 53% 0.425565%, 54% 0.531885%, 55% 0.473534%, 56% 0.288934%, 57% 0.170129%, 58% 0.200633%, 59% 0.255248%, 60% 0.203193%, 61% 0.112125%, 62% 0.151132%, 63% 0.334282%, 64% 0.482578%, 65% 0.464322%, 66% 0.367105%, 67% 0.354588%, 68% 0.42154%, 69% 0.407271%, 70% 0.246371%, 71% 0.0856693%, 72% 0.0908914%, 73% 0.220938%, 74% 0.296283%, 75% 0.25929%, 76% 0.245735%, 77% 0.365921%, 78% 0.52094%, 79% 0.52868%, 80% 0.379605%, 81% 0.250283%, 82% 0.254955%, 83% 0.296586%, 84% 0.231105%, 85% 0.0988088%, 86% 0.0789496%, 87% 0.230694%, 88% 0.399082%, 89% 0.425554%, 90% 0.358666%, 91% 0.361568%, 92% 0.45704%, 93% 0.487498%, 94% 0.350193%, 95% 0.161972%, 96% 0.108736%, 97% 0.195092%, 98% 0.255571%, 99% 0.206578%, 100% 0.5%, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0% 100%); position: relative; grid-area: 1 / 2; min-height: 69.0333px;" class="canvas-note-glyph canvas-glyph" data-glyph-id="note-fb198346-b25c-43c4-bbca-ef46e421728b" data-glyph-symbol="▣"><div class="glyph-resize-handle glyph-resize-handle--small"></div><div class="note-editor-container" style="flex: 1 1 0%; padding: 4px; overflow: auto; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif; color: rgb(42, 42, 42); line-height: 1.2; box-sizing: border-box; cursor: move; --note-strong-color: #1a1a1a; --note-em-color: #3a3a3a; --note-code-bg: #f0e5a8; --note-code-color: #5a4a3a; --note-heading-color: #4a3a2a;"><style>
         .note-editor-container .ProseMirror {
             padding: 0;
             margin: 0;
@@ -1790,6 +1970,6 @@ body { display: flex !important; flex-direction: column !important; }
     </style><div contenteditable="true" spellcheck="false" translate="no" class="ProseMirror"><h1>Demo</h1><p>Testing out static site canvas export feature.</p></div></div></div><div style="background-color: var(--bg-secondary); left: 0px; top: 0px; width: 330px; height: 316px; position: relative; grid-area: 2 / 2;" class="canvas-prompt-glyph canvas-glyph" data-glyph-id="prompt-5aad0fea-112c-48db-a28d-e503f9abcb24" data-glyph-symbol="⟶"><div class="canvas-glyph-title-bar"><span style="font-size: 16px; color: var(--accent-lavender); font-weight: bold; flex: 1 1 0%;">⟶ Prompt</span><button class="glyph-play-btn has-tooltip" data-tooltip="Execute prompt">▶</button></div><div class="glyph-resize-handle"></div><div style="flex: 1 1 0%; padding: 8px; display: flex; flex-direction: column; overflow: hidden;"><textarea placeholder="---
 model: &quot;anthropic/claude-haiku-4.5&quot;
 ---
-Your prompt here..." style="flex: 1 1 0%; padding: 8px; font-size: 13px; font-family: monospace; background-color: var(--bg-almost-black); color: var(--accent-lavender); border: 1px solid var(--border-color); border-radius: 4px; resize: none;"></textarea><div class="prompt-status-section" style="display: none; padding: 4px 8px; font-size: 11px; font-family: monospace; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; max-width: 100%;"></div></div></div><div class="canvas-ax-glyph canvas-glyph" data-glyph-id="ax-2e4fc9f8-5152-44f7-a0d9-f763bdf79520" data-glyph-symbol="⋈" style="left: 0px; top: 0px; width: 255px; height: 131px; min-width: 200px; min-height: 105.733px; background-color: rgba(30, 30, 35, 0.92); position: relative; grid-area: 2 / 1;" data-sync-state="unsynced" data-connectivity-mode="online"><div class="glyph-resize-handle"></div><div class="canvas-glyph-title-bar" style="padding: 4px 4px 4px 8px; background-color: var(--bg-tertiary);"><span style="cursor: move; font-weight: bold; flex-shrink: 0; color: var(--glyph-status-running-text);">⋈</span><input type="text" class="ax-query-input" placeholder="Enter ax query (e.g., ALICE, is git)" style="flex: 1 1 0%; padding: 4px 8px; font-size: 13px; font-family: monospace; border: medium; outline: none; background-color: rgba(25, 25, 30, 0.95); color: rgb(212, 240, 212); border-radius: 2px;"></div><div class="ax-glyph-results" style="flex: 1 1 0%; overflow: auto; padding: 8px; background-color: rgba(25, 25, 30, 0.95); border-top: 1px solid var(--border-color); font-size: 12px; font-family: monospace;" data-connectivity-mode="online"><div class="ax-glyph-empty-state" style="color: var(--text-secondary); text-align: center; padding: 20px;">No matches yet</div></div></div></div><div class="canvas-ix-glyph canvas-glyph" data-glyph-id="ix-8603f33d-0448-4650-9394-4ddb6d46f841" data-glyph-symbol="⨳" style="left: 113px; top: 349px; width: 425.842px; height: auto; overflow: visible; background-color: var(--bg-secondary);"><div class="canvas-glyph-title-bar"><span style="cursor: move; font-weight: bold; flex-shrink: 0; color: var(--accent-lavender);">⨳</span><input type="text" placeholder="Enter URL, file path, or data source..." style="flex: 1 1 0%; padding: 4px 8px; font-size: 13px; font-family: monospace; background-color: rgba(25, 25, 30, 0.95); color: var(--accent-lavender); border: medium; outline: none; border-radius: 2px;"><button class="glyph-play-btn" title="Execute" style="flex-shrink: 0;">▶</button></div><div class="ix-status-section" style="display: none; margin-top: 8px; padding: 8px; border-radius: 4px; font-size: 12px; font-family: monospace; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;"></div></div></div></div>
+Your prompt here..." style="flex: 1 1 0%; padding: 8px; font-size: 13px; font-family: monospace; background-color: var(--bg-almost-black); color: var(--accent-lavender); border: 1px solid var(--border-color); border-radius: 4px; resize: none;"></textarea><div class="prompt-status-section" style="display: none; padding: 4px 8px; font-size: 11px; font-family: monospace; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; max-width: 100%;"></div></div></div><div class="canvas-ax-glyph canvas-glyph" data-glyph-id="ax-2e4fc9f8-5152-44f7-a0d9-f763bdf79520" data-glyph-symbol="⋈" style="left: 0px; top: 0px; width: 255px; height: 131px; min-width: 200px; min-height: 105.733px; background-color: rgba(30, 30, 35, 0.92); position: relative; grid-area: 2 / 1;" data-sync-state="unsynced" data-connectivity-mode="online"><div class="glyph-resize-handle"></div><div class="canvas-glyph-title-bar" style="padding: 4px 4px 4px 8px; background-color: var(--bg-tertiary);"><span style="cursor: move; font-weight: bold; flex-shrink: 0; color: var(--glyph-status-running-text);">⋈</span><input type="text" class="ax-query-input" placeholder="Enter ax query (e.g., ALICE, is git)" style="flex: 1 1 0%; padding: 4px 8px; font-size: 13px; font-family: monospace; border: medium; outline: none; background-color: rgba(25, 25, 30, 0.95); color: rgb(212, 240, 212); border-radius: 2px;"></div><div class="ax-glyph-results" style="flex: 1 1 0%; overflow: auto; padding: 8px; background-color: rgba(25, 25, 30, 0.95); border-top: 1px solid var(--border-color); font-size: 12px; font-family: monospace;" data-connectivity-mode="online"><div class="ax-glyph-empty-state" style="color: var(--text-secondary); text-align: center; padding: 20px;">No matches yet</div></div></div></div></div></div>
 </body>
 </html>
