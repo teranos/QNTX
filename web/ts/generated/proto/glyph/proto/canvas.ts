@@ -28,7 +28,11 @@ export interface CanvasGlyph {
   /** which canvas this glyph belongs to ("" = root) */
   canvas_id: string;
   created_at: string | undefined;
-  updated_at: string | undefined;
+  updated_at:
+    | string
+    | undefined;
+  /** plugin that provides this glyph (empty for built-in glyphs) */
+  plugin_name: string;
 }
 
 /**

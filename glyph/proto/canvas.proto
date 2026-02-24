@@ -20,6 +20,7 @@ message CanvasGlyph {
   string canvas_id = 11;            // which canvas this glyph belongs to ("" = root)
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp updated_at = 10;
+  string plugin_name = 12;         // plugin that provides this glyph (empty for built-in glyphs)
 }
 
 // CompositionEdge represents a directed edge in the composition DAG
