@@ -12,7 +12,7 @@ This document shows Go type definitions from the codebase.
 
 ## ChildJobInfo {#childjobinfo}
 
-**Source**: [`server/pulse_types.go:70`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L70)
+**Source**: [`server/pulse_types.go:71`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L71)
 
 
 ```go
@@ -145,7 +145,7 @@ type GlyphFiredMessage struct {
 
 ## JobChildrenResponse {#jobchildrenresponse}
 
-**Source**: [`server/pulse_types.go:85`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L85)
+**Source**: [`server/pulse_types.go:86`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L86)
 
 
 ```go
@@ -164,6 +164,7 @@ type JobChildrenResponse struct {
 type JobStagesResponse struct {
 	JobID string `json:"job_id"`
 	Stages []schedule.StageInfo `json:"stages"`
+	PluginVersion string `json:"plugin_version,omitempty"`
 }
 ```
 
@@ -628,7 +629,7 @@ type StorageWarningMessage struct {
 
 ## TaskLogsResponse {#tasklogsresponse}
 
-**Source**: [`server/pulse_types.go:64`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L64)
+**Source**: [`server/pulse_types.go:65`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L65)
 
 
 ```go
