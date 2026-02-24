@@ -5,6 +5,7 @@ package server
 import (
 	"net/http"
 
+	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 )
 
@@ -18,8 +19,16 @@ func (s *QNTXServer) handleGetJobStages(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
+	// Look up plugin_version from the async job
+	var pluginVersion string
+	queue := async.NewQueue(s.db)
+	if job, err := queue.GetJob(jobID); err == nil && job != nil {
+		pluginVersion = job.PluginVersion
+	}
+
 	writeJSON(w, http.StatusOK, JobStagesResponse{
-		JobID:  jobID,
-		Stages: stages,
+		JobID:         jobID,
+		Stages:        stages,
+		PluginVersion: pluginVersion,
 	})
 }
