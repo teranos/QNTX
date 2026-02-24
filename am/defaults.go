@@ -78,6 +78,9 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("embeddings.cluster_label_max_tokens", 2000)
 	v.SetDefault("embeddings.cluster_label_model", "") // empty = system default
 
+	// Watcher defaults
+	v.SetDefault("watcher.max_fires_per_second", 3)
+
 	// Plugin configuration defaults
 	v.SetDefault("plugin.enabled", []string{}) // No plugins enabled by default (explicit opt-in via am.toml)
 	v.SetDefault("plugin.paths", []string{

@@ -73,9 +73,8 @@ type Engine struct {
 	parseErrors     map[string]error     // Stores parse errors for watchers that failed to load
 	queryEmbeddings map[string][]float32 // Pre-computed query embeddings for semantic watchers (watcherID → embedding)
 
-	// Retry queue
-	retryMu    sync.Mutex
-	retryQueue []*PendingExecution
+	// Persistent execution queue (replaces in-memory retry)
+	queueStore *QueueStore
 
 	// Control
 	ctx    context.Context
@@ -83,20 +82,14 @@ type Engine struct {
 	wg     sync.WaitGroup
 }
 
-// PendingExecution represents a failed execution queued for retry
-type PendingExecution struct {
-	WatcherID   string
-	Attestation *types.As
-	Attempt     int
-	NextRetryAt time.Time
-	LastError   string
-}
-
 const (
 	maxRetries          = 5
 	initialBackoff      = 1 * time.Second
 	maxBackoff          = 60 * time.Second
-	retryTickerInterval = 1 * time.Second
+	drainInterval       = 200 * time.Millisecond
+	drainBatchSize      = 50
+	purgeRetention      = 1 * time.Hour
+	purgeEveryNthTick   = 100 // purge completed entries every 100th drain tick
 )
 
 // NewEngine creates a new watcher engine
@@ -114,30 +107,48 @@ func NewEngine(db *sql.DB, apiBaseURL string, logger *zap.SugaredLogger) *Engine
 		rateLimiters:    make(map[string]*rate.Limiter),
 		parseErrors:     make(map[string]error),
 		queryEmbeddings: make(map[string][]float32),
-		retryQueue:      make([]*PendingExecution, 0),
+		queueStore:      NewQueueStore(db),
 		ctx:             ctx,
 		cancel:          cancel,
 	}
 }
 
-// Start loads watchers from DB and starts the retry loop
+// Start loads watchers from DB and starts the drain loop
 func (e *Engine) Start() error {
 	if err := e.loadWatchers(); err != nil {
 		return errors.Wrap(err, "failed to load watchers")
 	}
 
-	// Start retry loop
+	// Recover any entries that were 'running' when the process died
+	orphans, err := e.queueStore.RequeueOrphans()
+	if err != nil {
+		e.logger.Warnw("Failed to requeue orphaned execution queue entries", "error", err)
+	} else if orphans > 0 {
+		e.logger.Infow("Requeued orphaned execution queue entries from previous run", "count", orphans)
+	}
+
+	// Start drain loop (replaces in-memory retry loop)
 	e.wg.Add(1)
-	go e.retryLoop()
+	go e.drainLoop()
 
 	e.logger.Infow("Watcher engine started", "watchers_loaded", len(e.watchers))
 	return nil
 }
 
-// Stop gracefully shuts down the engine
+// Stop gracefully shuts down the engine. In-flight entries are reset to 'queued'
+// so they survive restart.
 func (e *Engine) Stop() {
 	e.cancel()
 	e.wg.Wait()
+
+	// Reset any entries claimed during this drain cycle back to queued
+	orphans, err := e.queueStore.RequeueOrphans()
+	if err != nil {
+		e.logger.Warnw("Failed to requeue in-flight entries during shutdown", "error", err)
+	} else if orphans > 0 {
+		e.logger.Infow("Reset in-flight queue entries for next startup", "count", orphans)
+	}
+
 	e.logger.Info("Watcher engine stopped")
 }
 
@@ -226,9 +237,8 @@ func (e *Engine) loadWatchers() error {
 		}
 
 		e.watchers[w.ID] = w
-		// Create rate limiter: MaxFiresPerMinute/60 = fires per second
-		// If MaxFiresPerMinute is 0, rate is 0/60 = 0, which means no fires allowed (QNTX LAW: zero means zero)
-		e.rateLimiters[w.ID] = rate.NewLimiter(rate.Limit(float64(w.MaxFiresPerMinute)/60.0), 1)
+		// If MaxFiresPerSecond is 0, rate is 0 — no fires allowed (QNTX LAW: zero means zero)
+		e.rateLimiters[w.ID] = rate.NewLimiter(rate.Limit(float64(w.MaxFiresPerSecond)), 1)
 	}
 
 	// Suppress standalone SE watchers that are targets of compound SE→SE melds.
@@ -581,36 +591,19 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 		}
 
 		// Check rate limit for action execution
-		// Per QNTX LAW: "Zero means zero" - if MaxFiresPerMinute is 0, never execute
-		if watcher.MaxFiresPerMinute == 0 {
-			e.logger.Infow("Watcher has MaxFiresPerMinute=0, not executing",
-				"watcher_id", watcher.ID,
-				"attestation_id", as.ID)
+		// Per QNTX LAW: "Zero means zero" - if MaxFiresPerSecond is 0, never execute
+		if watcher.MaxFiresPerSecond == 0 {
 			continue
 		}
 		limiter := e.rateLimiters[watcher.ID]
 		if limiter != nil && !limiter.Allow() {
-			e.logger.Infow("Watcher rate limited",
-				"watcher_id", watcher.ID,
-				"attestation_id", as.ID)
+			e.enqueueAttestation(watcher.ID, as, "rate_limited", 0, "")
 			continue
 		}
 
 		// Execute async with a deep copy to prevent race conditions
-		// Each goroutine gets its own copy of the attestation
-		asCopy := *as // Copy the struct
-		// Deep copy slices to prevent shared references
-		asCopy.Subjects = append([]string(nil), as.Subjects...)
-		asCopy.Predicates = append([]string(nil), as.Predicates...)
-		asCopy.Contexts = append([]string(nil), as.Contexts...)
-		asCopy.Actors = append([]string(nil), as.Actors...)
-		if as.Attributes != nil {
-			asCopy.Attributes = make(map[string]interface{})
-			for k, v := range as.Attributes {
-				asCopy.Attributes[k] = v
-			}
-		}
-		go e.executeAction(watcher, &asCopy)
+		asCopy := deepCopyAttestation(as)
+		go e.executeAction(watcher, asCopy)
 	}
 }
 
@@ -705,29 +698,17 @@ func (e *Engine) OnAttestationEmbedded(as *types.As, attestationEmbedding []floa
 		}
 
 		// Rate-limited action execution (same logic as OnAttestationCreated)
-		if watcher.MaxFiresPerMinute == 0 {
+		if watcher.MaxFiresPerSecond == 0 {
 			continue
 		}
 		limiter := e.rateLimiters[watcher.ID]
 		if limiter != nil && !limiter.Allow() {
-			e.logger.Infow("Watcher rate limited",
-				"watcher_id", watcher.ID,
-				"attestation_id", as.ID)
+			e.enqueueAttestation(watcher.ID, as, "rate_limited", 0, "")
 			continue
 		}
 
-		asCopy := *as
-		asCopy.Subjects = append([]string(nil), as.Subjects...)
-		asCopy.Predicates = append([]string(nil), as.Predicates...)
-		asCopy.Contexts = append([]string(nil), as.Contexts...)
-		asCopy.Actors = append([]string(nil), as.Actors...)
-		if as.Attributes != nil {
-			asCopy.Attributes = make(map[string]interface{})
-			for k, v := range as.Attributes {
-				asCopy.Attributes[k] = v
-			}
-		}
-		go e.executeAction(watcher, &asCopy)
+		asCopy := deepCopyAttestation(as)
+		go e.executeAction(watcher, asCopy)
 	}
 }
 
@@ -934,8 +915,8 @@ func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 		// Record error
 		e.store.RecordError(e.ctx, watcher.ID, err.Error())
 
-		// Queue for retry
-		e.queueRetry(watcher.ID, as, 1, err.Error())
+		// Queue for retry via persistent queue
+		e.enqueueAttestation(watcher.ID, as, "retry", 1, err.Error())
 	} else {
 		e.logger.Infow("Watcher action succeeded",
 			"watcher_id", watcher.ID,
@@ -1200,120 +1181,225 @@ func (e *Engine) executeWebhook(watcher *storage.Watcher, as *types.As) error {
 	return nil
 }
 
-// queueRetry adds a failed execution to the retry queue
-func (e *Engine) queueRetry(watcherID string, as *types.As, attempt int, lastError string) {
-	if attempt > maxRetries {
-		e.logger.Warnw("Max retries exceeded, dropping execution",
+// enqueueAttestation serializes an attestation and inserts it into the persistent queue.
+func (e *Engine) enqueueAttestation(watcherID string, as *types.As, reason string, attempt int, lastError string) {
+	if reason == "retry" && attempt > maxRetries {
+		e.logger.Warnw("Max retries exceeded, giving up",
 			"watcher_id", watcherID,
 			"attestation_id", as.ID,
 			"attempts", attempt)
 		return
 	}
 
-	// Calculate backoff: 1s, 2s, 4s, 8s, ... up to maxBackoff
-	backoff := initialBackoff * time.Duration(1<<(attempt-1))
-	if backoff > maxBackoff {
-		backoff = maxBackoff
+	attestationJSON, err := json.Marshal(as)
+	if err != nil {
+		e.logger.Errorw("Failed to serialize attestation for queue",
+			"watcher_id", watcherID,
+			"attestation_id", as.ID,
+			"error", err)
+		return
 	}
 
-	e.retryMu.Lock()
-	defer e.retryMu.Unlock()
+	notBefore := time.Now()
+	if reason == "retry" && attempt > 0 {
+		backoff := initialBackoff * time.Duration(1<<(attempt-1))
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
+		notBefore = notBefore.Add(backoff)
+	}
 
-	e.retryQueue = append(e.retryQueue, &PendingExecution{
-		WatcherID:   watcherID,
-		Attestation: as,
-		Attempt:     attempt,
-		NextRetryAt: time.Now().Add(backoff),
-		LastError:   lastError,
-	})
+	entry := &QueueEntry{
+		WatcherID:       watcherID,
+		AttestationJSON: string(attestationJSON),
+		Reason:          reason,
+		Attempt:         attempt,
+		NotBefore:       notBefore,
+		LastError:       lastError,
+	}
 
-	e.logger.Debugw("Queued for retry",
+	if err := e.queueStore.Enqueue(entry); err != nil {
+		e.logger.Errorw("Failed to enqueue execution",
+			"watcher_id", watcherID,
+			"attestation_id", as.ID,
+			"reason", reason,
+			"error", err)
+		return
+	}
+
+	e.logger.Infow("[QUEUE-TRACE] enqueued",
 		"watcher_id", watcherID,
 		"attestation_id", as.ID,
+		"reason", reason,
 		"attempt", attempt,
-		"next_retry_at", time.Now().Add(backoff))
+		"not_before", notBefore)
 }
 
-// retryLoop processes the retry queue
-func (e *Engine) retryLoop() {
+// drainLoop processes the persistent execution queue at a fixed interval.
+func (e *Engine) drainLoop() {
 	defer e.wg.Done()
 
-	ticker := time.NewTicker(retryTickerInterval)
+	ticker := time.NewTicker(drainInterval)
 	defer ticker.Stop()
 
+	tickCount := 0
 	for {
 		select {
 		case <-e.ctx.Done():
 			return
 		case <-ticker.C:
-			e.processRetryQueue()
+			e.drainOnce()
+			tickCount++
+			if tickCount%purgeEveryNthTick == 0 {
+				purged, err := e.queueStore.PurgeCompleted(purgeRetention)
+				if err != nil {
+					e.logger.Warnw("Failed to purge completed queue entries", "error", err)
+				} else if purged > 0 {
+					e.logger.Debugw("Purged completed queue entries", "count", purged)
+				}
+			}
 		}
 	}
 }
 
-// processRetryQueue executes due retries
-func (e *Engine) processRetryQueue() {
-	now := time.Now()
-
-	e.retryMu.Lock()
-	var due []*PendingExecution
-	var remaining []*PendingExecution
-
-	for _, pe := range e.retryQueue {
-		if pe.NextRetryAt.Before(now) || pe.NextRetryAt.Equal(now) {
-			due = append(due, pe)
-		} else {
-			remaining = append(remaining, pe)
-		}
+// drainOnce dequeues and processes one batch of entries (one per watcher, round-robin).
+func (e *Engine) drainOnce() {
+	entries, err := e.queueStore.DequeueRoundRobin(time.Now(), drainBatchSize)
+	if err != nil {
+		e.logger.Warnw("Failed to dequeue from execution queue", "error", err)
+		return
 	}
-	e.retryQueue = remaining
-	e.retryMu.Unlock()
 
-	// Process due items outside the lock
-	for _, pe := range due {
+	// TRACE: temporary detailed logging for queue testing
+	if len(entries) > 0 {
+		e.logger.Infow("[QUEUE-TRACE] drainOnce picked up entries",
+			"count", len(entries))
+	}
+
+	for _, entry := range entries {
+		e.logger.Infow("[QUEUE-TRACE] processing entry",
+			"queue_id", entry.ID,
+			"watcher_id", entry.WatcherID,
+			"reason", entry.Reason,
+			"attempt", entry.Attempt,
+			"not_before", entry.NotBefore)
+
 		e.mu.RLock()
-		watcher, exists := e.watchers[pe.WatcherID]
+		watcher, exists := e.watchers[entry.WatcherID]
 		e.mu.RUnlock()
 
 		if !exists || !watcher.Enabled {
+			e.logger.Infow("[QUEUE-TRACE] watcher gone or disabled, completing entry",
+				"queue_id", entry.ID,
+				"watcher_id", entry.WatcherID,
+				"exists", exists)
+			e.queueStore.Complete(entry.ID)
 			continue
 		}
 
-		go func(pe *PendingExecution, w *storage.Watcher) {
-			var err error
-
-			switch w.ActionType {
-			case storage.ActionTypePython:
-				err = e.executePython(w, pe.Attestation)
-			case storage.ActionTypeWebhook:
-				err = e.executeWebhook(w, pe.Attestation)
-			case storage.ActionTypeGlyphExecute:
-				err = e.executeGlyph(w, pe.Attestation)
-			case storage.ActionTypeSemanticMatch:
-				return // No action to retry — semantic watchers only broadcast
-			default:
-				err = errors.Newf("unknown action type for retry: %s", w.ActionType)
+		// For rate-limited entries, use Reserve/Cancel to peek at when the next token is available
+		if entry.Reason == "rate_limited" {
+			limiter := e.rateLimiters[entry.WatcherID]
+			if limiter != nil {
+				r := limiter.Reserve()
+				delay := r.Delay()
+				if delay > 0 {
+					// Token not available yet — cancel reservation and defer to exact time
+					r.Cancel()
+					retryAfter := time.Now().Add(delay)
+					e.logger.Infow("[QUEUE-TRACE] rate limit not ready, deferring to exact time",
+						"queue_id", entry.ID,
+						"watcher_id", entry.WatcherID,
+						"delay", delay,
+						"retry_after", retryAfter)
+					e.queueStore.Requeue(entry.ID, retryAfter)
+					continue
+				}
+				// delay == 0: token consumed by Reserve, proceed with execution
 			}
+			e.logger.Infow("[QUEUE-TRACE] rate limit token consumed, executing deferred action",
+				"queue_id", entry.ID,
+				"watcher_id", entry.WatcherID)
+		}
 
-			if err != nil {
-				e.logger.Warnw("Retry failed",
-					"watcher_id", w.ID,
-					"attestation_id", pe.Attestation.ID,
-					"attempt", pe.Attempt,
-					"error", err)
+		// Deserialize attestation
+		var as types.As
+		if err := json.Unmarshal([]byte(entry.AttestationJSON), &as); err != nil {
+			e.logger.Errorw("Failed to deserialize queued attestation",
+				"queue_id", entry.ID,
+				"watcher_id", entry.WatcherID,
+				"error", err)
+			e.queueStore.Fail(entry.ID, err.Error())
+			continue
+		}
 
-				e.store.RecordError(e.ctx, w.ID, err.Error())
-				e.queueRetry(w.ID, pe.Attestation, pe.Attempt+1, err.Error())
-			} else {
-				e.logger.Infow("Retry succeeded",
-					"watcher_id", w.ID,
-					"attestation_id", pe.Attestation.ID,
-					"attempt", pe.Attempt)
+		// Execute the action
+		var execErr error
+		switch watcher.ActionType {
+		case storage.ActionTypePython:
+			execErr = e.executePython(watcher, &as)
+		case storage.ActionTypeWebhook:
+			execErr = e.executeWebhook(watcher, &as)
+		case storage.ActionTypeGlyphExecute:
+			execErr = e.executeGlyph(watcher, &as)
+		case storage.ActionTypeSemanticMatch:
+			e.queueStore.Complete(entry.ID)
+			continue
+		default:
+			execErr = errors.Newf("unknown action type: %s", watcher.ActionType)
+		}
 
-				e.store.RecordFire(e.ctx, w.ID)
+		if execErr != nil {
+			e.logger.Warnw("[QUEUE-TRACE] queued execution FAILED",
+				"queue_id", entry.ID,
+				"watcher_id", watcher.ID,
+				"action_type", watcher.ActionType,
+				"attestation_id", as.ID,
+				"attempt", entry.Attempt,
+				"error", execErr)
+
+			e.store.RecordError(e.ctx, watcher.ID, execErr.Error())
+			e.queueStore.Complete(entry.ID)
+
+			// Re-enqueue as retry with incremented attempt and backoff
+			e.enqueueAttestation(watcher.ID, &as, "retry", entry.Attempt+1, execErr.Error())
+		} else {
+			e.logger.Infow("[QUEUE-TRACE] queued execution SUCCEEDED",
+				"queue_id", entry.ID,
+				"watcher_id", watcher.ID,
+				"action_type", watcher.ActionType,
+				"attestation_id", as.ID,
+				"attempt", entry.Attempt)
+
+			e.store.RecordFire(e.ctx, watcher.ID)
+			e.queueStore.Complete(entry.ID)
+
+			if watcher.ActionType == storage.ActionTypeGlyphExecute {
+				e.updateEdgeCursor(watcher, &as)
 			}
-		}(pe, watcher)
+		}
 	}
+}
+
+// deepCopyAttestation creates a deep copy of an attestation to prevent race conditions.
+func deepCopyAttestation(as *types.As) *types.As {
+	asCopy := *as
+	asCopy.Subjects = append([]string(nil), as.Subjects...)
+	asCopy.Predicates = append([]string(nil), as.Predicates...)
+	asCopy.Contexts = append([]string(nil), as.Contexts...)
+	asCopy.Actors = append([]string(nil), as.Actors...)
+	if as.Attributes != nil {
+		asCopy.Attributes = make(map[string]interface{})
+		for k, v := range as.Attributes {
+			asCopy.Attributes[k] = v
+		}
+	}
+	return &asCopy
+}
+
+// GetQueueStore returns the queue store for external access (stats endpoint).
+func (e *Engine) GetQueueStore() *QueueStore {
+	return e.queueStore
 }
 
 // GetStore returns the underlying watcher store for CRUD operations

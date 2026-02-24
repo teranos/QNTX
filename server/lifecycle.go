@@ -83,6 +83,11 @@ func (s *QNTXServer) startBackgroundServices() {
 	if s.ticker != nil {
 		s.startPulseExecutionPoller()
 	}
+
+	// Start watcher queue status broadcaster
+	if s.watcherEngine != nil {
+		s.startWatcherQueueBroadcaster()
+	}
 }
 
 // Start starts the server on the specified port
@@ -178,6 +183,13 @@ func (s *QNTXServer) Stop() error {
 		s.logger.Infow("Stopping daemon workers")
 		s.daemon.Stop()
 		s.logger.Infow("Daemon stopped")
+	}
+
+	// Stop watcher engine — drain loop stops, in-flight entries re-queued for next startup
+	if s.watcherEngine != nil {
+		s.logger.Infow("Stopping watcher engine")
+		s.watcherEngine.Stop()
+		s.logger.Infow("Watcher engine stopped")
 	}
 
 	// Shutdown plugins before closing clients

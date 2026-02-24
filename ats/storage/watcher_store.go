@@ -45,10 +45,10 @@ type Watcher struct {
 	ActionData string     `json:"action_data"` // Python code or webhook URL
 
 	// Rate limiting
-	// MaxFiresPerMinute controls action execution rate.
+	// MaxFiresPerSecond controls action execution rate.
 	// Set to 0 to disable execution (watcher will match but never fire actions).
 	// This follows QNTX LAW: "Zero means zero - 0 workers = no workers"
-	MaxFiresPerMinute int `json:"max_fires_per_minute"`
+	MaxFiresPerSecond int `json:"max_fires_per_second"`
 
 	// State
 	Enabled bool `json:"enabled"`
@@ -84,9 +84,9 @@ func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
 		return errors.New("watcher action_type cannot be empty")
 	}
 
-	// Validate MaxFiresPerMinute - zero means disabled (no fires allowed)
-	if w.MaxFiresPerMinute < 0 {
-		return errors.Newf("max_fires_per_minute must be >= 0, got %d", w.MaxFiresPerMinute)
+	// Validate MaxFiresPerSecond - zero means disabled (no fires allowed)
+	if w.MaxFiresPerSecond < 0 {
+		return errors.Newf("max_fires_per_second must be >= 0, got %d", w.MaxFiresPerSecond)
 	}
 
 	now := time.Now()
@@ -127,7 +127,7 @@ func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
 			semantic_query, semantic_threshold, semantic_cluster_id,
 			upstream_semantic_query, upstream_semantic_threshold,
 			action_type, action_data,
-			max_fires_per_minute, enabled,
+			max_fires_per_second, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		w.ID, w.Name,
@@ -135,7 +135,7 @@ func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
 		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold), w.SemanticClusterID,
 		nullIfEmpty(w.UpstreamSemanticQuery), nullIfZero(w.UpstreamSemanticThreshold),
 		w.ActionType, w.ActionData,
-		w.MaxFiresPerMinute, w.Enabled,
+		w.MaxFiresPerSecond, w.Enabled,
 		w.CreatedAt.Format(time.RFC3339Nano), w.UpdatedAt.Format(time.RFC3339Nano), nil, 0, 0, nil,
 	)
 	if err != nil {
@@ -156,8 +156,8 @@ func (ws *WatcherStore) CreateOrReplace(ctx context.Context, w *Watcher) error {
 	if w.ActionType == "" {
 		return errors.New("watcher action_type cannot be empty")
 	}
-	if w.MaxFiresPerMinute < 0 {
-		return errors.Newf("max_fires_per_minute must be >= 0, got %d", w.MaxFiresPerMinute)
+	if w.MaxFiresPerSecond < 0 {
+		return errors.Newf("max_fires_per_second must be >= 0, got %d", w.MaxFiresPerSecond)
 	}
 
 	now := time.Now()
@@ -198,7 +198,7 @@ func (ws *WatcherStore) CreateOrReplace(ctx context.Context, w *Watcher) error {
 			semantic_query, semantic_threshold, semantic_cluster_id,
 			upstream_semantic_query, upstream_semantic_threshold,
 			action_type, action_data,
-			max_fires_per_minute, enabled,
+			max_fires_per_second, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		w.ID, w.Name,
@@ -206,7 +206,7 @@ func (ws *WatcherStore) CreateOrReplace(ctx context.Context, w *Watcher) error {
 		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold), w.SemanticClusterID,
 		nullIfEmpty(w.UpstreamSemanticQuery), nullIfZero(w.UpstreamSemanticThreshold),
 		w.ActionType, w.ActionData,
-		w.MaxFiresPerMinute, w.Enabled,
+		w.MaxFiresPerSecond, w.Enabled,
 		w.CreatedAt.Format(time.RFC3339Nano), w.UpdatedAt.Format(time.RFC3339Nano), nil, 0, 0, nil,
 	)
 	if err != nil {
@@ -223,7 +223,7 @@ func (ws *WatcherStore) Get(ctx context.Context, id string) (*Watcher, error) {
 			semantic_query, semantic_threshold, semantic_cluster_id,
 			upstream_semantic_query, upstream_semantic_threshold,
 			action_type, action_data,
-			max_fires_per_minute, enabled,
+			max_fires_per_second, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
 		FROM watchers WHERE id = ?`, id)
 
@@ -238,7 +238,7 @@ func (ws *WatcherStore) List(ctx context.Context, enabledOnly bool) ([]*Watcher,
 			semantic_query, semantic_threshold, semantic_cluster_id,
 			upstream_semantic_query, upstream_semantic_threshold,
 			action_type, action_data,
-			max_fires_per_minute, enabled,
+			max_fires_per_second, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
 		FROM watchers`
 	if enabledOnly {
@@ -265,9 +265,9 @@ func (ws *WatcherStore) List(ctx context.Context, enabledOnly bool) ([]*Watcher,
 
 // Update updates a watcher
 func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
-	// Validate MaxFiresPerMinute
-	if w.MaxFiresPerMinute < 0 {
-		return errors.Newf("max_fires_per_minute must be >= 0, got %d", w.MaxFiresPerMinute)
+	// Validate MaxFiresPerSecond
+	if w.MaxFiresPerSecond < 0 {
+		return errors.Newf("max_fires_per_second must be >= 0, got %d", w.MaxFiresPerSecond)
 	}
 
 	w.UpdatedAt = time.Now()
@@ -312,7 +312,7 @@ func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
 			semantic_query = ?, semantic_threshold = ?, semantic_cluster_id = ?,
 			upstream_semantic_query = ?, upstream_semantic_threshold = ?,
 			action_type = ?, action_data = ?,
-			max_fires_per_minute = ?, enabled = ?,
+			max_fires_per_second = ?, enabled = ?,
 			fire_count = ?, error_count = ?, last_error = ?, last_fired_at = ?,
 			updated_at = ?
 		WHERE id = ?`,
@@ -321,7 +321,7 @@ func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
 		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold), w.SemanticClusterID,
 		nullIfEmpty(w.UpstreamSemanticQuery), nullIfZero(w.UpstreamSemanticThreshold),
 		w.ActionType, w.ActionData,
-		w.MaxFiresPerMinute, w.Enabled,
+		w.MaxFiresPerSecond, w.Enabled,
 		w.FireCount, w.ErrorCount, w.LastError, lastFiredAt,
 		w.UpdatedAt.Format(time.RFC3339Nano),
 		w.ID,
@@ -418,7 +418,7 @@ func scanWatcherFields(scan func(dest ...interface{}) error) (*Watcher, error) {
 		&semanticQuery, &semanticThreshold, &semanticClusterID,
 		&upstreamSemanticQuery, &upstreamSemanticThreshold,
 		&actionType, &w.ActionData,
-		&w.MaxFiresPerMinute, &w.Enabled,
+		&w.MaxFiresPerSecond, &w.Enabled,
 		&createdAt, &updatedAt, &lastFiredAt, &w.FireCount, &w.ErrorCount, &lastError,
 	)
 	if err != nil {
@@ -522,7 +522,7 @@ func (ws *WatcherStore) FindCompoundWatchersForTarget(ctx context.Context, targe
 			semantic_query, semantic_threshold, semantic_cluster_id,
 			upstream_semantic_query, upstream_semantic_threshold,
 			action_type, action_data,
-			max_fires_per_minute, enabled,
+			max_fires_per_second, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
 		FROM watchers
 		WHERE id LIKE 'meld-edge-%'
