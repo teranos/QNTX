@@ -142,3 +142,13 @@ func TestBase_ConcurrentPauseResume(t *testing.T) {
 	// Should be in a valid state — not panicked, not deadlocked
 	_ = b.IsPaused()
 }
+
+func TestBase_NilServicesDoesNotPanic(t *testing.T) {
+	b := NewBase(Metadata{Name: "test"})
+	// Init not called — services is nil
+	ctx := context.Background()
+
+	assert.NotPanics(t, func() { _ = b.Pause(ctx) })
+	assert.NotPanics(t, func() { _ = b.Resume(ctx) })
+	assert.NotPanics(t, func() { _ = b.Shutdown(ctx) })
+}
