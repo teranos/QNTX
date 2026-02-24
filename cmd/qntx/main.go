@@ -170,6 +170,7 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 		daemon := defaultServer.GetDaemon()
 		if daemon != nil {
 			handlerRegistry := daemon.Registry()
+			db := defaultServer.GetDB()
 			pluginLogger.Infow("Registering plugin async handlers with Pulse")
 
 			for _, p := range loadedPlugins {
@@ -185,14 +186,13 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 						"plugin", p.Metadata().Name,
 						"handler", handlerName,
 					)
-					proxyHandler := grpc.NewPluginProxyHandler(handlerName, externalPlugin)
+					proxyHandler := grpc.NewPluginProxyHandler(handlerName, externalPlugin, db, pluginLogger)
 					handlerRegistry.Register(proxyHandler)
 				}
 
 				// Setup plugin-announced schedules
 				schedules := externalPlugin.GetSchedules()
 				if len(schedules) > 0 {
-					db := defaultServer.GetDB()
 					if err := grpc.SetupPluginSchedules(db, p.Metadata().Name, schedules, pluginLogger); err != nil {
 						pluginLogger.Errorw("Failed to setup plugin schedules",
 							"plugin", p.Metadata().Name,
@@ -248,7 +248,7 @@ func retryScheduleSetup(plugins []plugin.DomainPlugin, logger *zap.SugaredLogger
 					"plugin", p.Metadata().Name,
 					"handler", handlerName,
 				)
-				proxyHandler := grpc.NewPluginProxyHandler(handlerName, externalPlugin)
+				proxyHandler := grpc.NewPluginProxyHandler(handlerName, externalPlugin, db, logger)
 				handlerRegistry.Register(proxyHandler)
 			}
 

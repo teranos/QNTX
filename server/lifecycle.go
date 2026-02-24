@@ -190,6 +190,17 @@ func (s *QNTXServer) Stop() error {
 		}
 	}
 
+	// Kill plugin processes (pluginRegistry only sends gRPC Shutdown RPCs,
+	// PluginManager owns the actual OS processes)
+	if pm := s.getPluginManager(); pm != nil {
+		s.logger.Infow("Stopping plugin processes")
+		if err := pm.Shutdown(s.ctx); err != nil {
+			s.logger.Warnw("Plugin process shutdown errors", "error", err)
+		} else {
+			s.logger.Infow("Plugin processes stopped")
+		}
+	}
+
 	// Shutdown gRPC services for plugins (Issue #138)
 	if s.servicesManager != nil {
 		s.logger.Infow("Shutting down plugin services")
