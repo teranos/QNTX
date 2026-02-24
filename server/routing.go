@@ -103,6 +103,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/canvas/compositions", wrap(s.canvasHandler.HandleCompositions))           // List/create compositions (GET/POST)
 	http.HandleFunc("/api/canvas/minimized-windows/", wrap(s.canvasHandler.HandleMinimizedWindows)) // Minimized window CRUD (DELETE /api/canvas/minimized-windows/{id})
 	http.HandleFunc("/api/canvas/minimized-windows", wrap(s.canvasHandler.HandleMinimizedWindows))  // List/add minimized windows (GET/POST)
+	http.HandleFunc("/api/canvas/export-dom", wrap(s.canvasHandler.HandleExportDOM))                // Export rendered DOM (POST /api/canvas/export-dom, demo mode only)
 	http.HandleFunc("/api/files/", wrap(s.HandleFiles))                                             // Serve stored file (GET /api/files/{id})
 	http.HandleFunc("/api/files", wrap(s.HandleFiles))                                              // Upload file (POST)
 	http.HandleFunc("/api/search/semantic", wrap(s.HandleSemanticSearch))                           // Semantic search (GET)
