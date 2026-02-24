@@ -593,6 +593,71 @@
     white-space: pre-wrap;
 }
 
+/* Log Viewer */
+.plugin-log-viewer {
+    margin-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 10px;
+}
+
+.plugin-log-header {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #6b7280;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.plugin-log-container {
+    max-height: 240px;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    padding: 6px 0;
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.plugin-log-entry {
+    display: flex;
+    gap: 8px;
+    padding: 1px 8px;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+.plugin-log-entry:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.plugin-log-time {
+    flex-shrink: 0;
+    color: #6b7280;
+}
+
+.plugin-log-level {
+    flex-shrink: 0;
+    width: 42px;
+    text-align: right;
+}
+
+.plugin-log-line {
+    flex: 1;
+    color: #d1d5db;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* Log level colors */
+.plugin-log-level-debug .plugin-log-level { color: #6b7280; }
+.plugin-log-level-info .plugin-log-level { color: #60a5fa; }
+.plugin-log-level-warn .plugin-log-level { color: #fbbf24; }
+.plugin-log-level-error .plugin-log-level { color: #f87171; }
+.plugin-log-level-error .plugin-log-line { color: #fca5a5; }
+
 /* Responsive */
 @media (max-width: 768px) {
     .plugin-card-header {
