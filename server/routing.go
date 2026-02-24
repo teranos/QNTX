@@ -87,6 +87,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/pulse/jobs/", wrap(s.HandlePulseJob))                                     // Individual async job and sub-resources (GET)
 	http.HandleFunc("/api/pulse/jobs", wrap(s.HandlePulseJobs))                                     // List async jobs (GET)
 	http.HandleFunc("/api/prompt/", wrap(s.HandlePrompt))                                           // Prompt operations (preview/execute/list/save/get/versions)
+	http.HandleFunc("/api/plugins/{name}/logs", wrap(s.HandlePluginLogs))                           // Plugin log stream (SSE)
 	http.HandleFunc("/api/plugins/{name}/config", wrap(s.HandlePluginConfig))                       // Plugin configuration (GET/PUT)
 	http.HandleFunc("/api/plugins/glyphs", wrap(s.HandlePluginGlyphs))                              // List custom plugin glyphs (GET)
 	http.HandleFunc("/api/plugins/", wrap(s.HandlePluginAction))                                    // Plugin actions: pause/resume (POST)
