@@ -54,6 +54,10 @@ export interface Job {
    */
   error_details?: string[];
   /**
+   * Version of plugin that executed this job
+   */
+  plugin_version?: string;
+  /**
    * For tasks grouped under parent job
    */
   parent_job_id?: string;

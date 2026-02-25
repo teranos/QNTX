@@ -10,14 +10,14 @@ import (
 // JobScanArgs holds all the variables needed for scanning a job from a database row.
 // This follows the same pattern as contact/scan.go and organization/scan.go.
 type JobScanArgs struct {
-	HandlerName       sql.NullString
-	Payload           sql.NullString
-	PulseStateJSON    sql.NullString
-	ErrorMsg          sql.NullString
-	ErrorDetailsJSON  sql.NullString
-	ParentJobID       sql.NullString
-	StartedAt         sql.NullTime
-	CompletedAt       sql.NullTime
+	HandlerName      sql.NullString
+	Payload          sql.NullString
+	PulseStateJSON   sql.NullString
+	ErrorMsg         sql.NullString
+	ErrorDetailsJSON sql.NullString
+	ParentJobID      sql.NullString
+	StartedAt        sql.NullTime
+	CompletedAt      sql.NullTime
 }
 
 // GetJobScanArgs returns a JobScanArgs struct with all variables ready for scanning
@@ -43,6 +43,7 @@ func GetJobScanTargets(job *Job, args *JobScanArgs) []interface{} {
 		&args.Payload,
 		&args.ParentJobID,
 		&job.RetryCount,
+		&job.PluginVersion,
 		&job.CreatedAt,
 		&args.StartedAt,
 		&args.CompletedAt,
@@ -124,6 +125,6 @@ func StandardJobSelectColumns() string {
 		progress_current, progress_total,
 		cost_estimate, cost_actual,
 		pulse_state, error, error_details, payload,
-		parent_job_id, retry_count,
+		parent_job_id, retry_count, plugin_version,
 		created_at, started_at, completed_at, updated_at`
 }

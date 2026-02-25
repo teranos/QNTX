@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -29,7 +30,7 @@ func NewPlugin() *Plugin {
 func (p *Plugin) Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name:        "github",
-		Version:     "0.1.5",
+		Version:     "0.1.6",
 		QNTXVersion: ">= 0.1.0",
 		Description: "GitHub integration for repository events and automation",
 		Author:      "QNTX Team",
@@ -196,23 +197,36 @@ func (p *Plugin) GetHandlerNames() []string {
 }
 
 // ExecuteJob executes an async job routed from Pulse.
-func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID string, payload []byte) (result []byte, err error) {
+func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID string, payload []byte) (result []byte, logs []*protocol.JobLogEntry, err error) {
 	switch handlerName {
 	case "github.poll-events":
-		// Execute GitHub event polling
+		logs = append(logs, jobLog("info", "poll-events", "Polling GitHub events"))
+
 		count, err := p.HandlePulseJob(ctx, jobID)
 		if err != nil {
-			return nil, err
+			logs = append(logs, jobLog("error", "poll-events", fmt.Sprintf("Poll failed: %v", err)))
+			return nil, logs, err
 		}
 
-		// Return success result with attestation count
+		logs = append(logs, jobLog("info", "poll-events", fmt.Sprintf("Poll complete, %d attestations created", count)))
+
 		resultData := map[string]interface{}{
 			"attestations_created": count,
 		}
-		return json.Marshal(resultData)
+		result, err := json.Marshal(resultData)
+		return result, logs, err
 
 	default:
-		return nil, fmt.Errorf("unknown handler: %s", handlerName)
+		return nil, nil, fmt.Errorf("unknown handler: %s", handlerName)
+	}
+}
+
+func jobLog(level, stage, message string) *protocol.JobLogEntry {
+	return &protocol.JobLogEntry{
+		Timestamp: time.Now().Format(time.RFC3339),
+		Level:     level,
+		Stage:     stage,
+		Message:   message,
 	}
 }
 
