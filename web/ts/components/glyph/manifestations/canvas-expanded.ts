@@ -24,6 +24,8 @@ import { uiState } from '../../../state/ui';
 import { getGlyphTypeBySymbol } from '../glyph-registry';
 import { destroyCanvasSelection } from '../canvas/selection';
 import { pushBreadcrumb, popBreadcrumb, buildBreadcrumbBar } from '../canvas/breadcrumb';
+import { exportCanvasDOM } from '../../../api/canvas-export';
+import { Button } from '../../button';
 
 /**
  * Morph a canvas-placed glyph to fullscreen workspace
@@ -107,6 +109,25 @@ export function morphCanvasPlacedToFullscreen(
 
             // Build breadcrumb bar with minimize button inside it
             const breadcrumbBar = buildBreadcrumbBar();
+
+            // Export button — captures rendered DOM and sends to backend (demo mode enforced by backend)
+            // Uses two-stage confirmation to prevent accidental overwrites
+            const exportBtn = new Button({
+                label: 'Export',
+                icon: '↓',
+                variant: 'warning',
+                size: 'small',
+                className: 'canvas-export-btn',
+                confirmation: {
+                    label: 'Confirm Export',
+                    timeout: 5000
+                },
+                onClick: async () => {
+                    await exportCanvasDOM(workspace);
+                    log.info(SEG.GLYPH, '[Canvas] Export complete');
+                }
+            });
+            breadcrumbBar.appendChild(exportBtn.element);
 
             const minimizeBtn = document.createElement('button');
             minimizeBtn.textContent = '−';

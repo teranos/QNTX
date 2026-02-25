@@ -21,8 +21,9 @@ use crate::engine::PythonEngine;
 use crate::handlers::{HandlerContext, PluginState};
 use crate::proto::{
     domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, Empty,
-    ExecuteJobRequest, ExecuteJobResponse, HealthResponse, HttpHeader, HttpRequest, HttpResponse,
-    InitializeRequest, InitializeResponse, MetadataResponse, WebSocketMessage,
+    ExecuteJobRequest, ExecuteJobResponse, GlyphDefResponse, HealthResponse, HttpHeader,
+    HttpRequest, HttpResponse, InitializeRequest, InitializeResponse, MetadataResponse,
+    WebSocketMessage,
 };
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -466,6 +467,14 @@ impl DomainPluginService for PythonPluginService {
         }))
     }
 
+    /// Register custom glyph types (none for Python plugin)
+    async fn register_glyphs(
+        &self,
+        _request: Request<Empty>,
+    ) -> Result<Response<GlyphDefResponse>, Status> {
+        Ok(Response::new(GlyphDefResponse { glyphs: vec![] }))
+    }
+
     /// Execute an async job
     /// Routes to appropriate handler based on handler_name
     async fn execute_job(
@@ -562,6 +571,8 @@ impl PythonPluginService {
                 progress_current: 0,
                 progress_total: 0,
                 cost_actual: 0.0,
+                log_entries: vec![],
+                plugin_version: env!("CARGO_PKG_VERSION").to_string(),
             }))
         } else {
             // Execution failed
@@ -574,6 +585,8 @@ impl PythonPluginService {
                 progress_current: 0,
                 progress_total: 0,
                 cost_actual: 0.0,
+                log_entries: vec![],
+                plugin_version: env!("CARGO_PKG_VERSION").to_string(),
             }))
         }
     }
@@ -641,6 +654,8 @@ impl PythonPluginService {
                 progress_current: 0,
                 progress_total: 0,
                 cost_actual: 0.0,
+                log_entries: vec![],
+                plugin_version: env!("CARGO_PKG_VERSION").to_string(),
             }))
         } else {
             // Execution failed
@@ -653,6 +668,8 @@ impl PythonPluginService {
                 progress_current: 0,
                 progress_total: 0,
                 cost_actual: 0.0,
+                log_entries: vec![],
+                plugin_version: env!("CARGO_PKG_VERSION").to_string(),
             }))
         }
     }
