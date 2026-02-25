@@ -134,6 +134,7 @@ export type {
   WatcherCreateRequest,
   WatcherErrorMessage,
   WatcherMatchMessage,
+  WatcherQueueStatusMessage,
   WatcherResponse,
 } from './server';
 
