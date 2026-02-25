@@ -9,6 +9,7 @@
 | POST | `/api/plugins/` | HandlePluginAction |
 | GET | `/api/plugins/glyphs` | HandlePluginGlyphs |
 | GET, PUT | `/api/plugins/{name}/config` | HandlePluginConfig |
+| GET | `/api/plugins/{name}/logs` | HandlePluginLogs |
 
 ---
 
@@ -47,6 +48,15 @@ GET /api/plugins/{name}/config - Get plugin configuration
 PUT /api/plugins/{name}/config - Update plugin configuration
 
 **Handler**: `HandlePluginConfig`
+
+---
+
+### `GET` /api/plugins/{name}/logs
+
+HandlePluginLogs streams plugin log entries via Server-Sent Events.
+GET /api/plugins/{name}/logs
+
+**Handler**: `HandlePluginLogs`
 
 ---
 
