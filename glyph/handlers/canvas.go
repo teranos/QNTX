@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/teranos/QNTX/ats/storage"
@@ -575,6 +577,48 @@ func (h *CanvasHandler) logWarn(format string, args ...any) {
 	if h.logger != nil {
 		h.logger.Warnf(format, args...)
 	}
+}
+
+// HandleExportDOM receives rendered DOM HTML from client and writes to docs/demo/index.html
+// POST /api/canvas/export-dom — requires html in JSON body, demo mode only
+func (h *CanvasHandler) HandleExportDOM(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("QNTX_DEMO") != "1" {
+		h.writeError(w, errors.New("canvas export only available in demo mode (make demo)"), http.StatusForbidden)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		h.writeError(w, errors.New("method not allowed"), http.StatusMethodNotAllowed)
+		return
+	}
+
+	var body struct {
+		HTML string `json:"html"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		h.writeError(w, errors.Wrap(err, "invalid request body"), http.StatusBadRequest)
+		return
+	}
+	if body.HTML == "" {
+		h.writeError(w, errors.New("html is required"), http.StatusBadRequest)
+		return
+	}
+
+	// Write to docs/demo/index.html
+	demoPath := filepath.Join("docs", "demo", "index.html")
+	if err := os.MkdirAll(filepath.Dir(demoPath), 0755); err != nil {
+		h.writeError(w, errors.Wrapf(err, "failed to create demo directory"), http.StatusInternalServerError)
+		return
+	}
+
+	if err := os.WriteFile(demoPath, []byte(body.HTML), 0644); err != nil {
+		h.writeError(w, errors.Wrapf(err, "failed to write %s", demoPath), http.StatusInternalServerError)
+		return
+	}
+
+	h.writeJSON(w, map[string]string{
+		"path": demoPath,
+	})
 }
 
 func (h *CanvasHandler) writeJSON(w http.ResponseWriter, data any) {

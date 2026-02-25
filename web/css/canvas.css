@@ -145,10 +145,15 @@
     transition: all 0.15s ease;
 }
 
-/* Inside breadcrumb bar: static positioning, right-aligned via auto margin */
+/* Inside breadcrumb bar: export button pushed to right, spaced from minimize */
+.canvas-breadcrumb-bar .canvas-export-btn {
+    margin-left: auto;
+    margin-right: 8px;
+}
+
+/* Inside breadcrumb bar: static positioning */
 .canvas-breadcrumb-bar .canvas-minimize-btn {
     position: static;
-    margin-left: auto;
     z-index: auto;
 }
 
