@@ -192,6 +192,10 @@ export interface JobChildrenResponse {
 export interface JobStagesResponse {
   job_id: string;
   stages: StageInfo[];
+  /**
+   * Version of plugin that executed this job
+   */
+  plugin_version?: string;
 }
 
 export interface JobUpdateMessage {
@@ -919,7 +923,7 @@ export interface WatcherCreateRequest {
    * Python code or webhook URL (not required for semantic_match)
    */
   action_data: string;
-  max_fires_per_second?: number;
+  max_fires_per_minute?: number;
   enabled?: boolean | null;
   /**
    * Semantic matching fields (for ⊨ glyphs)
@@ -982,17 +986,6 @@ export interface WatcherMatchMessage {
   timestamp: number;
 }
 
-export interface WatcherQueueStatusMessage {
-  /**
-   * "watcher_queue_status"
-   */
-  type: string;
-  total_queued: number;
-  per_watcher: Record<string, number>;
-  oldest_age_seconds: number;
-  timestamp: number;
-}
-
 export interface WatcherResponse {
   id: string;
   name: string;
@@ -1006,7 +999,7 @@ export interface WatcherResponse {
   action_data: string;
   semantic_query?: string;
   semantic_threshold?: number;
-  max_fires_per_second: number;
+  max_fires_per_minute: number;
   enabled: boolean;
   created_at: string;
   updated_at: string;
