@@ -732,7 +732,8 @@ func (s *QNTXServer) BroadcastPluginHealth(name string, healthy bool, state, mes
 	)
 }
 
-// startWatcherQueueBroadcaster periodically broadcasts queue status when the queue is non-empty
+// startWatcherQueueBroadcaster periodically broadcasts queue status.
+// Sends updates while queue is non-empty, plus one final total_queued:0 when it drains.
 func (s *QNTXServer) startWatcherQueueBroadcaster() {
 	s.wg.Add(1)
 	go func() {
@@ -741,6 +742,7 @@ func (s *QNTXServer) startWatcherQueueBroadcaster() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
 
+		wasNonEmpty := false
 		for {
 			select {
 			case <-s.ctx.Done():
@@ -758,9 +760,15 @@ func (s *QNTXServer) startWatcherQueueBroadcaster() {
 				}
 
 				stats, err := s.watcherEngine.GetQueueStore().Stats()
-				if err != nil || stats.TotalQueued == 0 {
+				if err != nil {
 					continue
 				}
+
+				if stats.TotalQueued == 0 && !wasNonEmpty {
+					continue
+				}
+
+				wasNonEmpty = stats.TotalQueued > 0
 
 				msg := WatcherQueueStatusMessage{
 					Type:             "watcher_queue_status",
