@@ -107,7 +107,7 @@ func (p *Plugin) handleCode(w http.ResponseWriter, r *http.Request) {
 
 // checkPaused returns true and writes 503 response if plugin is paused
 func (p *Plugin) checkPaused(w http.ResponseWriter) bool {
-	if p.paused {
+	if p.IsPaused() {
 		http.Error(w, "Code plugin is paused", http.StatusServiceUnavailable)
 		return true
 	}
@@ -139,7 +139,7 @@ func (p *Plugin) handleCodeContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger := p.services.Logger("code")
+	logger := p.Services().Logger("code")
 
 	// QNTX already stripped /api/code prefix, path comes as /filename
 	codePath := strings.TrimPrefix(r.URL.Path, "/")
@@ -194,7 +194,7 @@ func (p *Plugin) handlePRSuggestions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger := p.services.Logger("code")
+	logger := p.Services().Logger("code")
 
 	if !requireMethod(w, r, http.MethodGet) {
 		return
@@ -236,7 +236,7 @@ func (p *Plugin) handlePRList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger := p.services.Logger("code")
+	logger := p.Services().Logger("code")
 
 	if !requireMethod(w, r, http.MethodGet) {
 		return
@@ -268,7 +268,7 @@ type GitIxgestRequest struct {
 
 // handleGitIxgest handles git repository ingestion requests
 func (p *Plugin) handleGitIxgest(w http.ResponseWriter, r *http.Request) {
-	logger := p.services.Logger("code")
+	logger := p.Services().Logger("code")
 
 	// Parse request body
 	var req GitIxgestRequest
@@ -304,7 +304,7 @@ func (p *Plugin) handleGitIxgest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get ATSStore from services
-	store := p.services.ATSStore()
+	store := p.Services().ATSStore()
 	if store == nil && !req.DryRun {
 		http.Error(w, "ATSStore not available", http.StatusServiceUnavailable)
 		return
@@ -417,7 +417,7 @@ func (p *Plugin) buildCodeTreeFromFS(basePath, relPath string) ([]CodeEntry, err
 
 // serveCodeFile serves a code file
 func (p *Plugin) serveCodeFile(w http.ResponseWriter, r *http.Request, codePath string, workspaceRoot string) {
-	logger := p.services.Logger("code")
+	logger := p.Services().Logger("code")
 
 	fullPath := filepath.Join(workspaceRoot, codePath)
 	content, err := os.ReadFile(fullPath)
@@ -444,7 +444,7 @@ func (p *Plugin) serveCodeFile(w http.ResponseWriter, r *http.Request, codePath 
 
 // saveCodeFile saves a code file (dev mode only, validated by caller)
 func (p *Plugin) saveCodeFile(w http.ResponseWriter, r *http.Request, codePath string, workspaceRoot string) {
-	logger := p.services.Logger("code")
+	logger := p.Services().Logger("code")
 
 	fullPath := filepath.Join(workspaceRoot, codePath)
 
@@ -486,7 +486,7 @@ type CodeEntry struct {
 
 // attestFileAccess creates an attestation for file read/write operations
 func (p *Plugin) attestFileAccess(filePath, operation string) {
-	store := p.services.ATSStore()
+	store := p.Services().ATSStore()
 	if store == nil {
 		return
 	}
@@ -497,14 +497,14 @@ func (p *Plugin) attestFileAccess(filePath, operation string) {
 		Contexts:   []string{"code-domain"},
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
-		logger := p.services.Logger("code")
+		logger := p.Services().Logger("code")
 		logger.Debugw("Failed to create file access attestation", "path", filePath, "op", operation, "error", err)
 	}
 }
 
 // attestPRAction creates an attestation for PR-related actions
 func (p *Plugin) attestPRAction(prNumber int, action string, count int) {
-	store := p.services.ATSStore()
+	store := p.Services().ATSStore()
 	if store == nil {
 		return
 	}
@@ -519,14 +519,14 @@ func (p *Plugin) attestPRAction(prNumber int, action string, count int) {
 		},
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
-		logger := p.services.Logger("code")
+		logger := p.Services().Logger("code")
 		logger.Debugw("Failed to create PR attestation", "pr", prNumber, "action", action, "error", err)
 	}
 }
 
 // attestPRListFetch creates an attestation for fetching the PR list
 func (p *Plugin) attestPRListFetch(count int) {
-	store := p.services.ATSStore()
+	store := p.Services().ATSStore()
 	if store == nil {
 		return
 	}
@@ -540,14 +540,14 @@ func (p *Plugin) attestPRListFetch(count int) {
 		},
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
-		logger := p.services.Logger("code")
+		logger := p.Services().Logger("code")
 		logger.Debugw("Failed to create PR list attestation", "error", err)
 	}
 }
 
 // attestIxgestCompleted creates an attestation for git ingestion completion
 func (p *Plugin) attestIxgestCompleted(repoPath string, commits, attestations int) {
-	store := p.services.ATSStore()
+	store := p.Services().ATSStore()
 	if store == nil {
 		return
 	}
@@ -562,7 +562,7 @@ func (p *Plugin) attestIxgestCompleted(repoPath string, commits, attestations in
 		},
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
-		logger := p.services.Logger("code")
+		logger := p.Services().Logger("code")
 		logger.Debugw("Failed to create ixgest completion attestation", "error", err)
 	}
 }

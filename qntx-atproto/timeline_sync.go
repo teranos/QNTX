@@ -10,14 +10,10 @@ import (
 
 // syncTimeline is a Pulse job that fetches the timeline and creates attestations.
 func (p *Plugin) syncTimeline(ctx context.Context, jobID string) error {
-	logger := p.services.Logger("atproto")
+	logger := p.Services().Logger("atproto")
 
 	// Skip if paused
-	p.mu.RLock()
-	paused := p.paused
-	p.mu.RUnlock()
-
-	if paused {
+	if p.IsPaused() {
 		logger.Debug("Timeline sync skipped (plugin paused)")
 		return nil
 	}
@@ -29,7 +25,7 @@ func (p *Plugin) syncTimeline(ctx context.Context, jobID string) error {
 		return nil
 	}
 
-	config := p.services.Config("atproto")
+	config := p.Services().Config("atproto")
 	limit := int64(config.GetInt("timeline_sync_limit"))
 	if limit <= 0 {
 		limit = 50 // Default
