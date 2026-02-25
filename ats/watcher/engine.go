@@ -1227,7 +1227,7 @@ func (e *Engine) enqueueAttestation(watcherID string, as *types.As, reason strin
 		return
 	}
 
-	e.logger.Infow("[QUEUE-TRACE] enqueued",
+	e.logger.Debugw("Enqueued attestation for deferred execution",
 		"watcher_id", watcherID,
 		"attestation_id", as.ID,
 		"reason", reason,
@@ -1270,36 +1270,20 @@ func (e *Engine) drainOnce() {
 		return
 	}
 
-	// TRACE: temporary detailed logging for queue testing
-	if len(entries) > 0 {
-		e.logger.Infow("[QUEUE-TRACE] drainOnce picked up entries",
-			"count", len(entries))
-	}
-
 	for _, entry := range entries {
-		e.logger.Infow("[QUEUE-TRACE] processing entry",
-			"queue_id", entry.ID,
-			"watcher_id", entry.WatcherID,
-			"reason", entry.Reason,
-			"attempt", entry.Attempt,
-			"not_before", entry.NotBefore)
 
 		e.mu.RLock()
 		watcher, exists := e.watchers[entry.WatcherID]
+		limiter := e.rateLimiters[entry.WatcherID]
 		e.mu.RUnlock()
 
 		if !exists || !watcher.Enabled {
-			e.logger.Infow("[QUEUE-TRACE] watcher gone or disabled, completing entry",
-				"queue_id", entry.ID,
-				"watcher_id", entry.WatcherID,
-				"exists", exists)
 			e.queueStore.Complete(entry.ID)
 			continue
 		}
 
 		// For rate-limited entries, use Reserve/Cancel to peek at when the next token is available
 		if entry.Reason == "rate_limited" {
-			limiter := e.rateLimiters[entry.WatcherID]
 			if limiter != nil {
 				r := limiter.Reserve()
 				delay := r.Delay()
@@ -1307,19 +1291,11 @@ func (e *Engine) drainOnce() {
 					// Token not available yet — cancel reservation and defer to exact time
 					r.Cancel()
 					retryAfter := time.Now().Add(delay)
-					e.logger.Infow("[QUEUE-TRACE] rate limit not ready, deferring to exact time",
-						"queue_id", entry.ID,
-						"watcher_id", entry.WatcherID,
-						"delay", delay,
-						"retry_after", retryAfter)
 					e.queueStore.Requeue(entry.ID, retryAfter)
 					continue
 				}
 				// delay == 0: token consumed by Reserve, proceed with execution
 			}
-			e.logger.Infow("[QUEUE-TRACE] rate limit token consumed, executing deferred action",
-				"queue_id", entry.ID,
-				"watcher_id", entry.WatcherID)
 		}
 
 		// Deserialize attestation
@@ -1350,10 +1326,8 @@ func (e *Engine) drainOnce() {
 		}
 
 		if execErr != nil {
-			e.logger.Warnw("[QUEUE-TRACE] queued execution FAILED",
-				"queue_id", entry.ID,
+			e.logger.Warnw("Queued execution failed",
 				"watcher_id", watcher.ID,
-				"action_type", watcher.ActionType,
 				"attestation_id", as.ID,
 				"attempt", entry.Attempt,
 				"error", execErr)
@@ -1364,13 +1338,6 @@ func (e *Engine) drainOnce() {
 			// Re-enqueue as retry with incremented attempt and backoff
 			e.enqueueAttestation(watcher.ID, &as, "retry", entry.Attempt+1, execErr.Error())
 		} else {
-			e.logger.Infow("[QUEUE-TRACE] queued execution SUCCEEDED",
-				"queue_id", entry.ID,
-				"watcher_id", watcher.ID,
-				"action_type", watcher.ActionType,
-				"attestation_id", as.ID,
-				"attempt", entry.Attempt)
-
 			e.store.RecordFire(e.ctx, watcher.ID)
 			e.queueStore.Complete(entry.ID)
 
