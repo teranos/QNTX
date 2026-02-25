@@ -25,7 +25,7 @@ type goplsWebSocketHandler struct {
 
 // ServeWS handles gopls WebSocket connections
 func (h *goplsWebSocketHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
-	logger := h.plugin.services.Logger("code.gopls")
+	logger := h.plugin.Services().Logger("code.gopls")
 	logger.Infow("gopls WebSocket connection request", "remote", r.RemoteAddr)
 
 	// Check if gopls service is available

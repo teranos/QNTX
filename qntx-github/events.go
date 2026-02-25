@@ -13,19 +13,15 @@ import (
 // HandlePulseJob handles Pulse job execution for GitHub event polling.
 // Returns the number of attestations created.
 func (p *Plugin) HandlePulseJob(ctx context.Context, jobID string) (int, error) {
-	logger := p.services.Logger("github")
+	logger := p.Services().Logger("github")
 
 	// Skip if paused
-	p.mu.RLock()
-	paused := p.paused
-	p.mu.RUnlock()
-
-	if paused {
+	if p.IsPaused() {
 		logger.Debug("GitHub event polling skipped (plugin paused)")
 		return 0, nil
 	}
 
-	config := p.services.Config("github")
+	config := p.Services().Config("github")
 	repos := config.GetStringSlice("repos")
 	if len(repos) == 0 {
 		logger.Debug("No repositories configured, skipping event poll")
@@ -66,7 +62,7 @@ func (p *Plugin) HandlePulseJob(ctx context.Context, jobID string) (int, error) 
 
 // pollRepository polls a single repository for events and creates attestations.
 func (p *Plugin) pollRepository(ctx context.Context, owner, repo string) (int, error) {
-	logger := p.services.Logger("github")
+	logger := p.Services().Logger("github")
 
 	// Fetch events from GitHub API
 	events, err := p.client.GetEvents(ctx, owner, repo)
@@ -74,7 +70,7 @@ func (p *Plugin) pollRepository(ctx context.Context, owner, repo string) (int, e
 		return 0, err
 	}
 
-	store := p.services.ATSStore()
+	store := p.Services().ATSStore()
 	if store == nil {
 		return 0, errors.New("ATS store not available")
 	}
