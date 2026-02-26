@@ -882,7 +882,7 @@ func setupSEtoSE(t *testing.T) (*CanvasHandler, *storage.WatcherStore, context.C
 		ActionType:        storage.ActionTypeSemanticMatch,
 		SemanticQuery:     "science",
 		SemanticThreshold: 0.4,
-		MaxFiresPerMinute: 60,
+		MaxFiresPerSecond: 60,
 		Enabled:           true,
 	}
 	se2Watcher := &storage.Watcher{
@@ -891,7 +891,7 @@ func setupSEtoSE(t *testing.T) (*CanvasHandler, *storage.WatcherStore, context.C
 		ActionType:        storage.ActionTypeSemanticMatch,
 		SemanticQuery:     "about teaching",
 		SemanticThreshold: 0.5,
-		MaxFiresPerMinute: 60,
+		MaxFiresPerSecond: 60,
 		Enabled:           true,
 	}
 	if err := watcherStore.Create(ctx, se1Watcher); err != nil {
@@ -1045,8 +1045,8 @@ func TestCompileSubscriptions_SEtoSEtoPrompt_PropagatesUpstream(t *testing.T) {
 
 	// Create standalone watchers
 	for _, w := range []*storage.Watcher{
-		{ID: "se-glyph-se-1", Name: "SE: science", ActionType: storage.ActionTypeSemanticMatch, SemanticQuery: "science", SemanticThreshold: 0.4, MaxFiresPerMinute: 60, Enabled: true},
-		{ID: "se-glyph-se-2", Name: "SE: teaching", ActionType: storage.ActionTypeSemanticMatch, SemanticQuery: "about teaching", SemanticThreshold: 0.5, MaxFiresPerMinute: 60, Enabled: true},
+		{ID: "se-glyph-se-1", Name: "SE: science", ActionType: storage.ActionTypeSemanticMatch, SemanticQuery: "science", SemanticThreshold: 0.4, MaxFiresPerSecond: 60, Enabled: true},
+		{ID: "se-glyph-se-2", Name: "SE: teaching", ActionType: storage.ActionTypeSemanticMatch, SemanticQuery: "about teaching", SemanticThreshold: 0.5, MaxFiresPerSecond: 60, Enabled: true},
 	} {
 		if err := watcherStore.Create(ctx, w); err != nil {
 			t.Fatalf("Create watcher %s failed: %v", w.ID, err)

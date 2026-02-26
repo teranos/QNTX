@@ -30,6 +30,7 @@ mock.module('../../connectivity', () => ({
             cb(mockState);
             return () => { subscribers.delete(cb); };
         },
+        subscribeAuth: () => () => {},
     },
 }));
 

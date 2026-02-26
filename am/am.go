@@ -12,7 +12,13 @@ type Config struct {
 	Ax             AxConfig             `mapstructure:"ax"`
 	Plugin         PluginConfig         `mapstructure:"plugin"`
 	Embeddings     EmbeddingsConfig     `mapstructure:"embeddings"`
+	Watcher        WatcherConfig        `mapstructure:"watcher"`
 	Sync           SyncConfig           `mapstructure:"sync"`
+}
+
+// WatcherConfig configures the watcher engine
+type WatcherConfig struct {
+	MaxFiresPerSecond int `mapstructure:"max_fires_per_second"` // Default rate limit for new watchers (default: 3)
 }
 
 // AuthConfig configures biometric authentication (WebAuthn)

@@ -900,6 +900,16 @@ export interface UsageUpdateMessage {
   timestamp: number;
 }
 
+export interface WatcherBroadcastStats {
+  fire_count: number;
+  error_count: number;
+  /**
+   * Unix seconds, 0 = never
+   */
+  last_fired_at?: number;
+  last_error?: string;
+}
+
 export interface WatcherCreateRequest {
   id: string;
   name: string;
@@ -923,7 +933,7 @@ export interface WatcherCreateRequest {
    * Python code or webhook URL (not required for semantic_match)
    */
   action_data: string;
-  max_fires_per_minute?: number;
+  max_fires_per_second?: number;
   enabled?: boolean | null;
   /**
    * Semantic matching fields (for ⊨ glyphs)
@@ -986,6 +996,25 @@ export interface WatcherMatchMessage {
   timestamp: number;
 }
 
+export interface WatcherQueueStatusMessage {
+  /**
+   * "watcher_queue_status"
+   */
+  type: string;
+  total_queued: number;
+  per_watcher: Record<string, number>;
+  /**
+   * meld-edge watcher ID → target glyph ID
+   */
+  target_glyphs?: Record<string, string>;
+  /**
+   * per-watcher execution stats
+   */
+  watcher_stats?: Record<string, WatcherBroadcastStats>;
+  oldest_age_seconds: number;
+  timestamp: number;
+}
+
 export interface WatcherResponse {
   id: string;
   name: string;
@@ -999,7 +1028,7 @@ export interface WatcherResponse {
   action_data: string;
   semantic_query?: string;
   semantic_threshold?: number;
-  max_fires_per_minute: number;
+  max_fires_per_second: number;
   enabled: boolean;
   created_at: string;
   updated_at: string;

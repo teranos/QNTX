@@ -22,6 +22,7 @@ mock.module('../connectivity', () => ({
             cb(mockConnectivity);
             return () => { connectivitySubscribers.delete(cb); };
         },
+        subscribeAuth: () => () => {},
     },
 }));
 

@@ -39,6 +39,8 @@ const mockLocalStorage = (() => {
 
 **`mock.module` is process-global** — mocks leak across test files in the same `bun test` run; if two files mock the same module, the last one wins and can change async behavior (e.g., turning a throwing call into a real `await`).
 
+**Connectivity mock** — `test-setup.ts` (preloaded via `bunfig.toml`) provides a base `connectivityManager` mock with all interface methods (`state`, `subscribe`, `subscribeAuth`). Tests that need custom behavior (e.g. tracking subscribers, simulating offline) override it with their own `mock.module` call — but **must include all interface methods** in their override, otherwise other test files that import connectivity transitively will break when execution order differs (local vs CI).
+
 **Callbacks**:
 ```typescript
 const mockCallback = mock((path: string) => {});

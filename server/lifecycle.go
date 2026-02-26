@@ -83,6 +83,11 @@ func (s *QNTXServer) startBackgroundServices() {
 	if s.ticker != nil {
 		s.startPulseExecutionPoller()
 	}
+
+	// Start watcher queue status broadcaster
+	if s.watcherEngine != nil {
+		s.startWatcherQueueBroadcaster()
+	}
 }
 
 // Start starts the server on the specified port
@@ -180,6 +185,13 @@ func (s *QNTXServer) Stop() error {
 		s.logger.Infow("Daemon stopped")
 	}
 
+	// Stop watcher engine — drain loop stops, in-flight entries re-queued for next startup
+	if s.watcherEngine != nil {
+		s.logger.Infow("Stopping watcher engine")
+		s.watcherEngine.Stop()
+		s.logger.Infow("Watcher engine stopped")
+	}
+
 	// Shutdown plugins before closing clients
 	if s.pluginRegistry != nil {
 		s.logger.Infow("Shutting down domain plugins")
@@ -187,17 +199,6 @@ func (s *QNTXServer) Stop() error {
 			s.logger.Warnw("Plugin shutdown errors", "error", err)
 		} else {
 			s.logger.Infow("Domain plugins shut down")
-		}
-	}
-
-	// Kill plugin processes (pluginRegistry only sends gRPC Shutdown RPCs,
-	// PluginManager owns the actual OS processes)
-	if pm := s.getPluginManager(); pm != nil {
-		s.logger.Infow("Stopping plugin processes")
-		if err := pm.Shutdown(s.ctx); err != nil {
-			s.logger.Warnw("Plugin process shutdown errors", "error", err)
-		} else {
-			s.logger.Infow("Plugin processes stopped")
 		}
 	}
 
