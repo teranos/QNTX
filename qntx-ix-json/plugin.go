@@ -68,7 +68,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "ix-json",
-			Version:     "0.3.4",
+			Version:     "0.3.5",
 			QNTXVersion: ">= 0.1.0",
 			Description: "Generic JSON API ingestion with configurable mapping to attestations",
 			Author:      "QNTX Team",
@@ -241,17 +241,30 @@ func (p *Plugin) createSchedule(glyphID string, intervalSecs int) error {
 	return nil
 }
 
-// loadScheduleID loads a persisted schedule ID from the glyph's attestation.
+// loadScheduleID loads a persisted schedule ID from the glyph's schedule attestation.
+// Uses predicate "scheduled" (separate from "configured") to avoid clobbering glyph config.
 func (p *Plugin) loadScheduleID(glyphID string) string {
-	config := p.loadGlyphConfig(context.Background(), glyphID)
-	if config == nil {
+	store := p.Services().ATSStore()
+	if store == nil {
 		return ""
 	}
-	id, _ := config["schedule_id"].(string)
+
+	subject := fmt.Sprintf("ix-json-glyph-%s", glyphID)
+	attestations, err := store.GetAttestations(ats.AttestationFilter{
+		Subjects:   []string{subject},
+		Predicates: []string{"scheduled"},
+		Limit:      1,
+	})
+	if err != nil || len(attestations) == 0 {
+		return ""
+	}
+
+	id, _ := attestations[0].Attributes["schedule_id"].(string)
 	return id
 }
 
-// saveScheduleID persists the schedule ID in the glyph's config attestation.
+// saveScheduleID persists the schedule ID in a separate "scheduled" attestation.
+// Uses predicate "scheduled" (not "configured") to avoid clobbering glyph config.
 func (p *Plugin) saveScheduleID(glyphID, scheduleID string) {
 	store := p.Services().ATSStore()
 	if store == nil {
@@ -261,7 +274,7 @@ func (p *Plugin) saveScheduleID(glyphID, scheduleID string) {
 	subject := fmt.Sprintf("ix-json-glyph-%s", glyphID)
 	cmd := &atstypes.AsCommand{
 		Subjects:   []string{subject},
-		Predicates: []string{"configured"},
+		Predicates: []string{"scheduled"},
 		Contexts:   []string{"_"},
 		Attributes: map[string]any{"schedule_id": scheduleID},
 		Source:     "ix-json",
