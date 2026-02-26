@@ -714,7 +714,7 @@ If any phase fails and cannot be fixed quickly:
 
 **Known Limitations (documented in canvas.go):**
 - Old glyphs (created before 2026-02-26) have empty canvas_id and won't export
-- Export quality issues: happy-dom rendering has limitations vs live browser
+- Export quality issues: static HTML output differs from live canvas (root cause TBD)
 
 **Won't Do:**
 - Migration script to backfill old glyphs (not worth the effort, new glyphs work)
