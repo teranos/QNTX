@@ -1,6 +1,6 @@
 # Plugin Runtime Schedule Management
 
-**Status:** Planning
+**Status:** Implemented
 **Context:** ix-json plugin needs per-glyph polling schedules created at runtime, not just at init
 
 ## Problem
