@@ -56,6 +56,7 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(ctx context.Context, cmd *
 		Predicates: cmd.Predicates,
 		Contexts:   cmd.Contexts,
 		Actors:     cmd.Actors,
+		Source:     cmd.Source,
 	}
 
 	if len(cmd.Attributes) > 0 {

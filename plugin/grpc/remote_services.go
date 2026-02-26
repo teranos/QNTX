@@ -18,7 +18,7 @@ import (
 // gRPC plugins receive this registry with endpoints to connect back to QNTX.
 // Services are accessed via gRPC clients that connect to the endpoints.
 type RemoteServiceRegistry struct {
-	ctx              context.Context      // Parent context for cancellation
+	ctx              context.Context // Parent context for cancellation
 	atsStoreEndpoint string
 	queueEndpoint    string
 	authToken        string
@@ -30,7 +30,9 @@ type RemoteServiceRegistry struct {
 }
 
 // NewRemoteServiceRegistry creates a new remote service registry.
-// The provided context is used for all gRPC operations and enables cancellation.
+// Uses background context for gRPC clients — the caller's context (typically
+// the Initialize RPC) is short-lived and cancelled when the RPC returns,
+// but ATSStore/Queue clients must outlive initialization.
 func NewRemoteServiceRegistry(
 	ctx context.Context,
 	atsStoreEndpoint string,
@@ -41,7 +43,7 @@ func NewRemoteServiceRegistry(
 	pluginRef plugin.DomainPlugin,
 ) *RemoteServiceRegistry {
 	return &RemoteServiceRegistry{
-		ctx:              ctx,
+		ctx:              context.Background(),
 		atsStoreEndpoint: atsStoreEndpoint,
 		queueEndpoint:    queueEndpoint,
 		authToken:        authToken,
