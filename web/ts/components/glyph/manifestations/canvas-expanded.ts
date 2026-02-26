@@ -24,7 +24,7 @@ import { uiState } from '../../../state/ui';
 import { getGlyphTypeBySymbol } from '../glyph-registry';
 import { destroyCanvasSelection } from '../canvas/selection';
 import { pushBreadcrumb, popBreadcrumb, buildBreadcrumbBar } from '../canvas/breadcrumb';
-import { exportCanvasDOM } from '../../../api/canvas-export';
+import { exportCanvasStatic } from '../../../api/canvas';
 import { Button } from '../../button';
 
 /**
@@ -110,8 +110,9 @@ export function morphCanvasPlacedToFullscreen(
             // Build breadcrumb bar with minimize button inside it
             const breadcrumbBar = buildBreadcrumbBar();
 
-            // Export button — captures rendered DOM and sends to backend (demo mode enforced by backend)
-            // Uses two-stage confirmation to prevent accidental overwrites
+            // Export button — server-side rendering via canvas-renderer plugin
+            // Button automatically shows slide-out error display on failure
+            // TODO: Add Publish button next to Export (scope to canvas_id like export)
             const exportBtn = new Button({
                 label: 'Export',
                 icon: '↓',
@@ -123,8 +124,8 @@ export function morphCanvasPlacedToFullscreen(
                     timeout: 5000
                 },
                 onClick: async () => {
-                    await exportCanvasDOM(workspace);
-                    log.info(SEG.GLYPH, '[Canvas] Export complete');
+                    await exportCanvasStatic(glyph.id);
+                    log.info(SEG.GLYPH, '[Canvas] Export complete (server-side rendering)');
                 }
             });
             breadcrumbBar.appendChild(exportBtn.element);
