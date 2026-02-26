@@ -37,7 +37,11 @@ export interface AttestationCommand {
   actors: string[];
   /** Unix timestamp in milliseconds. If not set, server uses current time. */
   timestamp?: number | undefined;
-  attributes: { [key: string]: any } | undefined;
+  attributes:
+    | { [key: string]: any }
+    | undefined;
+  /** Origin identifier (e.g. "ix-json-ui", "github-webhook") */
+  source: string;
 }
 
 /** AttestationFilter for querying attestations */

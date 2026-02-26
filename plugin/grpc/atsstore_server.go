@@ -169,6 +169,7 @@ func protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error
 		Actors:     proto.Actors,
 		Timestamp:  timestamp,
 		Attributes: attributes,
+		Source:     proto.Source,
 	}, nil
 }
 
