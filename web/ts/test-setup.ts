@@ -5,6 +5,21 @@
  * Per-file JSDOM setup is eliminated to prevent cross-DOM node rejection.
  */
 
+import { mock } from 'bun:test';
+
+// Base connectivity mock — preloaded into every test file via bunfig.toml.
+// Individual tests can override with mock.module() if they need custom behavior
+// (e.g. tracking subscribers, simulating offline). Since mock.module is
+// process-global, this ensures subscribeAuth is always present.
+mock.module('./connectivity', () => ({
+    connectivityManager: {
+        get state() { return 'online' as const; },
+        get authenticated() { return true; },
+        subscribe: () => () => {},
+        subscribeAuth: () => () => {},
+    },
+}));
+
 export {};
 
 const USE_JSDOM = process.env.USE_JSDOM === '1';
