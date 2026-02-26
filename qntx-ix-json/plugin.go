@@ -71,7 +71,7 @@ func NewPlugin() *Plugin {
 func (p *Plugin) Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name:        "ix-json",
-		Version:     "0.2.2",
+		Version:     "0.2.3",
 		QNTXVersion: ">= 0.1.0",
 		Description: "Generic JSON API ingestion with configurable mapping to attestations",
 		Author:      "QNTX Team",
@@ -231,6 +231,7 @@ func (p *Plugin) RegisterGlyphs() []plugin.GlyphDef {
 }
 
 // startPoller starts a per-glyph ticker that enqueues Pulse jobs on each tick.
+// TEMPORARY: goroutine ticker until ScheduleService gRPC API exists (see docs/plans/plugin-runtime-schedules.md)
 func (p *Plugin) startPoller(glyphID string, intervalSecs int) {
 	logger := p.services.Logger("ix-json")
 
