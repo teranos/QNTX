@@ -55,6 +55,10 @@ The symbol palette is being migrated to the GlyphRun tray — each palette actio
 
 See [GLOSSARY.md](docs/GLOSSARY.md) for symbol definitions and [glyphs.md](docs/vision/glyphs.md) for the architectural vision.
 
+## Plugins
+
+**ANY edit to a plugin MUST bump its version in `Metadata().Version`.** Plugins run as separate processes — the version in the UI or logs is the only way to confirm new code is running. No exceptions.
+
 ## Go Development Standards
 
 ### WASM Integration

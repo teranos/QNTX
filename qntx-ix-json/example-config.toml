@@ -1,0 +1,50 @@
+# Example configuration for ix-json plugin
+# Add this to your am.toml file
+
+# IMPORTANT: Section name must be [ix-json] (lowercase, no "plugin." prefix)
+# The [plugin] section is separate and only lists enabled plugins
+
+[plugin]
+enabled = ["ix-json"]
+
+[ix-json]
+# Required: API endpoint that returns JSON
+api_url = "https://api.example.com/data"
+
+# Optional: Bearer token for authentication
+# auth_token = "your-bearer-token-here"
+
+# Optional: Polling interval in seconds
+# 0 = data-shaping mode (no automatic polling)
+# > 0 = active-running mode (polls at this interval)
+poll_interval_seconds = 0
+
+# Example configurations:
+
+## Example 1: Public API without auth (data-shaping mode)
+# [plugin]
+# enabled = ["ix-json"]
+#
+# [ix-json]
+# api_url = "https://api.github.com/repos/teranos/qntx/issues"
+# poll_interval_seconds = 0
+
+## Example 2: Authenticated API with periodic polling
+# [plugin]
+# enabled = ["ix-json"]
+#
+# [ix-json]
+# api_url = "https://api.example.com/events"
+# auth_token = "sk_live_abc123..."
+# poll_interval_seconds = 300  # Poll every 5 minutes
+
+## Example 3: Internal service without auth, frequent polling
+# [plugin]
+# enabled = ["ix-json"]
+#
+# [ix-json]
+# api_url = "http://localhost:3000/metrics"
+# poll_interval_seconds = 60  # Poll every minute
+
+## TIP: You can also configure API URL and auth token in the glyph UI!
+## Runtime config changes won't persist across restarts unless added to am.toml

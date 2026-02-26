@@ -137,6 +137,27 @@ async function fetchPluginContent(
         const html = await resp.text();
         container.innerHTML = html;
 
+        // Prevent drag on interactive elements (inputs, textareas, buttons, selects)
+        // so they can receive mouse events without triggering glyph drag
+        const interactiveElements = container.querySelectorAll('input, textarea, button, select, [contenteditable="true"]');
+        interactiveElements.forEach((el) => {
+            el.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+            });
+        });
+
+        // Execute inline scripts (innerHTML doesn't execute them for security)
+        const scripts = container.querySelectorAll('script');
+        scripts.forEach((oldScript) => {
+            const newScript = document.createElement('script');
+            if (oldScript.src) {
+                newScript.src = oldScript.src;
+            } else {
+                newScript.textContent = oldScript.textContent;
+            }
+            oldScript.parentNode?.replaceChild(newScript, oldScript);
+        });
+
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         log.error(SEG.GLYPH, '[PluginGlyph] Fetch error:', err);
