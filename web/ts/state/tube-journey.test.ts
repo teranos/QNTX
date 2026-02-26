@@ -36,6 +36,7 @@ mock.module('../connectivity', () => ({
             cb(mockConnectivity);
             return () => {};
         },
+        subscribeAuth: () => () => {},
     },
 }));
 
