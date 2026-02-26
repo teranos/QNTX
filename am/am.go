@@ -129,7 +129,13 @@ type AxConfig struct {
 type PluginConfig struct {
 	Enabled   []string              `mapstructure:"enabled"`   // Whitelist of enabled plugins (e.g., ["code"])
 	Paths     []string              `mapstructure:"paths"`     // Plugin search paths (e.g., ["~/.qntx/plugins", "./plugins"])
+	Runtime   PluginRuntimeConfig   `mapstructure:"runtime"`   // Runtime configuration
 	WebSocket PluginWebSocketConfig `mapstructure:"websocket"` // WebSocket configuration
+}
+
+// PluginRuntimeConfig configures plugin runtime environments
+type PluginRuntimeConfig struct {
+	TypeScriptRuntime string `mapstructure:"typescript_runtime"` // Path to TypeScript runtime (main.ts)
 }
 
 // PluginWebSocketConfig configures WebSocket keepalive behavior

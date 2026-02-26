@@ -145,9 +145,6 @@ func (h *CanvasHandler) handleUpsertGlyph(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// DEBUG: Log what canvas_id we received
-	h.logInfo("UpsertGlyph: id=%s, canvas_id=%q, symbol=%s", glyph.ID, glyph.CanvasID, glyph.Symbol)
-
 	if err := h.store.UpsertGlyph(r.Context(), &glyph); err != nil {
 		// TODO(#431): Implement offline queue support for failed canvas operations
 		// When storage fails (network issues, database locked), queue operation

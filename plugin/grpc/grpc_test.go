@@ -657,7 +657,7 @@ func TestPluginClientServer_MultiplePlugins(t *testing.T) {
 
 func TestPluginManager_NewPluginManager(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	manager := NewPluginManager(logger)
+	manager := NewPluginManager(logger, "")
 
 	assert.NotNil(t, manager)
 	assert.Empty(t, manager.GetAllPlugins())
@@ -665,7 +665,7 @@ func TestPluginManager_NewPluginManager(t *testing.T) {
 
 func TestPluginManager_LoadPlugins_Disabled(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	manager := NewPluginManager(logger)
+	manager := NewPluginManager(logger, "")
 
 	configs := []PluginConfig{
 		{Name: "disabled", Enabled: false},
@@ -678,7 +678,7 @@ func TestPluginManager_LoadPlugins_Disabled(t *testing.T) {
 
 func TestPluginManager_LoadPlugins_InvalidConfig(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	manager := NewPluginManager(logger)
+	manager := NewPluginManager(logger, "")
 
 	configs := []PluginConfig{
 		{Name: "invalid", Enabled: true}, // Neither address nor binary
@@ -705,7 +705,7 @@ func TestPluginManager_LoadPlugins_WithAddress(t *testing.T) {
 	addr, cleanup := startTestServer(t, plugin)
 	defer cleanup()
 
-	manager := NewPluginManager(logger)
+	manager := NewPluginManager(logger, "")
 	configs := []PluginConfig{
 		{Name: "mock", Enabled: true, Address: addr}, // Use "mock" to match the plugin metadata
 	}
@@ -732,7 +732,7 @@ func TestPluginManager_GetPlugin(t *testing.T) {
 	addr, cleanup := startTestServer(t, plugin)
 	defer cleanup()
 
-	manager := NewPluginManager(logger)
+	manager := NewPluginManager(logger, "")
 	configs := []PluginConfig{
 		{Name: "test", Enabled: true, Address: addr},
 	}
@@ -759,7 +759,7 @@ func TestPluginManager_Shutdown(t *testing.T) {
 	addr, cleanup := startTestServer(t, plugin)
 	defer cleanup()
 
-	manager := NewPluginManager(logger)
+	manager := NewPluginManager(logger, "")
 	configs := []PluginConfig{
 		{Name: "test", Enabled: true, Address: addr},
 	}
