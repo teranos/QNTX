@@ -247,8 +247,8 @@ async function startServer(pluginPath: string, port: number) {
 
                 server.start();
 
-                // Print GRPC_ADDRESS for Go discovery
-                console.log(`GRPC_ADDRESS=127.0.0.1:${assignedPort}`);
+                // Print port for Go discovery (matches protocol in discovery.go:636)
+                console.log(`QNTX_PLUGIN_PORT=${assignedPort}`);
                 console.log(`[Runtime] ${plugin.name} v${plugin.version || '1.0.0'} ready on port ${assignedPort}`);
 
                 resolve(assignedPort);
