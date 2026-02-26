@@ -5,6 +5,7 @@
  * Per-file JSDOM setup is eliminated to prevent cross-DOM node rejection.
  */
 
+// @ts-ignore — bun:test types not available during tsc --noEmit
 import { mock } from 'bun:test';
 
 // Base connectivity mock — preloaded into every test file via bunfig.toml.
