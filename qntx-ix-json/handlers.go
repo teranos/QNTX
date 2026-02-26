@@ -95,22 +95,31 @@ func (p *Plugin) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	store := p.services.ATSStore()
-	if store == nil {
-		writeError(w, http.StatusInternalServerError, "ATSStore not available")
+	// FIXME: saving config doesn't refresh the response preview — requires page reload to see persisted values
+	if err := p.saveGlyphConfig(r.Context(), req.GlyphID, req.APIURL, req.AuthToken, req.PollIntervalSeconds); err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to save configuration: %v", err))
 		return
 	}
 
-	// Create attestation for THIS glyph instance
-	// Subject: ix-json-glyph-{glyphID}
-	subject := fmt.Sprintf("ix-json-glyph-%s", req.GlyphID)
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status": "Configuration saved",
+	})
+}
 
-	attrs := map[string]interface{}{
-		"api_url":               req.APIURL,
-		"poll_interval_seconds": req.PollIntervalSeconds,
+// saveGlyphConfig persists glyph configuration as an attestation.
+func (p *Plugin) saveGlyphConfig(ctx context.Context, glyphID, apiURL, authToken string, pollIntervalSecs int) error {
+	store := p.services.ATSStore()
+	if store == nil {
+		return fmt.Errorf("ATSStore not available")
 	}
-	if req.AuthToken != "" {
-		attrs["auth_token"] = req.AuthToken
+
+	subject := fmt.Sprintf("ix-json-glyph-%s", glyphID)
+	attrs := map[string]any{
+		"api_url":               apiURL,
+		"poll_interval_seconds": pollIntervalSecs,
+	}
+	if authToken != "" {
+		attrs["auth_token"] = authToken
 	}
 
 	cmd := &atstypes.AsCommand{
@@ -121,25 +130,16 @@ func (p *Plugin) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 		Source:     "ix-json-ui",
 	}
 
-	if _, err := store.GenerateAndCreateAttestation(r.Context(), cmd); err != nil {
-		p.services.Logger("ix-json").Errorw("Failed to create glyph configuration attestation",
-			"glyph_id", req.GlyphID,
-			"error", err,
-		)
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to save configuration: %v", err))
-		return
+	if _, err := store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
+		return err
 	}
 
 	p.services.Logger("ix-json").Infow("Glyph configuration attested",
-		"glyph_id", req.GlyphID,
-		"api_url", req.APIURL,
-		"has_auth_token", req.AuthToken != "",
-		"poll_interval_seconds", req.PollIntervalSeconds,
+		"glyph_id", glyphID,
+		"api_url", apiURL,
+		"poll_interval_seconds", pollIntervalSecs,
 	)
-
-	writeJSON(w, http.StatusOK, map[string]string{
-		"status": fmt.Sprintf("Configuration saved for glyph %s ✓", req.GlyphID),
-	})
+	return nil
 }
 
 // handleUpdateMapping updates the mapping configuration.
@@ -174,29 +174,73 @@ func (p *Plugin) handleUpdateMapping(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "Mapping updated"})
 }
 
-// handleSetMode changes the plugin operation mode.
+// handleSetMode changes the operation mode for a specific glyph.
+// On activate: saves current config to attestations, then starts poller.
 func (p *Plugin) handleSetMode(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Mode OperationMode `json:"mode"`
+		GlyphID             string        `json:"glyph_id"`
+		Mode                OperationMode `json:"mode"`
+		APIURL              string        `json:"api_url"`
+		AuthToken           string        `json:"auth_token"`
+		PollIntervalSeconds int           `json:"poll_interval_seconds"`
 	}
 	if err := readJSON(w, r, &req); err != nil {
 		return
 	}
 
-	p.mu.Lock()
-	p.mode = req.Mode
-	p.mu.Unlock()
+	if req.GlyphID == "" {
+		writeError(w, http.StatusBadRequest, "glyph_id is required")
+		return
+	}
 
-	p.services.Logger("ix-json").Infow("Mode changed", "mode", req.Mode)
-	writeJSON(w, http.StatusOK, map[string]string{"status": fmt.Sprintf("Mode set to %s", req.Mode)})
+	logger := p.services.Logger("ix-json")
+
+	switch req.Mode {
+	case ModeActiveRunning:
+		if req.PollIntervalSeconds <= 0 {
+			writeError(w, http.StatusBadRequest, "Poll interval must be > 0 to activate")
+			return
+		}
+
+		// Check mapping exists
+		p.mu.RLock()
+		mapping := p.glyphMappings[req.GlyphID]
+		p.mu.RUnlock()
+		if mapping == nil {
+			writeError(w, http.StatusBadRequest, "No mapping configured — fetch and configure mapping first")
+			return
+		}
+
+		// Save config to attestations so it persists
+		if err := p.saveGlyphConfig(r.Context(), req.GlyphID, req.APIURL, req.AuthToken, req.PollIntervalSeconds); err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to save config: %v", err))
+			return
+		}
+
+		p.startPoller(req.GlyphID, req.PollIntervalSeconds)
+		logger.Infow("Glyph polling activated", "glyph_id", req.GlyphID, "interval_seconds", req.PollIntervalSeconds)
+		writeJSON(w, http.StatusOK, map[string]string{
+			"status": fmt.Sprintf("Polling active (every %ds)", req.PollIntervalSeconds),
+		})
+
+	case ModePaused:
+		p.stopPoller(req.GlyphID)
+		logger.Infow("Glyph polling paused", "glyph_id", req.GlyphID)
+		writeJSON(w, http.StatusOK, map[string]string{
+			"status": "Polling stopped",
+		})
+
+	default:
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("Unknown mode: %s", req.Mode))
+	}
 }
 
 // handleStatus returns the current plugin status.
 func (p *Plugin) handleStatus(w http.ResponseWriter, r *http.Request) {
 	p.mu.RLock()
-	status := map[string]interface{}{
-		"mode":    p.mode,
-		"api_url": p.apiURL,
+	status := map[string]any{
+		"mode":           p.mode,
+		"active_pollers": len(p.glyphPollers),
 	}
 	p.mu.RUnlock()
 
@@ -384,16 +428,26 @@ window.ixTestFetch = async function(btn) {
 
 window.ixSetMode = async function(btn, mode) {
 	var c = ixContainer(btn);
+	var glyphId = c.dataset.glyphId;
+	var apiUrl = c.querySelector('.ix-api-url').value;
+	var authToken = c.querySelector('.ix-auth-token').value;
+	var pollInterval = parseInt(c.querySelector('.ix-poll-interval').value) || 0;
 	try {
 		var res = await fetch('/api/ix-json/set-mode', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ mode: mode })
+			body: JSON.stringify({
+				glyph_id: glyphId,
+				mode: mode,
+				api_url: apiUrl,
+				auth_token: authToken,
+				poll_interval_seconds: pollInterval
+			})
 		});
+		var body = await res.json().catch(function() { return {}; });
 		if (res.ok) {
-			ixStatus(c, 'Mode: ' + mode, false);
+			ixStatus(c, body.status || 'Mode: ' + mode, false);
 		} else {
-			var body = await res.json().catch(function() { return {}; });
 			ixStatus(c, body.error || 'Failed to set mode', true);
 		}
 	} catch (e) {

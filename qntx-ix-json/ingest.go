@@ -8,39 +8,39 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 )
 
-// pollAndIngest fetches from the API and creates attestations based on configured mapping.
-func (p *Plugin) pollAndIngest(ctx context.Context) error {
-	p.mu.RLock()
-	apiURL := p.apiURL
-	authToken := p.authToken
-	mode := p.mode
-	p.mu.RUnlock()
-
-	// TODO: pollAndIngest needs to be per-glyph once scheduling is per-glyph
-	var mapping *MappingConfig
-
-	if mode != ModeActiveRunning {
-		return fmt.Errorf("cannot poll in mode %s", mode)
+// pollGlyph fetches and ingests for a single glyph instance.
+func (p *Plugin) pollGlyph(ctx context.Context, glyphID string) error {
+	// Load per-glyph config from attestations
+	config := p.loadGlyphConfig(ctx, glyphID)
+	if config == nil {
+		return fmt.Errorf("no config for glyph %s", glyphID)
 	}
+
+	apiURL, _ := config["api_url"].(string)
+	authToken, _ := config["auth_token"].(string)
 
 	if apiURL == "" {
-		return fmt.Errorf("API URL not configured")
+		return fmt.Errorf("API URL not configured for glyph %s", glyphID)
 	}
 
+	p.mu.RLock()
+	mapping := p.glyphMappings[glyphID]
+	p.mu.RUnlock()
+
 	if mapping == nil {
-		return fmt.Errorf("mapping configuration not set")
+		return fmt.Errorf("mapping not configured for glyph %s", glyphID)
 	}
 
 	// Fetch JSON from API
 	data, err := p.fetchJSON(ctx, apiURL, authToken)
 	if err != nil {
-		return fmt.Errorf("failed to fetch from API: %w", err)
+		return fmt.Errorf("failed to fetch from %s for glyph %s: %w", apiURL, glyphID, err)
 	}
 
 	// Parse JSON
-	var jsonData interface{}
+	var jsonData any
 	if err := json.Unmarshal(data, &jsonData); err != nil {
-		return fmt.Errorf("failed to parse JSON response: %w", err)
+		return fmt.Errorf("failed to parse JSON from %s: %w", apiURL, err)
 	}
 
 	// Create attestations
@@ -49,44 +49,41 @@ func (p *Plugin) pollAndIngest(ctx context.Context) error {
 		return fmt.Errorf("ATSStore not available")
 	}
 
-	// Determine if response is array or single object
+	logger := p.services.Logger("ix-json")
+
 	switch v := jsonData.(type) {
-	case []interface{}:
-		// Array of objects - create one attestation per item
+	case []any:
 		for i, item := range v {
 			if err := p.createAttestationFromJSON(ctx, store, item, mapping); err != nil {
-				p.services.Logger("ix-json").Errorw("Failed to create attestation",
-					"index", i,
-					"error", err,
-				)
+				logger.Errorw("Failed to create attestation",
+					"glyph_id", glyphID, "index", i, "error", err)
 			}
 		}
-		p.services.Logger("ix-json").Infow("Poll completed", "attestations_created", len(v))
+		logger.Infow("Poll completed", "glyph_id", glyphID, "attestations_created", len(v))
 
-	case map[string]interface{}:
-		// Single object - create one attestation
+	case map[string]any:
 		if err := p.createAttestationFromJSON(ctx, store, v, mapping); err != nil {
-			return fmt.Errorf("failed to create attestation: %w", err)
+			return fmt.Errorf("failed to create attestation for glyph %s: %w", glyphID, err)
 		}
-		p.services.Logger("ix-json").Infow("Poll completed", "attestations_created", 1)
+		logger.Infow("Poll completed", "glyph_id", glyphID, "attestations_created", 1)
 
 	default:
-		return fmt.Errorf("unexpected JSON type: %T", jsonData)
+		return fmt.Errorf("unexpected JSON type %T from %s", jsonData, apiURL)
 	}
 
 	return nil
 }
 
 // createAttestationFromJSON creates a single attestation from a JSON object.
-func (p *Plugin) createAttestationFromJSON(ctx context.Context, store interface{}, data interface{}, mapping *MappingConfig) error {
-	obj, ok := data.(map[string]interface{})
+func (p *Plugin) createAttestationFromJSON(ctx context.Context, store any, data any, mapping *MappingConfig) error {
+	obj, ok := data.(map[string]any)
 	if !ok {
 		return fmt.Errorf("expected JSON object, got %T", data)
 	}
 
 	// Apply key remapping if configured
 	if len(mapping.KeyRemapping) > 0 {
-		remapped := make(map[string]interface{})
+		remapped := make(map[string]any)
 		for oldKey, val := range obj {
 			newKey := mapping.KeyRemapping[oldKey]
 			if newKey == "" {
@@ -107,9 +104,8 @@ func (p *Plugin) createAttestationFromJSON(ctx context.Context, store interface{
 	}
 
 	// Build attributes from remaining fields
-	attributes := make(map[string]interface{})
+	attributes := make(map[string]any)
 	for k, v := range obj {
-		// Skip SPC fields
 		if k == mapping.SubjectPath || k == mapping.PredicatePath || k == mapping.ContextPath {
 			continue
 		}
@@ -122,7 +118,6 @@ func (p *Plugin) createAttestationFromJSON(ctx context.Context, store interface{
 		contexts = append(contexts, contextVal)
 	}
 
-	// Create attestation using AsCommand
 	cmd := &types.AsCommand{
 		Subjects:   []string{subject},
 		Predicates: []string{predicate},
@@ -153,17 +148,17 @@ func (p *Plugin) createAttestationFromJSON(ctx context.Context, store interface{
 }
 
 // extractValue extracts a value from a JSON object using a simple path (e.g., "id" or "user.name").
-func extractValue(obj map[string]interface{}, path string) string {
+func extractValue(obj map[string]any, path string) string {
 	if path == "" {
 		return ""
 	}
 
 	// Simple path traversal (supports "field" or "field.subfield")
 	parts := splitPath(path)
-	current := interface{}(obj)
+	current := any(obj)
 
 	for _, part := range parts {
-		m, ok := current.(map[string]interface{})
+		m, ok := current.(map[string]any)
 		if !ok {
 			return ""
 		}
@@ -205,21 +200,21 @@ func splitPath(path string) []string {
 
 // inferMapping attempts to infer a reasonable default mapping from JSON structure.
 func (p *Plugin) inferMapping(data []byte) *MappingConfig {
-	var jsonData interface{}
+	var jsonData any
 	if err := json.Unmarshal(data, &jsonData); err != nil {
 		return &MappingConfig{}
 	}
 
 	// Extract first object for analysis
-	var obj map[string]interface{}
+	var obj map[string]any
 	switch v := jsonData.(type) {
-	case []interface{}:
+	case []any:
 		if len(v) > 0 {
-			if m, ok := v[0].(map[string]interface{}); ok {
+			if m, ok := v[0].(map[string]any); ok {
 				obj = m
 			}
 		}
-	case map[string]interface{}:
+	case map[string]any:
 		obj = v
 	}
 
@@ -251,7 +246,7 @@ func (p *Plugin) inferMapping(data []byte) *MappingConfig {
 }
 
 // inferField finds the first matching field from candidates, or returns first string field.
-func inferField(obj map[string]interface{}, candidates []string) string {
+func inferField(obj map[string]any, candidates []string) string {
 	// Try candidates first
 	for _, candidate := range candidates {
 		if _, exists := obj[candidate]; exists {
