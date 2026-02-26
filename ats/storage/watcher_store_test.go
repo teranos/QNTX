@@ -24,7 +24,7 @@ func TestWatcherStore_Create(t *testing.T) {
 		},
 		ActionType:        storage.ActionTypePython,
 		ActionData:        "print('hello')",
-		MaxFiresPerMinute: 105,
+		MaxFiresPerSecond: 105,
 		Enabled:           true,
 	}
 
@@ -439,7 +439,7 @@ func TestWatcherStore_CreateOrReplace_NewWatcher(t *testing.T) {
 		Name:              "Brand New",
 		ActionType:        storage.ActionTypePython,
 		ActionData:        "print('new')",
-		MaxFiresPerMinute: 60,
+		MaxFiresPerSecond: 60,
 		Enabled:           true,
 	}
 
@@ -470,7 +470,7 @@ func TestWatcherStore_CreateOrReplace_Idempotent(t *testing.T) {
 		Name:              "Version 1",
 		ActionType:        storage.ActionTypePython,
 		ActionData:        "print('v1')",
-		MaxFiresPerMinute: 60,
+		MaxFiresPerSecond: 60,
 		Enabled:           true,
 	}
 
@@ -484,7 +484,7 @@ func TestWatcherStore_CreateOrReplace_Idempotent(t *testing.T) {
 		Name:              "Version 2",
 		ActionType:        storage.ActionTypePython,
 		ActionData:        "print('v2')",
-		MaxFiresPerMinute: 120,
+		MaxFiresPerSecond: 120,
 		Enabled:           false,
 	}
 
@@ -503,8 +503,8 @@ func TestWatcherStore_CreateOrReplace_Idempotent(t *testing.T) {
 	if retrieved.ActionData != "print('v2')" {
 		t.Errorf("ActionData not replaced: got %s", retrieved.ActionData)
 	}
-	if retrieved.MaxFiresPerMinute != 120 {
-		t.Errorf("MaxFiresPerMinute not replaced: got %d, want 120", retrieved.MaxFiresPerMinute)
+	if retrieved.MaxFiresPerSecond != 120 {
+		t.Errorf("MaxFiresPerSecond not replaced: got %d, want 120", retrieved.MaxFiresPerSecond)
 	}
 	if retrieved.Enabled != false {
 		t.Error("Enabled not replaced: expected false")
@@ -583,7 +583,7 @@ func TestWatcherStore_FindCompoundWatchersForTarget(t *testing.T) {
 		SemanticThreshold:         0.5,
 		UpstreamSemanticQuery:     "science",
 		UpstreamSemanticThreshold: 0.4,
-		MaxFiresPerMinute:         60,
+		MaxFiresPerSecond:         60,
 		Enabled:                   true,
 	}
 	if err := store.Create(ctx, compound); err != nil {
@@ -604,7 +604,7 @@ func TestWatcherStore_FindCompoundWatchersForTarget(t *testing.T) {
 		ActionData:        string(otherActionData),
 		SemanticQuery:     "science",
 		SemanticThreshold: 0.4,
-		MaxFiresPerMinute: 60,
+		MaxFiresPerSecond: 60,
 		Enabled:           true,
 	}
 	if err := store.Create(ctx, nonCompound); err != nil {
