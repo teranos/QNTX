@@ -1,5 +1,12 @@
 # Plan: Switch Attestation Storage from Go SQLStore to Rust qntx-sqlite
 
+## Decisions
+
+- **`signature`/`signer_did`**: Add to `qntx-core::Attestation` as `signature: Option<Vec<u8>>`, `signer_did: Option<String>`
+- **Eviction telemetry**: Rust returns `EvictionResult` via FFI, Go logs to `storage_events` — Rust doesn't touch the logger or telemetry table
+- **`BatchPersister`**: Add `storage_put_batch` FFI for bulk ingest through Rust
+- **`SQLQueryStore`**: Stays on Go `*sql.DB` for now, eventually moves to Rust
+
 ## Current State
 
 - **Go `SQLStore`** (`ats/storage/sql_store.go`) handles all attestation CRUD at runtime
@@ -10,17 +17,20 @@
 
 ## What Changes
 
-### Phase 1: Rewrite Rust BoundedStore to match Go's eviction strategy
+### Phase 1: Add signature/signer_did to qntx-core, rewrite Rust BoundedStore
 
-Replace the rejection-based Rust `BoundedStore` with Go's post-insert eviction model:
+**qntx-core changes:**
+- Add `signature: Option<Vec<u8>>` and `signer_did: Option<String>` to `Attestation`
+- Update `AttestationBuilder` to support these fields
+- Update serialization/deserialization
+
+**Rewrite Rust BoundedStore** — replace rejection-based quotas with Go's post-insert eviction model:
 
 1. **16 attestations per (actor, context) pair** — after insert, count attestations matching this actor+context. If > limit, delete oldest by timestamp.
 2. **64 contexts per actor** — after insert, count distinct context arrays for this actor. If > limit, delete all attestations for least-used contexts.
 3. **64 actors per entity/subject** — after insert, count distinct actors for this subject. If > limit, delete all attestations for least-recent actors.
 
 Rust `BoundedStore::put()` becomes: insert → enforce limits → return eviction details.
-
-Add `EvictionResult` struct to FFI so Go can log telemetry (Rust doesn't have the logger):
 
 ```rust
 pub struct EvictionResult {
@@ -30,38 +40,45 @@ pub struct EvictionResult {
 }
 ```
 
-The configurable limits (`BoundedStoreConfig` equivalent) pass through FFI at store construction.
+Configurable limits pass through at construction:
+
+```rust
+pub struct BoundedConfig {
+    pub actor_context_limit: usize,   // default 16
+    pub actor_contexts_limit: usize,  // default 64
+    pub entity_actors_limit: usize,   // default 64
+}
+```
 
 Files changed:
+- `crates/qntx-core/` — add signature/signer_did to Attestation
 - `crates/qntx-sqlite/src/bounded.rs` — rewrite enforcement logic
-- `crates/qntx-sqlite/src/ffi.rs` — add `storage_new_bounded_memory`, `storage_new_bounded_file`, `storage_put_bounded` (returns eviction info)
+- `crates/qntx-sqlite/src/store.rs` — handle signature/signer_did columns in SQL
 
-### Phase 2: Expand FFI surface for missing operations
+### Phase 2: Expand FFI surface
 
-Add FFI functions for discovery queries already implemented in Rust but not exposed:
+**Discovery queries** (already in Rust, not exposed via FFI):
+- `storage_predicates()` → `StringArrayResultC`
+- `storage_contexts()` → `StringArrayResultC`
+- `storage_subjects()` → `StringArrayResultC`
+- `storage_actors()` → `StringArrayResultC`
+- `storage_stats()` → new `StatsResultC`
 
-- `storage_predicates()` → `Vec<String>` via `StringArrayResultC`
-- `storage_contexts()` → `Vec<String>` via `StringArrayResultC`
-- `storage_subjects()` → `Vec<String>` via `StringArrayResultC`
-- `storage_actors()` → `Vec<String>` via `StringArrayResultC`
-- `storage_stats()` → `StorageStats` via new `StatsResultC`
+**Bounded store FFI:**
+- `storage_new_bounded_memory(config)` / `storage_new_bounded_file(path, config)`
+- `storage_put_bounded(store, json)` → new `PutResultC` containing success + `EvictionResult`
 
-Add FFI for signature fields (currently not in Rust's Attestation type):
-- `signature: Option<Vec<u8>>` and `signer_did: Option<String>` need to be added to Rust's attestation model (in `qntx-core` or handled at the adapter layer)
+**Batch FFI:**
+- `storage_put_batch(store, json_array)` → `BatchResultC` with persisted count, failure count, per-item errors, and aggregate eviction details
 
 Files changed:
-- `crates/qntx-sqlite/src/ffi.rs` — new FFI functions
-- `crates/qntx-core/` — may need `signature`/`signer_did` fields on Attestation (or handle in Go adapter)
+- `crates/qntx-sqlite/src/ffi.rs` — all new FFI functions
 
 ### Phase 3: Expand Go CGO wrapper to implement full interfaces
 
-Make `RustStore` implement `ats.AttestationStore` and `ats.BoundedStore`:
+`RustStore` implements `ats.AttestationStore` and `ats.BoundedStore`:
 
 ```go
-type RustStore struct {
-    store *C.SqliteStore  // Rust pointer (bounded variant)
-}
-
 // ats.AttestationStore
 func (r *RustStore) CreateAttestation(as *types.As) error       // sign → put_bounded → notify observers → log evictions
 func (r *RustStore) CreateAttestationInbound(as *types.As) error // put_bounded (no sign) → notify observers → log evictions
@@ -72,17 +89,20 @@ func (r *RustStore) GetAttestations(filters) ([]*types.As, error)
 // ats.BoundedStore
 func (r *RustStore) CreateAttestationWithLimits(cmd) (*types.As, error)
 func (r *RustStore) GetStorageStats() (*ats.StorageStats, error)
+
+// ats.BatchStore
+func (r *RustStore) PersistItems(items []AttestationItem, sourcePrefix string) *PersistenceResult
 ```
 
-Signing (`getDefaultSigner().Sign()`) and observer notification (`notifyObservers()`) stay in the Go wrapper — they're Go-side concerns that wrap the Rust CRUD.
+Signing (`getDefaultSigner().Sign()`) and observer notification (`notifyObservers()`) stay in the Go wrapper. Eviction telemetry: Go receives `EvictionResult` from FFI and writes to `storage_events`.
 
 Files changed:
-- `ats/storage/sqlitecgo/storage_cgo.go` — implement full interface
-- `ats/storage/sqlitecgo/adapter.go` — handle signature/signer_did fields in JSON conversion
+- `ats/storage/sqlitecgo/storage_cgo.go` — implement full interfaces
+- `ats/storage/sqlitecgo/adapter.go` — handle signature/signer_did in JSON conversion
 
 ### Phase 4: Wire up at initialization
 
-Replace all `storage.NewSQLStore(db, logger)` and `storage.NewBoundedStore(db, logger)` call sites with `sqlitecgo.NewFileStore(dbPath)`:
+Replace all `NewSQLStore`/`NewBoundedStore` call sites with a shared `RustStore`:
 
 | Call site | Current | After |
 |---|---|---|
@@ -94,16 +114,15 @@ Replace all `storage.NewSQLStore(db, logger)` and `storage.NewBoundedStore(db, l
 | `server/embeddings_handlers.go:308,738` | `NewBoundedStore(db, logger)` | shared `RustStore` |
 | `server/handlers_attestations.go:81` | `NewBoundedStore(db, logger)` | shared `RustStore` |
 
-The `RustStore` should be created once during server init and passed to handlers, not constructed per-request. The Rust side opens its own SQLite connection to the same database file.
+`RustStore` created once during server init, passed to handlers. Rust opens its own SQLite connection to the same database file.
 
-**Stays on Go `*sql.DB`:**
-- `SQLQueryStore` (NL expansion, OverComparison, rich query builder)
+**Stays on Go `*sql.DB` (this phase):**
+- `SQLQueryStore` (NL expansion, OverComparison, rich query builder) — moves to Rust later
 - `AliasStore` / `AliasResolver`
 - `EmbeddingStore` / vector search
 - `SymbolIndex` / LSP
 - Migrations
-- `storage_events` telemetry table writes
-- `BatchPersister`
+- `storage_events` telemetry writes (Go receives eviction results from Rust, writes them)
 
 Files changed:
 - `server/init.go` — create `RustStore` during startup, pass to handlers
@@ -112,27 +131,24 @@ Files changed:
 
 ### Phase 5: Delete dead Go code
 
-Once the switch is verified, remove:
+Remove:
 - `ats/storage/sql_store.go` — replaced by Rust
 - `ats/storage/bounded_store.go` — enforcement moved to Rust
 - `ats/storage/bounded_store_enforcement.go` — enforcement moved to Rust
 - `ats/storage/bounded_store_config.go` — config now passes through FFI
-- `ats/storage/bounded_store_telemetry.go` — telemetry logging moves to `RustStore` wrapper
-- `ats/storage/bounded_store_warnings.go` — warnings move to `RustStore` wrapper
+- `ats/storage/bounded_store_telemetry.go` — telemetry logging moves to `RustStore` Go wrapper
+- `ats/storage/bounded_store_warnings.go` — warnings move to `RustStore` Go wrapper
+- `ats/storage/batch_persister.go` (or equivalent) — replaced by Rust batch FFI
 
 Keep:
 - `ats/storage/observer.go` — still used by Go wrapper
-- `ats/storage/query_store.go` — still uses Go `*sql.DB`
-- `ats/storage/query_builder.go` — still uses Go `*sql.DB`
+- `ats/storage/query_store.go` — still uses Go `*sql.DB` (moves to Rust later)
+- `ats/storage/query_builder.go` — still uses Go `*sql.DB` (moves to Rust later)
 
-## Dual-Connection Considerations
+## Dual-Connection Model
 
-- SQLite WAL mode supports concurrent readers + one writer
-- Both Rust and Go may write (Rust: attestation CRUD; Go: `storage_events`, embeddings, etc.)
-- SQLite handles this with busy timeout — configure both sides with reasonable timeout (5s)
-- Long-term: more operations move to Rust, narrowing Go's write surface
-
-## Open Questions
-
-1. **`signature`/`signer_did` in Rust**: These fields exist in the Go schema but not in Rust's `Attestation` type. Options: (a) add to `qntx-core::Attestation`, (b) handle as opaque attributes in the adapter layer, (c) store them in the Go adapter JSON but round-trip through Rust as pass-through fields.
-2. **`BatchPersister`**: Currently uses `SQLStore` directly. Needs to either use `RustStore` or remain on Go `*sql.DB` as a special case.
+- SQLite WAL mode: concurrent readers + serialized writers
+- Rust writes: attestation CRUD + eviction deletes
+- Go writes: `storage_events`, embeddings, symbol index, migrations
+- Both sides: 5s busy timeout
+- Long-term: `SQLQueryStore` and `BatchPersister` move to Rust, narrowing Go's surface to embeddings/LSP/migrations
