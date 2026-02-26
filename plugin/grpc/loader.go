@@ -19,7 +19,7 @@ import (
 // LoadPluginsFromConfig loads plugins based on am configuration.
 // It discovers plugin binaries from configured paths and loads enabled plugins.
 func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.SugaredLogger) (*PluginManager, error) {
-	manager := NewPluginManager(logger)
+	manager := NewPluginManager(logger, cfg.Plugin.Runtime.TypeScriptRuntime)
 
 	// If no plugins enabled, return empty manager
 	if len(cfg.Plugin.Enabled) == 0 {
