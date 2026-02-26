@@ -211,7 +211,7 @@ func scheduleJobToProto(job *schedule.Job) *protocol.ScheduledJob {
 }
 
 // protoToScheduleJob converts a proto ScheduledJob to schedule.Job
-func protoToScheduleJob(pj *protocol.ScheduledJob) *schedule.Job {
+func protoToScheduleJob(pj *protocol.ScheduledJob, logger *zap.SugaredLogger) *schedule.Job {
 	job := &schedule.Job{
 		ID:              pj.Id,
 		ATSCode:         pj.AtsCode,
@@ -227,21 +227,29 @@ func protoToScheduleJob(pj *protocol.ScheduledJob) *schedule.Job {
 	if pj.NextRunAt != "" {
 		if t, err := time.Parse(time.RFC3339, pj.NextRunAt); err == nil {
 			job.NextRunAt = &t
+		} else {
+			logger.Warnw("Failed to parse NextRunAt", "schedule_id", pj.Id, "value", pj.NextRunAt, "error", err)
 		}
 	}
 	if pj.LastRunAt != "" {
 		if t, err := time.Parse(time.RFC3339, pj.LastRunAt); err == nil {
 			job.LastRunAt = &t
+		} else {
+			logger.Warnw("Failed to parse LastRunAt", "schedule_id", pj.Id, "value", pj.LastRunAt, "error", err)
 		}
 	}
 	if pj.CreatedAt != "" {
 		if t, err := time.Parse(time.RFC3339, pj.CreatedAt); err == nil {
 			job.CreatedAt = t
+		} else {
+			logger.Warnw("Failed to parse CreatedAt", "schedule_id", pj.Id, "value", pj.CreatedAt, "error", err)
 		}
 	}
 	if pj.UpdatedAt != "" {
 		if t, err := time.Parse(time.RFC3339, pj.UpdatedAt); err == nil {
 			job.UpdatedAt = t
+		} else {
+			logger.Warnw("Failed to parse UpdatedAt", "schedule_id", pj.Id, "value", pj.UpdatedAt, "error", err)
 		}
 	}
 
