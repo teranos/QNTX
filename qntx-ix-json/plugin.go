@@ -19,10 +19,11 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/plugin"
-	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/pulse/async"
 )
 
 // OperationMode represents the current operational mode of the plugin.
@@ -48,12 +49,11 @@ type Plugin struct {
 	services plugin.ServiceRegistry
 
 	mu             sync.RWMutex
-	mode           OperationMode             // Protected by mu
-	httpClient     *http.Client              // Protected by mu
-	apiURL         string                    // Protected by mu
-	authToken      string                    // Protected by mu
-	glyphResponses map[string][]byte         // Protected by mu - per-glyph cached response
-	glyphMappings  map[string]*MappingConfig // Protected by mu - per-glyph mapping
+	mode           OperationMode                 // Protected by mu
+	httpClient     *http.Client                  // Protected by mu
+	glyphResponses map[string][]byte             // Protected by mu - per-glyph cached response
+	glyphMappings  map[string]*MappingConfig     // Protected by mu - per-glyph mapping
+	glyphPollers   map[string]context.CancelFunc // Protected by mu - per-glyph active poller cancel functions
 }
 
 // NewPlugin creates a new ix-json plugin.
@@ -63,6 +63,7 @@ func NewPlugin() *Plugin {
 		mode:           ModeDataShaping,
 		glyphResponses: make(map[string][]byte),
 		glyphMappings:  make(map[string]*MappingConfig),
+		glyphPollers:   make(map[string]context.CancelFunc),
 	}
 }
 
@@ -70,7 +71,7 @@ func NewPlugin() *Plugin {
 func (p *Plugin) Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name:        "ix-json",
-		Version:     "0.1.4",
+		Version:     "0.2.2",
 		QNTXVersion: ">= 0.1.0",
 		Description: "Generic JSON API ingestion with configurable mapping to attestations",
 		Author:      "QNTX Team",
@@ -82,70 +83,8 @@ func (p *Plugin) Metadata() plugin.Metadata {
 func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
 	p.services = services
 	logger := services.Logger("ix-json")
-
-	// Load configuration from attestations ONLY (no TOML config)
-	config := p.loadAttestedConfig(ctx)
-
-	apiURL := ""
-	authToken := ""
-	intervalSecs := 0
-
-	if config != nil {
-		if url, ok := config["api_url"].(string); ok {
-			apiURL = url
-		}
-		if token, ok := config["auth_token"].(string); ok {
-			authToken = token
-		}
-		if interval, ok := config["poll_interval_seconds"].(float64); ok {
-			intervalSecs = int(interval)
-		}
-	}
-
-	p.mu.Lock()
-	p.apiURL = apiURL
-	p.authToken = authToken
-	if intervalSecs > 0 {
-		p.mode = ModeActiveRunning
-	} else {
-		p.mode = ModeDataShaping
-	}
-	p.mu.Unlock()
-
-	if apiURL == "" {
-		logger.Info("ix-json plugin initialized (unconfigured - use UI to configure)")
-	} else {
-		logger.Infow("ix-json plugin initialized from attestations",
-			"api_url", apiURL,
-			"mode", p.mode,
-			"poll_interval_seconds", intervalSecs,
-		)
-	}
-
+	logger.Info("ix-json plugin initialized (per-glyph config via attestations)")
 	return nil
-}
-
-// loadAttestedConfig loads the most recent plugin-wide configuration attestation (deprecated - use per-glyph config).
-func (p *Plugin) loadAttestedConfig(ctx context.Context) map[string]interface{} {
-	store := p.services.ATSStore()
-	if store == nil {
-		return nil
-	}
-
-	// Query for most recent configuration attestation
-	// Subject: ix-json-plugin, Predicate: configured
-	attestations, err := store.GetAttestations(ats.AttestationFilter{
-		Subjects:   []string{"ix-json-plugin"},
-		Predicates: []string{"configured"},
-		Limit:      1,
-	})
-
-	if err != nil || len(attestations) == 0 {
-		return nil
-	}
-
-	// Return the most recent one (sorted by ID descending in query)
-	return attestations[0].Attributes
 }
 
 // loadGlyphConfig loads the configuration for a specific glyph instance.
@@ -181,10 +120,19 @@ func (p *Plugin) loadGlyphConfig(ctx context.Context, glyphID string) map[string
 	return attestations[0].Attributes
 }
 
-// Shutdown shuts down the ix-json plugin.
+// Shutdown shuts down the ix-json plugin, stopping all pollers.
 func (p *Plugin) Shutdown(ctx context.Context) error {
 	logger := p.services.Logger("ix-json")
-	logger.Info("ix-json plugin shutting down")
+
+	p.mu.Lock()
+	for glyphID, cancel := range p.glyphPollers {
+		cancel()
+		logger.Infow("Stopped poller on shutdown", "glyph_id", glyphID)
+	}
+	p.glyphPollers = make(map[string]context.CancelFunc)
+	p.mu.Unlock()
+
+	logger.Info("ix-json plugin shut down")
 	return nil
 }
 
@@ -202,21 +150,19 @@ func (p *Plugin) RegisterWebSocket() (map[string]plugin.WebSocketHandler, error)
 func (p *Plugin) Health(ctx context.Context) plugin.HealthStatus {
 	p.mu.RLock()
 	mode := p.mode
-	apiURL := p.apiURL
+	activePollers := len(p.glyphPollers)
 	p.mu.RUnlock()
 
-	message := fmt.Sprintf("ix-json plugin operational (mode: %s)", mode)
-
-	details := map[string]interface{}{
-		"mode":    mode,
-		"api_url": apiURL,
-	}
+	message := fmt.Sprintf("ix-json plugin operational (mode: %s, active pollers: %d)", mode, activePollers)
 
 	return plugin.HealthStatus{
 		Healthy: true,
 		Paused:  mode == ModePaused,
 		Message: message,
-		Details: details,
+		Details: map[string]any{
+			"mode":           mode,
+			"active_pollers": activePollers,
+		},
 	}
 }
 
@@ -284,22 +230,69 @@ func (p *Plugin) RegisterGlyphs() []plugin.GlyphDef {
 	}
 }
 
-// GetSchedules returns the schedules this plugin wants QNTX to create.
-func (p *Plugin) GetSchedules() []*protocol.ScheduleInfo {
-	config := p.services.Config("ix-json")
-	interval := int32(config.GetInt("poll_interval_seconds"))
+// startPoller starts a per-glyph ticker that enqueues Pulse jobs on each tick.
+func (p *Plugin) startPoller(glyphID string, intervalSecs int) {
+	logger := p.services.Logger("ix-json")
 
-	if interval <= 0 {
-		return nil // Data-shaping mode, no schedule
+	p.mu.Lock()
+	if cancel, exists := p.glyphPollers[glyphID]; exists {
+		cancel()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	p.glyphPollers[glyphID] = cancel
+	p.mu.Unlock()
+
+	logger.Infow("Starting poller", "glyph_id", glyphID, "interval_seconds", intervalSecs)
+
+	go func() {
+		ticker := time.NewTicker(time.Duration(intervalSecs) * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				logger.Infow("Poller stopped", "glyph_id", glyphID)
+				return
+			case <-ticker.C:
+				p.enqueuePollJob(glyphID)
+			}
+		}
+	}()
+}
+
+// enqueuePollJob enqueues a Pulse job to poll a specific glyph.
+func (p *Plugin) enqueuePollJob(glyphID string) {
+	logger := p.services.Logger("ix-json")
+	queue := p.services.Queue()
+	if queue == nil {
+		logger.Errorw("Queue not available, polling directly", "glyph_id", glyphID)
+		if err := p.pollGlyph(context.Background(), glyphID); err != nil {
+			logger.Errorw("Direct poll failed", "glyph_id", glyphID, "error", err)
+		}
+		return
 	}
 
-	return []*protocol.ScheduleInfo{
-		{
-			HandlerName:      "ix-json.poll",
-			IntervalSeconds:  interval,
-			EnabledByDefault: true,
-			Description:      "Poll JSON API and create attestations",
-		},
+	payload, _ := json.Marshal(map[string]string{"glyph_id": glyphID})
+	job, err := async.NewJobWithPayload("ix-json.poll", "ix-json-glyph-"+glyphID, payload, 1, 0, "ix-json")
+	if err != nil {
+		logger.Errorw("Failed to create poll job", "glyph_id", glyphID, "error", err)
+		return
+	}
+
+	if err := queue.Enqueue(job); err != nil {
+		logger.Errorw("Failed to enqueue poll job", "glyph_id", glyphID, "error", err)
+	}
+}
+
+// stopPoller stops the polling goroutine for a glyph.
+func (p *Plugin) stopPoller(glyphID string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if cancel, exists := p.glyphPollers[glyphID]; exists {
+		cancel()
+		delete(p.glyphPollers, glyphID)
+		p.services.Logger("ix-json").Infow("Poller cancelled", "glyph_id", glyphID)
 	}
 }
 
@@ -309,17 +302,27 @@ func (p *Plugin) GetHandlerNames() []string {
 }
 
 // ExecuteJob executes an async job routed from Pulse.
-func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID string, payload []byte) (result []byte, err error) {
+func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID string, payload []byte) ([]byte, error) {
 	switch handlerName {
 	case "ix-json.poll":
-		if err := p.pollAndIngest(ctx); err != nil {
+		var req struct {
+			GlyphID string `json:"glyph_id"`
+		}
+		if err := json.Unmarshal(payload, &req); err != nil {
+			return nil, fmt.Errorf("invalid poll payload: %w", err)
+		}
+		if req.GlyphID == "" {
+			return nil, fmt.Errorf("glyph_id missing from poll payload")
+		}
+
+		if err := p.pollGlyph(ctx, req.GlyphID); err != nil {
 			return nil, err
 		}
 
-		resultData := map[string]string{
-			"status": "Poll completed successfully",
-		}
-		return json.Marshal(resultData)
+		return json.Marshal(map[string]string{
+			"status":   "poll completed",
+			"glyph_id": req.GlyphID,
+		})
 
 	default:
 		return nil, fmt.Errorf("unknown handler: %s", handlerName)
