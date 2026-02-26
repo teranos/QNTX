@@ -11,6 +11,11 @@ import (
 // Embed this in your plugin struct to get Metadata, Pause, Resume, IsPaused,
 // Health, Shutdown, and RegisterWebSocket for free.
 //
+// Per-glyph config pattern: plugins that support multiple glyph instances can
+// store per-glyph configuration as attestations (subject: "{plugin}-glyph-{glyphID}",
+// predicate: "configured"). This makes the plugin stateless across restarts —
+// all state lives in the ATS. See ix-json for the reference implementation.
+//
 // Usage:
 //
 //	type Plugin struct {
