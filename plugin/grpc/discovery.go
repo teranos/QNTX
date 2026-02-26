@@ -22,6 +22,38 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// isPackageJSONPlugin checks if a directory contains a package.json with qntx-plugin marker
+func isPackageJSONPlugin(path string) bool {
+	// If path is a directory, check for package.json
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+
+	var packageJSONPath string
+	if info.IsDir() {
+		packageJSONPath = filepath.Join(path, "package.json")
+	} else {
+		// If it's a file, check the parent directory
+		packageJSONPath = filepath.Join(filepath.Dir(path), "package.json")
+	}
+
+	data, err := os.ReadFile(packageJSONPath)
+	if err != nil {
+		return false
+	}
+
+	var pkg struct {
+		QNTXPlugin bool `json:"qntx-plugin"`
+	}
+
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return false
+	}
+
+	return pkg.QNTXPlugin
+}
+
 // PluginConfig represents configuration for a plugin.
 type PluginConfig struct {
 	// Name is the plugin identifier
@@ -299,8 +331,44 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 		return nil, 0, nil, nil, nil, errors.WithHint(err, "install the plugin binary to ~/.qntx/plugins/ or specify the full path in config")
 	}
 
-	// Build command arguments
-	args := append([]string{"--port", strconv.Itoa(port)}, config.Args...)
+	// Detect TypeScript plugins and wrap with Bun runtime
+	var cmd *exec.Cmd
+	isTypeScriptPlugin := strings.HasSuffix(binary, ".ts") || isPackageJSONPlugin(binary)
+
+	if isTypeScriptPlugin {
+		// TypeScript plugin - launch via Bun runtime
+		// Runtime path: plugin/typescript/runtime/main.ts (relative to QNTX root)
+		// If plugin is in ./plugins/hello-world/plugin.ts, need to go up 2 levels to QNTX root
+		runtimePath := filepath.Join(filepath.Dir(binary), "..", "..", "plugin", "typescript", "runtime", "main.ts")
+
+		// If plugin is in ~/.qntx/plugins/, find runtime relative to QNTX installation
+		if strings.Contains(binary, ".qntx/plugins") {
+			// Assume QNTX is installed - runtime should be in same location as qntx binary
+			// For now, use a fixed path relative to current working directory
+			// TODO: Make this more robust (environment variable or config)
+			runtimePath = "plugin/typescript/runtime/main.ts"
+		}
+
+		args := []string{
+			"run",
+			runtimePath,
+			"--plugin-path", binary,
+			"--grpc-port", strconv.Itoa(port),
+		}
+		args = append(args, config.Args...)
+
+		m.logger.Debugw("Launching TypeScript plugin via Bun runtime",
+			"name", config.Name,
+			"plugin_path", binary,
+			"runtime_path", runtimePath,
+			"port", port)
+
+		cmd = exec.Command("bun", args...)
+	} else {
+		// Native binary plugin (Go, Python, etc.)
+		args := append([]string{"--port", strconv.Itoa(port)}, config.Args...)
+		cmd = exec.Command(binary, args...)
+	}
 
 	// NOTE: Using exec.Command instead of exec.CommandContext intentionally.
 	// This prevents plugins from being killed when parent context is cancelled (e.g., during
@@ -309,7 +377,6 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	// TRADEOFF: If QNTX crashes or is killed (SIGKILL), plugin processes become orphans.
 	// TODO: Consider implementing process group management or pidfile tracking for cleanup
 	// of orphaned plugins on next QNTX startup.
-	cmd := exec.Command(binary, args...)
 
 	// Set environment
 	cmd.Env = os.Environ()
@@ -343,8 +410,8 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	cmd.Stderr = stderrLogger
 
 	if err := cmd.Start(); err != nil {
-		return nil, 0, nil, nil, nil, errors.Wrapf(err, "failed to start plugin %s (binary=%s, args=%v)",
-			config.Name, binary, args)
+		return nil, 0, nil, nil, nil, errors.Wrapf(err, "failed to start plugin %s (cmd=%v)",
+			config.Name, cmd.Args)
 	}
 
 	// Wait for the port announcement with a short timeout (2 seconds)
