@@ -9,6 +9,7 @@
 | GET | `/api/attestations` | HandleCreateAttestation |
 | GET | `/api/canvas/compositions` | canvasHandler.HandleCompositions |
 | GET | `/api/canvas/compositions/` | canvasHandler.HandleCompositions |
+| GET | `/api/canvas/export-dom` | canvasHandler.HandleExportDOM |
 | GET | `/api/canvas/glyphs` | canvasHandler.HandleGlyphs |
 | GET | `/api/canvas/glyphs/` | canvasHandler.HandleGlyphs |
 | GET | `/api/canvas/minimized-windows` | canvasHandler.HandleMinimizedWindows |
@@ -31,6 +32,7 @@
 | GET | `/api/types/` | HandleTypes |
 | GET | `/api/watchers` | HandleWatchers |
 | GET | `/api/watchers/` | HandleWatchers |
+| GET | `/api/watchers/queue/stats` | HandleWatcherQueueStats |
 
 ---
 
@@ -58,6 +60,12 @@ POST /api/attestations — idempotent (returns 200 if already exists).
 ### `GET` /api/canvas/compositions/
 
 **Handler**: `canvasHandler.HandleCompositions`
+
+---
+
+### `GET` /api/canvas/export-dom
+
+**Handler**: `canvasHandler.HandleExportDOM`
 
 ---
 
@@ -240,6 +248,14 @@ HandleWatchers handles watcher CRUD operations
 Routes:
 
 **Handler**: `HandleWatchers`
+
+---
+
+### `GET` /api/watchers/queue/stats
+
+HandleWatcherQueueStats returns execution queue statistics
+
+**Handler**: `HandleWatcherQueueStats`
 
 ---
 

@@ -5,6 +5,17 @@
  * These tests run only in CI with JSDOM environment
  */
 
+import { describe, test, expect, beforeEach, mock, jest } from 'bun:test';
+
+// Mock connectivity before importing status-indicators (subscribeAuth runs during init)
+mock.module('./connectivity', () => ({
+    connectivityManager: {
+        get state() { return 'online'; },
+        subscribe: () => () => {},
+        subscribeAuth: () => () => {},
+    },
+}));
+
 import { statusIndicators } from './status-indicators';
 
 describe('Status Indicators DOM Lifecycle', () => {

@@ -11,7 +11,9 @@ package server
 // race conditions from concurrent sends during client unregistration.
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/errors"
@@ -730,6 +732,98 @@ func (s *QNTXServer) BroadcastPluginHealth(name string, healthy bool, state, mes
 		"healthy", healthy,
 		"state", state,
 	)
+}
+
+// startWatcherQueueBroadcaster periodically broadcasts queue status.
+// Sends updates while queue is non-empty, plus one final total_queued:0 when it drains.
+func (s *QNTXServer) startWatcherQueueBroadcaster() {
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		wasNonEmpty := false
+		for {
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-ticker.C:
+				if s.watcherEngine == nil {
+					continue
+				}
+
+				s.mu.RLock()
+				hasClients := len(s.clients) > 0
+				s.mu.RUnlock()
+				if !hasClients {
+					continue
+				}
+
+				stats, err := s.watcherEngine.GetQueueStore().Stats()
+				if err != nil {
+					continue
+				}
+
+				if stats.TotalQueued == 0 && !wasNonEmpty {
+					continue
+				}
+
+				wasNonEmpty = stats.TotalQueued > 0
+
+				// Collect execution stats from ALL watchers (not just those with queue entries),
+				// and resolve target glyphs for meld-edge watchers.
+				allWatchers := s.watcherEngine.GetAllWatchers()
+				var targetGlyphs map[string]string
+				var watcherStats map[string]WatcherBroadcastStats
+				for watcherID, w := range allWatchers {
+					// Meld-edge: resolve target glyph ID from action data
+					if strings.HasPrefix(watcherID, "meld-edge-") {
+						var actionData struct {
+							TargetGlyphID string `json:"target_glyph_id"`
+						}
+						if json.Unmarshal([]byte(w.ActionData), &actionData) == nil && actionData.TargetGlyphID != "" {
+							if targetGlyphs == nil {
+								targetGlyphs = make(map[string]string)
+							}
+							targetGlyphs[watcherID] = actionData.TargetGlyphID
+						}
+					}
+
+					// Only include watchers that have fired or errored at least once
+					if w.FireCount == 0 && w.ErrorCount == 0 {
+						continue
+					}
+
+					if watcherStats == nil {
+						watcherStats = make(map[string]WatcherBroadcastStats)
+					}
+					var lastFired int64
+					if w.LastFiredAt != nil {
+						lastFired = w.LastFiredAt.Unix()
+					}
+					watcherStats[watcherID] = WatcherBroadcastStats{
+						FireCount:   w.FireCount,
+						ErrorCount:  w.ErrorCount,
+						LastFiredAt: lastFired,
+						LastError:   w.LastError,
+					}
+				}
+
+				msg := WatcherQueueStatusMessage{
+					Type:             "watcher_queue_status",
+					TotalQueued:      stats.TotalQueued,
+					PerWatcher:       stats.PerWatcher,
+					TargetGlyphs:     targetGlyphs,
+					WatcherStats:     watcherStats,
+					OldestAgeSeconds: stats.OldestAgeSeconds,
+					Timestamp:        time.Now().Unix(),
+				}
+				s.broadcastMessage(msg)
+			}
+		}
+	}()
 }
 
 // runBroadcastWorker is the dedicated worker goroutine that owns all client channel sends.

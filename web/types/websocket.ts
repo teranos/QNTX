@@ -29,6 +29,7 @@ import {
   PulseExecutionFailedMessage as GeneratedPulseExecutionFailedMessage,
   PulseExecutionCompletedMessage as GeneratedPulseExecutionCompletedMessage,
   PulseExecutionLogStreamMessage as GeneratedPulseExecutionLogStreamMessage,
+  WatcherQueueStatusMessage as GeneratedWatcherQueueStatusMessage,
 } from '../../types/generated/typescript/server';
 
 import {
@@ -76,6 +77,7 @@ export type MessageType =
   | 'watcher_match'
   | 'watcher_error'
   | 'glyph_fired'
+  | 'watcher_queue_status'
   | 'database_stats'
   | 'sync_status'
   | 'rich_search_results'
@@ -442,6 +444,14 @@ export interface WatcherErrorMessage extends BaseMessage {
 }
 
 /**
+ * Watcher queue status (from server/types.go:WatcherQueueStatusMessage)
+ * Broadcast every 5s while queue is non-empty
+ */
+export interface WatcherQueueStatusMessage extends Omit<GeneratedWatcherQueueStatusMessage, 'type'> {
+  type: 'watcher_queue_status';
+}
+
+/**
  * Database statistics response
  */
 export interface DatabaseStatsMessage extends BaseMessage {
@@ -611,6 +621,7 @@ export type WebSocketMessage =
   | WatcherMatchMessage
   | WatcherErrorMessage
   | GlyphFiredMessage
+  | WatcherQueueStatusMessage
   | DatabaseStatsMessage
   | SyncStatusMessage
   | RichSearchResultsMessage
@@ -661,6 +672,7 @@ export interface MessageHandlers {
   watcher_match?: MessageHandler<WatcherMatchMessage>;
   watcher_error?: MessageHandler<WatcherErrorMessage>;
   glyph_fired?: MessageHandler<GlyphFiredMessage>;
+  watcher_queue_status?: MessageHandler<WatcherQueueStatusMessage>;
   database_stats?: MessageHandler<DatabaseStatsMessage>;
   sync_status?: MessageHandler<SyncStatusMessage>;
   rich_search_results?: MessageHandler<RichSearchResultsMessage>;

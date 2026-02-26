@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
@@ -1213,7 +1214,7 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 	watcher := &storage.Watcher{
 		ID:                watcherID,
 		Name:              msg.WatcherName,
-		MaxFiresPerMinute: 60, // Default rate limit
+		MaxFiresPerSecond: am.GetInt("watcher.max_fires_per_second"),
 		Enabled:           msg.Enabled,
 	}
 

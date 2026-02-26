@@ -46,7 +46,7 @@ func TestEngine_LoadWatchers(t *testing.T) {
 		Name:              "Enabled Watcher",
 		ActionType:        storage.ActionTypePython,
 		ActionData:        "print('hello')",
-		MaxFiresPerMinute: 105,
+		MaxFiresPerSecond: 105,
 		Enabled:           true,
 		Filter: types.AxFilter{
 			Subjects: []string{"user:123"},
@@ -58,7 +58,7 @@ func TestEngine_LoadWatchers(t *testing.T) {
 		Name:              "Disabled Watcher",
 		ActionType:        storage.ActionTypePython,
 		ActionData:        "print('world')",
-		MaxFiresPerMinute: 105,
+		MaxFiresPerSecond: 105,
 		Enabled:           false,
 	}
 
@@ -67,7 +67,7 @@ func TestEngine_LoadWatchers(t *testing.T) {
 		Name:              "AX Query Watcher",
 		ActionType:        storage.ActionTypePython,
 		ActionData:        "print('ax')",
-		MaxFiresPerMinute: 105,
+		MaxFiresPerSecond: 105,
 		Enabled:           true,
 		AxQuery:           "subjects=user:456 predicates=login",
 	}
@@ -123,7 +123,7 @@ func TestEngine_MatchesFilter(t *testing.T) {
 		Name:              "Filter Test",
 		ActionType:        storage.ActionTypePython,
 		ActionData:        "pass",
-		MaxFiresPerMinute: 105,
+		MaxFiresPerSecond: 105,
 		Enabled:           true,
 		Filter: types.AxFilter{
 			Subjects:   []string{"user:123", "user:456"},
@@ -243,7 +243,7 @@ func TestEngine_RateLimiting(t *testing.T) {
 		Name:              "Rate Limited",
 		ActionType:        storage.ActionTypePython,
 		ActionData:        "pass",
-		MaxFiresPerMinute: 60, // 1 per second
+		MaxFiresPerSecond: 60, // 1 per second
 		Enabled:           true,
 		Filter:            types.AxFilter{}, // Match all
 	}
@@ -313,7 +313,7 @@ func TestEngine_ExecutePython(t *testing.T) {
 		Name:              "Python Test",
 		ActionType:        storage.ActionTypePython,
 		ActionData:        "print(attestation['id'])",
-		MaxFiresPerMinute: 105,
+		MaxFiresPerSecond: 105,
 		Enabled:           true,
 		Filter:            types.AxFilter{}, // Match all
 	}
@@ -370,7 +370,7 @@ func TestEngine_ExecuteWebhook(t *testing.T) {
 		Name:              "Webhook Test",
 		ActionType:        storage.ActionTypeWebhook,
 		ActionData:        server.URL + "/webhook",
-		MaxFiresPerMinute: 105,
+		MaxFiresPerSecond: 105,
 		Enabled:           true,
 		Filter:            types.AxFilter{}, // Match all
 	}
@@ -443,7 +443,7 @@ func TestEngine_QueryHistoricalMatches(t *testing.T) {
 		Name:              "Historical Test",
 		ActionType:        storage.ActionTypePython,
 		ActionData:        "pass",
-		MaxFiresPerMinute: 105,
+		MaxFiresPerSecond: 105,
 		Enabled:           true,
 		Filter: types.AxFilter{
 			Predicates: []string{"login"},
@@ -492,7 +492,7 @@ func TestEngine_TimeFilters(t *testing.T) {
 		Name:              "Time Filter Test",
 		ActionType:        storage.ActionTypePython,
 		ActionData:        "pass",
-		MaxFiresPerMinute: 105,
+		MaxFiresPerSecond: 105,
 		Enabled:           true,
 		Filter: types.AxFilter{
 			TimeStart: &past,
@@ -548,7 +548,7 @@ func TestEngine_TimeFilters(t *testing.T) {
 	}
 }
 
-func TestEngine_ZeroMaxFiresPerMinute(t *testing.T) {
+func TestEngine_ZeroMaxFiresPerSecond(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
 
@@ -562,14 +562,14 @@ func TestEngine_ZeroMaxFiresPerMinute(t *testing.T) {
 
 	engine := watcher.NewEngine(db, server.URL, logger)
 
-	// Create watcher with MaxFiresPerMinute = 0 (should mean no fires per QNTX LAW)
+	// Create watcher with MaxFiresPerSecond = 0 (should mean no fires per QNTX LAW)
 	store := storage.NewWatcherStore(db)
 	w := &storage.Watcher{
 		ID:                "zero-rate-test",
 		Name:              "Zero Rate Test",
 		ActionType:        storage.ActionTypePython,
 		ActionData:        "pass",
-		MaxFiresPerMinute: 0, // Zero means zero - no fires allowed
+		MaxFiresPerSecond: 0, // Zero means zero - no fires allowed
 		Enabled:           true,
 		Filter:            types.AxFilter{}, // Match all
 	}
@@ -596,7 +596,7 @@ func TestEngine_ZeroMaxFiresPerMinute(t *testing.T) {
 
 	// Should NOT have executed (zero means zero)
 	if callCount != 0 {
-		t.Errorf("Expected 0 executions (MaxFiresPerMinute=0), got %d", callCount)
+		t.Errorf("Expected 0 executions (MaxFiresPerSecond=0), got %d", callCount)
 	}
 }
 
@@ -639,7 +639,7 @@ func TestEngine_NoSharedMutation(t *testing.T) {
 			Name:              fmt.Sprintf("Webhook %d", i),
 			ActionType:        storage.ActionTypeWebhook,
 			ActionData:        server.URL,
-			MaxFiresPerMinute: 105,
+			MaxFiresPerSecond: 105,
 			Enabled:           true,
 			Filter:            types.AxFilter{}, // Match all
 		}
@@ -710,7 +710,7 @@ func TestEngine_GetParseError_SuccessfulWatcher(t *testing.T) {
 		Name:              "Valid Query Watcher",
 		ActionType:        storage.ActionTypePython,
 		ActionData:        "print('ok')",
-		MaxFiresPerMinute: 105,
+		MaxFiresPerSecond: 105,
 		Enabled:           true,
 		AxQuery:           "ANNA is author",
 	}
