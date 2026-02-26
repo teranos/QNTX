@@ -252,6 +252,9 @@ func (p *Plugin) handleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, status)
 }
 
+// TODO: Extract inline HTML/CSS/JS into separate files and use //go:embed.
+// Inline UI strings in Go are unmaintainable — split into templates/ and static/ dirs.
+
 // handleIXGlyph renders the ix-json glyph UI.
 func (p *Plugin) handleIXGlyph(w http.ResponseWriter, r *http.Request) {
 	glyphID := r.URL.Query().Get("glyph_id")
@@ -267,7 +270,7 @@ func (p *Plugin) handleIXGlyph(w http.ResponseWriter, r *http.Request) {
 	// Extract config from glyph-specific attestation
 	apiURL := ""
 	pollInterval := 0
-	mode := ModeDataShaping
+	mode := ModePaused
 
 	if glyphConfig != nil {
 		if url, ok := glyphConfig["api_url"].(string); ok {
@@ -295,7 +298,7 @@ func renderIXGlyphHTML(glyphID string, mode OperationMode, apiURL string, pollIn
 
 	// Header
 	html.WriteString(`<div class="ix-header">`)
-	html.WriteString(`<div class="ix-title">🔄 JSON API Ingestor</div>`)
+	html.WriteString(`<div class="ix-title">JSON API Ingestor</div>`)
 	html.WriteString(fmt.Sprintf(`<div class="ix-mode mode-%s">%s</div>`, mode, mode))
 	html.WriteString(fmt.Sprintf(`<div class="ix-version" style="font-size: 10px; color: #666; margin-left: auto;">v%s</div>`, escapeHTML(version)))
 	html.WriteString(`</div>`)
@@ -358,7 +361,6 @@ func renderIXGlyphHTML(glyphID string, mode OperationMode, apiURL string, pollIn
 	html.WriteString(`<div class="ix-section">`)
 	html.WriteString(`<h3>Mode Controls</h3>`)
 	html.WriteString(`<div class="mode-controls">`)
-	html.WriteString(`<button class="ix-btn" onclick="ixSetMode(this, 'data-shaping')">Data Shaping</button>`)
 	html.WriteString(`<button class="ix-btn" onclick="ixSetMode(this, 'paused')">Pause</button>`)
 	html.WriteString(`<button class="ix-btn ix-btn-primary" onclick="ixSetMode(this, 'active-running')">Activate</button>`)
 	html.WriteString(`</div>`)
@@ -476,7 +478,7 @@ func (p *Plugin) handleIXGlyphCSS(w http.ResponseWriter, r *http.Request) {
 	height: 100%;
 	background: var(--background, #fff);
 	color: var(--foreground, #000);
-	padding: 16px;
+	padding: 8px;
 	overflow-y: auto;
 }
 
@@ -484,27 +486,22 @@ func (p *Plugin) handleIXGlyphCSS(w http.ResponseWriter, r *http.Request) {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	padding-bottom: 16px;
-	border-bottom: 2px solid var(--border-color, #e0e0e0);
-	margin-bottom: 16px;
+	padding-bottom: 6px;
+	border-bottom: 1px solid var(--border-color, #e0e0e0);
+	margin-bottom: 8px;
 }
 
 .ix-title {
-	font-size: 18px;
+	font-size: 13px;
 	font-weight: 600;
 }
 
 .ix-mode {
-	padding: 4px 12px;
-	border-radius: 4px;
-	font-size: 12px;
+	padding: 2px 6px;
+	border-radius: 3px;
+	font-size: 11px;
 	font-weight: 500;
 	text-transform: uppercase;
-}
-
-.mode-data-shaping {
-	background: #fef3c7;
-	color: #92400e;
 }
 
 .mode-paused {
@@ -518,49 +515,51 @@ func (p *Plugin) handleIXGlyphCSS(w http.ResponseWriter, r *http.Request) {
 }
 
 .ix-section {
-	margin-bottom: 24px;
+	margin-bottom: 8px;
 }
 
 .ix-section h3 {
-	font-size: 14px;
+	font-size: 11px;
 	font-weight: 600;
-	margin-bottom: 12px;
+	margin-bottom: 4px;
 	color: var(--muted-foreground, #666);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
 }
 
 .config-item, .mapping-item {
-	padding: 8px 0;
-	font-size: 14px;
+	padding: 2px 0;
+	font-size: 12px;
 }
 
 .config-item strong, .mapping-item strong {
 	color: var(--foreground, #000);
-	margin-right: 8px;
+	margin-right: 4px;
 }
 
 .config-form {
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: 4px;
 }
 
 .form-group {
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
+	gap: 1px;
 }
 
 .form-group label {
-	font-size: 12px;
-	font-weight: 600;
+	font-size: 11px;
+	font-weight: 500;
 	color: var(--muted-foreground, #666);
 }
 
 .form-input {
-	padding: 8px 12px;
+	padding: 3px 6px;
 	border: 1px solid var(--border-color, #ccc);
-	border-radius: 4px;
-	font-size: 14px;
+	border-radius: 3px;
+	font-size: 12px;
 	background: var(--background, #fff);
 	color: var(--foreground, #000);
 }
@@ -572,42 +571,42 @@ func (p *Plugin) handleIXGlyphCSS(w http.ResponseWriter, r *http.Request) {
 
 .form-actions {
 	display: flex;
-	gap: 8px;
-	margin-top: 8px;
+	gap: 4px;
+	margin-top: 2px;
 }
 
 .json-preview {
 	background: var(--card-bg, #f9f9f9);
 	border: 1px solid var(--border-color, #e0e0e0);
-	border-radius: 4px;
-	padding: 12px;
-	font-size: 12px;
+	border-radius: 3px;
+	padding: 6px;
+	font-size: 11px;
 	font-family: monospace;
 	overflow-x: auto;
-	max-height: 300px;
+	max-height: 200px;
 	overflow-y: auto;
 }
 
 .mapping-empty {
-	padding: 16px;
+	padding: 6px;
 	background: var(--card-bg, #f9f9f9);
-	border-radius: 4px;
+	border-radius: 3px;
 	color: var(--muted-foreground, #666);
-	font-size: 14px;
+	font-size: 12px;
 }
 
 .mode-controls {
 	display: flex;
-	gap: 8px;
+	gap: 4px;
 }
 
 .ix-btn {
-	padding: 8px 16px;
+	padding: 3px 8px;
 	background: var(--card-bg, #f0f0f0);
 	border: 1px solid var(--border-color, #ccc);
-	border-radius: 4px;
+	border-radius: 3px;
 	cursor: pointer;
-	font-size: 14px;
+	font-size: 12px;
 	font-weight: 500;
 }
 
@@ -626,10 +625,10 @@ func (p *Plugin) handleIXGlyphCSS(w http.ResponseWriter, r *http.Request) {
 }
 
 .ix-status {
-	font-size: 12px;
+	font-size: 11px;
 	font-family: monospace;
-	min-height: 18px;
-	margin-top: 4px;
+	min-height: 14px;
+	margin-top: 2px;
 }
 `
 
