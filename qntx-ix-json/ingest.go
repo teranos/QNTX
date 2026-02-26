@@ -8,19 +8,25 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 )
 
+// pollResult holds the outcome of a single poll for log reporting.
+type pollResult struct {
+	APIURL              string
+	AttestationsCreated int
+}
+
 // pollGlyph fetches and ingests for a single glyph instance.
-func (p *Plugin) pollGlyph(ctx context.Context, glyphID string) error {
+func (p *Plugin) pollGlyph(ctx context.Context, glyphID string) (*pollResult, error) {
 	// Load per-glyph config from attestations
 	config := p.loadGlyphConfig(ctx, glyphID)
 	if config == nil {
-		return fmt.Errorf("no config for glyph %s", glyphID)
+		return nil, fmt.Errorf("no config for glyph %s", glyphID)
 	}
 
 	apiURL, _ := config["api_url"].(string)
 	authToken, _ := config["auth_token"].(string)
 
 	if apiURL == "" {
-		return fmt.Errorf("API URL not configured for glyph %s", glyphID)
+		return nil, fmt.Errorf("API URL not configured for glyph %s", glyphID)
 	}
 
 	p.mu.RLock()
@@ -28,28 +34,29 @@ func (p *Plugin) pollGlyph(ctx context.Context, glyphID string) error {
 	p.mu.RUnlock()
 
 	if mapping == nil {
-		return fmt.Errorf("mapping not configured for glyph %s", glyphID)
+		return nil, fmt.Errorf("mapping not configured for glyph %s", glyphID)
 	}
 
 	// Fetch JSON from API
 	data, err := p.fetchJSON(ctx, apiURL, authToken)
 	if err != nil {
-		return fmt.Errorf("failed to fetch from %s for glyph %s: %w", apiURL, glyphID, err)
+		return nil, fmt.Errorf("failed to fetch from %s for glyph %s: %w", apiURL, glyphID, err)
 	}
 
 	// Parse JSON
 	var jsonData any
 	if err := json.Unmarshal(data, &jsonData); err != nil {
-		return fmt.Errorf("failed to parse JSON from %s: %w", apiURL, err)
+		return nil, fmt.Errorf("failed to parse JSON from %s: %w", apiURL, err)
 	}
 
 	// Create attestations
 	store := p.services.ATSStore()
 	if store == nil {
-		return fmt.Errorf("ATSStore not available")
+		return nil, fmt.Errorf("ATSStore not available")
 	}
 
 	logger := p.services.Logger("ix-json")
+	result := &pollResult{APIURL: apiURL}
 
 	switch v := jsonData.(type) {
 	case []any:
@@ -59,19 +66,21 @@ func (p *Plugin) pollGlyph(ctx context.Context, glyphID string) error {
 					"glyph_id", glyphID, "index", i, "error", err)
 			}
 		}
+		result.AttestationsCreated = len(v)
 		logger.Infow("Poll completed", "glyph_id", glyphID, "attestations_created", len(v))
 
 	case map[string]any:
 		if err := p.createAttestationFromJSON(ctx, store, v, mapping); err != nil {
-			return fmt.Errorf("failed to create attestation for glyph %s: %w", glyphID, err)
+			return nil, fmt.Errorf("failed to create attestation for glyph %s: %w", glyphID, err)
 		}
+		result.AttestationsCreated = 1
 		logger.Infow("Poll completed", "glyph_id", glyphID, "attestations_created", 1)
 
 	default:
-		return fmt.Errorf("unexpected JSON type %T from %s", jsonData, apiURL)
+		return nil, fmt.Errorf("unexpected JSON type %T from %s", jsonData, apiURL)
 	}
 
-	return nil
+	return result, nil
 }
 
 // createAttestationFromJSON creates a single attestation from a JSON object.
