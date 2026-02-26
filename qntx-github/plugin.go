@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/plugin"
@@ -14,33 +13,27 @@ import (
 
 // Plugin is the GitHub domain plugin implementation.
 type Plugin struct {
-	services plugin.ServiceRegistry
-
-	mu     sync.RWMutex
-	paused bool
+	plugin.Base
 	client *GitHubClient // GitHub API client
 }
 
 // NewPlugin creates a new GitHub domain plugin.
 func NewPlugin() *Plugin {
-	return &Plugin{}
-}
-
-// Metadata returns information about the GitHub domain plugin.
-func (p *Plugin) Metadata() plugin.Metadata {
-	return plugin.Metadata{
-		Name:        "github",
-		Version:     "0.1.6",
-		QNTXVersion: ">= 0.1.0",
-		Description: "GitHub integration for repository events and automation",
-		Author:      "QNTX Team",
-		License:     "MIT",
+	return &Plugin{
+		Base: plugin.NewBase(plugin.Metadata{
+			Name:        "github",
+			Version:     "0.1.6",
+			QNTXVersion: ">= 0.1.0",
+			Description: "GitHub integration for repository events and automation",
+			Author:      "QNTX Team",
+			License:     "MIT",
+		}),
 	}
 }
 
 // Initialize initializes the GitHub domain plugin.
 func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
-	p.services = services
+	p.Init(services)
 	logger := services.Logger("github")
 
 	config := services.Config("github")
@@ -72,76 +65,9 @@ func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry
 	return nil
 }
 
-// Shutdown shuts down the GitHub domain plugin.
-func (p *Plugin) Shutdown(ctx context.Context) error {
-	logger := p.services.Logger("github")
-	logger.Info("GitHub plugin shutting down")
-	return nil
-}
-
 // RegisterHTTP registers HTTP handlers for the GitHub domain.
 func (p *Plugin) RegisterHTTP(mux *http.ServeMux) error {
 	return nil // No HTTP endpoints needed yet
-}
-
-// RegisterWebSocket registers WebSocket handlers for the GitHub domain.
-func (p *Plugin) RegisterWebSocket() (map[string]plugin.WebSocketHandler, error) {
-	return nil, nil // No WebSocket endpoints needed
-}
-
-// Health returns the health status of the GitHub domain plugin.
-func (p *Plugin) Health(ctx context.Context) plugin.HealthStatus {
-	p.mu.RLock()
-	paused := p.paused
-	p.mu.RUnlock()
-
-	message := "GitHub plugin operational"
-	if paused {
-		message = "GitHub plugin paused"
-	}
-
-	return plugin.HealthStatus{
-		Healthy: true,
-		Paused:  paused,
-		Message: message,
-	}
-}
-
-// Pause temporarily suspends the GitHub plugin operations.
-func (p *Plugin) Pause(ctx context.Context) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if p.paused {
-		return fmt.Errorf("github plugin is already paused")
-	}
-
-	p.paused = true
-	logger := p.services.Logger("github")
-	logger.Info("GitHub plugin paused")
-	return nil
-}
-
-// Resume restores the GitHub plugin to active operation.
-func (p *Plugin) Resume(ctx context.Context) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if !p.paused {
-		return fmt.Errorf("github plugin is not paused")
-	}
-
-	p.paused = false
-	logger := p.services.Logger("github")
-	logger.Info("GitHub plugin resumed")
-	return nil
-}
-
-// IsPaused returns whether the plugin is currently paused.
-func (p *Plugin) IsPaused() bool {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return p.paused
 }
 
 // ConfigSchema returns the configuration schema for the GitHub plugin.
@@ -169,7 +95,7 @@ func (p *Plugin) ConfigSchema() map[string]plugin.ConfigField {
 // GetSchedules returns the schedules this plugin wants QNTX to create.
 // Called during initialization to auto-create Pulse scheduled jobs.
 func (p *Plugin) GetSchedules() []*protocol.ScheduleInfo {
-	config := p.services.Config("github")
+	config := p.Services().Config("github")
 	repos := config.GetStringSlice("repos")
 	if len(repos) == 0 {
 		// No repos configured, don't create schedule
