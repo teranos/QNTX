@@ -11,7 +11,9 @@ package server
 // race conditions from concurrent sends during client unregistration.
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/errors"
@@ -770,10 +772,51 @@ func (s *QNTXServer) startWatcherQueueBroadcaster() {
 
 				wasNonEmpty = stats.TotalQueued > 0
 
+				// Collect execution stats from ALL watchers (not just those with queue entries),
+				// and resolve target glyphs for meld-edge watchers.
+				allWatchers := s.watcherEngine.GetAllWatchers()
+				var targetGlyphs map[string]string
+				var watcherStats map[string]WatcherBroadcastStats
+				for watcherID, w := range allWatchers {
+					// Meld-edge: resolve target glyph ID from action data
+					if strings.HasPrefix(watcherID, "meld-edge-") {
+						var actionData struct {
+							TargetGlyphID string `json:"target_glyph_id"`
+						}
+						if json.Unmarshal([]byte(w.ActionData), &actionData) == nil && actionData.TargetGlyphID != "" {
+							if targetGlyphs == nil {
+								targetGlyphs = make(map[string]string)
+							}
+							targetGlyphs[watcherID] = actionData.TargetGlyphID
+						}
+					}
+
+					// Only include watchers that have fired or errored at least once
+					if w.FireCount == 0 && w.ErrorCount == 0 {
+						continue
+					}
+
+					if watcherStats == nil {
+						watcherStats = make(map[string]WatcherBroadcastStats)
+					}
+					var lastFired int64
+					if w.LastFiredAt != nil {
+						lastFired = w.LastFiredAt.Unix()
+					}
+					watcherStats[watcherID] = WatcherBroadcastStats{
+						FireCount:   w.FireCount,
+						ErrorCount:  w.ErrorCount,
+						LastFiredAt: lastFired,
+						LastError:   w.LastError,
+					}
+				}
+
 				msg := WatcherQueueStatusMessage{
 					Type:             "watcher_queue_status",
 					TotalQueued:      stats.TotalQueued,
 					PerWatcher:       stats.PerWatcher,
+					TargetGlyphs:     targetGlyphs,
+					WatcherStats:     watcherStats,
 					OldestAgeSeconds: stats.OldestAgeSeconds,
 					Timestamp:        time.Now().Unix(),
 				}

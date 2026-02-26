@@ -131,6 +131,7 @@ export type {
   TaskLogsResponse,
   UpdateScheduledJobRequest,
   UsageUpdateMessage,
+  WatcherBroadcastStats,
   WatcherCreateRequest,
   WatcherErrorMessage,
   WatcherMatchMessage,
