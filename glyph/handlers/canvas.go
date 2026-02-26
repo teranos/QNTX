@@ -630,11 +630,10 @@ func (h *CanvasHandler) HandleExportDOM(w http.ResponseWriter, r *http.Request) 
 // Known limitations:
 //   - Only exports glyphs with canvas_id set. Glyphs created before 2026-02-26
 //     (when canvas_id sync was fixed) have empty canvas_id and won't export.
-//   - Export quality issues: rendering via happy-dom has limitations, static HTML
-//     output may not match live canvas appearance, styles/interactions may be broken.
+//   - Export quality issues: static HTML output differs from live canvas (root cause TBD).
 //
 // TODO: Add test coverage (canvas_export_test.go doesn't exist)
-// TODO: Improve export quality - investigate happy-dom rendering issues
+// TODO: Improve export quality - investigate rendering differences
 // TODO: Migration script to backfill canvas_id for old glyphs (if frontend has data)
 func (h *CanvasHandler) HandleExportStatic(w http.ResponseWriter, r *http.Request) {
 	if os.Getenv("QNTX_DEMO") != "1" {
