@@ -19,11 +19,21 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 )
+
+func logEntry(level, stage, message string) *protocol.JobLogEntry {
+	return &protocol.JobLogEntry{
+		Timestamp: time.Now().Format(time.RFC3339),
+		Level:     level,
+		Stage:     stage,
+		Message:   message,
+	}
+}
 
 // OperationMode represents the current operational mode of the plugin.
 type OperationMode string
@@ -70,7 +80,7 @@ func NewPlugin() *Plugin {
 func (p *Plugin) Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name:        "ix-json",
-		Version:     "0.3.0",
+		Version:     "0.3.1",
 		QNTXVersion: ">= 0.1.0",
 		Description: "Generic JSON API ingestion with configurable mapping to attestations",
 		Author:      "QNTX Team",
@@ -316,7 +326,8 @@ func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID strin
 			return nil, nil, fmt.Errorf("glyph_id missing from poll payload")
 		}
 
-		if err := p.pollGlyph(ctx, req.GlyphID); err != nil {
+		pollRes, err := p.pollGlyph(ctx, req.GlyphID)
+		if err != nil {
 			return nil, nil, err
 		}
 
@@ -324,7 +335,10 @@ func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID strin
 			"status":   "poll completed",
 			"glyph_id": req.GlyphID,
 		})
-		return result, nil, nil
+		logs := []*protocol.JobLogEntry{
+			logEntry("info", "poll", fmt.Sprintf("Fetched %s, created %d attestations", pollRes.APIURL, pollRes.AttestationsCreated)),
+		}
+		return result, logs, nil
 
 	default:
 		return nil, nil, fmt.Errorf("unknown handler: %s", handlerName)
