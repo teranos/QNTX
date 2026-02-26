@@ -699,7 +699,16 @@ func (h *CanvasHandler) HandleExportStatic(w http.ResponseWriter, r *http.Reques
 	// Call canvas-renderer plugin endpoint (internal HTTP request)
 	// Plugin is mounted at /api/canvas-renderer/, endpoint is /render
 	pluginURL := fmt.Sprintf("http://localhost:%d/api/canvas-renderer/render", h.getServerPort())
-	resp, err := http.Post(pluginURL, "application/json", strings.NewReader(string(reqBody)))
+
+	// Use request context for timeout/cancellation propagation
+	req, err := http.NewRequestWithContext(r.Context(), "POST", pluginURL, strings.NewReader(string(reqBody)))
+	if err != nil {
+		h.writeError(w, errors.Wrap(err, "failed to create plugin request"), http.StatusInternalServerError)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		h.writeError(w, errors.Wrapf(err, "failed to call canvas-renderer plugin at %s", pluginURL), http.StatusBadGateway)
 		return
