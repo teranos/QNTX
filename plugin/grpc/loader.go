@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -124,9 +125,49 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 
 		for _, candidate := range candidates {
 			if fileInfo, err := os.Stat(candidate); err == nil {
-				// Check if executable (Unix-specific: checks permission bits)
+				// Special handling for TypeScript plugins
+				if fileInfo.IsDir() {
+					// Check if this is a TypeScript plugin directory (has package.json with qntx-plugin marker)
+					pkgPath := filepath.Join(candidate, "package.json")
+					if _, err := os.Stat(pkgPath); err == nil {
+						// Has package.json, check if it's a QNTX plugin
+						var pkg struct {
+							QNTXPlugin bool `json:"qntx-plugin"`
+						}
+						if data, err := os.ReadFile(pkgPath); err == nil {
+							if err := json.Unmarshal(data, &pkg); err == nil && pkg.QNTXPlugin {
+								// TypeScript plugin directory - look for plugin.ts
+								pluginTsPath := filepath.Join(candidate, "plugin.ts")
+								if _, err := os.Stat(pluginTsPath); err == nil {
+									logger.Infof("Found '%s' TypeScript plugin: %s", name, pluginTsPath)
+									return PluginConfig{
+										Name:      name,
+										Enabled:   true,
+										Binary:    pluginTsPath,
+										AutoStart: true,
+									}, nil
+								}
+							}
+						}
+					}
+					// Not a valid plugin directory, continue searching
+					continue
+				}
+
+				// Regular file - check if executable
 				// Issue #137: This doesn't work on Windows where executability is by extension
 				if fileInfo.Mode()&0111 == 0 {
+					// Not executable - check if it's a .ts file (TypeScript plugin)
+					if strings.HasSuffix(candidate, ".ts") {
+						logger.Infof("Found '%s' TypeScript plugin: %s", name, candidate)
+						return PluginConfig{
+							Name:      name,
+							Enabled:   true,
+							Binary:    candidate,
+							AutoStart: true,
+						}, nil
+					}
+
 					logger.Debugw("Found plugin binary but not executable",
 						"plugin", name,
 						"path", candidate,
