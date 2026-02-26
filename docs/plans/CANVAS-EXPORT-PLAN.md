@@ -3,13 +3,13 @@
 ## Documentation Review
 
 **ADRs Read:**
-- [ADR-001: Domain Plugin Architecture](docs/adr/ADR-001-domain-plugin-architecture.md)
-- [ADR-002: Plugin Configuration Management](docs/adr/ADR-002-plugin-configuration.md) ✅ **CRITICAL**
-- [ADR-003: Plugin Communication Patterns](docs/adr/ADR-003-plugin-communication.md)
+- [ADR-001: Domain Plugin Architecture](../adr/ADR-001-domain-plugin-architecture.md)
+- [ADR-002: Plugin Configuration Management](../adr/ADR-002-plugin-configuration.md) ✅ **CRITICAL**
+- [ADR-003: Plugin Communication Patterns](../adr/ADR-003-plugin-communication.md)
 
 **Guides Read:**
-- [TypeScript Plugin Support](docs/development/ts-plugin.md) - Reference implementation plan
-- [External Plugin Guide](docs/development/external-plugin-guide.md) - gRPC protocol details
+- [TypeScript Plugin Support](../development/ts-plugin.md) - Reference implementation plan
+- [External Plugin Guide](../development/external-plugin-guide.md) - gRPC protocol details
 
 ## Context
 
@@ -678,7 +678,7 @@ If any phase fails and cannot be fixed quickly:
 
 - [ ] `plugin/typescript/README.md` - TypeScript runtime overview
 - [ ] `./plugins/canvas-renderer/README.md` - Canvas renderer plugin docs
-- [ ] Update `docs/development/ts-plugin.md` - Add actual implementation notes
+- [x] Update `docs/development/ts-plugin.md` - Add actual implementation notes
 - [ ] `CANVAS-EXPORT-COMPLETE.md` - Final status (only after Phase 3 success)
 
 ---
