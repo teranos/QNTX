@@ -46,18 +46,18 @@
 //! # }
 //! ```
 //!
-//! # Example: Bounded Storage with Quotas
+//! # Example: Bounded Storage with Eviction
 //!
 //! ```rust,no_run
-//! use qntx_sqlite::{BoundedStore, StorageQuotas};
+//! use qntx_sqlite::{BoundedStore, BoundedConfig};
 //! use qntx_core::{AttestationBuilder, storage::AttestationStore};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! // Create store with custom quotas
-//! let quotas = StorageQuotas::new(100, 256, 256); // 100 attestations, 256 predicates, 256 contexts
-//! let mut store = BoundedStore::in_memory_with_quotas(quotas)?;
+//! // Create store with custom limits (attestations per actor-context, contexts per actor, actors per entity)
+//! let config = BoundedConfig { actor_context_limit: 32, ..Default::default() };
+//! let mut store = BoundedStore::in_memory_with_config(config)?;
 //!
-//! // Attempts to exceed quotas will fail with QuotaExceeded error
+//! // Inserts succeed; oldest attestations are evicted when limits are exceeded
 //! # Ok(())
 //! # }
 //! ```
@@ -77,6 +77,6 @@ pub use qntx_proto::proto_convert;
 pub mod ffi;
 
 // Re-export main types
-pub use bounded::{BoundedStore, StorageQuotas};
+pub use bounded::{BoundedConfig, BoundedStore, EvictionResult};
 pub use error::{Result, SqliteError};
 pub use store::SqliteStore;

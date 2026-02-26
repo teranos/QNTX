@@ -39,6 +39,16 @@ pub struct Attestation {
     /// Defaults to 0 when absent (e.g. content hashing omits it deliberately).
     #[serde(default)]
     pub created_at: i64,
+
+    /// Cryptographic signature over the attestation's semantic content.
+    /// Set by the node's signer at creation time. None for unsigned attestations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<Vec<u8>>,
+
+    /// DID of the signer that produced the signature.
+    /// Preserves provenance — inbound synced attestations keep the original signer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signer_did: Option<String>,
 }
 
 impl Attestation {
@@ -74,6 +84,8 @@ impl Default for Attestation {
             source: String::new(),
             attributes: HashMap::new(),
             created_at: 0,
+            signature: None,
+            signer_did: None,
         }
     }
 }
@@ -167,6 +179,16 @@ impl AttestationBuilder {
 
     pub fn attribute(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
         self.attestation.attributes.insert(key.into(), value);
+        self
+    }
+
+    pub fn signature(mut self, sig: Vec<u8>) -> Self {
+        self.attestation.signature = Some(sig);
+        self
+    }
+
+    pub fn signer_did(mut self, did: impl Into<String>) -> Self {
+        self.attestation.signer_did = Some(did.into());
         self
     }
 

@@ -56,6 +56,10 @@ impl SqliteStore {
         &self.conn
     }
 
+    /// Column list for SELECT queries (11 columns).
+    const SELECT_COLUMNS: &'static str =
+        "id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did";
+
     /// Helper to extract a row into an Attestation, converting errors through SqliteError.
     fn row_to_attestation(
         row_data: (
@@ -68,6 +72,8 @@ impl SqliteStore {
             String,
             Option<String>,
             String,
+            Option<Vec<u8>>,
+            Option<String>,
         ),
     ) -> StoreResult<Attestation> {
         let (
@@ -80,6 +86,8 @@ impl SqliteStore {
             source,
             attributes_json,
             created_at_str,
+            signature,
+            signer_did,
         ) = row_data;
 
         let subjects = deserialize_string_vec(&subjects_json)?;
@@ -100,6 +108,8 @@ impl SqliteStore {
             source,
             attributes,
             created_at,
+            signature,
+            signer_did,
         })
     }
 
@@ -134,8 +144,8 @@ impl AttestationStore for SqliteStore {
 
         self.conn
             .execute(
-                "INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 rusqlite::params![
                     attestation.id,
                     subjects_json,
@@ -146,6 +156,8 @@ impl AttestationStore for SqliteStore {
                     attestation.source,
                     attributes_json,
                     created_at_sql,
+                    attestation.signature,
+                    attestation.signer_did,
                 ],
             )
             .map_err(SqliteError::from)?;
@@ -155,26 +167,13 @@ impl AttestationStore for SqliteStore {
 
     #[allow(clippy::type_complexity)]
     fn get(&self, id: &str) -> StoreResult<Option<Attestation>> {
-        let mut stmt = self
-            .conn
-            .prepare(
-                "SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at
-                 FROM attestations
-                 WHERE id = ?",
-            )
-            .map_err(SqliteError::from)?;
+        let sql = format!(
+            "SELECT {} FROM attestations WHERE id = ?",
+            Self::SELECT_COLUMNS
+        );
+        let mut stmt = self.conn.prepare(&sql).map_err(SqliteError::from)?;
 
-        let result: Option<(
-            String,
-            String,
-            String,
-            String,
-            String,
-            String,
-            String,
-            Option<String>,
-            String,
-        )> = stmt
+        let result = stmt
             .query_row([id], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
@@ -186,6 +185,8 @@ impl AttestationStore for SqliteStore {
                     row.get::<_, String>(6)?,
                     row.get::<_, Option<String>>(7)?,
                     row.get::<_, String>(8)?,
+                    row.get::<_, Option<Vec<u8>>>(9)?,
+                    row.get::<_, Option<String>>(10)?,
                 ))
             })
             .optional()
@@ -223,7 +224,8 @@ impl AttestationStore for SqliteStore {
             .execute(
                 "UPDATE attestations
              SET subjects = ?, predicates = ?, contexts = ?, actors = ?,
-                 timestamp = ?, source = ?, attributes = ?
+                 timestamp = ?, source = ?, attributes = ?,
+                 signature = ?, signer_did = ?
              WHERE id = ?",
                 rusqlite::params![
                     subjects_json,
@@ -233,6 +235,8 @@ impl AttestationStore for SqliteStore {
                     timestamp_sql,
                     attestation.source,
                     attributes_json,
+                    attestation.signature,
+                    attestation.signer_did,
                     attestation.id,
                 ],
             )
@@ -257,9 +261,9 @@ impl AttestationStore for SqliteStore {
 impl QueryStore for SqliteStore {
     fn query(&self, filter: &AxFilter) -> StoreResult<AxResult> {
         // Build dynamic SQL query based on filter
-        let mut sql = String::from(
-            "SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at \
-             FROM attestations WHERE 1=1"
+        let mut sql = format!(
+            "SELECT {} FROM attestations WHERE 1=1",
+            Self::SELECT_COLUMNS
         );
         let mut params: Vec<String> = Vec::new();
 
@@ -353,6 +357,8 @@ impl QueryStore for SqliteStore {
                     row.get::<_, String>(6)?,
                     row.get::<_, Option<String>>(7)?,
                     row.get::<_, String>(8)?,
+                    row.get::<_, Option<Vec<u8>>>(9)?,
+                    row.get::<_, Option<String>>(10)?,
                 ))
             })
             .map_err(SqliteError::from)?;
