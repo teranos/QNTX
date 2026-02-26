@@ -68,7 +68,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "ix-json",
-			Version:     "0.3.5",
+			Version:     "0.3.6",
 			QNTXVersion: ">= 0.1.0",
 			Description: "Generic JSON API ingestion with configurable mapping to attestations",
 			Author:      "QNTX Team",
@@ -125,9 +125,18 @@ func (p *Plugin) loadGlyphConfig(ctx context.Context, glyphID string) map[string
 func (p *Plugin) Shutdown(ctx context.Context) error {
 	logger := p.Services().Logger("ix-json")
 
+	// Snapshot and clear under lock, then delete without holding it.
+	// Delete is a gRPC call that could block during concurrent shutdown.
 	p.glyphMu.Lock()
+	schedules := make(map[string]string, len(p.glyphSchedules))
+	for k, v := range p.glyphSchedules {
+		schedules[k] = v
+	}
+	p.glyphSchedules = make(map[string]string)
+	p.glyphMu.Unlock()
+
 	schedSvc := p.Services().Schedule()
-	for glyphID, scheduleID := range p.glyphSchedules {
+	for glyphID, scheduleID := range schedules {
 		if schedSvc != nil {
 			if err := schedSvc.Delete(scheduleID); err != nil {
 				logger.Warnw("Failed to delete schedule on shutdown",
@@ -137,8 +146,6 @@ func (p *Plugin) Shutdown(ctx context.Context) error {
 			}
 		}
 	}
-	p.glyphSchedules = make(map[string]string)
-	p.glyphMu.Unlock()
 
 	logger.Info("ix-json plugin shut down")
 	return nil
