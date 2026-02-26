@@ -669,6 +669,20 @@ type UsageUpdateMessage struct {
 }
 ```
 
+## WatcherBroadcastStats {#watcherbroadcaststats}
+
+**Source**: [`server/types.go:275`](https://github.com/teranos/QNTX/blob/main/server/types.go#L275)
+
+
+```go
+type WatcherBroadcastStats struct {
+	FireCount int64 `json:"fire_count"`
+	ErrorCount int64 `json:"error_count"`
+	LastFiredAt int64 `json:"last_fired_at,omitempty"`
+	LastError string `json:"last_error,omitempty"`
+}
+```
+
 ## WatcherCreateRequest {#watchercreaterequest}
 
 **Source**: [`server/watcher_handlers.go:19`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L19)
@@ -686,7 +700,7 @@ type WatcherCreateRequest struct {
 	TimeEnd string `json:"time_end,omitempty"`
 	ActionType string `json:"action_type"`
 	ActionData string `json:"action_data"`
-	MaxFiresPerMinute int `json:"max_fires_per_minute,omitempty"`
+	MaxFiresPerSecond int `json:"max_fires_per_second,omitempty"`
 	Enabled *bool `json:"enabled,omitempty"`
 	SemanticQuery string `json:"semantic_query,omitempty"`
 	SemanticThreshold float32 `json:"semantic_threshold,omitempty"`
@@ -725,6 +739,23 @@ type WatcherMatchMessage struct {
 }
 ```
 
+## WatcherQueueStatusMessage {#watcherqueuestatusmessage}
+
+**Source**: [`server/types.go:283`](https://github.com/teranos/QNTX/blob/main/server/types.go#L283)
+
+
+```go
+type WatcherQueueStatusMessage struct {
+	Type string `json:"type"`
+	TotalQueued int `json:"total_queued"`
+	PerWatcher map[string]int `json:"per_watcher"`
+	TargetGlyphs map[string]string `json:"target_glyphs,omitempty"`
+	WatcherStats map[string]WatcherBroadcastStats `json:"watcher_stats,omitempty"`
+	OldestAgeSeconds float64 `json:"oldest_age_seconds"`
+	Timestamp int64 `json:"timestamp"`
+}
+```
+
 ## WatcherResponse {#watcherresponse}
 
 **Source**: [`server/watcher_handlers.go:38`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L38)
@@ -744,7 +775,7 @@ type WatcherResponse struct {
 	ActionData string `json:"action_data"`
 	SemanticQuery string `json:"semantic_query,omitempty"`
 	SemanticThreshold float32 `json:"semantic_threshold,omitempty"`
-	MaxFiresPerMinute int `json:"max_fires_per_minute"`
+	MaxFiresPerSecond int `json:"max_fires_per_second"`
 	Enabled bool `json:"enabled"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
