@@ -900,6 +900,16 @@ export interface UsageUpdateMessage {
   timestamp: number;
 }
 
+export interface WatcherBroadcastStats {
+  fire_count: number;
+  error_count: number;
+  /**
+   * Unix seconds, 0 = never
+   */
+  last_fired_at?: number;
+  last_error?: string;
+}
+
 export interface WatcherCreateRequest {
   id: string;
   name: string;
@@ -993,6 +1003,14 @@ export interface WatcherQueueStatusMessage {
   type: string;
   total_queued: number;
   per_watcher: Record<string, number>;
+  /**
+   * meld-edge watcher ID → target glyph ID
+   */
+  target_glyphs?: Record<string, string>;
+  /**
+   * per-watcher execution stats
+   */
+  watcher_stats?: Record<string, WatcherBroadcastStats>;
   oldest_age_seconds: number;
   timestamp: number;
 }

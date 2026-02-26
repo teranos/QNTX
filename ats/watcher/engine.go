@@ -320,6 +320,46 @@ func (e *Engine) GetWatcher(watcherID string) (*storage.Watcher, bool) {
 	return watcher, exists
 }
 
+// GetAllWatchers returns a snapshot of all in-memory watchers.
+func (e *Engine) GetAllWatchers() map[string]*storage.Watcher {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	out := make(map[string]*storage.Watcher, len(e.watchers))
+	for id, w := range e.watchers {
+		out[id] = w
+	}
+	return out
+}
+
+// recordFire persists a successful fire to SQLite and updates the in-memory watcher.
+func (e *Engine) recordFire(watcherID string) {
+	if err := e.store.RecordFire(e.ctx, watcherID); err != nil {
+		e.logger.Errorw("Failed to record watcher fire", "watcher_id", watcherID, "error", err)
+		return
+	}
+	e.mu.Lock()
+	if w, ok := e.watchers[watcherID]; ok {
+		now := time.Now()
+		w.FireCount++
+		w.LastFiredAt = &now
+	}
+	e.mu.Unlock()
+}
+
+// recordError persists an error to SQLite and updates the in-memory watcher.
+func (e *Engine) recordError(watcherID string, errMsg string) {
+	if err := e.store.RecordError(e.ctx, watcherID, errMsg); err != nil {
+		e.logger.Errorw("Failed to record watcher error", "watcher_id", watcherID, "error", err)
+		return
+	}
+	e.mu.Lock()
+	if w, ok := e.watchers[watcherID]; ok {
+		w.ErrorCount++
+		w.LastError = errMsg
+	}
+	e.mu.Unlock()
+}
+
 // GetParseError returns the parse error for a watcher that failed to load
 // Returns nil if the watcher loaded successfully or doesn't exist
 func (e *Engine) GetParseError(watcherID string) error {
@@ -710,13 +750,13 @@ func (e *Engine) drainOnce() {
 				"attempt", entry.Attempt,
 				"error", execErr)
 
-			e.store.RecordError(e.ctx, watcher.ID, execErr.Error())
+			e.recordError(watcher.ID, execErr.Error())
 			e.queueStore.Complete(entry.ID)
 
 			// Re-enqueue as retry with incremented attempt and backoff
 			e.enqueueAttestation(watcher.ID, &as, "retry", entry.Attempt+1, execErr.Error())
 		} else {
-			e.store.RecordFire(e.ctx, watcher.ID)
+			e.recordFire(watcher.ID)
 			e.queueStore.Complete(entry.ID)
 
 			if watcher.ActionType == storage.ActionTypeGlyphExecute {
