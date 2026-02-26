@@ -363,6 +363,8 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 			"runtime_path", runtimePath,
 			"port", port)
 
+		// TODO(#624): Replace primitive exec.Command with Runtime abstraction.
+		// Current approach assumes "bun" in PATH, no version checking, delayed failure.
 		cmd = exec.Command("bun", args...)
 	} else {
 		// Native binary plugin (Go, Python, etc.)
