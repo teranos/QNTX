@@ -175,6 +175,7 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 	// These will be empty strings if services aren't running
 	atsStoreEndpoint := ""
 	queueEndpoint := ""
+	scheduleEndpoint := ""
 	authToken := ""
 
 	// Try to extract endpoints from config (passed by PluginManager)
@@ -186,6 +187,10 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 		queueEndpoint = ep
 		c.logger.Debugw("Extracted Queue endpoint from config", "endpoint", ep)
 	}
+	if ep := pluginConfig.GetString("_schedule_endpoint"); ep != "" {
+		scheduleEndpoint = ep
+		c.logger.Debugw("Extracted Schedule endpoint from config", "endpoint", ep)
+	}
 	if token := pluginConfig.GetString("_auth_token"); token != "" {
 		authToken = token
 	}
@@ -193,6 +198,7 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 	req := &protocol.InitializeRequest{
 		AtsStoreEndpoint: atsStoreEndpoint,
 		QueueEndpoint:    queueEndpoint,
+		ScheduleEndpoint: scheduleEndpoint,
 		AuthToken:        authToken,
 		Config:           config,
 	}
@@ -201,6 +207,7 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 		"name", c.metadata.Name,
 		"ats_store_endpoint", atsStoreEndpoint,
 		"queue_endpoint", queueEndpoint,
+		"schedule_endpoint", scheduleEndpoint,
 	)
 
 	resp, err := c.client.Initialize(ctx, req)

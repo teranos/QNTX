@@ -217,17 +217,22 @@ func (p *Plugin) handleSetMode(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		p.startPoller(req.GlyphID, req.PollIntervalSeconds)
-		logger.Infow("Glyph polling activated", "glyph_id", req.GlyphID, "interval_seconds", req.PollIntervalSeconds)
+		if err := p.createSchedule(req.GlyphID, req.PollIntervalSeconds); err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to create schedule: %v", err))
+			return
+		}
+		logger.Infow("Glyph schedule activated", "glyph_id", req.GlyphID, "interval_seconds", req.PollIntervalSeconds)
 		writeJSON(w, http.StatusOK, map[string]string{
-			"status": fmt.Sprintf("Polling active (every %ds)", req.PollIntervalSeconds),
+			"status": fmt.Sprintf("Schedule active (every %ds)", req.PollIntervalSeconds),
 		})
 
 	case ModePaused:
-		p.stopPoller(req.GlyphID)
-		logger.Infow("Glyph polling paused", "glyph_id", req.GlyphID)
+		if err := p.pauseSchedule(req.GlyphID); err != nil {
+			logger.Warnw("Failed to pause schedule", "glyph_id", req.GlyphID, "error", err)
+		}
+		logger.Infow("Glyph schedule paused", "glyph_id", req.GlyphID)
 		writeJSON(w, http.StatusOK, map[string]string{
-			"status": "Polling stopped",
+			"status": "Schedule paused",
 		})
 
 	default:
@@ -239,8 +244,8 @@ func (p *Plugin) handleSetMode(w http.ResponseWriter, r *http.Request) {
 func (p *Plugin) handleStatus(w http.ResponseWriter, r *http.Request) {
 	p.mu.RLock()
 	status := map[string]any{
-		"mode":           p.mode,
-		"active_pollers": len(p.glyphPollers),
+		"mode":             p.mode,
+		"active_schedules": len(p.glyphSchedules),
 	}
 	p.mu.RUnlock()
 

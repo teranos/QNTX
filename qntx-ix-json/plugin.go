@@ -19,11 +19,10 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/plugin"
-	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 )
 
 // OperationMode represents the current operational mode of the plugin.
@@ -49,11 +48,11 @@ type Plugin struct {
 	services plugin.ServiceRegistry
 
 	mu             sync.RWMutex
-	mode           OperationMode                 // Protected by mu
-	httpClient     *http.Client                  // Protected by mu
-	glyphResponses map[string][]byte             // Protected by mu - per-glyph cached response
-	glyphMappings  map[string]*MappingConfig     // Protected by mu - per-glyph mapping
-	glyphPollers   map[string]context.CancelFunc // Protected by mu - per-glyph active poller cancel functions
+	mode           OperationMode             // Protected by mu
+	httpClient     *http.Client              // Protected by mu
+	glyphResponses map[string][]byte         // Protected by mu - per-glyph cached response
+	glyphMappings  map[string]*MappingConfig // Protected by mu - per-glyph mapping
+	glyphSchedules map[string]string         // Protected by mu - per-glyph schedule ID (glyphID → scheduleID)
 }
 
 // NewPlugin creates a new ix-json plugin.
@@ -63,7 +62,7 @@ func NewPlugin() *Plugin {
 		mode:           ModeDataShaping,
 		glyphResponses: make(map[string][]byte),
 		glyphMappings:  make(map[string]*MappingConfig),
-		glyphPollers:   make(map[string]context.CancelFunc),
+		glyphSchedules: make(map[string]string),
 	}
 }
 
@@ -71,7 +70,7 @@ func NewPlugin() *Plugin {
 func (p *Plugin) Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name:        "ix-json",
-		Version:     "0.2.3",
+		Version:     "0.3.0",
 		QNTXVersion: ">= 0.1.0",
 		Description: "Generic JSON API ingestion with configurable mapping to attestations",
 		Author:      "QNTX Team",
@@ -120,16 +119,23 @@ func (p *Plugin) loadGlyphConfig(ctx context.Context, glyphID string) map[string
 	return attestations[0].Attributes
 }
 
-// Shutdown shuts down the ix-json plugin, stopping all pollers.
+// Shutdown shuts down the ix-json plugin, deleting all active schedules.
 func (p *Plugin) Shutdown(ctx context.Context) error {
 	logger := p.services.Logger("ix-json")
 
 	p.mu.Lock()
-	for glyphID, cancel := range p.glyphPollers {
-		cancel()
-		logger.Infow("Stopped poller on shutdown", "glyph_id", glyphID)
+	schedSvc := p.services.Schedule()
+	for glyphID, scheduleID := range p.glyphSchedules {
+		if schedSvc != nil {
+			if err := schedSvc.Delete(scheduleID); err != nil {
+				logger.Warnw("Failed to delete schedule on shutdown",
+					"glyph_id", glyphID, "schedule_id", scheduleID, "error", err)
+			} else {
+				logger.Infow("Deleted schedule on shutdown", "glyph_id", glyphID, "schedule_id", scheduleID)
+			}
+		}
 	}
-	p.glyphPollers = make(map[string]context.CancelFunc)
+	p.glyphSchedules = make(map[string]string)
 	p.mu.Unlock()
 
 	logger.Info("ix-json plugin shut down")
@@ -150,18 +156,18 @@ func (p *Plugin) RegisterWebSocket() (map[string]plugin.WebSocketHandler, error)
 func (p *Plugin) Health(ctx context.Context) plugin.HealthStatus {
 	p.mu.RLock()
 	mode := p.mode
-	activePollers := len(p.glyphPollers)
+	activeSchedules := len(p.glyphSchedules)
 	p.mu.RUnlock()
 
-	message := fmt.Sprintf("ix-json plugin operational (mode: %s, active pollers: %d)", mode, activePollers)
+	message := fmt.Sprintf("ix-json plugin operational (mode: %s, active schedules: %d)", mode, activeSchedules)
 
 	return plugin.HealthStatus{
 		Healthy: true,
 		Paused:  mode == ModePaused,
 		Message: message,
 		Details: map[string]any{
-			"mode":           mode,
-			"active_pollers": activePollers,
+			"mode":             mode,
+			"active_schedules": activeSchedules,
 		},
 	}
 }
@@ -230,71 +236,65 @@ func (p *Plugin) RegisterGlyphs() []plugin.GlyphDef {
 	}
 }
 
-// startPoller starts a per-glyph ticker that enqueues Pulse jobs on each tick.
-// TEMPORARY: goroutine ticker until ScheduleService gRPC API exists (see docs/plans/plugin-runtime-schedules.md)
-func (p *Plugin) startPoller(glyphID string, intervalSecs int) {
+// createSchedule creates a Pulse schedule for a glyph via ScheduleService.
+func (p *Plugin) createSchedule(glyphID string, intervalSecs int) error {
 	logger := p.services.Logger("ix-json")
-
-	p.mu.Lock()
-	if cancel, exists := p.glyphPollers[glyphID]; exists {
-		cancel()
+	schedSvc := p.services.Schedule()
+	if schedSvc == nil {
+		return fmt.Errorf("ScheduleService not available")
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	p.glyphPollers[glyphID] = cancel
+
+	// Delete existing schedule for this glyph if any
+	p.mu.Lock()
+	if existingID, exists := p.glyphSchedules[glyphID]; exists {
+		p.mu.Unlock()
+		if err := schedSvc.Delete(existingID); err != nil {
+			logger.Warnw("Failed to delete previous schedule", "glyph_id", glyphID, "schedule_id", existingID, "error", err)
+		}
+		p.mu.Lock()
+	}
 	p.mu.Unlock()
 
-	logger.Infow("Starting poller", "glyph_id", glyphID, "interval_seconds", intervalSecs)
-
-	go func() {
-		ticker := time.NewTicker(time.Duration(intervalSecs) * time.Second)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				logger.Infow("Poller stopped", "glyph_id", glyphID)
-				return
-			case <-ticker.C:
-				p.enqueuePollJob(glyphID)
-			}
-		}
-	}()
-}
-
-// enqueuePollJob enqueues a Pulse job to poll a specific glyph.
-func (p *Plugin) enqueuePollJob(glyphID string) {
-	logger := p.services.Logger("ix-json")
-	queue := p.services.Queue()
-	if queue == nil {
-		logger.Errorw("Queue not available, polling directly", "glyph_id", glyphID)
-		if err := p.pollGlyph(context.Background(), glyphID); err != nil {
-			logger.Errorw("Direct poll failed", "glyph_id", glyphID, "error", err)
-		}
-		return
-	}
-
 	payload, _ := json.Marshal(map[string]string{"glyph_id": glyphID})
-	job, err := async.NewJobWithPayload("ix-json.poll", "ix-json-glyph-"+glyphID, payload, 1, 0, "ix-json")
-	if err != nil {
-		logger.Errorw("Failed to create poll job", "glyph_id", glyphID, "error", err)
-		return
+	metadata := map[string]string{
+		"plugin":   "ix-json",
+		"glyph_id": glyphID,
 	}
 
-	if err := queue.Enqueue(job); err != nil {
-		logger.Errorw("Failed to enqueue poll job", "glyph_id", glyphID, "error", err)
+	scheduleID, err := schedSvc.Create("ix-json.poll", intervalSecs, payload, metadata)
+	if err != nil {
+		return fmt.Errorf("failed to create schedule for glyph %s: %w", glyphID, err)
 	}
+
+	p.mu.Lock()
+	p.glyphSchedules[glyphID] = scheduleID
+	p.mu.Unlock()
+
+	logger.Infow("Schedule created", "glyph_id", glyphID, "schedule_id", scheduleID, "interval_seconds", intervalSecs)
+	return nil
 }
 
-// stopPoller stops the polling goroutine for a glyph.
-func (p *Plugin) stopPoller(glyphID string) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+// pauseSchedule pauses the Pulse schedule for a glyph.
+func (p *Plugin) pauseSchedule(glyphID string) error {
+	p.mu.RLock()
+	scheduleID, exists := p.glyphSchedules[glyphID]
+	p.mu.RUnlock()
 
-	if cancel, exists := p.glyphPollers[glyphID]; exists {
-		cancel()
-		delete(p.glyphPollers, glyphID)
-		p.services.Logger("ix-json").Infow("Poller cancelled", "glyph_id", glyphID)
+	if !exists {
+		return nil // No schedule to pause
 	}
+
+	schedSvc := p.services.Schedule()
+	if schedSvc == nil {
+		return fmt.Errorf("ScheduleService not available")
+	}
+
+	if err := schedSvc.Pause(scheduleID); err != nil {
+		return fmt.Errorf("failed to pause schedule %s for glyph %s: %w", scheduleID, glyphID, err)
+	}
+
+	p.services.Logger("ix-json").Infow("Schedule paused", "glyph_id", glyphID, "schedule_id", scheduleID)
+	return nil
 }
 
 // GetHandlerNames returns the async handler names this plugin can execute.
@@ -303,30 +303,31 @@ func (p *Plugin) GetHandlerNames() []string {
 }
 
 // ExecuteJob executes an async job routed from Pulse.
-func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID string, payload []byte) ([]byte, error) {
+func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID string, payload []byte) ([]byte, []*protocol.JobLogEntry, error) {
 	switch handlerName {
 	case "ix-json.poll":
 		var req struct {
 			GlyphID string `json:"glyph_id"`
 		}
 		if err := json.Unmarshal(payload, &req); err != nil {
-			return nil, fmt.Errorf("invalid poll payload: %w", err)
+			return nil, nil, fmt.Errorf("invalid poll payload: %w", err)
 		}
 		if req.GlyphID == "" {
-			return nil, fmt.Errorf("glyph_id missing from poll payload")
+			return nil, nil, fmt.Errorf("glyph_id missing from poll payload")
 		}
 
 		if err := p.pollGlyph(ctx, req.GlyphID); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
-		return json.Marshal(map[string]string{
+		result, _ := json.Marshal(map[string]string{
 			"status":   "poll completed",
 			"glyph_id": req.GlyphID,
 		})
+		return result, nil, nil
 
 	default:
-		return nil, fmt.Errorf("unknown handler: %s", handlerName)
+		return nil, nil, fmt.Errorf("unknown handler: %s", handlerName)
 	}
 }
 
