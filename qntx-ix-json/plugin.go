@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats"
+	atstypes "github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 )
@@ -39,7 +40,6 @@ func logEntry(level, stage, message string) *protocol.JobLogEntry {
 type OperationMode string
 
 const (
-	ModeDataShaping   OperationMode = "data-shaping"
 	ModePaused        OperationMode = "paused"
 	ModeActiveRunning OperationMode = "active-running"
 )
@@ -69,7 +69,7 @@ type Plugin struct {
 func NewPlugin() *Plugin {
 	return &Plugin{
 		httpClient:     &http.Client{},
-		mode:           ModeDataShaping,
+		mode:           ModePaused,
 		glyphResponses: make(map[string][]byte),
 		glyphMappings:  make(map[string]*MappingConfig),
 		glyphSchedules: make(map[string]string),
@@ -80,7 +80,7 @@ func NewPlugin() *Plugin {
 func (p *Plugin) Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name:        "ix-json",
-		Version:     "0.3.1",
+		Version:     "0.3.3",
 		QNTXVersion: ">= 0.1.0",
 		Description: "Generic JSON API ingestion with configurable mapping to attestations",
 		Author:      "QNTX Team",
@@ -209,26 +209,9 @@ func (p *Plugin) Resume(ctx context.Context) error {
 }
 
 // ConfigSchema returns the configuration schema for UI-based configuration.
+// All ix-json config is per-glyph (via glyph UI + attestations), not plugin-level.
 func (p *Plugin) ConfigSchema() map[string]plugin.ConfigField {
-	return map[string]plugin.ConfigField{
-		"api_url": {
-			Type:        "string",
-			Description: "API endpoint URL that returns JSON data.",
-			Required:    true,
-		},
-		"auth_token": {
-			Type:        "string",
-			Description: "Optional Bearer token for API authentication.",
-			Required:    false,
-		},
-		"poll_interval_seconds": {
-			Type:         "int",
-			Description:  "Polling interval in seconds (0 = data-shaping mode, no auto-polling).",
-			DefaultValue: "0",
-			Required:     false,
-			MinValue:     "0",
-		},
-	}
+	return map[string]plugin.ConfigField{}
 }
 
 // RegisterGlyphs returns custom glyph type definitions provided by this plugin.
@@ -247,6 +230,7 @@ func (p *Plugin) RegisterGlyphs() []plugin.GlyphDef {
 }
 
 // createSchedule creates a Pulse schedule for a glyph via ScheduleService.
+// Deletes any existing schedule for this glyph (from memory or attestation) before creating.
 func (p *Plugin) createSchedule(glyphID string, intervalSecs int) error {
 	logger := p.services.Logger("ix-json")
 	schedSvc := p.services.Schedule()
@@ -254,16 +238,20 @@ func (p *Plugin) createSchedule(glyphID string, intervalSecs int) error {
 		return fmt.Errorf("ScheduleService not available")
 	}
 
-	// Delete existing schedule for this glyph if any
-	p.mu.Lock()
-	if existingID, exists := p.glyphSchedules[glyphID]; exists {
-		p.mu.Unlock()
+	// Find existing schedule ID: check in-memory first, then attestation
+	p.mu.RLock()
+	existingID := p.glyphSchedules[glyphID]
+	p.mu.RUnlock()
+
+	if existingID == "" {
+		existingID = p.loadScheduleID(glyphID)
+	}
+
+	if existingID != "" {
 		if err := schedSvc.Delete(existingID); err != nil {
 			logger.Warnw("Failed to delete previous schedule", "glyph_id", glyphID, "schedule_id", existingID, "error", err)
 		}
-		p.mu.Lock()
 	}
-	p.mu.Unlock()
 
 	payload, _ := json.Marshal(map[string]string{"glyph_id": glyphID})
 	metadata := map[string]string{
@@ -280,8 +268,42 @@ func (p *Plugin) createSchedule(glyphID string, intervalSecs int) error {
 	p.glyphSchedules[glyphID] = scheduleID
 	p.mu.Unlock()
 
+	// Persist schedule ID so it survives plugin restarts
+	p.saveScheduleID(glyphID, scheduleID)
+
 	logger.Infow("Schedule created", "glyph_id", glyphID, "schedule_id", scheduleID, "interval_seconds", intervalSecs)
 	return nil
+}
+
+// loadScheduleID loads a persisted schedule ID from the glyph's attestation.
+func (p *Plugin) loadScheduleID(glyphID string) string {
+	config := p.loadGlyphConfig(context.Background(), glyphID)
+	if config == nil {
+		return ""
+	}
+	id, _ := config["schedule_id"].(string)
+	return id
+}
+
+// saveScheduleID persists the schedule ID in the glyph's config attestation.
+func (p *Plugin) saveScheduleID(glyphID, scheduleID string) {
+	store := p.services.ATSStore()
+	if store == nil {
+		return
+	}
+
+	subject := fmt.Sprintf("ix-json-glyph-%s", glyphID)
+	cmd := &atstypes.AsCommand{
+		Subjects:   []string{subject},
+		Predicates: []string{"configured"},
+		Contexts:   []string{"_"},
+		Attributes: map[string]any{"schedule_id": scheduleID},
+		Source:     "ix-json",
+	}
+
+	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
+		p.services.Logger("ix-json").Warnw("Failed to persist schedule ID", "glyph_id", glyphID, "error", err)
+	}
 }
 
 // pauseSchedule pauses the Pulse schedule for a glyph.
