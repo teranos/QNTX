@@ -56,13 +56,13 @@ func (p *Plugin) handleTestFetch(w http.ResponseWriter, r *http.Request) {
 
 	data, err := p.fetchJSON(r.Context(), req.APIURL, req.AuthToken)
 	if err != nil {
-		p.services.Logger("ix-json").Errorw("Test fetch failed", "api_url", req.APIURL, "error", err)
+		p.Services().Logger("ix-json").Errorw("Test fetch failed", "api_url", req.APIURL, "error", err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to fetch from API: %v", err))
 		return
 	}
 
 	// Cache response and infer mapping per-glyph
-	p.mu.Lock()
+	p.glyphMu.Lock()
 	if req.GlyphID != "" {
 		p.glyphResponses[req.GlyphID] = data
 		if p.glyphMappings[req.GlyphID] == nil {
@@ -70,7 +70,7 @@ func (p *Plugin) handleTestFetch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	mapping := p.glyphMappings[req.GlyphID]
-	p.mu.Unlock()
+	p.glyphMu.Unlock()
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"data":    json.RawMessage(data),
@@ -108,7 +108,7 @@ func (p *Plugin) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 
 // saveGlyphConfig persists glyph configuration as an attestation.
 func (p *Plugin) saveGlyphConfig(ctx context.Context, glyphID, apiURL, authToken string, pollIntervalSecs int) error {
-	store := p.services.ATSStore()
+	store := p.Services().ATSStore()
 	if store == nil {
 		return fmt.Errorf("ATSStore not available")
 	}
@@ -134,7 +134,7 @@ func (p *Plugin) saveGlyphConfig(ctx context.Context, glyphID, apiURL, authToken
 		return err
 	}
 
-	p.services.Logger("ix-json").Infow("Glyph configuration attested",
+	p.Services().Logger("ix-json").Infow("Glyph configuration attested",
 		"glyph_id", glyphID,
 		"api_url", apiURL,
 		"poll_interval_seconds", pollIntervalSecs,
@@ -164,13 +164,13 @@ func (p *Plugin) handleUpdateMapping(w http.ResponseWriter, r *http.Request) {
 		KeyRemapping:  req.KeyRemapping,
 	}
 
-	p.mu.Lock()
+	p.glyphMu.Lock()
 	if req.GlyphID != "" {
 		p.glyphMappings[req.GlyphID] = mapping
 	}
-	p.mu.Unlock()
+	p.glyphMu.Unlock()
 
-	p.services.Logger("ix-json").Infow("Mapping configuration updated", "glyph_id", req.GlyphID, "mapping", mapping)
+	p.Services().Logger("ix-json").Infow("Mapping configuration updated", "glyph_id", req.GlyphID, "mapping", mapping)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "Mapping updated"})
 }
 
@@ -193,7 +193,7 @@ func (p *Plugin) handleSetMode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger := p.services.Logger("ix-json")
+	logger := p.Services().Logger("ix-json")
 
 	switch req.Mode {
 	case ModeActiveRunning:
@@ -203,9 +203,9 @@ func (p *Plugin) handleSetMode(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Check mapping exists
-		p.mu.RLock()
+		p.glyphMu.RLock()
 		mapping := p.glyphMappings[req.GlyphID]
-		p.mu.RUnlock()
+		p.glyphMu.RUnlock()
 		if mapping == nil {
 			writeError(w, http.StatusBadRequest, "No mapping configured — fetch and configure mapping first")
 			return
@@ -242,45 +242,51 @@ func (p *Plugin) handleSetMode(w http.ResponseWriter, r *http.Request) {
 
 // handleStatus returns the current plugin status.
 func (p *Plugin) handleStatus(w http.ResponseWriter, r *http.Request) {
-	p.mu.RLock()
-	status := map[string]any{
-		"mode":             p.mode,
-		"active_schedules": len(p.glyphSchedules),
+	p.glyphMu.RLock()
+	activeSchedules := len(p.glyphSchedules)
+	p.glyphMu.RUnlock()
+
+	mode := ModeActiveRunning
+	if p.IsPaused() {
+		mode = ModePaused
 	}
-	p.mu.RUnlock()
+	status := map[string]any{
+		"mode":             mode,
+		"active_schedules": activeSchedules,
+	}
 
 	writeJSON(w, http.StatusOK, status)
 }
 
-// TODO: The ix-json glyph UI needs a redesign:
-// - Extract inline HTML/CSS/JS into separate files (//go:embed)
-// - Mapping must be editable from the UI, not just heuristics
-// - State changes (save, fetch, activate) should update inline without page reload
-// - Reuse existing glyph/panel design components instead of custom inline HTML
-// - Response preview should show one item at a time, not dump the full array
-// - Mapping config should be integrated into the preview (click field → assign SPC role)
-//   rather than a separate section
-// - Mode badge and UI must reflect state changes (pause/activate) without reload
-// - Glyph must be meldable — compose with py/se/ax glyphs for filtering/transform
-// - Integration with watcher system is undefined (how ix-json feeds into watchers)
-// - No rate-limiting — will hammer APIs if poll interval is too aggressive
-// - No meaningful error feedback — server down, no connectivity, expired key, 404, etc.
-//   all surface as generic "fetch failed" with no actionable guidance
-// - No secrets/variables system — auth tokens are stored as plain attestation attributes
-//   with no encryption, rotation, or reuse across glyphs
-// - Only supports GET with a single Bearer token — no custom headers, query params,
-//   POST bodies, or other auth schemes (API key in header, OAuth, etc.)
-// - No redirect policy control — Go http.Client follows redirects by default
-// - ix-json assumes JSON responses — the real ix vision is a universal data ingestor:
-//   point any URL at it and it ingests (HTML, CSV, XML, RSS, binary, etc.).
-//   ix-json is one specialization of that broader ix pipeline.
-// - No pagination support — APIs that paginate (cursor, offset, Link header) get only page 1
-// - No configurable timeout — uses Go http.Client default (no timeout), no per-request control
-// - Type attestation should happen at ingestion time, not after — user should be able to
-//   mark rich_string_fields and array fields from within this glyph during mapping setup,
-//   so embeddings (#479) and graph tags (#291) work without a separate type config step (#311).
-//   Field type vocabulary beyond rich_string: unique (identity/dedup key), secret (credential,
-//   encrypt/mask), array (navigable tags). All attestable at ingestion time.
+// Known limitations — tracked as GitHub issues:
+//
+// #626 Glyph UI redesign:
+//   - Extract inline HTML/CSS/JS into separate files (//go:embed)
+//   - Mapping must be editable from the UI, not just heuristics
+//   - State changes (save, fetch, activate) should update inline without page reload
+//   - Reuse existing glyph/panel design components instead of custom inline HTML
+//   - Response preview should show one item at a time, not dump the full array
+//   - Mapping config should be integrated into the preview (click field → assign SPC role)
+//   - Mode badge and UI must reflect state changes (pause/activate) without reload
+//
+// #627 HTTP client capabilities:
+//   - Only supports GET with Bearer token — no custom headers, query params, POST, other auth
+//   - No redirect policy control, no pagination, no configurable timeout
+//   - No rate-limiting — will hammer APIs if poll interval is too aggressive
+//   - No meaningful error feedback — all failures surface as generic "fetch failed"
+//
+// #628 Data pipeline and meld integration:
+//   - Glyph must be meldable — compose with py/se/ax glyphs for filtering/transform
+//   - Watcher system integration is undefined
+//   - ix-json is one specialization of the broader ix universal ingestor vision
+//
+// #629 Type attestation at ingestion time:
+//   - Field type vocabulary: rich_string, unique (dedup key), secret (credential), array (tags)
+//   - Should be attestable during mapping setup, not in a separate modal
+//   - Related: #479 (embeddings), #311 (type field config UI), #291 (array field metadata)
+//
+// #630 Secrets and variables system:
+//   - Auth tokens stored as plain attestation attributes — no encryption, rotation, or reuse
 
 // handleIXGlyph renders the ix-json glyph UI.
 func (p *Plugin) handleIXGlyph(w http.ResponseWriter, r *http.Request) {
@@ -289,10 +295,10 @@ func (p *Plugin) handleIXGlyph(w http.ResponseWriter, r *http.Request) {
 	// Load config for THIS specific glyph instance
 	glyphConfig := p.loadGlyphConfig(r.Context(), glyphID)
 
-	p.mu.RLock()
+	p.glyphMu.RLock()
 	mappingConfig := p.glyphMappings[glyphID]
 	lastResponse := p.glyphResponses[glyphID]
-	p.mu.RUnlock()
+	p.glyphMu.RUnlock()
 
 	// Extract config from glyph-specific attestation
 	apiURL := ""
