@@ -18,11 +18,13 @@ import type {
     WatcherMatchMessage,
     WatcherErrorMessage,
     GlyphFiredMessage,
+    WatcherQueueStatusMessage,
 } from '../types/websocket';
 import type { RichSearchResultsMessage } from './generated/proto/plugin/grpc/protocol/server.ts';
 import { handleJobNotification, notifyStorageWarning, handleDaemonStatusNotification } from './tauri-notifications';
 import { handlePluginHealth } from './websocket-handlers/plugin-health';
 import { handleSystemCapabilities } from './websocket-handlers/system-capabilities';
+import { handleWatcherQueueStatus } from './websocket-handlers/watcher-queue-status';
 import { log, SEG } from './logger';
 import { connectivityManager } from './connectivity';
 import { updateResultGlyphContent, type ExecutionResult } from './components/glyph/result-glyph';
@@ -309,6 +311,11 @@ const MESSAGE_HANDLERS = {
 
         // Invoke registered handler
         messageHandlers['watcher_error']?.(data);
+    },
+
+    watcher_queue_status: (data: WatcherQueueStatusMessage) => {
+        handleWatcherQueueStatus(data);
+        messageHandlers['watcher_queue_status']?.(data);
     }
 } as const;
 

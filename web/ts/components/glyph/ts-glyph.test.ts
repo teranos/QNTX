@@ -23,6 +23,7 @@ mock.module('../../connectivity', () => ({
             cb('offline');
             return () => {};
         },
+        subscribeAuth: () => () => {},
     },
 }));
 

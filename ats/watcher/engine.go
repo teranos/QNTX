@@ -1,12 +1,9 @@
 package watcher
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -73,9 +70,8 @@ type Engine struct {
 	parseErrors     map[string]error     // Stores parse errors for watchers that failed to load
 	queryEmbeddings map[string][]float32 // Pre-computed query embeddings for semantic watchers (watcherID → embedding)
 
-	// Retry queue
-	retryMu    sync.Mutex
-	retryQueue []*PendingExecution
+	// Persistent execution queue (replaces in-memory retry)
+	queueStore *QueueStore
 
 	// Control
 	ctx    context.Context
@@ -83,20 +79,14 @@ type Engine struct {
 	wg     sync.WaitGroup
 }
 
-// PendingExecution represents a failed execution queued for retry
-type PendingExecution struct {
-	WatcherID   string
-	Attestation *types.As
-	Attempt     int
-	NextRetryAt time.Time
-	LastError   string
-}
-
 const (
 	maxRetries          = 5
 	initialBackoff      = 1 * time.Second
 	maxBackoff          = 60 * time.Second
-	retryTickerInterval = 1 * time.Second
+	drainInterval       = 200 * time.Millisecond
+	drainBatchSize      = 50
+	purgeRetention      = 1 * time.Hour
+	purgeEveryNthTick   = 100 // purge completed entries every 100th drain tick
 )
 
 // NewEngine creates a new watcher engine
@@ -114,30 +104,48 @@ func NewEngine(db *sql.DB, apiBaseURL string, logger *zap.SugaredLogger) *Engine
 		rateLimiters:    make(map[string]*rate.Limiter),
 		parseErrors:     make(map[string]error),
 		queryEmbeddings: make(map[string][]float32),
-		retryQueue:      make([]*PendingExecution, 0),
+		queueStore:      NewQueueStore(db),
 		ctx:             ctx,
 		cancel:          cancel,
 	}
 }
 
-// Start loads watchers from DB and starts the retry loop
+// Start loads watchers from DB and starts the drain loop
 func (e *Engine) Start() error {
 	if err := e.loadWatchers(); err != nil {
 		return errors.Wrap(err, "failed to load watchers")
 	}
 
-	// Start retry loop
+	// Recover any entries that were 'running' when the process died
+	orphans, err := e.queueStore.RequeueOrphans()
+	if err != nil {
+		e.logger.Warnw("Failed to requeue orphaned execution queue entries", "error", err)
+	} else if orphans > 0 {
+		e.logger.Infow("Requeued orphaned execution queue entries from previous run", "count", orphans)
+	}
+
+	// Start drain loop (replaces in-memory retry loop)
 	e.wg.Add(1)
-	go e.retryLoop()
+	go e.drainLoop()
 
 	e.logger.Infow("Watcher engine started", "watchers_loaded", len(e.watchers))
 	return nil
 }
 
-// Stop gracefully shuts down the engine
+// Stop gracefully shuts down the engine. In-flight entries are reset to 'queued'
+// so they survive restart.
 func (e *Engine) Stop() {
 	e.cancel()
 	e.wg.Wait()
+
+	// Reset any entries claimed during this drain cycle back to queued
+	orphans, err := e.queueStore.RequeueOrphans()
+	if err != nil {
+		e.logger.Warnw("Failed to requeue in-flight entries during shutdown", "error", err)
+	} else if orphans > 0 {
+		e.logger.Infow("Reset in-flight queue entries for next startup", "count", orphans)
+	}
+
 	e.logger.Info("Watcher engine stopped")
 }
 
@@ -226,9 +234,8 @@ func (e *Engine) loadWatchers() error {
 		}
 
 		e.watchers[w.ID] = w
-		// Create rate limiter: MaxFiresPerMinute/60 = fires per second
-		// If MaxFiresPerMinute is 0, rate is 0/60 = 0, which means no fires allowed (QNTX LAW: zero means zero)
-		e.rateLimiters[w.ID] = rate.NewLimiter(rate.Limit(float64(w.MaxFiresPerMinute)/60.0), 1)
+		// If MaxFiresPerSecond is 0, rate is 0 — no fires allowed (QNTX LAW: zero means zero)
+		e.rateLimiters[w.ID] = rate.NewLimiter(rate.Limit(float64(w.MaxFiresPerSecond)), 1)
 	}
 
 	// Suppress standalone SE watchers that are targets of compound SE→SE melds.
@@ -311,6 +318,46 @@ func (e *Engine) GetWatcher(watcherID string) (*storage.Watcher, bool) {
 	defer e.mu.RUnlock()
 	watcher, exists := e.watchers[watcherID]
 	return watcher, exists
+}
+
+// GetAllWatchers returns a snapshot of all in-memory watchers.
+func (e *Engine) GetAllWatchers() map[string]*storage.Watcher {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	out := make(map[string]*storage.Watcher, len(e.watchers))
+	for id, w := range e.watchers {
+		out[id] = w
+	}
+	return out
+}
+
+// recordFire persists a successful fire to SQLite and updates the in-memory watcher.
+func (e *Engine) recordFire(watcherID string) {
+	if err := e.store.RecordFire(e.ctx, watcherID); err != nil {
+		e.logger.Errorw("Failed to record watcher fire", "watcher_id", watcherID, "error", err)
+		return
+	}
+	e.mu.Lock()
+	if w, ok := e.watchers[watcherID]; ok {
+		now := time.Now()
+		w.FireCount++
+		w.LastFiredAt = &now
+	}
+	e.mu.Unlock()
+}
+
+// recordError persists an error to SQLite and updates the in-memory watcher.
+func (e *Engine) recordError(watcherID string, errMsg string) {
+	if err := e.store.RecordError(e.ctx, watcherID, errMsg); err != nil {
+		e.logger.Errorw("Failed to record watcher error", "watcher_id", watcherID, "error", err)
+		return
+	}
+	e.mu.Lock()
+	if w, ok := e.watchers[watcherID]; ok {
+		w.ErrorCount++
+		w.LastError = errMsg
+	}
+	e.mu.Unlock()
 }
 
 // GetParseError returns the parse error for a watcher that failed to load
@@ -552,768 +599,192 @@ func scanAttestation(rows *sql.Rows) (*types.As, error) {
 	return &as, nil
 }
 
-// OnAttestationCreated is called when a new attestation is created.
-// Handles structural watchers only — semantic watchers are handled by
-// OnAttestationEmbedded after the embedding observer generates the vector.
-func (e *Engine) OnAttestationCreated(as *types.As) {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	for _, watcher := range e.watchers {
-		if !watcher.Enabled {
-			continue
-		}
-
-		// Skip semantic watchers — handled by OnAttestationEmbedded
-		// to avoid redundant GenerateEmbedding FFI calls.
-		if watcher.SemanticQuery != "" {
-			continue
-		}
-
-		matched, score := e.matchesWatcher(as, watcher)
-		if !matched {
-			continue
-		}
-
-		// Broadcast match to frontend (for live results display)
-		if e.broadcastMatch != nil {
-			e.broadcastMatch(watcher.ID, as, score)
-		}
-
-		// Check rate limit for action execution
-		// Per QNTX LAW: "Zero means zero" - if MaxFiresPerMinute is 0, never execute
-		if watcher.MaxFiresPerMinute == 0 {
-			e.logger.Infow("Watcher has MaxFiresPerMinute=0, not executing",
-				"watcher_id", watcher.ID,
-				"attestation_id", as.ID)
-			continue
-		}
-		limiter := e.rateLimiters[watcher.ID]
-		if limiter != nil && !limiter.Allow() {
-			e.logger.Infow("Watcher rate limited",
-				"watcher_id", watcher.ID,
-				"attestation_id", as.ID)
-			continue
-		}
-
-		// Execute async with a deep copy to prevent race conditions
-		// Each goroutine gets its own copy of the attestation
-		asCopy := *as // Copy the struct
-		// Deep copy slices to prevent shared references
-		asCopy.Subjects = append([]string(nil), as.Subjects...)
-		asCopy.Predicates = append([]string(nil), as.Predicates...)
-		asCopy.Contexts = append([]string(nil), as.Contexts...)
-		asCopy.Actors = append([]string(nil), as.Actors...)
-		if as.Attributes != nil {
-			asCopy.Attributes = make(map[string]interface{})
-			for k, v := range as.Attributes {
-				asCopy.Attributes[k] = v
-			}
-		}
-		go e.executeAction(watcher, &asCopy)
-	}
-}
-
-// OnAttestationEmbedded is called by the embedding observer after an attestation
-// has been embedded and stored. It handles semantic watcher matching using the
-// pre-computed attestation embedding, avoiding redundant GenerateEmbedding FFI calls.
-func (e *Engine) OnAttestationEmbedded(as *types.As, attestationEmbedding []float32) {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	if e.embeddingService == nil {
-		return
-	}
-
-	for _, watcher := range e.watchers {
-		if !watcher.Enabled {
-			continue
-		}
-
-		// Only process semantic watchers here
-		if watcher.SemanticQuery == "" {
-			continue
-		}
-
-		// Structural filter must also pass (semantic + structural are ANDed)
-		if !e.matchesFilter(as, watcher) {
-			continue
-		}
-
-		// Get cached query embedding for this watcher
-		queryEmbedding := e.queryEmbeddings[watcher.ID]
-		if queryEmbedding == nil {
-			continue
-		}
-
-		// Compute cosine similarity (cheap — pure math, no FFI)
-		similarity, err := e.embeddingService.ComputeSimilarity(queryEmbedding, attestationEmbedding)
-		if err != nil {
-			e.logger.Debugw("Failed to compute similarity",
-				"watcher_id", watcher.ID,
-				"attestation_id", as.ID,
-				"error", err)
-			continue
-		}
-
-		threshold := watcher.SemanticThreshold
-		if threshold <= 0 {
-			threshold = 0.3
-		}
-
-		if similarity < threshold {
-			continue
-		}
-
-		// Compound SE→SE watcher: upstream must also pass
-		if watcher.UpstreamSemanticQuery != "" {
-			upstreamEmbedding := e.queryEmbeddings[watcher.ID+":upstream"]
-			if upstreamEmbedding == nil {
-				continue
-			}
-			upstreamSimilarity, err := e.embeddingService.ComputeSimilarity(upstreamEmbedding, attestationEmbedding)
-			if err != nil {
-				e.logger.Debugw("Failed to compute upstream similarity",
-					"watcher_id", watcher.ID,
-					"attestation_id", as.ID,
-					"error", err)
-				continue
-			}
-			upstreamThreshold := watcher.UpstreamSemanticThreshold
-			if upstreamThreshold <= 0 {
-				upstreamThreshold = 0.3
-			}
-			if upstreamSimilarity < upstreamThreshold {
-				continue
-			}
-			e.logger.Debugw("Compound semantic match (both queries pass)",
-				"watcher_id", watcher.ID,
-				"attestation_id", as.ID,
-				"downstream_similarity", similarity,
-				"upstream_similarity", upstreamSimilarity)
-		} else {
-			e.logger.Debugw("Semantic match via pre-computed embedding",
-				"watcher_id", watcher.ID,
-				"attestation_id", as.ID,
-				"similarity", similarity,
-				"threshold", threshold)
-		}
-
-		// Broadcast match to frontend (downstream similarity as score)
-		if e.broadcastMatch != nil {
-			e.broadcastMatch(watcher.ID, as, similarity)
-		}
-
-		// Rate-limited action execution (same logic as OnAttestationCreated)
-		if watcher.MaxFiresPerMinute == 0 {
-			continue
-		}
-		limiter := e.rateLimiters[watcher.ID]
-		if limiter != nil && !limiter.Allow() {
-			e.logger.Infow("Watcher rate limited",
-				"watcher_id", watcher.ID,
-				"attestation_id", as.ID)
-			continue
-		}
-
-		asCopy := *as
-		asCopy.Subjects = append([]string(nil), as.Subjects...)
-		asCopy.Predicates = append([]string(nil), as.Predicates...)
-		asCopy.Contexts = append([]string(nil), as.Contexts...)
-		asCopy.Actors = append([]string(nil), as.Actors...)
-		if as.Attributes != nil {
-			asCopy.Attributes = make(map[string]interface{})
-			for k, v := range as.Attributes {
-				asCopy.Attributes[k] = v
-			}
-		}
-		go e.executeAction(watcher, &asCopy)
-	}
-}
-
-// matchesWatcher checks if an attestation matches a watcher using the appropriate strategy.
-// Structural filters (AxQuery / Filter fields) and semantic queries are ANDed:
-// if both are set, both must pass.
-// Returns (matched, similarity score). Score is 0 for structural-only matches.
-func (e *Engine) matchesWatcher(as *types.As, watcher *storage.Watcher) (bool, float32) {
-	// Structural filter check (empty filter passes all)
-	if !e.matchesFilter(as, watcher) {
-		return false, 0
-	}
-
-	// Semantic check — only if this watcher has a query embedding cached
-	if _, hasSemantic := e.queryEmbeddings[watcher.ID]; hasSemantic {
-		return e.matchesSemantic(as, watcher)
-	}
-
-	// No semantic embedding cached — try lazy initialization if embedding service
-	// is now available (it may have been nil at loadWatchers time).
-	// NOTE: called under RLock — schedule async caching, use one-shot embedding for this match.
-	if watcher.SemanticQuery != "" {
-		if e.embeddingService != nil {
-			embedding, err := e.embeddingService.GenerateEmbedding(watcher.SemanticQuery)
-			if err == nil {
-				// Cache for future calls (needs write lock — do async to avoid deadlock)
-				go func(id string, emb []float32) {
-					e.mu.Lock()
-					e.queryEmbeddings[id] = emb
-					e.mu.Unlock()
-					e.logger.Infow("Lazy-initialized query embedding for semantic watcher",
-						"watcher_id", id)
-				}(watcher.ID, embedding)
-				// Use the embedding for this match immediately
-				return e.matchesSemanticWithEmbedding(as, watcher, embedding)
-			}
-			e.logger.Debugw("Lazy embedding generation failed for semantic watcher",
-				"watcher_id", watcher.ID,
-				"semantic_query", watcher.SemanticQuery,
-				"error", err)
-		}
-		return false, 0
-	}
-
-	return true, 0
-}
-
-// matchesFilter checks if an attestation matches a watcher's filter using exact field matching
-func (e *Engine) matchesFilter(as *types.As, watcher *storage.Watcher) bool {
-	filter := &watcher.Filter
-
-	// Empty filter = match all
-	if len(filter.Subjects) > 0 && !hasOverlap(filter.Subjects, as.Subjects) {
-		return false
-	}
-	if len(filter.Predicates) > 0 && !hasOverlap(filter.Predicates, as.Predicates) {
-		return false
-	}
-	if len(filter.Contexts) > 0 && !hasOverlap(filter.Contexts, as.Contexts) {
-		return false
-	}
-	if len(filter.Actors) > 0 && !hasOverlap(filter.Actors, as.Actors) {
-		return false
-	}
-	if filter.TimeStart != nil && as.Timestamp.Before(*filter.TimeStart) {
-		return false
-	}
-	if filter.TimeEnd != nil && as.Timestamp.After(*filter.TimeEnd) {
-		return false
-	}
-	return true
-}
-
-// matchesSemantic checks using the cached query embedding.
-func (e *Engine) matchesSemantic(as *types.As, watcher *storage.Watcher) (bool, float32) {
-	queryEmbedding := e.queryEmbeddings[watcher.ID]
-	if queryEmbedding == nil {
-		return false, 0
-	}
-	return e.matchesSemanticWithEmbedding(as, watcher, queryEmbedding)
-}
-
-// matchesSemanticWithEmbedding checks if an attestation's text content is semantically
-// similar to a given query embedding. Used by both cached and lazy-init paths.
-func (e *Engine) matchesSemanticWithEmbedding(as *types.As, watcher *storage.Watcher, queryEmbedding []float32) (bool, float32) {
-	if e.embeddingService == nil {
-		return false, 0
-	}
-
-	text := extractAttestationText(as)
-	if text == "" {
-		return false, 0
-	}
-
-	attestationEmbedding, err := e.embeddingService.GenerateEmbedding(text)
-	if err != nil {
-		e.logger.Debugw("Failed to generate embedding for attestation",
-			"watcher_id", watcher.ID,
-			"attestation_id", as.ID,
-			"error", err)
-		return false, 0
-	}
-
-	similarity, err := e.embeddingService.ComputeSimilarity(queryEmbedding, attestationEmbedding)
-	if err != nil {
-		e.logger.Debugw("Failed to compute similarity",
-			"watcher_id", watcher.ID,
-			"attestation_id", as.ID,
-			"error", err)
-		return false, 0
-	}
-
-	threshold := watcher.SemanticThreshold
-	if threshold <= 0 {
-		threshold = 0.3 // Default threshold
-	}
-
-	matches := similarity >= threshold
-	e.logger.Debugw("Semantic comparison",
-		"watcher_id", watcher.ID,
-		"attestation_id", as.ID,
-		"similarity", similarity,
-		"threshold", threshold,
-		"matches", matches)
-
-	return matches, similarity
-}
-
-// extractAttestationText returns rich text from an attestation's attributes.
-// Returns empty string for structural-only attestations — semantic search
-// only applies to attestations with rich text content.
-// Skips metadata keys (rich_string_fields) that contain field names, not content.
-func extractAttestationText(as *types.As) string {
-	if as.Attributes == nil {
-		return ""
-	}
-
-	var parts []string
-	for key, value := range as.Attributes {
-		if key == "rich_string_fields" {
-			continue
-		}
-		switch v := value.(type) {
-		case string:
-			if v != "" {
-				parts = append(parts, v)
-			}
-		case []interface{}:
-			for _, item := range v {
-				if str, ok := item.(string); ok && str != "" {
-					parts = append(parts, str)
-				}
-			}
-		}
-	}
-
-	return strings.Join(parts, " ")
-}
-
-// hasOverlap returns true if there's any overlap between two string slices
-func hasOverlap(a, b []string) bool {
-	set := make(map[string]bool, len(a))
-	for _, v := range a {
-		set[strings.ToLower(v)] = true
-	}
-	for _, v := range b {
-		if set[strings.ToLower(v)] {
-			return true
-		}
-	}
-	return false
-}
-
-// executeAction executes a watcher's action with the triggering attestation
-func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
-	e.logger.Infow("Executing watcher action",
-		"watcher_id", watcher.ID,
-		"action_type", watcher.ActionType,
-		"attestation_id", as.ID)
-
-	var err error
-
-	switch watcher.ActionType {
-	case storage.ActionTypePython:
-		err = e.executePython(watcher, as)
-	case storage.ActionTypeWebhook:
-		err = e.executeWebhook(watcher, as)
-	case storage.ActionTypeGlyphExecute:
-		err = e.executeGlyph(watcher, as)
-	case storage.ActionTypeSemanticMatch:
-		// Semantic match watchers only broadcast — no separate action to execute.
-		// The match was already broadcast in OnAttestationCreated.
-		return
-	default:
-		err = errors.Newf("unknown action type: %s", watcher.ActionType)
-	}
-
-	if err != nil {
-		e.logger.Errorw("Watcher action failed",
-			"watcher_id", watcher.ID,
-			"attestation_id", as.ID,
-			"error", err)
-
-		// Record error
-		e.store.RecordError(e.ctx, watcher.ID, err.Error())
-
-		// Queue for retry
-		e.queueRetry(watcher.ID, as, 1, err.Error())
-	} else {
-		e.logger.Infow("Watcher action succeeded",
-			"watcher_id", watcher.ID,
-			"attestation_id", as.ID)
-
-		// Record success
-		e.store.RecordFire(e.ctx, watcher.ID)
-
-		// Update edge cursor for meld-edge watchers to prevent reprocessing on restart
-		if watcher.ActionType == storage.ActionTypeGlyphExecute {
-			e.updateEdgeCursor(watcher, as)
-		}
-	}
-}
-
-// applyEdgeCursor sets TimeStart on a meld-edge watcher's filter based on the stored cursor.
-// This prevents reprocessing attestations that were already handled before a server restart.
-func (e *Engine) applyEdgeCursor(w *storage.Watcher) {
-	var action GlyphExecuteAction
-	if err := json.Unmarshal([]byte(w.ActionData), &action); err != nil || action.CompositionID == "" {
-		return
-	}
-
-	var lastProcessedAt time.Time
-	err := e.db.QueryRowContext(e.ctx,
-		"SELECT last_processed_at FROM composition_edge_cursors WHERE composition_id = ? AND from_glyph_id = ? AND to_glyph_id = ?",
-		action.CompositionID, action.SourceGlyphID, action.TargetGlyphID,
-	).Scan(&lastProcessedAt)
-	if err != nil {
-		return // No cursor yet — first run, process everything
-	}
-
-	// Set TimeStart to cursor timestamp so matchesFilter skips already-processed attestations
-	w.Filter.TimeStart = &lastProcessedAt
-}
-
-// updateEdgeCursor records the last processed attestation for a meld-edge watcher.
-// On server restart, loadWatchers applies the cursor as TimeStart to avoid reprocessing.
-func (e *Engine) updateEdgeCursor(watcher *storage.Watcher, as *types.As) {
-	var action GlyphExecuteAction
-	if err := json.Unmarshal([]byte(watcher.ActionData), &action); err != nil {
-		return
-	}
-	if action.CompositionID == "" {
-		return
-	}
-
-	_, err := e.db.ExecContext(e.ctx, `
-		INSERT INTO composition_edge_cursors (composition_id, from_glyph_id, to_glyph_id, last_processed_id, last_processed_at)
-		VALUES (?, ?, ?, ?, ?)
-		ON CONFLICT (composition_id, from_glyph_id, to_glyph_id)
-		DO UPDATE SET last_processed_id = excluded.last_processed_id, last_processed_at = excluded.last_processed_at`,
-		action.CompositionID, action.SourceGlyphID, action.TargetGlyphID, as.ID, as.Timestamp)
-	if err != nil {
-		e.logger.Warnw("Failed to update edge cursor",
-			"watcher_id", watcher.ID,
-			"attestation_id", as.ID,
-			"error", err)
-	}
-}
-
-// executePython executes Python code with the attestation injected
-func (e *Engine) executePython(watcher *storage.Watcher, as *types.As) error {
-	// Inject attestation as a variable in the Python code
-	attestationJSON, err := json.Marshal(as)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal attestation")
-	}
-
-	// Prepend code to inject the attestation
-	injectedCode := fmt.Sprintf(`
-import json
-_attestation_json = %q
-attestation = json.loads(_attestation_json)
-
-# User code below
-%s
-`, string(attestationJSON), watcher.ActionData)
-
-	// Call Python plugin
-	reqBody, err := json.Marshal(map[string]interface{}{
-		"content": injectedCode,
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal request body")
-	}
-
-	url := e.apiBaseURL + "/api/python/execute"
-	req, err := http.NewRequestWithContext(e.ctx, "POST", url, bytes.NewReader(reqBody))
-	if err != nil {
-		return errors.Wrap(err, "failed to create request")
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := e.httpClient.Do(req)
-	if err != nil {
-		return errors.Wrap(err, "failed to execute Python")
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return errors.Newf("Python execution failed (status %d): %s", resp.StatusCode, string(body))
-	}
-
-	return nil
-}
-
-// GlyphExecuteAction is the JSON structure stored in ActionData for glyph_execute watchers
-type GlyphExecuteAction struct {
-	TargetGlyphID   string `json:"target_glyph_id"`
-	TargetGlyphType string `json:"target_glyph_type"`
-	CompositionID   string `json:"composition_id"`
-	SourceGlyphID   string `json:"source_glyph_id"`
-}
-
-// executeGlyph executes a canvas glyph with the triggering attestation
-func (e *Engine) executeGlyph(watcher *storage.Watcher, as *types.As) error {
-	var action GlyphExecuteAction
-	if err := json.Unmarshal([]byte(watcher.ActionData), &action); err != nil {
-		return errors.Wrapf(err, "failed to parse glyph_execute action data for watcher %s", watcher.ID)
-	}
-
-	// Broadcast started
-	if e.broadcastGlyphFired != nil {
-		e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "started", nil, nil)
-	}
-
-	// Fetch glyph's current content from canvas_glyphs
-	var content sql.NullString
-	err := e.db.QueryRowContext(e.ctx,
-		"SELECT content FROM canvas_glyphs WHERE id = ?", action.TargetGlyphID,
-	).Scan(&content)
-	if err != nil {
-		if e.broadcastGlyphFired != nil {
-			e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "error", err, nil)
-		}
-		return errors.Wrapf(err, "failed to fetch glyph %s content", action.TargetGlyphID)
-	}
-
-	attestationJSON, err := json.Marshal(as)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal attestation")
-	}
-
-	var execErr error
-	var resultBody []byte
-	switch action.TargetGlyphType {
-	case "py":
-		resultBody, execErr = e.executeGlyphPython(action.TargetGlyphID, content.String, attestationJSON)
-	case "prompt":
-		resultBody, execErr = e.executeGlyphPrompt(action.TargetGlyphID, content.String, attestationJSON)
-	default:
-		execErr = errors.Newf("unsupported glyph type for execution: %s (glyph %s)", action.TargetGlyphType, action.TargetGlyphID)
-	}
-
-	if e.broadcastGlyphFired != nil {
-		if execErr != nil {
-			e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "error", execErr, nil)
-		} else {
-			e.broadcastGlyphFired(action.TargetGlyphID, as.ID, "success", nil, resultBody)
-		}
-	}
-
-	return execErr
-}
-
-// executeGlyphPython runs a py glyph's content with the attestation injected as `upstream`.
-// Returns the JSON-encoded execution result on success.
-func (e *Engine) executeGlyphPython(glyphID string, content string, attestationJSON []byte) ([]byte, error) {
-	reqBody, err := json.Marshal(map[string]interface{}{
-		"content":              content,
-		"glyph_id":             glyphID,
-		"upstream_attestation": json.RawMessage(attestationJSON),
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal request body")
-	}
-
-	url := e.apiBaseURL + "/api/python/execute"
-	req, err := http.NewRequestWithContext(e.ctx, "POST", url, bytes.NewReader(reqBody))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create request")
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := e.httpClient.Do(req)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to execute py glyph %s", glyphID)
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.Newf("py glyph %s execution failed (status %d): %s", glyphID, resp.StatusCode, string(body))
-	}
-
-	return body, nil
-}
-
-// executeGlyphPrompt runs a prompt glyph's template with attestation fields interpolated.
-// Returns the JSON-encoded execution result on success.
-func (e *Engine) executeGlyphPrompt(glyphID string, template string, attestationJSON []byte) ([]byte, error) {
-	reqBody, err := json.Marshal(map[string]interface{}{
-		"template":             template,
-		"glyph_id":             glyphID,
-		"upstream_attestation": json.RawMessage(attestationJSON),
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal request body")
-	}
-
-	url := e.apiBaseURL + "/api/prompt/direct"
-	req, err := http.NewRequestWithContext(e.ctx, "POST", url, bytes.NewReader(reqBody))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create request")
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := e.httpClient.Do(req)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to execute prompt glyph %s", glyphID)
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.Newf("prompt glyph %s execution failed (status %d): %s", glyphID, resp.StatusCode, string(body))
-	}
-
-	return body, nil
-}
-
-// executeWebhook sends the attestation to a webhook URL
-func (e *Engine) executeWebhook(watcher *storage.Watcher, as *types.As) error {
-	body, err := json.Marshal(map[string]interface{}{
-		"watcher_id":  watcher.ID,
-		"attestation": as,
-		"fired_at":    time.Now(),
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal webhook body")
-	}
-
-	req, err := http.NewRequestWithContext(e.ctx, "POST", watcher.ActionData, bytes.NewReader(body))
-	if err != nil {
-		return errors.Wrap(err, "failed to create webhook request")
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := e.httpClient.Do(req)
-	if err != nil {
-		return errors.Wrap(err, "webhook request failed")
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		body, _ := io.ReadAll(resp.Body)
-		return errors.Newf("webhook returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	return nil
-}
-
-// queueRetry adds a failed execution to the retry queue
-func (e *Engine) queueRetry(watcherID string, as *types.As, attempt int, lastError string) {
-	if attempt > maxRetries {
-		e.logger.Warnw("Max retries exceeded, dropping execution",
+// enqueueAttestation serializes an attestation and inserts it into the persistent queue.
+func (e *Engine) enqueueAttestation(watcherID string, as *types.As, reason string, attempt int, lastError string) {
+	if reason == "retry" && attempt > maxRetries {
+		e.logger.Warnw("Max retries exceeded, giving up",
 			"watcher_id", watcherID,
 			"attestation_id", as.ID,
 			"attempts", attempt)
 		return
 	}
 
-	// Calculate backoff: 1s, 2s, 4s, 8s, ... up to maxBackoff
-	backoff := initialBackoff * time.Duration(1<<(attempt-1))
-	if backoff > maxBackoff {
-		backoff = maxBackoff
+	attestationJSON, err := json.Marshal(as)
+	if err != nil {
+		e.logger.Errorw("Failed to serialize attestation for queue",
+			"watcher_id", watcherID,
+			"attestation_id", as.ID,
+			"error", err)
+		return
 	}
 
-	e.retryMu.Lock()
-	defer e.retryMu.Unlock()
+	notBefore := time.Now()
+	if reason == "retry" && attempt > 0 {
+		backoff := initialBackoff * time.Duration(1<<(attempt-1))
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
+		notBefore = notBefore.Add(backoff)
+	}
 
-	e.retryQueue = append(e.retryQueue, &PendingExecution{
-		WatcherID:   watcherID,
-		Attestation: as,
-		Attempt:     attempt,
-		NextRetryAt: time.Now().Add(backoff),
-		LastError:   lastError,
-	})
+	entry := &QueueEntry{
+		WatcherID:       watcherID,
+		AttestationJSON: string(attestationJSON),
+		Reason:          reason,
+		Attempt:         attempt,
+		NotBefore:       notBefore,
+		LastError:       lastError,
+	}
 
-	e.logger.Debugw("Queued for retry",
+	if err := e.queueStore.Enqueue(entry); err != nil {
+		e.logger.Errorw("Failed to enqueue execution",
+			"watcher_id", watcherID,
+			"attestation_id", as.ID,
+			"reason", reason,
+			"error", err)
+		return
+	}
+
+	e.logger.Debugw("Enqueued attestation for deferred execution",
 		"watcher_id", watcherID,
 		"attestation_id", as.ID,
+		"reason", reason,
 		"attempt", attempt,
-		"next_retry_at", time.Now().Add(backoff))
+		"not_before", notBefore)
 }
 
-// retryLoop processes the retry queue
-func (e *Engine) retryLoop() {
+// drainLoop processes the persistent execution queue at a fixed interval.
+func (e *Engine) drainLoop() {
 	defer e.wg.Done()
 
-	ticker := time.NewTicker(retryTickerInterval)
+	ticker := time.NewTicker(drainInterval)
 	defer ticker.Stop()
 
+	tickCount := 0
 	for {
 		select {
 		case <-e.ctx.Done():
 			return
 		case <-ticker.C:
-			e.processRetryQueue()
+			e.drainOnce()
+			tickCount++
+			if tickCount%purgeEveryNthTick == 0 {
+				purged, err := e.queueStore.PurgeCompleted(purgeRetention)
+				if err != nil {
+					e.logger.Warnw("Failed to purge completed queue entries", "error", err)
+				} else if purged > 0 {
+					e.logger.Debugw("Purged completed queue entries", "count", purged)
+				}
+			}
 		}
 	}
 }
 
-// processRetryQueue executes due retries
-func (e *Engine) processRetryQueue() {
-	now := time.Now()
-
-	e.retryMu.Lock()
-	var due []*PendingExecution
-	var remaining []*PendingExecution
-
-	for _, pe := range e.retryQueue {
-		if pe.NextRetryAt.Before(now) || pe.NextRetryAt.Equal(now) {
-			due = append(due, pe)
-		} else {
-			remaining = append(remaining, pe)
-		}
+// drainOnce dequeues and processes one batch of entries (one per watcher, round-robin).
+func (e *Engine) drainOnce() {
+	entries, err := e.queueStore.DequeueRoundRobin(time.Now(), drainBatchSize)
+	if err != nil {
+		e.logger.Warnw("Failed to dequeue from execution queue", "error", err)
+		return
 	}
-	e.retryQueue = remaining
-	e.retryMu.Unlock()
 
-	// Process due items outside the lock
-	for _, pe := range due {
+	for _, entry := range entries {
+
 		e.mu.RLock()
-		watcher, exists := e.watchers[pe.WatcherID]
+		watcher, exists := e.watchers[entry.WatcherID]
+		limiter := e.rateLimiters[entry.WatcherID]
 		e.mu.RUnlock()
 
 		if !exists || !watcher.Enabled {
+			e.queueStore.Complete(entry.ID)
 			continue
 		}
 
-		go func(pe *PendingExecution, w *storage.Watcher) {
-			var err error
-
-			switch w.ActionType {
-			case storage.ActionTypePython:
-				err = e.executePython(w, pe.Attestation)
-			case storage.ActionTypeWebhook:
-				err = e.executeWebhook(w, pe.Attestation)
-			case storage.ActionTypeGlyphExecute:
-				err = e.executeGlyph(w, pe.Attestation)
-			case storage.ActionTypeSemanticMatch:
-				return // No action to retry — semantic watchers only broadcast
-			default:
-				err = errors.Newf("unknown action type for retry: %s", w.ActionType)
+		// For rate-limited entries, use Reserve/Cancel to peek at when the next token is available
+		if entry.Reason == "rate_limited" {
+			if limiter != nil {
+				r := limiter.Reserve()
+				delay := r.Delay()
+				if delay > 0 {
+					// Token not available yet — cancel reservation and defer to exact time
+					r.Cancel()
+					retryAfter := time.Now().Add(delay)
+					e.queueStore.Requeue(entry.ID, retryAfter)
+					continue
+				}
+				// delay == 0: token consumed by Reserve, proceed with execution
 			}
+		}
 
-			if err != nil {
-				e.logger.Warnw("Retry failed",
-					"watcher_id", w.ID,
-					"attestation_id", pe.Attestation.ID,
-					"attempt", pe.Attempt,
-					"error", err)
+		// Deserialize attestation
+		var as types.As
+		if err := json.Unmarshal([]byte(entry.AttestationJSON), &as); err != nil {
+			e.logger.Errorw("Failed to deserialize queued attestation",
+				"queue_id", entry.ID,
+				"watcher_id", entry.WatcherID,
+				"error", err)
+			e.queueStore.Fail(entry.ID, err.Error())
+			continue
+		}
 
-				e.store.RecordError(e.ctx, w.ID, err.Error())
-				e.queueRetry(w.ID, pe.Attestation, pe.Attempt+1, err.Error())
-			} else {
-				e.logger.Infow("Retry succeeded",
-					"watcher_id", w.ID,
-					"attestation_id", pe.Attestation.ID,
-					"attempt", pe.Attempt)
+		// Execute the action
+		var execErr error
+		switch watcher.ActionType {
+		case storage.ActionTypePython:
+			execErr = e.executePython(watcher, &as)
+		case storage.ActionTypeWebhook:
+			execErr = e.executeWebhook(watcher, &as)
+		case storage.ActionTypeGlyphExecute:
+			execErr = e.executeGlyph(watcher, &as)
+		case storage.ActionTypeSemanticMatch:
+			e.queueStore.Complete(entry.ID)
+			continue
+		default:
+			execErr = errors.Newf("unknown action type: %s", watcher.ActionType)
+		}
 
-				e.store.RecordFire(e.ctx, w.ID)
+		if execErr != nil {
+			e.logger.Warnw("Queued execution failed",
+				"watcher_id", watcher.ID,
+				"attestation_id", as.ID,
+				"attempt", entry.Attempt,
+				"error", execErr)
+
+			e.recordError(watcher.ID, execErr.Error())
+			e.queueStore.Complete(entry.ID)
+
+			// Re-enqueue as retry with incremented attempt and backoff
+			e.enqueueAttestation(watcher.ID, &as, "retry", entry.Attempt+1, execErr.Error())
+		} else {
+			e.recordFire(watcher.ID)
+			e.queueStore.Complete(entry.ID)
+
+			if watcher.ActionType == storage.ActionTypeGlyphExecute {
+				e.updateEdgeCursor(watcher, &as)
 			}
-		}(pe, watcher)
+		}
 	}
+}
+
+// deepCopyAttestation creates a deep copy of an attestation to prevent race conditions.
+func deepCopyAttestation(as *types.As) *types.As {
+	asCopy := *as
+	asCopy.Subjects = append([]string(nil), as.Subjects...)
+	asCopy.Predicates = append([]string(nil), as.Predicates...)
+	asCopy.Contexts = append([]string(nil), as.Contexts...)
+	asCopy.Actors = append([]string(nil), as.Actors...)
+	if as.Attributes != nil {
+		asCopy.Attributes = make(map[string]interface{})
+		for k, v := range as.Attributes {
+			asCopy.Attributes[k] = v
+		}
+	}
+	return &asCopy
+}
+
+// GetQueueStore returns the queue store for external access (stats endpoint).
+func (e *Engine) GetQueueStore() *QueueStore {
+	return e.queueStore
 }
 
 // GetStore returns the underlying watcher store for CRUD operations
