@@ -252,8 +252,35 @@ func (p *Plugin) handleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, status)
 }
 
-// TODO: Extract inline HTML/CSS/JS into separate files and use //go:embed.
-// Inline UI strings in Go are unmaintainable — split into templates/ and static/ dirs.
+// TODO: The ix-json glyph UI needs a redesign:
+// - Extract inline HTML/CSS/JS into separate files (//go:embed)
+// - Mapping must be editable from the UI, not just heuristics
+// - State changes (save, fetch, activate) should update inline without page reload
+// - Reuse existing glyph/panel design components instead of custom inline HTML
+// - Response preview should show one item at a time, not dump the full array
+// - Mapping config should be integrated into the preview (click field → assign SPC role)
+//   rather than a separate section
+// - Mode badge and UI must reflect state changes (pause/activate) without reload
+// - Glyph must be meldable — compose with py/se/ax glyphs for filtering/transform
+// - Integration with watcher system is undefined (how ix-json feeds into watchers)
+// - No rate-limiting — will hammer APIs if poll interval is too aggressive
+// - No meaningful error feedback — server down, no connectivity, expired key, 404, etc.
+//   all surface as generic "fetch failed" with no actionable guidance
+// - No secrets/variables system — auth tokens are stored as plain attestation attributes
+//   with no encryption, rotation, or reuse across glyphs
+// - Only supports GET with a single Bearer token — no custom headers, query params,
+//   POST bodies, or other auth schemes (API key in header, OAuth, etc.)
+// - No redirect policy control — Go http.Client follows redirects by default
+// - ix-json assumes JSON responses — the real ix vision is a universal data ingestor:
+//   point any URL at it and it ingests (HTML, CSV, XML, RSS, binary, etc.).
+//   ix-json is one specialization of that broader ix pipeline.
+// - No pagination support — APIs that paginate (cursor, offset, Link header) get only page 1
+// - No configurable timeout — uses Go http.Client default (no timeout), no per-request control
+// - Type attestation should happen at ingestion time, not after — user should be able to
+//   mark rich_string_fields and array fields from within this glyph during mapping setup,
+//   so embeddings (#479) and graph tags (#291) work without a separate type config step (#311).
+//   Field type vocabulary beyond rich_string: unique (identity/dedup key), secret (credential,
+//   encrypt/mask), array (navigable tags). All attestable at ingestion time.
 
 // handleIXGlyph renders the ix-json glyph UI.
 func (p *Plugin) handleIXGlyph(w http.ResponseWriter, r *http.Request) {
