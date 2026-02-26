@@ -270,3 +270,22 @@ type WatcherErrorMessage struct {
 	Severity  string   `json:"severity"`          // "error" or "warning"
 	Timestamp int64    `json:"timestamp"`         // Unix timestamp
 }
+
+// WatcherBroadcastStats carries per-watcher execution stats in queue status broadcasts
+type WatcherBroadcastStats struct {
+	FireCount   int64  `json:"fire_count"`
+	ErrorCount  int64  `json:"error_count"`
+	LastFiredAt int64  `json:"last_fired_at,omitempty"` // Unix seconds, 0 = never
+	LastError   string `json:"last_error,omitempty"`
+}
+
+// WatcherQueueStatusMessage represents the execution queue status broadcast
+type WatcherQueueStatusMessage struct {
+	Type             string                           `json:"type"`                     // "watcher_queue_status"
+	TotalQueued      int                              `json:"total_queued"`
+	PerWatcher       map[string]int                   `json:"per_watcher"`
+	TargetGlyphs     map[string]string                `json:"target_glyphs,omitempty"`  // meld-edge watcher ID → target glyph ID
+	WatcherStats     map[string]WatcherBroadcastStats `json:"watcher_stats,omitempty"`  // per-watcher execution stats
+	OldestAgeSeconds float64                          `json:"oldest_age_seconds"`
+	Timestamp        int64                            `json:"timestamp"`
+}

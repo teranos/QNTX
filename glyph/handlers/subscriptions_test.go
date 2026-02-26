@@ -54,7 +54,7 @@ func TestCompileSubscriptions_AxToPy(t *testing.T) {
 		Name:              "AX Glyph: contact",
 		AxQuery:           "contact",
 		ActionType:        storage.ActionTypePython,
-		MaxFiresPerMinute: 60,
+		MaxFiresPerSecond: 60,
 		Enabled:           true,
 	}
 	if err := watcherStore.Create(ctx, axWatcher); err != nil {
@@ -284,7 +284,7 @@ func TestCompileSubscriptions_StaleEdgeCleanup(t *testing.T) {
 		Name:              "AX Glyph: contact",
 		AxQuery:           "contact",
 		ActionType:        storage.ActionTypePython,
-		MaxFiresPerMinute: 60,
+		MaxFiresPerSecond: 60,
 		Enabled:           true,
 	}
 	if err := watcherStore.Create(ctx, axWatcher); err != nil {

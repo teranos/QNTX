@@ -48,11 +48,7 @@ func (p *Plugin) registerHTTPHandlers(mux *http.ServeMux) error {
 
 // checkPaused returns true and writes 503 if plugin is paused.
 func (p *Plugin) checkPaused(w http.ResponseWriter) bool {
-	p.mu.RLock()
-	paused := p.paused
-	p.mu.RUnlock()
-
-	if paused {
+	if p.IsPaused() {
 		writeError(w, http.StatusServiceUnavailable, "AT Protocol plugin is paused")
 		return true
 	}
@@ -82,7 +78,7 @@ func (p *Plugin) handleProfile(w http.ResponseWriter, r *http.Request) {
 	client := p.getClient()
 	profile, err := appbsky.ActorGetProfile(r.Context(), client, client.Auth.Did)
 	if err != nil {
-		p.services.Logger("atproto").Errorw("Failed to get profile", "did", client.Auth.Did, "error", err)
+		p.Services().Logger("atproto").Errorw("Failed to get profile", "did", client.Auth.Did, "error", err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to get profile: %v", err))
 		return
 	}
@@ -108,7 +104,7 @@ func (p *Plugin) handleActorProfile(w http.ResponseWriter, r *http.Request) {
 
 	profile, err := appbsky.ActorGetProfile(r.Context(), p.getClient(), actor)
 	if err != nil {
-		p.services.Logger("atproto").Errorw("Failed to get actor profile", "actor", actor, "error", err)
+		p.Services().Logger("atproto").Errorw("Failed to get actor profile", "actor", actor, "error", err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to get profile for %s: %v", actor, err))
 		return
 	}
@@ -135,7 +131,7 @@ func (p *Plugin) handleTimeline(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := appbsky.FeedGetTimeline(r.Context(), p.getClient(), "", cursor, limit)
 	if err != nil {
-		p.services.Logger("atproto").Errorw("Failed to get timeline", "error", err)
+		p.Services().Logger("atproto").Errorw("Failed to get timeline", "error", err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to get timeline: %v", err))
 		return
 	}
@@ -169,7 +165,7 @@ func (p *Plugin) handleAuthorFeed(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := appbsky.FeedGetAuthorFeed(r.Context(), p.getClient(), actor, cursor, "", false, limit)
 	if err != nil {
-		p.services.Logger("atproto").Errorw("Failed to get author feed", "actor", actor, "error", err)
+		p.Services().Logger("atproto").Errorw("Failed to get author feed", "actor", actor, "error", err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to get feed for %s: %v", actor, err))
 		return
 	}
@@ -196,7 +192,7 @@ func (p *Plugin) handleNotifications(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := appbsky.NotificationListNotifications(r.Context(), p.getClient(), cursor, limit, false, nil, "")
 	if err != nil {
-		p.services.Logger("atproto").Errorw("Failed to get notifications", "error", err)
+		p.Services().Logger("atproto").Errorw("Failed to get notifications", "error", err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to get notifications: %v", err))
 		return
 	}
@@ -220,7 +216,7 @@ func (p *Plugin) handleResolve(w http.ResponseWriter, r *http.Request) {
 	// Resolution works without authentication — use unauthenticated client if needed
 	client := p.getClient()
 	if client == nil {
-		config := p.services.Config("atproto")
+		config := p.Services().Config("atproto")
 		pdsHost := config.GetString("pds_host")
 		if pdsHost == "" {
 			pdsHost = "https://bsky.social"
@@ -231,7 +227,7 @@ func (p *Plugin) handleResolve(w http.ResponseWriter, r *http.Request) {
 	did, err := resolveHandle(r.Context(), client, handle)
 	if err != nil {
 		err = errors.WithDetail(err, fmt.Sprintf("Handle: %s", handle))
-		p.services.Logger("atproto").Errorw("Failed to resolve handle", "handle", handle, "error", err)
+		p.Services().Logger("atproto").Errorw("Failed to resolve handle", "handle", handle, "error", err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to resolve handle %s: %v", handle, err))
 		return
 	}
@@ -310,7 +306,7 @@ func (p *Plugin) handleCreatePost(w http.ResponseWriter, r *http.Request) {
 		Record:     &util.LexiconTypeDecoder{Val: post},
 	})
 	if err != nil {
-		p.services.Logger("atproto").Errorw("Failed to create post", "error", err)
+		p.Services().Logger("atproto").Errorw("Failed to create post", "error", err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to create post: %v", err))
 		return
 	}
@@ -360,7 +356,7 @@ func (p *Plugin) handleFollow(w http.ResponseWriter, r *http.Request) {
 		Record:     &util.LexiconTypeDecoder{Val: follow},
 	})
 	if err != nil {
-		p.services.Logger("atproto").Errorw("Failed to follow actor", "subject", req.Subject, "error", err)
+		p.Services().Logger("atproto").Errorw("Failed to follow actor", "subject", req.Subject, "error", err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to follow %s: %v", req.Subject, err))
 		return
 	}
@@ -414,7 +410,7 @@ func (p *Plugin) handleLike(w http.ResponseWriter, r *http.Request) {
 		Record:     &util.LexiconTypeDecoder{Val: like},
 	})
 	if err != nil {
-		p.services.Logger("atproto").Errorw("Failed to like post", "uri", req.URI, "error", err)
+		p.Services().Logger("atproto").Errorw("Failed to like post", "uri", req.URI, "error", err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to like post: %v", err))
 		return
 	}
@@ -437,7 +433,7 @@ func (p *Plugin) handleSyncTimeline(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := p.syncTimeline(r.Context(), "manual"); err != nil {
-		p.services.Logger("atproto").Errorw("Timeline sync failed", "error", err)
+		p.Services().Logger("atproto").Errorw("Timeline sync failed", "error", err)
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Timeline sync failed: %v", err))
 		return
 	}
@@ -474,7 +470,7 @@ func (p *Plugin) handleFeedGlyph(w http.ResponseWriter, r *http.Request) {
 	feedResp, err := appbsky.FeedGetAuthorFeed(ctx, p.getClient(), actor, cursor, "", false, limit)
 	if err != nil {
 		err = errors.WithDetail(err, fmt.Sprintf("Actor: %s, cursor: %s", actor, cursor))
-		p.services.Logger("atproto").Errorw("Failed to fetch feed", "actor", actor, "error", err)
+		p.Services().Logger("atproto").Errorw("Failed to fetch feed", "actor", actor, "error", err)
 		http.Error(w, fmt.Sprintf("Failed to fetch feed: %v", err), http.StatusInternalServerError)
 		return
 	}
