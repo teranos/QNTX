@@ -68,6 +68,7 @@ impl AtsStoreClient {
             actors: actors.unwrap_or_default(),
             timestamp: None, // Server will use current time
             attributes,
+            source: "qntx-python".to_string(),
         };
 
         let request = GenerateAttestationRequest {
