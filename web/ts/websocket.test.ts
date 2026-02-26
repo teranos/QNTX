@@ -6,6 +6,16 @@
  */
 
 import { describe, test, expect, mock } from 'bun:test';
+
+// Mock connectivity before importing websocket (subscribeAuth runs at module scope)
+mock.module('./connectivity', () => ({
+    connectivityManager: {
+        get state() { return 'online'; },
+        subscribe: () => () => {},
+        subscribeAuth: () => () => {},
+    },
+}));
+
 import { routeMessage } from './websocket';
 import type { MessageHandlers } from '../types/websocket';
 
