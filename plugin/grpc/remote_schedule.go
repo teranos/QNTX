@@ -23,7 +23,7 @@ type RemoteSchedule struct {
 
 // NewRemoteSchedule creates a gRPC client connection to the Schedule service.
 func NewRemoteSchedule(ctx context.Context, endpoint string, authToken string, logger *zap.SugaredLogger) (*RemoteSchedule, error) {
-	conn, err := grpc.Dial(endpoint,
+	conn, err := grpc.NewClient(endpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -145,5 +145,5 @@ func (r *RemoteSchedule) Get(scheduleID string) (*schedule.Job, error) {
 		return nil, errors.Newf("schedule not found: %s", scheduleID)
 	}
 
-	return protoToScheduleJob(resp.Job), nil
+	return protoToScheduleJob(resp.Job, r.logger), nil
 }

@@ -68,7 +68,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "ix-json",
-			Version:     "0.3.6",
+			Version:     "0.3.7",
 			QNTXVersion: ">= 0.1.0",
 			Description: "Generic JSON API ingestion with configurable mapping to attestations",
 			Author:      "QNTX Team",
