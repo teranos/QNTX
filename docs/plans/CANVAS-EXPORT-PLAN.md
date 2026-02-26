@@ -693,3 +693,33 @@ If any phase fails and cannot be fixed quickly:
 6. **We're using Bun, not Node.js** ✅
 7. **Manual verification at each step** ✅
 8. **Don't skip success criteria** ✅
+
+---
+
+## Phase 3 Status (2026-02-26)
+
+**Completed:**
+- ✅ Go export handler (`HandleExportStatic` in canvas.go)
+- ✅ Frontend API (`exportCanvasStatic` in canvas.ts)
+- ✅ Export button integration (canvas-expanded.ts)
+- ✅ DEMO flag gating (export only available with `make demo`)
+- ✅ canvas_id scoping (filters glyphs by subcanvas)
+- ✅ Error display via Button component (no alert/confirm/prompt)
+- ✅ Process improvements: ESLint rules, web/CLAUDE.md documentation, PreToolUse hooks
+- ✅ Sync fix: canvas-sync.ts uses spread operator (all proto fields auto-sync)
+- ✅ Test coverage: canvas_export_test.go validates core flow
+- ✅ Tests pass: 666 pass, 0 fail
+
+**Known Limitations (documented in canvas.go):**
+- Old glyphs (created before 2026-02-26) have empty canvas_id and won't export
+- Export quality issues: happy-dom rendering has limitations vs live browser
+
+**Won't Do:**
+- Migration script to backfill old glyphs (not worth the effort, new glyphs work)
+
+**Out of Scope (future work):**
+- Publish endpoint scoping (similar to export)
+- Publish button in breadcrumb bar
+- Export quality improvements
+
+**Status:** Phase 3 functional, ready for review as POC
