@@ -145,6 +145,9 @@ func (h *CanvasHandler) handleUpsertGlyph(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// DEBUG: Log what canvas_id we received
+	h.logInfo("UpsertGlyph: id=%s, canvas_id=%q, symbol=%s", glyph.ID, glyph.CanvasID, glyph.Symbol)
+
 	if err := h.store.UpsertGlyph(r.Context(), &glyph); err != nil {
 		// TODO(#431): Implement offline queue support for failed canvas operations
 		// When storage fails (network issues, database locked), queue operation
@@ -619,6 +622,125 @@ func (h *CanvasHandler) HandleExportDOM(w http.ResponseWriter, r *http.Request) 
 	h.writeJSON(w, map[string]string{
 		"path": demoPath,
 	})
+}
+
+// HandleExportStatic renders canvas server-side via canvas-renderer plugin
+// GET /api/canvas/export?canvas_id={id} — triggers HTML download (demo mode only)
+//
+// Known limitations:
+//   - Only exports glyphs with canvas_id set. Glyphs created before 2026-02-26
+//     (when canvas_id sync was fixed) have empty canvas_id and won't export.
+//   - Export quality issues: rendering via happy-dom has limitations, static HTML
+//     output may not match live canvas appearance, styles/interactions may be broken.
+//
+// TODO: Add test coverage (canvas_export_test.go doesn't exist)
+// TODO: Improve export quality - investigate happy-dom rendering issues
+// TODO: Migration script to backfill canvas_id for old glyphs (if frontend has data)
+func (h *CanvasHandler) HandleExportStatic(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("QNTX_DEMO") != "1" {
+		h.writeError(w, errors.New("canvas export only available in demo mode (make demo)"), http.StatusForbidden)
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		h.writeError(w, errors.New("method not allowed"), http.StatusMethodNotAllowed)
+		return
+	}
+
+	canvasID := r.URL.Query().Get("canvas_id")
+	if canvasID == "" {
+		h.writeError(w, errors.New("canvas_id query parameter required"), http.StatusBadRequest)
+		return
+	}
+
+	// Fetch all glyphs and filter by canvas_id
+	allGlyphs, err := h.store.ListGlyphs(r.Context())
+	if err != nil {
+		h.writeError(w, errors.Wrapf(err, "failed to fetch glyphs"), http.StatusInternalServerError)
+		return
+	}
+
+	// Log canvas_id distribution for debugging
+	h.logInfo("Export: found %d total glyphs in database", len(allGlyphs))
+	canvasIdCounts := make(map[string]int)
+	for _, g := range allGlyphs {
+		canvasIdCounts[g.CanvasID]++
+	}
+	for cid, count := range canvasIdCounts {
+		if cid == "" {
+			h.logInfo("  %d glyphs with canvas_id=\"\" (root canvas)", count)
+		} else {
+			h.logInfo("  %d glyphs with canvas_id=%q", count, cid)
+		}
+	}
+
+	// Filter to only glyphs that belong to this canvas
+	var glyphs []any
+	for _, g := range allGlyphs {
+		if g.CanvasID == canvasID {
+			glyphs = append(glyphs, g)
+		}
+	}
+
+	// Check if we found any glyphs for this canvas
+	h.logInfo("Export: filtered to %d glyphs for canvas_id=%q", len(glyphs), canvasID)
+	if len(glyphs) == 0 {
+		h.writeError(w, errors.New(fmt.Sprintf("no glyphs found for canvas %s (found %d total glyphs in database, none with canvas_id=%q)", canvasID, len(allGlyphs), canvasID)), http.StatusNotFound)
+		return
+	}
+
+	// Build request payload for canvas-renderer plugin
+	pluginReq := map[string]any{
+		"canvas_id": canvasID,
+		"glyphs":    glyphs,
+	}
+	reqBody, err := json.Marshal(pluginReq)
+	if err != nil {
+		h.writeError(w, errors.Wrap(err, "failed to marshal plugin request"), http.StatusInternalServerError)
+		return
+	}
+
+	// Call canvas-renderer plugin endpoint (internal HTTP request)
+	// Plugin is mounted at /api/canvas-renderer/, endpoint is /render
+	pluginURL := fmt.Sprintf("http://localhost:%d/api/canvas-renderer/render", h.getServerPort())
+	resp, err := http.Post(pluginURL, "application/json", strings.NewReader(string(reqBody)))
+	if err != nil {
+		h.writeError(w, errors.Wrapf(err, "failed to call canvas-renderer plugin at %s", pluginURL), http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		h.writeError(w, errors.New(fmt.Sprintf("canvas-renderer returned status %d", resp.StatusCode)), http.StatusBadGateway)
+		return
+	}
+
+	// Parse plugin response
+	var pluginResp struct {
+		HTML string `json:"html"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&pluginResp); err != nil {
+		h.writeError(w, errors.Wrap(err, "failed to parse plugin response"), http.StatusInternalServerError)
+		return
+	}
+
+	// Return HTML with download headers
+	filename := fmt.Sprintf("canvas-%s.html", canvasID)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	w.Write([]byte(pluginResp.HTML))
+}
+
+// getServerPort returns the server port for internal plugin calls
+// TODO: Pass this via handler config instead of hardcoding
+func (h *CanvasHandler) getServerPort() int {
+	port := os.Getenv("QNTX_PORT")
+	if port == "" {
+		return 8772 // Default from am.toml
+	}
+	portNum := 8772
+	fmt.Sscanf(port, "%d", &portNum)
+	return portNum
 }
 
 func (h *CanvasHandler) writeJSON(w http.ResponseWriter, data any) {
