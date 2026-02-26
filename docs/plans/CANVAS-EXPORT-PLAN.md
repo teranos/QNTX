@@ -85,9 +85,9 @@ plugin/typescript/runtime/
 
 ### 1.2 Create Hello World Test Plugin
 
-**Location:** `./plugins/hello-world/plugin.ts`
+**Location:** `./qntx-plugins/hello-world/plugin.ts`
 
-Why `./plugins/` and not `plugin/typescript/examples/`? **Because ADR-002 specifies `./plugins` as a search path.**
+Why `./qntx-plugins/` and not `plugin/typescript/examples/`? **Because ADR-002 specifies `./qntx-plugins` as a search path for QNTX-maintained plugins.**
 
 **File structure:**
 ```
@@ -687,7 +687,7 @@ If any phase fails and cannot be fixed quickly:
 
 1. **Read ADR-002 requirements FIRST** ✅
 2. **Verify each phase before proceeding** ✅
-3. **Use `./plugins/` directory for project plugins** ✅
+3. **Use `./qntx-plugins/` directory for QNTX-maintained plugins** ✅
 4. **Follow naming conventions:** `qntx-{name}-plugin`, `qntx-{name}`, or `{name}` ✅
 5. **Test discovery independently before integration** ✅
 6. **We're using Bun, not Node.js** ✅
