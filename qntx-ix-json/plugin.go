@@ -1,8 +1,7 @@
 // Package qntxixjson provides a generic JSON API ingestion plugin for QNTX.
 //
 // The ix-json plugin fetches JSON from HTTP APIs and maps responses to QNTX attestations.
-// It operates in three modes:
-//   - Data-shaping: Explore API response structure and configure mappings
+// It operates in two modes:
 //   - Paused: Schedule suspended, allows reconfiguration
 //   - Active-running: Periodically polls API and creates attestations
 //
@@ -36,7 +35,7 @@ func logEntry(level, stage, message string) *protocol.JobLogEntry {
 	}
 }
 
-// OperationMode represents the current operational mode of the plugin.
+// OperationMode represents the current operational mode of a glyph.
 type OperationMode string
 
 const (
@@ -55,44 +54,37 @@ type MappingConfig struct {
 
 // Plugin is the ix-json plugin implementation.
 type Plugin struct {
-	services plugin.ServiceRegistry
+	plugin.Base
 
-	mu             sync.RWMutex
-	mode           OperationMode             // Protected by mu
-	httpClient     *http.Client              // Protected by mu
-	glyphResponses map[string][]byte         // Protected by mu - per-glyph cached response
-	glyphMappings  map[string]*MappingConfig // Protected by mu - per-glyph mapping
-	glyphSchedules map[string]string         // Protected by mu - per-glyph schedule ID (glyphID → scheduleID)
+	glyphMu        sync.RWMutex
+	httpClient     *http.Client
+	glyphResponses map[string][]byte         // Protected by glyphMu - per-glyph cached response
+	glyphMappings  map[string]*MappingConfig // Protected by glyphMu - per-glyph mapping
+	glyphSchedules map[string]string         // Protected by glyphMu - per-glyph schedule ID (glyphID → scheduleID)
 }
 
 // NewPlugin creates a new ix-json plugin.
 func NewPlugin() *Plugin {
 	return &Plugin{
+		Base: plugin.NewBase(plugin.Metadata{
+			Name:        "ix-json",
+			Version:     "0.3.4",
+			QNTXVersion: ">= 0.1.0",
+			Description: "Generic JSON API ingestion with configurable mapping to attestations",
+			Author:      "QNTX Team",
+			License:     "MIT",
+		}),
 		httpClient:     &http.Client{},
-		mode:           ModePaused,
 		glyphResponses: make(map[string][]byte),
 		glyphMappings:  make(map[string]*MappingConfig),
 		glyphSchedules: make(map[string]string),
 	}
 }
 
-// Metadata returns information about the ix-json plugin.
-func (p *Plugin) Metadata() plugin.Metadata {
-	return plugin.Metadata{
-		Name:        "ix-json",
-		Version:     "0.3.3",
-		QNTXVersion: ">= 0.1.0",
-		Description: "Generic JSON API ingestion with configurable mapping to attestations",
-		Author:      "QNTX Team",
-		License:     "MIT",
-	}
-}
-
 // Initialize initializes the ix-json plugin.
 func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
-	p.services = services
-	logger := services.Logger("ix-json")
-	logger.Info("ix-json plugin initialized (per-glyph config via attestations)")
+	p.Init(services)
+	services.Logger("ix-json").Info("ix-json plugin initialized (per-glyph config via attestations)")
 	return nil
 }
 
@@ -102,7 +94,7 @@ func (p *Plugin) loadGlyphConfig(ctx context.Context, glyphID string) map[string
 		return nil
 	}
 
-	store := p.services.ATSStore()
+	store := p.Services().ATSStore()
 	if store == nil {
 		return nil
 	}
@@ -117,7 +109,7 @@ func (p *Plugin) loadGlyphConfig(ctx context.Context, glyphID string) map[string
 	})
 
 	if err != nil {
-		p.services.Logger("ix-json").Errorw("Failed to load glyph config",
+		p.Services().Logger("ix-json").Errorw("Failed to load glyph config",
 			"glyph_id", glyphID, "error", err)
 		return nil
 	}
@@ -131,10 +123,10 @@ func (p *Plugin) loadGlyphConfig(ctx context.Context, glyphID string) map[string
 
 // Shutdown shuts down the ix-json plugin, deleting all active schedules.
 func (p *Plugin) Shutdown(ctx context.Context) error {
-	logger := p.services.Logger("ix-json")
+	logger := p.Services().Logger("ix-json")
 
-	p.mu.Lock()
-	schedSvc := p.services.Schedule()
+	p.glyphMu.Lock()
+	schedSvc := p.Services().Schedule()
 	for glyphID, scheduleID := range p.glyphSchedules {
 		if schedSvc != nil {
 			if err := schedSvc.Delete(scheduleID); err != nil {
@@ -146,7 +138,7 @@ func (p *Plugin) Shutdown(ctx context.Context) error {
 		}
 	}
 	p.glyphSchedules = make(map[string]string)
-	p.mu.Unlock()
+	p.glyphMu.Unlock()
 
 	logger.Info("ix-json plugin shut down")
 	return nil
@@ -157,55 +149,29 @@ func (p *Plugin) RegisterHTTP(mux *http.ServeMux) error {
 	return p.registerHTTPHandlers(mux)
 }
 
-// RegisterWebSocket registers WebSocket handlers.
-func (p *Plugin) RegisterWebSocket() (map[string]plugin.WebSocketHandler, error) {
-	return nil, nil
-}
-
 // Health returns the health status of the ix-json plugin.
 func (p *Plugin) Health(ctx context.Context) plugin.HealthStatus {
-	p.mu.RLock()
-	mode := p.mode
+	p.glyphMu.RLock()
 	activeSchedules := len(p.glyphSchedules)
-	p.mu.RUnlock()
+	p.glyphMu.RUnlock()
+
+	paused := p.IsPaused()
+	mode := ModeActiveRunning
+	if paused {
+		mode = ModePaused
+	}
 
 	message := fmt.Sprintf("ix-json plugin operational (mode: %s, active schedules: %d)", mode, activeSchedules)
 
 	return plugin.HealthStatus{
 		Healthy: true,
-		Paused:  mode == ModePaused,
+		Paused:  paused,
 		Message: message,
 		Details: map[string]any{
 			"mode":             mode,
 			"active_schedules": activeSchedules,
 		},
 	}
-}
-
-// Pause temporarily suspends the plugin operations.
-func (p *Plugin) Pause(ctx context.Context) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if p.mode == ModePaused {
-		return fmt.Errorf("ix-json plugin is already paused")
-	}
-	p.mode = ModePaused
-	p.services.Logger("ix-json").Info("ix-json plugin paused")
-	return nil
-}
-
-// Resume restores the plugin to active operation.
-func (p *Plugin) Resume(ctx context.Context) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if p.mode != ModePaused {
-		return fmt.Errorf("ix-json plugin is not paused")
-	}
-	p.mode = ModeActiveRunning
-	p.services.Logger("ix-json").Info("ix-json plugin resumed")
-	return nil
 }
 
 // ConfigSchema returns the configuration schema for UI-based configuration.
@@ -232,16 +198,16 @@ func (p *Plugin) RegisterGlyphs() []plugin.GlyphDef {
 // createSchedule creates a Pulse schedule for a glyph via ScheduleService.
 // Deletes any existing schedule for this glyph (from memory or attestation) before creating.
 func (p *Plugin) createSchedule(glyphID string, intervalSecs int) error {
-	logger := p.services.Logger("ix-json")
-	schedSvc := p.services.Schedule()
+	logger := p.Services().Logger("ix-json")
+	schedSvc := p.Services().Schedule()
 	if schedSvc == nil {
 		return fmt.Errorf("ScheduleService not available")
 	}
 
 	// Find existing schedule ID: check in-memory first, then attestation
-	p.mu.RLock()
+	p.glyphMu.RLock()
 	existingID := p.glyphSchedules[glyphID]
-	p.mu.RUnlock()
+	p.glyphMu.RUnlock()
 
 	if existingID == "" {
 		existingID = p.loadScheduleID(glyphID)
@@ -264,9 +230,9 @@ func (p *Plugin) createSchedule(glyphID string, intervalSecs int) error {
 		return fmt.Errorf("failed to create schedule for glyph %s: %w", glyphID, err)
 	}
 
-	p.mu.Lock()
+	p.glyphMu.Lock()
 	p.glyphSchedules[glyphID] = scheduleID
-	p.mu.Unlock()
+	p.glyphMu.Unlock()
 
 	// Persist schedule ID so it survives plugin restarts
 	p.saveScheduleID(glyphID, scheduleID)
@@ -287,7 +253,7 @@ func (p *Plugin) loadScheduleID(glyphID string) string {
 
 // saveScheduleID persists the schedule ID in the glyph's config attestation.
 func (p *Plugin) saveScheduleID(glyphID, scheduleID string) {
-	store := p.services.ATSStore()
+	store := p.Services().ATSStore()
 	if store == nil {
 		return
 	}
@@ -302,21 +268,21 @@ func (p *Plugin) saveScheduleID(glyphID, scheduleID string) {
 	}
 
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
-		p.services.Logger("ix-json").Warnw("Failed to persist schedule ID", "glyph_id", glyphID, "error", err)
+		p.Services().Logger("ix-json").Warnw("Failed to persist schedule ID", "glyph_id", glyphID, "error", err)
 	}
 }
 
 // pauseSchedule pauses the Pulse schedule for a glyph.
 func (p *Plugin) pauseSchedule(glyphID string) error {
-	p.mu.RLock()
+	p.glyphMu.RLock()
 	scheduleID, exists := p.glyphSchedules[glyphID]
-	p.mu.RUnlock()
+	p.glyphMu.RUnlock()
 
 	if !exists {
 		return nil // No schedule to pause
 	}
 
-	schedSvc := p.services.Schedule()
+	schedSvc := p.Services().Schedule()
 	if schedSvc == nil {
 		return fmt.Errorf("ScheduleService not available")
 	}
@@ -325,7 +291,7 @@ func (p *Plugin) pauseSchedule(glyphID string) error {
 		return fmt.Errorf("failed to pause schedule %s for glyph %s: %w", scheduleID, glyphID, err)
 	}
 
-	p.services.Logger("ix-json").Infow("Schedule paused", "glyph_id", glyphID, "schedule_id", scheduleID)
+	p.Services().Logger("ix-json").Infow("Schedule paused", "glyph_id", glyphID, "schedule_id", scheduleID)
 	return nil
 }
 

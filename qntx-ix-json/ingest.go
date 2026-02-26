@@ -29,9 +29,9 @@ func (p *Plugin) pollGlyph(ctx context.Context, glyphID string) (*pollResult, er
 		return nil, fmt.Errorf("API URL not configured for glyph %s", glyphID)
 	}
 
-	p.mu.RLock()
+	p.glyphMu.RLock()
 	mapping := p.glyphMappings[glyphID]
-	p.mu.RUnlock()
+	p.glyphMu.RUnlock()
 
 	if mapping == nil {
 		return nil, fmt.Errorf("mapping not configured for glyph %s", glyphID)
@@ -50,12 +50,12 @@ func (p *Plugin) pollGlyph(ctx context.Context, glyphID string) (*pollResult, er
 	}
 
 	// Create attestations
-	store := p.services.ATSStore()
+	store := p.Services().ATSStore()
 	if store == nil {
 		return nil, fmt.Errorf("ATSStore not available")
 	}
 
-	logger := p.services.Logger("ix-json")
+	logger := p.Services().Logger("ix-json")
 	result := &pollResult{APIURL: apiURL}
 
 	switch v := jsonData.(type) {
@@ -147,7 +147,7 @@ func (p *Plugin) createAttestationFromJSON(ctx context.Context, store any, data 
 		return fmt.Errorf("failed to create attestation (subject=%s, predicate=%s): %w", subject, predicate, err)
 	}
 
-	p.services.Logger("ix-json").Debugw("Attestation created",
+	p.Services().Logger("ix-json").Debugw("Attestation created",
 		"subject", subject,
 		"predicate", predicate,
 		"context", contextVal,
@@ -239,7 +239,7 @@ func (p *Plugin) inferMapping(data []byte) *MappingConfig {
 	predicatePath := inferField(obj, []string{"type", "kind", "event", "action"})
 	contextPath := inferField(obj, []string{"source", "origin", "domain", "context"})
 
-	p.services.Logger("ix-json").Infow("Inferred mapping",
+	p.Services().Logger("ix-json").Infow("Inferred mapping",
 		"subject", subjectPath,
 		"predicate", predicatePath,
 		"context", contextPath,
