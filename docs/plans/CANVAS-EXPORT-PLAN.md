@@ -677,9 +677,11 @@ If any phase fails and cannot be fixed quickly:
 ## Documentation to Create
 
 - [x] `plugin/typescript/README.md` - TypeScript runtime overview
-- [ ] `./qntx-plugins/canvas-renderer/README.md` - Canvas renderer plugin docs
 - [x] Update `docs/development/ts-plugin.md` - Add actual implementation notes
-- [ ] `CANVAS-EXPORT-COMPLETE.md` - Final status (only after Phase 3 success)
+
+**Won't do:**
+- `./qntx-plugins/canvas-renderer/README.md` - Not needed for POC
+- `CANVAS-EXPORT-COMPLETE.md` - Phase 3 status section in this file is sufficient
 
 ---
 
