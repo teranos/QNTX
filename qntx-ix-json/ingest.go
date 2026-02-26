@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 )
 
@@ -60,14 +61,17 @@ func (p *Plugin) pollGlyph(ctx context.Context, glyphID string) (*pollResult, er
 
 	switch v := jsonData.(type) {
 	case []any:
+		created := 0
 		for i, item := range v {
 			if err := p.createAttestationFromJSON(ctx, store, item, mapping); err != nil {
 				logger.Errorw("Failed to create attestation",
 					"glyph_id", glyphID, "index", i, "error", err)
+			} else {
+				created++
 			}
 		}
-		result.AttestationsCreated = len(v)
-		logger.Infow("Poll completed", "glyph_id", glyphID, "attestations_created", len(v))
+		result.AttestationsCreated = created
+		logger.Infow("Poll completed", "glyph_id", glyphID, "attestations_created", created, "items_total", len(v))
 
 	case map[string]any:
 		if err := p.createAttestationFromJSON(ctx, store, v, mapping); err != nil {
@@ -84,7 +88,7 @@ func (p *Plugin) pollGlyph(ctx context.Context, glyphID string) (*pollResult, er
 }
 
 // createAttestationFromJSON creates a single attestation from a JSON object.
-func (p *Plugin) createAttestationFromJSON(ctx context.Context, store any, data any, mapping *MappingConfig) error {
+func (p *Plugin) createAttestationFromJSON(ctx context.Context, store ats.AttestationStore, data any, mapping *MappingConfig) error {
 	obj, ok := data.(map[string]any)
 	if !ok {
 		return fmt.Errorf("expected JSON object, got %T", data)
@@ -135,15 +139,7 @@ func (p *Plugin) createAttestationFromJSON(ctx context.Context, store any, data 
 		Source:     "ix-json",
 	}
 
-	// Type assertion to get the correct store interface
-	atsStore, ok := store.(interface {
-		GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error)
-	})
-	if !ok {
-		return fmt.Errorf("ATSStore does not support GenerateAndCreateAttestation")
-	}
-
-	if _, err := atsStore.GenerateAndCreateAttestation(ctx, cmd); err != nil {
+	if _, err := store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
 		return fmt.Errorf("failed to create attestation (subject=%s, predicate=%s): %w", subject, predicate, err)
 	}
 
