@@ -228,7 +228,8 @@ func (p *Plugin) handleSetMode(w http.ResponseWriter, r *http.Request) {
 
 	case ModePaused:
 		if err := p.pauseSchedule(req.GlyphID); err != nil {
-			logger.Warnw("Failed to pause schedule", "glyph_id", req.GlyphID, "error", err)
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to pause schedule: %v", err))
+			return
 		}
 		logger.Infow("Glyph schedule paused", "glyph_id", req.GlyphID)
 		writeJSON(w, http.StatusOK, map[string]string{
@@ -298,12 +299,16 @@ func (p *Plugin) handleIXGlyph(w http.ResponseWriter, r *http.Request) {
 	p.glyphMu.RLock()
 	mappingConfig := p.glyphMappings[glyphID]
 	lastResponse := p.glyphResponses[glyphID]
+	_, hasSchedule := p.glyphSchedules[glyphID]
 	p.glyphMu.RUnlock()
 
 	// Extract config from glyph-specific attestation
 	apiURL := ""
 	pollInterval := 0
 	mode := ModePaused
+	if hasSchedule {
+		mode = ModeActiveRunning
+	}
 
 	if glyphConfig != nil {
 		if url, ok := glyphConfig["api_url"].(string); ok {
@@ -311,9 +316,6 @@ func (p *Plugin) handleIXGlyph(w http.ResponseWriter, r *http.Request) {
 		}
 		if interval, ok := glyphConfig["poll_interval_seconds"].(float64); ok {
 			pollInterval = int(interval)
-			if pollInterval > 0 {
-				mode = ModeActiveRunning
-			}
 		}
 	}
 
