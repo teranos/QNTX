@@ -5,6 +5,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/pulse/schedule"
 	"go.uber.org/zap"
 )
 
@@ -24,6 +25,25 @@ type QueueService interface {
 	ListJobs(status *async.JobStatus, limit int) ([]*async.Job, error)
 }
 
+// ScheduleService defines runtime schedule management for plugins.
+// Plugins use this to create, pause, resume, and delete recurring Pulse schedules.
+type ScheduleService interface {
+	// Create creates a new recurring schedule and returns its ID
+	Create(handlerName string, intervalSecs int, payload []byte, metadata map[string]string) (scheduleID string, err error)
+
+	// Pause pauses an active schedule
+	Pause(scheduleID string) error
+
+	// Resume resumes a paused schedule
+	Resume(scheduleID string) error
+
+	// Delete soft-deletes a schedule
+	Delete(scheduleID string) error
+
+	// Get retrieves a schedule by ID
+	Get(scheduleID string) (*schedule.Job, error)
+}
+
 // ServiceRegistry provides access to QNTX core services for domain plugins.
 // Plugins use this registry to look up services they need.
 type ServiceRegistry interface {
@@ -41,6 +61,9 @@ type ServiceRegistry interface {
 
 	// Queue returns the Pulse async job queue
 	Queue() QueueService
+
+	// Schedule returns the Pulse schedule management service
+	Schedule() ScheduleService
 }
 
 // Config provides access to plugin configuration
@@ -129,4 +152,9 @@ func (r *DefaultServiceRegistry) ATSStore() ats.AttestationStore {
 // Queue returns the Pulse async job queue
 func (r *DefaultServiceRegistry) Queue() QueueService {
 	return r.queue
+}
+
+// Schedule returns nil for in-process plugins (runtime schedules are a gRPC feature).
+func (r *DefaultServiceRegistry) Schedule() ScheduleService {
+	return nil
 }
