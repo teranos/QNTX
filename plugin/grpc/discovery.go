@@ -338,7 +338,7 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	if isTypeScriptPlugin {
 		// TypeScript plugin - launch via Bun runtime
 		// Runtime path: plugin/typescript/runtime/main.ts (relative to QNTX root)
-		// If plugin is in ./plugins/hello-world/plugin.ts, need to go up 2 levels to QNTX root
+		// If plugin is in ./qntx-plugins/hello-world/plugin.ts, need to go up 2 levels to QNTX root
 		runtimePath := filepath.Join(filepath.Dir(binary), "..", "..", "plugin", "typescript", "runtime", "main.ts")
 
 		// If plugin is in ~/.qntx/plugins/, find runtime relative to QNTX installation
