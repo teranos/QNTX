@@ -86,12 +86,13 @@ type PluginConfig struct {
 
 // PluginManager manages plugin processes and connections.
 type PluginManager struct {
-	mu       sync.RWMutex
-	plugins  map[string]*managedPlugin
-	logger   *zap.SugaredLogger
-	basePort int
-	nextPort int        // Track the next port to allocate
-	portMu   sync.Mutex // Separate mutex for port allocation
+	mu                sync.RWMutex
+	plugins           map[string]*managedPlugin
+	logger            *zap.SugaredLogger
+	basePort          int
+	nextPort          int        // Track the next port to allocate
+	portMu            sync.Mutex // Separate mutex for port allocation
+	typescriptRuntime string     // Path to TypeScript runtime (main.ts)
 }
 
 // managedPlugin tracks a running plugin.
@@ -112,12 +113,13 @@ const (
 )
 
 // NewPluginManager creates a new plugin manager.
-func NewPluginManager(logger *zap.SugaredLogger) *PluginManager {
+func NewPluginManager(logger *zap.SugaredLogger, typescriptRuntime string) *PluginManager {
 	return &PluginManager{
-		plugins:  make(map[string]*managedPlugin),
-		logger:   logger,
-		basePort: DefaultPluginBasePort,
-		nextPort: DefaultPluginBasePort,
+		plugins:           make(map[string]*managedPlugin),
+		logger:            logger,
+		basePort:          DefaultPluginBasePort,
+		nextPort:          DefaultPluginBasePort,
+		typescriptRuntime: typescriptRuntime,
 	}
 }
 
@@ -337,16 +339,18 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 
 	if isTypeScriptPlugin {
 		// TypeScript plugin - launch via Bun runtime
-		// Runtime path: plugin/typescript/runtime/main.ts (relative to QNTX root)
-		// If plugin is in ./qntx-plugins/hello-world/plugin.ts, need to go up 2 levels to QNTX root
-		runtimePath := filepath.Join(filepath.Dir(binary), "..", "..", "plugin", "typescript", "runtime", "main.ts")
+		runtimePath := m.typescriptRuntime
+		if runtimePath == "" {
+			err := errors.New("TypeScript runtime not configured")
+			return nil, 0, nil, nil, nil, errors.WithHint(err,
+				"set plugin.runtime.typescript_runtime in am.toml or QNTX_ROOT environment variable")
+		}
 
-		// If plugin is in ~/.qntx/plugins/, find runtime relative to QNTX installation
-		if strings.Contains(binary, ".qntx/plugins") {
-			// Assume QNTX is installed - runtime should be in same location as qntx binary
-			// For now, use a fixed path relative to current working directory
-			// TODO: Make this more robust (environment variable or config)
-			runtimePath = "plugin/typescript/runtime/main.ts"
+		// Validate runtime exists
+		if _, err := os.Stat(runtimePath); os.IsNotExist(err) {
+			err := errors.Newf("TypeScript runtime not found at %s", runtimePath)
+			return nil, 0, nil, nil, nil, errors.WithHint(err,
+				"verify QNTX installation or set correct path in plugin.runtime.typescript_runtime")
 		}
 
 		args := []string{
