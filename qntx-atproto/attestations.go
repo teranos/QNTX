@@ -10,7 +10,7 @@ const atprotoContext = "atproto"
 
 // attestSessionStatus records a PDS session event.
 func (p *Plugin) attestSessionStatus(status, pdsHost, identity, errMsg string) {
-	store := p.services.ATSStore()
+	store := p.Services().ATSStore()
 	if store == nil {
 		return
 	}
@@ -29,14 +29,14 @@ func (p *Plugin) attestSessionStatus(status, pdsHost, identity, errMsg string) {
 		Attributes: attrs,
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
-		logger := p.services.Logger("atproto")
+		logger := p.Services().Logger("atproto")
 		logger.Debugw("Failed to create session attestation", "status", status, "error", err)
 	}
 }
 
 // attestPost records a post creation.
 func (p *Plugin) attestPost(did, uri, cid, text string) {
-	store := p.services.ATSStore()
+	store := p.Services().ATSStore()
 	if store == nil {
 		return
 	}
@@ -54,14 +54,14 @@ func (p *Plugin) attestPost(did, uri, cid, text string) {
 		Attributes: attrs,
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
-		logger := p.services.Logger("atproto")
+		logger := p.Services().Logger("atproto")
 		logger.Debugw("Failed to create post attestation", "uri", uri, "error", err)
 	}
 }
 
 // attestFollow records a follow action.
 func (p *Plugin) attestFollow(actorDID, subjectDID, uri string) {
-	store := p.services.ATSStore()
+	store := p.Services().ATSStore()
 	if store == nil {
 		return
 	}
@@ -76,14 +76,14 @@ func (p *Plugin) attestFollow(actorDID, subjectDID, uri string) {
 		},
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
-		logger := p.services.Logger("atproto")
+		logger := p.Services().Logger("atproto")
 		logger.Debugw("Failed to create follow attestation", "subject", subjectDID, "error", err)
 	}
 }
 
 // attestLike records a like action.
 func (p *Plugin) attestLike(actorDID, subjectURI, uri string) {
-	store := p.services.ATSStore()
+	store := p.Services().ATSStore()
 	if store == nil {
 		return
 	}
@@ -98,14 +98,14 @@ func (p *Plugin) attestLike(actorDID, subjectURI, uri string) {
 		},
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
-		logger := p.services.Logger("atproto")
+		logger := p.Services().Logger("atproto")
 		logger.Debugw("Failed to create like attestation", "subject_uri", subjectURI, "error", err)
 	}
 }
 
 // attestResolve records a handle → DID resolution.
 func (p *Plugin) attestResolve(handle, did string) {
-	store := p.services.ATSStore()
+	store := p.Services().ATSStore()
 	if store == nil {
 		return
 	}
@@ -119,14 +119,14 @@ func (p *Plugin) attestResolve(handle, did string) {
 		},
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
-		logger := p.services.Logger("atproto")
+		logger := p.Services().Logger("atproto")
 		logger.Debugw("Failed to create resolve attestation", "handle", handle, "error", err)
 	}
 }
 
 // attestTimelinePost records a post appearing in the authenticated user's timeline.
 func (p *Plugin) attestTimelinePost(ctx context.Context, uri, authorDID, authorHandle, text, cid string) error {
-	store := p.services.ATSStore()
+	store := p.Services().ATSStore()
 	if store == nil {
 		return nil // Store not available
 	}
