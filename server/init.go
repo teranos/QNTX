@@ -329,6 +329,12 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	if server.watcherEngine != nil {
 		canvasOpts = append(canvasOpts, handlers.WithWatcherEngine(server.watcherEngine, serverLogger))
 	}
+	// Pass server port for internal plugin calls
+	serverPort := appcfg.DefaultServerPort
+	if deps.config.Server.Port != nil {
+		serverPort = *deps.config.Server.Port
+	}
+	canvasOpts = append(canvasOpts, handlers.WithServerPort(serverPort))
 	server.canvasHandler = handlers.NewCanvasHandler(canvasStore, canvasOpts...)
 	serverLogger.Infow("Canvas state handlers initialized")
 

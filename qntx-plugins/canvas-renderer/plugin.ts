@@ -6,8 +6,8 @@
  */
 
 import { Window } from 'happy-dom';
-import { readFileSync, readdirSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, readdirSync, existsSync } from 'fs';
+import { join, dirname } from 'path';
 
 export default {
     name: 'canvas-renderer',
@@ -172,10 +172,38 @@ function renderGlyphSimple(document: Document, glyph: any): HTMLElement {
 }
 
 /**
+ * Find QNTX root by walking up from plugin directory looking for go.mod
+ */
+function findQNTXRoot(): string | null {
+    // Start from plugin file location (import.meta.dir is Bun-specific)
+    let dir = import.meta.dir;
+
+    // Walk up looking for go.mod (QNTX root marker)
+    while (dir !== dirname(dir)) {
+        if (existsSync(join(dir, 'go.mod'))) {
+            return dir;
+        }
+        dir = dirname(dir);
+    }
+
+    return null;
+}
+
+/**
  * Load canvas CSS files
  */
 function loadCanvasCSS(): string {
-    const root = process.cwd(); // QNTX repo root
+    // Find QNTX root - check env var first, then walk up from plugin dir
+    let root = process.env.QNTX_ROOT;
+    if (!root) {
+        // Walk up from plugin directory looking for go.mod
+        root = findQNTXRoot();
+    }
+    if (!root) {
+        console.error('[CanvasRenderer] Cannot find QNTX root - CSS will fail to load');
+        return '/* QNTX root not found - set QNTX_ROOT env var */';
+    }
+
     const cssFiles: string[] = [];
 
     // Core CSS files
