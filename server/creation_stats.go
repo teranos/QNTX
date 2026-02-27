@@ -11,14 +11,16 @@ import (
 
 // CreationStatsObserver implements storage.AttestationObserver and accumulates
 // creation counts for periodic summary logging by the Pulse ticker.
-// Tracks two dimensions that alternate each drain cycle:
+// Tracks three dimensions that cycle each drain:
 //   - "predicate of context" (e.g. "posted of atproto")
+//   - "subject predicate" (e.g. "did:plc:xxx posted")
 //   - "context by actor" (e.g. "atproto by glyph:abc")
 type CreationStatsObserver struct {
-	total        atomic.Int64
-	predContext  sync.Map // "predicate of context" → *atomic.Int64
-	contextActor sync.Map // "context by actor" → *atomic.Int64
-	drainCycle   atomic.Int64
+	total         atomic.Int64
+	predContext   sync.Map // "predicate of context" → *atomic.Int64
+	subjectPred   sync.Map // "subject predicate" → *atomic.Int64
+	contextActor  sync.Map // "context by actor" → *atomic.Int64
+	drainCycle    atomic.Int64
 }
 
 // NewCreationStatsObserver creates a new creation stats observer.
@@ -30,16 +32,19 @@ func NewCreationStatsObserver() *CreationStatsObserver {
 func (o *CreationStatsObserver) OnAttestationCreated(as *types.As) {
 	o.total.Add(1)
 
-	// Track per predicate/context pair
 	for _, predicate := range as.Predicates {
 		for _, ctx := range as.Contexts {
 			key := predicate + " of " + ctx
 			val, _ := o.predContext.LoadOrStore(key, &atomic.Int64{})
 			val.(*atomic.Int64).Add(1)
 		}
+		for _, subject := range as.Subjects {
+			key := subject + " " + predicate
+			val, _ := o.subjectPred.LoadOrStore(key, &atomic.Int64{})
+			val.(*atomic.Int64).Add(1)
+		}
 	}
 
-	// Track per context/actor pair
 	for _, ctx := range as.Contexts {
 		for _, actor := range as.Actors {
 			key := ctx + " by " + actor
@@ -56,7 +61,7 @@ type pairCount struct {
 }
 
 // DrainCreationCounts atomically reads and resets the accumulated creation counters.
-// Alternates between "predicate of context" and "context by actor" each cycle.
+// Cycles through three views: predicate of context → subject predicate → context by actor.
 // Returns total creations and up to 3 randomly selected top pairs (sampled from top 10).
 func (o *CreationStatsObserver) DrainCreationCounts() (total int, topPairs []string) {
 	total = int(o.total.Swap(0))
@@ -64,29 +69,19 @@ func (o *CreationStatsObserver) DrainCreationCounts() (total int, topPairs []str
 		return 0, nil
 	}
 
-	cycle := o.drainCycle.Add(1)
+	maps := []*sync.Map{&o.predContext, &o.subjectPred, &o.contextActor}
+	active := int(o.drainCycle.Add(1) % 3)
 
-	// Alternate: odd = predicate of context, even = context by actor
-	var source *sync.Map
-	if cycle%2 == 1 {
-		source = &o.predContext
-	} else {
-		source = &o.contextActor
+	// Drain all maps, only format the active one
+	for i, m := range maps {
+		if i == active {
+			topPairs = drainAndSample(m)
+		} else {
+			drainMap(m)
+		}
 	}
-
-	// Drain both maps (reset counters) but only format the active one
-	topPairs = drainAndSample(source)
-	drainMap(otherMap(cycle, &o.predContext, &o.contextActor))
 
 	return total, topPairs
-}
-
-// otherMap returns the map NOT used for display this cycle.
-func otherMap(cycle int64, predCtx, ctxActor *sync.Map) *sync.Map {
-	if cycle%2 == 1 {
-		return ctxActor
-	}
-	return predCtx
 }
 
 // drainMap resets all counters in a sync.Map without collecting results.
