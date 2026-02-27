@@ -23,7 +23,6 @@ import {
     getMinimizeDuration,
     WINDOW_BORDER_RADIUS,
     WINDOW_BOX_SHADOW,
-    TITLE_BAR_PADDING,
 } from '../glyph';
 import { runCleanup } from '../glyph-interaction';
 
@@ -85,11 +84,7 @@ export function morphCanvasPlacedToWindow(
 
     // 5. Build window title bar
     const titleBar = document.createElement('div');
-    titleBar.className = 'window-title-bar';
-    titleBar.style.width = '100%';
-    titleBar.style.flexShrink = '0';
-    titleBar.style.boxSizing = 'border-box';
-    titleBar.style.padding = TITLE_BAR_PADDING;
+    titleBar.className = 'glyph-title-bar';
 
     const titleText = document.createElement('span');
     titleText.textContent = title;
@@ -211,7 +206,7 @@ export function morphWindowToCanvasPlaced(
         .then(() => {
             // 5. Unwrap: move children out of content div, remove title bar
             const contentDiv = element.querySelector('.canvas-window-content');
-            const titleBar = element.querySelector('.window-title-bar');
+            const titleBar = element.querySelector('.glyph-title-bar');
 
             if (contentDiv) {
                 while (contentDiv.firstChild) {
@@ -358,7 +353,7 @@ export function placeWindowOnCanvas(
         .then(() => {
             // 8. Unwrap content div and title bar
             const contentDiv = element.querySelector('.canvas-window-content');
-            const titleBar = element.querySelector('.window-title-bar');
+            const titleBar = element.querySelector('.glyph-title-bar');
             if (contentDiv) {
                 while (contentDiv.firstChild) {
                     element.appendChild(contentDiv.firstChild);
