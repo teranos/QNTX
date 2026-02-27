@@ -36,8 +36,9 @@ type AsCommand struct {
 	Contexts   []string               `json:"contexts"`             // Optional "of" context (defaults to ["_"])
 	Actors     []string               `json:"actors"`               // Who made the attestation (optional, uses default)
 	Timestamp  time.Time              `json:"timestamp"`            // When attestation was made (optional, uses now)
-	Source     string                 `json:"source,omitempty"`     // Source of attestation (e.g., "cli", "github", "atproto")
-	Attributes map[string]interface{} `json:"attributes,omitempty"` // Arbitrary JSON
+	Source        string                 `json:"source,omitempty"`         // Source of attestation (e.g., "cli", "github", "atproto")
+	SourceVersion string                 `json:"source_version,omitempty"` // Version of the source that created this attestation
+	Attributes    map[string]interface{} `json:"attributes,omitempty"`     // Arbitrary JSON
 }
 
 // ToAs converts an AsCommand to an As struct with generated ASID and source
