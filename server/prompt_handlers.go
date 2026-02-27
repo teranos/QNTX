@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/ai/provider"
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/alias"
@@ -26,8 +25,6 @@ const (
 	defaultAxQueryLimit = 100
 	// Default model for local inference when not configured
 	defaultLocalModel = "llama3.2:3b"
-	// Default model for OpenRouter when not configured
-	defaultOpenRouterModel = "openai/gpt-4o-mini"
 )
 
 // PromptPreviewRequest represents a request to preview prompt execution with X-sampling
@@ -264,7 +261,7 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 		}
 
 		// Call LLM
-		chatReq := openrouter.ChatRequest{
+		chatReq := provider.ChatRequest{
 			SystemPrompt: req.SystemPrompt,
 			UserPrompt:   interpolatedPrompt,
 		}
@@ -484,7 +481,7 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 	client := s.createAIClient(req.Provider, modelName, "prompt-direct")
 
 	// Call LLM using Chat method
-	chatReq := openrouter.ChatRequest{
+	chatReq := provider.ChatRequest{
 		SystemPrompt: req.SystemPrompt,
 		UserPrompt:   promptText,
 	}
@@ -511,16 +508,16 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 
 			switch {
 			case strings.HasPrefix(mime, "image/"):
-				chatReq.Attachments = append(chatReq.Attachments, openrouter.ContentPart{
+				chatReq.Attachments = append(chatReq.Attachments, provider.ContentPart{
 					Type: "image_url",
-					ImageURL: &openrouter.ContentPartImage{
+					ImageURL: &provider.ContentPartImage{
 						URL: "data:" + mime + ";base64," + b64,
 					},
 				})
 			case mime == "application/pdf":
-				chatReq.Attachments = append(chatReq.Attachments, openrouter.ContentPart{
+				chatReq.Attachments = append(chatReq.Attachments, provider.ContentPart{
 					Type: "file",
-					File: &openrouter.ContentPartFile{
+					File: &provider.ContentPartFile{
 						Filename: fid,
 						FileData: "data:" + mime + ";base64," + b64,
 					},
@@ -805,48 +802,25 @@ func (s *QNTXServer) createPromptAIClientForPreview(req PromptPreviewRequest, do
 }
 
 // createAIClient creates an AI client using config defaults with optional overrides.
-// providerName selects "local" or "openrouter" (empty = auto-detect from config).
-// model overrides the configured model (empty = use config default).
-// operationType is used for usage tracking (e.g., "prompt-execute", "prompt-preview").
+// Only local inference is supported in core. For OpenRouter, use the qntx-openrouter plugin.
 func (s *QNTXServer) createAIClient(providerName, model, operationType string) provider.AIClient {
-	localEnabled := appcfg.GetBool("local_inference.enabled")
 	localBaseURL := appcfg.GetString("local_inference.base_url")
 	localModel := appcfg.GetString("local_inference.model")
 	localTimeout := appcfg.GetInt("local_inference.timeout_seconds")
-	openRouterAPIKey := appcfg.GetString("openrouter.api_key")
-	openRouterModel := appcfg.GetString("openrouter.model")
-
-	useLocal := providerName == "local" || (providerName == "" && localEnabled)
-
-	if useLocal {
-		effectiveModel := model
-		if effectiveModel == "" {
-			effectiveModel = localModel
-		}
-		if effectiveModel == "" {
-			effectiveModel = defaultLocalModel
-		}
-		return provider.NewLocalClient(provider.LocalClientConfig{
-			BaseURL:        localBaseURL,
-			Model:          effectiveModel,
-			TimeoutSeconds: localTimeout,
-			DB:             s.db,
-			OperationType:  operationType,
-		})
-	}
 
 	effectiveModel := model
 	if effectiveModel == "" {
-		effectiveModel = openRouterModel
+		effectiveModel = localModel
 	}
 	if effectiveModel == "" {
-		effectiveModel = defaultOpenRouterModel
+		effectiveModel = defaultLocalModel
 	}
-	return openrouter.NewClient(openrouter.Config{
-		APIKey:        openRouterAPIKey,
-		Model:         effectiveModel,
-		DB:            s.db,
-		OperationType: operationType,
+	return provider.NewLocalClient(provider.LocalClientConfig{
+		BaseURL:        localBaseURL,
+		Model:          effectiveModel,
+		TimeoutSeconds: localTimeout,
+		DB:             s.db,
+		OperationType:  operationType,
 	})
 }
 

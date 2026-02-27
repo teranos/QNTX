@@ -27,9 +27,8 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("local_inference.timeout_seconds", 360) // 6 minutes - reasonable for slow inference
 	v.SetDefault("local_inference.onnx_model_path", "ats/vidstream/models/yolo11n.onnx")
 
-	// OpenRouter defaults
-	v.SetDefault("openrouter.model", "openai/gpt-4o-mini") // Cost-effective default
-	// temperature and max_tokens are optional: nil = defaults (0.2, 1000) checked in ai/openrouter/client.go
+	// OpenRouter configuration is now handled by the qntx-openrouter plugin.
+	// Plugin config keys are read via plugin.Config.GetString("api_key") etc.
 
 	// Ax (attestation query) defaults
 	v.SetDefault("ax.default_actor", "ax@user")

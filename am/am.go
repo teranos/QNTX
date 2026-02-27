@@ -8,7 +8,6 @@ type Config struct {
 	Pulse          PulseConfig          `mapstructure:"pulse"`
 	Code           CodeConfig           `mapstructure:"code"`
 	LocalInference LocalInferenceConfig `mapstructure:"local_inference"`
-	OpenRouter     OpenRouterConfig     `mapstructure:"openrouter"`
 	Ax             AxConfig             `mapstructure:"ax"`
 	Plugin         PluginConfig         `mapstructure:"plugin"`
 	Embeddings     EmbeddingsConfig     `mapstructure:"embeddings"`
@@ -110,14 +109,6 @@ type LocalInferenceConfig struct {
 	TimeoutSeconds int    `mapstructure:"timeout_seconds"` // Request timeout in seconds
 	ContextSize    *int   `mapstructure:"context_size"`    // Context window size (nil = model default, e.g., 16384, 32768)
 	ONNXModelPath  string `mapstructure:"onnx_model_path"` // Path to ONNX model for vidstream (default: ats/vidstream/models/yolo11n.onnx)
-}
-
-// OpenRouterConfig configures OpenRouter.ai API access
-type OpenRouterConfig struct {
-	APIKey      string   `mapstructure:"api_key"`     // OpenRouter API key
-	Model       string   `mapstructure:"model"`       // Default model (e.g., "openai/gpt-4o-mini")
-	Temperature *float64 `mapstructure:"temperature"` // Sampling temperature (nil = default 0.2)
-	MaxTokens   *int     `mapstructure:"max_tokens"`  // Maximum tokens per request (nil = default 1000)
 }
 
 // AxConfig configures the attestation query system
