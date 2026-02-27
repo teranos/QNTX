@@ -49,7 +49,7 @@ registry.Register(externalProxy)  // Loaded via gRPC from ~/.qntx/plugins/
 ```
 
 Plugin characteristics:
-- Standalone binaries with their own repositories
+- Standalone binaries with their own repositories (or `./qntx-plugins/` for QNTX-maintained plugins)
 - Communicate via gRPC only (using `PluginServer` wrapper)
 - Configured via main `am.toml` file (whitelist model)
 - Run in separate processes for isolation
@@ -102,7 +102,7 @@ type DomainPlugin interface {
 ✅ **Scalability**: Each plugin can be developed/deployed independently
 ✅ **Third-party**: External developers can build private plugins (finance, legal, etc.)
 ✅ **Process isolation**: Plugin crashes don't crash QNTX server
-✅ **Language agnostic**: gRPC enables plugins in any language (Go, Python, Rust)
+✅ **Language agnostic**: gRPC enables plugins in any language (Go, Python, TypeScript, Rust)
 
 ### Negative
 

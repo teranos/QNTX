@@ -1,0 +1,7 @@
+{
+  "name": "qntx-hello-world",
+  "version": "1.0.0",
+  "type": "module",
+  "qntx-plugin": true,
+  "description": "Hello World test plugin for QNTX TypeScript runtime"
+}

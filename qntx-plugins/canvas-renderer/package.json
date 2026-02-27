@@ -1,0 +1,10 @@
+{
+  "name": "qntx-canvas-renderer",
+  "version": "1.0.0",
+  "type": "module",
+  "qntx-plugin": true,
+  "description": "Canvas renderer plugin - server-side canvas HTML generation",
+  "dependencies": {
+    "happy-dom": "^15.0.0"
+  }
+}
