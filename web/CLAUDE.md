@@ -41,3 +41,18 @@ Dark-mode first. Variables in `core.css`. Z-index hierarchy:
 ## Bun Bundler: const cross-references are unsafe
 
 `const BAR = FOO` where FOO is another const → BAR becomes `undefined` in bundle. Always use literal values for module-scope constants.
+
+## Error Handling — READ THIS FIRST
+
+**BANNED (ESLint enforced): `alert()`, `confirm()`, `prompt()`, `toast()`**
+
+Use contextualized error display:
+- **Button component:** Throws from `onClick` → automatic slide-out error display (see components/button.ts)
+- **Form validation:** Inline messages near fields
+- **API errors:** `log.error()` to console, display in UI context where action occurred
+
+**CRITICAL WORKFLOW:**
+1. Check what component you're modifying
+2. Read that component's source file FIRST
+3. Use its built-in capabilities
+4. Never add generic error handling (alert/toast) without checking component API first
