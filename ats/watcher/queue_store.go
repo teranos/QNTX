@@ -23,9 +23,9 @@ type QueueEntry struct {
 
 // QueueStats holds aggregate statistics about the execution queue.
 type QueueStats struct {
-	TotalQueued     int            `json:"total_queued"`
-	PerWatcher      map[string]int `json:"per_watcher"`
-	OldestAgeSeconds float64       `json:"oldest_age_seconds"`
+	TotalQueued      int            `json:"total_queued"`
+	PerWatcher       map[string]int `json:"per_watcher"`
+	OldestAgeSeconds float64        `json:"oldest_age_seconds"`
 }
 
 // QueueStore manages the watcher_execution_queue table.

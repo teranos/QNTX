@@ -24,7 +24,7 @@ type RemoteQueue struct {
 // NewRemoteQueue creates a gRPC client connection to the Queue service.
 // The provided context is used for all gRPC operations and enables cancellation.
 func NewRemoteQueue(ctx context.Context, endpoint string, authToken string, logger *zap.SugaredLogger) (*RemoteQueue, error) {
-	conn, err := grpc.Dial(endpoint,
+	conn, err := grpc.NewClient(endpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
