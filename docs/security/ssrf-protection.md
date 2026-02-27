@@ -40,7 +40,7 @@ client.Get(userURL)
 ### Basic
 
 ```go
-import "github.com/teranos/QNTX/internal/httpclient"
+import "github.com/teranos/QNTX/net/httpclient"
 
 client := httpclient.NewSaferClient(30 * time.Second)
 resp, err := client.Get(userURL)
@@ -87,7 +87,7 @@ client := httpclient.NewSaferClientWithOptions(30*time.Second, opts)
 ## Testing
 
 ```bash
-go test -v github.com/teranos/QNTX/internal/httpclient
+go test -v github.com/teranos/QNTX/net/httpclient
 ```
 
 **What's covered**: RFC1918 ranges, loopback, AWS metadata IP, @ injection, scheme blocking, redirect chains
