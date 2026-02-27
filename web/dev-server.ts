@@ -179,7 +179,21 @@ async function startServer() {
                 );
             }
 
-            // Frontend connects directly to backend - no proxying needed
+            // Proxy API requests to backend
+            if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/ws") || url.pathname.startsWith("/lsp")) {
+                const backendUrl = `${BACKEND_URL}${url.pathname}${url.search}`;
+                try {
+                    const response = await fetch(backendUrl, {
+                        method: req.method,
+                        headers: req.headers,
+                        body: req.body,
+                    });
+                    return response;
+                } catch (error) {
+                    console.error(`Proxy error for ${url.pathname}:`, error);
+                    return new Response("Backend unavailable", { status: 503 });
+                }
+            }
 
             // Serve static files from dist
             if (url.pathname === "/" || url.pathname === "") {

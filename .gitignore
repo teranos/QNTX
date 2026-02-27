@@ -31,6 +31,7 @@ web/coverage/
 *.wasm
 qntx-code-plugin
 qntx-webscraper-plugin
+qntx-ix-json/qntx-ix-json-plugin
 
 # IDE
 .vscode/

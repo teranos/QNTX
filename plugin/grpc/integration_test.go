@@ -592,6 +592,10 @@ func (r *testServiceRegistry) Queue() pluginpkg.QueueService {
 	return r.queue
 }
 
+func (r *testServiceRegistry) Schedule() pluginpkg.ScheduleService {
+	return nil
+}
+
 // testConfig implements pluginpkg.Config for integration testing
 type testConfig struct {
 	config map[string]string
@@ -651,7 +655,7 @@ func TestServiceIntegration_BookCollectorAttestations(t *testing.T) {
 
 	// 3. Start gRPC services for plugin callbacks
 	servicesManager := NewServicesManager(logger)
-	endpoints, err := servicesManager.Start(ctx, store, queue)
+	endpoints, err := servicesManager.Start(ctx, store, queue, nil)
 	require.NoError(t, err)
 	defer servicesManager.Shutdown()
 

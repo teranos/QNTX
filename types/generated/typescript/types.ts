@@ -95,6 +95,10 @@ export interface AsCommand {
    */
   source?: string;
   /**
+   * Version of the source that created this attestation
+   */
+  source_version?: string;
+  /**
    * Arbitrary JSON
    */
   attributes?: Record<string, unknown>;
