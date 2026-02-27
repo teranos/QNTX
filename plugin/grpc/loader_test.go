@@ -70,7 +70,7 @@ func TestLoadPluginsFromConfig_UniquePlugins(t *testing.T) {
 // return duplicates even if the internal map somehow had duplicates
 func TestGetAllPlugins_ReturnsUniqueInstances(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	manager := NewPluginManager(logger)
+	manager := NewPluginManager(logger, "")
 
 	// GetAllPlugins should return unique instances
 	plugins := manager.GetAllPlugins()
