@@ -492,9 +492,11 @@ func (p *Plugin) attestFileAccess(filePath, operation string) {
 	}
 
 	cmd := &types.AsCommand{
-		Subjects:   []string{filePath},
-		Predicates: []string{operation},
-		Contexts:   []string{"code-domain"},
+		Subjects:      []string{filePath},
+		Predicates:    []string{operation},
+		Contexts:      []string{"code-domain"},
+		Source:        p.Metadata().Name,
+		SourceVersion: p.Metadata().Version,
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.Services().Logger("code")
@@ -511,9 +513,11 @@ func (p *Plugin) attestPRAction(prNumber int, action string, count int) {
 
 	prID := fmt.Sprintf("pr-%d", prNumber)
 	cmd := &types.AsCommand{
-		Subjects:   []string{prID},
-		Predicates: []string{action},
-		Contexts:   []string{"github"},
+		Subjects:      []string{prID},
+		Predicates:    []string{action},
+		Contexts:      []string{"github"},
+		Source:        p.Metadata().Name,
+		SourceVersion: p.Metadata().Version,
 		Attributes: map[string]interface{}{
 			"count": count,
 		},
@@ -532,9 +536,11 @@ func (p *Plugin) attestPRListFetch(count int) {
 	}
 
 	cmd := &types.AsCommand{
-		Subjects:   []string{"github-prs"},
-		Predicates: []string{"listed"},
-		Contexts:   []string{"code-domain"},
+		Subjects:      []string{"github-prs"},
+		Predicates:    []string{"listed"},
+		Contexts:      []string{"code-domain"},
+		Source:        p.Metadata().Name,
+		SourceVersion: p.Metadata().Version,
 		Attributes: map[string]interface{}{
 			"count": count,
 		},
@@ -553,9 +559,11 @@ func (p *Plugin) attestIxgestCompleted(repoPath string, commits, attestations in
 	}
 
 	cmd := &types.AsCommand{
-		Subjects:   []string{repoPath},
-		Predicates: []string{"ingested"},
-		Contexts:   []string{"ixgest-git"},
+		Subjects:      []string{repoPath},
+		Predicates:    []string{"ingested"},
+		Contexts:      []string{"ixgest-git"},
+		Source:        p.Metadata().Name,
+		SourceVersion: p.Metadata().Version,
 		Attributes: map[string]interface{}{
 			"commits":      commits,
 			"attestations": attestations,

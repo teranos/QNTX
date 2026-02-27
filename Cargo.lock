@@ -3739,7 +3739,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-python-plugin"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "clap",
  "parking_lot",

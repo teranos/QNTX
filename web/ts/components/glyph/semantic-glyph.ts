@@ -520,7 +520,7 @@ export function updateSemanticGlyphResults(glyphId: string, attestation: Attesta
 
     const resultsContainer = glyph.querySelector('.se-glyph-results') as HTMLElement;
     if (!resultsContainer) {
-        log.warn(SEG.GLYPH, `[SeGlyph] Cannot update results: results container not found for ${glyphId}`);
+        log.debug(SEG.GLYPH, `[SeGlyph] Cannot update results: results container not found for ${glyphId}`);
         return;
     }
 

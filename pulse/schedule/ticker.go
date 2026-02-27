@@ -38,6 +38,13 @@ type EvictionStats interface {
 	DrainEvictionCounts() (events int, attestations int)
 }
 
+// CreationStats provides accumulated attestation creation counts for periodic summaries.
+// DrainCreationCounts atomically reads and resets the counters.
+// topPredicateContexts contains formatted "predicate/context(N)" strings.
+type CreationStats interface {
+	DrainCreationCounts() (total int, topPredicateContexts []string)
+}
+
 // Ticker manages periodic execution of scheduled ATS jobs
 // Runs every second to check for jobs that need execution
 type Ticker struct {
@@ -56,6 +63,7 @@ type Ticker struct {
 	ticksSinceStart int64
 	lastActiveWork  int // Track last active work count to detect changes
 	evictionStats   EvictionStats
+	creationStats   CreationStats
 }
 
 // TickerConfig contains configuration for the Pulse ticker
@@ -96,6 +104,11 @@ func NewTickerWithContext(ctx context.Context, store *Store, queue *async.Queue,
 // SetEvictionStats injects an eviction counter for periodic summary logging.
 func (t *Ticker) SetEvictionStats(es EvictionStats) {
 	t.evictionStats = es
+}
+
+// SetCreationStats injects a creation counter for periodic summary logging.
+func (t *Ticker) SetCreationStats(cs CreationStats) {
+	t.creationStats = cs
 }
 
 // Start begins the ticker loop
@@ -146,12 +159,9 @@ func (t *Ticker) run() {
 
 // logNextJobInfo logs time until the next scheduled job
 func (t *Ticker) logNextJobInfo(now time.Time) {
-	// Periodic eviction summary (every 50 ticks)
-	if t.evictionStats != nil && t.ticksSinceStart%50 == 0 {
-		events, attestations := t.evictionStats.DrainEvictionCounts()
-		if events > 0 {
-			t.pulseLog.Infow(fmt.Sprintf("Evicted %d attestations across %d events since last summary", attestations, events))
-		}
+	// Periodic activity summary (every 50 ticks)
+	if t.ticksSinceStart%50 == 0 {
+		t.logActivitySummary()
 	}
 
 	nextJob, err := t.store.GetNextScheduledJob()
@@ -219,6 +229,40 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 		msg += fmt.Sprintf(" │ Workers: %d/%d active │ Mem: %.1f/%.1fGB (%.0f%%)",
 			metrics.WorkersActive, metrics.WorkersTotal,
 			metrics.MemoryUsedGB, metrics.MemoryTotalGB, metrics.MemoryPercent)
+	}
+
+	t.pulseLog.Infow(msg)
+}
+
+// logActivitySummary logs a combined creation + eviction summary.
+func (t *Ticker) logActivitySummary() {
+	var created int
+	var topPCs []string
+	if t.creationStats != nil {
+		created, topPCs = t.creationStats.DrainCreationCounts()
+	}
+
+	var evictionEvents, evicted int
+	if t.evictionStats != nil {
+		evictionEvents, evicted = t.evictionStats.DrainEvictionCounts()
+	}
+
+	if created == 0 && evictionEvents == 0 {
+		return
+	}
+
+	var parts []string
+	if created > 0 {
+		parts = append(parts, fmt.Sprintf("Created %d", created))
+	}
+	if evictionEvents > 0 {
+		parts = append(parts, fmt.Sprintf("evicted %d", evicted))
+	}
+
+	msg := strings.Join(parts, ", ")
+
+	if len(topPCs) > 0 {
+		msg += " (top: " + strings.Join(topPCs, ", ") + ")"
 	}
 
 	t.pulseLog.Infow(msg)

@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
@@ -46,8 +47,6 @@ func (s *ATSStoreServer) CreateAttestation(ctx context.Context, req *protocol.Cr
 			Error:   fmt.Sprintf("failed to create attestation: %v", err),
 		}, nil
 	}
-
-	s.logger.Infow("Attestation created via gRPC", "id", as.ID, "subjects", as.Subjects)
 
 	return &protocol.CreateAttestationResponse{
 		Success: true,
@@ -95,8 +94,6 @@ func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *
 			Error:   fmt.Sprintf("failed to generate attestation: %v", err),
 		}, nil
 	}
-
-	s.logger.Infow("Attestation generated and created via gRPC", "id", as.ID, "subjects", as.Subjects)
 
 	protoAtt, err := protocol.AttestationFromTypes(as)
 	if err != nil {
@@ -162,6 +159,16 @@ func protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error
 		timestamp = time.UnixMilli(*proto.Timestamp)
 	}
 
+	source := proto.Source
+	if source == "" {
+		log.Printf("DEPRECATION WARNING: AttestationCommand.source not set by plugin, falling back to 'plugin'. Set source to your plugin name.")
+		source = "plugin"
+	}
+
+	if proto.SourceVersion != "" {
+		attributes["source_version"] = proto.SourceVersion
+	}
+
 	return &types.AsCommand{
 		Subjects:   proto.Subjects,
 		Predicates: proto.Predicates,
@@ -169,7 +176,7 @@ func protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error
 		Actors:     proto.Actors,
 		Timestamp:  timestamp,
 		Attributes: attributes,
-		Source:     proto.Source,
+		Source:     source,
 	}, nil
 }
 

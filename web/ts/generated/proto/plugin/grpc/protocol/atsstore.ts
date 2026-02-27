@@ -40,8 +40,10 @@ export interface AttestationCommand {
   attributes:
     | { [key: string]: any }
     | undefined;
-  /** Origin identifier (e.g. "ix-json-ui", "github-webhook") */
+  /** Plugin name that created this attestation (e.g. "python", "atproto") */
   source: string;
+  /** Plugin version that created this attestation (e.g. "0.5.3") */
+  source_version: string;
 }
 
 /** AttestationFilter for querying attestations */
