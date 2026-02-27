@@ -186,6 +186,8 @@ func (p *Plugin) attestGoplsStatus(status, workspace, errMsg string) {
 		Subjects:   []string{"gopls"},
 		Predicates: []string{status},
 		Contexts:   []string{"code-domain"},
+		Source:        p.Metadata().Name,
+		SourceVersion: p.Metadata().Version,
 		Attributes: attrs,
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {

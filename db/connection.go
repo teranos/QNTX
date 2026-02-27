@@ -53,7 +53,11 @@ func Open(path string, log *zap.SugaredLogger) (*sql.DB, error) {
 		}
 	}
 
-	db, err := sql.Open("sqlite3", path)
+	// _txlock=immediate: all BEGIN statements use BEGIN IMMEDIATE, acquiring
+	// the write lock upfront where busy_timeout applies. Without this, deferred
+	// transactions fail instantly with "database is locked" when upgrading from
+	// shared to reserved lock while another writer holds the lock.
+	db, err := sql.Open("sqlite3", path+"?_txlock=immediate")
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open database at %s", path)
 	}

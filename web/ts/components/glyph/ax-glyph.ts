@@ -353,7 +353,7 @@ export function updateAxGlyphResults(glyphId: string, attestation: Attestation):
 
     const resultsContainer = glyph.querySelector('.ax-glyph-results') as HTMLElement;
     if (!resultsContainer) {
-        log.warn(SEG.GLYPH, `[AxGlyph] Cannot update results: results container not found for ${glyphId}`);
+        log.debug(SEG.GLYPH, `[AxGlyph] Cannot update results: results container not found for ${glyphId}`);
         return;
     }
 
