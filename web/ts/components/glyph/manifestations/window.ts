@@ -128,6 +128,7 @@ export function morphToWindow(
         // Add title
         const titleText = document.createElement('span');
         titleText.textContent = stripHtml(glyph.title);
+        titleText.style.flex = '1';
         titleBar.appendChild(titleText);
 
         // Add minimize button
