@@ -141,7 +141,8 @@ func (p *Plugin) attestPullRequestEvent(ctx context.Context, store ats.Attestati
 		Subjects:   []string{pr.HTMLURL},
 		Predicates: []string{"pr-merged"},
 		Contexts:   []string{"github"},
-		Source:     "github",
+		Source:        p.Metadata().Name,
+		SourceVersion: p.Metadata().Version,
 		Attributes: attrs,
 	}
 
@@ -177,7 +178,8 @@ func (p *Plugin) attestReleaseEvent(ctx context.Context, store ats.AttestationSt
 		Subjects:   []string{release.HTMLURL},
 		Predicates: []string{"released"},
 		Contexts:   []string{"github"},
-		Source:     "github",
+		Source:        p.Metadata().Name,
+		SourceVersion: p.Metadata().Version,
 		Attributes: attrs,
 	}
 
@@ -220,7 +222,8 @@ func (p *Plugin) attestIssueEvent(ctx context.Context, store ats.AttestationStor
 		Subjects:   []string{issue.HTMLURL},
 		Predicates: []string{predicate},
 		Contexts:   []string{"github"},
-		Source:     "github",
+		Source:        p.Metadata().Name,
+		SourceVersion: p.Metadata().Version,
 		Attributes: attrs,
 	}
 
@@ -265,7 +268,8 @@ func (p *Plugin) attestPushEvent(ctx context.Context, store ats.AttestationStore
 		Subjects:   []string{event.Repo.URL + "/tree/" + branch},
 		Predicates: []string{"pushed"},
 		Contexts:   []string{"github"},
-		Source:     "github",
+		Source:        p.Metadata().Name,
+		SourceVersion: p.Metadata().Version,
 		Attributes: attrs,
 	}
 
