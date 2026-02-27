@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/teranos/QNTX/errors"
-	"github.com/teranos/QNTX/internal/httpclient"
+	"github.com/teranos/QNTX/net/httpclient"
 )
 
 const (
@@ -38,8 +38,8 @@ type Client struct {
 type Config struct {
 	APIKey        string
 	Model         string
-	Temperature   *float64           // nil = use default (0.2)
-	MaxTokens     *int               // nil = use default (1000)
+	Temperature   *float64 // nil = use default (0.2)
+	MaxTokens     *int     // nil = use default (1000)
 	Debug         bool
 	Logger        *zap.SugaredLogger // Structured logger (nil = nop logger)
 	DB            *sql.DB            // Database for automatic cost/usage tracking
