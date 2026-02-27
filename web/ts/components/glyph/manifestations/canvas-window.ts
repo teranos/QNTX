@@ -88,6 +88,7 @@ export function morphCanvasPlacedToWindow(
 
     const titleText = document.createElement('span');
     titleText.textContent = title;
+    titleText.style.flex = '1';
     titleBar.appendChild(titleText);
 
     const minimizeBtn = document.createElement('button');
