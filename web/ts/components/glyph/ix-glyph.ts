@@ -230,7 +230,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
 
     // Title bar (custom layout: symbol + input + play button)
     const titleBar = document.createElement('div');
-    titleBar.className = 'canvas-glyph-title-bar';
+    titleBar.className = 'glyph-title-bar';
 
     // Play button
     const playBtn = document.createElement('button');

@@ -100,7 +100,7 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
 
     // Title bar (custom layout: symbol + query input) — shared CSS class for state styling
     const titleBar = document.createElement('div');
-    titleBar.className = 'canvas-glyph-title-bar';
+    titleBar.className = 'glyph-title-bar';
     titleBar.style.padding = '4px 4px 4px 8px'; // Compact: reduced top/bottom/right, keep left for symbol
 
     titleBar.appendChild(symbol);
@@ -443,7 +443,7 @@ export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: 
     const errorBg = severity === 'error' ? 'rgba(61, 31, 31, 0.92)' : 'rgba(61, 61, 31, 0.92)';
     const errorTitleBg = severity === 'error' ? '#3d1f1f' : '#3d3d1f';
     glyph.style.backgroundColor = errorBg;
-    const errorTitleBar = glyph.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+    const errorTitleBar = glyph.querySelector('.glyph-title-bar') as HTMLElement;
     if (errorTitleBar) errorTitleBar.style.backgroundColor = errorTitleBg;
 
     log.debug(SEG.GLYPH, `[AxGlyph] Displayed ${severity} for ${glyphId}:`, errorMsg);
