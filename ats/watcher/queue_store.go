@@ -58,6 +58,9 @@ func (s *QueueStore) Enqueue(entry *QueueEntry) error {
 func (s *QueueStore) DequeueRoundRobin(now time.Time, limit int) ([]*QueueEntry, error) {
 	nowStr := now.UTC().Format(time.RFC3339Nano)
 
+	// Use Exec to start an IMMEDIATE transaction so the write lock is acquired
+	// upfront (with busy_timeout) rather than failing at UPDATE time with
+	// "database is locked" when another writer holds the lock.
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to begin dequeue transaction")
