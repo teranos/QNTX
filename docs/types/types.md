@@ -44,13 +44,14 @@ type AsCommand struct {
 	Actors []string `json:"actors"`
 	Timestamp time.Time `json:"timestamp"`
 	Source string `json:"source,omitempty"`
+	SourceVersion string `json:"source_version,omitempty"`
 	Attributes map[string]interface{} `json:"attributes,omitempty"`
 }
 ```
 
 ## AxDebug {#axdebug}
 
-**Source**: [`ats/types/attestation.go:128`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L128)
+**Source**: [`ats/types/attestation.go:129`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L129)
 
 
 ```go
@@ -67,7 +68,7 @@ type AxDebug struct {
 
 ## AxFilter {#axfilter}
 
-**Source**: [`ats/types/attestation.go:105`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L105)
+**Source**: [`ats/types/attestation.go:106`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L106)
 
 
 ```go
@@ -87,7 +88,7 @@ type AxFilter struct {
 
 ## AxResult {#axresult}
 
-**Source**: [`ats/types/attestation.go:119`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L119)
+**Source**: [`ats/types/attestation.go:120`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L120)
 
 
 ```go
@@ -102,7 +103,7 @@ type AxResult struct {
 
 ## AxSummary {#axsummary}
 
-**Source**: [`ats/types/attestation.go:139`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L139)
+**Source**: [`ats/types/attestation.go:140`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L140)
 
 
 ```go
@@ -133,7 +134,7 @@ type CompletionItem struct {
 
 ## Conflict {#conflict}
 
-**Source**: [`ats/types/attestation.go:148`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L148)
+**Source**: [`ats/types/attestation.go:149`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L149)
 
 
 ```go
@@ -148,7 +149,7 @@ type Conflict struct {
 
 ## OverFilter {#overfilter}
 
-**Source**: [`ats/types/attestation.go:98`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L98)
+**Source**: [`ats/types/attestation.go:99`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L99)
 
 
 ```go
