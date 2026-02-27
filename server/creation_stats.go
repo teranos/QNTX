@@ -11,9 +11,14 @@ import (
 
 // CreationStatsObserver implements storage.AttestationObserver and accumulates
 // creation counts for periodic summary logging by the Pulse ticker.
+// Tracks two dimensions that alternate each drain cycle:
+//   - "predicate of context" (e.g. "posted of atproto")
+//   - "context by actor" (e.g. "atproto by glyph:abc")
 type CreationStatsObserver struct {
-	total            atomic.Int64
-	predicateContext sync.Map // map[string]*atomic.Int64 — "predicate/context" → count
+	total        atomic.Int64
+	predContext  sync.Map // "predicate of context" → *atomic.Int64
+	contextActor sync.Map // "context by actor" → *atomic.Int64
+	drainCycle   atomic.Int64
 }
 
 // NewCreationStatsObserver creates a new creation stats observer.
@@ -28,44 +33,89 @@ func (o *CreationStatsObserver) OnAttestationCreated(as *types.As) {
 	// Track per predicate/context pair
 	for _, predicate := range as.Predicates {
 		for _, ctx := range as.Contexts {
-			key := predicate + "/" + ctx
-			val, _ := o.predicateContext.LoadOrStore(key, &atomic.Int64{})
+			key := predicate + " of " + ctx
+			val, _ := o.predContext.LoadOrStore(key, &atomic.Int64{})
+			val.(*atomic.Int64).Add(1)
+		}
+	}
+
+	// Track per context/actor pair
+	for _, ctx := range as.Contexts {
+		for _, actor := range as.Actors {
+			key := ctx + " by " + actor
+			val, _ := o.contextActor.LoadOrStore(key, &atomic.Int64{})
 			val.(*atomic.Int64).Add(1)
 		}
 	}
 }
 
-// predicateCount is a helper for sorting.
-type predicateCount struct {
+// pairCount is a helper for sorting.
+type pairCount struct {
 	Key   string
 	Count int64
 }
 
 // DrainCreationCounts atomically reads and resets the accumulated creation counters.
-// Returns total creations and up to 3 randomly selected top predicate/context pairs
-// (sampled from top 10) formatted as "predicate/context(N)".
-func (o *CreationStatsObserver) DrainCreationCounts() (total int, topPredicateContexts []string) {
+// Alternates between "predicate of context" and "context by actor" each cycle.
+// Returns total creations and up to 3 randomly selected top pairs (sampled from top 10).
+func (o *CreationStatsObserver) DrainCreationCounts() (total int, topPairs []string) {
 	total = int(o.total.Swap(0))
 	if total == 0 {
 		return 0, nil
 	}
 
-	// Drain the predicate/context map
-	var counts []predicateCount
-	o.predicateContext.Range(func(key, value any) bool {
+	cycle := o.drainCycle.Add(1)
+
+	// Alternate: odd = predicate of context, even = context by actor
+	var source *sync.Map
+	if cycle%2 == 1 {
+		source = &o.predContext
+	} else {
+		source = &o.contextActor
+	}
+
+	// Drain both maps (reset counters) but only format the active one
+	topPairs = drainAndSample(source)
+	drainMap(otherMap(cycle, &o.predContext, &o.contextActor))
+
+	return total, topPairs
+}
+
+// otherMap returns the map NOT used for display this cycle.
+func otherMap(cycle int64, predCtx, ctxActor *sync.Map) *sync.Map {
+	if cycle%2 == 1 {
+		return ctxActor
+	}
+	return predCtx
+}
+
+// drainMap resets all counters in a sync.Map without collecting results.
+func drainMap(m *sync.Map) {
+	m.Range(func(key, value any) bool {
+		count := value.(*atomic.Int64).Swap(0)
+		if count == 0 {
+			m.Delete(key)
+		}
+		return true
+	})
+}
+
+// drainAndSample drains a sync.Map and returns up to 3 randomly sampled top pairs.
+func drainAndSample(m *sync.Map) []string {
+	var counts []pairCount
+	m.Range(func(key, value any) bool {
 		count := value.(*atomic.Int64).Swap(0)
 		if count > 0 {
-			counts = append(counts, predicateCount{Key: key.(string), Count: count})
+			counts = append(counts, pairCount{Key: key.(string), Count: count})
 		}
-		// Clean up zero entries
 		if count == 0 {
-			o.predicateContext.Delete(key)
+			m.Delete(key)
 		}
 		return true
 	})
 
 	if len(counts) == 0 {
-		return total, nil
+		return nil
 	}
 
 	// Sort by count descending
@@ -80,15 +130,13 @@ func (o *CreationStatsObserver) DrainCreationCounts() (total int, topPredicateCo
 	}
 
 	if len(top) <= 3 {
-		// 3 or fewer: show all
-		topPredicateContexts = make([]string, len(top))
+		result := make([]string, len(top))
 		for i, pc := range top {
-			topPredicateContexts[i] = formatPredicateCount(pc)
+			result[i] = formatPairCount(pc)
 		}
-		return total, topPredicateContexts
+		return result
 	}
 
-	// Randomly sample 3 from top 10
 	rand.Shuffle(len(top), func(i, j int) {
 		top[i], top[j] = top[j], top[i]
 	})
@@ -99,14 +147,14 @@ func (o *CreationStatsObserver) DrainCreationCounts() (total int, topPredicateCo
 		return selected[i].Count > selected[j].Count
 	})
 
-	topPredicateContexts = make([]string, 3)
+	result := make([]string, 3)
 	for i, pc := range selected {
-		topPredicateContexts[i] = formatPredicateCount(pc)
+		result[i] = formatPairCount(pc)
 	}
-	return total, topPredicateContexts
+	return result
 }
 
-func formatPredicateCount(pc predicateCount) string {
+func formatPairCount(pc pairCount) string {
 	return pc.Key + "(" + itoa(pc.Count) + ")"
 }
 
