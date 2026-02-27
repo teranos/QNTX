@@ -17,9 +17,8 @@ import { canvasPlaced } from './manifestations/canvas-placed';
 import { uiState } from '../../state/ui';
 import { getGlyphTypeBySymbol } from './glyph-registry';
 
-// Muted azure — desaturated toward gray, dark title bar
+// Muted azure — desaturated toward gray
 const AZURE = '#adbcc1';
-const AZURE_DARK = '#10161d';
 const AZURE_KEYWORD = '#919599';
 const AZURE_VALUE = '#d7dee3';
 
@@ -91,14 +90,7 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
 
     // Title bar: + symbol + triple
     const titleBar = document.createElement('div');
-    titleBar.className = 'canvas-glyph-title-bar';
-    titleBar.style.height = 'auto';
-    titleBar.style.minHeight = '0';
-    titleBar.style.padding = '3px 8px';
-    titleBar.style.backgroundColor = AZURE_DARK;
-    titleBar.style.display = 'flex';
-    titleBar.style.alignItems = 'baseline';
-    titleBar.style.gap = '6px';
+    titleBar.className = 'glyph-title-bar glyph-title-bar--auto';
 
     const symbol = document.createElement('span');
     symbol.textContent = AS;

@@ -28,7 +28,6 @@ import {
     WINDOW_BORDER_RADIUS,
     WINDOW_BOX_SHADOW,
     TITLE_BAR_HEIGHT,
-    TITLE_BAR_PADDING,
     CANVAS_GLYPH_CONTENT_PADDING,
     GLYPH_CONTENT_INNER_PADDING,
     MAX_VIEWPORT_HEIGHT_RATIO,
@@ -124,25 +123,14 @@ export function morphToWindow(
 
         // Add window chrome (title bar, controls)
         const titleBar = document.createElement('div');
-        titleBar.className = 'window-title-bar';
-        titleBar.style.width = '100%';
-        titleBar.style.backgroundColor = 'rgba(58, 59, 58, 0.90)';
-        titleBar.style.borderBottom = '1px solid var(--border-on-dark)';
-        titleBar.style.borderRadius = '8px 8px 0 0';
-        titleBar.style.display = 'flex';
-        titleBar.style.alignItems = 'center';
-        titleBar.style.padding = TITLE_BAR_PADDING;
-        titleBar.style.flexShrink = '0'; // Prevent title bar from shrinking
-        titleBar.style.boxSizing = 'border-box'; // Include padding in width calculation
+        titleBar.className = 'glyph-title-bar';
 
         // Add title
         const titleText = document.createElement('span');
         titleText.textContent = stripHtml(glyph.title);
-        titleText.style.flex = '1';
-        titleText.style.color = 'var(--text-on-dark)';
         titleBar.appendChild(titleText);
 
-        // Add minimize button (sized by .window-title-bar button CSS, including touch breakpoints)
+        // Add minimize button
         const minimizeBtn = document.createElement('button');
         minimizeBtn.textContent = '−';
         minimizeBtn.onclick = () => morphFromWindow(

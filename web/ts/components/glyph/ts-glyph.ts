@@ -140,7 +140,7 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Orange = local-only glyph (ts-glyph always runs in-browser)
     element.dataset.localActive = 'true';
     element.style.backgroundColor = 'rgba(61, 45, 20, 0.92)';
-    const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+    const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
     if (titleBar) {
         titleBar.style.backgroundColor = '#5c3d1a';
         const labelSpan = titleBar.querySelector('span:first-child') as HTMLElement;
