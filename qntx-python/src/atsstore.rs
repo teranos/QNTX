@@ -12,7 +12,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tonic::transport::Channel;
-use tracing::{error, info};
+use tracing::error;
 
 // Thread-local storage for the ATSStore client during Python execution
 thread_local! {
@@ -68,7 +68,8 @@ impl AtsStoreClient {
             actors: actors.unwrap_or_default(),
             timestamp: None, // Server will use current time
             attributes,
-            source: "qntx-python".to_string(),
+            source: "python".to_string(),
+            source_version: env!("CARGO_PKG_VERSION").to_string(),
         };
 
         let request = GenerateAttestationRequest {
@@ -120,8 +121,6 @@ impl AtsStoreClient {
         let attestation = response
             .attestation
             .ok_or_else(|| "server returned success but no attestation".to_string())?;
-
-        info!("Created attestation via Python: {}", attestation.id);
 
         Ok(AttestationResult {
             id: attestation.id,

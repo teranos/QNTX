@@ -23,10 +23,12 @@ func (p *Plugin) attestSessionStatus(status, pdsHost, identity, errMsg string) {
 	}
 
 	cmd := &types.AsCommand{
-		Subjects:   []string{identity},
-		Predicates: []string{status},
-		Contexts:   []string{atprotoContext},
-		Attributes: attrs,
+		Subjects:      []string{identity},
+		Predicates:    []string{status},
+		Contexts:      []string{atprotoContext},
+		Source:        p.Metadata().Name,
+		SourceVersion: p.Metadata().Version,
+		Attributes:    attrs,
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.Services().Logger("atproto")
@@ -48,10 +50,12 @@ func (p *Plugin) attestPost(did, uri, cid, text string) {
 	}
 
 	cmd := &types.AsCommand{
-		Subjects:   []string{did},
-		Predicates: []string{"posted"},
-		Contexts:   []string{atprotoContext},
-		Attributes: attrs,
+		Subjects:      []string{did},
+		Predicates:    []string{"posted"},
+		Contexts:      []string{atprotoContext},
+		Source:        p.Metadata().Name,
+		SourceVersion: p.Metadata().Version,
+		Attributes:    attrs,
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.Services().Logger("atproto")
@@ -67,9 +71,11 @@ func (p *Plugin) attestFollow(actorDID, subjectDID, uri string) {
 	}
 
 	cmd := &types.AsCommand{
-		Subjects:   []string{actorDID},
-		Predicates: []string{"following"},
-		Contexts:   []string{atprotoContext},
+		Subjects:      []string{actorDID},
+		Predicates:    []string{"following"},
+		Contexts:      []string{atprotoContext},
+		Source:        p.Metadata().Name,
+		SourceVersion: p.Metadata().Version,
 		Attributes: map[string]interface{}{
 			"subject": subjectDID,
 			"uri":     uri,
@@ -89,9 +95,11 @@ func (p *Plugin) attestLike(actorDID, subjectURI, uri string) {
 	}
 
 	cmd := &types.AsCommand{
-		Subjects:   []string{actorDID},
-		Predicates: []string{"liked"},
-		Contexts:   []string{atprotoContext},
+		Subjects:      []string{actorDID},
+		Predicates:    []string{"liked"},
+		Contexts:      []string{atprotoContext},
+		Source:        p.Metadata().Name,
+		SourceVersion: p.Metadata().Version,
 		Attributes: map[string]interface{}{
 			"subject_uri": subjectURI,
 			"uri":         uri,
@@ -111,9 +119,11 @@ func (p *Plugin) attestResolve(handle, did string) {
 	}
 
 	cmd := &types.AsCommand{
-		Subjects:   []string{handle},
-		Predicates: []string{"resolved-to"},
-		Contexts:   []string{atprotoContext},
+		Subjects:      []string{handle},
+		Predicates:    []string{"resolved-to"},
+		Contexts:      []string{atprotoContext},
+		Source:        p.Metadata().Name,
+		SourceVersion: p.Metadata().Version,
 		Attributes: map[string]interface{}{
 			"did": did,
 		},
@@ -142,10 +152,12 @@ func (p *Plugin) attestTimelinePost(ctx context.Context, uri, authorDID, authorH
 	}
 
 	cmd := &types.AsCommand{
-		Subjects:   []string{uri},
-		Predicates: []string{"appeared-in-timeline"},
-		Contexts:   []string{atprotoContext},
-		Attributes: attrs,
+		Subjects:      []string{uri},
+		Predicates:    []string{"appeared-in-timeline"},
+		Contexts:      []string{atprotoContext},
+		Source:        p.Metadata().Name,
+		SourceVersion: p.Metadata().Version,
+		Attributes:    attrs,
 	}
 	if _, err := store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
 		return err

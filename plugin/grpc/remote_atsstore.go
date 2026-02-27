@@ -52,11 +52,12 @@ func (r *RemoteATSStore) Close() error {
 // GenerateAndCreateAttestation creates an attestation via gRPC.
 func (r *RemoteATSStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
 	protoCmd := &protocol.AttestationCommand{
-		Subjects:   cmd.Subjects,
-		Predicates: cmd.Predicates,
-		Contexts:   cmd.Contexts,
-		Actors:     cmd.Actors,
-		Source:     cmd.Source,
+		Subjects:      cmd.Subjects,
+		Predicates:    cmd.Predicates,
+		Contexts:      cmd.Contexts,
+		Actors:        cmd.Actors,
+		Source:        cmd.Source,
+		SourceVersion: cmd.SourceVersion,
 	}
 
 	if len(cmd.Attributes) > 0 {
@@ -161,7 +162,6 @@ func (r *RemoteATSStore) CreateAttestation(a *types.As) error {
 		return errors.Newf("failed to create attestation: %s", resp.Error)
 	}
 
-	r.logger.Infow("Attestation created via gRPC", "id", a.ID)
 	return nil
 }
 

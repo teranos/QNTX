@@ -16,11 +16,6 @@ import (
 
 // executeAction executes a watcher's action with the triggering attestation
 func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
-	e.logger.Infow("Executing watcher action",
-		"watcher_id", watcher.ID,
-		"action_type", watcher.ActionType,
-		"attestation_id", as.ID)
-
 	var err error
 
 	switch watcher.ActionType {
@@ -50,10 +45,6 @@ func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 		// Queue for retry via persistent queue
 		e.enqueueAttestation(watcher.ID, as, "retry", 1, err.Error())
 	} else {
-		e.logger.Infow("Watcher action succeeded",
-			"watcher_id", watcher.ID,
-			"attestation_id", as.ID)
-
 		// Record success
 		e.recordFire(watcher.ID)
 
