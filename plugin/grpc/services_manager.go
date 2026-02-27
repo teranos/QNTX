@@ -10,6 +10,7 @@ import (
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/pulse/schedule"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
@@ -18,6 +19,7 @@ import (
 type ServiceEndpoints struct {
 	ATSStoreAddress string
 	QueueAddress    string
+	ScheduleAddress string
 	AuthToken       string
 }
 
@@ -25,6 +27,7 @@ type ServiceEndpoints struct {
 type ServicesManager struct {
 	atsStoreServer *grpc.Server
 	queueServer    *grpc.Server
+	scheduleServer *grpc.Server
 	endpoints      ServiceEndpoints
 	logger         *zap.SugaredLogger
 }
@@ -37,7 +40,7 @@ func NewServicesManager(logger *zap.SugaredLogger) *ServicesManager {
 }
 
 // Start starts the gRPC service servers with dynamic port allocation
-func (m *ServicesManager) Start(ctx context.Context, store *storage.SQLStore, queue *async.Queue) (*ServiceEndpoints, error) {
+func (m *ServicesManager) Start(ctx context.Context, store *storage.SQLStore, queue *async.Queue, scheduleStore *schedule.Store) (*ServiceEndpoints, error) {
 	// Generate authentication token
 	authToken, err := generateAuthToken()
 	if err != nil {
@@ -53,16 +56,28 @@ func (m *ServicesManager) Start(ctx context.Context, store *storage.SQLStore, qu
 	// Start Queue service
 	queueAddr, err := m.startQueueService(ctx, queue, authToken)
 	if err != nil {
-		// Cleanup ATS store service if queue fails
 		if m.atsStoreServer != nil {
 			m.atsStoreServer.Stop()
 		}
 		return nil, errors.Wrap(err, "failed to start queue service")
 	}
 
+	// Start Schedule service
+	scheduleAddr, err := m.startScheduleService(ctx, scheduleStore, authToken)
+	if err != nil {
+		if m.atsStoreServer != nil {
+			m.atsStoreServer.Stop()
+		}
+		if m.queueServer != nil {
+			m.queueServer.Stop()
+		}
+		return nil, errors.Wrap(err, "failed to start schedule service")
+	}
+
 	m.endpoints = ServiceEndpoints{
 		ATSStoreAddress: atsStoreAddr,
 		QueueAddress:    queueAddr,
+		ScheduleAddress: scheduleAddr,
 		AuthToken:       authToken,
 	}
 
@@ -137,6 +152,40 @@ func (m *ServicesManager) startQueueService(ctx context.Context, queue *async.Qu
 	return addr, nil
 }
 
+// startScheduleService starts the Schedule gRPC service
+func (m *ServicesManager) startScheduleService(ctx context.Context, store *schedule.Store, authToken string) (string, error) {
+	// Listen on dynamic port
+	// Use explicit IPv4 127.0.0.1 instead of "localhost" to avoid IPv6 [::1] resolution
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to listen")
+	}
+
+	// Create gRPC server
+	m.scheduleServer = grpc.NewServer()
+	schedServer := NewScheduleServer(store, authToken, m.logger)
+	protocol.RegisterScheduleServiceServer(m.scheduleServer, schedServer)
+
+	// Handle context cancellation for graceful shutdown
+	go func() {
+		<-ctx.Done()
+		m.logger.Debug("Context cancelled, stopping Schedule service")
+		m.scheduleServer.GracefulStop()
+	}()
+
+	// Start serving in background
+	go func() {
+		if err := m.scheduleServer.Serve(listener); err != nil {
+			m.logger.Errorw("Schedule service error", "error", err)
+		}
+	}()
+
+	addr := listener.Addr().String()
+	m.logger.Infow("Schedule service started", "address", addr)
+
+	return addr, nil
+}
+
 // Shutdown gracefully stops all service servers
 func (m *ServicesManager) Shutdown() {
 	m.logger.Info("Shutting down plugin services")
@@ -147,6 +196,10 @@ func (m *ServicesManager) Shutdown() {
 
 	if m.queueServer != nil {
 		m.queueServer.GracefulStop()
+	}
+
+	if m.scheduleServer != nil {
+		m.scheduleServer.GracefulStop()
 	}
 
 	m.logger.Info("Plugin services stopped")

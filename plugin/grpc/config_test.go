@@ -243,6 +243,7 @@ func TestRemoteServiceRegistryConfig(t *testing.T) {
 			context.Background(),
 			"localhost:50051",
 			"localhost:50052",
+			"localhost:50053",
 			"test-token",
 			configMap,
 			nil, // logger

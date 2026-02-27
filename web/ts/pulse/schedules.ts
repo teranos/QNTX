@@ -178,7 +178,7 @@ export function renderJobCard(job: ScheduledJobResponse, state: PulsePanelState)
             </div>
 
             <div class="pulse-job-code">
-                <code>${escapeHtml(job.ats_code || job.handler_name || '')}</code>
+                <code>${escapeHtml(job.ats_code || job.handler_name || '')}</code>${!job.ats_code && job.id ? ` <span class="pulse-schedule-label">${escapeHtml(job.id.slice(-6))}</span>` : ''}
             </div>
 
             <div class="pulse-job-meta">

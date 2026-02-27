@@ -1,21 +1,12 @@
 /**
- * Hixtory Panel - IX operation history
- *
- * Displays async jobs when clicking ix (⨳) in the symbol palette:
- * - Shows job progress (15/20 operations completed)
- * - Displays cost tracking ($0.030 / $5.00 daily budget)
- * - Provides pause/resume controls for running jobs
- * - Keeps completed jobs visible for result exploration
- * - Click completed jobs to view results in graph
- * - Updates in real-time via WebSocket job_update messages
- *
- * Design based on docs/development/pulse-async-ix.md - Phase 3
+ * DEPRECATED: Hixtory Panel is a remnant from the early IX prototype.
+ * Job execution visibility has moved to the Pulse panel and per-glyph UI.
+ * This file is pending removal.
  */
 
 import { BasePanel } from './base-panel.ts';
 import type { JobUpdateData, LLMStreamData } from '../types/websocket';
 import type { Job as BackendJob } from '../../types/generated/typescript';
-import { toast } from './toast';
 import { IX } from '@generated/sym.js';
 import { formatRelativeTime } from './html-utils.ts';
 import { log, SEG } from './logger.ts';
@@ -141,7 +132,6 @@ class JobListPanel extends BasePanel {
             job._graph_query = data.metadata.graph_query as string;
         }
 
-        // Show toast notifications for important state changes
         this.notifyJobStateChange(previousJob, job);
 
         // Update jobs map
@@ -153,38 +143,8 @@ class JobListPanel extends BasePanel {
         }
     }
 
-    /**
-     * Show toast notifications for important job state changes
-     */
-    private notifyJobStateChange(previous: Job | undefined, current: Job): void {
-        const jobName = current.id.substring(0, 8);
-
-        // Job just paused - show reason
-        if (current.status === 'paused' && previous?.status !== 'paused') {
-            const pulseState = current.pulse_state;
-            const reason = pulseState?.pause_reason || 'unknown';
-
-            if (reason === 'rate_limited') {
-                toast.warning(`Job ${jobName} paused: Rate limit reached`);
-            } else if (reason === 'budget_exceeded') {
-                toast.warning(`Job ${jobName} paused: Budget limit exceeded`);
-            } else if (reason === 'user_requested') {
-                toast.info(`Job ${jobName} paused by user`);
-            }
-        }
-
-        // Job failed - show error
-        if (current.status === 'failed' && previous?.status !== 'failed') {
-            const errorMsg = current.error ? `: ${current.error.substring(0, 50)}` : '';
-            toast.error(`Job ${jobName} failed${errorMsg}`);
-        }
-
-        // Job completed - show success (only for top-level jobs, not tasks)
-        if (current.status === 'completed' && previous?.status !== 'completed') {
-            if (!current.parent_job_id) {
-                toast.success(`Job ${jobName} completed`);
-            }
-        }
+    // Deprecated: was toast notifications, now a no-op.
+    private notifyJobStateChange(_previous: Job | undefined, _current: Job): void {
     }
 
     // Handle streaming LLM output - display live tokens

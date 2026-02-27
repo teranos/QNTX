@@ -47,6 +47,11 @@
   color: #000;
 }
 
+.pulse-schedule-label {
+  color: var(--text-muted, #888);
+  font-size: 0.85em;
+}
+
 /* Job Meta */
 .pulse-job-meta {
   margin: 8px 0;

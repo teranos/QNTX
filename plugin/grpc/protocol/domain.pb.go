@@ -214,9 +214,12 @@ type InitializeRequest struct {
 	// Simple types (string, int, bool) passed as string representations
 	// Complex types (maps, slices) JSON-encoded as strings
 	// Plugins should parse and validate values appropriate to their schema
-	Config        map[string]string `protobuf:"bytes,4,rep,name=config,proto3" json:"config,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Config map[string]string `protobuf:"bytes,4,rep,name=config,proto3" json:"config,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// schedule_endpoint: gRPC endpoint for ScheduleService
+	// Provides: Runtime schedule creation, pause, resume, delete
+	ScheduleEndpoint string `protobuf:"bytes,5,opt,name=schedule_endpoint,json=scheduleEndpoint,proto3" json:"schedule_endpoint,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *InitializeRequest) Reset() {
@@ -275,6 +278,13 @@ func (x *InitializeRequest) GetConfig() map[string]string {
 		return x.Config
 	}
 	return nil
+}
+
+func (x *InitializeRequest) GetScheduleEndpoint() string {
+	if x != nil {
+		return x.ScheduleEndpoint
+	}
+	return ""
 }
 
 type HTTPRequest struct {
@@ -1283,13 +1293,14 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\fqntx_version\x18\x03 \x01(\tR\vqntxVersion\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x16\n" +
 	"\x06author\x18\x05 \x01(\tR\x06author\x12\x18\n" +
-	"\alicense\x18\x06 \x01(\tR\alicense\"\x83\x02\n" +
+	"\alicense\x18\x06 \x01(\tR\alicense\"\xb0\x02\n" +
 	"\x11InitializeRequest\x12,\n" +
 	"\x12ats_store_endpoint\x18\x01 \x01(\tR\x10atsStoreEndpoint\x12%\n" +
 	"\x0equeue_endpoint\x18\x02 \x01(\tR\rqueueEndpoint\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x03 \x01(\tR\tauthToken\x12?\n" +
-	"\x06config\x18\x04 \x03(\v2'.protocol.InitializeRequest.ConfigEntryR\x06config\x1a9\n" +
+	"\x06config\x18\x04 \x03(\v2'.protocol.InitializeRequest.ConfigEntryR\x06config\x12+\n" +
+	"\x11schedule_endpoint\x18\x05 \x01(\tR\x10scheduleEndpoint\x1a9\n" +
 	"\vConfigEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"}\n" +
