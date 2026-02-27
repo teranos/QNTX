@@ -57,8 +57,8 @@ function getPrefersReducedMotion(): boolean {
 }
 
 // Animation durations in milliseconds
-export const MAXIMIZE_DURATION_MS = 350;  // Base duration for dot → manifestation
-export const MINIMIZE_DURATION_MS = 200;  // Base duration for manifestation → dot
+export const MAXIMIZE_DURATION_MS = 450;  // Base duration for dot → manifestation
+export const MINIMIZE_DURATION_MS = 350;  // Base duration for manifestation → dot
 
 // Get actual durations considering reduced motion preference
 export function getMaximizeDuration(): number {
