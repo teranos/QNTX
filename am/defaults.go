@@ -50,7 +50,8 @@ func SetDefaults(v *viper.Viper) {
 
 	// Server configuration defaults
 	v.SetDefault("server.port", DefaultServerPort)
-	v.SetDefault("server.frontend_port", 8820) // Frontend dev server port
+	v.SetDefault("server.bind_address", "127.0.0.1") // Loopback only — safe default, no auth required
+	v.SetDefault("server.frontend_port", 8820)       // Frontend dev server port
 	v.SetDefault("server.allowed_origins", []string{
 		"http://localhost",
 		"https://localhost",
@@ -145,10 +146,18 @@ func BindSensitiveEnvVars(v *viper.Viper) {
 	// Database path
 	v.BindEnv("database.path", "QNTX_DATABASE_PATH")
 
+	// Server bind address (e.g., "0.0.0.0" for all interfaces — requires auth.enabled)
+	v.BindEnv("server.bind_address", "QNTX_BIND_ADDRESS")
+
 	// Local inference configuration
 	v.BindEnv("local_inference.enabled", "QNTX_LOCAL_INFERENCE_ENABLED")
 	v.BindEnv("local_inference.base_url", "QNTX_LOCAL_INFERENCE_BASE_URL")
 	v.BindEnv("local_inference.model", "QNTX_LOCAL_INFERENCE_MODEL")
+}
+
+// IsLoopbackAddress returns true if the address is a loopback address (127.0.0.1, ::1, localhost)
+func IsLoopbackAddress(addr string) bool {
+	return addr == "" || addr == "127.0.0.1" || addr == "::1" || addr == "localhost"
 }
 
 // GetServerPort returns the configured QNTX server port
