@@ -162,10 +162,23 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		}
 	}
 
+	// Security: non-loopback bind requires authentication
+	bindAddr := deps.config.Server.BindAddress
+	if bindAddr == "" {
+		bindAddr = "127.0.0.1"
+	}
+	if !appcfg.IsLoopbackAddress(bindAddr) && !deps.config.Auth.Enabled {
+		return nil, errors.Newf(
+			"auth.enabled must be true when server.bind_address is %q (non-loopback bind exposes all endpoints to the network)",
+			bindAddr,
+		)
+	}
+
 	// Create server instance (before ticker so we can pass it as broadcaster)
 	server := &QNTXServer{
 		db:            db,
 		dbPath:        dbPath,
+		bindAddress:   bindAddr,
 		builder:       deps.builder,
 		langService:   deps.langService,
 		usageTracker:  deps.usageTracker,
