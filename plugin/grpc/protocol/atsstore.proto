@@ -44,7 +44,8 @@ message AttestationCommand {
   repeated string actors = 4;
   optional int64 timestamp = 5;  // Unix timestamp in milliseconds. If not set, server uses current time.
   google.protobuf.Struct attributes = 6;
-  string source = 7;             // Origin identifier (e.g. "ix-json-ui", "github-webhook")
+  string source = 7;             // Plugin name that created this attestation (e.g. "python", "atproto")
+  string source_version = 8;     // Plugin version that created this attestation (e.g. "0.5.3")
 }
 
 // AttestationFilter for querying attestations

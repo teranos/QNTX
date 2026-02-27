@@ -312,6 +312,11 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	storagePoller := NewStorageEventsPoller(db, server, serverLogger)
 	server.storageEventsPoller = storagePoller
 	ticker.SetEvictionStats(storagePoller)
+
+	// Track attestation creation counts for periodic summary logging
+	creationStats := NewCreationStatsObserver()
+	storage.RegisterObserver(creationStats)
+	ticker.SetCreationStats(creationStats)
 	server.wg.Add(1)
 	go func() {
 		defer server.wg.Done()

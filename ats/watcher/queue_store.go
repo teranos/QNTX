@@ -23,9 +23,9 @@ type QueueEntry struct {
 
 // QueueStats holds aggregate statistics about the execution queue.
 type QueueStats struct {
-	TotalQueued     int            `json:"total_queued"`
-	PerWatcher      map[string]int `json:"per_watcher"`
-	OldestAgeSeconds float64       `json:"oldest_age_seconds"`
+	TotalQueued      int            `json:"total_queued"`
+	PerWatcher       map[string]int `json:"per_watcher"`
+	OldestAgeSeconds float64        `json:"oldest_age_seconds"`
 }
 
 // QueueStore manages the watcher_execution_queue table.
@@ -58,6 +58,9 @@ func (s *QueueStore) Enqueue(entry *QueueEntry) error {
 func (s *QueueStore) DequeueRoundRobin(now time.Time, limit int) ([]*QueueEntry, error) {
 	nowStr := now.UTC().Format(time.RFC3339Nano)
 
+	// Use Exec to start an IMMEDIATE transaction so the write lock is acquired
+	// upfront (with busy_timeout) rather than failing at UPDATE time with
+	// "database is locked" when another writer holds the lock.
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to begin dequeue transaction")
