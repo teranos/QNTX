@@ -234,7 +234,7 @@ const MESSAGE_HANDLERS = {
     },
 
     glyph_fired: (data: GlyphFiredMessage) => {
-        log.info(SEG.WS, 'Glyph fired:', data.glyph_id, data.status, data.error || '');
+        log.debug(SEG.WS, 'Glyph fired:', data.glyph_id, data.status, data.error || '');
 
         // Apply execution state to target glyph element for CSS-driven visual feedback
         const el = document.querySelector(`[data-glyph-id="${CSS.escape(data.glyph_id)}"]`) as HTMLElement | null;
@@ -281,7 +281,7 @@ const MESSAGE_HANDLERS = {
                 }
             }
         } else {
-            log.warn(SEG.WS, 'Glyph fired: no DOM element found for', data.glyph_id);
+            log.debug(SEG.WS, 'Glyph fired: no DOM element found for', data.glyph_id);
         }
 
         // Invoke registered handler

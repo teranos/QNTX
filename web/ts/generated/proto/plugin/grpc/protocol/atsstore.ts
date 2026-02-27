@@ -37,7 +37,13 @@ export interface AttestationCommand {
   actors: string[];
   /** Unix timestamp in milliseconds. If not set, server uses current time. */
   timestamp?: number | undefined;
-  attributes: { [key: string]: any } | undefined;
+  attributes:
+    | { [key: string]: any }
+    | undefined;
+  /** Plugin name that created this attestation (e.g. "python", "atproto") */
+  source: string;
+  /** Plugin version that created this attestation (e.g. "0.5.3") */
+  source_version: string;
 }
 
 /** AttestationFilter for querying attestations */
