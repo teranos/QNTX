@@ -74,6 +74,9 @@ export interface CreateScheduledJobRequest {
   force?: boolean;
 }
 
+export interface CreationStatsObserver {
+}
+
 export interface DaemonStatusMessage {
   /**
    * "daemon_status"

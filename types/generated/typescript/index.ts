@@ -96,6 +96,7 @@ export type {
   ConsoleFormatter,
   ConsoleLog,
   CreateScheduledJobRequest,
+  CreationStatsObserver,
   DaemonStatusMessage,
   ErrorResponse,
   GlyphFiredMessage,
