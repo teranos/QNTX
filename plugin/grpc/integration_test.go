@@ -47,7 +47,7 @@ func TestCriticalPath_PluginLifecycle(t *testing.T) {
 	defer cleanup()
 
 	// 2. Create plugin manager
-	manager := NewPluginManager(logger)
+	manager := NewPluginManager(logger, "")
 
 	// 3. Load plugin from address
 	configs := []PluginConfig{
@@ -102,7 +102,7 @@ func TestCriticalPath_MultiPluginCoordination(t *testing.T) {
 	defer cleanup3()
 
 	// Load all plugins
-	manager := NewPluginManager(logger)
+	manager := NewPluginManager(logger, "")
 	configs := []PluginConfig{
 		{Name: "plugin1", Enabled: true, Address: addr1},
 		{Name: "plugin2", Enabled: true, Address: addr2},
@@ -419,7 +419,7 @@ func TestCrash_PartialFailure(t *testing.T) {
 	addr2, cleanup2 := startTestServer(t, plugin2)
 	defer cleanup2()
 
-	manager := NewPluginManager(logger)
+	manager := NewPluginManager(logger, "")
 	configs := []PluginConfig{
 		{Name: "plugin1", Enabled: true, Address: addr1},
 		{Name: "plugin2", Enabled: true, Address: addr2},
@@ -456,7 +456,7 @@ func TestCrash_GracefulDegradation(t *testing.T) {
 	}
 
 	logger := zaptest.NewLogger(t).Sugar()
-	manager := NewPluginManager(logger)
+	manager := NewPluginManager(logger, "")
 
 	// Try to load plugin that doesn't exist
 	configs := []PluginConfig{

@@ -2,8 +2,8 @@
 // Regenerate with: make types
 // TODO: Migrate to proto generation
 // Source package: types
-// Source last modified: 2026-02-24T00:00:33+01:00
-// Source version: 12553ce0
+// Source last modified: 2026-02-27T01:28:21+01:00
+// Source version: 1ce0e009
 
 //! # types module
 //!
@@ -80,6 +80,9 @@ pub struct AsCommand {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Source of attestation (e.g., "cli", "github", "atproto")
     pub source: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Version of the source that created this attestation
+    pub source_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Arbitrary JSON
     pub attributes: Option<serde_json::Map<String, serde_json::Value>>,
