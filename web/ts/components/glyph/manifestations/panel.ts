@@ -143,6 +143,7 @@ export function morphToPanel(
 
         const titleText = document.createElement('span');
         titleText.textContent = stripHtml(glyph.title);
+        titleText.style.flex = '1';
         titleBar.appendChild(titleText);
 
         // Minimize button
