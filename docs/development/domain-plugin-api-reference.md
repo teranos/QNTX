@@ -227,7 +227,9 @@ func (p *Plugin) buildIxGitCommand() *cobra.Command {
 
 ### RegisterHTTP
 
-Registers HTTP handlers for this domain. Routes must be namespaced under `/api/<domain>/`.
+Registers HTTP handlers for this domain.
+
+**CRITICAL**: Routes must NOT include the `/api/<domain>/` prefix. The server automatically strips this prefix before routing to your plugin's mux.
 
 ```go
 func (p *Plugin) RegisterHTTP(mux *http.ServeMux) error
@@ -237,9 +239,10 @@ func (p *Plugin) RegisterHTTP(mux *http.ServeMux) error
 - `mux`: HTTP request multiplexer (plugin-specific, not global)
 
 **Route Constraints**:
-- All routes MUST start with `/api/<domain>/`
-- Example: `/api/code/`, `/api/code/github/pr`
-- **Enforcement**: Routes outside namespace will be rejected in future versions
+- Routes must NOT include the `/api/<domain>/` prefix
+- The server strips `/api/<domain>` before routing to your mux
+- Example: Browser requests `/api/code/github/pr` → Plugin receives `/github/pr`
+- Register routes as they should appear AFTER prefix stripping
 
 **Return**:
 - `nil` on success
@@ -248,13 +251,15 @@ func (p *Plugin) RegisterHTTP(mux *http.ServeMux) error
 **Example**:
 ```go
 func (p *Plugin) RegisterHTTP(mux *http.ServeMux) error {
-    // Code file tree and content
-    mux.HandleFunc("/api/code", p.handleCodeTree)
-    mux.HandleFunc("/api/code/", p.handleCodeContent)
+    // Browser requests /api/code → Plugin receives /
+    mux.HandleFunc("GET /", p.handleCodeTree)
 
-    // GitHub integration
-    mux.HandleFunc("/api/code/github/pr/", p.handlePRSuggestions)
-    mux.HandleFunc("/api/code/github/pr", p.handlePRList)
+    // Browser requests /api/code/files → Plugin receives /files
+    mux.HandleFunc("GET /files", p.handleCodeContent)
+
+    // Browser requests /api/code/github/pr → Plugin receives /github/pr
+    mux.HandleFunc("GET /github/pr", p.handlePRList)
+    mux.HandleFunc("POST /github/pr", p.handlePRSuggestions)
 
     return nil
 }
