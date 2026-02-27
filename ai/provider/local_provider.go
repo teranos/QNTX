@@ -12,7 +12,7 @@ import (
 
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/errors"
-	"github.com/teranos/QNTX/internal/httpclient"
+	"github.com/teranos/QNTX/net/httpclient"
 )
 
 // LocalProvider implements Provider interface for local inference servers
