@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/internal/httpclient"
@@ -333,8 +332,8 @@ func (lp *LocalProvider) generateTextStreamingWithContext(ctx context.Context, s
 }
 
 // ChatStreaming implements StreamingAIClient interface for Ollama streaming
-// This bridges the OpenRouter ChatRequest format to Ollama's streaming API
-func (lp *LocalProvider) ChatStreaming(ctx context.Context, req openrouter.ChatRequest, streamChan chan<- StreamChunk) error {
+// This bridges the ChatRequest format to Ollama's streaming API
+func (lp *LocalProvider) ChatStreaming(ctx context.Context, req ChatRequest, streamChan chan<- StreamChunk) error {
 	// Combine system and user prompts
 	systemPrompt := req.SystemPrompt
 	userPrompt := req.UserPrompt
