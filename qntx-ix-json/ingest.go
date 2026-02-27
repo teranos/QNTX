@@ -170,6 +170,10 @@ func extractValue(obj map[string]any, path string) string {
 		current = m[part]
 	}
 
+	if current == nil {
+		return ""
+	}
+
 	// Convert to string
 	switch v := current.(type) {
 	case string:
