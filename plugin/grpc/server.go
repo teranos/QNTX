@@ -175,6 +175,7 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 			ctx,
 			req.AtsStoreEndpoint,
 			req.QueueEndpoint,
+			req.ScheduleEndpoint,
 			req.AuthToken,
 			req.Config,
 			s.logger,
