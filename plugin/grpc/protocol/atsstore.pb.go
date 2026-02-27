@@ -156,7 +156,8 @@ type AttestationCommand struct {
 	Actors        []string               `protobuf:"bytes,4,rep,name=actors,proto3" json:"actors,omitempty"`
 	Timestamp     *int64                 `protobuf:"varint,5,opt,name=timestamp,proto3,oneof" json:"timestamp,omitempty"` // Unix timestamp in milliseconds. If not set, server uses current time.
 	Attributes    *structpb.Struct       `protobuf:"bytes,6,opt,name=attributes,proto3" json:"attributes,omitempty"`
-	Source        string                 `protobuf:"bytes,7,opt,name=source,proto3" json:"source,omitempty"` // Origin identifier (e.g. "ix-json-ui", "github-webhook")
+	Source        string                 `protobuf:"bytes,7,opt,name=source,proto3" json:"source,omitempty"`                                    // Plugin name that created this attestation (e.g. "python", "atproto")
+	SourceVersion string                 `protobuf:"bytes,8,opt,name=source_version,json=sourceVersion,proto3" json:"source_version,omitempty"` // Plugin version that created this attestation (e.g. "0.5.3")
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -236,6 +237,13 @@ func (x *AttestationCommand) GetAttributes() *structpb.Struct {
 func (x *AttestationCommand) GetSource() string {
 	if x != nil {
 		return x.Source
+	}
+	return ""
+}
+
+func (x *AttestationCommand) GetSourceVersion() string {
+	if x != nil {
+		return x.SourceVersion
 	}
 	return ""
 }
@@ -780,7 +788,7 @@ const file_plugin_grpc_protocol_atsstore_proto_rawDesc = "" +
 	"\tsignature\x18\n" +
 	" \x01(\fR\tsignature\x12\x1d\n" +
 	"\n" +
-	"signer_did\x18\v \x01(\tR\tsignerDid\"\x86\x02\n" +
+	"signer_did\x18\v \x01(\tR\tsignerDid\"\xad\x02\n" +
 	"\x12AttestationCommand\x12\x1a\n" +
 	"\bsubjects\x18\x01 \x03(\tR\bsubjects\x12\x1e\n" +
 	"\n" +
@@ -792,7 +800,8 @@ const file_plugin_grpc_protocol_atsstore_proto_rawDesc = "" +
 	"\n" +
 	"attributes\x18\x06 \x01(\v2\x17.google.protobuf.StructR\n" +
 	"attributes\x12\x16\n" +
-	"\x06source\x18\a \x01(\tR\x06sourceB\f\n" +
+	"\x06source\x18\a \x01(\tR\x06source\x12%\n" +
+	"\x0esource_version\x18\b \x01(\tR\rsourceVersionB\f\n" +
 	"\n" +
 	"_timestamp\"\xe2\x01\n" +
 	"\x11AttestationFilter\x12\x1a\n" +
