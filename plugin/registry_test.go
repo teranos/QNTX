@@ -651,6 +651,7 @@ func (m *mockServiceRegistry) Logger(domain string) *zap.SugaredLogger {
 func (m *mockServiceRegistry) Config(domain string) Config    { return &mockConfig{} }
 func (m *mockServiceRegistry) ATSStore() ats.AttestationStore { return m.store }
 func (m *mockServiceRegistry) Queue() QueueService            { return m.queue }
+func (m *mockServiceRegistry) Schedule() ScheduleService      { return nil }
 
 // Verify mockServiceRegistry implements ServiceRegistry
 var _ ServiceRegistry = (*mockServiceRegistry)(nil)
