@@ -16,11 +16,11 @@ import (
 //   - "subject predicate" (e.g. "did:plc:xxx posted")
 //   - "context by actor" (e.g. "atproto by glyph:abc")
 type CreationStatsObserver struct {
-	total         atomic.Int64
-	predContext   sync.Map // "predicate of context" → *atomic.Int64
-	subjectPred   sync.Map // "subject predicate" → *atomic.Int64
-	contextActor  sync.Map // "context by actor" → *atomic.Int64
-	drainCycle    atomic.Int64
+	total        atomic.Int64
+	predContext  sync.Map // "predicate of context" → *atomic.Int64
+	subjectPred  sync.Map // "subject predicate" → *atomic.Int64
+	contextActor sync.Map // "context by actor" → *atomic.Int64
+	drainCycle   atomic.Int64
 }
 
 // NewCreationStatsObserver creates a new creation stats observer.

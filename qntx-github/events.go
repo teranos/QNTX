@@ -138,12 +138,12 @@ func (p *Plugin) attestPullRequestEvent(ctx context.Context, store ats.Attestati
 	}
 
 	cmd := &types.AsCommand{
-		Subjects:   []string{pr.HTMLURL},
-		Predicates: []string{"pr-merged"},
-		Contexts:   []string{"github"},
+		Subjects:      []string{pr.HTMLURL},
+		Predicates:    []string{"pr-merged"},
+		Contexts:      []string{"github"},
 		Source:        p.Metadata().Name,
 		SourceVersion: p.Metadata().Version,
-		Attributes: attrs,
+		Attributes:    attrs,
 	}
 
 	_, err := store.GenerateAndCreateAttestation(ctx, cmd)
@@ -175,12 +175,12 @@ func (p *Plugin) attestReleaseEvent(ctx context.Context, store ats.AttestationSt
 	}
 
 	cmd := &types.AsCommand{
-		Subjects:   []string{release.HTMLURL},
-		Predicates: []string{"released"},
-		Contexts:   []string{"github"},
+		Subjects:      []string{release.HTMLURL},
+		Predicates:    []string{"released"},
+		Contexts:      []string{"github"},
 		Source:        p.Metadata().Name,
 		SourceVersion: p.Metadata().Version,
-		Attributes: attrs,
+		Attributes:    attrs,
 	}
 
 	_, err := store.GenerateAndCreateAttestation(ctx, cmd)
@@ -219,12 +219,12 @@ func (p *Plugin) attestIssueEvent(ctx context.Context, store ats.AttestationStor
 	}
 
 	cmd := &types.AsCommand{
-		Subjects:   []string{issue.HTMLURL},
-		Predicates: []string{predicate},
-		Contexts:   []string{"github"},
+		Subjects:      []string{issue.HTMLURL},
+		Predicates:    []string{predicate},
+		Contexts:      []string{"github"},
 		Source:        p.Metadata().Name,
 		SourceVersion: p.Metadata().Version,
-		Attributes: attrs,
+		Attributes:    attrs,
 	}
 
 	_, err := store.GenerateAndCreateAttestation(ctx, cmd)
@@ -265,12 +265,12 @@ func (p *Plugin) attestPushEvent(ctx context.Context, store ats.AttestationStore
 	}
 
 	cmd := &types.AsCommand{
-		Subjects:   []string{event.Repo.URL + "/tree/" + branch},
-		Predicates: []string{"pushed"},
-		Contexts:   []string{"github"},
+		Subjects:      []string{event.Repo.URL + "/tree/" + branch},
+		Predicates:    []string{"pushed"},
+		Contexts:      []string{"github"},
 		Source:        p.Metadata().Name,
 		SourceVersion: p.Metadata().Version,
-		Attributes: attrs,
+		Attributes:    attrs,
 	}
 
 	_, err := store.GenerateAndCreateAttestation(ctx, cmd)
