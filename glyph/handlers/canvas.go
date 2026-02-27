@@ -22,6 +22,7 @@ type CanvasHandler struct {
 	store         *glyphstorage.CanvasStore
 	watcherEngine *watcher.Engine
 	logger        *zap.SugaredLogger
+	serverPort    int // Server port for internal plugin calls
 }
 
 // NewCanvasHandler creates a new canvas handler
@@ -43,6 +44,13 @@ func WithWatcherEngine(engine *watcher.Engine, logger *zap.SugaredLogger) Canvas
 	return func(h *CanvasHandler) {
 		h.watcherEngine = engine
 		h.logger = logger
+	}
+}
+
+// WithServerPort sets the server port for internal plugin calls
+func WithServerPort(port int) CanvasHandlerOption {
+	return func(h *CanvasHandler) {
+		h.serverPort = port
 	}
 }
 
@@ -737,15 +745,21 @@ func (h *CanvasHandler) HandleExportStatic(w http.ResponseWriter, r *http.Reques
 }
 
 // getServerPort returns the server port for internal plugin calls
-// TODO: Pass this via handler config instead of hardcoding
 func (h *CanvasHandler) getServerPort() int {
-	port := os.Getenv("QNTX_PORT")
-	if port == "" {
-		return 8772 // Default from am.toml
+	// Use configured port if available
+	if h.serverPort != 0 {
+		return h.serverPort
 	}
-	portNum := 8772
-	fmt.Sscanf(port, "%d", &portNum)
-	return portNum
+
+	// Fallback to env var (useful for testing/dev)
+	port := os.Getenv("QNTX_PORT")
+	if port != "" {
+		portNum := 0
+		fmt.Sscanf(port, "%d", &portNum)
+		return portNum
+	}
+
+	return 0
 }
 
 func (h *CanvasHandler) writeJSON(w http.ResponseWriter, data any) {
