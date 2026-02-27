@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ScheduleService provides runtime schedule management for gRPC plugins.
+// Plugins use this to create, pause, resume, and delete recurring Pulse schedules.
+service ScheduleService {
+  // CreateSchedule creates a new recurring schedule in Pulse
+  rpc CreateSchedule(CreateScheduleRequest) returns (CreateScheduleResponse);
+
+  // PauseSchedule pauses an active schedule
+  rpc PauseSchedule(PauseScheduleRequest) returns (PauseScheduleResponse);
+
+  // ResumeSchedule resumes a paused schedule
+  rpc ResumeSchedule(ResumeScheduleRequest) returns (ResumeScheduleResponse);
+
+  // DeleteSchedule soft-deletes a schedule
+  rpc DeleteSchedule(DeleteScheduleRequest) returns (DeleteScheduleResponse);
+
+  // GetSchedule retrieves a schedule by ID
+  rpc GetSchedule(GetScheduleRequest) returns (GetScheduleResponse);
+}
+
+// ScheduledJob represents a recurring Pulse schedule
+message ScheduledJob {
+  string id = 1;
+  string ats_code = 2;
+  string handler_name = 3;
+  bytes payload = 4;
+  string source_url = 5;
+  int32 interval_seconds = 6;
+  string next_run_at = 7;    // RFC3339 timestamp
+  string last_run_at = 8;    // RFC3339 timestamp (empty if never run)
+  string last_execution_id = 9;
+  string state = 10;         // active, paused, deleted, inactive
+  string metadata = 11;
+  string created_at = 12;    // RFC3339 timestamp
+  string updated_at = 13;    // RFC3339 timestamp
+}
+
+message CreateScheduleRequest {
+  string auth_token = 1;
+  string handler_name = 2;      // Handler to invoke on each tick
+  int32 interval_seconds = 3;   // Execution interval
+  bytes payload = 4;            // Handler-specific data (JSON)
+  map<string, string> metadata = 5;  // Optional metadata (glyph_id, plugin, etc.)
+}
+
+message CreateScheduleResponse {
+  bool success = 1;
+  string error = 2;
+  string schedule_id = 3;       // The created schedule ID
+}
+
+message PauseScheduleRequest {
+  string auth_token = 1;
+  string schedule_id = 2;
+}
+
+message PauseScheduleResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message ResumeScheduleRequest {
+  string auth_token = 1;
+  string schedule_id = 2;
+}
+
+message ResumeScheduleResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message DeleteScheduleRequest {
+  string auth_token = 1;
+  string schedule_id = 2;
+}
+
+message DeleteScheduleResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message GetScheduleRequest {
+  string auth_token = 1;
+  string schedule_id = 2;
+}
+
+message GetScheduleResponse {
+  bool success = 1;
+  string error = 2;
+  ScheduledJob job = 3;
+}

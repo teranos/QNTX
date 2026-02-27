@@ -98,7 +98,6 @@ import {
     PulseExecutionCompletedMessage,
     PulseExecutionLogStreamMessage
 } from '../../types/websocket';
-import { toast } from '../toast';
 import {
     dispatchExecutionStarted,
     dispatchExecutionCompleted,
@@ -163,8 +162,8 @@ export function handlePulseExecutionFailed(data: PulseExecutionFailedMessage): v
         timestamp: data.timestamp
     });
 
-    // ALWAYS show failure toast
-    toast.error(`Pulse job failed: ${data.ats_code}\n\nError: ${data.error_message}`);
+    // Failure is already visible in the Pulse panel execution history.
+    // Don't toast — recurring schedule failures would spam the screen.
 }
 
 /**
