@@ -111,7 +111,7 @@ describe('TS Glyph - Tim (Happy Path)', () => {
     test('Tim sees title bar with label and run button', async () => {
         const element = await createTsGlyph(makeGlyph('ts-tim-2'));
 
-        const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
         expect(titleBar).toBeTruthy();
         expect(titleBar.querySelector('span')?.textContent).toBe('ts');
         expect(element.querySelector('.glyph-play-btn')).toBeTruthy();
@@ -125,14 +125,14 @@ describe('TS Glyph - Tim (Happy Path)', () => {
         expect(element.dataset.localActive).toBe('true');
         expect(element.style.backgroundColor).toBe('rgba(61, 45, 20, 0.92)');
 
-        const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
         expect(titleBar.style.backgroundColor).toMatch(/#5c3d1a|rgb\(92, 61, 26\)/);
     });
 
     test('Tim sees title bar label styled warm to match orange tint', async () => {
         const element = await createTsGlyph(makeGlyph('ts-tim-4'));
 
-        const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
         const label = titleBar.querySelector('span:first-child') as HTMLElement;
         expect(label.style.color).toMatch(/#f0c878|rgb\(240, 200, 120\)/);
         expect(label.style.fontWeight).toBe('bold');

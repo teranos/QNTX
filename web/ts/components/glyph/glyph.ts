@@ -77,7 +77,6 @@ export const WINDOW_BOX_SHADOW = '0 4px 12px rgba(0, 0, 0, 0.15)';
 
 // Window chrome dimensions
 export const TITLE_BAR_HEIGHT = '32px';
-export const TITLE_BAR_PADDING = '0 12px';
 export const WINDOW_BUTTON_SIZE = '24px';
 export const CONTENT_PADDING = '16px';
 

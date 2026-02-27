@@ -62,15 +62,7 @@ export function createResultGlyph(
 
     // Build header first (used as custom drag handle)
     const header = document.createElement('div');
-    header.className = 'result-glyph-header';
-    header.style.padding = '4px 8px';
-    header.style.backgroundColor = 'rgba(51, 52, 51, 0.9)';
-    header.style.borderBottom = '1px solid var(--border-color)';
-    header.style.display = 'flex';
-    header.style.alignItems = 'flex-start';
-    header.style.justifyContent = 'space-between';
-    header.style.fontSize = '11px';
-    header.style.color = 'var(--text-secondary)';
+    header.className = 'glyph-title-bar glyph-title-bar--auto result-glyph-header';
 
     // Prompt label — full multiline prompt text
     if (prompt) {
@@ -92,17 +84,15 @@ export function createResultGlyph(
     buttonContainer.style.gap = '3px';
     buttonContainer.style.flexShrink = '0';
 
-    function headerBtn(label: string, title: string, fontSize = '11px'): HTMLButtonElement {
+    function headerBtn(label: string, title: string): HTMLButtonElement {
         const btn = document.createElement('button');
-        btn.className = 'result-header-btn';
         btn.textContent = label;
         btn.title = title;
-        btn.style.fontSize = fontSize;
         return btn;
     }
 
     // Copy button — copies prompt + result to clipboard
-    const copyBtn = headerBtn('⎘', 'Copy to clipboard', '12px');
+    const copyBtn = headerBtn('⎘', 'Copy to clipboard');
 
     copyBtn.addEventListener('click', () => {
         let text = '';
@@ -117,7 +107,7 @@ export function createResultGlyph(
     buttonContainer.appendChild(copyBtn);
 
     // To window / back to canvas toggle button
-    const toWindowBtn = headerBtn('⬆', 'Expand to window', '10px');
+    const toWindowBtn = headerBtn('⬆', 'Expand to window');
 
     toWindowBtn.addEventListener('click', () => {
         if (isInWindowState(element)) {
@@ -214,7 +204,7 @@ export function createResultGlyph(
     buttonContainer.appendChild(toWindowBtn);
 
     // Close button
-    const closeBtn = headerBtn('×', 'Close result', '13px');
+    const closeBtn = headerBtn('×', 'Close result');
 
     closeBtn.addEventListener('click', () => {
         // Check if result is in a composition

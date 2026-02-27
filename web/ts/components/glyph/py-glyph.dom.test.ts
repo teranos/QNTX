@@ -52,7 +52,7 @@ describe('PyGlyph', () => {
 
         test('has title bar with py label', async () => {
             const element = await createPyGlyph(glyph);
-            const titleBar = element.querySelector('.canvas-glyph-title-bar');
+            const titleBar = element.querySelector('.glyph-title-bar');
             expect(titleBar).not.toBeNull();
             expect(titleBar?.textContent).toContain('py');
         });

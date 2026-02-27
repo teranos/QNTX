@@ -296,7 +296,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     });
 
     // Style the label span created by canvasPlaced
-    const labelSpan = element.querySelector('.canvas-glyph-title-bar > span:first-child') as HTMLElement;
+    const labelSpan = element.querySelector('.glyph-title-bar > span:first-child') as HTMLElement;
     if (labelSpan) {
         labelSpan.style.fontSize = '16px';
         labelSpan.style.color = 'var(--accent-lavender)';

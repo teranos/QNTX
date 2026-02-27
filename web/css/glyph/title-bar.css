@@ -1,0 +1,115 @@
+/**
+ * Glyph Title Bar — unified title bar for all manifestations.
+ *
+ * Averaged from six prior implementations:
+ *   window, panel, canvas-placed, canvas-window, attestation/plugin, result
+ *
+ * Modifiers:
+ *   --auto    Auto-height for multiline content (attestation, plugin, result)
+ */
+
+/* ── Base ─────────────────────────────────────────────────────────── */
+
+.glyph-title-bar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 1px 10px;
+    background-color: rgba(41, 43, 43, 0.90);
+    border-bottom: 1px solid var(--border-color);
+    border-radius: 4px 4px 0 0;
+    height: 32px;
+    flex-shrink: 0;
+    user-select: none;
+    box-sizing: border-box;
+    cursor: move;
+}
+
+.glyph-title-bar span {
+    flex: 1;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--text-on-dark);
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* ── Buttons (averaged from window controls + result header) ────── */
+
+.glyph-title-bar button {
+    width: 22px;
+    height: 22px;
+    padding: 1px 2px;
+    font-size: 13px;
+    background: rgba(104, 105, 105, 0.67);
+    color: #9fa0a0;
+    border: 1px solid #999a99;
+    border-radius: 3px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    margin-left: 2px;
+    transition: background 0.15s ease;
+}
+
+.glyph-title-bar button:hover {
+    background: #808281;
+}
+
+/* Play/execute buttons override the generic title bar button style */
+.glyph-title-bar .glyph-play-btn {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    font-size: 11px;
+    border-radius: 3px;
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    margin-left: 0;
+    transition: all 0.15s ease;
+}
+
+.glyph-title-bar .glyph-play-btn:hover {
+    background-color: var(--bg-dark-light);
+}
+
+.glyph-title-bar .glyph-play-btn:active {
+    border-color: var(--border-light);
+}
+
+/* Touch devices: enlarge buttons for reliable thumb targeting */
+@media (pointer: coarse) {
+    .glyph-title-bar {
+        height: 44px;
+    }
+
+    .glyph-title-bar button {
+        width: 44px;
+        height: 44px;
+        font-size: 17px;
+        margin-left: 2px;
+    }
+
+    .glyph-title-bar .glyph-play-btn {
+        width: 44px;
+        height: 44px;
+        font-size: 14px;
+    }
+}
+
+/* ── Auto-height modifier ─────────────────────────────────────────── */
+
+.glyph-title-bar--auto {
+    height: auto;
+    min-height: 0;
+    align-items: baseline;
+}
+
+/* ── Panel override: not draggable ─────────────────────────────────── */
+
+.glyph-panel .glyph-title-bar {
+    cursor: default;
+}

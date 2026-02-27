@@ -434,7 +434,7 @@
  * ============================================================================ */
 
 /* Compact subcanvas title bar — purple accent */
-.canvas-subcanvas-glyph .canvas-glyph-title-bar {
+.canvas-subcanvas-glyph .glyph-title-bar {
     background: #3a2d5a;
     color: #c0a0e8;
 }

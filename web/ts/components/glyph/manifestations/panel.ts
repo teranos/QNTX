@@ -139,8 +139,7 @@ export function morphToPanel(
 
         // Title bar
         const titleBar = document.createElement('div');
-        titleBar.className = 'window-title-bar';
-        titleBar.style.cursor = 'default'; // Not draggable
+        titleBar.className = 'glyph-title-bar';
 
         const titleText = document.createElement('span');
         titleText.textContent = stripHtml(glyph.title);
