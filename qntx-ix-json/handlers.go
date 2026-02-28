@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	atstypes "github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/plugin/httputil"
 )
 
 // registerHTTPHandlers registers all HTTP handlers for the ix-json plugin.
@@ -329,13 +330,13 @@ func (p *Plugin) handleIXGlyph(w http.ResponseWriter, r *http.Request) {
 func renderIXGlyphHTML(glyphID string, mode OperationMode, apiURL string, pollInterval int, mapping *MappingConfig, lastResponse []byte, version string) string {
 	var html strings.Builder
 
-	html.WriteString(fmt.Sprintf(`<div class="ix-json-content" data-glyph-id="%s">`, escapeHTMLAttr(glyphID)))
+	html.WriteString(fmt.Sprintf(`<div class="ix-json-content" data-glyph-id="%s">`, httputil.EscapeHTMLAttr(glyphID)))
 
 	// Header
 	html.WriteString(`<div class="ix-header">`)
 	html.WriteString(`<div class="ix-title">JSON API Ingestor</div>`)
 	html.WriteString(fmt.Sprintf(`<div class="ix-mode mode-%s">%s</div>`, mode, mode))
-	html.WriteString(fmt.Sprintf(`<div class="ix-version" style="font-size: 10px; color: #666; margin-left: auto;">v%s</div>`, escapeHTML(version)))
+	html.WriteString(fmt.Sprintf(`<div class="ix-version" style="font-size: 10px; color: #666; margin-left: auto;">v%s</div>`, httputil.EscapeHTML(version)))
 	html.WriteString(`</div>`)
 
 	// Configuration section
@@ -344,7 +345,7 @@ func renderIXGlyphHTML(glyphID string, mode OperationMode, apiURL string, pollIn
 	html.WriteString(`<div class="config-form">`)
 	html.WriteString(`<div class="form-group">`)
 	html.WriteString(`<label>API URL</label>`)
-	html.WriteString(fmt.Sprintf(`<input type="text" class="form-input ix-api-url" value="%s" placeholder="https://api.example.com/data">`, escapeHTMLAttr(apiURL)))
+	html.WriteString(fmt.Sprintf(`<input type="text" class="form-input ix-api-url" value="%s" placeholder="https://api.example.com/data">`, httputil.EscapeHTMLAttr(apiURL)))
 	html.WriteString(`</div>`)
 	html.WriteString(`<div class="form-group">`)
 	html.WriteString(`<label>Auth Token (optional)</label>`)
@@ -370,9 +371,9 @@ func renderIXGlyphHTML(glyphID string, mode OperationMode, apiURL string, pollIn
 		// Pretty-print JSON
 		var prettyJSON bytes.Buffer
 		if err := json.Indent(&prettyJSON, lastResponse, "", "  "); err == nil {
-			html.WriteString(fmt.Sprintf(`<pre class="json-preview">%s</pre>`, escapeHTML(prettyJSON.String())))
+			html.WriteString(fmt.Sprintf(`<pre class="json-preview">%s</pre>`, httputil.EscapeHTML(prettyJSON.String())))
 		} else {
-			html.WriteString(fmt.Sprintf(`<pre class="json-preview">%s</pre>`, escapeHTML(string(lastResponse))))
+			html.WriteString(fmt.Sprintf(`<pre class="json-preview">%s</pre>`, httputil.EscapeHTML(string(lastResponse))))
 		}
 		html.WriteString(`</div>`)
 	}
@@ -381,11 +382,11 @@ func renderIXGlyphHTML(glyphID string, mode OperationMode, apiURL string, pollIn
 	html.WriteString(`<div class="ix-section">`)
 	html.WriteString(`<h3>Attestation Mapping</h3>`)
 	if mapping != nil {
-		html.WriteString(fmt.Sprintf(`<div class="mapping-item"><strong>Subject Path:</strong> %s</div>`, escapeHTML(mapping.SubjectPath)))
-		html.WriteString(fmt.Sprintf(`<div class="mapping-item"><strong>Predicate Path:</strong> %s</div>`, escapeHTML(mapping.PredicatePath)))
-		html.WriteString(fmt.Sprintf(`<div class="mapping-item"><strong>Context Path:</strong> %s</div>`, escapeHTML(mapping.ContextPath)))
+		html.WriteString(fmt.Sprintf(`<div class="mapping-item"><strong>Subject Path:</strong> %s</div>`, httputil.EscapeHTML(mapping.SubjectPath)))
+		html.WriteString(fmt.Sprintf(`<div class="mapping-item"><strong>Predicate Path:</strong> %s</div>`, httputil.EscapeHTML(mapping.PredicatePath)))
+		html.WriteString(fmt.Sprintf(`<div class="mapping-item"><strong>Context Path:</strong> %s</div>`, httputil.EscapeHTML(mapping.ContextPath)))
 		if len(mapping.RichFields) > 0 {
-			html.WriteString(fmt.Sprintf(`<div class="mapping-item"><strong>Rich Fields:</strong> %s</div>`, escapeHTML(strings.Join(mapping.RichFields, ", "))))
+			html.WriteString(fmt.Sprintf(`<div class="mapping-item"><strong>Rich Fields:</strong> %s</div>`, httputil.EscapeHTML(strings.Join(mapping.RichFields, ", "))))
 		}
 	} else {
 		html.WriteString(`<div class="mapping-empty">No mapping configured. Run "Test Fetch" to infer a default mapping.</div>`)
@@ -718,15 +719,3 @@ func readJSON(w http.ResponseWriter, r *http.Request, v interface{}) error {
 	return nil
 }
 
-func escapeHTML(s string) string {
-	s = strings.ReplaceAll(s, "&", "&amp;")
-	s = strings.ReplaceAll(s, "<", "&lt;")
-	s = strings.ReplaceAll(s, ">", "&gt;")
-	s = strings.ReplaceAll(s, "\"", "&quot;")
-	s = strings.ReplaceAll(s, "'", "&#39;")
-	return s
-}
-
-func escapeHTMLAttr(s string) string {
-	return escapeHTML(s)
-}
