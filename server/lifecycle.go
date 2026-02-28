@@ -65,6 +65,13 @@ func (s *QNTXServer) startBackgroundServices() {
 		s.authHandler.StartSessionSweep(s.wg.Done, s.ctx.Done())
 	}
 
+	// Start rate limiter sweep goroutine
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		s.sweepRateLimiters(s.ctx)
+	}()
+
 	// Broadcast worker is started in Run() method
 	// Start usage update broadcaster
 	s.startUsageUpdateTicker()
