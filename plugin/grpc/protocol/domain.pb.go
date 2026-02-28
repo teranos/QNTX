@@ -1198,6 +1198,8 @@ type GlyphDef struct {
 	// DefaultWidth and DefaultHeight in pixels (0 = use system default)
 	DefaultWidth  int32 `protobuf:"varint,6,opt,name=default_width,json=defaultWidth,proto3" json:"default_width,omitempty"`
 	DefaultHeight int32 `protobuf:"varint,7,opt,name=default_height,json=defaultHeight,proto3" json:"default_height,omitempty"`
+	// ModulePath is the HTTP path to a JS/TS module exporting a render function
+	ModulePath    string `protobuf:"bytes,8,opt,name=module_path,json=modulePath,proto3" json:"module_path,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1279,6 +1281,13 @@ func (x *GlyphDef) GetDefaultHeight() int32 {
 		return x.DefaultHeight
 	}
 	return 0
+}
+
+func (x *GlyphDef) GetModulePath() string {
+	if x != nil {
+		return x.ModulePath
+	}
+	return ""
 }
 
 var File_plugin_grpc_protocol_domain_proto protoreflect.FileDescriptor
