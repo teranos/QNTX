@@ -9,11 +9,6 @@
  * Dynamically imported by the QNTX frontend when module_url is set in GlyphDef.
  */
 
-/**
- * @param {import('./plugin-glyph-sdk').Glyph} glyph
- * @param {import('./plugin-glyph-sdk').PluginGlyphSDK} sdk
- * @returns {HTMLElement}
- */
 export function render(glyph, sdk) {
     const { element, titleBar } = sdk.container({
         defaults: {
@@ -114,9 +109,6 @@ export function render(glyph, sdk) {
     content.appendChild(responseSection);
     content.appendChild(modeSection);
     element.appendChild(content);
-
-    // Load persisted config from the plugin's status endpoint
-    loadPersistedConfig(sdk, glyph.id, apiUrlInput, pollIntervalInput);
 
     return element;
 }
@@ -222,10 +214,3 @@ async function setMode(sdk, glyphId, mode, apiUrlEl, authTokenEl, pollIntervalEl
     }
 }
 
-async function loadPersistedConfig(sdk, glyphId, apiUrlEl, pollIntervalEl) {
-    // The glyph content_url endpoint loads config from attestations.
-    // We fetch the status endpoint to check if the plugin has persisted config.
-    // For now, config is loaded when the Go handler builds the HTML — with the
-    // module path, we'll need a dedicated config endpoint. This is a TODO.
-    // The glyph will start empty and the user fills in config.
-}

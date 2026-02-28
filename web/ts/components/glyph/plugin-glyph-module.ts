@@ -55,19 +55,24 @@ export async function createPluginGlyphFromModule(
     }
 }
 
-/** Load and cache a plugin module. */
+/** Load and cache a plugin module. Only caches successful imports. */
 function loadModule(url: string): Promise<PluginGlyphModule> {
-    let cached = moduleCache.get(url);
-    if (!cached) {
-        cached = import(/* @vite-ignore */ url).then((mod) => {
-            // Support both default export and named export
-            if (typeof mod.render === 'function') return mod as PluginGlyphModule;
-            if (mod.default && typeof mod.default.render === 'function') return mod.default as PluginGlyphModule;
-            throw new Error(`Module does not export a render function: ${url}`);
-        });
-        moduleCache.set(url, cached);
-    }
-    return cached;
+    const cached = moduleCache.get(url);
+    if (cached) return cached;
+
+    const pending = import(/* @vite-ignore */ url).then((mod) => {
+        // Support both default export and named export
+        if (typeof mod.render === 'function') return mod as PluginGlyphModule;
+        if (mod.default && typeof mod.default.render === 'function') return mod.default as PluginGlyphModule;
+        throw new Error(`Module does not export a render function: ${url}`);
+    });
+
+    // Cache the promise immediately for dedup, but evict on failure
+    // so the next attempt can retry (e.g., after plugin restart)
+    moduleCache.set(url, pending);
+    pending.catch(() => { moduleCache.delete(url); });
+
+    return pending;
 }
 
 /** Create an error placeholder when module loading fails. */

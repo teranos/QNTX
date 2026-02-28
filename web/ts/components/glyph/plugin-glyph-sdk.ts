@@ -97,6 +97,8 @@ export interface PluginFetchOpts {
 export function createPluginSDK(glyph: Glyph, pluginName: string): PluginGlyphSDK {
     // Element reference — set when container() is called
     let rootElement: HTMLElement | null = null;
+    // Cleanups registered before container() — flushed when container is created
+    const pendingCleanups: Array<() => void> = [];
 
     const prefix = `[Plugin:${pluginName}]`;
 
@@ -113,6 +115,13 @@ export function createPluginSDK(glyph: Glyph, pluginName: string): PluginGlyphSD
 
             const result = canvasPlaced(config);
             rootElement = result.element;
+
+            // Flush any cleanups registered before container() was called
+            for (const fn of pendingCleanups) {
+                storeCleanup(rootElement, fn);
+            }
+            pendingCleanups.length = 0;
+
             return result;
         },
 
@@ -153,6 +162,8 @@ export function createPluginSDK(glyph: Glyph, pluginName: string): PluginGlyphSD
         onCleanup(fn: () => void) {
             if (rootElement) {
                 storeCleanup(rootElement, fn);
+            } else {
+                pendingCleanups.push(fn);
             }
         },
 
