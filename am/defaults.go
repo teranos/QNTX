@@ -61,6 +61,18 @@ func SetDefaults(v *viper.Viper) {
 	})
 	v.SetDefault("server.log_theme", "everforest")
 
+	// Rate limiting defaults (per-IP token bucket)
+	v.SetDefault("server.rate_limit.auth_rate", 2.0)
+	v.SetDefault("server.rate_limit.auth_burst", 5)
+	v.SetDefault("server.rate_limit.ws_rate", 2.0)
+	v.SetDefault("server.rate_limit.ws_burst", 10)
+	v.SetDefault("server.rate_limit.write_rate", 20.0)
+	v.SetDefault("server.rate_limit.write_burst", 40)
+	v.SetDefault("server.rate_limit.read_rate", 60.0)
+	v.SetDefault("server.rate_limit.read_burst", 120)
+	v.SetDefault("server.rate_limit.public_rate", 10.0)
+	v.SetDefault("server.rate_limit.public_burst", 20)
+
 	// Embeddings (semantic search) defaults
 	v.SetDefault("embeddings.enabled", false) // Disabled by default - requires ONNX model
 	v.SetDefault("embeddings.path", "ats/embeddings/models/all-MiniLM-L6-v2/model.onnx")

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -174,6 +175,9 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		)
 	}
 
+	// Initialize per-IP rate limiters from config
+	rl := deps.config.Server.RateLimit
+
 	// Create server instance (before ticker so we can pass it as broadcaster)
 	server := &QNTXServer{
 		db:            db,
@@ -196,6 +200,11 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		wsCore:        wsCore,
 		consoleBuffer: consoleBuffer, // Browser console log buffer with terminal printing
 		initialQuery:  query,
+		rlAuth:        newRateLimitGroup(rl.AuthRate, rl.AuthBurst),
+		rlWS:          newRateLimitGroup(rl.WSRate, rl.WSBurst),
+		rlWrite:       newRateLimitGroup(rl.WriteRate, rl.WriteBurst),
+		rlRead:        newRateLimitGroup(rl.ReadRate, rl.ReadBurst),
+		rlPublic:      newRateLimitGroup(rl.PublicRate, rl.PublicBurst),
 		ctx:           ctx,
 		cancel:        cancel,
 	}
@@ -215,7 +224,12 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		if deps.config.Server.Port != nil {
 			serverPort = *deps.config.Server.Port
 		}
-		authHandler, err := auth.New(db, serverPort, deps.config.Server.FrontendPort, deps.config.Auth.SessionExpiryHours, serverLogger, server.corsMiddleware)
+		// Auth routes: rate limit BEFORE CORS so brute-force attempts are rejected early.
+		// CORS still runs first for OPTIONS preflight (corsMiddleware short-circuits OPTIONS with 200).
+		authCorsWrap := func(handler http.HandlerFunc) http.HandlerFunc {
+			return server.rateLimitAuthMiddleware(server.corsMiddleware(handler))
+		}
+		authHandler, err := auth.New(db, serverPort, deps.config.Server.FrontendPort, deps.config.Auth.SessionExpiryHours, serverLogger, authCorsWrap)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to initialize WebAuthn auth")
 		}
