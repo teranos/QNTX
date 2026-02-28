@@ -1198,7 +1198,9 @@ type GlyphDef struct {
 	// DefaultWidth and DefaultHeight in pixels (0 = use system default)
 	DefaultWidth  int32 `protobuf:"varint,6,opt,name=default_width,json=defaultWidth,proto3" json:"default_width,omitempty"`
 	DefaultHeight int32 `protobuf:"varint,7,opt,name=default_height,json=defaultHeight,proto3" json:"default_height,omitempty"`
-	// ModulePath is the HTTP path to a JS/TS module exporting a render function
+	// ModulePath is the HTTP path to a JS/TS module exporting a render function.
+	// When set, the frontend dynamically imports it with SDK injection,
+	// bypassing the server-rendered HTML pipeline.
 	ModulePath    string `protobuf:"bytes,8,opt,name=module_path,json=modulePath,proto3" json:"module_path,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1395,7 +1397,7 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x05stage\x18\x04 \x01(\tR\x05stage\x12\x1a\n" +
 	"\bmetadata\x18\x05 \x01(\tR\bmetadata\">\n" +
 	"\x10GlyphDefResponse\x12*\n" +
-	"\x06glyphs\x18\x01 \x03(\v2\x12.protocol.GlyphDefR\x06glyphs\"\xd8\x01\n" +
+	"\x06glyphs\x18\x01 \x03(\v2\x12.protocol.GlyphDefR\x06glyphs\"\xf9\x01\n" +
 	"\bGlyphDef\x12\x16\n" +
 	"\x06symbol\x18\x01 \x01(\tR\x06symbol\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x14\n" +
@@ -1403,7 +1405,9 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\fcontent_path\x18\x04 \x01(\tR\vcontentPath\x12\x19\n" +
 	"\bcss_path\x18\x05 \x01(\tR\acssPath\x12#\n" +
 	"\rdefault_width\x18\x06 \x01(\x05R\fdefaultWidth\x12%\n" +
-	"\x0edefault_height\x18\a \x01(\x05R\rdefaultHeight2\xcf\x04\n" +
+	"\x0edefault_height\x18\a \x01(\x05R\rdefaultHeight\x12\x1f\n" +
+	"\vmodule_path\x18\b \x01(\tR\n" +
+	"modulePath2\xcf\x04\n" +
 	"\x13DomainPluginService\x127\n" +
 	"\bMetadata\x12\x0f.protocol.Empty\x1a\x1a.protocol.MetadataResponse\x12G\n" +
 	"\n" +
