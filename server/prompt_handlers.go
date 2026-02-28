@@ -1,7 +1,10 @@
 package server
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -118,6 +121,40 @@ type PromptExecuteResponse struct {
 	Error            string   `json:"error,omitempty"`
 }
 
+// resolveProvider returns the effective AI provider name.
+// Explicit request value takes priority; otherwise falls back to config.
+// When local_inference is disabled (default), returns "openrouter".
+func resolveProvider(explicit string) string {
+	if explicit != "" {
+		return explicit
+	}
+	if appcfg.GetBool("local_inference.enabled") {
+		return "local"
+	}
+	return "openrouter"
+}
+
+// forwardToProviderPlugin re-encodes the request and forwards it to the named plugin's
+// prompt handler. Returns true if forwarded, false if the provider is local or unknown.
+func (s *QNTXServer) forwardToProviderPlugin(w http.ResponseWriter, r *http.Request, providerName string, body any, endpoint string) bool {
+	if providerName == "local" {
+		return false
+	}
+	if s.pluginRegistry == nil || !s.pluginRegistry.IsReady(providerName) {
+		return false
+	}
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		writeWrappedError(w, s.logger, errors.Wrap(err, "failed to re-encode request for plugin"), "Plugin forward failed", http.StatusInternalServerError)
+		return true
+	}
+	r.Body = io.NopCloser(bytes.NewReader(encoded))
+	r.ContentLength = int64(len(encoded))
+	r.URL.Path = "/api/" + providerName + endpoint
+	s.handlePluginRequest(w, r)
+	return true
+}
+
 // HandlePromptPreview handles POST /api/prompt/preview
 // Samples X attestations, executes prompt against them, and returns results for comparison
 func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request) {
@@ -130,6 +167,10 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 
 	var req PromptPreviewRequest
 	if err := readJSON(w, r, &req); err != nil {
+		return
+	}
+
+	if s.forwardToProviderPlugin(w, r, resolveProvider(req.Provider), req, "/prompt/preview") {
 		return
 	}
 
@@ -347,6 +388,10 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if s.forwardToProviderPlugin(w, r, resolveProvider(req.Provider), req, "/prompt/execute") {
+		return
+	}
+
 	// Validation
 	if strings.TrimSpace(req.AxQuery) == "" {
 		writeError(w, http.StatusBadRequest, "ax_query is required")
@@ -440,6 +485,12 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 
 	if req.Template == "" {
 		writeError(w, http.StatusBadRequest, "template is required")
+		return
+	}
+
+	// If provider matches a running plugin, forward the entire request to it.
+	// The plugin handles frontmatter, attachments, attestations, and the LLM call.
+	if s.forwardToProviderPlugin(w, r, resolveProvider(req.Provider), req, "/prompt/direct") {
 		return
 	}
 
