@@ -238,7 +238,10 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 
 	// Register system type definitions so attestations render in the graph
 	{
-		store := storage.NewSQLStore(db, serverLogger)
+		store, err := storage.NewStore(db, dbPath, serverLogger)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create attestation store for type registration")
+		}
 		if err := types.EnsureTypes(store, "prompt-direct", types.PromptResult); err != nil {
 			serverLogger.Warnw("Failed to register prompt-result type", "error", err)
 		}
@@ -253,13 +256,17 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		server.pluginRegistry = pluginRegistry
 
 		// Initialize plugins with services
-		store := storage.NewSQLStore(db, serverLogger)
+		sqlStore := storage.NewSQLStore(db, serverLogger)
+		pluginStore, err := storage.NewStore(db, dbPath, serverLogger)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create attestation store for plugins")
+		}
 		queue := daemon.GetQueue()
 
 		// Start gRPC services for plugins (Issue #138)
 		// These services allow plugins to call back to QNTX core
 		servicesManager := grpcplugin.NewServicesManager(serverLogger)
-		endpoints, err := servicesManager.Start(ctx, store, queue, scheduleStore)
+		endpoints, err := servicesManager.Start(ctx, sqlStore, queue, scheduleStore)
 		if err != nil {
 			serverLogger.Warnw("Failed to start plugin services, plugins will not have service access", "error", err)
 			endpoints = nil
@@ -277,7 +284,7 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 			endpoints: endpoints,
 		}
 
-		services := plugin.NewServiceRegistry(db, serverLogger, store, configProvider, queue)
+		services := plugin.NewServiceRegistry(db, serverLogger, pluginStore, configProvider, queue)
 
 		if err := pluginRegistry.InitializeAll(ctx, services); err != nil {
 			serverLogger.Errorw("Failed to initialize domain plugins", "error", err)

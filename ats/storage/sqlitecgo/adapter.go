@@ -20,6 +20,8 @@ type rustAttestation struct {
 	Source     string                 `json:"source"`
 	Attributes map[string]interface{} `json:"attributes"`
 	CreatedAt  int64                  `json:"created_at"` // Unix milliseconds
+	Signature  []byte                 `json:"signature,omitempty"`
+	SignerDID  string                 `json:"signer_did,omitempty"`
 }
 
 // toRustJSON converts Go types.As to Rust-compatible JSON.
@@ -44,6 +46,8 @@ func toRustJSON(as *types.As) ([]byte, error) {
 		Source:     as.Source,
 		Attributes: attrs,
 		CreatedAt:  as.CreatedAt.UnixMilli(),
+		Signature:  as.Signature,
+		SignerDID:  as.SignerDID,
 	}
 
 	return json.Marshal(rust)
@@ -70,6 +74,8 @@ func fromRustJSON(jsonBytes []byte) (*types.As, error) {
 		Source:     rust.Source,
 		Attributes: rust.Attributes,
 		CreatedAt:  createdAt,
+		Signature:  rust.Signature,
+		SignerDID:  rust.SignerDID,
 	}
 
 	return as, nil
