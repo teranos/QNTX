@@ -11,6 +11,9 @@
 import { log, SEG } from '../../../logger';
 import { stripHtml } from '../../../html-utils';
 import type { Glyph } from '../glyph';
+import { addWindowControls } from './title-bar-controls';
+import { stashContent, restoreContent } from './stash';
+import { setupWindowDrag, teardownWindowDrag } from './canvas-window';
 import {
     setWindowState,
     getLastPosition,
@@ -111,7 +114,7 @@ export function morphToWindow(
         glyphElement.style.width = `${windowWidth}px`;
         glyphElement.style.height = `${windowHeight}px`;
         glyphElement.style.borderRadius = WINDOW_BORDER_RADIUS;
-        glyphElement.style.backgroundColor = 'rgba(58, 59, 58, 0.90)';
+        glyphElement.style.backgroundColor = 'var(--bg-almost-black)';
         glyphElement.style.boxShadow = WINDOW_BOX_SHADOW;
         glyphElement.style.padding = '0';
         glyphElement.style.opacity = '1';
@@ -120,79 +123,98 @@ export function morphToWindow(
         // Set up window as flex container
         glyphElement.style.display = 'flex';
         glyphElement.style.flexDirection = 'column';
+        glyphElement.style.overflow = 'hidden';
 
-        // Add window chrome (title bar, controls)
-        const titleBar = document.createElement('div');
-        titleBar.className = 'glyph-title-bar';
+        // Try restoring stashed content first (preserves glyph identity)
+        const restored = restoreContent(glyphElement);
 
-        // Add title
-        const titleText = document.createElement('span');
-        titleText.textContent = stripHtml(glyph.title);
-        titleText.style.flex = '1';
-        titleBar.appendChild(titleText);
+        let titleBar: HTMLElement;
+        let contentElement: HTMLElement | null = null;
 
-        // Add minimize button
-        const minimizeBtn = document.createElement('button');
-        minimizeBtn.textContent = '−';
-        minimizeBtn.onclick = () => morphFromWindow(
-            glyphElement,
-            glyph,
-            verifyElement,
-            onMinimize
-        );
-        titleBar.appendChild(minimizeBtn);
+        if (restored) {
+            // Content restored from stash — find existing title bar
+            titleBar = glyphElement.querySelector('.glyph-title-bar') as HTMLElement;
+            if (!titleBar) {
+                // Stash had no title bar — create generic
+                titleBar = document.createElement('div');
+                titleBar.className = 'glyph-title-bar';
+                const titleText = document.createElement('span');
+                titleText.textContent = stripHtml(glyph.title);
+                titleText.style.flex = '1';
+                titleBar.appendChild(titleText);
+                glyphElement.insertBefore(titleBar, glyphElement.firstChild);
+            }
 
-        // Add close button if glyph has onClose (sized by CSS, including touch breakpoints)
-        if (glyph.onClose) {
-            const closeBtn = document.createElement('button');
-            closeBtn.textContent = '×';
-            closeBtn.onclick = () => {
-                // Remove from tray data AND remove element
+            // Find content element (first non-title-bar child)
+            for (const child of Array.from(glyphElement.children)) {
+                if (child !== titleBar) {
+                    contentElement = child as HTMLElement;
+                    break;
+                }
+            }
+
+            log.debug(SEG.GLYPH, `[Window] Restored stashed content for ${glyph.id}`);
+        } else {
+            // No stash: initial creation — use renderTitleBar/renderContent callbacks
+            if (glyph.renderTitleBar) {
+                titleBar = glyph.renderTitleBar();
+            } else {
+                titleBar = document.createElement('div');
+                titleBar.className = 'glyph-title-bar';
+                const titleText = document.createElement('span');
+                titleText.textContent = stripHtml(glyph.title);
+                titleText.style.flex = '1';
+                titleBar.appendChild(titleText);
+            }
+
+            glyphElement.appendChild(titleBar);
+
+            // Add content area with error boundary
+            try {
+                const content = glyph.renderContent();
+                content.style.padding = `${CANVAS_GLYPH_CONTENT_PADDING}px`;
+                content.style.flex = '1';
+                content.style.overflow = 'auto';
+                glyphElement.appendChild(content);
+                contentElement = content;
+            } catch (error) {
+                log.error(SEG.GLYPH, `[Window ${glyph.id}] Error rendering content:`, error);
+                const errorContent = document.createElement('div');
+                errorContent.style.padding = '8px';
+                errorContent.style.flex = '1';
+                errorContent.style.overflow = 'auto';
+                errorContent.style.color = 'var(--color-error)';
+                errorContent.style.fontFamily = 'var(--font-mono)';
+                errorContent.innerHTML = `
+                        <div style="margin-bottom: 8px; font-weight: bold;">Error rendering content</div>
+                        <div style="opacity: 0.8; font-size: 12px;">${error instanceof Error ? error.message : String(error)}</div>
+                    `;
+                glyphElement.appendChild(errorContent);
+                contentElement = errorContent;
+            }
+        }
+
+        // Add window controls (minimize/close) to the title bar
+        addWindowControls(titleBar, {
+            onMinimize: () => morphFromWindow(glyphElement, glyph, verifyElement, onMinimize),
+            onClose: glyph.onClose ? () => {
                 onRemove(glyph.id);
                 glyphElement.remove();
-                // Call onClose in try-catch (cleanup already done, so safe if it fails)
                 try {
                     glyph.onClose!();
                 } catch (error) {
                     log.error(SEG.GLYPH, `[Window ${glyph.id}] Error in onClose callback:`, error);
                 }
-            };
-            titleBar.appendChild(closeBtn);
-        }
-
-        glyphElement.appendChild(titleBar);
-
-        // Add content area with error boundary
-        let contentElement: HTMLElement;
-        try {
-            const content = glyph.renderContent();
-            content.style.padding = `${CANVAS_GLYPH_CONTENT_PADDING}px`;
-            content.style.flex = '1'; // Take remaining space in flex container
-            content.style.overflow = 'auto';
-            glyphElement.appendChild(content);
-            contentElement = content;
-        } catch (error) {
-            // Show error UI if renderContent fails
-            log.error(SEG.GLYPH, `[Window ${glyph.id}] Error rendering content:`, error);
-            const errorContent = document.createElement('div');
-            errorContent.style.padding = '8px'; // Reduced from CONTENT_PADDING (16px)
-            errorContent.style.flex = '1';
-            errorContent.style.overflow = 'auto';
-            errorContent.style.color = 'var(--color-error)';
-            errorContent.style.fontFamily = 'var(--font-mono)';
-            errorContent.innerHTML = `
-                    <div style="margin-bottom: 8px; font-weight: bold;">Error rendering content</div>
-                    <div style="opacity: 0.8; font-size: 12px;">${error instanceof Error ? error.message : String(error)}</div>
-                `;
-            glyphElement.appendChild(errorContent);
-            contentElement = errorContent;
-        }
+            } : undefined,
+        });
 
         // Set up ResizeObserver for auto-sizing window to content
-        setupWindowResizeObserver(glyphElement, contentElement, glyph.id);
+        if (contentElement) {
+            setupWindowResizeObserver(glyphElement, contentElement, glyph.id);
+        }
 
-        // Make window draggable
-        makeWindowDraggable(glyphElement, titleBar);
+        // Make window draggable (uses same system as canvas-window.ts for compatibility)
+        setupWindowDrag(glyphElement, titleBar);
     }).catch(error => {
         // ROLLBACK: Animation was cancelled or failed
         log.warn(SEG.GLYPH, `[Window] Animation failed for ${glyph.id}:`, error);
@@ -220,17 +242,11 @@ export function morphFromWindow(
     // Remember window position for next time it opens
     setLastPosition(windowElement, currentRect.left, currentRect.top);
 
-    // Cleanup ResizeObserver
-    const resizeObserver = (windowElement as any).__resizeObserver;
-    if (resizeObserver && typeof resizeObserver.disconnect === 'function') {
-        resizeObserver.disconnect();
-        delete (windowElement as any).__resizeObserver;
-        log.debug(SEG.GLYPH, `[Window] ResizeObserver cleaned up for ${glyph.id}`);
-    }
+    // Tear down window drag handlers before stashing (prevents handler accumulation)
+    teardownWindowDrag(windowElement);
 
-    // Clear window content immediately for visual feedback
-    windowElement.innerHTML = '';
-    windowElement.textContent = '';
+    // Stash content (strips window controls, preserves glyph identity off-DOM)
+    stashContent(windowElement);
 
     // Calculate target position for the dot
     // The glyph will go to the right side of the tray
@@ -278,103 +294,6 @@ export function morphFromWindow(
             log.warn(SEG.GLYPH, `[Window] Animation failed for ${glyph.id}:`, error);
             // Element stays in window state, can retry
         });
-}
-
-/**
- * Make a window draggable by its title bar
- */
-function makeWindowDraggable(windowElement: HTMLElement, handle: HTMLElement): void {
-    let isDragging = false;
-    let offsetX = 0;
-    let offsetY = 0;
-
-    const startDrag = (e: MouseEvent | TouchEvent) => {
-        // Handle both mouse and touch/pen input
-        const clientX = e instanceof MouseEvent ? e.clientX : e.touches[0]?.clientX;
-        const clientY = e instanceof MouseEvent ? e.clientY : e.touches[0]?.clientY;
-
-        if (!clientX || !clientY) return;
-
-        isDragging = true;
-
-        // Calculate offset from pointer to window top-left
-        const rect = windowElement.getBoundingClientRect();
-        offsetX = clientX - rect.left;
-        offsetY = clientY - rect.top;
-
-        // Prevent text selection while dragging
-        e.preventDefault();
-
-        // Add cursor style
-        document.body.style.cursor = 'move';
-
-        // Move handlers to window for better capture
-        window.addEventListener('mousemove', drag);
-        window.addEventListener('mouseup', stopDrag);
-        window.addEventListener('touchmove', drag, { passive: false });
-        window.addEventListener('touchend', stopDrag);
-        window.addEventListener('keydown', cancelOnEscape);
-    };
-
-    const drag = (e: MouseEvent | TouchEvent) => {
-        if (!isDragging) return;
-
-        // Handle both mouse and touch input
-        const clientX = e instanceof MouseEvent ? e.clientX : e.touches[0]?.clientX;
-        const clientY = e instanceof MouseEvent ? e.clientY : e.touches[0]?.clientY;
-
-        if (!clientX || !clientY) return;
-
-        // Calculate new position
-        let newX = clientX - offsetX;
-        let newY = clientY - offsetY;
-
-        // Clamp to viewport bounds (keep at least 50px visible)
-        const rect = windowElement.getBoundingClientRect();
-        const minVisibleArea = 50;
-
-        // Clamp X position
-        newX = Math.max(-rect.width + minVisibleArea, newX);
-        newX = Math.min(window.innerWidth - minVisibleArea, newX);
-
-        // Clamp Y position (keep title bar visible)
-        newY = Math.max(0, newY);
-        newY = Math.min(window.innerHeight - minVisibleArea, newY);
-
-        windowElement.style.left = `${newX}px`;
-        windowElement.style.top = `${newY}px`;
-    };
-
-    const stopDrag = () => {
-        if (!isDragging) return;
-        isDragging = false;
-
-        // Reset cursor
-        document.body.style.cursor = '';
-
-        // Save final position for next time window opens
-        const finalRect = windowElement.getBoundingClientRect();
-        setLastPosition(windowElement, finalRect.left, finalRect.top);
-
-        // TODO(#609): Detect proximity to viewport edges and snap to panel manifestation
-
-        // Remove all event handlers
-        window.removeEventListener('mousemove', drag);
-        window.removeEventListener('mouseup', stopDrag);
-        window.removeEventListener('touchmove', drag);
-        window.removeEventListener('touchend', stopDrag);
-        window.removeEventListener('keydown', cancelOnEscape);
-    };
-
-    const cancelOnEscape = (e: KeyboardEvent) => {
-        if (e.key === 'Escape' && isDragging) {
-            stopDrag();
-        }
-    };
-
-    // Add both mouse and touch/pen event handlers
-    handle.addEventListener('mousedown', startDrag);
-    handle.addEventListener('touchstart', startDrag, { passive: false });
 }
 
 /**

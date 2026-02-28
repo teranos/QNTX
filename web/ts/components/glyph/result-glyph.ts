@@ -161,13 +161,15 @@ export function createResultGlyph(
                     uiState.removeCanvasGlyph(glyph.id);
                     log.debug(SEG.GLYPH, `[ResultGlyph] Closed from window ${glyph.id}`);
                 },
-                onMinimize: () => {
-                    // Keep glyph data in uiState (needed for tray restoration on refresh)
-                    glyphRun.add({
+                onMinimize: (el: HTMLElement) => {
+                    // Adopt the same element into the tray (preserves DOM identity)
+                    // renderContent/renderTitleBar are fallbacks for page-refresh restoration
+                    glyphRun.adopt(el, {
                         id: glyph.id,
                         title: prompt || 'Result',
                         symbol: 'result',
                         renderContent: () => renderResultContent(result, promptConfig, prompt),
+                        renderTitleBar: () => buildResultTitleBar(result, prompt),
                         onClose: () => {
                             log.debug(SEG.GLYPH, `[ResultGlyph] Closed from tray ${glyph.id}`);
                         },
@@ -534,6 +536,50 @@ function renderOutput(container: HTMLElement, result: ExecutionResult): void {
         container.style.color = 'var(--text-secondary)';
         container.style.fontStyle = 'italic';
     }
+}
+
+/**
+ * Build a result glyph title bar for tray restoration.
+ * Contains prompt label + copy/close buttons (no expand button — already in window).
+ */
+export function buildResultTitleBar(execResult: ExecutionResult, promptText?: string): HTMLElement {
+    const header = document.createElement('div');
+    header.className = 'glyph-title-bar glyph-title-bar--auto result-glyph-header';
+
+    if (promptText) {
+        const promptLabel = document.createElement('span');
+        promptLabel.className = 'result-prompt-label';
+        promptLabel.style.flex = '1';
+        promptLabel.style.whiteSpace = 'pre-wrap';
+        promptLabel.style.wordBreak = 'break-word';
+        promptLabel.style.padding = '0 8px';
+        promptLabel.style.color = 'var(--text-on-dark)';
+        promptLabel.style.fontSize = '12px';
+        promptLabel.textContent = promptText;
+        header.appendChild(promptLabel);
+    }
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.display = 'flex';
+    buttonContainer.style.gap = '3px';
+    buttonContainer.style.flexShrink = '0';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = '\u2398'; // ⎘
+    copyBtn.title = 'Copy to clipboard';
+    copyBtn.addEventListener('click', () => {
+        let text = '';
+        if (promptText) text += `> ${promptText.replace(/\n/g, '\n> ')}\n\n`;
+        text += execResult.stdout || execResult.error || '(no output)';
+        navigator.clipboard.writeText(text).then(() => {
+            copyBtn.textContent = '\u2713'; // ✓
+            setTimeout(() => { copyBtn.textContent = '\u2398'; }, 1500);
+        });
+    });
+    buttonContainer.appendChild(copyBtn);
+
+    header.appendChild(buttonContainer);
+    return header;
 }
 
 /**

@@ -466,6 +466,47 @@ describe('Canvas → Window Morph', () => {
         resetCanvasState('offset-canvas');
     });
 
+    // ── Glyph-owned title bar preservation ──────────────────────────
+
+    test('minimize: glyph-owned title bar is preserved, only window controls removed', async () => {
+        const { contentLayer, glyph } = buildCanvas();
+
+        // Replace the .result-glyph-header with a proper .glyph-title-bar
+        const oldHeader = glyph.querySelector('.result-glyph-header')!;
+        const glyphTitleBar = document.createElement('div');
+        glyphTitleBar.className = 'glyph-title-bar';
+        const glyphBtn = document.createElement('button');
+        glyphBtn.textContent = 'Copy';
+        glyphTitleBar.appendChild(glyphBtn);
+        glyph.replaceChild(glyphTitleBar, oldHeader);
+
+        morphCanvasPlacedToWindow(glyph, {
+            title: 'Test',
+            canvasId: 'test-canvas',
+            onRestoreComplete: () => {},
+        });
+
+        await new Promise(r => queueMicrotask(r));
+        await new Promise(r => queueMicrotask(r));
+
+        // Window controls should have been added to existing title bar
+        expect(glyphTitleBar.querySelector('.glyph-window-controls')).not.toBeNull();
+
+        mockRect(glyph, { left: 300, top: 100, width: 520, height: 420 });
+        const minimizeBtn = glyphTitleBar.querySelector('.glyph-window-controls button') as HTMLElement;
+        minimizeBtn.click();
+
+        await new Promise(r => queueMicrotask(r));
+        await new Promise(r => queueMicrotask(r));
+
+        // Title bar should still exist (glyph-owned)
+        expect(glyph.querySelector('.glyph-title-bar')).not.toBeNull();
+        // But window controls should be stripped
+        expect(glyph.querySelector('.glyph-window-controls')).toBeNull();
+        // Glyph's own button should survive
+        expect(glyph.querySelector('.glyph-title-bar button')!.textContent).toBe('Copy');
+    });
+
     // ── Close button ────────────────────────────────────────────────
 
     test('close button calls onClose callback', async () => {
