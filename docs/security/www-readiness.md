@@ -29,8 +29,6 @@ Code: `server/init.go` (safety check), `am/defaults.go` (default + env binding `
 
 **Peer sync has zero authentication.** `server/sync_handler.go` — `/ws/sync` accepts any WebSocket connection. An attacker can run Merkle tree reconciliation and exfiltrate the entire attestation store. Budget data (spend limits) is also exchanged. This is the single biggest exposure.
 
-**CORS origin validation uses prefix matching.** `server/util.go:51` — `strings.HasPrefix(origin, allowedOrigin)`. With `http://localhost` in the allowlist, `http://localhost.evil.com` passes. Needs exact scheme+host+port matching.
-
 **No rate limiting.** Zero rate limiting on any endpoint. Login ceremonies, API calls, file uploads, WebSocket connections — all unlimited.
 
 ### P1 — Significant risk on the open internet
@@ -76,7 +74,7 @@ Code: `server/init.go` (safety check), `am/defaults.go` (default + env binding `
 | P0 | Auth required for non-loopback bind | Low | Done |
 | P0 | TLS termination | Low | Open |
 | P0 | Peer sync authentication | High | Open |
-| P0 | CORS exact matching | Low | Open |
+| P0 | CORS exact matching | Low | Done |
 | P0 | Rate limiting middleware | Medium | Open |
 | P1 | WebAuthn RPID from config | Low | Open |
 | P1 | Require Origin header on WS | Low | Open |
