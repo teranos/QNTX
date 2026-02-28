@@ -5,6 +5,7 @@ import (
 	"time"
 
 	appbsky "github.com/bluesky-social/indigo/api/bsky"
+	"github.com/bluesky-social/indigo/xrpc"
 	"github.com/teranos/QNTX/errors"
 )
 
@@ -19,8 +20,7 @@ func (p *Plugin) syncTimeline(ctx context.Context, jobID string) error {
 	}
 
 	// Skip if not authenticated
-	client := p.getClient()
-	if client == nil {
+	if p.getClient() == nil {
 		logger.Debug("Timeline sync skipped (not authenticated)")
 		return nil
 	}
@@ -36,9 +36,13 @@ func (p *Plugin) syncTimeline(ctx context.Context, jobID string) error {
 
 	logger.Infow("Starting timeline sync", "limit", limit)
 
-	// Fetch timeline (use request context for this)
-	resp, err := appbsky.FeedGetTimeline(ctx, client, "", "", limit)
-	if err != nil {
+	// Fetch timeline with automatic token refresh on expiry
+	var resp *appbsky.FeedGetTimeline_Output
+	if err := p.doWithRefresh(ctx, func(c *xrpc.Client) error {
+		var err error
+		resp, err = appbsky.FeedGetTimeline(ctx, c, "", "", limit)
+		return err
+	}); err != nil {
 		return errors.Wrap(err, "failed to fetch timeline")
 	}
 
