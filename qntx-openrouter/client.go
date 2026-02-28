@@ -3,7 +3,6 @@ package qntxopenrouter
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,12 +25,11 @@ const (
 
 // Client represents an OpenRouter.ai API client
 type Client struct {
-	apiKey       string
-	baseURL      string
-	httpClient   *httpclient.SaferClient
-	config       Config
-	usageTracker *UsageTracker
-	logger       *zap.SugaredLogger
+	apiKey     string
+	baseURL    string
+	httpClient *httpclient.SaferClient
+	config     Config
+	logger     *zap.SugaredLogger
 }
 
 // Config holds AI client configuration
@@ -42,11 +40,7 @@ type Config struct {
 	MaxTokens     *int     // nil = use default (1000)
 	Debug         bool
 	Logger        *zap.SugaredLogger // Structured logger (nil = nop logger)
-	DB            *sql.DB            // Database for automatic cost/usage tracking
-	Verbosity     int
-	OperationType string // Operation type for tracking context (e.g., "prompt-execute")
-	EntityType    string
-	EntityID      string
+	OperationType string             // Operation type for HTTP X-Title header context
 }
 
 // NewClient creates a new OpenRouter.ai client
@@ -63,11 +57,6 @@ func NewClient(config Config) *Client {
 		config.MaxTokens = &defaultTokens
 	}
 
-	var usageTracker *UsageTracker
-	if config.DB != nil {
-		usageTracker = NewUsageTracker(config.DB, config.Verbosity)
-	}
-
 	logger := config.Logger
 	if logger == nil {
 		logger = zap.NewNop().Sugar()
@@ -79,12 +68,11 @@ func NewClient(config Config) *Client {
 	})
 
 	return &Client{
-		apiKey:       config.APIKey,
-		baseURL:      "https://openrouter.ai/api/v1",
-		httpClient:   saferClient,
-		config:       config,
-		usageTracker: usageTracker,
-		logger:       logger,
+		apiKey:     config.APIKey,
+		baseURL:    "https://openrouter.ai/api/v1",
+		httpClient: saferClient,
+		config:     config,
+		logger:     logger,
 	}
 }
 
@@ -109,6 +97,7 @@ type ChatRequest struct {
 // ChatResponse represents the AI response
 type ChatResponse struct {
 	Content string
+	Model   string // Actual model used (may differ from requested model)
 	Usage   Usage
 }
 
@@ -275,8 +264,6 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 		MaxTokens:   maxTokens,
 	}
 
-	requestTime := time.Now()
-
 	maxRetries := 3
 	var resp *ChatCompletionResponse
 	var err error
@@ -307,12 +294,10 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 			continue
 		}
 
-		c.trackFailedRequest(requestTime, model, temperature, maxTokens, err)
 		return nil, errors.Wrap(err, "OpenRouter API error")
 	}
 
 	if err != nil {
-		c.trackFailedRequest(requestTime, model, temperature, maxTokens, err)
 		return nil, errors.Wrapf(err, "OpenRouter API error after %d retries", maxRetries)
 	}
 
@@ -329,34 +314,9 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 		"total_tokens", resp.Usage.TotalTokens,
 	)
 
-	// Track successful usage
-	if c.usageTracker != nil {
-		responseTime := time.Now()
-		tokensUsed := resp.Usage.TotalTokens
-		modelConfig := NewModelConfig(&temperature, &maxTokens)
-		cost := CalculateCost(model, resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
-
-		usage := &ModelUsage{
-			OperationType:     c.config.OperationType,
-			EntityType:        c.config.EntityType,
-			EntityID:          c.config.EntityID,
-			ModelName:         model,
-			ModelProvider:     "openrouter",
-			ModelConfig:       modelConfig,
-			RequestTimestamp:  requestTime,
-			ResponseTimestamp: &responseTime,
-			TokensUsed:        &tokensUsed,
-			Cost:              &cost,
-			Success:           true,
-		}
-
-		if err := c.usageTracker.TrackUsage(usage); err != nil {
-			c.logger.Warnw("Failed to track usage", "error", err, "model", model, "tokens", tokensUsed)
-		}
-	}
-
 	return &ChatResponse{
 		Content: strings.TrimSpace(responseText),
+		Model:   resp.Model,
 		Usage: Usage{
 			PromptTokens:     resp.Usage.PromptTokens,
 			CompletionTokens: resp.Usage.CompletionTokens,
@@ -397,34 +357,6 @@ func (c *Client) isRetryableError(err error) bool {
 	}
 
 	return false
-}
-
-// trackFailedRequest tracks a failed API request
-func (c *Client) trackFailedRequest(requestTime time.Time, model string, temperature float64, maxTokens int, err error) {
-	if c.usageTracker == nil {
-		return
-	}
-
-	responseTime := time.Now()
-	errMsg := err.Error()
-	modelConfig := NewModelConfig(&temperature, &maxTokens)
-
-	usage := &ModelUsage{
-		OperationType:     c.config.OperationType,
-		EntityType:        c.config.EntityType,
-		EntityID:          c.config.EntityID,
-		ModelName:         model,
-		ModelProvider:     "openrouter",
-		ModelConfig:       modelConfig,
-		RequestTimestamp:  requestTime,
-		ResponseTimestamp: &responseTime,
-		Success:           false,
-		ErrorMessage:      &errMsg,
-	}
-
-	if trackErr := c.usageTracker.TrackUsage(usage); trackErr != nil {
-		c.logger.Warnw("Failed to track failed request", "error", trackErr, "model", model, "original_error", err.Error())
-	}
 }
 
 // IsConfigured returns true if the client has a valid API key
