@@ -97,6 +97,7 @@ type PromptDirectRequest struct {
 // PromptDirectResponse represents the direct execution response
 type PromptDirectResponse struct {
 	Response         string                `json:"response"`
+	Model            string                `json:"model,omitempty"`
 	AttestationID    string                `json:"attestation_id,omitempty"`
 	Attestation      *protocol.Attestation `json:"attestation,omitempty"`
 	PromptTokens     int                   `json:"prompt_tokens,omitempty"`
@@ -539,6 +540,7 @@ func (h *Handlers) HandlePromptDirect(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, PromptDirectResponse{
 		Response:         resp.Content,
+		Model:            resp.Model,
 		AttestationID:    attestationID,
 		Attestation:      createdAttestation,
 		PromptTokens:     resp.Usage.PromptTokens,
@@ -673,7 +675,6 @@ func (h *Handlers) buildClient(modelOverride string, doc *prompt.PromptDocument)
 		APIKey:        apiKey,
 		Model:         model,
 		Logger:        h.plugin.Services().Logger("openrouter"),
-		DB:            h.plugin.Services().Database(),
 		OperationType: "prompt",
 	})
 }

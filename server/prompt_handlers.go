@@ -7,10 +7,12 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/ai/provider"
+	"github.com/teranos/QNTX/ai/tracker"
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/alias"
 	"github.com/teranos/QNTX/ats/parser"
@@ -86,6 +88,7 @@ type PromptDirectRequest struct {
 // PromptDirectResponse represents the direct execution response
 type PromptDirectResponse struct {
 	Response         string                `json:"response"`
+	Model            string                `json:"model,omitempty"`
 	AttestationID    string                `json:"attestation_id,omitempty"`
 	Attestation      *protocol.Attestation `json:"attestation,omitempty"` // Full attestation with signature
 	PromptTokens     int                   `json:"prompt_tokens,omitempty"`
@@ -135,7 +138,8 @@ func resolveProvider(explicit string) string {
 }
 
 // forwardToProviderPlugin re-encodes the request and forwards it to the named plugin's
-// prompt handler. Returns true if forwarded, false if the provider is local or unknown.
+// prompt handler. Buffers the response to extract token usage for core-side tracking.
+// Returns true if forwarded, false if the provider is local or unknown.
 func (s *QNTXServer) forwardToProviderPlugin(w http.ResponseWriter, r *http.Request, providerName string, body any, endpoint string) bool {
 	if providerName == "local" {
 		return false
@@ -151,8 +155,113 @@ func (s *QNTXServer) forwardToProviderPlugin(w http.ResponseWriter, r *http.Requ
 	r.Body = io.NopCloser(bytes.NewReader(encoded))
 	r.ContentLength = int64(len(encoded))
 	r.URL.Path = "/api/" + providerName + endpoint
-	s.handlePluginRequest(w, r)
+
+	requestTime := time.Now()
+
+	// Buffer the plugin response so we can extract token usage for tracking
+	rec := httptest.NewRecorder()
+	s.handlePluginRequest(rec, r)
+
+	// Copy buffered response to the real ResponseWriter
+	result := rec.Result()
+	for k, vals := range result.Header {
+		for _, v := range vals {
+			w.Header().Add(k, v)
+		}
+	}
+	w.WriteHeader(result.StatusCode)
+	respBody := rec.Body.Bytes()
+	w.Write(respBody)
+
+	// Track usage asynchronously from the buffered response
+	if result.StatusCode == http.StatusOK && s.usageTracker != nil {
+		go s.trackPluginUsage(respBody, providerName, endpoint, requestTime)
+	}
+
 	return true
+}
+
+// pluginResponseTokens is a generic shape to extract token counts from any plugin response.
+// Works for /prompt/direct (top-level fields), /prompt/preview (samples array), and
+// /prompt/execute (results array).
+type pluginResponseTokens struct {
+	// Top-level fields (/prompt/direct)
+	Model            string `json:"model"`
+	PromptTokens     int    `json:"prompt_tokens"`
+	CompletionTokens int    `json:"completion_tokens"`
+	TotalTokens      int    `json:"total_tokens"`
+
+	// Nested arrays (/prompt/preview and /prompt/execute)
+	Samples []struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+		TotalTokens      int `json:"total_tokens"`
+	} `json:"samples"`
+	Results []struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+		TotalTokens      int `json:"total_tokens"`
+	} `json:"results"`
+}
+
+// trackPluginUsage parses token counts from a buffered plugin response and records usage.
+func (s *QNTXServer) trackPluginUsage(body []byte, providerName, endpoint string, requestTime time.Time) {
+	var parsed pluginResponseTokens
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		s.logger.Debugw("Could not parse plugin response for usage tracking",
+			"provider", providerName, "endpoint", endpoint, "error", err)
+		return
+	}
+
+	promptTokens := parsed.PromptTokens
+	completionTokens := parsed.CompletionTokens
+	totalTokens := parsed.TotalTokens
+	model := parsed.Model
+
+	// Aggregate from samples (preview) or results (execute) if top-level is zero
+	if totalTokens == 0 {
+		for _, s := range parsed.Samples {
+			promptTokens += s.PromptTokens
+			completionTokens += s.CompletionTokens
+			totalTokens += s.TotalTokens
+		}
+		for _, r := range parsed.Results {
+			promptTokens += r.PromptTokens
+			completionTokens += r.CompletionTokens
+			totalTokens += r.TotalTokens
+		}
+	}
+
+	if totalTokens == 0 {
+		return // Nothing to track
+	}
+
+	responseTime := time.Now()
+	cost := tracker.CalculateCost(model, promptTokens, completionTokens)
+
+	// Determine operation type from endpoint (endpoint is e.g. "/prompt/direct")
+	opType := "prompt"
+	if len(endpoint) > 1 {
+		opType = endpoint[1:] // strip leading slash: "prompt/direct", "prompt/preview"
+	}
+
+	usage := &tracker.ModelUsage{
+		OperationType:     opType,
+		EntityType:        "plugin",
+		EntityID:          providerName,
+		ModelName:         model,
+		ModelProvider:     providerName,
+		RequestTimestamp:  requestTime,
+		ResponseTimestamp: &responseTime,
+		TokensUsed:        &totalTokens,
+		Cost:              &cost,
+		Success:           true,
+	}
+
+	if err := s.usageTracker.TrackUsage(usage); err != nil {
+		s.logger.Warnw("Failed to track plugin usage",
+			"provider", providerName, "endpoint", endpoint, "error", err)
+	}
 }
 
 // HandlePromptPreview handles POST /api/prompt/preview
