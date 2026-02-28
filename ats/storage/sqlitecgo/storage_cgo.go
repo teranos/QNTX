@@ -119,6 +119,12 @@ func (rs *RustStore) CreateAttestation(as *types.As) error {
 	return nil
 }
 
+// CreateAttestationInbound stores a synced attestation without signing (preserves provenance).
+func (rs *RustStore) CreateAttestationInbound(as *types.As) error {
+	// Same as CreateAttestation — Rust does the raw INSERT, signing is Go's concern
+	return rs.CreateAttestation(as)
+}
+
 // GetAttestation retrieves an attestation by ID (implements ats.AttestationStore).
 func (rs *RustStore) GetAttestation(id string) (*types.As, error) {
 	if rs.store == nil {
