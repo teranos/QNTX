@@ -142,6 +142,7 @@ func resolveProvider(explicit string) string {
 // Returns true if forwarded, false if the provider is local or unknown.
 func (s *QNTXServer) forwardToProviderPlugin(w http.ResponseWriter, r *http.Request, providerName string, body any, endpoint string) bool {
 	if providerName == "local" {
+		// TODO(#639): Track local Ollama usage to quantify cost savings vs paid APIs.
 		return false
 	}
 	if s.pluginRegistry == nil || !s.pluginRegistry.IsReady(providerName) {
