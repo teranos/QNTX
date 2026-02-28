@@ -14,6 +14,8 @@
 import { log, SEG } from '../../../logger';
 import { stripHtml } from '../../../html-utils';
 import type { Glyph } from '../glyph';
+import { addWindowControls } from './title-bar-controls';
+import { stashContent, restoreContent } from './stash';
 import {
     setWindowState,
     hasProximityText,
@@ -137,32 +139,65 @@ export function morphToPanel(
         glyphElement.style.height = `${panelHeight}px`;
         glyphElement.style.zIndex = PANEL_Z_INDEX;
 
-        // Title bar
-        const titleBar = document.createElement('div');
-        titleBar.className = 'window-title-bar';
-        titleBar.style.cursor = 'default'; // Not draggable
+        // Try restoring stashed content first (preserves glyph identity)
+        const restored = restoreContent(glyphElement);
 
-        const titleText = document.createElement('span');
-        titleText.textContent = stripHtml(glyph.title);
-        titleBar.appendChild(titleText);
+        let titleBar: HTMLElement;
 
-        // Minimize button
-        const minimizeBtn = document.createElement('button');
-        minimizeBtn.textContent = '\u2212';
-        minimizeBtn.onclick = () => morphFromPanel(
-            glyphElement,
-            glyph,
-            verifyElement,
-            onMinimize
-        );
-        titleBar.appendChild(minimizeBtn);
+        if (restored) {
+            titleBar = glyphElement.querySelector('.glyph-title-bar') as HTMLElement;
+            if (!titleBar) {
+                titleBar = document.createElement('div');
+                titleBar.className = 'glyph-title-bar';
+                const titleText = document.createElement('span');
+                titleText.textContent = stripHtml(glyph.title);
+                titleText.style.flex = '1';
+                titleBar.appendChild(titleText);
+                glyphElement.insertBefore(titleBar, glyphElement.firstChild);
+            }
+            log.debug(SEG.GLYPH, `[Panel] Restored stashed content for ${glyph.id}`);
+        } else {
+            // No stash: initial creation — use renderTitleBar/renderContent callbacks
+            if (glyph.renderTitleBar) {
+                titleBar = glyph.renderTitleBar();
+            } else {
+                titleBar = document.createElement('div');
+                titleBar.className = 'glyph-title-bar';
+                const titleText = document.createElement('span');
+                titleText.textContent = stripHtml(glyph.title);
+                titleText.style.flex = '1';
+                titleBar.appendChild(titleText);
+            }
 
-        // Close button if glyph has onClose
-        if (glyph.onClose) {
-            const closeBtn = document.createElement('button');
-            closeBtn.textContent = '\u00d7';
-            closeBtn.onclick = () => {
-                // Clean up overlay and escape handler
+            glyphElement.appendChild(titleBar);
+
+            // Content area
+            try {
+                const content = glyph.renderContent();
+                content.style.padding = `${CANVAS_GLYPH_CONTENT_PADDING}px`;
+                content.style.flex = '1';
+                content.style.overflow = 'auto';
+                glyphElement.appendChild(content);
+            } catch (error) {
+                log.error(SEG.GLYPH, `[Panel ${glyph.id}] Error rendering content:`, error);
+                const errorContent = document.createElement('div');
+                errorContent.style.padding = '8px';
+                errorContent.style.flex = '1';
+                errorContent.style.overflow = 'auto';
+                errorContent.style.color = 'var(--color-error)';
+                errorContent.style.fontFamily = 'var(--font-mono)';
+                errorContent.innerHTML = `
+                    <div style="margin-bottom: 8px; font-weight: bold;">Error rendering content</div>
+                    <div style="opacity: 0.8; font-size: 12px;">${error instanceof Error ? error.message : String(error)}</div>
+                `;
+                glyphElement.appendChild(errorContent);
+            }
+        }
+
+        // Add window controls (minimize/close) to the title bar
+        addWindowControls(titleBar, {
+            onMinimize: () => morphFromPanel(glyphElement, glyph, verifyElement, onMinimize),
+            onClose: glyph.onClose ? () => {
                 removeOverlay(glyph.id);
                 const handler = escapeHandlers.get(glyphElement);
                 if (handler) {
@@ -174,33 +209,8 @@ export function morphToPanel(
                 try { glyph.onClose!(); } catch (error) {
                     log.error(SEG.GLYPH, `[Panel ${glyph.id}] Error in onClose:`, error);
                 }
-            };
-            titleBar.appendChild(closeBtn);
-        }
-
-        glyphElement.appendChild(titleBar);
-
-        // Content area
-        try {
-            const content = glyph.renderContent();
-            content.style.padding = `${CANVAS_GLYPH_CONTENT_PADDING}px`;
-            content.style.flex = '1';
-            content.style.overflow = 'auto';
-            glyphElement.appendChild(content);
-        } catch (error) {
-            log.error(SEG.GLYPH, `[Panel ${glyph.id}] Error rendering content:`, error);
-            const errorContent = document.createElement('div');
-            errorContent.style.padding = '8px';
-            errorContent.style.flex = '1';
-            errorContent.style.overflow = 'auto';
-            errorContent.style.color = 'var(--color-error)';
-            errorContent.style.fontFamily = 'var(--font-mono)';
-            errorContent.innerHTML = `
-                <div style="margin-bottom: 8px; font-weight: bold;">Error rendering content</div>
-                <div style="opacity: 0.8; font-size: 12px;">${error instanceof Error ? error.message : String(error)}</div>
-            `;
-            glyphElement.appendChild(errorContent);
-        }
+            } : undefined,
+        });
     }).catch(error => {
         log.warn(SEG.GLYPH, `[Panel] Animation failed for ${glyph.id}:`, error);
         removeOverlay(glyph.id);
@@ -247,8 +257,8 @@ export function morphFromPanel(
     // Fade out overlay
     removeOverlay(glyph.id);
 
-    // Clear content
-    panelElement.innerHTML = '';
+    // Stash content (strips window controls, preserves glyph identity off-DOM)
+    stashContent(panelElement);
 
     // Calculate target position (tray dot)
     const trayElement = document.querySelector('.glyph-run');

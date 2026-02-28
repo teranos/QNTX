@@ -204,7 +204,7 @@ describe('Canvas → Window Morph', () => {
         await new Promise(r => queueMicrotask(r));
         await new Promise(r => queueMicrotask(r));
 
-        const titleBar = glyph.querySelector('.window-title-bar');
+        const titleBar = glyph.querySelector('.glyph-title-bar');
         expect(titleBar).not.toBeNull();
         expect(titleBar!.querySelector('span')!.textContent).toBe('My Result');
 
@@ -256,7 +256,7 @@ describe('Canvas → Window Morph', () => {
         mockRect(glyph, { left: 300, top: 100, width: 520, height: 420 });
 
         // Click minimize
-        const minimizeBtn = glyph.querySelector('.window-title-bar button') as HTMLElement;
+        const minimizeBtn = glyph.querySelector('.glyph-title-bar button') as HTMLElement;
         expect(minimizeBtn).not.toBeNull();
         minimizeBtn.click();
 
@@ -283,7 +283,7 @@ describe('Canvas → Window Morph', () => {
         await new Promise(r => queueMicrotask(r));
 
         mockRect(glyph, { left: 300, top: 100, width: 520, height: 420 });
-        const btn = glyph.querySelector('.window-title-bar button') as HTMLElement;
+        const btn = glyph.querySelector('.glyph-title-bar button') as HTMLElement;
         btn.click();
 
         await new Promise(r => queueMicrotask(r));
@@ -305,7 +305,7 @@ describe('Canvas → Window Morph', () => {
         await new Promise(r => queueMicrotask(r));
 
         mockRect(glyph, { left: 300, top: 100, width: 520, height: 420 });
-        const btn = glyph.querySelector('.window-title-bar button') as HTMLElement;
+        const btn = glyph.querySelector('.glyph-title-bar button') as HTMLElement;
         btn.click();
 
         await new Promise(r => queueMicrotask(r));
@@ -313,7 +313,7 @@ describe('Canvas → Window Morph', () => {
 
         // Content div and title bar should be removed
         expect(glyph.querySelector('.canvas-window-content')).toBeNull();
-        expect(glyph.querySelector('.window-title-bar')).toBeNull();
+        expect(glyph.querySelector('.glyph-title-bar')).toBeNull();
 
         // Original children should be direct children again
         expect(glyph.querySelector('.result-glyph-header')).not.toBeNull();
@@ -337,7 +337,7 @@ describe('Canvas → Window Morph', () => {
         expect(getCanvasOrigin(glyph)).not.toBeNull();
 
         mockRect(glyph, { left: 300, top: 100, width: 520, height: 420 });
-        const btn = glyph.querySelector('.window-title-bar button') as HTMLElement;
+        const btn = glyph.querySelector('.glyph-title-bar button') as HTMLElement;
         btn.click();
 
         await new Promise(r => queueMicrotask(r));
@@ -359,7 +359,7 @@ describe('Canvas → Window Morph', () => {
         await new Promise(r => queueMicrotask(r));
 
         mockRect(glyph, { left: 300, top: 100, width: 520, height: 420 });
-        const btn = glyph.querySelector('.window-title-bar button') as HTMLElement;
+        const btn = glyph.querySelector('.glyph-title-bar button') as HTMLElement;
         btn.click();
 
         await new Promise(r => queueMicrotask(r));
@@ -387,7 +387,7 @@ describe('Canvas → Window Morph', () => {
 
         // Simulate window at a custom position
         mockRect(glyph, { left: 450, top: 200, width: 520, height: 420 });
-        const btn = glyph.querySelector('.window-title-bar button') as HTMLElement;
+        const btn = glyph.querySelector('.glyph-title-bar button') as HTMLElement;
         btn.click();
 
         await new Promise(r => queueMicrotask(r));
@@ -447,7 +447,7 @@ describe('Canvas → Window Morph', () => {
         await new Promise(r => queueMicrotask(r));
 
         mockRect(glyph, { left: 300, top: 100, width: 520, height: 420 });
-        const btn = glyph.querySelector('.window-title-bar button') as HTMLElement;
+        const btn = glyph.querySelector('.glyph-title-bar button') as HTMLElement;
         btn.click();
 
         await new Promise(r => queueMicrotask(r));
@@ -464,6 +464,47 @@ describe('Canvas → Window Morph', () => {
 
         // Clean up canvas state
         resetCanvasState('offset-canvas');
+    });
+
+    // ── Glyph-owned title bar preservation ──────────────────────────
+
+    test('minimize: glyph-owned title bar is preserved, only window controls removed', async () => {
+        const { contentLayer, glyph } = buildCanvas();
+
+        // Replace the .result-glyph-header with a proper .glyph-title-bar
+        const oldHeader = glyph.querySelector('.result-glyph-header')!;
+        const glyphTitleBar = document.createElement('div');
+        glyphTitleBar.className = 'glyph-title-bar';
+        const glyphBtn = document.createElement('button');
+        glyphBtn.textContent = 'Copy';
+        glyphTitleBar.appendChild(glyphBtn);
+        glyph.replaceChild(glyphTitleBar, oldHeader);
+
+        morphCanvasPlacedToWindow(glyph, {
+            title: 'Test',
+            canvasId: 'test-canvas',
+            onRestoreComplete: () => {},
+        });
+
+        await new Promise(r => queueMicrotask(r));
+        await new Promise(r => queueMicrotask(r));
+
+        // Window controls should have been added to existing title bar
+        expect(glyphTitleBar.querySelector('.glyph-window-controls')).not.toBeNull();
+
+        mockRect(glyph, { left: 300, top: 100, width: 520, height: 420 });
+        const minimizeBtn = glyphTitleBar.querySelector('.glyph-window-controls button') as HTMLElement;
+        minimizeBtn.click();
+
+        await new Promise(r => queueMicrotask(r));
+        await new Promise(r => queueMicrotask(r));
+
+        // Title bar should still exist (glyph-owned)
+        expect(glyph.querySelector('.glyph-title-bar')).not.toBeNull();
+        // But window controls should be stripped
+        expect(glyph.querySelector('.glyph-window-controls')).toBeNull();
+        // Glyph's own button should survive
+        expect(glyph.querySelector('.glyph-title-bar button')!.textContent).toBe('Copy');
     });
 
     // ── Close button ────────────────────────────────────────────────
@@ -483,7 +524,7 @@ describe('Canvas → Window Morph', () => {
         await new Promise(r => queueMicrotask(r));
 
         // Close button is the second button (after minimize)
-        const buttons = glyph.querySelectorAll('.window-title-bar button');
+        const buttons = glyph.querySelectorAll('.glyph-title-bar button');
         expect(buttons.length).toBe(2);
         const closeBtn = buttons[1] as HTMLElement;
         expect(closeBtn.textContent).toBe('×');
