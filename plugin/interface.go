@@ -176,8 +176,8 @@ type GlyphDef struct {
 	// ModulePath is the HTTP path (relative to /api/{plugin}/) to a
 	// TypeScript/JavaScript module that exports a render function.
 	// When set, the frontend dynamically imports this module and injects
-	// the PluginGlyphSDK, bypassing the server-rendered HTML pipeline.
-	// The module must export: render(glyph, sdk) => HTMLElement
+	// a GlyphUI instance, bypassing the server-rendered HTML pipeline.
+	// The module must export: render(glyph, ui) => HTMLElement
 	ModulePath string
 
 	// DefaultWidth and DefaultHeight in pixels. 0 = use system default.

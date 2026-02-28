@@ -11,7 +11,7 @@
 
 import { registerGlyphType } from './glyph-registry';
 import { createPluginGlyph } from './plugin-glyph';
-import { createPluginGlyphFromModule } from './plugin-glyph-module';
+import { createPluginGlyphFromModule } from './glyph-module-loader';
 import { apiFetch } from '../../api';
 import { log, SEG } from '../../logger';
 import type { Glyph } from './glyph';
