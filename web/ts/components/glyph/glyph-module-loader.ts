@@ -1,9 +1,9 @@
 /**
- * Plugin Glyph Module Loader — dynamic import + SDK injection for TS-authored plugin glyphs.
+ * Glyph Module Loader — dynamic import + GlyphUI injection for TS-authored plugin glyphs.
  *
  * When a plugin declares a module_url in its GlyphDef, the frontend uses this
  * loader instead of the legacy HTML pipeline. The module is dynamically imported,
- * its render function is called with a PluginGlyphSDK, and the returned element
+ * its render function is called with a GlyphUI, and the returned element
  * is mounted on the canvas.
  *
  * This eliminates: innerHTML, script re-execution, duplicated escapeHTML,
@@ -12,14 +12,14 @@
 
 import type { Glyph } from './glyph';
 import type { PluginGlyphDef } from './plugin-provided-glyphs';
-import type { PluginGlyphModule } from './plugin-glyph-sdk';
-import { createPluginSDK } from './plugin-glyph-sdk';
+import type { GlyphModule } from './glyph-ui';
+import { createGlyphUI } from './glyph-ui';
 import { loadPluginCSS } from './plugin-provided-glyphs';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from './manifestations/canvas-placed';
 
 // Cache imported modules — one import per module_url
-const moduleCache = new Map<string, Promise<PluginGlyphModule>>();
+const moduleCache = new Map<string, Promise<GlyphModule>>();
 
 /** Create a plugin glyph by dynamically importing its TypeScript module. */
 export async function createPluginGlyphFromModule(
@@ -41,29 +41,29 @@ export async function createPluginGlyphFromModule(
         // Import module (cached per URL)
         const mod = await loadModule(absoluteUrl);
 
-        // Create SDK scoped to this glyph + plugin
-        const sdk = createPluginSDK(glyph, def.plugin);
+        // Create GlyphUI scoped to this glyph + plugin
+        const ui = createGlyphUI(glyph, def.plugin);
 
         // Call the plugin's render function
-        const element = await mod.render(glyph, sdk);
+        const element = await mod.render(glyph, ui);
 
-        log.debug(SEG.GLYPH, `[PluginModule] Rendered ${def.plugin} glyph ${glyph.id} from module`);
+        log.debug(SEG.GLYPH, `[GlyphModule] Rendered ${def.plugin} glyph ${glyph.id} from module`);
         return element;
     } catch (err) {
-        log.error(SEG.GLYPH, `[PluginModule] Failed to load module for ${def.plugin}: ${moduleUrl}`, err);
+        log.error(SEG.GLYPH, `[GlyphModule] Failed to load module for ${def.plugin}: ${moduleUrl}`, err);
         return createModuleErrorGlyph(glyph, def, err);
     }
 }
 
 /** Load and cache a plugin module. Only caches successful imports. */
-function loadModule(url: string): Promise<PluginGlyphModule> {
+function loadModule(url: string): Promise<GlyphModule> {
     const cached = moduleCache.get(url);
     if (cached) return cached;
 
     const pending = import(/* @vite-ignore */ url).then((mod) => {
         // Support both default export and named export
-        if (typeof mod.render === 'function') return mod as PluginGlyphModule;
-        if (mod.default && typeof mod.default.render === 'function') return mod.default as PluginGlyphModule;
+        if (typeof mod.render === 'function') return mod as GlyphModule;
+        if (mod.default && typeof mod.default.render === 'function') return mod.default as GlyphModule;
         throw new Error(`Module does not export a render function: ${url}`);
     });
 
@@ -87,7 +87,7 @@ function createModuleErrorGlyph(glyph: Glyph, def: PluginGlyphDef, err: unknown)
             height: def.default_height ?? 300,
         },
         resizable: false,
-        logLabel: 'PluginModuleError',
+        logLabel: 'GlyphModuleError',
     });
 
     const content = document.createElement('div');

@@ -1,23 +1,23 @@
 /**
- * Plugin Glyph SDK — the interface plugins use to build their glyphs.
+ * GlyphUI — the interface plugins use to build their glyphs.
  *
  * Instead of serving raw HTML from Go, plugins ship a TypeScript module
  * that exports a render function. The frontend dynamically imports it
- * and injects this SDK, giving the plugin type-safe access to QNTX
+ * and injects this UI interface, giving the plugin type-safe access to QNTX
  * primitives: canvasPlaced, drag protection, plugin fetch, logging, cleanup.
  *
  * Usage from a plugin module:
  *
- *   import type { PluginGlyphSDK, PluginRenderFn } from '@qntx/glyph-sdk';
+ *   import type { GlyphUI, RenderFn } from '@qntx/glyphs';
  *
- *   export const render: PluginRenderFn = (glyph, sdk) => {
- *       const { element } = sdk.container({
+ *   export const render: RenderFn = (glyph, ui) => {
+ *       const { element } = ui.container({
  *           defaults: { x: 200, y: 200, width: 600, height: 700 },
  *           titleBar: { label: 'My Plugin' },
  *           resizable: true,
  *       });
  *
- *       const input = sdk.input({ placeholder: 'Enter URL...' });
+ *       const input = ui.input({ placeholder: 'Enter URL...' });
  *       element.appendChild(input);
  *
  *       return element;
@@ -33,20 +33,20 @@ import { log, SEG } from '../../logger';
 // ── Public types (plugin-facing) ────────────────────────────────────
 
 /** The render function a plugin module must export. */
-export type PluginRenderFn = (glyph: Glyph, sdk: PluginGlyphSDK) => HTMLElement | Promise<HTMLElement>;
+export type RenderFn = (glyph: Glyph, ui: GlyphUI) => HTMLElement | Promise<HTMLElement>;
 
 /** Plugin module shape — the default or named export. */
-export interface PluginGlyphModule {
-    render: PluginRenderFn;
+export interface GlyphModule {
+    render: RenderFn;
 }
 
-/** SDK injected into plugin render functions. */
-export interface PluginGlyphSDK {
+/** UI interface injected into plugin render functions. */
+export interface GlyphUI {
     /**
      * Create a canvas-placed container with title bar, drag, and resize.
      * This is the root element — the plugin appends its content into it.
      */
-    container(opts: PluginContainerOpts): { element: HTMLElement; titleBar: HTMLElement | null };
+    container(opts: ContainerOpts): { element: HTMLElement; titleBar: HTMLElement | null };
 
     /** Prevent drag from starting on interactive children. */
     preventDrag(...elements: HTMLElement[]): void;
@@ -55,7 +55,7 @@ export interface PluginGlyphSDK {
      * Fetch from this plugin's HTTP endpoints.
      * Path is relative to /api/{plugin}/ — e.g., pluginFetch('/test-fetch', ...).
      */
-    pluginFetch(path: string, opts?: PluginFetchOpts): Promise<Response>;
+    pluginFetch(path: string, opts?: FetchOpts): Promise<Response>;
 
     /** Structured logging with [Plugin:{name}] prefix. */
     log: {
@@ -84,23 +84,23 @@ export interface PluginGlyphSDK {
     saveConfig(config: Record<string, unknown>): Promise<void>;
 }
 
-export interface PluginContainerOpts {
+export interface ContainerOpts {
     defaults: { x: number; y: number; width: number; height: number };
     titleBar?: { label: string; actions?: HTMLElement[] };
     resizable?: boolean | { minWidth?: number; minHeight?: number };
     className?: string;
 }
 
-export interface PluginFetchOpts {
+export interface FetchOpts {
     method?: string;
     body?: unknown;
     headers?: Record<string, string>;
 }
 
-// ── SDK factory ─────────────────────────────────────────────────────
+// ── Factory ─────────────────────────────────────────────────────────
 
-/** Create an SDK instance scoped to a specific glyph and plugin. */
-export function createPluginSDK(glyph: Glyph, pluginName: string): PluginGlyphSDK {
+/** Create a GlyphUI instance scoped to a specific glyph and plugin. */
+export function createGlyphUI(glyph: Glyph, pluginName: string): GlyphUI {
     // Element reference — set when container() is called
     let rootElement: HTMLElement | null = null;
     // Cleanups registered before container() — flushed when container is created
@@ -108,8 +108,8 @@ export function createPluginSDK(glyph: Glyph, pluginName: string): PluginGlyphSD
 
     const prefix = `[Plugin:${pluginName}]`;
 
-    const sdk: PluginGlyphSDK = {
-        container(opts: PluginContainerOpts) {
+    const ui: GlyphUI = {
+        container(opts: ContainerOpts) {
             const config: CanvasPlacedConfig = {
                 glyph,
                 className: opts.className ?? `canvas-plugin-glyph plugin-${pluginName}`,
@@ -135,7 +135,7 @@ export function createPluginSDK(glyph: Glyph, pluginName: string): PluginGlyphSD
             preventDrag(...elements);
         },
 
-        async pluginFetch(path: string, opts?: PluginFetchOpts): Promise<Response> {
+        async pluginFetch(path: string, opts?: FetchOpts): Promise<Response> {
             const url = `/api/${pluginName}${path}`;
             const init: RequestInit = {};
 
@@ -175,17 +175,17 @@ export function createPluginSDK(glyph: Glyph, pluginName: string): PluginGlyphSD
 
         input(opts) {
             const wrapper = document.createElement('div');
-            wrapper.className = 'plugin-sdk-form-group';
+            wrapper.className = 'glyph-form-group';
 
             if (opts?.label) {
                 const label = document.createElement('label');
-                label.className = 'plugin-sdk-label';
+                label.className = 'glyph-label';
                 label.textContent = opts.label;
                 wrapper.appendChild(label);
             }
 
             const input = document.createElement('input');
-            input.className = 'plugin-sdk-input';
+            input.className = 'glyph-input';
             input.type = opts?.type ?? 'text';
             if (opts?.placeholder) input.placeholder = opts.placeholder;
             if (opts?.value) input.value = opts.value;
@@ -197,7 +197,7 @@ export function createPluginSDK(glyph: Glyph, pluginName: string): PluginGlyphSD
 
         button(opts) {
             const btn = document.createElement('button');
-            btn.className = opts.primary ? 'plugin-sdk-btn plugin-sdk-btn--primary' : 'plugin-sdk-btn';
+            btn.className = opts.primary ? 'glyph-btn glyph-btn--primary' : 'glyph-btn';
             btn.textContent = opts.label;
             btn.addEventListener('click', opts.onClick);
             preventDrag(btn);
@@ -206,7 +206,7 @@ export function createPluginSDK(glyph: Glyph, pluginName: string): PluginGlyphSD
 
         statusLine() {
             const el = document.createElement('div');
-            el.className = 'plugin-sdk-status';
+            el.className = 'glyph-status';
             let timer: ReturnType<typeof setTimeout> | null = null;
 
             return {
@@ -244,5 +244,5 @@ export function createPluginSDK(glyph: Glyph, pluginName: string): PluginGlyphSD
         },
     };
 
-    return sdk;
+    return ui;
 }

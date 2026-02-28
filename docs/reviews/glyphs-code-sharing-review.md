@@ -91,78 +91,42 @@ morphToManifested(element, glyph, {
 
 The content-rendering block (stash restore OR renderContent + error boundary + addWindowControls) is identical and should be extracted. `canvas.ts` would use a simpler variant without stash/chrome.
 
-### 3b. Plugin SDK: TypeScript-first glyph authoring
+### ~~3b. @qntx/glyphs: TypeScript-first glyph authoring~~ — SHIPPED
 
-The biggest code-sharing opportunity is **letting plugins author their glyphs in TypeScript** that runs in the host frontend, rather than serving HTML from Go.
-
-**Current flow:**
-```
-Plugin (Go) → HTML string → HTTP → innerHTML → script re-execution
-```
-
-**Proposed flow:**
-```
-Plugin (Go) → GlyphDef { symbol, title, ... } → gRPC
-                                                    ↓
-Plugin (TS) → render(glyph, sdk) → HTMLElement → registry
-```
-
-A plugin would ship a small TypeScript module alongside its Go process. The Go side handles domain logic (API calls, attestations, scheduling). The TS side handles rendering, using a provided SDK:
+Plugins author glyphs in TypeScript using the `GlyphUI` interface (from `@qntx/glyphs`). The Go side handles domain logic; the TS side handles rendering. The host injects `GlyphUI` at render time — plugins import types only.
 
 ```typescript
-// qntx-ix-json/web/ix-glyph.ts
-import type { PluginGlyphSDK } from '@qntx/glyph-sdk';
+// qntx-ix-json/web/ix-glyph-module.ts
+import type { Glyph, GlyphUI, RenderFn } from '@qntx/glyphs';
 
-export function render(glyph: Glyph, sdk: PluginGlyphSDK): HTMLElement {
-    const { element, titleBar } = sdk.canvasPlaced({
-        glyph,
-        className: 'canvas-ix-json-glyph',
+export const render: RenderFn = async (glyph, ui) => {
+    const { element } = ui.container({
         defaults: { x: 200, y: 200, width: 600, height: 700 },
         titleBar: { label: 'JSON API Ingestor' },
         resizable: true,
     });
 
-    const apiUrl = sdk.input({ label: 'API URL', placeholder: 'https://...' });
-    sdk.preventDrag(apiUrl);
+    const apiUrl = ui.input({ label: 'API URL', placeholder: 'https://...' });
     element.appendChild(apiUrl);
-
-    const fetchBtn = sdk.button({
-        label: 'Test Fetch',
-        onClick: async () => {
-            const resp = await sdk.pluginFetch('/test-fetch', {
-                method: 'POST',
-                body: { glyph_id: glyph.id, api_url: apiUrl.value }
-            });
-            // ...
-        }
-    });
-    element.appendChild(fetchBtn);
-
     return element;
-}
+};
 ```
 
-**What the SDK would expose:**
+**What `GlyphUI` exposes:**
 
 | Primitive | Source | Purpose |
 |-----------|--------|---------|
-| `canvasPlaced()` | `manifestations/canvas-placed.ts` | Positioned, draggable, resizable container |
-| `button()` | `components/button.ts` | Stateful button with loading/error/confirm |
+| `container()` | `manifestations/canvas-placed.ts` | Positioned, draggable, resizable container |
+| `button()` | `glyph-ui.ts` | Button with click handler |
+| `input()` | `glyph-ui.ts` | Text input with drag protection |
 | `preventDrag()` | `glyph-interaction.ts` | Protect interactive children from drag |
-| `pluginFetch()` | New wrapper around `apiFetch` | `POST /api/{plugin}/{path}` with auth |
-| `subscribe(event, cb)` | `uiState` / `connectivityManager` | React to state changes |
+| `pluginFetch()` | wrapper around `apiFetch` | `POST /api/{plugin}/{path}` with auth |
+| `loadConfig()` / `saveConfig()` | server-owned `/api/glyph-config` | Attestation-based config persistence |
+| `statusLine()` | `glyph-ui.ts` | Feedback status display |
 | `log` | `logger.ts` | Structured logging with SEG prefix |
-| `tooltip.attach()` | `components/tooltip.ts` | Attach tooltip to container |
+| `onCleanup()` | `glyph-interaction.ts` | Cleanup registration for glyph removal |
 
-**Delivery mechanism:** Plugin declares a `glyph_module` path in `GlyphDef`. The frontend dynamically imports it. The Go `ContentPath` field becomes optional (used only for server-rendered fallback or static content).
-
-This eliminates:
-- HTML string building in Go
-- Duplicated `escapeHTML` functions
-- Inline `<script>` execution
-- Global `window.*` function pollution
-- CSS duplication
-- The entire `fetchPluginContent` + script re-creation pipeline
+**Build pipeline:** Plugin TS → `bun build` → JS → `go:embed`. Type-only imports erased during compilation. ix-json is the first consumer (legacy HTML pipeline deleted).
 
 ### 3c. Shared CSS token contract
 
@@ -191,12 +155,12 @@ Plugin glyphs currently have no cleanup path — when the glyph is removed from 
 2. Extract `escapeHTML`/`escapeHTMLAttr` from both plugins into `plugin/html` or similar shared Go package.
 3. Document the CSS custom property contract for plugin glyphs.
 
-**Medium-term (plugin SDK):**
+**Medium-term (@qntx/glyphs):** — DONE
 
-4. Define the `PluginGlyphSDK` interface — the subset of frontend primitives available to plugin TS modules.
-5. Add a `glyph_module` field to `GlyphDef` (alongside existing `ContentPath`).
-6. Implement dynamic import of plugin glyph modules in the frontend, with SDK injection.
-7. Port `ix-json` glyph to TS as the first consumer — it already has issue #626 tracking UI redesign.
+4. ~~Define the `GlyphUI` interface — the subset of frontend primitives available to plugin TS modules.~~
+5. ~~Add a `module_url` field to `GlyphDef` (alongside existing `ContentPath`).~~
+6. ~~Implement dynamic import of plugin glyph modules in the frontend, with `GlyphUI` injection.~~
+7. ~~Port `ix-json` glyph to TS as the first consumer (legacy HTML pipeline deleted).~~
 
 **Longer-term (manifestation unification):**
 
