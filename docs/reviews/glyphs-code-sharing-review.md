@@ -148,5 +148,5 @@ Only one SDK consumer exists (ix-json), using 4 host-defined variables that all 
 
 **Longer-term (manifestation unification):**
 
-8. Unify the morph skeleton across window/panel/canvas manifestations.
+8. Unify glyph morphology across window/panel/canvas manifestations.
 9. ~~Enable plugin glyphs to declare their own manifestation type.~~ — won't do. No problem to solve, and the suggestion misunderstands what a manifestation is.
