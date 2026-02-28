@@ -15,6 +15,7 @@ import {
 } from '../dataset';
 import { beginMaximizeMorph, beginMinimizeMorph } from '../morph-transaction';
 import { getMaximizeDuration, getMinimizeDuration } from '../glyph';
+import { verifyGlyphAxiom, calculateTrayTarget, resetGlyphElement } from './morphology';
 
 /**
  * Morph a glyph to fullscreen canvas (no chrome)
@@ -25,8 +26,7 @@ export function morphToCanvas(
     verifyElement: (id: string, element: HTMLElement) => void,
     onMinimize: (element: HTMLElement, glyph: Glyph) => void
 ): void {
-    // AXIOM CHECK: Verify this is the correct element
-    verifyElement(glyph.id, glyphElement);
+    verifyGlyphAxiom(glyph.id, glyphElement, verifyElement);
 
     // Get current glyph position and size
     const glyphRect = glyphElement.getBoundingClientRect();
@@ -129,7 +129,6 @@ export function morphFromCanvas(
     verifyElement: (id: string, element: HTMLElement) => void,
     onMorphComplete: (element: HTMLElement, glyph: Glyph) => void
 ): void {
-    // AXIOM CHECK: Verify this is the correct element
     verifyElement(glyph.id, canvasElement);
     log.debug(SEG.GLYPH, `[Canvas] Minimizing ${glyph.id}`);
 
@@ -140,37 +139,11 @@ export function morphFromCanvas(
     canvasElement.innerHTML = '';
     canvasElement.textContent = '';
 
-    // Calculate target position (tray)
-    const trayElement = document.querySelector('.glyph-run');
-    let targetX = window.innerWidth - 50;
-    let targetY = window.innerHeight / 2;
+    const trayTarget = calculateTrayTarget();
 
-    if (trayElement) {
-        const trayRect = trayElement.getBoundingClientRect();
-        targetX = trayRect.right - 20;
-        targetY = trayRect.top + trayRect.height / 2;
-    }
-
-    // Begin minimize animation
-    beginMinimizeMorph(canvasElement, currentRect, { x: targetX, y: targetY }, getMinimizeDuration())
+    beginMinimizeMorph(canvasElement, currentRect, trayTarget, getMinimizeDuration())
         .then(() => {
-            log.debug(SEG.GLYPH, `[Canvas] Animation complete for ${glyph.id}`);
-
-            // Clear state
-            setWindowState(canvasElement, false);
-            setProximityText(canvasElement, false);
-
-            // Remove from body
-            canvasElement.remove();
-
-            // Clear styles
-            canvasElement.style.cssText = '';
-
-            // Apply glyph class
-            canvasElement.className = 'glyph-run-glyph';
-
-            // Re-attach to indicator container
-            onMorphComplete(canvasElement, glyph);
+            resetGlyphElement(canvasElement, glyph, 'Canvas', onMorphComplete);
         })
         .catch(error => {
             log.warn(SEG.GLYPH, `[Canvas] Animation failed for ${glyph.id}:`, error);
