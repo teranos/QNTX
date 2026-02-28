@@ -724,6 +724,7 @@ func (s *QNTXServer) HandlePluginGlyphs(w http.ResponseWriter, r *http.Request) 
 		Label         string `json:"label"`
 		ContentURL    string `json:"content_url"`
 		CSSURL        string `json:"css_url,omitempty"`
+		ModuleURL     string `json:"module_url,omitempty"`
 		DefaultWidth  int    `json:"default_width,omitempty"`
 		DefaultHeight int    `json:"default_height,omitempty"`
 	}
@@ -766,6 +767,10 @@ func (s *QNTXServer) HandlePluginGlyphs(w http.ResponseWriter, r *http.Request) 
 			if def.CssPath != "" {
 				cssURL = fmt.Sprintf("/api/%s%s", name, def.CssPath)
 			}
+			moduleURL := ""
+			if def.ModulePath != "" {
+				moduleURL = fmt.Sprintf("/api/%s%s", name, def.ModulePath)
+			}
 
 			glyphs = append(glyphs, PluginGlyphDef{
 				Plugin:        name,
@@ -774,6 +779,7 @@ func (s *QNTXServer) HandlePluginGlyphs(w http.ResponseWriter, r *http.Request) 
 				Label:         def.Label,
 				ContentURL:    contentURL,
 				CSSURL:        cssURL,
+				ModuleURL:     moduleURL,
 				DefaultWidth:  int(def.DefaultWidth),
 				DefaultHeight: int(def.DefaultHeight),
 			})

@@ -28,6 +28,7 @@ func (p *Plugin) registerHTTPHandlers(mux *http.ServeMux) error {
 	// Glyph UI
 	mux.HandleFunc("GET /ix-glyph", p.handleIXGlyph)
 	mux.HandleFunc("GET /ix-glyph.css", p.handleIXGlyphCSS)
+	mux.HandleFunc("GET /ix-glyph-module.js", p.handleIXGlyphModule)
 
 	// API operations
 	mux.HandleFunc("POST /test-fetch", p.handleTestFetch)
@@ -669,6 +670,14 @@ func (p *Plugin) handleIXGlyphCSS(w http.ResponseWriter, r *http.Request) {
 `
 
 	w.Write([]byte(css))
+}
+
+// handleIXGlyphModule serves the embedded TypeScript glyph module.
+// This is the SDK-based alternative to the server-rendered HTML pipeline.
+func (p *Plugin) handleIXGlyphModule(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Write(ixGlyphModuleJS)
 }
 
 // fetchJSON performs an HTTP GET to the API and returns the raw JSON response.
