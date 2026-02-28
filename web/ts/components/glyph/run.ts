@@ -416,6 +416,40 @@ class GlyphRunImpl {
     }
 
     /**
+     * Adopt an existing element into the tray (no new element created).
+     * Used when a canvas-placed glyph is minimized to tray — the same
+     * DOM element transitions from canvas/window to tray dot.
+     */
+    public adopt(element: HTMLElement, item: Glyph): void {
+        this.init();
+
+        if (!this.element) return;
+        if (this.items.has(item.id)) return;
+
+        // Register the existing element (no factory creation)
+        this.items.set(item.id, item);
+        this.glyphElements.set(item.id, element);
+
+        // Ensure tray-dot state
+        element.className = 'glyph-run-glyph';
+        setGlyphId(element, item.id);
+
+        // Attach click handler
+        const clickHandler = (e: MouseEvent) => {
+            e.stopPropagation();
+            log.debug(SEG.GLYPH, `[Glyph ${item.id}] Click detected, windowState:`, isInWindowState(element));
+            this.morphGlyph(element, item);
+        };
+        this.glyphClickHandlers.set(element, clickHandler);
+        element.addEventListener('click', clickHandler);
+
+        // Add to tray
+        this.indicatorContainer!.appendChild(element);
+        this.element.setAttribute('data-empty', 'false');
+        uiState.addMinimizedWindow(item.id);
+    }
+
+    /**
      * Verify no duplicate glyph elements exist in DOM
      * Hard errors if duplicates found - this is an AXIOM VIOLATION
      */
