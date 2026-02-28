@@ -20,8 +20,8 @@ import {
     setLastPosition,
     hasProximityText,
     setProximityText,
-    setGlyphId
 } from '../dataset';
+import { verifyGlyphAxiom, calculateTrayTarget, resetGlyphElement } from './morphology';
 import { beginMaximizeMorph, beginMinimizeMorph } from '../morph-transaction';
 import {
     getMaximizeDuration,
@@ -49,16 +49,7 @@ export function morphToWindow(
     onRemove: (id: string) => void,
     onMinimize: (element: HTMLElement, glyph: Glyph) => void
 ): void {
-    // AXIOM CHECK: Verify this is the correct element
-    verifyElement(glyph.id, glyphElement);
-
-    // Verify no duplicates exist
-    const elements = document.querySelectorAll(`[data-glyph-id="${glyph.id}"]`);
-    if (elements.length !== 1) {
-        throw new Error(
-            `AXIOM VIOLATION: Expected exactly 1 element for ${glyph.id}, found ${elements.length}`
-        );
-    }
+    verifyGlyphAxiom(glyph.id, glyphElement, verifyElement);
 
     // Get current glyph position and size (may be proximity-expanded)
     const glyphRect = glyphElement.getBoundingClientRect();
@@ -166,7 +157,6 @@ export function morphFromWindow(
     verifyElement: (id: string, element: HTMLElement) => void,
     onMorphComplete: (element: HTMLElement, glyph: Glyph) => void
 ): void {
-    // AXIOM CHECK: Verify this is the correct element
     verifyElement(glyph.id, windowElement);
     log.debug(SEG.GLYPH, `[Window] Minimizing ${glyph.id}`);
 
@@ -182,46 +172,11 @@ export function morphFromWindow(
     // Stash content (strips window controls, preserves glyph identity off-DOM)
     stashContent(windowElement);
 
-    // Calculate target position for the dot
-    // The glyph will go to the right side of the tray
-    const trayElement = document.querySelector('.glyph-run');
-    let targetX = window.innerWidth - 50; // Default to right side if no tray
-    let targetY = window.innerHeight / 2;
+    const trayTarget = calculateTrayTarget();
 
-    if (trayElement) {
-        const trayRect = trayElement.getBoundingClientRect();
-        // Position at the right edge of the tray, centered vertically
-        targetX = trayRect.right - 20; // A bit inset from the edge
-        targetY = trayRect.top + trayRect.height / 2;
-    }
-
-    // Begin the minimize morph animation
-    // Element stays fixed on body during animation
-    beginMinimizeMorph(windowElement, currentRect, { x: targetX, y: targetY }, getMinimizeDuration())
+    beginMinimizeMorph(windowElement, currentRect, trayTarget, getMinimizeDuration())
         .then(() => {
-            // Animation completed successfully
-            log.debug(SEG.GLYPH, `[Window] Animation complete for ${glyph.id}`);
-
-            // Now reparent the element to the indicator container
-            // Clear state flags
-            setWindowState(windowElement, false);
-            setProximityText(windowElement, false);
-
-            // Remove from body
-            windowElement.remove();
-
-            // Clear all inline styles
-            windowElement.style.cssText = '';
-
-            // Apply glyph class
-            windowElement.className = 'glyph-run-glyph';
-
-            // Keep the glyph ID
-            setGlyphId(windowElement, glyph.id);
-
-            // Re-attach to indicator container
-            log.debug(SEG.GLYPH, `[Window] Re-attaching to indicator container`);
-            onMorphComplete(windowElement, glyph);
+            resetGlyphElement(windowElement, glyph, 'Window', onMorphComplete);
         })
         .catch(error => {
             // Animation was cancelled or failed

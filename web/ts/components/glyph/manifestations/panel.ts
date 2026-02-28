@@ -22,6 +22,7 @@ import {
     setProximityText,
     setGlyphId
 } from '../dataset';
+import { verifyGlyphAxiom, calculateTrayTarget, resetGlyphElement } from './morphology';
 import { beginMaximizeMorph, beginMinimizeMorph } from '../morph-transaction';
 import {
     getMaximizeDuration,
@@ -58,15 +59,7 @@ export function morphToPanel(
     onRemove: (id: string) => void,
     onMinimize: (element: HTMLElement, glyph: Glyph) => void
 ): void {
-    // AXIOM CHECK: Verify this is the correct element
-    verifyElement(glyph.id, glyphElement);
-
-    const elements = document.querySelectorAll(`[data-glyph-id="${glyph.id}"]`);
-    if (elements.length !== 1) {
-        throw new Error(
-            `AXIOM VIOLATION: Expected exactly 1 element for ${glyph.id}, found ${elements.length}`
-        );
-    }
+    verifyGlyphAxiom(glyph.id, glyphElement, verifyElement);
 
     const glyphRect = glyphElement.getBoundingClientRect();
     const direction = detectSlideDirection();
@@ -207,27 +200,12 @@ export function morphFromPanel(
     // Stash content (strips window controls, preserves glyph identity off-DOM)
     stashContent(panelElement);
 
-    // Calculate target position (tray dot)
-    const trayElement = document.querySelector('.glyph-run');
-    let targetX = window.innerWidth - 50;
-    let targetY = window.innerHeight / 2;
-    if (trayElement) {
-        const trayRect = trayElement.getBoundingClientRect();
-        targetX = trayRect.right - 20;
-        targetY = trayRect.top + trayRect.height / 2;
-    }
+    const trayTarget = calculateTrayTarget();
 
-    beginMinimizeMorph(panelElement, currentRect, { x: targetX, y: targetY }, getMinimizeDuration())
+    beginMinimizeMorph(panelElement, currentRect, trayTarget, getMinimizeDuration())
         .then(() => {
-            log.debug(SEG.GLYPH, `[Panel] Animation complete for ${glyph.id}`);
             minimizing.delete(panelElement);
-            setWindowState(panelElement, false);
-            setProximityText(panelElement, false);
-            panelElement.remove();
-            panelElement.style.cssText = '';
-            panelElement.className = 'glyph-run-glyph';
-            setGlyphId(panelElement, glyph.id);
-            onMorphComplete(panelElement, glyph);
+            resetGlyphElement(panelElement, glyph, 'Panel', onMorphComplete);
         })
         .catch(error => {
             log.warn(SEG.GLYPH, `[Panel] Animation failed for ${glyph.id}:`, error);
