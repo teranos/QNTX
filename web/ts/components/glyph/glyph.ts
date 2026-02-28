@@ -15,6 +15,7 @@ export interface Glyph {
     id: string;
     title: string;
     renderContent: () => HTMLElement;    // Function to render content
+    renderTitleBar?: () => HTMLElement;   // Glyph-specific title bar, enhanced by manifestations with window controls
 
     // Manifestation configuration
     manifestationType?: 'window' | 'fullscreen' | 'canvas' | 'modal' | 'panel' | 'ix' | 'ax';  // Default: 'window'
@@ -57,8 +58,8 @@ function getPrefersReducedMotion(): boolean {
 }
 
 // Animation durations in milliseconds
-export const MAXIMIZE_DURATION_MS = 350;  // Base duration for dot → manifestation
-export const MINIMIZE_DURATION_MS = 200;  // Base duration for manifestation → dot
+export const MAXIMIZE_DURATION_MS = 450;  // Base duration for dot → manifestation
+export const MINIMIZE_DURATION_MS = 350;  // Base duration for manifestation → dot
 
 // Get actual durations considering reduced motion preference
 export function getMaximizeDuration(): number {
@@ -77,7 +78,6 @@ export const WINDOW_BOX_SHADOW = '0 4px 12px rgba(0, 0, 0, 0.15)';
 
 // Window chrome dimensions
 export const TITLE_BAR_HEIGHT = '32px';
-export const TITLE_BAR_PADDING = '0 12px';
 export const WINDOW_BUTTON_SIZE = '24px';
 export const CONTENT_PADDING = '16px';
 

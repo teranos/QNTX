@@ -229,7 +229,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
 
     // Title bar (symbol + query input + threshold)
     const titleBar = document.createElement('div');
-    titleBar.className = 'canvas-glyph-title-bar';
+    titleBar.className = 'glyph-title-bar';
     titleBar.style.padding = '4px 4px 4px 8px';
 
     titleBar.appendChild(symbol);
@@ -621,7 +621,7 @@ export function updateSemanticGlyphError(glyphId: string, errorMsg: string, seve
     const errorBg = severity === 'error' ? 'rgba(61, 31, 31, 0.92)' : 'rgba(61, 61, 31, 0.92)';
     const errorTitleBg = severity === 'error' ? '#3d1f1f' : '#3d3d1f';
     glyph.style.backgroundColor = errorBg;
-    const errorTitleBar = glyph.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+    const errorTitleBar = glyph.querySelector('.glyph-title-bar') as HTMLElement;
     if (errorTitleBar) errorTitleBar.style.backgroundColor = errorTitleBg;
 
     log.debug(SEG.GLYPH, `[SeGlyph] Displayed ${severity} for ${glyphId}:`, errorMsg);
