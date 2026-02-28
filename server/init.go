@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -246,7 +247,8 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		// Start gRPC services for plugins (Issue #138)
 		// These services allow plugins to call back to QNTX core
 		servicesManager := grpcplugin.NewServicesManager(serverLogger)
-		endpoints, err := servicesManager.Start(ctx, store, queue, scheduleStore)
+		filesDir := filepath.Join(filepath.Dir(dbPath), "files")
+		endpoints, err := servicesManager.Start(ctx, store, queue, scheduleStore, filesDir)
 		if err != nil {
 			serverLogger.Warnw("Failed to start plugin services, plugins will not have service access", "error", err)
 			endpoints = nil
@@ -255,6 +257,7 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 				"ats_store", endpoints.ATSStoreAddress,
 				"queue", endpoints.QueueAddress,
 				"schedule", endpoints.ScheduleAddress,
+				"file_service", endpoints.FileServiceAddress,
 			)
 		}
 
@@ -663,6 +666,8 @@ func (c *pluginConfigWithEndpoints) GetString(key string) string {
 			return c.endpoints.QueueAddress
 		case "_schedule_endpoint":
 			return c.endpoints.ScheduleAddress
+		case "_file_service_endpoint":
+			return c.endpoints.FileServiceAddress
 		case "_auth_token":
 			return c.endpoints.AuthToken
 		}
@@ -692,6 +697,8 @@ func (c *pluginConfigWithEndpoints) Get(key string) interface{} {
 			return c.endpoints.QueueAddress
 		case "_schedule_endpoint":
 			return c.endpoints.ScheduleAddress
+		case "_file_service_endpoint":
+			return c.endpoints.FileServiceAddress
 		case "_auth_token":
 			return c.endpoints.AuthToken
 		}

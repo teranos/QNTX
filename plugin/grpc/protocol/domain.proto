@@ -74,6 +74,10 @@ message InitializeRequest {
   // schedule_endpoint: gRPC endpoint for ScheduleService
   // Provides: Runtime schedule creation, pause, resume, delete
   string schedule_endpoint = 5;
+
+  // file_service_endpoint: gRPC endpoint for FileService
+  // Provides: Read stored files (for multimodal attachments)
+  string file_service_endpoint = 6;
 }
 
 message HTTPRequest {
