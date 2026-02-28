@@ -176,6 +176,7 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 	atsStoreEndpoint := ""
 	queueEndpoint := ""
 	scheduleEndpoint := ""
+	fileServiceEndpoint := ""
 	authToken := ""
 
 	// Try to extract endpoints from config (passed by PluginManager)
@@ -191,16 +192,21 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 		scheduleEndpoint = ep
 		c.logger.Debugw("Extracted Schedule endpoint from config", "endpoint", ep)
 	}
+	if ep := pluginConfig.GetString("_file_service_endpoint"); ep != "" {
+		fileServiceEndpoint = ep
+		c.logger.Debugw("Extracted FileService endpoint from config", "endpoint", ep)
+	}
 	if token := pluginConfig.GetString("_auth_token"); token != "" {
 		authToken = token
 	}
 
 	req := &protocol.InitializeRequest{
-		AtsStoreEndpoint: atsStoreEndpoint,
-		QueueEndpoint:    queueEndpoint,
-		ScheduleEndpoint: scheduleEndpoint,
-		AuthToken:        authToken,
-		Config:           config,
+		AtsStoreEndpoint:    atsStoreEndpoint,
+		QueueEndpoint:       queueEndpoint,
+		ScheduleEndpoint:    scheduleEndpoint,
+		FileServiceEndpoint: fileServiceEndpoint,
+		AuthToken:           authToken,
+		Config:              config,
 	}
 
 	c.logger.Infow("Sending Initialize RPC to plugin",
@@ -208,6 +214,7 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 		"ats_store_endpoint", atsStoreEndpoint,
 		"queue_endpoint", queueEndpoint,
 		"schedule_endpoint", scheduleEndpoint,
+		"file_service_endpoint", fileServiceEndpoint,
 	)
 
 	resp, err := c.client.Initialize(ctx, req)

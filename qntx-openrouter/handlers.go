@@ -12,7 +12,6 @@ import (
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	vanity "github.com/teranos/vanity-id"
 )
@@ -492,9 +491,13 @@ func (h *Handlers) HandlePromptDirect(w http.ResponseWriter, r *http.Request) {
 	// Build multimodal attachments from file IDs
 	if len(req.FileIDs) > 0 {
 		logger := h.plugin.Services().Logger("openrouter")
-		db := h.plugin.Services().Database()
+		fileSvc := h.plugin.Services().FileService()
 		for _, fid := range req.FileIDs {
-			mime, b64, readErr := readFileBase64(db, fid)
+			if fileSvc == nil {
+				logger.Warnw("FileService not available, skipping attachment", "file_id", fid)
+				continue
+			}
+			mime, b64, readErr := fileSvc.ReadFileBase64(fid)
 			if readErr != nil {
 				logger.Warnw("Skipping attached file",
 					"file_id", fid, "error", readErr)
@@ -748,13 +751,6 @@ func sampleAttestations(attestations []types.As, n int) []types.As {
 	}
 
 	return sampled[:n]
-}
-
-// readFileBase64 reads a stored file and returns its MIME type and base64-encoded content.
-// File attachments are stored on the filesystem by the core server. The plugin doesn't
-// have direct filesystem access yet — this will be implemented via a gRPC file service.
-func readFileBase64(_ interface{}, fileID string) (string, string, error) {
-	return "", "", errors.Newf("file attachment loading not yet implemented in plugin for %s", fileID)
 }
 
 // JSON helpers
