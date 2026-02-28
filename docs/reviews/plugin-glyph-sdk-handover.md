@@ -37,9 +37,9 @@ The legacy HTML pipeline hydrates glyph config by baking attestation data into t
 - **(b)** Pass glyph config via the SDK. The frontend reads the glyph's attestation content before calling `render()` and injects it: `sdk.config` or as a third arg. Centralizes the pattern but requires the frontend to know how to read plugin-specific attestation data.
 - **(c)** Add `sdk.loadConfig()` to the SDK itself — it calls a standardized endpoint the plugin framework provides, not plugin-specific handlers. Cleanest, but requires a config storage contract in the plugin framework.
 
-### 2. Hand-edited .pb.go
+### ~~2. Hand-edited .pb.go~~ — RESOLVED
 
-The `domain.pb.go` file was hand-edited to add `ModulePath` field 8. This will be overwritten next time `protoc` is run. The `.proto` file has the correct definition. Run `make proto` (or equivalent) to regenerate from the `.proto` source when ready.
+Regenerated via `make proto`. The hand-edited version had the correct struct but wrong raw descriptor bytes (wire format).
 
 ### 3. Plugin module bundling / build pipeline
 
