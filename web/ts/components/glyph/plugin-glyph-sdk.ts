@@ -76,6 +76,12 @@ export interface PluginGlyphSDK {
 
     /** Create a status line for showing feedback messages. */
     statusLine(): { element: HTMLElement; show(msg: string, isError?: boolean): void; clear(): void };
+
+    /** Load this glyph's persisted config from the server. Returns null if no config saved. */
+    loadConfig(): Promise<Record<string, unknown> | null>;
+
+    /** Save config for this glyph to the server. */
+    saveConfig(config: Record<string, unknown>): Promise<void>;
 }
 
 export interface PluginContainerOpts {
@@ -218,6 +224,23 @@ export function createPluginSDK(glyph: Glyph, pluginName: string): PluginGlyphSD
                     el.textContent = '';
                 },
             };
+        },
+
+        async loadConfig(): Promise<Record<string, unknown> | null> {
+            const resp = await apiFetch(
+                `/api/glyph-config?plugin=${encodeURIComponent(pluginName)}&glyph_id=${encodeURIComponent(glyph.id)}`
+            );
+            if (!resp.ok) return null;
+            const data = await resp.json();
+            return data.config ?? null;
+        },
+
+        async saveConfig(config: Record<string, unknown>): Promise<void> {
+            await apiFetch('/api/glyph-config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ plugin: pluginName, glyph_id: glyph.id, config }),
+            });
         },
     };
 

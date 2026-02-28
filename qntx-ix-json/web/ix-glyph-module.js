@@ -9,7 +9,7 @@
  * Dynamically imported by the QNTX frontend when module_url is set in GlyphDef.
  */
 
-export function render(glyph, sdk) {
+export async function render(glyph, sdk) {
     const { element, titleBar } = sdk.container({
         defaults: {
             x: glyph.x ?? 200,
@@ -110,6 +110,14 @@ export function render(glyph, sdk) {
     content.appendChild(modeSection);
     element.appendChild(content);
 
+    // Hydrate inputs from saved config
+    const config = await sdk.loadConfig();
+    if (config) {
+        setInputValue(apiUrlInput, config.api_url || '');
+        setInputValue(authTokenInput, config.auth_token || '');
+        setInputValue(pollIntervalInput, String(config.poll_interval_seconds || 0));
+    }
+
     return element;
 }
 
@@ -137,6 +145,11 @@ function section(title) {
 function getInputValue(wrapper) {
     const input = wrapper.querySelector('input');
     return input ? input.value : '';
+}
+
+function setInputValue(wrapper, value) {
+    const input = wrapper.querySelector('input');
+    if (input) input.value = value;
 }
 
 async function saveConfig(sdk, glyphId, apiUrlEl, authTokenEl, pollIntervalEl, status) {

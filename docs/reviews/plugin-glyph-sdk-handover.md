@@ -28,14 +28,9 @@ What was built, what was fixed in review, what needs design decisions before goi
 
 ## Open questions — needs design decisions
 
-### 1. Config hydration for module-path glyphs
+### ~~1. Config hydration for module-path glyphs~~ — RESOLVED
 
-The legacy HTML pipeline hydrates glyph config by baking attestation data into the server-rendered HTML template (Go reads attestations, injects values into `<input value="...">`). Module-path glyphs don't have this — they start empty.
-
-**Options:**
-- **(a)** Add a `GET /config?glyph_id=X` endpoint to each plugin. The module calls `sdk.pluginFetch('/config?glyph_id=...')` on mount. Simple, plugin-specific, but every plugin re-implements the same pattern.
-- **(b)** Pass glyph config via the SDK. The frontend reads the glyph's attestation content before calling `render()` and injects it: `sdk.config` or as a third arg. Centralizes the pattern but requires the frontend to know how to read plugin-specific attestation data.
-- **(c)** Add `sdk.loadConfig()` to the SDK itself — it calls a standardized endpoint the plugin framework provides, not plugin-specific handlers. Cleanest, but requires a config storage contract in the plugin framework.
+Server-owned endpoint `GET/POST /api/glyph-config` queries ATSStore directly using the ix-json convention (subject=`{plugin}-glyph-{glyphID}`, predicate=`configured`). SDK exposes `loadConfig()` / `saveConfig()` — plugins call `await sdk.loadConfig()` on mount. ix-json is the first consumer.
 
 ### ~~2. Hand-edited .pb.go~~ — RESOLVED
 
