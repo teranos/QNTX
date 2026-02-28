@@ -9,20 +9,39 @@ import (
 
 // setupHTTPRoutes configures all HTTP handlers
 func (s *QNTXServer) setupHTTPRoutes() {
-	// wrap applies CORS + auth middleware. When auth is disabled, identical to corsMiddleware.
-	// Resolved at registration time — zero per-request branching.
-	wrap := s.corsMiddleware
+	// wrap applies CORS + rate limit + auth middleware for API routes.
+	// When auth is disabled, rate limiting still applies.
+	// Chain: cors → rateLimit(read/write) → auth → handler
+	wrap := func(handler http.HandlerFunc) http.HandlerFunc {
+		return s.corsMiddleware(s.rateLimitMiddleware(handler))
+	}
 	if s.authEnabled {
 		inner := s.authHandler.Middleware
 		wrap = func(handler http.HandlerFunc) http.HandlerFunc {
-			return s.corsMiddleware(inner(handler))
+			return s.corsMiddleware(s.rateLimitMiddleware(inner(handler)))
 		}
-		// Register auth routes (CORS only, no auth middleware)
+		// Register auth routes (rate limited via authCorsWrap composed in init.go)
 		s.authHandler.RegisterRoutes()
 	}
 
+	// wrapWS applies CORS + WS rate limit + auth for WebSocket upgrades.
+	wrapWS := func(handler http.HandlerFunc) http.HandlerFunc {
+		return s.corsMiddleware(s.rateLimitWSMiddleware(handler))
+	}
+	if s.authEnabled {
+		inner := s.authHandler.Middleware
+		wrapWS = func(handler http.HandlerFunc) http.HandlerFunc {
+			return s.corsMiddleware(s.rateLimitWSMiddleware(inner(handler)))
+		}
+	}
+
+	// wrapPublic applies public rate limit + CORS (no auth).
+	wrapPublic := func(handler http.HandlerFunc) http.HandlerFunc {
+		return s.rateLimitPublicMiddleware(s.corsMiddleware(handler))
+	}
+
 	// Node DID document (public, no auth)
-	http.HandleFunc("/.well-known/did.json", s.corsMiddleware(s.nodeDID.HandleDIDDocument))
+	http.HandleFunc("/.well-known/did.json", wrapPublic(s.nodeDID.HandleDIDDocument))
 
 	// Register plugin routes with dynamic handler that waits for plugins to load
 	// This allows routes to be registered immediately while plugins load asynchronously
@@ -71,9 +90,9 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	}
 
 	// Core QNTX handlers
-	http.HandleFunc("/ws", wrap(s.HandleWebSocket))              // Custom WebSocket protocol (graph updates, logs, etc.)
-	http.HandleFunc("/lsp", wrap(s.HandleGLSPWebSocket))         // ATS LSP protocol (completions, hover, semantic tokens)
-	http.HandleFunc("/health", s.corsMiddleware(s.HandleHealth)) // Health check always public
+	http.HandleFunc("/ws", wrapWS(s.HandleWebSocket))      // Custom WebSocket protocol (graph updates, logs, etc.)
+	http.HandleFunc("/lsp", wrapWS(s.HandleGLSPWebSocket)) // ATS LSP protocol (completions, hover, semantic tokens)
+	http.HandleFunc("/health", wrapPublic(s.HandleHealth)) // Health check always public
 	http.HandleFunc("/logs/download", wrap(s.HandleLogDownload))
 	http.HandleFunc("/api/timeseries/usage", wrap(s.HandleUsageTimeSeries))
 	http.HandleFunc("/api/config", wrap(s.HandleConfig))
@@ -94,7 +113,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/plugins", wrap(s.HandlePlugins))                                          // List installed plugins (GET)
 	http.HandleFunc("/api/types/", wrap(s.HandleTypes))                                             // Get specific type (GET /api/types/{typename})
 	http.HandleFunc("/api/types", wrap(s.HandleTypes))                                              // List/create types (GET/POST)
-	http.HandleFunc("/api/watchers/queue/stats", wrap(s.HandleWatcherQueueStats))                    // Watcher execution queue stats (GET)
+	http.HandleFunc("/api/watchers/queue/stats", wrap(s.HandleWatcherQueueStats))                   // Watcher execution queue stats (GET)
 	http.HandleFunc("/api/watchers/", wrap(s.HandleWatchers))                                       // Watcher CRUD (GET/PUT/DELETE /api/watchers/{id})
 	http.HandleFunc("/api/watchers", wrap(s.HandleWatchers))                                        // List/create watchers (GET/POST)
 	http.HandleFunc("/api/attestations", wrap(s.HandleCreateAttestation))                           // Sync browser-created attestations (POST)
@@ -118,10 +137,10 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/embeddings/info", wrap(s.HandleEmbeddingInfo))                            // Embedding service status (GET)
 	http.HandleFunc("/api/embeddings/project", wrap(s.HandleEmbeddingProject))                      // UMAP projection (POST)
 	http.HandleFunc("/api/embeddings/projections", wrap(s.HandleEmbeddingProjections))              // Get 2D projections (GET)
-	http.HandleFunc("/ws/sync", wrap(s.HandleSyncWebSocket))                                        // Sync peer WebSocket (incoming reconciliation)
+	http.HandleFunc("/ws/sync", wrapWS(s.HandleSyncWebSocket))                                      // Sync peer WebSocket (incoming reconciliation)
 	http.HandleFunc("/api/sync/status", wrap(s.HandleSyncStatus))                                   // Sync tree status (GET)
 	http.HandleFunc("/api/sync", wrap(s.HandleSync))                                                // Initiate sync with peer (POST)
-	http.HandleFunc("/", wrap(s.HandleStatic))
+	http.HandleFunc("/", wrapPublic(s.HandleStatic))
 }
 
 // corsMiddleware adds CORS headers to HTTP responses using configured allowed origins
