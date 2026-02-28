@@ -32,10 +32,7 @@
     border-radius: 12px 12px 0 0;
 }
 
-/* Panel title bar - reuses window-title-bar but not draggable */
-.glyph-panel .window-title-bar {
-    cursor: default;
-}
+/* Panel title bar cursor override now in /css/glyph/title-bar.css */
 
 /* Semi-transparent overlay backdrop */
 .glyph-panel-overlay {
