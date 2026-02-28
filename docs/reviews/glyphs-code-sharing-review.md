@@ -76,20 +76,9 @@ ix-json's legacy HTML pipeline (~350 lines of Go string builder HTML/CSS/JS, ~90
 
 ## 3. Code Sharing Opportunities
 
-### 3a. Extract shared manifestation skeleton
+### ~~3a. Extract shared manifestation skeleton~~ — DONE
 
-The morph→content→controls pattern in `window.ts` and `panel.ts` should be a shared function:
-
-```
-morphToManifested(element, glyph, {
-    target: { x, y, width, height },
-    className: 'glyph-panel' | 'glyph-window',
-    setupChrome: (element, titleBar) => void,  // panel adds overlay + escape; window adds drag
-    verify, onRemove, onMinimize
-})
-```
-
-The content-rendering block (stash restore OR renderContent + error boundary + addWindowControls) is identical and should be extracted. `canvas.ts` would use a simpler variant without stash/chrome.
+The shared content-rendering block (stash restore OR renderContent + error boundary + addWindowControls) was extracted from `window.ts` and `panel.ts` into a shared helper (commit `b1bb102c`).
 
 ### ~~3b. @qntx/glyphs: TypeScript-first glyph authoring~~ — SHIPPED
 
@@ -128,22 +117,17 @@ export const render: RenderFn = async (glyph, ui) => {
 
 **Build pipeline:** Plugin TS → `bun build` → JS → `go:embed`. Type-only imports erased during compilation. ix-json is the first consumer (legacy HTML pipeline deleted).
 
-### 3c. Shared CSS token contract
+### 3c. Shared CSS token contract — DEFERRED
 
-Today, plugin CSS references `var(--background)`, `var(--border-color)`, `var(--foreground)`, etc. — but these are informal. The host defines `var(--bg-primary)`, `var(--text-on-dark)`, `var(--border-color)`.
+Only one SDK consumer exists (ix-json), using 4 host-defined variables that all work (`--color-error`, `--color-success`, `--border-color`, `--text-secondary`). Two undefined vars (`--card-bg`, `--muted-foreground`) have working fallbacks. atproto uses a different variable namespace entirely but is still on the legacy HTML pipeline. Formalizing a contract now would be speculative — revisit when a second plugin module surfaces real naming conflicts.
 
-Document and stabilize the CSS custom property contract that plugins can rely on. A `plugin-theme.css` or a section in `core.css` that explicitly lists the properties available to plugin glyphs. This is needed regardless of whether plugins move to TS rendering.
+### ~~3d. Shared Go utilities for HTML rendering~~ — DONE
 
-### 3d. Shared Go utilities for HTML rendering (interim)
+`escapeHTML`/`escapeHTMLAttr` extracted to `plugin/httputil` (commit `98f5babb`). ix-json no longer needs them (legacy HTML pipeline deleted).
 
-Even before a TS SDK, plugins can stop duplicating code:
+### ~~3e. Plugin glyph lifecycle hooks~~ — DONE
 
-- `escapeHTML` / `escapeHTMLAttr` — identical in both `qntx-atproto/handlers.go` and `qntx-ix-json/handlers.go`. Extract to a shared `plugin/html` package.
-- Common CSS fragments (form inputs, status badges, section headers) could be shared via a Go template library or a shared CSS file served by the core.
-
-### 3e. Plugin glyph lifecycle hooks
-
-Plugin glyphs currently have no cleanup path — when the glyph is removed from the canvas, any intervals, event listeners, or subscriptions set up by inline scripts just leak. The `storeCleanup()` / `runCleanup()` pattern from `glyph-interaction.ts` should be extended to plugin glyphs. The TS SDK approach solves this naturally (the `render` function returns an element; the SDK can track cleanup via the same `storeCleanup` mechanism).
+`GlyphUI.onCleanup()` registers cleanup functions via the existing `storeCleanup` mechanism. Cleanups registered before `container()` are queued and flushed when the container is created.
 
 ---
 
@@ -151,9 +135,9 @@ Plugin glyphs currently have no cleanup path — when the glyph is removed from 
 
 **Short-term (reduce duplication now):**
 
-1. Extract the shared content-rendering block from `window.ts` and `panel.ts` into a helper (stash restore, renderContent with error boundary, addWindowControls).
-2. Extract `escapeHTML`/`escapeHTMLAttr` from both plugins into `plugin/html` or similar shared Go package.
-3. Document the CSS custom property contract for plugin glyphs.
+1. ~~Extract the shared content-rendering block from `window.ts` and `panel.ts` into a helper.~~
+2. ~~Extract `escapeHTML`/`escapeHTMLAttr` into `plugin/httputil`.~~
+3. ~~Document the CSS custom property contract for plugin glyphs.~~ — deferred, only 1 consumer
 
 **Medium-term (@qntx/glyphs):** — DONE
 
@@ -165,4 +149,4 @@ Plugin glyphs currently have no cleanup path — when the glyph is removed from 
 **Longer-term (manifestation unification):**
 
 8. Unify the morph skeleton across window/panel/canvas manifestations.
-9. Enable plugin glyphs to declare their own manifestation type (currently all plugin glyphs are `canvasPlaced` only — they can't morph to window or panel).
+9. ~~Enable plugin glyphs to declare their own manifestation type.~~ — won't do. No problem to solve, and the suggestion misunderstands what a manifestation is.
