@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/bluesky-social/indigo/xrpc"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 )
@@ -35,6 +36,11 @@ type Plugin struct {
 	mu     sync.RWMutex
 	client *xrpc.Client // Protected by mu
 	did    string       // Protected by mu
+
+	// Stored for re-authentication when refresh token also expires
+	pdsHost     string
+	identifier  string
+	appPassword string
 }
 
 // NewPlugin creates a new AT Protocol domain plugin.
@@ -42,7 +48,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "atproto",
-			Version:     "0.2.15",
+			Version:     "0.3.0",
 			QNTXVersion: ">= 0.1.0",
 			Description: "AT Protocol integration (Bluesky) with auto-scheduled timeline sync",
 			Author:      "QNTX Team",
@@ -64,6 +70,10 @@ func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry
 	if pdsHost == "" {
 		pdsHost = "https://bsky.social"
 	}
+
+	p.pdsHost = pdsHost
+	p.identifier = identifier
+	p.appPassword = appPassword
 
 	if identifier != "" && appPassword != "" {
 		client, did, err := createSession(ctx, pdsHost, identifier, appPassword)
@@ -171,6 +181,54 @@ func (p *Plugin) ConfigSchema() map[string]plugin.ConfigField {
 			Required:     false,
 		},
 	}
+}
+
+// doWithRefresh executes an operation with the authenticated client. If the access token
+// has expired, it refreshes the session and retries once. If the refresh token is also
+// expired, it falls back to full re-authentication with stored credentials.
+func (p *Plugin) doWithRefresh(ctx context.Context, op func(*xrpc.Client) error) error {
+	p.mu.RLock()
+	client := p.client
+	p.mu.RUnlock()
+
+	if client == nil {
+		return errors.New("not authenticated")
+	}
+
+	err := op(client)
+	if err == nil || !isExpiredToken(err) {
+		return err
+	}
+
+	logger := p.Services().Logger("atproto")
+	logger.Info("Access token expired, refreshing session")
+
+	// Try refresh token first
+	p.mu.Lock()
+	refreshErr := refreshSession(ctx, p.client)
+	if refreshErr == nil {
+		logger.Info("Session refreshed successfully")
+		client = p.client
+		p.mu.Unlock()
+		return op(client)
+	}
+	p.mu.Unlock()
+
+	logger.Warnw("Refresh token failed, re-authenticating", "error", refreshErr)
+
+	// Fall back to full re-authentication
+	newClient, did, authErr := createSession(ctx, p.pdsHost, p.identifier, p.appPassword)
+	if authErr != nil {
+		return errors.Wrap(authErr, "re-authentication failed after token expiry")
+	}
+
+	p.mu.Lock()
+	p.client = newClient
+	p.did = did
+	p.mu.Unlock()
+
+	logger.Infow("Re-authenticated with PDS", "did", did)
+	return op(newClient)
 }
 
 // getClient returns the authenticated XRPC client, or nil if not authenticated.
