@@ -41,6 +41,12 @@ entity_actors_limit = 64
 # Default: 877 (development), fallback 7878 (production)
 port = 877
 
+# Network interface to bind
+# "127.0.0.1" = local only (default), "0.0.0.0" = all interfaces
+# Non-loopback requires auth.enabled = true
+# Environment: QNTX_BIND_ADDRESS
+# bind_address = "127.0.0.1"
+
 # Allowed CORS origins for web UI access
 # Default: localhost and 127.0.0.1 (HTTP and HTTPS), plus Tauri desktop app
 allowed_origins = [
