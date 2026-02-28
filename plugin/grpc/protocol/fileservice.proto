@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// FileService provides file access for gRPC plugins.
+// Plugins use this to read files stored on the core server's filesystem.
+service FileService {
+  // ReadFileBase64 reads a stored file and returns its MIME type and base64-encoded content.
+  rpc ReadFileBase64(ReadFileRequest) returns (ReadFileResponse);
+}
+
+message ReadFileRequest {
+  string auth_token = 1;
+  string file_id = 2;
+}
+
+message ReadFileResponse {
+  bool success = 1;
+  string error = 2;
+  string mime_type = 3;
+  string base64_data = 4;
+}

@@ -596,6 +596,10 @@ func (r *testServiceRegistry) Schedule() pluginpkg.ScheduleService {
 	return nil
 }
 
+func (r *testServiceRegistry) FileService() pluginpkg.FileService {
+	return nil
+}
+
 // testConfig implements pluginpkg.Config for integration testing
 type testConfig struct {
 	config map[string]string
