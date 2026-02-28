@@ -42,6 +42,7 @@ export interface ResultGlyphContent {
     result: ExecutionResult;
     promptConfig?: PromptConfig;
     prompt?: string;
+    followupError?: string;
 }
 
 /**
@@ -319,6 +320,11 @@ export function createResultGlyph(
 
     element.appendChild(outputContainer);
 
+    // Red border when result contains an error
+    if (result.error) {
+        element.classList.add('glyph-error');
+    }
+
     // Follow-up input zone — hidden until hover/focus
     const followupZone = document.createElement('div');
     followupZone.className = 'result-followup-zone';
@@ -408,6 +414,21 @@ export function createResultGlyph(
                     followupInput.value = '';
                     followupInput.style.height = 'auto';
                     followupInput.disabled = false;
+                    followupZone.classList.remove('has-error');
+                    element.classList.remove('glyph-error');
+
+                    // Clear persisted error
+                    const glyphId = element.getAttribute('data-glyph-id');
+                    if (glyphId) {
+                        const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+                        if (existing?.content) {
+                            try {
+                                const payload = JSON.parse(existing.content) as ResultGlyphContent;
+                                delete payload.followupError;
+                                uiState.addCanvasGlyph({ ...existing, content: JSON.stringify(payload) });
+                            } catch { /* ignore */ }
+                        }
+                    }
 
                     const followupResult: ExecutionResult = {
                         success: !data.error,
@@ -425,6 +446,22 @@ export function createResultGlyph(
                     const attachmentInfo = fileIds.length > 0 ? ` (${fileIds.length} file${fileIds.length > 1 ? 's' : ''} attached)` : '';
                     followupStatus.textContent = `Failed${attachmentInfo}: ${msg}`;
                     followupInput.disabled = false;
+                    followupZone.classList.add('has-error');
+                    element.classList.add('glyph-error');
+
+                    // Persist error so it survives page refresh
+                    const glyphId = element.getAttribute('data-glyph-id');
+                    if (glyphId) {
+                        const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+                        if (existing?.content) {
+                            try {
+                                const payload = JSON.parse(existing.content) as ResultGlyphContent;
+                                payload.followupError = followupStatus.textContent || undefined;
+                                uiState.addCanvasGlyph({ ...existing, content: JSON.stringify(payload) });
+                            } catch { /* ignore parse errors */ }
+                        }
+                    }
+
                     log.error(SEG.GLYPH, `[ResultGlyph] Follow-up failed for ${glyph.id}${attachmentInfo}:`, err);
                 });
         }
