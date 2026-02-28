@@ -9,10 +9,10 @@
  */
 
 import { log, SEG } from '../../../logger';
-import { stripHtml } from '../../../html-utils';
 import type { Glyph } from '../glyph';
 import { addWindowControls } from './title-bar-controls';
-import { stashContent, restoreContent } from './stash';
+import { stashContent } from './stash';
+import { renderGlyphContent } from './render-content';
 import { setupWindowDrag, teardownWindowDrag } from './canvas-window';
 import {
     setWindowState,
@@ -125,74 +125,8 @@ export function morphToWindow(
         glyphElement.style.flexDirection = 'column';
         glyphElement.style.overflow = 'hidden';
 
-        // Try restoring stashed content first (preserves glyph identity)
-        const restored = restoreContent(glyphElement);
-
-        let titleBar: HTMLElement;
-        let contentElement: HTMLElement | null = null;
-
-        if (restored) {
-            // Content restored from stash — find existing title bar
-            titleBar = glyphElement.querySelector('.glyph-title-bar') as HTMLElement;
-            if (!titleBar) {
-                // Stash had no title bar — create generic
-                titleBar = document.createElement('div');
-                titleBar.className = 'glyph-title-bar';
-                const titleText = document.createElement('span');
-                titleText.textContent = stripHtml(glyph.title);
-                titleText.style.flex = '1';
-                titleBar.appendChild(titleText);
-                glyphElement.insertBefore(titleBar, glyphElement.firstChild);
-            }
-
-            // Find content element (first non-title-bar child)
-            for (const child of Array.from(glyphElement.children)) {
-                if (child !== titleBar) {
-                    contentElement = child as HTMLElement;
-                    break;
-                }
-            }
-
-            log.debug(SEG.GLYPH, `[Window] Restored stashed content for ${glyph.id}`);
-        } else {
-            // No stash: initial creation — use renderTitleBar/renderContent callbacks
-            if (glyph.renderTitleBar) {
-                titleBar = glyph.renderTitleBar();
-            } else {
-                titleBar = document.createElement('div');
-                titleBar.className = 'glyph-title-bar';
-                const titleText = document.createElement('span');
-                titleText.textContent = stripHtml(glyph.title);
-                titleText.style.flex = '1';
-                titleBar.appendChild(titleText);
-            }
-
-            glyphElement.appendChild(titleBar);
-
-            // Add content area with error boundary
-            try {
-                const content = glyph.renderContent();
-                content.style.padding = `${CANVAS_GLYPH_CONTENT_PADDING}px`;
-                content.style.flex = '1';
-                content.style.overflow = 'auto';
-                glyphElement.appendChild(content);
-                contentElement = content;
-            } catch (error) {
-                log.error(SEG.GLYPH, `[Window ${glyph.id}] Error rendering content:`, error);
-                const errorContent = document.createElement('div');
-                errorContent.style.padding = '8px';
-                errorContent.style.flex = '1';
-                errorContent.style.overflow = 'auto';
-                errorContent.style.color = 'var(--color-error)';
-                errorContent.style.fontFamily = 'var(--font-mono)';
-                errorContent.innerHTML = `
-                        <div style="margin-bottom: 8px; font-weight: bold;">Error rendering content</div>
-                        <div style="opacity: 0.8; font-size: 12px;">${error instanceof Error ? error.message : String(error)}</div>
-                    `;
-                glyphElement.appendChild(errorContent);
-                contentElement = errorContent;
-            }
-        }
+        // Restore stashed content or render fresh (shared with panel.ts)
+        const { titleBar, contentElement } = renderGlyphContent(glyphElement, glyph, 'Window');
 
         // Add window controls (minimize/close) to the title bar
         addWindowControls(titleBar, {
