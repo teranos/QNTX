@@ -1010,3 +1010,45 @@ func mustParsePort(t *testing.T, portStr string) int {
 	require.NoError(t, err)
 	return port
 }
+
+func TestRegisterWebSocket_PathFormat(t *testing.T) {
+	logger := zaptest.NewLogger(t).Sugar()
+	// Use a dummy address — we only need Metadata(), not a live connection
+	proxy := &ExternalDomainProxy{
+		metadata: pluginpkg.Metadata{Name: "pty-glyph"},
+		logger:   logger,
+	}
+
+	handlers, err := proxy.RegisterWebSocket()
+	require.NoError(t, err)
+
+	// Must use /ws/<name> convention (not /<name>-ws)
+	_, ok := handlers["/ws/pty-glyph"]
+	assert.True(t, ok, "RegisterWebSocket must register at /ws/<name>, got keys: %v", mapKeys(handlers))
+
+	// Must NOT use the old format
+	_, old := handlers["/pty-glyph-ws"]
+	assert.False(t, old, "RegisterWebSocket must not use old /<name>-ws format")
+}
+
+func TestRegisterWebSocketWithConfig_PathFormat(t *testing.T) {
+	logger := zaptest.NewLogger(t).Sugar()
+	proxy := &ExternalDomainProxy{
+		metadata: pluginpkg.Metadata{Name: "test-plugin"},
+		logger:   logger,
+	}
+
+	handlers, err := proxy.RegisterWebSocketWithConfig(DefaultKeepaliveConfig())
+	require.NoError(t, err)
+
+	_, ok := handlers["/ws/test-plugin"]
+	assert.True(t, ok, "RegisterWebSocketWithConfig must register at /ws/<name>")
+}
+
+func mapKeys(m map[string]pluginpkg.WebSocketHandler) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
