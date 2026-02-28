@@ -127,8 +127,8 @@
     padding: 0 8px;
 }
 
-/* Hover: reveal at compact height */
-.canvas-result-glyph:hover .result-followup-zone {
+/* Hover: reveal at compact height (but not when showing an error) */
+.canvas-result-glyph:hover .result-followup-zone:not(.has-error) {
     height: 42px;
     opacity: 1;
     padding: 4px 8px;
@@ -166,11 +166,33 @@
 }
 
 .result-followup-zone .followup-status {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-secondary);
     margin-top: 2px;
     display: block;
     min-height: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* Error state: keep zone visible, style error red */
+.result-followup-zone.has-error {
+    height: auto;
+    opacity: 1;
+    padding: 4px 8px;
+    border-top: 1px solid var(--glyph-status-error-text);
+    background-color: var(--glyph-status-error-section-bg);
+}
+
+.result-followup-zone.has-error .followup-status {
+    color: var(--glyph-status-error-text);
+    font-weight: bold;
+}
+
+/* Error border on the glyph itself — !important overrides inline styles */
+.canvas-result-glyph.glyph-error {
+    border-color: var(--glyph-status-error-text) !important;
+    background-color: var(--glyph-status-error-section-bg) !important;
 }
 
 /* Result glyph header buttons — small solid buttons on dark surface */
