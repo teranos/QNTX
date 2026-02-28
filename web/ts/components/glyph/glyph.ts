@@ -15,6 +15,7 @@ export interface Glyph {
     id: string;
     title: string;
     renderContent: () => HTMLElement;    // Function to render content
+    renderTitleBar?: () => HTMLElement;   // Glyph-specific title bar, enhanced by manifestations with window controls
 
     // Manifestation configuration
     manifestationType?: 'window' | 'fullscreen' | 'canvas' | 'modal' | 'panel' | 'ix' | 'ax';  // Default: 'window'

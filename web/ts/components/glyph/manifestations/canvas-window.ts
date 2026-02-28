@@ -25,6 +25,8 @@ import {
     WINDOW_BOX_SHADOW,
 } from '../glyph';
 import { runCleanup } from '../glyph-interaction';
+import { addWindowControls, removeWindowControls } from './title-bar-controls';
+import { stashContent } from './stash';
 
 // ── Default window dimensions ────────────────────────────────────────
 
@@ -40,8 +42,8 @@ export interface CanvasWindowConfig {
     title: string;
     canvasId: string;
     onClose?: () => void;
-    /** When provided, the − button minimizes to tray instead of returning to canvas. */
-    onMinimize?: () => void;
+    /** When provided, the − button minimizes to tray instead of returning to canvas. Receives the element for adoption. */
+    onMinimize?: (element: HTMLElement) => void;
     onRestoreComplete: (element: HTMLElement) => void;
 }
 
@@ -73,44 +75,43 @@ export function morphCanvasPlacedToWindow(
     // 3. Tear down canvas drag/resize handlers
     runCleanup(element);
 
-    // 4. Wrap existing children into a scrollable content div
+    // 4. Detect existing glyph title bar (belongs to the glyph, not the manifestation)
+    const existingTitleBar = element.querySelector(':scope > .glyph-title-bar') as HTMLElement | null;
+
+    // 5. Wrap non-title-bar children into a scrollable content div
     const contentDiv = document.createElement('div');
     contentDiv.className = 'canvas-window-content';
     contentDiv.style.flex = '1';
     contentDiv.style.overflow = 'auto';
-    while (element.firstChild) {
-        contentDiv.appendChild(element.firstChild);
+    const children = Array.from(element.childNodes);
+    for (const child of children) {
+        if (child === existingTitleBar) continue;
+        contentDiv.appendChild(child);
     }
 
-    // 5. Build window title bar
-    const titleBar = document.createElement('div');
-    titleBar.className = 'glyph-title-bar';
-
-    const titleText = document.createElement('span');
-    titleText.textContent = title;
-    titleText.style.flex = '1';
-    titleBar.appendChild(titleText);
-
-    const minimizeBtn = document.createElement('button');
-    minimizeBtn.textContent = '−';
-    if (config.onMinimize) {
-        minimizeBtn.title = 'Minimize to tray';
-        minimizeBtn.onclick = () => minimizeCanvasWindowToTray(element, config);
+    // 6. Reuse existing title bar or create a generic one
+    let titleBar: HTMLElement;
+    if (existingTitleBar) {
+        titleBar = existingTitleBar;
     } else {
-        minimizeBtn.title = 'Minimize back to canvas';
-        minimizeBtn.onclick = () => morphWindowToCanvasPlaced(element, config);
-    }
-    titleBar.appendChild(minimizeBtn);
-
-    if (onClose) {
-        const closeBtn = document.createElement('button');
-        closeBtn.textContent = '×';
-        closeBtn.title = 'Close';
-        closeBtn.onclick = () => onClose();
-        titleBar.appendChild(closeBtn);
+        titleBar = document.createElement('div');
+        titleBar.className = 'glyph-title-bar';
+        titleBar.dataset.windowCreated = 'true'; // Mark for removal on restore
+        const titleText = document.createElement('span');
+        titleText.textContent = title;
+        titleText.style.flex = '1';
+        titleBar.appendChild(titleText);
     }
 
-    // 6. Assemble: title bar + content
+    // 7. Add window controls (minimize/close) to the title bar
+    addWindowControls(titleBar, {
+        onMinimize: config.onMinimize
+            ? () => minimizeCanvasWindowToTray(element, config)
+            : () => morphWindowToCanvasPlaced(element, config),
+        onClose,
+    });
+
+    // 8. Assemble: title bar + content
     element.appendChild(titleBar);
     element.appendChild(contentDiv);
 
@@ -205,18 +206,22 @@ export function morphWindowToCanvasPlaced(
     // 4. Animate back to canvas rect
     beginRestoreMorph(element, windowRect, toRect, getMinimizeDuration())
         .then(() => {
-            // 5. Unwrap: move children out of content div, remove title bar
+            // 5. Unwrap: move children out of content div, strip window controls from title bar
             const contentDiv = element.querySelector('.canvas-window-content');
             const titleBar = element.querySelector('.glyph-title-bar');
 
+            if (titleBar) {
+                if ((titleBar as HTMLElement).dataset.windowCreated) {
+                    titleBar.remove(); // Manifestation-created: remove entirely
+                } else {
+                    removeWindowControls(titleBar as HTMLElement); // Glyph-owned: just strip controls
+                }
+            }
             if (contentDiv) {
                 while (contentDiv.firstChild) {
                     element.appendChild(contentDiv.firstChild);
                 }
                 contentDiv.remove();
-            }
-            if (titleBar) {
-                titleBar.remove();
             }
 
             // 6. Clear state
@@ -281,14 +286,15 @@ function minimizeCanvasWindowToTray(
     // 4. Animate toward tray
     beginMinimizeMorph(element, windowRect, { x: targetX, y: targetY }, getMinimizeDuration())
         .then(() => {
-            // 5. Clear state and remove
+            // 5. Stash content, clear state, pass element through
+            stashContent(element);
             setWindowState(element, false);
             clearCanvasOrigin(element);
             element.remove();
             element.style.cssText = '';
 
-            // 6. Notify caller
-            config.onMinimize!();
+            // 6. Pass element to caller for tray adoption (same element, no new creation)
+            config.onMinimize!(element);
 
             log.debug(SEG.GLYPH, `[CanvasWindow] Minimized to tray`);
         })
@@ -352,17 +358,21 @@ export function placeWindowOnCanvas(
     // 7. Animate
     beginRestoreMorph(element, windowRect, toRect, getMinimizeDuration())
         .then(() => {
-            // 8. Unwrap content div and title bar
+            // 8. Unwrap content div, strip window controls from title bar
             const contentDiv = element.querySelector('.canvas-window-content');
             const titleBar = element.querySelector('.glyph-title-bar');
+            if (titleBar) {
+                if ((titleBar as HTMLElement).dataset.windowCreated) {
+                    titleBar.remove(); // Manifestation-created: remove entirely
+                } else {
+                    removeWindowControls(titleBar as HTMLElement); // Glyph-owned: just strip controls
+                }
+            }
             if (contentDiv) {
                 while (contentDiv.firstChild) {
                     element.appendChild(contentDiv.firstChild);
                 }
                 contentDiv.remove();
-            }
-            if (titleBar) {
-                titleBar.remove();
             }
 
             // 9. Clear state
@@ -393,11 +403,11 @@ export function placeWindowOnCanvas(
         });
 }
 
-// ── Window drag (private) ────────────────────────────────────────────
+// ── Window drag ──────────────────────────────────────────────────────
 
 const DRAG_KEY = '__canvasWindowDrag';
 
-function setupWindowDrag(windowElement: HTMLElement, handle: HTMLElement): void {
+export function setupWindowDrag(windowElement: HTMLElement, handle: HTMLElement): void {
     let isDragging = false;
     let offsetX = 0;
     let offsetY = 0;
@@ -469,7 +479,7 @@ function applyDragPosition(el: HTMLElement, newX: number, newY: number): void {
     el.style.top = `${newY}px`;
 }
 
-function teardownWindowDrag(windowElement: HTMLElement): void {
+export function teardownWindowDrag(windowElement: HTMLElement): void {
     const state = (windowElement as any)[DRAG_KEY];
     if (!state) return;
     const { handleMouseDown, handleTouchStart, handle } = state;
