@@ -49,17 +49,11 @@ Review of the glyph system, manifestation architecture, and opportunities to sha
 
 The content-rendering block (lines ~130-195 in both files) is copy-pasted. Same error HTML template, same `try/catch` around `renderContent()`, same stash restore logic. `canvas.ts` is simpler (no stash, no title bar) but repeats the same morph→commit→rollback skeleton.
 
-### 2b. Plugin glyphs are HTML islands
+### ~~2b. Plugin glyphs are HTML islands~~ — RESOLVED (ix-json)
 
-Plugin glyphs (`qntx-atproto/handlers.go:484`, `qntx-ix-json/handlers.go:329`) build complete HTML documents with Go string builders. Each plugin:
+ix-json's legacy HTML pipeline (~350 lines of Go string builder HTML/CSS/JS, ~90 lines of inline `<script>`, global `window.*` functions) has been deleted. The plugin now ships only a JS module (`ix-glyph-module.js`) that uses the Plugin Glyph SDK — `sdk.container()`, `sdk.input()`, `sdk.button()`, `sdk.pluginFetch()`, `sdk.loadConfig()`, `sdk.statusLine()`.
 
-- Re-implements `escapeHTML` / `escapeHTMLAttr` (identical functions in both plugins)
-- Inlines its own CSS (declares its own `var(--background)`, `var(--border-color)` references that must match the host)
-- Writes interactive JavaScript as inline strings (no type checking, no imports, no dev tooling)
-- Has no access to QNTX's `uiState`, `connectivityManager`, `log`, `apiFetch`, or any frontend primitives
-- Cannot participate in the meld system, proximity morphing, or attestation-backed state
-
-The `ix-json` plugin's inline script (~90 lines) re-implements `fetch()` calls to its own backend, status display logic, and DOM traversal — all patterns that already exist in the frontend codebase.
+`qntx-atproto` still uses the legacy HTML pipeline and remains an HTML island.
 
 ### 2c. The `innerHTML` + script re-execution pattern
 
