@@ -17,7 +17,8 @@
         plugin/grpc/protocol/atsstore.proto \
         plugin/grpc/protocol/queue.proto \
         plugin/grpc/protocol/schedule.proto \
-        plugin/grpc/protocol/server.proto
+        plugin/grpc/protocol/server.proto \
+        plugin/grpc/protocol/fileservice.proto
 
       echo "✓ Plugin proto files generated in plugin/grpc/protocol/"
 
