@@ -12,6 +12,7 @@ import (
 	"github.com/bluesky-social/indigo/lex/util"
 	"github.com/bluesky-social/indigo/xrpc"
 	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/plugin/httputil"
 )
 
 // registerHTTPHandlers registers all HTTP handlers for the atproto domain.
@@ -484,11 +485,11 @@ func (p *Plugin) handleFeedGlyph(w http.ResponseWriter, r *http.Request) {
 func (p *Plugin) renderFeedHTML(glyphID, actor string, feed []*appbsky.FeedDefs_FeedViewPost, cursor *string) string {
 	var html strings.Builder
 
-	html.WriteString(fmt.Sprintf(`<div class="atproto-feed-content" data-glyph-id="%s" data-actor="%s">`, escapeHTMLAttr(glyphID), escapeHTMLAttr(actor)))
+	html.WriteString(fmt.Sprintf(`<div class="atproto-feed-content" data-glyph-id="%s" data-actor="%s">`, httputil.EscapeHTMLAttr(glyphID), httputil.EscapeHTMLAttr(actor)))
 
 	// Header with refresh button
 	html.WriteString(`<div class="feed-header">`)
-	html.WriteString(fmt.Sprintf(`<div class="feed-actor">@%s</div>`, escapeHTML(actor)))
+	html.WriteString(fmt.Sprintf(`<div class="feed-actor">@%s</div>`, httputil.EscapeHTML(actor)))
 	html.WriteString(`<button class="feed-refresh" onclick="location.reload()">↻</button>`)
 	html.WriteString(`</div>`)
 
@@ -523,9 +524,9 @@ func (p *Plugin) renderFeedHTML(glyphID, actor string, feed []*appbsky.FeedDefs_
 				<span class="author-name">%s</span>
 				<span class="author-handle">@%s</span>
 				<span class="post-time">%s</span>
-			</div>`, escapeHTML(displayName), escapeHTML(authorHandle), escapeHTML(timeAgo)))
+			</div>`, httputil.EscapeHTML(displayName), httputil.EscapeHTML(authorHandle), httputil.EscapeHTML(timeAgo)))
 
-			html.WriteString(fmt.Sprintf(`<div class="post-text">%s</div>`, escapeHTML(record.Text)))
+			html.WriteString(fmt.Sprintf(`<div class="post-text">%s</div>`, httputil.EscapeHTML(record.Text)))
 
 			// Engagement metrics
 			likeCount := int64(0)
@@ -551,7 +552,7 @@ func (p *Plugin) renderFeedHTML(glyphID, actor string, feed []*appbsky.FeedDefs_
 			postID := extractPostID(post.Uri)
 			html.WriteString(fmt.Sprintf(`<div class="post-actions">
 				<a href="https://bsky.app/profile/%s/post/%s" target="_blank" class="post-link">Open in Bluesky →</a>
-			</div>`, escapeHTMLAttr(authorDID), escapeHTMLAttr(postID)))
+			</div>`, httputil.EscapeHTMLAttr(authorDID), httputil.EscapeHTMLAttr(postID)))
 
 			html.WriteString(`</div>`) // end post
 		}
@@ -563,7 +564,7 @@ func (p *Plugin) renderFeedHTML(glyphID, actor string, feed []*appbsky.FeedDefs_
 	if cursor != nil && *cursor != "" {
 		html.WriteString(fmt.Sprintf(`<div class="feed-pagination">
 			<a href="?glyph_id=%s&content=%s&cursor=%s" class="load-more">Load More</a>
-		</div>`, escapeHTMLAttr(glyphID), escapeHTMLAttr(actor), escapeHTMLAttr(*cursor)))
+		</div>`, httputil.EscapeHTMLAttr(glyphID), httputil.EscapeHTMLAttr(actor), httputil.EscapeHTMLAttr(*cursor)))
 	}
 
 	html.WriteString(`</div>`) // end feed-content
@@ -591,19 +592,6 @@ func extractPostID(atURI string) string {
 		return parts[len(parts)-1]
 	}
 	return ""
-}
-
-func escapeHTML(s string) string {
-	s = strings.ReplaceAll(s, "&", "&amp;")
-	s = strings.ReplaceAll(s, "<", "&lt;")
-	s = strings.ReplaceAll(s, ">", "&gt;")
-	s = strings.ReplaceAll(s, "\"", "&quot;")
-	s = strings.ReplaceAll(s, "'", "&#39;")
-	return s
-}
-
-func escapeHTMLAttr(s string) string {
-	return escapeHTML(s)
 }
 
 // handleFeedGlyphCSS returns the CSS stylesheet for the feed glyph.
