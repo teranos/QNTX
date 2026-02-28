@@ -1,4 +1,4 @@
-package qntxopenrouter
+package tracker
 
 // ModelPricing contains per-token pricing information for OpenRouter models
 // Prices are in USD per million tokens
@@ -8,13 +8,14 @@ type ModelPricing struct {
 }
 
 // modelPricing contains hardcoded pricing for common OpenRouter models
-// TODO: Replace with dynamic pricing - periodically pull from OpenRouter API and store as attestations
+// TODO(#636): Replace with dynamic pricing — pull from OpenRouter API and store as attestations.
+// Current table uses stale model names; unmatched models fall back to DefaultPricingFallback.
 var modelPricing = map[string]ModelPricing{
 	// OpenAI models via OpenRouter
-	"openai/gpt-4o":         {PromptPrice: 2.50, CompletionPrice: 10.00},
-	"openai/gpt-4o-mini":    {PromptPrice: 0.15, CompletionPrice: 0.60},
-	"openai/gpt-4-turbo":    {PromptPrice: 10.00, CompletionPrice: 30.00},
-	"openai/gpt-3.5-turbo":  {PromptPrice: 0.50, CompletionPrice: 1.50},
+	"openai/gpt-4o":        {PromptPrice: 2.50, CompletionPrice: 10.00},
+	"openai/gpt-4o-mini":   {PromptPrice: 0.15, CompletionPrice: 0.60},
+	"openai/gpt-4-turbo":   {PromptPrice: 10.00, CompletionPrice: 30.00},
+	"openai/gpt-3.5-turbo": {PromptPrice: 0.50, CompletionPrice: 1.50},
 
 	// Anthropic models via OpenRouter
 	"anthropic/claude-3.5-sonnet": {PromptPrice: 3.00, CompletionPrice: 15.00},

@@ -104,7 +104,6 @@ func (p *Plugin) executePromptJob(ctx context.Context, jobID string, payload []b
 		APIKey:        apiKey,
 		Model:         model,
 		Logger:        logger,
-		DB:            db,
 		OperationType: "prompt-execute",
 	})
 
