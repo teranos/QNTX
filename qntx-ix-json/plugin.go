@@ -198,8 +198,6 @@ func (p *Plugin) RegisterGlyphs() []plugin.GlyphDef {
 			Symbol:        "🔄",
 			Title:         "JSON API Ingestor",
 			Label:         "ix-json",
-			ContentPath:   "/ix-glyph",
-			CSSPath:       "/ix-glyph.css",
 			ModulePath:    "/ix-glyph-module.js",
 			DefaultWidth:  600,
 			DefaultHeight: 700,
