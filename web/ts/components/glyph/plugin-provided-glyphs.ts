@@ -5,7 +5,7 @@
  * Registers each glyph type in the global registry for spawn menu and canvas rendering.
  *
  * Two rendering paths:
- * 1. module_url set → TypeScript module with SDK injection (preferred)
+ * 1. module_url set → TypeScript module with GlyphUI injection (preferred)
  * 2. content_url only → server-rendered HTML via innerHTML (legacy)
  */
 
