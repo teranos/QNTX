@@ -8,14 +8,9 @@
 
 import { log, SEG } from '../../../logger';
 import type { Glyph } from '../glyph';
-import {
-    setWindowState,
-    hasProximityText,
-    setProximityText
-} from '../dataset';
 import { beginMaximizeMorph, beginMinimizeMorph } from '../morph-transaction';
 import { getMaximizeDuration, getMinimizeDuration } from '../glyph';
-import { verifyGlyphAxiom, calculateTrayTarget, resetGlyphElement } from './morphology';
+import { prepareMorphTo, calculateTrayTarget, resetGlyphElement } from './morphology';
 
 /**
  * Morph a glyph to fullscreen canvas (no chrome)
@@ -26,36 +21,13 @@ export function morphToCanvas(
     verifyElement: (id: string, element: HTMLElement) => void,
     onMinimize: (element: HTMLElement, glyph: Glyph) => void
 ): void {
-    verifyGlyphAxiom(glyph.id, glyphElement, verifyElement);
-
-    // Get current glyph position and size
-    const glyphRect = glyphElement.getBoundingClientRect();
+    const glyphRect = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-canvas', '1000');
 
     // Target: full viewport
     const targetX = 0;
     const targetY = 0;
     const targetWidth = window.innerWidth;
     const targetHeight = window.innerHeight;
-
-    // Remove from indicator container and reparent to body
-    glyphElement.remove();
-
-    // Clear any proximity text
-    if (hasProximityText(glyphElement)) {
-        glyphElement.textContent = '';
-        setProximityText(glyphElement, false);
-    }
-
-    // Apply initial fixed positioning at current state
-    glyphElement.className = 'glyph-morphing-to-canvas';
-    glyphElement.style.position = 'fixed';
-    glyphElement.style.zIndex = '1000';
-
-    // Reparent to document body for morphing
-    document.body.appendChild(glyphElement);
-
-    // Mark element as in-window-state (but keep glyph ID)
-    setWindowState(glyphElement, true);
 
     // BEGIN TRANSACTION: Start the morph animation
     beginMaximizeMorph(

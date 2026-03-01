@@ -149,4 +149,7 @@ Only one SDK consumer exists (ix-json), using 4 host-defined variables that all 
 **Longer-term (manifestation unification):**
 
 8. Unify glyph morphology across window/panel/canvas manifestations.
+   - 8a. ~~Extract shared helpers (axiom check, tray target, element reset).~~ — done (`morphology.ts`)
+   - 8b. Extract morph-to preamble. All three do: remove from parent, clear proximity text, apply morphing class, set fixed position, reparent to body, set window state. Differs only in class name and z-index.
+   - 8c. Template for morph-from. Same shape: verify, log, get rect, [manifestation-specific teardown], tray target, minimize morph, reset. The teardown differs per manifestation (window: remember position + drag teardown + stash; panel: re-entrance guard + escape handler + overlay + stash; canvas: clear innerHTML). This is a callback-based template — worth doing only if more manifestation types are coming.
 9. ~~Enable plugin glyphs to declare their own manifestation type.~~ — won't do. No problem to solve, and the suggestion misunderstands what a manifestation is.

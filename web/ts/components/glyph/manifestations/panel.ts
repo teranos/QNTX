@@ -18,11 +18,9 @@ import { stashContent } from './stash';
 import { renderGlyphContent } from './render-content';
 import {
     setWindowState,
-    hasProximityText,
-    setProximityText,
     setGlyphId
 } from '../dataset';
-import { verifyGlyphAxiom, calculateTrayTarget, resetGlyphElement } from './morphology';
+import { prepareMorphTo, calculateTrayTarget, resetGlyphElement } from './morphology';
 import { beginMaximizeMorph, beginMinimizeMorph } from '../morph-transaction';
 import {
     getMaximizeDuration,
@@ -59,9 +57,8 @@ export function morphToPanel(
     onRemove: (id: string) => void,
     onMinimize: (element: HTMLElement, glyph: Glyph) => void
 ): void {
-    verifyGlyphAxiom(glyph.id, glyphElement, verifyElement);
+    const glyphRect = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-panel', PANEL_Z_INDEX);
 
-    const glyphRect = glyphElement.getBoundingClientRect();
     const direction = detectSlideDirection();
 
     // Panel dimensions: full viewport width, 70% height
@@ -71,21 +68,6 @@ export function morphToPanel(
     // Target position based on slide direction
     const targetX = 0;
     const targetY = direction === 'from-top' ? 0 : window.innerHeight - panelHeight;
-
-    // THE GLYPH ITSELF BECOMES THE PANEL - NO CLONING
-    glyphElement.remove();
-
-    if (hasProximityText(glyphElement)) {
-        glyphElement.textContent = '';
-        setProximityText(glyphElement, false);
-    }
-
-    glyphElement.className = 'glyph-morphing-to-panel';
-    glyphElement.style.position = 'fixed';
-    glyphElement.style.zIndex = PANEL_Z_INDEX; // Above system drawer (10002)
-
-    document.body.appendChild(glyphElement);
-    setWindowState(glyphElement, true);
 
     // Create overlay
     const overlay = document.createElement('div');
