@@ -1,0 +1,7 @@
+{
+  "name": "@qntx/glyphs",
+  "version": "0.1.0",
+  "description": "Type definitions for QNTX glyph UI authoring",
+  "types": "index.ts",
+  "private": true
+}
