@@ -59,7 +59,6 @@ type ServerConfig struct {
 }
 
 // RateLimitConfig configures per-IP token bucket rate limits.
-// 0 rate = disabled for that group.
 type RateLimitConfig struct {
 	AuthRate    float64 `mapstructure:"auth_rate"`    // /auth/* requests per second (default: 2)
 	AuthBurst   int     `mapstructure:"auth_burst"`   // /auth/* burst capacity (default: 5)
