@@ -389,16 +389,25 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		}
 	}
 
-	// Initialize sync tree and observer for content-addressed attestation sync
-	setupSync(server, db, serverLogger)
+	// Initialize sync tree and observer for content-addressed attestation sync.
+	// Sync is disabled on non-loopback bind because the /ws/sync endpoint has no
+	// peer authentication. See https://github.com/teranos/QNTX/issues/643
+	if appcfg.IsLoopbackAddress(bindAddr) {
+		setupSync(server, db, serverLogger)
 
-	// Start periodic sync with configured peers
-	if deps.config.Sync.IntervalSeconds > 0 && server.syncTree != nil {
-		server.wg.Add(1)
-		go func() {
-			defer server.wg.Done()
-			server.startSyncTicker(ctx, time.Duration(deps.config.Sync.IntervalSeconds)*time.Second)
-		}()
+		// Start periodic sync with configured peers
+		if deps.config.Sync.IntervalSeconds > 0 && server.syncTree != nil {
+			server.wg.Add(1)
+			go func() {
+				defer server.wg.Done()
+				server.startSyncTicker(ctx, time.Duration(deps.config.Sync.IntervalSeconds)*time.Second)
+			}()
+		}
+	} else {
+		serverLogger.Infow("Sync disabled on non-loopback bind (no peer authentication)",
+			"bind_address", bindAddr,
+			"issue", "https://github.com/teranos/QNTX/issues/643",
+		)
 	}
 
 	// Set up config file watcher for auto-reload
