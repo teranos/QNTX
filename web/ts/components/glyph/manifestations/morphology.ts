@@ -44,6 +44,7 @@ export function prepareMorphTo(
 
     const glyphRect = glyphElement.getBoundingClientRect();
 
+    // THE GLYPH ITSELF BECOMES THE MANIFESTATION - NO CLONING
     glyphElement.remove();
 
     if (hasProximityText(glyphElement)) {
