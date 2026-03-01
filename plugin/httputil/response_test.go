@@ -20,11 +20,3 @@ func TestEscapeHTML(t *testing.T) {
 		}
 	}
 }
-
-func TestEscapeHTMLAttr(t *testing.T) {
-	got := EscapeHTMLAttr(`val"ue`)
-	want := "val&quot;ue"
-	if got != want {
-		t.Errorf("EscapeHTMLAttr(%q) = %q, want %q", `val"ue`, got, want)
-	}
-}

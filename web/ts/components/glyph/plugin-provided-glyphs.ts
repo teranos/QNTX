@@ -12,7 +12,7 @@
 import { registerGlyphType } from './glyph-registry';
 import { createPluginGlyph } from './plugin-glyph';
 import { createPluginGlyphFromModule } from './glyph-module-loader';
-import { apiFetch } from '../../api';
+import { apiFetch, getBackendUrl } from '../../api';
 import { log, SEG } from '../../logger';
 import type { Glyph } from './glyph';
 
@@ -43,9 +43,7 @@ export function loadPluginCSS(url: string): void {
     if (loadedCSS.has(url)) return;
     loadedCSS.add(url);
 
-    // Use absolute URL to backend (dev mode: frontend on :8826, backend on :8776)
-    const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
-    const absoluteUrl = backendUrl + url;
+    const absoluteUrl = getBackendUrl() + url;
 
     const link = document.createElement('link');
     link.rel = 'stylesheet';
