@@ -319,5 +319,3 @@ func (p *Plugin) fetchJSON(ctx context.Context, apiURL, authToken string) ([]byt
 
 	return data, nil
 }
-
-
