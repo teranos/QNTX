@@ -29,7 +29,8 @@ import {
   onExecutionLog,
   unixToISO,
 } from './events.ts';
-import { extractHttpStatus, type RichError } from '../base-panel-error.ts';
+import type { RichError } from '../base-panel-error.ts';
+import { extractHttpStatus } from '../http-utils.ts';
 
 class JobDetailPanel {
   private panel: HTMLElement | null = null;

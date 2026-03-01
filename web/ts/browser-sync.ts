@@ -9,7 +9,8 @@
 import { log, SEG } from './logger';
 import { connectivityManager } from './connectivity';
 import { embeddingStore } from './embedding-store';
-import { apiFetch, stripProtocol } from './api';
+import { apiFetch } from './api';
+import { stripProtocol } from './http-utils';
 import { validateBackendURL } from './websocket';
 import {
     listAttestationIds,
