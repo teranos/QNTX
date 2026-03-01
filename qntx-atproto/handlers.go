@@ -514,7 +514,7 @@ func (p *Plugin) handleFeedGlyph(w http.ResponseWriter, r *http.Request) {
 func (p *Plugin) renderFeedHTML(glyphID, actor string, feed []*appbsky.FeedDefs_FeedViewPost, cursor *string) string {
 	var html strings.Builder
 
-	html.WriteString(fmt.Sprintf(`<div class="atproto-feed-content" data-glyph-id="%s" data-actor="%s">`, httputil.EscapeHTMLAttr(glyphID), httputil.EscapeHTMLAttr(actor)))
+	html.WriteString(fmt.Sprintf(`<div class="atproto-feed-content" data-glyph-id="%s" data-actor="%s">`, httputil.EscapeHTML(glyphID), httputil.EscapeHTML(actor)))
 
 	// Header with refresh button
 	html.WriteString(`<div class="feed-header">`)
@@ -581,7 +581,7 @@ func (p *Plugin) renderFeedHTML(glyphID, actor string, feed []*appbsky.FeedDefs_
 			postID := extractPostID(post.Uri)
 			html.WriteString(fmt.Sprintf(`<div class="post-actions">
 				<a href="https://bsky.app/profile/%s/post/%s" target="_blank" class="post-link">Open in Bluesky →</a>
-			</div>`, httputil.EscapeHTMLAttr(authorDID), httputil.EscapeHTMLAttr(postID)))
+			</div>`, httputil.EscapeHTML(authorDID), httputil.EscapeHTML(postID)))
 
 			html.WriteString(`</div>`) // end post
 		}
@@ -593,7 +593,7 @@ func (p *Plugin) renderFeedHTML(glyphID, actor string, feed []*appbsky.FeedDefs_
 	if cursor != nil && *cursor != "" {
 		html.WriteString(fmt.Sprintf(`<div class="feed-pagination">
 			<a href="?glyph_id=%s&content=%s&cursor=%s" class="load-more">Load More</a>
-		</div>`, httputil.EscapeHTMLAttr(glyphID), httputil.EscapeHTMLAttr(actor), httputil.EscapeHTMLAttr(*cursor)))
+		</div>`, httputil.EscapeHTML(glyphID), httputil.EscapeHTML(actor), httputil.EscapeHTML(*cursor)))
 	}
 
 	html.WriteString(`</div>`) // end feed-content
