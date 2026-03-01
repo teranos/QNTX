@@ -288,6 +288,7 @@ export interface PluginGlyphDef {
   label: string;
   content_url: string;
   css_url?: string;
+  module_url?: string;
   default_width?: number;
   default_height?: number;
 }

@@ -166,11 +166,19 @@ type GlyphDef struct {
 	// returns the HTML fragment for this glyph's content area.
 	// The frontend GETs this path with ?glyph_id={id}&content={encoded}
 	// and mounts the response HTML into the glyph element.
+	// Used for server-rendered HTML glyphs. Ignored when ModulePath is set.
 	ContentPath string
 
 	// CSSPath is an optional HTTP path to a stylesheet for this glyph type.
 	// Loaded once when the first glyph of this type is created.
 	CSSPath string
+
+	// ModulePath is the HTTP path (relative to /api/{plugin}/) to a
+	// TypeScript/JavaScript module that exports a render function.
+	// When set, the frontend dynamically imports this module and injects
+	// a GlyphUI instance, bypassing the server-rendered HTML pipeline.
+	// The module must export: render(glyph, ui) => HTMLElement
+	ModulePath string
 
 	// DefaultWidth and DefaultHeight in pixels. 0 = use system default.
 	DefaultWidth  int

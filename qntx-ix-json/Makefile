@@ -1,8 +1,11 @@
-.PHONY: build install clean
+.PHONY: build build-module install clean
 
 PREFIX ?= $(HOME)/.qntx
 
-build: ## Build ix-json plugin binary
+build-module: ## Compile TypeScript glyph module to JS for go:embed
+	@bun build web/ix-glyph-module.ts --outfile web/ix-glyph-module.js --target browser
+
+build: build-module ## Build ix-json plugin binary
 	@echo "Building qntx-ix-json-plugin..."
 	@go build -o bin/qntx-ix-json-plugin ./cmd/qntx-ix-json-plugin
 	@echo "✓ bin/qntx-ix-json-plugin"
