@@ -26,6 +26,7 @@
 | GET | `/api/embeddings/projections` | HandleEmbeddingProjections |
 | GET | `/api/files` | HandleFiles |
 | GET | `/api/files/` | HandleFiles |
+| GET, POST, PATCH | `/api/glyph-config` | HandleGlyphConfig |
 | GET | `/api/search/semantic` | HandleSemanticSearch |
 | GET | `/api/sync` | HandleSync |
 | GET | `/api/sync/status` | HandleSyncStatus |
@@ -193,6 +194,14 @@ HandleEmbeddingProjections serves 2D projections (GET /api/embeddings/projection
 HandleFiles routes file upload and serve requests.
 
 **Handler**: `HandleFiles`
+
+---
+
+### `GET | POST | PATCH` /api/glyph-config
+
+HandleGlyphConfig handles plugin glyph configuration via attestations.
+
+**Handler**: `HandleGlyphConfig`
 
 ---
 

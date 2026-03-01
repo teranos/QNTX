@@ -9,19 +9,16 @@
  */
 
 import { log, SEG } from '../../../logger';
-import { stripHtml } from '../../../html-utils';
 import type { Glyph } from '../glyph';
 import { addWindowControls } from './title-bar-controls';
-import { stashContent, restoreContent } from './stash';
+import { stashContent } from './stash';
+import { renderGlyphContent } from './render-content';
 import { setupWindowDrag, teardownWindowDrag } from './canvas-window';
 import {
-    setWindowState,
     getLastPosition,
     setLastPosition,
-    hasProximityText,
-    setProximityText,
-    setGlyphId
 } from '../dataset';
+import { prepareMorphTo, calculateTrayTarget, resetGlyphElement } from './morphology';
 import { beginMaximizeMorph, beginMinimizeMorph } from '../morph-transaction';
 import {
     getMaximizeDuration,
@@ -49,19 +46,7 @@ export function morphToWindow(
     onRemove: (id: string) => void,
     onMinimize: (element: HTMLElement, glyph: Glyph) => void
 ): void {
-    // AXIOM CHECK: Verify this is the correct element
-    verifyElement(glyph.id, glyphElement);
-
-    // Verify no duplicates exist
-    const elements = document.querySelectorAll(`[data-glyph-id="${glyph.id}"]`);
-    if (elements.length !== 1) {
-        throw new Error(
-            `AXIOM VIOLATION: Expected exactly 1 element for ${glyph.id}, found ${elements.length}`
-        );
-    }
-
-    // Get current glyph position and size (may be proximity-expanded)
-    const glyphRect = glyphElement.getBoundingClientRect();
+    const glyphRect = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-window', '1000');
 
     // Calculate window target position
     const windowWidth = parseInt(glyph.initialWidth || DEFAULT_WINDOW_WIDTH);
@@ -75,27 +60,6 @@ export function morphToWindow(
                    (glyph.defaultX ?? (window.innerWidth - windowWidth) / 2);
     const targetY = rememberedPos?.y ??
                    (glyph.defaultY ?? (window.innerHeight - windowHeight) / 2);
-
-    // THE GLYPH ITSELF BECOMES THE WINDOW - NO CLONING
-    // Remove from indicator container and reparent to body
-    glyphElement.remove(); // Detach from current parent (keeps element alive)
-
-    // Clear any proximity text that might be present AFTER detaching
-    if (hasProximityText(glyphElement)) {
-        glyphElement.textContent = '';
-        setProximityText(glyphElement, false);
-    }
-
-    // Apply initial fixed positioning at EXACT current state (including proximity expansion)
-    glyphElement.className = 'glyph-morphing-to-window';
-    glyphElement.style.position = 'fixed';
-    glyphElement.style.zIndex = '1000';
-
-    // Reparent to document body for morphing
-    document.body.appendChild(glyphElement);
-
-    // Mark element as in-window-state (but keep glyph ID)
-    setWindowState(glyphElement, true);
 
     // BEGIN TRANSACTION: Start the morph animation
     beginMaximizeMorph(
@@ -125,74 +89,8 @@ export function morphToWindow(
         glyphElement.style.flexDirection = 'column';
         glyphElement.style.overflow = 'hidden';
 
-        // Try restoring stashed content first (preserves glyph identity)
-        const restored = restoreContent(glyphElement);
-
-        let titleBar: HTMLElement;
-        let contentElement: HTMLElement | null = null;
-
-        if (restored) {
-            // Content restored from stash — find existing title bar
-            titleBar = glyphElement.querySelector('.glyph-title-bar') as HTMLElement;
-            if (!titleBar) {
-                // Stash had no title bar — create generic
-                titleBar = document.createElement('div');
-                titleBar.className = 'glyph-title-bar';
-                const titleText = document.createElement('span');
-                titleText.textContent = stripHtml(glyph.title);
-                titleText.style.flex = '1';
-                titleBar.appendChild(titleText);
-                glyphElement.insertBefore(titleBar, glyphElement.firstChild);
-            }
-
-            // Find content element (first non-title-bar child)
-            for (const child of Array.from(glyphElement.children)) {
-                if (child !== titleBar) {
-                    contentElement = child as HTMLElement;
-                    break;
-                }
-            }
-
-            log.debug(SEG.GLYPH, `[Window] Restored stashed content for ${glyph.id}`);
-        } else {
-            // No stash: initial creation — use renderTitleBar/renderContent callbacks
-            if (glyph.renderTitleBar) {
-                titleBar = glyph.renderTitleBar();
-            } else {
-                titleBar = document.createElement('div');
-                titleBar.className = 'glyph-title-bar';
-                const titleText = document.createElement('span');
-                titleText.textContent = stripHtml(glyph.title);
-                titleText.style.flex = '1';
-                titleBar.appendChild(titleText);
-            }
-
-            glyphElement.appendChild(titleBar);
-
-            // Add content area with error boundary
-            try {
-                const content = glyph.renderContent();
-                content.style.padding = `${CANVAS_GLYPH_CONTENT_PADDING}px`;
-                content.style.flex = '1';
-                content.style.overflow = 'auto';
-                glyphElement.appendChild(content);
-                contentElement = content;
-            } catch (error) {
-                log.error(SEG.GLYPH, `[Window ${glyph.id}] Error rendering content:`, error);
-                const errorContent = document.createElement('div');
-                errorContent.style.padding = '8px';
-                errorContent.style.flex = '1';
-                errorContent.style.overflow = 'auto';
-                errorContent.style.color = 'var(--color-error)';
-                errorContent.style.fontFamily = 'var(--font-mono)';
-                errorContent.innerHTML = `
-                        <div style="margin-bottom: 8px; font-weight: bold;">Error rendering content</div>
-                        <div style="opacity: 0.8; font-size: 12px;">${error instanceof Error ? error.message : String(error)}</div>
-                    `;
-                glyphElement.appendChild(errorContent);
-                contentElement = errorContent;
-            }
-        }
+        // Restore stashed content or render fresh (shared with panel.ts)
+        const { titleBar, contentElement } = renderGlyphContent(glyphElement, glyph, 'Window');
 
         // Add window controls (minimize/close) to the title bar
         addWindowControls(titleBar, {
@@ -232,7 +130,6 @@ export function morphFromWindow(
     verifyElement: (id: string, element: HTMLElement) => void,
     onMorphComplete: (element: HTMLElement, glyph: Glyph) => void
 ): void {
-    // AXIOM CHECK: Verify this is the correct element
     verifyElement(glyph.id, windowElement);
     log.debug(SEG.GLYPH, `[Window] Minimizing ${glyph.id}`);
 
@@ -248,46 +145,11 @@ export function morphFromWindow(
     // Stash content (strips window controls, preserves glyph identity off-DOM)
     stashContent(windowElement);
 
-    // Calculate target position for the dot
-    // The glyph will go to the right side of the tray
-    const trayElement = document.querySelector('.glyph-run');
-    let targetX = window.innerWidth - 50; // Default to right side if no tray
-    let targetY = window.innerHeight / 2;
+    const trayTarget = calculateTrayTarget();
 
-    if (trayElement) {
-        const trayRect = trayElement.getBoundingClientRect();
-        // Position at the right edge of the tray, centered vertically
-        targetX = trayRect.right - 20; // A bit inset from the edge
-        targetY = trayRect.top + trayRect.height / 2;
-    }
-
-    // Begin the minimize morph animation
-    // Element stays fixed on body during animation
-    beginMinimizeMorph(windowElement, currentRect, { x: targetX, y: targetY }, getMinimizeDuration())
+    beginMinimizeMorph(windowElement, currentRect, trayTarget, getMinimizeDuration())
         .then(() => {
-            // Animation completed successfully
-            log.debug(SEG.GLYPH, `[Window] Animation complete for ${glyph.id}`);
-
-            // Now reparent the element to the indicator container
-            // Clear state flags
-            setWindowState(windowElement, false);
-            setProximityText(windowElement, false);
-
-            // Remove from body
-            windowElement.remove();
-
-            // Clear all inline styles
-            windowElement.style.cssText = '';
-
-            // Apply glyph class
-            windowElement.className = 'glyph-run-glyph';
-
-            // Keep the glyph ID
-            setGlyphId(windowElement, glyph.id);
-
-            // Re-attach to indicator container
-            log.debug(SEG.GLYPH, `[Window] Re-attaching to indicator container`);
-            onMorphComplete(windowElement, glyph);
+            resetGlyphElement(windowElement, glyph, 'Window', onMorphComplete);
         })
         .catch(error => {
             // Animation was cancelled or failed
