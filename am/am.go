@@ -41,7 +41,7 @@ type DatabaseConfig struct {
 }
 
 // BoundedStorageConfig configures storage limits for attestations.
-// Values <= 0 default to: ActorContextLimit=16, ActorContextsLimit=64, EntityActorsLimit=64.
+// Omit fields for defaults: ActorContextLimit=16, ActorContextsLimit=64, EntityActorsLimit=64.
 type BoundedStorageConfig struct {
 	ActorContextLimit  int `mapstructure:"actor_context_limit"`  // attestations per (actor, context) pair (default: 16)
 	ActorContextsLimit int `mapstructure:"actor_contexts_limit"` // contexts per actor (default: 64)
@@ -158,14 +158,14 @@ type EmbeddingsConfig struct {
 	Path                     string   `mapstructure:"path"`                       // Path to ONNX model file
 	Name                     string   `mapstructure:"name"`                       // Model identifier for metadata
 	ClusterThreshold         float64  `mapstructure:"cluster_threshold"`          // Minimum similarity for cluster assignment (default: 0.5)
-	ReclusterIntervalSeconds int      `mapstructure:"recluster_interval_seconds"` // Pulse schedule interval for HDBSCAN re-clustering (0 = disabled)
-	ReprojectIntervalSeconds int      `mapstructure:"reproject_interval_seconds"` // Pulse schedule interval for UMAP re-projection (0 = disabled)
+	ReclusterIntervalSeconds *int     `mapstructure:"recluster_interval_seconds"` // Pulse schedule interval for HDBSCAN re-clustering (nil = not scheduled, omit for default)
+	ReprojectIntervalSeconds *int     `mapstructure:"reproject_interval_seconds"` // Pulse schedule interval for UMAP re-projection (nil = not scheduled, omit for default)
 	MinClusterSize           int      `mapstructure:"min_cluster_size"`           // Minimum cluster size for HDBSCAN (default: 5)
 	ClusterMatchThreshold    float64  `mapstructure:"cluster_match_threshold"`    // Cosine similarity threshold for stable cluster matching (default: 0.7)
 	ProjectionMethods        []string `mapstructure:"projection_methods"`         // Dimensionality reduction methods: umap, tsne, pca (default: ["umap"])
 
 	// Cluster labeling via LLM
-	ClusterLabelIntervalSeconds int    `mapstructure:"cluster_label_interval_seconds"` // Pulse schedule interval (0 = disabled)
+	ClusterLabelIntervalSeconds *int   `mapstructure:"cluster_label_interval_seconds"` // Pulse schedule interval (nil = not scheduled, omit for default)
 	ClusterLabelMinSize         int    `mapstructure:"cluster_label_min_size"`         // Min members to be eligible for labeling
 	ClusterLabelSampleSize      int    `mapstructure:"cluster_label_sample_size"`      // Random samples sent to LLM
 	ClusterLabelMaxPerCycle     int    `mapstructure:"cluster_label_max_per_cycle"`    // Max clusters labeled per run
