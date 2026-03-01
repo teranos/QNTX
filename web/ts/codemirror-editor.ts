@@ -19,7 +19,7 @@ import { languageServer } from 'codemirror-languageserver';
 // DISABLED: LSP WebSocket transport conflicts with main WebSocket
 // import { createLSPClient } from './lsp-websocket-transport.js';
 import { validateBackendURL } from './websocket.ts';
-import { stripProtocol } from './api.ts';
+import { stripProtocol } from './http-utils.ts';
 import { requestParse } from './ats-semantic-tokens-client.ts';
 import type { Diagnostic, SemanticToken } from '../types/lsp';
 import { log, SEG } from './logger.ts';

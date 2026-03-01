@@ -8,7 +8,8 @@ import type { PulsePanelState } from './panel-state';
 import { formatInterval } from './types';
 import { formatRelativeTime, escapeHtml, formatDuration } from '../html-utils.ts';
 import { Pulse } from '@generated/sym.js';
-import { extractHttpStatus, type RichError } from '../base-panel-error.ts';
+import type { RichError } from '../base-panel-error.ts';
+import { extractHttpStatus } from '../http-utils.ts';
 import { buildTooltipText } from '../components/tooltip.ts';
 import { buttonPlaceholder } from '../components/button.ts';
 

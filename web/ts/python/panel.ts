@@ -7,7 +7,8 @@
 
 import { BasePanel } from '../base-panel.ts';
 import { apiFetch } from '../api.ts';
-import { createRichErrorState, extractHttpStatus, type RichError } from '../base-panel-error.ts';
+import { createRichErrorState, type RichError } from '../base-panel-error.ts';
+import { extractHttpStatus } from '../http-utils.ts';
 import { escapeHtml } from '../html-utils.ts';
 import { log, SEG } from '../logger.ts';
 import { handleError } from '../error-handler.ts';

@@ -27,7 +27,7 @@ import { handleSystemCapabilities } from './websocket-handlers/system-capabiliti
 import { handleWatcherQueueStatus } from './websocket-handlers/watcher-queue-status';
 import { log, SEG } from './logger';
 import { connectivityManager } from './connectivity';
-import { stripProtocol } from './api';
+import { stripProtocol } from './http-utils';
 import { updateResultGlyphContent, type ExecutionResult } from './components/glyph/result-glyph';
 
 let ws: WebSocket | null = null;

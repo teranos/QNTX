@@ -83,7 +83,7 @@ func (h *CanvasHandler) HandleGlyphs(w http.ResponseWriter, r *http.Request) {
 		}
 		h.handleDeleteGlyph(w, r, glyphID)
 	default:
-		h.writeError(w, errors.Newf("method %s not allowed", r.Method), http.StatusMethodNotAllowed)
+		h.writeError(w, errors.NewMethodNotAllowedError(r.Method), http.StatusMethodNotAllowed)
 	}
 }
 
@@ -116,7 +116,7 @@ func (h *CanvasHandler) HandleCompositions(w http.ResponseWriter, r *http.Reques
 		}
 		h.handleDeleteComposition(w, r, compID)
 	default:
-		h.writeError(w, errors.Newf("method %s not allowed", r.Method), http.StatusMethodNotAllowed)
+		h.writeError(w, errors.NewMethodNotAllowedError(r.Method), http.StatusMethodNotAllowed)
 	}
 }
 
@@ -291,7 +291,7 @@ func (h *CanvasHandler) HandleMinimizedWindows(w http.ResponseWriter, r *http.Re
 		}
 		h.handleRemoveMinimizedWindow(w, r, glyphID)
 	default:
-		h.writeError(w, errors.Newf("method %s not allowed", r.Method), http.StatusMethodNotAllowed)
+		h.writeError(w, errors.NewMethodNotAllowedError(r.Method), http.StatusMethodNotAllowed)
 	}
 }
 
@@ -596,7 +596,7 @@ func (h *CanvasHandler) HandleExportDOM(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if r.Method != http.MethodPost {
-		h.writeError(w, errors.Newf("method %s not allowed", r.Method), http.StatusMethodNotAllowed)
+		h.writeError(w, errors.NewMethodNotAllowedError(r.Method), http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -647,7 +647,7 @@ func (h *CanvasHandler) HandleExportStatic(w http.ResponseWriter, r *http.Reques
 	}
 
 	if r.Method != http.MethodGet {
-		h.writeError(w, errors.Newf("method %s not allowed", r.Method), http.StatusMethodNotAllowed)
+		h.writeError(w, errors.NewMethodNotAllowedError(r.Method), http.StatusMethodNotAllowed)
 		return
 	}
 
