@@ -87,8 +87,7 @@ func SetDefaults(v *viper.Viper) {
 	// Plugin configuration defaults
 	v.SetDefault("plugin.enabled", []string{}) // No plugins enabled by default (explicit opt-in via am.toml)
 	v.SetDefault("plugin.paths", []string{
-		"~/.qntx/plugins", // User-level plugins
-		"./plugins",       // Project-level plugins
+		"~/.qntx/plugins",
 	})
 	v.SetDefault("plugin.websocket.keepalive.enabled", true)
 	// ping_interval_secs, pong_timeout_secs, reconnect_attempts are optional: nil = defaults (30, 60, 3) in plugin/grpc/websocket_keepalive.go
