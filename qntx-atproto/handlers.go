@@ -76,10 +76,13 @@ func (p *Plugin) handleProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := p.getClient()
-	profile, err := appbsky.ActorGetProfile(r.Context(), client, client.Auth.Did)
-	if err != nil {
-		p.Services().Logger("atproto").Errorw("Failed to get profile", "did", client.Auth.Did, "error", err)
+	var profile *appbsky.ActorDefs_ProfileViewDetailed
+	if err := p.doWithRefresh(r.Context(), func(c *xrpc.Client) error {
+		var err error
+		profile, err = appbsky.ActorGetProfile(r.Context(), c, c.Auth.Did)
+		return err
+	}); err != nil {
+		p.Services().Logger("atproto").Errorw("Failed to get profile", "error", err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to get profile: %v", err))
 		return
 	}
@@ -103,8 +106,12 @@ func (p *Plugin) handleActorProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	profile, err := appbsky.ActorGetProfile(r.Context(), p.getClient(), actor)
-	if err != nil {
+	var profile *appbsky.ActorDefs_ProfileViewDetailed
+	if err := p.doWithRefresh(r.Context(), func(c *xrpc.Client) error {
+		var err error
+		profile, err = appbsky.ActorGetProfile(r.Context(), c, actor)
+		return err
+	}); err != nil {
 		p.Services().Logger("atproto").Errorw("Failed to get actor profile", "actor", actor, "error", err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to get profile for %s: %v", actor, err))
 		return
@@ -130,8 +137,12 @@ func (p *Plugin) handleTimeline(w http.ResponseWriter, r *http.Request) {
 	}
 	cursor := r.URL.Query().Get("cursor")
 
-	resp, err := appbsky.FeedGetTimeline(r.Context(), p.getClient(), "", cursor, limit)
-	if err != nil {
+	var resp *appbsky.FeedGetTimeline_Output
+	if err := p.doWithRefresh(r.Context(), func(c *xrpc.Client) error {
+		var err error
+		resp, err = appbsky.FeedGetTimeline(r.Context(), c, "", cursor, limit)
+		return err
+	}); err != nil {
 		p.Services().Logger("atproto").Errorw("Failed to get timeline", "error", err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to get timeline: %v", err))
 		return
@@ -164,8 +175,12 @@ func (p *Plugin) handleAuthorFeed(w http.ResponseWriter, r *http.Request) {
 	}
 	cursor := r.URL.Query().Get("cursor")
 
-	resp, err := appbsky.FeedGetAuthorFeed(r.Context(), p.getClient(), actor, cursor, "", false, limit)
-	if err != nil {
+	var resp *appbsky.FeedGetAuthorFeed_Output
+	if err := p.doWithRefresh(r.Context(), func(c *xrpc.Client) error {
+		var err error
+		resp, err = appbsky.FeedGetAuthorFeed(r.Context(), c, actor, cursor, "", false, limit)
+		return err
+	}); err != nil {
 		p.Services().Logger("atproto").Errorw("Failed to get author feed", "actor", actor, "error", err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to get feed for %s: %v", actor, err))
 		return
@@ -191,8 +206,12 @@ func (p *Plugin) handleNotifications(w http.ResponseWriter, r *http.Request) {
 	}
 	cursor := r.URL.Query().Get("cursor")
 
-	resp, err := appbsky.NotificationListNotifications(r.Context(), p.getClient(), cursor, limit, false, nil, "")
-	if err != nil {
+	var resp *appbsky.NotificationListNotifications_Output
+	if err := p.doWithRefresh(r.Context(), func(c *xrpc.Client) error {
+		var err error
+		resp, err = appbsky.NotificationListNotifications(r.Context(), c, cursor, limit, false, nil, "")
+		return err
+	}); err != nil {
 		p.Services().Logger("atproto").Errorw("Failed to get notifications", "error", err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to get notifications: %v", err))
 		return
@@ -271,8 +290,6 @@ func (p *Plugin) handleCreatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := p.getClient()
-
 	post := &appbsky.FeedPost{
 		Text:      req.Text,
 		CreatedAt: time.Now().Format(time.RFC3339),
@@ -301,18 +318,22 @@ func (p *Plugin) handleCreatePost(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	resp, err := comatproto.RepoCreateRecord(r.Context(), client, &comatproto.RepoCreateRecord_Input{
-		Collection: "app.bsky.feed.post",
-		Repo:       client.Auth.Did,
-		Record:     &util.LexiconTypeDecoder{Val: post},
-	})
-	if err != nil {
+	var resp *comatproto.RepoCreateRecord_Output
+	if err := p.doWithRefresh(r.Context(), func(c *xrpc.Client) error {
+		var err error
+		resp, err = comatproto.RepoCreateRecord(r.Context(), c, &comatproto.RepoCreateRecord_Input{
+			Collection: "app.bsky.feed.post",
+			Repo:       c.Auth.Did,
+			Record:     &util.LexiconTypeDecoder{Val: post},
+		})
+		return err
+	}); err != nil {
 		p.Services().Logger("atproto").Errorw("Failed to create post", "error", err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to create post: %v", err))
 		return
 	}
 
-	p.attestPost(client.Auth.Did, resp.Uri, resp.Cid, req.Text)
+	p.attestPost(p.getDID(), resp.Uri, resp.Cid, req.Text)
 
 	writeJSON(w, http.StatusCreated, map[string]string{
 		"uri": resp.Uri,
@@ -344,25 +365,27 @@ func (p *Plugin) handleFollow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := p.getClient()
-
 	follow := &appbsky.GraphFollow{
 		Subject:   req.Subject,
 		CreatedAt: time.Now().Format(time.RFC3339),
 	}
 
-	resp, err := comatproto.RepoCreateRecord(r.Context(), client, &comatproto.RepoCreateRecord_Input{
-		Collection: "app.bsky.graph.follow",
-		Repo:       client.Auth.Did,
-		Record:     &util.LexiconTypeDecoder{Val: follow},
-	})
-	if err != nil {
+	var resp *comatproto.RepoCreateRecord_Output
+	if err := p.doWithRefresh(r.Context(), func(c *xrpc.Client) error {
+		var err error
+		resp, err = comatproto.RepoCreateRecord(r.Context(), c, &comatproto.RepoCreateRecord_Input{
+			Collection: "app.bsky.graph.follow",
+			Repo:       c.Auth.Did,
+			Record:     &util.LexiconTypeDecoder{Val: follow},
+		})
+		return err
+	}); err != nil {
 		p.Services().Logger("atproto").Errorw("Failed to follow actor", "subject", req.Subject, "error", err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to follow %s: %v", req.Subject, err))
 		return
 	}
 
-	p.attestFollow(client.Auth.Did, req.Subject, resp.Uri)
+	p.attestFollow(p.getDID(), req.Subject, resp.Uri)
 
 	writeJSON(w, http.StatusCreated, map[string]string{
 		"uri": resp.Uri,
@@ -395,8 +418,6 @@ func (p *Plugin) handleLike(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := p.getClient()
-
 	like := &appbsky.FeedLike{
 		Subject: &comatproto.RepoStrongRef{
 			Uri: req.URI,
@@ -405,18 +426,22 @@ func (p *Plugin) handleLike(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: time.Now().Format(time.RFC3339),
 	}
 
-	resp, err := comatproto.RepoCreateRecord(r.Context(), client, &comatproto.RepoCreateRecord_Input{
-		Collection: "app.bsky.feed.like",
-		Repo:       client.Auth.Did,
-		Record:     &util.LexiconTypeDecoder{Val: like},
-	})
-	if err != nil {
+	var resp *comatproto.RepoCreateRecord_Output
+	if err := p.doWithRefresh(r.Context(), func(c *xrpc.Client) error {
+		var err error
+		resp, err = comatproto.RepoCreateRecord(r.Context(), c, &comatproto.RepoCreateRecord_Input{
+			Collection: "app.bsky.feed.like",
+			Repo:       c.Auth.Did,
+			Record:     &util.LexiconTypeDecoder{Val: like},
+		})
+		return err
+	}); err != nil {
 		p.Services().Logger("atproto").Errorw("Failed to like post", "uri", req.URI, "error", err)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to like post: %v", err))
 		return
 	}
 
-	p.attestLike(client.Auth.Did, req.URI, resp.Uri)
+	p.attestLike(p.getDID(), req.URI, resp.Uri)
 
 	writeJSON(w, http.StatusCreated, map[string]string{
 		"uri": resp.Uri,
@@ -468,8 +493,12 @@ func (p *Plugin) handleFeedGlyph(w http.ResponseWriter, r *http.Request) {
 	limit := int64(20) // posts per page
 	ctx := r.Context()
 
-	feedResp, err := appbsky.FeedGetAuthorFeed(ctx, p.getClient(), actor, cursor, "", false, limit)
-	if err != nil {
+	var feedResp *appbsky.FeedGetAuthorFeed_Output
+	if err := p.doWithRefresh(ctx, func(c *xrpc.Client) error {
+		var err error
+		feedResp, err = appbsky.FeedGetAuthorFeed(ctx, c, actor, cursor, "", false, limit)
+		return err
+	}); err != nil {
 		err = errors.WithDetail(err, fmt.Sprintf("Actor: %s, cursor: %s", actor, cursor))
 		p.Services().Logger("atproto").Errorw("Failed to fetch feed", "actor", actor, "error", err)
 		http.Error(w, fmt.Sprintf("Failed to fetch feed: %v", err), http.StatusInternalServerError)

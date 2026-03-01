@@ -37,23 +37,33 @@ func checkOrigin(r *http.Request) bool {
 	config, err := appcfg.Load()
 	if err != nil {
 		// If config fails to load, use secure defaults (localhost only + Tauri)
-		return strings.HasPrefix(origin, "http://localhost") ||
-			strings.HasPrefix(origin, "https://localhost") ||
-			strings.HasPrefix(origin, "tauri://localhost")
+		return matchOrigin(origin, "http://localhost") ||
+			matchOrigin(origin, "https://localhost") ||
+			matchOrigin(origin, "tauri://localhost")
 	}
 
 	// Get allowed origins (includes defaults if not configured)
 	allowedOrigins := config.GetServerAllowedOrigins()
 
-	// Check if origin matches any of the configured allowed origins
-	// We use prefix matching to allow any port number
 	for _, allowedOrigin := range allowedOrigins {
-		if strings.HasPrefix(origin, allowedOrigin) {
+		if matchOrigin(origin, allowedOrigin) {
 			return true
 		}
 	}
 
 	return false
+}
+
+// matchOrigin checks if origin matches an allowed origin (scheme+host).
+// Allows any port: "http://localhost" matches "http://localhost:877"
+// but NOT "http://localhost.evil.com" (the old prefix matching did).
+func matchOrigin(origin, allowed string) bool {
+	if !strings.HasPrefix(origin, allowed) {
+		return false
+	}
+	// After the prefix, must be end-of-string or ":" (port separator)
+	rest := origin[len(allowed):]
+	return rest == "" || rest[0] == ':'
 }
 
 // isPortAvailable checks if a port is available for binding
