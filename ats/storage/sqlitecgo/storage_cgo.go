@@ -292,14 +292,15 @@ func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As,
 		return nil, errors.New("store is closed")
 	}
 
-	// Convert Go filter to Rust-compatible JSON format
+	// Convert Go filter to Rust-compatible JSON format.
+	// omitempty prevents nil slices from marshaling as null (Rust expects missing or []).
 	rustFilter := struct {
-		Subjects   []string `json:"subjects"`
-		Predicates []string `json:"predicates"`
-		Contexts   []string `json:"contexts"`
-		Actors     []string `json:"actors"`
-		TimeStart  *int64   `json:"time_start,omitempty"` // Unix milliseconds
-		TimeEnd    *int64   `json:"time_end,omitempty"`   // Unix milliseconds
+		Subjects   []string `json:"subjects,omitempty"`
+		Predicates []string `json:"predicates,omitempty"`
+		Contexts   []string `json:"contexts,omitempty"`
+		Actors     []string `json:"actors,omitempty"`
+		TimeStart  *int64   `json:"time_start,omitempty"`
+		TimeEnd    *int64   `json:"time_end,omitempty"`
 		Limit      int      `json:"limit,omitempty"`
 	}{
 		Subjects:   filter.Subjects,

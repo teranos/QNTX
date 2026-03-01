@@ -236,18 +236,19 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	// Set global signer so all attestations are signed with the node's DID key
 	storage.SetDefaultSigner(signing.NewSigner(nodeDIDHandler.PrivateKey, nodeDIDHandler.DID))
 
+	// Create the attestation store (Rust FFI when rustsqlite tag is active, Go SQLite otherwise)
+	atsStore, err := storage.NewStore(db, dbPath, serverLogger)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create attestation store")
+	}
+	server.atsStore = atsStore
+
 	// Register system type definitions so attestations render in the graph
-	{
-		store, err := storage.NewStore(db, dbPath, serverLogger)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create attestation store for type registration")
-		}
-		if err := types.EnsureTypes(store, "prompt-direct", types.PromptResult); err != nil {
-			serverLogger.Warnw("Failed to register prompt-result type", "error", err)
-		}
-		if err := types.EnsureTypes(store, "cluster-labeling", types.ClusterLabeled); err != nil {
-			serverLogger.Warnw("Failed to register cluster-labeled type", "error", err)
-		}
+	if err := types.EnsureTypes(atsStore, "prompt-direct", types.PromptResult); err != nil {
+		serverLogger.Warnw("Failed to register prompt-result type", "error", err)
+	}
+	if err := types.EnsureTypes(atsStore, "cluster-labeling", types.ClusterLabeled); err != nil {
+		serverLogger.Warnw("Failed to register cluster-labeled type", "error", err)
 	}
 
 	// Initialize domain plugin registry
@@ -255,18 +256,12 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	if pluginRegistry != nil {
 		server.pluginRegistry = pluginRegistry
 
-		// Initialize plugins with services
-		sqlStore := storage.NewSQLStore(db, serverLogger)
-		pluginStore, err := storage.NewStore(db, dbPath, serverLogger)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create attestation store for plugins")
-		}
 		queue := daemon.GetQueue()
 
 		// Start gRPC services for plugins (Issue #138)
 		// These services allow plugins to call back to QNTX core
 		servicesManager := grpcplugin.NewServicesManager(serverLogger)
-		endpoints, err := servicesManager.Start(ctx, sqlStore, queue, scheduleStore)
+		endpoints, err := servicesManager.Start(ctx, atsStore, queue, scheduleStore)
 		if err != nil {
 			serverLogger.Warnw("Failed to start plugin services, plugins will not have service access", "error", err)
 			endpoints = nil
@@ -284,7 +279,7 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 			endpoints: endpoints,
 		}
 
-		services := plugin.NewServiceRegistry(db, serverLogger, pluginStore, configProvider, queue)
+		services := plugin.NewServiceRegistry(db, serverLogger, atsStore, configProvider, queue)
 
 		if err := pluginRegistry.InitializeAll(ctx, services); err != nil {
 			serverLogger.Errorw("Failed to initialize domain plugins", "error", err)
@@ -426,15 +421,14 @@ func setupSync(server *QNTXServer, db *sql.DB, logger *zap.SugaredLogger) {
 
 	// Backfill: load existing attestations into the Merkle tree so the root
 	// reflects the full dataset (not just attestations created after startup).
-	store := storage.NewSQLStore(db, logger)
-	go backfillSyncTree(store, tree, observer, logger)
+	go backfillSyncTree(server.atsStore, tree, observer, logger)
 
 	logger.Infow("Sync observer registered, backfill started")
 }
 
 // backfillSyncTree walks all existing attestations and inserts them into the
 // Merkle tree. Runs in a background goroutine to avoid blocking server startup.
-func backfillSyncTree(store *storage.SQLStore, tree syncPkg.SyncTree, observer *syncPkg.TreeObserver, logger *zap.SugaredLogger) {
+func backfillSyncTree(store ats.AttestationStore, tree syncPkg.SyncTree, observer *syncPkg.TreeObserver, logger *zap.SugaredLogger) {
 	start := time.Now()
 	allAtts, err := store.GetAttestations(ats.AttestationFilter{})
 	if err != nil {

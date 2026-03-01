@@ -10,6 +10,7 @@ import (
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/db"
 	qntxdisplay "github.com/teranos/QNTX/display"
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
@@ -262,7 +263,8 @@ func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, origina
 			spinner, _ = pterm.DefaultSpinner.Start("Detecting and processing project dependencies...")
 		}
 
-		depsProcessor := git.NewDepsIxProcessor(database, repoPath, dryRun, actor, verbosity, logger.Logger)
+		depsStore := storage.NewSQLStore(database, logger.Logger)
+		depsProcessor := git.NewDepsIxProcessor(database, depsStore, repoPath, dryRun, actor, verbosity, logger.Logger)
 		depsResult, err = depsProcessor.ProcessProjectFiles()
 
 		if !useJSON && spinner != nil {
