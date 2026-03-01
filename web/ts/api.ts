@@ -41,6 +41,15 @@ export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
 }
 
 /**
+ * Strip the protocol (http:// or https://) from a URL, returning the host and path.
+ */
+export function stripProtocol(url: string): string {
+    if (url.startsWith('https://')) return url.slice(8);
+    if (url.startsWith('http://')) return url.slice(7);
+    return url;
+}
+
+/**
  * Get the backend auth login URL for explicit user-initiated navigation.
  */
 export function getAuthLoginUrl(): string {
