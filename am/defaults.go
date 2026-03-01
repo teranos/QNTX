@@ -66,14 +66,14 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("embeddings.path", "ats/embeddings/models/all-MiniLM-L6-v2/model.onnx")
 	v.SetDefault("embeddings.name", "all-MiniLM-L6-v2")
 	v.SetDefault("embeddings.cluster_threshold", 0.5)               // Minimum cosine similarity for cluster prediction
-	v.SetDefault("embeddings.recluster_interval_seconds", 0)        // 0 = disabled (QNTX LAW: zero means zero)
-	v.SetDefault("embeddings.reproject_interval_seconds", 0)        // 0 = disabled (QNTX LAW: zero means zero)
+	// recluster_interval_seconds: omit for default (not scheduled). Set positive value to enable.
+	// reproject_interval_seconds: omit for default (not scheduled). Set positive value to enable.
 	v.SetDefault("embeddings.min_cluster_size", 5)                  // Minimum cluster size for HDBSCAN
 	v.SetDefault("embeddings.cluster_match_threshold", 0.7)         // Cosine similarity for stable cluster matching
 	v.SetDefault("embeddings.projection_methods", []string{"umap"}) // Dimensionality reduction methods
 
 	// Cluster labeling via LLM
-	v.SetDefault("embeddings.cluster_label_interval_seconds", 0) // 0 = disabled (QNTX LAW: zero means zero)
+	// cluster_label_interval_seconds: omit for default (not scheduled). Set positive value to enable.
 	v.SetDefault("embeddings.cluster_label_min_size", 15)
 	v.SetDefault("embeddings.cluster_label_sample_size", 5)
 	v.SetDefault("embeddings.cluster_label_max_per_cycle", 3)
