@@ -14,6 +14,7 @@ import (
 	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/ai/provider"
 	appcfg "github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
@@ -27,10 +28,11 @@ const ClusterLabelHandlerName = "embeddings.cluster-label"
 
 // ClusterLabelHandler asks an LLM to label unlabeled clusters.
 type ClusterLabelHandler struct {
-	db     *sql.DB
-	store  *storage.EmbeddingStore
-	cfg    *appcfg.Config
-	logger *zap.SugaredLogger
+	db       *sql.DB
+	store    *storage.EmbeddingStore
+	atsStore ats.AttestationStore
+	cfg      *appcfg.Config
+	logger   *zap.SugaredLogger
 }
 
 func (h *ClusterLabelHandler) Name() string { return ClusterLabelHandlerName }
@@ -60,7 +62,7 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 
 	aiProvider := provider.DetermineProvider(h.cfg, "")
 	modelOverride := embCfg.ClusterLabelModel
-	asStore := storage.NewSQLStore(h.db, h.logger)
+	asStore := h.atsStore
 
 	// Resolve model name once — used for attestation metadata
 	modelUsed := modelOverride
@@ -156,7 +158,7 @@ type clusterLabelAttrs struct {
 	NMembers   int    `attr:"n_members"`
 }
 
-func (h *ClusterLabelHandler) createLabelAttestation(asStore *storage.SQLStore, clusterID int, label, model string, sampleSize, nMembers int) {
+func (h *ClusterLabelHandler) createLabelAttestation(asStore ats.AttestationStore, clusterID int, label, model string, sampleSize, nMembers int) {
 	subject := fmt.Sprintf("cluster:%d", clusterID)
 	asid, err := vanity.GenerateASID(subject, "labeled", "embeddings", "qntx@embeddings")
 	if err != nil {
@@ -212,10 +214,11 @@ func (s *QNTXServer) setupClusterLabelSchedule(cfg *appcfg.Config) {
 	}
 
 	handler := &ClusterLabelHandler{
-		db:     s.db,
-		store:  s.embeddingStore,
-		cfg:    cfg,
-		logger: s.logger.Named("cluster-label"),
+		db:       s.db,
+		store:    s.embeddingStore,
+		atsStore: s.atsStore,
+		cfg:      cfg,
+		logger:   s.logger.Named("cluster-label"),
 	}
 
 	registry := s.daemon.Registry()

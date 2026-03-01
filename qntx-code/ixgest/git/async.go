@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/pulse/async"
 	"go.uber.org/zap"
@@ -103,7 +104,8 @@ func (h *GitIngestionHandler) Execute(ctx context.Context, job *async.Job) error
 	// Process dependencies unless disabled
 	var depsResult *DepsIngestionResult
 	if !payload.NoDeps {
-		depsProcessor := NewDepsIxProcessor(h.db, repoPath, false, payload.Actor, payload.Verbosity, h.logger)
+		depsStore := storage.NewSQLStore(h.db, h.logger)
+		depsProcessor := NewDepsIxProcessor(h.db, depsStore, repoPath, false, payload.Actor, payload.Verbosity, h.logger)
 		depsResult, err = depsProcessor.ProcessProjectFiles()
 		if err != nil {
 			h.logger.Warnw("Dependency ingestion had errors",

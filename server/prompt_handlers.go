@@ -579,8 +579,7 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 				CreatedAt:  now,
 			}
 
-			store := storage.NewSQLStore(s.db, s.logger)
-			if storeErr := store.CreateAttestation(as); storeErr != nil {
+			if storeErr := s.atsStore.CreateAttestation(as); storeErr != nil {
 				s.logger.Warnw("Failed to create prompt-result attestation",
 					"glyph_id", req.GlyphID, "asid", asid, "error", storeErr)
 			} else {
@@ -630,7 +629,7 @@ func (s *QNTXServer) HandlePromptList(w http.ResponseWriter, r *http.Request) {
 
 	logger.AddAxSymbol(s.logger).Infow("Prompt list request")
 
-	store := prompt.NewPromptStore(s.db)
+	store := prompt.NewPromptStore(s.db, s.atsStore)
 	prompts, err := store.ListPrompts(r.Context(), 100)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "Failed to list prompts", http.StatusInternalServerError)
@@ -651,7 +650,7 @@ func (s *QNTXServer) HandlePromptGet(w http.ResponseWriter, r *http.Request, pro
 		return
 	}
 
-	store := prompt.NewPromptStore(s.db)
+	store := prompt.NewPromptStore(s.db, s.atsStore)
 	p, err := store.GetPromptByID(r.Context(), promptID)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "Failed to get prompt", http.StatusInternalServerError)
@@ -673,7 +672,7 @@ func (s *QNTXServer) HandlePromptVersions(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	store := prompt.NewPromptStore(s.db)
+	store := prompt.NewPromptStore(s.db, s.atsStore)
 	versions, err := store.GetPromptVersions(r.Context(), promptName, 16)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "Failed to get prompt versions", http.StatusInternalServerError)
@@ -710,7 +709,7 @@ func (s *QNTXServer) HandlePromptSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	store := prompt.NewPromptStore(s.db)
+	store := prompt.NewPromptStore(s.db, s.atsStore)
 	storedPrompt := &prompt.StoredPrompt{
 		Name:         req.Name,
 		Template:     req.Template,
