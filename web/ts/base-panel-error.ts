@@ -205,15 +205,39 @@ function isRichError(obj: unknown): obj is RichError {
 }
 
 /**
+ * Extract an HTTP status code from an error message string.
+ * Looks for patterns like "HTTP 404", "HTTP404", "http 500".
+ * Returns the status code as a number, or null if not found.
+ */
+export function extractHttpStatus(message: string): number | null {
+    const upper = message.toUpperCase();
+    let pos = upper.indexOf('HTTP');
+    while (pos !== -1) {
+        // Skip past "HTTP" and any whitespace
+        let i = pos + 4;
+        while (i < message.length && message[i] === ' ') i++;
+        // Check for exactly 3 digits
+        if (i + 3 <= message.length &&
+            message[i] >= '0' && message[i] <= '9' &&
+            message[i + 1] >= '0' && message[i + 1] <= '9' &&
+            message[i + 2] >= '0' && message[i + 2] <= '9' &&
+            (i + 3 >= message.length || message[i + 3] < '0' || message[i + 3] > '9')) {
+            return parseInt(message.slice(i, i + 3), 10);
+        }
+        pos = upper.indexOf('HTTP', pos + 1);
+    }
+    return null;
+}
+
+/**
  * Parse a standard Error object into RichError
  */
 function parseErrorObject(error: Error): RichError {
     const message = error.message;
 
     // Check for HTTP status codes in the message
-    const httpMatch = message.match(/HTTP\s*(\d{3})/i);
-    if (httpMatch) {
-        const status = parseInt(httpMatch[1], 10);
+    const status = extractHttpStatus(message);
+    if (status !== null) {
         return parseHttpError(status, message, error.stack);
     }
 

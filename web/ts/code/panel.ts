@@ -8,9 +8,9 @@
 import { BasePanel } from '../base-panel.ts';
 import { GoEditorNavigation } from './navigation.ts';
 import { CodeSuggestions } from './suggestions.ts';
-import { apiFetch } from '../api.ts';
+import { apiFetch, stripProtocol } from '../api.ts';
 import { fetchDevMode } from '../dev-mode.ts';
-import { createRichErrorState, type RichError } from '../base-panel-error.ts';
+import { createRichErrorState, extractHttpStatus, type RichError } from '../base-panel-error.ts';
 import { handleError, SEG } from '../error-handler.ts';
 import { log } from '../logger.ts';
 import type { EditorView } from '@codemirror/view';
@@ -287,7 +287,7 @@ class GoEditorPanel extends BasePanel {
     private async fetchGoplsConfig() {
         const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
         const wsProtocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
-        const wsHost = backendUrl.replace(/^https?:\/\//, '');
+        const wsHost = stripProtocol(backendUrl);
         const goplsUri = `${wsProtocol}//${wsHost}/gopls` as `ws://${string}` | `wss://${string}`;
 
         let workspaceRoot = 'file:///tmp/qntx-workspace';
@@ -457,9 +457,8 @@ class GoEditorPanel extends BasePanel {
         }
 
         // Check for HTTP errors
-        const httpMatch = errorMessage.match(/HTTP\s*(\d{3})/i);
-        if (httpMatch) {
-            const status = parseInt(httpMatch[1], 10);
+        const status = extractHttpStatus(errorMessage);
+        if (status !== null) {
             if (status === 404) {
                 return {
                     title: 'File Not Found',
