@@ -56,7 +56,7 @@ func (g *rateLimitGroup) sweep(maxAge time.Duration) {
 	cutoff := time.Now().Add(-maxAge).UnixNano()
 	g.limiters.Range(func(key, value any) bool {
 		entry := value.(*ipLimiter)
-		if entry.lastSeen.Load() < cutoff {
+		if entry.lastSeen.Load() <= cutoff {
 			g.limiters.Delete(key)
 		}
 		return true
