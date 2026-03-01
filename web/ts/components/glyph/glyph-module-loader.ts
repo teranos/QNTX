@@ -15,6 +15,7 @@ import type { PluginGlyphDef } from './plugin-provided-glyphs';
 import type { GlyphModule } from './glyph-ui';
 import { createGlyphUI } from './glyph-ui';
 import { loadPluginCSS } from './plugin-provided-glyphs';
+import { getBackendUrl } from '../../api';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from './manifestations/canvas-placed';
 
@@ -33,9 +34,7 @@ export async function createPluginGlyphFromModule(
 
     const moduleUrl = def.module_url!;
 
-    // Resolve to absolute URL (dev mode: frontend on :8826, backend on :8776)
-    const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
-    const absoluteUrl = backendUrl + moduleUrl;
+    const absoluteUrl = getBackendUrl() + moduleUrl;
 
     try {
         // Import module (cached per URL)

@@ -8,6 +8,7 @@ package httputil
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 )
@@ -28,7 +29,7 @@ func WriteError(w http.ResponseWriter, status int, message string) {
 // On failure, writes a 400 error response and returns the error.
 func ReadJSON(w http.ResponseWriter, r *http.Request, v interface{}) error {
 	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		WriteError(w, http.StatusBadRequest, fmt.Sprintf("Invalid JSON: %v", err))
 		return err
 	}
 	return nil
@@ -43,9 +44,4 @@ func EscapeHTML(s string) string {
 	s = strings.ReplaceAll(s, "\"", "&quot;")
 	s = strings.ReplaceAll(s, "'", "&#39;")
 	return s
-}
-
-// EscapeHTMLAttr escapes s for safe use in HTML attribute values.
-func EscapeHTMLAttr(s string) string {
-	return EscapeHTML(s)
 }
