@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin pty-glyph-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -241,6 +241,9 @@ github-plugin: ## Build and install GitHub plugin to ~/.qntx/plugins/
 
 ix-json-plugin: ## Build and install ix-json plugin to ~/.qntx/plugins/
 	@$(MAKE) -C qntx-ix-json install PREFIX=$(PREFIX)
+
+pty-glyph-plugin: ## Build and install pty-glyph plugin to ~/.qntx/plugins/
+	@$(MAKE) -C qntx-plugins/pty-glyph install PREFIX=$(PREFIX)
 
 rust-vidstream: ## Build Rust vidstream library with ONNX support (for CGO integration)
 	@echo "Building Rust vidstream library with ONNX..."
