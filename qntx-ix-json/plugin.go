@@ -14,6 +14,7 @@ package qntxixjson
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -25,6 +26,9 @@ import (
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 )
+
+//go:embed web/ix-glyph-module.js
+var ixGlyphModuleJS []byte
 
 func logEntry(level, stage, message string) *protocol.JobLogEntry {
 	return &protocol.JobLogEntry{
@@ -68,7 +72,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "ix-json",
-			Version:     "0.3.7",
+			Version:     "0.4.0",
 			QNTXVersion: ">= 0.1.0",
 			Description: "Generic JSON API ingestion with configurable mapping to attestations",
 			Author:      "QNTX Team",
@@ -194,8 +198,7 @@ func (p *Plugin) RegisterGlyphs() []plugin.GlyphDef {
 			Symbol:        "🔄",
 			Title:         "JSON API Ingestor",
 			Label:         "ix-json",
-			ContentPath:   "/ix-glyph",
-			CSSPath:       "/ix-glyph.css",
+			ModulePath:    "/ix-glyph-module.js",
 			DefaultWidth:  600,
 			DefaultHeight: 700,
 		},

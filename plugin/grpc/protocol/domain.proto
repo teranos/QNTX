@@ -233,4 +233,9 @@ message GlyphDef {
   // DefaultWidth and DefaultHeight in pixels (0 = use system default)
   int32 default_width = 6;
   int32 default_height = 7;
+
+  // ModulePath is the HTTP path to a JS/TS module exporting a render function.
+  // When set, the frontend dynamically imports it with SDK injection,
+  // bypassing the server-rendered HTML pipeline.
+  string module_path = 8;
 }
