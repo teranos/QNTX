@@ -202,10 +202,14 @@ func (c *Config) GetServerAllowedOrigins() []string {
 	// Define secure default origins that should always be allowed
 	defaults := []string{
 		"http://localhost",
+		"http://localhost:*",
 		"https://localhost",
+		"https://localhost:*",
 		"http://127.0.0.1",
+		"http://127.0.0.1:*",
 		"https://127.0.0.1",
-		"tauri://localhost", // Allow Tauri desktop app
+		"https://127.0.0.1:*",
+		"tauri://localhost",
 	}
 
 	// If no custom origins configured, return defaults
