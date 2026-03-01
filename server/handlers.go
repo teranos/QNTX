@@ -248,12 +248,8 @@ func (s *QNTXServer) loadJobHistoryForClient(client *Client) []*async.Job {
 		allJobs = append(allJobs, completedJobs...)
 	}
 
-	failedJobs, err := queue.ListJobs(asyncJobStatusPtr(async.JobStatusFailed), 50)
-	if err != nil {
-		s.logger.Warnw("Failed to load failed jobs", "client_id", client.id, "error", err)
-	} else {
-		allJobs = append(allJobs, failedJobs...)
-	}
+	// Failed jobs are not sent to new clients — they are historical noise.
+	// Active and completed jobs are sufficient for the client to show current state.
 
 	return allJobs
 }
