@@ -28,13 +28,26 @@ func TestRateLimitGroup_AllowAndDeny(t *testing.T) {
 	}
 }
 
-func TestRateLimitGroup_DisabledWhenRateZero(t *testing.T) {
+func TestRateLimitGroup_ZeroMeansZero(t *testing.T) {
+	// QNTX LAW: zero means zero — 0 rate with 0 burst denies everything
 	g := newRateLimitGroup(0, 0)
 
-	for i := 0; i < 100; i++ {
+	if g.allow("10.0.0.1") {
+		t.Fatal("0 rate + 0 burst should deny all requests")
+	}
+}
+
+func TestRateLimitGroup_ZeroRateWithBurst(t *testing.T) {
+	// 0 rate with burst 3: allows 3 requests (burst), then denies forever (no refill)
+	g := newRateLimitGroup(0, 3)
+
+	for i := 0; i < 3; i++ {
 		if !g.allow("10.0.0.1") {
-			t.Fatal("disabled group should always allow")
+			t.Fatalf("request %d should be allowed (within burst)", i+1)
 		}
+	}
+	if g.allow("10.0.0.1") {
+		t.Fatal("request after burst should be denied (0 rate = no refill)")
 	}
 }
 

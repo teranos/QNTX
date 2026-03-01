@@ -4,18 +4,20 @@ import (
 	"context"
 	"net"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/time/rate"
 )
 
 // ipLimiter tracks a per-IP token bucket and when it was last used.
+// lastSeen is stored as UnixNano via atomic to avoid data races between
+// concurrent allow() calls and the sweep goroutine.
 type ipLimiter struct {
 	limiter  *rate.Limiter
-	lastSeen time.Time
+	lastSeen atomic.Int64 // UnixNano
 }
 
 // rateLimitGroup holds per-IP limiters for one category of traffic.
@@ -25,8 +27,7 @@ type rateLimitGroup struct {
 	burst    int
 }
 
-// newRateLimitGroup creates a rate limit group. If r is 0, the group is
-// disabled and allow() always returns true.
+// newRateLimitGroup creates a rate limit group.
 func newRateLimitGroup(r float64, burst int) *rateLimitGroup {
 	return &rateLimitGroup{
 		rate:  rate.Limit(r),
@@ -34,31 +35,28 @@ func newRateLimitGroup(r float64, burst int) *rateLimitGroup {
 	}
 }
 
-// allow returns true if the IP has budget remaining. Disabled groups (rate 0)
-// always allow.
+// allow returns true if the IP has budget remaining.
 func (g *rateLimitGroup) allow(ip string) bool {
-	if g.rate == 0 {
-		return true
-	}
-
 	now := time.Now()
-	val, loaded := g.limiters.LoadOrStore(ip, &ipLimiter{
-		limiter:  rate.NewLimiter(g.rate, g.burst),
-		lastSeen: now,
-	})
-	entry := val.(*ipLimiter)
+	entry := &ipLimiter{
+		limiter: rate.NewLimiter(g.rate, g.burst),
+	}
+	entry.lastSeen.Store(now.UnixNano())
+
+	val, loaded := g.limiters.LoadOrStore(ip, entry)
 	if loaded {
-		entry.lastSeen = now
+		entry = val.(*ipLimiter)
+		entry.lastSeen.Store(now.UnixNano())
 	}
 	return entry.limiter.Allow()
 }
 
 // sweep removes entries idle longer than maxAge.
 func (g *rateLimitGroup) sweep(maxAge time.Duration) {
-	cutoff := time.Now().Add(-maxAge)
+	cutoff := time.Now().Add(-maxAge).UnixNano()
 	g.limiters.Range(func(key, value any) bool {
 		entry := value.(*ipLimiter)
-		if entry.lastSeen.Before(cutoff) {
+		if entry.lastSeen.Load() < cutoff {
 			g.limiters.Delete(key)
 		}
 		return true
@@ -67,6 +65,11 @@ func (g *rateLimitGroup) sweep(maxAge time.Duration) {
 
 // clientIP extracts the client IP from the request. It checks
 // X-Forwarded-For (leftmost entry) first, then falls back to RemoteAddr.
+//
+// Note: X-Forwarded-For is trivially spoofable by clients. Rate limiting
+// via XFF is only reliable behind a trusted reverse proxy that overwrites
+// the header. On loopback (the default bind), this is irrelevant since
+// RemoteAddr is always 127.0.0.1.
 func clientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		// Leftmost IP is the original client
@@ -177,14 +180,4 @@ func countLimiters(g *rateLimitGroup) int {
 		return true
 	})
 	return n
-}
-
-// retryAfterSeconds formats a duration as a whole-second string for the
-// Retry-After header.
-func retryAfterSeconds(d time.Duration) string {
-	secs := int(d.Seconds())
-	if secs < 1 {
-		secs = 1
-	}
-	return strconv.Itoa(secs)
 }
