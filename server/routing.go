@@ -126,9 +126,13 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/embeddings/info", wrap(s.HandleEmbeddingInfo))                            // Embedding service status (GET)
 	http.HandleFunc("/api/embeddings/project", wrap(s.HandleEmbeddingProject))                      // UMAP projection (POST)
 	http.HandleFunc("/api/embeddings/projections", wrap(s.HandleEmbeddingProjections))              // Get 2D projections (GET)
-	http.HandleFunc("/ws/sync", wrapWS(s.HandleSyncWebSocket))                                      // Sync peer WebSocket (incoming reconciliation)
-	http.HandleFunc("/api/sync/status", wrap(s.HandleSyncStatus))                                   // Sync tree status (GET)
-	http.HandleFunc("/api/sync", wrap(s.HandleSync))                                                // Initiate sync with peer (POST)
+	// Sync routes are only registered when sync is enabled (loopback bind only).
+	// See https://github.com/teranos/QNTX/issues/643
+	if s.syncTree != nil {
+		http.HandleFunc("/ws/sync", wrapWS(s.HandleSyncWebSocket))    // Sync peer WebSocket (incoming reconciliation)
+		http.HandleFunc("/api/sync/status", wrap(s.HandleSyncStatus)) // Sync tree status (GET)
+		http.HandleFunc("/api/sync", wrap(s.HandleSync))              // Initiate sync with peer (POST)
+	}
 	http.HandleFunc("/", wrapPublic(s.HandleStatic))
 }
 
