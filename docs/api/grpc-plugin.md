@@ -261,5 +261,6 @@ GlyphDef defines a custom glyph type provided by a plugin
 | css_path | string | CSSPath is an optional HTTP path to a stylesheet for this glyph type |
 | default_width | int32 | DefaultWidth and DefaultHeight in pixels (0 = use system default) |
 | default_height | int32 | - |
+| module_path | string | ModulePath is the HTTP path to a JS/TS module exporting a render function. When set, the frontend dynamically imports it with SDK injection, bypassing the server-rendered HTML pipeline. |
 
 [← Back to API Index](./README.md)
