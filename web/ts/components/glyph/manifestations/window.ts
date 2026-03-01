@@ -15,13 +15,10 @@ import { stashContent } from './stash';
 import { renderGlyphContent } from './render-content';
 import { setupWindowDrag, teardownWindowDrag } from './canvas-window';
 import {
-    setWindowState,
     getLastPosition,
     setLastPosition,
-    hasProximityText,
-    setProximityText,
 } from '../dataset';
-import { verifyGlyphAxiom, calculateTrayTarget, resetGlyphElement } from './morphology';
+import { prepareMorphTo, calculateTrayTarget, resetGlyphElement } from './morphology';
 import { beginMaximizeMorph, beginMinimizeMorph } from '../morph-transaction';
 import {
     getMaximizeDuration,
@@ -49,10 +46,7 @@ export function morphToWindow(
     onRemove: (id: string) => void,
     onMinimize: (element: HTMLElement, glyph: Glyph) => void
 ): void {
-    verifyGlyphAxiom(glyph.id, glyphElement, verifyElement);
-
-    // Get current glyph position and size (may be proximity-expanded)
-    const glyphRect = glyphElement.getBoundingClientRect();
+    const glyphRect = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-window', '1000');
 
     // Calculate window target position
     const windowWidth = parseInt(glyph.initialWidth || DEFAULT_WINDOW_WIDTH);
@@ -66,27 +60,6 @@ export function morphToWindow(
                    (glyph.defaultX ?? (window.innerWidth - windowWidth) / 2);
     const targetY = rememberedPos?.y ??
                    (glyph.defaultY ?? (window.innerHeight - windowHeight) / 2);
-
-    // THE GLYPH ITSELF BECOMES THE WINDOW - NO CLONING
-    // Remove from indicator container and reparent to body
-    glyphElement.remove(); // Detach from current parent (keeps element alive)
-
-    // Clear any proximity text that might be present AFTER detaching
-    if (hasProximityText(glyphElement)) {
-        glyphElement.textContent = '';
-        setProximityText(glyphElement, false);
-    }
-
-    // Apply initial fixed positioning at EXACT current state (including proximity expansion)
-    glyphElement.className = 'glyph-morphing-to-window';
-    glyphElement.style.position = 'fixed';
-    glyphElement.style.zIndex = '1000';
-
-    // Reparent to document body for morphing
-    document.body.appendChild(glyphElement);
-
-    // Mark element as in-window-state (but keep glyph ID)
-    setWindowState(glyphElement, true);
 
     // BEGIN TRANSACTION: Start the morph animation
     beginMaximizeMorph(
