@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #1e1e23;
+        }
+        #terminal {
+            width: 100%;
+            height: 100%;
+            padding: 8px;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+</head>
+<body>
+    <div id="terminal"></div>
+
+    <!-- Load xterm.js and addon as UMD (not ES modules) -->
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
+
+    <script>
+        // Wrap in IIFE to avoid global scope pollution when multiple terminal glyphs exist
+        (function() {
+            // Initialize terminal
+            const term = new Terminal({
+            cursorBlink: true,
+            fontSize: 13,
+            fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+            theme: {
+                background: '#1e1e23',
+                foreground: '#d4d4d4',
+                cursor: '#d4d4d4',
+                black: '#000000',
+                red: '#cd3131',
+                green: '#0dbc79',
+                yellow: '#e5e510',
+                blue: '#2472c8',
+                magenta: '#bc3fbc',
+                cyan: '#11a8cd',
+                white: '#e5e5e5',
+                brightBlack: '#666666',
+                brightRed: '#f14c4c',
+                brightGreen: '#23d18b',
+                brightYellow: '#f5f543',
+                brightBlue: '#3b8eea',
+                brightMagenta: '#d670d6',
+                brightCyan: '#29b8db',
+                brightWhite: '#e5e5e5'
+            }
+        });
+
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+
+        term.open(document.getElementById('terminal'));
+        fitAddon.fit();
+
+        // Initialize terminal connection
+        async function initTerminal() {
+            try {
+                // Hardcode backend URL - dev server injection doesn't work in plugin context
+                const backendUrl = 'http://localhost:8772';
+                console.log('[PTY] Backend URL:', backendUrl);
+
+                // Get glyph_id from query params
+                const params = new URLSearchParams(window.location.search);
+                const glyphID = params.get('glyph_id') || 'unknown';
+                console.log('[PTY] Glyph ID:', glyphID);
+
+                term.write('Creating PTY session...\r\n');
+
+                const requestBody = { glyph_id: glyphID };
+                const requestUrl = backendUrl + '/api/pty-glyph/create';
+                console.log('[PTY] Request URL:', requestUrl);
+                console.log('[PTY] Request body:', requestBody);
+
+                // Create PTY session - use full backend URL
+                const resp = await fetch(requestUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody),
+                    credentials: 'include'  // Include cookies for cross-origin
+                });
+
+                console.log('[PTY] Response status:', resp.status, resp.statusText);
+
+                if (!resp.ok) {
+                    throw new Error(`Failed to create session: ${resp.statusText}`);
+                }
+
+                const { pty_id } = await resp.json();
+                term.write(`Session created: ${pty_id}\r\n`);
+                term.write('Connecting to PTY...\r\n');
+
+                // Connect WebSocket - use backend URL
+                const backendWsUrl = backendUrl.replace('http://', 'ws://').replace('https://', 'wss://');
+                const ws = new WebSocket(`${backendWsUrl}/ws/pty-glyph?session_id=${pty_id}`);
+
+                ws.onopen = () => {
+                    term.clear();
+                    console.log('[PTY] WebSocket connected');
+
+                    // Send initial resize via PING
+                    ws.send(JSON.stringify({
+                        type: 3, // PING
+                        data: '',
+                        headers: {
+                            cols: String(term.cols),
+                            rows: String(term.rows)
+                        },
+                        timestamp: 0
+                    }));
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        // Parse JSON message from server
+                        const msg = JSON.parse(event.data);
+
+                        if (msg.type === 1 && msg.data) { // DATA type
+                            // Decode base64 data
+                            const text = atob(msg.data);
+                            term.write(text);
+                        }
+                    } catch (e) {
+                        console.error('[PTY] Failed to parse message:', e, event.data);
+                        // Fallback: try to write raw data
+                        if (typeof event.data === 'string') {
+                            term.write(event.data);
+                        }
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    console.error('[PTY] WebSocket error:', error);
+                    term.write('\r\n\x1b[31mWebSocket connection error\x1b[0m\r\n');
+                };
+
+                ws.onclose = () => {
+                    console.log('[PTY] WebSocket closed');
+                    term.write('\r\n\x1b[33mConnection closed\x1b[0m\r\n');
+                };
+
+                // Terminal input → WebSocket
+                term.onData((data) => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        // Send as DATA type message with base64 encoded data
+                        ws.send(JSON.stringify({
+                            type: 1, // DATA
+                            data: btoa(data),
+                            headers: {},
+                            timestamp: 0
+                        }));
+                    }
+                });
+
+                // Handle terminal resize
+                term.onResize(({ cols, rows }) => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        // Send as PING type with resize info in headers
+                        ws.send(JSON.stringify({
+                            type: 3, // PING
+                            data: '',
+                            headers: {
+                                cols: String(cols),
+                                rows: String(rows)
+                            },
+                            timestamp: 0
+                        }));
+                    }
+                });
+
+            } catch (error) {
+                console.error('[PTY] Initialization error:', error);
+                term.write(`\r\n\x1b[31mError: ${error.message}\x1b[0m\r\n`);
+            }
+        }
+
+        // Start terminal
+        initTerminal();
+
+            // Fit terminal on window resize
+            window.addEventListener('resize', () => fitAddon.fit());
+        })(); // End IIFE
+    </script>
+</body>
+</html>
