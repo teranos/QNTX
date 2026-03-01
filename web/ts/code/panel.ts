@@ -8,9 +8,11 @@
 import { BasePanel } from '../base-panel.ts';
 import { GoEditorNavigation } from './navigation.ts';
 import { CodeSuggestions } from './suggestions.ts';
-import { apiFetch, stripProtocol } from '../api.ts';
+import { apiFetch } from '../api.ts';
+import { stripProtocol } from '../http-utils.ts';
 import { fetchDevMode } from '../dev-mode.ts';
-import { createRichErrorState, extractHttpStatus, type RichError } from '../base-panel-error.ts';
+import { createRichErrorState, type RichError } from '../base-panel-error.ts';
+import { extractHttpStatus } from '../http-utils.ts';
 import { handleError, SEG } from '../error-handler.ts';
 import { log } from '../logger.ts';
 import type { EditorView } from '@codemirror/view';
