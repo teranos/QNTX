@@ -27,6 +27,7 @@ import { handleSystemCapabilities } from './websocket-handlers/system-capabiliti
 import { handleWatcherQueueStatus } from './websocket-handlers/watcher-queue-status';
 import { log, SEG } from './logger';
 import { connectivityManager } from './connectivity';
+import { stripProtocol } from './api';
 import { updateResultGlyphContent, type ExecutionResult } from './components/glyph/result-glyph';
 
 let ws: WebSocket | null = null;
@@ -385,7 +386,7 @@ export function connectWebSocket(handlers: MessageHandlers): void {
     }
 
     const backendUrl = validatedUrl || window.location.origin;
-    const backendHost = backendUrl.replace(/^https?:\/\//, '');
+    const backendHost = stripProtocol(backendUrl);
     const protocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${backendHost}/ws`;
 

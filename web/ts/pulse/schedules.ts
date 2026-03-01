@@ -8,7 +8,7 @@ import type { PulsePanelState } from './panel-state';
 import { formatInterval } from './types';
 import { formatRelativeTime, escapeHtml, formatDuration } from '../html-utils.ts';
 import { Pulse } from '@generated/sym.js';
-import type { RichError } from '../base-panel-error.ts';
+import { extractHttpStatus, type RichError } from '../base-panel-error.ts';
 import { buildTooltipText } from '../components/tooltip.ts';
 import { buttonPlaceholder } from '../components/button.ts';
 
@@ -39,9 +39,8 @@ function buildExecutionError(errorMessage: string, atsCode: string): RichError {
     }
 
     // HTTP errors
-    const httpMatch = errorMessage.match(/(\d{3})/);
-    if (httpMatch) {
-        const status = parseInt(httpMatch[1], 10);
+    const status = extractHttpStatus(errorMessage);
+    if (status !== null) {
         if (status >= 400 && status < 600) {
             const statusInfo: Record<number, { title: string; suggestion: string }> = {
                 401: { title: 'Unauthorized', suggestion: 'Your session may have expired. Try refreshing the page.' },
