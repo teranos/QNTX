@@ -6,7 +6,7 @@
  */
 
 import type { Glyph } from '../glyph';
-import { setWindowState, setProximityText } from '../dataset';
+import { setWindowState, setProximityText, hasProximityText } from '../dataset';
 import { log, SEG } from '../../../logger';
 
 /**
@@ -26,6 +26,39 @@ export function verifyGlyphAxiom(
             `AXIOM VIOLATION: Expected exactly 1 element for ${id}, found ${elements.length}`
         );
     }
+}
+
+/**
+ * Morph-to preamble shared by all manifestations.
+ * Verifies axiom, captures current rect, detaches, clears proximity text,
+ * reparents to body with fixed positioning, and marks window state.
+ */
+export function prepareMorphTo(
+    glyphElement: HTMLElement,
+    glyph: Glyph,
+    verifyElement: (id: string, element: HTMLElement) => void,
+    morphClass: string,
+    zIndex: string
+): DOMRect {
+    verifyGlyphAxiom(glyph.id, glyphElement, verifyElement);
+
+    const glyphRect = glyphElement.getBoundingClientRect();
+
+    glyphElement.remove();
+
+    if (hasProximityText(glyphElement)) {
+        glyphElement.textContent = '';
+        setProximityText(glyphElement, false);
+    }
+
+    glyphElement.className = morphClass;
+    glyphElement.style.position = 'fixed';
+    glyphElement.style.zIndex = zIndex;
+
+    document.body.appendChild(glyphElement);
+    setWindowState(glyphElement, true);
+
+    return glyphRect;
 }
 
 /**
