@@ -2,11 +2,22 @@ package qntxatproto
 
 import (
 	"context"
+	"strings"
 
 	"github.com/teranos/QNTX/ats/types"
 )
 
-const atprotoContext = "atproto"
+// collectionFromURI extracts the collection from an AT URI.
+// at://did:plc:xxx/app.bsky.feed.post/abc123 → app.bsky.feed.post
+func collectionFromURI(atURI string) string {
+	// Strip "at://" prefix, then split: [did, collection, rkey]
+	trimmed := strings.TrimPrefix(atURI, "at://")
+	parts := strings.SplitN(trimmed, "/", 3)
+	if len(parts) >= 2 {
+		return parts[1]
+	}
+	return ""
+}
 
 // attestSessionStatus records a PDS session event.
 func (p *Plugin) attestSessionStatus(status, pdsHost, identity, errMsg string) {
@@ -25,7 +36,6 @@ func (p *Plugin) attestSessionStatus(status, pdsHost, identity, errMsg string) {
 	cmd := &types.AsCommand{
 		Subjects:      []string{identity},
 		Predicates:    []string{status},
-		Contexts:      []string{atprotoContext},
 		Source:        p.Metadata().Name,
 		SourceVersion: p.Metadata().Version,
 		Attributes:    attrs,
@@ -43,19 +53,17 @@ func (p *Plugin) attestPost(did, uri, cid, text string) {
 		return
 	}
 
-	attrs := map[string]interface{}{
-		"uri":  uri,
-		"cid":  cid,
-		"text": text,
-	}
-
 	cmd := &types.AsCommand{
-		Subjects:      []string{did},
+		Actors:        []string{did},
+		Subjects:      []string{uri},
 		Predicates:    []string{"posted"},
-		Contexts:      []string{atprotoContext},
+		Contexts:      []string{collectionFromURI(uri)},
 		Source:        p.Metadata().Name,
 		SourceVersion: p.Metadata().Version,
-		Attributes:    attrs,
+		Attributes: map[string]interface{}{
+			"cid":  cid,
+			"text": text,
+		},
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 		logger := p.Services().Logger("atproto")
@@ -71,14 +79,14 @@ func (p *Plugin) attestFollow(actorDID, subjectDID, uri string) {
 	}
 
 	cmd := &types.AsCommand{
-		Subjects:      []string{actorDID},
+		Actors:        []string{actorDID},
+		Subjects:      []string{subjectDID},
 		Predicates:    []string{"following"},
-		Contexts:      []string{atprotoContext},
+		Contexts:      []string{collectionFromURI(uri)},
 		Source:        p.Metadata().Name,
 		SourceVersion: p.Metadata().Version,
 		Attributes: map[string]interface{}{
-			"subject": subjectDID,
-			"uri":     uri,
+			"uri": uri,
 		},
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
@@ -95,14 +103,14 @@ func (p *Plugin) attestLike(actorDID, subjectURI, uri string) {
 	}
 
 	cmd := &types.AsCommand{
-		Subjects:      []string{actorDID},
+		Actors:        []string{actorDID},
+		Subjects:      []string{subjectURI},
 		Predicates:    []string{"liked"},
-		Contexts:      []string{atprotoContext},
+		Contexts:      []string{collectionFromURI(uri)},
 		Source:        p.Metadata().Name,
 		SourceVersion: p.Metadata().Version,
 		Attributes: map[string]interface{}{
-			"subject_uri": subjectURI,
-			"uri":         uri,
+			"uri": uri,
 		},
 	}
 	if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
@@ -121,7 +129,6 @@ func (p *Plugin) attestResolve(handle, did string) {
 	cmd := &types.AsCommand{
 		Subjects:      []string{handle},
 		Predicates:    []string{"resolved-to"},
-		Contexts:      []string{atprotoContext},
 		Source:        p.Metadata().Name,
 		SourceVersion: p.Metadata().Version,
 		Attributes: map[string]interface{}{
@@ -142,8 +149,6 @@ func (p *Plugin) attestTimelinePost(ctx context.Context, uri, authorDID, authorH
 	}
 
 	attrs := map[string]interface{}{
-		"uri":           uri,
-		"author_did":    authorDID,
 		"author_handle": authorHandle,
 		"cid":           cid,
 	}
@@ -152,9 +157,10 @@ func (p *Plugin) attestTimelinePost(ctx context.Context, uri, authorDID, authorH
 	}
 
 	cmd := &types.AsCommand{
+		Actors:        []string{authorDID},
 		Subjects:      []string{uri},
 		Predicates:    []string{"appeared-in-timeline"},
-		Contexts:      []string{atprotoContext},
+		Contexts:      []string{collectionFromURI(uri)},
 		Source:        p.Metadata().Name,
 		SourceVersion: p.Metadata().Version,
 		Attributes:    attrs,
