@@ -7,7 +7,7 @@
 
 import { BasePanel } from '../base-panel.ts';
 import { apiFetch } from '../api.ts';
-import { createRichErrorState, type RichError } from '../base-panel-error.ts';
+import { createRichErrorState, extractHttpStatus, type RichError } from '../base-panel-error.ts';
 import { escapeHtml } from '../html-utils.ts';
 import { log, SEG } from '../logger.ts';
 import { handleError } from '../error-handler.ts';
@@ -437,9 +437,8 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
         }
 
         // Check for HTTP errors
-        const httpMatch = errorMessage.match(/HTTP\s*(\d{3})/i);
-        if (httpMatch) {
-            const status = parseInt(httpMatch[1], 10);
+        const status = extractHttpStatus(errorMessage);
+        if (status !== null) {
             if (status === 404) {
                 return {
                     title: 'Endpoint Not Found',
