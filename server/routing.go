@@ -82,7 +82,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 				for path, handler := range wsHandlers {
 					// Capture handler in local variable for closure
 					wsHandler := handler
-					http.HandleFunc(path, wrap(wsHandler.ServeWS))
+					http.HandleFunc(path, wrapWS(wsHandler.ServeWS))
 					s.logger.Infow("Registered WebSocket handler", "plugin", name, "path", path)
 				}
 			}
