@@ -71,8 +71,8 @@ func (s *QNTXServer) handleGetGlyphConfig(w http.ResponseWriter, r *http.Request
 
 func (s *QNTXServer) handleSetGlyphConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Plugin  string                 `json:"plugin"`
-		GlyphID string                 `json:"glyph_id"`
+		Plugin  string         `json:"plugin"`
+		GlyphID string         `json:"glyph_id"`
 		Config  map[string]any `json:"config"`
 	}
 
