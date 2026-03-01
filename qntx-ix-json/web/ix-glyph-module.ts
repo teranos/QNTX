@@ -169,6 +169,7 @@ async function saveConfig(
     status: StatusLine,
 ): Promise<void> {
     try {
+        // Legacy: uses plugin endpoint. Migrate to ui.saveConfig() (#641)
         const resp = await ui.pluginFetch('/update-config', {
             method: 'POST',
             body: {

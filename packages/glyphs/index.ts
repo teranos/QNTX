@@ -2,6 +2,7 @@
  * @qntx/glyphs — Type definitions for QNTX glyph UI authoring.
  *
  * Plugin repos import types from this package for type-safe glyph development.
+ * Monorepo-only — re-exports via relative paths that break outside this repo.
  * Runtime is injected by the host — the `ui` parameter in render() provides
  * the real implementations of GlyphUI at render time.
  *

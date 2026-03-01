@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	atstypes "github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/plugin/httputil"
 )
 
 // registerHTTPHandlers registers all HTTP handlers for the ix-json plugin.
@@ -42,19 +43,19 @@ func (p *Plugin) handleTestFetch(w http.ResponseWriter, r *http.Request) {
 		APIURL    string `json:"api_url"`
 		AuthToken string `json:"auth_token"`
 	}
-	if err := readJSON(w, r, &req); err != nil {
+	if err := httputil.ReadJSON(w, r, &req); err != nil {
 		return
 	}
 
 	if req.APIURL == "" {
-		writeError(w, http.StatusBadRequest, "API URL not configured")
+		httputil.WriteError(w, http.StatusBadRequest, "API URL not configured")
 		return
 	}
 
 	data, err := p.fetchJSON(r.Context(), req.APIURL, req.AuthToken)
 	if err != nil {
 		p.Services().Logger("ix-json").Errorw("Test fetch failed", "api_url", req.APIURL, "error", err)
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("Failed to fetch from API: %v", err))
+		httputil.WriteError(w, http.StatusBadGateway, fmt.Sprintf("Failed to fetch from API: %v", err))
 		return
 	}
 
@@ -69,7 +70,7 @@ func (p *Plugin) handleTestFetch(w http.ResponseWriter, r *http.Request) {
 	mapping := p.glyphMappings[req.GlyphID]
 	p.glyphMu.Unlock()
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	httputil.WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"data":    json.RawMessage(data),
 		"mapping": mapping,
 	})
@@ -83,22 +84,22 @@ func (p *Plugin) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 		AuthToken           string `json:"auth_token"`
 		PollIntervalSeconds int    `json:"poll_interval_seconds"`
 	}
-	if err := readJSON(w, r, &req); err != nil {
+	if err := httputil.ReadJSON(w, r, &req); err != nil {
 		return
 	}
 
 	if req.GlyphID == "" {
-		writeError(w, http.StatusBadRequest, "glyph_id is required")
+		httputil.WriteError(w, http.StatusBadRequest, "glyph_id is required")
 		return
 	}
 
 	// FIXME: saving config doesn't refresh the response preview — requires page reload to see persisted values
 	if err := p.saveGlyphConfig(r.Context(), req.GlyphID, req.APIURL, req.AuthToken, req.PollIntervalSeconds); err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to save configuration: %v", err))
+		httputil.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to save configuration: %v", err))
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{
+	httputil.WriteJSON(w, http.StatusOK, map[string]string{
 		"status": "Configuration saved",
 	})
 }
@@ -149,7 +150,7 @@ func (p *Plugin) handleUpdateMapping(w http.ResponseWriter, r *http.Request) {
 		RichFields    []string          `json:"rich_fields"`
 		KeyRemapping  map[string]string `json:"key_remapping"`
 	}
-	if err := readJSON(w, r, &req); err != nil {
+	if err := httputil.ReadJSON(w, r, &req); err != nil {
 		return
 	}
 
@@ -168,7 +169,7 @@ func (p *Plugin) handleUpdateMapping(w http.ResponseWriter, r *http.Request) {
 	p.glyphMu.Unlock()
 
 	p.Services().Logger("ix-json").Infow("Mapping configuration updated", "glyph_id", req.GlyphID, "mapping", mapping)
-	writeJSON(w, http.StatusOK, map[string]string{"status": "Mapping updated"})
+	httputil.WriteJSON(w, http.StatusOK, map[string]string{"status": "Mapping updated"})
 }
 
 // handleSetMode changes the operation mode for a specific glyph.
@@ -181,12 +182,12 @@ func (p *Plugin) handleSetMode(w http.ResponseWriter, r *http.Request) {
 		AuthToken           string        `json:"auth_token"`
 		PollIntervalSeconds int           `json:"poll_interval_seconds"`
 	}
-	if err := readJSON(w, r, &req); err != nil {
+	if err := httputil.ReadJSON(w, r, &req); err != nil {
 		return
 	}
 
 	if req.GlyphID == "" {
-		writeError(w, http.StatusBadRequest, "glyph_id is required")
+		httputil.WriteError(w, http.StatusBadRequest, "glyph_id is required")
 		return
 	}
 
@@ -195,7 +196,7 @@ func (p *Plugin) handleSetMode(w http.ResponseWriter, r *http.Request) {
 	switch req.Mode {
 	case ModeActiveRunning:
 		if req.PollIntervalSeconds <= 0 {
-			writeError(w, http.StatusBadRequest, "Poll interval must be > 0 to activate")
+			httputil.WriteError(w, http.StatusBadRequest, "Poll interval must be > 0 to activate")
 			return
 		}
 
@@ -204,37 +205,37 @@ func (p *Plugin) handleSetMode(w http.ResponseWriter, r *http.Request) {
 		mapping := p.glyphMappings[req.GlyphID]
 		p.glyphMu.RUnlock()
 		if mapping == nil {
-			writeError(w, http.StatusBadRequest, "No mapping configured — fetch and configure mapping first")
+			httputil.WriteError(w, http.StatusBadRequest, "No mapping configured — fetch and configure mapping first")
 			return
 		}
 
 		// Save config to attestations so it persists
 		if err := p.saveGlyphConfig(r.Context(), req.GlyphID, req.APIURL, req.AuthToken, req.PollIntervalSeconds); err != nil {
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to save config: %v", err))
+			httputil.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to save config: %v", err))
 			return
 		}
 
 		if err := p.createSchedule(req.GlyphID, req.PollIntervalSeconds); err != nil {
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to create schedule: %v", err))
+			httputil.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to create schedule: %v", err))
 			return
 		}
 		logger.Infow("Glyph schedule activated", "glyph_id", req.GlyphID, "interval_seconds", req.PollIntervalSeconds)
-		writeJSON(w, http.StatusOK, map[string]string{
+		httputil.WriteJSON(w, http.StatusOK, map[string]string{
 			"status": fmt.Sprintf("Schedule active (every %ds)", req.PollIntervalSeconds),
 		})
 
 	case ModePaused:
 		if err := p.pauseSchedule(req.GlyphID); err != nil {
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to pause schedule: %v", err))
+			httputil.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to pause schedule: %v", err))
 			return
 		}
 		logger.Infow("Glyph schedule paused", "glyph_id", req.GlyphID)
-		writeJSON(w, http.StatusOK, map[string]string{
+		httputil.WriteJSON(w, http.StatusOK, map[string]string{
 			"status": "Schedule paused",
 		})
 
 	default:
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("Unknown mode: %s", req.Mode))
+		httputil.WriteError(w, http.StatusBadRequest, fmt.Sprintf("Unknown mode: %s", req.Mode))
 	}
 }
 
@@ -253,7 +254,7 @@ func (p *Plugin) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"active_schedules": activeSchedules,
 	}
 
-	writeJSON(w, http.StatusOK, status)
+	httputil.WriteJSON(w, http.StatusOK, status)
 }
 
 // Known limitations — tracked as GitHub issues:
@@ -319,22 +320,4 @@ func (p *Plugin) fetchJSON(ctx context.Context, apiURL, authToken string) ([]byt
 	return data, nil
 }
 
-// Helper functions for HTTP responses
-func writeJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
-}
-
-func writeError(w http.ResponseWriter, status int, message string) {
-	writeJSON(w, status, map[string]string{"error": message})
-}
-
-func readJSON(w http.ResponseWriter, r *http.Request, v interface{}) error {
-	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid JSON: %v", err))
-		return err
-	}
-	return nil
-}
 
