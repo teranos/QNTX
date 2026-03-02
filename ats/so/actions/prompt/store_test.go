@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/teranos/QNTX/ats/storage"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
@@ -18,8 +17,8 @@ import (
 //     ATTRIBUTES{rigatoni:250g, canned_tomatoes:2pc, onion:3pc}
 
 func TestSavePrompt_RecipeGenerator(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	store := NewPromptStore(db, storage.NewSQLStore(db, nil))
+	atsStore, db := qntxtest.CreateTestStore(t)
+	store := NewPromptStore(db, atsStore)
 	ctx := context.Background()
 
 	// A prompt that generates recipes from inventory attestations
@@ -49,8 +48,8 @@ func TestSavePrompt_RecipeGenerator(t *testing.T) {
 }
 
 func TestSavePrompt_VersionIncrementsAsRecipeEvolves(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	store := NewPromptStore(db, storage.NewSQLStore(db, nil))
+	atsStore, db := qntxtest.CreateTestStore(t)
+	store := NewPromptStore(db, atsStore)
 	ctx := context.Background()
 
 	// Version 1: Simple recipe suggestion
@@ -109,8 +108,8 @@ func TestSavePrompt_VersionIncrementsAsRecipeEvolves(t *testing.T) {
 }
 
 func TestGetPromptVersions_RecipePromptHistory(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	store := NewPromptStore(db, storage.NewSQLStore(db, nil))
+	atsStore, db := qntxtest.CreateTestStore(t)
+	store := NewPromptStore(db, atsStore)
 	ctx := context.Background()
 
 	// Create recipe prompt versions showing evolution
@@ -151,8 +150,8 @@ func TestGetPromptVersions_RecipePromptHistory(t *testing.T) {
 }
 
 func TestListPrompts_MultipleRecipePrompts(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	store := NewPromptStore(db, storage.NewSQLStore(db, nil))
+	atsStore, db := qntxtest.CreateTestStore(t)
+	store := NewPromptStore(db, atsStore)
 	ctx := context.Background()
 
 	// Create different recipe-related prompts
@@ -188,8 +187,8 @@ func TestListPrompts_MultipleRecipePrompts(t *testing.T) {
 }
 
 func TestSavePrompt_FullRecipeConfiguration(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	store := NewPromptStore(db, storage.NewSQLStore(db, nil))
+	atsStore, db := qntxtest.CreateTestStore(t)
+	store := NewPromptStore(db, atsStore)
 	ctx := context.Background()
 
 	// Full configuration for a recipe prompt with all options
@@ -229,8 +228,8 @@ func TestSavePrompt_FullRecipeConfiguration(t *testing.T) {
 }
 
 func TestSavePrompt_ValidatesRecipeTemplate(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	store := NewPromptStore(db, storage.NewSQLStore(db, nil))
+	atsStore, db := qntxtest.CreateTestStore(t)
+	store := NewPromptStore(db, atsStore)
 	ctx := context.Background()
 
 	// Invalid template with unknown field
@@ -247,8 +246,8 @@ func TestSavePrompt_ValidatesRecipeTemplate(t *testing.T) {
 }
 
 func TestSavePrompt_RequiresName(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	store := NewPromptStore(db, storage.NewSQLStore(db, nil))
+	atsStore, db := qntxtest.CreateTestStore(t)
+	store := NewPromptStore(db, atsStore)
 	ctx := context.Background()
 
 	prompt := &StoredPrompt{
@@ -264,8 +263,8 @@ func TestSavePrompt_RequiresName(t *testing.T) {
 }
 
 func TestSavePrompt_RequiresTemplate(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	store := NewPromptStore(db, storage.NewSQLStore(db, nil))
+	atsStore, db := qntxtest.CreateTestStore(t)
+	store := NewPromptStore(db, atsStore)
 	ctx := context.Background()
 
 	prompt := &StoredPrompt{

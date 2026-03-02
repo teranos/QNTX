@@ -1,18 +1,19 @@
 package storage
 
 import (
+	"database/sql"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/ats/storage/testutil"
+	_ "github.com/mattn/go-sqlite3"
+
 	"github.com/teranos/QNTX/ats/types"
 )
 
 // TestNewSymbolIndex_Success tests successful index creation
 func TestNewSymbolIndex_Success(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	db := createTestDB(t)
 
 	idx, err := NewSymbolIndex(db)
 	if err != nil {
@@ -31,10 +32,13 @@ func TestNewSymbolIndex_Success(t *testing.T) {
 
 // TestNewSymbolIndex_MissingTable tests error handling for missing attestations table
 func TestNewSymbolIndex_MissingTable(t *testing.T) {
-	db := testutil.SetupEmptyDB(t)
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("failed to create empty test db: %v", err)
+	}
 	defer db.Close()
 
-	_, err := NewSymbolIndex(db)
+	_, err = NewSymbolIndex(db)
 	if err == nil {
 		t.Error("NewSymbolIndex() error = nil, want error for missing table")
 	}
@@ -46,8 +50,7 @@ func TestNewSymbolIndex_MissingTable(t *testing.T) {
 
 // TestRefresh tests index refresh functionality
 func TestRefresh(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	store, db := createTestStore(t)
 
 	idx, err := NewSymbolIndex(db)
 	if err != nil {
@@ -55,7 +58,6 @@ func TestRefresh(t *testing.T) {
 	}
 
 	// Add test attestations
-	store := NewSQLStore(db, nil)
 	attestations := []types.As{
 		{
 			ID:         "test-1",
@@ -106,11 +108,7 @@ func TestRefresh(t *testing.T) {
 
 // TestGetAttestationCount tests symbol count retrieval
 func TestGetAttestationCount(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
-
-	// Create test data
-	store := NewSQLStore(db, nil)
+	store, db := createTestStore(t)
 	for i := 0; i < 5; i++ {
 		attestation := &types.As{
 			ID:         string(rune('a' + i)),
@@ -157,11 +155,7 @@ func TestGetAttestationCount(t *testing.T) {
 
 // TestGetSubjectCompletions tests subject completion with 3-char minimum
 func TestGetSubjectCompletions(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
-
-	// Create test data with various subjects
-	store := NewSQLStore(db, nil)
+	store, db := createTestStore(t)
 	subjects := []string{"alice", "alicia", "alex", "bob", "barbara"}
 	for _, subject := range subjects {
 		attestation := &types.As{
@@ -224,11 +218,7 @@ func TestGetSubjectCompletions(t *testing.T) {
 
 // TestGetPredicateCompletions tests predicate completion with 1-char minimum
 func TestGetPredicateCompletions(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
-
-	// Create test data
-	store := NewSQLStore(db, nil)
+	store, db := createTestStore(t)
 	predicates := []string{"knows", "works-at", "lives-in"}
 	for _, predicate := range predicates {
 		attestation := &types.As{
@@ -276,10 +266,7 @@ func TestGetPredicateCompletions(t *testing.T) {
 
 // TestGetContextCompletions tests context completion
 func TestGetContextCompletions(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
-
-	store := NewSQLStore(db, nil)
+	store, db := createTestStore(t)
 	contexts := []string{"seattle", "san-francisco", "new-york"}
 	for _, ctx := range contexts {
 		attestation := &types.As{
@@ -313,10 +300,7 @@ func TestGetContextCompletions(t *testing.T) {
 
 // TestGetActorCompletions tests actor completion
 func TestGetActorCompletions(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
-
-	store := NewSQLStore(db, nil)
+	store, db := createTestStore(t)
 	actors := []string{"alice-agent", "bob-bot", "carol-script"}
 	for _, actor := range actors {
 		attestation := &types.As{
@@ -346,10 +330,7 @@ func TestGetActorCompletions(t *testing.T) {
 
 // TestCompletions_Metadata tests completion item metadata
 func TestCompletions_Metadata(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
-
-	store := NewSQLStore(db, nil)
+	store, db := createTestStore(t)
 
 	// Create multiple attestations for same subject to test count
 	for i := 0; i < 3; i++ {
@@ -404,10 +385,7 @@ func TestCompletions_Metadata(t *testing.T) {
 
 // TestCompletions_Limit tests 10-item limit
 func TestCompletions_Limit(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
-
-	store := NewSQLStore(db, nil)
+	store, db := createTestStore(t)
 
 	// Create 15 subjects starting with "test"
 	for i := 0; i < 15; i++ {
@@ -441,8 +419,7 @@ func TestCompletions_Limit(t *testing.T) {
 
 // TestLastUpdate tests LastUpdate tracking
 func TestLastUpdate(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	db := createTestDB(t)
 
 	idx, err := NewSymbolIndex(db)
 	if err != nil {

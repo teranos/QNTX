@@ -1,5 +1,3 @@
-//go:build cgo && rustsqlite
-
 package storage
 
 import (

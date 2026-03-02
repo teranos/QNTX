@@ -1,11 +1,13 @@
 package plugin
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/pulse/async"
 	"go.uber.org/zap/zaptest"
 )
@@ -17,7 +19,7 @@ import (
 func TestNewServiceRegistry(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	db := &sql.DB{}
-	store := &storage.SQLStore{}
+	store := &mockATSStore{}
 	config := &mockConfigProvider{}
 	queue := &async.Queue{}
 
@@ -31,7 +33,7 @@ func TestNewServiceRegistry(t *testing.T) {
 func TestDefaultServiceRegistry_Database(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	db := &sql.DB{}
-	store := &storage.SQLStore{}
+	store := &mockATSStore{}
 	config := &mockConfigProvider{}
 	queue := &async.Queue{}
 
@@ -42,7 +44,7 @@ func TestDefaultServiceRegistry_Database(t *testing.T) {
 func TestDefaultServiceRegistry_Logger(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	db := &sql.DB{}
-	store := &storage.SQLStore{}
+	store := &mockATSStore{}
 	config := &mockConfigProvider{}
 	queue := &async.Queue{}
 
@@ -70,7 +72,7 @@ func TestDefaultServiceRegistry_Logger(t *testing.T) {
 func TestDefaultServiceRegistry_Config(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	db := &sql.DB{}
-	store := &storage.SQLStore{}
+	store := &mockATSStore{}
 	mockProvider := &mockConfigProvider{
 		configs: make(map[string]Config),
 	}
@@ -110,7 +112,7 @@ func TestDefaultServiceRegistry_Config(t *testing.T) {
 func TestDefaultServiceRegistry_ATSStore(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	db := &sql.DB{}
-	store := &storage.SQLStore{}
+	store := &mockATSStore{}
 	config := &mockConfigProvider{}
 	queue := &async.Queue{}
 
@@ -121,7 +123,7 @@ func TestDefaultServiceRegistry_ATSStore(t *testing.T) {
 func TestDefaultServiceRegistry_Queue(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	db := &sql.DB{}
-	store := &storage.SQLStore{}
+	store := &mockATSStore{}
 	config := &mockConfigProvider{}
 	queue := &async.Queue{}
 
@@ -201,6 +203,17 @@ func (m *mockConfigWithID) GetKeys() []string                   { return []strin
 // Verify mockConfigWithID implements Config
 var _ Config = (*mockConfigWithID)(nil)
 
+// mockATSStore satisfies ats.AttestationStore for tests that only need a non-nil value
+type mockATSStore struct{}
+
+func (m *mockATSStore) CreateAttestation(as *types.As) error                                            { return nil }
+func (m *mockATSStore) CreateAttestationInbound(as *types.As) error                                     { return nil }
+func (m *mockATSStore) AttestationExists(asid string) bool                                              { return false }
+func (m *mockATSStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) { return nil, nil }
+func (m *mockATSStore) GetAttestations(filters ats.AttestationFilter) ([]*types.As, error)              { return nil, nil }
+
+var _ ats.AttestationStore = (*mockATSStore)(nil)
+
 // =============================================================================
 // Integration Test - Full Service Registry Usage
 // =============================================================================
@@ -209,7 +222,7 @@ func TestServiceRegistry_Integration(t *testing.T) {
 	// Create a real service registry with all components
 	logger := zaptest.NewLogger(t).Sugar()
 	db := &sql.DB{}
-	store := &storage.SQLStore{}
+	store := &mockATSStore{}
 	configProvider := &mockConfigProvider{
 		configs: make(map[string]Config),
 	}

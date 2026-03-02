@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/pulse/async"
 	"go.uber.org/zap"
@@ -16,13 +16,15 @@ import (
 // GitIngestionHandler implements async.JobHandler for git repository ingestion
 type GitIngestionHandler struct {
 	db     *sql.DB
+	store  ats.AttestationStore
 	logger *zap.SugaredLogger
 }
 
 // NewGitIngestionHandler creates a new git ingestion job handler
-func NewGitIngestionHandler(db *sql.DB, logger *zap.SugaredLogger) *GitIngestionHandler {
+func NewGitIngestionHandler(db *sql.DB, store ats.AttestationStore, logger *zap.SugaredLogger) *GitIngestionHandler {
 	return &GitIngestionHandler{
 		db:     db,
+		store:  store,
 		logger: logger,
 	}
 }
@@ -75,7 +77,7 @@ func (h *GitIngestionHandler) Execute(ctx context.Context, job *async.Job) error
 	}
 
 	// Create git processor
-	processor := NewGitIxProcessor(h.db, false, payload.Actor, payload.Verbosity, h.logger)
+	processor := NewGitIxProcessor(h.store, false, payload.Actor, payload.Verbosity, h.logger)
 
 	// Set incremental filter if --since is provided
 	if payload.Since != "" {
@@ -104,8 +106,7 @@ func (h *GitIngestionHandler) Execute(ctx context.Context, job *async.Job) error
 	// Process dependencies unless disabled
 	var depsResult *DepsIngestionResult
 	if !payload.NoDeps {
-		depsStore := storage.NewSQLStore(h.db, h.logger)
-		depsProcessor := NewDepsIxProcessor(h.db, depsStore, repoPath, false, payload.Actor, payload.Verbosity, h.logger)
+		depsProcessor := NewDepsIxProcessor(h.db, h.store, repoPath, false, payload.Actor, payload.Verbosity, h.logger)
 		depsResult, err = depsProcessor.ProcessProjectFiles()
 		if err != nil {
 			h.logger.Warnw("Dependency ingestion had errors",

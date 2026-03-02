@@ -3,7 +3,9 @@
 package server
 
 import (
+	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/teranos/QNTX/ats/storage"
@@ -18,7 +20,7 @@ func createObserverWithRichFields(t *testing.T, richFields []string) *EmbeddingO
 	t.Helper()
 	db := qntxtest.CreateTestDB(t)
 
-	store := storage.NewSQLStore(db, zap.NewNop().Sugar())
+	// Insert type definition via raw SQL (test helper, no store needed)
 	typeDef := &types.As{
 		ID:         "ASTEST-TYPE-001",
 		Subjects:   []string{"testtype"},
@@ -30,11 +32,17 @@ func createObserverWithRichFields(t *testing.T, richFields []string) *EmbeddingO
 			"rich_string_fields": richFields,
 		},
 	}
-	err := store.CreateAttestation(typeDef)
+	subj, _ := json.Marshal(typeDef.Subjects)
+	pred, _ := json.Marshal(typeDef.Predicates)
+	ctx, _ := json.Marshal(typeDef.Contexts)
+	actors, _ := json.Marshal([]string{})
+	attrs, _ := json.Marshal(typeDef.Attributes)
+	_, err := db.Exec(`INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		typeDef.ID, string(subj), string(pred), string(ctx), string(actors), time.Now(), "test", string(attrs), time.Now())
 	assert.NoError(t, err)
 
 	return &EmbeddingObserver{
-		richStore: storage.NewBoundedStore(db, zap.NewNop().Sugar()),
+		richStore: storage.NewBoundedStore(db, nil, zap.NewNop().Sugar()),
 		logger:    zap.NewNop().Sugar(),
 	}
 }
@@ -148,7 +156,7 @@ func TestExtractRichText_NoRichFieldsDefined(t *testing.T) {
 	// No type definitions in the DB — no rich fields to discover
 	db := qntxtest.CreateTestDB(t)
 	observer := &EmbeddingObserver{
-		richStore: storage.NewBoundedStore(db, zap.NewNop().Sugar()),
+		richStore: storage.NewBoundedStore(db, nil, zap.NewNop().Sugar()),
 		logger:    zap.NewNop().Sugar(),
 	}
 
