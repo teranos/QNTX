@@ -14,6 +14,7 @@ import { apiFetch } from './api.ts';
 import { AM } from '@generated/sym.js';
 import { formatValue } from './html-utils.ts';
 import { createRichErrorState, type RichError } from './base-panel-error.ts';
+import { extractHttpStatus } from './http-utils.ts';
 import { handleError, SEG } from './error-handler.ts';
 import { log } from './logger.ts';
 import { toast } from './toast.ts';
@@ -172,9 +173,8 @@ class ConfigPanel extends BasePanel {
         const errorStack = error instanceof Error ? error.stack : undefined;
 
         // Check for HTTP errors
-        const httpMatch = errorMessage.match(/HTTP\s*(\d{3})/i);
-        if (httpMatch) {
-            const status = parseInt(httpMatch[1], 10);
+        const status = extractHttpStatus(errorMessage);
+        if (status !== null) {
             if (status === 404) {
                 return {
                     title: 'Config Endpoint Not Found',

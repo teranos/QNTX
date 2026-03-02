@@ -221,14 +221,14 @@ func (s *QNTXServer) setupClusterLabelSchedule(cfg *appcfg.Config) {
 	registry.Register(handler)
 	s.logger.Infow("Registered cluster label handler")
 
-	interval := cfg.Embeddings.ClusterLabelIntervalSeconds
 	schedStore := schedule.NewStore(s.db)
 
-	// If interval is disabled, pause any existing active schedule
-	if interval <= 0 {
+	// If interval not configured, pause any existing active schedule
+	if cfg.Embeddings.ClusterLabelIntervalSeconds == nil {
 		s.pauseExistingSchedule(schedStore, ClusterLabelHandlerName)
 		return
 	}
+	interval := *cfg.Embeddings.ClusterLabelIntervalSeconds
 
 	// Check for existing schedule to avoid duplicates on restart
 	existing, err := schedStore.ListAllScheduledJobs()
