@@ -659,7 +659,7 @@ func TestServiceIntegration_BookCollectorAttestations(t *testing.T) {
 
 	// 3. Start gRPC services for plugin callbacks
 	servicesManager := NewServicesManager(logger)
-	endpoints, err := servicesManager.Start(ctx, store, queue, nil)
+	endpoints, err := servicesManager.Start(ctx, store, queue, nil, t.TempDir())
 	require.NoError(t, err)
 	defer servicesManager.Shutdown()
 
