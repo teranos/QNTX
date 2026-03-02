@@ -276,7 +276,10 @@ pub extern "C" fn storage_exists(store: *const SqliteStore, id: *const c_char) -
 
     match store.exists(id_str) {
         Ok(true) => StorageResultC::ok(),
-        Ok(false) => StorageResultC::error("not found"),
+        Ok(false) => StorageResultC {
+            success: false,
+            error_msg: ptr::null_mut(),
+        },
         Err(e) => StorageResultC::error(&format!("{}", e)),
     }
 }

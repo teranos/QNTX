@@ -64,28 +64,3 @@ func createTestStore(t *testing.T) (ats.AttestationStore, *sql.DB) {
 	return store, goDb
 }
 
-// createTestDB creates an in-memory SQLite test database with migrations.
-// Use this for tests that only need raw SQL access (no store CRUD).
-func createTestDB(t *testing.T) *sql.DB {
-	t.Helper()
-
-	testDB, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatalf("failed to create test db: %v", err)
-	}
-	testDB.SetMaxOpenConns(1)
-
-	if _, err := testDB.Exec("PRAGMA foreign_keys = ON"); err != nil {
-		t.Fatalf("failed to enable foreign keys: %v", err)
-	}
-
-	if err := db.Migrate(testDB, nil); err != nil {
-		t.Fatalf("failed to migrate test db: %v", err)
-	}
-
-	t.Cleanup(func() {
-		testDB.Close()
-	})
-
-	return testDB
-}
