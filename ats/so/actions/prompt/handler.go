@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/ai/provider"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
@@ -87,7 +86,7 @@ type Result struct {
 	ResultAttestationID string `json:"result_attestation_id,omitempty"`
 
 	// Usage tracks token usage
-	Usage openrouter.Usage `json:"usage,omitempty"`
+	Usage provider.Usage `json:"usage,omitempty"`
 }
 
 // Handler implements async.JobHandler for prompt execution
@@ -223,7 +222,7 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 
 		// Call LLM with timing
 		// Priority: payload > frontmatter > defaults
-		chatReq := openrouter.ChatRequest{
+		chatReq := provider.ChatRequest{
 			SystemPrompt: payload.SystemPrompt,
 			UserPrompt:   prompt,
 		}
@@ -323,14 +322,8 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 // createAIClient creates the appropriate AI client based on payload and frontmatter configuration
 // Priority: payload.Provider > config default
 //
-// TODO(provider-plugins): AI providers should be implemented as Rust-based gRPC plugins
-// following the qntx-python pattern. Each provider (Ollama, OpenRouter, llama.cpp) would be:
-// - A separate Rust crate using tonic for gRPC
-// - Implementing the DomainPluginService interface
-// - Using reqwest/hyper for efficient HTTP streaming to provider APIs
-// - Running as a separate process for isolation and stability
-// This follows the successful pattern of qntx-python-plugin and allows hot-swapping
-// providers without recompiling QNTX core. See qntx-python/README.md for the pattern.
+// OpenRouter is now a gRPC plugin (qntx-openrouter). This handler uses
+// the in-process provider factory which only supports local inference.
 func (h *Handler) createAIClient(payload Payload, doc *PromptDocument) provider.AIClient {
 	// Determine model to use (payload overrides frontmatter overrides config)
 	model := ""
@@ -373,10 +366,8 @@ func (h *Handler) createResultAttestation(
 		var model string
 		if payload.Model != "" {
 			model = payload.Model
-		} else if h.config.LocalInference.Enabled {
-			model = h.config.LocalInference.Model
 		} else {
-			model = h.config.OpenRouter.Model
+			model = h.config.LocalInference.Model
 		}
 
 		// Construct actor as model@promptID if we have a prompt ID
@@ -496,7 +487,7 @@ func ExecuteOneShot(
 		}
 
 		// Call LLM with frontmatter metadata applied
-		chatReq := openrouter.ChatRequest{
+		chatReq := provider.ChatRequest{
 			SystemPrompt: systemPrompt,
 			UserPrompt:   prompt,
 		}
