@@ -2,10 +2,12 @@ package grpc
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -15,6 +17,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 // ExternalDomainProxy implements DomainPlugin by proxying to a gRPC plugin process.
@@ -36,6 +39,11 @@ type ExternalDomainProxy struct {
 	// WebSocket configuration (set via SetWebSocketConfig)
 	keepaliveConfig *KeepaliveConfig
 	wsConfig        *WebSocketConfig
+
+	// Initialize idempotency — multiple code paths may call Initialize
+	// (server/init.go eager init + async goroutine in main.go)
+	initOnce sync.Once
+	initErr  error
 }
 
 // NewExternalDomainProxy creates a new client proxy to a gRPC plugin at the given address.
@@ -126,8 +134,22 @@ func (c *ExternalDomainProxy) Client() protocol.DomainPluginServiceClient {
 	return c.client
 }
 
-// Initialize initializes the remote plugin.
+// Initialize initializes the remote plugin. Idempotent — safe to call from multiple code paths.
 func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
+	c.initOnce.Do(func() {
+		c.initErr = c.doInitialize(ctx, services)
+	})
+	return c.initErr
+}
+
+// ForceInitialize re-initializes the plugin (e.g. after config update).
+// Bypasses the once-guard so the gRPC call is actually sent again.
+func (c *ExternalDomainProxy) ForceInitialize(ctx context.Context, services plugin.ServiceRegistry) error {
+	return c.doInitialize(ctx, services)
+}
+
+// doInitialize performs the actual gRPC Initialize RPC.
+func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.ServiceRegistry) error {
 	// Build config map from service registry
 	config := make(map[string]string)
 	pluginConfig := services.Config(c.metadata.Name)
@@ -176,6 +198,7 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 	atsStoreEndpoint := ""
 	queueEndpoint := ""
 	scheduleEndpoint := ""
+	fileServiceEndpoint := ""
 	authToken := ""
 
 	// Try to extract endpoints from config (passed by PluginManager)
@@ -191,23 +214,29 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 		scheduleEndpoint = ep
 		c.logger.Debugw("Extracted Schedule endpoint from config", "endpoint", ep)
 	}
+	if ep := pluginConfig.GetString("_file_service_endpoint"); ep != "" {
+		fileServiceEndpoint = ep
+		c.logger.Debugw("Extracted FileService endpoint from config", "endpoint", ep)
+	}
 	if token := pluginConfig.GetString("_auth_token"); token != "" {
 		authToken = token
 	}
 
 	req := &protocol.InitializeRequest{
-		AtsStoreEndpoint: atsStoreEndpoint,
-		QueueEndpoint:    queueEndpoint,
-		ScheduleEndpoint: scheduleEndpoint,
-		AuthToken:        authToken,
-		Config:           config,
+		AtsStoreEndpoint:    atsStoreEndpoint,
+		QueueEndpoint:       queueEndpoint,
+		ScheduleEndpoint:    scheduleEndpoint,
+		FileServiceEndpoint: fileServiceEndpoint,
+		AuthToken:           authToken,
+		Config:              config,
 	}
 
-	c.logger.Infow("Sending Initialize RPC to plugin",
+	c.logger.Debugw("Sending Initialize RPC to plugin",
 		"name", c.metadata.Name,
 		"ats_store_endpoint", atsStoreEndpoint,
 		"queue_endpoint", queueEndpoint,
 		"schedule_endpoint", scheduleEndpoint,
+		"file_service_endpoint", fileServiceEndpoint,
 	)
 
 	resp, err := c.client.Initialize(ctx, req)
@@ -218,26 +247,14 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 
 	// Store handler names announced by plugin
 	c.handlerNames = resp.GetHandlerNames()
-	if len(c.handlerNames) > 0 {
-		c.logger.Infow("Plugin announced async handlers",
-			"plugin", c.metadata.Name,
-			"handlers", c.handlerNames,
-		)
-	}
 
 	// Store schedules announced by plugin
 	c.schedules = resp.GetSchedules()
-	if len(c.schedules) > 0 {
-		c.logger.Infow("Plugin announced schedules",
-			"plugin", c.metadata.Name,
-			"count", len(c.schedules),
-		)
-	}
 
-	c.logger.Infow("Remote plugin initialized",
+	c.logger.Infow("Plugin initialized",
 		"name", c.metadata.Name,
-		"ats_store", atsStoreEndpoint != "",
-		"queue", queueEndpoint != "",
+		"handlers", len(c.handlerNames),
+		"schedules", len(c.schedules),
 	)
 	return nil
 }
@@ -410,7 +427,7 @@ func (c *ExternalDomainProxy) RegisterWebSocket() (map[string]plugin.WebSocketHa
 	}
 
 	// Create a proxy handler for the plugin's WebSocket endpoints
-	handlers[fmt.Sprintf("/%s-ws", c.metadata.Name)] = &wsProxyHandler{
+	handlers[fmt.Sprintf("/ws/%s", c.metadata.Name)] = &wsProxyHandler{
 		client:    c,
 		logger:    c.logger,
 		keepalive: keepaliveHandler,
@@ -426,8 +443,7 @@ func (c *ExternalDomainProxy) RegisterWebSocketWithConfig(config KeepaliveConfig
 
 	keepaliveHandler := NewKeepaliveHandler(config, c.logger)
 
-	// TODO: Load WebSocket config from plugin manifest
-	handlers[fmt.Sprintf("/%s-ws", c.metadata.Name)] = &wsProxyHandler{
+	handlers[fmt.Sprintf("/ws/%s", c.metadata.Name)] = &wsProxyHandler{
 		client:    c,
 		logger:    c.logger,
 		keepalive: keepaliveHandler,
@@ -435,6 +451,16 @@ func (c *ExternalDomainProxy) RegisterWebSocketWithConfig(config KeepaliveConfig
 	}
 
 	return handlers, nil
+}
+
+// browserWSMessage mirrors the JSON protocol used by the browser.
+// The browser sends/receives JSON with type (enum int), base64-encoded data,
+// headers map, and a timestamp. The Go proxy translates this to/from gRPC protobuf.
+type browserWSMessage struct {
+	Type      int32             `json:"type"`
+	Data      string            `json:"data"`
+	Headers   map[string]string `json:"headers,omitempty"`
+	Timestamp int64             `json:"timestamp"`
 }
 
 // wsProxyHandler proxies WebSocket connections to the remote plugin.
@@ -465,7 +491,15 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	defer wsConn.Close()
 
 	// Establish bidirectional gRPC stream
+	// Forward query params as gRPC metadata (e.g. session_id)
 	ctx := r.Context()
+	md := metadata.New(nil)
+	for key, values := range r.URL.Query() {
+		if len(values) > 0 {
+			md.Set(key, values[0])
+		}
+	}
+	ctx = metadata.NewOutgoingContext(ctx, md)
 	stream, err := h.client.client.HandleWebSocket(ctx)
 	if err != nil {
 		h.logger.Errorw("Failed to establish gRPC stream", "error", err)
@@ -519,10 +553,28 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 			h.logger.Debugw("WebSocket -> gRPC", "type", messageType, "size", len(data))
 
-			// Convert WebSocket message to protocol message
+			// Parse browser JSON message into protobuf
+			var browserMsg browserWSMessage
+			if err := json.Unmarshal(data, &browserMsg); err != nil {
+				h.logger.Errorw("Failed to parse browser WebSocket message", "error", err, "raw", string(data))
+				continue
+			}
+
+			// Decode base64 data field
+			var rawData []byte
+			if browserMsg.Data != "" {
+				var decErr error
+				rawData, decErr = base64.StdEncoding.DecodeString(browserMsg.Data)
+				if decErr != nil {
+					h.logger.Errorw("Failed to decode base64 data", "error", decErr)
+					continue
+				}
+			}
+
 			protoMsg := &protocol.WebSocketMessage{
-				Type:      protocol.WebSocketMessage_DATA,
-				Data:      data,
+				Type:      protocol.WebSocketMessage_Type(browserMsg.Type),
+				Data:      rawData,
+				Headers:   browserMsg.Headers,
 				Timestamp: time.Now().UnixNano(),
 			}
 
@@ -576,9 +628,21 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// Send DATA message to WebSocket client
+			// Send DATA message to WebSocket client as JSON with base64-encoded data
 			if msg.Type == protocol.WebSocketMessage_DATA {
-				if err := wsConn.WriteMessage(websocket.TextMessage, msg.Data); err != nil {
+				outMsg := browserWSMessage{
+					Type:      int32(msg.Type),
+					Data:      base64.StdEncoding.EncodeToString(msg.Data),
+					Headers:   msg.Headers,
+					Timestamp: msg.Timestamp,
+				}
+				jsonBytes, err := json.Marshal(outMsg)
+				if err != nil {
+					h.logger.Errorw("Failed to marshal outbound message", "error", err)
+					errChan <- err
+					return
+				}
+				if err := wsConn.WriteMessage(websocket.TextMessage, jsonBytes); err != nil {
 					h.logger.Errorw("WebSocket write error", "error", err)
 					errChan <- err
 					return

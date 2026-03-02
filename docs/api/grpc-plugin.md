@@ -125,6 +125,7 @@ ExecuteJob executes an async job Used by Pulse to route jobs to plugin-registere
 | auth_token | string | auth_token: Simple token for authenticating with service endpoints Plugins must include this token in all service RPC calls |
 | config | map<string, string> | Plugin-specific configuration values Simple types (string, int, bool) passed as string representations Complex types (maps, slices) JSON-encoded as strings Plugins should parse and validate values appropriate to their schema |
 | schedule_endpoint | string | schedule_endpoint: gRPC endpoint for ScheduleService Provides: Runtime schedule creation, pause, resume, delete |
+| file_service_endpoint | string | file_service_endpoint: gRPC endpoint for FileService Provides: Read stored files (for multimodal attachments) |
 
 ### HTTPRequest
 
@@ -261,5 +262,6 @@ GlyphDef defines a custom glyph type provided by a plugin
 | css_path | string | CSSPath is an optional HTTP path to a stylesheet for this glyph type |
 | default_width | int32 | DefaultWidth and DefaultHeight in pixels (0 = use system default) |
 | default_height | int32 | - |
+| module_path | string | ModulePath is the HTTP path to a JS/TS module exporting a render function. When set, the frontend dynamically imports it with SDK injection, bypassing the server-rendered HTML pipeline. |
 
 [← Back to API Index](./README.md)

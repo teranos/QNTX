@@ -29,9 +29,8 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("local_inference.timeout_seconds", 360) // 6 minutes - reasonable for slow inference
 	v.SetDefault("local_inference.onnx_model_path", "ats/vidstream/models/yolo11n.onnx")
 
-	// OpenRouter defaults
-	v.SetDefault("openrouter.model", "openai/gpt-4o-mini") // Cost-effective default
-	// temperature and max_tokens are optional: nil = defaults (0.2, 1000) checked in ai/openrouter/client.go
+	// OpenRouter configuration is now handled by the qntx-openrouter plugin.
+	// Plugin config keys are read via plugin.Config.GetString("api_key") etc.
 
 	// Ax (attestation query) defaults
 	v.SetDefault("ax.default_actor", "ax@user")
@@ -60,6 +59,18 @@ func SetDefaults(v *viper.Viper) {
 		"tauri://localhost", // Allow Tauri desktop app
 	})
 	v.SetDefault("server.log_theme", "everforest")
+
+	// Rate limiting defaults (per-IP token bucket)
+	v.SetDefault("server.rate_limit.auth_rate", 2.0)
+	v.SetDefault("server.rate_limit.auth_burst", 5)
+	v.SetDefault("server.rate_limit.ws_rate", 2.0)
+	v.SetDefault("server.rate_limit.ws_burst", 10)
+	v.SetDefault("server.rate_limit.write_rate", 20.0)
+	v.SetDefault("server.rate_limit.write_burst", 40)
+	v.SetDefault("server.rate_limit.read_rate", 60.0)
+	v.SetDefault("server.rate_limit.read_burst", 120)
+	v.SetDefault("server.rate_limit.public_rate", 10.0)
+	v.SetDefault("server.rate_limit.public_burst", 20)
 
 	// Embeddings (semantic search) defaults
 	v.SetDefault("embeddings.enabled", false) // Disabled by default - requires ONNX model
@@ -190,10 +201,14 @@ func (c *Config) GetServerAllowedOrigins() []string {
 	// Define secure default origins that should always be allowed
 	defaults := []string{
 		"http://localhost",
+		"http://localhost:*",
 		"https://localhost",
+		"https://localhost:*",
 		"http://127.0.0.1",
+		"http://127.0.0.1:*",
 		"https://127.0.0.1",
-		"tauri://localhost", // Allow Tauri desktop app
+		"https://127.0.0.1:*",
+		"tauri://localhost",
 	}
 
 	// If no custom origins configured, return defaults

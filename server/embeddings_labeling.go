@@ -11,7 +11,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/ai/provider"
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
@@ -67,10 +66,7 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 	// Resolve model name once — used for attestation metadata
 	modelUsed := modelOverride
 	if modelUsed == "" {
-		modelUsed = h.cfg.OpenRouter.Model
-		if h.cfg.LocalInference.Enabled {
-			modelUsed = h.cfg.LocalInference.Model
-		}
+		modelUsed = h.cfg.LocalInference.Model
 	}
 
 	labeled := 0
@@ -101,7 +97,7 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 			"cluster-labeling", "cluster", fmt.Sprintf("%d", cluster.ID),
 		)
 
-		req := openrouter.ChatRequest{
+		req := provider.ChatRequest{
 			SystemPrompt: "You label clusters of text. Given sample texts from a cluster, respond with a short descriptive label (2-5 words). No explanation, just the label.",
 			UserPrompt:   userPrompt.String(),
 			MaxTokens:    &maxTokens,
@@ -265,8 +261,14 @@ func (s *QNTXServer) setupClusterLabelSchedule(cfg *appcfg.Config) {
 		HandlerName:     ClusterLabelHandlerName,
 		IntervalSeconds: interval,
 		State:           schedule.StateActive,
-		NextRunAt:       &now,
 	}
+
+	// Only run immediately if there are enough embeddings for clusters to exist
+	count, err := s.embeddingStore.CountEmbeddings()
+	if err == nil && count >= 2 {
+		job.NextRunAt = &now
+	}
+
 	if err := schedStore.CreateJob(job); err != nil {
 		s.logger.Errorw("Failed to create cluster-label schedule",
 			"interval_seconds", interval,
@@ -275,5 +277,6 @@ func (s *QNTXServer) setupClusterLabelSchedule(cfg *appcfg.Config) {
 	}
 	s.logger.Infow("Auto-created cluster-label schedule",
 		"job_id", job.ID,
-		"interval_seconds", interval)
+		"interval_seconds", interval,
+		"embedding_count", count)
 }

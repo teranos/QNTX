@@ -44,19 +44,13 @@ pub struct PythonPluginService {
 impl PythonPluginService {
     /// Create a new Python plugin service
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        tracing::info!("Creating Python engine...");
         let engine = match PythonEngine::new() {
-            Ok(e) => {
-                tracing::info!("Python engine created successfully");
-                e
-            }
+            Ok(e) => e,
             Err(e) => {
                 tracing::error!("Failed to create Python engine: {}", e);
                 return Err(format!("Python engine creation failed: {}", e).into());
             }
         };
-
-        tracing::info!("Initializing plugin state...");
         let state = Arc::new(RwLock::new(PluginState {
             config: None,
             engine,
@@ -100,7 +94,7 @@ impl PythonPluginService {
             }
         };
 
-        info!("Discovering Python handlers from ATS store");
+        debug!("Discovering Python handlers from ATS store");
 
         let endpoint = config.ats_store_endpoint.clone();
         let auth_token = config.auth_token.clone();
@@ -186,7 +180,7 @@ impl PythonPluginService {
 
         match result {
             Ok(handlers) => {
-                info!(
+                debug!(
                     "Discovered {} handler(s) from ATS store: {:?}",
                     handlers.len(),
                     handlers.keys().collect::<Vec<_>>()
@@ -231,12 +225,13 @@ impl DomainPluginService for PythonPluginService {
         request: Request<InitializeRequest>,
     ) -> Result<Response<InitializeResponse>, Status> {
         let req = request.into_inner();
-        info!("Initializing Python plugin");
-        info!("ATSStore endpoint: {}", req.ats_store_endpoint);
-        info!("Queue endpoint: {}", req.queue_endpoint);
+        debug!(
+            "Initializing Python plugin (ATS: {}, Queue: {})",
+            req.ats_store_endpoint, req.queue_endpoint
+        );
 
         // Clone config for later use after dropping lock
-        let state_config = {
+        let (state_config, py_version) = {
             let mut state = self.handlers.state.write();
 
             // Store configuration
@@ -249,7 +244,7 @@ impl DomainPluginService for PythonPluginService {
 
             // Initialize ATSStore client if endpoint is provided
             if !req.ats_store_endpoint.is_empty() {
-                info!("Initializing ATSStore client for Python attestation support");
+                debug!("Initializing ATSStore client for Python attestation support");
                 atsstore::init_shared_client(
                     &state.ats_client,
                     atsstore::AtsStoreConfig {
@@ -292,13 +287,10 @@ impl DomainPluginService for PythonPluginService {
             }
 
             state.initialized = true;
-            info!(
-                "Python plugin initialized successfully (Python {})",
-                state.engine.python_version()
-            );
+            let py_version = state.engine.python_version();
 
             // Clone config before dropping lock
-            state.config.clone()
+            (state.config.clone(), py_version)
         }; // Lock automatically dropped here
 
         // Discover handler scripts from ATS store
@@ -321,7 +313,11 @@ impl DomainPluginService for PythonPluginService {
             handler_names.push(format!("python.{}", handler_name));
         }
 
-        info!("Announcing async handlers: {:?}", handler_names);
+        info!(
+            "Python plugin initialized (Python {}) — {} handlers",
+            py_version,
+            handler_names.len()
+        );
 
         Ok(Response::new(InitializeResponse {
             handler_names,

@@ -288,6 +288,7 @@ export interface PluginGlyphDef {
   label: string;
   content_url: string;
   css_url?: string;
+  module_url?: string;
   default_width?: number;
   default_height?: number;
 }
@@ -401,6 +402,7 @@ export interface PromptDirectRequest {
 
 export interface PromptDirectResponse {
   response: string;
+  model?: string;
   attestation_id?: string;
   /**
    * Full attestation with signature
