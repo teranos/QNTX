@@ -8,6 +8,21 @@ use rusqlite::{Connection, OptionalExtension};
 use std::collections::HashMap;
 
 use crate::error::SqliteError;
+
+/// Raw row tuple from the attestations table, before conversion to Attestation.
+type AttestationRow = (
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    Option<String>,
+    String,
+    Option<Vec<u8>>,
+    Option<String>,
+);
 use crate::json::{
     deserialize_attributes, deserialize_string_vec, serialize_attributes, serialize_string_vec,
     sql_to_timestamp, timestamp_to_sql,
@@ -57,21 +72,7 @@ impl SqliteStore {
     }
 
     /// Helper to extract a row into an Attestation, converting errors through SqliteError.
-    fn row_to_attestation(
-        row_data: (
-            String,
-            String,
-            String,
-            String,
-            String,
-            String,
-            String,
-            Option<String>,
-            String,
-            Option<Vec<u8>>,
-            Option<String>,
-        ),
-    ) -> StoreResult<Attestation> {
+    fn row_to_attestation(row_data: AttestationRow) -> StoreResult<Attestation> {
         let (
             id,
             subjects_json,
