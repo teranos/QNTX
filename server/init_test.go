@@ -53,7 +53,7 @@ func TestServerWithPluginManager(t *testing.T) {
 
 	// Create and set a plugin manager globally (simulating main.go behavior)
 	logger := zap.NewNop().Sugar()
-	manager := grpcplugin.NewPluginManager(logger)
+	manager := grpcplugin.NewPluginManager(logger, "")
 	grpcplugin.SetDefaultPluginManager(manager)
 	t.Cleanup(func() {
 		grpcplugin.SetDefaultPluginManager(nil) // Clean up global state
@@ -96,7 +96,7 @@ func TestServerServicesRegistry(t *testing.T) {
 
 	// Set plugin manager globally (simulating main.go behavior)
 	logger := zap.NewNop().Sugar()
-	manager := grpcplugin.NewPluginManager(logger)
+	manager := grpcplugin.NewPluginManager(logger, "")
 	grpcplugin.SetDefaultPluginManager(manager)
 	t.Cleanup(func() {
 		grpcplugin.SetDefaultPluginManager(nil)

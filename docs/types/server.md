@@ -261,6 +261,7 @@ type PluginGlyphDef struct {
 	Label string `json:"label"`
 	ContentURL string `json:"content_url"`
 	CSSURL string `json:"css_url,omitempty"`
+	ModuleURL string `json:"module_url,omitempty"`
 	DefaultWidth int `json:"default_width,omitempty"`
 	DefaultHeight int `json:"default_height,omitempty"`
 }

@@ -1,28 +1,50 @@
 package server
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 )
 
 // setupHTTPRoutes configures all HTTP handlers
 func (s *QNTXServer) setupHTTPRoutes() {
-	// wrap applies CORS + auth middleware. When auth is disabled, identical to corsMiddleware.
-	// Resolved at registration time — zero per-request branching.
-	wrap := s.corsMiddleware
+	// wrap applies CORS + rate limit + auth middleware for API routes.
+	// When auth is disabled, rate limiting still applies.
+	// Chain: cors → rateLimit(read/write) → auth → handler
+	wrap := func(handler http.HandlerFunc) http.HandlerFunc {
+		return s.corsMiddleware(s.rateLimitMiddleware(handler))
+	}
 	if s.authEnabled {
 		inner := s.authHandler.Middleware
 		wrap = func(handler http.HandlerFunc) http.HandlerFunc {
-			return s.corsMiddleware(inner(handler))
+			return s.corsMiddleware(s.rateLimitMiddleware(inner(handler)))
 		}
-		// Register auth routes (CORS only, no auth middleware)
+		// Register auth routes (rate limited via authCorsWrap composed in init.go)
 		s.authHandler.RegisterRoutes()
 	}
 
+	// wrapWS applies CORS + WS rate limit + auth for WebSocket upgrades.
+	wrapWS := func(handler http.HandlerFunc) http.HandlerFunc {
+		return s.corsMiddleware(s.rateLimitWSMiddleware(handler))
+	}
+	if s.authEnabled {
+		inner := s.authHandler.Middleware
+		wrapWS = func(handler http.HandlerFunc) http.HandlerFunc {
+			return s.corsMiddleware(s.rateLimitWSMiddleware(inner(handler)))
+		}
+	}
+
+	// wrapPublic applies public rate limit + CORS (no auth).
+	wrapPublic := func(handler http.HandlerFunc) http.HandlerFunc {
+		return s.rateLimitPublicMiddleware(s.corsMiddleware(handler))
+	}
+
 	// Node DID document (public, no auth)
-	http.HandleFunc("/.well-known/did.json", s.corsMiddleware(s.nodeDID.HandleDIDDocument))
+	http.HandleFunc("/.well-known/did.json", wrapPublic(s.nodeDID.HandleDIDDocument))
 
 	// Register plugin routes with dynamic handler that waits for plugins to load
 	// This allows routes to be registered immediately while plugins load asynchronously
@@ -43,37 +65,22 @@ func (s *QNTXServer) setupHTTPRoutes() {
 		}
 	}
 
-	// Register WebSocket handlers for loaded plugins
-	// These are registered separately as they don't go through the same routing
+	// Register WebSocket routes for plugins (same lazy pattern as HTTP routes above).
+	// Plugins load asynchronously, so we register /ws/<name> from pre-registered names
+	// and resolve the actual handler when the connection arrives.
 	if s.pluginRegistry != nil {
-		for _, name := range s.pluginRegistry.List() {
-			plugin, ok := s.pluginRegistry.Get(name)
-			if !ok {
-				continue
-			}
-
-			// Register WebSocket handlers
-			wsHandlers, err := plugin.RegisterWebSocket()
-			if err != nil {
-				s.logger.Errorw("Failed to register WebSocket handlers for plugin",
-					"plugin", name,
-					"error", err)
-			} else {
-				// Register each WebSocket handler
-				for path, handler := range wsHandlers {
-					// Capture handler in local variable for closure
-					wsHandler := handler
-					http.HandleFunc(path, wrap(wsHandler.ServeWS))
-					s.logger.Infow("Registered WebSocket handler", "plugin", name, "path", path)
-				}
-			}
+		wsHandler := wrapWS(s.handlePluginWebSocket)
+		for _, name := range s.pluginRegistry.ListEnabled() {
+			pattern := "/ws/" + name
+			http.HandleFunc(pattern, wsHandler)
+			s.logger.Infow("Registered WebSocket route", "plugin", name, "path", pattern)
 		}
 	}
 
 	// Core QNTX handlers
-	http.HandleFunc("/ws", wrap(s.HandleWebSocket))              // Custom WebSocket protocol (graph updates, logs, etc.)
-	http.HandleFunc("/lsp", wrap(s.HandleGLSPWebSocket))         // ATS LSP protocol (completions, hover, semantic tokens)
-	http.HandleFunc("/health", s.corsMiddleware(s.HandleHealth)) // Health check always public
+	http.HandleFunc("/ws", wrapWS(s.HandleWebSocket))      // Custom WebSocket protocol (graph updates, logs, etc.)
+	http.HandleFunc("/lsp", wrapWS(s.HandleGLSPWebSocket)) // ATS LSP protocol (completions, hover, semantic tokens)
+	http.HandleFunc("/health", wrapPublic(s.HandleHealth)) // Health check always public
 	http.HandleFunc("/logs/download", wrap(s.HandleLogDownload))
 	http.HandleFunc("/api/timeseries/usage", wrap(s.HandleUsageTimeSeries))
 	http.HandleFunc("/api/config", wrap(s.HandleConfig))
@@ -94,10 +101,11 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/plugins", wrap(s.HandlePlugins))                                          // List installed plugins (GET)
 	http.HandleFunc("/api/types/", wrap(s.HandleTypes))                                             // Get specific type (GET /api/types/{typename})
 	http.HandleFunc("/api/types", wrap(s.HandleTypes))                                              // List/create types (GET/POST)
-	http.HandleFunc("/api/watchers/queue/stats", wrap(s.HandleWatcherQueueStats))                    // Watcher execution queue stats (GET)
+	http.HandleFunc("/api/watchers/queue/stats", wrap(s.HandleWatcherQueueStats))                   // Watcher execution queue stats (GET)
 	http.HandleFunc("/api/watchers/", wrap(s.HandleWatchers))                                       // Watcher CRUD (GET/PUT/DELETE /api/watchers/{id})
 	http.HandleFunc("/api/watchers", wrap(s.HandleWatchers))                                        // List/create watchers (GET/POST)
 	http.HandleFunc("/api/attestations", wrap(s.HandleCreateAttestation))                           // Sync browser-created attestations (POST)
+	http.HandleFunc("/api/glyph-config", wrap(s.HandleGlyphConfig))                                 // Plugin glyph config via attestations (GET/POST)
 	http.HandleFunc("/api/canvas/glyphs/", wrap(s.canvasHandler.HandleGlyphs))                      // Glyph CRUD (GET/POST/DELETE /api/canvas/glyphs/{id})
 	http.HandleFunc("/api/canvas/glyphs", wrap(s.canvasHandler.HandleGlyphs))                       // List/create glyphs (GET/POST)
 	http.HandleFunc("/api/canvas/compositions/", wrap(s.canvasHandler.HandleCompositions))          // Composition CRUD (GET/POST/DELETE /api/canvas/compositions/{id})
@@ -105,6 +113,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/canvas/minimized-windows/", wrap(s.canvasHandler.HandleMinimizedWindows)) // Minimized window CRUD (DELETE /api/canvas/minimized-windows/{id})
 	http.HandleFunc("/api/canvas/minimized-windows", wrap(s.canvasHandler.HandleMinimizedWindows))  // List/add minimized windows (GET/POST)
 	http.HandleFunc("/api/canvas/export-dom", wrap(s.canvasHandler.HandleExportDOM))                // Export rendered DOM (POST /api/canvas/export-dom, demo mode only)
+	http.HandleFunc("/api/canvas/export", wrap(s.canvasHandler.HandleExportStatic))                 // Export canvas via server-side rendering (GET /api/canvas/export?canvas_id={id})
 	http.HandleFunc("/api/files/", wrap(s.HandleFiles))                                             // Serve stored file (GET /api/files/{id})
 	http.HandleFunc("/api/files", wrap(s.HandleFiles))                                              // Upload file (POST)
 	http.HandleFunc("/api/search/semantic", wrap(s.HandleSemanticSearch))                           // Semantic search (GET)
@@ -117,10 +126,14 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/embeddings/info", wrap(s.HandleEmbeddingInfo))                            // Embedding service status (GET)
 	http.HandleFunc("/api/embeddings/project", wrap(s.HandleEmbeddingProject))                      // UMAP projection (POST)
 	http.HandleFunc("/api/embeddings/projections", wrap(s.HandleEmbeddingProjections))              // Get 2D projections (GET)
-	http.HandleFunc("/ws/sync", wrap(s.HandleSyncWebSocket))                                        // Sync peer WebSocket (incoming reconciliation)
-	http.HandleFunc("/api/sync/status", wrap(s.HandleSyncStatus))                                   // Sync tree status (GET)
-	http.HandleFunc("/api/sync", wrap(s.HandleSync))                                                // Initiate sync with peer (POST)
-	http.HandleFunc("/", wrap(s.HandleStatic))
+	// Sync routes are only registered when sync is enabled (loopback bind only).
+	// See https://github.com/teranos/QNTX/issues/643
+	if s.syncTree != nil {
+		http.HandleFunc("/ws/sync", wrapWS(s.HandleSyncWebSocket))    // Sync peer WebSocket (incoming reconciliation)
+		http.HandleFunc("/api/sync/status", wrap(s.HandleSyncStatus)) // Sync tree status (GET)
+		http.HandleFunc("/api/sync", wrap(s.HandleSync))              // Initiate sync with peer (POST)
+	}
+	http.HandleFunc("/", wrapPublic(s.HandleStatic))
 }
 
 // corsMiddleware adds CORS headers to HTTP responses using configured allowed origins
@@ -236,11 +249,25 @@ func (s *QNTXServer) handlePluginRequest(w http.ResponseWriter, r *http.Request)
 		strippedPath = "/"
 	}
 
+	// Read body once — Clone() does not preserve it, and the fallback path also needs it.
+	var bodyBytes []byte
+	if r.Body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to read request body: %v", err), http.StatusBadRequest)
+			return
+		}
+		r.Body.Close()
+	}
+
 	// Try stripped path first (modern approach)
 	recorder := &responseRecorder{ResponseWriter: w, statusCode: http.StatusOK}
 	newReq := r.Clone(r.Context())
 	newReq.URL.Path = strippedPath
 	newReq.RequestURI = strippedPath
+	newReq.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+	newReq.ContentLength = int64(len(bodyBytes))
 	mux.ServeHTTP(recorder, newReq)
 
 	// If 404, try full path (backward compat for plugins that include prefix)
@@ -249,12 +276,59 @@ func (s *QNTXServer) handlePluginRequest(w http.ResponseWriter, r *http.Request)
 			"plugin", pluginName,
 			"stripped", strippedPath,
 			"full", path)
+		r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		r.ContentLength = int64(len(bodyBytes))
 		mux.ServeHTTP(w, r)
 		return
 	}
 
 	// Write buffered response
 	recorder.flush()
+}
+
+// handlePluginWebSocket proxies WebSocket connections to the plugin's handler.
+// Like handlePluginRequest, it waits for the plugin to be ready (async loading).
+func (s *QNTXServer) handlePluginWebSocket(w http.ResponseWriter, r *http.Request) {
+	// Extract plugin name from /ws/<name>
+	pluginName := strings.TrimPrefix(r.URL.Path, "/ws/")
+
+	// Wait for plugin to be ready (polls briefly since plugins load async)
+	if s.pluginRegistry == nil {
+		http.Error(w, "Plugin registry not available", http.StatusServiceUnavailable)
+		return
+	}
+	if !s.pluginRegistry.IsReady(pluginName) {
+		// Give async loading a moment to finish
+		deadline := time.Now().Add(5 * time.Second)
+		for time.Now().Before(deadline) && !s.pluginRegistry.IsReady(pluginName) {
+			time.Sleep(100 * time.Millisecond)
+		}
+		if !s.pluginRegistry.IsReady(pluginName) {
+			http.Error(w, fmt.Sprintf("Plugin '%s' is still loading", pluginName), http.StatusServiceUnavailable)
+			return
+		}
+	}
+
+	p, ok := s.pluginRegistry.Get(pluginName)
+	if !ok {
+		http.Error(w, fmt.Sprintf("Plugin '%s' not found", pluginName), http.StatusNotFound)
+		return
+	}
+
+	wsHandlers, err := p.RegisterWebSocket()
+	if err != nil {
+		s.logger.Errorw("Failed to get WebSocket handlers", "plugin", pluginName, "error", err)
+		http.Error(w, fmt.Sprintf("Plugin '%s' WebSocket error: %v", pluginName, err), http.StatusInternalServerError)
+		return
+	}
+
+	handler, ok := wsHandlers["/ws/"+pluginName]
+	if !ok {
+		http.Error(w, fmt.Sprintf("Plugin '%s' has no WebSocket handler at /ws/%s", pluginName, pluginName), http.StatusNotFound)
+		return
+	}
+
+	handler.ServeWS(w, r)
 }
 
 // responseRecorder captures response to detect 404s

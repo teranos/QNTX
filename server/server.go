@@ -36,6 +36,7 @@ import (
 type QNTXServer struct {
 	db                  *sql.DB
 	dbPath              string           // Database file path (for display in banner)
+	bindAddress         string           // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
 	authHandler         *auth.Handler    // nil when auth.enabled = false
 	authEnabled         bool             // resolved at init, never changes
 	nodeDID             *nodedid.Handler // node's decentralized identity
@@ -85,6 +86,13 @@ type QNTXServer struct {
 	wg             sync.WaitGroup     // Tracks active goroutines for clean shutdown
 	broadcastDrops atomic.Int64       // Tracks dropped broadcasts for monitoring
 	state          atomic.Int32       // Opening/Closing Phase 4: Server state (Running/Draining/Stopped)
+
+	// Per-IP rate limiting groups
+	rlAuth   *rateLimitGroup
+	rlWS     *rateLimitGroup
+	rlWrite  *rateLimitGroup
+	rlRead   *rateLimitGroup
+	rlPublic *rateLimitGroup
 
 	// Watcher engine for reactive attestation triggers
 	watcherEngine   *watcher.Engine

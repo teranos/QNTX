@@ -9,6 +9,7 @@
 | GET | `/api/attestations` | HandleCreateAttestation |
 | GET | `/api/canvas/compositions` | canvasHandler.HandleCompositions |
 | GET | `/api/canvas/compositions/` | canvasHandler.HandleCompositions |
+| GET | `/api/canvas/export` | canvasHandler.HandleExportStatic |
 | GET | `/api/canvas/export-dom` | canvasHandler.HandleExportDOM |
 | GET | `/api/canvas/glyphs` | canvasHandler.HandleGlyphs |
 | GET | `/api/canvas/glyphs/` | canvasHandler.HandleGlyphs |
@@ -25,6 +26,7 @@
 | GET | `/api/embeddings/projections` | HandleEmbeddingProjections |
 | GET | `/api/files` | HandleFiles |
 | GET | `/api/files/` | HandleFiles |
+| GET, POST, PATCH | `/api/glyph-config` | HandleGlyphConfig |
 | GET | `/api/search/semantic` | HandleSemanticSearch |
 | GET | `/api/sync` | HandleSync |
 | GET | `/api/sync/status` | HandleSyncStatus |
@@ -60,6 +62,12 @@ POST /api/attestations — idempotent (returns 200 if already exists).
 ### `GET` /api/canvas/compositions/
 
 **Handler**: `canvasHandler.HandleCompositions`
+
+---
+
+### `GET` /api/canvas/export
+
+**Handler**: `canvasHandler.HandleExportStatic`
 
 ---
 
@@ -186,6 +194,14 @@ HandleEmbeddingProjections serves 2D projections (GET /api/embeddings/projection
 HandleFiles routes file upload and serve requests.
 
 **Handler**: `HandleFiles`
+
+---
+
+### `GET | POST | PATCH` /api/glyph-config
+
+HandleGlyphConfig handles plugin glyph configuration via attestations.
+
+**Handler**: `HandleGlyphConfig`
 
 ---
 

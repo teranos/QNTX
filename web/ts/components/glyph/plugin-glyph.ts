@@ -37,16 +37,9 @@ export async function createPluginGlyph(
         logLabel: 'PluginGlyph',
     });
 
-    // Custom title bar (attestation glyph style)
+    // Custom title bar
     const titleBar = document.createElement('div');
-    titleBar.className = 'canvas-glyph-title-bar';
-    titleBar.style.height = 'auto';
-    titleBar.style.minHeight = '0';
-    titleBar.style.padding = '3px 8px';
-    titleBar.style.backgroundColor = '#10161d';
-    titleBar.style.display = 'flex';
-    titleBar.style.alignItems = 'baseline';
-    titleBar.style.gap = '6px';
+    titleBar.className = 'glyph-title-bar glyph-title-bar--auto';
 
     const symbol = document.createElement('span');
     symbol.textContent = def.symbol;
@@ -204,15 +197,7 @@ export function createPluginPlaceholderGlyph(
 
     // Custom title bar (same style as working plugin glyph)
     const titleBar = document.createElement('div');
-    titleBar.className = 'canvas-glyph-title-bar';
-    titleBar.style.height = 'auto';
-    titleBar.style.minHeight = '0';
-    titleBar.style.padding = '3px 8px';
-    titleBar.style.backgroundColor = '#10161d';
-    titleBar.style.display = 'flex';
-    titleBar.style.alignItems = 'baseline';
-    titleBar.style.gap = '6px';
-    titleBar.style.cursor = 'move';
+    titleBar.className = 'glyph-title-bar glyph-title-bar--auto';
 
     const symbol = document.createElement('span');
     symbol.textContent = glyph.symbol ?? '?';

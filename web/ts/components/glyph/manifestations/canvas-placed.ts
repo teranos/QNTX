@@ -76,7 +76,7 @@ export function canvasPlaced(config: CanvasPlacedConfig): CanvasPlacedResult {
     let titleBar: HTMLElement | null = null;
     if (config.titleBar) {
         titleBar = document.createElement('div');
-        titleBar.className = 'canvas-glyph-title-bar';
+        titleBar.className = 'glyph-title-bar';
 
         const label = document.createElement('span');
         label.textContent = config.titleBar.label;

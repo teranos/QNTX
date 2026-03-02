@@ -12,19 +12,19 @@
  */
 
 import { log, SEG } from '../../../logger';
-import { stripHtml } from '../../../html-utils';
 import type { Glyph } from '../glyph';
+import { addWindowControls } from './title-bar-controls';
+import { stashContent } from './stash';
+import { renderGlyphContent } from './render-content';
 import {
     setWindowState,
-    hasProximityText,
-    setProximityText,
     setGlyphId
 } from '../dataset';
+import { prepareMorphTo, calculateTrayTarget, resetGlyphElement } from './morphology';
 import { beginMaximizeMorph, beginMinimizeMorph } from '../morph-transaction';
 import {
     getMaximizeDuration,
     getMinimizeDuration,
-    CANVAS_GLYPH_CONTENT_PADDING,
     PANEL_Z_INDEX
 } from '../glyph';
 
@@ -57,17 +57,8 @@ export function morphToPanel(
     onRemove: (id: string) => void,
     onMinimize: (element: HTMLElement, glyph: Glyph) => void
 ): void {
-    // AXIOM CHECK: Verify this is the correct element
-    verifyElement(glyph.id, glyphElement);
+    const glyphRect = prepareMorphTo(glyphElement, glyph, verifyElement, 'glyph-morphing-to-panel', PANEL_Z_INDEX);
 
-    const elements = document.querySelectorAll(`[data-glyph-id="${glyph.id}"]`);
-    if (elements.length !== 1) {
-        throw new Error(
-            `AXIOM VIOLATION: Expected exactly 1 element for ${glyph.id}, found ${elements.length}`
-        );
-    }
-
-    const glyphRect = glyphElement.getBoundingClientRect();
     const direction = detectSlideDirection();
 
     // Panel dimensions: full viewport width, 70% height
@@ -77,21 +68,6 @@ export function morphToPanel(
     // Target position based on slide direction
     const targetX = 0;
     const targetY = direction === 'from-top' ? 0 : window.innerHeight - panelHeight;
-
-    // THE GLYPH ITSELF BECOMES THE PANEL - NO CLONING
-    glyphElement.remove();
-
-    if (hasProximityText(glyphElement)) {
-        glyphElement.textContent = '';
-        setProximityText(glyphElement, false);
-    }
-
-    glyphElement.className = 'glyph-morphing-to-panel';
-    glyphElement.style.position = 'fixed';
-    glyphElement.style.zIndex = PANEL_Z_INDEX; // Above system drawer (10002)
-
-    document.body.appendChild(glyphElement);
-    setWindowState(glyphElement, true);
 
     // Create overlay
     const overlay = document.createElement('div');
@@ -137,32 +113,13 @@ export function morphToPanel(
         glyphElement.style.height = `${panelHeight}px`;
         glyphElement.style.zIndex = PANEL_Z_INDEX;
 
-        // Title bar
-        const titleBar = document.createElement('div');
-        titleBar.className = 'window-title-bar';
-        titleBar.style.cursor = 'default'; // Not draggable
+        // Restore stashed content or render fresh (shared with window.ts)
+        const { titleBar } = renderGlyphContent(glyphElement, glyph, 'Panel');
 
-        const titleText = document.createElement('span');
-        titleText.textContent = stripHtml(glyph.title);
-        titleBar.appendChild(titleText);
-
-        // Minimize button
-        const minimizeBtn = document.createElement('button');
-        minimizeBtn.textContent = '\u2212';
-        minimizeBtn.onclick = () => morphFromPanel(
-            glyphElement,
-            glyph,
-            verifyElement,
-            onMinimize
-        );
-        titleBar.appendChild(minimizeBtn);
-
-        // Close button if glyph has onClose
-        if (glyph.onClose) {
-            const closeBtn = document.createElement('button');
-            closeBtn.textContent = '\u00d7';
-            closeBtn.onclick = () => {
-                // Clean up overlay and escape handler
+        // Add window controls (minimize/close) to the title bar
+        addWindowControls(titleBar, {
+            onMinimize: () => morphFromPanel(glyphElement, glyph, verifyElement, onMinimize),
+            onClose: glyph.onClose ? () => {
                 removeOverlay(glyph.id);
                 const handler = escapeHandlers.get(glyphElement);
                 if (handler) {
@@ -174,33 +131,8 @@ export function morphToPanel(
                 try { glyph.onClose!(); } catch (error) {
                     log.error(SEG.GLYPH, `[Panel ${glyph.id}] Error in onClose:`, error);
                 }
-            };
-            titleBar.appendChild(closeBtn);
-        }
-
-        glyphElement.appendChild(titleBar);
-
-        // Content area
-        try {
-            const content = glyph.renderContent();
-            content.style.padding = `${CANVAS_GLYPH_CONTENT_PADDING}px`;
-            content.style.flex = '1';
-            content.style.overflow = 'auto';
-            glyphElement.appendChild(content);
-        } catch (error) {
-            log.error(SEG.GLYPH, `[Panel ${glyph.id}] Error rendering content:`, error);
-            const errorContent = document.createElement('div');
-            errorContent.style.padding = '8px';
-            errorContent.style.flex = '1';
-            errorContent.style.overflow = 'auto';
-            errorContent.style.color = 'var(--color-error)';
-            errorContent.style.fontFamily = 'var(--font-mono)';
-            errorContent.innerHTML = `
-                <div style="margin-bottom: 8px; font-weight: bold;">Error rendering content</div>
-                <div style="opacity: 0.8; font-size: 12px;">${error instanceof Error ? error.message : String(error)}</div>
-            `;
-            glyphElement.appendChild(errorContent);
-        }
+            } : undefined,
+        });
     }).catch(error => {
         log.warn(SEG.GLYPH, `[Panel] Animation failed for ${glyph.id}:`, error);
         removeOverlay(glyph.id);
@@ -247,30 +179,15 @@ export function morphFromPanel(
     // Fade out overlay
     removeOverlay(glyph.id);
 
-    // Clear content
-    panelElement.innerHTML = '';
+    // Stash content (strips window controls, preserves glyph identity off-DOM)
+    stashContent(panelElement);
 
-    // Calculate target position (tray dot)
-    const trayElement = document.querySelector('.glyph-run');
-    let targetX = window.innerWidth - 50;
-    let targetY = window.innerHeight / 2;
-    if (trayElement) {
-        const trayRect = trayElement.getBoundingClientRect();
-        targetX = trayRect.right - 20;
-        targetY = trayRect.top + trayRect.height / 2;
-    }
+    const trayTarget = calculateTrayTarget();
 
-    beginMinimizeMorph(panelElement, currentRect, { x: targetX, y: targetY }, getMinimizeDuration())
+    beginMinimizeMorph(panelElement, currentRect, trayTarget, getMinimizeDuration())
         .then(() => {
-            log.debug(SEG.GLYPH, `[Panel] Animation complete for ${glyph.id}`);
             minimizing.delete(panelElement);
-            setWindowState(panelElement, false);
-            setProximityText(panelElement, false);
-            panelElement.remove();
-            panelElement.style.cssText = '';
-            panelElement.className = 'glyph-run-glyph';
-            setGlyphId(panelElement, glyph.id);
-            onMorphComplete(panelElement, glyph);
+            resetGlyphElement(panelElement, glyph, 'Panel', onMorphComplete);
         })
         .catch(error => {
             log.warn(SEG.GLYPH, `[Panel] Animation failed for ${glyph.id}:`, error);
