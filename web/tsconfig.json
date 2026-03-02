@@ -16,7 +16,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./ts/*"],
-      "@generated/*": ["../types/generated/typescript/*"]
+      "@generated/*": ["../types/generated/typescript/*"],
+      "@qntx/glyphs": ["../packages/glyphs/index.ts"]
     },
 
     // Full strict mode
@@ -35,7 +36,8 @@
     "ts/**/*.ts",
     "ts/**/*.js",
     "types/**/*.ts",
-    "types/**/*.d.ts"
+    "types/**/*.d.ts",
+    "../packages/glyphs/**/*.ts"
   ],
   "exclude": [
     "node_modules",

@@ -1,6 +1,18 @@
 # TypeScript Plugin Support
 
+**Status:** ✅ Implemented (2026-02-26)
+
 **Goal:** Enable TypeScript as a third plugin language alongside Go and Python, allowing shared code between client and server for canvas rendering and other use cases.
+
+## Implementation Status
+
+- ✅ **Phase 1 Complete:** TypeScript plugin runtime via Bun subprocess with gRPC
+- ✅ **Phase 2 Complete:** Canvas renderer plugin with server-side DOM (happy-dom)
+- 🟡 **Phase 3 Partial:** Export integration functional, publish and quality improvements deferred
+
+**Supported Plugin Languages:** Go (native), Python (subprocess), TypeScript (Bun subprocess)
+
+See `docs/plans/CANVAS-EXPORT-PLAN.md` for detailed implementation notes and known limitations.
 
 ## Motivation
 

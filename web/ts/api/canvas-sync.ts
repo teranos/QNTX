@@ -201,13 +201,11 @@ class CanvasSyncQueueImpl {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                id: glyph.id,
-                symbol: glyph.symbol,
+                ...glyph,
                 x: Math.round(glyph.x),
                 y: Math.round(glyph.y),
                 width: glyph.width != null ? Math.round(glyph.width) : undefined,
                 height: glyph.height != null ? Math.round(glyph.height) : undefined,
-                content: glyph.content,
             }),
         });
 
