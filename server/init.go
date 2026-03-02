@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -174,6 +176,9 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		)
 	}
 
+	// Initialize per-IP rate limiters from config
+	rl := deps.config.Server.RateLimit
+
 	// Create server instance (before ticker so we can pass it as broadcaster)
 	server := &QNTXServer{
 		db:            db,
@@ -196,6 +201,11 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		wsCore:        wsCore,
 		consoleBuffer: consoleBuffer, // Browser console log buffer with terminal printing
 		initialQuery:  query,
+		rlAuth:        newRateLimitGroup(rl.AuthRate, rl.AuthBurst),
+		rlWS:          newRateLimitGroup(rl.WSRate, rl.WSBurst),
+		rlWrite:       newRateLimitGroup(rl.WriteRate, rl.WriteBurst),
+		rlRead:        newRateLimitGroup(rl.ReadRate, rl.ReadBurst),
+		rlPublic:      newRateLimitGroup(rl.PublicRate, rl.PublicBurst),
 		ctx:           ctx,
 		cancel:        cancel,
 	}
@@ -215,7 +225,12 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		if deps.config.Server.Port != nil {
 			serverPort = *deps.config.Server.Port
 		}
-		authHandler, err := auth.New(db, serverPort, deps.config.Server.FrontendPort, deps.config.Auth.SessionExpiryHours, serverLogger, server.corsMiddleware)
+		// Auth routes: rate limit BEFORE CORS so brute-force attempts are rejected early.
+		// CORS still runs first for OPTIONS preflight (corsMiddleware short-circuits OPTIONS with 200).
+		authCorsWrap := func(handler http.HandlerFunc) http.HandlerFunc {
+			return server.rateLimitAuthMiddleware(server.corsMiddleware(handler))
+		}
+		authHandler, err := auth.New(db, serverPort, deps.config.Server.FrontendPort, deps.config.Auth.SessionExpiryHours, serverLogger, authCorsWrap)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to initialize WebAuthn auth")
 		}
@@ -259,7 +274,8 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		// Start gRPC services for plugins (Issue #138)
 		// These services allow plugins to call back to QNTX core
 		servicesManager := grpcplugin.NewServicesManager(serverLogger)
-		endpoints, err := servicesManager.Start(ctx, store, queue, scheduleStore)
+		filesDir := filepath.Join(filepath.Dir(dbPath), "files")
+		endpoints, err := servicesManager.Start(ctx, store, queue, scheduleStore, filesDir)
 		if err != nil {
 			serverLogger.Warnw("Failed to start plugin services, plugins will not have service access", "error", err)
 			endpoints = nil
@@ -268,6 +284,7 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 				"ats_store", endpoints.ATSStoreAddress,
 				"queue", endpoints.QueueAddress,
 				"schedule", endpoints.ScheduleAddress,
+				"file_service", endpoints.FileServiceAddress,
 			)
 		}
 
@@ -375,16 +392,25 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		}
 	}
 
-	// Initialize sync tree and observer for content-addressed attestation sync
-	setupSync(server, db, serverLogger)
+	// Initialize sync tree and observer for content-addressed attestation sync.
+	// Sync is disabled on non-loopback bind because the /ws/sync endpoint has no
+	// peer authentication. See https://github.com/teranos/QNTX/issues/643
+	if appcfg.IsLoopbackAddress(bindAddr) {
+		setupSync(server, db, serverLogger)
 
-	// Start periodic sync with configured peers
-	if deps.config.Sync.IntervalSeconds > 0 && server.syncTree != nil {
-		server.wg.Add(1)
-		go func() {
-			defer server.wg.Done()
-			server.startSyncTicker(ctx, time.Duration(deps.config.Sync.IntervalSeconds)*time.Second)
-		}()
+		// Start periodic sync with configured peers
+		if deps.config.Sync.IntervalSeconds > 0 && server.syncTree != nil {
+			server.wg.Add(1)
+			go func() {
+				defer server.wg.Done()
+				server.startSyncTicker(ctx, time.Duration(deps.config.Sync.IntervalSeconds)*time.Second)
+			}()
+		}
+	} else {
+		serverLogger.Infow("Sync disabled on non-loopback bind (no peer authentication)",
+			"bind_address", bindAddr,
+			"issue", "https://github.com/teranos/QNTX/issues/643",
+		)
 	}
 
 	// Set up config file watcher for auto-reload
@@ -682,6 +708,8 @@ func (c *pluginConfigWithEndpoints) GetString(key string) string {
 			return c.endpoints.QueueAddress
 		case "_schedule_endpoint":
 			return c.endpoints.ScheduleAddress
+		case "_file_service_endpoint":
+			return c.endpoints.FileServiceAddress
 		case "_auth_token":
 			return c.endpoints.AuthToken
 		}
@@ -711,6 +739,8 @@ func (c *pluginConfigWithEndpoints) Get(key string) interface{} {
 			return c.endpoints.QueueAddress
 		case "_schedule_endpoint":
 			return c.endpoints.ScheduleAddress
+		case "_file_service_endpoint":
+			return c.endpoints.FileServiceAddress
 		case "_auth_token":
 			return c.endpoints.AuthToken
 		}

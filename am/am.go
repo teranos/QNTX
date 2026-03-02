@@ -8,7 +8,6 @@ type Config struct {
 	Pulse          PulseConfig          `mapstructure:"pulse"`
 	Code           CodeConfig           `mapstructure:"code"`
 	LocalInference LocalInferenceConfig `mapstructure:"local_inference"`
-	OpenRouter     OpenRouterConfig     `mapstructure:"openrouter"`
 	Ax             AxConfig             `mapstructure:"ax"`
 	Plugin         PluginConfig         `mapstructure:"plugin"`
 	Embeddings     EmbeddingsConfig     `mapstructure:"embeddings"`
@@ -50,11 +49,26 @@ type BoundedStorageConfig struct {
 
 // ServerConfig configures the QNTX web server
 type ServerConfig struct {
-	Port           *int     `mapstructure:"port"`          // Server port: nil = default 877, 0 is invalid (omit for default)
-	BindAddress    string   `mapstructure:"bind_address"`  // Network interface to bind: "127.0.0.1" (default, local only) or "0.0.0.0" (all interfaces)
-	FrontendPort   int      `mapstructure:"frontend_port"` // Frontend dev server port (default: 8820)
-	AllowedOrigins []string `mapstructure:"allowed_origins"`
-	LogTheme       string   `mapstructure:"log_theme"` // Color theme: gruvbox, everforest
+	Port           *int            `mapstructure:"port"`          // Server port: nil = default 877, 0 is invalid (omit for default)
+	BindAddress    string          `mapstructure:"bind_address"`  // Network interface to bind: "127.0.0.1" (default, local only) or "0.0.0.0" (all interfaces)
+	FrontendPort   int             `mapstructure:"frontend_port"` // Frontend dev server port (default: 8820)
+	AllowedOrigins []string        `mapstructure:"allowed_origins"`
+	LogTheme       string          `mapstructure:"log_theme"`  // Color theme: gruvbox, everforest
+	RateLimit      RateLimitConfig `mapstructure:"rate_limit"` // Per-IP rate limiting
+}
+
+// RateLimitConfig configures per-IP token bucket rate limits.
+type RateLimitConfig struct {
+	AuthRate    float64 `mapstructure:"auth_rate"`    // /auth/* requests per second (default: 2)
+	AuthBurst   int     `mapstructure:"auth_burst"`   // /auth/* burst capacity (default: 5)
+	WSRate      float64 `mapstructure:"ws_rate"`      // WebSocket upgrades per second (default: 2)
+	WSBurst     int     `mapstructure:"ws_burst"`     // WebSocket burst capacity (default: 10)
+	WriteRate   float64 `mapstructure:"write_rate"`   // POST/PUT/DELETE per second (default: 20)
+	WriteBurst  int     `mapstructure:"write_burst"`  // Write burst capacity (default: 40)
+	ReadRate    float64 `mapstructure:"read_rate"`    // GET per second (default: 60)
+	ReadBurst   int     `mapstructure:"read_burst"`   // Read burst capacity (default: 120)
+	PublicRate  float64 `mapstructure:"public_rate"`  // /health, static per second (default: 10)
+	PublicBurst int     `mapstructure:"public_burst"` // Public burst capacity (default: 20)
 }
 
 // Server port constants
@@ -111,14 +125,6 @@ type LocalInferenceConfig struct {
 	TimeoutSeconds int    `mapstructure:"timeout_seconds"` // Request timeout in seconds
 	ContextSize    *int   `mapstructure:"context_size"`    // Context window size (nil = model default, e.g., 16384, 32768)
 	ONNXModelPath  string `mapstructure:"onnx_model_path"` // Path to ONNX model for vidstream (default: ats/vidstream/models/yolo11n.onnx)
-}
-
-// OpenRouterConfig configures OpenRouter.ai API access
-type OpenRouterConfig struct {
-	APIKey      string   `mapstructure:"api_key"`     // OpenRouter API key
-	Model       string   `mapstructure:"model"`       // Default model (e.g., "openai/gpt-4o-mini")
-	Temperature *float64 `mapstructure:"temperature"` // Sampling temperature (nil = default 0.2)
-	MaxTokens   *int     `mapstructure:"max_tokens"`  // Maximum tokens per request (nil = default 1000)
 }
 
 // AxConfig configures the attestation query system
