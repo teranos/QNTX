@@ -402,6 +402,7 @@ export interface PromptDirectRequest {
 
 export interface PromptDirectResponse {
   response: string;
+  model?: string;
   attestation_id?: string;
   /**
    * Full attestation with signature

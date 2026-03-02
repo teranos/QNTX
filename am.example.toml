@@ -61,6 +61,19 @@ allowed_origins = [
 # Default: "everforest"
 log_theme = "everforest"
 
+# [server.rate_limit]
+# Per-IP token bucket limits.
+# auth_rate = 2        # /auth/* requests per second
+# auth_burst = 5
+# ws_rate = 2          # WebSocket upgrades per second
+# ws_burst = 10
+# write_rate = 20      # POST/PUT/DELETE per second
+# write_burst = 40
+# read_rate = 60       # GET per second
+# read_burst = 120
+# public_rate = 10     # /health, static per second
+# public_burst = 20
+
 # ════════════════════════════════════════════════════════════════
 # Pulse Configuration (Async Job System)
 # ════════════════════════════════════════════════════════════════

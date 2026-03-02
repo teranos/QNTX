@@ -44,6 +44,13 @@ type ScheduleService interface {
 	Get(scheduleID string) (*schedule.Job, error)
 }
 
+// FileService provides file access for plugins.
+// Plugins use this to read files stored on the core server's filesystem.
+type FileService interface {
+	// ReadFileBase64 reads a stored file and returns its MIME type and base64-encoded content.
+	ReadFileBase64(fileID string) (mimeType, base64Data string, err error)
+}
+
 // ServiceRegistry provides access to QNTX core services for domain plugins.
 // Plugins use this registry to look up services they need.
 type ServiceRegistry interface {
@@ -64,6 +71,9 @@ type ServiceRegistry interface {
 
 	// Schedule returns the Pulse schedule management service
 	Schedule() ScheduleService
+
+	// FileService returns the file storage service for reading uploaded files
+	FileService() FileService
 }
 
 // Config provides access to plugin configuration
@@ -156,5 +166,10 @@ func (r *DefaultServiceRegistry) Queue() QueueService {
 
 // Schedule returns nil for in-process plugins (runtime schedules are a gRPC feature).
 func (r *DefaultServiceRegistry) Schedule() ScheduleService {
+	return nil
+}
+
+// FileService returns nil for in-process plugins (they share the filesystem with core).
+func (r *DefaultServiceRegistry) FileService() FileService {
 	return nil
 }
