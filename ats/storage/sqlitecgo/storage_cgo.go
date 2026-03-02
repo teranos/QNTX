@@ -261,13 +261,13 @@ func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *type
 	if len(cmd.Predicates) > 0 {
 		predicate = cmd.Predicates[0]
 	}
-	context := "_"
+	ctxStr := "_"
 	if len(cmd.Contexts) > 0 {
-		context = cmd.Contexts[0]
+		ctxStr = cmd.Contexts[0]
 	}
 
 	// Import id package for vanity generation
-	asid, err := id.GenerateASIDWithVanityAndRetry(subject, predicate, context, "", checkExists)
+	asid, err := id.GenerateASIDWithVanityAndRetry(subject, predicate, ctxStr, "", checkExists)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate vanity ASID")
 	}

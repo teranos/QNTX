@@ -8,12 +8,14 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
+	qntxtest "github.com/teranos/QNTX/internal/testing"
+
 	"github.com/teranos/QNTX/ats/types"
 )
 
 // TestNewSymbolIndex_Success tests successful index creation
 func TestNewSymbolIndex_Success(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 
 	idx, err := NewSymbolIndex(db)
 	if err != nil {
@@ -419,7 +421,7 @@ func TestCompletions_Limit(t *testing.T) {
 
 // TestLastUpdate tests LastUpdate tracking
 func TestLastUpdate(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 
 	idx, err := NewSymbolIndex(db)
 	if err != nil {
