@@ -8,9 +8,10 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/db"
 	qntxdisplay "github.com/teranos/QNTX/display"
-	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
@@ -110,11 +111,17 @@ func runIxGit(cmd *cobra.Command, repoInput string, dryRun bool, actor string, v
 		return errors.Wrap(err, "failed to load config")
 	}
 
-	database, err := db.OpenWithMigrations(cfg.Database.Path, logger.Logger)
+	dbPath := cfg.Database.Path
+	database, err := db.OpenWithMigrations(dbPath, logger.Logger)
 	if err != nil {
 		return errors.Wrap(err, "failed to open database")
 	}
 	defer database.Close()
+
+	atsStore, err := storage.NewStore(database, dbPath, logger.Logger)
+	if err != nil {
+		return errors.Wrap(err, "failed to create attestation store")
+	}
 
 	// Resolve repository (handles URLs with auto-clone)
 	if !useJSON && git.IsRepoURL(repoInput) {
@@ -144,7 +151,7 @@ func runIxGit(cmd *cobra.Command, repoInput string, dryRun bool, actor string, v
 	}
 
 	// Synchronous mode (original behavior)
-	return runIxGitSync(cmd, database, repoPath, repoSource.OriginalInput, dryRun, actor, verbosity, noDeps, since, useJSON)
+	return runIxGitSync(cmd, database, atsStore, repoPath, repoSource.OriginalInput, dryRun, actor, verbosity, noDeps, since, useJSON)
 }
 
 // runIxGitAsync creates an async pulse job for git ingestion
@@ -197,7 +204,7 @@ func runIxGitAsync(database *sql.DB, repoSource string, actor string, verbosity 
 }
 
 // runIxGitSync runs git ingestion synchronously (original behavior)
-func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, originalInput string, dryRun bool, actor string, verbosity int, noDeps bool, since string, useJSON bool) error {
+func runIxGitSync(cmd *cobra.Command, database *sql.DB, atsStore ats.AttestationStore, repoPath string, originalInput string, dryRun bool, actor string, verbosity int, noDeps bool, since string, useJSON bool) error {
 
 	if !useJSON {
 		pterm.DefaultHeader.WithFullWidth().Printf("%s Git IX - Attestation Generation", sym.IX)
@@ -220,7 +227,7 @@ func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, origina
 	}
 
 	// Create git processor with global logger
-	processor := git.NewGitIxProcessor(database, dryRun, actor, verbosity, logger.Logger)
+	processor := git.NewGitIxProcessor(atsStore, dryRun, actor, verbosity, logger.Logger)
 
 	// Set incremental filter if --since is provided
 	if since != "" {
@@ -263,8 +270,7 @@ func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, origina
 			spinner, _ = pterm.DefaultSpinner.Start("Detecting and processing project dependencies...")
 		}
 
-		depsStore := storage.NewSQLStore(database, logger.Logger)
-		depsProcessor := git.NewDepsIxProcessor(database, depsStore, repoPath, dryRun, actor, verbosity, logger.Logger)
+		depsProcessor := git.NewDepsIxProcessor(database, atsStore, repoPath, dryRun, actor, verbosity, logger.Logger)
 		depsResult, err = depsProcessor.ProcessProjectFiles()
 
 		if !useJSON && spinner != nil {

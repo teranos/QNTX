@@ -1,5 +1,3 @@
-//go:build cgo && rustsqlite
-
 package storage
 
 import (
@@ -39,7 +37,7 @@ func (s *RustBackedStore) CreateAttestation(as *types.As) error {
 
 	notifyObservers(as)
 
-	bs := NewBoundedStore(s.db, s.log)
+	bs := NewBoundedStore(s.db, nil, s.log)
 	bs.enforceLimits(as)
 
 	return nil
@@ -53,7 +51,7 @@ func (s *RustBackedStore) CreateAttestationInbound(as *types.As) error {
 
 	notifyObservers(as)
 
-	bs := NewBoundedStore(s.db, s.log)
+	bs := NewBoundedStore(s.db, nil, s.log)
 	bs.enforceLimits(as)
 
 	return nil

@@ -59,7 +59,7 @@ func runAxCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	// Open database
-	database, err := openDatabase("")
+	database, _, err := openDatabase("")
 	if err != nil {
 		return errors.Wrap(err, "failed to open database")
 	}
