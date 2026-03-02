@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/internal/httpclient"
+	"github.com/teranos/QNTX/net/httpclient"
 )
 
 // GitHubPR represents a minimal GitHub PR response
