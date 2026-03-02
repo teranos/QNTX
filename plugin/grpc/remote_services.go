@@ -18,17 +18,19 @@ import (
 // gRPC plugins receive this registry with endpoints to connect back to QNTX.
 // Services are accessed via gRPC clients that connect to the endpoints.
 type RemoteServiceRegistry struct {
-	ctx              context.Context // Parent context for cancellation
-	atsStoreEndpoint string
-	queueEndpoint    string
-	scheduleEndpoint string
-	authToken        string
-	config           map[string]string
-	logger           *zap.SugaredLogger
-	atsStoreClient   ats.AttestationStore   // Lazy-initialized gRPC client
-	queueClient      plugin.QueueService    // Lazy-initialized gRPC client
-	scheduleClient   plugin.ScheduleService // Lazy-initialized gRPC client
-	pluginRef        plugin.DomainPlugin    // Reference to plugin for metadata lookup
+	ctx                 context.Context // Parent context for cancellation
+	atsStoreEndpoint    string
+	queueEndpoint       string
+	scheduleEndpoint    string
+	fileServiceEndpoint string
+	authToken           string
+	config              map[string]string
+	logger              *zap.SugaredLogger
+	atsStoreClient      ats.AttestationStore   // Lazy-initialized gRPC client
+	queueClient         plugin.QueueService    // Lazy-initialized gRPC client
+	scheduleClient      plugin.ScheduleService // Lazy-initialized gRPC client
+	fileServiceClient   plugin.FileService     // Lazy-initialized gRPC client
+	pluginRef           plugin.DomainPlugin    // Reference to plugin for metadata lookup
 }
 
 // NewRemoteServiceRegistry creates a new remote service registry.
@@ -40,20 +42,22 @@ func NewRemoteServiceRegistry(
 	atsStoreEndpoint string,
 	queueEndpoint string,
 	scheduleEndpoint string,
+	fileServiceEndpoint string,
 	authToken string,
 	config map[string]string,
 	logger *zap.SugaredLogger,
 	pluginRef plugin.DomainPlugin,
 ) *RemoteServiceRegistry {
 	return &RemoteServiceRegistry{
-		ctx:              context.Background(),
-		atsStoreEndpoint: atsStoreEndpoint,
-		queueEndpoint:    queueEndpoint,
-		scheduleEndpoint: scheduleEndpoint,
-		authToken:        authToken,
-		config:           config,
-		logger:           logger,
-		pluginRef:        pluginRef,
+		ctx:                 context.Background(),
+		atsStoreEndpoint:    atsStoreEndpoint,
+		queueEndpoint:       queueEndpoint,
+		scheduleEndpoint:    scheduleEndpoint,
+		fileServiceEndpoint: fileServiceEndpoint,
+		authToken:           authToken,
+		config:              config,
+		logger:              logger,
+		pluginRef:           pluginRef,
 	}
 }
 
@@ -125,6 +129,20 @@ func (r *RemoteServiceRegistry) Schedule() plugin.ScheduleService {
 		r.scheduleClient = client
 	}
 	return r.scheduleClient
+}
+
+// FileService returns a gRPC client for file operations.
+// The client is lazy-initialized on first access.
+func (r *RemoteServiceRegistry) FileService() plugin.FileService {
+	if r.fileServiceClient == nil && r.fileServiceEndpoint != "" {
+		client, err := NewRemoteFileService(r.ctx, r.fileServiceEndpoint, r.authToken, r.logger)
+		if err != nil {
+			r.logger.Errorw("Failed to create FileService client", "error", err)
+			return nil
+		}
+		r.fileServiceClient = client
+	}
+	return r.fileServiceClient
 }
 
 // remoteConfig provides configuration for remote plugins using viper for parsing.

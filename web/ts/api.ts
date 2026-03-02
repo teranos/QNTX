@@ -7,7 +7,7 @@ import { connectivityManager } from './connectivity';
 /**
  * Get the backend base URL from injected global or current origin
  */
-function getBackendUrl(): string {
+export function getBackendUrl(): string {
     return (window as any).__BACKEND_URL__ || window.location.origin;
 }
 

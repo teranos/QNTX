@@ -218,8 +218,11 @@ type InitializeRequest struct {
 	// schedule_endpoint: gRPC endpoint for ScheduleService
 	// Provides: Runtime schedule creation, pause, resume, delete
 	ScheduleEndpoint string `protobuf:"bytes,5,opt,name=schedule_endpoint,json=scheduleEndpoint,proto3" json:"schedule_endpoint,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// file_service_endpoint: gRPC endpoint for FileService
+	// Provides: Read stored files (for multimodal attachments)
+	FileServiceEndpoint string `protobuf:"bytes,6,opt,name=file_service_endpoint,json=fileServiceEndpoint,proto3" json:"file_service_endpoint,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *InitializeRequest) Reset() {
@@ -283,6 +286,13 @@ func (x *InitializeRequest) GetConfig() map[string]string {
 func (x *InitializeRequest) GetScheduleEndpoint() string {
 	if x != nil {
 		return x.ScheduleEndpoint
+	}
+	return ""
+}
+
+func (x *InitializeRequest) GetFileServiceEndpoint() string {
+	if x != nil {
+		return x.FileServiceEndpoint
 	}
 	return ""
 }
@@ -1198,6 +1208,10 @@ type GlyphDef struct {
 	// DefaultWidth and DefaultHeight in pixels (0 = use system default)
 	DefaultWidth  int32 `protobuf:"varint,6,opt,name=default_width,json=defaultWidth,proto3" json:"default_width,omitempty"`
 	DefaultHeight int32 `protobuf:"varint,7,opt,name=default_height,json=defaultHeight,proto3" json:"default_height,omitempty"`
+	// ModulePath is the HTTP path to a JS/TS module exporting a render function.
+	// When set, the frontend dynamically imports it with SDK injection,
+	// bypassing the server-rendered HTML pipeline.
+	ModulePath    string `protobuf:"bytes,8,opt,name=module_path,json=modulePath,proto3" json:"module_path,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1281,6 +1295,13 @@ func (x *GlyphDef) GetDefaultHeight() int32 {
 	return 0
 }
 
+func (x *GlyphDef) GetModulePath() string {
+	if x != nil {
+		return x.ModulePath
+	}
+	return ""
+}
+
 var File_plugin_grpc_protocol_domain_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
@@ -1293,14 +1314,15 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\fqntx_version\x18\x03 \x01(\tR\vqntxVersion\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x16\n" +
 	"\x06author\x18\x05 \x01(\tR\x06author\x12\x18\n" +
-	"\alicense\x18\x06 \x01(\tR\alicense\"\xb0\x02\n" +
+	"\alicense\x18\x06 \x01(\tR\alicense\"\xe4\x02\n" +
 	"\x11InitializeRequest\x12,\n" +
 	"\x12ats_store_endpoint\x18\x01 \x01(\tR\x10atsStoreEndpoint\x12%\n" +
 	"\x0equeue_endpoint\x18\x02 \x01(\tR\rqueueEndpoint\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x03 \x01(\tR\tauthToken\x12?\n" +
 	"\x06config\x18\x04 \x03(\v2'.protocol.InitializeRequest.ConfigEntryR\x06config\x12+\n" +
-	"\x11schedule_endpoint\x18\x05 \x01(\tR\x10scheduleEndpoint\x1a9\n" +
+	"\x11schedule_endpoint\x18\x05 \x01(\tR\x10scheduleEndpoint\x122\n" +
+	"\x15file_service_endpoint\x18\x06 \x01(\tR\x13fileServiceEndpoint\x1a9\n" +
 	"\vConfigEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"}\n" +
@@ -1386,7 +1408,7 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x05stage\x18\x04 \x01(\tR\x05stage\x12\x1a\n" +
 	"\bmetadata\x18\x05 \x01(\tR\bmetadata\">\n" +
 	"\x10GlyphDefResponse\x12*\n" +
-	"\x06glyphs\x18\x01 \x03(\v2\x12.protocol.GlyphDefR\x06glyphs\"\xd8\x01\n" +
+	"\x06glyphs\x18\x01 \x03(\v2\x12.protocol.GlyphDefR\x06glyphs\"\xf9\x01\n" +
 	"\bGlyphDef\x12\x16\n" +
 	"\x06symbol\x18\x01 \x01(\tR\x06symbol\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x14\n" +
@@ -1394,7 +1416,9 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\fcontent_path\x18\x04 \x01(\tR\vcontentPath\x12\x19\n" +
 	"\bcss_path\x18\x05 \x01(\tR\acssPath\x12#\n" +
 	"\rdefault_width\x18\x06 \x01(\x05R\fdefaultWidth\x12%\n" +
-	"\x0edefault_height\x18\a \x01(\x05R\rdefaultHeight2\xcf\x04\n" +
+	"\x0edefault_height\x18\a \x01(\x05R\rdefaultHeight\x12\x1f\n" +
+	"\vmodule_path\x18\b \x01(\tR\n" +
+	"modulePath2\xcf\x04\n" +
 	"\x13DomainPluginService\x127\n" +
 	"\bMetadata\x12\x0f.protocol.Empty\x1a\x1a.protocol.MetadataResponse\x12G\n" +
 	"\n" +

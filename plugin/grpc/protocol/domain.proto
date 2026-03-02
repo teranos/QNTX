@@ -74,6 +74,10 @@ message InitializeRequest {
   // schedule_endpoint: gRPC endpoint for ScheduleService
   // Provides: Runtime schedule creation, pause, resume, delete
   string schedule_endpoint = 5;
+
+  // file_service_endpoint: gRPC endpoint for FileService
+  // Provides: Read stored files (for multimodal attachments)
+  string file_service_endpoint = 6;
 }
 
 message HTTPRequest {
@@ -233,4 +237,9 @@ message GlyphDef {
   // DefaultWidth and DefaultHeight in pixels (0 = use system default)
   int32 default_width = 6;
   int32 default_height = 7;
+
+  // ModulePath is the HTTP path to a JS/TS module exporting a render function.
+  // When set, the frontend dynamically imports it with SDK injection,
+  // bypassing the server-rendered HTML pipeline.
+  string module_path = 8;
 }

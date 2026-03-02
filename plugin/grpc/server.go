@@ -176,6 +176,7 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 			req.AtsStoreEndpoint,
 			req.QueueEndpoint,
 			req.ScheduleEndpoint,
+			req.FileServiceEndpoint,
 			req.AuthToken,
 			req.Config,
 			s.logger,
@@ -432,6 +433,7 @@ func (s *PluginServer) RegisterGlyphs(ctx context.Context, _ *protocol.Empty) (*
 			CssPath:       def.CSSPath,
 			DefaultWidth:  int32(def.DefaultWidth),
 			DefaultHeight: int32(def.DefaultHeight),
+			ModulePath:    def.ModulePath,
 		}
 	}
 

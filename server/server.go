@@ -89,6 +89,13 @@ type QNTXServer struct {
 	broadcastDrops atomic.Int64       // Tracks dropped broadcasts for monitoring
 	state          atomic.Int32       // Opening/Closing Phase 4: Server state (Running/Draining/Stopped)
 
+	// Per-IP rate limiting groups
+	rlAuth   *rateLimitGroup
+	rlWS     *rateLimitGroup
+	rlWrite  *rateLimitGroup
+	rlRead   *rateLimitGroup
+	rlPublic *rateLimitGroup
+
 	// Watcher engine for reactive attestation triggers
 	watcherEngine   *watcher.Engine
 	reloadCoalescer *watcherReloadCoalescer
