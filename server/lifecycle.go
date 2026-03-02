@@ -65,6 +65,13 @@ func (s *QNTXServer) startBackgroundServices() {
 		s.authHandler.StartSessionSweep(s.wg.Done, s.ctx.Done())
 	}
 
+	// Start rate limiter sweep goroutine
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		s.sweepRateLimiters(s.ctx)
+	}()
+
 	// Broadcast worker is started in Run() method
 	// Start usage update broadcaster
 	s.startUsageUpdateTicker()
@@ -139,13 +146,13 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 	}
 
 	s.httpServer = &http.Server{
-		Addr:              fmt.Sprintf(":%d", actualPort),
+		Addr:              fmt.Sprintf("%s:%d", s.bindAddress, actualPort),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		// ReadTimeout and WriteTimeout must be 0 — non-zero values kill
 		// long-lived WebSocket connections (graph, sync, LSP, VidStream).
 	}
-	s.logger.Infow(fmt.Sprintf("HTTP server listening on port %d", actualPort))
+	s.logger.Infow(fmt.Sprintf("HTTP server listening on %s:%d", s.bindAddress, actualPort))
 	return s.httpServer.ListenAndServe()
 }
 

@@ -49,10 +49,26 @@ type BoundedStorageConfig struct {
 
 // ServerConfig configures the QNTX web server
 type ServerConfig struct {
-	Port           *int     `mapstructure:"port"`          // Server port: nil = default 877, 0 is invalid (omit for default)
-	FrontendPort   int      `mapstructure:"frontend_port"` // Frontend dev server port (default: 8820)
-	AllowedOrigins []string `mapstructure:"allowed_origins"`
-	LogTheme       string   `mapstructure:"log_theme"` // Color theme: gruvbox, everforest
+	Port           *int            `mapstructure:"port"`          // Server port: nil = default 877, 0 is invalid (omit for default)
+	BindAddress    string          `mapstructure:"bind_address"`  // Network interface to bind: "127.0.0.1" (default, local only) or "0.0.0.0" (all interfaces)
+	FrontendPort   int             `mapstructure:"frontend_port"` // Frontend dev server port (default: 8820)
+	AllowedOrigins []string        `mapstructure:"allowed_origins"`
+	LogTheme       string          `mapstructure:"log_theme"`  // Color theme: gruvbox, everforest
+	RateLimit      RateLimitConfig `mapstructure:"rate_limit"` // Per-IP rate limiting
+}
+
+// RateLimitConfig configures per-IP token bucket rate limits.
+type RateLimitConfig struct {
+	AuthRate    float64 `mapstructure:"auth_rate"`    // /auth/* requests per second (default: 2)
+	AuthBurst   int     `mapstructure:"auth_burst"`   // /auth/* burst capacity (default: 5)
+	WSRate      float64 `mapstructure:"ws_rate"`      // WebSocket upgrades per second (default: 2)
+	WSBurst     int     `mapstructure:"ws_burst"`     // WebSocket burst capacity (default: 10)
+	WriteRate   float64 `mapstructure:"write_rate"`   // POST/PUT/DELETE per second (default: 20)
+	WriteBurst  int     `mapstructure:"write_burst"`  // Write burst capacity (default: 40)
+	ReadRate    float64 `mapstructure:"read_rate"`    // GET per second (default: 60)
+	ReadBurst   int     `mapstructure:"read_burst"`   // Read burst capacity (default: 120)
+	PublicRate  float64 `mapstructure:"public_rate"`  // /health, static per second (default: 10)
+	PublicBurst int     `mapstructure:"public_burst"` // Public burst capacity (default: 20)
 }
 
 // Server port constants
@@ -120,7 +136,13 @@ type AxConfig struct {
 type PluginConfig struct {
 	Enabled   []string              `mapstructure:"enabled"`   // Whitelist of enabled plugins (e.g., ["code"])
 	Paths     []string              `mapstructure:"paths"`     // Plugin search paths (e.g., ["~/.qntx/plugins", "./plugins"])
+	Runtime   PluginRuntimeConfig   `mapstructure:"runtime"`   // Runtime configuration
 	WebSocket PluginWebSocketConfig `mapstructure:"websocket"` // WebSocket configuration
+}
+
+// PluginRuntimeConfig configures plugin runtime environments
+type PluginRuntimeConfig struct {
+	TypeScriptRuntime string `mapstructure:"typescript_runtime"` // Path to TypeScript runtime (main.ts)
 }
 
 // PluginWebSocketConfig configures WebSocket keepalive behavior

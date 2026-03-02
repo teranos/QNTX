@@ -184,7 +184,7 @@ function ensureMetaPill(glyphEl: HTMLElement): HTMLElement | null {
     if (pill) return pill;
 
     // Find the title bar — pill is positioned relative to it
-    const titleBar = glyphEl.querySelector('.canvas-glyph-title-bar') as HTMLElement | null;
+    const titleBar = glyphEl.querySelector('.glyph-title-bar') as HTMLElement | null;
     if (!titleBar) return null;
 
     // Title bar becomes the positioning context (matches attestation glyph's wrapper pattern)

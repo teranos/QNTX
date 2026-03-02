@@ -2,6 +2,8 @@ package am
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 
 	"github.com/spf13/viper"
@@ -47,7 +49,8 @@ func SetDefaults(v *viper.Viper) {
 
 	// Server configuration defaults
 	v.SetDefault("server.port", DefaultServerPort)
-	v.SetDefault("server.frontend_port", 8820) // Frontend dev server port
+	v.SetDefault("server.bind_address", "127.0.0.1") // Loopback only — safe default, no auth required
+	v.SetDefault("server.frontend_port", 8820)       // Frontend dev server port
 	v.SetDefault("server.allowed_origins", []string{
 		"http://localhost",
 		"https://localhost",
@@ -56,6 +59,18 @@ func SetDefaults(v *viper.Viper) {
 		"tauri://localhost", // Allow Tauri desktop app
 	})
 	v.SetDefault("server.log_theme", "everforest")
+
+	// Rate limiting defaults (per-IP token bucket)
+	v.SetDefault("server.rate_limit.auth_rate", 2.0)
+	v.SetDefault("server.rate_limit.auth_burst", 5)
+	v.SetDefault("server.rate_limit.ws_rate", 2.0)
+	v.SetDefault("server.rate_limit.ws_burst", 10)
+	v.SetDefault("server.rate_limit.write_rate", 20.0)
+	v.SetDefault("server.rate_limit.write_burst", 40)
+	v.SetDefault("server.rate_limit.read_rate", 60.0)
+	v.SetDefault("server.rate_limit.read_burst", 120)
+	v.SetDefault("server.rate_limit.public_rate", 10.0)
+	v.SetDefault("server.rate_limit.public_burst", 20)
 
 	// Embeddings (semantic search) defaults
 	v.SetDefault("embeddings.enabled", false) // Disabled by default - requires ONNX model
@@ -88,6 +103,50 @@ func SetDefaults(v *viper.Viper) {
 	})
 	v.SetDefault("plugin.websocket.keepalive.enabled", true)
 	// ping_interval_secs, pong_timeout_secs, reconnect_attempts are optional: nil = defaults (30, 60, 3) in plugin/grpc/websocket_keepalive.go
+
+	// Runtime defaults - auto-detect QNTX root or use env var
+	if tsRuntime := findTypeScriptRuntime(); tsRuntime != "" {
+		v.SetDefault("plugin.runtime.typescript_runtime", tsRuntime)
+	}
+}
+
+// findTypeScriptRuntime locates the TypeScript runtime (main.ts)
+// Checks QNTX_ROOT env var, then walks up from CWD looking for go.mod
+func findTypeScriptRuntime() string {
+	// 1. Check env var QNTX_ROOT
+	if root := os.Getenv("QNTX_ROOT"); root != "" {
+		runtimePath := filepath.Join(root, "plugin/typescript/runtime/main.ts")
+		if _, err := os.Stat(runtimePath); err == nil {
+			return runtimePath
+		}
+	}
+
+	// 2. Walk up from CWD looking for go.mod (QNTX root marker)
+	dir, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+
+	for {
+		// Check if this directory contains go.mod
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			// Found QNTX root - check if runtime exists
+			runtimePath := filepath.Join(dir, "plugin/typescript/runtime/main.ts")
+			if _, err := os.Stat(runtimePath); err == nil {
+				return runtimePath
+			}
+		}
+
+		// Move up one directory
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// Reached filesystem root
+			break
+		}
+		dir = parent
+	}
+
+	return ""
 }
 
 // BindSensitiveEnvVars explicitly binds sensitive configuration to environment variables
@@ -98,10 +157,18 @@ func BindSensitiveEnvVars(v *viper.Viper) {
 	// Database path
 	v.BindEnv("database.path", "QNTX_DATABASE_PATH")
 
+	// Server bind address (e.g., "0.0.0.0" for all interfaces — requires auth.enabled)
+	v.BindEnv("server.bind_address", "QNTX_BIND_ADDRESS")
+
 	// Local inference configuration
 	v.BindEnv("local_inference.enabled", "QNTX_LOCAL_INFERENCE_ENABLED")
 	v.BindEnv("local_inference.base_url", "QNTX_LOCAL_INFERENCE_BASE_URL")
 	v.BindEnv("local_inference.model", "QNTX_LOCAL_INFERENCE_MODEL")
+}
+
+// IsLoopbackAddress returns true if the address is a loopback address (127.0.0.1, ::1, localhost)
+func IsLoopbackAddress(addr string) bool {
+	return addr == "" || addr == "127.0.0.1" || addr == "::1" || addr == "localhost"
 }
 
 // GetServerPort returns the configured QNTX server port
@@ -134,10 +201,14 @@ func (c *Config) GetServerAllowedOrigins() []string {
 	// Define secure default origins that should always be allowed
 	defaults := []string{
 		"http://localhost",
+		"http://localhost:*",
 		"https://localhost",
+		"https://localhost:*",
 		"http://127.0.0.1",
+		"http://127.0.0.1:*",
 		"https://127.0.0.1",
-		"tauri://localhost", // Allow Tauri desktop app
+		"https://127.0.0.1:*",
+		"tauri://localhost",
 	}
 
 	// If no custom origins configured, return defaults

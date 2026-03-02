@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 // ExternalDomainProxy implements DomainPlugin by proxying to a gRPC plugin process.
@@ -417,7 +419,7 @@ func (c *ExternalDomainProxy) RegisterWebSocket() (map[string]plugin.WebSocketHa
 	}
 
 	// Create a proxy handler for the plugin's WebSocket endpoints
-	handlers[fmt.Sprintf("/%s-ws", c.metadata.Name)] = &wsProxyHandler{
+	handlers[fmt.Sprintf("/ws/%s", c.metadata.Name)] = &wsProxyHandler{
 		client:    c,
 		logger:    c.logger,
 		keepalive: keepaliveHandler,
@@ -433,8 +435,7 @@ func (c *ExternalDomainProxy) RegisterWebSocketWithConfig(config KeepaliveConfig
 
 	keepaliveHandler := NewKeepaliveHandler(config, c.logger)
 
-	// TODO: Load WebSocket config from plugin manifest
-	handlers[fmt.Sprintf("/%s-ws", c.metadata.Name)] = &wsProxyHandler{
+	handlers[fmt.Sprintf("/ws/%s", c.metadata.Name)] = &wsProxyHandler{
 		client:    c,
 		logger:    c.logger,
 		keepalive: keepaliveHandler,
@@ -442,6 +443,16 @@ func (c *ExternalDomainProxy) RegisterWebSocketWithConfig(config KeepaliveConfig
 	}
 
 	return handlers, nil
+}
+
+// browserWSMessage mirrors the JSON protocol used by the browser.
+// The browser sends/receives JSON with type (enum int), base64-encoded data,
+// headers map, and a timestamp. The Go proxy translates this to/from gRPC protobuf.
+type browserWSMessage struct {
+	Type      int32             `json:"type"`
+	Data      string            `json:"data"`
+	Headers   map[string]string `json:"headers,omitempty"`
+	Timestamp int64             `json:"timestamp"`
 }
 
 // wsProxyHandler proxies WebSocket connections to the remote plugin.
@@ -472,7 +483,15 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	defer wsConn.Close()
 
 	// Establish bidirectional gRPC stream
+	// Forward query params as gRPC metadata (e.g. session_id)
 	ctx := r.Context()
+	md := metadata.New(nil)
+	for key, values := range r.URL.Query() {
+		if len(values) > 0 {
+			md.Set(key, values[0])
+		}
+	}
+	ctx = metadata.NewOutgoingContext(ctx, md)
 	stream, err := h.client.client.HandleWebSocket(ctx)
 	if err != nil {
 		h.logger.Errorw("Failed to establish gRPC stream", "error", err)
@@ -526,10 +545,28 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 			h.logger.Debugw("WebSocket -> gRPC", "type", messageType, "size", len(data))
 
-			// Convert WebSocket message to protocol message
+			// Parse browser JSON message into protobuf
+			var browserMsg browserWSMessage
+			if err := json.Unmarshal(data, &browserMsg); err != nil {
+				h.logger.Errorw("Failed to parse browser WebSocket message", "error", err, "raw", string(data))
+				continue
+			}
+
+			// Decode base64 data field
+			var rawData []byte
+			if browserMsg.Data != "" {
+				var decErr error
+				rawData, decErr = base64.StdEncoding.DecodeString(browserMsg.Data)
+				if decErr != nil {
+					h.logger.Errorw("Failed to decode base64 data", "error", decErr)
+					continue
+				}
+			}
+
 			protoMsg := &protocol.WebSocketMessage{
-				Type:      protocol.WebSocketMessage_DATA,
-				Data:      data,
+				Type:      protocol.WebSocketMessage_Type(browserMsg.Type),
+				Data:      rawData,
+				Headers:   browserMsg.Headers,
 				Timestamp: time.Now().UnixNano(),
 			}
 
@@ -583,9 +620,21 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// Send DATA message to WebSocket client
+			// Send DATA message to WebSocket client as JSON with base64-encoded data
 			if msg.Type == protocol.WebSocketMessage_DATA {
-				if err := wsConn.WriteMessage(websocket.TextMessage, msg.Data); err != nil {
+				outMsg := browserWSMessage{
+					Type:      int32(msg.Type),
+					Data:      base64.StdEncoding.EncodeToString(msg.Data),
+					Headers:   msg.Headers,
+					Timestamp: msg.Timestamp,
+				}
+				jsonBytes, err := json.Marshal(outMsg)
+				if err != nil {
+					h.logger.Errorw("Failed to marshal outbound message", "error", err)
+					errChan <- err
+					return
+				}
+				if err := wsConn.WriteMessage(websocket.TextMessage, jsonBytes); err != nil {
 					h.logger.Errorw("WebSocket write error", "error", err)
 					errChan <- err
 					return

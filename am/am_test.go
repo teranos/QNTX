@@ -337,9 +337,9 @@ func TestUpdatePluginConfig(t *testing.T) {
 
 	// Test: Update config for a new plugin
 	newConfig := map[string]string{
-		"python_paths":     "/new/path",
-		"default_modules":  "numpy,pandas",
-		"timeout_secs":     "30",
+		"python_paths":    "/new/path",
+		"default_modules": "numpy,pandas",
+		"timeout_secs":    "30",
 	}
 
 	if err := UpdatePluginConfig("python", newConfig); err != nil {
@@ -406,5 +406,38 @@ func TestWritePluginConfigToTemp(t *testing.T) {
 	content := string(data)
 	if !strings.Contains(content, "python_paths = \"/test/path\"") {
 		t.Error("Temp file doesn't contain expected values")
+	}
+}
+
+func TestGetServerAllowedOrigins_IncludesWildcardPorts(t *testing.T) {
+	v := viper.New()
+	SetDefaults(v)
+
+	cfg, err := LoadWithViper(v)
+	if err != nil {
+		t.Fatalf("LoadWithViper() failed: %v", err)
+	}
+
+	origins := cfg.GetServerAllowedOrigins()
+
+	// Wildcard port patterns must be present so that origins like
+	// http://localhost:8822 (dev frontend) pass origin checks.
+	required := []string{
+		"http://localhost:*",
+		"http://127.0.0.1:*",
+		"https://localhost:*",
+		"https://127.0.0.1:*",
+	}
+	for _, want := range required {
+		found := false
+		for _, got := range origins {
+			if got == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("GetServerAllowedOrigins() missing %q, got %v", want, origins)
+		}
 	}
 }

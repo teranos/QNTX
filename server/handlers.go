@@ -248,12 +248,8 @@ func (s *QNTXServer) loadJobHistoryForClient(client *Client) []*async.Job {
 		allJobs = append(allJobs, completedJobs...)
 	}
 
-	failedJobs, err := queue.ListJobs(asyncJobStatusPtr(async.JobStatusFailed), 50)
-	if err != nil {
-		s.logger.Warnw("Failed to load failed jobs", "client_id", client.id, "error", err)
-	} else {
-		allJobs = append(allJobs, failedJobs...)
-	}
+	// Failed jobs are not sent to new clients — they are historical noise.
+	// Active and completed jobs are sufficient for the client to show current state.
 
 	return allJobs
 }
@@ -724,6 +720,7 @@ func (s *QNTXServer) HandlePluginGlyphs(w http.ResponseWriter, r *http.Request) 
 		Label         string `json:"label"`
 		ContentURL    string `json:"content_url"`
 		CSSURL        string `json:"css_url,omitempty"`
+		ModuleURL     string `json:"module_url,omitempty"`
 		DefaultWidth  int    `json:"default_width,omitempty"`
 		DefaultHeight int    `json:"default_height,omitempty"`
 	}
@@ -766,6 +763,10 @@ func (s *QNTXServer) HandlePluginGlyphs(w http.ResponseWriter, r *http.Request) 
 			if def.CssPath != "" {
 				cssURL = fmt.Sprintf("/api/%s%s", name, def.CssPath)
 			}
+			moduleURL := ""
+			if def.ModulePath != "" {
+				moduleURL = fmt.Sprintf("/api/%s%s", name, def.ModulePath)
+			}
 
 			glyphs = append(glyphs, PluginGlyphDef{
 				Plugin:        name,
@@ -774,6 +775,7 @@ func (s *QNTXServer) HandlePluginGlyphs(w http.ResponseWriter, r *http.Request) 
 				Label:         def.Label,
 				ContentURL:    contentURL,
 				CSSURL:        cssURL,
+				ModuleURL:     moduleURL,
 				DefaultWidth:  int(def.DefaultWidth),
 				DefaultHeight: int(def.DefaultHeight),
 			})

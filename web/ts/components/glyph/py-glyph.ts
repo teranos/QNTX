@@ -83,7 +83,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     element.style.zIndex = '1';
 
     // Python brand colors on title bar
-    const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+    const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
     if (titleBar) {
         titleBar.style.backgroundColor = '#2a5578';
         const labelSpan = titleBar.querySelector('span:first-child') as HTMLElement;
