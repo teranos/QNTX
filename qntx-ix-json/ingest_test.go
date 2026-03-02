@@ -42,6 +42,7 @@ func (m *mockServices) Config(string) plugin.Config      { return nil }
 func (m *mockServices) ATSStore() ats.AttestationStore   { return m.store }
 func (m *mockServices) Queue() plugin.QueueService       { return nil }
 func (m *mockServices) Schedule() plugin.ScheduleService { return nil }
+func (m *mockServices) FileService() plugin.FileService  { return nil }
 
 func testPlugin(store ats.AttestationStore) *Plugin {
 	p := NewPlugin()
