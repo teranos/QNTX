@@ -14,7 +14,7 @@ use tokio::net::TcpListener;
 use tokio::signal;
 use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::Server;
-use tracing::{info, warn, Level};
+use tracing::{debug, info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 
 #[derive(Parser, Debug)]
@@ -86,8 +86,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_line_number(false)
         .init();
 
-    info!("Initializing QNTX Python Plugin");
-    info!("  Version: {}", env!("CARGO_PKG_VERSION"));
+    debug!(
+        "Initializing QNTX Python Plugin v{}",
+        env!("CARGO_PKG_VERSION")
+    );
 
     // Bind with port retry to handle multi-session port conflicts.
     // When multiple QNTX sessions run concurrently, they each allocate ports
@@ -135,19 +137,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("QNTX_PLUGIN_PORT={}", local_addr.port());
 
     // Create the Python plugin service
-    info!("Creating Python plugin service...");
     let service = match PythonPluginService::new() {
-        Ok(s) => {
-            info!("Python plugin service created successfully");
-            s
-        }
+        Ok(s) => s,
         Err(e) => {
             eprintln!("ERROR: Failed to create Python plugin service: {}", e);
             return Err(format!("Service creation failed: {}", e).into());
         }
     };
 
-    info!("Starting gRPC server on {}", local_addr);
+    info!("gRPC server listening on {}", local_addr);
 
     let incoming = TcpListenerStream::new(listener);
     Server::builder()
