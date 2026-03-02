@@ -1,0 +1,13 @@
+{
+    "name": "qntx-ix-bin-plugin",
+    "description": "QNTX binary/structured data ingestion plugin — D language",
+    "authors": ["QNTX"],
+    "license": "MIT",
+    "targetType": "executable",
+    "targetName": "qntx-ix-bin-plugin",
+    "targetPath": "bin",
+    "sourcePaths": ["source"],
+    "stringImportPaths": ["source"],
+    "mainSourceFile": "source/ixbin/app.d",
+    "dflags-ldc": ["-O2"]
+}
