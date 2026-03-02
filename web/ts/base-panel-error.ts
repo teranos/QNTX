@@ -11,6 +11,7 @@
 import { CSS, DATA, setLoading } from './css-classes.ts';
 import { Button } from './components/button.ts';
 import { log, SEG } from './logger.ts';
+import { extractHttpStatus } from './http-utils.ts';
 
 /**
  * Error state for a panel
@@ -211,9 +212,8 @@ function parseErrorObject(error: Error): RichError {
     const message = error.message;
 
     // Check for HTTP status codes in the message
-    const httpMatch = message.match(/HTTP\s*(\d{3})/i);
-    if (httpMatch) {
-        const status = parseInt(httpMatch[1], 10);
+    const status = extractHttpStatus(message);
+    if (status !== null) {
         return parseHttpError(status, message, error.stack);
     }
 

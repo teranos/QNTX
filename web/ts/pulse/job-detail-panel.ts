@@ -30,6 +30,7 @@ import {
   unixToISO,
 } from './events.ts';
 import type { RichError } from '../base-panel-error.ts';
+import { extractHttpStatus } from '../http-utils.ts';
 
 class JobDetailPanel {
   private panel: HTMLElement | null = null;
@@ -604,9 +605,8 @@ class JobDetailPanel {
     }
 
     // HTTP status code errors
-    const httpMatch = message.match(/(\d{3})/);
-    if (httpMatch) {
-      const status = parseInt(httpMatch[1], 10);
+    const status = extractHttpStatus(message);
+    if (status !== null) {
       if (status >= 400 && status < 600) {
         const statusInfo: Record<number, { title: string; suggestion: string }> = {
           401: { title: 'Unauthorized', suggestion: 'Your session may have expired. Try refreshing the page.' },
