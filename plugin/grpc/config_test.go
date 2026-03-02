@@ -244,6 +244,7 @@ func TestRemoteServiceRegistryConfig(t *testing.T) {
 			"localhost:50051",
 			"localhost:50052",
 			"localhost:50053",
+			"", // file service
 			"test-token",
 			configMap,
 			nil, // logger

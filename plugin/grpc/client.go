@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -38,6 +39,11 @@ type ExternalDomainProxy struct {
 	// WebSocket configuration (set via SetWebSocketConfig)
 	keepaliveConfig *KeepaliveConfig
 	wsConfig        *WebSocketConfig
+
+	// Initialize idempotency — multiple code paths may call Initialize
+	// (server/init.go eager init + async goroutine in main.go)
+	initOnce sync.Once
+	initErr  error
 }
 
 // NewExternalDomainProxy creates a new client proxy to a gRPC plugin at the given address.
@@ -128,8 +134,22 @@ func (c *ExternalDomainProxy) Client() protocol.DomainPluginServiceClient {
 	return c.client
 }
 
-// Initialize initializes the remote plugin.
+// Initialize initializes the remote plugin. Idempotent — safe to call from multiple code paths.
 func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
+	c.initOnce.Do(func() {
+		c.initErr = c.doInitialize(ctx, services)
+	})
+	return c.initErr
+}
+
+// ForceInitialize re-initializes the plugin (e.g. after config update).
+// Bypasses the once-guard so the gRPC call is actually sent again.
+func (c *ExternalDomainProxy) ForceInitialize(ctx context.Context, services plugin.ServiceRegistry) error {
+	return c.doInitialize(ctx, services)
+}
+
+// doInitialize performs the actual gRPC Initialize RPC.
+func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.ServiceRegistry) error {
 	// Build config map from service registry
 	config := make(map[string]string)
 	pluginConfig := services.Config(c.metadata.Name)
@@ -178,6 +198,7 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 	atsStoreEndpoint := ""
 	queueEndpoint := ""
 	scheduleEndpoint := ""
+	fileServiceEndpoint := ""
 	authToken := ""
 
 	// Try to extract endpoints from config (passed by PluginManager)
@@ -193,23 +214,29 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 		scheduleEndpoint = ep
 		c.logger.Debugw("Extracted Schedule endpoint from config", "endpoint", ep)
 	}
+	if ep := pluginConfig.GetString("_file_service_endpoint"); ep != "" {
+		fileServiceEndpoint = ep
+		c.logger.Debugw("Extracted FileService endpoint from config", "endpoint", ep)
+	}
 	if token := pluginConfig.GetString("_auth_token"); token != "" {
 		authToken = token
 	}
 
 	req := &protocol.InitializeRequest{
-		AtsStoreEndpoint: atsStoreEndpoint,
-		QueueEndpoint:    queueEndpoint,
-		ScheduleEndpoint: scheduleEndpoint,
-		AuthToken:        authToken,
-		Config:           config,
+		AtsStoreEndpoint:    atsStoreEndpoint,
+		QueueEndpoint:       queueEndpoint,
+		ScheduleEndpoint:    scheduleEndpoint,
+		FileServiceEndpoint: fileServiceEndpoint,
+		AuthToken:           authToken,
+		Config:              config,
 	}
 
-	c.logger.Infow("Sending Initialize RPC to plugin",
+	c.logger.Debugw("Sending Initialize RPC to plugin",
 		"name", c.metadata.Name,
 		"ats_store_endpoint", atsStoreEndpoint,
 		"queue_endpoint", queueEndpoint,
 		"schedule_endpoint", scheduleEndpoint,
+		"file_service_endpoint", fileServiceEndpoint,
 	)
 
 	resp, err := c.client.Initialize(ctx, req)
@@ -220,26 +247,14 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 
 	// Store handler names announced by plugin
 	c.handlerNames = resp.GetHandlerNames()
-	if len(c.handlerNames) > 0 {
-		c.logger.Infow("Plugin announced async handlers",
-			"plugin", c.metadata.Name,
-			"handlers", c.handlerNames,
-		)
-	}
 
 	// Store schedules announced by plugin
 	c.schedules = resp.GetSchedules()
-	if len(c.schedules) > 0 {
-		c.logger.Infow("Plugin announced schedules",
-			"plugin", c.metadata.Name,
-			"count", len(c.schedules),
-		)
-	}
 
-	c.logger.Infow("Remote plugin initialized",
+	c.logger.Infow("Plugin initialized",
 		"name", c.metadata.Name,
-		"ats_store", atsStoreEndpoint != "",
-		"queue", queueEndpoint != "",
+		"handlers", len(c.handlerNames),
+		"schedules", len(c.schedules),
 	)
 	return nil
 }

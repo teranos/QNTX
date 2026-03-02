@@ -11,7 +11,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/ai/provider"
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/attrs"
@@ -65,10 +64,7 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 	// Resolve model name once — used for attestation metadata
 	modelUsed := modelOverride
 	if modelUsed == "" {
-		modelUsed = h.cfg.OpenRouter.Model
-		if h.cfg.LocalInference.Enabled {
-			modelUsed = h.cfg.LocalInference.Model
-		}
+		modelUsed = h.cfg.LocalInference.Model
 	}
 
 	labeled := 0
@@ -99,7 +95,7 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 			"cluster-labeling", "cluster", fmt.Sprintf("%d", cluster.ID),
 		)
 
-		req := openrouter.ChatRequest{
+		req := provider.ChatRequest{
 			SystemPrompt: "You label clusters of text. Given sample texts from a cluster, respond with a short descriptive label (2-5 words). No explanation, just the label.",
 			UserPrompt:   userPrompt.String(),
 			MaxTokens:    &maxTokens,

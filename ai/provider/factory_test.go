@@ -36,7 +36,7 @@ func TestDetermineProvider(t *testing.T) {
 			expected:         ProviderTypeLocal,
 		},
 		{
-			name: "local enabled but no base URL",
+			name: "local enabled but no base URL defaults to local",
 			config: &am.Config{
 				LocalInference: am.LocalInferenceConfig{
 					Enabled: true,
@@ -44,10 +44,10 @@ func TestDetermineProvider(t *testing.T) {
 				},
 			},
 			explicitProvider: "",
-			expected:         ProviderTypeOpenRouter,
+			expected:         ProviderTypeLocal,
 		},
 		{
-			name: "local disabled",
+			name: "local disabled defaults to local (OpenRouter is a plugin now)",
 			config: &am.Config{
 				LocalInference: am.LocalInferenceConfig{
 					Enabled: false,
@@ -55,10 +55,10 @@ func TestDetermineProvider(t *testing.T) {
 				},
 			},
 			explicitProvider: "",
-			expected:         ProviderTypeOpenRouter,
+			expected:         ProviderTypeLocal,
 		},
 		{
-			name: "default to OpenRouter",
+			name: "default to local (OpenRouter moved to plugin)",
 			config: &am.Config{
 				LocalInference: am.LocalInferenceConfig{
 					Enabled: false,
@@ -66,7 +66,7 @@ func TestDetermineProvider(t *testing.T) {
 				},
 			},
 			explicitProvider: "",
-			expected:         ProviderTypeOpenRouter,
+			expected:         ProviderTypeLocal,
 		},
 	}
 

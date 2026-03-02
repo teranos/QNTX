@@ -17,19 +17,21 @@ import (
 
 // ServiceEndpoints holds the addresses of running service servers
 type ServiceEndpoints struct {
-	ATSStoreAddress string
-	QueueAddress    string
-	ScheduleAddress string
-	AuthToken       string
+	ATSStoreAddress    string
+	QueueAddress       string
+	ScheduleAddress    string
+	FileServiceAddress string
+	AuthToken          string
 }
 
 // ServicesManager manages gRPC service servers for plugin callbacks
 type ServicesManager struct {
-	atsStoreServer *grpc.Server
-	queueServer    *grpc.Server
-	scheduleServer *grpc.Server
-	endpoints      ServiceEndpoints
-	logger         *zap.SugaredLogger
+	atsStoreServer    *grpc.Server
+	queueServer       *grpc.Server
+	scheduleServer    *grpc.Server
+	fileServiceServer *grpc.Server
+	endpoints         ServiceEndpoints
+	logger            *zap.SugaredLogger
 }
 
 // NewServicesManager creates a new services manager
@@ -39,8 +41,9 @@ func NewServicesManager(logger *zap.SugaredLogger) *ServicesManager {
 	}
 }
 
-// Start starts the gRPC service servers with dynamic port allocation
-func (m *ServicesManager) Start(ctx context.Context, store *storage.SQLStore, queue *async.Queue, scheduleStore *schedule.Store) (*ServiceEndpoints, error) {
+// Start starts the gRPC service servers with dynamic port allocation.
+// filesDir is the path to stored files (for the FileService).
+func (m *ServicesManager) Start(ctx context.Context, store *storage.SQLStore, queue *async.Queue, scheduleStore *schedule.Store, filesDir string) (*ServiceEndpoints, error) {
 	// Generate authentication token
 	authToken, err := generateAuthToken()
 	if err != nil {
@@ -74,11 +77,27 @@ func (m *ServicesManager) Start(ctx context.Context, store *storage.SQLStore, qu
 		return nil, errors.Wrap(err, "failed to start schedule service")
 	}
 
+	// Start File service
+	fileServiceAddr, err := m.startFileService(ctx, filesDir, authToken)
+	if err != nil {
+		if m.atsStoreServer != nil {
+			m.atsStoreServer.Stop()
+		}
+		if m.queueServer != nil {
+			m.queueServer.Stop()
+		}
+		if m.scheduleServer != nil {
+			m.scheduleServer.Stop()
+		}
+		return nil, errors.Wrap(err, "failed to start file service")
+	}
+
 	m.endpoints = ServiceEndpoints{
-		ATSStoreAddress: atsStoreAddr,
-		QueueAddress:    queueAddr,
-		ScheduleAddress: scheduleAddr,
-		AuthToken:       authToken,
+		ATSStoreAddress:    atsStoreAddr,
+		QueueAddress:       queueAddr,
+		ScheduleAddress:    scheduleAddr,
+		FileServiceAddress: fileServiceAddr,
+		AuthToken:          authToken,
 	}
 
 	return &m.endpoints, nil
@@ -186,6 +205,35 @@ func (m *ServicesManager) startScheduleService(ctx context.Context, store *sched
 	return addr, nil
 }
 
+// startFileService starts the File gRPC service
+func (m *ServicesManager) startFileService(ctx context.Context, filesDir string, authToken string) (string, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to listen")
+	}
+
+	m.fileServiceServer = grpc.NewServer()
+	fileServer := NewFileServiceServer(filesDir, authToken, m.logger)
+	protocol.RegisterFileServiceServer(m.fileServiceServer, fileServer)
+
+	go func() {
+		<-ctx.Done()
+		m.logger.Debug("Context cancelled, stopping File service")
+		m.fileServiceServer.GracefulStop()
+	}()
+
+	go func() {
+		if err := m.fileServiceServer.Serve(listener); err != nil {
+			m.logger.Errorw("File service error", "error", err)
+		}
+	}()
+
+	addr := listener.Addr().String()
+	m.logger.Infow("File service started", "address", addr)
+
+	return addr, nil
+}
+
 // Shutdown gracefully stops all service servers
 func (m *ServicesManager) Shutdown() {
 	m.logger.Info("Shutting down plugin services")
@@ -200,6 +248,10 @@ func (m *ServicesManager) Shutdown() {
 
 	if m.scheduleServer != nil {
 		m.scheduleServer.GracefulStop()
+	}
+
+	if m.fileServiceServer != nil {
+		m.fileServiceServer.GracefulStop()
 	}
 
 	m.logger.Info("Plugin services stopped")
