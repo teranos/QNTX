@@ -50,7 +50,7 @@ func (s *QNTXServer) HandlePluginConfig(w http.ResponseWriter, r *http.Request) 
 	case http.MethodPut:
 		s.handleUpdatePluginConfig(w, r, pluginName)
 	default:
-		s.writeRichError(w, errors.New("method not allowed"), http.StatusMethodNotAllowed)
+		s.writeRichError(w, errors.NewMethodNotAllowedError(r.Method), http.StatusMethodNotAllowed)
 	}
 }
 
