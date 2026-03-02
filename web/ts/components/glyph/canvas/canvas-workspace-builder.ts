@@ -199,7 +199,18 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
             const result = parsed.result ?? parsed;
             const promptConfig: PromptConfig | undefined = parsed.promptConfig;
             const prompt: string | undefined = parsed.prompt;
-            return createResultGlyph(glyph, result, promptConfig, prompt);
+            const el = createResultGlyph(glyph, result, promptConfig, prompt);
+
+            // Restore follow-up error state if persisted
+            if (parsed.followupError) {
+                el.classList.add('glyph-error');
+                const zone = el.querySelector('.result-followup-zone');
+                const status = el.querySelector('.followup-status');
+                if (zone) zone.classList.add('has-error');
+                if (status) status.textContent = parsed.followupError;
+            }
+
+            return el;
         } catch (err) {
             log.error(SEG.GLYPH, `[Canvas] Result glyph ${glyph.id} has invalid JSON content`, err);
             return createErrorGlyph(
