@@ -63,15 +63,7 @@ export function createResultGlyph(
 
     // Build header first (used as custom drag handle)
     const header = document.createElement('div');
-    header.className = 'result-glyph-header';
-    header.style.padding = '4px 8px';
-    header.style.backgroundColor = 'rgba(51, 52, 51, 0.9)';
-    header.style.borderBottom = '1px solid var(--border-color)';
-    header.style.display = 'flex';
-    header.style.alignItems = 'flex-start';
-    header.style.justifyContent = 'space-between';
-    header.style.fontSize = '11px';
-    header.style.color = 'var(--text-secondary)';
+    header.className = 'glyph-title-bar glyph-title-bar--auto result-glyph-header';
 
     // Prompt label — full multiline prompt text
     if (prompt) {
@@ -93,17 +85,15 @@ export function createResultGlyph(
     buttonContainer.style.gap = '3px';
     buttonContainer.style.flexShrink = '0';
 
-    function headerBtn(label: string, title: string, fontSize = '11px'): HTMLButtonElement {
+    function headerBtn(label: string, title: string): HTMLButtonElement {
         const btn = document.createElement('button');
-        btn.className = 'result-header-btn';
         btn.textContent = label;
         btn.title = title;
-        btn.style.fontSize = fontSize;
         return btn;
     }
 
     // Copy button — copies prompt + result to clipboard
-    const copyBtn = headerBtn('⎘', 'Copy to clipboard', '12px');
+    const copyBtn = headerBtn('⎘', 'Copy to clipboard');
 
     copyBtn.addEventListener('click', () => {
         let text = '';
@@ -118,7 +108,7 @@ export function createResultGlyph(
     buttonContainer.appendChild(copyBtn);
 
     // To window / back to canvas toggle button
-    const toWindowBtn = headerBtn('⬆', 'Expand to window', '10px');
+    const toWindowBtn = headerBtn('⬆', 'Expand to window');
 
     toWindowBtn.addEventListener('click', () => {
         if (isInWindowState(element)) {
@@ -172,13 +162,15 @@ export function createResultGlyph(
                     uiState.removeCanvasGlyph(glyph.id);
                     log.debug(SEG.GLYPH, `[ResultGlyph] Closed from window ${glyph.id}`);
                 },
-                onMinimize: () => {
-                    // Keep glyph data in uiState (needed for tray restoration on refresh)
-                    glyphRun.add({
+                onMinimize: (el: HTMLElement) => {
+                    // Adopt the same element into the tray (preserves DOM identity)
+                    // renderContent/renderTitleBar are fallbacks for page-refresh restoration
+                    glyphRun.adopt(el, {
                         id: glyph.id,
                         title: prompt || 'Result',
                         symbol: 'result',
                         renderContent: () => renderResultContent(result, promptConfig, prompt),
+                        renderTitleBar: () => buildResultTitleBar(result, prompt),
                         onClose: () => {
                             log.debug(SEG.GLYPH, `[ResultGlyph] Closed from tray ${glyph.id}`);
                         },
@@ -215,7 +207,7 @@ export function createResultGlyph(
     buttonContainer.appendChild(toWindowBtn);
 
     // Close button
-    const closeBtn = headerBtn('×', 'Close result', '13px');
+    const closeBtn = headerBtn('×', 'Close result');
 
     closeBtn.addEventListener('click', () => {
         // Check if result is in a composition
@@ -581,6 +573,50 @@ function renderOutput(container: HTMLElement, result: ExecutionResult): void {
         container.style.color = 'var(--text-secondary)';
         container.style.fontStyle = 'italic';
     }
+}
+
+/**
+ * Build a result glyph title bar for tray restoration.
+ * Contains prompt label + copy/close buttons (no expand button — already in window).
+ */
+export function buildResultTitleBar(execResult: ExecutionResult, promptText?: string): HTMLElement {
+    const header = document.createElement('div');
+    header.className = 'glyph-title-bar glyph-title-bar--auto result-glyph-header';
+
+    if (promptText) {
+        const promptLabel = document.createElement('span');
+        promptLabel.className = 'result-prompt-label';
+        promptLabel.style.flex = '1';
+        promptLabel.style.whiteSpace = 'pre-wrap';
+        promptLabel.style.wordBreak = 'break-word';
+        promptLabel.style.padding = '0 8px';
+        promptLabel.style.color = 'var(--text-on-dark)';
+        promptLabel.style.fontSize = '12px';
+        promptLabel.textContent = promptText;
+        header.appendChild(promptLabel);
+    }
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.display = 'flex';
+    buttonContainer.style.gap = '3px';
+    buttonContainer.style.flexShrink = '0';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = '\u2398'; // ⎘
+    copyBtn.title = 'Copy to clipboard';
+    copyBtn.addEventListener('click', () => {
+        let text = '';
+        if (promptText) text += `> ${promptText.replace(/\n/g, '\n> ')}\n\n`;
+        text += execResult.stdout || execResult.error || '(no output)';
+        navigator.clipboard.writeText(text).then(() => {
+            copyBtn.textContent = '\u2713'; // ✓
+            setTimeout(() => { copyBtn.textContent = '\u2398'; }, 1500);
+        });
+    });
+    buttonContainer.appendChild(copyBtn);
+
+    header.appendChild(buttonContainer);
+    return header;
 }
 
 /**

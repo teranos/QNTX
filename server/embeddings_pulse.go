@@ -481,8 +481,14 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 		HandlerName:     ReclusterHandlerName,
 		IntervalSeconds: interval,
 		State:           schedule.StateActive,
-		NextRunAt:       &now,
 	}
+
+	// Only run immediately if there are enough embeddings to cluster
+	count, err := s.embeddingStore.CountEmbeddings()
+	if err == nil && count >= 2 {
+		job.NextRunAt = &now
+	}
+
 	if err := schedStore.CreateJob(job); err != nil {
 		s.logger.Errorw("Failed to create HDBSCAN recluster schedule",
 			"interval_seconds", interval,
@@ -491,7 +497,8 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 	}
 	s.logger.Infow("Auto-created HDBSCAN recluster schedule",
 		"job_id", job.ID,
-		"interval_seconds", interval)
+		"interval_seconds", interval,
+		"embedding_count", count)
 }
 
 // --- Dimensionality reduction projection ---
@@ -739,8 +746,14 @@ func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
 		HandlerName:     ReprojectHandlerName,
 		IntervalSeconds: interval,
 		State:           schedule.StateActive,
-		NextRunAt:       &now,
 	}
+
+	// Only run immediately if there are enough embeddings to project
+	count, err := s.embeddingStore.CountEmbeddings()
+	if err == nil && count >= 2 {
+		job.NextRunAt = &now
+	}
+
 	if err := schedStore.CreateJob(job); err != nil {
 		s.logger.Errorw("Failed to create reproject schedule",
 			"interval_seconds", interval,
@@ -750,7 +763,8 @@ func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
 	s.logger.Infow("Auto-created reproject schedule",
 		"job_id", job.ID,
 		"interval_seconds", interval,
-		"methods", methods)
+		"methods", methods,
+		"embedding_count", count)
 }
 
 // pauseExistingSchedule pauses any active scheduled jobs for the given handler.

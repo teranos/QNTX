@@ -41,6 +41,12 @@ entity_actors_limit = 64
 # Default: 877 (development), fallback 7878 (production)
 port = 877
 
+# Network interface to bind
+# "127.0.0.1" = local only (default), "0.0.0.0" = all interfaces
+# Non-loopback requires auth.enabled = true
+# Environment: QNTX_BIND_ADDRESS
+# bind_address = "127.0.0.1"
+
 # Allowed CORS origins for web UI access
 # Default: localhost and 127.0.0.1 (HTTP and HTTPS), plus Tauri desktop app
 allowed_origins = [
@@ -54,6 +60,19 @@ allowed_origins = [
 # Log output color theme: "everforest" or "gruvbox"
 # Default: "everforest"
 log_theme = "everforest"
+
+# [server.rate_limit]
+# Per-IP token bucket limits.
+# auth_rate = 2        # /auth/* requests per second
+# auth_burst = 5
+# ws_rate = 2          # WebSocket upgrades per second
+# ws_burst = 10
+# write_rate = 20      # POST/PUT/DELETE per second
+# write_burst = 40
+# read_rate = 60       # GET per second
+# read_burst = 120
+# public_rate = 10     # /health, static per second
+# public_burst = 20
 
 # ════════════════════════════════════════════════════════════════
 # Pulse Configuration (Async Job System)

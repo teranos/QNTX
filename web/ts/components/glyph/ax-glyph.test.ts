@@ -97,10 +97,10 @@ describe('AX Glyph - Tim (Happy Path)', () => {
         expect(element.querySelector('.ax-glyph-results')).toBeTruthy();
     });
 
-    test('Tim sees title bar with shared canvas-glyph-title-bar class', () => {
+    test('Tim sees title bar with shared glyph-title-bar class', () => {
         const element = createAxGlyph(makeGlyph('ax-tim-2'));
 
-        const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
         expect(titleBar).toBeTruthy();
         expect(titleBar.style.padding).toBe('4px 4px 4px 8px');
         expect(titleBar.querySelector('span')?.textContent).toBe(AX);
@@ -109,7 +109,7 @@ describe('AX Glyph - Tim (Happy Path)', () => {
 
     test('Tim creates fresh glyph, starts in idle color state', () => {
         const element = createAxGlyph(makeGlyph('ax-tim-3'));
-        const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
 
         expect(element.style.backgroundColor).toBe('rgba(30, 30, 35, 0.92)');
         expect(titleBar.style.backgroundColor).toBe('var(--bg-tertiary)');
@@ -129,7 +129,7 @@ describe('AX Glyph - Tim (Happy Path)', () => {
 
         const element = createAxGlyph(makeGlyph('ax-tim-5'));
         document.body.appendChild(element);
-        const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
 
         // Offline → orange
         expect(element.style.backgroundColor).toBe('rgba(61, 45, 20, 0.92)');
@@ -146,7 +146,7 @@ describe('AX Glyph - Tim (Happy Path)', () => {
 
         const element = createAxGlyph(makeGlyph('ax-tim-6'));
         document.body.appendChild(element);
-        const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
 
         // Offline → orange pair
         expect(element.style.backgroundColor).toBe('rgba(61, 45, 20, 0.92)');
@@ -178,7 +178,7 @@ describe('AX Glyph - Spike (Edge Cases)', () => {
 
         updateAxGlyphError('ax-spike-1', 'bad query', 'error');
 
-        const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
         expect(element.style.backgroundColor).toContain('rgba(61, 31, 31');
         expect(titleBar.style.backgroundColor).toMatch(/#3d1f1f|rgb\(61, 31, 31\)/);
     });
@@ -197,7 +197,7 @@ describe('AX Glyph - Jenny (Power User)', () => {
 
         const element = createAxGlyph(makeGlyph('ax-jenny-1'));
         document.body.appendChild(element);
-        const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+        const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
 
         // Online → teal
         expect(element.style.backgroundColor).toBe('rgba(31, 61, 61, 0.92)');

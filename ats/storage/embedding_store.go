@@ -439,6 +439,16 @@ func (s *EmbeddingStore) GetBySourceIDs(sourceIDs []string) ([]EmbeddingModel, e
 	return results, nil
 }
 
+// CountEmbeddings returns the number of stored embeddings.
+func (s *EmbeddingStore) CountEmbeddings() (int, error) {
+	var count int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM embeddings`).Scan(&count)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to count embeddings")
+	}
+	return count, nil
+}
+
 // GetAllEmbeddingVectors reads all embedding IDs and blobs for HDBSCAN input.
 func (s *EmbeddingStore) GetAllEmbeddingVectors() (ids []string, blobs [][]byte, err error) {
 	rows, err := s.db.Query(`SELECT id, embedding FROM embeddings ORDER BY id`)

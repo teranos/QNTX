@@ -175,3 +175,34 @@ export function mergeCanvasState(
         mergedMinimized: newMinimized.length,
     };
 }
+
+/**
+ * Export canvas as static HTML via server-side rendering
+ * Triggers browser download of self-contained HTML file
+ */
+export async function exportCanvasStatic(canvasId: string): Promise<void> {
+    try {
+        const response = await apiFetch(`/api/canvas/export?canvas_id=${encodeURIComponent(canvasId)}`);
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Canvas export failed');
+        }
+
+        // Get HTML content and trigger download
+        const html = await response.text();
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `canvas-${canvasId}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        log.info(SEG.GLYPH, `[CanvasAPI] Exported canvas ${canvasId} (server-side rendering)`);
+    } catch (error) {
+        log.error(SEG.GLYPH, '[CanvasAPI] Canvas export failed:', error);
+        throw error;
+    }
+}

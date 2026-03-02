@@ -3,11 +3,16 @@
  *
  * Called at app startup to discover glyphs from plugins.
  * Registers each glyph type in the global registry for spawn menu and canvas rendering.
+ *
+ * Two rendering paths:
+ * 1. module_url set → TypeScript module with GlyphUI injection (preferred)
+ * 2. content_url only → server-rendered HTML via innerHTML (legacy)
  */
 
 import { registerGlyphType } from './glyph-registry';
 import { createPluginGlyph } from './plugin-glyph';
-import { apiFetch } from '../../api';
+import { createPluginGlyphFromModule } from './glyph-module-loader';
+import { apiFetch, getBackendUrl } from '../../api';
 import { log, SEG } from '../../logger';
 import type { Glyph } from './glyph';
 
@@ -18,6 +23,7 @@ export interface PluginGlyphDef {
     label: string;
     content_url: string;
     css_url?: string;
+    module_url?: string;
     default_width?: number;
     default_height?: number;
 }
@@ -37,9 +43,7 @@ export function loadPluginCSS(url: string): void {
     if (loadedCSS.has(url)) return;
     loadedCSS.add(url);
 
-    // Use absolute URL to backend (dev mode: frontend on :8826, backend on :8776)
-    const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
-    const absoluteUrl = backendUrl + url;
+    const absoluteUrl = getBackendUrl() + url;
 
     const link = document.createElement('link');
     link.rel = 'stylesheet';
@@ -73,12 +77,17 @@ function registerPluginGlyphType(def: PluginGlyphDef): void {
     // Track symbol → plugin name mapping for placeholder fallback
     pluginSymbols.set(def.symbol, def.plugin);
 
+    // module_url → TypeScript SDK path; content_url → legacy HTML path
+    const renderer = def.module_url
+        ? (glyph: Glyph) => createPluginGlyphFromModule(glyph, def)
+        : (glyph: Glyph) => createPluginGlyph(glyph, def);
+
     registerGlyphType({
         symbol: def.symbol,
         className: `canvas-plugin-glyph plugin-${def.plugin}`,
         title: def.title,
         label: def.label,
         pluginName: def.plugin,
-        render: (glyph: Glyph) => createPluginGlyph(glyph, def),
+        render: renderer,
     });
 }

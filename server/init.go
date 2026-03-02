@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
@@ -163,10 +164,26 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		}
 	}
 
+	// Security: non-loopback bind requires authentication
+	bindAddr := deps.config.Server.BindAddress
+	if bindAddr == "" {
+		bindAddr = "127.0.0.1"
+	}
+	if !appcfg.IsLoopbackAddress(bindAddr) && !deps.config.Auth.Enabled {
+		return nil, errors.Newf(
+			"auth.enabled must be true when server.bind_address is %q (non-loopback bind exposes all endpoints to the network)",
+			bindAddr,
+		)
+	}
+
+	// Initialize per-IP rate limiters from config
+	rl := deps.config.Server.RateLimit
+
 	// Create server instance (before ticker so we can pass it as broadcaster)
 	server := &QNTXServer{
 		db:            db,
 		dbPath:        dbPath,
+		bindAddress:   bindAddr,
 		builder:       deps.builder,
 		langService:   deps.langService,
 		usageTracker:  deps.usageTracker,
@@ -184,6 +201,11 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		wsCore:        wsCore,
 		consoleBuffer: consoleBuffer, // Browser console log buffer with terminal printing
 		initialQuery:  query,
+		rlAuth:        newRateLimitGroup(rl.AuthRate, rl.AuthBurst),
+		rlWS:          newRateLimitGroup(rl.WSRate, rl.WSBurst),
+		rlWrite:       newRateLimitGroup(rl.WriteRate, rl.WriteBurst),
+		rlRead:        newRateLimitGroup(rl.ReadRate, rl.ReadBurst),
+		rlPublic:      newRateLimitGroup(rl.PublicRate, rl.PublicBurst),
 		ctx:           ctx,
 		cancel:        cancel,
 	}
@@ -203,7 +225,12 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		if deps.config.Server.Port != nil {
 			serverPort = *deps.config.Server.Port
 		}
-		authHandler, err := auth.New(db, serverPort, deps.config.Server.FrontendPort, deps.config.Auth.SessionExpiryHours, serverLogger, server.corsMiddleware)
+		// Auth routes: rate limit BEFORE CORS so brute-force attempts are rejected early.
+		// CORS still runs first for OPTIONS preflight (corsMiddleware short-circuits OPTIONS with 200).
+		authCorsWrap := func(handler http.HandlerFunc) http.HandlerFunc {
+			return server.rateLimitAuthMiddleware(server.corsMiddleware(handler))
+		}
+		authHandler, err := auth.New(db, serverPort, deps.config.Server.FrontendPort, deps.config.Auth.SessionExpiryHours, serverLogger, authCorsWrap)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to initialize WebAuthn auth")
 		}
@@ -338,6 +365,12 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	if server.watcherEngine != nil {
 		canvasOpts = append(canvasOpts, handlers.WithWatcherEngine(server.watcherEngine, serverLogger))
 	}
+	// Pass server port for internal plugin calls
+	serverPort := appcfg.DefaultServerPort
+	if deps.config.Server.Port != nil {
+		serverPort = *deps.config.Server.Port
+	}
+	canvasOpts = append(canvasOpts, handlers.WithServerPort(serverPort))
 	server.canvasHandler = handlers.NewCanvasHandler(canvasStore, canvasOpts...)
 	serverLogger.Infow("Canvas state handlers initialized")
 
@@ -359,16 +392,25 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		}
 	}
 
-	// Initialize sync tree and observer for content-addressed attestation sync
-	setupSync(server, db, serverLogger)
+	// Initialize sync tree and observer for content-addressed attestation sync.
+	// Sync is disabled on non-loopback bind because the /ws/sync endpoint has no
+	// peer authentication. See https://github.com/teranos/QNTX/issues/643
+	if appcfg.IsLoopbackAddress(bindAddr) {
+		setupSync(server, db, serverLogger)
 
-	// Start periodic sync with configured peers
-	if deps.config.Sync.IntervalSeconds > 0 && server.syncTree != nil {
-		server.wg.Add(1)
-		go func() {
-			defer server.wg.Done()
-			server.startSyncTicker(ctx, time.Duration(deps.config.Sync.IntervalSeconds)*time.Second)
-		}()
+		// Start periodic sync with configured peers
+		if deps.config.Sync.IntervalSeconds > 0 && server.syncTree != nil {
+			server.wg.Add(1)
+			go func() {
+				defer server.wg.Done()
+				server.startSyncTicker(ctx, time.Duration(deps.config.Sync.IntervalSeconds)*time.Second)
+			}()
+		}
+	} else {
+		serverLogger.Infow("Sync disabled on non-loopback bind (no peer authentication)",
+			"bind_address", bindAddr,
+			"issue", "https://github.com/teranos/QNTX/issues/643",
+		)
 	}
 
 	// Set up config file watcher for auto-reload
