@@ -1,0 +1,40 @@
+[package]
+name = "qntx-vidstream-plugin"
+version = "0.1.0"
+edition.workspace = true
+description = "QNTX gRPC plugin for real-time video inference via ONNX"
+license.workspace = true
+authors = ["QNTX Contributors"]
+
+[[bin]]
+name = "qntx-vidstream-plugin"
+path = "src/main.rs"
+
+[dependencies]
+# QNTX gRPC infrastructure
+qntx-grpc = { path = "../crates/qntx-grpc", features = ["plugin"] }
+qntx-proto = { path = "../crates/qntx-proto" }
+
+# Video engine (direct Rust dependency — no FFI/CGO bridge)
+qntx-vidstream = { path = "../ats/vidstream" }
+
+# gRPC and async
+tonic.workspace = true
+prost.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Utilities
+thiserror.workspace = true
+parking_lot.workspace = true
