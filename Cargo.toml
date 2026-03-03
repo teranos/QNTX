@@ -10,11 +10,12 @@ members = [
     "crates/qntx-wasm",
     "qntx-python",
     "qntx-reduce",
+    "qntx-vidstream",
     "web/src-tauri",
 ]
 exclude = [
     "ats/ax/fuzzy-ax",      # CGO library for Go, not part of Rust ecosystem
-    "ats/vidstream",        # CGO library for Go, not part of Rust ecosystem
+    "ats/vidstream",        # Rust engine, excluded from workspace (used via path dep by qntx-vidstream plugin)
     "ats/embeddings",       # CGO library for Go, not part of Rust ecosystem
 ]
 
