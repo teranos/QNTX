@@ -8,7 +8,6 @@ type Config struct {
 	Pulse          PulseConfig          `mapstructure:"pulse"`
 	Code           CodeConfig           `mapstructure:"code"`
 	LocalInference LocalInferenceConfig `mapstructure:"local_inference"`
-	OpenRouter     OpenRouterConfig     `mapstructure:"openrouter"`
 	Ax             AxConfig             `mapstructure:"ax"`
 	Plugin         PluginConfig         `mapstructure:"plugin"`
 	Embeddings     EmbeddingsConfig     `mapstructure:"embeddings"`
@@ -41,7 +40,7 @@ type DatabaseConfig struct {
 }
 
 // BoundedStorageConfig configures storage limits for attestations.
-// Values <= 0 default to: ActorContextLimit=16, ActorContextsLimit=64, EntityActorsLimit=64.
+// Omit fields for defaults: ActorContextLimit=16, ActorContextsLimit=64, EntityActorsLimit=64.
 type BoundedStorageConfig struct {
 	ActorContextLimit  int `mapstructure:"actor_context_limit"`  // attestations per (actor, context) pair (default: 16)
 	ActorContextsLimit int `mapstructure:"actor_contexts_limit"` // contexts per actor (default: 64)
@@ -50,11 +49,26 @@ type BoundedStorageConfig struct {
 
 // ServerConfig configures the QNTX web server
 type ServerConfig struct {
-	Port           *int     `mapstructure:"port"`          // Server port: nil = default 877, 0 is invalid (omit for default)
-	BindAddress    string   `mapstructure:"bind_address"`  // Network interface to bind: "127.0.0.1" (default, local only) or "0.0.0.0" (all interfaces)
-	FrontendPort   int      `mapstructure:"frontend_port"` // Frontend dev server port (default: 8820)
-	AllowedOrigins []string `mapstructure:"allowed_origins"`
-	LogTheme       string   `mapstructure:"log_theme"` // Color theme: gruvbox, everforest
+	Port           *int            `mapstructure:"port"`          // Server port: nil = default 877, 0 is invalid (omit for default)
+	BindAddress    string          `mapstructure:"bind_address"`  // Network interface to bind: "127.0.0.1" (default, local only) or "0.0.0.0" (all interfaces)
+	FrontendPort   int             `mapstructure:"frontend_port"` // Frontend dev server port (default: 8820)
+	AllowedOrigins []string        `mapstructure:"allowed_origins"`
+	LogTheme       string          `mapstructure:"log_theme"`  // Color theme: gruvbox, everforest
+	RateLimit      RateLimitConfig `mapstructure:"rate_limit"` // Per-IP rate limiting
+}
+
+// RateLimitConfig configures per-IP token bucket rate limits.
+type RateLimitConfig struct {
+	AuthRate    float64 `mapstructure:"auth_rate"`    // /auth/* requests per second (default: 2)
+	AuthBurst   int     `mapstructure:"auth_burst"`   // /auth/* burst capacity (default: 5)
+	WSRate      float64 `mapstructure:"ws_rate"`      // WebSocket upgrades per second (default: 2)
+	WSBurst     int     `mapstructure:"ws_burst"`     // WebSocket burst capacity (default: 10)
+	WriteRate   float64 `mapstructure:"write_rate"`   // POST/PUT/DELETE per second (default: 20)
+	WriteBurst  int     `mapstructure:"write_burst"`  // Write burst capacity (default: 40)
+	ReadRate    float64 `mapstructure:"read_rate"`    // GET per second (default: 60)
+	ReadBurst   int     `mapstructure:"read_burst"`   // Read burst capacity (default: 120)
+	PublicRate  float64 `mapstructure:"public_rate"`  // /health, static per second (default: 10)
+	PublicBurst int     `mapstructure:"public_burst"` // Public burst capacity (default: 20)
 }
 
 // Server port constants
@@ -113,14 +127,6 @@ type LocalInferenceConfig struct {
 	ONNXModelPath  string `mapstructure:"onnx_model_path"` // Path to ONNX model for vidstream (default: ats/vidstream/models/yolo11n.onnx)
 }
 
-// OpenRouterConfig configures OpenRouter.ai API access
-type OpenRouterConfig struct {
-	APIKey      string   `mapstructure:"api_key"`     // OpenRouter API key
-	Model       string   `mapstructure:"model"`       // Default model (e.g., "openai/gpt-4o-mini")
-	Temperature *float64 `mapstructure:"temperature"` // Sampling temperature (nil = default 0.2)
-	MaxTokens   *int     `mapstructure:"max_tokens"`  // Maximum tokens per request (nil = default 1000)
-}
-
 // AxConfig configures the attestation query system
 type AxConfig struct {
 	DefaultActor string `mapstructure:"default_actor"`
@@ -158,14 +164,14 @@ type EmbeddingsConfig struct {
 	Path                     string   `mapstructure:"path"`                       // Path to ONNX model file
 	Name                     string   `mapstructure:"name"`                       // Model identifier for metadata
 	ClusterThreshold         float64  `mapstructure:"cluster_threshold"`          // Minimum similarity for cluster assignment (default: 0.5)
-	ReclusterIntervalSeconds int      `mapstructure:"recluster_interval_seconds"` // Pulse schedule interval for HDBSCAN re-clustering (0 = disabled)
-	ReprojectIntervalSeconds int      `mapstructure:"reproject_interval_seconds"` // Pulse schedule interval for UMAP re-projection (0 = disabled)
+	ReclusterIntervalSeconds *int     `mapstructure:"recluster_interval_seconds"` // Pulse schedule interval for HDBSCAN re-clustering (nil = not scheduled, omit for default)
+	ReprojectIntervalSeconds *int     `mapstructure:"reproject_interval_seconds"` // Pulse schedule interval for UMAP re-projection (nil = not scheduled, omit for default)
 	MinClusterSize           int      `mapstructure:"min_cluster_size"`           // Minimum cluster size for HDBSCAN (default: 5)
 	ClusterMatchThreshold    float64  `mapstructure:"cluster_match_threshold"`    // Cosine similarity threshold for stable cluster matching (default: 0.7)
 	ProjectionMethods        []string `mapstructure:"projection_methods"`         // Dimensionality reduction methods: umap, tsne, pca (default: ["umap"])
 
 	// Cluster labeling via LLM
-	ClusterLabelIntervalSeconds int    `mapstructure:"cluster_label_interval_seconds"` // Pulse schedule interval (0 = disabled)
+	ClusterLabelIntervalSeconds *int   `mapstructure:"cluster_label_interval_seconds"` // Pulse schedule interval (nil = not scheduled, omit for default)
 	ClusterLabelMinSize         int    `mapstructure:"cluster_label_min_size"`         // Min members to be eligible for labeling
 	ClusterLabelSampleSize      int    `mapstructure:"cluster_label_sample_size"`      // Random samples sent to LLM
 	ClusterLabelMaxPerCycle     int    `mapstructure:"cluster_label_max_per_cycle"`    // Max clusters labeled per run

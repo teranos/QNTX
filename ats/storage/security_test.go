@@ -9,17 +9,13 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/ax"
-	"github.com/teranos/QNTX/ats/storage/testutil"
 	"github.com/teranos/QNTX/ats/types"
 )
 
 // TestSQLInjectionPrevention verifies that query builders properly escape
 // and parameterize user inputs to prevent SQL injection attacks.
 func TestSQLInjectionPrevention(t *testing.T) {
-	testDB := testutil.SetupTestDB(t)
-	defer testDB.Close()
-
-	store := NewSQLStore(testDB, nil)
+	store, testDB := createTestStore(t)
 	now := time.Now()
 
 	// Insert test attestations with normal values
@@ -132,10 +128,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 // TestNumericPredicateParameterization verifies that numeric predicate
 // queries use proper parameterization instead of string interpolation.
 func TestNumericPredicateParameterization(t *testing.T) {
-	testDB := testutil.SetupTestDB(t)
-	defer testDB.Close()
-
-	store := NewSQLStore(testDB, nil)
+	store, testDB := createTestStore(t)
 	now := time.Now()
 
 	// Insert attestation with numeric context

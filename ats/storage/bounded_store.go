@@ -32,7 +32,7 @@ const (
 // BoundedStore implements configurable storage limits for attestations
 type BoundedStore struct {
 	db     *sql.DB
-	store  *SQLStore
+	store  ats.AttestationStore
 	logger *zap.SugaredLogger
 	config *BoundedStoreConfig
 
@@ -42,39 +42,30 @@ type BoundedStore struct {
 	typeFieldsCacheTime time.Time
 }
 
-// NewBoundedStore creates a new bounded storage manager with default limits (16/64/64)
-func NewBoundedStore(db *sql.DB, logger *zap.SugaredLogger) *BoundedStore {
-	return NewBoundedStoreWithConfig(db, logger, nil)
+// NewBoundedStore creates a new bounded storage manager with default limits (16/64/64).
+// store may be nil when only enforcement/rich-field methods are needed.
+func NewBoundedStore(db *sql.DB, store ats.AttestationStore, logger *zap.SugaredLogger) *BoundedStore {
+	return NewBoundedStoreWithConfig(db, store, logger, nil)
 }
 
-// NewBoundedStoreWithConfig creates a bounded storage manager with custom limits
-// Pass nil config to use defaults (16/64/64)
-func NewBoundedStoreWithConfig(db *sql.DB, logger *zap.SugaredLogger, config *BoundedStoreConfig) *BoundedStore {
+// NewBoundedStoreWithConfig creates a bounded storage manager with custom limits.
+// store may be nil when only enforcement/rich-field methods are needed.
+// Pass nil config to use defaults (16/64/64).
+func NewBoundedStoreWithConfig(db *sql.DB, store ats.AttestationStore, logger *zap.SugaredLogger, config *BoundedStoreConfig) *BoundedStore {
 	if config == nil {
 		config = DefaultBoundedStoreConfig()
 	}
 
-	// Validate config: zero or negative limits are invalid (use positive limits)
-	if config.ActorContextLimit <= 0 {
-		config.ActorContextLimit = DefaultActorContextLimit
-	}
-	if config.ActorContextsLimit <= 0 {
-		config.ActorContextsLimit = DefaultActorContextsLimit
-	}
-	if config.EntityActorsLimit <= 0 {
-		config.EntityActorsLimit = DefaultEntityActorsLimit
-	}
-
 	return &BoundedStore{
 		db:     db,
-		store:  NewSQLStore(db, logger),
+		store:  store,
 		logger: logger,
 		config: config,
 	}
 }
 
 // CreateAttestation inserts a new attestation into the database with quota enforcement (implements ats.AttestationStore)
-// Note: Observer notification is handled by SQLStore.CreateAttestation
+// Note: Observer notification is handled by RustBackedStore.CreateAttestation
 func (bs *BoundedStore) CreateAttestation(as *types.As) error {
 	if err := bs.store.CreateAttestation(as); err != nil {
 		return errors.Wrap(err, "failed to create attestation")
@@ -92,7 +83,7 @@ func (bs *BoundedStore) AttestationExists(asid string) bool {
 }
 
 // GenerateAndCreateAttestation generates a vanity ASID and creates a self-certifying attestation (implements ats.AttestationStore)
-// Note: Observer notification is handled by SQLStore.CreateAttestation (called internally)
+// Note: Observer notification is handled by RustBackedStore.CreateAttestation (called internally)
 func (bs *BoundedStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
 	return bs.store.GenerateAndCreateAttestation(ctx, cmd)
 }
@@ -103,9 +94,9 @@ func (bs *BoundedStore) GetAttestations(filters ats.AttestationFilter) ([]*types
 }
 
 // CreateAttestationWithLimits creates an attestation and enforces storage limits (implements ats.BoundedStore)
-// Note: Observer notification is handled by SQLStore.CreateAttestation (called internally)
+// Note: Observer notification is handled by RustBackedStore.CreateAttestation (called internally)
 func (bs *BoundedStore) CreateAttestationWithLimits(cmd *types.AsCommand) (*types.As, error) {
-	// First create the attestation (observer notification happens in SQLStore)
+	// First create the attestation (observer notification happens in RustBackedStore)
 	as, err := bs.store.GenerateAndCreateAttestation(context.Background(), cmd)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create attestation")

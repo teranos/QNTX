@@ -65,15 +65,26 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Bounded storage limits: 0 = use default (per struct docs), negative = invalid
-	if c.Database.BoundedStorage.ActorContextLimit < 0 {
-		return errors.Newf("database.bounded_storage.actor_context_limit must be >= 0, got %d", c.Database.BoundedStorage.ActorContextLimit)
+	// Bounded storage limits: must be positive (omit for defaults: 16/64/64)
+	if c.Database.BoundedStorage.ActorContextLimit <= 0 {
+		return errors.Newf("database.bounded_storage.actor_context_limit must be > 0, got %d (omit for default 16)", c.Database.BoundedStorage.ActorContextLimit)
 	}
-	if c.Database.BoundedStorage.ActorContextsLimit < 0 {
-		return errors.Newf("database.bounded_storage.actor_contexts_limit must be >= 0, got %d", c.Database.BoundedStorage.ActorContextsLimit)
+	if c.Database.BoundedStorage.ActorContextsLimit <= 0 {
+		return errors.Newf("database.bounded_storage.actor_contexts_limit must be > 0, got %d (omit for default 64)", c.Database.BoundedStorage.ActorContextsLimit)
 	}
-	if c.Database.BoundedStorage.EntityActorsLimit < 0 {
-		return errors.Newf("database.bounded_storage.entity_actors_limit must be >= 0, got %d", c.Database.BoundedStorage.EntityActorsLimit)
+	if c.Database.BoundedStorage.EntityActorsLimit <= 0 {
+		return errors.Newf("database.bounded_storage.entity_actors_limit must be > 0, got %d (omit for default 64)", c.Database.BoundedStorage.EntityActorsLimit)
+	}
+
+	// Embeddings intervals: nil = not scheduled (default), must be positive when set
+	if c.Embeddings.ReclusterIntervalSeconds != nil && *c.Embeddings.ReclusterIntervalSeconds <= 0 {
+		return errors.Newf("embeddings.recluster_interval_seconds must be > 0 when set, got %d (omit to disable)", *c.Embeddings.ReclusterIntervalSeconds)
+	}
+	if c.Embeddings.ReprojectIntervalSeconds != nil && *c.Embeddings.ReprojectIntervalSeconds <= 0 {
+		return errors.Newf("embeddings.reproject_interval_seconds must be > 0 when set, got %d (omit to disable)", *c.Embeddings.ReprojectIntervalSeconds)
+	}
+	if c.Embeddings.ClusterLabelIntervalSeconds != nil && *c.Embeddings.ClusterLabelIntervalSeconds <= 0 {
+		return errors.Newf("embeddings.cluster_label_interval_seconds must be > 0 when set, got %d (omit to disable)", *c.Embeddings.ClusterLabelIntervalSeconds)
 	}
 
 	return nil
