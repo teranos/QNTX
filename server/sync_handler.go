@@ -11,7 +11,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	appcfg "github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/ats/storage"
 	syncPkg "github.com/teranos/QNTX/sync"
 )
 
@@ -41,7 +40,7 @@ func (s *QNTXServer) HandleSyncWebSocket(w http.ResponseWriter, r *http.Request)
 	}
 
 	cfg, _ := appcfg.Load()
-	store := storage.NewSQLStore(s.db, s.logger)
+	store := s.atsStore
 	wsConn := &gorillaSyncConn{conn: conn}
 	peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.budgetTracker, s.logger)
 	if cfg != nil {
@@ -130,7 +129,7 @@ func (s *QNTXServer) HandleSync(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	store := storage.NewSQLStore(s.db, s.logger)
+	store := s.atsStore
 	wsConn := &gorillaSyncConn{conn: conn}
 	peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.budgetTracker, s.logger)
 	peer.Name = peerName
@@ -338,7 +337,7 @@ func (s *QNTXServer) syncAllPeers(ctx context.Context, st *syncTickState) {
 			continue
 		}
 
-		store := storage.NewSQLStore(s.db, s.logger)
+		store := s.atsStore
 		wsConn := &gorillaSyncConn{conn: conn}
 		peer := syncPkg.NewPeer(wsConn, s.syncTree, store, s.budgetTracker, s.logger)
 		peer.Name = name

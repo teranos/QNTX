@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"database/sql"
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"strings"
 	"testing"
 	"time"
@@ -97,8 +96,8 @@ func normalizePredicate(pred string) string {
 // setupDomainTestDB creates a test database with recruiting-domain attestations.
 // Uses real migrations to ensure test schema matches production schema.
 func setupDomainTestDB(t *testing.T) *sql.DB {
-	// Create in-memory test database
-	testDB := qntxtest.CreateTestDB(t)
+	// Create file-backed test database with Rust-backed store for CRUD
+	store, testDB := createTestStore(t)
 
 	// Create test attestations with predicate-context pairs
 	testTime := time.Now()
@@ -311,7 +310,6 @@ func setupDomainTestDB(t *testing.T) *sql.DB {
 	}
 
 	// Insert attestations
-	store := NewSQLStore(testDB, nil)
 	for _, attestation := range testAttestations {
 		err := store.CreateAttestation(attestation)
 		require.NoError(t, err)
@@ -562,7 +560,7 @@ func TestPredicateContextMatching(t *testing.T) {
 // This test showcases how context queries now work regardless of casing differences
 func TestCaseInsensitiveContextMatching(t *testing.T) {
 	// Create test database with mixed case data to demonstrate case-insensitive matching
-	testDB := qntxtest.CreateTestDB(t)
+	store, testDB := createTestStore(t)
 
 	// Insert test data with intentionally mixed casing
 	testTime := time.Now()
@@ -597,7 +595,6 @@ func TestCaseInsensitiveContextMatching(t *testing.T) {
 	}
 
 	// Insert all test attestations
-	store := NewSQLStore(testDB, nil)
 	for _, att := range testAttestations {
 		err := store.CreateAttestation(att)
 		require.NoError(t, err)

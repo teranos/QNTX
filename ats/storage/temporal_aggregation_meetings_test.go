@@ -12,7 +12,6 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
 // ==============================================================================
@@ -65,7 +64,7 @@ type meetingAttendance struct {
 	attestedAt   time.Time
 }
 
-func createMeetingAttestation(t *testing.T, store *SQLStore, meeting *meetingAttendance) {
+func createMeetingAttestation(t *testing.T, store ats.AttestationStore, meeting *meetingAttendance) {
 	metadata := map[string]interface{}{
 		"start_time":   meeting.startTime.Format(time.RFC3339),
 		"end_time":     meeting.endTime.Format(time.RFC3339),
@@ -94,8 +93,7 @@ func createMeetingAttestation(t *testing.T, store *SQLStore, meeting *meetingAtt
 
 // setupBasicMeetingsTestDB creates test database with meeting attestations
 func setupBasicMeetingsTestDB(t *testing.T) *sql.DB {
-	testDB := qntxtest.CreateTestDB(t)
-	store := NewSQLStore(testDB, nil)
+	store, testDB := createTestStore(t)
 
 	now := time.Now()
 	attestationTime := now.Add(-1 * time.Hour)
@@ -352,8 +350,7 @@ func TestMeetingTemporalAggregation_Basic(t *testing.T) {
 
 // setupOverlappingMeetingsTestDB creates test database with overlapping meetings
 func setupOverlappingMeetingsTestDB(t *testing.T) *sql.DB {
-	testDB := qntxtest.CreateTestDB(t)
-	store := NewSQLStore(testDB, nil)
+	store, testDB := createTestStore(t)
 
 	now := time.Now()
 	attestationTime := now.Add(-1 * time.Hour)
@@ -507,8 +504,7 @@ func TestMeetingTemporalAggregation_OverlapDetection(t *testing.T) {
 
 // setupRealisticOverlapsTestDB creates realistic double-booking scenario
 func setupRealisticOverlapsTestDB(t *testing.T) *sql.DB {
-	testDB := qntxtest.CreateTestDB(t)
-	store := NewSQLStore(testDB, nil)
+	store, testDB := createTestStore(t)
 
 	now := time.Now()
 	attestationTime := now.Add(-1 * time.Hour)

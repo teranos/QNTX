@@ -21,17 +21,17 @@ type AttestationItem = ingestion.Item
 // BatchPersister handles batch attestation persistence with error tracking and statistics
 type BatchPersister struct {
 	db           *sql.DB
-	store        *SQLStore
+	store        ats.AttestationStore
 	actor        string
 	source       string
 	boundedStore *BoundedStore // Optional: for predictive storage warnings
 }
 
 // NewBatchPersister creates a new batch attestation persister
-func NewBatchPersister(db *sql.DB, actor, source string) *BatchPersister {
+func NewBatchPersister(db *sql.DB, store ats.AttestationStore, actor, source string) *BatchPersister {
 	return &BatchPersister{
 		db:     db,
-		store:  NewSQLStore(db, nil),
+		store:  store,
 		actor:  actor,
 		source: source,
 	}
