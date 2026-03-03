@@ -4,6 +4,10 @@
  * Replaces legacy terminal.html. xterm.js is bundled by bun build
  * instead of loaded from CDN. Backend URL comes from GlyphUI
  * instead of being hardcoded.
+ *
+ * TODO(#650): Keyboard input reaches xterm (onData fires) but typed
+ * characters don't echo back from the PTY. The send path between
+ * onData and the WebSocket needs investigation.
  */
 
 import type { Glyph, GlyphUI, RenderFn } from '@qntx/glyphs';
