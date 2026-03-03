@@ -13,8 +13,8 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-// RemoteATSStore is a gRPC client wrapper for storage.SQLStore.
-// It implements the subset of SQLStore methods needed by plugins.
+// RemoteATSStore is a gRPC client wrapper for the attestation store.
+// It implements the subset of AttestationStore methods needed by plugins.
 type RemoteATSStore struct {
 	client    protocol.ATSStoreServiceClient
 	conn      *grpc.ClientConn

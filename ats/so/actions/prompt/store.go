@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
@@ -31,14 +32,14 @@ type StoredPrompt struct {
 // PromptStore handles prompt persistence as attestations
 type PromptStore struct {
 	db    *sql.DB
-	store *storage.SQLStore
+	store ats.AttestationStore
 }
 
 // NewPromptStore creates a new prompt store
-func NewPromptStore(db *sql.DB) *PromptStore {
+func NewPromptStore(db *sql.DB, store ats.AttestationStore) *PromptStore {
 	return &PromptStore{
 		db:    db,
-		store: storage.NewSQLStore(db, nil),
+		store: store,
 	}
 }
 

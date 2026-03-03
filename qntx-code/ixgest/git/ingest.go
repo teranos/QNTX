@@ -3,7 +3,6 @@ package git
 // Git repository ingestion for QNTX attestation system.
 
 import (
-	"database/sql"
 	"fmt"
 	"go/parser"
 	"go/token"
@@ -16,7 +15,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/QNTX/ats/storage"
 	atstypes "github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/ixgest/types"
@@ -43,7 +41,6 @@ const (
 // Capture: PR metadata, status, reviews, CI/CD pipeline results
 // Actor strategy: Use per-PR actors like "pr-{number}@github"
 type GitIxProcessor struct {
-	db           *sql.DB
 	store        ats.AttestationStore // Interface for attestation storage (supports plugin callbacks)
 	dryRun       bool
 	defaultActor string // Used for repo-level attestations (branches)
@@ -90,31 +87,12 @@ type GitBranchResult struct {
 	Attestations     []string `json:"attestations,omitempty"`
 }
 
-// NewGitIxProcessor creates a new git ix processor with database connection.
-// This constructor creates an SQLStore internally - use NewGitIxProcessorWithStore
-// for plugin integration with service callbacks.
-func NewGitIxProcessor(db *sql.DB, dryRun bool, actor string, verbosity int, logger *zap.SugaredLogger) *GitIxProcessor {
+// NewGitIxProcessor creates a new git ix processor with an attestation store.
+func NewGitIxProcessor(store ats.AttestationStore, dryRun bool, actor string, verbosity int, logger *zap.SugaredLogger) *GitIxProcessor {
 	if actor == "" {
 		actor = "ixgest-git@repo" // Used for repo-level attestations (branches)
 	}
 	return &GitIxProcessor{
-		db:           db,
-		store:        storage.NewSQLStore(db, logger),
-		dryRun:       dryRun,
-		defaultActor: actor,
-		verbosity:    verbosity,
-		logger:       logger,
-	}
-}
-
-// NewGitIxProcessorWithStore creates a new git ix processor with an existing AttestationStore.
-// This allows plugin integration where the store comes from ServiceRegistry.ATSStore().
-func NewGitIxProcessorWithStore(store ats.AttestationStore, dryRun bool, actor string, verbosity int, logger *zap.SugaredLogger) *GitIxProcessor {
-	if actor == "" {
-		actor = "ixgest-git@repo"
-	}
-	return &GitIxProcessor{
-		db:           nil, // Not needed when store is provided directly
 		store:        store,
 		dryRun:       dryRun,
 		defaultActor: actor,
@@ -122,6 +100,9 @@ func NewGitIxProcessorWithStore(store ats.AttestationStore, dryRun bool, actor s
 		logger:       logger,
 	}
 }
+
+// NewGitIxProcessorWithStore is an alias for NewGitIxProcessor.
+var NewGitIxProcessorWithStore = NewGitIxProcessor
 
 // SetSince configures the processor to only ingest commits after the given
 // timestamp or commit hash. Supports:
