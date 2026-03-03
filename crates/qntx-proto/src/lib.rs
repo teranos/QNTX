@@ -17,6 +17,9 @@ pub use protocol::*;
 // Custom serde for prost_types::Struct ↔ JSON object
 pub mod serde_struct;
 
+// Base64 serde for Vec<u8> fields (Go's []byte JSON encoding)
+pub mod base64_serde;
+
 // Proto conversion utilities for attestations
 pub mod proto_convert;
 

@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"database/sql"
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"testing"
 	"time"
 
@@ -15,8 +14,8 @@ import (
 )
 
 func setupTestDatabaseWithAttestations(t *testing.T) *sql.DB {
-	// Create in-memory test database
-	testDB := qntxtest.CreateTestDB(t)
+	// Create file-backed test database with Rust-backed store for CRUD
+	store, testDB := createTestStore(t)
 
 	// Create test attestations using the existing CreateAttestation function
 	testTime1, _ := time.Parse(time.RFC3339, "2024-01-01T00:00:00Z")
@@ -79,7 +78,6 @@ func setupTestDatabaseWithAttestations(t *testing.T) *sql.DB {
 	}
 
 	// Insert using the CreateAttestation function from storage package
-	store := NewSQLStore(testDB, nil)
 	for _, attestation := range testAttestations {
 		err := store.CreateAttestation(attestation)
 		require.NoError(t, err)

@@ -218,7 +218,7 @@ func TestBuildTemporalFilters(t *testing.T) {
 
 		assert.Equal(t, 1, len(qb.whereClauses))
 		assert.Contains(t, qb.whereClauses[0], "timestamp >")
-		assert.Equal(t, &now, qb.args[0])
+		assert.Equal(t, now.UTC().Format(time.RFC3339), qb.args[0])
 	})
 
 	t.Run("with end time", func(t *testing.T) {
@@ -230,7 +230,7 @@ func TestBuildTemporalFilters(t *testing.T) {
 
 		assert.Equal(t, 1, len(qb.whereClauses))
 		assert.Contains(t, qb.whereClauses[0], "timestamp <=")
-		assert.Equal(t, &later, qb.args[0])
+		assert.Equal(t, later.UTC().Format(time.RFC3339), qb.args[0])
 	})
 
 	t.Run("with both start and end", func(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -17,7 +17,7 @@ import (
 )
 
 // startATSStoreServer starts an ATSStoreService gRPC server for testing
-func startATSStoreServer(t *testing.T, store *storage.SQLStore, authToken string) (string, func()) {
+func startATSStoreServer(t *testing.T, store ats.AttestationStore, authToken string) (string, func()) {
 	t.Helper()
 	logger := zaptest.NewLogger(t).Sugar()
 	server := NewATSStoreServer(store, authToken, logger)
@@ -43,9 +43,8 @@ func startATSStoreServer(t *testing.T, store *storage.SQLStore, authToken string
 }
 
 func TestRemoteATSStore_CreateAttestation(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	store, _ := qntxtest.CreateTestStore(t)
 	logger := zaptest.NewLogger(t).Sugar()
-	store := storage.NewSQLStore(db, logger)
 
 	authToken := "test-token"
 	addr, cleanup := startATSStoreServer(t, store, authToken)
@@ -78,9 +77,8 @@ func TestRemoteATSStore_CreateAttestation(t *testing.T) {
 }
 
 func TestRemoteATSStore_CreateAttestation_InvalidToken(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	store, _ := qntxtest.CreateTestStore(t)
 	logger := zaptest.NewLogger(t).Sugar()
-	store := storage.NewSQLStore(db, logger)
 
 	authToken := "correct-token"
 	addr, cleanup := startATSStoreServer(t, store, authToken)

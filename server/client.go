@@ -813,7 +813,7 @@ func (c *Client) handleGetDatabaseStats() {
 	}
 
 	// Get discovered rich fields with statistics from a bounded store instance
-	boundedStore := storage.NewBoundedStore(c.server.db, c.server.logger.Named("db-stats"))
+	boundedStore := storage.NewBoundedStore(c.server.db, nil, c.server.logger.Named("db-stats"))
 	richFieldsWithStats, err := boundedStore.GetRichFieldsWithStats()
 	if err != nil {
 		c.server.logger.Errorw("Failed to get rich fields with stats",
@@ -929,7 +929,7 @@ func (c *Client) handleRichSearch(query string) {
 	)
 
 	// Text search (fuzzy/exact)
-	boundedStore := storage.NewBoundedStore(c.server.db, c.server.logger.Named("search"))
+	boundedStore := storage.NewBoundedStore(c.server.db, nil, c.server.logger.Named("search"))
 	ctx := c.server.ctx
 	matches, err := boundedStore.SearchRichStringFields(ctx, query, 50)
 	if err != nil {
