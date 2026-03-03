@@ -31,7 +31,6 @@ import {
 } from '@generated/sym.js';
 import { uiState } from './state/ui.ts';
 import { log, SEG } from './logger';
-import { handleError } from './error-handler.ts';
 import { tooltip } from './components/tooltip.ts';
 
 // Import all panel/window modules statically
@@ -42,11 +41,10 @@ import { toggleProsePanel } from './prose/panel.js';
 import { toggleGoEditor } from './code/panel.js';
 import { togglePythonEditor } from './python/panel.js';
 import { glyphRun } from './components/glyph/run.ts';
-import { VidStreamWindow } from './vidstream-window.js';
 import { toggleJobList } from './hixtory-panel.js';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
-type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'vidstream' | 'db';
+type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'db';
 
 /**
  * Get symbol for a command, with fallback for UI-only commands
@@ -59,7 +57,6 @@ function getSymbol(cmd: string): string {
     if (cmd === 'py') return 'py';
     if (cmd === 'plugins') return '\u2699'; // Gear symbol
     if (cmd === 'scraper') return '⛶'; // White draughts king - extraction/capture
-    if (cmd === 'vidstream') return '⮀'; // VidStream - video inference
     return CommandToSymbol[cmd] || cmd;
 }
 
@@ -91,16 +88,6 @@ function initializeSymbolPalette(): void {
             cell.textContent = getSymbol(cmd);
         }
     });
-
-    // Mark VidStream as degraded in desktop mode (camera not yet supported)
-    const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-    if (isTauri) {
-        const vidstreamCell = document.querySelector('.palette-cell[data-cmd="vidstream"]');
-        if (vidstreamCell) {
-            vidstreamCell.classList.add('degraded');
-            vidstreamCell.setAttribute('aria-label', 'VidStream: camera not yet supported in desktop mode (browser only)');
-        }
-    }
 
     cmdCells.forEach((cell, index) => {
         cell.addEventListener('click', handleSymbolClick);
@@ -179,7 +166,6 @@ function getInitialTooltip(cmd: string): string {
         'go': 'Go — Code editor',
         'py': 'py — Python editor',
         'plugins': '⚙ Plugins — Domain extensions',
-        'vidstream': '⮀ VidStream — Video inference\n(version info loading...)',
     };
     return uiTooltips[cmd] || cmd;
 }
@@ -298,11 +284,6 @@ function handleSymbolClick(e: Event): void {
             // Plugins - show installed domain plugins
             showPluginPanel();
             break;
-        case 'vidstream':
-            // VidStream - show video inference window
-            log(SEG.VID, 'VidStream button clicked');
-            showVidStreamWindow();
-            break;
         default:
             log.warn(SEG.UI, `[Symbol Palette] Unknown command: ${cmd}`);
     }
@@ -391,51 +372,6 @@ function showPythonEditor(): void {
  */
 function showPluginPanel(): void {
     glyphRun.openGlyph('plugin-glyph');
-}
-
-/**
- * Show VidStream window - real-time video inference (desktop only)
- */
-let vidstreamWindowInstance: VidStreamWindow | null = null;
-let vidstreamVersion: string | null = null; // Store version before window creation
-
-/**
- * Get VidStream window instance (for system-capabilities updates)
- */
-export function getVidStreamWindowInstance(): VidStreamWindow | null {
-    return vidstreamWindowInstance;
-}
-
-/**
- * Set VidStream version (called from system-capabilities before window exists)
- */
-export function setVidStreamVersion(version: string): void {
-    vidstreamVersion = version;
-    // Also update existing instance if present
-    if (vidstreamWindowInstance) {
-        vidstreamWindowInstance.updateVersion(version);
-    }
-}
-
-function showVidStreamWindow(): void {
-    log(SEG.VID, 'showVidStreamWindow() called');
-    try {
-        if (!vidstreamWindowInstance) {
-            log(SEG.VID, 'Creating new VidStreamWindow instance...');
-            vidstreamWindowInstance = new VidStreamWindow();
-            log(SEG.VID, 'VidStreamWindow instance created');
-
-            // Apply stored version if received before window creation
-            if (vidstreamVersion) {
-                vidstreamWindowInstance.updateVersion(vidstreamVersion);
-                log(SEG.VID, `Applied stored version: ${vidstreamVersion}`);
-            }
-        }
-        log(SEG.VID, 'Calling toggle()');
-        vidstreamWindowInstance.toggle();
-    } catch (error: unknown) {
-        handleError(error, 'Failed to show VidStream window', { context: SEG.VID });
-    }
 }
 
 /**

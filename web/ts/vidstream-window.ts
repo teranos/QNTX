@@ -1,5 +1,8 @@
 /**
- * VidStreamWindow - Draggable video inference window
+ * @deprecated VidStream moved to qntx-vidstream plugin (canvas glyph with window manifestation).
+ * Use the vidstream plugin glyph instead.
+ *
+ * VidStreamWindow - Draggable video inference window (DEPRECATED)
  *
  * Real-time webcam + ONNX inference in a draggable/resizable window.
  * Uses VID (⮀) segment for logging.

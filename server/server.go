@@ -13,7 +13,6 @@ import (
 	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/QNTX/ats/vidstream/vidstream"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/glyph/handlers"
 	"github.com/teranos/QNTX/graph"
@@ -68,10 +67,6 @@ type QNTXServer struct {
 	pluginManager       *grpcplugin.PluginManager   // Plugin process manager
 	services            plugin.ServiceRegistry      // Service registry for plugins
 	servicesManager     *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
-
-	// VidStream real-time video inference (browser → WS → ONNX)
-	vidstreamEngine *vidstream.VideoEngine // Singleton video processing engine
-	vidstreamMu     sync.Mutex             // Protects vidstream engine operations
 
 	// Plugin HTTP routing (lazy initialization for async plugin loading)
 	pluginMuxes   sync.Map // map[string]*http.ServeMux - plugin name -> dedicated mux

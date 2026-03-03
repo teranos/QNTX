@@ -34,11 +34,8 @@ const (
 	pingPeriod = 54 * time.Second
 
 	// Maximum message size allowed from peer
-	// Currently 10MB to support VidStream frames (640x480 RGBA as JSON ≈ 4.4MB)
-	// TODO: Switch to binary WebSocket frames to reduce payload from 4.4MB → 1.2MB
-	//       Binary format: 12-byte header (width:u32, height:u32, format:u32) + raw bytes
-	//       This would allow reducing maxMessageSize back to 2MB
-	maxMessageSize = 10 * 1024 * 1024
+	// VidStream moved to plugin (HTTP endpoints) — no longer needs large WS messages.
+	maxMessageSize = 2 * 1024 * 1024
 
 	// Semantic search defaults for unified search
 	// TODO(#486): Make configurable via am.toml and UI
@@ -255,10 +252,6 @@ func (c *Client) routeMessage(msg *QueryMessage) {
 		c.handleVisibility(*msg)
 	case "rich_search":
 		c.handleRichSearch(msg.Query)
-	case "vidstream_init":
-		c.handleVidStreamInit(*msg)
-	case "vidstream_frame":
-		c.handleVidStreamFrame(*msg)
 	case "get_database_stats":
 		c.handleGetDatabaseStats()
 	case "get_sync_status":
