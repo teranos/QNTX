@@ -5,21 +5,12 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/db"
 )
 
 func TestCheckStorageStatus_SelfCertifying(t *testing.T) {
-	database, err := db.Open(":memory:", nil)
-	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
-	}
-	defer database.Close()
+	rustStore, database := createTestStore(t)
 
-	if err := db.Migrate(database, nil); err != nil {
-		t.Fatalf("failed to migrate database: %v", err)
-	}
-
-	store := NewBoundedStore(database, nil)
+	store := NewBoundedStore(database, rustStore, nil)
 
 	// Create self-certifying attestation (actor == ID)
 	as := &types.As{
@@ -39,17 +30,9 @@ func TestCheckStorageStatus_SelfCertifying(t *testing.T) {
 }
 
 func TestCheckStorageStatus_BelowThreshold(t *testing.T) {
-	database, err := db.Open(":memory:", nil)
-	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
-	}
-	defer database.Close()
+	rustStore, database := createTestStore(t)
 
-	if err := db.Migrate(database, nil); err != nil {
-		t.Fatalf("failed to migrate database: %v", err)
-	}
-
-	store := NewBoundedStoreWithConfig(database, nil, &BoundedStoreConfig{
+	store := NewBoundedStoreWithConfig(database, rustStore, nil, &BoundedStoreConfig{
 		ActorContextLimit:  16,
 		ActorContextsLimit: 64,
 		EntityActorsLimit:  64,
@@ -88,17 +71,9 @@ func TestCheckStorageStatus_BelowThreshold(t *testing.T) {
 }
 
 func TestCheckStorageStatus_AtThreshold(t *testing.T) {
-	database, err := db.Open(":memory:", nil)
-	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
-	}
-	defer database.Close()
+	rustStore, database := createTestStore(t)
 
-	if err := db.Migrate(database, nil); err != nil {
-		t.Fatalf("failed to migrate database: %v", err)
-	}
-
-	store := NewBoundedStoreWithConfig(database, nil, &BoundedStoreConfig{
+	store := NewBoundedStoreWithConfig(database, rustStore, nil, &BoundedStoreConfig{
 		ActorContextLimit:  16,
 		ActorContextsLimit: 64,
 		EntityActorsLimit:  64,
@@ -155,17 +130,9 @@ func TestCheckStorageStatus_AtThreshold(t *testing.T) {
 }
 
 func TestCheckStorageStatus_AboveCapacity(t *testing.T) {
-	database, err := db.Open(":memory:", nil)
-	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
-	}
-	defer database.Close()
+	rustStore, database := createTestStore(t)
 
-	if err := db.Migrate(database, nil); err != nil {
-		t.Fatalf("failed to migrate database: %v", err)
-	}
-
-	store := NewBoundedStoreWithConfig(database, nil, &BoundedStoreConfig{
+	store := NewBoundedStoreWithConfig(database, rustStore, nil, &BoundedStoreConfig{
 		ActorContextLimit:  16,
 		ActorContextsLimit: 64,
 		EntityActorsLimit:  64,
@@ -204,17 +171,9 @@ func TestCheckStorageStatus_AboveCapacity(t *testing.T) {
 }
 
 func TestCheckStorageStatus_AccelerationDetection(t *testing.T) {
-	database, err := db.Open(":memory:", nil)
-	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
-	}
-	defer database.Close()
+	rustStore, database := createTestStore(t)
 
-	if err := db.Migrate(database, nil); err != nil {
-		t.Fatalf("failed to migrate database: %v", err)
-	}
-
-	store := NewBoundedStoreWithConfig(database, nil, &BoundedStoreConfig{
+	store := NewBoundedStoreWithConfig(database, rustStore, nil, &BoundedStoreConfig{
 		ActorContextLimit:  16,
 		ActorContextsLimit: 64,
 		EntityActorsLimit:  64,
@@ -287,17 +246,9 @@ func TestCheckStorageStatus_AccelerationDetection(t *testing.T) {
 }
 
 func TestCheckStorageStatus_SlowRate(t *testing.T) {
-	database, err := db.Open(":memory:", nil)
-	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
-	}
-	defer database.Close()
+	rustStore, database := createTestStore(t)
 
-	if err := db.Migrate(database, nil); err != nil {
-		t.Fatalf("failed to migrate database: %v", err)
-	}
-
-	store := NewBoundedStoreWithConfig(database, nil, &BoundedStoreConfig{
+	store := NewBoundedStoreWithConfig(database, rustStore, nil, &BoundedStoreConfig{
 		ActorContextLimit:  16,
 		ActorContextsLimit: 64,
 		EntityActorsLimit:  64,
@@ -339,17 +290,9 @@ func TestCheckStorageStatus_SlowRate(t *testing.T) {
 }
 
 func TestCheckStorageStatus_MultipleContexts(t *testing.T) {
-	database, err := db.Open(":memory:", nil)
-	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
-	}
-	defer database.Close()
+	rustStore, database := createTestStore(t)
 
-	if err := db.Migrate(database, nil); err != nil {
-		t.Fatalf("failed to migrate database: %v", err)
-	}
-
-	store := NewBoundedStoreWithConfig(database, nil, &BoundedStoreConfig{
+	store := NewBoundedStoreWithConfig(database, rustStore, nil, &BoundedStoreConfig{
 		ActorContextLimit:  16,
 		ActorContextsLimit: 64,
 		EntityActorsLimit:  64,

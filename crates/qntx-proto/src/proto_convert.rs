@@ -24,6 +24,16 @@ pub fn from_proto(proto: ProtoAttestation) -> CoreAttestation {
             .map(serde_struct::struct_to_json_map)
             .unwrap_or_default(),
         created_at: proto.created_at,
+        signature: if proto.signature.is_empty() {
+            None
+        } else {
+            Some(proto.signature)
+        },
+        signer_did: if proto.signer_did.is_empty() {
+            None
+        } else {
+            Some(proto.signer_did)
+        },
     }
 }
 
@@ -45,8 +55,8 @@ pub fn to_proto(core: CoreAttestation) -> ProtoAttestation {
         source: core.source,
         attributes,
         created_at: core.created_at,
-        signature: Vec::new(),
-        signer_did: String::new(),
+        signature: core.signature.unwrap_or_default(),
+        signer_did: core.signer_did.unwrap_or_default(),
     }
 }
 
@@ -71,6 +81,8 @@ mod tests {
             source: "test".to_string(),
             attributes,
             created_at: 1234567890,
+            signature: None,
+            signer_did: None,
         };
 
         let proto = to_proto(core.clone());
@@ -104,6 +116,8 @@ mod tests {
             source: "wasm_boundary_test".to_string(),
             attributes,
             created_at: 1704067200,
+            signature: None,
+            signer_did: None,
         };
 
         let proto = to_proto(core);
@@ -136,6 +150,8 @@ mod tests {
             source: "test".to_string(),
             attributes: HashMap::new(),
             created_at: 0,
+            signature: None,
+            signer_did: None,
         };
 
         let proto = to_proto(core.clone());
