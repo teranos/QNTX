@@ -11,9 +11,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/ai/provider"
 	appcfg "github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
@@ -27,10 +27,11 @@ const ClusterLabelHandlerName = "embeddings.cluster-label"
 
 // ClusterLabelHandler asks an LLM to label unlabeled clusters.
 type ClusterLabelHandler struct {
-	db     *sql.DB
-	store  *storage.EmbeddingStore
-	cfg    *appcfg.Config
-	logger *zap.SugaredLogger
+	db       *sql.DB
+	store    *storage.EmbeddingStore
+	atsStore ats.AttestationStore
+	cfg      *appcfg.Config
+	logger   *zap.SugaredLogger
 }
 
 func (h *ClusterLabelHandler) Name() string { return ClusterLabelHandlerName }
@@ -60,15 +61,12 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 
 	aiProvider := provider.DetermineProvider(h.cfg, "")
 	modelOverride := embCfg.ClusterLabelModel
-	asStore := storage.NewSQLStore(h.db, h.logger)
+	asStore := h.atsStore
 
 	// Resolve model name once — used for attestation metadata
 	modelUsed := modelOverride
 	if modelUsed == "" {
-		modelUsed = h.cfg.OpenRouter.Model
-		if h.cfg.LocalInference.Enabled {
-			modelUsed = h.cfg.LocalInference.Model
-		}
+		modelUsed = h.cfg.LocalInference.Model
 	}
 
 	labeled := 0
@@ -99,7 +97,7 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 			"cluster-labeling", "cluster", fmt.Sprintf("%d", cluster.ID),
 		)
 
-		req := openrouter.ChatRequest{
+		req := provider.ChatRequest{
 			SystemPrompt: "You label clusters of text. Given sample texts from a cluster, respond with a short descriptive label (2-5 words). No explanation, just the label.",
 			UserPrompt:   userPrompt.String(),
 			MaxTokens:    &maxTokens,
@@ -156,7 +154,7 @@ type clusterLabelAttrs struct {
 	NMembers   int    `attr:"n_members"`
 }
 
-func (h *ClusterLabelHandler) createLabelAttestation(asStore *storage.SQLStore, clusterID int, label, model string, sampleSize, nMembers int) {
+func (h *ClusterLabelHandler) createLabelAttestation(asStore ats.AttestationStore, clusterID int, label, model string, sampleSize, nMembers int) {
 	subject := fmt.Sprintf("cluster:%d", clusterID)
 	asid, err := vanity.GenerateASID(subject, "labeled", "embeddings", "qntx@embeddings")
 	if err != nil {
@@ -212,24 +210,25 @@ func (s *QNTXServer) setupClusterLabelSchedule(cfg *appcfg.Config) {
 	}
 
 	handler := &ClusterLabelHandler{
-		db:     s.db,
-		store:  s.embeddingStore,
-		cfg:    cfg,
-		logger: s.logger.Named("cluster-label"),
+		db:       s.db,
+		store:    s.embeddingStore,
+		atsStore: s.atsStore,
+		cfg:      cfg,
+		logger:   s.logger.Named("cluster-label"),
 	}
 
 	registry := s.daemon.Registry()
 	registry.Register(handler)
 	s.logger.Infow("Registered cluster label handler")
 
-	interval := cfg.Embeddings.ClusterLabelIntervalSeconds
 	schedStore := schedule.NewStore(s.db)
 
-	// If interval is disabled, pause any existing active schedule
-	if interval <= 0 {
+	// If interval not configured, pause any existing active schedule
+	if cfg.Embeddings.ClusterLabelIntervalSeconds == nil {
 		s.pauseExistingSchedule(schedStore, ClusterLabelHandlerName)
 		return
 	}
+	interval := *cfg.Embeddings.ClusterLabelIntervalSeconds
 
 	// Check for existing schedule to avoid duplicates on restart
 	existing, err := schedStore.ListAllScheduledJobs()

@@ -7,7 +7,6 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/ats/storage"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
@@ -18,9 +17,7 @@ func TestGitIxProcessor_ProcessCurrentRepository(t *testing.T) {
 		t.Skip("Not in a git repository, skipping test")
 	}
 
-	db := qntxtest.CreateTestDB(t)
-
-	processor := NewGitIxProcessor(db, true, "", 0, nil) // dry-run mode
+	processor := NewGitIxProcessor(nil, true, "", 0, nil) // dry-run mode
 
 	// Process the qntx repository (from ixgest/git/ we need to go up two levels)
 	result, err := processor.ProcessGitRepository("../..")
@@ -112,7 +109,7 @@ func TestGitIxProcessor_CommitAttestations(t *testing.T) {
 		t.Skip("Not in a git repository, skipping test")
 	}
 
-	db := qntxtest.CreateTestDB(t)
+	store, _ := qntxtest.CreateTestStore(t)
 
 	repo, err := git.PlainOpen("../../../..")
 	require.NoError(t, err, "Failed to open repository")
@@ -125,7 +122,7 @@ func TestGitIxProcessor_CommitAttestations(t *testing.T) {
 	require.NoError(t, err, "Failed to get commit object")
 
 	// Create processor
-	processor := NewGitIxProcessor(db, false, "", 0, nil)
+	processor := NewGitIxProcessor(store, false, "", 0, nil)
 
 	// Process single commit
 	result, err := processor.processCommit(commit)
@@ -159,13 +156,13 @@ func TestGitIxProcessor_BranchAttestations(t *testing.T) {
 		t.Skip("Not in a git repository, skipping test")
 	}
 
-	db := qntxtest.CreateTestDB(t)
+	store, _ := qntxtest.CreateTestStore(t)
 
 	repo, err := git.PlainOpen("../..")
 	require.NoError(t, err, "Failed to open repository")
 
 	// Create processor
-	processor := NewGitIxProcessor(db, false, "", 0, nil)
+	processor := NewGitIxProcessor(store, false, "", 0, nil)
 
 	// Process branches
 	results, err := processor.processBranches(repo)
@@ -193,9 +190,7 @@ func TestGitIxProcessor_BranchAttestations(t *testing.T) {
 
 // TestGitIxProcessor_ErrorHandling tests error cases
 func TestGitIxProcessor_ErrorHandling(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-
-	processor := NewGitIxProcessor(db, true, "", 0, nil)
+	processor := NewGitIxProcessor(nil, true, "", 0, nil)
 
 	tests := []struct {
 		name        string
@@ -236,7 +231,7 @@ func TestGitIxProcessor_DryRunMode(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 
 	// Process in dry-run mode
-	processor := NewGitIxProcessor(db, true, "", 0, nil)
+	processor := NewGitIxProcessor(nil, true, "", 0, nil)
 	result, err := processor.ProcessGitRepository("../..")
 	require.NoError(t, err, "Dry-run processing should succeed")
 
@@ -252,8 +247,6 @@ func TestGitIxProcessor_DryRunMode(t *testing.T) {
 
 // TestGitIxProcessor_NewGitIxProcessor tests processor initialization
 func TestGitIxProcessor_NewGitIxProcessor(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-
 	tests := []struct {
 		name          string
 		actor         string
@@ -273,9 +266,8 @@ func TestGitIxProcessor_NewGitIxProcessor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := NewGitIxProcessor(db, false, tt.actor, 0, nil)
+			processor := NewGitIxProcessor(nil, false, tt.actor, 0, nil)
 			assert.Equal(t, tt.expectedActor, processor.defaultActor)
-			assert.Equal(t, db, processor.db)
 			assert.False(t, processor.dryRun)
 			assert.Equal(t, 0, processor.verbosity)
 		})
@@ -284,8 +276,7 @@ func TestGitIxProcessor_NewGitIxProcessor(t *testing.T) {
 
 // TestGitIxProcessor_NewGitIxProcessorWithStore tests the store-based constructor
 func TestGitIxProcessor_NewGitIxProcessorWithStore(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	store := storage.NewSQLStore(db, nil)
+	store, _ := qntxtest.CreateTestStore(t)
 
 	tests := []struct {
 		name          string
@@ -312,9 +303,8 @@ func TestGitIxProcessor_NewGitIxProcessorWithStore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			processor := NewGitIxProcessorWithStore(store, tt.dryRun, tt.actor, tt.verbosity, nil)
+			processor := NewGitIxProcessor(store, tt.dryRun, tt.actor, tt.verbosity, nil)
 			assert.Equal(t, tt.expectedActor, processor.defaultActor)
-			assert.Nil(t, processor.db, "db should be nil when using store constructor")
 			assert.NotNil(t, processor.store, "store should not be nil")
 			assert.Equal(t, tt.dryRun, processor.dryRun)
 			assert.Equal(t, tt.verbosity, processor.verbosity)

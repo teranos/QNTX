@@ -3823,6 +3823,7 @@ dependencies = [
 name = "qntx-proto"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "prost",
  "prost-build",
  "prost-types",
@@ -3858,7 +3859,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-python-plugin"
-version = "0.5.4"
+version = "0.5.6"
 dependencies = [
  "clap",
  "parking_lot",

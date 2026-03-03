@@ -39,6 +39,14 @@ pub struct Attestation {
     /// Defaults to 0 when absent (e.g. content hashing omits it deliberately).
     #[serde(default)]
     pub created_at: i64,
+
+    /// Ed25519 signature over canonical JSON
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<Vec<u8>>,
+
+    /// did:key of the signing node
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signer_did: Option<String>,
 }
 
 impl Attestation {
@@ -74,6 +82,8 @@ impl Default for Attestation {
             source: String::new(),
             attributes: HashMap::new(),
             created_at: 0,
+            signature: None,
+            signer_did: None,
         }
     }
 }
@@ -167,6 +177,16 @@ impl AttestationBuilder {
 
     pub fn attribute(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
         self.attestation.attributes.insert(key.into(), value);
+        self
+    }
+
+    pub fn signature(mut self, signature: Vec<u8>) -> Self {
+        self.attestation.signature = Some(signature);
+        self
+    }
+
+    pub fn signer_did(mut self, signer_did: impl Into<String>) -> Self {
+        self.attestation.signer_did = Some(signer_did.into());
         self
     }
 

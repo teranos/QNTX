@@ -10,6 +10,7 @@ import { log, SEG } from './logger';
 import { connectivityManager } from './connectivity';
 import { embeddingStore } from './embedding-store';
 import { apiFetch } from './api';
+import { stripProtocol } from './http-utils';
 import { validateBackendURL } from './websocket';
 import {
     listAttestationIds,
@@ -377,7 +378,7 @@ export class BrowserSync {
             }
 
             const backendUrl = validatedUrl || window.location.origin;
-            const backendHost = backendUrl.replace(/^https?:\/\//, '');
+            const backendHost = stripProtocol(backendUrl);
             const protocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${backendHost}/ws/sync`;
 

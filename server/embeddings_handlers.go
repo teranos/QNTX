@@ -305,7 +305,7 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 	embeddingModels := []*storage.EmbeddingModel{}
 
 	// Get rich string fields from type definitions for embedding text construction.
-	richStore := storage.NewBoundedStore(s.db, s.logger.Named("embeddings"))
+	richStore := storage.NewBoundedStore(s.db, nil, s.logger.Named("embeddings"))
 	richFields := richStore.GetDiscoveredRichFields()
 
 	for _, attestationID := range req.AttestationIDs {
@@ -735,7 +735,7 @@ func (s *QNTXServer) SetupEmbeddingService() {
 	observer := &EmbeddingObserver{
 		embeddingService: embService,
 		embeddingStore:   embStore,
-		richStore:        storage.NewBoundedStore(s.db, s.logger.Named("auto-embed")),
+		richStore:        storage.NewBoundedStore(s.db, nil, s.logger.Named("auto-embed")),
 		logger:           s.logger.Named("auto-embed"),
 		clusterThreshold: float32(appcfg.GetFloat64("embeddings.cluster_threshold")),
 		projectFunc:      s.projectToCanvas,

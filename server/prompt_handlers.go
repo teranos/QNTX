@@ -1,14 +1,18 @@
 package server
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/ai/provider"
+	"github.com/teranos/QNTX/ai/tracker"
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/alias"
 	"github.com/teranos/QNTX/ats/parser"
@@ -26,8 +30,6 @@ const (
 	defaultAxQueryLimit = 100
 	// Default model for local inference when not configured
 	defaultLocalModel = "llama3.2:3b"
-	// Default model for OpenRouter when not configured
-	defaultOpenRouterModel = "openai/gpt-4o-mini"
 )
 
 // PromptPreviewRequest represents a request to preview prompt execution with X-sampling
@@ -86,6 +88,7 @@ type PromptDirectRequest struct {
 // PromptDirectResponse represents the direct execution response
 type PromptDirectResponse struct {
 	Response         string                `json:"response"`
+	Model            string                `json:"model,omitempty"`
 	AttestationID    string                `json:"attestation_id,omitempty"`
 	Attestation      *protocol.Attestation `json:"attestation,omitempty"` // Full attestation with signature
 	PromptTokens     int                   `json:"prompt_tokens,omitempty"`
@@ -121,6 +124,147 @@ type PromptExecuteResponse struct {
 	Error            string   `json:"error,omitempty"`
 }
 
+// resolveProvider returns the effective AI provider name.
+// Explicit request value takes priority; otherwise falls back to config.
+// When local_inference is disabled (default), returns "openrouter".
+func resolveProvider(explicit string) string {
+	if explicit != "" {
+		return explicit
+	}
+	if appcfg.GetBool("local_inference.enabled") {
+		return "local"
+	}
+	return "openrouter"
+}
+
+// forwardToProviderPlugin re-encodes the request and forwards it to the named plugin's
+// prompt handler. Buffers the response to extract token usage for core-side tracking.
+// Returns true if forwarded, false if the provider is local or unknown.
+func (s *QNTXServer) forwardToProviderPlugin(w http.ResponseWriter, r *http.Request, providerName string, body any, endpoint string) bool {
+	if providerName == "local" {
+		// TODO(#639): Track local Ollama usage to quantify cost savings vs paid APIs.
+		return false
+	}
+	if s.pluginRegistry == nil || !s.pluginRegistry.IsReady(providerName) {
+		return false
+	}
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		writeWrappedError(w, s.logger, errors.Wrap(err, "failed to re-encode request for plugin"), "Plugin forward failed", http.StatusInternalServerError)
+		return true
+	}
+	r.Body = io.NopCloser(bytes.NewReader(encoded))
+	r.ContentLength = int64(len(encoded))
+	r.URL.Path = "/api/" + providerName + endpoint
+
+	requestTime := time.Now()
+
+	// Buffer the plugin response so we can extract token usage for tracking
+	rec := httptest.NewRecorder()
+	s.handlePluginRequest(rec, r)
+
+	// Copy buffered response to the real ResponseWriter
+	result := rec.Result()
+	for k, vals := range result.Header {
+		for _, v := range vals {
+			w.Header().Add(k, v)
+		}
+	}
+	w.WriteHeader(result.StatusCode)
+	respBody := rec.Body.Bytes()
+	w.Write(respBody)
+
+	// Track usage asynchronously from the buffered response
+	if result.StatusCode == http.StatusOK && s.usageTracker != nil {
+		go s.trackPluginUsage(respBody, providerName, endpoint, requestTime)
+	}
+
+	return true
+}
+
+// pluginResponseTokens is a generic shape to extract token counts from any plugin response.
+// Works for /prompt/direct (top-level fields), /prompt/preview (samples array), and
+// /prompt/execute (results array).
+type pluginResponseTokens struct {
+	// Top-level fields (/prompt/direct)
+	Model            string `json:"model"`
+	PromptTokens     int    `json:"prompt_tokens"`
+	CompletionTokens int    `json:"completion_tokens"`
+	TotalTokens      int    `json:"total_tokens"`
+
+	// Nested arrays (/prompt/preview and /prompt/execute)
+	Samples []struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+		TotalTokens      int `json:"total_tokens"`
+	} `json:"samples"`
+	Results []struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+		TotalTokens      int `json:"total_tokens"`
+	} `json:"results"`
+}
+
+// trackPluginUsage parses token counts from a buffered plugin response and records usage.
+func (s *QNTXServer) trackPluginUsage(body []byte, providerName, endpoint string, requestTime time.Time) {
+	var parsed pluginResponseTokens
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		s.logger.Debugw("Could not parse plugin response for usage tracking",
+			"provider", providerName, "endpoint", endpoint, "error", err)
+		return
+	}
+
+	promptTokens := parsed.PromptTokens
+	completionTokens := parsed.CompletionTokens
+	totalTokens := parsed.TotalTokens
+	model := parsed.Model
+
+	// Aggregate from samples (preview) or results (execute) if top-level is zero
+	if totalTokens == 0 {
+		for _, s := range parsed.Samples {
+			promptTokens += s.PromptTokens
+			completionTokens += s.CompletionTokens
+			totalTokens += s.TotalTokens
+		}
+		for _, r := range parsed.Results {
+			promptTokens += r.PromptTokens
+			completionTokens += r.CompletionTokens
+			totalTokens += r.TotalTokens
+		}
+	}
+
+	if totalTokens == 0 {
+		return // Nothing to track
+	}
+
+	responseTime := time.Now()
+	cost := tracker.CalculateCost(model, promptTokens, completionTokens)
+
+	// Determine operation type from endpoint (endpoint is e.g. "/prompt/direct")
+	opType := "prompt"
+	if len(endpoint) > 1 {
+		opType = endpoint[1:] // strip leading slash: "prompt/direct", "prompt/preview"
+	}
+
+	usage := &tracker.ModelUsage{
+		OperationType:     opType,
+		EntityType:        "plugin",
+		EntityID:          providerName,
+		ModelName:         model,
+		ModelProvider:     providerName,
+		RequestTimestamp:  requestTime,
+		ResponseTimestamp: &responseTime,
+		TokensUsed:        &totalTokens,
+		Cost:              &cost,
+		Success:           true,
+	}
+
+	if err := s.usageTracker.TrackUsage(usage); err != nil {
+		s.logger.Warnw("Failed to track plugin usage",
+			"provider", providerName, "endpoint", endpoint, "error", err)
+	}
+}
+
 // HandlePromptPreview handles POST /api/prompt/preview
 // Samples X attestations, executes prompt against them, and returns results for comparison
 func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request) {
@@ -133,6 +277,10 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 
 	var req PromptPreviewRequest
 	if err := readJSON(w, r, &req); err != nil {
+		return
+	}
+
+	if s.forwardToProviderPlugin(w, r, resolveProvider(req.Provider), req, "/prompt/preview") {
 		return
 	}
 
@@ -264,7 +412,7 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 		}
 
 		// Call LLM
-		chatReq := openrouter.ChatRequest{
+		chatReq := provider.ChatRequest{
 			SystemPrompt: req.SystemPrompt,
 			UserPrompt:   interpolatedPrompt,
 		}
@@ -347,6 +495,10 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 
 	var req PromptExecuteRequest
 	if err := readJSON(w, r, &req); err != nil {
+		return
+	}
+
+	if s.forwardToProviderPlugin(w, r, resolveProvider(req.Provider), req, "/prompt/execute") {
 		return
 	}
 
@@ -446,6 +598,12 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// If provider matches a running plugin, forward the entire request to it.
+	// The plugin handles frontmatter, attachments, attestations, and the LLM call.
+	if s.forwardToProviderPlugin(w, r, resolveProvider(req.Provider), req, "/prompt/direct") {
+		return
+	}
+
 	// Parse frontmatter to extract config
 	doc, err := prompt.ParseFrontmatter(req.Template)
 	if err != nil {
@@ -484,7 +642,7 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 	client := s.createAIClient(req.Provider, modelName, "prompt-direct")
 
 	// Call LLM using Chat method
-	chatReq := openrouter.ChatRequest{
+	chatReq := provider.ChatRequest{
 		SystemPrompt: req.SystemPrompt,
 		UserPrompt:   promptText,
 	}
@@ -511,16 +669,16 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 
 			switch {
 			case strings.HasPrefix(mime, "image/"):
-				chatReq.Attachments = append(chatReq.Attachments, openrouter.ContentPart{
+				chatReq.Attachments = append(chatReq.Attachments, provider.ContentPart{
 					Type: "image_url",
-					ImageURL: &openrouter.ContentPartImage{
+					ImageURL: &provider.ContentPartImage{
 						URL: "data:" + mime + ";base64," + b64,
 					},
 				})
 			case mime == "application/pdf":
-				chatReq.Attachments = append(chatReq.Attachments, openrouter.ContentPart{
+				chatReq.Attachments = append(chatReq.Attachments, provider.ContentPart{
 					Type: "file",
-					File: &openrouter.ContentPartFile{
+					File: &provider.ContentPartFile{
 						Filename: fid,
 						FileData: "data:" + mime + ";base64," + b64,
 					},
@@ -579,8 +737,7 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 				CreatedAt:  now,
 			}
 
-			store := storage.NewSQLStore(s.db, s.logger)
-			if storeErr := store.CreateAttestation(as); storeErr != nil {
+			if storeErr := s.atsStore.CreateAttestation(as); storeErr != nil {
 				s.logger.Warnw("Failed to create prompt-result attestation",
 					"glyph_id", req.GlyphID, "asid", asid, "error", storeErr)
 			} else {
@@ -630,7 +787,7 @@ func (s *QNTXServer) HandlePromptList(w http.ResponseWriter, r *http.Request) {
 
 	logger.AddAxSymbol(s.logger).Infow("Prompt list request")
 
-	store := prompt.NewPromptStore(s.db)
+	store := prompt.NewPromptStore(s.db, s.atsStore)
 	prompts, err := store.ListPrompts(r.Context(), 100)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "Failed to list prompts", http.StatusInternalServerError)
@@ -651,7 +808,7 @@ func (s *QNTXServer) HandlePromptGet(w http.ResponseWriter, r *http.Request, pro
 		return
 	}
 
-	store := prompt.NewPromptStore(s.db)
+	store := prompt.NewPromptStore(s.db, s.atsStore)
 	p, err := store.GetPromptByID(r.Context(), promptID)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "Failed to get prompt", http.StatusInternalServerError)
@@ -673,7 +830,7 @@ func (s *QNTXServer) HandlePromptVersions(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	store := prompt.NewPromptStore(s.db)
+	store := prompt.NewPromptStore(s.db, s.atsStore)
 	versions, err := store.GetPromptVersions(r.Context(), promptName, 16)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "Failed to get prompt versions", http.StatusInternalServerError)
@@ -710,7 +867,7 @@ func (s *QNTXServer) HandlePromptSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	store := prompt.NewPromptStore(s.db)
+	store := prompt.NewPromptStore(s.db, s.atsStore)
 	storedPrompt := &prompt.StoredPrompt{
 		Name:         req.Name,
 		Template:     req.Template,
@@ -805,48 +962,25 @@ func (s *QNTXServer) createPromptAIClientForPreview(req PromptPreviewRequest, do
 }
 
 // createAIClient creates an AI client using config defaults with optional overrides.
-// providerName selects "local" or "openrouter" (empty = auto-detect from config).
-// model overrides the configured model (empty = use config default).
-// operationType is used for usage tracking (e.g., "prompt-execute", "prompt-preview").
+// Only local inference is supported in core. For OpenRouter, use the qntx-openrouter plugin.
 func (s *QNTXServer) createAIClient(providerName, model, operationType string) provider.AIClient {
-	localEnabled := appcfg.GetBool("local_inference.enabled")
 	localBaseURL := appcfg.GetString("local_inference.base_url")
 	localModel := appcfg.GetString("local_inference.model")
 	localTimeout := appcfg.GetInt("local_inference.timeout_seconds")
-	openRouterAPIKey := appcfg.GetString("openrouter.api_key")
-	openRouterModel := appcfg.GetString("openrouter.model")
-
-	useLocal := providerName == "local" || (providerName == "" && localEnabled)
-
-	if useLocal {
-		effectiveModel := model
-		if effectiveModel == "" {
-			effectiveModel = localModel
-		}
-		if effectiveModel == "" {
-			effectiveModel = defaultLocalModel
-		}
-		return provider.NewLocalClient(provider.LocalClientConfig{
-			BaseURL:        localBaseURL,
-			Model:          effectiveModel,
-			TimeoutSeconds: localTimeout,
-			DB:             s.db,
-			OperationType:  operationType,
-		})
-	}
 
 	effectiveModel := model
 	if effectiveModel == "" {
-		effectiveModel = openRouterModel
+		effectiveModel = localModel
 	}
 	if effectiveModel == "" {
-		effectiveModel = defaultOpenRouterModel
+		effectiveModel = defaultLocalModel
 	}
-	return openrouter.NewClient(openrouter.Config{
-		APIKey:        openRouterAPIKey,
-		Model:         effectiveModel,
-		DB:            s.db,
-		OperationType: operationType,
+	return provider.NewLocalClient(provider.LocalClientConfig{
+		BaseURL:        localBaseURL,
+		Model:          effectiveModel,
+		TimeoutSeconds: localTimeout,
+		DB:             s.db,
+		OperationType:  operationType,
 	})
 }
 

@@ -25,11 +25,11 @@ Code: `server/init.go` (safety check), `am/defaults.go` (default + env binding `
 
 ### P0 — Must fix before any internet exposure
 
-**No TLS.** `server/lifecycle.go` uses `ListenAndServe()`. All traffic (auth cookies, attestation data, sync payloads) is cleartext. Needs `ListenAndServeTLS` or a reverse proxy (Caddy, nginx).
+**~~No TLS.~~** ~~All traffic is cleartext.~~ Done — deployment concern, not application concern. Use a reverse proxy (Caddy, nginx) for TLS termination.
 
-**Peer sync has zero authentication.** `server/sync_handler.go` — `/ws/sync` accepts any WebSocket connection. An attacker can run Merkle tree reconciliation and exfiltrate the entire attestation store. Budget data (spend limits) is also exchanged. This is the single biggest exposure.
+**~~Peer sync has zero authentication.~~** Mitigated — sync is disabled when `bind_address` is non-loopback. The endpoint is not registered and the sync tree is not initialized. Full fix requires a QR-based pairing flow for DID exchange. See [#643](https://github.com/teranos/QNTX/issues/643).
 
-**No rate limiting.** Zero rate limiting on any endpoint. Login ceremonies, API calls, file uploads, WebSocket connections — all unlimited.
+**~~No rate limiting.~~** ~~Zero rate limiting on any endpoint.~~ Done — per-IP token bucket rate limiting across 5 route groups (auth, ws, write, read, public). Configurable via `[server.rate_limit]`. See `server/ratelimit.go`.
 
 ### P1 — Significant risk on the open internet
 
@@ -72,10 +72,10 @@ Code: `server/init.go` (safety check), `am/defaults.go` (default + env binding `
 | Pri | Item | Effort | Status |
 |-----|------|--------|--------|
 | P0 | Auth required for non-loopback bind | Low | Done |
-| P0 | TLS termination | Low | Open |
-| P0 | Peer sync authentication | High | Open |
+| P0 | TLS termination | Low | Done (deployment) |
+| P0 | Peer sync authentication | High | Mitigated ([#643](https://github.com/teranos/QNTX/issues/643)) |
 | P0 | CORS exact matching | Low | Done |
-| P0 | Rate limiting middleware | Medium | Open |
+| P0 | Rate limiting middleware | Medium | Done |
 | P1 | WebAuthn RPID from config | Low | Open |
 | P1 | Require Origin header on WS | Low | Open |
 | P1 | Strip `/health` or auth-gate it | Low | Open |

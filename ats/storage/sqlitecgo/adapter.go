@@ -8,33 +8,31 @@ import (
 	"github.com/teranos/QNTX/errors"
 )
 
-// rustAttestation is the JSON-compatible format expected by Rust qntx-sqlite.
-// Timestamps are Unix milliseconds (i64) instead of Go's time.Time.
-type rustAttestation struct {
-	ID         string                 `json:"id"`
-	Subjects   []string               `json:"subjects"`
-	Predicates []string               `json:"predicates"`
-	Contexts   []string               `json:"contexts"`
-	Actors     []string               `json:"actors"`
-	Timestamp  int64                  `json:"timestamp"` // Unix milliseconds
-	Source     string                 `json:"source"`
-	Attributes map[string]interface{} `json:"attributes"`
-	CreatedAt  int64                  `json:"created_at"` // Unix milliseconds
+// ffiAttestation is the JSON shape shared between Go and Rust at the FFI boundary.
+// On the Rust side, the proto type (qntx_proto::Attestation) deserializes this JSON
+// using serde with base64_serde for signature and serde(default) for missing fields.
+// Go's omitempty omits nil/zero fields; Rust's serde(default) fills in defaults.
+type ffiAttestation struct {
+	ID         string                 `json:"id,omitempty"`
+	Subjects   []string               `json:"subjects,omitempty"`
+	Predicates []string               `json:"predicates,omitempty"`
+	Contexts   []string               `json:"contexts,omitempty"`
+	Actors     []string               `json:"actors,omitempty"`
+	Timestamp  int64                  `json:"timestamp,omitempty"`
+	Source     string                 `json:"source,omitempty"`
+	Attributes map[string]interface{} `json:"attributes,omitempty"`
+	CreatedAt  int64                  `json:"created_at,omitempty"`
+	Signature  []byte                 `json:"signature,omitempty"` // base64 in JSON
+	SignerDID  string                 `json:"signer_did,omitempty"`
 }
 
-// toRustJSON converts Go types.As to Rust-compatible JSON.
+// toRustJSON converts Go types.As to JSON for the Rust FFI boundary.
 func toRustJSON(as *types.As) ([]byte, error) {
 	if as == nil {
 		return nil, errors.New("attestation is nil")
 	}
 
-	// Ensure attributes is never nil for Rust
-	attrs := as.Attributes
-	if attrs == nil {
-		attrs = make(map[string]interface{})
-	}
-
-	rust := rustAttestation{
+	ffi := ffiAttestation{
 		ID:         as.ID,
 		Subjects:   as.Subjects,
 		Predicates: as.Predicates,
@@ -42,35 +40,33 @@ func toRustJSON(as *types.As) ([]byte, error) {
 		Actors:     as.Actors,
 		Timestamp:  as.Timestamp.UnixMilli(),
 		Source:     as.Source,
-		Attributes: attrs,
+		Attributes: as.Attributes,
 		CreatedAt:  as.CreatedAt.UnixMilli(),
+		Signature:  as.Signature,
+		SignerDID:  as.SignerDID,
 	}
 
-	return json.Marshal(rust)
+	return json.Marshal(ffi)
 }
 
 // fromRustJSON converts Rust JSON back to Go types.As.
 func fromRustJSON(jsonBytes []byte) (*types.As, error) {
-	var rust rustAttestation
-	if err := json.Unmarshal(jsonBytes, &rust); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal Rust JSON")
+	var ffi ffiAttestation
+	if err := json.Unmarshal(jsonBytes, &ffi); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal FFI JSON")
 	}
 
-	// Convert Unix milliseconds back to time.Time
-	timestamp := time.UnixMilli(rust.Timestamp)
-	createdAt := time.UnixMilli(rust.CreatedAt)
-
-	as := &types.As{
-		ID:         rust.ID,
-		Subjects:   rust.Subjects,
-		Predicates: rust.Predicates,
-		Contexts:   rust.Contexts,
-		Actors:     rust.Actors,
-		Timestamp:  timestamp,
-		Source:     rust.Source,
-		Attributes: rust.Attributes,
-		CreatedAt:  createdAt,
-	}
-
-	return as, nil
+	return &types.As{
+		ID:         ffi.ID,
+		Subjects:   ffi.Subjects,
+		Predicates: ffi.Predicates,
+		Contexts:   ffi.Contexts,
+		Actors:     ffi.Actors,
+		Timestamp:  time.UnixMilli(ffi.Timestamp),
+		Source:     ffi.Source,
+		Attributes: ffi.Attributes,
+		CreatedAt:  time.UnixMilli(ffi.CreatedAt),
+		Signature:  ffi.Signature,
+		SignerDID:  ffi.SignerDID,
+	}, nil
 }

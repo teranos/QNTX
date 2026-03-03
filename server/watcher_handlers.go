@@ -527,7 +527,7 @@ func (s *QNTXServer) initWatcherEngine() error {
 		}
 	}
 
-	// Register as global observer (notified by SQLStore on all attestation creations)
+	// Register as global observer (notified on all attestation creations)
 	storage.RegisterObserver(s.watcherEngine)
 
 	// Start the engine

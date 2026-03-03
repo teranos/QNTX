@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin pty-glyph-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin openrouter-plugin pty-glyph-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -242,6 +242,9 @@ github-plugin: ## Build and install GitHub plugin to ~/.qntx/plugins/
 ix-json-plugin: ## Build and install ix-json plugin to ~/.qntx/plugins/
 	@$(MAKE) -C qntx-ix-json install PREFIX=$(PREFIX)
 
+openrouter-plugin: ## Build and install OpenRouter plugin to ~/.qntx/plugins/
+	@$(MAKE) -C qntx-openrouter install PREFIX=$(PREFIX)
+
 pty-glyph-plugin: ## Build and install pty-glyph plugin to ~/.qntx/plugins/
 	@$(MAKE) -C qntx-plugins/pty-glyph install PREFIX=$(PREFIX)
 
@@ -287,38 +290,26 @@ rust-embeddings: ## Build Rust embeddings library with ONNX support (for CGO int
 
 # Rust Python plugin (PyO3-based Python execution)
 # REQUIRES Nix: Platform-specific Python linking issues make cargo-only builds unreliable
-rust-python: ## Build Rust Python plugin binary (via Nix)
+rust-python: ## Build and install Rust Python plugin to ~/.qntx/plugins/
 	@echo "Building qntx-python-plugin via Nix..."
 	@nix build ./qntx-python#qntx-python-plugin
-	@mkdir -p bin
-	@rm -f bin/qntx-python-plugin
+	@mkdir -p bin $(PREFIX)/plugins
+	@rm -f bin/qntx-python-plugin $(PREFIX)/plugins/qntx-python-plugin
 	@cp -L result/bin/qntx-python-plugin bin/
 	@chmod +x bin/qntx-python-plugin
-	@echo "✓ qntx-python-plugin built in bin/"
+	@cp bin/qntx-python-plugin $(PREFIX)/plugins/
+	@chmod +x $(PREFIX)/plugins/qntx-python-plugin
+	@echo "✓ qntx-python-plugin built and installed to $(PREFIX)/plugins/"
 
 # Rust Reduce plugin (PyO3-based UMAP dimensionality reduction)
 # REQUIRES Nix: Python linking + umap-learn dependency
-rust-reduce: ## Build Rust Reduce plugin binary (via Nix)
+rust-reduce: ## Build and install Rust Reduce plugin to ~/.qntx/plugins/
 	@echo "Building qntx-reduce-plugin via Nix..."
 	@nix build ./qntx-reduce#qntx-reduce-plugin
-	@mkdir -p bin
-	@rm -f bin/qntx-reduce-plugin
+	@mkdir -p bin $(PREFIX)/plugins
+	@rm -f bin/qntx-reduce-plugin $(PREFIX)/plugins/qntx-reduce-plugin
 	@cp -L result/bin/qntx-reduce-plugin bin/
 	@chmod +x bin/qntx-reduce-plugin
-	@echo "✓ qntx-reduce-plugin built in bin/"
-
-rust-reduce-install: rust-reduce ## Install Rust Reduce plugin to ~/.qntx/plugins/
-	@echo "Installing qntx-reduce-plugin to $(PREFIX)/plugins..."
-	@mkdir -p $(PREFIX)/plugins
-	@rm -f $(PREFIX)/plugins/qntx-reduce-plugin
 	@cp bin/qntx-reduce-plugin $(PREFIX)/plugins/
 	@chmod +x $(PREFIX)/plugins/qntx-reduce-plugin
-	@echo "✓ qntx-reduce-plugin installed to $(PREFIX)/plugins/"
-
-rust-python-install: rust-python ## Install Rust Python plugin to ~/.qntx/plugins/
-	@echo "Installing qntx-python-plugin to $(PREFIX)/plugins..."
-	@mkdir -p $(PREFIX)/plugins
-	@rm -f $(PREFIX)/plugins/qntx-python-plugin
-	@cp bin/qntx-python-plugin $(PREFIX)/plugins/
-	@chmod +x $(PREFIX)/plugins/qntx-python-plugin
-	@echo "✓ qntx-python-plugin installed to $(PREFIX)/plugins/"
+	@echo "✓ qntx-reduce-plugin built and installed to $(PREFIX)/plugins/"

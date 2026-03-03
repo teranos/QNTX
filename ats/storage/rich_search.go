@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/ats/ax"
 	"github.com/teranos/QNTX/ats/types"
@@ -333,29 +332,37 @@ func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (map[string][]st
 	}
 	bs.typeFieldsCacheLock.RUnlock()
 
-	// Query for type definition attestations (predicate="type", any context)
-	filter := ats.AttestationFilter{
-		Predicates: []string{"type"},
-		// No context filter - allow types from any domain context
-		Limit: 1000, // Reasonable upper bound on number of types
-	}
-
-	attestations, err := bs.GetAttestations(filter)
+	// Query type definitions directly from the database.
+	// Uses bs.db (not bs.store) because BoundedStore may have a nil store
+	// when created for enforcement/rich-field purposes only.
+	rows, err := bs.db.QueryContext(ctx, `
+		SELECT json_extract(subjects, '$[0]') as type_name, attributes
+		FROM attestations
+		WHERE json_extract(predicates, '$[0]') = 'type'
+		ORDER BY created_at DESC
+		LIMIT 1000
+	`)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query type definitions")
 	}
+	defer rows.Close()
 
 	typeFields := make(map[string][]string)
 
-	for _, attestation := range attestations {
-		// Type name is the first subject
-		if len(attestation.Subjects) == 0 {
+	for rows.Next() {
+		var typeName string
+		var attributesJSON string
+		if err := rows.Scan(&typeName, &attributesJSON); err != nil {
 			continue
 		}
-		typeName := attestation.Subjects[0]
+
+		var attrMap map[string]interface{}
+		if err := json.Unmarshal([]byte(attributesJSON), &attrMap); err != nil {
+			continue
+		}
 
 		var def types.TypeDef
-		attrs.Scan(attestation.Attributes, &def)
+		attrs.Scan(attrMap, &def)
 		if len(def.RichStringFields) > 0 {
 			typeFields[typeName] = def.RichStringFields
 			if bs.logger != nil {
@@ -364,6 +371,9 @@ func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (map[string][]st
 					"fields", def.RichStringFields)
 			}
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "failed to iterate type definitions")
 	}
 
 	// Update cache
@@ -374,8 +384,7 @@ func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (map[string][]st
 
 	if bs.logger != nil {
 		bs.logger.Debugw("Cached type definitions",
-			"type_count", len(typeFields),
-			"total_attestations", len(attestations))
+			"type_count", len(typeFields))
 	}
 
 	return typeFields, nil
