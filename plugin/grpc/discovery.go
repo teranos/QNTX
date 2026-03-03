@@ -560,8 +560,8 @@ func (m *PluginManager) ReinitializePlugin(ctx context.Context, pluginName strin
 		return errors.WithHintf(err, "ensure plugin '%s' is enabled and running before reinitializing", pluginName)
 	}
 
-	// Call Initialize again with updated config from ServiceRegistry
-	if err := p.client.Initialize(ctx, services); err != nil {
+	// Call ForceInitialize to bypass the once-guard (this is an explicit re-init)
+	if err := p.client.ForceInitialize(ctx, services); err != nil {
 		wrappedErr := errors.Wrapf(err, "failed to reinitialize plugin %s", pluginName)
 		return errors.WithHintf(wrappedErr, "check plugin logs and verify configuration is valid")
 	}

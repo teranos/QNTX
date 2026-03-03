@@ -45,37 +45,37 @@ var (
 
 // User-facing messages and details
 var (
-	WithHint          = crdb.WithHint
-	WithHintf         = crdb.WithHintf
-	WithDetail        = crdb.WithDetail
-	WithDetailf       = crdb.WithDetailf
-	WithSafeDetails   = crdb.WithSafeDetails
+	WithHint           = crdb.WithHint
+	WithHintf          = crdb.WithHintf
+	WithDetail         = crdb.WithDetail
+	WithDetailf        = crdb.WithDetailf
+	WithSafeDetails    = crdb.WithSafeDetails
 	WithSecondaryError = crdb.WithSecondaryError
 )
 
 // Error inspection
 var (
-	Is        = crdb.Is
-	IsAny     = crdb.IsAny
-	As        = crdb.As
-	Unwrap    = crdb.Unwrap
-	UnwrapOnce = crdb.UnwrapOnce
-	UnwrapAll = crdb.UnwrapAll
-	GetAllHints = crdb.GetAllHints
-	GetAllDetails = crdb.GetAllDetails
-	FlattenHints = crdb.FlattenHints
+	Is             = crdb.Is
+	IsAny          = crdb.IsAny
+	As             = crdb.As
+	Unwrap         = crdb.Unwrap
+	UnwrapOnce     = crdb.UnwrapOnce
+	UnwrapAll      = crdb.UnwrapAll
+	GetAllHints    = crdb.GetAllHints
+	GetAllDetails  = crdb.GetAllDetails
+	FlattenHints   = crdb.FlattenHints
 	FlattenDetails = crdb.FlattenDetails
 )
 
 // Advanced features
 var (
-	Handled            = crdb.Handled
-	HandledWithMessage = crdb.HandledWithMessage
-	WithDomain         = crdb.WithDomain
-	GetDomain          = crdb.GetDomain
-	WithContextTags    = crdb.WithContextTags
-	EncodeError        = crdb.EncodeError
-	DecodeError        = crdb.DecodeError
+	Handled                 = crdb.Handled
+	HandledWithMessage      = crdb.HandledWithMessage
+	WithDomain              = crdb.WithDomain
+	GetDomain               = crdb.GetDomain
+	WithContextTags         = crdb.WithContextTags
+	EncodeError             = crdb.EncodeError
+	DecodeError             = crdb.DecodeError
 	GetReportableStackTrace = crdb.GetReportableStackTrace
 )
 
@@ -84,7 +84,7 @@ var GetStack = crdb.GetReportableStackTrace
 
 // Assertions and panics
 var (
-	AssertionFailedf  = crdb.AssertionFailedf
+	AssertionFailedf                 = crdb.AssertionFailedf
 	NewAssertionErrorWithWrappedErrf = crdb.NewAssertionErrorWithWrappedErrf
 )
 
@@ -112,6 +112,9 @@ var (
 
 	// ErrConflict indicates a resource conflict (e.g., duplicate key)
 	ErrConflict = New("resource conflict")
+
+	// ErrMethodNotAllowed indicates the HTTP method is not supported for this endpoint
+	ErrMethodNotAllowed = New("method not allowed")
 )
 
 // IsNotFoundError checks if an error is or wraps ErrNotFound.
@@ -160,4 +163,14 @@ func NewNotFoundError(format string, args ...interface{}) error {
 // NewInvalidRequestError creates an invalid-request error with a formatted message
 func NewInvalidRequestError(format string, args ...interface{}) error {
 	return Wrap(ErrInvalidRequest, Newf(format, args...).Error())
+}
+
+// IsMethodNotAllowedError checks if an error is or wraps ErrMethodNotAllowed
+func IsMethodNotAllowedError(err error) bool {
+	return err != nil && Is(err, ErrMethodNotAllowed)
+}
+
+// NewMethodNotAllowedError creates a method-not-allowed error that includes the HTTP method
+func NewMethodNotAllowedError(method string) error {
+	return Wrapf(ErrMethodNotAllowed, "method %s not allowed", method)
 }

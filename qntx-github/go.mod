@@ -1,6 +1,6 @@
 module github.com/teranos/qntx-github
 
-go 1.25.0
+go 1.24.6
 
 require (
 	github.com/teranos/QNTX v0.23.0

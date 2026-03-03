@@ -33,7 +33,7 @@ Users want to run models locally (Ollama, LocalAI) for privacy/cost, or use clou
 
 ## Related Packages
 
-- **[httpclient](../internal/httpclient/)** - SSRF-safe HTTP client used by openrouter/provider
+- **[httpclient](../net/httpclient/)** - SSRF-safe HTTP client used by openrouter/provider
 - **[pulse/budget](../pulse/budget/)** - Budget enforcement (uses tracker data)
 - **[code](../code/)** - Code intelligence (uses provider for LLM calls)
 

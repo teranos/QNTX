@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/am"
 )
 
@@ -168,9 +167,9 @@ func TestGenerateTextWithUsage_ReturnsTokenStats(t *testing.T) {
 			Created: 1234567890,
 			Model:   "test-model",
 			Choices: []struct {
-				Index   int         `json:"index"`
-				Message ChatMessage `json:"message"`
-				FinishReason string `json:"finish_reason"`
+				Index        int         `json:"index"`
+				Message      ChatMessage `json:"message"`
+				FinishReason string      `json:"finish_reason"`
 			}{
 				{
 					Index:        0,
@@ -225,7 +224,7 @@ func TestGenerateTextWithUsage_ReturnsTokenStats(t *testing.T) {
 }
 
 // TestLocalClientAdapter_PropagatesTokenStats verifies the adapter passes
-// token stats through to the openrouter.ChatResponse format.
+// token stats through to the ChatResponse format.
 func TestLocalClientAdapter_PropagatesTokenStats(t *testing.T) {
 	// Create mock server with token usage
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -233,9 +232,9 @@ func TestLocalClientAdapter_PropagatesTokenStats(t *testing.T) {
 			ID:    "test-id",
 			Model: "test-model",
 			Choices: []struct {
-				Index   int         `json:"index"`
-				Message ChatMessage `json:"message"`
-				FinishReason string `json:"finish_reason"`
+				Index        int         `json:"index"`
+				Message      ChatMessage `json:"message"`
+				FinishReason string      `json:"finish_reason"`
 			}{
 				{
 					Index:        0,
@@ -267,7 +266,7 @@ func TestLocalClientAdapter_PropagatesTokenStats(t *testing.T) {
 	})
 
 	// Call Chat through the adapter
-	resp, err := adapter.Chat(context.Background(), openrouter.ChatRequest{
+	resp, err := adapter.Chat(context.Background(), ChatRequest{
 		SystemPrompt: "system",
 		UserPrompt:   "user",
 	})
