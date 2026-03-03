@@ -1,6 +1,6 @@
 [package]
 name = "qntx-pty-glyph"
-version = "0.1.5"
+version = "0.1.6"
 edition.workspace = true
 description = "QNTX gRPC plugin for persistent terminal glyphs (PTY)"
 license.workspace = true
