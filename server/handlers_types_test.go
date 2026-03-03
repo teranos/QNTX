@@ -2,14 +2,17 @@ package server
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	qntxtest "github.com/teranos/QNTX/internal/testing"
+	"github.com/teranos/QNTX/db"
 )
 
 // TypeRequest represents the JSON request for creating/updating types
@@ -27,11 +30,21 @@ type TypeRequest struct {
 // can configure which fields are fuzzy-searchable, enabling discovery of
 // restaurants by cuisine, menu items by ingredients, and cities by neighborhoods
 func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
-	// Create test database with real migrations
-	db := qntxtest.CreateTestDB(t)
+	// Create file-backed test database so Go and Rust share the same file
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	testDB, err := sql.Open("sqlite3", dbPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { testDB.Close() })
 
-	// Create server instance
-	srv, err := NewQNTXServer(db, ":memory:", 0, "")
+	_, err = testDB.Exec("PRAGMA journal_mode=WAL")
+	require.NoError(t, err)
+	_, err = testDB.Exec("PRAGMA foreign_keys = ON")
+	require.NoError(t, err)
+	err = db.Migrate(testDB, nil)
+	require.NoError(t, err)
+
+	// Create server instance with file-backed DB
+	srv, err := NewQNTXServer(testDB, dbPath, 0, "")
 	require.NoError(t, err)
 	defer srv.Stop()
 

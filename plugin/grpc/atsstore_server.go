@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
@@ -16,13 +15,13 @@ import (
 // ATSStoreServer implements the ATSStoreService gRPC server
 type ATSStoreServer struct {
 	protocol.UnimplementedATSStoreServiceServer
-	store     *storage.SQLStore
+	store     ats.AttestationStore
 	authToken string
 	logger    *zap.SugaredLogger
 }
 
 // NewATSStoreServer creates a new ATS store gRPC server
-func NewATSStoreServer(store *storage.SQLStore, authToken string, logger *zap.SugaredLogger) *ATSStoreServer {
+func NewATSStoreServer(store ats.AttestationStore, authToken string, logger *zap.SugaredLogger) *ATSStoreServer {
 	return &ATSStoreServer{
 		store:     store,
 		authToken: authToken,

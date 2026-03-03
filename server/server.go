@@ -12,6 +12,7 @@ import (
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/ats/lsp"
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/vidstream/vidstream"
 	"github.com/teranos/QNTX/ats/watcher"
@@ -35,7 +36,8 @@ import (
 // QNTXServer provides live-updating graph visualization for Ax queries
 type QNTXServer struct {
 	db                  *sql.DB
-	dbPath              string           // Database file path (for display in banner)
+	dbPath              string                     // Database file path (for display in banner)
+	atsStore            ats.AttestationStore        // Attestation store (Rust FFI or Go SQLite)
 	bindAddress         string           // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
 	authHandler         *auth.Handler    // nil when auth.enabled = false
 	authEnabled         bool             // resolved at init, never changes
