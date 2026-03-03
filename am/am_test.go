@@ -220,6 +220,9 @@ func TestGetDatabasePath(t *testing.T) {
 	}
 }
 
+// DEPRECATED: Per-plugin .toml files in ~/.qntx/plugins/ are no longer the desired flow.
+// Plugin config belongs in am.toml under domain namespace (ADR-002).
+// This mechanism and its tests need to be removed from QNTX.
 func TestLoadPluginConfigs(t *testing.T) {
 	// Setup: Create test home directory
 	testHome := t.TempDir()
@@ -280,6 +283,7 @@ enable_debug = true
 	}
 }
 
+// DEPRECATED: See TestLoadPluginConfigs.
 func TestLoadPluginConfigs_NoPluginsDir(t *testing.T) {
 	// Setup: Create test home without plugins directory
 	testHome := t.TempDir()
@@ -296,6 +300,7 @@ func TestLoadPluginConfigs_NoPluginsDir(t *testing.T) {
 	}
 }
 
+// DEPRECATED: See TestLoadPluginConfigs.
 func TestLoadPluginConfigs_InvalidTOML(t *testing.T) {
 	// Setup: Create test home directory
 	testHome := t.TempDir()
@@ -323,6 +328,7 @@ broken syntax here
 	}
 }
 
+// DEPRECATED: See TestLoadPluginConfigs.
 func TestUpdatePluginConfig(t *testing.T) {
 	// Setup: Create test home directory
 	testHome := t.TempDir()
@@ -368,6 +374,7 @@ func TestUpdatePluginConfig(t *testing.T) {
 	}
 }
 
+// DEPRECATED: See TestLoadPluginConfigs.
 func TestWritePluginConfigToTemp(t *testing.T) {
 	// Setup: Create test home directory
 	testHome := t.TempDir()
