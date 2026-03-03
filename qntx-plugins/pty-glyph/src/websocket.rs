@@ -95,6 +95,7 @@ pub async fn handle_pty_websocket(
     // Spawn task to read from PTY and send to WebSocket (PTY -> client)
     let handle_clone = handle.clone();
     let session_id_clone = session_id.clone();
+    let pty_manager_clone = pty_manager.clone();
     tokio::spawn(async move {
         loop {
             // Read from PTY (blocking operation, run in blocking task)
@@ -140,10 +141,13 @@ pub async fn handle_pty_websocket(
                 }
             }
         }
-        info!(
-            "WebSocket output handler finished for session {}",
-            session_id_clone
-        );
+
+        // Clean up PTY session — prevents leak when WebSocket disconnects
+        if let Err(e) = pty_manager_clone.write().kill_session(&session_id_clone) {
+            warn!("Failed to clean up PTY session {}: {}", session_id_clone, e);
+        } else {
+            info!("Cleaned up PTY session {} after WebSocket disconnect", session_id_clone);
+        }
     });
 
     Ok(rx)

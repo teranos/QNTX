@@ -1,9 +1,14 @@
-.PHONY: build install clean
+.PHONY: build build-module install clean
 
 PREFIX ?= $(HOME)/.qntx
 WORKSPACE_ROOT := $(shell cd ../.. && pwd)
 
-build: ## Build pty-glyph plugin binary
+build-module: ## Compile TypeScript glyph module to JS for include_str!
+	@cd web && bun install --frozen-lockfile
+	@bun build web/pty-glyph-module.ts --outfile web/pty-glyph-module.js --target browser
+	@cp web/node_modules/@xterm/xterm/css/xterm.css web/xterm.css
+
+build: build-module ## Build pty-glyph plugin binary
 	@echo "Building qntx-pty-glyph..."
 	@cargo build --release
 	@echo "✓ $(WORKSPACE_ROOT)/target/release/qntx-pty-glyph"

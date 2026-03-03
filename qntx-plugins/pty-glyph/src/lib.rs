@@ -119,8 +119,11 @@ impl DomainPluginService for PTYGlyphService {
 
         // Route HTTP requests
         match (req.method.as_str(), req.path.as_str()) {
-            ("GET", path) if path.starts_with("/api/pty-glyph/terminal") => {
-                self.handle_terminal_ui(req).await
+            ("GET", "/api/pty-glyph/pty-glyph-module.js") => {
+                self.handle_glyph_module().await
+            }
+            ("GET", "/api/pty-glyph/xterm.css") => {
+                self.handle_xterm_css().await
             }
             ("POST", "/api/pty-glyph/create") => self.handle_create_pty(req).await,
             ("GET", path) if path.starts_with("/api/pty-glyph/session/") => {
@@ -184,10 +187,11 @@ impl DomainPluginService for PTYGlyphService {
             symbol: "⌨".to_string(),
             title: "Terminal".to_string(),
             label: "pty".to_string(),
-            content_path: "/terminal".to_string(),
-            css_path: String::new(),
+            content_path: String::new(),
+            css_path: "/xterm.css".to_string(),
             default_width: 800,
             default_height: 600,
+            module_path: "/pty-glyph-module.js".to_string(),
         }];
 
         Ok(Response::new(GlyphDefResponse { glyphs }))
@@ -203,19 +207,27 @@ impl DomainPluginService for PTYGlyphService {
 }
 
 impl PTYGlyphService {
-    async fn handle_terminal_ui(
-        &self,
-        _req: HttpRequest,
-    ) -> Result<Response<HttpResponse>, Status> {
-        let html = include_str!("../static/terminal.html");
-
+    async fn handle_glyph_module(&self) -> Result<Response<HttpResponse>, Status> {
+        let js = include_str!("../web/pty-glyph-module.js");
         Ok(Response::new(HttpResponse {
             status_code: 200,
             headers: vec![HttpHeader {
                 name: "Content-Type".to_string(),
-                values: vec!["text/html".to_string()],
+                values: vec!["application/javascript; charset=utf-8".to_string()],
             }],
-            body: html.as_bytes().to_vec(),
+            body: js.as_bytes().to_vec(),
+        }))
+    }
+
+    async fn handle_xterm_css(&self) -> Result<Response<HttpResponse>, Status> {
+        let css = include_str!("../web/xterm.css");
+        Ok(Response::new(HttpResponse {
+            status_code: 200,
+            headers: vec![HttpHeader {
+                name: "Content-Type".to_string(),
+                values: vec!["text/css; charset=utf-8".to_string()],
+            }],
+            body: css.as_bytes().to_vec(),
         }))
     }
 

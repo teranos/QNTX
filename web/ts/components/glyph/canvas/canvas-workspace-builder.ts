@@ -358,10 +358,12 @@ export function buildCanvasWorkspace(
         const spawnMenu = document.querySelector('.canvas-spawn-menu');
         if (spawnMenu && !spawnMenu.contains(target)) spawnMenu.remove();
 
-        // Ignore clicks on action bar, buttons, inputs, textareas, and contenteditable elements
+        // Ignore clicks on action bar, buttons, inputs, textareas, contenteditable,
+        // and elements marked as interactive via preventDrag (e.g. xterm terminals)
         if (target.closest('.canvas-action-bar')) return;
         if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
         if (target.isContentEditable || target.closest('[contenteditable="true"]')) return;
+        if (target.closest('[data-prevent-drag]')) return;
 
         // Focus container to enable keyboard shortcuts
         container.focus();
