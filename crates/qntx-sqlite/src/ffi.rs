@@ -168,7 +168,10 @@ impl FfiResult for CountResultC {
 pub extern "C" fn storage_new_memory() -> *mut SqliteStore {
     match SqliteStore::in_memory() {
         Ok(store) => Box::into_raw(Box::new(store)),
-        Err(_) => ptr::null_mut(),
+        Err(e) => {
+            eprintln!("qntx-sqlite: failed to create in-memory store: {}", e);
+            ptr::null_mut()
+        }
     }
 }
 
@@ -177,12 +180,18 @@ pub extern "C" fn storage_new_memory() -> *mut SqliteStore {
 pub extern "C" fn storage_new_file(path: *const c_char) -> *mut SqliteStore {
     let path_str = match unsafe { cstr_to_str(path) } {
         Ok(s) => s,
-        Err(_) => return ptr::null_mut(),
+        Err(e) => {
+            eprintln!("qntx-sqlite: invalid path string: {}", e);
+            return ptr::null_mut();
+        }
     };
 
     match SqliteStore::open(Path::new(path_str)) {
         Ok(store) => Box::into_raw(Box::new(store)),
-        Err(_) => ptr::null_mut(),
+        Err(e) => {
+            eprintln!("qntx-sqlite: failed to open {}: {}", path_str, e);
+            ptr::null_mut()
+        }
     }
 }
 
