@@ -28,15 +28,23 @@ func getAxUpgrader() websocket.Upgrader {
 func checkOrigin(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 
-	// Allow requests with no origin header (e.g., direct WebSocket clients, testing)
+	config, err := appcfg.Load()
+
 	if origin == "" {
-		return true
+		// On loopback, allow missing Origin (direct WebSocket clients, testing).
+		// On non-loopback, require Origin — raw clients must not bypass origin checking.
+		if err != nil {
+			return true // config failed to load → defaults to loopback
+		}
+		bindAddr := config.Server.BindAddress
+		if bindAddr == "" {
+			bindAddr = "127.0.0.1"
+		}
+		return appcfg.IsLoopbackAddress(bindAddr)
 	}
 
-	// Load allowed origins from config (with defaults)
-	config, err := appcfg.Load()
 	if err != nil {
-		// If config fails to load, use secure defaults (localhost only + Tauri)
+		// Config failed to load — use secure defaults (localhost only + Tauri)
 		return matchOrigin(origin, "http://localhost") ||
 			matchOrigin(origin, "https://localhost") ||
 			matchOrigin(origin, "tauri://localhost")

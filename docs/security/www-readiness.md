@@ -33,7 +33,7 @@ Code: `server/init.go` (safety check), `am/defaults.go` (default + env binding `
 
 ### P1 — Significant risk on the open internet
 
-**Missing Origin header accepted on WebSocket.** `server/util.go:32` — `if origin == "" { return true }`. Raw WebSocket clients bypass origin checking entirely.
+**~~Missing Origin header accepted on WebSocket.~~** Done — empty Origin is only accepted on loopback bind. Non-loopback bind rejects WebSocket connections without an Origin header (`server/util.go:checkOrigin`).
 
 **`/health` leaks reconnaissance data.** `server/handlers.go:411-428` — Public endpoint returns version, git commit, build time, client count, owner name.
 
@@ -77,7 +77,7 @@ Code: `server/init.go` (safety check), `am/defaults.go` (default + env binding `
 | P0 | CORS exact matching | Low | Done |
 | P0 | Rate limiting middleware | Medium | Done |
 | P1 | WebAuthn RPID from config | Low | Open |
-| P1 | Require Origin header on WS | Low | Open |
+| P1 | Require Origin header on WS | Low | Done |
 | P1 | Strip `/health` or auth-gate it | Low | Open |
 | P1 | `Secure` flag on session cookie | Low | Open |
 | P1 | Persist sessions to SQLite | Medium | Open |
