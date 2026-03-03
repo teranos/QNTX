@@ -8,6 +8,22 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+// NewJobLogEntry creates a JobLogEntry with the current timestamp.
+// This is the standard way to build log entries in ExecuteJob implementations.
+func NewJobLogEntry(level, stage, message string) *JobLogEntry {
+	return &JobLogEntry{
+		Timestamp: time.Now().Format(time.RFC3339),
+		Level:     level,
+		Stage:     stage,
+		Message:   message,
+	}
+}
+
+// ErrUnknownHandler returns a formatted error for unrecognized handler names in ExecuteJob.
+func ErrUnknownHandler(handlerName string) error {
+	return fmt.Errorf("unknown handler: %s", handlerName)
+}
+
 // ToTypes converts a proto Attestation to types.As.
 func (p *Attestation) ToTypes() *types.As {
 	attributes := make(map[string]interface{})
