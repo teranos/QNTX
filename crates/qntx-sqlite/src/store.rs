@@ -61,8 +61,8 @@ impl SqliteStore {
 
         let conn = Connection::open(path)?;
 
-        conn.execute("PRAGMA journal_mode = WAL", [])?;
-        conn.execute("PRAGMA foreign_keys = ON", [])?;
+        conn.pragma_update(None, "journal_mode", "WAL")?;
+        conn.pragma_update(None, "foreign_keys", "ON")?;
         crate::migrate::migrate(&conn)?;
         Ok(Self::new(conn))
     }
