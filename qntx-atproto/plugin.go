@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/bluesky-social/indigo/xrpc"
 	"github.com/teranos/QNTX/errors"
@@ -48,7 +47,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "atproto",
-			Version:     "0.3.2",
+			Version:     "0.3.3",
 			QNTXVersion: ">= 0.1.0",
 			Description: "AT Protocol integration (Bluesky) with auto-scheduled timeline sync",
 			Author:      "QNTX Team",
@@ -282,14 +281,14 @@ func (p *Plugin) GetHandlerNames() []string {
 func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID string, payload []byte) (result []byte, logs []*protocol.JobLogEntry, err error) {
 	switch handlerName {
 	case "atproto.timeline-sync":
-		logs = append(logs, jobLog("info", "timeline-sync", "Starting timeline sync"))
+		logs = append(logs, protocol.NewJobLogEntry("info", "timeline-sync", "Starting timeline sync"))
 
 		if err := p.syncTimeline(ctx, jobID); err != nil {
-			logs = append(logs, jobLog("error", "timeline-sync", fmt.Sprintf("Sync failed: %v", err)))
+			logs = append(logs, protocol.NewJobLogEntry("error", "timeline-sync", fmt.Sprintf("Sync failed: %v", err)))
 			return nil, logs, err
 		}
 
-		logs = append(logs, jobLog("info", "timeline-sync", "Timeline sync completed"))
+		logs = append(logs, protocol.NewJobLogEntry("info", "timeline-sync", "Timeline sync completed"))
 
 		resultData := map[string]string{
 			"status": "Timeline sync completed",
@@ -298,16 +297,7 @@ func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID strin
 		return result, logs, err
 
 	default:
-		return nil, nil, fmt.Errorf("unknown handler: %s", handlerName)
-	}
-}
-
-func jobLog(level, stage, message string) *protocol.JobLogEntry {
-	return &protocol.JobLogEntry{
-		Timestamp: time.Now().Format(time.RFC3339),
-		Level:     level,
-		Stage:     stage,
-		Message:   message,
+		return nil, nil, protocol.ErrUnknownHandler(handlerName)
 	}
 }
 

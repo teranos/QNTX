@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/teranos/QNTX/ats"
 	atstypes "github.com/teranos/QNTX/ats/types"
@@ -29,15 +28,6 @@ import (
 
 //go:embed web/ix-glyph-module.js
 var ixGlyphModuleJS []byte
-
-func logEntry(level, stage, message string) *protocol.JobLogEntry {
-	return &protocol.JobLogEntry{
-		Timestamp: time.Now().Format(time.RFC3339),
-		Level:     level,
-		Stage:     stage,
-		Message:   message,
-	}
-}
 
 // OperationMode represents the current operational mode of a glyph.
 type OperationMode string
@@ -72,7 +62,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "ix-json",
-			Version:     "0.4.0",
+			Version:     "0.4.1",
 			QNTXVersion: ">= 0.1.0",
 			Description: "Generic JSON API ingestion with configurable mapping to attestations",
 			Author:      "QNTX Team",
@@ -347,12 +337,12 @@ func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID strin
 			"glyph_id": req.GlyphID,
 		})
 		logs := []*protocol.JobLogEntry{
-			logEntry("info", "poll", fmt.Sprintf("Fetched %s, created %d attestations", pollRes.APIURL, pollRes.AttestationsCreated)),
+			protocol.NewJobLogEntry("info", "poll", fmt.Sprintf("Fetched %s, created %d attestations", pollRes.APIURL, pollRes.AttestationsCreated)),
 		}
 		return result, logs, nil
 
 	default:
-		return nil, nil, fmt.Errorf("unknown handler: %s", handlerName)
+		return nil, nil, protocol.ErrUnknownHandler(handlerName)
 	}
 }
 
