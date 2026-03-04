@@ -158,6 +158,16 @@ unsafe fn execute_query(
     let filter: AxFilter = serde_json::from_str(filter_json)
         .map_err(|e| format!("ax_query: invalid filter JSON: {}", e))?;
 
+    if filter.subjects.is_empty()
+        && filter.predicates.is_empty()
+        && filter.contexts.is_empty()
+        && filter.actors.is_empty()
+        && filter.time_start.is_none()
+        && filter.time_end.is_none()
+    {
+        return Err("ax_query: empty filter — must contain at least one constraint".to_string());
+    }
+
     let (sql, params) = build_sql(&filter);
 
     // Prepare statement
@@ -229,7 +239,7 @@ unsafe fn execute_query(
     let summary = build_summary(&attestations);
     let result = AxResult {
         attestations,
-        conflicts: Vec::new(),
+        conflicts: Vec::new(), // TODO(#655): wire up qntx-core classification
         summary,
     };
 
@@ -302,6 +312,15 @@ fn build_sql(filter: &AxFilter) -> (String, Vec<String>) {
             placeholders
         ));
         params.extend(filter.actors.iter().cloned());
+    }
+
+    if let Some(start) = filter.time_start {
+        sql.push_str(" AND timestamp >= ?");
+        params.push(ms_to_rfc3339(start));
+    }
+    if let Some(end) = filter.time_end {
+        sql.push_str(" AND timestamp <= ?");
+        params.push(ms_to_rfc3339(end));
     }
 
     sql.push_str(" ORDER BY created_at DESC");
@@ -417,6 +436,36 @@ fn parse_timestamp_to_ms(s: &str) -> i64 {
 
     let days = days_from_civil(year, month, day);
     days * 86_400_000 + hour * 3_600_000 + minute * 60_000 + second * 1000
+}
+
+/// Convert Unix milliseconds to RFC3339 string (inverse of parse_timestamp_to_ms).
+fn ms_to_rfc3339(ms: i64) -> String {
+    let total_secs = ms.div_euclid(1000);
+    let days = total_secs.div_euclid(86400);
+    let day_secs = total_secs.rem_euclid(86400);
+    let hour = day_secs / 3600;
+    let minute = (day_secs % 3600) / 60;
+    let second = day_secs % 60;
+    let (year, month, day) = civil_from_days(days);
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        year, month, day, hour, minute, second
+    )
+}
+
+/// Days since Unix epoch → (year, month, day). Inverse of days_from_civil. Howard Hinnant.
+fn civil_from_days(days: i64) -> (i64, i64, i64) {
+    let z = days + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = z - era * 146097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    (y, m, d)
 }
 
 /// Days since Unix epoch. Algorithm from Howard Hinnant.
