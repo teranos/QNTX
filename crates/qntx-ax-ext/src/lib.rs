@@ -179,8 +179,12 @@ unsafe fn execute_query(
     // Bind parameters — keep CStrings alive until after step loop
     let param_cstrs: Vec<CString> = params
         .iter()
-        .map(|p| CString::new(p.as_str()).unwrap_or_default())
-        .collect();
+        .enumerate()
+        .map(|(i, p)| {
+            CString::new(p.as_str())
+                .map_err(|_| format!("ax_query: param {} contains null byte", i + 1))
+        })
+        .collect::<std::result::Result<Vec<_>, _>>()?;
 
     for (i, cstr) in param_cstrs.iter().enumerate() {
         let rc = ext::sqlite3ext_bind_text(
