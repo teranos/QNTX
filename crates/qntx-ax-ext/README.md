@@ -53,7 +53,7 @@ SELECT ax('ALICE is author of GitHub');
 sqlite3_load_extension(db, "libqntx_ax_ext.dylib", "sqlite3_qntxax_init")
         |
         v
-sqlite3_qntxax_init()          <- #[sqlite_entrypoint] via sqlite-loadable
+sqlite3_qntxax_init()          <- manual entrypoint, captures API pointer table
         |
         +-- registers ax_parse()   -> qntx_core::parser::Parser::parse
         +-- registers ax_query()   -> build_sql() + sqlite3ext_prepare_v2/step/column
@@ -111,8 +111,6 @@ The extension is loaded at runtime by SQLite's `dlopen` — it does NOT need to 
 
 ## Known Limitations
 
-1. **No temporal filtering**: The parser recognizes temporal clauses (`since 2024-01-01`, `over 5y`) but conversion to `time_start`/`time_end` filter fields is unimplemented.
-2. **No fuzzy matching**: Exact matching only. `"author"` will not match `"author_of"`.
-3. **No classification or conflict detection**: Returns `conflicts: []` always.
-4. **No cartesian expansion**: Returns raw attestations, not individual claims.
-5. **macOS system sqlite3**: `/usr/bin/sqlite3` has extension loading disabled by Apple. Use nix or brew sqlite3 for CLI testing.
+1. **No temporal parsing**: `ax_parse` doesn't populate `time_start`/`time_end` from temporal clauses (`since 2024-01-01`, `over 5y`). `ax_query` handles these fields correctly if passed via filter JSON.
+2. **No classification or conflict detection** ([#655](https://github.com/teranos/QNTX/issues/655)): Returns `conflicts: []` always.
+3. **No cartesian expansion** ([#656](https://github.com/teranos/QNTX/issues/656)): Returns raw attestations, not individual claims. An attestation with `subjects: ["ALICE", "BOB"]` and `predicates: ["member"]` comes back as one result, not two separate claims. Callers must decompose multi-valued fields themselves. Summary counts are per-attestation, not per-claim. The expansion logic exists in `qntx-core::expand` — needs wiring into the extension.
