@@ -3835,7 +3835,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-pty-glyph"
-version = "0.1.6"
+version = "0.1.8"
 dependencies = [
  "chrono",
  "clap",

@@ -4,10 +4,6 @@
  * Replaces legacy terminal.html. xterm.js is bundled by bun build
  * instead of loaded from CDN. Backend URL comes from GlyphUI
  * instead of being hardcoded.
- *
- * TODO(#650): Keyboard input reaches xterm (onData fires) but typed
- * characters don't echo back from the PTY. The send path between
- * onData and the WebSocket needs investigation.
  */
 
 import type { Glyph, GlyphUI, RenderFn } from '@qntx/glyphs';
@@ -65,9 +61,40 @@ export const render: RenderFn = async (glyph: Glyph, ui: GlyphUI): Promise<HTMLE
         const resizeObserver = new ResizeObserver(() => fitAddon.fit());
         resizeObserver.observe(termDiv);
 
-        // Single async flow: create PTY session, connect WebSocket, wire everything
+        // ws is populated by the async flow below; handlers registered
+        // synchronously here close over this variable.
+        let ws: WebSocket | null = null;
+
+        // Keyboard input → WebSocket. Registered synchronously so xterm
+        // binds the handler during the same tick as term.open().
+        term.onData((data) => {
+            if (ws?.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 1,
+                    data: btoa(data),
+                    headers: {},
+                    timestamp: 0,
+                }));
+            } else {
+                // Self-diagnostic: shows in terminal so user sees what's wrong
+                const state = ws ? `readyState=${ws.readyState}` : 'null';
+                term.write(`\x1b[33m[ws: ${state}]\x1b[0m`);
+            }
+        });
+
+        term.onResize(({ cols, rows }) => {
+            if (ws?.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 3,
+                    data: '',
+                    headers: { cols: String(cols), rows: String(rows) },
+                    timestamp: 0,
+                }));
+            }
+        });
+
+        // Async flow: create PTY session, connect WebSocket
         (async () => {
-            let ws: WebSocket | null = null;
             try {
                 const resp = await ui.pluginFetch('/create', {
                     method: 'POST',
@@ -113,41 +140,18 @@ export const render: RenderFn = async (glyph: Glyph, ui: GlyphUI): Promise<HTMLE
                 ws.onclose = () => {
                     term.write('\r\n\x1b[33mConnection closed\x1b[0m\r\n');
                 };
-
-                // Single onData handler — keyboard input to WebSocket
-                term.onData((data) => {
-                    if (ws?.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify({
-                            type: 1,
-                            data: btoa(data),
-                            headers: {},
-                            timestamp: 0,
-                        }));
-                    }
-                });
-
-                term.onResize(({ cols, rows }) => {
-                    if (ws?.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify({
-                            type: 3,
-                            data: '',
-                            headers: { cols: String(cols), rows: String(rows) },
-                            timestamp: 0,
-                        }));
-                    }
-                });
             } catch (err) {
                 const msg = err instanceof Error ? err.message : String(err);
                 term.write(`\x1b[31mError: ${msg}\x1b[0m\r\n`);
                 ui.log.error('PTY initialization failed', err);
             }
-
-            ui.onCleanup(() => {
-                resizeObserver.disconnect();
-                if (ws && ws.readyState !== WebSocket.CLOSED) ws.close();
-                term.dispose();
-            });
         })();
+
+        ui.onCleanup(() => {
+            resizeObserver.disconnect();
+            if (ws && ws.readyState !== WebSocket.CLOSED) ws.close();
+            term.dispose();
+        });
     });
 
     return element;

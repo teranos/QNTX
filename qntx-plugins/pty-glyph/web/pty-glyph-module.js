@@ -6740,8 +6740,31 @@ var render = async (glyph, ui) => {
     termDiv.addEventListener("mousedown", () => term.focus());
     const resizeObserver = new ResizeObserver(() => fitAddon.fit());
     resizeObserver.observe(termDiv);
+    let ws = null;
+    term.onData((data) => {
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 1,
+          data: btoa(data),
+          headers: {},
+          timestamp: 0
+        }));
+      } else {
+        const state = ws ? `readyState=${ws.readyState}` : "null";
+        term.write(`\x1B[33m[ws: ${state}]\x1B[0m`);
+      }
+    });
+    term.onResize(({ cols, rows }) => {
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 3,
+          data: "",
+          headers: { cols: String(cols), rows: String(rows) },
+          timestamp: 0
+        }));
+      }
+    });
     (async () => {
-      let ws = null;
       try {
         const resp = await ui.pluginFetch("/create", {
           method: "POST",
@@ -6785,39 +6808,19 @@ var render = async (glyph, ui) => {
 \x1B[33mConnection closed\x1B[0m\r
 `);
         };
-        term.onData((data) => {
-          if (ws?.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: 1,
-              data: btoa(data),
-              headers: {},
-              timestamp: 0
-            }));
-          }
-        });
-        term.onResize(({ cols, rows }) => {
-          if (ws?.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: 3,
-              data: "",
-              headers: { cols: String(cols), rows: String(rows) },
-              timestamp: 0
-            }));
-          }
-        });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         term.write(`\x1B[31mError: ${msg}\x1B[0m\r
 `);
         ui.log.error("PTY initialization failed", err);
       }
-      ui.onCleanup(() => {
-        resizeObserver.disconnect();
-        if (ws && ws.readyState !== WebSocket.CLOSED)
-          ws.close();
-        term.dispose();
-      });
     })();
+    ui.onCleanup(() => {
+      resizeObserver.disconnect();
+      if (ws && ws.readyState !== WebSocket.CLOSED)
+        ws.close();
+      term.dispose();
+    });
   });
   return element;
 };
