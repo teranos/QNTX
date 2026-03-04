@@ -38,7 +38,7 @@
     "prosemirror-schema-basic": "1.2.3",
     "prosemirror-schema-list": "1.4.1",
     "prosemirror-state": "1.4.3",
-    "prosemirror-tables": "1.6.1",
+    "prosemirror-tables": "1.8.5",
     "prosemirror-view": "1.38.1",
     "ts-proto": "^2.11.2",
     "typescript": "5.7.2"
