@@ -37,7 +37,7 @@ private __gshared PluginState state;
 // ---------------------------------------------------------------------------
 
 enum PLUGIN_NAME    = "ix-bin";
-enum PLUGIN_VERSION = "0.1.0";
+enum PLUGIN_VERSION = "0.2.0";
 
 MetadataResponse metadata() {
     MetadataResponse resp;
@@ -55,15 +55,24 @@ MetadataResponse metadata() {
 // ---------------------------------------------------------------------------
 
 InitializeResponse initialize(ref const InitializeRequest req) {
+    import ixbin.log;
+
     state.authToken       = req.authToken;
     state.atsEndpoint     = req.atsStoreEndpoint;
     state.queueEndpoint   = req.queueEndpoint;
     state.scheduleEndpoint = req.scheduleEndpoint;
     state.config          = cast(string[string])req.config;
 
-    // Connect to ATSStore
+    logInfo("[ix-bin] Initialize: ats=%s queue=%s schedule=%s",
+        state.atsEndpoint, state.queueEndpoint, state.scheduleEndpoint);
+
+    // Connect to ATSStore — non-fatal, plugin can still serve HTTP without attestation writes
     if (state.atsEndpoint.length > 0) {
-        state.atsClient.connect(state.atsEndpoint, state.authToken);
+        if (!state.atsClient.connect(state.atsEndpoint, state.authToken)) {
+            logWarn("[ix-bin] Initialize: ATSStore connection failed, attestation writes disabled");
+        }
+    } else {
+        logWarn("[ix-bin] Initialize: no ATSStore endpoint provided");
     }
 
     state.initialized = true;
