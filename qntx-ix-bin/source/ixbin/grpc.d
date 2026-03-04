@@ -8,8 +8,9 @@ import ixbin.hpack;
 import ixbin.proto;
 import std.socket;
 import std.conv : to;
-import core.stdc.stdio : fprintf, stderr;
 import core.stdc.string : memcpy;
+import core.time : dur;
+import ixbin.log;
 
 // ---------------------------------------------------------------------------
 // HTTP/2 frame types and constants
@@ -368,18 +369,28 @@ struct GrpcClient {
     uint nextStreamId = 1; // client streams are odd-numbered
     DynamicTable dynTable;
 
-    /// Connect to the gRPC server.
+    /// Connect to the gRPC server. Returns true on success.
+    /// Logs errors to stderr with endpoint context.
     bool connect(string endpoint) {
         // Parse host:port
         auto colonIdx = lastIndexOf(endpoint, ':');
-        if (colonIdx < 0) return false;
+        if (colonIdx < 0) {
+            logError("[ix-bin] gRPC client: invalid endpoint %s (no port)", endpoint);
+            return false;
+        }
         host = endpoint[0 .. colonIdx];
         port = to!ushort(endpoint[colonIdx + 1 .. $]);
 
         sock = new TcpSocket();
+
+        // Set read timeout so handshake can't block forever (5 seconds)
+        sock.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, dur!"seconds"(5));
+
         try {
             sock.connect(new InternetAddress(host, port));
-        } catch (SocketOSException) {
+        } catch (SocketOSException e) {
+            logError("[ix-bin] gRPC client: TCP connect to %s failed: %s", endpoint, e.msg);
+            sock = null;
             return false;
         }
 
@@ -389,7 +400,12 @@ struct GrpcClient {
 
         // Read server SETTINGS
         auto serverSettings = readFrame(sock);
-        if (serverSettings is null) return false;
+        if (serverSettings is null) {
+            logError("[ix-bin] gRPC client: no SETTINGS from %s (timeout or connection closed)", endpoint);
+            sock.close();
+            sock = null;
+            return false;
+        }
         sendSettingsAck(sock);
 
         // Read SETTINGS ACK from server
@@ -405,12 +421,23 @@ struct GrpcClient {
             maxReads--;
         }
 
+        if (maxReads == 0) {
+            logError("[ix-bin] gRPC client: SETTINGS ACK not received from %s after 10 frames", endpoint);
+            sock.close();
+            sock = null;
+            return false;
+        }
+
+        logInfo("[ix-bin] gRPC client: connected to %s", endpoint);
         return true;
     }
 
-    /// Make a unary RPC call.
+    /// Make a unary RPC call. Returns empty on failure.
     ubyte[] call(string method, const ubyte[] requestProto) {
-        if (sock is null) return [];
+        if (sock is null) {
+            logError("[ix-bin] gRPC client: call %s failed — not connected", method);
+            return [];
+        }
 
         uint streamId = nextStreamId;
         nextStreamId += 2;
