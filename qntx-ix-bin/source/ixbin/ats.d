@@ -6,16 +6,24 @@ module ixbin.ats;
 
 import ixbin.grpc;
 import ixbin.proto;
+import ixbin.log;
 
 struct ATSClient {
     GrpcClient client;
     string authToken;
     bool connected;
+    string endpoint;
 
     /// Connect to the ATSStore service endpoint.
-    bool connect(string endpoint, string token) {
+    bool connect(string ep, string token) {
+        endpoint = ep;
         authToken = token;
-        connected = client.connect(endpoint);
+        connected = client.connect(ep);
+        if (!connected) {
+            logError("[ix-bin] ATSStore: failed to connect to %s", ep);
+        } else {
+            logInfo("[ix-bin] ATSStore: connected to %s", ep);
+        }
         return connected;
     }
 
@@ -23,7 +31,8 @@ struct ATSClient {
     /// Returns true on success, sets error string on failure.
     bool createAttestation(ref const AttestationCommand cmd, ref string error) {
         if (!connected) {
-            error = "ATSStore client not connected";
+            error = "ATSStore client not connected to " ~ endpoint;
+            logError("[ix-bin] ATSStore: createAttestation failed — not connected to %s", endpoint);
             return false;
         }
 
@@ -34,13 +43,15 @@ struct ATSClient {
         );
 
         if (responseBytes.length == 0) {
-            error = "empty response from ATSStore";
+            error = "empty response from ATSStore at " ~ endpoint;
+            logError("[ix-bin] ATSStore: empty response from %s", endpoint);
             return false;
         }
 
         auto resp = decodeGenerateAttestationResponse(responseBytes);
         if (!resp.success) {
             error = resp.error;
+            logError("[ix-bin] ATSStore: attestation rejected: %s", resp.error);
             return false;
         }
         return true;

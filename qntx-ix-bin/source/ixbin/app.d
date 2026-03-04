@@ -9,7 +9,8 @@ import ixbin.plugin;
 import ixbin.proto;
 
 import std.conv : convTo = to;
-import std.stdio : stdout, stderr, writeln, writefln;
+import std.stdio : stdout, writeln, writefln;
+import ixbin.log;
 
 void main(string[] args) {
     ushort port = 9005;
@@ -50,7 +51,7 @@ void main(string[] args) {
     // Bind to port
     auto actualPort = server.bind(port);
     if (actualPort == 0) {
-        stderr.writefln("failed to bind to port %d (tried 64 ports)", port);
+        logError("[ix-bin] failed to bind to port %d (tried 64 ports)", port);
         return;
     }
 
@@ -59,8 +60,8 @@ void main(string[] args) {
     writefln("QNTX_PLUGIN_PORT=%d", actualPort);
     stdout.flush();
 
-    stderr.writefln("[ix-bin] gRPC server listening on 127.0.0.1:%d", actualPort);
-    stderr.writefln("[ix-bin] Binary ingestion plugin v%s ready", PLUGIN_VERSION);
+    logInfo("[ix-bin] gRPC server listening on 127.0.0.1:%d", actualPort);
+    logInfo("[ix-bin] Binary ingestion plugin v%s ready", PLUGIN_VERSION);
 
     // Serve (blocks until shutdown)
     server.serve();
