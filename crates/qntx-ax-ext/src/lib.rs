@@ -51,11 +51,9 @@ pub unsafe extern "C" fn sqlite3_qntxax_init(
 }
 
 fn init(db: *mut sqlite3) -> sqlite_loadable::Result<()> {
-    let flags = FunctionFlags::UTF8 | FunctionFlags::DETERMINISTIC;
-
-    define_scalar_function(db, "ax_parse", 1, ax_parse_fn, flags)?;
-    define_scalar_function(db, "ax_query", 1, ax_query_fn, flags)?;
-    define_scalar_function(db, "ax", 1, ax_fn, flags)?;
+    define_scalar_function(db, "ax_parse", 1, ax_parse_fn, FunctionFlags::UTF8 | FunctionFlags::DETERMINISTIC)?;
+    define_scalar_function(db, "ax_query", 1, ax_query_fn, FunctionFlags::UTF8)?;
+    define_scalar_function(db, "ax", 1, ax_fn, FunctionFlags::UTF8)?;
 
     Ok(())
 }
