@@ -25,14 +25,32 @@ use qntx_core::attestation::{Attestation, AxFilter, AxResult, AxSummary};
 
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
-use std::os::raw::c_char;
+use std::os::raw::{c_char, c_uint};
 
 // ============================================================================
 // Extension Entry Point
 // ============================================================================
 
-#[sqlite_entrypoint]
-pub fn sqlite3_qntxax_init(db: *mut sqlite3) -> sqlite_loadable::Result<()> {
+/// Stored API pointer table — needed for sqlite3_errmsg which sqlite-loadable doesn't wrap.
+static mut API: *const ext::sqlite3_api_routines = std::ptr::null();
+
+/// Manual entrypoint (replaces #[sqlite_entrypoint] macro) so we can capture p_api.
+#[no_mangle]
+pub unsafe extern "C" fn sqlite3_qntxax_init(
+    db: *mut sqlite3,
+    _pz_err_msg: *mut *mut c_char,
+    p_api: *mut ext::sqlite3_api_routines,
+) -> c_uint {
+    ext::faux_sqlite_extension_init2(p_api);
+    API = p_api;
+
+    match init(db) {
+        Ok(()) => 0,
+        Err(err) => err.code_extended(),
+    }
+}
+
+fn init(db: *mut sqlite3) -> sqlite_loadable::Result<()> {
     let flags = FunctionFlags::UTF8 | FunctionFlags::DETERMINISTIC;
 
     define_scalar_function(db, "ax_parse", 1, ax_parse_fn, flags)?;
@@ -40,6 +58,19 @@ pub fn sqlite3_qntxax_init(db: *mut sqlite3) -> sqlite_loadable::Result<()> {
     define_scalar_function(db, "ax", 1, ax_fn, flags)?;
 
     Ok(())
+}
+
+/// Get SQLite error message from db handle via the stored API pointer table.
+unsafe fn errmsg(db: *mut sqlite3) -> String {
+    if !API.is_null() {
+        if let Some(f) = (*API).errmsg {
+            let ptr = f(db);
+            if !ptr.is_null() {
+                return CStr::from_ptr(ptr).to_string_lossy().into_owned();
+            }
+        }
+    }
+    String::from("unknown error")
 }
 
 // ============================================================================
@@ -144,7 +175,7 @@ unsafe fn execute_query(
         std::ptr::null_mut(),
     );
     if rc != 0 {
-        return Err(format!("ax_query: prepare failed (rc={})", rc));
+        return Err(format!("ax_query: prepare failed: {}", errmsg(db)));
     }
 
     // Bind parameters — keep CStrings alive until after step loop
@@ -164,7 +195,7 @@ unsafe fn execute_query(
         );
         if rc != 0 {
             ext::sqlite3ext_finalize(stmt);
-            return Err(format!("ax_query: bind failed at param {}", i + 1));
+            return Err(format!("ax_query: bind param {}: {}", i + 1, errmsg(db)));
         }
     }
 
@@ -179,7 +210,7 @@ unsafe fn execute_query(
         if rc != 100 {
             // Not SQLITE_ROW
             ext::sqlite3ext_finalize(stmt);
-            return Err(format!("ax_query: step failed (rc={})", rc));
+            return Err(format!("ax_query: step failed: {}", errmsg(db)));
         }
 
         match row_to_attestation(stmt) {
