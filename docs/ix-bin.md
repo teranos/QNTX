@@ -90,18 +90,21 @@ Source: `plugin/grpc/loader.go:47` (search log), `plugin/grpc/loader.go:178` (fo
   - `ixbin.hpack`: integer codec round-trip, string codec round-trip, static table lookup, Huffman trie existence
   - `ixbin.grpc`: gRPC frame/unframe round-trip, empty frame handling (`grpc.d:486-500`)
   - `ixbin.ingest`: format detection, struct sizes (static assert), hex dump, magic scanner, ELF parser (`ingest.d:432-474`)
-- **CLI**: `--version` prints `qntx-ix-bin-plugin 0.1.0`, `--port N` binds TCP and announces `QNTX_PLUGIN_PORT=N` on stdout
+- **CLI**: `--version` prints `qntx-ix-bin-plugin 0.2.0`, `--port N` binds TCP and announces `QNTX_PLUGIN_PORT=N` on stdout
 - **gRPC integration**: Hand-rolled HTTP/2 + HPACK + protobuf works against Go's grpc-go. QNTX core successfully calls `Metadata()` and `Initialize()` RPCs. Verified manually — plugin loads and connects.
+- **ATSStore callback**: gRPC client (`ats.d:24-47`) calls `/protocol.ATSStoreService/GenerateAndCreateAttestation` back to QNTX core. Protobuf encoding matches Go's expectations. Verified: `curl -X POST --data-binary @qntx-ix-bin-plugin localhost:PORT/api/ix-bin/ingest` returned `attestations_created: 1`. The plugin ingested its own Mach-O binary and wrote an attestation.
+- **HTTP handler routing**: QNTX core strips `/api/ix-bin/` prefix (`plugin/grpc/client.go:338-346`), plugin receives `POST /ingest` (`plugin.d:121`). Verified with the same curl above.
+- **Structured logging**: JSON log format (`log.d`) parsed by plugin loader (`discovery.go:656-663`). INFO/WARN/ERROR routed correctly — no false ERROR noise from informational messages.
 
 ### Not yet verified
 
-1. **ATSStore callback** (`ats.d:24-47`): gRPC client calls `/protocol.ATSStoreService/GenerateAndCreateAttestation`. Protobuf encoding of nested `AttestationCommand` + `google.protobuf.Struct` attributes needs to match Go's expectations byte-for-byte. Test: `curl -X POST --data-binary @file.pcap http://localhost:PORT/api/ix-bin/ingest` — response should show `attestations_created > 0`.
+1. **Hex viewer glyph**: Glyph registered with symbol ⬢ (`plugin.d:102`), module served from `/api/ix-bin/hex-viewer-module.js` (`plugin.d:123,230-239`). Ingest button calls `fetch('/api/ix-bin/ingest')` (`hex-viewer-module.js:94`). Verify: glyph appears in spawn menu, file upload works, ingest creates attestations.
 
-2. **HTTP handler routing**: QNTX core strips `/api/ix-bin/` prefix (`plugin/grpc/client.go:338-346`), plugin receives `POST /ingest` (`plugin.d:121`). Same curl as above verifies both routing and ATSStore in one shot.
+2. **Pulse job execution**: Handler `ix-bin.ingest` registered (`plugin.d:72`), dispatched in `executeJob` (`plugin.d:245-285`). Verify: trigger job through Pulse, check response includes progress and result JSON.
 
-3. **Hex viewer glyph**: Glyph registered with symbol ⬢ (`plugin.d:102`), module served from `/api/ix-bin/hex-viewer-module.js` (`plugin.d:123,230-239`). Ingest button calls `fetch('/api/ix-bin/ingest')` (`hex-viewer-module.js:94`). Verify: glyph appears in spawn menu, file upload works, ingest creates attestations.
+### Known issues
 
-4. **Pulse job execution**: Handler `ix-bin.ingest` registered (`plugin.d:72`), dispatched in `executeJob` (`plugin.d:245-285`). Verify: trigger job through Pulse, check response includes progress and result JSON.
+- **5-second handshake delay**: ATSStore gRPC client connect takes ~5s. Likely a frame ordering mismatch in the HTTP/2 SETTINGS exchange with grpc-go. Not a blocker — connection succeeds.
 
 ## Known limitations
 
@@ -121,10 +124,8 @@ Source: `plugin/grpc/loader.go:47` (search log), `plugin/grpc/loader.go:178` (fo
 
 ## Next
 
-**Immediate** — complete verification items 1-4 above (ATSStore callback is the critical path).
-
-**Then:**
-
+- Verify hex viewer glyph and Pulse job execution (items 1-2 above)
+- Fix 5-second handshake delay in gRPC client SETTINGS exchange
 - Thread-per-connection: replace sequential `accept()` loop (`grpc.d:216-223`) with `std.concurrency` or `core.thread`
 - CONTINUATION frame support: buffer HEADERS payloads across CONTINUATION frames before HPACK decode
 - More format parsers: ZIP central directory, PNG chunks, PDF cross-reference table
