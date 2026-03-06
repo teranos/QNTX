@@ -37,7 +37,7 @@ private __gshared PluginState state;
 // ---------------------------------------------------------------------------
 
 enum PLUGIN_NAME    = "ix-bin";
-enum PLUGIN_VERSION = "0.2.0";
+enum PLUGIN_VERSION = "0.3.0";
 
 MetadataResponse metadata() {
     MetadataResponse resp;
@@ -242,7 +242,7 @@ private HTTPResponse serveGlyphModule() {
     resp.body_ = cast(ubyte[])glyphModuleSource;
     resp.headers = [
         httpHeader("Content-Type", "application/javascript"),
-        httpHeader("Cache-Control", "public, max-age=3600"),
+        httpHeader("Cache-Control", "no-cache"),
     ];
     return resp;
 }
