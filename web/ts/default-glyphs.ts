@@ -597,14 +597,23 @@ function renderEmbeddings(): void {
                 </div>
             `;
         }
+        const hc = embeddingsInfo.hdbscan_config;
+        const minCS = hc?.min_cluster_size ?? 5;
+        const ct = hc?.cluster_threshold ?? 0.5;
+        const cmt = hc?.cluster_match_threshold ?? 0.7;
         clusterSection = `
             <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
                 <h3 class="glyph-section-title">HDBSCAN Clustering</h3>
                 ${clusterRows}
-                <button class="emb-cluster-btn panel-btn" style="width:100%;margin-top:6px"
-                    ${embeddingsClustering ? 'disabled' : ''}>
-                    ${embeddingsClustering ? 'Clustering...' : 'Recompute Clusters'}
-                </button>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;font-size:11px;align-items:center">
+                    <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">size<input class="emb-param-min-cluster-size" type="number" min="2" max="50" step="1" value="${minCS}" style="width:36px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
+                    <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">thresh<input class="emb-param-cluster-threshold" type="number" min="0.1" max="1.0" step="0.05" value="${ct}" style="width:42px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
+                    <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">match<input class="emb-param-match-threshold" type="number" min="0.1" max="1.0" step="0.05" value="${cmt}" style="width:42px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
+                    <button class="emb-cluster-btn panel-btn" style="margin-left:auto;padding:2px 10px;font-size:11px"
+                        ${embeddingsClustering ? 'disabled' : ''}>
+                        ${embeddingsClustering ? 'Clustering...' : 'Recompute'}
+                    </button>
+                </div>
                 <div class="emb-cluster-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
             </div>
         `;
@@ -1145,10 +1154,13 @@ async function recluster(): Promise<void> {
     const resultEl = embeddingsElement?.querySelector('.emb-cluster-result');
 
     try {
+        const minClusterSize = Number((embeddingsElement?.querySelector('.emb-param-min-cluster-size') as HTMLInputElement)?.value) || 5;
+        const clusterThreshold = Number((embeddingsElement?.querySelector('.emb-param-cluster-threshold') as HTMLInputElement)?.value) || 0.5;
+        const clusterMatchThreshold = Number((embeddingsElement?.querySelector('.emb-param-match-threshold') as HTMLInputElement)?.value) || 0.7;
         const resp = await apiFetch('/api/embeddings/cluster', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ min_cluster_size: 5 })
+            body: JSON.stringify({ min_cluster_size: minClusterSize, cluster_threshold: clusterThreshold, cluster_match_threshold: clusterMatchThreshold })
         });
         const result = await resp.json();
 

@@ -18,7 +18,9 @@ import (
 
 // ClusterRequest represents a clustering API request
 type ClusterRequest struct {
-	MinClusterSize int `json:"min_cluster_size,omitempty"`
+	MinClusterSize       int      `json:"min_cluster_size,omitempty"`
+	ClusterThreshold     *float64 `json:"cluster_threshold,omitempty"`
+	ClusterMatchThreshold *float64 `json:"cluster_match_threshold,omitempty"`
 }
 
 // ClusterResponse represents the result of a clustering operation
@@ -49,12 +51,39 @@ func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Parse optional min_cluster_size from body
-	minClusterSize := 5
+	// Parse optional clustering parameters from body
+	minClusterSize := appcfg.GetInt("embeddings.min_cluster_size")
+	if minClusterSize <= 0 {
+		minClusterSize = 5
+	}
+	clusterMatchThreshold := appcfg.GetFloat64("embeddings.cluster_match_threshold")
+
+	var req ClusterRequest
 	if r.Body != nil {
-		var req ClusterRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err == nil && req.MinClusterSize > 0 {
-			minClusterSize = req.MinClusterSize
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+			if req.MinClusterSize > 0 {
+				minClusterSize = req.MinClusterSize
+			}
+			if req.ClusterMatchThreshold != nil && *req.ClusterMatchThreshold > 0 {
+				clusterMatchThreshold = *req.ClusterMatchThreshold
+			}
+		}
+	}
+
+	// Persist any explicitly provided parameters
+	if req.MinClusterSize > 0 {
+		if err := appcfg.UpdateEmbeddingsMinClusterSize(req.MinClusterSize); err != nil {
+			s.logger.Warnw("Failed to persist min_cluster_size", "error", err)
+		}
+	}
+	if req.ClusterThreshold != nil {
+		if err := appcfg.UpdateEmbeddingsClusterThreshold(*req.ClusterThreshold); err != nil {
+			s.logger.Warnw("Failed to persist cluster_threshold", "error", err)
+		}
+	}
+	if req.ClusterMatchThreshold != nil {
+		if err := appcfg.UpdateEmbeddingsClusterMatchThreshold(*req.ClusterMatchThreshold); err != nil {
+			s.logger.Warnw("Failed to persist cluster_match_threshold", "error", err)
 		}
 	}
 
@@ -66,7 +95,7 @@ func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Reque
 		s.embeddingService,
 		s.embeddingClusterInvalidator,
 		minClusterSize,
-		appcfg.GetFloat64("embeddings.cluster_match_threshold"),
+		clusterMatchThreshold,
 		s.atsStore,
 		projectCtx,
 		s.logger,

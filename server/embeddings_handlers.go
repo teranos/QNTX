@@ -506,6 +506,14 @@ type EmbeddingInfoResponse struct {
 	AttestationCount int                     `json:"attestation_count"`
 	UnembeddedIDs    []string                `json:"unembedded_ids,omitempty"`
 	ClusterInfo      *storage.ClusterSummary `json:"cluster_info,omitempty"`
+	HDBSCANConfig    *HDBSCANConfig          `json:"hdbscan_config,omitempty"`
+}
+
+// HDBSCANConfig exposes current clustering parameters to the frontend
+type HDBSCANConfig struct {
+	MinClusterSize        int     `json:"min_cluster_size"`
+	ClusterThreshold      float64 `json:"cluster_threshold"`
+	ClusterMatchThreshold float64 `json:"cluster_match_threshold"`
 }
 
 // HandleEmbeddingInfo returns embedding service status and counts (GET /api/embeddings/info)
@@ -568,6 +576,17 @@ func (s *QNTXServer) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request)
 		if summary, err := s.embeddingStore.GetClusterSummary(); err == nil && summary.NClusters > 0 {
 			resp.ClusterInfo = summary
 		}
+	}
+
+	// Include current HDBSCAN config
+	minCS := appcfg.GetInt("embeddings.min_cluster_size")
+	if minCS <= 0 {
+		minCS = 5
+	}
+	resp.HDBSCANConfig = &HDBSCANConfig{
+		MinClusterSize:        minCS,
+		ClusterThreshold:      appcfg.GetFloat64("embeddings.cluster_threshold"),
+		ClusterMatchThreshold: appcfg.GetFloat64("embeddings.cluster_match_threshold"),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
