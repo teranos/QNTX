@@ -690,6 +690,42 @@ func (s *QNTXServer) HandleEmbeddingClusters(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+// HandleClusterSamples returns sample texts from a cluster (GET /api/embeddings/clusters/samples?cluster_id=N&size=5)
+func (s *QNTXServer) HandleClusterSamples(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.embeddingStore == nil {
+		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	clusterID, err := strconv.Atoi(r.URL.Query().Get("cluster_id"))
+	if err != nil {
+		http.Error(w, "cluster_id parameter required (integer)", http.StatusBadRequest)
+		return
+	}
+
+	size := 5
+	if sizeParam := r.URL.Query().Get("size"); sizeParam != "" {
+		if n, err := strconv.Atoi(sizeParam); err == nil && n > 0 && n <= 20 {
+			size = n
+		}
+	}
+
+	samples, err := s.embeddingStore.SampleClusterTexts(clusterID, size)
+	if err != nil {
+		s.logger.Errorw("Failed to sample cluster texts", "cluster_id", clusterID, "error", err)
+		http.Error(w, fmt.Sprintf("Failed to sample texts for cluster %d", clusterID), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"cluster_id": clusterID, "samples": samples})
+}
+
 // SetupEmbeddingService initializes the embedding service if available
 func (s *QNTXServer) SetupEmbeddingService() {
 	// Check for rustembeddings build tag
