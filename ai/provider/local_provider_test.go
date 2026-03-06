@@ -167,9 +167,9 @@ func TestGenerateTextWithUsage_ReturnsTokenStats(t *testing.T) {
 			Created: 1234567890,
 			Model:   "test-model",
 			Choices: []struct {
-				Index   int         `json:"index"`
-				Message ChatMessage `json:"message"`
-				FinishReason string `json:"finish_reason"`
+				Index        int         `json:"index"`
+				Message      ChatMessage `json:"message"`
+				FinishReason string      `json:"finish_reason"`
 			}{
 				{
 					Index:        0,
@@ -232,9 +232,9 @@ func TestLocalClientAdapter_PropagatesTokenStats(t *testing.T) {
 			ID:    "test-id",
 			Model: "test-model",
 			Choices: []struct {
-				Index   int         `json:"index"`
-				Message ChatMessage `json:"message"`
-				FinishReason string `json:"finish_reason"`
+				Index        int         `json:"index"`
+				Message      ChatMessage `json:"message"`
+				FinishReason string      `json:"finish_reason"`
 			}{
 				{
 					Index:        0,

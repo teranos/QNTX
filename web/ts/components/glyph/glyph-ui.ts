@@ -27,7 +27,7 @@
 import type { Glyph } from './glyph';
 import { canvasPlaced, type CanvasPlacedConfig } from './manifestations/canvas-placed';
 import { preventDrag, storeCleanup } from './glyph-interaction';
-import { apiFetch } from '../../api';
+import { apiFetch, getBackendUrl } from '../../api';
 import { log, SEG } from '../../logger';
 
 // ── Public types (plugin-facing) ────────────────────────────────────
@@ -76,6 +76,12 @@ export interface GlyphUI {
 
     /** Create a status line for showing feedback messages. */
     statusLine(): { element: HTMLElement; show(msg: string, isError?: boolean): void; clear(): void };
+
+    /**
+     * Open a WebSocket to this plugin's WS endpoint.
+     * Constructs the full URL from backend config — no hardcoded ports.
+     */
+    pluginWebSocket(params?: Record<string, string>): WebSocket;
 
     /** Load this glyph's persisted config from the server. Returns null if no config saved. */
     loadConfig(): Promise<Record<string, unknown> | null>;
@@ -148,6 +154,12 @@ export function createGlyphUI(glyph: Glyph, pluginName: string): GlyphUI {
             }
 
             return apiFetch(url, init);
+        },
+
+        pluginWebSocket(params?: Record<string, string>): WebSocket {
+            const base = getBackendUrl().replace(/^http/, 'ws');
+            const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+            return new WebSocket(`${base}/ws/${pluginName}${qs}`);
         },
 
         log: {
