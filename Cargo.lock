@@ -3928,6 +3928,7 @@ dependencies = [
  "console_error_panic_hook",
  "js-sys",
  "qntx-core",
+ "qntx-id",
  "qntx-indexeddb",
  "qntx-proto",
  "serde",
