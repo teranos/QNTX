@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -23,7 +22,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "openrouter",
-			Version:     "0.3.0",
+			Version:     "0.3.1",
 			QNTXVersion: ">= 0.1.0",
 			Description: "OpenRouter LLM gateway for prompt execution, usage tracking, and model pricing",
 			Author:      "QNTX Team",
@@ -104,30 +103,21 @@ func (p *Plugin) GetHandlerNames() []string {
 func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID string, payload []byte) (result []byte, logs []*protocol.JobLogEntry, err error) {
 	switch handlerName {
 	case PromptExecuteHandlerName:
-		logs = append(logs, jobLog("info", "prompt", "Executing prompt via OpenRouter"))
+		logs = append(logs, protocol.NewJobLogEntry("info", "prompt", "Executing prompt via OpenRouter"))
 
 		results, execErr := p.executePromptJob(ctx, jobID, payload)
 		if execErr != nil {
-			logs = append(logs, jobLog("error", "prompt", fmt.Sprintf("Prompt execution failed: %v", execErr)))
+			logs = append(logs, protocol.NewJobLogEntry("error", "prompt", fmt.Sprintf("Prompt execution failed: %v", execErr)))
 			return nil, logs, execErr
 		}
 
-		logs = append(logs, jobLog("info", "prompt", fmt.Sprintf("Prompt execution complete, %d results", len(results))))
+		logs = append(logs, protocol.NewJobLogEntry("info", "prompt", fmt.Sprintf("Prompt execution complete, %d results", len(results))))
 
 		resultData, _ := json.Marshal(results)
 		return resultData, logs, nil
 
 	default:
-		return nil, nil, fmt.Errorf("unknown handler: %s", handlerName)
-	}
-}
-
-func jobLog(level, stage, message string) *protocol.JobLogEntry {
-	return &protocol.JobLogEntry{
-		Timestamp: time.Now().Format(time.RFC3339),
-		Level:     level,
-		Stage:     stage,
-		Message:   message,
+		return nil, nil, protocol.ErrUnknownHandler(handlerName)
 	}
 }
 

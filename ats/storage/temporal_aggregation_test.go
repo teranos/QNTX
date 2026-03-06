@@ -13,7 +13,6 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
 // ==============================================================================
@@ -74,8 +73,7 @@ func (m *mockNeuralQueryExpander) GetNaturalLanguagePredicates() []string {
 
 // setupNeuralActivityTestDB creates test database with neural activity attestations
 func setupNeuralActivityTestDB(t *testing.T) *sql.DB {
-	testDB := qntxtest.CreateTestDB(t)
-	store := NewSQLStore(testDB, nil)
+	store, testDB := createTestStore(t)
 
 	now := time.Now()
 	attestationTime := now.Add(-30 * time.Minute) // Recorded 30 minutes ago
@@ -202,7 +200,7 @@ type neuralActivity struct {
 	attestedAt   time.Time
 }
 
-func createActivityAttestation(t *testing.T, store *SQLStore, activity *neuralActivity) {
+func createActivityAttestation(t *testing.T, store ats.AttestationStore, activity *neuralActivity) {
 	metadata := map[string]interface{}{
 		"start_time":       activity.startTime.Format(time.RFC3339),
 		"end_time":         activity.endTime.Format(time.RFC3339),
@@ -282,8 +280,7 @@ func TestTemporalAggregation_SimpleSum(t *testing.T) {
 
 // setupTemporalFilteringTestDB creates test database with activities both inside and outside time window
 func setupTemporalFilteringTestDB(t *testing.T) *sql.DB {
-	testDB := qntxtest.CreateTestDB(t)
-	store := NewSQLStore(testDB, nil)
+	store, testDB := createTestStore(t)
 
 	now := time.Now()
 	attestationTime := now.Add(-30 * time.Minute)
@@ -412,8 +409,7 @@ func TestTemporalAggregation_WithSinceFilter(t *testing.T) {
 // setupSemanticMatchingTestDB creates test database with neurons in different regions/types
 // for testing semantic distance-based weighted aggregation
 func setupSemanticMatchingTestDB(t *testing.T) *sql.DB {
-	testDB := qntxtest.CreateTestDB(t)
-	store := NewSQLStore(testDB, nil)
+	store, testDB := createTestStore(t)
 
 	now := time.Now()
 	attestationTime := now.Add(-30 * time.Minute)
@@ -545,8 +541,7 @@ func TestTemporalAggregation_SemanticWeightedSum(t *testing.T) {
 
 // setupCombinedFilteringTestDB creates test database with semantic matches having both old and recent activity
 func setupCombinedFilteringTestDB(t *testing.T) *sql.DB {
-	testDB := qntxtest.CreateTestDB(t)
-	store := NewSQLStore(testDB, nil)
+	store, testDB := createTestStore(t)
 
 	now := time.Now()
 	attestationTime := now.Add(-30 * time.Minute)
@@ -676,8 +671,7 @@ func TestTemporalAggregation_CombinedTemporalAndSemantic(t *testing.T) {
 
 // setupOverlapDetectionTestDB creates test database with overlapping activity periods
 func setupOverlapDetectionTestDB(t *testing.T) *sql.DB {
-	testDB := qntxtest.CreateTestDB(t)
-	store := NewSQLStore(testDB, nil)
+	store, testDB := createTestStore(t)
 
 	now := time.Now()
 	attestationTime := now.Add(-30 * time.Minute)
@@ -815,8 +809,7 @@ func TestTemporalAggregation_OverlapDetection(t *testing.T) {
 
 // setupOngoingActivityTestDB creates test database with ongoing activities (no end_date)
 func setupOngoingActivityTestDB(t *testing.T) *sql.DB {
-	testDB := qntxtest.CreateTestDB(t)
-	store := NewSQLStore(testDB, nil)
+	store, testDB := createTestStore(t)
 
 	now := time.Now()
 	attestationTime := now.Add(-10 * time.Minute) // Recorded 10 minutes ago
@@ -961,8 +954,7 @@ func TestTemporalAggregation_OngoingActivity(t *testing.T) {
 
 // setupMultiplePredicatesTestDB creates test database with neurons having both activity duration and neurotransmitter properties
 func setupMultiplePredicatesTestDB(t *testing.T) *sql.DB {
-	testDB := qntxtest.CreateTestDB(t)
-	store := NewSQLStore(testDB, nil)
+	store, testDB := createTestStore(t)
 
 	now := time.Now()
 	attestationTime := now.Add(-30 * time.Minute)
