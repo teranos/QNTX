@@ -485,9 +485,39 @@ func emitClusterLifecycleAttestation(atsStore ats.AttestationStore, ev storage.C
 	}
 }
 
+// getUndeliveredDetail returns the detail text from the most recent undelivered
+// deferred:cluster-update attestation. Returns empty string if all news has been
+// delivered or no prior news exists.
+func getUndeliveredDetail(atsStore ats.AttestationStore, projectCtx string) string {
+	// Find the latest deferred:cluster-update
+	deferred, err := atsStore.GetAttestations(ats.AttestationFilter{
+		Predicates: []string{"deferred:cluster-update"},
+		Contexts:   []string{projectCtx},
+		Limit:      1,
+	})
+	if err != nil || len(deferred) == 0 {
+		return ""
+	}
+
+	// Check if there's a delivery ack newer than the deferred news
+	acks, err := atsStore.GetAttestations(ats.AttestationFilter{
+		Predicates: []string{"delivered:cluster-update"},
+		Contexts:   []string{projectCtx},
+		Limit:      1,
+	})
+	if err == nil && len(acks) > 0 && !acks[0].Timestamp.Before(deferred[0].Timestamp) {
+		return "" // already delivered
+	}
+
+	// Extract detail from the undelivered news
+	if detail, ok := deferred[0].Attributes["detail"].(string); ok {
+		return detail
+	}
+	return ""
+}
+
 // emitClusterDeferredNews writes a deferred message attestation for Graunde to pick up
-// on Stop. Global context (not session-scoped) — Graunde delivers it once to the next
-// session on main.
+// on Stop. If there's undelivered news from a previous run, accumulates by prepending it.
 func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.AttestationStore, events []storage.ClusterEvent, memberCounts map[int]int, runID string, projectCtx string, logger *zap.SugaredLogger) {
 	type birthInfo struct {
 		clusterID int
@@ -568,6 +598,12 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 			detail += fmt.Sprintf(" +%d more", len(deaths)-3)
 		}
 		detail += "\n"
+	}
+
+	// Accumulate: if there's undelivered news from a previous run, prepend it
+	if prior := getUndeliveredDetail(atsStore, projectCtx); prior != "" {
+		detail = prior + "\n" + detail
+		logger.Infow("Accumulating with undelivered prior news")
 	}
 
 	asid, err := vanity.GenerateASID("embeddings", "deferred:cluster-update", projectCtx, "qntx@embeddings")

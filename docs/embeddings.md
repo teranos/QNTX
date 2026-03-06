@@ -128,7 +128,7 @@ When HDBSCAN re-clustering runs (manually or via Pulse schedule), the system emi
 
 Graunde reads `deferred:*` attestations and delivers the `detail` field. After delivery, it writes a `delivered:<name>` attestation with the same project context as an ack.
 
-**Limitation:** QNTX does not yet check for the `delivered:*` ack before emitting new deferred news. The ASID is deterministic (same inputs each run), so subsequent runs overwrite undelivered news. Once ack-checking is added, QNTX can accumulate events across runs and produce richer summaries spanning the period since last delivery.
+**Ack-aware accumulation:** Before emitting new deferred news, QNTX checks for a `delivered:cluster-update` ack from Graunde. If the previous news hasn't been delivered yet, the new events are prepended to the existing detail — so Graunde delivers the full accumulated summary spanning all runs since last delivery.
 
 ## Open Work
 
