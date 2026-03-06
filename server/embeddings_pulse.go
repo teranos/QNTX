@@ -8,12 +8,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
 	"sort"
 	"time"
 
 	appcfg "github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -212,6 +217,8 @@ func RunHDBSCANClustering(
 	invalidator func(),
 	minClusterSize int,
 	clusterMatchThreshold float64,
+	atsStore ats.AttestationStore,
+	projectCtx string,
 	logger *zap.SugaredLogger,
 ) (*EmbeddingClusterResult, error) {
 	startTime := time.Now()
@@ -354,6 +361,16 @@ func RunHDBSCANClustering(
 		logger.Errorw("Failed to record cluster events", "run_id", runID, "error", err)
 	}
 
+	if atsStore != nil {
+		for _, ev := range matchResult.events {
+			if ev.EventType == "stable" {
+				continue
+			}
+			emitClusterLifecycleAttestation(atsStore, ev, memberCounts[ev.ClusterID], runID, projectCtx, logger)
+		}
+		emitClusterDeferredNews(store, atsStore, matchResult.events, memberCounts, runID, projectCtx, logger)
+	}
+
 	summary, err := store.GetClusterSummary()
 	if err != nil {
 		return nil, errors.Wrap(err, "clustering succeeded but failed to read summary")
@@ -378,8 +395,10 @@ const ReclusterHandlerName = "embeddings.recluster"
 // ReclusterHandler runs HDBSCAN re-clustering as a Pulse scheduled job
 type ReclusterHandler struct {
 	db                    *sql.DB
+	projectCtx            string // e.g. "project:tmp3/QNTX"
 	store                 *storage.EmbeddingStore
 	svc                   EmbeddingServiceForClustering
+	atsStore              ats.AttestationStore
 	invalidator           func()
 	minClusterSize        int
 	clusterMatchThreshold float64
@@ -391,9 +410,10 @@ func (h *ReclusterHandler) Name() string { return ReclusterHandlerName }
 func (h *ReclusterHandler) Execute(ctx context.Context, job *async.Job) error {
 	h.writeLog(job.ID, "clustering", "info", "Starting HDBSCAN re-clustering", fmt.Sprintf(`{"min_cluster_size":%d}`, h.minClusterSize))
 
-	result, err := RunHDBSCANClustering(h.store, h.svc, h.invalidator, h.minClusterSize, h.clusterMatchThreshold, h.logger)
+	result, err := RunHDBSCANClustering(h.store, h.svc, h.invalidator, h.minClusterSize, h.clusterMatchThreshold, h.atsStore, h.projectCtx, h.logger)
 	if err != nil {
 		h.writeLog(job.ID, "clustering", "error", fmt.Sprintf("Clustering failed: %s", err), "")
+		emitPulseDeferredNews(h.db, h.atsStore, h.projectCtx, h.logger)
 		return err
 	}
 
@@ -402,6 +422,8 @@ func (h *ReclusterHandler) Execute(ctx context.Context, job *async.Job) error {
 			result.Summary.NTotal, result.Summary.NClusters, result.Summary.NNoise, result.TimeMS),
 		fmt.Sprintf(`{"n_points":%d,"n_clusters":%d,"n_noise":%d,"time_ms":%.0f}`,
 			result.Summary.NTotal, result.Summary.NClusters, result.Summary.NNoise, result.TimeMS))
+
+	emitPulseDeferredNews(h.db, h.atsStore, h.projectCtx, h.logger)
 	return nil
 }
 
@@ -417,6 +439,297 @@ func (h *ReclusterHandler) writeLog(jobID, stage, level, message, metadata strin
 	}
 }
 
+type clusterLifecycleAttrs struct {
+	RunID    string `attr:"run_id"`
+	NMembers int    `attr:"n_members,omitempty"`
+}
+
+func emitClusterLifecycleAttestation(atsStore ats.AttestationStore, ev storage.ClusterEvent, nMembers int, runID string, projectCtx string, logger *zap.SugaredLogger) {
+	predicate := ev.EventType
+	if ev.EventType == "birth" {
+		predicate = "born"
+	} else if ev.EventType == "death" {
+		predicate = "died"
+	}
+
+	subject := fmt.Sprintf("cluster:%d", ev.ClusterID)
+	asid, err := vanity.GenerateASID(subject, predicate, projectCtx, "qntx@embeddings")
+	if err != nil {
+		logger.Warnw("Failed to generate ASID for cluster lifecycle attestation",
+			"cluster_id", ev.ClusterID, "event", ev.EventType, "error", err)
+		return
+	}
+
+	now := time.Now()
+	as := &types.As{
+		ID:         asid,
+		Subjects:   []string{subject},
+		Predicates: []string{predicate},
+		Contexts:   []string{projectCtx},
+		Actors:     []string{"qntx@embeddings"},
+		Timestamp:  now,
+		Source:     "cluster-lifecycle",
+		Attributes: attrs.From(clusterLifecycleAttrs{
+			RunID:    runID,
+			NMembers: nMembers,
+		}),
+		CreatedAt: now,
+	}
+
+	if err := atsStore.CreateAttestation(as); err != nil {
+		logger.Warnw("Failed to create cluster lifecycle attestation",
+			"cluster_id", ev.ClusterID, "event", predicate, "asid", asid, "error", err)
+	} else {
+		logger.Infow("Created cluster lifecycle attestation",
+			"asid", asid, "cluster_id", ev.ClusterID, "event", predicate)
+	}
+}
+
+// getUndeliveredDetail returns the detail text from the most recent undelivered
+// deferred:cluster-update attestation. Returns empty string if all news has been
+// delivered or no prior news exists.
+func getUndeliveredDetail(atsStore ats.AttestationStore, projectCtx string) string {
+	// Find the latest deferred:cluster-update
+	deferred, err := atsStore.GetAttestations(ats.AttestationFilter{
+		Predicates: []string{"deferred:cluster-update"},
+		Contexts:   []string{projectCtx},
+		Limit:      1,
+	})
+	if err != nil || len(deferred) == 0 {
+		return ""
+	}
+
+	// Check if there's a delivery ack newer than the deferred news
+	acks, err := atsStore.GetAttestations(ats.AttestationFilter{
+		Predicates: []string{"delivered:cluster-update"},
+		Contexts:   []string{projectCtx},
+		Limit:      1,
+	})
+	if err == nil && len(acks) > 0 && !acks[0].Timestamp.Before(deferred[0].Timestamp) {
+		return "" // already delivered
+	}
+
+	// Extract detail from the undelivered news
+	if detail, ok := deferred[0].Attributes["detail"].(string); ok {
+		return detail
+	}
+	return ""
+}
+
+// emitClusterDeferredNews writes a deferred message attestation for Graunde to pick up
+// on Stop. If there's undelivered news from a previous run, accumulates by prepending it.
+func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.AttestationStore, events []storage.ClusterEvent, memberCounts map[int]int, runID string, projectCtx string, logger *zap.SugaredLogger) {
+	type birthInfo struct {
+		clusterID int
+		nMembers  int
+	}
+	var births []birthInfo
+	var deaths []int
+
+	for _, ev := range events {
+		switch ev.EventType {
+		case "birth":
+			births = append(births, birthInfo{ev.ClusterID, memberCounts[ev.ClusterID]})
+		case "death":
+			deaths = append(deaths, ev.ClusterID)
+		}
+	}
+	if len(births) == 0 && len(deaths) == 0 {
+		return
+	}
+
+	// Sort births by member count descending — show the biggest first
+	sort.Slice(births, func(i, j int) bool { return births[i].nMembers > births[j].nMembers })
+
+	var detail string
+
+	// Header
+	switch {
+	case len(births) > 0 && len(deaths) > 0:
+		detail = fmt.Sprintf("Embedding topology: %d born, %d died.\n", len(births), len(deaths))
+	case len(births) > 0:
+		detail = fmt.Sprintf("%d new cluster(s) emerged.\n", len(births))
+	default:
+		detail = fmt.Sprintf("%d cluster(s) dissolved.\n", len(deaths))
+	}
+
+	// Show top 3 births with sample texts
+	showN := len(births)
+	if showN > 3 {
+		showN = 3
+	}
+	for i := 0; i < showN; i++ {
+		b := births[i]
+		detail += fmt.Sprintf("  cluster:%d (%d members)", b.clusterID, b.nMembers)
+		samples, err := embStore.SampleClusterTexts(b.clusterID, 2)
+		if err == nil && len(samples) > 0 {
+			detail += " — "
+			for j, s := range samples {
+				// Truncate long texts
+				if len(s) > 60 {
+					s = s[:60] + "..."
+				}
+				if j > 0 {
+					detail += "; "
+				}
+				detail += s
+			}
+		}
+		detail += "\n"
+	}
+	if len(births) > 3 {
+		detail += fmt.Sprintf("  ...and %d more\n", len(births)-3)
+	}
+
+	// Deaths
+	if len(deaths) > 0 {
+		detail += "Dissolved: "
+		showD := len(deaths)
+		if showD > 3 {
+			showD = 3
+		}
+		for i := 0; i < showD; i++ {
+			if i > 0 {
+				detail += ", "
+			}
+			detail += fmt.Sprintf("cluster:%d", deaths[i])
+		}
+		if len(deaths) > 3 {
+			detail += fmt.Sprintf(" +%d more", len(deaths)-3)
+		}
+		detail += "\n"
+	}
+
+	// Accumulate: if there's undelivered news from a previous run, prepend it
+	if prior := getUndeliveredDetail(atsStore, projectCtx); prior != "" {
+		detail = prior + "\n" + detail
+		logger.Infow("Accumulating with undelivered prior news")
+	}
+
+	asid, err := vanity.GenerateASID("embeddings", "deferred:cluster-update", projectCtx, "qntx@embeddings")
+	if err != nil {
+		logger.Warnw("Failed to generate ASID for cluster deferred news", "error", err)
+		return
+	}
+
+	now := time.Now()
+	as := &types.As{
+		ID:         asid,
+		Subjects:   []string{"embeddings"},
+		Predicates: []string{"deferred:cluster-update"},
+		Contexts:   []string{projectCtx},
+		Actors:     []string{"qntx@embeddings"},
+		Timestamp:  now,
+		Source:     "cluster-lifecycle",
+		Attributes: map[string]any{
+			"event":  "cluster-update",
+			"detail": detail,
+			"after":  now.Unix(),
+		},
+		CreatedAt: now,
+	}
+
+	if err := atsStore.CreateAttestation(as); err != nil {
+		logger.Warnw("Failed to create cluster deferred news",
+			"asid", asid, "error", err)
+	} else {
+		logger.Infow("Deferred cluster news for Graunde",
+			"asid", asid, "births", len(births), "deaths", len(deaths))
+	}
+}
+
+// emitPulseDeferredNews queries recent Pulse execution stats and writes a deferred
+// news attestation for Graunde. Emitted after every recluster run (success or failure)
+// as the recluster heartbeat is the natural place for periodic Pulse health reporting.
+func emitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx string, logger *zap.SugaredLogger) {
+	if atsStore == nil {
+		return
+	}
+
+	// Query execution stats from the last 24 hours
+	var completed, failed int
+	var avgDurationMS sql.NullFloat64
+	row := db.QueryRow(`SELECT
+		COUNT(CASE WHEN status = 'completed' THEN 1 END),
+		COUNT(CASE WHEN status = 'failed' THEN 1 END),
+		AVG(CASE WHEN status = 'completed' THEN duration_ms END)
+		FROM pulse_executions
+		WHERE started_at > datetime('now', '-24 hours')`)
+	if err := row.Scan(&completed, &failed, &avgDurationMS); err != nil {
+		logger.Warnw("Failed to query Pulse execution stats", "error", err)
+		return
+	}
+
+	// Query recent failures with handler names
+	var failedHandlers []string
+	rows, err := db.Query(`SELECT DISTINCT s.handler_name
+		FROM pulse_executions e
+		JOIN scheduled_pulse_jobs s ON e.scheduled_job_id = s.id
+		WHERE e.status = 'failed'
+		AND e.started_at > datetime('now', '-24 hours')
+		ORDER BY e.started_at DESC LIMIT 5`)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var name string
+			if rows.Scan(&name) == nil {
+				failedHandlers = append(failedHandlers, name)
+			}
+		}
+	}
+
+	total := completed + failed
+	if total == 0 {
+		return // nothing to report
+	}
+
+	// Build summary
+	var detail string
+	if failed == 0 {
+		detail = fmt.Sprintf("Pulse: %d jobs completed (avg %.0fms) in last 24h, no failures",
+			completed, avgDurationMS.Float64)
+	} else {
+		detail = fmt.Sprintf("Pulse: %d/%d jobs failed in last 24h", failed, total)
+		if len(failedHandlers) > 0 {
+			detail += fmt.Sprintf(" — failing: %s", failedHandlers[0])
+			for _, h := range failedHandlers[1:] {
+				detail += ", " + h
+			}
+		}
+	}
+
+	asid, err := vanity.GenerateASID("pulse", "deferred:pulse-summary", projectCtx, "qntx@pulse")
+	if err != nil {
+		logger.Warnw("Failed to generate ASID for Pulse deferred news", "error", err)
+		return
+	}
+
+	now := time.Now()
+	as := &types.As{
+		ID:         asid,
+		Subjects:   []string{"pulse"},
+		Predicates: []string{"deferred:pulse-summary"},
+		Contexts:   []string{projectCtx},
+		Actors:     []string{"qntx@pulse"},
+		Timestamp:  now,
+		Source:     "pulse-heartbeat",
+		Attributes: map[string]any{
+			"event":  "pulse-summary",
+			"detail": detail,
+			"after":  now.Unix(),
+		},
+		CreatedAt: now,
+	}
+
+	if err := atsStore.CreateAttestation(as); err != nil {
+		logger.Warnw("Failed to create Pulse deferred news",
+			"asid", asid, "error", err)
+	} else {
+		logger.Infow("Deferred Pulse news for Graunde",
+			"asid", asid, "completed", completed, "failed", failed)
+	}
+}
+
 // setupEmbeddingReclusterSchedule registers the recluster handler and auto-creates
 // a Pulse schedule if embeddings.recluster_interval_seconds > 0.
 func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
@@ -424,10 +737,15 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 		return
 	}
 
+	cwd, _ := os.Getwd()
+	projectCtx := "project:" + filepath.Join(filepath.Base(filepath.Dir(cwd)), filepath.Base(cwd))
+
 	handler := &ReclusterHandler{
 		db:                    s.db,
+		projectCtx:            projectCtx,
 		store:                 s.embeddingStore,
 		svc:                   s.embeddingService,
+		atsStore:              s.atsStore,
 		invalidator:           s.embeddingClusterInvalidator,
 		minClusterSize:        cfg.Embeddings.MinClusterSize,
 		clusterMatchThreshold: cfg.Embeddings.ClusterMatchThreshold,
