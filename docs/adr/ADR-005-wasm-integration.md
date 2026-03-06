@@ -41,10 +41,12 @@ We will integrate the qntx-core parser as a WebAssembly module, making it the fi
 ### Migration Strategy
 
 Gradually migrate all Rust components to WASM:
-1. ✅ Parser (qntx-core) - COMPLETED (89KB)
-2. ⏳ Fuzzy matching (fuzzy-ax)
-3. ⏳ Storage (qntx-sqlite) - IndexedDB for browser, SQLite for Tauri
-4. ⏳ Video inference (vidstream) - May remain server-only due to size
+1. ✅ Parser (qntx-core)
+2. ✅ Fuzzy matching — rebuild, find, completions all via WASM on both targets
+3. ✅ Storage — `qntx-sqlite` C FFI for Go server, `qntx-indexeddb` for browser
+4. ✅ Classification — conflict detection, temporal analysis, credibility
+5. ✅ Sync — content-addressed hashing, Merkle tree operations
+6. ✅ Expansion — cartesian product, grouping, dedup (wazero)
 
 ## Consequences
 
@@ -90,21 +92,23 @@ Gradually migrate all Rust components to WASM:
 
 ## Metrics
 
-- WASM module size: 89KB (excellent for mobile)
+- Wazero WASM module: 497KB (parser + fuzzy + classification + sync + expansion)
+- Browser WASM module: 561KB (above + IndexedDB storage + rich search + cosine similarity)
 - Parse performance: ~25µs per call (acceptable overhead)
 - Works in: Chrome, Firefox, Safari, Edge
-- Tauri bundle size impact: +89KB per module
 - Verified via System Diagnostic UI showing "qntx-core WASM"
 
 ## Implementation Status
 
-- ✅ WASM module built (crates/qntx-wasm)
-- ✅ Server integration via wazero
+- ✅ WASM module built (crates/qntx-wasm) — wazero target (497KB) and browser target (561KB)
+- ✅ Server integration via wazero — parser, fuzzy, classification, expansion, sync
+- ✅ Browser integration via wasm-bindgen — `web/ts/qntx-wasm.ts` wraps 35+ functions
+- ✅ Browser storage via IndexedDB — `qntx-indexeddb` crate, full CRUD + query
+- ✅ Rich text search in browser — fuzzy word matching over attestation fields
+- ✅ Cosine similarity in browser — typed array passthrough, no JSON overhead
 - ✅ System Diagnostic shows WASM status with tooltips
-- ✅ Fixed critical testing gap - CI now tests WASM parser
-- ✅ Achieved parser compatibility (commit 62f55d1)
-- ⏳ web/ts integration pending
-- ⏳ Tauri bundling pending
+- ✅ CI tests WASM parser (commit 62f55d1)
+- ⏳ Tauri native Rust — currently uses browser WASM path; could call qntx-core/qntx-sqlite directly as native Rust (no WASM overhead)
 
 ## Technical Debt Discovered
 
@@ -118,12 +122,9 @@ See [Issue #387](https://github.com/teranos/QNTX/issues/387) for detailed analys
 
 ## Future Considerations
 
-1. **Web Integration**: web/ts should import and use same WASM modules
-2. **Tauri Options**: Explore native Rust in Tauri vs WASM for performance
-3. **Storage Strategy**: IndexedDB for browser, SQLite for Tauri/server
-4. **Module Loading**: Lazy loading and compression for web deployment
-5. **Complete Migration**: Eventually eliminate all CGO dependencies
-6. **Mobile Apps**: React Native or Flutter could use same WASM modules
+1. **Tauri Native Rust**: Tauri can call qntx-core and qntx-sqlite directly — no WASM serialization boundary, native performance
+2. **Module Loading**: Lazy loading and compression for web deployment
+3. **Mobile Apps**: React Native or Flutter could use same WASM modules
 
 ## References
 
