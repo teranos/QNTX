@@ -1,6 +1,8 @@
 package server
 
 import (
+	"database/sql"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -8,7 +10,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 )
 
@@ -162,12 +163,7 @@ func TestGLSPSemanticTokensWithDatabase(t *testing.T) {
 		},
 	}
 
-	store := storage.NewSQLStore(db, nil)
-	for _, att := range testAttestations {
-		if err := store.CreateAttestation(&att); err != nil {
-			t.Fatalf("Failed to create test attestation: %v", err)
-		}
-	}
+	insertTestAttestations(t, db, testAttestations)
 
 	srv, err := NewQNTXServer(db, ":memory:", 0)
 	if err != nil {
@@ -639,12 +635,7 @@ func TestGLSPContextCompletions(t *testing.T) {
 		},
 	}
 
-	store := storage.NewSQLStore(db, nil)
-	for _, att := range testAttestations {
-		if err := store.CreateAttestation(&att); err != nil {
-			t.Fatalf("Failed to create test attestation: %v", err)
-		}
-	}
+	insertTestAttestations(t, db, testAttestations)
 
 	srv, err := NewQNTXServer(db, ":memory:", 0)
 	if err != nil {
@@ -797,12 +788,7 @@ func TestGLSPActorCompletions(t *testing.T) {
 		},
 	}
 
-	store := storage.NewSQLStore(db, nil)
-	for _, att := range testAttestations {
-		if err := store.CreateAttestation(&att); err != nil {
-			t.Fatalf("Failed to create test attestation: %v", err)
-		}
-	}
+	insertTestAttestations(t, db, testAttestations)
 
 	srv, err := NewQNTXServer(db, ":memory:", 0)
 	if err != nil {
@@ -1072,4 +1058,26 @@ func TestGLSPContextActorSemanticTokens(t *testing.T) {
 	}
 
 	t.Logf("✓ Context and actor semantic tokens classified correctly")
+}
+
+// insertTestAttestations inserts attestations into the database using raw SQL.
+func insertTestAttestations(t *testing.T, db *sql.DB, attestations []types.As) {
+	t.Helper()
+	for _, as := range attestations {
+		subj, _ := json.Marshal(as.Subjects)
+		pred, _ := json.Marshal(as.Predicates)
+		ctx, _ := json.Marshal(as.Contexts)
+		actors, _ := json.Marshal(as.Actors)
+		attrs := []byte("{}")
+		if as.Attributes != nil {
+			attrs, _ = json.Marshal(as.Attributes)
+		}
+		_, err := db.Exec(
+			`INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			as.ID, string(subj), string(pred), string(ctx), string(actors), as.Timestamp, as.Source, string(attrs), as.CreatedAt,
+		)
+		if err != nil {
+			t.Fatalf("Failed to insert test attestation %s: %v", as.ID, err)
+		}
+	}
 }

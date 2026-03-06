@@ -14,10 +14,10 @@ use std::path::Path;
 use std::ptr;
 
 use qntx_core::storage::AttestationStore;
-use qntx_core::Attestation;
 use qntx_ffi_common::{
     cstr_to_str, cstring_new_or_empty, free_boxed, free_cstring, vec_into_raw, FfiResult,
 };
+use qntx_proto::proto_convert;
 
 use crate::SqliteStore;
 
@@ -168,7 +168,10 @@ impl FfiResult for CountResultC {
 pub extern "C" fn storage_new_memory() -> *mut SqliteStore {
     match SqliteStore::in_memory() {
         Ok(store) => Box::into_raw(Box::new(store)),
-        Err(_) => ptr::null_mut(),
+        Err(e) => {
+            eprintln!("qntx-sqlite: failed to create in-memory store: {}", e);
+            ptr::null_mut()
+        }
     }
 }
 
@@ -177,12 +180,18 @@ pub extern "C" fn storage_new_memory() -> *mut SqliteStore {
 pub extern "C" fn storage_new_file(path: *const c_char) -> *mut SqliteStore {
     let path_str = match unsafe { cstr_to_str(path) } {
         Ok(s) => s,
-        Err(_) => return ptr::null_mut(),
+        Err(e) => {
+            eprintln!("qntx-sqlite: invalid path string: {}", e);
+            return ptr::null_mut();
+        }
     };
 
     match SqliteStore::open(Path::new(path_str)) {
         Ok(store) => Box::into_raw(Box::new(store)),
-        Err(_) => ptr::null_mut(),
+        Err(e) => {
+            eprintln!("qntx-sqlite: failed to open {}: {}", path_str, e);
+            ptr::null_mut()
+        }
     }
 }
 
@@ -217,10 +226,11 @@ pub extern "C" fn storage_put(
 
     let store = unsafe { &mut *store };
 
-    let attestation: Attestation = match serde_json::from_str(json_str) {
+    let proto: qntx_proto::Attestation = match serde_json::from_str(json_str) {
         Ok(a) => a,
         Err(e) => return StorageResultC::error(&format!("failed to parse JSON: {}", e)),
     };
+    let attestation = proto_convert::from_proto(proto);
 
     match store.put(attestation) {
         Ok(()) => StorageResultC::ok(),
@@ -247,10 +257,13 @@ pub extern "C" fn storage_get(store: *const SqliteStore, id: *const c_char) -> A
     let store = unsafe { &*store };
 
     match store.get(id_str) {
-        Ok(Some(attestation)) => match serde_json::to_string(&attestation) {
-            Ok(json) => AttestationResultC::ok(json),
-            Err(e) => AttestationResultC::error(&format!("failed to serialize: {}", e)),
-        },
+        Ok(Some(attestation)) => {
+            let proto = proto_convert::to_proto(attestation);
+            match serde_json::to_string(&proto) {
+                Ok(json) => AttestationResultC::ok(json),
+                Err(e) => AttestationResultC::error(&format!("failed to serialize: {}", e)),
+            }
+        }
         Ok(None) => AttestationResultC::not_found(),
         Err(e) => AttestationResultC::error(&format!("{}", e)),
     }
@@ -272,7 +285,10 @@ pub extern "C" fn storage_exists(store: *const SqliteStore, id: *const c_char) -
 
     match store.exists(id_str) {
         Ok(true) => StorageResultC::ok(),
-        Ok(false) => StorageResultC::error("not found"),
+        Ok(false) => StorageResultC {
+            success: false,
+            error_msg: ptr::null_mut(),
+        },
         Err(e) => StorageResultC::error(&format!("{}", e)),
     }
 }
@@ -315,10 +331,11 @@ pub extern "C" fn storage_update(
 
     let store = unsafe { &mut *store };
 
-    let attestation: Attestation = match serde_json::from_str(json_str) {
+    let proto: qntx_proto::Attestation = match serde_json::from_str(json_str) {
         Ok(a) => a,
         Err(e) => return StorageResultC::error(&format!("failed to parse JSON: {}", e)),
     };
+    let attestation = proto_convert::from_proto(proto);
 
     match store.update(attestation) {
         Ok(()) => StorageResultC::ok(),
@@ -406,8 +423,13 @@ pub extern "C" fn storage_query(
         Err(e) => return AttestationResultC::error(&format!("query failed: {}", e)),
     };
 
-    // Convert attestations to JSON array
-    match serde_json::to_string(&result.attestations) {
+    // Convert attestations to proto types and serialize
+    let proto_attestations: Vec<qntx_proto::Attestation> = result
+        .attestations
+        .into_iter()
+        .map(proto_convert::to_proto)
+        .collect();
+    match serde_json::to_string(&proto_attestations) {
         Ok(json) => AttestationResultC::ok(json),
         Err(e) => AttestationResultC::error(&format!("failed to serialize results: {}", e)),
     }

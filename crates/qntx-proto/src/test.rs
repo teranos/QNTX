@@ -14,6 +14,8 @@ mod tests {
             source: "test".to_string(),
             attributes: None,
             created_at: 1234567890,
+            signature: Vec::new(),
+            signer_did: String::new(),
         };
 
         // Test JSON serialization works

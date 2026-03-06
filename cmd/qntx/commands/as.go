@@ -74,7 +74,7 @@ func runAsCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	// Open and migrate database
-	database, err := openDatabase("")
+	database, dbPath, err := openDatabase("")
 	if err != nil {
 		return errors.Wrap(err, "failed to open attestation database")
 	}
@@ -93,9 +93,16 @@ func runAsCommand(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Create Rust-backed store
+	atsStore, err := storage.NewStore(database, dbPath, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to create attestation store")
+	}
+
 	// Create bounded store (enforces storage limits)
 	boundedStore := storage.NewBoundedStoreWithConfig(
 		database,
+		atsStore,
 		nil, // logger
 		&storage.BoundedStoreConfig{
 			ActorContextLimit:  cfg.Database.BoundedStorage.ActorContextLimit,

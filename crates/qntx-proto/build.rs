@@ -16,6 +16,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     config.type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]");
     config.type_attribute(".", "#[serde(rename_all = \"snake_case\")]");
 
+    // Attestation: accept missing fields as defaults (Go omitempty omits zero values)
+    config.type_attribute("protocol.Attestation", "#[serde(default)]");
+
     // google.protobuf.Struct fields need custom serde because prost_types::Struct
     // doesn't implement Serialize/Deserialize. Use our serde_struct helper module.
     let struct_serde = concat!(
@@ -36,8 +39,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Signature fields: optional in JSON (backward compat with unsigned attestations)
-    config.field_attribute("protocol.Attestation.signature", "#[serde(default)]");
+    // Signature: Go's []byte JSON-marshals as base64 string; use custom serde
+    config.field_attribute(
+        "protocol.Attestation.signature",
+        concat!(
+            "#[serde(",
+            "default, ",
+            "serialize_with = \"crate::base64_serde::serialize\", ",
+            "deserialize_with = \"crate::base64_serde::deserialize\"",
+            ")]"
+        ),
+    );
     config.field_attribute("protocol.Attestation.signer_did", "#[serde(default)]");
 
     config.compile_protos(&protos, &[&proto_dir])?;

@@ -112,6 +112,9 @@ var (
 
 	// ErrConflict indicates a resource conflict (e.g., duplicate key)
 	ErrConflict = New("resource conflict")
+
+	// ErrMethodNotAllowed indicates the HTTP method is not supported for this endpoint
+	ErrMethodNotAllowed = New("method not allowed")
 )
 
 // IsNotFoundError checks if an error is or wraps ErrNotFound.
@@ -160,4 +163,14 @@ func NewNotFoundError(format string, args ...interface{}) error {
 // NewInvalidRequestError creates an invalid-request error with a formatted message
 func NewInvalidRequestError(format string, args ...interface{}) error {
 	return Wrap(ErrInvalidRequest, Newf(format, args...).Error())
+}
+
+// IsMethodNotAllowedError checks if an error is or wraps ErrMethodNotAllowed
+func IsMethodNotAllowedError(err error) bool {
+	return err != nil && Is(err, ErrMethodNotAllowed)
+}
+
+// NewMethodNotAllowedError creates a method-not-allowed error that includes the HTTP method
+func NewMethodNotAllowedError(method string) error {
+	return Wrapf(ErrMethodNotAllowed, "method %s not allowed", method)
 }
