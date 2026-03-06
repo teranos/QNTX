@@ -28,6 +28,7 @@ import (
 )
 
 const ClusterLabelHandlerName = "embeddings.cluster-label"
+const clusterLabelSystemPrompt = "You label clusters of text. Given sample texts from a cluster, respond with a short descriptive label (2-5 words). No explanation, just the label."
 
 // ClusterLabelHandler asks an LLM to label unlabeled clusters.
 type ClusterLabelHandler struct {
@@ -193,7 +194,7 @@ func (h *ClusterLabelHandler) callPromptDirect(ctx context.Context, userPrompt, 
 
 	reqBody := PromptDirectRequest{
 		Template:     template,
-		SystemPrompt: "You label clusters of text. Given sample texts from a cluster, respond with a short descriptive label (2-5 words). No explanation, just the label.",
+		SystemPrompt: clusterLabelSystemPrompt,
 	}
 
 	body, err := json.Marshal(reqBody)
