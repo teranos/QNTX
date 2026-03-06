@@ -33,11 +33,6 @@
 //! - `qntx-sqlite`: SQLite backend for native platforms (Tauri, server)
 //! - `qntx-indexeddb`: IndexedDB backend for browser WASM (async API matching
 //!   the same trait contract)
-//!
-//! TODO: Add CGO wrapper for Go server to use Rust storage
-//! - Similar pattern to fuzzy-ax CGO wrapper
-//! - Expose AttestationStore operations via C FFI
-//! - Go server can then use qntx-core storage instead of Go sql_store.go
 
 mod error;
 mod memory;
