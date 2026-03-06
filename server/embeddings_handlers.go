@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -612,12 +613,17 @@ func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
+	cwd, _ := os.Getwd()
+	projectCtx := "project:" + filepath.Join(filepath.Base(filepath.Dir(cwd)), filepath.Base(cwd))
+
 	result, err := RunHDBSCANClustering(
 		s.embeddingStore,
 		s.embeddingService,
 		s.embeddingClusterInvalidator,
 		minClusterSize,
 		appcfg.GetFloat64("embeddings.cluster_match_threshold"),
+		s.atsStore,
+		projectCtx,
 		s.logger,
 	)
 	if err != nil {
