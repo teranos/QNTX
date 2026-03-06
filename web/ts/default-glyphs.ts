@@ -734,6 +734,11 @@ function renderEmbeddings(): void {
                 el.dataset.tooltip = header + '\n' + samples.map((s, i) => `${i + 1}. ${s}`).join('\n');
             } catch { /* ignore */ }
         }, { once: true });
+
+        // Click → drill-down into cluster detail view
+        el.addEventListener('click', () => {
+            renderClusterDetail(cid);
+        });
     });
 
     embeddingsElement.querySelectorAll('.emb-scatter[data-method]').forEach(el => {
@@ -749,6 +754,352 @@ function renderEmbeddings(): void {
     if (timelineContainer && timelineData.length > 0) {
         renderTimeline(timelineContainer, timelineData);
     }
+}
+
+// Track active keydown handler so we can clean it up on back/navigate
+let clusterDetailKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+
+function getClusterIDs(): number[] {
+    const ci = embeddingsInfo?.cluster_info;
+    if (!ci?.clusters) return [];
+    return Object.keys(ci.clusters).map(Number).sort((a, b) => a - b);
+}
+
+async function renderClusterDetail(clusterID: number): Promise<void> {
+    if (!embeddingsElement) return;
+
+    // Clean up previous keydown handler
+    if (clusterDetailKeyHandler) {
+        document.removeEventListener('keydown', clusterDetailKeyHandler);
+        clusterDetailKeyHandler = null;
+    }
+
+    const label = clusterLabels.get(clusterID);
+    const ci = embeddingsInfo?.cluster_info;
+    const memberCount = ci?.clusters?.[String(clusterID)] ?? 0;
+    const pillColor = d3.scaleOrdinal(d3.schemeTableau10);
+    const color = pillColor(String(clusterID));
+    const title = label ? `#${clusterID} ${escapeHtml(label)}` : `#${clusterID}`;
+
+    const clusterIDs = getClusterIDs();
+    const idx = clusterIDs.indexOf(clusterID);
+    const prevID = idx > 0 ? clusterIDs[idx - 1] : null;
+    const nextID = idx < clusterIDs.length - 1 ? clusterIDs[idx + 1] : null;
+
+    embeddingsElement.innerHTML = `
+        <div class="glyph-content">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                <button class="emb-back-btn panel-btn" style="padding:2px 10px;font-size:12px">← Back</button>
+                <button class="emb-prev-btn panel-btn" style="padding:2px 8px;font-size:12px" ${prevID === null ? 'disabled' : ''}>◀</button>
+                <span style="font-size:14px;font-weight:bold;color:${color}">${title}</span>
+                <span style="color:#9ca3af;font-size:12px">${memberCount} members</span>
+                <button class="emb-next-btn panel-btn" style="padding:2px 8px;font-size:12px" ${nextID === null ? 'disabled' : ''}>▶</button>
+                <span style="color:#6b7280;font-size:10px;margin-left:auto">${idx + 1}/${clusterIDs.length} ← →</span>
+            </div>
+            <div class="glyph-section" style="border-top:1px solid var(--border-color, #333);padding-top:8px">
+                <h3 class="glyph-section-title">Projection</h3>
+                <div style="display:flex;gap:6px" class="emb-detail-scatters"></div>
+            </div>
+            <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
+                <h3 class="glyph-section-title">Cluster History</h3>
+                <div class="emb-detail-timeline"></div>
+            </div>
+            <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
+                <h3 class="glyph-section-title">Recent Attestations</h3>
+                <div class="emb-detail-members" style="font-size:12px;color:#9ca3af">Loading...</div>
+            </div>
+        </div>
+    `;
+
+    // Back button
+    const cleanupAndBack = () => {
+        if (clusterDetailKeyHandler) {
+            document.removeEventListener('keydown', clusterDetailKeyHandler);
+            clusterDetailKeyHandler = null;
+        }
+        renderEmbeddings();
+    };
+    embeddingsElement.querySelector('.emb-back-btn')?.addEventListener('click', cleanupAndBack);
+
+    // Prev/Next buttons
+    if (prevID !== null) {
+        embeddingsElement.querySelector('.emb-prev-btn')?.addEventListener('click', () => renderClusterDetail(prevID));
+    }
+    if (nextID !== null) {
+        embeddingsElement.querySelector('.emb-next-btn')?.addEventListener('click', () => renderClusterDetail(nextID));
+    }
+
+    // Arrow key navigation
+    clusterDetailKeyHandler = (e: KeyboardEvent) => {
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+        if (e.key === 'ArrowLeft' && prevID !== null) {
+            e.preventDefault();
+            renderClusterDetail(prevID);
+        } else if (e.key === 'ArrowRight' && nextID !== null) {
+            e.preventDefault();
+            renderClusterDetail(nextID);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cleanupAndBack();
+        }
+    };
+    document.addEventListener('keydown', clusterDetailKeyHandler);
+
+    // Projection scatter — highlight this cluster, dim rest
+    const scatterContainer = embeddingsElement.querySelector('.emb-detail-scatters') as HTMLElement;
+    if (scatterContainer) {
+        for (const method of Object.keys(projectionsData)) {
+            const pts = projectionsData[method];
+            if (!pts || pts.length === 0) continue;
+            const slot = document.createElement('div');
+            slot.style.flex = '1';
+            slot.style.minWidth = '0';
+            const header = document.createElement('div');
+            header.style.fontSize = '11px';
+            header.style.color = '#9ca3af';
+            header.style.textAlign = 'center';
+            header.style.marginBottom = '4px';
+            header.textContent = method.toUpperCase();
+            slot.appendChild(header);
+            const canvas = document.createElement('div');
+            slot.appendChild(canvas);
+            scatterContainer.appendChild(slot);
+            renderScatterHighlighted(canvas, pts, clusterID);
+        }
+    }
+
+    // Fetch member attestations
+    const membersContainer = embeddingsElement.querySelector('.emb-detail-members') as HTMLElement;
+    try {
+        const resp = await apiFetch(`/api/embeddings/clusters/members?cluster_id=${clusterID}&limit=20`);
+        if (resp.ok) {
+            const data = await resp.json();
+            const attestations = data.attestations as any[];
+            if (attestations.length === 0) {
+                membersContainer.textContent = 'No attestations found';
+            } else {
+                membersContainer.innerHTML = '';
+                for (const as of attestations) {
+                    const row = document.createElement('div');
+                    row.className = 'has-tooltip';
+                    row.style.padding = '4px 8px';
+                    row.style.marginBottom = '2px';
+                    row.style.backgroundColor = 'rgba(31, 61, 31, 0.35)';
+                    row.style.borderRadius = '2px';
+                    row.style.cursor = 'pointer';
+                    row.style.fontSize = '11px';
+                    row.style.fontFamily = 'monospace';
+                    row.style.wordBreak = 'break-word';
+                    row.style.overflowWrap = 'break-word';
+
+                    const subjects = as.subjects?.join(', ') || '?';
+                    const predicates = as.predicates?.join(', ') || '?';
+                    const contexts = as.contexts?.join(', ') || '?';
+                    row.innerHTML = `<span style="color:#60a5fa">${escapeHtml(subjects)}</span> <span style="color:#9ca3af">is</span> <span style="color:#4ade80">${escapeHtml(predicates)}</span> <span style="color:#9ca3af">of</span> <span style="color:#c084fc">${escapeHtml(contexts)}</span>`;
+
+                    // Build tooltip from attributes
+                    const tipLines: string[] = [];
+                    if (as.attributes && typeof as.attributes === 'object') {
+                        for (const [key, value] of Object.entries(as.attributes)) {
+                            if (key === 'rich_string_fields') continue;
+                            const display = typeof value === 'string' ? value : JSON.stringify(value);
+                            const truncated = display.length > 120 ? display.substring(0, 120) + '...' : display;
+                            tipLines.push(`${key}: ${truncated}`);
+                        }
+                    }
+                    if (as.source) tipLines.push(`source: ${as.source}`);
+                    if (as.actors?.length > 0) tipLines.push(`actors: ${as.actors.join(', ')}`);
+                    row.dataset.tooltip = tipLines.join('\n') || `${subjects} is ${predicates} of ${contexts}`;
+
+                    // Click → open as window glyph
+                    row.addEventListener('click', () => {
+                        openAttestationWindow(as);
+                    });
+                    membersContainer.appendChild(row);
+                }
+                tooltip.attach(membersContainer, '.has-tooltip');
+            }
+        }
+    } catch { membersContainer.textContent = 'Failed to load'; }
+
+    // Cluster history — filter timeline data for this cluster
+    const tlContainer = embeddingsElement.querySelector('.emb-detail-timeline') as HTMLElement;
+    const clusterTimeline = timelineData.filter(p => p.cluster_id === clusterID);
+    if (clusterTimeline.length >= 2) {
+        renderClusterHistoryChart(tlContainer, clusterTimeline);
+    } else if (clusterTimeline.length === 1) {
+        tlContainer.innerHTML = `<div style="font-size:12px;color:#9ca3af">First seen: ${new Date(clusterTimeline[0].run_time).toLocaleString()} (${clusterTimeline[0].n_members} members)</div>`;
+    } else {
+        tlContainer.innerHTML = '<div style="font-size:12px;color:#6b7280">No history available</div>';
+    }
+}
+
+function openAttestationWindow(attestation: any): void {
+    const id = `as-win-${attestation.id || crypto.randomUUID()}`;
+    if (glyphRun.has(id)) {
+        glyphRun.openGlyph(id);
+        return;
+    }
+
+    const subjects = attestation.subjects?.join(', ') || '?';
+    const predicates = attestation.predicates?.join(', ') || '?';
+    const titleText = `${subjects} is ${predicates}`;
+
+    glyphRun.add({
+        id,
+        title: titleText,
+        renderContent: () => {
+            const content = document.createElement('div');
+            content.style.padding = '8px';
+            content.style.fontSize = '11px';
+            content.style.fontFamily = 'monospace';
+            content.style.color = '#e2e8f0';
+            content.style.wordBreak = 'break-word';
+            content.style.overflowWrap = 'break-word';
+
+            const lines: string[] = [];
+            lines.push(`<div style="margin-bottom:6px"><span style="color:#60a5fa">${escapeHtml(attestation.subjects?.join(', ') || '')}</span> <span style="color:#9ca3af">is</span> <span style="color:#4ade80">${escapeHtml(attestation.predicates?.join(', ') || '')}</span> <span style="color:#9ca3af">of</span> <span style="color:#c084fc">${escapeHtml(attestation.contexts?.join(', ') || '')}</span></div>`);
+
+            if (attestation.actors?.length > 0) {
+                lines.push(`<div style="color:#9ca3af">actors: ${escapeHtml(attestation.actors.join(', '))}</div>`);
+            }
+            if (attestation.source) {
+                lines.push(`<div style="color:#9ca3af">source: ${escapeHtml(attestation.source)}</div>`);
+            }
+            if (attestation.id) {
+                lines.push(`<div style="color:#6b7280;font-size:10px;margin-top:4px">${escapeHtml(attestation.id)}</div>`);
+            }
+
+            // Attributes
+            if (attestation.attributes && typeof attestation.attributes === 'object') {
+                lines.push('<div style="margin-top:6px;border-top:1px solid #333;padding-top:6px">');
+                for (const [key, value] of Object.entries(attestation.attributes)) {
+                    if (key === 'rich_string_fields') continue;
+                    const display = typeof value === 'string' ? value : JSON.stringify(value);
+                    lines.push(`<div><span style="color:#fbbf24">${escapeHtml(key)}:</span> ${escapeHtml(display)}</div>`);
+                }
+                lines.push('</div>');
+            }
+
+            content.innerHTML = lines.join('');
+            return content;
+        },
+        initialWidth: '420px',
+        initialHeight: '300px',
+    });
+    glyphRun.openGlyph(id);
+}
+
+function renderScatterHighlighted(container: HTMLElement, data: ProjectionPoint[], highlightCluster: number): void {
+    const width = 280;
+    const height = 220;
+    const pad = 12;
+
+    const svg = d3.select(container)
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height)
+        .style('background', '#1e293b')
+        .style('border-radius', '4px');
+
+    const xExtent = d3.extent(data, d => d.x) as [number, number];
+    const yExtent = d3.extent(data, d => d.y) as [number, number];
+
+    const xScale = d3.scaleLinear().domain(xExtent).range([pad, width - pad]);
+    const yScale = d3.scaleLinear().domain(yExtent).range([height - pad, pad]);
+
+    const color = d3.scaleOrdinal(d3.schemeTableau10);
+
+    // Dim all points first
+    svg.selectAll('circle')
+        .data(data)
+        .join('circle')
+        .attr('cx', d => xScale(d.x))
+        .attr('cy', d => yScale(d.y))
+        .attr('r', d => d.cluster_id === highlightCluster ? 4 : 2)
+        .attr('fill', d => d.cluster_id === highlightCluster ? color(String(d.cluster_id)) : '#374151')
+        .attr('opacity', d => d.cluster_id === highlightCluster ? 1.0 : 0.2);
+}
+
+function renderClusterHistoryChart(container: HTMLElement, data: TimelinePoint[]): void {
+    const width = container.clientWidth || 600;
+    const height = 120;
+    const margin = { top: 8, right: 8, bottom: 24, left: 36 };
+    const innerW = width - margin.left - margin.right;
+    const innerH = height - margin.top - margin.bottom;
+
+    const points = data.map(p => ({ time: new Date(p.run_time), members: p.n_members, event: p.event_type }));
+
+    const svg = d3.select(container)
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height)
+        .style('background', '#1e293b')
+        .style('border-radius', '4px');
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const xScale = d3.scaleTime()
+        .domain(d3.extent(points, d => d.time) as [Date, Date])
+        .range([0, innerW]);
+
+    const yScale = d3.scaleLinear()
+        .domain([0, d3.max(points, d => d.members) ?? 0])
+        .nice()
+        .range([innerH, 0]);
+
+    // Area
+    const area = d3.area<typeof points[0]>()
+        .x(d => xScale(d.time))
+        .y0(innerH)
+        .y1(d => yScale(d.members))
+        .curve(d3.curveMonotoneX);
+
+    g.append('path')
+        .datum(points)
+        .attr('d', area)
+        .attr('fill', '#3b82f6')
+        .attr('opacity', 0.3);
+
+    // Line
+    const line = d3.line<typeof points[0]>()
+        .x(d => xScale(d.time))
+        .y(d => yScale(d.members))
+        .curve(d3.curveMonotoneX);
+
+    g.append('path')
+        .datum(points)
+        .attr('d', line)
+        .attr('fill', 'none')
+        .attr('stroke', '#3b82f6')
+        .attr('stroke-width', 1.5);
+
+    // Event markers
+    for (const p of points) {
+        if (p.event === 'birth') {
+            g.append('circle')
+                .attr('cx', xScale(p.time))
+                .attr('cy', yScale(p.members))
+                .attr('r', 4)
+                .attr('fill', '#4ade80');
+        }
+    }
+
+    // Axes
+    g.append('g')
+        .attr('transform', `translate(0,${innerH})`)
+        .call(d3.axisBottom(xScale).ticks(4).tickFormat(d => {
+            const date = d as Date;
+            return `${date.getMonth() + 1}/${date.getDate()}`;
+        }))
+        .selectAll('text').style('fill', '#9ca3af').style('font-size', '9px');
+
+    g.append('g')
+        .call(d3.axisLeft(yScale).ticks(3))
+        .selectAll('text').style('fill', '#9ca3af').style('font-size', '9px');
+
+    g.selectAll('.domain').attr('stroke', '#374151');
+    g.selectAll('.tick line').attr('stroke', '#374151');
 }
 
 async function reembedAll(): Promise<void> {
