@@ -837,6 +837,30 @@ pub fn cosine_similarity_f32(query: &[f32], candidate: &[f32]) -> Result<f32, Js
 }
 
 // ============================================================================
+// Identity (qntx-id)
+// ============================================================================
+
+/// Generate a content-addressed ASUID from SPC components and a content hash.
+/// Returns JSON: `{"full":"AS-SARAH-AUTHOR-GITHUB-7K4M3B9X","short":"AS-SARAH-AUTHOR-GITHUB-7K4M"}`
+/// or `{"error":"..."}` on invalid input.
+#[wasm_bindgen]
+pub fn generate_asuid(input: &str) -> String {
+    crate::identity::generate_asuid_impl(input)
+}
+
+/// Clean a seed string for ID generation (normalize, uppercase, collapse repeats).
+#[wasm_bindgen]
+pub fn id_clean_seed(input: &str) -> String {
+    qntx_id::clean_seed(input)
+}
+
+/// Normalize input for ID lookup (uppercase, map 0→O/1→I, strip invalid).
+#[wasm_bindgen]
+pub fn id_normalize_for_lookup(input: &str) -> String {
+    qntx_id::normalize_for_lookup(input)
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 
