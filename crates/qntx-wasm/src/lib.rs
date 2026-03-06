@@ -27,6 +27,9 @@
 //! - qntx-proto: Just types (5 dependencies)
 //! - qntx-grpc: Types + gRPC infrastructure (50+ dependencies)
 
+// Shared identity logic (used by both wazero and browser targets)
+mod identity;
+
 // Browser-specific module (wasm-bindgen + IndexedDB)
 #[cfg(feature = "browser")]
 pub mod browser;
@@ -556,6 +559,38 @@ mod wazero {
     pub extern "C" fn sync_merkle_find_group_key(ptr: u32, len: u32) -> u64 {
         let input = unsafe { read_str(ptr, len) };
         write_result(&qntx_core::sync::merkle_find_group_key_json(input))
+    }
+
+    // ============================================================================
+    // Identity (qntx-id)
+    // ============================================================================
+
+    /// Generate a content-addressed ASUID from SPC components and a content hash.
+    /// Input: `{"prefix":"AS","subject":"Sarah","predicate":"author","context":"GitHub","content_hash":"<64-char hex>"}`
+    /// Returns packed u64 pointing to `{"full":"AS-SARAH-AUTHOR-GITHUB-7K4M3B9X","short":"AS-SARAH-AUTHOR-GITHUB-7K4M"}`
+    /// or `{"error":"..."}` on invalid input.
+    #[no_mangle]
+    pub extern "C" fn generate_asuid(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&crate::identity::generate_asuid_impl(input))
+    }
+
+    /// Clean a seed string for ID generation (normalize, uppercase, collapse repeats).
+    /// Input: raw UTF-8 string
+    /// Returns packed u64 pointing to the cleaned string.
+    #[no_mangle]
+    pub extern "C" fn id_clean_seed(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&qntx_id::clean_seed(input))
+    }
+
+    /// Normalize input for ID lookup (uppercase, map 0→O/1→I, strip invalid).
+    /// Input: raw UTF-8 string
+    /// Returns packed u64 pointing to the normalized string.
+    #[no_mangle]
+    pub extern "C" fn id_normalize_for_lookup(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&qntx_id::normalize_for_lookup(input))
     }
 
     // ============================================================================
