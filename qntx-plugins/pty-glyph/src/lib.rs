@@ -119,12 +119,8 @@ impl DomainPluginService for PTYGlyphService {
 
         // Route HTTP requests
         match (req.method.as_str(), req.path.as_str()) {
-            ("GET", "/api/pty-glyph/pty-glyph-module.js") => {
-                self.handle_glyph_module().await
-            }
-            ("GET", "/api/pty-glyph/xterm.css") => {
-                self.handle_xterm_css().await
-            }
+            ("GET", "/api/pty-glyph/pty-glyph-module.js") => self.handle_glyph_module().await,
+            ("GET", "/api/pty-glyph/xterm.css") => self.handle_xterm_css().await,
             ("POST", "/api/pty-glyph/create") => self.handle_create_pty(req).await,
             ("GET", path) if path.starts_with("/api/pty-glyph/session/") => {
                 self.handle_get_session(req).await
