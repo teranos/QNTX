@@ -629,8 +629,6 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 		CreatedAt: now,
 	}
 
-	logger.Debugw("Creating cluster deferred news attestation",
-		"asid", asid, "subjects", as.Subjects, "predicates", as.Predicates, "contexts", as.Contexts, "attributes", as.Attributes)
 	if err := atsStore.CreateAttestation(as); err != nil {
 		logger.Warnw("Failed to create cluster deferred news",
 			"asid", asid, "error", err)
@@ -723,8 +721,6 @@ func emitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx
 		CreatedAt: now,
 	}
 
-	logger.Debugw("Creating Pulse deferred news attestation",
-		"asid", asid, "subjects", as.Subjects, "predicates", as.Predicates, "contexts", as.Contexts, "attributes", as.Attributes)
 	if err := atsStore.CreateAttestation(as); err != nil {
 		logger.Warnw("Failed to create Pulse deferred news",
 			"asid", asid, "error", err)
