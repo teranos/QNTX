@@ -566,14 +566,16 @@ function renderEmbeddings(): void {
     if (available && embedding_count >= 2) {
         let clusterRows = '';
         if (ci && ci.n_clusters > 0) {
-            const clusterSizes = Object.entries(ci.clusters)
+            const pillColor = d3.scaleOrdinal(d3.schemeTableau10);
+            const clusterPills = Object.entries(ci.clusters)
                 .sort(([a], [b]) => Number(a) - Number(b))
                 .map(([id, count]) => {
+                    const c = pillColor(id);
                     const label = clusterLabels.get(Number(id));
-                    const labelSpan = label ? ` <span style="color:#a0aec0;font-style:italic">${escapeHtml(label)}</span>` : '';
-                    return `<span style="color:#60a5fa">#${id}</span>${labelSpan}:${count}`;
+                    const labelText = label ? ` ${escapeHtml(label)}` : '';
+                    return `<span class="emb-cluster-pill" data-cluster-id="${id}" style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:${c}22;border:1px solid ${c}55;cursor:pointer;white-space:nowrap;font-size:11px;line-height:1.4"><span style="color:${c};font-weight:bold">#${id}</span>${labelText ? `<span style="color:#a0aec0">${labelText}</span>` : ''}<span style="color:#9ca3af">:${count}</span></span>`;
                 })
-                .join('  ');
+                .join('');
             clusterRows = `
                 <div class="glyph-row">
                     <span class="glyph-label">Clusters:</span>
@@ -583,10 +585,7 @@ function renderEmbeddings(): void {
                     <span class="glyph-label">Noise:</span>
                     <span class="glyph-value">${ci.n_noise}</span>
                 </div>
-                <div class="glyph-row">
-                    <span class="glyph-label">Sizes:</span>
-                    <span class="glyph-value" style="font-size:11px;flex-wrap:wrap;display:flex;gap:2px 8px">${clusterSizes}</span>
-                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${clusterPills}</div>
             `;
         } else {
             clusterRows = `
