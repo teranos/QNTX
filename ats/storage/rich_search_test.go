@@ -42,7 +42,7 @@ func attestTypeDefinition(t *testing.T, db *sql.DB, typeName string, richFields 
 func TestSearchRichStringFields(t *testing.T) {
 	ctx := context.Background()
 	db := qntxtest.CreateTestDB(t)
-	store := NewBoundedStore(db, nil)
+	store := NewBoundedStore(db, nil, nil)
 
 	// First, attest type definitions for the fields we'll use
 	attestTypeDefinition(t, db, "Commit", []string{"message", "description"})
@@ -297,7 +297,7 @@ func TestSearchRichStringFields(t *testing.T) {
 func TestSearchRichStringFields_FuzzyMatching(t *testing.T) {
 	ctx := context.Background()
 	db := qntxtest.CreateTestDB(t)
-	store := NewBoundedStore(db, nil)
+	store := NewBoundedStore(db, nil, nil)
 
 	// First, attest type definition for the 'message' field we'll use
 	attestTypeDefinition(t, db, "Commit", []string{"message"})
@@ -430,7 +430,7 @@ func TestSearchRichStringFields_Performance(t *testing.T) {
 
 	ctx := context.Background()
 	db := qntxtest.CreateTestDB(t)
-	store := NewBoundedStore(db, nil)
+	store := NewBoundedStore(db, nil, nil)
 
 	// Attest a type definition with rich fields for Commit type
 	attestTypeDefinition(t, db, "Commit", []string{"message", "description"})
@@ -466,7 +466,7 @@ func TestSearchRichStringFields_Performance(t *testing.T) {
 func TestDynamicFieldDiscovery(t *testing.T) {
 	ctx := context.Background()
 	db := qntxtest.CreateTestDB(t)
-	store := NewBoundedStore(db, nil)
+	store := NewBoundedStore(db, nil, nil)
 
 	t.Run("Discovers fields from type definitions", func(t *testing.T) {
 		// Insert a type definition attestation with custom rich fields
@@ -500,7 +500,7 @@ func TestDynamicFieldDiscovery(t *testing.T) {
 	t.Run("Returns empty slice when no type definitions", func(t *testing.T) {
 		// Fresh database with no type definitions
 		db2 := qntxtest.CreateTestDB(t)
-		store2 := NewBoundedStore(db2, nil)
+		store2 := NewBoundedStore(db2, nil, nil)
 
 		fields := store2.buildDynamicRichStringFields(ctx)
 
@@ -511,7 +511,7 @@ func TestDynamicFieldDiscovery(t *testing.T) {
 	t.Run("SearchRichStringFieldsWithResult returns searched fields", func(t *testing.T) {
 		// Create a fresh database and store to avoid cache conflicts
 		freshDB := qntxtest.CreateTestDB(t)
-		freshStore := NewBoundedStore(freshDB, nil)
+		freshStore := NewBoundedStore(freshDB, nil, nil)
 
 		// Attest a type definition for SearchTestNote with notes and message fields
 		attestTypeDefinition(t, freshDB, "SearchTestNote", []string{"notes", "message"})

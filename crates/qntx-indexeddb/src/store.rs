@@ -434,6 +434,8 @@ fn js_to_attestation(val: &JsValue) -> StoreResult<Attestation> {
         source,
         attributes,
         created_at,
+        signature: None,
+        signer_did: None,
     })
 }
 

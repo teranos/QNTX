@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -22,7 +21,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "github",
-			Version:     "0.1.6",
+			Version:     "0.1.7",
 			QNTXVersion: ">= 0.1.0",
 			Description: "GitHub integration for repository events and automation",
 			Author:      "QNTX Team",
@@ -126,15 +125,15 @@ func (p *Plugin) GetHandlerNames() []string {
 func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID string, payload []byte) (result []byte, logs []*protocol.JobLogEntry, err error) {
 	switch handlerName {
 	case "github.poll-events":
-		logs = append(logs, jobLog("info", "poll-events", "Polling GitHub events"))
+		logs = append(logs, protocol.NewJobLogEntry("info", "poll-events", "Polling GitHub events"))
 
 		count, err := p.HandlePulseJob(ctx, jobID)
 		if err != nil {
-			logs = append(logs, jobLog("error", "poll-events", fmt.Sprintf("Poll failed: %v", err)))
+			logs = append(logs, protocol.NewJobLogEntry("error", "poll-events", fmt.Sprintf("Poll failed: %v", err)))
 			return nil, logs, err
 		}
 
-		logs = append(logs, jobLog("info", "poll-events", fmt.Sprintf("Poll complete, %d attestations created", count)))
+		logs = append(logs, protocol.NewJobLogEntry("info", "poll-events", fmt.Sprintf("Poll complete, %d attestations created", count)))
 
 		resultData := map[string]interface{}{
 			"attestations_created": count,
@@ -143,16 +142,7 @@ func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID strin
 		return result, logs, err
 
 	default:
-		return nil, nil, fmt.Errorf("unknown handler: %s", handlerName)
-	}
-}
-
-func jobLog(level, stage, message string) *protocol.JobLogEntry {
-	return &protocol.JobLogEntry{
-		Timestamp: time.Now().Format(time.RFC3339),
-		Level:     level,
-		Stage:     stage,
-		Message:   message,
+		return nil, nil, protocol.ErrUnknownHandler(handlerName)
 	}
 }
 

@@ -3,19 +3,24 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"time"
 	"unicode/utf8"
 
-	"github.com/teranos/QNTX/ai/provider"
 	appcfg "github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	vanity "github.com/teranos/vanity-id"
@@ -23,13 +28,16 @@ import (
 )
 
 const ClusterLabelHandlerName = "embeddings.cluster-label"
+const clusterLabelSystemPrompt = "You label clusters of text. Given sample texts from a cluster, respond with a short descriptive label (2-5 words). No explanation, just the label."
 
 // ClusterLabelHandler asks an LLM to label unlabeled clusters.
 type ClusterLabelHandler struct {
-	db     *sql.DB
-	store  *storage.EmbeddingStore
-	cfg    *appcfg.Config
-	logger *zap.SugaredLogger
+	server   *QNTXServer
+	db       *sql.DB
+	store    *storage.EmbeddingStore
+	atsStore ats.AttestationStore
+	cfg      *appcfg.Config
+	logger   *zap.SugaredLogger
 }
 
 func (h *ClusterLabelHandler) Name() string { return ClusterLabelHandlerName }
@@ -57,15 +65,8 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 		fmt.Sprintf("Found %d eligible clusters", len(eligible)),
 		fmt.Sprintf(`{"eligible":%d,"min_size":%d,"cooldown_days":%d}`, len(eligible), minSize, cooldownDays))
 
-	aiProvider := provider.DetermineProvider(h.cfg, "")
 	modelOverride := embCfg.ClusterLabelModel
-	asStore := storage.NewSQLStore(h.db, h.logger)
-
-	// Resolve model name once — used for attestation metadata
-	modelUsed := modelOverride
-	if modelUsed == "" {
-		modelUsed = h.cfg.LocalInference.Model
-	}
+	asStore := h.atsStore
 
 	labeled := 0
 	for _, cluster := range eligible {
@@ -90,18 +91,7 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 			fmt.Fprintf(&userPrompt, "%d. %s\n", i+1, text)
 		}
 
-		client := provider.NewAIClientForProviderWithModel(
-			aiProvider, h.cfg, modelOverride, h.db, 0,
-			"cluster-labeling", "cluster", fmt.Sprintf("%d", cluster.ID),
-		)
-
-		req := provider.ChatRequest{
-			SystemPrompt: "You label clusters of text. Given sample texts from a cluster, respond with a short descriptive label (2-5 words). No explanation, just the label.",
-			UserPrompt:   userPrompt.String(),
-			MaxTokens:    &maxTokens,
-		}
-
-		resp, err := client.Chat(ctx, req)
+		resp, err := h.callPromptDirect(ctx, userPrompt.String(), modelOverride, maxTokens)
 		if err != nil {
 			h.logger.Warnw("LLM labeling failed for cluster",
 				"cluster_id", cluster.ID, "error", err)
@@ -111,7 +101,7 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 		}
 
 		// Clean label: trim whitespace, enforce max length (rune-safe)
-		label := strings.TrimSpace(resp.Content)
+		label := strings.TrimSpace(resp.Response)
 		if utf8.RuneCountInString(label) > 100 {
 			runes := []rune(label)
 			label = string(runes[:100])
@@ -119,6 +109,11 @@ func (h *ClusterLabelHandler) Execute(ctx context.Context, job *async.Job) error
 		if label == "" {
 			h.logger.Warnw("LLM returned empty label for cluster", "cluster_id", cluster.ID)
 			continue
+		}
+
+		modelUsed := resp.Model
+		if modelUsed == "" {
+			modelUsed = modelOverride
 		}
 
 		if err := h.store.UpdateClusterLabel(cluster.ID, label); err != nil {
@@ -152,7 +147,7 @@ type clusterLabelAttrs struct {
 	NMembers   int    `attr:"n_members"`
 }
 
-func (h *ClusterLabelHandler) createLabelAttestation(asStore *storage.SQLStore, clusterID int, label, model string, sampleSize, nMembers int) {
+func (h *ClusterLabelHandler) createLabelAttestation(asStore ats.AttestationStore, clusterID int, label, model string, sampleSize, nMembers int) {
 	subject := fmt.Sprintf("cluster:%d", clusterID)
 	asid, err := vanity.GenerateASID(subject, "labeled", "embeddings", "qntx@embeddings")
 	if err != nil {
@@ -188,6 +183,50 @@ func (h *ClusterLabelHandler) createLabelAttestation(asStore *storage.SQLStore, 
 	}
 }
 
+// callPromptDirect routes an LLM request through HandlePromptDirect, which
+// handles plugin forwarding (OpenRouter) and local inference transparently.
+func (h *ClusterLabelHandler) callPromptDirect(ctx context.Context, userPrompt, model string, maxTokens int) (*PromptDirectResponse, error) {
+	template := fmt.Sprintf("---\nmax_tokens: %d\n", maxTokens)
+	if model != "" {
+		template += fmt.Sprintf("model: %q\n", model)
+	}
+	template += "---\n" + userPrompt
+
+	reqBody := PromptDirectRequest{
+		Template:     template,
+		SystemPrompt: clusterLabelSystemPrompt,
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal prompt request")
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, "/api/prompt/direct", io.NopCloser(bytes.NewReader(body)))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create internal HTTP request")
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.ContentLength = int64(len(body))
+
+	rec := httptest.NewRecorder()
+	h.server.HandlePromptDirect(rec, httpReq)
+
+	if rec.Code != http.StatusOK {
+		return nil, errors.Newf("prompt/direct returned status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp PromptDirectResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		return nil, errors.Wrap(err, "failed to parse prompt response")
+	}
+	if resp.Error != "" {
+		return nil, errors.Newf("prompt/direct error: %s", resp.Error)
+	}
+
+	return &resp, nil
+}
+
 func (h *ClusterLabelHandler) writeLog(jobID, stage, level, message, metadata string) {
 	var metaPtr *string
 	if metadata != "" {
@@ -208,24 +247,26 @@ func (s *QNTXServer) setupClusterLabelSchedule(cfg *appcfg.Config) {
 	}
 
 	handler := &ClusterLabelHandler{
-		db:     s.db,
-		store:  s.embeddingStore,
-		cfg:    cfg,
-		logger: s.logger.Named("cluster-label"),
+		server:   s,
+		db:       s.db,
+		store:    s.embeddingStore,
+		atsStore: s.atsStore,
+		cfg:      cfg,
+		logger:   s.logger.Named("cluster-label"),
 	}
 
 	registry := s.daemon.Registry()
 	registry.Register(handler)
 	s.logger.Infow("Registered cluster label handler")
 
-	interval := cfg.Embeddings.ClusterLabelIntervalSeconds
 	schedStore := schedule.NewStore(s.db)
 
-	// If interval is disabled, pause any existing active schedule
-	if interval <= 0 {
+	// If interval not configured, pause any existing active schedule
+	if cfg.Embeddings.ClusterLabelIntervalSeconds == nil {
 		s.pauseExistingSchedule(schedStore, ClusterLabelHandlerName)
 		return
 	}
+	interval := *cfg.Embeddings.ClusterLabelIntervalSeconds
 
 	// Check for existing schedule to avoid duplicates on restart
 	existing, err := schedStore.ListAllScheduledJobs()
