@@ -17,7 +17,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/QNTX/ats/storage"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	pluginpkg "github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -650,11 +649,10 @@ func TestServiceIntegration_BookCollectorAttestations(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	ctx := context.Background()
 
-	// 1. Create test database
-	db := qntxtest.CreateTestDB(t)
+	// 1. Create test store and database
+	store, db := qntxtest.CreateTestStore(t)
 
-	// 2. Create ATSStore and Queue
-	store := storage.NewSQLStore(db, logger)
+	// 2. Create Queue
 	queue := async.NewQueue(db)
 
 	// 3. Start gRPC services for plugin callbacks

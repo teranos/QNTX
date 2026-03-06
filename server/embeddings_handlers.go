@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -305,7 +306,7 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 	embeddingModels := []*storage.EmbeddingModel{}
 
 	// Get rich string fields from type definitions for embedding text construction.
-	richStore := storage.NewBoundedStore(s.db, s.logger.Named("embeddings"))
+	richStore := storage.NewBoundedStore(s.db, nil, s.logger.Named("embeddings"))
 	richFields := richStore.GetDiscoveredRichFields()
 
 	for _, attestationID := range req.AttestationIDs {
@@ -612,12 +613,17 @@ func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
+	cwd, _ := os.Getwd()
+	projectCtx := "project:" + filepath.Join(filepath.Base(filepath.Dir(cwd)), filepath.Base(cwd))
+
 	result, err := RunHDBSCANClustering(
 		s.embeddingStore,
 		s.embeddingService,
 		s.embeddingClusterInvalidator,
 		minClusterSize,
 		appcfg.GetFloat64("embeddings.cluster_match_threshold"),
+		s.atsStore,
+		projectCtx,
 		s.logger,
 	)
 	if err != nil {
@@ -735,7 +741,7 @@ func (s *QNTXServer) SetupEmbeddingService() {
 	observer := &EmbeddingObserver{
 		embeddingService: embService,
 		embeddingStore:   embStore,
-		richStore:        storage.NewBoundedStore(s.db, s.logger.Named("auto-embed")),
+		richStore:        storage.NewBoundedStore(s.db, nil, s.logger.Named("auto-embed")),
 		logger:           s.logger.Named("auto-embed"),
 		clusterThreshold: float32(appcfg.GetFloat64("embeddings.cluster_threshold")),
 		projectFunc:      s.projectToCanvas,

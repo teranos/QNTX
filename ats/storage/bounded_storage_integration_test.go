@@ -8,16 +8,15 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/ats/storage/testutil"
 	"github.com/teranos/QNTX/ats/types"
 )
 
 // TestBoundedStorage_16PerActorContext verifies that only 16 attestations
 // are kept per actor/context pair
 func TestBoundedStorage_16PerActorContext(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	rustStore, db := createTestStore(t)
 
-	store := NewBoundedStore(db, nil)
+	store := NewBoundedStore(db, rustStore, nil)
 	actor := "test@bounded-storage"
 	subject := "KYSTSN"
 
@@ -52,9 +51,9 @@ func TestBoundedStorage_16PerActorContext(t *testing.T) {
 // TestBoundedStorage_SameActorContextPruning verifies that when we exceed 16 attestations
 // for the SAME actor AND SAME context, oldest ones are pruned
 func TestBoundedStorage_SameActorContextPruning(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	rustStore, db := createTestStore(t)
 
-	store := NewBoundedStore(db, nil)
+	store := NewBoundedStore(db, rustStore, nil)
 	actor := "test@bounded-storage"
 	subject := "KYSTSN"
 	context := "10.0" // Same context for all
@@ -90,9 +89,9 @@ func TestBoundedStorage_SameActorContextPruning(t *testing.T) {
 // TestBoundedStorage_DomainScenario simulates a realistic domain scenario
 // where multiple predicates exist for one subject with the same actor
 func TestBoundedStorage_DomainScenario(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	rustStore, db := createTestStore(t)
 
-	store := NewBoundedStore(db, nil)
+	store := NewBoundedStore(db, rustStore, nil)
 	actor := "test@domain-integration"
 	subject := "KYSTSN"
 

@@ -17,7 +17,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"go.uber.org/zap"
 
-	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats"
 	atstypes "github.com/teranos/QNTX/ats/types"
 	id "github.com/teranos/vanity-id"
 )
@@ -49,7 +49,7 @@ type ProjectFileResult struct {
 // DepsIxProcessor handles project file detection and ingestion
 type DepsIxProcessor struct {
 	db        *sql.DB
-	store     *storage.SQLStore
+	store     ats.AttestationStore
 	repoPath  string
 	dryRun    bool
 	actor     string
@@ -58,10 +58,10 @@ type DepsIxProcessor struct {
 }
 
 // NewDepsIxProcessor creates a new dependency ingestion processor
-func NewDepsIxProcessor(db *sql.DB, repoPath string, dryRun bool, actor string, verbosity int, logger *zap.SugaredLogger) *DepsIxProcessor {
+func NewDepsIxProcessor(db *sql.DB, store ats.AttestationStore, repoPath string, dryRun bool, actor string, verbosity int, logger *zap.SugaredLogger) *DepsIxProcessor {
 	return &DepsIxProcessor{
 		db:        db,
-		store:     storage.NewSQLStore(db, logger),
+		store:     store,
 		repoPath:  repoPath,
 		dryRun:    dryRun,
 		actor:     actor,

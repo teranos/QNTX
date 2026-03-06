@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
@@ -66,11 +67,17 @@ The daemon will:
 		}
 
 		// Open and migrate database
-		database, err := openDatabase("")
+		database, dbPath, err := openDatabase("")
 		if err != nil {
 			return errors.Wrap(err, "failed to open pulse database")
 		}
 		defer database.Close()
+
+		// Create attestation store for Pulse handlers
+		atsStore, err := storage.NewStore(database, dbPath, logger.Logger)
+		if err != nil {
+			return errors.Wrap(err, "failed to create attestation store for pulse")
+		}
 
 		// Create worker pool config
 		poolCfg := async.DefaultWorkerPoolConfig()
@@ -82,7 +89,7 @@ The daemon will:
 
 		// Create handler registry and register handlers
 		registry := async.NewHandlerRegistry()
-		registry.Register(git.NewGitIngestionHandler(database, logger.Logger))
+		registry.Register(git.NewGitIngestionHandler(database, atsStore, logger.Logger))
 
 		// Create worker pool with registered handlers
 		pool := async.NewWorkerPoolWithRegistry(ctx, database, cfg, poolCfg, logger.Logger, registry, nil, nil)

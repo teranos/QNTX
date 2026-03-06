@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	id "github.com/teranos/vanity-id"
 )
@@ -78,8 +77,6 @@ func (s *QNTXServer) HandleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	store := storage.NewBoundedStore(s.db, s.logger.Named("attestation-sync"))
-
 	// Auto-generate vanity ASID when client omits ID
 	if req.ID == "" {
 		subject := req.Subjects[0]
@@ -89,7 +86,7 @@ func (s *QNTXServer) HandleCreateAttestation(w http.ResponseWriter, r *http.Requ
 			context = req.Contexts[0]
 		}
 		checkExists := func(asid string) bool {
-			return store.AttestationExists(asid)
+			return s.atsStore.AttestationExists(asid)
 		}
 		generated, err := id.GenerateASIDWithVanityAndRetry(subject, predicate, context, "", checkExists)
 		if err != nil {
@@ -102,7 +99,7 @@ func (s *QNTXServer) HandleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Idempotent: if already exists, return success
-	if store.AttestationExists(req.ID) {
+	if s.atsStore.AttestationExists(req.ID) {
 		writeJSON(w, http.StatusOK, map[string]string{"id": req.ID, "status": "exists"})
 		return
 	}
@@ -124,7 +121,7 @@ func (s *QNTXServer) HandleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		CreatedAt:  time.Now(),
 	}
 
-	if err := store.CreateAttestation(as); err != nil {
+	if err := s.atsStore.CreateAttestation(as); err != nil {
 		writeWrappedError(w, s.logger, err,
 			fmt.Sprintf("failed to create attestation %s (subjects: %v, predicates: %v, source: %s)",
 				req.ID, req.Subjects, req.Predicates, req.Source),
