@@ -146,7 +146,10 @@ pub async fn handle_pty_websocket(
         if let Err(e) = pty_manager_clone.write().kill_session(&session_id_clone) {
             warn!("Failed to clean up PTY session {}: {}", session_id_clone, e);
         } else {
-            info!("Cleaned up PTY session {} after WebSocket disconnect", session_id_clone);
+            info!(
+                "Cleaned up PTY session {} after WebSocket disconnect",
+                session_id_clone
+            );
         }
     });
 
