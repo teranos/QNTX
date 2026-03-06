@@ -60,7 +60,7 @@ import { apiFetch } from './api';
 import { escapeHtml } from './html-utils';
 import { DB } from '@generated/sym.js';
 import { log, SEG } from './logger.ts';
-import { formatBuildTime } from './components/tooltip.ts';
+import { formatBuildTime, tooltip } from './components/tooltip.ts';
 import type { VersionMessage, SystemCapabilitiesMessage, SyncStatusMessage } from '../types/websocket';
 import { browserSync, type BrowserSyncState } from './browser-sync';
 import { createPluginGlyph } from './plugin-panel.ts';
@@ -327,6 +327,7 @@ let embeddingsProjecting = false;
 type ProjectionPoint = { id: string; source_id: string; method: string; x: number; y: number; cluster_id: number };
 let projectionsData: Record<string, ProjectionPoint[]> = {};
 let clusterLabels: Map<number, string | null> = new Map();
+const clusterSamplesCache: Map<number, string[]> = new Map();
 type TimelinePoint = { run_id: string; run_time: string; n_points: number; n_noise: number; cluster_id: number; label: string | null; n_members: number; event_type: string };
 let timelineData: TimelinePoint[] = [];
 
@@ -573,7 +574,8 @@ function renderEmbeddings(): void {
                     const c = pillColor(id);
                     const label = clusterLabels.get(Number(id));
                     const labelText = label ? ` ${escapeHtml(label)}` : '';
-                    return `<span class="emb-cluster-pill" data-cluster-id="${id}" style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:${c}22;border:1px solid ${c}55;cursor:pointer;white-space:nowrap;font-size:11px;line-height:1.4"><span style="color:${c};font-weight:bold">#${id}</span>${labelText ? `<span style="color:#a0aec0">${labelText}</span>` : ''}<span style="color:#9ca3af">:${count}</span></span>`;
+                    const tooltipDefault = label ? `#${id} ${escapeHtml(label)}` : `#${id}`;
+                    return `<span class="emb-cluster-pill has-tooltip" data-cluster-id="${id}" data-tooltip="${escapeHtml(tooltipDefault)}" style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:${c}22;border:1px solid ${c}55;cursor:pointer;white-space:nowrap;font-size:11px;line-height:1.4"><span style="color:${c};font-weight:bold">#${id}</span>${labelText ? `<span style="color:#a0aec0">${labelText}</span>` : ''}<span style="color:#9ca3af">:${count}</span></span>`;
                 })
                 .join('');
             clusterRows = `
@@ -713,6 +715,26 @@ function renderEmbeddings(): void {
     if (projectBtn) {
         projectBtn.addEventListener('click', projectAll);
     }
+
+    // Cluster pill hover tooltips — lazy-fetch sample texts on first hover
+    tooltip.attach(embeddingsElement, '.emb-cluster-pill');
+    embeddingsElement.querySelectorAll('.emb-cluster-pill').forEach(pill => {
+        const el = pill as HTMLElement;
+        const cid = Number(el.dataset.clusterId);
+        el.addEventListener('mouseenter', async () => {
+            if (clusterSamplesCache.has(cid)) return;
+            try {
+                const resp = await apiFetch(`/api/embeddings/clusters/samples?cluster_id=${cid}&size=5`);
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const samples = data.samples as string[];
+                clusterSamplesCache.set(cid, samples);
+                const label = clusterLabels.get(cid);
+                const header = label ? `#${cid} ${label}` : `#${cid}`;
+                el.dataset.tooltip = header + '\n' + samples.map((s, i) => `${i + 1}. ${s}`).join('\n');
+            } catch { /* ignore */ }
+        }, { once: true });
+    });
 
     embeddingsElement.querySelectorAll('.emb-scatter[data-method]').forEach(el => {
         const container = el as HTMLElement;
