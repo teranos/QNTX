@@ -40,11 +40,40 @@ export async function createPluginGlyphFromModule(
         // Import module (cached per URL)
         const mod = await loadModule(absoluteUrl);
 
+        // Create canvas-placed wrapper with title bar (drag, resize, selection)
+        const { element } = canvasPlaced({
+            glyph,
+            className: `canvas-plugin-glyph plugin-${def.plugin}`,
+            defaults: {
+                x: glyph.x ?? 200,
+                y: glyph.y ?? 200,
+                width: def.default_width ?? 400,
+                height: def.default_height ?? 300,
+            },
+            titleBar: { label: `${def.symbol} ${def.title}` },
+            resizable: true,
+            logLabel: 'PluginGlyphModule',
+        });
+
+        // Content container
+        const content = document.createElement('div');
+        content.className = 'plugin-glyph-content';
+        content.style.flex = '1';
+        content.style.overflow = 'auto';
+        element.appendChild(content);
+
         // Create GlyphUI scoped to this glyph + plugin
         const ui = createGlyphUI(glyph, def.plugin);
 
-        // Call the plugin's render function
-        const element = await mod.render(glyph, ui);
+        // Call the plugin's render function and mount inside the wrapper
+        const rendered = await mod.render(glyph, ui);
+        content.appendChild(rendered);
+
+        // Prevent drag on interactive elements inside plugin content
+        const interactive = content.querySelectorAll('input, textarea, button, select, [contenteditable="true"]');
+        interactive.forEach((el) => {
+            el.addEventListener('mousedown', (e) => { e.stopPropagation(); });
+        });
 
         log.debug(SEG.GLYPH, `[GlyphModule] Rendered ${def.plugin} glyph ${glyph.id} from module`);
         return element;

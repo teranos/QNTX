@@ -9,7 +9,7 @@
 
 export function render(glyph, ui) {
   const container = document.createElement('div');
-  container.style.cssText = 'font-family: monospace; font-size: 13px; padding: 12px; display: flex; flex-direction: column; height: 100%; gap: 8px; overflow: hidden;';
+  container.style.cssText = 'font-family: monospace; font-size: 13px; padding: 12px; display: flex; flex-direction: column; height: 100%; gap: 8px; overflow: hidden; color: #33ff33;';
 
   // Header
   const header = document.createElement('div');
@@ -19,7 +19,7 @@ export function render(glyph, ui) {
 
   // Status bar
   const status = document.createElement('div');
-  status.style.cssText = 'font-size: 11px; color: #888; flex-shrink: 0;';
+  status.style.cssText = 'font-size: 11px; color: #88cc88; flex-shrink: 0;';
   status.textContent = 'Drop or paste a binary file to inspect';
   container.appendChild(status);
 
@@ -47,7 +47,7 @@ export function render(glyph, ui) {
 
   // Hex view area
   const hexView = document.createElement('pre');
-  hexView.style.cssText = 'flex: 1; overflow: auto; margin: 0; padding: 8px; background: #0a0a0a; border: 1px solid #333; font-size: 12px; line-height: 1.4; white-space: pre; word-break: break-word; overflow-wrap: break-word;';
+  hexView.style.cssText = 'flex: 1; overflow: auto; margin: 0; padding: 8px; background: #1a1a2e; border: 1px solid #333; font-size: 12px; line-height: 1.4; white-space: pre; word-break: break-word; overflow-wrap: break-word; color: #33ff33;';
   hexView.textContent = '';
   container.appendChild(hexView);
 
