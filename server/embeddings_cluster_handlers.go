@@ -13,7 +13,6 @@ import (
 
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/QNTX/ats/types"
 )
 
 // ClusterRequest represents a clustering API request
@@ -70,23 +69,6 @@ func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	// Persist any explicitly provided parameters
-	if req.MinClusterSize > 0 {
-		if err := appcfg.UpdateEmbeddingsMinClusterSize(req.MinClusterSize); err != nil {
-			s.logger.Warnw("Failed to persist min_cluster_size", "error", err)
-		}
-	}
-	if req.ClusterThreshold != nil {
-		if err := appcfg.UpdateEmbeddingsClusterThreshold(*req.ClusterThreshold); err != nil {
-			s.logger.Warnw("Failed to persist cluster_threshold", "error", err)
-		}
-	}
-	if req.ClusterMatchThreshold != nil {
-		if err := appcfg.UpdateEmbeddingsClusterMatchThreshold(*req.ClusterMatchThreshold); err != nil {
-			s.logger.Warnw("Failed to persist cluster_match_threshold", "error", err)
-		}
-	}
-
 	cwd, _ := os.Getwd()
 	projectCtx := "project:" + filepath.Join(filepath.Base(filepath.Dir(cwd)), filepath.Base(cwd))
 
@@ -104,6 +86,23 @@ func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Reque
 		s.logger.Errorw("HDBSCAN clustering failed", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Persist parameters only after successful clustering
+	if req.MinClusterSize > 0 {
+		if err := appcfg.UpdateEmbeddingsMinClusterSize(req.MinClusterSize); err != nil {
+			s.logger.Warnw("Failed to persist min_cluster_size", "error", err)
+		}
+	}
+	if req.ClusterThreshold != nil {
+		if err := appcfg.UpdateEmbeddingsClusterThreshold(*req.ClusterThreshold); err != nil {
+			s.logger.Warnw("Failed to persist cluster_threshold", "error", err)
+		}
+	}
+	if req.ClusterMatchThreshold != nil {
+		if err := appcfg.UpdateEmbeddingsClusterMatchThreshold(*req.ClusterMatchThreshold); err != nil {
+			s.logger.Warnw("Failed to persist cluster_match_threshold", "error", err)
+		}
 	}
 
 	resp := ClusterResponse{
@@ -187,7 +186,9 @@ func (s *QNTXServer) HandleClusterSamples(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"cluster_id": clusterID, "samples": samples})
+	if err := json.NewEncoder(w).Encode(map[string]any{"cluster_id": clusterID, "samples": samples}); err != nil {
+		s.logger.Errorw("Failed to encode cluster samples response", "cluster_id", clusterID, "error", err)
+	}
 }
 
 // HandleClusterMembers returns recent attestations belonging to a cluster (GET /api/embeddings/clusters/members?cluster_id=N&limit=20)
@@ -222,20 +223,17 @@ func (s *QNTXServer) HandleClusterMembers(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	attestations := make([]*types.As, 0, len(sourceIDs))
-	for _, id := range sourceIDs {
-		as, err := storage.GetAttestationByID(s.db, id)
-		if err != nil {
-			s.logger.Warnw("Failed to resolve cluster member attestation", "source_id", id, "error", err)
-			continue
-		}
-		if as != nil {
-			attestations = append(attestations, as)
-		}
+	attestations, err := storage.GetAttestationsByIDs(s.db, sourceIDs)
+	if err != nil {
+		s.logger.Errorw("Failed to resolve cluster member attestations", "cluster_id", clusterID, "error", err)
+		http.Error(w, fmt.Sprintf("Failed to resolve attestations for cluster %d", clusterID), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"cluster_id": clusterID, "attestations": attestations})
+	if err := json.NewEncoder(w).Encode(map[string]any{"cluster_id": clusterID, "attestations": attestations}); err != nil {
+		s.logger.Errorw("Failed to encode cluster members response", "cluster_id", clusterID, "error", err)
+	}
 }
 
 // HandleClusterTimeline serves cluster evolution data across runs (GET /api/embeddings/cluster-timeline).
