@@ -170,26 +170,26 @@ func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, ov
 
 	for _, pred := range numericPredicates {
 		if strings.HasSuffix(pred, "_duration_s") ||
-		   strings.HasSuffix(pred, "_duration_sec") ||
-		   strings.HasSuffix(pred, "_duration_seconds") {
+			strings.HasSuffix(pred, "_duration_sec") ||
+			strings.HasSuffix(pred, "_duration_seconds") {
 			usesSeconds = true
 			break
 		}
 		if strings.HasSuffix(pred, "_duration_m") ||
-		   strings.HasSuffix(pred, "_duration_min") ||
-		   strings.HasSuffix(pred, "_duration_minutes") {
+			strings.HasSuffix(pred, "_duration_min") ||
+			strings.HasSuffix(pred, "_duration_minutes") {
 			usesMinutes = true
 			break
 		}
 		if strings.HasSuffix(pred, "_duration_h") ||
-		   strings.HasSuffix(pred, "_duration_hr") ||
-		   strings.HasSuffix(pred, "_duration_hours") {
+			strings.HasSuffix(pred, "_duration_hr") ||
+			strings.HasSuffix(pred, "_duration_hours") {
 			usesHours = true
 			break
 		}
 		if strings.HasSuffix(pred, "_duration_y") ||
-		   strings.HasSuffix(pred, "_duration_yr") ||
-		   strings.HasSuffix(pred, "_duration_years") {
+			strings.HasSuffix(pred, "_duration_yr") ||
+			strings.HasSuffix(pred, "_duration_years") {
 			usesYears = true
 			break
 		}

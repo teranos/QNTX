@@ -12,7 +12,7 @@
 import { registerGlyphType } from './glyph-registry';
 import { createPluginGlyph } from './plugin-glyph';
 import { createPluginGlyphFromModule } from './glyph-module-loader';
-import { apiFetch, getBackendUrl } from '../../api';
+import { apiFetch } from '../../api';
 import { log, SEG } from '../../logger';
 import type { Glyph } from './glyph';
 
@@ -43,13 +43,11 @@ export function loadPluginCSS(url: string): void {
     if (loadedCSS.has(url)) return;
     loadedCSS.add(url);
 
-    const absoluteUrl = getBackendUrl() + url;
-
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = absoluteUrl;
+    link.href = url;
     document.head.appendChild(link);
-    log.debug(SEG.GLYPH, `[PluginGlyphs] Loaded CSS: ${absoluteUrl}`);
+    log.debug(SEG.GLYPH, `[PluginGlyphs] Loaded CSS: ${url}`);
 }
 
 /** Fetch plugin glyph definitions and register them */
