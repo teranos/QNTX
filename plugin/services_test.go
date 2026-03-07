@@ -198,7 +198,7 @@ func (m *mockConfigWithID) GetBool(key string) bool            { return false }
 func (m *mockConfigWithID) GetStringSlice(key string) []string { return nil }
 func (m *mockConfigWithID) Get(key string) interface{}         { return nil }
 func (m *mockConfigWithID) Set(key string, value interface{})  {}
-func (m *mockConfigWithID) GetKeys() []string                   { return []string{} }
+func (m *mockConfigWithID) GetKeys() []string                  { return []string{} }
 
 // Verify mockConfigWithID implements Config
 var _ Config = (*mockConfigWithID)(nil)
@@ -206,11 +206,15 @@ var _ Config = (*mockConfigWithID)(nil)
 // mockATSStore satisfies ats.AttestationStore for tests that only need a non-nil value
 type mockATSStore struct{}
 
-func (m *mockATSStore) CreateAttestation(as *types.As) error                                            { return nil }
-func (m *mockATSStore) CreateAttestationInbound(as *types.As) error                                     { return nil }
-func (m *mockATSStore) AttestationExists(asid string) bool                                              { return false }
-func (m *mockATSStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) { return nil, nil }
-func (m *mockATSStore) GetAttestations(filters ats.AttestationFilter) ([]*types.As, error)              { return nil, nil }
+func (m *mockATSStore) CreateAttestation(as *types.As) error        { return nil }
+func (m *mockATSStore) CreateAttestationInbound(as *types.As) error { return nil }
+func (m *mockATSStore) AttestationExists(asid string) bool          { return false }
+func (m *mockATSStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
+	return nil, nil
+}
+func (m *mockATSStore) GetAttestations(filters ats.AttestationFilter) ([]*types.As, error) {
+	return nil, nil
+}
 
 var _ ats.AttestationStore = (*mockATSStore)(nil)
 
