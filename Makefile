@@ -243,7 +243,7 @@ ix-json-plugin: ## Build and install ix-json plugin to ~/.qntx/plugins/
 	@$(MAKE) -C qntx-ix-json install PREFIX=$(PREFIX)
 
 ix-bin-plugin: ## Build and install ix-bin D plugin to ~/.qntx/plugins/
-	@$(MAKE) -C qntx-ix-bin install PREFIX=$(PREFIX)
+	@$(MAKE) -C qntx-plugins/ix-bin install PREFIX=$(PREFIX)
 
 openrouter-plugin: ## Build and install OpenRouter plugin to ~/.qntx/plugins/
 	@$(MAKE) -C qntx-openrouter install PREFIX=$(PREFIX)
