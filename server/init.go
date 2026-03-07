@@ -65,8 +65,14 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		return nil, errors.Newf("verbosity must be 0-4, got %d", verbosity)
 	}
 
+	// Load config early for log path
+	logPath := appcfg.DefaultLogPath
+	if cfg, cfgErr := appcfg.Load(); cfgErr == nil {
+		logPath = cfg.GetServerLogPath()
+	}
+
 	// Create logger with multi-output (console, WebSocket, file)
-	serverLogger, wsCore, wsTransport, err := createGraphLogger(verbosity)
+	serverLogger, wsCore, wsTransport, err := createServerLogger(verbosity, logPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create logger")
 	}
@@ -197,6 +203,7 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		register:      make(chan *Client),
 		unregister:    make(chan *Client),
 		logger:        serverLogger,
+		logPath:       logPath,
 		logTransport:  wsTransport,
 		wsCore:        wsCore,
 		consoleBuffer: consoleBuffer, // Browser console log buffer with terminal printing
@@ -474,8 +481,8 @@ func backfillSyncTree(store ats.AttestationStore, tree syncPkg.SyncTree, observe
 	)
 }
 
-// createGraphLogger creates a multi-output zap logger (console + WebSocket + file)
-func createGraphLogger(verbosity int) (*zap.SugaredLogger, *wslogs.WebSocketCore, *wslogs.Transport, error) {
+// createServerLogger creates a multi-output zap logger (console + WebSocket + file)
+func createServerLogger(verbosity int, logPath string) (*zap.SugaredLogger, *wslogs.WebSocketCore, *wslogs.Transport, error) {
 	// Create WebSocket log transport
 	wsTransport := wslogs.NewTransport()
 
@@ -490,7 +497,7 @@ func createGraphLogger(verbosity int) (*zap.SugaredLogger, *wslogs.WebSocketCore
 
 	// Add file logging for verbosity >= 2
 	if verbosity >= 2 {
-		fileCore, err := createFileCore("tmp/graph-debug.log", verbosity)
+		fileCore, err := createFileCore(logPath, verbosity)
 		if err == nil {
 			cores = append(cores, fileCore)
 		}

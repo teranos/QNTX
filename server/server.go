@@ -62,6 +62,7 @@ type QNTXServer struct {
 	verbosity           atomic.Int32        // Thread-safe verbosity level (fixes Issue #64)
 	graphLimit          atomic.Int32        // Thread-safe graph node limit (default 1000)
 	logger              *zap.SugaredLogger
+	logPath             string              // Configured log file path (from am.toml server.log_path)
 	logTransport        *wslogs.Transport
 	wsCore              *wslogs.WebSocketCore
 	consoleBuffer       *ConsoleBuffer              // Browser console log buffer for debugging (dev mode only)
