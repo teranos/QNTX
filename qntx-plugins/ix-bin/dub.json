@@ -7,7 +7,7 @@
     "targetName": "qntx-ix-bin-plugin",
     "targetPath": "bin",
     "sourcePaths": ["source"],
-    "stringImportPaths": ["source"],
+    "stringImportPaths": ["source", "web"],
     "mainSourceFile": "source/ixbin/app.d",
     "dflags-ldc": ["-O2"]
 }
