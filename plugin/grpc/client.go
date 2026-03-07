@@ -53,7 +53,7 @@ func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDo
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	const maxMsgSize = 16 * 1024 * 1024 // 16MB — embedding payloads exceed the 4MB default
+	const maxMsgSize = 100 * 1024 * 1024 // 100MB — binary ingestion payloads exceed the 4MB default
 	conn, err := grpc.DialContext(ctx, addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
