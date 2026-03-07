@@ -22,7 +22,7 @@ type ffiAttestation struct {
 	Source     string                 `json:"source,omitempty"`
 	Attributes map[string]interface{} `json:"attributes,omitempty"`
 	CreatedAt  int64                  `json:"created_at,omitempty"`
-	Signature  []byte                 `json:"signature,omitempty"`  // base64 in JSON
+	Signature  []byte                 `json:"signature,omitempty"` // base64 in JSON
 	SignerDID  string                 `json:"signer_did,omitempty"`
 }
 

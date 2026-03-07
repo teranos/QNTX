@@ -130,25 +130,48 @@ async function fetchPluginContent(
         const html = await resp.text();
         container.innerHTML = html;
 
-        // Prevent drag on interactive elements (inputs, textareas, buttons, selects)
-        // so they can receive mouse events without triggering glyph drag
-        const interactiveElements = container.querySelectorAll('input, textarea, button, select, [contenteditable="true"]');
+        // Execute scripts — innerHTML doesn't execute them for security.
+        // External scripts load via document.head (detached trees don't trigger loads).
+        // Inline scripts run after externals complete (they may depend on globals like Terminal).
+        const scripts = container.querySelectorAll('script');
+        const externalLoads: Promise<void>[] = [];
+        const inlineScripts: HTMLScriptElement[] = [];
+
+        scripts.forEach((oldScript) => {
+            if (oldScript.src) {
+                const newScript = document.createElement('script');
+                const loaded = new Promise<void>((resolve, reject) => {
+                    newScript.onload = () => resolve();
+                    newScript.onerror = () => reject(new Error(`Failed to load script: ${oldScript.src}`));
+                });
+                newScript.src = oldScript.src;
+                document.head.appendChild(newScript);
+                oldScript.remove();
+                externalLoads.push(loaded);
+            } else {
+                inlineScripts.push(oldScript);
+            }
+        });
+
+        if (externalLoads.length > 0) {
+            await Promise.all(externalLoads);
+        }
+        for (const oldScript of inlineScripts) {
+            const newScript = document.createElement('script');
+            newScript.textContent = oldScript.textContent;
+            oldScript.parentNode?.replaceChild(newScript, oldScript);
+        }
+
+        // Prevent drag on interactive elements so they receive mouse events
+        // without triggering glyph drag. Runs AFTER scripts execute so
+        // dynamically created elements (e.g. xterm.js textarea) are included.
+        const interactiveElements = container.querySelectorAll(
+            'input, textarea, button, select, canvas, [contenteditable="true"], .xterm'
+        );
         interactiveElements.forEach((el) => {
             el.addEventListener('mousedown', (e) => {
                 e.stopPropagation();
             });
-        });
-
-        // Execute inline scripts (innerHTML doesn't execute them for security)
-        const scripts = container.querySelectorAll('script');
-        scripts.forEach((oldScript) => {
-            const newScript = document.createElement('script');
-            if (oldScript.src) {
-                newScript.src = oldScript.src;
-            } else {
-                newScript.textContent = oldScript.textContent;
-            }
-            oldScript.parentNode?.replaceChild(newScript, oldScript);
         });
 
     } catch (err) {

@@ -63,4 +63,3 @@ func createTestStore(t *testing.T) (ats.AttestationStore, *sql.DB) {
 
 	return store, goDb
 }
-
