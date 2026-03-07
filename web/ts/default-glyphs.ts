@@ -607,9 +607,9 @@ function renderEmbeddings(): void {
                 <h3 class="glyph-section-title">HDBSCAN Clustering</h3>
                 ${clusterRows}
                 <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;font-size:11px;align-items:center">
-                    <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">size<input class="emb-param-min-cluster-size" type="number" min="2" max="50" step="1" value="${minCS}" style="width:36px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
-                    <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">thresh<input class="emb-param-cluster-threshold" type="number" min="0.1" max="1.0" step="0.05" value="${ct}" style="width:42px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
-                    <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">match<input class="emb-param-match-threshold" type="number" min="0.1" max="1.0" step="0.05" value="${cmt}" style="width:42px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
+                    <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">size<input class="emb-param emb-param-min-cluster-size" type="number" min="2" max="50" step="1" value="${minCS}" style="width:36px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
+                    <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">thresh<input class="emb-param emb-param-cluster-threshold" type="number" min="0.1" max="1.0" step="0.05" value="${ct}" style="width:42px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
+                    <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">match<input class="emb-param emb-param-match-threshold" type="number" min="0.1" max="1.0" step="0.05" value="${cmt}" style="width:42px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
                     <button class="emb-cluster-btn panel-btn" style="margin-left:auto;padding:2px 10px;font-size:11px"
                         ${embeddingsClustering ? 'disabled' : ''}>
                         ${embeddingsClustering ? 'Clustering...' : 'Recompute'}
@@ -626,24 +626,33 @@ function renderEmbeddings(): void {
     let scatterSection = '';
     if (available && embedding_count >= 2) {
         if (hasProjections) {
+            const inputStyle = 'padding:2px 4px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right;-moz-appearance:textfield';
+            const methodParams: Record<string, string> = {
+                umap: `<label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">neighbors<input class="emb-param emb-param-n-neighbors" type="number" min="2" max="200" step="1" value="15" style="width:40px;${inputStyle}"></label> <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">min_dist<input class="emb-param emb-param-min-dist" type="number" min="0.0" max="1.0" step="0.05" value="0.1" style="width:42px;${inputStyle}"></label>`,
+                tsne: `<label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">perplexity<input class="emb-param emb-param-perplexity" type="number" min="5" max="100" step="5" value="30" style="width:40px;${inputStyle}"></label>`,
+            };
             const scatterSlots = methodNames
                 .filter(m => projectionsData[m]?.length > 0)
                 .map(m => {
                     const pts = projectionsData[m];
                     const nClusters = new Set(pts.filter(p => p.cluster_id !== -1).map(p => p.cluster_id)).size;
+                    const params = methodParams[m] || '';
                     return `<div style="flex:1;min-width:0">
                         <div style="font-size:11px;color:#9ca3af;text-align:center;margin-bottom:4px">${m.toUpperCase()} (${pts.length}pts, ${nClusters}cl)</div>
                         <div class="emb-scatter" data-method="${m}"></div>
+                        ${params ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;font-size:11px;justify-content:center">${params}</div>` : ''}
                     </div>`;
                 }).join('');
             scatterSection = `
                 <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
                     <h3 class="glyph-section-title">Projections</h3>
                     <div style="display:flex;gap:6px">${scatterSlots}</div>
-                    <button class="emb-project-btn panel-btn" style="width:100%;margin-top:6px"
-                        ${embeddingsProjecting ? 'disabled' : ''}>
-                        ${embeddingsProjecting ? 'Projecting...' : 'Re-project'}
-                    </button>
+                    <div style="display:flex;justify-content:flex-end;margin-top:6px">
+                        <button class="emb-project-btn panel-btn" style="padding:2px 10px;font-size:11px"
+                            ${embeddingsProjecting ? 'disabled' : ''}>
+                            ${embeddingsProjecting ? 'Projecting...' : 'Re-project'}
+                        </button>
+                    </div>
                     <div class="emb-project-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
                 </div>
             `;
@@ -655,10 +664,12 @@ function renderEmbeddings(): void {
                         <span class="glyph-label">Status:</span>
                         <span class="glyph-value" style="color:#6b7280">not computed</span>
                     </div>
-                    <button class="emb-project-btn panel-btn" style="width:100%;margin-top:6px"
-                        ${embeddingsProjecting ? 'disabled' : ''}>
-                        ${embeddingsProjecting ? 'Projecting...' : 'Project'}
-                    </button>
+                    <div style="display:flex;justify-content:flex-end;margin-top:6px">
+                        <button class="emb-project-btn panel-btn" style="padding:2px 10px;font-size:11px"
+                            ${embeddingsProjecting ? 'disabled' : ''}>
+                            ${embeddingsProjecting ? 'Projecting...' : 'Project'}
+                        </button>
+                    </div>
                     <div class="emb-project-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
                 </div>
             `;
@@ -685,6 +696,7 @@ function renderEmbeddings(): void {
     }
 
     embeddingsElement.innerHTML = `
+        <style>.emb-param::-webkit-inner-spin-button,.emb-param::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.emb-param{-moz-appearance:textfield}</style>
         <div class="glyph-content">
             <div class="glyph-row">
                 <span class="glyph-label">Status:</span>
@@ -1408,10 +1420,13 @@ async function projectAll(): Promise<void> {
     const resultEl = embeddingsElement?.querySelector('.emb-project-result');
 
     try {
+        const nNeighbors = Number((embeddingsElement?.querySelector('.emb-param-n-neighbors') as HTMLInputElement)?.value) || 15;
+        const minDist = Number((embeddingsElement?.querySelector('.emb-param-min-dist') as HTMLInputElement)?.value) || 0.1;
+        const perplexity = Number((embeddingsElement?.querySelector('.emb-param-perplexity') as HTMLInputElement)?.value) || 30;
         const resp = await apiFetch('/api/embeddings/project', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({}),
+            body: JSON.stringify({ n_neighbors: nNeighbors, min_dist: minDist, perplexity }),
         });
         const result = await resp.json();
 
