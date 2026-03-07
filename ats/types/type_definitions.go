@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/attrs"
+	"github.com/teranos/QNTX/ats/wasm"
 	"github.com/teranos/QNTX/errors"
-	"github.com/teranos/vanity-id"
 )
 
 // PromptResult is the type for LLM prompt execution results.
@@ -97,18 +97,21 @@ func AttestType(store AttestationStore, typeName, source, context string, attrib
 		return errors.New("context cannot be empty")
 	}
 
-	// Generate ASID for the type definition
-	// Empty actor seed creates self-certifying ASID
-	asid, err := id.GenerateASID(typeName, "type", context, "")
+	// Generate ASUID via Rust WASM engine
+	engine, err := wasm.GetEngine()
 	if err != nil {
-		return errors.Wrapf(err, "failed to generate ASID for type %s", typeName)
+		return errors.Wrapf(err, "failed to get WASM engine for type %s", typeName)
+	}
+	asuid, err := engine.GenerateASUID("AS", typeName, "type", context)
+	if err != nil {
+		return errors.Wrapf(err, "failed to generate ASUID for type %s", typeName)
 	}
 
 	// Create attestation with self-certifying actor
 	// Actor IS the type name itself (type-as-actor in typespace)
 	now := time.Now()
 	attestation := &As{
-		ID:         asid,
+		ID:         asuid,
 		Subjects:   []string{typeName},
 		Predicates: []string{"type"},
 		Contexts:   []string{context},
@@ -199,16 +202,19 @@ func AttestRelationshipType(store AttestationStore, predicateName, source string
 		return errors.New("source cannot be empty")
 	}
 
-	// Generate ASID for the relationship type definition
-	// Using "relationship_type" as predicate to distinguish from node types
-	asid, err := id.GenerateASID(predicateName, "relationship_type", "graph", "")
+	// Generate ASUID via Rust WASM engine
+	engine, err := wasm.GetEngine()
 	if err != nil {
-		return errors.Wrapf(err, "failed to generate ASID for relationship type %s", predicateName)
+		return errors.Wrapf(err, "failed to get WASM engine for relationship type %s", predicateName)
+	}
+	asuid, err := engine.GenerateASUID("AS", predicateName, "relationship_type", "graph")
+	if err != nil {
+		return errors.Wrapf(err, "failed to generate ASUID for relationship type %s", predicateName)
 	}
 
 	// Create attestation with self-certifying actor
 	attestation := &As{
-		ID:         asid,
+		ID:         asuid,
 		Subjects:   []string{predicateName},
 		Predicates: []string{"relationship_type"},
 		Contexts:   []string{"graph"},
