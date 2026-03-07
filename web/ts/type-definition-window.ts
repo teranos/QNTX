@@ -8,6 +8,25 @@ import { apiFetch } from './api.js';
 import { log, SEG } from './logger.ts';
 import { escapeHtml } from './html-utils.js';
 
+const HEX_CHARS = '0123456789abcdefABCDEF';
+
+function isLetter(ch: string): boolean {
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
+}
+
+function isDigit(ch: string): boolean {
+    return ch >= '0' && ch <= '9';
+}
+
+/** Validate hex color: # followed by 3-8 hex digits */
+function isHexColor(value: string): boolean {
+    if (!value.startsWith('#') || value.length < 4 || value.length > 9) return false;
+    for (let i = 1; i < value.length; i++) {
+        if (!HEX_CHARS.includes(value[i])) return false;
+    }
+    return true;
+}
+
 interface TypeDefinition {
     name: string;
     label: string;
@@ -156,7 +175,7 @@ export class TypeDefinitionWindow {
         const header = document.createElement('div');
         header.className = 'type-def-header';
         // Sanitize color to prevent CSS injection (only allow hex colors)
-        const safeColor = /^#[0-9A-Fa-f]{3,8}$/.test(this.currentType.color)
+        const safeColor = isHexColor(this.currentType.color)
             ? this.currentType.color : '#888888';
         header.innerHTML = `
             <div class="type-def-title">
@@ -279,13 +298,16 @@ export class TypeDefinitionWindow {
         }
 
         // Check first character is letter
-        if (!/^[a-zA-Z]/.test(name)) {
+        if (!isLetter(name[0])) {
             return { valid: false, error: 'Field name must start with a letter' };
         }
 
         // Check only contains alphanumeric and underscores
-        if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(name)) {
-            return { valid: false, error: 'Field name can only contain letters, numbers, and underscores' };
+        for (let i = 1; i < name.length; i++) {
+            const ch = name[i];
+            if (!isLetter(ch) && !isDigit(ch) && ch !== '_') {
+                return { valid: false, error: 'Field name can only contain letters, numbers, and underscores' };
+            }
         }
 
         // Check length
@@ -627,8 +649,9 @@ export class TypeDefinitionWindow {
 
         // Auto-generate label from name
         nameInput?.addEventListener('input', () => {
-            if (!labelInput.value || labelInput.value === this.capitalizeFirst(nameInput.value.replace(/_/g, ' '))) {
-                labelInput.value = this.capitalizeFirst(nameInput.value.replace(/_/g, ' '));
+            const labelFromName = this.capitalizeFirst(nameInput.value.split('_').join(' '));
+            if (!labelInput.value || labelInput.value === labelFromName) {
+                labelInput.value = labelFromName;
             }
         });
 
@@ -638,7 +661,7 @@ export class TypeDefinitionWindow {
         });
 
         colorTextInput?.addEventListener('input', () => {
-            if (/^#[0-9A-Fa-f]{6}$/.test(colorTextInput.value)) {
+            if (isHexColor(colorTextInput.value) && colorTextInput.value.length === 7) {
                 colorInput.value = colorTextInput.value;
             }
         });
