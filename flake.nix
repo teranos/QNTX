@@ -77,7 +77,13 @@
 
           installPhase = ''
             mkdir -p $out/lib
-            find target/release -maxdepth 1 -name 'libqntx_sqlite*' -not -name '*.d' -exec cp {} $out/lib/ \;
+            echo "=== Searching for libqntx_sqlite ==="
+            find . -name 'libqntx_sqlite*' -not -name '*.d' 2>/dev/null || true
+            echo "=== target/release contents ==="
+            ls -la target/release/libqntx_sqlite* 2>/dev/null || echo "Nothing in target/release/"
+            echo "=== Copying ==="
+            cp target/release/libqntx_sqlite.a $out/lib/ || true
+            cp target/release/libqntx_sqlite.so $out/lib/ || true
             ls -la $out/lib/
           '';
         };
@@ -87,7 +93,9 @@
           export GOWORK=off  # Build without workspace (use go.mod only)
           cp ${qntx-wasm}/lib/qntx_core.wasm ats/wasm/qntx_core.wasm
           mkdir -p target/release
-          cp -v ${qntx-sqlite-ffi}/lib/* target/release/
+          echo "=== qntx-sqlite-ffi lib contents ==="
+          ls -la ${qntx-sqlite-ffi}/lib/ || echo "lib dir missing"
+          cp ${qntx-sqlite-ffi}/lib/* target/release/ || echo "WARNING: no libs to copy"
         '';
 
         # Pre-commit hooks configuration
