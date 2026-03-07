@@ -76,7 +76,7 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("embeddings.enabled", false) // Disabled by default - requires ONNX model
 	v.SetDefault("embeddings.path", "ats/embeddings/models/all-MiniLM-L6-v2/model.onnx")
 	v.SetDefault("embeddings.name", "all-MiniLM-L6-v2")
-	v.SetDefault("embeddings.cluster_threshold", 0.5)               // Minimum cosine similarity for cluster prediction
+	v.SetDefault("embeddings.cluster_threshold", 0.5) // Minimum cosine similarity for cluster prediction
 	// recluster_interval_seconds: omit for default (not scheduled). Set positive value to enable.
 	// reproject_interval_seconds: omit for default (not scheduled). Set positive value to enable.
 	v.SetDefault("embeddings.min_cluster_size", 5)                  // Minimum cluster size for HDBSCAN
@@ -98,8 +98,7 @@ func SetDefaults(v *viper.Viper) {
 	// Plugin configuration defaults
 	v.SetDefault("plugin.enabled", []string{}) // No plugins enabled by default (explicit opt-in via am.toml)
 	v.SetDefault("plugin.paths", []string{
-		"~/.qntx/plugins", // User-level plugins
-		"./plugins",       // Project-level plugins
+		"~/.qntx/plugins",
 	})
 	v.SetDefault("plugin.websocket.keepalive.enabled", true)
 	// ping_interval_secs, pong_timeout_secs, reconnect_attempts are optional: nil = defaults (30, 60, 3) in plugin/grpc/websocket_keepalive.go
