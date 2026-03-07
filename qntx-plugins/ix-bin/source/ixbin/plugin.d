@@ -26,8 +26,6 @@ struct PluginState {
     bool initialized;
     bool paused;
 
-    // Cached ingestion results per glyph
-    IngestResult[string] glyphResults;
 }
 
 private __gshared PluginState state;
@@ -246,12 +244,11 @@ private HTTPResponse handleSetMode(ref const HTTPRequest req) {
         return jsonResponse(400, `{"error":"missing body"}`);
     }
 
-    // Simple JSON parsing for {"mode":"paused"} or {"mode":"active"}
     auto bodyStr = cast(string)req.body_;
-    if (indexOf(bodyStr, "paused") >= 0) {
+    if (indexOf(bodyStr, `"mode":"paused"`) >= 0 || indexOf(bodyStr, `"mode": "paused"`) >= 0) {
         state.paused = true;
         return jsonResponse(200, `{"mode":"paused"}`);
-    } else if (indexOf(bodyStr, "active") >= 0) {
+    } else if (indexOf(bodyStr, `"mode":"active"`) >= 0 || indexOf(bodyStr, `"mode": "active"`) >= 0) {
         state.paused = false;
         return jsonResponse(200, `{"mode":"active"}`);
     }
