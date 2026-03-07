@@ -96,10 +96,15 @@ export function render(glyph, ui) {
         headers: { 'Content-Type': 'application/octet-stream' },
         body: currentData,
       });
-      const result = await resp.json();
-      status.textContent = 'Ingested: ' + result.format + ' \u2014 ' + (result.attestations_created || 0) + ' attestations created';
-      if (result.last_error) {
-        status.textContent += ' (error: ' + result.last_error + ')';
+      const text = await resp.text();
+      if (!resp.ok) {
+        status.textContent = 'Ingest failed: ' + resp.status + ' ' + text.slice(0, 200);
+      } else {
+        const result = JSON.parse(text);
+        status.textContent = 'Ingested: ' + result.format + ' \u2014 ' + (result.attestations_created || 0) + ' attestations created';
+        if (result.last_error) {
+          status.textContent += ' (error: ' + result.last_error + ')';
+        }
       }
     } catch (err) {
       status.textContent = 'Ingest failed: ' + err.message;
@@ -174,6 +179,39 @@ function detectAndSummarize(data, element) {
         const types = { 1: 'relocatable', 2: 'executable', 3: 'shared object', 4: 'core' };
         const et = data[16] | (data[17] << 8);
         info += '\nType: ' + (types[et] || 'unknown (' + et + ')');
+      }
+      break;
+    case 0xfeedface:
+    case 0xfeedfacf:
+    case 0xcefaedfe:
+    case 0xcffaedfe:
+      info = 'Format: Mach-O';
+      if (data.length >= 16) {
+        const is64 = (magic === 0xfeedfacf || magic === 0xcffaedfe);
+        info += ' (' + (is64 ? '64-bit' : '32-bit') + ')';
+        const view = new DataView(data.buffer, data.byteOffset);
+        const cpu = view.getUint32(4, true);
+        const cpuNames = { 7: 'x86', 12: 'arm', 0x01000007: 'x86-64', 0x0100000c: 'arm64' };
+        info += '\nCPU: ' + (cpuNames[cpu] || 'other');
+        const ft = view.getUint32(12, true);
+        const ftNames = { 1: 'object', 2: 'executable', 6: 'dylib', 7: 'dylinker', 8: 'bundle' };
+        info += '\nType: ' + (ftNames[ft] || 'type-' + ft);
+        info += '\nLoad commands: ' + view.getUint32(16, true);
+      }
+      break;
+    case 0xcafebabe:
+    case 0xbebafeca:
+      info = 'Format: Mach-O (universal/fat)';
+      if (data.length >= 8) {
+        const nArch = (data[4] << 24) | (data[5] << 16) | (data[6] << 8) | data[7];
+        info += '\nArchitectures: ' + nArch;
+        const cpuNames = { 7: 'x86', 12: 'arm', 0x01000007: 'x86-64', 0x0100000c: 'arm64' };
+        for (let i = 0; i < nArch && i < 4; i++) {
+          const off = 8 + i * 20;
+          if (off + 4 > data.length) break;
+          const cpu = (data[off] << 24) | (data[off+1] << 16) | (data[off+2] << 8) | data[off+3];
+          info += '\n  ' + (cpuNames[cpu] || 'cpu-' + cpu);
+        }
       }
       break;
     case 0x504b0304:
