@@ -45,7 +45,16 @@ Format detectFormat(const ubyte[] data) {
         case 0xFEEDFACF: return Format.MachO;
         case 0xCEFAEDFE: return Format.MachO;
         case 0xCFFAEDFE: return Format.MachO;
-        case 0xCAFEBABE: return Format.MachO;
+        case 0xCAFEBABE:
+            // CAFEBABE is shared by Mach-O fat binaries and Java class files.
+            // Mach-O fat: BE uint32 at offset 4 is nfat_arch (realistically 1-4).
+            // Java class: BE uint32 at offset 4 is (minor_version << 16 | major_version),
+            // always >= 45 (0x2D) since JDK 1.1. Safe threshold: nfat_arch > 30 is Java.
+            if (data.length >= 8) {
+                uint nfatOrVersion = readBE32(data, 4);
+                if (nfatOrVersion > 30) return Format.Unknown;
+            }
+            return Format.MachO;
         case 0xBEBAFECA: return Format.MachO;
         case 0x504B0304: return Format.Zip;
         case 0x89504E47: return Format.PNG;
@@ -62,7 +71,7 @@ Format detectFormat(const ubyte[] data) {
 
     if (data[0] == '#' && data[1] == '!') return Format.Shebang;
 
-    if (data.length >= 16) {
+    if (data.length >= 15) {
         if (cast(string)data[0 .. 15] == "SQLite format 3") return Format.SQLite;
     }
     if (data.length >= 8) {

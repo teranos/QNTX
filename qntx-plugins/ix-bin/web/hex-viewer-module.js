@@ -115,7 +115,7 @@ async function detectFormat(data, element) {
     const resp = await fetch('/api/ix-bin/detect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/octet-stream' },
-      body: data,
+      body: data.slice(0, 32),
     });
     if (!resp.ok) return;
     const result = await resp.json();
