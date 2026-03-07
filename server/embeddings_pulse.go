@@ -345,6 +345,7 @@ func RunHDBSCANClustering(
 				snapshots = append(snapshots, storage.ClusterSnapshot{
 					ClusterID: ev.ClusterID,
 					RunID:     runID,
+					Centroid:  []byte{},
 					NMembers:  0,
 				})
 			}
