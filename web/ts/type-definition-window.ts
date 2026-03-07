@@ -102,7 +102,11 @@ export function openTypeDefinition(typeName: string, typeInfo?: TypeDefinition):
     fields.clear();
     selectedField = null;
     populateFieldsFromType(currentType);
-    spawnGlyph('Type: ' + currentType.name, renderEditContent);
+    try {
+        spawnGlyph('Type: ' + currentType.name, renderEditContent);
+    } catch (e) {
+        log.error(SEG.GLYPH, '[TypeDefGlyph] Failed to spawn glyph:', e);
+    }
 }
 
 /**
