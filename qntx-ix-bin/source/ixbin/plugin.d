@@ -126,7 +126,9 @@ HTTPResponse handleHTTP(ref const HTTPRequest req) {
     auto method = req.method;
 
     // Route dispatch using string methods (no regex per CLAUDE.md)
-    if (method == "POST" && path == "/ingest") {
+    if (method == "POST" && path == "/detect") {
+        return handleDetect(req);
+    } else if (method == "POST" && path == "/ingest") {
         return handleIngest(req);
     } else if (method == "GET" && path == "/hex-viewer-module.js") {
         return serveGlyphModule();
@@ -144,6 +146,28 @@ HTTPResponse handleHTTP(ref const HTTPRequest req) {
     resp.body_ = cast(ubyte[])("{\"error\":\"not found: " ~ path ~ "\"}");
     resp.headers = [httpHeader("Content-Type", "application/json")];
     return resp;
+}
+
+/// POST /detect — detect format and parse structure, no attestation creation.
+private HTTPResponse handleDetect(ref const HTTPRequest req) {
+    if (req.body_.length == 0) {
+        return jsonResponse(400, `{"error":"empty body"}`);
+    }
+
+    auto result = .ingest(req.body_, "detect");
+
+    auto json = `{"format":"` ~ result.formatName ~
+                `","size_bytes":` ~ to!string(req.body_.length) ~
+                `,"summary":{`;
+    bool first = true;
+    foreach (k, v; result.summary) {
+        if (!first) json ~= ",";
+        json ~= `"` ~ escapeJsonString(k) ~ `":"` ~ escapeJsonString(v) ~ `"`;
+        first = false;
+    }
+    json ~= "}}";
+
+    return jsonResponse(200, json);
 }
 
 /// POST /ingest — accept binary data, detect format, parse, create attestations.
