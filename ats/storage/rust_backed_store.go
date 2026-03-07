@@ -17,8 +17,8 @@ import (
 // signing (before write), observers (after write), and bounded enforcement (after write).
 // Go keeps its own *sql.DB for bounded enforcement and non-attestation tables.
 type RustBackedStore struct {
-	rust *sqlitecgo.RustStore  // Attestation CRUD via Rust FFI
-	db   *sql.DB               // For bounded enforcement (same file, separate connection)
+	rust *sqlitecgo.RustStore // Attestation CRUD via Rust FFI
+	db   *sql.DB              // For bounded enforcement (same file, separate connection)
 	log  *zap.SugaredLogger
 }
 
