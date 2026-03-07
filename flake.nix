@@ -62,8 +62,12 @@
           '';
         };
 
-        # Build qntx-sqlite as static library for CGO linking
-        qntx-sqlite-ffi = pkgs.rustPlatform.buildRustPackage {
+        # Build qntx-sqlite as static library for CGO linking.
+        # Uses the same Rust toolchain as qntx-wasm (fenix stable).
+        qntx-sqlite-ffi = (pkgs.makeRustPlatform {
+          cargo = fenix.packages.${system}.stable.cargo;
+          rustc = fenix.packages.${system}.stable.rustc;
+        }).buildRustPackage {
           pname = "qntx-sqlite-ffi";
           version = self.rev or "dev";
           src = ./.;
@@ -72,20 +76,20 @@
             lockFile = ./Cargo.lock;
           };
 
-          cargoBuildFlags = [ "-p" "qntx-sqlite" "--features" "ffi" ];
+          cargoBuildFlags = [ "-p" "qntx-sqlite" "--features" "ffi" "--lib" ];
           doCheck = false;
 
-          installPhase = ''
-            mkdir -p $out/lib
-            echo "=== Searching for libqntx_sqlite ==="
-            find . -name 'libqntx_sqlite*' -not -name '*.d' 2>/dev/null || true
-            echo "=== target/release contents ==="
-            ls -la target/release/libqntx_sqlite* 2>/dev/null || echo "Nothing in target/release/"
-            echo "=== Copying ==="
-            cp target/release/libqntx_sqlite.a $out/lib/ || true
-            cp target/release/libqntx_sqlite.so $out/lib/ || true
-            ls -la $out/lib/
+          # buildRustPackage's default installPhase only copies binaries.
+          # We need the static/shared library from the build output.
+          postBuild = ''
+            mkdir -p $out/lib $out/include
+            find target -name 'libqntx_sqlite.a' -exec cp {} $out/lib/ \;
+            find target -name 'libqntx_sqlite.so' -exec cp {} $out/lib/ \;
+            cp crates/qntx-sqlite/include/storage_ffi.h $out/include/
           '';
+
+          # Skip default install (tries to find binaries, there are none)
+          installPhase = "true";
         };
 
         # Common preBuild hook for Go derivations: copy WASM module and Rust FFI lib
@@ -93,9 +97,7 @@
           export GOWORK=off  # Build without workspace (use go.mod only)
           cp ${qntx-wasm}/lib/qntx_core.wasm ats/wasm/qntx_core.wasm
           mkdir -p target/release
-          echo "=== qntx-sqlite-ffi lib contents ==="
-          ls -la ${qntx-sqlite-ffi}/lib/ || echo "lib dir missing"
-          cp ${qntx-sqlite-ffi}/lib/* target/release/ || echo "WARNING: no libs to copy"
+          cp ${qntx-sqlite-ffi}/lib/libqntx_sqlite.a target/release/
         '';
 
         # Pre-commit hooks configuration
