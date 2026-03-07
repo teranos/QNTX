@@ -1,535 +1,21 @@
 /// Binary data ingestion engine.
 ///
-/// Format detection uses magic byte signatures. Parsers for known formats
-/// (PCAP, ELF) are generated at compile time from struct definitions —
-/// the struct layout IS the parser. SIMD scanning finds record boundaries
-/// in large buffers.
+/// Orchestrates format detection and parsing. Format-specific parsers
+/// live in their own modules (pcap, elf, macho). Detection and shared
+/// binary utilities live in detect.
 module ixbin.ingest;
 
 import ixbin.proto;
 import ixbin.version_ : PLUGIN_VERSION;
+import ixbin.detect;
+import ixbin.pcap;
+import ixbin.elf;
+import ixbin.macho;
+
 import std.conv : convTo = to;
 
 // ---------------------------------------------------------------------------
-// CTFE-powered binary struct parser
-//
-// Define a D struct with align(1) and the fields mirror the binary layout.
-// BinaryParser!(T) generates a zero-copy parser at compile time.
-// ---------------------------------------------------------------------------
-
-/// Parse a packed struct from a byte buffer. Zero-copy when possible,
-/// validated at compile time for size/alignment.
-T parseBinaryStruct(T)(const ubyte[] data, size_t offset = 0) {
-    enum sz = T.sizeof;
-    if (offset + sz > data.length) {
-        return T.init;
-    }
-    // Direct memory reinterpretation — the struct is align(1) packed
-    return *cast(const(T)*)(data.ptr + offset);
-}
-
-/// Get the compile-time size of a binary struct.
-enum binarySize(T) = T.sizeof;
-
-// ---------------------------------------------------------------------------
-// Format signatures (magic bytes)
-// ---------------------------------------------------------------------------
-
-enum Format {
-    Unknown,
-    PCAP,
-    PCAPSwapped,
-    PCAPNG,
-    ELF,
-    MachO,
-    PE,
-    Zip,
-    Gzip,
-    PNG,
-    PDF,
-    SQLite,
-}
-
-/// Detect binary format from the first bytes of data.
-Format detectFormat(const ubyte[] data) {
-    if (data.length < 4) return Format.Unknown;
-
-    // 4-byte magic checks
-    uint magic4 = (cast(uint)data[0] << 24) | (cast(uint)data[1] << 16) |
-                  (cast(uint)data[2] << 8) | data[3];
-
-    switch (magic4) {
-        case 0xA1B2C3D4: return Format.PCAP;
-        case 0xD4C3B2A1: return Format.PCAPSwapped;
-        case 0x0A0D0D0A: return Format.PCAPNG;
-        case 0x7F454C46: return Format.ELF;          // \x7FELF
-        case 0xFEEDFACE: return Format.MachO;        // Mach-O 32
-        case 0xFEEDFACF: return Format.MachO;        // Mach-O 64
-        case 0xCEFAEDFE: return Format.MachO;        // Mach-O 32 swapped
-        case 0xCFFAEDFE: return Format.MachO;        // Mach-O 64 swapped
-        case 0xCAFEBABE: return Format.MachO;        // Mach-O fat/universal
-        case 0xBEBAFECA: return Format.MachO;        // Mach-O fat/universal swapped
-        case 0x504B0304: return Format.Zip;           // PK\x03\x04
-        case 0x89504E47: return Format.PNG;           // \x89PNG
-        case 0x25504446: return Format.PDF;           // %PDF
-        default: break;
-    }
-
-    // 2-byte magic checks
-    ushort magic2 = (cast(ushort)data[0] << 8) | data[1];
-    switch (magic2) {
-        case 0x1F8B: return Format.Gzip;
-        case 0x4D5A: return Format.PE;                // MZ
-        default: break;
-    }
-
-    // SQLite: "SQLite format 3\0" (15 bytes + null)
-    if (data.length >= 16) {
-        auto sig = cast(string)data[0 .. 15];
-        if (sig == "SQLite format 3") return Format.SQLite;
-    }
-
-    return Format.Unknown;
-}
-
-/// Human-readable name for a format.
-string formatName(Format f) {
-    final switch (f) {
-        case Format.Unknown:     return "unknown";
-        case Format.PCAP:        return "pcap";
-        case Format.PCAPSwapped: return "pcap-swapped";
-        case Format.PCAPNG:      return "pcap-ng";
-        case Format.ELF:         return "elf";
-        case Format.MachO:       return "mach-o";
-        case Format.PE:          return "pe";
-        case Format.Zip:         return "zip";
-        case Format.Gzip:        return "gzip";
-        case Format.PNG:         return "png";
-        case Format.PDF:         return "pdf";
-        case Format.SQLite:      return "sqlite";
-    }
-}
-
-// ---------------------------------------------------------------------------
-// PCAP format (CTFE-generated from struct layout)
-// ---------------------------------------------------------------------------
-
-/// PCAP global header — 24 bytes, packed.
-/// The struct IS the parser: each field maps to its binary position.
-align(1) struct PcapGlobalHeader {
-    align(1):
-    uint magicNumber;
-    ushort versionMajor;
-    ushort versionMinor;
-    int thiszone;       // GMT to local correction
-    uint sigfigs;       // accuracy of timestamps
-    uint snaplen;       // max length of captured packets
-    uint network;       // data link type
-}
-
-static assert(PcapGlobalHeader.sizeof == 24, "PCAP header must be exactly 24 bytes");
-
-/// PCAP packet record header — 16 bytes, packed.
-align(1) struct PcapPacketHeader {
-    align(1):
-    uint tsSec;         // timestamp seconds
-    uint tsUsec;        // timestamp microseconds (or nanoseconds for pcap-ns)
-    uint inclLen;       // number of octets of packet saved in file
-    uint origLen;       // actual length of packet on the wire
-}
-
-static assert(PcapPacketHeader.sizeof == 16, "PCAP packet header must be exactly 16 bytes");
-
-/// Parse a PCAP file: extract the global header and packet count.
-struct PcapSummary {
-    PcapGlobalHeader global;
-    uint packetCount;
-    ulong totalBytes;
-    bool swapped;
-}
-
-PcapSummary parsePcap(const ubyte[] data) {
-    PcapSummary result;
-    if (data.length < PcapGlobalHeader.sizeof) return result;
-
-    result.global = parseBinaryStruct!PcapGlobalHeader(data);
-    result.swapped = (result.global.magicNumber == 0xD4C3B2A1);
-
-    size_t pos = PcapGlobalHeader.sizeof;
-    while (pos + PcapPacketHeader.sizeof <= data.length) {
-        auto pktHdr = parseBinaryStruct!PcapPacketHeader(data, pos);
-        uint inclLen = result.swapped ? byteSwap32(pktHdr.inclLen) : pktHdr.inclLen;
-        pos += PcapPacketHeader.sizeof + inclLen;
-        result.packetCount++;
-        result.totalBytes += inclLen;
-    }
-    return result;
-}
-
-// ---------------------------------------------------------------------------
-// ELF format (CTFE-generated from struct layout)
-// ---------------------------------------------------------------------------
-
-/// ELF identification header — first 16 bytes of any ELF file.
-align(1) struct ElfIdent {
-    align(1):
-    ubyte[4] magic;     // \x7FELF
-    ubyte classType;    // 1=32-bit, 2=64-bit
-    ubyte dataEncoding; // 1=little-endian, 2=big-endian
-    ubyte elfVersion;
-    ubyte osabi;
-    ubyte[8] padding;
-}
-
-static assert(ElfIdent.sizeof == 16, "ELF ident must be exactly 16 bytes");
-
-/// ELF 64-bit header (follows ident).
-align(1) struct Elf64Header {
-    align(1):
-    ElfIdent ident;
-    ushort type;        // 1=relocatable, 2=executable, 3=shared, 4=core
-    ushort machine;     // e.g., 0x3E=x86-64, 0xB7=AArch64
-    uint version_;
-    ulong entry;        // entry point virtual address
-    ulong phoff;        // program header table offset
-    ulong shoff;        // section header table offset
-    uint flags;
-    ushort ehsize;      // ELF header size
-    ushort phentsize;   // program header entry size
-    ushort phnum;       // number of program headers
-    ushort shentsize;   // section header entry size
-    ushort shnum;       // number of section headers
-    ushort shstrndx;    // section name string table index
-}
-
-static assert(Elf64Header.sizeof == 64, "ELF64 header must be exactly 64 bytes");
-
-struct ElfSummary {
-    bool is64bit;
-    bool littleEndian;
-    string elfType;
-    string machine;
-    ulong entryPoint;
-    ushort programHeaders;
-    ushort sectionHeaders;
-}
-
-ElfSummary parseElf(const ubyte[] data) {
-    ElfSummary result;
-    if (data.length < ElfIdent.sizeof) return result;
-
-    auto ident = parseBinaryStruct!ElfIdent(data);
-    result.is64bit = (ident.classType == 2);
-    result.littleEndian = (ident.dataEncoding == 1);
-
-    if (result.is64bit && data.length >= Elf64Header.sizeof) {
-        auto hdr = parseBinaryStruct!Elf64Header(data);
-        result.entryPoint = hdr.entry;
-        result.programHeaders = hdr.phnum;
-        result.sectionHeaders = hdr.shnum;
-
-        switch (hdr.type) {
-            case 1: result.elfType = "relocatable"; break;
-            case 2: result.elfType = "executable"; break;
-            case 3: result.elfType = "shared-object"; break;
-            case 4: result.elfType = "core-dump"; break;
-            default: result.elfType = "unknown"; break;
-        }
-        switch (hdr.machine) {
-            case 0x03: result.machine = "x86"; break;
-            case 0x3E: result.machine = "x86-64"; break;
-            case 0xB7: result.machine = "aarch64"; break;
-            case 0xF3: result.machine = "riscv"; break;
-            default: result.machine = "other-" ~ convTo!string(hdr.machine); break;
-        }
-    }
-    return result;
-}
-
-// ---------------------------------------------------------------------------
-// Mach-O format (CTFE-generated from struct layout)
-// ---------------------------------------------------------------------------
-
-/// Mach-O 64-bit header — 32 bytes, packed.
-align(1) struct MachO64Header {
-    align(1):
-    uint magic;
-    uint cpuType;
-    uint cpuSubtype;
-    uint fileType;
-    uint ncmds;         // number of load commands
-    uint sizeOfCmds;    // total size of load commands
-    uint flags;
-    uint reserved;      // 64-bit only
-}
-
-static assert(MachO64Header.sizeof == 32, "Mach-O 64 header must be exactly 32 bytes");
-
-/// Mach-O 32-bit header — 28 bytes, packed.
-align(1) struct MachO32Header {
-    align(1):
-    uint magic;
-    uint cpuType;
-    uint cpuSubtype;
-    uint fileType;
-    uint ncmds;
-    uint sizeOfCmds;
-    uint flags;
-}
-
-static assert(MachO32Header.sizeof == 28, "Mach-O 32 header must be exactly 28 bytes");
-
-/// Mach-O fat (universal) header — 8 bytes, big-endian.
-align(1) struct FatHeader {
-    align(1):
-    uint magic;
-    uint nfatArch;      // number of architecture slices
-}
-
-static assert(FatHeader.sizeof == 8, "Fat header must be exactly 8 bytes");
-
-/// Mach-O fat architecture entry — 20 bytes, big-endian.
-align(1) struct FatArch {
-    align(1):
-    uint cpuType;
-    uint cpuSubtype;
-    uint offset;        // offset to the Mach-O header for this slice
-    uint size;
-    uint alignment;
-}
-
-static assert(FatArch.sizeof == 20, "Fat arch entry must be exactly 20 bytes");
-
-struct MachOSummary {
-    bool is64bit;
-    bool swapped;
-    bool fat;
-    uint fatSlices;
-    string[] sliceArchs;
-    string cpuType;
-    string fileType;
-    uint loadCommands;
-    uint loadCommandsSize;
-    uint flags;
-}
-
-private string cpuTypeName(uint cpuType) {
-    uint baseCpu = cpuType & 0x00FFFFFF;
-    switch (baseCpu) {
-        case 7:    return (cpuType & 0x01000000) ? "x86-64" : "x86";
-        case 12:   return (cpuType & 0x01000000) ? "arm64" : "arm";
-        case 18:   return "powerpc";
-        default:   return "other-" ~ convTo!string(cpuType);
-    }
-}
-
-private string fileTypeName(uint ft) {
-    switch (ft) {
-        case 1:  return "object";
-        case 2:  return "executable";
-        case 3:  return "fvmlib";
-        case 4:  return "core";
-        case 5:  return "preload";
-        case 6:  return "dylib";
-        case 7:  return "dylinker";
-        case 8:  return "bundle";
-        case 9:  return "dylib-stub";
-        case 10: return "dsym";
-        case 11: return "kext";
-        default: return "unknown-" ~ convTo!string(ft);
-    }
-}
-
-/// Read a big-endian uint32 from a byte buffer.
-private uint readBE32(const ubyte[] data, size_t offset) {
-    if (offset + 4 > data.length) return 0;
-    return (cast(uint)data[offset] << 24) | (cast(uint)data[offset+1] << 16) |
-           (cast(uint)data[offset+2] << 8) | data[offset+3];
-}
-
-MachOSummary parseMachO(const ubyte[] data) {
-    MachOSummary result;
-    if (data.length < 4) return result;
-
-    uint magic = (cast(uint)data[0]) | (cast(uint)data[1] << 8) |
-                 (cast(uint)data[2] << 16) | (cast(uint)data[3] << 24);
-
-    // Fat/universal binary — big-endian header, contains multiple arch slices
-    bool isFat = (magic == 0xBEBAFECA || magic == 0xCAFEBABE);
-    if (isFat) {
-        result.fat = true;
-        // Fat header is big-endian
-        uint nArch = readBE32(data, 4);
-        result.fatSlices = nArch;
-
-        // Parse each fat_arch entry to list architectures
-        size_t pos = FatHeader.sizeof;
-        uint firstSliceOffset = 0;
-        foreach (i; 0 .. nArch) {
-            if (pos + FatArch.sizeof > data.length) break;
-            uint archCpu = readBE32(data, pos);
-            uint archOffset = readBE32(data, pos + 8);
-            result.sliceArchs ~= cpuTypeName(archCpu);
-            if (i == 0) firstSliceOffset = archOffset;
-            pos += FatArch.sizeof;
-        }
-
-        // Parse the first slice's Mach-O header for detailed info
-        if (firstSliceOffset > 0 && firstSliceOffset + 32 <= data.length) {
-            auto sliceResult = parseMachOSingle(data[firstSliceOffset .. $]);
-            result.is64bit = sliceResult.is64bit;
-            result.cpuType = sliceResult.cpuType;
-            result.fileType = sliceResult.fileType;
-            result.loadCommands = sliceResult.loadCommands;
-            result.loadCommandsSize = sliceResult.loadCommandsSize;
-            result.flags = sliceResult.flags;
-        }
-        return result;
-    }
-
-    return parseMachOSingle(data);
-}
-
-/// Parse a single-arch Mach-O header (not fat).
-private MachOSummary parseMachOSingle(const ubyte[] data) {
-    MachOSummary result;
-    if (data.length < 4) return result;
-
-    uint magic = (cast(uint)data[0]) | (cast(uint)data[1] << 8) |
-                 (cast(uint)data[2] << 16) | (cast(uint)data[3] << 24);
-
-    result.is64bit = (magic == 0xFEEDFACF || magic == 0xCFFAEDFE);
-    result.swapped = (magic == 0xCEFAEDFE || magic == 0xCFFAEDFE);
-
-    uint cpuType, fileType, ncmds, sizeOfCmds, flags;
-
-    if (result.is64bit && data.length >= MachO64Header.sizeof) {
-        auto hdr = parseBinaryStruct!MachO64Header(data);
-        cpuType = hdr.cpuType;
-        fileType = hdr.fileType;
-        ncmds = hdr.ncmds;
-        sizeOfCmds = hdr.sizeOfCmds;
-        flags = hdr.flags;
-    } else if (!result.is64bit && data.length >= MachO32Header.sizeof) {
-        auto hdr = parseBinaryStruct!MachO32Header(data);
-        cpuType = hdr.cpuType;
-        fileType = hdr.fileType;
-        ncmds = hdr.ncmds;
-        sizeOfCmds = hdr.sizeOfCmds;
-        flags = hdr.flags;
-    } else {
-        return result;
-    }
-
-    if (result.swapped) {
-        cpuType = byteSwap32(cpuType);
-        fileType = byteSwap32(fileType);
-        ncmds = byteSwap32(ncmds);
-        sizeOfCmds = byteSwap32(sizeOfCmds);
-        flags = byteSwap32(flags);
-    }
-
-    result.cpuType = cpuTypeName(cpuType);
-    result.fileType = fileTypeName(fileType);
-    result.loadCommands = ncmds;
-    result.loadCommandsSize = sizeOfCmds;
-    result.flags = flags;
-
-    return result;
-}
-
-// ---------------------------------------------------------------------------
-// SIMD-accelerated magic byte scanner
-//
-// Scans a large buffer for all occurrences of a 4-byte magic signature.
-// Uses 128-bit SIMD (SSE2 on x86-64) for 16-byte-at-a-time comparison.
-// ---------------------------------------------------------------------------
-
-/// Find all offsets where a 4-byte magic value appears in the buffer.
-size_t[] scanForMagic(const ubyte[] data, uint magic) {
-    size_t[] offsets;
-    ubyte[4] target = [
-        cast(ubyte)(magic >> 24),
-        cast(ubyte)(magic >> 16),
-        cast(ubyte)(magic >> 8),
-        cast(ubyte)(magic),
-    ];
-
-    // Scalar scan — correct on all platforms.
-    // On x86-64 with SSE2, the compiler auto-vectorizes tight scalar loops.
-    if (data.length < 4) return offsets;
-    foreach (i; 0 .. data.length - 3) {
-        if (data[i] == target[0] &&
-            data[i + 1] == target[1] &&
-            data[i + 2] == target[2] &&
-            data[i + 3] == target[3]) {
-            offsets ~= i;
-        }
-    }
-    return offsets;
-}
-
-// ---------------------------------------------------------------------------
-// Hex dump generator
-// ---------------------------------------------------------------------------
-
-/// Generate a hex dump string for a byte range.
-/// Format: "OFFSET  HH HH HH ... HH  |ASCII.....|"
-string hexDump(const ubyte[] data, size_t offset = 0, size_t maxLines = 64) {
-    char[] result;
-    size_t bytesPerLine = 16;
-    size_t lines = 0;
-
-    for (size_t i = 0; i < data.length && lines < maxLines; i += bytesPerLine) {
-        // Offset
-        result ~= hexStr(offset + i, 8);
-        result ~= "  ";
-
-        // Hex bytes
-        foreach (j; 0 .. bytesPerLine) {
-            if (i + j < data.length) {
-                result ~= hexStr(data[i + j], 2);
-                result ~= ' ';
-            } else {
-                result ~= "   ";
-            }
-            if (j == 7) result ~= ' ';
-        }
-
-        // ASCII
-        result ~= " |";
-        foreach (j; 0 .. bytesPerLine) {
-            if (i + j < data.length) {
-                ubyte b = data[i + j];
-                result ~= (b >= 0x20 && b <= 0x7E) ? cast(char)b : '.';
-            }
-        }
-        result ~= "|\n";
-        lines++;
-    }
-    return cast(string)result.idup;
-}
-
-private string hexStr(ulong value, int width) {
-    char[] buf;
-    buf.length = width;
-    foreach_reverse (i; 0 .. width) {
-        auto nibble = value & 0xF;
-        buf[i] = nibble < 10 ? cast(char)('0' + nibble) : cast(char)('a' + nibble - 10);
-        value >>= 4;
-    }
-    return cast(string)buf.idup;
-}
-
-private uint byteSwap32(uint val) {
-    return ((val & 0xFF) << 24) |
-           ((val & 0xFF00) << 8) |
-           ((val & 0xFF0000) >> 8) |
-           ((val & 0xFF000000) >> 24);
-}
-
-// ---------------------------------------------------------------------------
-// Ingestion: parse binary data into attestation commands
+// Ingestion result
 // ---------------------------------------------------------------------------
 
 struct IngestResult {
@@ -548,106 +34,115 @@ IngestResult ingest(const ubyte[] data, string source) {
     result.hexPreview = hexDump(data, 0, 32);
 
     result.summary["format"] = result.formatName;
-    result.summary["size_bytes"] = sizeToString(data.length);
+    result.summary["size_bytes"] = convTo!string(data.length);
 
     switch (result.format) {
         case Format.PCAP:
         case Format.PCAPSwapped:
-            auto pcap = parsePcap(data);
-            result.summary["packets"] = uintToString(pcap.packetCount);
-            result.summary["total_captured_bytes"] = sizeToString(pcap.totalBytes);
-            result.summary["snaplen"] = uintToString(
-                result.format == Format.PCAPSwapped ?
-                    byteSwap32(pcap.global.snaplen) : pcap.global.snaplen);
-            result.summary["link_type"] = uintToString(
-                result.format == Format.PCAPSwapped ?
-                    byteSwap32(pcap.global.network) : pcap.global.network);
-
-            // One attestation for the capture file summary
-            AttestationCommand cmd;
-            cmd.subjects = [source];
-            cmd.predicates = ["ingested"];
-            cmd.contexts = ["pcap"];
-            cmd.source = "ix-bin";
-            cmd.sourceVersion = PLUGIN_VERSION;
-            cmd.attributes = encodeStructFromStringMap(result.summary);
-            result.attestations ~= cmd;
+            ingestPcap(data, source, result);
             break;
 
         case Format.ELF:
-            auto elf = parseElf(data);
-            result.summary["class"] = elf.is64bit ? "64-bit" : "32-bit";
-            result.summary["endianness"] = elf.littleEndian ? "little-endian" : "big-endian";
-            result.summary["type"] = elf.elfType;
-            result.summary["machine"] = elf.machine;
-            result.summary["entry_point"] = "0x" ~ hexStr(elf.entryPoint, 16);
-            result.summary["program_headers"] = ushortToString(elf.programHeaders);
-            result.summary["section_headers"] = ushortToString(elf.sectionHeaders);
-
-            AttestationCommand cmd;
-            cmd.subjects = [source];
-            cmd.predicates = ["ingested"];
-            cmd.contexts = ["elf"];
-            cmd.source = "ix-bin";
-            cmd.sourceVersion = PLUGIN_VERSION;
-            cmd.attributes = encodeStructFromStringMap(result.summary);
-            result.attestations ~= cmd;
+            ingestElf(data, source, result);
             break;
 
         case Format.MachO:
-            auto macho = parseMachO(data);
-            if (macho.fat) {
-                result.summary["universal"] = "true";
-                result.summary["slices"] = uintToString(macho.fatSlices);
-                // Join arch names: "x86-64, arm64"
-                string archs;
-                foreach (i, a; macho.sliceArchs) {
-                    if (i > 0) archs ~= ", ";
-                    archs ~= a;
-                }
-                result.summary["architectures"] = archs;
-            }
-            result.summary["class"] = macho.is64bit ? "64-bit" : "32-bit";
-            result.summary["cpu"] = macho.cpuType;
-            result.summary["type"] = macho.fileType;
-            result.summary["load_commands"] = uintToString(macho.loadCommands);
-            result.summary["load_commands_size"] = uintToString(macho.loadCommandsSize);
-            result.summary["flags"] = "0x" ~ hexStr(macho.flags, 8);
+            ingestMachO(data, source, result);
+            break;
 
-            AttestationCommand cmdm;
-            cmdm.subjects = [source];
-            cmdm.predicates = ["ingested"];
-            cmdm.contexts = ["mach-o"];
-            cmdm.source = "ix-bin";
-            cmdm.sourceVersion = PLUGIN_VERSION;
-            cmdm.attributes = encodeStructFromStringMap(result.summary);
-            result.attestations ~= cmdm;
+        case Format.Shebang:
+            // Extract interpreter from first line
+            size_t lineEnd = 0;
+            while (lineEnd < data.length && data[lineEnd] != '\n') lineEnd++;
+            if (lineEnd > 2) {
+                result.summary["interpreter"] = cast(string)data[2 .. lineEnd];
+            }
+            goto case;
+
+        case Format.BPlist:
+        case Format.USDC:
+        case Format.BOM:
+        case Format.SQLite:
+        case Format.PNG:
+        case Format.PDF:
+        case Format.Gzip:
+        case Format.PE:
+        case Format.PCAPNG:
+            // Detected format, no deep parser yet
+            result.attestations ~= makeAttestation(source, result.formatName, result.summary);
             break;
 
         default:
-            // Unknown format — create a generic attestation with hex preview
-            AttestationCommand cmd;
-            cmd.subjects = [source];
-            cmd.predicates = ["ingested"];
-            cmd.contexts = ["binary"];
-            cmd.source = "ix-bin";
-            cmd.sourceVersion = PLUGIN_VERSION;
-            cmd.attributes = encodeStructFromStringMap(result.summary);
-            result.attestations ~= cmd;
+            result.attestations ~= makeAttestation(source, "binary", result.summary);
             break;
     }
 
     return result;
 }
 
-private string sizeToString(size_t val) {
-    return convTo!string(val);
+// ---------------------------------------------------------------------------
+// Format-specific ingestion
+// ---------------------------------------------------------------------------
+
+private void ingestPcap(const ubyte[] data, string source, ref IngestResult result) {
+    auto pcap = parsePcap(data);
+    result.summary["packets"] = convTo!string(pcap.packetCount);
+    result.summary["total_captured_bytes"] = convTo!string(pcap.totalBytes);
+    result.summary["snaplen"] = convTo!string(
+        result.format == Format.PCAPSwapped ?
+            byteSwap32(pcap.global.snaplen) : pcap.global.snaplen);
+    result.summary["link_type"] = convTo!string(
+        result.format == Format.PCAPSwapped ?
+            byteSwap32(pcap.global.network) : pcap.global.network);
+    result.attestations ~= makeAttestation(source, "pcap", result.summary);
 }
-private string uintToString(uint val) {
-    return convTo!string(val);
+
+private void ingestElf(const ubyte[] data, string source, ref IngestResult result) {
+    auto elf = parseElf(data);
+    result.summary["class"] = elf.is64bit ? "64-bit" : "32-bit";
+    result.summary["endianness"] = elf.littleEndian ? "little-endian" : "big-endian";
+    result.summary["type"] = elf.elfType;
+    result.summary["machine"] = elf.machine;
+    result.summary["entry_point"] = "0x" ~ hexStr(elf.entryPoint, 16);
+    result.summary["program_headers"] = convTo!string(elf.programHeaders);
+    result.summary["section_headers"] = convTo!string(elf.sectionHeaders);
+    result.attestations ~= makeAttestation(source, "elf", result.summary);
 }
-private string ushortToString(ushort val) {
-    return convTo!string(val);
+
+private void ingestMachO(const ubyte[] data, string source, ref IngestResult result) {
+    auto macho = parseMachO(data);
+    if (macho.fat) {
+        result.summary["universal"] = "true";
+        result.summary["slices"] = convTo!string(macho.fatSlices);
+        string archs;
+        foreach (i, a; macho.sliceArchs) {
+            if (i > 0) archs ~= ", ";
+            archs ~= a;
+        }
+        result.summary["architectures"] = archs;
+    }
+    result.summary["class"] = macho.is64bit ? "64-bit" : "32-bit";
+    result.summary["cpu"] = macho.cpuType;
+    result.summary["type"] = macho.fileType;
+    result.summary["load_commands"] = convTo!string(macho.loadCommands);
+    result.summary["load_commands_size"] = convTo!string(macho.loadCommandsSize);
+    result.summary["flags"] = "0x" ~ hexStr(macho.flags, 8);
+    result.attestations ~= makeAttestation(source, "mach-o", result.summary);
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+private AttestationCommand makeAttestation(string source, string context, string[string] summary) {
+    AttestationCommand cmd;
+    cmd.subjects = [source];
+    cmd.predicates = ["ingested"];
+    cmd.contexts = [context];
+    cmd.source = "ix-bin";
+    cmd.sourceVersion = PLUGIN_VERSION;
+    cmd.attributes = encodeStructFromStringMap(summary);
+    return cmd;
 }
 
 // ---------------------------------------------------------------------------
@@ -655,7 +150,7 @@ private string ushortToString(ushort val) {
 // ---------------------------------------------------------------------------
 
 unittest {
-    // Test format detection
+    // Format detection
     ubyte[8] pcap = [0xA1, 0xB2, 0xC3, 0xD4, 0, 0, 0, 0];
     assert(detectFormat(pcap[]) == Format.PCAP);
 
@@ -668,87 +163,23 @@ unittest {
     ubyte[3] empty = [0, 0, 0];
     assert(detectFormat(empty[]) == Format.Unknown);
 
-    // Test PCAP struct size (compile-time check via static assert above)
-    assert(binarySize!PcapGlobalHeader == 24);
-    assert(binarySize!PcapPacketHeader == 16);
+    // String-based format detection
+    ubyte[8] bplist = [0x62, 0x70, 0x6C, 0x69, 0x73, 0x74, 0x30, 0x30];
+    assert(detectFormat(bplist[]) == Format.BPlist);
 
-    // Test hex dump
-    ubyte[5] data = [0x48, 0x65, 0x6C, 0x6C, 0x6F];
-    auto hex = hexDump(data[], 0, 1);
-    assert(hex.length > 0);
+    ubyte[8] shebang = [0x23, 0x21, 0x2F, 0x75, 0x73, 0x72, 0x2F, 0x62];
+    assert(detectFormat(shebang[]) == Format.Shebang);
 
-    // Test magic scanner
-    ubyte[12] buf = [0, 0, 0x7F, 0x45, 0x4C, 0x46, 0, 0, 0x7F, 0x45, 0x4C, 0x46];
-    auto hits = scanForMagic(buf[], 0x7F454C46);
-    assert(hits.length == 2);
-    assert(hits[0] == 2);
-    assert(hits[1] == 8);
+    ubyte[8] usdc = [0x50, 0x58, 0x52, 0x2D, 0x55, 0x53, 0x44, 0x43];
+    assert(detectFormat(usdc[]) == Format.USDC);
 
-    // Test ELF parser
-    auto elfData = new ubyte[64];
-    elfData[0] = 0x7F; elfData[1] = 0x45; elfData[2] = 0x4C; elfData[3] = 0x46;
-    elfData[4] = 2; // 64-bit
-    elfData[5] = 1; // little-endian
-    elfData[16] = 3; elfData[17] = 0; // shared object (LE)
-    elfData[18] = 0x3E; elfData[19] = 0; // x86-64 (LE)
-    auto elfInfo = parseElf(elfData);
-    assert(elfInfo.is64bit);
-    assert(elfInfo.littleEndian);
-    assert(elfInfo.elfType == "shared-object");
-    assert(elfInfo.machine == "x86-64");
+    ubyte[8] bom = [0x42, 0x4F, 0x4D, 0x53, 0x74, 0x6F, 0x72, 0x65];
+    assert(detectFormat(bom[]) == Format.BOM);
 
-    // Test Mach-O format detection
-    ubyte[8] macho64 = [0xCF, 0xFA, 0xED, 0xFE, 0, 0, 0, 0]; // Mach-O 64 LE (native macOS)
+    // Mach-O detection
+    ubyte[8] macho64 = [0xCF, 0xFA, 0xED, 0xFE, 0, 0, 0, 0];
     assert(detectFormat(macho64[]) == Format.MachO);
 
-    ubyte[8] macho32 = [0xCE, 0xFA, 0xED, 0xFE, 0, 0, 0, 0]; // Mach-O 32 LE
-    assert(detectFormat(macho32[]) == Format.MachO);
-
-    // Test Mach-O parser — 64-bit arm64 executable (native Apple Silicon layout)
-    auto machoData = new ubyte[32];
-    machoData[0] = 0xCF; machoData[1] = 0xFA; machoData[2] = 0xED; machoData[3] = 0xFE; // magic LE
-    // CPU type: arm64 = 0x0100000C (LE bytes: 0C 00 00 01)
-    machoData[4] = 0x0C; machoData[5] = 0x00; machoData[6] = 0x00; machoData[7] = 0x01;
-    // CPU subtype
-    machoData[8] = 0x00; machoData[9] = 0x00; machoData[10] = 0x00; machoData[11] = 0x00;
-    // File type: 2 = executable (LE)
-    machoData[12] = 0x02; machoData[13] = 0x00; machoData[14] = 0x00; machoData[15] = 0x00;
-    // ncmds: 15
-    machoData[16] = 0x0F; machoData[17] = 0x00; machoData[18] = 0x00; machoData[19] = 0x00;
-    auto machoInfo = parseMachO(machoData);
-    assert(machoInfo.is64bit);
-    assert(!machoInfo.swapped);
-    assert(machoInfo.cpuType == "arm64");
-    assert(machoInfo.fileType == "executable");
-    assert(machoInfo.loadCommands == 15);
-
-    // Test fat/universal Mach-O detection
     ubyte[8] fatBE = [0xCA, 0xFE, 0xBA, 0xBE, 0, 0, 0, 0];
     assert(detectFormat(fatBE[]) == Format.MachO);
-
-    // Test fat Mach-O parser — 2 slices (x86-64 + arm64), first slice is a 64-bit executable
-    auto fatData = new ubyte[8 + 2*20 + 32]; // fat header + 2 fat_arch + one Mach-O 64 header
-    // Fat header (big-endian): magic=0xCAFEBABE, nfat_arch=2
-    fatData[0] = 0xCA; fatData[1] = 0xFE; fatData[2] = 0xBA; fatData[3] = 0xBE;
-    fatData[4] = 0x00; fatData[5] = 0x00; fatData[6] = 0x00; fatData[7] = 0x02;
-    // Fat arch 0 (big-endian): cpu=x86-64 (0x01000007), offset=48 (0x30)
-    fatData[8]  = 0x01; fatData[9]  = 0x00; fatData[10] = 0x00; fatData[11] = 0x07; // cpu
-    fatData[12] = 0x00; fatData[13] = 0x00; fatData[14] = 0x00; fatData[15] = 0x03; // subtype
-    fatData[16] = 0x00; fatData[17] = 0x00; fatData[18] = 0x00; fatData[19] = 0x30; // offset=48
-    // Fat arch 1 (big-endian): cpu=arm64 (0x0100000C)
-    fatData[28] = 0x01; fatData[29] = 0x00; fatData[30] = 0x00; fatData[31] = 0x0C; // cpu
-    // Mach-O 64 header at offset 48 (first slice)
-    size_t o = 48;
-    fatData[o]   = 0xCF; fatData[o+1] = 0xFA; fatData[o+2] = 0xED; fatData[o+3] = 0xFE; // magic
-    fatData[o+4] = 0x07; fatData[o+5] = 0x00; fatData[o+6] = 0x00; fatData[o+7] = 0x01; // x86-64 LE
-    fatData[o+12] = 0x02; // file type: executable
-    fatData[o+16] = 0x0A; // ncmds: 10
-    auto fatInfo = parseMachO(fatData);
-    assert(fatInfo.fat);
-    assert(fatInfo.fatSlices == 2);
-    assert(fatInfo.sliceArchs.length == 2);
-    assert(fatInfo.sliceArchs[0] == "x86-64");
-    assert(fatInfo.sliceArchs[1] == "arm64");
-    assert(fatInfo.fileType == "executable");
-    assert(fatInfo.loadCommands == 10);
 }
