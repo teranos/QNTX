@@ -62,12 +62,7 @@ mod tests {
             .unwrap()
             .starts_with("AS-SARAH-AUTHOR-GITHUB-"));
         let full_suffix = parsed["full"].as_str().unwrap().split('-').last().unwrap();
-        let short_suffix = parsed["short"]
-            .as_str()
-            .unwrap()
-            .split('-')
-            .last()
-            .unwrap();
+        let short_suffix = parsed["short"].as_str().unwrap().split('-').last().unwrap();
         assert_eq!(full_suffix.len(), 8);
         assert_eq!(short_suffix.len(), 4);
     }
