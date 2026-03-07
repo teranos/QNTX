@@ -59,6 +59,7 @@ func SetDefaults(v *viper.Viper) {
 		"tauri://localhost", // Allow Tauri desktop app
 	})
 	v.SetDefault("server.log_theme", "everforest")
+	v.SetDefault("server.log_path", DefaultLogPath)
 
 	// Rate limiting defaults (per-IP token bucket)
 	v.SetDefault("server.rate_limit.auth_rate", 2.0)
@@ -232,6 +233,14 @@ func (c *Config) GetServerAllowedOrigins() []string {
 	sort.Strings(merged)
 
 	return merged
+}
+
+// GetServerLogPath returns the configured log file path (default: tmp/qntx.log)
+func (c *Config) GetServerLogPath() string {
+	if c.Server.LogPath == "" {
+		return DefaultLogPath
+	}
+	return c.Server.LogPath
 }
 
 // GetServerLogTheme returns the log theme (default: everforest)

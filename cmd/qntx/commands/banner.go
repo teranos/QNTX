@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 
+	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/sym"
@@ -51,7 +52,11 @@ func printStartupBanner(verbosity int, dbPath string) {
 		fmt.Printf("%s│%s Database:  %s\n", green, reset, dbPath)
 	}
 	if verbosity >= 2 {
-		fmt.Printf("%s│%s Logs:      tmp/graph-debug.log\n", green, reset)
+		logPath := am.DefaultLogPath
+		if cfg, err := am.Load(); err == nil {
+			logPath = cfg.GetServerLogPath()
+		}
+		fmt.Printf("%s│%s Logs:      %s\n", green, reset, logPath)
 	}
 	fmt.Printf("%s└─────────────────────────────────────────────────────┘%s\n", green, reset)
 

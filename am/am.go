@@ -54,6 +54,7 @@ type ServerConfig struct {
 	FrontendPort   int             `mapstructure:"frontend_port"` // Frontend dev server port (default: 8820)
 	AllowedOrigins []string        `mapstructure:"allowed_origins"`
 	LogTheme       string          `mapstructure:"log_theme"`  // Color theme: gruvbox, everforest
+	LogPath        string          `mapstructure:"log_path"`   // File path for debug logs (default: tmp/qntx.log)
 	RateLimit      RateLimitConfig `mapstructure:"rate_limit"` // Per-IP rate limiting
 }
 
@@ -71,11 +72,12 @@ type RateLimitConfig struct {
 	PublicBurst int     `mapstructure:"public_burst"` // Public burst capacity (default: 20)
 }
 
-// Server port constants
+// Server constants
 const (
-	DefaultServerPort     = 877  // Development port (easy to type, above privileged range)
-	DefaultGraphEventPort = 878  // Event viewer port
-	FallbackServerPort    = 7878 // Production fallback port
+	DefaultServerPort     = 877              // Development port (easy to type, above privileged range)
+	DefaultGraphEventPort = 878              // Event viewer port
+	FallbackServerPort    = 7878             // Production fallback port
+	DefaultLogPath        = "tmp/qntx.log"   // Default log file path
 )
 
 // PulseConfig configures the Pulse async job system (core infrastructure)
