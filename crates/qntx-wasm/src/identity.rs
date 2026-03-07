@@ -10,7 +10,7 @@ pub(crate) struct AsuidInput {
     pub subject: String,
     pub predicate: String,
     pub context: String,
-    pub content_hash: String,
+    pub random_bytes: Vec<u8>,
 }
 
 /// Generate an ASUID from JSON input, returning JSON with full and short forms.
@@ -30,19 +30,16 @@ pub(crate) fn generate_asuid_impl(input: &str) -> String {
         &parsed.subject,
         &parsed.predicate,
         &parsed.context,
-        &parsed.content_hash,
+        &parsed.random_bytes,
     ) {
         Some(id) => format!(r#"{{"full":"{}","short":"{}"}}"#, id.full(), id.short()),
-        None => r#"{"error":"invalid ASUID input: check prefix (2 uppercase letters) and content_hash (>= 16 hex chars)"}"#.to_string(),
+        None => r#"{"error":"invalid ASUID input: check prefix (2 uppercase letters) and random_bytes (>= 8 bytes)"}"#.to_string(),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    const HASH: &str =
-        "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2";
 
     #[test]
     fn generate_asuid_basic() {
@@ -51,7 +48,7 @@ mod tests {
             "subject": "Sarah",
             "predicate": "author",
             "context": "GitHub",
-            "content_hash": HASH
+            "random_bytes": [0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6, 0xA7, 0xB8]
         });
         let result = generate_asuid_impl(&input.to_string());
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
@@ -82,7 +79,7 @@ mod tests {
             "subject": "Alice",
             "predicate": "knows",
             "context": "work",
-            "content_hash": HASH
+            "random_bytes": [0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6, 0xA7, 0xB8]
         });
         let json = input.to_string();
         let r1 = generate_asuid_impl(&json);
@@ -97,7 +94,7 @@ mod tests {
             "subject": "s",
             "predicate": "p",
             "context": "c",
-            "content_hash": HASH
+            "random_bytes": [0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6, 0xA7, 0xB8]
         });
         let result = generate_asuid_impl(&input.to_string());
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
@@ -109,5 +106,19 @@ mod tests {
         let result = generate_asuid_impl("not json");
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
         assert!(parsed["error"].as_str().unwrap().contains("invalid JSON"));
+    }
+
+    #[test]
+    fn generate_asuid_insufficient_bytes() {
+        let input = serde_json::json!({
+            "prefix": "AS",
+            "subject": "s",
+            "predicate": "p",
+            "context": "c",
+            "random_bytes": [0x01, 0x02]
+        });
+        let result = generate_asuid_impl(&input.to_string());
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert!(parsed["error"].as_str().is_some());
     }
 }

@@ -1,57 +1,53 @@
-//! Content-addressed Attestation System Unique IDs (ASUIDs).
+//! Attestation System Unique IDs (ASUIDs).
 //!
-//! An ASUID is a deterministic identifier derived from an attestation's content.
-//! Same content produces the same ASUID on any node, offline or online.
+//! An ASUID is a human-readable identifier with a random suffix for uniqueness.
+//! The SPC segments make attestations recognizable in logs without lookup.
 //!
 //! ## Structure
 //!
 //! ```text
 //! AS-SARAH-AUTHOR-GITHUB-7K4M3B9X
-//! ╰prefix╯╰─S──╯╰──P──╯╰──C──╯╰hash suffix╯
+//! ╰prefix╯╰─S──╯╰──P──╯╰──C──╯╰─suffix──╯
 //! ```
 //!
 //! - **Prefix**: 2-letter domain (`AS` attestation, `JB` job, `PX` pulse execution)
 //! - **S, P, C**: Truncated subject, predicate, context for log readability
-//! - **Hash suffix**: Derived from content hash for uniqueness
+//! - **Suffix**: Random characters from QNTX alphabet for uniqueness
 
 use crate::alphabet::{clean_seed, ALPHABET};
 
 /// Maximum length for each SPC display segment in an ASUID.
 const SEGMENT_MAX_LEN: usize = 8;
 
-/// Number of hash suffix characters in the full ASUID.
-const HASH_SUFFIX_LEN: usize = 8;
+/// Number of random suffix characters in the full ASUID.
+const SUFFIX_LEN: usize = 8;
 
-/// Number of hash suffix characters shown in the short display form.
-const HASH_SUFFIX_SHORT: usize = 4;
+/// Number of suffix characters shown in the short display form.
+const SUFFIX_SHORT: usize = 4;
 
-/// A content-addressed attestation identifier.
+/// An attestation identifier with readable SPC segments and random suffix.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Asuid {
     prefix: [u8; 2],
     subject: String,
     predicate: String,
     context: String,
-    hash_suffix: String,
+    suffix: String,
 }
 
 impl Asuid {
-    /// Build an ASUID from its components and a content hash.
+    /// Build an ASUID from its components and random bytes.
     ///
-    /// The `content_hash` should be a hex-encoded hash (e.g. from
-    /// `qntx_core::sync::content_hash`). The suffix is derived from
-    /// these hash bytes mapped to the QNTX alphabet.
+    /// The caller provides randomness — the crate has no RNG dependency.
+    /// Go callers use `crypto/rand`, browser uses `crypto.getRandomValues`.
+    ///
+    /// Returns `None` if the prefix is invalid or insufficient random bytes.
     ///
     /// ```
     /// use qntx_id::Asuid;
     ///
-    /// let id = Asuid::new(
-    ///     "AS",
-    ///     "Sarah",
-    ///     "author_of",
-    ///     "GitHub",
-    ///     "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2",
-    /// );
+    /// let random_bytes = [0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6, 0xA7, 0xB8];
+    /// let id = Asuid::new("AS", "Sarah", "author_of", "GitHub", &random_bytes);
     /// assert!(id.is_some());
     /// let id = id.unwrap();
     /// assert!(id.to_string().starts_with("AS-"));
@@ -62,17 +58,20 @@ impl Asuid {
         subject: &str,
         predicate: &str,
         context: &str,
-        content_hash: &str,
+        random_bytes: &[u8],
     ) -> Option<Self> {
         let prefix_bytes = validate_prefix(prefix)?;
-        let hash_suffix = derive_suffix(content_hash)?;
+        if random_bytes.len() < SUFFIX_LEN {
+            return None;
+        }
+        let suffix = derive_suffix(random_bytes);
 
         Some(Self {
             prefix: prefix_bytes,
             subject: truncate_segment(subject),
             predicate: truncate_segment(predicate),
             context: truncate_segment(context),
-            hash_suffix,
+            suffix,
         })
     }
 
@@ -81,13 +80,13 @@ impl Asuid {
         std::str::from_utf8(&self.prefix).unwrap()
     }
 
-    /// Full ASUID string with all hash suffix characters.
+    /// Full ASUID string with all suffix characters.
     ///
     /// ```
     /// use qntx_id::Asuid;
     ///
-    /// let hash = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2";
-    /// let id = Asuid::new("AS", "Alice", "knows", "work", hash).unwrap();
+    /// let bytes = [0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6, 0xA7, 0xB8];
+    /// let id = Asuid::new("AS", "Alice", "knows", "work", &bytes).unwrap();
     /// let full = id.to_string();
     /// // AS-ALICE-KNOWS-WORK-XXXXXXXX (8-char suffix)
     /// assert_eq!(full.matches('-').count(), 4);
@@ -99,11 +98,11 @@ impl Asuid {
             self.subject,
             self.predicate,
             self.context,
-            self.hash_suffix,
+            self.suffix,
         )
     }
 
-    /// Short display form with truncated hash suffix (for logs).
+    /// Short display form with truncated suffix (for logs).
     pub fn short(&self) -> String {
         format!(
             "{}-{}-{}-{}-{}",
@@ -111,7 +110,7 @@ impl Asuid {
             self.subject,
             self.predicate,
             self.context,
-            &self.hash_suffix[..HASH_SUFFIX_SHORT],
+            &self.suffix[..SUFFIX_SHORT],
         )
     }
 }
@@ -145,52 +144,39 @@ fn truncate_segment(value: &str) -> String {
     }
 }
 
-/// Derive the hash suffix from a hex-encoded content hash.
-///
-/// Takes the first N bytes of the hash and maps them to the QNTX alphabet.
-fn derive_suffix(content_hash: &str) -> Option<String> {
-    if content_hash.len() < HASH_SUFFIX_LEN * 2 {
-        return None;
-    }
-
-    let suffix: String = (0..HASH_SUFFIX_LEN)
-        .map(|i| {
-            let hex_byte = &content_hash[i * 2..i * 2 + 2];
-            let byte = u8::from_str_radix(hex_byte, 16).unwrap_or(0);
-            ALPHABET[(byte as usize) % ALPHABET.len()] as char
-        })
-        .collect();
-
-    Some(suffix)
+/// Derive the suffix from random bytes mapped to the QNTX alphabet.
+fn derive_suffix(random_bytes: &[u8]) -> String {
+    random_bytes[..SUFFIX_LEN]
+        .iter()
+        .map(|&b| ALPHABET[(b as usize) % ALPHABET.len()] as char)
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const HASH_A: &str =
-        "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2a3b4c5d6a7b8c9d0e1f2";
-    const HASH_B: &str =
-        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+    const BYTES_A: [u8; 8] = [0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6, 0xA7, 0xB8];
+    const BYTES_B: [u8; 8] = [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77];
 
     #[test]
     fn basic_construction() {
-        let id = Asuid::new("AS", "Sarah", "author", "GitHub", HASH_A).unwrap();
+        let id = Asuid::new("AS", "Sarah", "author", "GitHub", &BYTES_A).unwrap();
         assert_eq!(id.prefix(), "AS");
         assert!(id.to_string().starts_with("AS-SARAH-AUTHOR-GITHUB-"));
     }
 
     #[test]
-    fn deterministic() {
-        let id1 = Asuid::new("AS", "Alice", "knows", "work", HASH_A).unwrap();
-        let id2 = Asuid::new("AS", "Alice", "knows", "work", HASH_A).unwrap();
+    fn deterministic_given_same_bytes() {
+        let id1 = Asuid::new("AS", "Alice", "knows", "work", &BYTES_A).unwrap();
+        let id2 = Asuid::new("AS", "Alice", "knows", "work", &BYTES_A).unwrap();
         assert_eq!(id1.to_string(), id2.to_string());
     }
 
     #[test]
-    fn different_hash_different_suffix() {
-        let id1 = Asuid::new("AS", "Alice", "knows", "work", HASH_A).unwrap();
-        let id2 = Asuid::new("AS", "Alice", "knows", "work", HASH_B).unwrap();
+    fn different_bytes_different_suffix() {
+        let id1 = Asuid::new("AS", "Alice", "knows", "work", &BYTES_A).unwrap();
+        let id2 = Asuid::new("AS", "Alice", "knows", "work", &BYTES_B).unwrap();
         assert_ne!(id1.to_string(), id2.to_string());
         // SPC segments should match
         assert_eq!(id1.subject, id2.subject);
@@ -199,8 +185,8 @@ mod tests {
     }
 
     #[test]
-    fn short_form_fewer_hash_chars() {
-        let id = Asuid::new("AS", "Alice", "knows", "work", HASH_A).unwrap();
+    fn short_form_fewer_suffix_chars() {
+        let id = Asuid::new("AS", "Alice", "knows", "work", &BYTES_A).unwrap();
         let full = id.full();
         let short = id.short();
         assert!(full.len() > short.len());
@@ -214,10 +200,9 @@ mod tests {
             "very long subject name here",
             "also_a_very_long_predicate",
             "context!@#",
-            HASH_A,
+            &BYTES_A,
         )
         .unwrap();
-        // Each segment should be at most SEGMENT_MAX_LEN
         let full = id.to_string();
         let parts: Vec<&str> = full.split('-').collect();
         assert!(parts[1].len() <= SEGMENT_MAX_LEN);
@@ -227,46 +212,63 @@ mod tests {
 
     #[test]
     fn segments_are_uppercased() {
-        let id = Asuid::new("AS", "alice", "knows", "work", HASH_A).unwrap();
+        let id = Asuid::new("AS", "alice", "knows", "work", &BYTES_A).unwrap();
         assert!(id.to_string().starts_with("AS-ALICE-KNOWS-WORK-"));
     }
 
     #[test]
     fn prefixes() {
-        assert!(Asuid::new("AS", "s", "p", "c", HASH_A).is_some());
-        assert!(Asuid::new("JB", "s", "p", "c", HASH_A).is_some());
-        assert!(Asuid::new("PX", "s", "p", "c", HASH_A).is_some());
+        assert!(Asuid::new("AS", "s", "p", "c", &BYTES_A).is_some());
+        assert!(Asuid::new("JB", "s", "p", "c", &BYTES_A).is_some());
+        assert!(Asuid::new("PX", "s", "p", "c", &BYTES_A).is_some());
     }
 
     #[test]
     fn invalid_prefix() {
-        assert!(Asuid::new("A", "s", "p", "c", HASH_A).is_none());
-        assert!(Asuid::new("ABC", "s", "p", "c", HASH_A).is_none());
-        assert!(Asuid::new("as", "s", "p", "c", HASH_A).is_none());
-        assert!(Asuid::new("12", "s", "p", "c", HASH_A).is_none());
+        assert!(Asuid::new("A", "s", "p", "c", &BYTES_A).is_none());
+        assert!(Asuid::new("ABC", "s", "p", "c", &BYTES_A).is_none());
+        assert!(Asuid::new("as", "s", "p", "c", &BYTES_A).is_none());
+        assert!(Asuid::new("12", "s", "p", "c", &BYTES_A).is_none());
     }
 
     #[test]
-    fn invalid_hash() {
-        // Too short
-        assert!(Asuid::new("AS", "s", "p", "c", "abcd").is_none());
-        // Empty
-        assert!(Asuid::new("AS", "s", "p", "c", "").is_none());
+    fn insufficient_random_bytes() {
+        assert!(Asuid::new("AS", "s", "p", "c", &[0x01, 0x02]).is_none());
+        assert!(Asuid::new("AS", "s", "p", "c", &[]).is_none());
     }
 
     #[test]
     fn display_matches_full() {
-        let id = Asuid::new("AS", "Sarah", "author", "GitHub", HASH_A).unwrap();
+        let id = Asuid::new("AS", "Sarah", "author", "GitHub", &BYTES_A).unwrap();
         assert_eq!(format!("{}", id), id.full());
     }
 
     #[test]
     fn unicode_subjects() {
-        let id = Asuid::new("AS", "Müller", "café", "Straße", HASH_A).unwrap();
+        let id = Asuid::new("AS", "Müller", "café", "Straße", &BYTES_A).unwrap();
         let s = id.to_string();
-        // Should be normalized to ASCII and uppercased
         assert!(s.contains("MULER"));
         assert!(s.contains("CAFE"));
         assert!(s.contains("STRASE"));
+    }
+
+    #[test]
+    fn suffix_uses_alphabet_chars_only() {
+        // All possible byte values should produce valid alphabet chars
+        let bytes: Vec<u8> = (0..=255).collect();
+        for chunk in bytes.chunks(SUFFIX_LEN) {
+            if chunk.len() < SUFFIX_LEN {
+                break;
+            }
+            let id = Asuid::new("AS", "s", "p", "c", chunk).unwrap();
+            let suffix = id.full().split('-').last().unwrap().to_string();
+            for c in suffix.chars() {
+                assert!(
+                    matches!(c, '2'..='9' | 'A'..='Z'),
+                    "unexpected character in suffix: {}",
+                    c
+                );
+            }
+        }
     }
 }
