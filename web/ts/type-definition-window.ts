@@ -25,7 +25,7 @@ function isDigit(ch: string): boolean {
 
 /** Validate hex color: # followed by 3-8 hex digits */
 function isHexColor(value: string): boolean {
-    if (!value.startsWith('#') || value.length < 4 || value.length > 9) return false;
+    if (!value || !value.startsWith('#') || value.length < 4 || value.length > 9) return false;
     for (let i = 1; i < value.length; i++) {
         if (!HEX_CHARS.includes(value[i])) return false;
     }
@@ -176,15 +176,26 @@ function buildEditUI(container: HTMLElement): void {
     container.innerHTML = '';
     if (!currentType) return;
 
+    // Back button
+    const backBtn = document.createElement('button');
+    backBtn.textContent = '← Back';
+    backBtn.style.cssText = 'background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:4px 0;font-size:12px;margin-bottom:4px;';
+    backBtn.addEventListener('mouseenter', () => { backBtn.style.color = 'var(--text-primary)'; });
+    backBtn.addEventListener('mouseleave', () => { backBtn.style.color = 'var(--text-secondary)'; });
+    backBtn.addEventListener('click', () => {
+        resetState();
+        createNewType();
+    });
+    container.appendChild(backBtn);
+
     // Type header
     const header = document.createElement('div');
     header.className = 'type-def-header';
     const safeColor = isHexColor(currentType.color) ? currentType.color : '#888888';
     header.innerHTML = `
-        <div class="type-def-title">
-            <span class="type-def-name">${escapeHtml(currentType.name)}</span>
-            <span class="type-def-label">${escapeHtml(currentType.label)}</span>
-            <span class="type-def-color" style="background-color: ${safeColor}"></span>
+        <div class="type-def-title" style="display:flex;align-items:center;gap:8px;">
+            <span class="type-def-name" style="color:var(--text-primary);font-weight:600;">${escapeHtml(currentType.name)}</span>
+            <span class="type-def-color" style="width:14px;height:14px;border-radius:3px;background:${safeColor};display:inline-block;"></span>
         </div>
     `;
     container.appendChild(header);
@@ -192,7 +203,7 @@ function buildEditUI(container: HTMLElement): void {
     // Fields section
     const fieldsSection = document.createElement('div');
     fieldsSection.className = 'type-def-fields';
-    fieldsSection.innerHTML = '<h3>Fields</h3>';
+    fieldsSection.innerHTML = '<h3 style="color:var(--text-primary);font-size:13px;">Fields</h3>';
 
     const fieldList = document.createElement('div');
     fieldList.className = 'field-list';
@@ -239,14 +250,14 @@ function buildEditUI(container: HTMLElement): void {
     saveSection.className = 'save-section';
     saveSection.style.cssText = `
         padding: 12px;
-        border-top: 1px solid var(--panel-border-color, #e0e0e0);
+        border-top: 1px solid var(--panel-border-color, #333);
         display: flex;
         justify-content: space-between;
         align-items: center;
     `;
     saveSection.innerHTML = `
         <button class="btn btn-primary" id="save-type-btn">Attest Type Definition</button>
-        <div class="save-status" id="save-status" style="font-size: 11px; color: var(--panel-text-secondary, #666);"></div>
+        <div class="save-status" id="save-status" style="font-size: 11px; color: var(--text-secondary);"></div>
     `;
     container.appendChild(saveSection);
 
@@ -469,7 +480,7 @@ function renderCreateContent(): HTMLElement {
     typesSection.innerHTML = '<h4>Existing Types</h4>';
     const typesList = document.createElement('div');
     typesList.className = 'type-def-types-list';
-    typesList.style.cssText = 'font-size:12px;color:var(--text-secondary);';
+    typesList.style.cssText = 'font-size:12px;color:var(--text-secondary);max-height:200px;overflow-y:auto;';
     typesList.textContent = 'Loading...';
     typesSection.appendChild(typesList);
     container.appendChild(typesSection);
