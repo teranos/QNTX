@@ -932,8 +932,18 @@ func (s *QNTXServer) HandleEmbeddingProject(w http.ResponseWriter, r *http.Reque
 		methods = []string{"umap"}
 	}
 
+	var params *ProjectionParams
+	if r.Body != nil {
+		var req ProjectionParams
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+			if req.NNeighbors != nil || req.MinDist != nil || req.Perplexity != nil {
+				params = &req
+			}
+		}
+	}
+
 	startTime := time.Now()
-	results, err := RunAllProjections(r.Context(), methods, s.embeddingStore, s.embeddingService, s.callReducePlugin, s.logger)
+	results, err := RunAllProjections(r.Context(), methods, s.embeddingStore, s.embeddingService, s.callReducePlugin, s.logger, params)
 	if err != nil {
 		s.logger.Errorw("Projection failed", "methods", methods, "error", err)
 		http.Error(w, fmt.Sprintf("Projection failed: %s", err), http.StatusInternalServerError)
