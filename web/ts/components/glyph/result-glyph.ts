@@ -97,7 +97,7 @@ export function createResultGlyph(
 
     copyBtn.addEventListener('click', () => {
         let text = '';
-        if (prompt) text += `> ${prompt.replace(/\n/g, '\n> ')}\n\n`;
+        if (prompt) text += `> ${prompt.split('\n').join('\n> ')}\n\n`;
         text += result.stdout || result.error || '(no output)';
         navigator.clipboard.writeText(text).then(() => {
             copyBtn.textContent = '✓';
@@ -606,7 +606,7 @@ export function buildResultTitleBar(execResult: ExecutionResult, promptText?: st
     copyBtn.title = 'Copy to clipboard';
     copyBtn.addEventListener('click', () => {
         let text = '';
-        if (promptText) text += `> ${promptText.replace(/\n/g, '\n> ')}\n\n`;
+        if (promptText) text += `> ${promptText.split('\n').join('\n> ')}\n\n`;
         text += execResult.stdout || execResult.error || '(no output)';
         navigator.clipboard.writeText(text).then(() => {
             copyBtn.textContent = '\u2713'; // ✓
