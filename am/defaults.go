@@ -98,9 +98,11 @@ func SetDefaults(v *viper.Viper) {
 
 	// Plugin configuration defaults
 	v.SetDefault("plugin.enabled", []string{}) // No plugins enabled by default (explicit opt-in via am.toml)
-	v.SetDefault("plugin.paths", []string{
-		"~/.qntx/plugins",
-	})
+	pluginPaths := []string{"~/.qntx/plugins"}
+	if root := findQNTXRoot(); root != "" {
+		pluginPaths = append(pluginPaths, filepath.Join(root, "qntx-plugins"))
+	}
+	v.SetDefault("plugin.paths", pluginPaths)
 	v.SetDefault("plugin.websocket.keepalive.enabled", true)
 	// ping_interval_secs, pong_timeout_secs, reconnect_attempts are optional: nil = defaults (30, 60, 3) in plugin/grpc/websocket_keepalive.go
 
@@ -110,42 +112,44 @@ func SetDefaults(v *viper.Viper) {
 	}
 }
 
-// findTypeScriptRuntime locates the TypeScript runtime (main.ts)
-// Checks QNTX_ROOT env var, then walks up from CWD looking for go.mod
-func findTypeScriptRuntime() string {
-	// 1. Check env var QNTX_ROOT
+// findQNTXRoot returns the QNTX project root directory.
+// Checks QNTX_ROOT env var, then walks up from CWD looking for go.mod.
+func findQNTXRoot() string {
 	if root := os.Getenv("QNTX_ROOT"); root != "" {
-		runtimePath := filepath.Join(root, "plugin/typescript/runtime/main.ts")
-		if _, err := os.Stat(runtimePath); err == nil {
-			return runtimePath
+		if _, err := os.Stat(filepath.Join(root, "go.mod")); err == nil {
+			return root
 		}
 	}
 
-	// 2. Walk up from CWD looking for go.mod (QNTX root marker)
 	dir, err := os.Getwd()
 	if err != nil {
 		return ""
 	}
 
 	for {
-		// Check if this directory contains go.mod
 		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			// Found QNTX root - check if runtime exists
-			runtimePath := filepath.Join(dir, "plugin/typescript/runtime/main.ts")
-			if _, err := os.Stat(runtimePath); err == nil {
-				return runtimePath
-			}
+			return dir
 		}
-
-		// Move up one directory
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			// Reached filesystem root
 			break
 		}
 		dir = parent
 	}
 
+	return ""
+}
+
+// findTypeScriptRuntime locates the TypeScript runtime (main.ts)
+func findTypeScriptRuntime() string {
+	root := findQNTXRoot()
+	if root == "" {
+		return ""
+	}
+	runtimePath := filepath.Join(root, "plugin/typescript/runtime/main.ts")
+	if _, err := os.Stat(runtimePath); err == nil {
+		return runtimePath
+	}
 	return ""
 }
 
