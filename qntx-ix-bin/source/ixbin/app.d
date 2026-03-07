@@ -7,6 +7,7 @@ module ixbin.app;
 import ixbin.grpc;
 import ixbin.plugin;
 import ixbin.proto;
+import ixbin.version_ : PLUGIN_VERSION;
 
 import std.conv : convTo = to;
 import std.stdio : stdout, writeln, writefln;
