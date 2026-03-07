@@ -15,7 +15,6 @@ import type { PluginGlyphDef } from './plugin-provided-glyphs';
 import type { GlyphModule } from './glyph-ui';
 import { createGlyphUI } from './glyph-ui';
 import { loadPluginCSS } from './plugin-provided-glyphs';
-import { getBackendUrl } from '../../api';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from './manifestations/canvas-placed';
 
@@ -34,11 +33,10 @@ export async function createPluginGlyphFromModule(
 
     const moduleUrl = def.module_url!;
 
-    const absoluteUrl = getBackendUrl() + moduleUrl;
-
     try {
-        // Import module (cached per URL)
-        const mod = await loadModule(absoluteUrl);
+        // Import module (cached per URL) — relative path resolves against
+        // window.location.origin (dev server in dev, backend in production)
+        const mod = await loadModule(moduleUrl);
 
         // Create GlyphUI scoped to this glyph + plugin
         const ui = createGlyphUI(glyph, def.plugin);

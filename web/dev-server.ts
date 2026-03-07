@@ -179,6 +179,59 @@ async function startServer() {
                 );
             }
 
+            // Hot-reload: serve plugin CSS from disk
+            if (url.pathname.startsWith("/api/") && url.pathname.endsWith(".css")) {
+                const parts = url.pathname.split("/"); // ["", "api", plugin, file.css]
+                if (parts.length === 4) {
+                    const plugin = parts[2];
+                    const cssFile = parts[3];
+                    const cssPath = join("..", "qntx-plugins", plugin, "web", cssFile);
+
+                    if (existsSync(cssPath)) {
+                        console.log(`${pink}[plugin-hot] Serving ${cssPath}${reset}`);
+                        return new Response(Bun.file(cssPath), {
+                            headers: { "Content-Type": "text/css" },
+                        });
+                    }
+                }
+            }
+
+            // Hot-reload: serve plugin module .ts source transpiled on the fly
+            // Matches /api/{plugin}/{module}.js and checks for .ts source on disk
+            if (url.pathname.startsWith("/api/") && url.pathname.endsWith(".js")) {
+                const parts = url.pathname.split("/"); // ["", "api", plugin, file.js]
+                if (parts.length === 4) {
+                    const plugin = parts[2];
+                    const jsFile = parts[3];
+                    const tsFile = jsFile.slice(0, -3) + ".ts";
+                    const tsPath = join("..", "qntx-plugins", plugin, "web", tsFile);
+
+                    if (existsSync(tsPath)) {
+                        try {
+                            const result = await Bun.build({
+                                entrypoints: [tsPath],
+                                format: "esm",
+                                target: "browser",
+                            });
+                            if (result.success && result.outputs.length > 0) {
+                                const code = await result.outputs[0].text();
+                                console.log(`${pink}[plugin-hot] Transpiled ${tsPath}${reset}`);
+                                return new Response(code, {
+                                    headers: { "Content-Type": "application/javascript" },
+                                });
+                            }
+                            console.error(`${darkPink}[plugin-hot] Build failed for ${tsPath}${reset}`);
+                            for (const log of result.logs) {
+                                console.error(`  ${log}`);
+                            }
+                        } catch (err) {
+                            console.error(`${darkPink}[plugin-hot] Error transpiling ${tsPath}:${reset}`, err);
+                        }
+                        // Fall through to backend proxy on failure
+                    }
+                }
+            }
+
             // Proxy API requests to backend
             if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/ws") || url.pathname.startsWith("/lsp")) {
                 const backendUrl = `${BACKEND_URL}${url.pathname}${url.search}`;

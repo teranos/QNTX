@@ -53,5 +53,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     config.field_attribute("protocol.Attestation.signer_did", "#[serde(default)]");
 
     config.compile_protos(&protos, &[&proto_dir])?;
+
+    for proto in &protos {
+        println!("cargo:rerun-if-changed={}", proto.display());
+    }
+
     Ok(())
 }

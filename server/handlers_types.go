@@ -259,4 +259,3 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusCreated, response)
 }
-
