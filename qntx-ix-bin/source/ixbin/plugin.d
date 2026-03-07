@@ -36,8 +36,7 @@ private __gshared PluginState state;
 // Metadata
 // ---------------------------------------------------------------------------
 
-enum PLUGIN_NAME    = "ix-bin";
-enum PLUGIN_VERSION = "0.3.0";
+import ixbin.version_ : PLUGIN_NAME, PLUGIN_VERSION;
 
 MetadataResponse metadata() {
     MetadataResponse resp;
