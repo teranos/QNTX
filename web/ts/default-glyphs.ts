@@ -320,6 +320,7 @@ let embeddingsInfo: {
     attestation_count: number;
     unembedded_ids?: string[];
     cluster_info?: { n_clusters: number; n_noise: number; n_total: number; clusters: Record<string, number> };
+    hdbscan_config?: { min_cluster_size: number; cluster_threshold: number; cluster_match_threshold: number };
 } | null = null;
 let embeddingsReembedding = false;
 let embeddingsClustering = false;

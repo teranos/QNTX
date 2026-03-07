@@ -339,6 +339,17 @@ func RunHDBSCANClustering(
 				"error", err)
 		}
 
+		// Add zero-member snapshots for dissolved clusters so timeline shows deaths
+		for _, ev := range matchResult.events {
+			if ev.EventType == "death" {
+				snapshots = append(snapshots, storage.ClusterSnapshot{
+					ClusterID: ev.ClusterID,
+					RunID:     runID,
+					NMembers:  0,
+				})
+			}
+		}
+
 		if err := store.SaveClusterSnapshots(snapshots); err != nil {
 			logger.Errorw("Failed to save cluster snapshots",
 				"count", len(snapshots),
