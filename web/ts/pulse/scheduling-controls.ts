@@ -289,8 +289,8 @@ function renderAddScheduleButton(
  */
 function showCustomIntervalInput(
   container: HTMLElement,
-  job: ScheduledJobResponse,
-  options: SchedulingControlsOptions
+  _job: ScheduledJobResponse,
+  _options: SchedulingControlsOptions
 ): void {
   // Remove any existing custom input
   const existing = container.querySelector('.pulse-custom-interval-row');
