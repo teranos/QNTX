@@ -321,3 +321,72 @@ func UpdatePulseMonthlyBudget(monthlyBudget float64) error {
 	}
 	return nil
 }
+
+// UpdateEmbeddingsMinClusterSize persists min_cluster_size to config
+func UpdateEmbeddingsMinClusterSize(size int) error {
+	config, configPath, err := loadOrInitializeUIConfig()
+	if err != nil {
+		return errors.Wrapf(err, "failed to load UI config for embeddings.min_cluster_size update (size=%d)", size)
+	}
+
+	var embeddings map[string]interface{}
+	if e, ok := config["embeddings"].(map[string]interface{}); ok {
+		embeddings = e
+	} else {
+		embeddings = make(map[string]interface{})
+	}
+
+	embeddings["min_cluster_size"] = size
+	config["embeddings"] = embeddings
+
+	if err := saveUIConfig(config, configPath); err != nil {
+		return errors.Wrapf(err, "failed to save embeddings.min_cluster_size=%d to %s", size, configPath)
+	}
+	return nil
+}
+
+// UpdateEmbeddingsClusterThreshold persists cluster_threshold to config
+func UpdateEmbeddingsClusterThreshold(threshold float64) error {
+	config, configPath, err := loadOrInitializeUIConfig()
+	if err != nil {
+		return errors.Wrapf(err, "failed to load UI config for embeddings.cluster_threshold update (threshold=%.3f)", threshold)
+	}
+
+	var embeddings map[string]interface{}
+	if e, ok := config["embeddings"].(map[string]interface{}); ok {
+		embeddings = e
+	} else {
+		embeddings = make(map[string]interface{})
+	}
+
+	embeddings["cluster_threshold"] = threshold
+	config["embeddings"] = embeddings
+
+	if err := saveUIConfig(config, configPath); err != nil {
+		return errors.Wrapf(err, "failed to save embeddings.cluster_threshold=%.3f to %s", threshold, configPath)
+	}
+	return nil
+}
+
+// UpdateEmbeddingsClusterMatchThreshold persists cluster_match_threshold to config
+func UpdateEmbeddingsClusterMatchThreshold(threshold float64) error {
+	config, configPath, err := loadOrInitializeUIConfig()
+	if err != nil {
+		return errors.Wrapf(err, "failed to load UI config for embeddings.cluster_match_threshold update (threshold=%.3f)", threshold)
+	}
+
+	var embeddings map[string]interface{}
+	if e, ok := config["embeddings"].(map[string]interface{}); ok {
+		embeddings = e
+	} else {
+		embeddings = make(map[string]interface{})
+	}
+
+	embeddings["cluster_match_threshold"] = threshold
+	config["embeddings"] = embeddings
+
+	if err := saveUIConfig(config, configPath); err != nil {
+		return errors.Wrapf(err, "failed to save embeddings.cluster_match_threshold=%.3f to %s", threshold, configPath)
+	}
+	return nil
+}

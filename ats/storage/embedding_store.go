@@ -1091,6 +1091,31 @@ func (s *EmbeddingStore) SampleClusterTexts(clusterID, sampleSize int) ([]string
 	return texts, nil
 }
 
+// GetClusterMemberIDs returns source_ids (attestation IDs) for a cluster, most recent first.
+func (s *EmbeddingStore) GetClusterMemberIDs(clusterID, limit int) ([]string, error) {
+	rows, err := s.db.Query(
+		`SELECT source_id FROM embeddings WHERE cluster_id = ? ORDER BY created_at DESC LIMIT ?`,
+		clusterID, limit,
+	)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get member IDs for cluster %d", clusterID)
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan member ID for cluster %d at row %d", clusterID, len(ids)+1)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "failed to iterate member IDs for cluster %d (read %d)", clusterID, len(ids))
+	}
+	return ids, nil
+}
+
 // ClusterTimelinePoint represents one cluster's state at one run.
 type ClusterTimelinePoint struct {
 	RunID     string  `json:"run_id"`
