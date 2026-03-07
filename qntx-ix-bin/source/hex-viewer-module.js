@@ -1,10 +1,9 @@
 // Hex Viewer glyph module for ix-bin plugin.
 //
 // Renders a binary data inspector on the QNTX canvas. Supports:
-// - Binary file upload/paste
-// - Automatic format detection
+// - Binary file upload/drag-drop
+// - Server-side format detection and structure parsing
 // - Hex dump with ASCII sidebar
-// - Parsed structure overlay for known formats (PCAP, ELF)
 // - Ingestion trigger (creates attestations in ATS)
 
 export function render(glyph, ui) {
@@ -40,7 +39,7 @@ export function render(glyph, ui) {
   actions.appendChild(ingestBtn);
   container.appendChild(actions);
 
-  // Summary panel
+  // Summary panel — populated by server /detect response
   const summary = document.createElement('div');
   summary.style.cssText = 'font-size: 12px; padding: 6px 8px; background: #111; border: 1px solid #333; flex-shrink: 0; display: none; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;';
   container.appendChild(summary);
@@ -53,36 +52,29 @@ export function render(glyph, ui) {
 
   let currentData = null;
 
-  // File selection handler
-  fileInput.addEventListener('change', function () {
-    const file = fileInput.files[0];
-    if (!file) return;
+  // Load file: render hex client-side, detect format server-side
+  function loadFile(file) {
     const reader = new FileReader();
     reader.onload = function () {
       currentData = new Uint8Array(reader.result);
       status.textContent = file.name + ' \u2014 ' + currentData.length + ' bytes';
       ingestBtn.disabled = false;
       renderHex(currentData, hexView);
-      detectAndSummarize(currentData, summary);
+      detectFormat(currentData, summary);
     };
     reader.readAsArrayBuffer(file);
+  }
+
+  // File selection
+  fileInput.addEventListener('change', function () {
+    if (fileInput.files[0]) loadFile(fileInput.files[0]);
   });
 
   // Drag and drop
   container.addEventListener('dragover', function (e) { e.preventDefault(); });
   container.addEventListener('drop', function (e) {
     e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function () {
-      currentData = new Uint8Array(reader.result);
-      status.textContent = file.name + ' \u2014 ' + currentData.length + ' bytes';
-      ingestBtn.disabled = false;
-      renderHex(currentData, hexView);
-      detectAndSummarize(currentData, summary);
-    };
-    reader.readAsArrayBuffer(file);
+    if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
   });
 
   // Ingest button
@@ -116,7 +108,37 @@ export function render(glyph, ui) {
   return container;
 }
 
-// Render hex dump in the pre element
+// Server-side format detection — single source of truth
+async function detectFormat(data, element) {
+  element.style.display = 'none';
+  try {
+    const resp = await fetch('/api/ix-bin/detect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: data,
+    });
+    if (!resp.ok) return;
+    const result = await resp.json();
+
+    // Build summary from server response
+    let info = 'Format: ' + result.format;
+    if (result.summary) {
+      var keys = Object.keys(result.summary);
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        if (k !== 'format') {
+          info += '\n' + k + ': ' + result.summary[k];
+        }
+      }
+    }
+    element.textContent = info;
+    element.style.display = 'block';
+  } catch (_) {
+    // Silent — summary panel stays hidden
+  }
+}
+
+// Render hex dump in the pre element (client-side, no server round-trip needed)
 function renderHex(data, element) {
   const lines = [];
   const bytesPerLine = 16;
@@ -147,92 +169,3 @@ function renderHex(data, element) {
 
   element.textContent = lines.join('\n');
 }
-
-// Client-side format detection and summary
-function detectAndSummarize(data, element) {
-  if (data.length < 4) {
-    element.style.display = 'none';
-    return;
-  }
-
-  const magic = (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3];
-  let info = '';
-
-  switch (magic) {
-    case 0xa1b2c3d4:
-    case 0xd4c3b2a1:
-      info = 'Format: PCAP (packet capture)\nMagic: ' + magic.toString(16);
-      if (data.length >= 24) {
-        const view = new DataView(data.buffer, data.byteOffset);
-        const swapped = magic === 0xd4c3b2a1;
-        info += '\nVersion: ' + (swapped ? swap16(view.getUint16(4, false)) : view.getUint16(4, true));
-        info += '.' + (swapped ? swap16(view.getUint16(6, false)) : view.getUint16(6, true));
-        info += '\nSnap length: ' + (swapped ? swap32(view.getUint32(16, false)) : view.getUint32(16, true));
-        info += '\nLink type: ' + (swapped ? swap32(view.getUint32(20, false)) : view.getUint32(20, true));
-      }
-      break;
-    case 0x7f454c46:
-      info = 'Format: ELF (Executable and Linkable Format)';
-      if (data.length >= 20) {
-        info += '\nClass: ' + (data[4] === 2 ? '64-bit' : '32-bit');
-        info += '\nEndianness: ' + (data[5] === 1 ? 'little-endian' : 'big-endian');
-        const types = { 1: 'relocatable', 2: 'executable', 3: 'shared object', 4: 'core' };
-        const et = data[16] | (data[17] << 8);
-        info += '\nType: ' + (types[et] || 'unknown (' + et + ')');
-      }
-      break;
-    case 0xfeedface:
-    case 0xfeedfacf:
-    case 0xcefaedfe:
-    case 0xcffaedfe:
-      info = 'Format: Mach-O';
-      if (data.length >= 16) {
-        const is64 = (magic === 0xfeedfacf || magic === 0xcffaedfe);
-        info += ' (' + (is64 ? '64-bit' : '32-bit') + ')';
-        const view = new DataView(data.buffer, data.byteOffset);
-        const cpu = view.getUint32(4, true);
-        const cpuNames = { 7: 'x86', 12: 'arm', 0x01000007: 'x86-64', 0x0100000c: 'arm64' };
-        info += '\nCPU: ' + (cpuNames[cpu] || 'other');
-        const ft = view.getUint32(12, true);
-        const ftNames = { 1: 'object', 2: 'executable', 6: 'dylib', 7: 'dylinker', 8: 'bundle' };
-        info += '\nType: ' + (ftNames[ft] || 'type-' + ft);
-        info += '\nLoad commands: ' + view.getUint32(16, true);
-      }
-      break;
-    case 0xcafebabe:
-    case 0xbebafeca:
-      info = 'Format: Mach-O (universal/fat)';
-      if (data.length >= 8) {
-        const nArch = (data[4] << 24) | (data[5] << 16) | (data[6] << 8) | data[7];
-        info += '\nArchitectures: ' + nArch;
-        const cpuNames = { 7: 'x86', 12: 'arm', 0x01000007: 'x86-64', 0x0100000c: 'arm64' };
-        for (let i = 0; i < nArch && i < 4; i++) {
-          const off = 8 + i * 20;
-          if (off + 4 > data.length) break;
-          const cpu = (data[off] << 24) | (data[off+1] << 16) | (data[off+2] << 8) | data[off+3];
-          info += '\n  ' + (cpuNames[cpu] || 'cpu-' + cpu);
-        }
-      }
-      break;
-    case 0x504b0304:
-      info = 'Format: ZIP archive'; break;
-    case 0x89504e47:
-      info = 'Format: PNG image'; break;
-    case 0x25504446:
-      info = 'Format: PDF document'; break;
-    default:
-      if ((data[0] === 0x1f) && (data[1] === 0x8b)) {
-        info = 'Format: gzip compressed';
-      } else if ((data[0] === 0x4d) && (data[1] === 0x5a)) {
-        info = 'Format: PE/COFF executable (Windows)';
-      } else {
-        info = 'Format: unknown binary\nSize: ' + data.length + ' bytes';
-      }
-  }
-
-  element.textContent = info;
-  element.style.display = 'block';
-}
-
-function swap16(v) { return ((v & 0xff) << 8) | ((v >> 8) & 0xff); }
-function swap32(v) { return ((v & 0xff) << 24) | ((v & 0xff00) << 8) | ((v >> 8) & 0xff00) | ((v >> 24) & 0xff); }
