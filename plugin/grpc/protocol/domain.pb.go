@@ -898,10 +898,10 @@ func (x *InitializeResponse) GetSchedules() []*ScheduleInfo {
 // ExecuteJobRequest is sent to plugins to execute an async job
 type ExecuteJobRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`                    // For logging/tracking
-	HandlerName   string                 `protobuf:"bytes,2,opt,name=handler_name,json=handlerName,proto3" json:"handler_name,omitempty"`  // Which handler to invoke
-	Payload       []byte                 `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`                             // Job-specific data (JSON)
-	TimeoutSecs   int64                  `protobuf:"varint,4,opt,name=timeout_secs,json=timeoutSecs,proto3" json:"timeout_secs,omitempty"` // Execution timeout (0 = no timeout)
+	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`                          // For logging/tracking
+	HandlerName   string                 `protobuf:"bytes,2,opt,name=handler_name,json=handlerName,proto3" json:"handler_name,omitempty"`        // Which handler to invoke
+	Payload       []byte                 `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`                                   // Job-specific data (JSON)
+	TimeoutSecs   *int64                 `protobuf:"varint,4,opt,name=timeout_secs,json=timeoutSecs,proto3,oneof" json:"timeout_secs,omitempty"` // Execution timeout. If not set, no timeout.
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -958,8 +958,8 @@ func (x *ExecuteJobRequest) GetPayload() []byte {
 }
 
 func (x *ExecuteJobRequest) GetTimeoutSecs() int64 {
-	if x != nil {
-		return x.TimeoutSecs
+	if x != nil && x.TimeoutSecs != nil {
+		return *x.TimeoutSecs
 	}
 	return 0
 }
@@ -1384,12 +1384,13 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\bats_code\x18\x05 \x01(\tR\aatsCode\"o\n" +
 	"\x12InitializeResponse\x12#\n" +
 	"\rhandler_names\x18\x01 \x03(\tR\fhandlerNames\x124\n" +
-	"\tschedules\x18\x02 \x03(\v2\x16.protocol.ScheduleInfoR\tschedules\"\x8a\x01\n" +
+	"\tschedules\x18\x02 \x03(\v2\x16.protocol.ScheduleInfoR\tschedules\"\xa0\x01\n" +
 	"\x11ExecuteJobRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12!\n" +
 	"\fhandler_name\x18\x02 \x01(\tR\vhandlerName\x12\x18\n" +
-	"\apayload\x18\x03 \x01(\fR\apayload\x12!\n" +
-	"\ftimeout_secs\x18\x04 \x01(\x03R\vtimeoutSecs\"\xae\x02\n" +
+	"\apayload\x18\x03 \x01(\fR\apayload\x12&\n" +
+	"\ftimeout_secs\x18\x04 \x01(\x03H\x00R\vtimeoutSecs\x88\x01\x01B\x0f\n" +
+	"\r_timeout_secs\"\xae\x02\n" +
 	"\x12ExecuteJobResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12\x16\n" +
@@ -1513,6 +1514,7 @@ func file_plugin_grpc_protocol_domain_proto_init() {
 	if File_plugin_grpc_protocol_domain_proto != nil {
 		return
 	}
+	file_plugin_grpc_protocol_domain_proto_msgTypes[12].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
