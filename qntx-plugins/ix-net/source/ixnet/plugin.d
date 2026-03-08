@@ -9,7 +9,6 @@
 ///     pagination or filtering.
 ///   - Cert paths resolved relative to executable — assumes certs/ is
 ///     a sibling of bin/. No config override.
-///   - Not added to am.toml plugin.enabled or installed via Makefile.
 module ixnet.plugin;
 
 import ixnet.proto;
@@ -373,6 +372,9 @@ private void autoStartProxy() {
             keyFile = "";
         }
     }
+
+    // Pass ATSClient to proxy for attestation writes
+    state.proxy.atsClient = cast(void*)&state.atsClient;
 
     if (startProxy(state.proxy, proxyPort, certFile, keyFile)) {
         state.capturing = true;
