@@ -192,13 +192,13 @@ func protoToFilter(proto *protocol.AttestationFilter) ats.AttestationFilter {
 		Contexts:   proto.Contexts,
 	}
 
-	if proto.TimeStart != 0 {
-		t := time.UnixMilli(proto.TimeStart)
+	if proto.TimeStart != nil {
+		t := time.UnixMilli(*proto.TimeStart)
 		filter.TimeStart = &t
 	}
 
-	if proto.TimeEnd != 0 {
-		t := time.UnixMilli(proto.TimeEnd)
+	if proto.TimeEnd != nil {
+		t := time.UnixMilli(*proto.TimeEnd)
 		filter.TimeEnd = &t
 	}
 
