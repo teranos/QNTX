@@ -143,13 +143,7 @@ class TooltipManager {
             this.hideImmediate();
 
             // Create new tooltip
-            this.tooltip = document.createElement('div');
-            this.tooltip.className = 'panel-tooltip';
-            if (this.config.position === 'top') {
-                this.tooltip.classList.add('panel-tooltip-top');
-            }
-            this.tooltip.textContent = text;
-            this.tooltip.style.maxWidth = `${this.config.maxWidth}px`;
+            this.tooltip = this.createTooltipElement(text);
 
             // Append to DOM before positioning (getBoundingClientRect needs element in DOM)
             document.body.appendChild(this.tooltip);
@@ -169,13 +163,7 @@ class TooltipManager {
         this.hideImmediate();
 
         // Create new tooltip
-        this.tooltip = document.createElement('div');
-        this.tooltip.className = 'panel-tooltip';
-        if (this.config.position === 'top') {
-            this.tooltip.classList.add('panel-tooltip-top');
-        }
-        this.tooltip.textContent = text;
-        this.tooltip.style.maxWidth = `${this.config.maxWidth}px`;
+        this.tooltip = this.createTooltipElement(text);
 
         // Append to DOM before positioning (getBoundingClientRect needs element in DOM)
         document.body.appendChild(this.tooltip);
@@ -194,6 +182,21 @@ class TooltipManager {
         }
         this.hideImmediate();
         this.currentTrigger = null;
+    }
+
+    /**
+     * Create a tooltip DOM element with proper semantics
+     */
+    private createTooltipElement(text: string): HTMLElement {
+        const el = document.createElement('div');
+        el.className = 'panel-tooltip';
+        el.setAttribute('role', 'tooltip');
+        if (this.config.position === 'top') {
+            el.classList.add('panel-tooltip-top');
+        }
+        el.textContent = text;
+        el.style.maxWidth = `${this.config.maxWidth}px`;
+        return el;
     }
 
     /**
