@@ -32,6 +32,7 @@ enum FrameType : ubyte {
 enum FrameFlags : ubyte {
     NONE         = 0x0,
     END_STREAM   = 0x1,
+    ACK          = 0x1,  // SETTINGS/PING ACK (same bit as END_STREAM, different frame types)
     END_HEADERS  = 0x4,
     PADDED       = 0x8,
     PRIORITY_FL  = 0x20,
@@ -118,7 +119,7 @@ bool sendSettings(Socket sock, uint streamId = 0) {
 
 /// Send a SETTINGS ACK.
 bool sendSettingsAck(Socket sock) {
-    return writeFrame(sock, FrameType.SETTINGS, FrameFlags.END_HEADERS, 0, []);
+    return writeFrame(sock, FrameType.SETTINGS, FrameFlags.ACK, 0, []);
 }
 
 /// Send a WINDOW_UPDATE frame.
@@ -157,7 +158,7 @@ ubyte[] grpcUnframe(const ubyte[] data) {
     // byte 0 = compressed flag (ignore)
     uint len = (cast(uint)data[1] << 24) | (cast(uint)data[2] << 16) |
                (cast(uint)data[3] << 8) | data[4];
-    if (5 + len > data.length) return data[5 .. $].dup; // partial
+    if (5 + len > data.length) return []; // partial frame, caller must handle
     return data[5 .. 5 + len].dup;
 }
 
@@ -261,7 +262,7 @@ struct GrpcServer {
 
             switch (frame.type) {
                 case FrameType.SETTINGS:
-                    if ((frame.flags & FrameFlags.END_HEADERS) == 0) {
+                    if ((frame.flags & FrameFlags.ACK) == 0) {
                         // Not an ACK — acknowledge it
                         sendSettingsAck(sock);
                     }
@@ -414,7 +415,7 @@ struct GrpcClient {
         int maxReads = 10;
         while (settingsAck !is null && maxReads > 0) {
             if (settingsAck.type == FrameType.SETTINGS &&
-                (settingsAck.flags & FrameFlags.END_HEADERS) != 0) {
+                (settingsAck.flags & FrameFlags.ACK) != 0) {
                 break; // Got ACK
             }
             settingsAck = readFrame(sock);

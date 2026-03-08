@@ -170,7 +170,10 @@ int extractImages(const(ubyte)[] body_, string outputDir, int captureNum) {
                 mkdirRecurse(outputDir);
                 write_(filename, cast(const(void)[])decoded);
                 saved++;
-            } catch (Exception) {}
+            } catch (Exception e) {
+                import ixnet.log;
+                logError("[ix-net] failed to write image %s: %s", filename, e.msg);
+            }
         }
 
         pos = dataIdx + b64.length;

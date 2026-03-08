@@ -479,6 +479,7 @@ private struct TLSBufReader {
             }
             // n == -1: would-block
             if (!waitForData()) return false;
+            return true; // waitForData filled buf
         }
     }
 
