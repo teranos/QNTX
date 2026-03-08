@@ -15,11 +15,8 @@
 /// Phase 3: Payload extraction (JSON body, base64 images).
 ///
 /// Known limitations:
-///   - Non-anthropic domains (github, datadog, statsig) fail TLS accept
-///     because the leaf cert only covers *.anthropic.com. These should
-///     fall back to blind relay instead of erroring.
-///   - TLSBufReader reads byte-by-byte — slow for large bodies (1MB+
-///     context windows). Should read in bulk from the TLS buffer.
+///   - Only api.anthropic.com is intercepted; all other domains use
+///     blind relay (no payload capture for non-anthropic traffic).
 ///   - readByte retries on would-block with 10ms sleep, up to 120s.
 ///     Busy-wait; should use select/poll on the underlying fd.
 ///   - Thread-per-connection — fine for single-user proxy, won't scale.
@@ -32,8 +29,7 @@
 ///     SSE framing splits the JSON across chunk boundaries.
 ///   - ATSStore attestation not wired up — captures are in the ring
 ///     buffer but never attested to QNTX.
-///   - Debug dump code (/tmp/ix-net-dump) and verbose relay logging
-///     still present — remove before release.
+///   - Debug dump code (/tmp/ix-net-dump) still present.
 ///   - API key visible in captured request headers (authorization header).
 ///   - OpenSSL linked from /usr/local/opt/openssl (homebrew path).
 ///   - Not yet tested as a QNTX plugin (only standalone mode verified).
@@ -228,8 +224,6 @@ private void handleConnection(ProxyState* state, Socket client) {
         if (line.length == 0) break;
     }
 
-    logInfo("[ix-net] proxy: CONNECT tunnel to %s", hostPort);
-
     // Connect to upstream
     auto upstream = connectUpstream(hostPort);
     if (upstream is null) {
@@ -242,12 +236,11 @@ private void handleConnection(ProxyState* state, Socket client) {
     // Tell client the tunnel is established
     sendResponse(client, "HTTP/1.1 200 Connection Established\r\n\r\n");
 
-    if (state.tlsEnabled) {
-        // Phase 2: TLS interception
+    if (state.tlsEnabled && isInterceptHost(hostPort)) {
+        // TLS interception for anthropic API traffic
         handleTLSInterception(state, client, upstream, hostPort);
     } else {
-        // Phase 1: blind relay
-        recordCapture(state, hostPort, "CONNECT", 0, 0);
+        // Blind relay for non-anthropic hosts or passthrough mode
         relay(client, upstream);
     }
 }
@@ -275,8 +268,6 @@ private void handleTLSInterception(ProxyState* state, Socket client,
     }
     scope(exit) tlsClose(upstreamTLS);
 
-    logInfo("[ix-net] proxy: TLS interception active for %s", hostPort);
-
     // Relay plaintext between the two TLS connections, capturing traffic
     tlsRelay(state, clientTLS, upstreamTLS, hostPort);
 }
@@ -293,35 +284,26 @@ private void tlsRelay(ProxyState* state, ref TLSConn clientTLS,
     // Handle one or more HTTP request/response pairs
     while (true) {
         // ---- Read request from client ----
-        logInfo("[ix-net] relay: reading request headers from client...");
         string reqHeaders = readHTTPHeaders(clientBuf);
-        if (reqHeaders.length == 0) { logInfo("[ix-net] relay: client closed"); break; }
+        if (reqHeaders.length == 0) break;
 
-        // Parse request line
         string method, path;
         parseRequestLine(cast(const ubyte[])reqHeaders, method, path);
-        logInfo("[ix-net] relay: got %s %s (%d header bytes)", method, path, reqHeaders.length);
 
         // Strip accept-encoding so upstream sends plaintext (not gzip/br)
-        // — we need readable response bodies for token/image extraction
         reqHeaders = stripHeader(reqHeaders, "accept-encoding");
 
         // Forward request headers to upstream
         if (tlsWrite(upstreamTLS, cast(const ubyte[])reqHeaders) <= 0) break;
 
-        // Get content-length from request headers
         size_t reqContentLen = parseContentLength(reqHeaders);
         size_t totalReqBytes = reqHeaders.length;
 
         // Read and forward request body
         ubyte[] reqBody;
         if (reqContentLen > 0) {
-            logInfo("[ix-net] relay: reading %d byte request body...", reqContentLen);
             reqBody = readAndForward(clientBuf, upstreamTLS, reqContentLen);
             totalReqBytes += reqBody.length;
-            logInfo("[ix-net] relay: forwarded %d/%d request body bytes", reqBody.length, reqContentLen);
-        } else {
-            logInfo("[ix-net] relay: no request body (content-length=0)");
         }
 
         // Extract request fields
@@ -332,35 +314,26 @@ private void tlsRelay(ProxyState* state, ref TLSConn clientTLS,
             enum IMG_DIR = "/tmp/ix-net-images";
             auto imgsSaved = extractImages(reqBody, IMG_DIR, state.captureCount);
             if (imgsSaved > 0) {
-                logInfo("[ix-net] saved %d images to %s (capture #%d)",
-                        imgsSaved, IMG_DIR, state.captureCount);
+                logInfo("[ix-net] saved %d images from capture #%d",
+                        imgsSaved, state.captureCount);
             }
         }
 
-        logInfo("[ix-net] relay: reading response from upstream for %s...", path);
         // ---- Read response from upstream ----
         string respHeaders = readHTTPHeaders(upstreamBuf);
-        if (respHeaders.length == 0) { logInfo("[ix-net] relay: upstream closed (no resp headers for %s)", path); break; }
-        logInfo("[ix-net] relay: got response headers (%d bytes) for %s", respHeaders.length, path);
+        if (respHeaders.length == 0) break;
 
         // Forward response headers to client
         if (tlsWrite(clientTLS, cast(const ubyte[])respHeaders) <= 0) break;
 
-        // Parse response status
         int statusCode = parseStatusCode(respHeaders);
-
-        // Determine response body handling
         bool isChunked = containsHeader(respHeaders, "transfer-encoding", "chunked");
         size_t respContentLen = parseContentLength(respHeaders);
         size_t totalRespBytes = respHeaders.length;
 
-        logInfo("[ix-net] relay: resp status=%d chunked=%s content-len=%d",
-                statusCode, isChunked ? "yes" : "no", respContentLen);
-
         ResponseInfo respInfo;
         ubyte[] respBody;
         if (isChunked) {
-            // Streaming/chunked: read chunks, forward, accumulate for extraction
             respBody = readAndForwardChunked(upstreamBuf, clientTLS);
             totalRespBytes += respBody.length;
             respInfo = extractStreamingResponse(respBody);
@@ -370,7 +343,7 @@ private void tlsRelay(ProxyState* state, ref TLSConn clientTLS,
             respInfo = extractResponse(respBody);
         }
 
-        // Debug: dump first /v1/messages exchange to /tmp/ix-net-dump/
+        // Debug: dump first /v1/messages exchange
         if (startsWith(path, "/v1/messages")) {
             import std.file : mkdirRecurse, write_ = write, exists;
             enum DUMP_DIR = "/tmp/ix-net-dump";
@@ -383,12 +356,11 @@ private void tlsRelay(ProxyState* state, ref TLSConn clientTLS,
                     write_(DUMP_DIR ~ "/resp-headers.txt", cast(const(void)[])respHeaders);
                     if (respBody.length > 0)
                         write_(DUMP_DIR ~ "/resp-body.txt", cast(const(void)[])respBody);
-                    logInfo("[ix-net] dumped /v1/messages exchange to %s", DUMP_DIR);
                 } catch (Exception) {}
             }
         }
 
-        // Record the capture with all extracted info
+        // Record the capture
         Capture cap;
         cap.method = method;
         cap.path = path.length > 0 ? path : hostPort;
@@ -411,7 +383,7 @@ private void tlsRelay(ProxyState* state, ref TLSConn clientTLS,
         state.captureHead = (state.captureHead + 1) % MAX_CAPTURES;
         state.captureCount++;
 
-        // Only log actual API calls, not telemetry/health noise
+        // Log only API calls — one line per exchange
         if (startsWith(path, "/v1/messages")) {
             logInfo("[ix-net] %s %s model=%s status=%d req=%dB resp=%dB images=%d in_tok=%d out_tok=%d",
                     method, path, reqInfo.model, statusCode,
@@ -437,36 +409,102 @@ private struct TLSBufReader {
     /// Retries on would-block (essential for streaming responses).
     int readByte() {
         if (eof) return -1;
+        if (pos < len) return buf[pos++];
+        if (!refill()) return -1;
+        return buf[pos++];
+    }
 
-        if (pos >= len) {
-            // Refill buffer — retry on would-block
-            int retries = 0;
-            while (true) {
-                int n = tlsRead(*conn, buf[]);
+    /// Bulk read into dest. Returns number of bytes read (0 on EOF).
+    /// Much faster than readByte() for large bodies.
+    size_t readBulk(ubyte[] dest) {
+        if (eof) return 0;
+        size_t total = 0;
+
+        // First, drain any buffered data
+        if (pos < len) {
+            size_t avail = len - pos;
+            size_t take = avail < dest.length ? avail : dest.length;
+            dest[0 .. take] = buf[pos .. pos + take];
+            pos += take;
+            total += take;
+            if (total >= dest.length) return total;
+        }
+
+        // For remaining data, read directly from TLS into dest (skip buffer)
+        while (total < dest.length) {
+            size_t remaining = dest.length - total;
+            // Read directly into destination for large reads
+            if (remaining >= buf.length) {
+                int n = tlsRead(*conn, dest[total .. $]);
                 if (n > 0) {
-                    pos = 0;
-                    len = n;
-                    break;
+                    total += n;
+                    continue;
                 } else if (n == 0) {
                     eof = true;
-                    return -1; // clean close
+                    return total;
                 } else if (n == -2) {
                     eof = true;
-                    return -1; // hard error
+                    return total;
                 }
-                // n == -1: would-block — retry with brief pause
-                // Streaming responses can pause for 60+ seconds during thinking
-                retries++;
-                if (retries > 12000) { // ~120 seconds of no data
-                    eof = true;
-                    return -1;
-                }
-                import core.thread : Thread;
-                import core.time : dur;
-                Thread.sleep(dur!"msecs"(10));
+                // would-block: retry
+                if (!waitForData()) return total;
+                continue;
             }
+            // Small remaining amount — use buffer
+            if (!refill()) return total;
+            size_t avail = len - pos;
+            size_t take = avail < remaining ? avail : remaining;
+            dest[total .. total + take] = buf[pos .. pos + take];
+            pos += take;
+            total += take;
         }
-        return buf[pos++];
+        return total;
+    }
+
+    /// Refill internal buffer. Returns false on EOF/error.
+    private bool refill() {
+        int retries = 0;
+        while (true) {
+            int n = tlsRead(*conn, buf[]);
+            if (n > 0) {
+                pos = 0;
+                len = n;
+                return true;
+            } else if (n == 0) {
+                eof = true;
+                return false;
+            } else if (n == -2) {
+                eof = true;
+                return false;
+            }
+            // n == -1: would-block
+            if (!waitForData()) return false;
+        }
+    }
+
+    /// Wait for data with retry. Returns false on timeout.
+    private bool waitForData() {
+        import core.thread : Thread;
+        import core.time : dur;
+        // Streaming responses can pause for 60+ seconds during thinking
+        int retries = 0;
+        while (true) {
+            int n = tlsRead(*conn, buf[]);
+            if (n > 0) {
+                pos = 0;
+                len = n;
+                return true;
+            } else if (n == 0 || n == -2) {
+                eof = true;
+                return false;
+            }
+            retries++;
+            if (retries > 12000) { // ~120 seconds
+                eof = true;
+                return false;
+            }
+            Thread.sleep(dur!"msecs"(10));
+        }
     }
 }
 
@@ -498,31 +536,17 @@ private string readHTTPHeaders(ref TLSBufReader reader) {
 /// Read exactly `n` bytes from reader and forward to dest TLS conn.
 /// Returns the accumulated body.
 private ubyte[] readAndForward(ref TLSBufReader reader, ref TLSConn dest, size_t n) {
-    ubyte[] body_;
-    body_.reserve(n);
-    ubyte[16384] chunk;
-    size_t remaining = n;
+    ubyte[] body_ = new ubyte[](n);
+    size_t total = 0;
 
-    while (remaining > 0) {
-        size_t toRead = remaining < chunk.length ? remaining : chunk.length;
-        size_t got = 0;
-        foreach (i; 0 .. toRead) {
-            int b = reader.readByte();
-            if (b < 0) {
-                // Forward what we have and return
-                if (got > 0) {
-                    tlsWrite(dest, chunk[0 .. got]);
-                    body_ ~= chunk[0 .. got];
-                }
-                return body_;
-            }
-            chunk[got++] = cast(ubyte)b;
-        }
-        tlsWrite(dest, chunk[0 .. got]);
-        body_ ~= chunk[0 .. got];
-        remaining -= got;
+    while (total < n) {
+        auto got = reader.readBulk(body_[total .. n]);
+        if (got == 0) break;
+        tlsWrite(dest, body_[total .. total + got]);
+        total += got;
     }
-    return body_;
+
+    return body_[0 .. total];
 }
 
 /// Read chunked transfer encoding from reader, forward each chunk immediately.
@@ -559,27 +583,19 @@ private ubyte[] readAndForwardChunked(ref TLSBufReader reader, ref TLSConn dest)
             break;
         }
 
-        // Read chunk data and forward immediately
-        ubyte[16384] chunkBuf;
-        size_t remaining = chunkSize;
-        while (remaining > 0) {
-            size_t toRead = remaining < chunkBuf.length ? remaining : chunkBuf.length;
-            size_t got = 0;
-            foreach (i; 0 .. toRead) {
-                int b = reader.readByte();
-                if (b < 0) {
-                    if (got > 0) {
-                        tlsWrite(dest, chunkBuf[0 .. got]);
-                        body_ ~= chunkBuf[0 .. got];
-                    }
-                    return body_;
-                }
-                chunkBuf[got++] = cast(ubyte)b;
+        // Read chunk data in bulk and forward immediately
+        ubyte[] chunkData = new ubyte[](chunkSize);
+        size_t total = 0;
+        while (total < chunkSize) {
+            auto got = reader.readBulk(chunkData[total .. chunkSize]);
+            if (got == 0) {
+                body_ ~= chunkData[0 .. total];
+                return body_;
             }
-            tlsWrite(dest, chunkBuf[0 .. got]);
-            body_ ~= chunkBuf[0 .. got];
-            remaining -= got;
+            tlsWrite(dest, chunkData[total .. total + got]);
+            total += got;
         }
+        body_ ~= chunkData;
 
         // Read and forward trailing \r\n after chunk data
         ubyte[2] crlf;
@@ -833,6 +849,15 @@ private ptrdiff_t lastIndexOfChar(string s, char c) {
 private bool startsWith(string s, string prefix) {
     if (prefix.length > s.length) return false;
     return s[0 .. prefix.length] == prefix;
+}
+
+/// Check if a host:port should be TLS-intercepted (vs blind relay).
+/// Only intercept hosts we have a leaf cert for.
+private bool isInterceptHost(string hostPort) {
+    // Extract hostname (strip :port)
+    auto colonIdx = lastIndexOfChar(hostPort, ':');
+    string host = colonIdx > 0 ? hostPort[0 .. colonIdx] : hostPort;
+    return host == "api.anthropic.com";
 }
 
 /// Remove a header line by name (case-insensitive) from HTTP headers block.
