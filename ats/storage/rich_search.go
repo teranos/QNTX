@@ -168,6 +168,7 @@ func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit 
 			a.attributes
 		FROM attestations a
 		WHERE a.attributes IS NOT NULL
+			AND json_valid(a.attributes) = 1
 			AND (%s)
 		ORDER BY a.timestamp DESC
 		LIMIT 500
