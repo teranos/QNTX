@@ -15,7 +15,7 @@ import type { Glyph } from './glyph';
 const AUTH_GLYPH_ID = 'auth';
 
 function bufferDecode(value: string): ArrayBuffer {
-    const s = value.replace(/-/g, '+').replace(/_/g, '/');
+    const s = value.split('-').join('+').split('_').join('/');
     const pad = s.length % 4 === 0 ? '' : '='.repeat(4 - (s.length % 4));
     const raw = atob(s + pad);
     const arr = new Uint8Array(raw.length);
@@ -27,7 +27,7 @@ function bufferEncode(buffer: ArrayBuffer): string {
     const bytes = new Uint8Array(buffer);
     let s = '';
     for (const b of bytes) s += String.fromCharCode(b);
-    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    return btoa(s).split('+').join('-').split('/').join('_').split('=').join('');
 }
 
 function renderAuthContent(): HTMLElement {
