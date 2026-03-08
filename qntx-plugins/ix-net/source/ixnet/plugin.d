@@ -2,6 +2,14 @@
 ///
 /// Metadata, lifecycle, HTTP handlers, glyph definition, and proxy control
 /// for Claude Code API traffic capture.
+///
+/// Known limitations:
+///   - Glyph UI is a placeholder (static text, no live capture display).
+///   - /captures endpoint returns JSON from ring buffer but has no
+///     pagination or filtering.
+///   - Cert paths resolved relative to executable — assumes certs/ is
+///     a sibling of bin/. No config override.
+///   - Not added to am.toml plugin.enabled or installed via Makefile.
 module ixnet.plugin;
 
 import ixnet.proto;

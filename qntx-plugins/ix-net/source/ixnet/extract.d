@@ -114,6 +114,96 @@ ResponseInfo extractStreamingResponse(const(ubyte)[] body_) {
     return info;
 }
 
+/// Extract and save base64 images from a Claude API request body.
+/// Writes decoded images to outputDir/capture-N-img-M.ext
+/// Returns the number of images saved.
+int extractImages(const(ubyte)[] body_, string outputDir, int captureNum) {
+    if (body_.length == 0) return 0;
+
+    auto json = cast(string)body_;
+    int saved = 0;
+
+    // Find each "type":"image" block and extract the base64 data
+    size_t pos = 0;
+    while (pos < json.length) {
+        // Look for image source blocks: "type":"base64"
+        auto idx = findSubstring(json, `"type":"base64"`, pos);
+        if (idx < 0) break;
+
+        // Find "media_type" near this block (within 200 chars before)
+        size_t searchStart = idx > 200 ? idx - 200 : 0;
+        auto mediaIdx = findSubstring(json, `"media_type"`, searchStart);
+        string ext = "bin";
+        if (mediaIdx >= 0 && mediaIdx < idx + 50) {
+            auto mediaType = extractStringValue(json[mediaIdx .. $], `"media_type"`);
+            if (mediaType == "image/png") ext = "png";
+            else if (mediaType == "image/jpeg") ext = "jpeg";
+            else if (mediaType == "image/gif") ext = "gif";
+            else if (mediaType == "image/webp") ext = "webp";
+        }
+
+        // Find "data":"<base64>" after this position
+        auto dataIdx = findSubstring(json, `"data"`, idx);
+        if (dataIdx < 0 || dataIdx > idx + 100) { pos = idx + 15; continue; }
+
+        // Extract the base64 string value
+        auto b64 = extractStringValue(json[dataIdx .. $], `"data"`);
+        if (b64.length == 0) { pos = idx + 15; continue; }
+
+        // Decode base64 and write to file
+        auto decoded = decodeBase64(b64);
+        if (decoded.length > 0) {
+            import std.format : format;
+            auto filename = format("%s/capture-%d-img-%d.%s",
+                                   outputDir, captureNum, saved, ext);
+            try {
+                import std.file : mkdirRecurse, write_ = write;
+                mkdirRecurse(outputDir);
+                write_(filename, cast(const(void)[])decoded);
+                saved++;
+            } catch (Exception) {}
+        }
+
+        pos = dataIdx + b64.length;
+    }
+    return saved;
+}
+
+// ---------------------------------------------------------------------------
+// Base64 decoder
+// ---------------------------------------------------------------------------
+
+private ubyte[] decodeBase64(string input) {
+    static immutable ubyte[256] TABLE = () {
+        ubyte[256] t;
+        t[] = 0xFF;
+        foreach (i, c; "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/") {
+            t[c] = cast(ubyte)i;
+        }
+        t['='] = 0;
+        return t;
+    }();
+
+    ubyte[] output;
+    output.reserve(input.length * 3 / 4);
+
+    uint buf = 0;
+    int bits = 0;
+    foreach (c; input) {
+        if (c == '\n' || c == '\r' || c == ' ') continue;
+        if (c == '=') break;
+        ubyte val = TABLE[c];
+        if (val == 0xFF) continue;
+        buf = (buf << 6) | val;
+        bits += 6;
+        if (bits >= 8) {
+            bits -= 8;
+            output ~= cast(ubyte)((buf >> bits) & 0xFF);
+        }
+    }
+    return output;
+}
+
 // ---------------------------------------------------------------------------
 // String-based JSON field extraction
 // ---------------------------------------------------------------------------
