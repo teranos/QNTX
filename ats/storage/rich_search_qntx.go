@@ -54,6 +54,7 @@ func (bs *BoundedStore) searchFuzzyWithEngine(ctx context.Context, query string,
 			a.attributes
 		FROM attestations a
 		WHERE a.attributes IS NOT NULL
+			AND json_valid(a.attributes) = 1
 			AND (%s)
 		ORDER BY a.timestamp DESC
 		LIMIT 500

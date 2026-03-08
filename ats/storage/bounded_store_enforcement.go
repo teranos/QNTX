@@ -6,6 +6,32 @@ import (
 )
 
 const (
+	// SQL queries used by enforceLimits to count and delete attestations
+	AttestationCountByActorContextQuery = `
+		SELECT COUNT(*) FROM attestations
+		WHERE EXISTS (
+			SELECT 1 FROM json_each(attestations.actors)
+			WHERE value = ?
+		) AND EXISTS (
+			SELECT 1 FROM json_each(attestations.contexts)
+			WHERE value = ? COLLATE NOCASE
+		)`
+
+	AttestationDeleteOldestByActorContextQuery = `
+		DELETE FROM attestations
+		WHERE id IN (
+			SELECT id FROM attestations
+			WHERE EXISTS (
+				SELECT 1 FROM json_each(attestations.actors)
+				WHERE value = ?
+			) AND EXISTS (
+				SELECT 1 FROM json_each(attestations.contexts)
+				WHERE value = ? COLLATE NOCASE
+			)
+			ORDER BY timestamp ASC
+			LIMIT ?
+		)`
+
 	// SQL query to get actor contexts with usage counts for limit enforcement
 	queryActorContexts = `
 		SELECT DISTINCT json_extract(contexts, '$') as context_array, COUNT(*) as usage_count

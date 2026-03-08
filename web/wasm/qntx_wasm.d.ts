@@ -220,10 +220,10 @@ export interface InitOutput {
     readonly sync_merkle_remove: (a: number, b: number) => [number, number];
     readonly sync_merkle_root: () => [number, number];
     readonly version: () => [number, number];
-    readonly wasm_bindgen__closure__destroy__h63454322f75c3832: (a: number, b: number) => void;
+    readonly wasm_bindgen__closure__destroy__h182a2abd191e3067: (a: number, b: number) => void;
     readonly wasm_bindgen__closure__destroy__h622d11ff1c80a730: (a: number, b: number) => void;
     readonly wasm_bindgen__convert__closures_____invoke__h0970674685b3ee7c: (a: number, b: number, c: any, d: any) => void;
-    readonly wasm_bindgen__convert__closures_____invoke__h857fdb0c9bdea0c8: (a: number, b: number, c: any) => void;
+    readonly wasm_bindgen__convert__closures_____invoke__h768c0c6f6cd75d67: (a: number, b: number, c: any) => void;
     readonly wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

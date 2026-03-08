@@ -560,7 +560,7 @@ func (h *Handlers) HandlePromptList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db := h.plugin.Services().Database()
-	store := prompt.NewPromptStore(db)
+	store := prompt.NewPromptStore(db, h.plugin.Services().ATSStore())
 	prompts, err := store.ListPrompts(r.Context(), 100)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to list prompts: %v", err))
@@ -596,7 +596,7 @@ func (h *Handlers) HandlePromptSave(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db := h.plugin.Services().Database()
-	store := prompt.NewPromptStore(db)
+	store := prompt.NewPromptStore(db, h.plugin.Services().ATSStore())
 	storedPrompt := &prompt.StoredPrompt{
 		Name:         req.Name,
 		Template:     req.Template,
@@ -623,7 +623,7 @@ func (h *Handlers) handlePromptGet(w http.ResponseWriter, r *http.Request, promp
 	}
 
 	db := h.plugin.Services().Database()
-	store := prompt.NewPromptStore(db)
+	store := prompt.NewPromptStore(db, h.plugin.Services().ATSStore())
 	p, err := store.GetPromptByID(r.Context(), promptID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get prompt: %v", err))
@@ -645,7 +645,7 @@ func (h *Handlers) handlePromptVersions(w http.ResponseWriter, r *http.Request, 
 	}
 
 	db := h.plugin.Services().Database()
-	store := prompt.NewPromptStore(db)
+	store := prompt.NewPromptStore(db, h.plugin.Services().ATSStore())
 	versions, err := store.GetPromptVersions(r.Context(), promptName, 16)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get prompt versions: %v", err))

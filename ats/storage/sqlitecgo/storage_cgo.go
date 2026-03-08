@@ -119,6 +119,12 @@ func (rs *RustStore) CreateAttestation(as *types.As) error {
 	return nil
 }
 
+// CreateAttestationInbound stores a synced attestation without signing (preserves provenance).
+func (rs *RustStore) CreateAttestationInbound(as *types.As) error {
+	// Same as CreateAttestation — Rust does the raw INSERT, signing is Go's concern
+	return rs.CreateAttestation(as)
+}
+
 // GetAttestation retrieves an attestation by ID (implements ats.AttestationStore).
 func (rs *RustStore) GetAttestation(id string) (*types.As, error) {
 	if rs.store == nil {
@@ -255,13 +261,12 @@ func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *type
 	if len(cmd.Predicates) > 0 {
 		predicate = cmd.Predicates[0]
 	}
-	context := "_"
+	ctxStr := "_"
 	if len(cmd.Contexts) > 0 {
-		context = cmd.Contexts[0]
+		ctxStr = cmd.Contexts[0]
 	}
 
-	// Import id package for vanity generation
-	asid, err := id.GenerateASIDWithVanityAndRetry(subject, predicate, context, "", checkExists)
+	asid, err := id.GenerateASIDWithVanityAndRetry(subject, predicate, ctxStr, "", checkExists)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate vanity ASID")
 	}
@@ -286,14 +291,15 @@ func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As,
 		return nil, errors.New("store is closed")
 	}
 
-	// Convert Go filter to Rust-compatible JSON format
+	// Convert Go filter to Rust-compatible JSON format.
+	// omitempty prevents nil slices from marshaling as null (Rust expects missing or []).
 	rustFilter := struct {
-		Subjects   []string `json:"subjects"`
-		Predicates []string `json:"predicates"`
-		Contexts   []string `json:"contexts"`
-		Actors     []string `json:"actors"`
-		TimeStart  *int64   `json:"time_start,omitempty"` // Unix milliseconds
-		TimeEnd    *int64   `json:"time_end,omitempty"`   // Unix milliseconds
+		Subjects   []string `json:"subjects,omitempty"`
+		Predicates []string `json:"predicates,omitempty"`
+		Contexts   []string `json:"contexts,omitempty"`
+		Actors     []string `json:"actors,omitempty"`
+		TimeStart  *int64   `json:"time_start,omitempty"`
+		TimeEnd    *int64   `json:"time_end,omitempty"`
 		Limit      int      `json:"limit,omitempty"`
 	}{
 		Subjects:   filter.Subjects,

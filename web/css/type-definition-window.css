@@ -1,6 +1,6 @@
 /**
  * Type Definition Window Styles
- * Floating window for configuring type field metadata
+ * Dark-mode first per CLAUDE.md
  */
 
 /* Window content container */
@@ -22,7 +22,7 @@
     margin-bottom: 6px;
     font-size: var(--font-size-sm);
     font-weight: 600;
-    color: var(--panel-text-secondary, #666);
+    color: var(--text-secondary, #999);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -32,16 +32,16 @@
     padding: var(--panel-padding-sm);
     font-size: var(--font-size-md);
     font-family: 'JetBrains Mono', monospace;
-    background: var(--panel-bg, #fff);
-    border: 1px solid var(--panel-border-color, #e0e0e0);
+    background: var(--panel-bg, #1a1a1a);
+    border: 1px solid var(--panel-border-color, #333);
     border-radius: var(--border-radius);
-    color: var(--panel-text-primary, #333);
+    color: var(--text-primary, #e0e0e0);
 }
 
 .form-input:focus {
     outline: none;
-    border-color: var(--accent-color, #0066cc);
-    box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+    border-color: var(--accent-color, #4a9eff);
+    box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.15);
 }
 
 /* Color input wrapper */
@@ -54,7 +54,7 @@
 .form-color {
     width: 60px;
     height: 36px;
-    border: 1px solid var(--panel-border-color, #e0e0e0);
+    border: 1px solid var(--panel-border-color, #333);
     border-radius: var(--border-radius);
     cursor: pointer;
 }
@@ -71,7 +71,7 @@
     justify-content: flex-end;
     margin-top: 20px;
     padding-top: 16px;
-    border-top: 1px solid var(--panel-border-color, #e0e0e0);
+    border-top: 1px solid var(--panel-border-color, #333);
 }
 
 .btn {
@@ -85,29 +85,29 @@
 }
 
 .btn-primary {
-    background: var(--accent-color, #0066cc);
+    background: var(--accent-color, #4a9eff);
     color: white;
 }
 
 .btn-primary:hover {
-    background: var(--accent-hover, #0052a3);
+    background: var(--accent-hover, #3a8eef);
 }
 
 .btn-secondary {
-    background: var(--panel-bg-secondary, #f0f0f0);
-    color: var(--panel-text-primary, #333);
-    border: 1px solid var(--panel-border-color, #e0e0e0);
+    background: var(--panel-bg-secondary, #252525);
+    color: var(--text-primary, #e0e0e0);
+    border: 1px solid var(--panel-border-color, #333);
 }
 
 .btn-secondary:hover {
-    background: var(--panel-bg-hover, #e8e8e8);
+    background: var(--panel-bg-hover, #2a2a2a);
 }
 
 /* Type header section */
 .type-def-header {
     padding: 12px;
     border-bottom: var(--panel-border);
-    background: var(--panel-bg-secondary, #f8f8f8);
+    background: var(--panel-bg-secondary, #1e1e1e);
 }
 
 .type-def-title {
@@ -119,12 +119,12 @@
 .type-def-name {
     font-weight: 600;
     font-size: var(--font-size-md);
-    color: var(--panel-text-primary, #333);
+    color: var(--text-primary, #e0e0e0);
     font-family: 'JetBrains Mono', monospace;
 }
 
 .type-def-label {
-    color: var(--panel-text-secondary, #666);
+    color: var(--text-secondary, #999);
     font-size: var(--font-size-sm);
 }
 
@@ -132,7 +132,7 @@
     width: 20px;
     height: 20px;
     border-radius: var(--border-radius);
-    border: 1px solid var(--panel-border-color, #ddd);
+    border: 1px solid var(--panel-border-color, #444);
 }
 
 /* Fields section */
@@ -144,7 +144,7 @@
     margin: 0 0 12px 0;
     font-size: var(--font-size-md);
     font-weight: 600;
-    color: var(--panel-text-primary, #333);
+    color: var(--text-primary, #e0e0e0);
 }
 
 /* Field list */
@@ -160,40 +160,39 @@
     justify-content: space-between;
     align-items: center;
     padding: var(--panel-padding-sm);
-    background: var(--panel-bg, #fff);
-    border: 1px solid var(--panel-border-color, #e0e0e0);
+    background: var(--panel-bg, #1a1a1a);
+    border: 1px solid var(--panel-border-color, #333);
     border-radius: var(--border-radius);
     cursor: pointer;
     transition: var(--panel-transition-normal);
 }
 
 .field-item:hover {
-    background: var(--panel-bg-hover, #f8f8f8);
-    border-color: var(--accent-color, #0066cc);
+    background: var(--panel-bg-hover, #252525);
+    border-color: var(--accent-color, #4a9eff);
 }
 
 .field-item.selected {
-    background: var(--accent-bg, #e6f2ff);
-    border-color: var(--accent-color, #0066cc);
-    box-shadow: 0 0 0 1px var(--accent-color, #0066cc);
+    background: rgba(74, 158, 255, 0.1);
+    border-color: var(--accent-color, #4a9eff);
+    box-shadow: 0 0 0 1px var(--accent-color, #4a9eff);
 }
 
 /* Rich string field highlighting - using search yellow */
 .field-item.searchable-field {
     background: linear-gradient(90deg,
-        rgba(255, 235, 59, 0.1) 0%,
-        rgba(255, 235, 59, 0.05) 100%);
+        rgba(255, 235, 59, 0.08) 0%,
+        rgba(255, 235, 59, 0.03) 100%);
 }
 
 .field-item.searchable-field .field-name {
-    color: #333;
-    text-shadow: 0 0 8px rgba(255, 235, 59, 0.4);
+    color: #e8d88a;
 }
 
 .field-item.searchable-field.selected {
     background: linear-gradient(90deg,
-        rgba(255, 235, 59, 0.2) 0%,
-        rgba(230, 242, 255, 1) 100%);
+        rgba(255, 235, 59, 0.15) 0%,
+        rgba(74, 158, 255, 0.1) 100%);
 }
 
 /* Field name */
@@ -201,7 +200,7 @@
     font-family: 'JetBrains Mono', monospace;
     font-size: var(--font-size-sm);
     font-weight: 500;
-    color: var(--panel-text-primary, #333);
+    color: var(--text-primary, #e0e0e0);
 }
 
 /* Field indicators */
@@ -232,7 +231,7 @@
     gap: var(--gap);
     margin-top: 8px;
     padding-top: 8px;
-    border-top: 1px dashed var(--panel-border-color, #e0e0e0);
+    border-top: 1px dashed var(--panel-border-color, #333);
 }
 
 .add-field-input {
@@ -240,23 +239,23 @@
     padding: 6px 10px;
     font-family: 'JetBrains Mono', monospace;
     font-size: var(--font-size-sm);
-    background: var(--panel-bg, #fff);
-    border: 1px solid var(--panel-border-color, #e0e0e0);
+    background: var(--panel-bg, #1a1a1a);
+    border: 1px solid var(--panel-border-color, #333);
     border-radius: var(--border-radius);
-    color: var(--panel-text-primary, #333);
+    color: var(--text-primary, #e0e0e0);
 }
 
 .add-field-input:focus {
     outline: none;
-    border-color: var(--accent-color, #0066cc);
-    box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+    border-color: var(--accent-color, #4a9eff);
+    box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.15);
 }
 
 .add-field-btn {
     padding: 6px 16px;
     font-size: var(--font-size-md);
     font-weight: 600;
-    background: var(--accent-color, #0066cc);
+    background: var(--accent-color, #4a9eff);
     color: white;
     border: none;
     border-radius: var(--border-radius);
@@ -265,13 +264,13 @@
 }
 
 .add-field-btn:hover {
-    background: var(--accent-hover, #0052a3);
+    background: var(--accent-hover, #3a8eef);
 }
 
 /* Field controls section */
 .field-controls {
     padding: 12px;
-    background: var(--panel-bg-secondary, #f8f8f8);
+    background: var(--panel-bg-secondary, #1e1e1e);
     border-top: var(--panel-border);
 }
 
@@ -280,7 +279,7 @@
     font-size: var(--font-size-sm);
     font-weight: 600;
     text-transform: uppercase;
-    color: var(--panel-text-secondary, #666);
+    color: var(--text-secondary, #999);
     letter-spacing: 0.5px;
 }
 
@@ -310,11 +309,11 @@
 .field-option span:first-of-type {
     font-size: var(--font-size-md);
     font-weight: 500;
-    color: var(--panel-text-primary, #333);
+    color: var(--text-primary, #e0e0e0);
 }
 
 .field-option-desc {
     font-size: var(--font-size-sm);
-    color: var(--panel-text-secondary, #666);
+    color: var(--text-secondary, #999);
     margin-top: 2px;
 }

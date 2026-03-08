@@ -8,7 +8,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/ats/storage/testutil"
 	"github.com/teranos/QNTX/ats/types"
 )
 
@@ -19,10 +18,9 @@ import (
 // A librarian catalogs 20 different scrolls about 20 different subjects.
 // Each subject gets its own shelf (context), so no scrolls are discarded.
 func TestBoundedStorage_DoesNotDeleteDifferentContexts(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	rustStore, db := createTestStore(t)
 
-	store := NewBoundedStore(db, nil)
+	store := NewBoundedStore(db, rustStore, nil)
 	librarian := "hypatia@alexandria"
 
 	// Create 20 attestations with DIFFERENT contexts (different subjects = different shelves)
@@ -70,10 +68,9 @@ func TestBoundedStorage_DoesNotDeleteDifferentContexts(t *testing.T) {
 // A librarian tries to shelve 20 astronomy scrolls, but the astronomy shelf
 // only has room for 16. The oldest 4 scrolls are moved to archives (deleted).
 func TestBoundedStorage_DeletesWhenExceeding16PerActorContext(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	rustStore, db := createTestStore(t)
 
-	store := NewBoundedStore(db, nil)
+	store := NewBoundedStore(db, rustStore, nil)
 	librarian := "ptolemy@alexandria"
 	subject := "Astronomy" // All scrolls about the same subject
 
@@ -123,10 +120,9 @@ func TestBoundedStorage_DeletesWhenExceeding16PerActorContext(t *testing.T) {
 // A librarian manages two overfull shelves: Philosophy (17 scrolls) and Medicine (17 scrolls).
 // Each shelf independently archives its oldest scroll. Philosophy doesn't affect Medicine.
 func TestBoundedStorage_DoesNotDeleteCrossingContextBoundaries(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	rustStore, db := createTestStore(t)
 
-	store := NewBoundedStore(db, nil)
+	store := NewBoundedStore(db, rustStore, nil)
 	librarian := "eratosthenes@alexandria"
 
 	// Shelve 17 Philosophy scrolls (shelf holds 16)
@@ -182,10 +178,9 @@ func TestBoundedStorage_DoesNotDeleteCrossingContextBoundaries(t *testing.T) {
 // TestBoundedStorage_MixedContextsPreservation validates a realistic domain scenario:
 // Mix of empty contexts and valued contexts, ensuring valued contexts are preserved
 func TestBoundedStorage_MixedContextsPreservation(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	rustStore, db := createTestStore(t)
 
-	store := NewBoundedStore(db, nil)
+	store := NewBoundedStore(db, rustStore, nil)
 	actor := "test@domain-integration"
 
 	// Simulate domain pattern: First create many empty-context attestations
@@ -254,10 +249,9 @@ func TestBoundedStorage_MixedContextsPreservation(t *testing.T) {
 // TestBoundedStorage_ExactDomainReproduction reproduces a realistic E2E test scenario
 // with the order and types of attestations that a typical domain generates
 func TestBoundedStorage_ExactDomainReproduction(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	rustStore, db := createTestStore(t)
 
-	store := NewBoundedStore(db, nil)
+	store := NewBoundedStore(db, rustStore, nil)
 	actor := "test@domain-integration"
 
 	// Simulate processing 9 entities, each generating:

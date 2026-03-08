@@ -170,26 +170,26 @@ func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, ov
 
 	for _, pred := range numericPredicates {
 		if strings.HasSuffix(pred, "_duration_s") ||
-		   strings.HasSuffix(pred, "_duration_sec") ||
-		   strings.HasSuffix(pred, "_duration_seconds") {
+			strings.HasSuffix(pred, "_duration_sec") ||
+			strings.HasSuffix(pred, "_duration_seconds") {
 			usesSeconds = true
 			break
 		}
 		if strings.HasSuffix(pred, "_duration_m") ||
-		   strings.HasSuffix(pred, "_duration_min") ||
-		   strings.HasSuffix(pred, "_duration_minutes") {
+			strings.HasSuffix(pred, "_duration_min") ||
+			strings.HasSuffix(pred, "_duration_minutes") {
 			usesMinutes = true
 			break
 		}
 		if strings.HasSuffix(pred, "_duration_h") ||
-		   strings.HasSuffix(pred, "_duration_hr") ||
-		   strings.HasSuffix(pred, "_duration_hours") {
+			strings.HasSuffix(pred, "_duration_hr") ||
+			strings.HasSuffix(pred, "_duration_hours") {
 			usesHours = true
 			break
 		}
 		if strings.HasSuffix(pred, "_duration_y") ||
-		   strings.HasSuffix(pred, "_duration_yr") ||
-		   strings.HasSuffix(pred, "_duration_years") {
+			strings.HasSuffix(pred, "_duration_yr") ||
+			strings.HasSuffix(pred, "_duration_years") {
 			usesYears = true
 			break
 		}
@@ -259,15 +259,15 @@ func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, ov
 	}
 
 	// Build temporal filter for subquery if present
-	// Use RFC3339 format for full timestamp comparison
+	// Use UTC RFC3339 format to match Rust-stored timestamps
 	temporalFilter := ""
 	if filter.TimeStart != nil {
 		temporalFilter = " AND json_extract(attributes, '$.start_time') >= ?"
-		qb.args = append(qb.args, filter.TimeStart.Format(time.RFC3339))
+		qb.args = append(qb.args, filter.TimeStart.UTC().Format(time.RFC3339))
 	}
 	if filter.TimeEnd != nil {
 		temporalFilter += " AND json_extract(attributes, '$.start_time') <= ?"
-		qb.args = append(qb.args, filter.TimeEnd.Format(time.RFC3339))
+		qb.args = append(qb.args, filter.TimeEnd.UTC().Format(time.RFC3339))
 	}
 
 	// Aggregation subquery: GROUP BY subject, SUM durations, filter by threshold
@@ -323,15 +323,17 @@ func (qb *queryBuilder) buildLegacyOverComparison(numericPredicates []string, ov
 }
 
 // buildTemporalFilters adds timestamp range filters
+// Timestamps are stored as UTC RFC3339 strings by the Rust backend,
+// so we compare against UTC RFC3339 formatted strings.
 func (qb *queryBuilder) buildTemporalFilters(filter types.AxFilter) {
 	// TimeStart is exclusive (>) to exclude exact boundary matches
 	if filter.TimeStart != nil {
-		qb.addClause("timestamp > ?", filter.TimeStart)
+		qb.addClause("timestamp > ?", filter.TimeStart.UTC().Format(time.RFC3339))
 	}
 
 	// TimeEnd is inclusive (<=) to include items up to and including the end time
 	if filter.TimeEnd != nil {
-		qb.addClause("timestamp <= ?", filter.TimeEnd)
+		qb.addClause("timestamp <= ?", filter.TimeEnd.UTC().Format(time.RFC3339))
 	}
 }
 
@@ -339,12 +341,12 @@ func (qb *queryBuilder) buildTemporalFilters(filter types.AxFilter) {
 // This filters activities by when they occurred, not when attestations were created.
 // Used for temporal aggregation queries like "since last 10 years" on experience/activity data.
 func (qb *queryBuilder) buildMetadataTemporalFilters(filter types.AxFilter) {
-	// Use RFC3339 format for full timestamp comparison, matching the aggregation subquery
+	// Use UTC RFC3339 format to match Rust-stored timestamps
 	if filter.TimeStart != nil {
-		qb.addClause("json_extract(attributes, '$.start_time') >= ?", filter.TimeStart.Format(time.RFC3339))
+		qb.addClause("json_extract(attributes, '$.start_time') >= ?", filter.TimeStart.UTC().Format(time.RFC3339))
 	}
 
 	if filter.TimeEnd != nil {
-		qb.addClause("json_extract(attributes, '$.start_time') <= ?", filter.TimeEnd.Format(time.RFC3339))
+		qb.addClause("json_extract(attributes, '$.start_time') <= ?", filter.TimeEnd.UTC().Format(time.RFC3339))
 	}
 }

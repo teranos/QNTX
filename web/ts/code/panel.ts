@@ -141,9 +141,50 @@ class GoEditorPanel extends BasePanel {
 
     protected beforeHide(): boolean {
         if (this.hasUnsavedChanges) {
-            return confirm('You have unsaved changes. Close anyway?');
+            this.showCloseConfirmation();
+            return false;
         }
         return true;
+    }
+
+    private showCloseConfirmation(): void {
+        if (!this.panel) return;
+
+        // Don't add duplicate confirmation bars
+        if (this.panel.querySelector('.panel-confirm-bar')) return;
+
+        const bar = document.createElement('div');
+        bar.className = 'panel-confirm-bar';
+        bar.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--warning-bg, #2a2000);border-bottom:1px solid var(--warning-border, #665500);font-size:12px;color:var(--text-primary);';
+
+        const msg = document.createElement('span');
+        msg.textContent = 'You have unsaved changes.';
+        msg.style.flex = '1';
+
+        const discardBtn = document.createElement('button');
+        discardBtn.className = 'btn btn-danger';
+        discardBtn.textContent = 'Discard and close';
+        discardBtn.style.cssText = 'font-size:12px;padding:2px 10px;';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'btn btn-secondary';
+        cancelBtn.textContent = 'Keep editing';
+        cancelBtn.style.cssText = 'font-size:12px;padding:2px 10px;';
+
+        discardBtn.addEventListener('click', () => {
+            this.hasUnsavedChanges = false;
+            bar.remove();
+            this.hide();
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            bar.remove();
+        });
+
+        bar.appendChild(msg);
+        bar.appendChild(cancelBtn);
+        bar.appendChild(discardBtn);
+        this.panel.insertBefore(bar, this.panel.firstChild);
     }
 
     protected async onShow(): Promise<void> {
