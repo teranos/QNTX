@@ -274,9 +274,8 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 		err = json.Unmarshal(w.Body.Bytes(), &types)
 		require.NoError(t, err)
 
-		// Should have complete restaurant domain model
-		// Note: health_inspection appears twice (initial + update)
-		require.Len(t, types, 8, "Should have restaurant, menu_item, city, food_review, health_inspection (2 versions), prompt-result, and labeled")
+		// Should have complete restaurant domain model (deduped by name, latest wins)
+		require.Len(t, types, 7, "Should have restaurant, menu_item, city, food_review, health_inspection, prompt-result, and labeled")
 
 		// Map for easy verification
 		typeMap := make(map[string]map[string]interface{})

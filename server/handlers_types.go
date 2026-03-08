@@ -44,11 +44,14 @@ func (s *QNTXServer) HandleTypes(w http.ResponseWriter, r *http.Request) {
 func (s *QNTXServer) handleGetTypes(w http.ResponseWriter, r *http.Request) {
 	// Query type attestations from the database using SQLite JSON functions
 	query := `
-		SELECT json_extract(subjects, '$[0]') as type_name, attributes
-		FROM attestations
-		WHERE json_extract(predicates, '$[0]') = 'type'
-		  AND json_extract(contexts, '$[0]') = 'graph'
-		ORDER BY created_at DESC
+		SELECT type_name, attributes FROM (
+			SELECT json_extract(subjects, '$[0]') as type_name, attributes,
+				ROW_NUMBER() OVER (PARTITION BY json_extract(subjects, '$[0]') ORDER BY created_at DESC) as rn
+			FROM attestations
+			WHERE json_extract(predicates, '$[0]') = 'type'
+			  AND json_valid(attributes) = 1
+		) WHERE rn = 1
+		ORDER BY type_name
 	`
 
 	rows, err := s.db.Query(query)
@@ -101,7 +104,7 @@ func (s *QNTXServer) handleGetType(w http.ResponseWriter, r *http.Request, typeN
 		FROM attestations
 		WHERE json_extract(subjects, '$[0]') = ?
 		  AND json_extract(predicates, '$[0]') = 'type'
-		  AND json_extract(contexts, '$[0]') = 'graph'
+		  AND json_valid(attributes) = 1
 		ORDER BY rowid DESC
 		LIMIT 1
 	`
