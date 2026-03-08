@@ -174,12 +174,9 @@ function renderExistingJobControls(
   intervalSelect.addEventListener("change", async () => {
     const value = intervalSelect.value;
     if (value === "custom") {
-      const customValue = prompt("Enter interval (e.g., 30m, 2h, 1d):");
-      if (!customValue) {
-        intervalSelect.value = (job.interval_seconds ?? 0).toString();
-        return;
-      }
-      // TODO(#30): Parse custom interval
+      // Show inline custom interval input
+      intervalSelect.value = (job.interval_seconds ?? 0).toString();
+      showCustomIntervalInput(container, job, options);
       return;
     }
 
@@ -202,8 +199,32 @@ function renderExistingJobControls(
     }
   });
 
+  // Two-click delete: first click shows confirmation, second click deletes
+  let deleteConfirmTimeout: number | null = null;
+  let deleteArmed = false;
+
   deleteBtn.addEventListener("click", async () => {
-    if (!confirm("Remove this scheduled job?")) return;
+    if (!deleteArmed) {
+      // First click: arm for confirmation
+      deleteArmed = true;
+      deleteBtn.textContent = 'Confirm delete';
+      deleteBtn.classList.add('pulse-btn-delete-armed');
+
+      // Auto-reset after 3 seconds
+      deleteConfirmTimeout = window.setTimeout(() => {
+        deleteArmed = false;
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.classList.remove('pulse-btn-delete-armed');
+      }, 3000);
+      return;
+    }
+
+    // Second click: actually delete
+    deleteArmed = false;
+    if (deleteConfirmTimeout) {
+      clearTimeout(deleteConfirmTimeout);
+      deleteConfirmTimeout = null;
+    }
 
     try {
       await deleteScheduledJob(job.id);
@@ -260,6 +281,62 @@ function renderAddScheduleButton(
 
     // Show interval selection dropdown
     renderIntervalSelection(container, options);
+  });
+}
+
+/**
+ * Show inline input for custom interval on existing job controls
+ */
+function showCustomIntervalInput(
+  container: HTMLElement,
+  _job: ScheduledJobResponse,
+  _options: SchedulingControlsOptions
+): void {
+  // Remove any existing custom input
+  const existing = container.querySelector('.pulse-custom-interval-row');
+  existing?.remove();
+
+  const row = document.createElement('div');
+  row.className = 'pulse-custom-interval-row';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'pulse-custom-interval-input';
+  input.placeholder = 'e.g., 30m, 2h, 1d';
+  input.style.fontSize = '12px';
+  input.style.padding = '2px 6px';
+  input.style.width = '120px';
+
+  const applyBtn = document.createElement('button');
+  applyBtn.className = 'pulse-btn-confirm';
+  applyBtn.textContent = '✓';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'pulse-btn-cancel';
+  cancelBtn.textContent = '✗';
+
+  row.appendChild(input);
+  row.appendChild(applyBtn);
+  row.appendChild(cancelBtn);
+  container.appendChild(row);
+
+  input.focus();
+
+  cancelBtn.addEventListener('click', () => row.remove());
+
+  const apply = async () => {
+    const value = input.value.trim();
+    if (!value) return;
+
+    // TODO(#30): Parse custom interval string (e.g., "30m", "2h", "1d")
+    // For now, remove the row
+    row.remove();
+  };
+
+  applyBtn.addEventListener('click', apply);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') apply();
+    if (e.key === 'Escape') row.remove();
   });
 }
 
