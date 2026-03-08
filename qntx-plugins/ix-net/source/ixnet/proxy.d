@@ -13,6 +13,32 @@
 /// Phase 1: Stub — accepts connections, logs them, passes through without TLS interception.
 /// Phase 2: TLS termination with local CA cert — intercept plaintext HTTP.
 /// Phase 3: Payload extraction (JSON body, base64 images).
+///
+/// Known limitations:
+///   - Non-anthropic domains (github, datadog, statsig) fail TLS accept
+///     because the leaf cert only covers *.anthropic.com. These should
+///     fall back to blind relay instead of erroring.
+///   - TLSBufReader reads byte-by-byte — slow for large bodies (1MB+
+///     context windows). Should read in bulk from the TLS buffer.
+///   - readByte retries on would-block with 10ms sleep, up to 120s.
+///     Busy-wait; should use select/poll on the underlying fd.
+///   - Thread-per-connection — fine for single-user proxy, won't scale.
+///   - Leaf cert is pre-generated for api.anthropic.com only. No dynamic
+///     cert generation per-host.
+///   - accept-encoding is stripped so upstream sends plaintext. This
+///     increases bandwidth; proper fix is gzip/br decompression.
+///   - Streaming (SSE) token extraction scans for last "input_tokens"/
+///     "output_tokens" in the accumulated body. May miss tokens if the
+///     SSE framing splits the JSON across chunk boundaries.
+///   - ATSStore attestation not wired up — captures are in the ring
+///     buffer but never attested to QNTX.
+///   - Debug dump code (/tmp/ix-net-dump) and verbose relay logging
+///     still present — remove before release.
+///   - API key visible in captured request headers (authorization header).
+///   - OpenSSL linked from /usr/local/opt/openssl (homebrew path).
+///   - Not yet tested as a QNTX plugin (only standalone mode verified).
+///     gRPC lifecycle, plugin discovery, and ATSStore attestation creation
+///     are untested end-to-end within a running QNTX instance.
 module ixnet.proxy;
 
 import ixnet.log;
@@ -300,6 +326,16 @@ private void tlsRelay(ProxyState* state, ref TLSConn clientTLS,
 
         // Extract request fields
         auto reqInfo = extractRequest(reqBody);
+
+        // Extract and save images from request body
+        if (reqInfo.hasImages && startsWith(path, "/v1/messages")) {
+            enum IMG_DIR = "/tmp/ix-net-images";
+            auto imgsSaved = extractImages(reqBody, IMG_DIR, state.captureCount);
+            if (imgsSaved > 0) {
+                logInfo("[ix-net] saved %d images to %s (capture #%d)",
+                        imgsSaved, IMG_DIR, state.captureCount);
+            }
+        }
 
         logInfo("[ix-net] relay: reading response from upstream for %s...", path);
         // ---- Read response from upstream ----
