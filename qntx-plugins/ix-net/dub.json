@@ -1,0 +1,15 @@
+{
+    "name": "qntx-ix-net-plugin",
+    "description": "QNTX network traffic capture plugin — D language HTTPS proxy for Claude Code API inspection",
+    "authors": ["QNTX"],
+    "license": "MIT",
+    "targetType": "executable",
+    "targetName": "qntx-ix-net-plugin",
+    "targetPath": "bin",
+    "sourcePaths": ["source"],
+    "mainSourceFile": "source/ixnet/app.d",
+    "dflags-ldc": ["-O2"],
+    "libs": ["ssl", "crypto"],
+    "lflags": ["-L/usr/local/opt/openssl/lib"],
+    "dflags": ["-I/usr/local/opt/openssl/include"]
+}
