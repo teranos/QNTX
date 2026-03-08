@@ -32,6 +32,7 @@ import (
 	"context"
 	"encoding/json"
 	"runtime"
+	"sync"
 	"unsafe"
 
 	"github.com/teranos/QNTX/ats"
@@ -40,8 +41,11 @@ import (
 	id "github.com/teranos/vanity-id"
 )
 
-// RustStore wraps the Rust SqliteStore via CGO
+// RustStore wraps the Rust SqliteStore via CGO.
+// All access is serialized via mu because rusqlite::Connection
+// uses RefCell internally and is not thread-safe.
 type RustStore struct {
+	mu    sync.Mutex
 	store *C.SqliteStore
 }
 
@@ -86,6 +90,8 @@ func NewFileStore(path string) (*RustStore, error) {
 // Close frees the underlying Rust store.
 // Safe to call multiple times.
 func (rs *RustStore) Close() error {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
 	if rs.store != nil {
 		C.storage_free(rs.store)
 		rs.store = nil
@@ -95,11 +101,7 @@ func (rs *RustStore) Close() error {
 
 // CreateAttestation stores a new attestation (implements ats.AttestationStore).
 func (rs *RustStore) CreateAttestation(as *types.As) error {
-	if rs.store == nil {
-		return errors.New("store is closed")
-	}
-
-	// Convert to Rust-compatible JSON format
+	// Convert to Rust-compatible JSON format (no lock needed for serialization)
 	jsonBytes, err := toRustJSON(as)
 	if err != nil {
 		return errors.Wrap(err, "failed to convert attestation")
@@ -107,6 +109,12 @@ func (rs *RustStore) CreateAttestation(as *types.As) error {
 
 	cJSON := C.CString(string(jsonBytes))
 	defer C.free(unsafe.Pointer(cJSON))
+
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	if rs.store == nil {
+		return errors.New("store is closed")
+	}
 
 	result := C.storage_put(rs.store, cJSON)
 	defer C.storage_result_free(result)
@@ -127,12 +135,14 @@ func (rs *RustStore) CreateAttestationInbound(as *types.As) error {
 
 // GetAttestation retrieves an attestation by ID (implements ats.AttestationStore).
 func (rs *RustStore) GetAttestation(id string) (*types.As, error) {
+	cID := C.CString(id)
+	defer C.free(unsafe.Pointer(cID))
+
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
 	if rs.store == nil {
 		return nil, errors.New("store is closed")
 	}
-
-	cID := C.CString(id)
-	defer C.free(unsafe.Pointer(cID))
 
 	result := C.storage_get(rs.store, cID)
 	defer C.attestation_result_free(result)
@@ -157,12 +167,14 @@ func (rs *RustStore) GetAttestation(id string) (*types.As, error) {
 
 // AttestationExists checks if an attestation exists.
 func (rs *RustStore) AttestationExists(id string) bool {
+	cID := C.CString(id)
+	defer C.free(unsafe.Pointer(cID))
+
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
 	if rs.store == nil {
 		return false
 	}
-
-	cID := C.CString(id)
-	defer C.free(unsafe.Pointer(cID))
 
 	result := C.storage_exists(rs.store, cID)
 	defer C.storage_result_free(result)
@@ -172,11 +184,6 @@ func (rs *RustStore) AttestationExists(id string) bool {
 
 // UpdateAttestation updates an existing attestation.
 func (rs *RustStore) UpdateAttestation(as *types.As) error {
-	if rs.store == nil {
-		return errors.New("store is closed")
-	}
-
-	// Convert to Rust-compatible JSON format
 	jsonBytes, err := toRustJSON(as)
 	if err != nil {
 		return errors.Wrap(err, "failed to convert attestation")
@@ -184,6 +191,12 @@ func (rs *RustStore) UpdateAttestation(as *types.As) error {
 
 	cJSON := C.CString(string(jsonBytes))
 	defer C.free(unsafe.Pointer(cJSON))
+
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	if rs.store == nil {
+		return errors.New("store is closed")
+	}
 
 	result := C.storage_update(rs.store, cJSON)
 	defer C.storage_result_free(result)
@@ -198,6 +211,8 @@ func (rs *RustStore) UpdateAttestation(as *types.As) error {
 
 // ListAttestationIDs returns all attestation IDs.
 func (rs *RustStore) ListAttestationIDs() ([]string, error) {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
 	if rs.store == nil {
 		return nil, errors.New("store is closed")
 	}
@@ -226,6 +241,8 @@ func (rs *RustStore) ListAttestationIDs() ([]string, error) {
 
 // CountAttestations returns the total count of attestations.
 func (rs *RustStore) CountAttestations() (int, error) {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
 	if rs.store == nil {
 		return 0, errors.New("store is closed")
 	}
@@ -241,15 +258,38 @@ func (rs *RustStore) CountAttestations() (int, error) {
 	return int(result.count), nil
 }
 
+// existsLocked checks existence without acquiring the lock (caller must hold mu).
+func (rs *RustStore) existsLocked(asid string) bool {
+	cID := C.CString(asid)
+	defer C.free(unsafe.Pointer(cID))
+	result := C.storage_exists(rs.store, cID)
+	defer C.storage_result_free(result)
+	return bool(result.success)
+}
+
+// putLocked stores an attestation without acquiring the lock (caller must hold mu).
+func (rs *RustStore) putLocked(jsonBytes []byte) error {
+	cJSON := C.CString(string(jsonBytes))
+	defer C.free(unsafe.Pointer(cJSON))
+	result := C.storage_put(rs.store, cJSON)
+	defer C.storage_result_free(result)
+	if !result.success {
+		return errors.New(C.GoString(result.error_msg))
+	}
+	return nil
+}
+
 // GenerateAndCreateAttestation generates a vanity ASID and creates a self-certifying attestation (implements ats.AttestationStore).
 func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
 	if rs.store == nil {
 		return nil, errors.New("store is closed")
 	}
 
-	// Generate vanity ASID with collision detection (uses Go id package)
+	// Generate vanity ASID with collision detection (lock held throughout)
 	checkExists := func(asid string) bool {
-		return rs.AttestationExists(asid)
+		return rs.existsLocked(asid)
 	}
 
 	// Use first subject, predicate, and context for vanity generation
@@ -277,8 +317,12 @@ func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *type
 	// Make attestation self-certifying: use ASID as its own actor
 	as.Actors = []string{asid}
 
-	// Store via Rust backend
-	if err := rs.CreateAttestation(as); err != nil {
+	// Store via Rust backend (using unlocked helper since we hold mu)
+	jsonBytes, err := toRustJSON(as)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to convert attestation")
+	}
+	if err := rs.putLocked(jsonBytes); err != nil {
 		return nil, errors.Wrap(err, "failed to store attestation")
 	}
 
@@ -287,11 +331,7 @@ func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *type
 
 // GetAttestations retrieves attestations based on filters (implements ats.AttestationStore).
 func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
-	if rs.store == nil {
-		return nil, errors.New("store is closed")
-	}
-
-	// Convert Go filter to Rust-compatible JSON format.
+	// Convert Go filter to Rust-compatible JSON format (no lock needed for serialization).
 	// omitempty prevents nil slices from marshaling as null (Rust expects missing or []).
 	rustFilter := struct {
 		Subjects   []string `json:"subjects,omitempty"`
@@ -327,20 +367,34 @@ func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As,
 	cFilterJSON := C.CString(string(filterJSON))
 	defer C.free(unsafe.Pointer(cFilterJSON))
 
-	result := C.storage_query(rs.store, cFilterJSON)
-	defer C.attestation_result_free(result)
+	rs.mu.Lock()
+	if rs.store == nil {
+		rs.mu.Unlock()
+		return nil, errors.New("store is closed")
+	}
 
-	if !result.success {
-		errMsg := C.GoString(result.error_msg)
+	result := C.storage_query(rs.store, cFilterJSON)
+	// Copy result data before unlocking — C strings are valid until result is freed
+	var success bool
+	var errMsg, jsonStr string
+	success = bool(result.success)
+	if !success {
+		errMsg = C.GoString(result.error_msg)
+	} else if result.attestation_json != nil {
+		jsonStr = C.GoString(result.attestation_json)
+	}
+	C.attestation_result_free(result)
+	rs.mu.Unlock()
+
+	if !success {
 		return nil, errors.New(errMsg)
 	}
 
-	if result.attestation_json == nil {
+	if jsonStr == "" {
 		return []*types.As{}, nil
 	}
 
-	// Parse JSON array of attestations
-	jsonStr := C.GoString(result.attestation_json)
+	// Parse JSON array of attestations (no lock needed)
 	var rustAttestations []json.RawMessage
 	if err := json.Unmarshal([]byte(jsonStr), &rustAttestations); err != nil {
 		return nil, errors.Wrap(err, "failed to parse attestation array")
