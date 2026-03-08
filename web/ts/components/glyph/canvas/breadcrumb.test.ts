@@ -111,8 +111,9 @@ describe('buildBreadcrumbBar - Tim (Happy Path)', () => {
         expect(items[1].textContent).toBe('Notes');
         expect(items[1].classList.contains('breadcrumb-current')).toBe(true);
 
-        // Separator present
-        expect(bar.querySelectorAll('.breadcrumb-separator')).toHaveLength(1);
+        // Items are in an ordered list
+        expect(bar.querySelector('ol.breadcrumb-list')).not.toBeNull();
+        expect(bar.querySelectorAll('ol.breadcrumb-list > li')).toHaveLength(2);
     });
 
     test('Tim sees 3-level trail with correct clickability', () => {

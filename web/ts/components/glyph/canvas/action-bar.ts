@@ -36,6 +36,8 @@ export function showActionBar(
 
     const bar = document.createElement('div');
     bar.className = 'canvas-action-bar';
+    bar.setAttribute('role', 'toolbar');
+    bar.setAttribute('aria-label', 'Glyph actions');
 
     // Check if any selected glyphs are in a meld
     // Uses .closest() to handle glyphs inside sub-containers within compositions
