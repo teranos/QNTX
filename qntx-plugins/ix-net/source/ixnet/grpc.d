@@ -375,7 +375,7 @@ struct GrpcClient {
         // Parse host:port
         auto colonIdx = lastIndexOf(endpoint, ':');
         if (colonIdx < 0) {
-            logError("[ix-bin] gRPC client: invalid endpoint %s (no port)", endpoint);
+            logError("[ix-net] gRPC client: invalid endpoint %s (no port)", endpoint);
             return false;
         }
         host = endpoint[0 .. colonIdx];
@@ -389,7 +389,7 @@ struct GrpcClient {
         try {
             sock.connect(new InternetAddress(host, port));
         } catch (SocketOSException e) {
-            logError("[ix-bin] gRPC client: TCP connect to %s failed: %s", endpoint, e.msg);
+            logError("[ix-net] gRPC client: TCP connect to %s failed: %s", endpoint, e.msg);
             sock = null;
             return false;
         }
@@ -401,7 +401,7 @@ struct GrpcClient {
         // Read server SETTINGS
         auto serverSettings = readFrame(sock);
         if (serverSettings is null) {
-            logError("[ix-bin] gRPC client: no SETTINGS from %s (timeout or connection closed)", endpoint);
+            logError("[ix-net] gRPC client: no SETTINGS from %s (timeout or connection closed)", endpoint);
             sock.close();
             sock = null;
             return false;
@@ -422,20 +422,20 @@ struct GrpcClient {
         }
 
         if (maxReads == 0) {
-            logError("[ix-bin] gRPC client: SETTINGS ACK not received from %s after 10 frames", endpoint);
+            logError("[ix-net] gRPC client: SETTINGS ACK not received from %s after 10 frames", endpoint);
             sock.close();
             sock = null;
             return false;
         }
 
-        logInfo("[ix-bin] gRPC client: connected to %s", endpoint);
+        logInfo("[ix-net] gRPC client: connected to %s", endpoint);
         return true;
     }
 
     /// Make a unary RPC call. Returns empty on failure.
     ubyte[] call(string method, const ubyte[] requestProto) {
         if (sock is null) {
-            logError("[ix-bin] gRPC client: call %s failed — not connected", method);
+            logError("[ix-net] gRPC client: call %s failed — not connected", method);
             return [];
         }
 
