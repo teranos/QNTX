@@ -10,10 +10,6 @@
 ///                            Capture buffer (ring)
 ///                            → Attest to QNTX
 ///
-/// Phase 1: Stub — accepts connections, logs them, passes through without TLS interception.
-/// Phase 2: TLS termination with local CA cert — intercept plaintext HTTP.
-/// Phase 3: Payload extraction (JSON body, base64 images).
-///
 /// Known limitations:
 ///   - Only api.anthropic.com is intercepted; all other domains use
 ///     blind relay (no payload capture for non-anthropic traffic).
@@ -27,8 +23,6 @@
 ///   - Streaming (SSE) token extraction scans for last "input_tokens"/
 ///     "output_tokens" in the accumulated body. May miss tokens if the
 ///     SSE framing splits the JSON across chunk boundaries.
-///   - ATSStore connects but captures are not attested yet.
-///   - Debug dump code (/tmp/ix-net-dump) still present.
 ///   - API key visible in captured request headers (authorization header).
 ///   - OpenSSL linked from /usr/local/opt/openssl (homebrew path).
 module ixnet.proxy;
@@ -78,12 +72,17 @@ struct ProxyState {
     int captureHead;                 // next write index
     Thread listenerThread;
     void* atsClient;                 // ATSClient* from plugin state (null if not connected)
+    import core.sync.mutex : Mutex;
+    Mutex captureMutex;              // guards captures/captureHead/captureCount
 }
 
 /// Start the HTTPS proxy on the given port.
 /// certFile/keyFile enable TLS interception (MITM). Pass empty strings for passthrough mode.
 bool startProxy(ref ProxyState state, ushort port,
                 string certFile = "", string keyFile = "") {
+
+    import core.sync.mutex : Mutex;
+    state.captureMutex = new Mutex();
 
     // Initialize TLS if cert paths provided
     if (certFile.length > 0 && keyFile.length > 0) {
@@ -141,6 +140,9 @@ void stopProxy(ref ProxyState state) {
 
 /// Get recent captures as JSON.
 string getRecentCaptures(ref ProxyState state) {
+    state.captureMutex.lock();
+    scope(exit) state.captureMutex.unlock();
+
     string json = `{"captures":[`;
     bool first = true;
     int count = state.captureCount < MAX_CAPTURES ? state.captureCount : MAX_CAPTURES;
@@ -151,13 +153,13 @@ string getRecentCaptures(ref ProxyState state) {
         auto c = &state.captures[idx];
         if (!first) json ~= ",";
         json ~= `{"timestamp":` ~ c.timestamp.to!string ~
-                `,"method":"` ~ c.method ~
-                `","path":"` ~ c.path ~
+                `,"method":"` ~ jsonEscape(c.method) ~
+                `","path":"` ~ jsonEscape(c.path) ~
                 `","request_bytes":` ~ c.requestSize.to!string ~
                 `,"response_bytes":` ~ c.responseSize.to!string ~
                 `,"has_images":` ~ (c.hasImages ? "true" : "false") ~
                 `,"image_count":` ~ c.imageCount.to!string ~
-                `,"model":"` ~ c.model ~
+                `,"model":"` ~ jsonEscape(c.model) ~
                 `","input_tokens":` ~ c.inputTokens.to!string ~
                 `,"output_tokens":` ~ c.outputTokens.to!string ~
                 `,"status_code":` ~ c.statusCode.to!string ~
@@ -331,23 +333,6 @@ private void tlsRelay(ProxyState* state, ref TLSConn clientTLS,
             respInfo = extractResponse(respBody);
         }
 
-        // Debug: dump first /v1/messages exchange
-        if (startsWith(path, "/v1/messages")) {
-            import std.file : mkdirRecurse, write_ = write, exists;
-            enum DUMP_DIR = "/tmp/ix-net-dump";
-            if (!exists(DUMP_DIR ~ "/req-body.json")) {
-                try {
-                    mkdirRecurse(DUMP_DIR);
-                    write_(DUMP_DIR ~ "/req-headers.txt", cast(const(void)[])reqHeaders);
-                    if (reqBody.length > 0)
-                        write_(DUMP_DIR ~ "/req-body.json", cast(const(void)[])reqBody);
-                    write_(DUMP_DIR ~ "/resp-headers.txt", cast(const(void)[])respHeaders);
-                    if (respBody.length > 0)
-                        write_(DUMP_DIR ~ "/resp-body.txt", cast(const(void)[])respBody);
-                } catch (Exception) {}
-            }
-        }
-
         // Record the capture
         Capture cap;
         cap.method = method;
@@ -366,10 +351,12 @@ private void tlsRelay(ProxyState* state, ref TLSConn clientTLS,
             cap.timestamp = cast(long)time(null);
         }
 
+        state.captureMutex.lock();
         auto idx = state.captureHead % MAX_CAPTURES;
         state.captures[idx] = cap;
         state.captureHead = (state.captureHead + 1) % MAX_CAPTURES;
         state.captureCount++;
+        state.captureMutex.unlock();
 
         // Log and extract only for API calls — one line per exchange
         if (startsWith(path, "/v1/messages")) {
@@ -724,20 +711,6 @@ private string findHeaderValue(string headers, string name) {
 }
 
 /// Record a capture entry in the ring buffer.
-private void recordCapture(ProxyState* state, string hostPort,
-                           string method, size_t reqBytes, size_t respBytes) {
-    import core.stdc.time : time;
-    auto idx = state.captureHead % MAX_CAPTURES;
-    state.captures[idx] = Capture.init;
-    state.captures[idx].method = method.length > 0 ? method : "CONNECT";
-    state.captures[idx].path = hostPort;
-    state.captures[idx].timestamp = cast(long)time(null);
-    state.captures[idx].requestSize = reqBytes;
-    state.captures[idx].responseSize = respBytes;
-    state.captureHead = (state.captureHead + 1) % MAX_CAPTURES;
-    state.captureCount++;
-}
-
 /// Parse HTTP request line from raw bytes: "POST /v1/messages HTTP/1.1\r\n..."
 private void parseRequestLine(const ubyte[] data, ref string method, ref string path) {
     // Find first line
@@ -862,6 +835,27 @@ private ptrdiff_t lastIndexOfChar(string s, char c) {
 private bool startsWith(string s, string prefix) {
     if (prefix.length > s.length) return false;
     return s[0 .. prefix.length] == prefix;
+}
+
+/// Escape a string for safe JSON interpolation.
+private string jsonEscape(string s) {
+    bool needsEscape = false;
+    foreach (c; s) {
+        if (c == '"' || c == '\\' || c < 0x20) { needsEscape = true; break; }
+    }
+    if (!needsEscape) return s;
+
+    string result;
+    foreach (c; s) {
+        if (c == '"') result ~= `\"`;
+        else if (c == '\\') result ~= `\\`;
+        else if (c == '\n') result ~= `\n`;
+        else if (c == '\r') result ~= `\r`;
+        else if (c == '\t') result ~= `\t`;
+        else if (c < 0x20) continue;
+        else result ~= c;
+    }
+    return result;
 }
 
 /// Check if a host:port should be TLS-intercepted (vs blind relay).

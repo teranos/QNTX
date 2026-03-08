@@ -199,23 +199,8 @@ private HTTPResponse handleStart(ref const HTTPRequest req) {
         }
     }
 
-    // Resolve cert paths relative to executable location
-    string certFile = "";
-    string keyFile = "";
-    auto exeDir = getExeDir();
-    if (exeDir.length > 0) {
-        auto certsDir = exeDir ~ "/../certs/";
-        certFile = certsDir ~ "leaf.pem";
-        keyFile = certsDir ~ "leaf.key";
-
-        // Check if certs exist
-        import std.file : exists;
-        if (!exists(certFile) || !exists(keyFile)) {
-            logWarn("[ix-net] certs not found at %s — running in passthrough mode", certsDir);
-            certFile = "";
-            keyFile = "";
-        }
-    }
+    string certFile, keyFile;
+    resolveCertPaths(certFile, keyFile);
 
     if (startProxy(state.proxy, proxyPort, certFile, keyFile)) {
         state.capturing = true;
@@ -357,8 +342,28 @@ private void autoStartProxy() {
 
     ushort proxyPort = 9100;
 
-    string certFile = "";
-    string keyFile = "";
+    string certFile, keyFile;
+    resolveCertPaths(certFile, keyFile);
+
+    // Pass ATSClient to proxy for attestation writes
+    state.proxy.atsClient = cast(void*)&state.atsClient;
+
+    if (startProxy(state.proxy, proxyPort, certFile, keyFile)) {
+        state.capturing = true;
+        auto mode = state.proxy.tlsEnabled ? "intercept" : "passthrough";
+        logInfo("[ix-net] proxy auto-started on port %d (mode=%s)",
+                state.proxy.proxyPort, mode);
+    } else {
+        logError("[ix-net] proxy auto-start failed on port %d", proxyPort);
+    }
+}
+
+/// Resolve leaf cert/key paths relative to the executable.
+/// Sets certFile/keyFile to empty strings if not found (passthrough mode).
+private void resolveCertPaths(out string certFile, out string keyFile) {
+    import ixnet.log;
+    certFile = "";
+    keyFile = "";
     auto exeDir = getExeDir();
     if (exeDir.length > 0) {
         auto certsDir = exeDir ~ "/../certs/";
@@ -371,18 +376,6 @@ private void autoStartProxy() {
             certFile = "";
             keyFile = "";
         }
-    }
-
-    // Pass ATSClient to proxy for attestation writes
-    state.proxy.atsClient = cast(void*)&state.atsClient;
-
-    if (startProxy(state.proxy, proxyPort, certFile, keyFile)) {
-        state.capturing = true;
-        auto mode = state.proxy.tlsEnabled ? "intercept" : "passthrough";
-        logInfo("[ix-net] proxy auto-started on port %d (mode=%s)",
-                state.proxy.proxyPort, mode);
-    } else {
-        logError("[ix-net] proxy auto-start failed on port %d", proxyPort);
     }
 }
 
