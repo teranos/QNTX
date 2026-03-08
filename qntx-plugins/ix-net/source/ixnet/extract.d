@@ -11,6 +11,7 @@ struct RequestInfo {
     int imageCount;
     bool hasImages;
     bool streaming;      // "stream": true
+    string sessionId;    // from metadata.user_id "_session_<uuid>"
 }
 
 /// Extracted fields from a Claude API response body.
@@ -33,6 +34,14 @@ RequestInfo extractRequest(const(ubyte)[] body_) {
     // "stream": true
     auto streamVal = extractRawValue(json, `"stream"`);
     info.streaming = (streamVal == "true");
+
+    // "user_id": "user_..._session_<uuid>"
+    auto userId = extractStringValue(json, `"user_id"`);
+    if (userId.length > 0) {
+        auto sessionIdx = findSubstring(userId, "_session_", 0);
+        if (sessionIdx >= 0)
+            info.sessionId = userId[sessionIdx + 9 .. $].idup;
+    }
 
     // Count image content blocks: "type": "image"
     size_t pos = 0;

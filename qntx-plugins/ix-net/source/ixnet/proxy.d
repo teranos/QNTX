@@ -309,16 +309,6 @@ private void tlsRelay(ProxyState* state, ref TLSConn clientTLS,
         // Extract request fields
         auto reqInfo = extractRequest(reqBody);
 
-        // Extract and save images from request body
-        if (reqInfo.hasImages && startsWith(path, "/v1/messages")) {
-            enum IMG_DIR = "/tmp/ix-net-images";
-            auto imgsSaved = extractImages(reqBody, IMG_DIR, state.captureCount);
-            if (imgsSaved > 0) {
-                logInfo("[ix-net] saved %d images from capture #%d",
-                        imgsSaved, state.captureCount);
-            }
-        }
-
         // ---- Read response from upstream ----
         string respHeaders = readHTTPHeaders(upstreamBuf);
         if (respHeaders.length == 0) break;
@@ -383,12 +373,30 @@ private void tlsRelay(ProxyState* state, ref TLSConn clientTLS,
         state.captureHead = (state.captureHead + 1) % MAX_CAPTURES;
         state.captureCount++;
 
-        // Log only API calls — one line per exchange
+        // Log and extract only for API calls — one line per exchange
         if (startsWith(path, "/v1/messages")) {
-            logInfo("[ix-net] %s %s model=%s status=%d req=%dB resp=%dB images=%d in_tok=%d out_tok=%d",
-                    method, path, reqInfo.model, statusCode,
-                    totalReqBytes, totalRespBytes, reqInfo.imageCount,
-                    respInfo.inputTokens, respInfo.outputTokens);
+            int imgsSaved = 0;
+            if (reqInfo.hasImages) {
+                auto imgDir = getImageDir();
+                if (imgDir.length > 0) {
+                    // Store images in session subdirectory
+                    if (reqInfo.sessionId.length > 0)
+                        imgDir = imgDir ~ "/" ~ reqInfo.sessionId;
+                    imgsSaved = extractImages(reqBody, imgDir, state.captureCount - 1);
+                }
+            }
+
+            if (imgsSaved > 0) {
+                logInfo("[ix-net] %s %s model=%s status=%d req=%dB resp=%dB images=%d saved=%d in_tok=%d out_tok=%d",
+                        method, path, reqInfo.model, statusCode,
+                        totalReqBytes, totalRespBytes, reqInfo.imageCount, imgsSaved,
+                        respInfo.inputTokens, respInfo.outputTokens);
+            } else {
+                logInfo("[ix-net] %s %s model=%s status=%d req=%dB resp=%dB images=%d in_tok=%d out_tok=%d",
+                        method, path, reqInfo.model, statusCode,
+                        totalReqBytes, totalRespBytes, reqInfo.imageCount,
+                        respInfo.inputTokens, respInfo.outputTokens);
+            }
         }
     }
 }
@@ -858,6 +866,15 @@ private bool isInterceptHost(string hostPort) {
     auto colonIdx = lastIndexOfChar(hostPort, ':');
     string host = colonIdx > 0 ? hostPort[0 .. colonIdx] : hostPort;
     return host == "api.anthropic.com";
+}
+
+/// Resolve image storage directory (~/.qntx/files/ix-net/).
+private string getImageDir() {
+    import core.stdc.stdlib : getenv;
+    auto home = getenv("HOME");
+    if (home is null) return "";
+    import std.string : fromStringz;
+    return cast(string)fromStringz(home) ~ "/.qntx/files/ix-net";
 }
 
 /// Remove a header line by name (case-insensitive) from HTTP headers block.
