@@ -44,30 +44,29 @@ export function jumpToBreadcrumb(targetIndex: number): void {
  * "Canvas › Sub A › Sub B" — all except the last are clickable.
  */
 export function buildBreadcrumbBar(): HTMLElement {
-    const bar = document.createElement('div');
-    bar.className = 'canvas-breadcrumb-bar';
+    const nav = document.createElement('nav');
+    nav.className = 'canvas-breadcrumb-bar';
+    nav.setAttribute('aria-label', 'Canvas nesting');
+
+    const list = document.createElement('ol');
+    list.className = 'breadcrumb-list';
 
     // Root crumb
-    const root = document.createElement('span');
-    root.className = 'breadcrumb-item';
+    const rootItem = document.createElement('li');
+    rootItem.className = 'breadcrumb-item';
     if (stack.length > 0) {
-        root.classList.add('breadcrumb-clickable');
-        root.textContent = 'Canvas';
-        root.addEventListener('click', () => jumpToBreadcrumb(-1));
+        rootItem.classList.add('breadcrumb-clickable');
+        rootItem.textContent = 'Canvas';
+        rootItem.addEventListener('click', () => jumpToBreadcrumb(-1));
     } else {
-        root.classList.add('breadcrumb-current');
-        root.textContent = 'Canvas';
+        rootItem.classList.add('breadcrumb-current');
+        rootItem.textContent = 'Canvas';
     }
-    bar.appendChild(root);
+    list.appendChild(rootItem);
 
     // Stack entries
     for (let i = 0; i < stack.length; i++) {
-        const sep = document.createElement('span');
-        sep.className = 'breadcrumb-separator';
-        sep.textContent = ' › ';
-        bar.appendChild(sep);
-
-        const crumb = document.createElement('span');
+        const crumb = document.createElement('li');
         crumb.className = 'breadcrumb-item';
 
         const isLast = i === stack.length - 1;
@@ -80,10 +79,11 @@ export function buildBreadcrumbBar(): HTMLElement {
         }
 
         crumb.textContent = stack[i].name || 'subcanvas';
-        bar.appendChild(crumb);
+        list.appendChild(crumb);
     }
 
-    return bar;
+    nav.appendChild(list);
+    return nav;
 }
 
 /**
