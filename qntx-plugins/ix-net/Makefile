@@ -19,6 +19,13 @@ install: build ## Install ix-net plugin to ~/.qntx/plugins/
 	@mkdir -p $(PREFIX)/plugins
 	@cp bin/qntx-ix-net-plugin $(PREFIX)/plugins/qntx-ix-net-plugin
 	@chmod +x $(PREFIX)/plugins/qntx-ix-net-plugin
+	@mkdir -p $(PREFIX)/certs
+	@if [ -f certs/leaf.pem ] && [ -f certs/leaf.key ]; then \
+		cp certs/leaf.pem certs/leaf.key certs/ca.pem $(PREFIX)/certs/; \
+		echo "✓ certs → $(PREFIX)/certs/"; \
+	else \
+		echo "⚠ certs not found — run: cd certs && fish anthropic.fish"; \
+	fi
 	@echo "✓ qntx-ix-net-plugin → $(PREFIX)/plugins/qntx-ix-net-plugin"
 
 clean: ## Clean build artifacts

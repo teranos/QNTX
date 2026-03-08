@@ -79,6 +79,9 @@ InitializeResponse initialize(ref const InitializeRequest req) {
 
     state.initialized = true;
 
+    // Auto-start the HTTPS proxy on initialize
+    autoStartProxy();
+
     InitializeResponse resp;
     return resp;
 }
@@ -347,6 +350,38 @@ private ptrdiff_t indexOf(string haystack, string needle) {
         if (haystack[i .. i + needle.length] == needle) return cast(ptrdiff_t)i;
     }
     return -1;
+}
+
+/// Auto-start the proxy during plugin initialization.
+private void autoStartProxy() {
+    import ixnet.log;
+
+    ushort proxyPort = 9100;
+
+    string certFile = "";
+    string keyFile = "";
+    auto exeDir = getExeDir();
+    if (exeDir.length > 0) {
+        auto certsDir = exeDir ~ "/../certs/";
+        certFile = certsDir ~ "leaf.pem";
+        keyFile = certsDir ~ "leaf.key";
+
+        import std.file : exists;
+        if (!exists(certFile) || !exists(keyFile)) {
+            logWarn("[ix-net] certs not found at %s — running in passthrough mode", certsDir);
+            certFile = "";
+            keyFile = "";
+        }
+    }
+
+    if (startProxy(state.proxy, proxyPort, certFile, keyFile)) {
+        state.capturing = true;
+        auto mode = state.proxy.tlsEnabled ? "intercept" : "passthrough";
+        logInfo("[ix-net] proxy auto-started on port %d (mode=%s)",
+                state.proxy.proxyPort, mode);
+    } else {
+        logError("[ix-net] proxy auto-start failed on port %d", proxyPort);
+    }
 }
 
 /// Get the directory containing the running executable.
