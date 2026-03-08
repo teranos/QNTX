@@ -19,7 +19,7 @@ import { autoMeldResultBelow } from './meld/meld-system';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
 import { canvasPlaced } from './manifestations/canvas-placed';
-import { putAttestation, queryAttestations, parseQuery } from '../../qntx-wasm';
+import { putAttestation, queryAttestations, parseQuery, generateASUID } from '../../qntx-wasm';
 import type { Attestation } from '../../qntx-wasm';
 
 export const TS_DEFAULT_CODE = `// Create a local attestation — searchable offline via WASM fuzzy search
@@ -54,17 +54,22 @@ function buildQntxApi(outputLines: string[]) {
             attributes?: Record<string, unknown>;
         }): Promise<Attestation> {
             const now = Math.floor(Date.now() / 1000);
+            const subjects = opts.subjects;
+            const predicates = opts.predicates;
+            const contexts = opts.contexts ?? ['_'];
+            const actors = opts.actors ?? ['ts-glyph'];
+            const { full: asuid } = generateASUID('AS', subjects[0] ?? '', predicates[0] ?? '', contexts[0] ?? '');
             const attestation: Attestation = {
-                id: `AS-${crypto.randomUUID()}`,
-                subjects: opts.subjects,
-                predicates: opts.predicates,
-                contexts: opts.contexts ?? ['_'],
-                actors: opts.actors ?? ['ts-glyph'],
+                id: asuid,
+                subjects,
+                predicates,
+                contexts,
+                actors,
                 timestamp: now,
                 source: 'ts-glyph',
                 attributes: opts.attributes ?? {},
                 created_at: now,
-                signature: new Uint8Array(),
+                signature: '',
                 signer_did: '',
             };
 

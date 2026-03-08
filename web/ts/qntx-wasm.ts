@@ -394,6 +394,41 @@ export async function richSearch(query: string, limit: number = 50): Promise<Ric
 }
 
 // ============================================================================
+// Identity
+// ============================================================================
+
+/** ASUID generation result from Rust WASM engine */
+export interface AsuidResult {
+    full: string;
+    short: string;
+}
+
+/**
+ * Generate an ASUID (Attestation System Unique ID) via the Rust WASM engine.
+ *
+ * Uses crypto.getRandomValues for entropy — no RNG in the Rust crate.
+ * Returns human-readable ID: `AS-SARAH-AUTHOR-GITHUB-7K4M3B9X`
+ */
+export function generateASUID(prefix: string, subject: string, predicate: string, context: string): AsuidResult {
+    const randomBytes = new Uint8Array(8);
+    crypto.getRandomValues(randomBytes);
+
+    const input = JSON.stringify({
+        prefix,
+        subject,
+        predicate,
+        context,
+        random_bytes: Array.from(randomBytes),
+    });
+
+    const result = JSON.parse(wasm.generate_asuid(input));
+    if (result.error) {
+        throw new Error(`ASUID generation failed: ${result.error}`);
+    }
+    return result;
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 
