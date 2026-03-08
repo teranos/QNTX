@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/attrs"
-	"github.com/teranos/QNTX/ats/wasm"
 	"github.com/teranos/QNTX/errors"
 )
 
@@ -97,12 +96,8 @@ func AttestType(store AttestationStore, typeName, source, context string, attrib
 		return errors.New("context cannot be empty")
 	}
 
-	// Generate ASUID via Rust WASM engine
-	engine, err := wasm.GetEngine()
-	if err != nil {
-		return errors.Wrapf(err, "failed to get WASM engine for type %s", typeName)
-	}
-	asuid, err := engine.GenerateASUID("AS", typeName, "type", context)
+	// Generate ASUID (WASM engine with qntxwasm tag, vanity-id fallback without)
+	asuid, err := generateASUID("AS", typeName, "type", context)
 	if err != nil {
 		return errors.Wrapf(err, "failed to generate ASUID for type %s", typeName)
 	}
@@ -202,12 +197,8 @@ func AttestRelationshipType(store AttestationStore, predicateName, source string
 		return errors.New("source cannot be empty")
 	}
 
-	// Generate ASUID via Rust WASM engine
-	engine, err := wasm.GetEngine()
-	if err != nil {
-		return errors.Wrapf(err, "failed to get WASM engine for relationship type %s", predicateName)
-	}
-	asuid, err := engine.GenerateASUID("AS", predicateName, "relationship_type", "graph")
+	// Generate ASUID (WASM engine with qntxwasm tag, vanity-id fallback without)
+	asuid, err := generateASUID("AS", predicateName, "relationship_type", "graph")
 	if err != nil {
 		return errors.Wrapf(err, "failed to generate ASUID for relationship type %s", predicateName)
 	}
