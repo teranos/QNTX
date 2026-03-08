@@ -222,6 +222,10 @@ export class ProseEditor {
         return this.hasUnsavedChanges;
     }
 
+    clearUnsavedChanges(): void {
+        this.hasUnsavedChanges = false;
+    }
+
     /**
      * Get the current editor content as markdown
      */

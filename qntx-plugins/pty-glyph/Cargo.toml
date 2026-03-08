@@ -1,0 +1,46 @@
+[package]
+name = "qntx-pty-glyph"
+version = "0.1.8"
+edition.workspace = true
+description = "QNTX gRPC plugin for persistent terminal glyphs (PTY)"
+license.workspace = true
+authors = ["QNTX Contributors"]
+
+[[bin]]
+name = "qntx-pty-glyph"
+path = "src/main.rs"
+
+[dependencies]
+# QNTX gRPC infrastructure
+qntx-grpc = { path = "../../crates/qntx-grpc", features = ["plugin"] }
+qntx-proto = { path = "../../crates/qntx-proto" }
+
+# gRPC and async
+tonic.workspace = true
+prost.workspace = true
+tokio = { workspace = true, features = ["full"] }
+tokio-stream.workspace = true
+
+# PTY support
+portable-pty = "0.8"
+
+# WebSocket
+tokio-tungstenite = "0.24"
+futures = "0.3"
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Utilities
+thiserror.workspace = true
+parking_lot.workspace = true
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }

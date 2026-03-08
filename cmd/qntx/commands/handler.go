@@ -78,15 +78,22 @@ func runHandlerCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Open database
-	database, err := openDatabase("")
+	database, dbPath, err := openDatabase("")
 	if err != nil {
 		return errors.Wrap(err, "failed to open database")
 	}
 	defer database.Close()
 
+	// Create Rust-backed store
+	atsStore, err := storage.NewStore(database, dbPath, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to create attestation store")
+	}
+
 	// Create bounded store
 	boundedStore := storage.NewBoundedStoreWithConfig(
 		database,
+		atsStore,
 		nil, // logger
 		storage.DefaultBoundedStoreConfig(),
 	)

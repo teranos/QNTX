@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
@@ -34,10 +35,10 @@ func GetAttestations(db *sql.DB, filters ats.AttestationFilter) ([]*types.As, er
 	qb.buildContextFilter(filters.Contexts)
 
 	if filters.TimeStart != nil {
-		qb.addClause("timestamp >= ?", *filters.TimeStart)
+		qb.addClause("timestamp >= ?", filters.TimeStart.UTC().Format(time.RFC3339))
 	}
 	if filters.TimeEnd != nil {
-		qb.addClause("timestamp <= ?", *filters.TimeEnd)
+		qb.addClause("timestamp <= ?", filters.TimeEnd.UTC().Format(time.RFC3339))
 	}
 
 	// Add WHERE clause if we have filters
@@ -182,4 +183,50 @@ func GetAttestationByID(db *sql.DB, id string) (*types.As, error) {
 		return nil, errors.Wrapf(err, "failed to scan attestation %s", id)
 	}
 	return as, nil
+}
+
+// GetAttestationsByIDs fetches multiple attestations in a single query.
+// Results are returned in the order of the input IDs; missing IDs are skipped.
+func GetAttestationsByIDs(db *sql.DB, ids []string) ([]*types.As, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	placeholders := make([]byte, 0, len(ids)*2-1)
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		if i > 0 {
+			placeholders = append(placeholders, ',')
+		}
+		placeholders = append(placeholders, '?')
+		args[i] = id
+	}
+
+	query := AttestationSelectQuery + " WHERE id IN (" + string(placeholders) + ")"
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to batch query %d attestations", len(ids))
+	}
+	defer rows.Close()
+
+	// Index results by ID for ordered output
+	byID := make(map[string]*types.As, len(ids))
+	for rows.Next() {
+		as, err := ScanAttestation(rows)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to scan attestation in batch query")
+		}
+		byID[as.ID] = as
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "error iterating batch attestation results")
+	}
+
+	result := make([]*types.As, 0, len(ids))
+	for _, id := range ids {
+		if as, ok := byID[id]; ok {
+			result = append(result, as)
+		}
+	}
+	return result, nil
 }

@@ -126,9 +126,13 @@ export function cleanupResizeObserver(element: HTMLElement, glyphId?: string): v
  * Canvas glyphs are draggable, but their interactive children (textareas,
  * buttons, inputs) need to receive mousedown without triggering a drag.
  * This stops the event from bubbling to the drag handler.
+ *
+ * Also marks elements with data-prevent-drag so the canvas click handler
+ * knows to skip focus theft and glyph selection for these elements.
  */
 export function preventDrag(...elements: HTMLElement[]): void {
     for (const el of elements) {
+        el.dataset.preventDrag = '';
         el.addEventListener('mousedown', (e) => {
             e.stopPropagation();
         });

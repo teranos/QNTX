@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/teranos/QNTX/ats/ingestion"
-	"github.com/teranos/QNTX/ats/storage/testutil"
 )
 
 // mockItem implements AttestationItem interface for testing
@@ -25,13 +24,12 @@ var _ ingestion.Item = (*mockItem)(nil)
 
 // TestNewBatchPersister tests batch persister creation
 func TestNewBatchPersister(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	store, db := createTestStore(t)
 
 	actor := "test-actor"
 	source := "test-source"
 
-	bp := NewBatchPersister(db, actor, source)
+	bp := NewBatchPersister(db, store, actor, source)
 
 	if bp == nil {
 		t.Fatal("NewBatchPersister() returned nil")
@@ -56,10 +54,9 @@ func TestNewBatchPersister(t *testing.T) {
 
 // TestPersistItems_Success tests successful batch persistence
 func TestPersistItems_Success(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	store, db := createTestStore(t)
 
-	bp := NewBatchPersister(db, "test-actor", "test-source")
+	bp := NewBatchPersister(db, store, "test-actor", "test-source")
 
 	items := []AttestationItem{
 		&mockItem{
@@ -101,10 +98,9 @@ func TestPersistItems_Success(t *testing.T) {
 
 // TestPersistItems_WithMetadata tests persistence with item metadata
 func TestPersistItems_WithMetadata(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	store, db := createTestStore(t)
 
-	bp := NewBatchPersister(db, "test-actor", "test-source")
+	bp := NewBatchPersister(db, store, "test-actor", "test-source")
 
 	items := []AttestationItem{
 		&mockItem{
@@ -130,10 +126,9 @@ func TestPersistItems_WithMetadata(t *testing.T) {
 
 // TestPersistItems_EmptyBatch tests persistence of empty batch
 func TestPersistItems_EmptyBatch(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	store, db := createTestStore(t)
 
-	bp := NewBatchPersister(db, "test-actor", "test-source")
+	bp := NewBatchPersister(db, store, "test-actor", "test-source")
 
 	items := []AttestationItem{}
 	result := bp.PersistItems(items, "test-prefix")
@@ -191,10 +186,9 @@ func TestPersistItems_NilDatabase(t *testing.T) {
 
 // TestPersistItems_EmptySubject tests that empty subjects are accepted by ASID generation
 func TestPersistItems_EmptySubject(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	store, db := createTestStore(t)
 
-	bp := NewBatchPersister(db, "test-actor", "test-source")
+	bp := NewBatchPersister(db, store, "test-actor", "test-source")
 
 	// Empty subject is valid - vanity-id library accepts empty strings
 	items := []AttestationItem{
@@ -237,10 +231,9 @@ func TestPersistItems_EmptySubject(t *testing.T) {
 
 // TestPersistItems_LargeBatch tests performance with larger batch
 func TestPersistItems_LargeBatch(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	store, db := createTestStore(t)
 
-	bp := NewBatchPersister(db, "test-actor", "test-source")
+	bp := NewBatchPersister(db, store, "test-actor", "test-source")
 
 	// Create 100 items
 	items := make([]AttestationItem, 100)
@@ -269,10 +262,9 @@ func TestPersistItems_LargeBatch(t *testing.T) {
 
 // TestPersistItems_UniqueASIDs tests that ASIDs are generated correctly
 func TestPersistItems_UniqueASIDs(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	store, db := createTestStore(t)
 
-	bp := NewBatchPersister(db, "test-actor", "test-source")
+	bp := NewBatchPersister(db, store, "test-actor", "test-source")
 
 	// Create items with different subjects/predicates
 	items := []AttestationItem{

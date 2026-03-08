@@ -12,7 +12,6 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
 // ==============================================================================
@@ -55,20 +54,20 @@ func (m *mockMeetingQueryExpander) GetNaturalLanguagePredicates() []string {
 }
 
 type meetingAttendance struct {
-	personID     string
-	meetingID    string
-	title        string
-	meetingType  string
-	startTime    time.Time
-	endTime      time.Time
-	durationH    float64
-	attestedAt   time.Time
+	personID    string
+	meetingID   string
+	title       string
+	meetingType string
+	startTime   time.Time
+	endTime     time.Time
+	durationH   float64
+	attestedAt  time.Time
 }
 
-func createMeetingAttestation(t *testing.T, store *SQLStore, meeting *meetingAttendance) {
+func createMeetingAttestation(t *testing.T, store ats.AttestationStore, meeting *meetingAttendance) {
 	metadata := map[string]interface{}{
-		"start_time":   meeting.startTime.Format(time.RFC3339),
-		"end_time":     meeting.endTime.Format(time.RFC3339),
+		"start_time":     meeting.startTime.Format(time.RFC3339),
+		"end_time":       meeting.endTime.Format(time.RFC3339),
 		"duration_hours": fmt.Sprintf("%.2f", meeting.durationH),
 		"meeting_title":  meeting.title,
 		"meeting_type":   meeting.meetingType,
@@ -94,8 +93,7 @@ func createMeetingAttestation(t *testing.T, store *SQLStore, meeting *meetingAtt
 
 // setupBasicMeetingsTestDB creates test database with meeting attestations
 func setupBasicMeetingsTestDB(t *testing.T) *sql.DB {
-	testDB := qntxtest.CreateTestDB(t)
-	store := NewSQLStore(testDB, nil)
+	store, testDB := createTestStore(t)
 
 	now := time.Now()
 	attestationTime := now.Add(-1 * time.Hour)
@@ -352,8 +350,7 @@ func TestMeetingTemporalAggregation_Basic(t *testing.T) {
 
 // setupOverlappingMeetingsTestDB creates test database with overlapping meetings
 func setupOverlappingMeetingsTestDB(t *testing.T) *sql.DB {
-	testDB := qntxtest.CreateTestDB(t)
-	store := NewSQLStore(testDB, nil)
+	store, testDB := createTestStore(t)
 
 	now := time.Now()
 	attestationTime := now.Add(-1 * time.Hour)
@@ -379,7 +376,7 @@ func setupOverlappingMeetingsTestDB(t *testing.T) *sql.DB {
 		meetingID:   "meeting_alice_bugfix",
 		title:       "Emergency Bug Fix Discussion",
 		meetingType: "technical",
-		startTime:   baseTime.Add(90 * time.Minute), // 12:30
+		startTime:   baseTime.Add(90 * time.Minute),  // 12:30
 		endTime:     baseTime.Add(150 * time.Minute), // 13:30
 		durationH:   1.0,
 		attestedAt:  attestationTime,
@@ -391,7 +388,7 @@ func setupOverlappingMeetingsTestDB(t *testing.T) *sql.DB {
 		meetingID:   "meeting_alice_planning",
 		title:       "Sprint Planning",
 		meetingType: "planning",
-		startTime:   baseTime.Add(3 * time.Hour), // 14:00
+		startTime:   baseTime.Add(3 * time.Hour),     // 14:00
 		endTime:     baseTime.Add(270 * time.Minute), // 15:30
 		durationH:   1.5,
 		attestedAt:  attestationTime,
@@ -450,24 +447,27 @@ func setupOverlappingMeetingsTestDB(t *testing.T) *sql.DB {
 //  3. Sum durations of merged periods
 //
 // Alice (overlapping meetings):
-//   Meeting 1: 11:00-13:00 (2.0h) - "Demo QNTX project"
-//   Meeting 2: 12:30-13:30 (1.0h) - "Emergency Bug Fix Discussion" (overlaps 30min)
-//   Meeting 3: 14:00-15:30 (1.5h) - "Sprint Planning" (separate)
 //
-//   WITHOUT overlap detection: 2.0 + 1.0 + 1.5 = 4.5h ✓ (matches threshold)
-//   WITH overlap detection:
-//     Meetings 1 & 2 merged → 11:00-13:30 = 2.5h
-//     Meeting 3 → 1.5h
-//     Total: 2.5 + 1.5 = 4.0h ✓ (still matches threshold)
+//	Meeting 1: 11:00-13:00 (2.0h) - "Demo QNTX project"
+//	Meeting 2: 12:30-13:30 (1.0h) - "Emergency Bug Fix Discussion" (overlaps 30min)
+//	Meeting 3: 14:00-15:30 (1.5h) - "Sprint Planning" (separate)
+//
+//	WITHOUT overlap detection: 2.0 + 1.0 + 1.5 = 4.5h ✓ (matches threshold)
+//	WITH overlap detection:
+//	  Meetings 1 & 2 merged → 11:00-13:30 = 2.5h
+//	  Meeting 3 → 1.5h
+//	  Total: 2.5 + 1.5 = 4.0h ✓ (still matches threshold)
 //
 // Bob (no overlaps):
-//   Meeting 1: 1.0h
-//   Meeting 2: 1.0h
-//   Meeting 3: 0.5h
-//   Total: 2.5h ✗ (below threshold, same with or without overlap detection)
+//
+//	Meeting 1: 1.0h
+//	Meeting 2: 1.0h
+//	Meeting 3: 0.5h
+//	Total: 2.5h ✗ (below threshold, same with or without overlap detection)
 //
 // Expected: Only Alice matches (4.0h >= 3.5h with overlap detection)
-//           Bob does NOT match (2.5h < 3.5h)
+//
+//	Bob does NOT match (2.5h < 3.5h)
 func TestMeetingTemporalAggregation_OverlapDetection(t *testing.T) {
 	t.Skip("Phase 3: Overlap detection - implement period merging algorithm for calendar meetings")
 
@@ -507,8 +507,7 @@ func TestMeetingTemporalAggregation_OverlapDetection(t *testing.T) {
 
 // setupRealisticOverlapsTestDB creates realistic double-booking scenario
 func setupRealisticOverlapsTestDB(t *testing.T) *sql.DB {
-	testDB := qntxtest.CreateTestDB(t)
-	store := NewSQLStore(testDB, nil)
+	store, testDB := createTestStore(t)
 
 	now := time.Now()
 	attestationTime := now.Add(-1 * time.Hour)
@@ -593,21 +592,24 @@ func setupRealisticOverlapsTestDB(t *testing.T) *sql.DB {
 // Query: ax meeting_duration_hours over 5h
 //
 // Alice's day (overlapping meetings):
-//   9:00-10:00: Daily Standup (1h)
-//   9:30-11:00: All-Hands (1.5h, overlaps 30min with standup)
-//   11:00-12:00: Project Sync (1h)
-//   11:30-13:00: Client Call (1.5h, overlaps 30min with project sync)
-//   16:00-17:30: Architecture Review (1.5h)
+//
+//	9:00-10:00: Daily Standup (1h)
+//	9:30-11:00: All-Hands (1.5h, overlaps 30min with standup)
+//	11:00-12:00: Project Sync (1h)
+//	11:30-13:00: Client Call (1.5h, overlaps 30min with project sync)
+//	16:00-17:30: Architecture Review (1.5h)
 //
 // WITHOUT overlap detection: 1.0 + 1.5 + 1.0 + 1.5 + 1.5 = 6.5h
 // WITH overlap detection:
-//   9:00-11:00 (merged) = 2.0h
-//   11:00-13:00 (merged) = 2.0h
-//   16:00-17:30 = 1.5h
-//   Total: 5.5h
+//
+//	9:00-11:00 (merged) = 2.0h
+//	11:00-13:00 (merged) = 2.0h
+//	16:00-17:30 = 1.5h
+//	Total: 5.5h
 //
 // Expected: Alice matches with 5.5h >= 5h (with overlap detection)
-//           Without overlap detection would show 6.5h (incorrect)
+//
+//	Without overlap detection would show 6.5h (incorrect)
 func TestMeetingTemporalAggregation_RealisticOverlaps(t *testing.T) {
 	t.Skip("Phase 3: Realistic overlap scenario - Alice double-booked for 1 hour total")
 

@@ -106,13 +106,15 @@ func AttestType(store AttestationStore, typeName, source, context string, attrib
 
 	// Create attestation with self-certifying actor
 	// Actor IS the type name itself (type-as-actor in typespace)
+	now := time.Now()
 	attestation := &As{
 		ID:         asid,
 		Subjects:   []string{typeName},
 		Predicates: []string{"type"},
 		Contexts:   []string{context},
 		Actors:     []string{typeName}, // Self-certifying: type IS its own actor
-		Timestamp:  time.Now(),
+		Timestamp:  now,
+		CreatedAt:  now,
 		Source:     source,
 		Attributes: attributes,
 	}

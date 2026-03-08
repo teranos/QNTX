@@ -18,6 +18,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "001",
         include_str!("../../../db/sqlite/migrations/001_create_attestations_table.sql"),
     ),
+    (
+        "040",
+        include_str!("../../../db/sqlite/migrations/040_add_signature_to_attestations.sql"),
+    ),
 ];
 
 /// Apply all pending migrations to the database
@@ -148,6 +152,6 @@ mod tests {
             })
             .unwrap();
 
-        assert_eq!(count, 2); // 000 and 001
+        assert_eq!(count, 3); // 000, 001, and 040
     }
 }

@@ -305,7 +305,7 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 	embeddingModels := []*storage.EmbeddingModel{}
 
 	// Get rich string fields from type definitions for embedding text construction.
-	richStore := storage.NewBoundedStore(s.db, s.logger.Named("embeddings"))
+	richStore := storage.NewBoundedStore(s.db, nil, s.logger.Named("embeddings"))
 	richFields := richStore.GetDiscoveredRichFields()
 
 	for _, attestationID := range req.AttestationIDs {
@@ -506,6 +506,14 @@ type EmbeddingInfoResponse struct {
 	AttestationCount int                     `json:"attestation_count"`
 	UnembeddedIDs    []string                `json:"unembedded_ids,omitempty"`
 	ClusterInfo      *storage.ClusterSummary `json:"cluster_info,omitempty"`
+	HDBSCANConfig    *HDBSCANConfig          `json:"hdbscan_config,omitempty"`
+}
+
+// HDBSCANConfig exposes current clustering parameters to the frontend
+type HDBSCANConfig struct {
+	MinClusterSize        int     `json:"min_cluster_size"`
+	ClusterThreshold      float64 `json:"cluster_threshold"`
+	ClusterMatchThreshold float64 `json:"cluster_match_threshold"`
 }
 
 // HandleEmbeddingInfo returns embedding service status and counts (GET /api/embeddings/info)
@@ -570,6 +578,17 @@ func (s *QNTXServer) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
+	// Include current HDBSCAN config
+	minCS := appcfg.GetInt("embeddings.min_cluster_size")
+	if minCS <= 0 {
+		minCS = 5
+	}
+	resp.HDBSCANConfig = &HDBSCANConfig{
+		MinClusterSize:        minCS,
+		ClusterThreshold:      appcfg.GetFloat64("embeddings.cluster_threshold"),
+		ClusterMatchThreshold: appcfg.GetFloat64("embeddings.cluster_match_threshold"),
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		s.logger.Errorw("Failed to encode embeddings info response",
@@ -577,110 +596,6 @@ func (s *QNTXServer) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request)
 			"embedding_count", resp.EmbeddingCount,
 			"attestation_count", resp.AttestationCount,
 			"error", err)
-	}
-}
-
-// ClusterRequest represents the request body for clustering
-type ClusterRequest struct {
-	MinClusterSize int `json:"min_cluster_size,omitempty"`
-}
-
-// ClusterResponse represents the result of a clustering operation
-type ClusterResponse struct {
-	Summary *storage.ClusterSummary `json:"summary"`
-	TimeMS  float64                 `json:"time_ms"`
-}
-
-// HandleEmbeddingCluster runs HDBSCAN clustering on all stored embeddings (POST /api/embeddings/cluster)
-func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	if s.embeddingService == nil || s.embeddingStore == nil {
-		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	// Parse optional min_cluster_size from body
-	minClusterSize := 5
-	if r.Body != nil {
-		var req ClusterRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err == nil && req.MinClusterSize > 0 {
-			minClusterSize = req.MinClusterSize
-		}
-	}
-
-	result, err := RunHDBSCANClustering(
-		s.embeddingStore,
-		s.embeddingService,
-		s.embeddingClusterInvalidator,
-		minClusterSize,
-		appcfg.GetFloat64("embeddings.cluster_match_threshold"),
-		s.logger,
-	)
-	if err != nil {
-		s.logger.Errorw("HDBSCAN clustering failed", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	resp := ClusterResponse{
-		Summary: result.Summary,
-		TimeMS:  result.TimeMS,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		s.logger.Errorw("Failed to encode cluster response", "error", err)
-	}
-}
-
-// ClusterListEntry represents a single cluster in the API response.
-type ClusterListEntry struct {
-	ID        int     `json:"id"`
-	Label     *string `json:"label"`
-	Members   int     `json:"members"`
-	Status    string  `json:"status"`
-	FirstSeen string  `json:"first_seen"`
-	LastSeen  string  `json:"last_seen"`
-}
-
-// HandleEmbeddingClusters returns active clusters with metadata (GET /api/embeddings/clusters)
-func (s *QNTXServer) HandleEmbeddingClusters(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	if s.embeddingStore == nil {
-		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	details, err := s.embeddingStore.GetClusterDetails()
-	if err != nil {
-		s.logger.Errorw("Failed to get cluster details", "error", err)
-		http.Error(w, "Failed to retrieve cluster details", http.StatusInternalServerError)
-		return
-	}
-
-	entries := make([]ClusterListEntry, len(details))
-	for i, d := range details {
-		entries[i] = ClusterListEntry{
-			ID:        d.ID,
-			Label:     d.Label,
-			Members:   d.Members,
-			Status:    d.Status,
-			FirstSeen: d.FirstSeen.Format(time.RFC3339),
-			LastSeen:  d.LastSeen.Format(time.RFC3339),
-		}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(entries); err != nil {
-		s.logger.Errorw("Failed to encode clusters response", "error", err)
 	}
 }
 
@@ -735,7 +650,7 @@ func (s *QNTXServer) SetupEmbeddingService() {
 	observer := &EmbeddingObserver{
 		embeddingService: embService,
 		embeddingStore:   embStore,
-		richStore:        storage.NewBoundedStore(s.db, s.logger.Named("auto-embed")),
+		richStore:        storage.NewBoundedStore(s.db, nil, s.logger.Named("auto-embed")),
 		logger:           s.logger.Named("auto-embed"),
 		clusterThreshold: float32(appcfg.GetFloat64("embeddings.cluster_threshold")),
 		projectFunc:      s.projectToCanvas,
@@ -969,35 +884,6 @@ func extractRichTextFromAttributes(attrs map[string]interface{}, richFields []st
 	return strings.Join(parts, " ")
 }
 
-// HandleClusterTimeline serves cluster evolution data across runs (GET /api/embeddings/cluster-timeline).
-func (s *QNTXServer) HandleClusterTimeline(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	if s.embeddingStore == nil {
-		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	timeline, err := s.embeddingStore.GetClusterTimeline()
-	if err != nil {
-		s.logger.Errorw("Failed to get cluster timeline", "error", err)
-		http.Error(w, "Failed to retrieve cluster timeline", http.StatusInternalServerError)
-		return
-	}
-
-	if timeline == nil {
-		timeline = []storage.ClusterTimelinePoint{}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(timeline); err != nil {
-		s.logger.Errorw("Failed to encode cluster timeline response", "error", err)
-	}
-}
-
 // callReducePlugin sends an HTTP request to the reduce plugin via gRPC.
 // Returns the response body or an error.
 func (s *QNTXServer) callReducePlugin(ctx context.Context, method, path string, body []byte) ([]byte, error) {
@@ -1046,8 +932,18 @@ func (s *QNTXServer) HandleEmbeddingProject(w http.ResponseWriter, r *http.Reque
 		methods = []string{"umap"}
 	}
 
+	var params *ProjectionParams
+	if r.Body != nil {
+		var req ProjectionParams
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+			if req.NNeighbors != nil || req.MinDist != nil || req.Perplexity != nil {
+				params = &req
+			}
+		}
+	}
+
 	startTime := time.Now()
-	results, err := RunAllProjections(r.Context(), methods, s.embeddingStore, s.embeddingService, s.callReducePlugin, s.logger)
+	results, err := RunAllProjections(r.Context(), methods, s.embeddingStore, s.embeddingService, s.callReducePlugin, s.logger, params)
 	if err != nil {
 		s.logger.Errorw("Projection failed", "methods", methods, "error", err)
 		http.Error(w, fmt.Sprintf("Projection failed: %s", err), http.StatusInternalServerError)

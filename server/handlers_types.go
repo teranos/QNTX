@@ -10,9 +10,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-	"time"
 
-	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 )
@@ -46,11 +44,14 @@ func (s *QNTXServer) HandleTypes(w http.ResponseWriter, r *http.Request) {
 func (s *QNTXServer) handleGetTypes(w http.ResponseWriter, r *http.Request) {
 	// Query type attestations from the database using SQLite JSON functions
 	query := `
-		SELECT json_extract(subjects, '$[0]') as type_name, attributes
-		FROM attestations
-		WHERE json_extract(predicates, '$[0]') = 'type'
-		  AND json_extract(contexts, '$[0]') = 'graph'
-		ORDER BY created_at DESC
+		SELECT type_name, attributes FROM (
+			SELECT json_extract(subjects, '$[0]') as type_name, attributes,
+				ROW_NUMBER() OVER (PARTITION BY json_extract(subjects, '$[0]') ORDER BY created_at DESC) as rn
+			FROM attestations
+			WHERE json_extract(predicates, '$[0]') = 'type'
+			  AND json_valid(attributes) = 1
+		) WHERE rn = 1
+		ORDER BY type_name
 	`
 
 	rows, err := s.db.Query(query)
@@ -103,8 +104,8 @@ func (s *QNTXServer) handleGetType(w http.ResponseWriter, r *http.Request, typeN
 		FROM attestations
 		WHERE json_extract(subjects, '$[0]') = ?
 		  AND json_extract(predicates, '$[0]') = 'type'
-		  AND json_extract(contexts, '$[0]') = 'graph'
-		ORDER BY created_at DESC
+		  AND json_valid(attributes) = 1
+		ORDER BY rowid DESC
 		LIMIT 1
 	`
 
@@ -229,8 +230,7 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Use AttestType function from the types package
-	store := &dbAttestationStore{db: s.db}
-	if err := types.AttestType(store, req.Name, "web-ui", "graph", attributes); err != nil {
+	if err := types.AttestType(s.atsStore, req.Name, "web-ui", "graph", attributes); err != nil {
 		s.logger.Errorw("Failed to create type attestation",
 			"error", err,
 			"type", req.Name,
@@ -261,41 +261,4 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, response)
-}
-
-// dbAttestationStore implements the AttestationStore interface for types.AttestType
-type dbAttestationStore struct {
-	db *sql.DB
-}
-
-func (s *dbAttestationStore) CreateAttestation(as *types.As) error {
-	fields, err := storage.MarshalAttestationFields(as)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal attestation fields")
-	}
-
-	// Insert attestation into SQLite database
-	query := `
-		INSERT INTO attestations (
-			id, subjects, predicates, contexts, actors,
-			timestamp, source, attributes, created_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`
-
-	_, err = s.db.Exec(query,
-		as.ID,
-		fields.SubjectsJSON,
-		fields.PredicatesJSON,
-		fields.ContextsJSON,
-		fields.ActorsJSON,
-		as.Timestamp,
-		as.Source,
-		fields.AttributesJSON,
-		time.Now(),
-	)
-
-	if err != nil {
-		return errors.Wrap(err, "failed to create attestation")
-	}
-	return nil
 }
