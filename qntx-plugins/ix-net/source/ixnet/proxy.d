@@ -27,18 +27,15 @@
 ///   - Streaming (SSE) token extraction scans for last "input_tokens"/
 ///     "output_tokens" in the accumulated body. May miss tokens if the
 ///     SSE framing splits the JSON across chunk boundaries.
-///   - ATSStore attestation not wired up — captures are in the ring
-///     buffer but never attested to QNTX.
+///   - ATSStore connects but captures are not attested yet.
 ///   - Debug dump code (/tmp/ix-net-dump) still present.
 ///   - API key visible in captured request headers (authorization header).
 ///   - OpenSSL linked from /usr/local/opt/openssl (homebrew path).
-///   - Not yet tested as a QNTX plugin (only standalone mode verified).
-///     gRPC lifecycle, plugin discovery, and ATSStore attestation creation
-///     are untested end-to-end within a running QNTX instance.
 module ixnet.proxy;
 
 import ixnet.log;
 import ixnet.tls;
+import ixnet.extract;
 import std.conv : to;
 import std.socket;
 import core.thread;
@@ -80,6 +77,7 @@ struct ProxyState {
     Capture[MAX_CAPTURES] captures;  // ring buffer
     int captureHead;                 // next write index
     Thread listenerThread;
+    void* atsClient;                 // ATSClient* from plugin state (null if not connected)
 }
 
 /// Start the HTTPS proxy on the given port.
@@ -376,8 +374,9 @@ private void tlsRelay(ProxyState* state, ref TLSConn clientTLS,
         // Log and extract only for API calls — one line per exchange
         if (startsWith(path, "/v1/messages")) {
             int imgsSaved = 0;
+            string imgDir = "";
             if (reqInfo.hasImages) {
-                auto imgDir = getImageDir();
+                imgDir = getImageDir();
                 if (imgDir.length > 0) {
                     // Store images in session subdirectory
                     if (reqInfo.sessionId.length > 0)
@@ -396,6 +395,12 @@ private void tlsRelay(ProxyState* state, ref TLSConn clientTLS,
                         method, path, reqInfo.model, statusCode,
                         totalReqBytes, totalRespBytes, reqInfo.imageCount,
                         respInfo.inputTokens, respInfo.outputTokens);
+            }
+
+            // Attest only when images were captured
+            if (imgsSaved > 0) {
+                attestCapture(state, reqInfo, respInfo, statusCode,
+                              totalReqBytes, totalRespBytes, imgsSaved, imgDir);
             }
         }
     }
@@ -866,6 +871,54 @@ private bool isInterceptHost(string hostPort) {
     auto colonIdx = lastIndexOfChar(hostPort, ':');
     string host = colonIdx > 0 ? hostPort[0 .. colonIdx] : hostPort;
     return host == "api.anthropic.com";
+}
+
+/// Attest a captured API exchange to QNTX.
+private void attestCapture(ProxyState* state,
+                           ref RequestInfo reqInfo, ref ResponseInfo respInfo,
+                           int statusCode, size_t reqBytes, size_t respBytes,
+                           int imgsSaved, string imgDir) {
+    import ixnet.ats : ATSClient;
+    import ixnet.proto : AttestationCommand, encodeStructFromStringMap;
+    import ixnet.version_ : PLUGIN_VERSION;
+
+    if (state.atsClient is null) return;
+    auto ats = cast(ATSClient*)state.atsClient;
+    if (!ats.connected) return;
+
+    AttestationCommand cmd;
+    cmd.subjects = ["/v1/messages"];
+    cmd.predicates = ["captured"];
+    cmd.contexts = [reqInfo.model];
+    cmd.source = "ix-net";
+    cmd.sourceVersion = PLUGIN_VERSION;
+
+    import core.stdc.time : time;
+    cmd.timestamp = cast(long)time(null);
+
+    // Build attributes map
+    string[string] attrs;
+    attrs["status"] = intToStr(statusCode);
+    attrs["req_bytes"] = intToStr(cast(int)reqBytes);
+    attrs["resp_bytes"] = intToStr(cast(int)respBytes);
+    attrs["input_tokens"] = intToStr(respInfo.inputTokens);
+    attrs["output_tokens"] = intToStr(respInfo.outputTokens);
+    attrs["images"] = intToStr(reqInfo.imageCount);
+    attrs["streaming"] = reqInfo.streaming ? "true" : "false";
+    if (reqInfo.sessionId.length > 0)
+        attrs["session_id"] = reqInfo.sessionId;
+    if (imgsSaved > 0 && imgDir.length > 0)
+        attrs["image_dir"] = imgDir;
+
+    cmd.attributes = encodeStructFromStringMap(attrs);
+
+    string err;
+    ats.createAttestation(cmd, err);
+}
+
+private string intToStr(int n) {
+    import std.conv : to;
+    return n.to!string;
 }
 
 /// Resolve image storage directory (~/.qntx/files/ix-net/).
