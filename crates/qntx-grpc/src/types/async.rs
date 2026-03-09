@@ -15,44 +15,6 @@
 #![allow(clippy::all)]
 #![allow(unused_imports)]
 
-/// ErrorCode represents the classification of an error
-#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#errorcode>"]
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum ErrorCode {
-    #[serde(rename = "ai_error")]
-    AiError,
-    #[serde(rename = "database_error")]
-    DatabaseError,
-    #[serde(rename = "file_not_found")]
-    FileNotFound,
-    #[serde(rename = "network_error")]
-    NetworkError,
-    #[serde(rename = "parse_error")]
-    ParseError,
-    #[serde(rename = "timeout")]
-    Timeout,
-    #[serde(rename = "unknown")]
-    Unknown,
-    #[serde(rename = "validation_error")]
-    ValidationError,
-}
-
-/// ErrorContext provides structured error information for job failures
-#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#errorcontext>"]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ErrorContext {
-    /// Where the error occurred
-    pub stage: String,
-    /// Error classification
-    pub code: ErrorCode,
-    /// Human-readable message
-    pub message: String,
-    /// Can the job be retried?
-    pub retryable: bool,
-    /// Can continue processing other items?
-    pub recoverable: bool,
-}
-
 /// Job represents an async IX operation
 /// ARCHITECTURE: Generic job system with handler-based execution
 /// - Infrastructure (pulse/async) is domain-agnostic

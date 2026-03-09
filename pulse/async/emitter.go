@@ -72,23 +72,16 @@ func (e *JobProgressEmitter) EmitComplete(summary map[string]interface{}) {
 
 // EmitError logs errors, updates job state, and broadcasts to WebSocket clients.
 func (e *JobProgressEmitter) EmitError(stage string, err error) {
-	// Classify the error for structured reporting
-	ctx := ClassifyError(stage, err)
-
-	// Log error with classification
 	e.log.Errorw("Job error",
 		"stage", stage,
-		"error_code", ctx.Code,
 		"error", err,
-		"retryable", ctx.Retryable,
-		"recoverable", ctx.Recoverable,
 	)
 
 	// Update job error state in database
-	e.job.Error = ctx.Message
-	if err := e.queue.UpdateJob(e.job); err != nil {
+	e.job.Error = err.Error()
+	if updateErr := e.queue.UpdateJob(e.job); updateErr != nil {
 		e.log.Warnw("Failed to update job error state",
-			"error", err,
+			"error", updateErr,
 		)
 	}
 
@@ -109,18 +102,14 @@ func (e *JobProgressEmitter) EmitError(stage string, err error) {
 		broadcastIxProgress(event ixProgressEvent)
 	}
 
-	// Try to cast to the server type that has broadcastIxProgress
 	if srv, ok := e.streamBroadcaster.(serverBroadcaster); ok {
 		event := ixProgressEvent{
 			Type:      "error",
 			Timestamp: time.Now(),
 			Data: map[string]interface{}{
-				"job_id":      e.job.ID,
-				"stage":       ctx.Stage,
-				"code":        string(ctx.Code),
-				"error":       ctx.Message,
-				"retryable":   ctx.Retryable,
-				"recoverable": ctx.Recoverable,
+				"job_id": e.job.ID,
+				"stage":  stage,
+				"error":  err.Error(),
 			},
 		}
 		srv.broadcastIxProgress(event)

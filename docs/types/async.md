@@ -10,41 +10,6 @@ This document shows Go type definitions from the codebase.
 - TypeScript: [`types/generated/typescript/async.ts`](https://github.com/teranos/QNTX/blob/main/types/generated/typescript/async.ts)
 - Rust: [`types/generated/rust/async.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/async.rs)
 
-## ErrorCode {#errorcode}
-
-**Source**: [`pulse/async/error.go:13`](https://github.com/teranos/QNTX/blob/main/pulse/async/error.go#L13)
-
-
-```go
-type ErrorCode string
-
-const (
-	ErrorCodeAi_error ErrorCode = "ai_error"
-	ErrorCodeDatabase_error ErrorCode = "database_error"
-	ErrorCodeFile_not_found ErrorCode = "file_not_found"
-	ErrorCodeNetwork_error ErrorCode = "network_error"
-	ErrorCodeParse_error ErrorCode = "parse_error"
-	ErrorCodeTimeout ErrorCode = "timeout"
-	ErrorCodeUnknown ErrorCode = "unknown"
-	ErrorCodeValidation_error ErrorCode = "validation_error"
-)
-```
-
-## ErrorContext {#errorcontext}
-
-**Source**: [`pulse/async/error.go:27`](https://github.com/teranos/QNTX/blob/main/pulse/async/error.go#L27)
-
-
-```go
-type ErrorContext struct {
-	Stage string `json:"stage"`
-	Code ErrorCode `json:"code"`
-	Message string `json:"message"`
-	Retryable bool `json:"retryable"`
-	Recoverable bool `json:"recoverable"`
-}
-```
-
 ## Job {#job}
 
 **Source**: [`pulse/async/job.go:69`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L69)
