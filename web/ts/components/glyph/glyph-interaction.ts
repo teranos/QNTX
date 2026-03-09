@@ -299,7 +299,8 @@ export function makeDraggable(
 
                     if (existingComp && standaloneClass) {
                         const options = getMeldOptions(standaloneClass, compositionElement, existingComp.edges);
-                        const option = selectPreferredMeldOption(options, anchorId);
+                        const option = selectPreferredMeldOption(options, anchorId, meldInfo.direction);
+
                         if (option) {
                             extendComposition(compositionElement, standaloneElement, standaloneId, option.glyphId, option.direction, option.incomingRole);
 
