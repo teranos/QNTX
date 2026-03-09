@@ -7,7 +7,7 @@
 //
 // Build with:
 //
-//	go build ./qntx-ix-json/cmd/qntx-ix-json-plugin
+//	go build ./qntx-plugins/ix-json/cmd/qntx-ix-json-plugin
 //
 // Then install to ~/.qntx/plugins/ or add to plugin.paths in am.toml.
 package qntxixjson

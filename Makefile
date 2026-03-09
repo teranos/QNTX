@@ -240,7 +240,7 @@ github-plugin: ## Build and install GitHub plugin to ~/.qntx/plugins/
 	@$(MAKE) -C qntx-github install PREFIX=$(PREFIX)
 
 ix-json-plugin: ## Build and install ix-json plugin to ~/.qntx/plugins/
-	@$(MAKE) -C qntx-ix-json install PREFIX=$(PREFIX)
+	@$(MAKE) -C qntx-plugins/ix-json install PREFIX=$(PREFIX)
 
 ix-bin-plugin: ## Build and install ix-bin D plugin to ~/.qntx/plugins/
 	@$(MAKE) -C qntx-plugins/ix-bin install PREFIX=$(PREFIX)
