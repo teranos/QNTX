@@ -43,11 +43,12 @@ func (h *PluginProxyHandler) Name() string {
 
 // Execute forwards the job to the plugin for execution.
 func (h *PluginProxyHandler) Execute(ctx context.Context, job *async.Job) error {
+	timeout := int64(300) // TODO: Make configurable or derive from job
 	req := &protocol.ExecuteJobRequest{
 		JobId:       job.ID,
 		HandlerName: h.handlerName,
 		Payload:     job.Payload,
-		TimeoutSecs: 300, // TODO: Make configurable or derive from job
+		TimeoutSecs: &timeout,
 	}
 
 	client := h.plugin.Client()

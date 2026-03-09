@@ -179,7 +179,7 @@ message ExecuteJobRequest {
   string job_id = 1;           // For logging/tracking
   string handler_name = 2;     // Which handler to invoke
   bytes payload = 3;           // Job-specific data (JSON)
-  int64 timeout_secs = 4;      // Execution timeout (0 = no timeout)
+  optional int64 timeout_secs = 4;  // Execution timeout. If not set, no timeout.
 }
 
 // ExecuteJobResponse is returned after job execution
