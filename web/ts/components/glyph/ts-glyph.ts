@@ -22,14 +22,24 @@ import { canvasPlaced } from './manifestations/canvas-placed';
 import { putAttestation, queryAttestations, parseQuery, generateASUID } from '../../qntx-wasm';
 import type { Attestation } from '../../qntx-wasm';
 
-export const TS_DEFAULT_CODE = `// Create a local attestation — searchable offline via WASM fuzzy search
-await qntx.attest({
-    subjects: ["teranos"],
-    predicates: ["develops"],
-    contexts: ["decentralised attestation network"],
-    attributes: { description: "QNTX node running locally in browser" }
+export const TS_DEFAULT_CODE = `// Generate a random attestation — each run creates a unique ASUID
+const subjects = ["alice", "bob", "charlie", "diana", "eve"]
+const actions = ["discovered", "verified", "challenged", "confirmed", "witnessed"]
+const domains = ["cryptography", "graph-theory", "distributed-systems", "formal-proofs", "zero-knowledge"]
+
+const who = subjects[Math.floor(Math.random() * subjects.length)]
+const did = actions[Math.floor(Math.random() * actions.length)]
+const where = domains[Math.floor(Math.random() * domains.length)]
+const confidence = Math.round(Math.random() * 100)
+
+const result = await qntx.attest({
+    subjects: [who],
+    predicates: [did],
+    contexts: [where],
+    attributes: { confidence, note: who + " " + did + " something in " + where }
 })
-qntx.log("Attested!")
+qntx.log(result.id)
+qntx.log(who + " " + did + " [" + where + "] confidence=" + confidence + "%")
 `;
 
 /** AsyncFunction constructor — supports `await` in user code */
