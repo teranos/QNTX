@@ -255,9 +255,9 @@ type AttestationFilter struct {
 	Predicates    []string               `protobuf:"bytes,2,rep,name=predicates,proto3" json:"predicates,omitempty"`
 	Contexts      []string               `protobuf:"bytes,3,rep,name=contexts,proto3" json:"contexts,omitempty"`
 	Actors        []string               `protobuf:"bytes,4,rep,name=actors,proto3" json:"actors,omitempty"`
-	TimeStart     int64                  `protobuf:"varint,5,opt,name=time_start,json=timeStart,proto3" json:"time_start,omitempty"` // Unix timestamp in milliseconds (0 = no filter)
-	TimeEnd       int64                  `protobuf:"varint,6,opt,name=time_end,json=timeEnd,proto3" json:"time_end,omitempty"`       // Unix timestamp in milliseconds (0 = no filter)
-	Limit         *int32                 `protobuf:"varint,7,opt,name=limit,proto3,oneof" json:"limit,omitempty"`                    // Maximum results. If not set, no limit applied.
+	TimeStart     *int64                 `protobuf:"varint,5,opt,name=time_start,json=timeStart,proto3,oneof" json:"time_start,omitempty"` // Unix timestamp in milliseconds. If not set, no lower bound.
+	TimeEnd       *int64                 `protobuf:"varint,6,opt,name=time_end,json=timeEnd,proto3,oneof" json:"time_end,omitempty"`       // Unix timestamp in milliseconds. If not set, no upper bound.
+	Limit         *int32                 `protobuf:"varint,7,opt,name=limit,proto3,oneof" json:"limit,omitempty"`                          // Maximum results. If not set, no limit applied.
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -321,15 +321,15 @@ func (x *AttestationFilter) GetActors() []string {
 }
 
 func (x *AttestationFilter) GetTimeStart() int64 {
-	if x != nil {
-		return x.TimeStart
+	if x != nil && x.TimeStart != nil {
+		return *x.TimeStart
 	}
 	return 0
 }
 
 func (x *AttestationFilter) GetTimeEnd() int64 {
-	if x != nil {
-		return x.TimeEnd
+	if x != nil && x.TimeEnd != nil {
+		return *x.TimeEnd
 	}
 	return 0
 }
@@ -803,18 +803,20 @@ const file_plugin_grpc_protocol_atsstore_proto_rawDesc = "" +
 	"\x06source\x18\a \x01(\tR\x06source\x12%\n" +
 	"\x0esource_version\x18\b \x01(\tR\rsourceVersionB\f\n" +
 	"\n" +
-	"_timestamp\"\xe2\x01\n" +
+	"_timestamp\"\x88\x02\n" +
 	"\x11AttestationFilter\x12\x1a\n" +
 	"\bsubjects\x18\x01 \x03(\tR\bsubjects\x12\x1e\n" +
 	"\n" +
 	"predicates\x18\x02 \x03(\tR\n" +
 	"predicates\x12\x1a\n" +
 	"\bcontexts\x18\x03 \x03(\tR\bcontexts\x12\x16\n" +
-	"\x06actors\x18\x04 \x03(\tR\x06actors\x12\x1d\n" +
+	"\x06actors\x18\x04 \x03(\tR\x06actors\x12\"\n" +
 	"\n" +
-	"time_start\x18\x05 \x01(\x03R\ttimeStart\x12\x19\n" +
-	"\btime_end\x18\x06 \x01(\x03R\atimeEnd\x12\x19\n" +
-	"\x05limit\x18\a \x01(\x05H\x00R\x05limit\x88\x01\x01B\b\n" +
+	"time_start\x18\x05 \x01(\x03H\x00R\ttimeStart\x88\x01\x01\x12\x1e\n" +
+	"\btime_end\x18\x06 \x01(\x03H\x01R\atimeEnd\x88\x01\x01\x12\x19\n" +
+	"\x05limit\x18\a \x01(\x05H\x02R\x05limit\x88\x01\x01B\r\n" +
+	"\v_time_startB\v\n" +
+	"\t_time_endB\b\n" +
 	"\x06_limit\"r\n" +
 	"\x18CreateAttestationRequest\x12\x1d\n" +
 	"\n" +

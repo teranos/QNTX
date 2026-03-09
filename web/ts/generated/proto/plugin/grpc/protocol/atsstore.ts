@@ -52,10 +52,14 @@ export interface AttestationFilter {
   predicates: string[];
   contexts: string[];
   actors: string[];
-  /** Unix timestamp in milliseconds (0 = no filter) */
-  time_start: number;
-  /** Unix timestamp in milliseconds (0 = no filter) */
-  time_end: number;
+  /** Unix timestamp in milliseconds. If not set, no lower bound. */
+  time_start?:
+    | number
+    | undefined;
+  /** Unix timestamp in milliseconds. If not set, no upper bound. */
+  time_end?:
+    | number
+    | undefined;
   /** Maximum results. If not set, no limit applied. */
   limit?: number | undefined;
 }
