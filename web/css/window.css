@@ -259,7 +259,62 @@
 
 .glyph-label {
     font-weight: normal;
-    color: #c0c0c0;
+    color: var(--text-on-dark-secondary, #a9abaa);
+    font-size: 12px;
+}
+
+/* GlyphUI form primitives — dark-mode first */
+.glyph-form-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.glyph-input {
+    padding: 6px 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--bg-dark-light, #343534);
+    border: 1px solid var(--border-on-dark, #3f4140);
+    border-radius: 4px;
+    color: var(--text-on-dark, #dfe1e0);
+}
+
+.glyph-input:focus {
+    outline: none;
+    border-color: var(--accent-on-dark, #7dba8a);
+}
+
+.glyph-input::placeholder {
+    color: var(--text-on-dark-tertiary, #878988);
+}
+
+.glyph-btn {
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: var(--font-mono);
+    background: var(--bg-dark-light, #343534);
+    border: 1px solid var(--border-on-dark, #3f4140);
+    border-radius: 4px;
+    color: var(--text-on-dark, #dfe1e0);
+    cursor: pointer;
+}
+
+.glyph-btn:hover {
+    background: var(--bg-dark-hover, #2a2b2a);
+    border-color: var(--accent-on-dark, #7dba8a);
+}
+
+.glyph-btn--primary {
+    background: var(--accent-color, #5a9a6a);
+    border-color: var(--accent-color, #5a9a6a);
+    color: #fff;
+}
+
+.glyph-btn--primary:hover {
+    background: var(--accent-hover, #4a8559);
+    border-color: var(--accent-hover, #4a8559);
 }
 
 .glyph-value {
