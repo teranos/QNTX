@@ -59,6 +59,13 @@ export function fuzzy_search(query: string, vocab_type: string, limit: number, m
 export function fuzzy_status(): string;
 
 /**
+ * Generate a content-addressed ASUID from SPC components and a content hash.
+ * Returns JSON: `{"full":"AS-SARAH-AUTHOR-GITHUB-7K4M3B9X","short":"AS-SARAH-AUTHOR-GITHUB-7K4M"}`
+ * or `{"error":"..."}` on invalid input.
+ */
+export function generate_asuid(input: string): string;
+
+/**
  * Retrieve an attestation by ID from IndexedDB.
  * Returns a Promise that resolves to JSON-serialized attestation or null if not found.
  *
@@ -76,6 +83,16 @@ export function get_attestation(id: string): Promise<string | undefined>;
  * Returns JSON: `{"slot":"predicates","prefix":"auth","items":[{"value":"...","score":0.95,"strategy":"exact"},...]}`
  */
 export function get_completions(partial_query: string, limit: number): string;
+
+/**
+ * Clean a seed string for ID generation (normalize, uppercase, collapse repeats).
+ */
+export function id_clean_seed(input: string): string;
+
+/**
+ * Normalize input for ID lookup (uppercase, map 0→O/1→I, strip invalid).
+ */
+export function id_normalize_for_lookup(input: string): string;
 
 /**
  * Initialize the IndexedDB store. Must be called before any storage operations.
@@ -202,8 +219,11 @@ export interface InitOutput {
     readonly fuzzy_rebuild_index: () => any;
     readonly fuzzy_search: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly fuzzy_status: () => [number, number];
+    readonly generate_asuid: (a: number, b: number) => [number, number];
     readonly get_attestation: (a: number, b: number) => any;
     readonly get_completions: (a: number, b: number, c: number) => [number, number];
+    readonly id_clean_seed: (a: number, b: number) => [number, number];
+    readonly id_normalize_for_lookup: (a: number, b: number) => [number, number];
     readonly init_store: (a: number, b: number) => any;
     readonly is_store_initialized: () => number;
     readonly list_attestation_ids: () => any;
