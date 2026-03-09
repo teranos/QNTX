@@ -135,18 +135,36 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 	// Register loaded plugins with registry
 	loadedPlugins := manager.GetAllPlugins()
 	pluginLogger.Infof("Registering %d loaded plugins with registry", len(loadedPlugins))
+	registeredNames := make(map[string]bool)
 	for i, p := range loadedPlugins {
 		meta := p.Metadata()
 		pluginLogger.Infof("[%d/%d] Attempting to register '%s' plugin", i+1, len(loadedPlugins), meta.Name)
 		if err := registry.Register(p); err != nil {
 			pluginLogger.Errorf("Failed to register '%s' plugin v%s: %s (skipping)",
 				meta.Name, meta.Version, err.Error())
+			registry.MarkFailed(meta.Name, err.Error())
 			continue
 		}
 		// Mark plugin as running since gRPC connection is already established
 		registry.MarkReady(meta.Name)
+		registeredNames[meta.Name] = true
 		pluginLogger.Infof("Registered '%s' plugin v%s - %s",
 			meta.Name, meta.Version, meta.Description)
+	}
+
+	// Mark any pre-registered plugins that never loaded as failed, with the real error
+	failedErrors := manager.GetFailedPlugins()
+	for _, name := range cfg.Plugin.Enabled {
+		if registeredNames[name] {
+			continue
+		}
+		if state, ok := registry.GetState(name); ok && state == plugin.StateLoading {
+			reason := failedErrors[name]
+			if reason == "" {
+				reason = "plugin failed to load (check server logs for details)"
+			}
+			registry.MarkFailed(name, reason)
+		}
 	}
 
 	pluginLogger.Info("Plugin loading complete")
