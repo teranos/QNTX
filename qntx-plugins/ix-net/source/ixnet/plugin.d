@@ -148,6 +148,8 @@ HTTPResponse handleHTTP(ref const HTTPRequest req) {
         return handleCaptures();
     } else if (method == "GET" && path == "/net-inspector-module.js") {
         return serveGlyphModule();
+    } else if (method == "GET" && path.length >= 7 && path[0 .. 7] == "/images") {
+        return handleImages(path, req);
     }
 
     // 404
@@ -256,6 +258,314 @@ private HTTPResponse serveGlyphModule() {
         httpHeader("Cache-Control", "no-cache"),
     ];
     return resp;
+}
+
+/// GET /images?session=<id> — list images for a session.
+/// GET /images?branch=<name> — find sessions for a branch, list all images.
+/// GET /images/<session>/<filename> — serve an image file.
+private HTTPResponse handleImages(string path, ref const HTTPRequest req) {
+    import std.file : exists, isDir, dirEntries, SpanMode, read_ = read;
+
+    auto baseDir = getImageDir();
+    if (baseDir.length == 0)
+        return jsonResponse(500, `{"error":"cannot resolve image directory"}`);
+
+    if (path == "/images" || (path.length > 7 && path[7] == '?')) {
+        auto branch = getQueryParam(req, "branch");
+        auto session = getQueryParam(req, "session");
+
+        // Branch query: resolve branch → session IDs via ATS
+        if (branch.length > 0) {
+            return handleImagesByBranch(branch, baseDir);
+        }
+
+        if (session.length == 0)
+            return jsonResponse(400, `{"error":"missing session or branch parameter"}`);
+
+        return handleImagesBySession(session, baseDir);
+    }
+
+    // Serve image: GET /images/<session>/<filename>
+    // path is "/images/<session>/<filename>"
+    auto rest = path[8 .. $]; // skip "/images/"
+    auto slashIdx = indexOf(rest, "/");
+    if (slashIdx < 0)
+        return jsonResponse(400, `{"error":"expected /images/<session>/<filename>"}`);
+
+    auto session = rest[0 .. slashIdx];
+    auto filename = rest[slashIdx + 1 .. $];
+
+    if (!isSafePath(session) || !isSafePath(filename))
+        return jsonResponse(400, `{"error":"invalid path"}`);
+
+    auto filePath = baseDir ~ "/" ~ session ~ "/" ~ filename;
+    if (!exists(filePath))
+        return jsonResponse(404, `{"error":"image not found"}`);
+
+    // Read and serve
+    try {
+        auto data = cast(ubyte[])read_(filePath);
+        HTTPResponse resp;
+        resp.statusCode = 200;
+        resp.body_ = data;
+        resp.headers = [
+            httpHeader("Content-Type", mimeForFile(filename)),
+            httpHeader("Cache-Control", "max-age=3600"),
+            httpHeader("Access-Control-Allow-Origin", "https://github.com"),
+        ];
+        return resp;
+    } catch (Exception e) {
+        return jsonResponse(500, `{"error":"failed to read image"}`);
+    }
+}
+
+/// Extract the filename from a full path.
+private string entryName(string fullPath) {
+    for (ptrdiff_t i = cast(ptrdiff_t)fullPath.length - 1; i >= 0; i--) {
+        if (fullPath[i] == '/') return fullPath[i + 1 .. $];
+    }
+    return fullPath;
+}
+
+/// Check if a filename looks like an image.
+private bool isImageFile(string name) {
+    return endsWith(name, ".png") || endsWith(name, ".jpeg") ||
+           endsWith(name, ".jpg") || endsWith(name, ".gif") ||
+           endsWith(name, ".webp");
+}
+
+/// Get MIME type from filename extension.
+private string mimeForFile(string name) {
+    if (endsWith(name, ".png")) return "image/png";
+    if (endsWith(name, ".jpeg") || endsWith(name, ".jpg")) return "image/jpeg";
+    if (endsWith(name, ".gif")) return "image/gif";
+    if (endsWith(name, ".webp")) return "image/webp";
+    return "application/octet-stream";
+}
+
+/// List images for a single session.
+private HTTPResponse handleImagesBySession(string session, string baseDir) {
+    import std.file : exists, isDir, dirEntries, SpanMode;
+
+    if (!isSafePath(session))
+        return jsonResponse(400, `{"error":"invalid session id"}`);
+
+    auto sessionDir = baseDir ~ "/" ~ session;
+    if (!exists(sessionDir) || !isDir(sessionDir))
+        return jsonResponse(404, `{"error":"session not found"}`);
+
+    string json = `{"session":"` ~ jsonEscape(session) ~ `","images":[`;
+    bool first = true;
+    foreach (entry; dirEntries(sessionDir, SpanMode.shallow)) {
+        auto name = entryName(entry.name);
+        if (!isImageFile(name)) continue;
+        if (!first) json ~= ",";
+        json ~= `"` ~ jsonEscape(name) ~ `"`;
+        first = false;
+    }
+    json ~= `]}`;
+    return corsJsonResponse(200, json);
+}
+
+/// Resolve branch → sessions via ATS, then list all images across sessions.
+///
+/// Queries GraundedPreToolUse attestations with control=git-checkout-b
+/// to find which sessions created branches. The branch name is in the
+/// companion PreToolUse attestation's tool_input.command.
+/// Then collects images from ix-net captures for those sessions.
+private HTTPResponse handleImagesByBranch(string branch, string baseDir) {
+    import std.file : exists, isDir, dirEntries, SpanMode;
+    import ixnet.ats : ATSClient;
+    import ixnet.proto : AttestationFilter, Attestation;
+
+    if (!state.atsClient.connected)
+        return jsonResponse(503, `{"error":"ATS not connected"}`);
+
+    // Step 1: Find ix-net capture attestations that have image_dir set.
+    // These have predicate "captured", source "ix-net", and attributes
+    // with session_id and image_dir.
+    AttestationFilter captureFilter;
+    captureFilter.predicates = ["captured"];
+    captureFilter.limit = 100;
+
+    string err;
+    auto captures = state.atsClient.getAttestations(captureFilter, err);
+    if (err.length > 0)
+        return jsonResponse(500, `{"error":"ATS query failed: ` ~ jsonEscape(err) ~ `"}`);
+
+    // Step 2: For each capture, check if its session had a checkout of this branch.
+    // Collect session IDs from captures that have images.
+    string[] sessionIds;
+    string[string] sessionImageDirs; // session_id → image_dir
+    foreach (ref cap; captures) {
+        auto attrs = decodeStructToStringMap(cap.attributes);
+        auto sid = "session_id" in attrs;
+        auto imgDir = "image_dir" in attrs;
+        if (sid is null || imgDir is null) continue;
+        sessionImageDirs[*sid] = *imgDir;
+        sessionIds ~= *sid;
+    }
+
+    if (sessionIds.length == 0)
+        return corsJsonResponse(200, `{"branch":"` ~ jsonEscape(branch) ~ `","sessions":[]}`);
+
+    // Step 3: Check which sessions had a checkout of this branch.
+    // Query PreToolUse attestations for each session that contain the branch name.
+    string json = `{"branch":"` ~ jsonEscape(branch) ~ `","sessions":[`;
+    bool firstSession = true;
+
+    foreach (sid; sessionIds) {
+        AttestationFilter branchFilter;
+        branchFilter.predicates = ["PreToolUse"];
+        branchFilter.contexts = ["session:" ~ sid];
+        branchFilter.limit = 50;
+
+        string berr;
+        auto events = state.atsClient.getAttestations(branchFilter, berr);
+
+        // Check if any event has checkout -b <branch> in the raw attributes.
+        // tool_input is a nested Struct so we search the raw bytes for the branch name.
+        bool found = false;
+        foreach (ref ev; events) {
+            auto raw = cast(string)ev.attributes;
+            if (indexOf(raw, "checkout -b " ~ branch) >= 0 ||
+                indexOf(raw, "checkout " ~ branch) >= 0) {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) continue;
+
+        // This session checked out this branch — list its images
+        auto imgDir = sessionImageDirs[sid];
+        if (!exists(imgDir) || !isDir(imgDir)) continue;
+
+        if (!firstSession) json ~= ",";
+        json ~= `{"session":"` ~ jsonEscape(sid) ~ `","images":[`;
+        bool firstImg = true;
+        foreach (entry; dirEntries(imgDir, SpanMode.shallow)) {
+            auto name = entryName(entry.name);
+            if (!isImageFile(name)) continue;
+            if (!firstImg) json ~= ",";
+            json ~= `"` ~ jsonEscape(name) ~ `"`;
+            firstImg = false;
+        }
+        json ~= `]}`;
+        firstSession = false;
+    }
+
+    json ~= `]}`;
+    return corsJsonResponse(200, json);
+}
+
+/// JSON response with CORS header for github.com.
+private HTTPResponse corsJsonResponse(int status, string body_) {
+    HTTPResponse resp;
+    resp.statusCode = status;
+    resp.body_ = cast(ubyte[])body_;
+    resp.headers = [
+        httpHeader("Content-Type", "application/json"),
+        httpHeader("Access-Control-Allow-Origin", "https://github.com"),
+    ];
+    return resp;
+}
+
+/// Decode a google.protobuf.Struct (raw bytes) into a flat string[string] map.
+/// Only extracts string values — skips numbers, bools, nested structs.
+private string[string] decodeStructToStringMap(const(ubyte)[] data) {
+    import ixnet.proto : decodeVarint, WireType, skipField;
+    string[string] result;
+    size_t pos = 0;
+    while (pos < data.length) {
+        auto tag = decodeVarint(data, pos);
+        int fieldNum = cast(int)(tag >> 3);
+        WireType wt = cast(WireType)(tag & 0x7);
+        if (fieldNum == 1 && wt == WireType.LengthDelimited) {
+            // Map entry message
+            auto len = cast(size_t)decodeVarint(data, pos);
+            auto end = pos + len;
+            string k, v;
+            while (pos < end) {
+                auto etag = decodeVarint(data, pos);
+                int eNum = cast(int)(etag >> 3);
+                WireType ewt = cast(WireType)(etag & 0x7);
+                if (eNum == 1 && ewt == WireType.LengthDelimited) {
+                    // key
+                    auto klen = cast(size_t)decodeVarint(data, pos);
+                    k = cast(string)data[pos .. pos + klen].idup;
+                    pos += klen;
+                } else if (eNum == 2 && ewt == WireType.LengthDelimited) {
+                    // Value message — extract string_value (field 3)
+                    auto vlen = cast(size_t)decodeVarint(data, pos);
+                    auto vend = pos + vlen;
+                    while (pos < vend) {
+                        auto vtag = decodeVarint(data, pos);
+                        int vNum = cast(int)(vtag >> 3);
+                        WireType vwt = cast(WireType)(vtag & 0x7);
+                        if (vNum == 3 && vwt == WireType.LengthDelimited) {
+                            auto slen = cast(size_t)decodeVarint(data, pos);
+                            v = cast(string)data[pos .. pos + slen].idup;
+                            pos += slen;
+                        } else {
+                            skipField(data, pos, vwt);
+                        }
+                    }
+                } else {
+                    skipField(data, pos, ewt);
+                }
+            }
+            if (k.length > 0) result[k] = v;
+        } else {
+            skipField(data, pos, wt);
+        }
+    }
+    return result;
+}
+
+/// Check that a path segment contains only safe characters (no traversal).
+private bool isSafePath(string s) {
+    if (s.length == 0) return false;
+    foreach (c; s) {
+        if (c == '/' || c == '\\' || c == '\0') return false;
+        if (c == '.' && s.length >= 2 && s[0] == '.' && s[1] == '.') return false;
+    }
+    // Also reject if it starts with ".."
+    if (s.length >= 2 && s[0] == '.' && s[1] == '.') return false;
+    return true;
+}
+
+/// Check if string ends with suffix.
+private bool endsWith(string s, string suffix) {
+    if (suffix.length > s.length) return false;
+    return s[$ - suffix.length .. $] == suffix;
+}
+
+/// Extract a query parameter from the request.
+/// Looks for "key=value" in the query string portion of the path or body.
+private string getQueryParam(ref const HTTPRequest req, string key) {
+    // Check if path contains query string
+    auto qIdx = indexOf(req.path, "?");
+    if (qIdx < 0) return "";
+    auto query = req.path[qIdx + 1 .. $];
+    return findParam(query, key);
+}
+
+private string findParam(string query, string key) {
+    size_t pos = 0;
+    while (pos < query.length) {
+        // Find key=
+        auto eqIdx = indexOf(query[pos .. $], "=");
+        if (eqIdx < 0) break;
+        auto paramName = query[pos .. pos + eqIdx];
+        auto valStart = pos + eqIdx + 1;
+        // Find end of value (& or end)
+        auto ampIdx = indexOf(query[valStart .. $], "&");
+        size_t valEnd = ampIdx < 0 ? query.length : valStart + ampIdx;
+        if (paramName == key) return query[valStart .. valEnd].idup;
+        pos = valEnd + 1;
+    }
+    return "";
 }
 
 // ---------------------------------------------------------------------------
