@@ -60,6 +60,7 @@ export function buildBreadcrumbBar(): HTMLElement {
         rootItem.addEventListener('click', () => jumpToBreadcrumb(-1));
     } else {
         rootItem.classList.add('breadcrumb-current');
+        rootItem.setAttribute('aria-current', 'page');
         rootItem.textContent = 'Canvas';
     }
     list.appendChild(rootItem);
@@ -72,6 +73,7 @@ export function buildBreadcrumbBar(): HTMLElement {
         const isLast = i === stack.length - 1;
         if (isLast) {
             crumb.classList.add('breadcrumb-current');
+            crumb.setAttribute('aria-current', 'page');
         } else {
             crumb.classList.add('breadcrumb-clickable');
             const idx = i;
