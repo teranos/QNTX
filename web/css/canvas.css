@@ -86,6 +86,11 @@
     transform: scale(0.95);
 }
 
+.canvas-spawn-button:focus-visible {
+    outline: 2px solid var(--accent-color, #4a9eff);
+    outline-offset: 2px;
+}
+
 /* Breadcrumb bar — nesting trail at top of expanded subcanvas */
 .canvas-breadcrumb-bar {
     display: flex;

@@ -44,12 +44,15 @@ export function showToast(message: string, options: ToastOptions = {}): void {
     if (!container) {
         container = document.createElement('div');
         container.id = 'toast-container';
+        container.setAttribute('aria-live', 'polite');
+        container.setAttribute('aria-label', 'Notifications');
         document.body.appendChild(container);
     }
 
     // Create toast element
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
 
     // Icon for toast type
     const icons = {
