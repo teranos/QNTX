@@ -84,9 +84,10 @@ export function showActionBar(
 
     // Add unmeld button if glyphs are in a meld
     if (meldedComposition) {
+        const isSingleInsideComposition = selectedGlyphIds.length === 1;
         const unmeldBtn = document.createElement('button');
         unmeldBtn.className = 'canvas-action-button canvas-action-unmeld has-tooltip';
-        unmeldBtn.dataset.tooltip = 'Break meld';
+        unmeldBtn.dataset.tooltip = isSingleInsideComposition ? 'Detach from meld' : 'Break meld';
         unmeldBtn.textContent = '⋈'; // Bowtie/join symbol
         unmeldBtn.addEventListener('click', (e) => {
             e.stopPropagation();

@@ -10,5 +10,5 @@
 
 export { canInitiateMeld, canReceiveMeld, findMeldTarget, PROXIMITY_THRESHOLD, MELD_THRESHOLD } from './meld-detect';
 export { applyMeldFeedback, clearMeldFeedback } from './meld-feedback';
-export { performMeld, extendComposition, reconstructMeld, isMeldedComposition, unmeldComposition } from './meld-composition';
+export { performMeld, extendComposition, reconstructMeld, isMeldedComposition, unmeldComposition, detachGlyph } from './meld-composition';
 export { autoMeldResultBelow } from './auto-meld-result';
