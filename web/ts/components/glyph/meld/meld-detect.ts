@@ -50,7 +50,16 @@ function checkDirectionalProximity(
     targetRect: DOMRect,
     direction: EdgeDirection
 ): number {
+    // Angular disambiguation: use center-to-center vector to reject directions
+    // that don't match the spatial relationship. Prevents 'right' from winning
+    // when a glyph is clearly below (and vice versa).
+    const dx = Math.abs((targetRect.left + targetRect.width / 2) - (initiatorRect.left + initiatorRect.width / 2));
+    const dy = Math.abs((targetRect.top + targetRect.height / 2) - (initiatorRect.top + initiatorRect.height / 2));
+
     if (direction === 'right') {
+        // Reject if target is more above/below than to the side
+        if (dy > dx) return Infinity;
+
         // Vertical alignment check
         const verticalOverlap = Math.min(initiatorRect.bottom, targetRect.bottom) -
                               Math.max(initiatorRect.top, targetRect.top);
@@ -64,6 +73,9 @@ function checkDirectionalProximity(
     }
 
     if (direction === 'bottom') {
+        // Reject if target is more to the side than below
+        if (dx > dy) return Infinity;
+
         // Horizontal alignment check
         const horizontalOverlap = Math.min(initiatorRect.right, targetRect.right) -
                                 Math.max(initiatorRect.left, targetRect.left);
@@ -77,6 +89,9 @@ function checkDirectionalProximity(
     }
 
     if (direction === 'top') {
+        // Reject if target is more to the side than above
+        if (dx > dy) return Infinity;
+
         // Horizontal alignment check
         const horizontalOverlap = Math.min(initiatorRect.right, targetRect.right) -
                                 Math.max(initiatorRect.left, targetRect.left);
@@ -198,7 +213,7 @@ export function findMeldTarget(draggedElement: HTMLElement): {
                     // Proximity: nearby is the meld initiator, dragged is the target
                     const distance = checkDirectionalProximity(nearbyRect, draggedRect, direction);
 
-                    if (distance < PROXIMITY_THRESHOLD && distance < closestDistance) {
+                    if (distance < PROXIMITY_THRESHOLD && distance <= closestDistance) {
                         closestDistance = distance;
                         closestTarget = nearbyElement;
                         closestDirection = direction;
