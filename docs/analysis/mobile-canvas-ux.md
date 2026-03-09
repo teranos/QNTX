@@ -120,19 +120,7 @@ All touch sizing is gated behind `@media (pointer: coarse)` — desktop unchange
 
 ## Offline Capability (WASM)
 
-The browser WASM module (`web/wasm/`, 488KB) provides local compute without a server connection:
-
-| Capability | Rust core | browser.rs | TS wrapper | UI wired |
-|---|---|---|---|---|
-| Query parsing | Yes | Yes | Yes | Yes (fuzzy search) |
-| Attestation CRUD | Yes | Yes (IndexedDB) | Yes | Yes (ax-glyph, ts-glyph) |
-| Fuzzy search | Yes | Yes | Yes | Yes |
-| Classification | Yes | Yes | No | No |
-| Merkle sync | Yes | Yes | No | No |
-| Cartesian expansion | Yes | No | No | No |
-| Claim grouping/dedup | Yes | No | No | No |
-
-See ADR-005 for the integration strategy. "Rust core" = the shared `qntx-core` crate. "browser.rs" = `#[wasm_bindgen]` exports. "TS wrapper" = `web/ts/qntx-wasm.ts`. Each column is a step in the wiring pipeline.
+The browser WASM module (`web/wasm/`) provides local compute without a server connection. See [wasm-capabilities.md](../wasm-capabilities.md) for the full capability matrix and migration candidates.
 
 ## Remaining Work
 
