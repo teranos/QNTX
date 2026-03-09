@@ -106,8 +106,8 @@ impl PythonPluginService {
             predicates: vec!["handler".to_string()],
             contexts: vec!["python".to_string()],
             actors: vec![],
-            time_start: 0,
-            time_end: 0,
+            time_start: None,
+            time_end: None,
             limit: Some(100), // Limit to 100 handlers
         };
 
@@ -527,10 +527,9 @@ impl PythonPluginService {
 
         // Execute the Python script
         let config = ExecutionConfig {
-            timeout_secs: if req.timeout_secs > 0 {
-                req.timeout_secs as u64
-            } else {
-                DEFAULT_TIMEOUT_SECS
+            timeout_secs: match req.timeout_secs {
+                Some(t) if t > 0 => t as u64,
+                _ => DEFAULT_TIMEOUT_SECS,
             },
             capture_variables: false,
             python_paths: vec![],
@@ -610,10 +609,9 @@ impl PythonPluginService {
 
         // Execute the Python script
         let config = ExecutionConfig {
-            timeout_secs: if req.timeout_secs > 0 {
-                req.timeout_secs as u64
-            } else {
-                DEFAULT_TIMEOUT_SECS
+            timeout_secs: match req.timeout_secs {
+                Some(t) if t > 0 => t as u64,
+                _ => DEFAULT_TIMEOUT_SECS,
             },
             capture_variables: false,
             python_paths: vec![],
