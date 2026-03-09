@@ -19,7 +19,7 @@ import { uploadFile } from '../../../api/files';
 import { createDocGlyph, type DocGlyphContent } from '../doc-glyph';
 import { uiState } from '../../../state/ui';
 import { getMinimizeDuration } from '../glyph';
-import { unmeldComposition, reconstructMeld } from '../meld/meld-system';
+import { unmeldComposition, reconstructMeld, detachGlyph } from '../meld/meld-system';
 import { makeDraggable } from '../glyph-interaction';
 import { showActionBar, hideActionBar } from './action-bar';
 import { showSpawnMenu } from './spawn-menu';
@@ -125,6 +125,52 @@ function unmeldFromSelection(canvasId: string, container: HTMLElement): void {
 
 /** Unmeld selected glyphs that are in a melded composition */
 function unmeldSelectedGlyphs(canvasId: string, container: HTMLElement, composition: HTMLElement): void {
+    const selectedIds = getSelectedGlyphIds(canvasId);
+
+    // Single glyph selected inside a composition → try partial detach
+    if (selectedIds.length === 1) {
+        const glyphId = selectedIds[0];
+        const glyphEl = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+        if (glyphEl?.closest('.melded-composition') === composition) {
+            const detachResult = detachGlyph(glyphId, composition);
+            if (detachResult) {
+                const { detachedElement, remainingComposition } = detachResult;
+
+                // Restore drag on detached element
+                const detachedId = detachedElement.dataset.glyphId || detachedElement.getAttribute('data-glyph-id') || 'unknown';
+                const detachedGlyph = createGlyphFromElement(detachedElement, detachedId);
+                const detachedEntry = detachedGlyph.symbol ? getGlyphTypeBySymbol(detachedGlyph.symbol) : undefined;
+                makeDraggable(detachedElement, detachedElement, detachedGlyph, { logLabel: detachedEntry?.label ?? 'Glyph' });
+
+                if (remainingComposition) {
+                    // Remaining composition needs drag handler refreshed
+                    const compId = remainingComposition.getAttribute('data-glyph-id') || 'unknown';
+                    const compGlyph: Glyph = { id: compId, title: 'Melded Composition', renderContent: () => remainingComposition };
+                    makeDraggable(remainingComposition, remainingComposition, compGlyph, { logLabel: 'MeldedComposition' });
+                } else {
+                    // Full unmeld happened — restore drag on all freed elements
+                    const allFreed = container.querySelectorAll('[data-glyph-id]');
+                    allFreed.forEach((el) => {
+                        const element = el as HTMLElement;
+                        const id = element.dataset.glyphId || element.getAttribute('data-glyph-id') || 'unknown';
+                        if (id === detachedId) return; // already handled
+                        if (element.closest('.melded-composition')) return; // still in a composition
+                        const glyph = createGlyphFromElement(element, id);
+                        const entry = glyph.symbol ? getGlyphTypeBySymbol(glyph.symbol) : undefined;
+                        makeDraggable(element, element, glyph, { logLabel: entry?.label ?? 'Glyph' });
+                    });
+                }
+
+                deselectAll(canvasId, container);
+                log.debug(SEG.GLYPH, '[Canvas] Detached glyph from composition', {
+                    glyphId, partial: !!remainingComposition
+                });
+                return;
+            }
+        }
+    }
+
+    // Full unmeld: multiple selected or detach not applicable
     const result = unmeldComposition(composition);
     if (!result) {
         const compId = composition.dataset.glyphId || 'unknown';
@@ -381,9 +427,8 @@ export function buildCanvasWorkspace(
 
         // Walk up from click target to find a glyph element (must be inside this workspace)
         const glyphEl = target.closest('[data-glyph-id]') as HTMLElement | null;
-        const isInsideComposition = glyphEl?.closest('.melded-composition') !== null;
         const isInsideWorkspace = glyphEl ? container.contains(glyphEl) : false;
-        if (glyphEl && isInsideWorkspace && glyphEl.dataset.glyphId !== 'canvas-workspace' && !isInsideComposition) {
+        if (glyphEl && isInsideWorkspace && glyphEl.dataset.glyphId !== 'canvas-workspace') {
             const glyphId = glyphEl.dataset.glyphId;
             if (glyphId) {
                 e.stopPropagation();
