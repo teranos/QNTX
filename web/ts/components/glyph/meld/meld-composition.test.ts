@@ -2,7 +2,7 @@
  * Tests for meld composition — create, extend, reconstruct, unmeld
  *
  * Validates the core axiom: proximity-based melding preserves element identity
- * Layout: CSS Grid with per-glyph grid-row/grid-column placement
+ * Layout: Flexbox columns — each column stacks independently
  *
  * Personas:
  * - Tim: Happy path user, normal workflows
@@ -14,6 +14,14 @@ import { performMeld, unmeldComposition, isMeldedComposition, reconstructMeld, e
 import { MELD_THRESHOLD } from './meld-detect';
 import type { Glyph } from '../glyph';
 import { uiState } from '../../../state/ui';
+
+/** Get column wrappers and their glyph children */
+function getColumns(composition: HTMLElement): HTMLElement[][] {
+    const cols = composition.querySelectorAll('.meld-column');
+    return Array.from(cols).map(col =>
+        Array.from(col.querySelectorAll('[data-glyph-id]')) as HTMLElement[]
+    );
+}
 
 describe('Meld System - Critical Behavior', () => {
     test('compatible glyphs meld into composition preserving element identity', () => {
@@ -49,20 +57,16 @@ describe('Meld System - Critical Behavior', () => {
         expect(composition.parentElement).toBe(canvas);
         expect(composition.contains(originalAxElement)).toBe(true);
         expect(composition.contains(originalPromptElement)).toBe(true);
-        expect(composition.children.length).toBe(2);
-        expect(composition.children[0]).toBe(originalAxElement);
-        expect(composition.children[1]).toBe(originalPromptElement);
-        expect(originalAxElement.parentElement).toBe(composition);
-        expect(originalPromptElement.parentElement).toBe(composition);
+        expect(composition.contains(originalAxElement)).toBe(true);
+        expect(composition.contains(originalPromptElement)).toBe(true);
         expect(composition.style.left).toBe('100px');
         expect(composition.style.top).toBe('100px');
 
-        // Grid layout applied
-        expect(composition.style.display).toBe('grid');
-        expect(originalAxElement.style.gridRow).toBe('1');
-        expect(originalAxElement.style.gridColumn).toBe('1');
-        expect(originalPromptElement.style.gridRow).toBe('1');
-        expect(originalPromptElement.style.gridColumn).toBe('2');
+        // Column layout: 2 columns, one element each
+        const cols = getColumns(composition);
+        expect(cols.length).toBe(2);
+        expect(cols[0]).toEqual([originalAxElement]);
+        expect(cols[1]).toEqual([originalPromptElement]);
 
         document.body.innerHTML = '';
     });
@@ -185,18 +189,16 @@ describe('Directional Melding', () => {
 
         const composition = performMeld(pyElement, resultElement, pyGlyph, resultGlyph, 'bottom');
 
-        expect(composition.style.display).toBe('grid');
         expect(composition.contains(pyElement)).toBe(true);
         expect(composition.contains(resultElement)).toBe(true);
-        expect(pyElement.style.gridRow).toBe('1');
-        expect(pyElement.style.gridColumn).toBe('1');
-        expect(resultElement.style.gridRow).toBe('2');
-        expect(resultElement.style.gridColumn).toBe('1');
+        const cols = getColumns(composition);
+        expect(cols.length).toBe(1);
+        expect(cols[0]).toEqual([pyElement, resultElement]);
 
         document.body.innerHTML = '';
     });
 
-    test('bottom meld: note above prompt uses grid layout', () => {
+    test('bottom meld: note above prompt uses column layout', () => {
         const canvas = document.createElement('div');
         document.body.appendChild(canvas);
 
@@ -221,16 +223,16 @@ describe('Directional Melding', () => {
 
         const composition = performMeld(noteElement, promptElement, noteGlyph, promptGlyph, 'bottom');
 
-        expect(composition.style.display).toBe('grid');
         expect(composition.contains(noteElement)).toBe(true);
         expect(composition.contains(promptElement)).toBe(true);
-        expect(noteElement.style.gridRow).toBe('1');
-        expect(promptElement.style.gridRow).toBe('2');
+        const cols = getColumns(composition);
+        expect(cols.length).toBe(1);
+        expect(cols[0]).toEqual([noteElement, promptElement]);
 
         document.body.innerHTML = '';
     });
 
-    test('right meld: ax + py uses grid layout', () => {
+    test('right meld: ax + py uses column layout', () => {
         const canvas = document.createElement('div');
         document.body.appendChild(canvas);
 
@@ -254,11 +256,10 @@ describe('Directional Melding', () => {
         const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => pyElement };
 
         const composition = performMeld(axElement, pyElement, axGlyph, pyGlyph, 'right');
-        expect(composition.style.display).toBe('grid');
-        expect(axElement.style.gridRow).toBe('1');
-        expect(axElement.style.gridColumn).toBe('1');
-        expect(pyElement.style.gridRow).toBe('1');
-        expect(pyElement.style.gridColumn).toBe('2');
+        const cols = getColumns(composition);
+        expect(cols.length).toBe(2);
+        expect(cols[0]).toEqual([axElement]);
+        expect(cols[1]).toEqual([pyElement]);
 
         document.body.innerHTML = '';
     });
@@ -309,16 +310,12 @@ describe('Direction-aware reconstructMeld', () => {
         const edges = [{ from: 'ax1', to: 'py1', direction: 'right', position: 0 }];
         const composition = reconstructMeld([ax, py], edges, 'comp1', 50, 75);
 
-        expect(composition.style.display).toBe('grid');
         expect(composition.style.left).toBe('50px');
         expect(composition.style.top).toBe('75px');
-        expect(composition.children.length).toBe(2);
-        expect(composition.children[0]).toBe(ax);
-        expect(composition.children[1]).toBe(py);
-        expect(ax.style.gridRow).toBe('1');
-        expect(ax.style.gridColumn).toBe('1');
-        expect(py.style.gridRow).toBe('1');
-        expect(py.style.gridColumn).toBe('2');
+        const cols = getColumns(composition);
+        expect(cols.length).toBe(2);
+        expect(cols[0]).toEqual([ax]);
+        expect(cols[1]).toEqual([py]);
 
         document.body.innerHTML = '';
     });
@@ -338,18 +335,16 @@ describe('Direction-aware reconstructMeld', () => {
         const edges = [{ from: 'py1', to: 'result1', direction: 'bottom', position: 0 }];
         const composition = reconstructMeld([py, result], edges, 'comp2', 100, 100);
 
-        expect(composition.style.display).toBe('grid');
         expect(composition.contains(py)).toBe(true);
         expect(composition.contains(result)).toBe(true);
-        expect(py.style.gridRow).toBe('1');
-        expect(py.style.gridColumn).toBe('1');
-        expect(result.style.gridRow).toBe('2');
-        expect(result.style.gridColumn).toBe('1');
+        const cols = getColumns(composition);
+        expect(cols.length).toBe(1);
+        expect(cols[0]).toEqual([py, result]);
 
         document.body.innerHTML = '';
     });
 
-    test('mixed right+bottom edges — flat children with grid positions, no sub-containers', () => {
+    test('mixed right+bottom edges — column wrappers with correct structure', () => {
         const canvas = document.createElement('div');
         document.body.appendChild(canvas);
 
@@ -371,20 +366,11 @@ describe('Direction-aware reconstructMeld', () => {
         ];
         const composition = reconstructMeld([ax, py, result], edges, 'comp3', 0, 0);
 
-        expect(composition.style.display).toBe('grid');
-        // All 3 are direct children — no sub-containers
-        expect(composition.children.length).toBe(3);
-        expect(composition.children[0]).toBe(ax);
-        expect(composition.children[1]).toBe(py);
-        expect(composition.children[2]).toBe(result);
-
-        // Grid positions
-        expect(ax.style.gridRow).toBe('1');
-        expect(ax.style.gridColumn).toBe('1');
-        expect(py.style.gridRow).toBe('1');
-        expect(py.style.gridColumn).toBe('2');
-        expect(result.style.gridRow).toBe('2');
-        expect(result.style.gridColumn).toBe('2');
+        // 2 columns: col1=[ax], col2=[py, result]
+        const cols = getColumns(composition);
+        expect(cols.length).toBe(2);
+        expect(cols[0]).toEqual([ax]);
+        expect(cols[1]).toEqual([py, result]);
 
         document.body.innerHTML = '';
     });
@@ -407,8 +393,8 @@ describe('Direction-aware reconstructMeld', () => {
         const edges = [{ from: 'py1', to: 'result1', direction: 'bottom', position: 0 }];
         const composition = reconstructMeld([py, result], edges, 'comp4', 0, 0);
 
-        expect(composition.children[0]).toBe(originalPy);
-        expect(composition.children[1]).toBe(originalResult);
+        expect(composition.contains(originalPy)).toBe(true);
+        expect(composition.contains(originalResult)).toBe(true);
         expect(originalPy.style.position).toBe('relative');
 
         document.body.innerHTML = '';
@@ -457,21 +443,16 @@ describe('Composition Extension - Tim (Happy Path)', () => {
 
         extendComposition(composition, prompt, 'prompt1', 'py1', 'right', 'to');
 
-        expect(composition.children.length).toBe(3);
-        expect(composition.children[0]).toBe(ax);
-        expect(composition.children[1]).toBe(py);
-        expect(composition.children[2]).toBe(prompt);
-        expect(prompt.parentElement).toBe(composition);
+        expect(composition.contains(prompt)).toBe(true);
         expect(prompt.style.position).toBe('relative');
         expect(composition.getAttribute('data-glyph-id')).toBe('melded-py1-prompt1');
 
-        // Grid positions
-        expect(ax.style.gridRow).toBe('1');
-        expect(ax.style.gridColumn).toBe('1');
-        expect(py.style.gridRow).toBe('1');
-        expect(py.style.gridColumn).toBe('2');
-        expect(prompt.style.gridRow).toBe('1');
-        expect(prompt.style.gridColumn).toBe('3');
+        // 3 columns: ax | py | prompt
+        const cols = getColumns(composition);
+        expect(cols.length).toBe(3);
+        expect(cols[0]).toEqual([ax]);
+        expect(cols[1]).toEqual([py]);
+        expect(cols[2]).toEqual([prompt]);
 
         clearState();
     });
@@ -514,10 +495,13 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         canvas.appendChild(py2);
         extendComposition(composition, py2, 'py2', 'prompt1', 'right', 'to');
 
-        expect(composition.children.length).toBe(4);
-        expect(composition.children[3]).toBe(py2);
-        expect(py2.style.gridRow).toBe('1');
-        expect(py2.style.gridColumn).toBe('4');
+        // 4 columns: ax | py | prompt | py2
+        const cols = getColumns(composition);
+        expect(cols.length).toBe(4);
+        expect(cols[0]).toEqual([ax]);
+        expect(cols[1]).toEqual([py]);
+        expect(cols[2]).toEqual([prompt]);
+        expect(cols[3]).toEqual([py2]);
 
         clearState();
     });
@@ -554,16 +538,14 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         canvas.appendChild(ax);
         extendComposition(composition, ax, 'ax1', 'py1', 'right', 'from');
 
-        expect(composition.children.length).toBe(3);
         expect(composition.getAttribute('data-glyph-id')).toBe('melded-ax1-py1');
 
-        // Grid positions — ax prepended as new root
-        expect(ax.style.gridRow).toBe('1');
-        expect(ax.style.gridColumn).toBe('1');
-        expect(py.style.gridRow).toBe('1');
-        expect(py.style.gridColumn).toBe('2');
-        expect(prompt.style.gridRow).toBe('1');
-        expect(prompt.style.gridColumn).toBe('3');
+        // 3 columns: ax | py | prompt
+        const cols = getColumns(composition);
+        expect(cols.length).toBe(3);
+        expect(cols[0]).toEqual([ax]);
+        expect(cols[1]).toEqual([py]);
+        expect(cols[2]).toEqual([prompt]);
 
         clearState();
     });
@@ -602,19 +584,11 @@ describe('Composition Extension - Tim (Happy Path)', () => {
 
         extendComposition(composition, result, 'result1', 'py1', 'bottom', 'to');
 
-        // All 3 are direct children — no sub-containers
-        expect(composition.children.length).toBe(3);
-        expect(composition.children[0]).toBe(ax);
-        expect(composition.children[1]).toBe(py);
-        expect(composition.children[2]).toBe(result);
-
-        // Grid positions
-        expect(ax.style.gridRow).toBe('1');
-        expect(ax.style.gridColumn).toBe('1');
-        expect(py.style.gridRow).toBe('1');
-        expect(py.style.gridColumn).toBe('2');
-        expect(result.style.gridRow).toBe('2');
-        expect(result.style.gridColumn).toBe('2');
+        // 2 columns: col1=[ax], col2=[py, result]
+        const cols = getColumns(composition);
+        expect(cols.length).toBe(2);
+        expect(cols[0]).toEqual([ax]);
+        expect(cols[1]).toEqual([py, result]);
 
         clearState();
     });
@@ -655,20 +629,11 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         canvas.appendChild(result2);
         extendComposition(composition, result2, 'r2', 'py1', 'bottom', 'to');
 
-        // All 4 are direct children
-        expect(composition.children.length).toBe(4);
-        expect(composition.children[0]).toBe(ax);
-        expect(composition.children[1]).toBe(py);
-        expect(composition.children[2]).toBe(result1);
-        expect(composition.children[3]).toBe(result2);
-
-        // Grid positions
-        expect(py.style.gridRow).toBe('1');
-        expect(py.style.gridColumn).toBe('2');
-        expect(result1.style.gridRow).toBe('2');
-        expect(result1.style.gridColumn).toBe('2');
-        expect(result2.style.gridRow).toBe('3');
-        expect(result2.style.gridColumn).toBe('2');
+        // 2 columns: col1=[ax], col2=[py, result1, result2]
+        const cols = getColumns(composition);
+        expect(cols.length).toBe(2);
+        expect(cols[0]).toEqual([ax]);
+        expect(cols[1]).toEqual([py, result1, result2]);
 
         clearState();
     });
