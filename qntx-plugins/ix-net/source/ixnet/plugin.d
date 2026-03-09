@@ -311,7 +311,6 @@ private HTTPResponse handleImages(string path, ref const HTTPRequest req) {
         resp.headers = [
             httpHeader("Content-Type", mimeForFile(filename)),
             httpHeader("Cache-Control", "max-age=3600"),
-            httpHeader("Access-Control-Allow-Origin", "https://github.com"),
         ];
         return resp;
     } catch (Exception e) {
@@ -364,7 +363,7 @@ private HTTPResponse handleImagesBySession(string session, string baseDir) {
         first = false;
     }
     json ~= `]}`;
-    return corsJsonResponse(200, json);
+    return jsonResponse(200, json);
 }
 
 /// Resolve branch → sessions via ATS, then list all images across sessions.
@@ -407,7 +406,7 @@ private HTTPResponse handleImagesByBranch(string branch, string baseDir) {
     }
 
     if (sessionIds.length == 0)
-        return corsJsonResponse(200, `{"branch":"` ~ jsonEscape(branch) ~ `","sessions":[]}`);
+        return jsonResponse(200, `{"branch":"` ~ jsonEscape(branch) ~ `","sessions":[]}`);
 
     // Step 3: Check which sessions had a checkout of this branch.
     // Query PreToolUse attestations for each session that contain the branch name.
@@ -456,20 +455,9 @@ private HTTPResponse handleImagesByBranch(string branch, string baseDir) {
     }
 
     json ~= `]}`;
-    return corsJsonResponse(200, json);
+    return jsonResponse(200, json);
 }
 
-/// JSON response with CORS header for github.com.
-private HTTPResponse corsJsonResponse(int status, string body_) {
-    HTTPResponse resp;
-    resp.statusCode = status;
-    resp.body_ = cast(ubyte[])body_;
-    resp.headers = [
-        httpHeader("Content-Type", "application/json"),
-        httpHeader("Access-Control-Allow-Origin", "https://github.com"),
-    ];
-    return resp;
-}
 
 /// Decode a google.protobuf.Struct (raw bytes) into a flat string[string] map.
 /// Only extracts string values — skips numbers, bools, nested structs.
