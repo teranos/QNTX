@@ -88,6 +88,7 @@ type PluginConfig struct {
 type PluginManager struct {
 	mu                sync.RWMutex
 	plugins           map[string]*managedPlugin
+	failedPlugins     map[string]string // plugin name → error message for plugins that failed to load
 	logger            *zap.SugaredLogger
 	basePort          int
 	nextPort          int        // Track the next port to allocate
@@ -116,6 +117,7 @@ const (
 func NewPluginManager(logger *zap.SugaredLogger, typescriptRuntime string) *PluginManager {
 	return &PluginManager{
 		plugins:           make(map[string]*managedPlugin),
+		failedPlugins:     make(map[string]string),
 		logger:            logger,
 		basePort:          DefaultPluginBasePort,
 		nextPort:          DefaultPluginBasePort,
@@ -158,6 +160,7 @@ func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig)
 			m.logger.Errorf("Failed to load plugin '%s' (binary=%s, address=%s): %v",
 				config.Name, config.Binary, config.Address, err)
 			failedPlugins = append(failedPlugins, config.Name)
+			m.failedPlugins[config.Name] = err.Error()
 			continue
 		}
 	}
@@ -516,6 +519,18 @@ func (m *PluginManager) GetLogBuffer(name string) *LogBuffer {
 		return p.logBuffer
 	}
 	return nil
+}
+
+// GetFailedPlugins returns a map of plugin names to error messages for plugins that failed to load.
+func (m *PluginManager) GetFailedPlugins() map[string]string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	result := make(map[string]string, len(m.failedPlugins))
+	for name, errMsg := range m.failedPlugins {
+		result[name] = errMsg
+	}
+	return result
 }
 
 // GetAllPlugins returns all connected plugins as DomainPlugin instances.
