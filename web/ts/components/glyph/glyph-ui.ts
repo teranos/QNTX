@@ -29,6 +29,8 @@ import { canvasPlaced, type CanvasPlacedConfig } from './manifestations/canvas-p
 import { preventDrag, storeCleanup } from './glyph-interaction';
 import { apiFetch, getBackendUrl } from '../../api';
 import { log, SEG } from '../../logger';
+import { uiState, type CanvasGlyphState } from '../../state/ui';
+import type { CompositionEdge } from '../../state/ui';
 
 // ── Public types (plugin-facing) ────────────────────────────────────
 
@@ -38,6 +40,16 @@ export type RenderFn = (glyph: Glyph, ui: GlyphUI) => HTMLElement | Promise<HTML
 /** Plugin module shape — the default or named export. */
 export interface GlyphModule {
     render: RenderFn;
+    glyphDef?: GlyphDef;
+}
+
+/** Self-describing metadata exported by pure TS plugin modules. */
+export interface GlyphDef {
+    symbol: string;
+    title: string;
+    label: string;
+    defaultWidth?: number;
+    defaultHeight?: number;
 }
 
 /** UI interface injected into plugin render functions. */
@@ -83,11 +95,29 @@ export interface GlyphUI {
      */
     pluginWebSocket(params?: Record<string, string>): WebSocket;
 
+    /**
+     * Subscribe to meld events — called when another glyph melds onto this one.
+     * Returns unsubscribe function.
+     */
+    onMeld(callback: (event: MeldEvent) => void): () => void;
+
     /** Load this glyph's persisted config from the server. Returns null if no config saved. */
     loadConfig(): Promise<Record<string, unknown> | null>;
 
     /** Save config for this glyph to the server. */
     saveConfig(config: Record<string, unknown>): Promise<void>;
+}
+
+/** Data passed to onMeld callbacks when a glyph melds onto this one. */
+export interface MeldEvent {
+    /** ID of the glyph that melded onto this one */
+    glyphId: string;
+    /** Symbol of the melded glyph */
+    symbol: string;
+    /** Direction the meld came from (the edge direction) */
+    direction: string;
+    /** Content of the melded glyph (source code, URL, markdown, etc.) */
+    content: string;
 }
 
 export interface ContainerOpts {
@@ -236,6 +266,50 @@ export function createGlyphUI(glyph: Glyph, pluginName: string): GlyphUI {
                     el.textContent = '';
                 },
             };
+        },
+
+        onMeld(callback: (event: MeldEvent) => void): () => void {
+            // Track edges we've already seen so we only fire for new melds
+            const seenEdges = new Set<string>();
+
+            // Seed with current edges (don't fire for pre-existing melds)
+            const compositions = uiState.getCanvasCompositions();
+            for (const comp of compositions) {
+                for (const edge of comp.edges) {
+                    if (edge.from === glyph.id || edge.to === glyph.id) {
+                        seenEdges.add(`${edge.from}-${edge.direction}-${edge.to}`);
+                    }
+                }
+            }
+
+            const unsubscribe = uiState.subscribe('canvasCompositions', (comps) => {
+                for (const comp of comps) {
+                    for (const edge of comp.edges) {
+                        // Only care about edges where this glyph is the target
+                        if (edge.to !== glyph.id) continue;
+
+                        const edgeKey = `${edge.from}-${edge.direction}-${edge.to}`;
+                        if (seenEdges.has(edgeKey)) continue;
+                        seenEdges.add(edgeKey);
+
+                        // Look up the melded glyph's data
+                        const canvasGlyphs = uiState.getCanvasGlyphs();
+                        const melded = canvasGlyphs.find(g => g.id === edge.from);
+
+                        callback({
+                            glyphId: edge.from,
+                            symbol: melded?.symbol ?? '',
+                            direction: edge.direction,
+                            content: melded?.content ?? '',
+                        });
+
+                        log.info(SEG.GLYPH, `${prefix} Meld received from ${edge.from} (${edge.direction})`);
+                    }
+                }
+            });
+
+            ui.onCleanup(unsubscribe);
+            return unsubscribe;
         },
 
         async loadConfig(): Promise<Record<string, unknown> | null> {
