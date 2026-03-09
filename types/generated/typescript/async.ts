@@ -4,31 +4,6 @@
 // Source package: async
 // TODO: Migrate to proto generation (web/ts/generated/proto/)
 
-export type ErrorCode = 'ai_error' | 'database_error' | 'file_not_found' | 'network_error' | 'parse_error' | 'timeout' | 'unknown' | 'validation_error';
-
-export interface ErrorContext {
-  /**
-   * Where the error occurred
-   */
-  stage: string;
-  /**
-   * Error classification
-   */
-  code: ErrorCode;
-  /**
-   * Human-readable message
-   */
-  message: string;
-  /**
-   * Can the job be retried?
-   */
-  retryable: boolean;
-  /**
-   * Can continue processing other items?
-   */
-  recoverable: boolean;
-}
-
 export interface Job {
   id: string;
   /**

@@ -73,7 +73,7 @@ func GenerateIndexFile(outputDir string, exports []PackageExport) error {
 		var typesToExport []string
 		switch modName {
 		case "async":
-			typesToExport = []string{"ErrorCode", "ErrorContext", "Job", "JobStatus", "Progress", "PulseState"}
+			typesToExport = []string{"Job", "JobStatus", "Progress", "PulseState"}
 		case "budget":
 			typesToExport = []string{"BudgetCalculation", "Limiter", "RateLimitConfig", "Tracker"}
 		case "schedule":
@@ -204,7 +204,7 @@ func GenerateLibRs(outputDir string, exports []PackageExport) error {
 		var typesToExport []string
 		switch modName {
 		case "async":
-			typesToExport = []string{"ErrorCode", "ErrorContext", "Job", "JobStatus", "Progress", "PulseState"}
+			typesToExport = []string{"Job", "JobStatus", "Progress", "PulseState"}
 		case "budget":
 			typesToExport = []string{"Limiter", "Tracker"}
 		case "schedule":

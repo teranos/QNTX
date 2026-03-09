@@ -11,8 +11,6 @@ export type {
 
 // Types from async
 export type {
-  ErrorCode,
-  ErrorContext,
   Job,
   JobStatus,
   Progress,

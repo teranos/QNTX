@@ -77,7 +77,7 @@ export type {
 			exports: []PackageExport{
 				{
 					PackageName: "async",
-					TypeNames:   []string{"Job", "ErrorContext", "Progress", "JobStatus"},
+					TypeNames:   []string{"Job", "Progress", "JobStatus"},
 				},
 			},
 			want: `/* eslint-disable */
@@ -86,7 +86,6 @@ export type {
 
 // Types from async
 export type {
-  ErrorContext,
   Job,
   JobStatus,
   Progress,

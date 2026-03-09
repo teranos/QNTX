@@ -32,8 +32,6 @@ export type {
   JobStatus,
   Progress,
   PulseState,
-  ErrorCode,
-  ErrorContext,
   QueueStats,
   SystemMetrics,
   WorkerPoolConfig,
