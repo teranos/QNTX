@@ -29,8 +29,7 @@ import { canvasPlaced, type CanvasPlacedConfig } from './manifestations/canvas-p
 import { preventDrag, storeCleanup } from './glyph-interaction';
 import { apiFetch, getBackendUrl } from '../../api';
 import { log, SEG } from '../../logger';
-import { uiState, type CanvasGlyphState } from '../../state/ui';
-import type { CompositionEdge } from '../../state/ui';
+import { uiState } from '../../state/ui';
 
 // ── Public types (plugin-facing) ────────────────────────────────────
 

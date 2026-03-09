@@ -97,8 +97,9 @@ async function discoverTSPluginModules(): Promise<void> {
     for (const name of pluginNames) {
         const moduleUrl = `/api/${name}/ix-glyph-module.js`;
         try {
-            const mod: GlyphModule & { glyphDef?: GlyphDef } = await import(/* @vite-ignore */ moduleUrl);
-            const def = mod.glyphDef ?? mod.default?.glyphDef;
+            const raw: Record<string, unknown> = await import(/* @vite-ignore */ moduleUrl);
+            const mod = (raw.default ?? raw) as GlyphModule & { glyphDef?: GlyphDef };
+            const def = mod.glyphDef;
             if (!def || typeof mod.render !== 'function') continue;
 
             // Skip if this symbol was already registered (e.g., by the Go plugin path)
