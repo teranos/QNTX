@@ -51,7 +51,9 @@ func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.Suga
 			logger.Warnf("Plugin '%s' not found - searched paths: %v, tried names: [qntx-%s-plugin, qntx-%s, %s]",
 				pluginName, cfg.Plugin.Paths, pluginName, pluginName, pluginName)
 			failedPlugins = append(failedPlugins, pluginName)
+			manager.mu.Lock()
 			manager.failedPlugins[pluginName] = fmt.Sprintf("binary not found in search paths: %v", cfg.Plugin.Paths)
+			manager.mu.Unlock()
 			continue
 		}
 		logger.Infof("Will load '%s' plugin from binary: %s", pluginName, pluginConfig.Binary)
