@@ -69,6 +69,8 @@ export function showSpawnMenu(
     // Create spawn menu
     const menu = document.createElement('div');
     menu.className = 'canvas-spawn-menu';
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', 'Spawn new glyph');
     menu.style.position = 'fixed';
     menu.style.left = `${mouseX}px`;
     menu.style.top = `${mouseY}px`;
@@ -103,6 +105,7 @@ export function showSpawnMenu(
     // Add IX symbol
     const ixBtn = document.createElement('button');
     ixBtn.className = 'canvas-spawn-button';
+    ixBtn.setAttribute('role', 'menuitem');
     ixBtn.textContent = IX;
     ixBtn.title = 'Spawn IX glyph';
 
@@ -116,6 +119,7 @@ export function showSpawnMenu(
     // Add AX symbol
     const axBtn = document.createElement('button');
     axBtn.className = 'canvas-spawn-button';
+    axBtn.setAttribute('role', 'menuitem');
     axBtn.textContent = AX;
     axBtn.title = 'Spawn AX query glyph';
 
@@ -129,6 +133,7 @@ export function showSpawnMenu(
     // Add SE (semantic search) symbol
     const seBtn = document.createElement('button');
     seBtn.className = 'canvas-spawn-button';
+    seBtn.setAttribute('role', 'menuitem');
     seBtn.textContent = SE;
     seBtn.title = 'Spawn Semantic Search glyph';
 
@@ -146,6 +151,7 @@ export function showSpawnMenu(
     // Add py button
     const pyBtn = document.createElement('button');
     pyBtn.className = 'canvas-spawn-button';
+    pyBtn.setAttribute('role', 'menuitem');
     pyBtn.textContent = 'py';
     pyBtn.title = 'Spawn Python glyph';
 
@@ -159,6 +165,7 @@ export function showSpawnMenu(
     // Add ts button
     const tsBtn = document.createElement('button');
     tsBtn.className = 'canvas-spawn-button';
+    tsBtn.setAttribute('role', 'menuitem');
     tsBtn.textContent = 'ts';
     tsBtn.title = 'Spawn TypeScript glyph';
 
@@ -172,6 +179,7 @@ export function showSpawnMenu(
     // Add prompt button
     const promptBtn = document.createElement('button');
     promptBtn.className = 'canvas-spawn-button';
+    promptBtn.setAttribute('role', 'menuitem');
     promptBtn.textContent = SO;
     promptBtn.title = 'Spawn Prompt glyph';
 
@@ -185,6 +193,7 @@ export function showSpawnMenu(
     // Add note button
     const noteBtn = document.createElement('button');
     noteBtn.className = 'canvas-spawn-button';
+    noteBtn.setAttribute('role', 'menuitem');
     noteBtn.textContent = Prose;
     noteBtn.title = 'Spawn Note glyph';
 
@@ -198,6 +207,7 @@ export function showSpawnMenu(
     // Add subcanvas button
     const subcanvasBtn = document.createElement('button');
     subcanvasBtn.className = 'canvas-spawn-button';
+    subcanvasBtn.setAttribute('role', 'menuitem');
     subcanvasBtn.textContent = Subcanvas;
     subcanvasBtn.title = 'Spawn Subcanvas glyph';
 
@@ -217,6 +227,7 @@ export function showSpawnMenu(
     for (const glyphType of pluginGlyphs) {
         const btn = document.createElement('button');
         btn.className = 'canvas-spawn-button';
+        btn.setAttribute('role', 'menuitem');
         btn.textContent = glyphType.symbol;
         btn.title = `Spawn ${glyphType.title} glyph`;
 
