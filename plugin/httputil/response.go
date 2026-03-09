@@ -3,7 +3,7 @@
 // Plugins that serve HTTP endpoints (glyph content, API handlers) share
 // common patterns: JSON request/response encoding, error responses, and
 // HTML escaping for server-rendered glyph content. This package eliminates
-// the duplication across qntx-atproto, qntx-ix-json, qntx-code, etc.
+// the duplication across qntx-atproto, ix-json, qntx-code, etc.
 package httputil
 
 import (
