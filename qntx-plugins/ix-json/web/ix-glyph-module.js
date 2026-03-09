@@ -1,4 +1,4 @@
-// qntx-ix-json/web/ix-glyph-module.ts
+// web/ix-glyph-module.ts
 var render = async (glyph, ui) => {
   const { element, titleBar } = ui.container({
     defaults: {
