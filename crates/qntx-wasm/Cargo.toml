@@ -17,6 +17,7 @@ browser = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:qn
 # Proto types - demonstrates WASM can use proto without gRPC dependencies (ADR-006)
 qntx-proto = { path = "../qntx-proto" }
 qntx-core = { path = "../qntx-core", default-features = false, features = ["wasm"] }
+qntx-id = { path = "../qntx-id" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
