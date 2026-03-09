@@ -8,7 +8,7 @@ package main
 
 import (
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
-	qntxixjson "github.com/teranos/QNTX/qntx-ix-json"
+	qntxixjson "github.com/teranos/QNTX/qntx-plugins/ix-json"
 )
 
 func main() {
