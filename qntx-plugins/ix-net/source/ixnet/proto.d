@@ -516,6 +516,46 @@ GenerateAttestationResponse decodeGenerateAttestationResponse(const ubyte[] data
     return result;
 }
 
+// ATSStore query messages (atsstore.proto)
+
+struct AttestationFilter {
+    @Proto(1) string[] subjects;
+    @Proto(2) string[] predicates;
+    @Proto(3) string[] contexts;
+    @Proto(4) string[] actors;
+    @Proto(5) long timeStart;
+    @Proto(6) long timeEnd;
+    @Proto(7) int limit;
+}
+
+struct GetAttestationsRequest {
+    @Proto(1) string authToken;
+    @Proto(2) AttestationFilter filter;
+}
+
+/// Encode GetAttestationsRequest with embedded filter message.
+ubyte[] encodeGetAttestationsRequest(string authToken, ref const AttestationFilter filter) {
+    ubyte[] result;
+    if (authToken.length > 0) {
+        result ~= encodeTag(1, WireType.LengthDelimited);
+        result ~= encodeVarint(authToken.length);
+        result ~= cast(const(ubyte)[])authToken;
+    }
+    auto filterBytes = encode(filter);
+    if (filterBytes.length > 0) {
+        result ~= encodeTag(2, WireType.LengthDelimited);
+        result ~= encodeVarint(filterBytes.length);
+        result ~= filterBytes;
+    }
+    return result;
+}
+
+struct GetAttestationsResponse {
+    @Proto(1) bool success;
+    @Proto(2) string error;
+    @Proto(3) Attestation[] attestations;
+}
+
 // ---------------------------------------------------------------------------
 // google.protobuf.Struct encoding helpers
 //

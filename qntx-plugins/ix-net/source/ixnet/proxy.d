@@ -839,7 +839,7 @@ private bool startsWith(string s, string prefix) {
 }
 
 /// Escape a string for safe JSON interpolation.
-private string jsonEscape(string s) {
+package string jsonEscape(string s) {
     bool needsEscape = false;
     foreach (c; s) {
         if (c == '"' || c == '\\' || c < 0x20) { needsEscape = true; break; }
@@ -917,7 +917,7 @@ private string intToStr(int n) {
 }
 
 /// Resolve image storage directory (~/.qntx/files/ix-net/).
-private string getImageDir() {
+package string getImageDir() {
     import core.stdc.stdlib : getenv;
     auto home = getenv("HOME");
     if (home is null) return "";
