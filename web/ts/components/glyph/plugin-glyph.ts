@@ -301,19 +301,23 @@ function fetchPluginState(pluginName: string, content: HTMLElement, displayName:
             if (!info) return; // Not in registry at all — "not enabled" is correct
 
             if (info.state === 'loading') {
-                content.innerHTML = `
-                    <div>${displayName} is loading...</div>
-                    <div style="font-size: 11px; color: #999;">
-                        Plugin is starting up, glyph will appear when ready
-                    </div>
-                `;
+                content.textContent = '';
+                const title = document.createElement('div');
+                title.textContent = `${displayName} is loading...`;
+                const sub = document.createElement('div');
+                sub.style.cssText = 'font-size: 11px; color: #999;';
+                sub.textContent = 'Plugin is starting up, glyph will appear when ready';
+                content.appendChild(title);
+                content.appendChild(sub);
             } else if (info.state === 'failed' && info.message) {
-                content.innerHTML = `
-                    <div>${displayName} failed to load</div>
-                    <div style="font-size: 11px; color: #ef4444; max-width: 360px; word-break: break-word; overflow-wrap: break-word;">
-                        ${info.message}
-                    </div>
-                `;
+                content.textContent = '';
+                const title = document.createElement('div');
+                title.textContent = `${displayName} failed to load`;
+                const errEl = document.createElement('div');
+                errEl.style.cssText = 'font-size: 11px; color: #ef4444; max-width: 360px; word-break: break-word; overflow-wrap: break-word;';
+                errEl.textContent = info.message;
+                content.appendChild(title);
+                content.appendChild(errEl);
             }
         })
         .catch(() => {
