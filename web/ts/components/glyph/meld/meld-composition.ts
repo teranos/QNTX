@@ -311,6 +311,146 @@ export function reconstructMeld(
 }
 
 /**
+ * Check if remaining node IDs form a connected graph when treating edges as undirected.
+ * Used by detachGlyph to decide between partial detach and full unmeld.
+ */
+function isConnectedGraph(edges: CompositionEdge[]): boolean {
+    const ids = new Set<string>();
+    const adjacency = new Map<string, Set<string>>();
+    for (const edge of edges) {
+        ids.add(edge.from);
+        ids.add(edge.to);
+        if (!adjacency.has(edge.from)) adjacency.set(edge.from, new Set());
+        if (!adjacency.has(edge.to)) adjacency.set(edge.to, new Set());
+        adjacency.get(edge.from)!.add(edge.to);
+        adjacency.get(edge.to)!.add(edge.from);
+    }
+    if (ids.size === 0) return false;
+
+    const start = ids.values().next().value!;
+    const visited = new Set<string>([start]);
+    const queue = [start];
+    while (queue.length > 0) {
+        const current = queue.shift()!;
+        for (const neighbor of adjacency.get(current) || []) {
+            if (!visited.has(neighbor)) {
+                visited.add(neighbor);
+                queue.push(neighbor);
+            }
+        }
+    }
+    return visited.size === ids.size;
+}
+
+/**
+ * Detach a single glyph from a composition, keeping the rest melded if possible.
+ *
+ * - If only 2 glyphs: delegates to unmeldComposition (can't have 1-glyph composition)
+ * - If removing the glyph disconnects the graph: delegates to unmeldComposition
+ * - Otherwise: removes the glyph, updates edges/storage, rebuilds layout
+ *
+ * Returns the detached element and remaining composition (null if fully unmelded).
+ */
+export function detachGlyph(glyphId: string, composition: HTMLElement): {
+    detachedElement: HTMLElement;
+    remainingComposition: HTMLElement | null;
+} | null {
+    if (!isMeldedComposition(composition)) {
+        log.warn(SEG.GLYPH, '[MeldSystem] detachGlyph: not a melded composition');
+        return null;
+    }
+
+    const canvas = composition.parentElement;
+    if (!canvas) {
+        log.error(SEG.GLYPH, '[MeldSystem] detachGlyph: composition has no parent canvas');
+        return null;
+    }
+
+    const compositionId = composition.getAttribute('data-glyph-id') || '';
+    const storedComp = findCompositionByGlyph(glyphId);
+    if (!storedComp) {
+        log.warn(SEG.GLYPH, `[MeldSystem] detachGlyph: no stored composition for glyph ${glyphId}`);
+        return null;
+    }
+
+    const allGlyphIds = extractGlyphIds(storedComp.edges);
+
+    // 2-glyph composition → full unmeld
+    if (allGlyphIds.length <= 2) {
+        log.info(SEG.GLYPH, '[MeldSystem] detachGlyph: 2-glyph composition, delegating to full unmeld');
+        const result = unmeldComposition(composition);
+        if (!result) return null;
+        const detached = result.glyphElements.find(
+            el => (el.getAttribute('data-glyph-id') || el.dataset.glyphId) === glyphId
+        );
+        if (!detached) return null;
+        return { detachedElement: detached, remainingComposition: null };
+    }
+
+    // Filter edges: remove all edges involving this glyph
+    const remainingEdges = storedComp.edges.filter(
+        e => e.from !== glyphId && e.to !== glyphId
+    );
+
+    // Check if remaining edges form a connected graph
+    if (!isConnectedGraph(remainingEdges)) {
+        log.info(SEG.GLYPH, `[MeldSystem] detachGlyph: removing ${glyphId} disconnects graph, delegating to full unmeld`);
+        const result = unmeldComposition(composition);
+        if (!result) return null;
+        const detached = result.glyphElements.find(
+            el => (el.getAttribute('data-glyph-id') || el.dataset.glyphId) === glyphId
+        );
+        if (!detached) return null;
+        return { detachedElement: detached, remainingComposition: null };
+    }
+
+    // Partial detach: reparent detached element to canvas
+    const detachedEl = composition.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+    if (!detachedEl) {
+        log.error(SEG.GLYPH, `[MeldSystem] detachGlyph: element not found for glyph ${glyphId}`);
+        return null;
+    }
+
+    // Position the detached element near the composition
+    const compLeft = parseInt(composition.style.left || '0', 10) || 0;
+    const compTop = parseInt(composition.style.top || '0', 10) || 0;
+    detachedEl.style.position = 'absolute';
+    detachedEl.style.left = `${compLeft + UNMELD_OFFSET}px`;
+    detachedEl.style.top = `${compTop - UNMELD_OFFSET - 40}px`;
+    detachedEl.style.gridRow = '';
+    detachedEl.style.gridColumn = '';
+
+    // Reparent to canvas
+    canvas.insertBefore(detachedEl, composition);
+
+    // Update storage: remove old composition, add new with remaining edges
+    const newId = `melded-${remainingEdges[0].from}-${remainingEdges[0].to}`;
+    removeComposition(storedComp.id);
+    composition.setAttribute('data-glyph-id', newId);
+    addComposition({
+        id: newId,
+        edges: remainingEdges,
+        x: storedComp.x,
+        y: storedComp.y
+    });
+
+    // Rebuild layout for remaining elements
+    const remainingElements = Array.from(
+        composition.querySelectorAll('[data-glyph-id]')
+    ) as HTMLElement[];
+    applyColumnLayout(composition, remainingElements, remainingEdges);
+
+    log.info(SEG.GLYPH, `[MeldSystem] Detached glyph ${glyphId} from composition`, {
+        oldId: compositionId,
+        newId,
+        remainingEdges: remainingEdges.length,
+        remainingGlyphs: extractGlyphIds(remainingEdges)
+    });
+
+    return { detachedElement: detachedEl, remainingComposition: composition };
+}
+
+/**
  * Check if element is a melded composition
  */
 export function isMeldedComposition(element: HTMLElement): boolean {
