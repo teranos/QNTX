@@ -77,7 +77,7 @@ export async function loadPluginGlyphs(): Promise<void> {
 /**
  * Discover pure TS plugin modules by probing enabled plugins for a glyph module.
  *
- * For each enabled plugin, tries to import /api/{name}/ix-glyph-module.js.
+ * For each enabled plugin, tries to import /api/{name}/glyph-module.js.
  * If the module exports a glyphDef, it's a self-describing TS plugin — register it.
  * If the import fails, the plugin is Go-only (already handled above).
  */
@@ -95,7 +95,7 @@ async function discoverTSPluginModules(): Promise<void> {
 
     let count = 0;
     for (const name of pluginNames) {
-        const moduleUrl = `/api/${name}/ix-glyph-module.js`;
+        const moduleUrl = `/api/${name}/glyph-module.js`;
         try {
             const raw: Record<string, unknown> = await import(/* @vite-ignore */ moduleUrl);
             const mod = (raw.default ?? raw) as GlyphModule & { glyphDef?: GlyphDef };
