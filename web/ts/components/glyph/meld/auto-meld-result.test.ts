@@ -55,10 +55,12 @@ describe('Auto-Meld Result Below - Tim (Happy Path)', () => {
         expect(composition?.contains(pyElement)).toBe(true);
         expect(composition?.contains(resultElement)).toBe(true);
 
-        // Verify composition uses grid layout with py above result
-        expect((composition as HTMLElement)?.style.display).toBe('grid');
-        expect(pyElement.style.gridRow).toBe('1');
-        expect(resultElement.style.gridRow).toBe('2');
+        // Verify column layout: single column with py above result
+        const cols = (composition as HTMLElement)?.querySelectorAll('.meld-column');
+        expect(cols?.length).toBe(1);
+        const col1 = Array.from(cols![0].querySelectorAll('[data-glyph-id]'));
+        expect(col1[0]).toBe(pyElement);
+        expect(col1[1]).toBe(resultElement);
 
         clearState();
     });
@@ -113,13 +115,13 @@ describe('Auto-Meld Result Below - Tim (Happy Path)', () => {
         expect(composition.contains(axElement)).toBe(true);
         expect(composition.contains(pyElement)).toBe(true);
 
-        // Verify all glyphs are direct children with correct grid positions (no sub-containers)
-        expect(pyElement.parentElement).toBe(composition);
-        expect(resultElement.parentElement).toBe(composition);
-        expect(pyElement.style.gridRow).toBe('1');
-        expect(pyElement.style.gridColumn).toBe('2');
-        expect(resultElement.style.gridRow).toBe('2');
-        expect(resultElement.style.gridColumn).toBe('2');
+        // Verify column layout: col1=[ax], col2=[py, result]
+        const cols = composition.querySelectorAll('.meld-column');
+        expect(cols.length).toBe(2);
+        const col1 = Array.from(cols[0].querySelectorAll('[data-glyph-id]'));
+        const col2 = Array.from(cols[1].querySelectorAll('[data-glyph-id]'));
+        expect(col1).toEqual([axElement]);
+        expect(col2).toEqual([pyElement, resultElement]);
 
         clearState();
     });

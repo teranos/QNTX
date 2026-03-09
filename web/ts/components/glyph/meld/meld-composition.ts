@@ -7,8 +7,8 @@
  * NO cloneNode. NO createElement for existing glyphs.
  * Melding is achieved through reparenting, not cloning.
  *
- * Layout: CSS Grid with per-glyph grid-row/grid-column placement
- * derived from the edge DAG via computeGridPositions().
+ * Layout: Flexbox columns derived from the edge DAG via computeGridPositions().
+ * Each column stacks independently, avoiding CSS grid's row-height coupling.
  */
 
 import { log, SEG } from '../../../logger';
@@ -22,21 +22,30 @@ import { clearMeldFeedback } from './meld-feedback';
 const UNMELD_OFFSET = 20; // px - spacing between glyphs when unmelding
 
 /**
- * Apply CSS Grid layout to a composition based on its edge graph.
+ * Apply flexbox column layout to a composition based on its edge graph.
  * Single source of truth — used by performMeld, extendComposition, and reconstructMeld.
+ *
+ * Groups elements into column wrappers so each column stacks independently.
+ * This avoids CSS grid's row-height coupling where a tall element in one column
+ * forces gaps in adjacent columns.
  */
-function applyGridLayout(
+function applyColumnLayout(
     composition: HTMLElement,
     elements: HTMLElement[],
     edges: CompositionEdge[]
 ): void {
-    composition.style.display = 'grid';
-    composition.style.gridAutoRows = 'auto';
-    composition.style.gridAutoColumns = 'auto';
-    composition.style.gap = '0';
-
     const positions = computeGridPositions(edges);
 
+    // Remove existing column wrappers, moving children back to composition
+    composition.querySelectorAll('.meld-column').forEach(col => {
+        while (col.firstChild) {
+            composition.appendChild(col.firstChild);
+        }
+        col.remove();
+    });
+
+    // Group elements by column, sorted by row
+    const columns = new Map<number, Array<{ el: HTMLElement; row: number }>>();
     for (const el of elements) {
         const id = el.getAttribute('data-glyph-id') || '';
         const pos = positions.get(id);
@@ -44,8 +53,31 @@ function applyGridLayout(
             log.warn(SEG.GLYPH, `[MeldSystem] No grid position computed for glyph ${id}`);
             continue;
         }
-        el.style.gridRow = String(pos.row);
-        el.style.gridColumn = String(pos.col);
+        if (!columns.has(pos.col)) columns.set(pos.col, []);
+        columns.get(pos.col)!.push({ el, row: pos.row });
+    }
+
+    // Sort columns by number, items within by row
+    const sortedCols = [...columns.entries()].sort(([a], [b]) => a - b);
+
+    // Clear old grid styles
+    composition.style.gridAutoRows = '';
+    composition.style.gridAutoColumns = '';
+
+    // Create column wrappers and place elements
+    for (const [, items] of sortedCols) {
+        items.sort((a, b) => a.row - b.row);
+
+        const colWrapper = document.createElement('div');
+        colWrapper.className = 'meld-column';
+
+        for (const { el } of items) {
+            el.style.gridRow = '';
+            el.style.gridColumn = '';
+            colWrapper.appendChild(el);
+        }
+
+        composition.appendChild(colWrapper);
     }
 }
 
@@ -122,7 +154,7 @@ export function performMeld(
     composition.appendChild(targetElement);
 
     // Apply grid layout from edge graph
-    applyGridLayout(composition, [initiatorElement, targetElement], edges);
+    applyColumnLayout(composition, [initiatorElement, targetElement], edges);
 
     // Add to canvas
     canvas.appendChild(composition);
@@ -209,7 +241,7 @@ export function extendComposition(
     const allChildren = Array.from(
         compositionElement.querySelectorAll('[data-glyph-id]')
     ) as HTMLElement[];
-    applyGridLayout(compositionElement, allChildren, allEdges);
+    applyColumnLayout(compositionElement, allChildren, allEdges);
 
     log.info(SEG.GLYPH, '[MeldSystem] Composition extended', {
         newId,
@@ -265,7 +297,7 @@ export function reconstructMeld(
     });
 
     // Apply grid layout from edge graph
-    applyGridLayout(composition, glyphElements, edges);
+    applyColumnLayout(composition, glyphElements, edges);
 
     // Add to canvas
     canvas.appendChild(composition);
