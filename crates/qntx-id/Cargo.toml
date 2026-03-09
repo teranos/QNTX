@@ -1,0 +1,10 @@
+[package]
+name = "qntx-id"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "QNTX identity primitives — vanity subjects and content-addressed attestation IDs (ADR-010)"
+
+[dependencies]
+unicode-normalization = "0.1"
