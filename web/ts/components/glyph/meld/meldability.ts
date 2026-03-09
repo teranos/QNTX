@@ -22,6 +22,7 @@ const ALL_GLYPH_CLASSES = [
     'canvas-ax-glyph', 'canvas-se-glyph', 'canvas-py-glyph',
     'canvas-prompt-glyph', 'canvas-doc-glyph', 'canvas-note-glyph',
     'canvas-result-glyph', 'canvas-subcanvas-glyph',
+    'canvas-plugin-glyph',
 ] as const;
 
 /**
@@ -48,10 +49,13 @@ export const MELDABILITY: Record<string, readonly PortRule[]> = {
         { direction: 'bottom', targets: ['canvas-prompt-glyph', 'canvas-doc-glyph', 'canvas-subcanvas-glyph'] }
     ],
     'canvas-note-glyph': [
-        { direction: 'bottom', targets: ['canvas-prompt-glyph', 'canvas-subcanvas-glyph'] }
+        { direction: 'bottom', targets: ['canvas-prompt-glyph', 'canvas-plugin-glyph', 'canvas-subcanvas-glyph'] }
     ],
     'canvas-result-glyph': [
         { direction: 'bottom', targets: ['canvas-result-glyph'] }
+    ],
+    'canvas-plugin-glyph': [
+        { direction: 'bottom', targets: ['canvas-result-glyph', 'canvas-subcanvas-glyph'] }
     ],
     'canvas-subcanvas-glyph': [
         { direction: 'right', targets: ALL_GLYPH_CLASSES },
