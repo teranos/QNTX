@@ -25,7 +25,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
-	github.com/teranos/vanity-id v0.3.0
+	github.com/teranos/vanity-id v0.3.0 // TODO(#645): retire — migrate remaining callers to qntx-id via WASM
 	github.com/tetratelabs/wazero v1.11.0
 	github.com/tliron/glsp v0.2.2
 	go.uber.org/zap v1.27.1

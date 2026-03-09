@@ -79,7 +79,7 @@ function buildQntxApi(outputLines: string[]) {
                 source: 'ts-glyph',
                 attributes: opts.attributes ?? {},
                 created_at: now,
-                signature: '',
+                signature: '' as unknown as Uint8Array, // base64 string for proto JSON wire format
                 signer_did: '',
             };
 
