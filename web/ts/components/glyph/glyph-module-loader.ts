@@ -17,6 +17,10 @@ import { createGlyphUI } from './glyph-ui';
 import { loadPluginCSS } from './plugin-provided-glyphs';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from './manifestations/canvas-placed';
+import { makeDraggable, makeResizable, storeCleanup, preventDrag } from './glyph-interaction';
+import { morphCanvasPlacedToWindow } from './manifestations/canvas-window';
+import { isInWindowState } from './dataset';
+import { uiState } from '../../state/ui';
 
 // Cache imported modules — one import per module_url
 const moduleCache = new Map<string, Promise<GlyphModule>>();
@@ -74,6 +78,14 @@ interface WrapOpts {
 
 /** Wrap a raw plugin element in canvasPlaced with title bar for selection/drag/resize. */
 export function wrapInCanvasPlaced(glyph: Glyph, rendered: HTMLElement, opts: WrapOpts): HTMLElement {
+    // Expand button for morph to window
+    const expandBtn = document.createElement('button');
+    expandBtn.textContent = '\u2B06'; // ⬆
+    expandBtn.title = 'Expand to window';
+    expandBtn.setAttribute('aria-label', 'Expand to window');
+    preventDrag(expandBtn);
+
+    const title = opts.title || opts.plugin;
     const { element } = canvasPlaced({
         glyph,
         className: `canvas-plugin-glyph plugin-${opts.plugin}`,
@@ -83,11 +95,44 @@ export function wrapInCanvasPlaced(glyph: Glyph, rendered: HTMLElement, opts: Wr
             width: opts.defaultWidth ?? 400,
             height: opts.defaultHeight ?? 300,
         },
-        titleBar: opts.title ? { label: opts.title } : undefined,
+        titleBar: { label: title, actions: [expandBtn] },
         resizable: true,
         logLabel: `Plugin:${opts.plugin}`,
     });
     element.appendChild(rendered);
+
+    expandBtn.addEventListener('click', () => {
+        if (isInWindowState(element)) return;
+        const canvas = element.closest('.canvas-workspace') as HTMLElement | null;
+        const canvasId = (canvas?.closest('[data-canvas-id]') as HTMLElement | null)?.dataset?.canvasId ?? 'canvas-workspace';
+
+        morphCanvasPlacedToWindow(element, {
+            title,
+            canvasId,
+            onClose: () => {
+                element.remove();
+                uiState.removeCanvasGlyph(glyph.id);
+            },
+            onRestoreComplete: (el) => {
+                // Re-attach drag/resize handlers torn down by morph
+                const titleBar = el.querySelector(':scope > .glyph-title-bar') as HTMLElement | null;
+                const dragHandle = titleBar ?? el;
+                const cleanupDrag = makeDraggable(el, dragHandle, glyph, {
+                    logLabel: `Plugin:${opts.plugin}`,
+                });
+                storeCleanup(el, cleanupDrag);
+
+                const resizeHandle = el.querySelector('.glyph-resize-handle') as HTMLElement | null;
+                if (resizeHandle) {
+                    const cleanupResize = makeResizable(el, resizeHandle, glyph, {
+                        logLabel: `Plugin:${opts.plugin}`,
+                    });
+                    storeCleanup(el, cleanupResize);
+                }
+            },
+        });
+    });
+
     log.debug(SEG.GLYPH, `[GlyphModule] Wrapped ${opts.plugin} glyph ${glyph.id} in canvasPlaced`);
     return element;
 }
