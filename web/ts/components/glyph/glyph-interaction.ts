@@ -28,6 +28,9 @@ import { isGlyphSelected, getSelectedGlyphIds } from './canvas/selection';
 import { getTransform } from './canvas/canvas-pan.js';
 import { addComposition, findCompositionByGlyph } from '../../state/compositions';
 
+// Monotonic z-index counter — each drag/click brings glyph to front
+let topZIndex = 1;
+
 // ── Composition anchor selection ────────────────────────────────────
 
 /**
@@ -548,6 +551,9 @@ export function makeDraggable(
 
         element.classList.add('is-dragging');
 
+        // Bring to front — stays on top after release
+        element.style.zIndex = String(++topZIndex);
+
         // Check if this glyph is part of a multi-selection
         const canvasId = (element.closest('[data-canvas-id]') as HTMLElement | null)?.dataset?.canvasId ?? 'canvas-workspace';
         dragCanvasId = canvasId;
@@ -578,6 +584,7 @@ export function makeDraggable(
                             glyph: glyphData
                         });
                         el.classList.add('is-dragging');
+                        el.style.zIndex = element.style.zIndex;
                     }
                 }
             }
