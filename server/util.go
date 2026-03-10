@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gorilla/websocket"
@@ -110,9 +111,9 @@ func findAvailablePort(requestedPort int) (int, error) {
 // createFileCore creates a zap core for file logging without colors
 func createFileCore(path string, verbosity int) (zapcore.Core, error) {
 	// Ensure directory exists (os.OpenFile doesn't create intermediate directories)
-	dir := "tmp"
+	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, errors.Wrap(err, "failed to create log directory")
+		return nil, errors.Wrapf(err, "failed to create log directory %s", dir)
 	}
 
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)

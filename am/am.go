@@ -53,6 +53,7 @@ type ServerConfig struct {
 	BindAddress    string          `mapstructure:"bind_address"`  // Network interface to bind: "127.0.0.1" (default, local only) or "0.0.0.0" (all interfaces)
 	FrontendPort   int             `mapstructure:"frontend_port"` // Frontend dev server port (default: 8820)
 	AllowedOrigins []string        `mapstructure:"allowed_origins"`
+	LogPath        string          `mapstructure:"log_path"`   // File log path when verbosity >= 2 (default: tmp/qntx.log)
 	LogTheme       string          `mapstructure:"log_theme"`  // Color theme: gruvbox, everforest
 	RateLimit      RateLimitConfig `mapstructure:"rate_limit"` // Per-IP rate limiting
 }
