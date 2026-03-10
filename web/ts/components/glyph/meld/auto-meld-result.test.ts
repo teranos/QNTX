@@ -55,12 +55,11 @@ describe('Auto-Meld Result Below - Tim (Happy Path)', () => {
         expect(composition?.contains(pyElement)).toBe(true);
         expect(composition?.contains(resultElement)).toBe(true);
 
-        // Verify column layout: single column with py above result
-        const cols = (composition as HTMLElement)?.querySelectorAll('.meld-column');
-        expect(cols?.length).toBe(1);
-        const col1 = Array.from(cols![0].querySelectorAll('[data-glyph-id]'));
-        expect(col1[0]).toBe(pyElement);
-        expect(col1[1]).toBe(resultElement);
+        // Both elements are direct children (absolute positioning)
+        const children = Array.from(composition!.querySelectorAll('[data-glyph-id]'));
+        expect(children).toContain(pyElement);
+        expect(children).toContain(resultElement);
+        expect(children.length).toBe(2);
 
         clearState();
     });
@@ -115,13 +114,12 @@ describe('Auto-Meld Result Below - Tim (Happy Path)', () => {
         expect(composition.contains(axElement)).toBe(true);
         expect(composition.contains(pyElement)).toBe(true);
 
-        // Verify column layout: col1=[ax], col2=[py, result]
-        const cols = composition.querySelectorAll('.meld-column');
-        expect(cols.length).toBe(2);
-        const col1 = Array.from(cols[0].querySelectorAll('[data-glyph-id]'));
-        const col2 = Array.from(cols[1].querySelectorAll('[data-glyph-id]'));
-        expect(col1).toEqual([axElement]);
-        expect(col2).toEqual([pyElement, resultElement]);
+        // All 3 elements are direct children (absolute positioning)
+        const children = Array.from(composition.querySelectorAll('[data-glyph-id]'));
+        expect(children).toContain(axElement);
+        expect(children).toContain(pyElement);
+        expect(children).toContain(resultElement);
+        expect(children.length).toBe(3);
 
         clearState();
     });
