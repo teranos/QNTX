@@ -1,0 +1,3 @@
+(library
+ (name qntx_loom_proto)
+ (libraries ocaml-protoc-plugin))
