@@ -14,6 +14,7 @@ import {
     canInitiateMeld,
     canReceiveMeld,
     findMeldTarget,
+    checkDirectionalProximity,
     applyMeldFeedback,
     clearMeldFeedback,
     performMeld,
@@ -30,17 +31,6 @@ import { addComposition, findCompositionByGlyph } from '../../state/compositions
 // ── Composition anchor selection ────────────────────────────────────
 
 /**
- * Simple center-to-center distance between two rects.
- * Used for anchor selection within a composition — no angular filtering
- * needed since direction is derived from port compatibility, not spatial inference.
- */
-function centerDistance(a: DOMRect, b: DOMRect): number {
-    const dx = (a.left + a.width / 2) - (b.left + b.width / 2);
-    const dy = (a.top + a.height / 2) - (b.top + b.height / 2);
-    return Math.sqrt(dx * dx + dy * dy);
-}
-
-/**
  * Find the spatially-nearest glyph in a composition that has a free port
  * compatible with the standalone element, in ANY valid direction.
  *
@@ -55,13 +45,14 @@ function findBestAnchorInComposition(
     standaloneElement: HTMLElement,
     compositionElement: HTMLElement,
     edges: Array<{ from: string; to: string; direction: string }>,
-): { anchorId: string; direction: EdgeDirection } | null {
+): { anchorId: string; direction: EdgeDirection; role: 'from' | 'to' } | null {
     const standaloneRect = standaloneElement.getBoundingClientRect();
     const standaloneClass = getGlyphClass(standaloneElement);
     if (!standaloneClass) return null;
 
     let bestId: string | null = null;
     let bestDirection: EdgeDirection = 'right';
+    let bestRole: 'from' | 'to' = 'to';
     let bestDistance = Infinity;
 
     const glyphElements = compositionElement.querySelectorAll('[data-glyph-id]');
@@ -74,31 +65,35 @@ function findBestAnchorInComposition(
         if (!glyphClass) continue;
 
         const glyphRect = glyphEl.getBoundingClientRect();
-        const dist = centerDistance(glyphRect, standaloneRect);
 
         // Append: composition glyph → standalone (outgoing port)
+        // Use directional proximity so spatial relationship determines direction
         for (const dir of getCompatibleDirections(glyphClass, standaloneClass)) {
             if (!isPortFree(glyphId, dir, 'outgoing', edges)) continue;
+            const dist = checkDirectionalProximity(glyphRect, standaloneRect, dir);
             if (dist < bestDistance) {
                 bestDistance = dist;
                 bestId = glyphId;
                 bestDirection = dir;
+                bestRole = 'to';
             }
         }
 
         // Prepend: standalone → composition glyph (incoming port)
         for (const dir of getCompatibleDirections(standaloneClass, glyphClass)) {
             if (!isPortFree(glyphId, dir, 'incoming', edges)) continue;
+            const dist = checkDirectionalProximity(standaloneRect, glyphRect, dir);
             if (dist < bestDistance) {
                 bestDistance = dist;
                 bestId = glyphId;
                 bestDirection = dir;
+                bestRole = 'from';
             }
         }
     }
 
     if (!bestId) return null;
-    return { anchorId: bestId, direction: bestDirection };
+    return { anchorId: bestId, direction: bestDirection, role: bestRole };
 }
 
 // ── Options ─────────────────────────────────────────────────────────
@@ -374,13 +369,25 @@ export function makeDraggable(
                     const existingComp = findCompositionByGlyph(fallbackAnchorId);
 
                     if (existingComp && standaloneClass) {
-                        // Pick the spatially-nearest glyph with a free port as anchor,
-                        // rather than trusting findMeldTarget's single result
-                        const bestAnchor = findBestAnchorInComposition(
-                            standaloneElement, compositionElement, existingComp.edges
+                        // If a glyph inside the composition is selected, use it as the anchor —
+                        // the user is explicitly saying "connect to this one"
+                        const selectedIds = getSelectedGlyphIds(dragCanvasId);
+                        const selectedAnchor = selectedIds.find(id =>
+                            compositionElement.querySelector(`[data-glyph-id="${id}"]`) !== null
                         );
-                        const bestAnchorId = bestAnchor?.anchorId || fallbackAnchorId;
-                        const bestDirection = bestAnchor?.direction || meldInfo.direction;
+
+                        let bestAnchorId: string;
+                        let bestDirection: EdgeDirection;
+                        if (selectedAnchor) {
+                            bestAnchorId = selectedAnchor;
+                            bestDirection = meldInfo.direction;
+                        } else {
+                            const bestAnchor = findBestAnchorInComposition(
+                                standaloneElement, compositionElement, existingComp.edges
+                            );
+                            bestAnchorId = bestAnchor?.anchorId || fallbackAnchorId;
+                            bestDirection = bestAnchor?.direction || meldInfo.direction;
+                        }
 
                         const options = getMeldOptions(standaloneClass, compositionElement, existingComp.edges);
                         const option = selectPreferredMeldOption(options, bestAnchorId, bestDirection);

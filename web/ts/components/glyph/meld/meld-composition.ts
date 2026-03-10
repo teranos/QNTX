@@ -7,8 +7,9 @@
  * NO cloneNode. NO createElement for existing glyphs.
  * Melding is achieved through reparenting, not cloning.
  *
- * Layout: Flexbox columns derived from the edge DAG via computeGridPositions().
- * Each column stacks independently, avoiding CSS grid's row-height coupling.
+ * Layout: Absolute positioning derived from the edge DAG via computeGridPositions().
+ * Elements are measured and positioned with pixel offsets, avoiding both
+ * CSS grid's row-height coupling and flexbox's inability to express row offsets.
  */
 
 import { log, SEG } from '../../../logger';
@@ -22,12 +23,12 @@ import { clearMeldFeedback } from './meld-feedback';
 const UNMELD_OFFSET = 20; // px - spacing between glyphs when unmelding
 
 /**
- * Apply flexbox column layout to a composition based on its edge graph.
+ * Apply absolute positioning layout to a composition based on its edge graph.
  * Single source of truth — used by performMeld, extendComposition, and reconstructMeld.
  *
- * Groups elements into column wrappers so each column stacks independently.
- * This avoids CSS grid's row-height coupling where a tall element in one column
- * forces gaps in adjacent columns.
+ * Computes pixel positions from the DAG grid positions, measuring actual element
+ * sizes to accumulate row/column offsets. This avoids both CSS grid's row-height
+ * coupling and flexbox's inability to express row offsets.
  */
 function applyColumnLayout(
     composition: HTMLElement,
@@ -36,7 +37,7 @@ function applyColumnLayout(
 ): void {
     const positions = computeGridPositions(edges);
 
-    // Remove existing column wrappers, moving children back to composition
+    // Remove existing column wrappers (migration from flexbox), moving children back
     composition.querySelectorAll('.meld-column').forEach(col => {
         while (col.firstChild) {
             composition.appendChild(col.firstChild);
@@ -44,8 +45,17 @@ function applyColumnLayout(
         col.remove();
     });
 
-    // Group elements by column, sorted by row
-    const columns = new Map<number, Array<{ el: HTMLElement; row: number }>>();
+    // Build a map of element by id for quick lookup
+    const elementById = new Map<string, HTMLElement>();
+    for (const el of elements) {
+        const id = el.getAttribute('data-glyph-id') || '';
+        elementById.set(id, el);
+    }
+
+    // Group elements by (row, col) for layout computation
+    const rows = new Map<number, Map<number, { el: HTMLElement; id: string }>>();
+    let maxRow = 0;
+    let maxCol = 0;
     for (const el of elements) {
         const id = el.getAttribute('data-glyph-id') || '';
         const pos = positions.get(id);
@@ -53,32 +63,70 @@ function applyColumnLayout(
             log.warn(SEG.GLYPH, `[MeldSystem] No grid position computed for glyph ${id}`);
             continue;
         }
-        if (!columns.has(pos.col)) columns.set(pos.col, []);
-        columns.get(pos.col)!.push({ el, row: pos.row });
+        if (!rows.has(pos.row)) rows.set(pos.row, new Map());
+        rows.get(pos.row)!.set(pos.col, { el, id });
+        maxRow = Math.max(maxRow, pos.row);
+        maxCol = Math.max(maxCol, pos.col);
     }
 
-    // Sort columns by number, items within by row
-    const sortedCols = [...columns.entries()].sort(([a], [b]) => a - b);
-
-    // Clear old grid styles
-    composition.style.gridAutoRows = '';
-    composition.style.gridAutoColumns = '';
-
-    // Create column wrappers and place elements
-    for (const [, items] of sortedCols) {
-        items.sort((a, b) => a.row - b.row);
-
-        const colWrapper = document.createElement('div');
-        colWrapper.className = 'meld-column';
-
-        for (const { el } of items) {
-            el.style.gridRow = '';
-            el.style.gridColumn = '';
-            colWrapper.appendChild(el);
+    // Clear old layout styles and ensure children are direct children of composition
+    for (const el of elements) {
+        el.style.gridRow = '';
+        el.style.gridColumn = '';
+        el.style.position = 'absolute';
+        if (el.parentElement !== composition) {
+            composition.appendChild(el);
         }
-
-        composition.appendChild(colWrapper);
     }
+
+    // Force browser to compute layout before measuring:
+    // Set a large temporary size so absolutely positioned children aren't constrained,
+    // then trigger a synchronous reflow via offsetHeight read.
+    composition.style.width = '10000px';
+    composition.style.height = '10000px';
+    void composition.offsetHeight;
+
+    // Measure element sizes (must be in DOM and laid out to get dimensions)
+    // Compute max width per column and max height per row
+    const colWidths = new Map<number, number>();
+    const rowHeights = new Map<number, number>();
+
+    for (const [id, el] of elementById) {
+        const pos = positions.get(id);
+        if (!pos) continue;
+        const rect = el.getBoundingClientRect();
+        const w = rect.width || el.offsetWidth || 200;
+        const h = rect.height || el.offsetHeight || 150;
+        colWidths.set(pos.col, Math.max(colWidths.get(pos.col) || 0, w));
+        rowHeights.set(pos.row, Math.max(rowHeights.get(pos.row) || 0, h));
+    }
+
+    // Compute pixel offsets: accumulate column widths and row heights
+    const colOffsets = new Map<number, number>();
+    let xAccum = 0;
+    for (let c = 1; c <= maxCol; c++) {
+        colOffsets.set(c, xAccum);
+        xAccum += (colWidths.get(c) || 0);
+    }
+
+    const rowOffsets = new Map<number, number>();
+    let yAccum = 0;
+    for (let r = 1; r <= maxRow; r++) {
+        rowOffsets.set(r, yAccum);
+        yAccum += (rowHeights.get(r) || 0);
+    }
+
+    // Position each element
+    for (const [id, el] of elementById) {
+        const pos = positions.get(id);
+        if (!pos) continue;
+        el.style.left = `${colOffsets.get(pos.col) || 0}px`;
+        el.style.top = `${rowOffsets.get(pos.row) || 0}px`;
+    }
+
+    // Size the composition to contain all children
+    composition.style.width = `${xAccum}px`;
+    composition.style.height = `${yAccum}px`;
 }
 
 /**
@@ -153,11 +201,11 @@ export function performMeld(
     composition.appendChild(initiatorElement);
     composition.appendChild(targetElement);
 
+    // Add to canvas BEFORE layout so elements are in the DOM for measurement
+    canvas.appendChild(composition);
+
     // Apply grid layout from edge graph
     applyColumnLayout(composition, [initiatorElement, targetElement], edges);
-
-    // Add to canvas
-    canvas.appendChild(composition);
 
     // Persist composition to storage
     addComposition({
@@ -302,11 +350,11 @@ export function reconstructMeld(
         composition.appendChild(element);
     });
 
+    // Add to canvas BEFORE layout so elements are in the DOM for measurement
+    canvas.appendChild(composition);
+
     // Apply grid layout from edge graph
     applyColumnLayout(composition, glyphElements, edges);
-
-    // Add to canvas
-    canvas.appendChild(composition);
 
     log.info(SEG.GLYPH, '[MeldSystem] Meld reconstructed', {
         compositionId,
