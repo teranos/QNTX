@@ -66,8 +66,15 @@ func runServer(cmd *cobra.Command, args []string) error {
 	}
 	defer database.Close()
 
+	// Resolve log path from config
+	cfg, err := am.Load()
+	if err != nil {
+		cfg = &am.Config{}
+	}
+	logPath := cfg.GetLogPath(serverPort)
+
 	// Print startup banner
-	printStartupBanner(verbosity, dbPath)
+	printStartupBanner(verbosity, dbPath, logPath)
 
 	if serverAtsQuery != "" {
 		pterm.Info.Printf("Pre-loaded query: %s\n", serverAtsQuery)
