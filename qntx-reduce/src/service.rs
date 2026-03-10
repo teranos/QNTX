@@ -1,8 +1,8 @@
 use crate::handlers::{HandlerContext, ReduceState};
 use crate::proto::{
     domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, Empty,
-    ExecuteJobRequest, ExecuteJobResponse, HealthResponse, HttpRequest, HttpResponse,
-    InitializeRequest, InitializeResponse, MetadataResponse, WebSocketMessage,
+    ExecuteJobRequest, ExecuteJobResponse, GlyphDefResponse, HealthResponse, HttpRequest,
+    HttpResponse, InitializeRequest, InitializeResponse, MetadataResponse, WebSocketMessage,
 };
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -66,7 +66,15 @@ impl DomainPluginService for ReducePluginService {
                 "reduce.tsne".to_string(),
                 "reduce.pca".to_string(),
             ],
+            schedules: vec![],
         }))
+    }
+
+    async fn register_glyphs(
+        &self,
+        _request: Request<Empty>,
+    ) -> Result<Response<GlyphDefResponse>, Status> {
+        Ok(Response::new(GlyphDefResponse { glyphs: vec![] }))
     }
 
     async fn shutdown(&self, _request: Request<Empty>) -> Result<Response<Empty>, Status> {
