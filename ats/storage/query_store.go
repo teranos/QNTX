@@ -144,10 +144,13 @@ func (s *SQLQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilte
 		qb.buildMetadataTemporalFilters(filter)
 	}
 
-	// Build full query
-	query := AttestationSelectQuery
+	// Build full query — use ValidAttestationSelectQuery to skip rows with
+	// malformed JSON (e.g., synced melded attestations with bare strings).
+	// The base query already includes WHERE json_valid(...), so additional
+	// filters are appended with AND.
+	query := ValidAttestationSelectQuery
 	if len(qb.whereClauses) > 0 {
-		query += " WHERE " + strings.Join(qb.whereClauses, " AND ")
+		query += " AND " + strings.Join(qb.whereClauses, " AND ")
 	}
 	query += " ORDER BY timestamp DESC"
 

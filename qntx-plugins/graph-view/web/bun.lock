@@ -1,0 +1,15 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "qntx-graph-view-web",
+      "dependencies": {
+        "regl": "2.1.0",
+      },
+    },
+  },
+  "packages": {
+    "regl": ["regl@2.1.0", "", {}, "sha512-oWUce/aVoEvW5l2V0LK7O5KJMzUSKeiOwFuJehzpSFd43dO5spP9r+sSUfhKtsky4u6MCqWJaRL+abzExynfTg=="],
+  }
+}

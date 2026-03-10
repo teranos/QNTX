@@ -1,0 +1,7 @@
+{
+  "name": "qntx-graph-view-web",
+  "private": true,
+  "dependencies": {
+    "regl": "2.1.0"
+  }
+}
