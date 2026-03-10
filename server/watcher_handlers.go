@@ -7,12 +7,16 @@ import (
 	"strings"
 	"time"
 
+	"context"
+
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/errors"
+	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 )
 
 // WatcherCreateRequest represents a request to create a new watcher
@@ -517,6 +521,9 @@ func (s *QNTXServer) initWatcherEngine() error {
 	// Set glyph fired callback for meld-triggered execution feedback
 	s.watcherEngine.SetGlyphFiredCallback(s.broadcastGlyphFired)
 
+	// Wire plugin executor for plugin_execute action type
+	s.watcherEngine.SetPluginExecutor(&watcherPluginAdapter{server: s})
+
 	// Wire embedding service for semantic matching (optional — nil when embeddings unavailable)
 	// Note: embeddingService may be nil here if SetupEmbeddingService() hasn't run yet.
 	// In that case, init.go reconnects after embedding init.
@@ -586,4 +593,41 @@ func (a *watcherSearchAdapter) Search(queryEmbedding []byte, limit int, threshol
 		}
 	}
 	return out, nil
+}
+
+// watcherPluginAdapter adapts the server's plugin manager to the watcher engine's PluginExecutor interface.
+type watcherPluginAdapter struct {
+	server *QNTXServer
+}
+
+func (a *watcherPluginAdapter) ExecutePluginJob(ctx context.Context, pluginName string, handlerName string, payload []byte) ([]byte, error) {
+	pm := a.server.getPluginManager()
+	if pm == nil {
+		return nil, errors.Newf("no plugin manager available, cannot execute plugin %s", pluginName)
+	}
+
+	dp, ok := pm.GetPlugin(pluginName)
+	if !ok {
+		return nil, errors.Newf("plugin %q not found", pluginName)
+	}
+
+	proxy, ok := dp.(*grpcplugin.ExternalDomainProxy)
+	if !ok {
+		return nil, errors.Newf("plugin %q is not a gRPC plugin", pluginName)
+	}
+
+	resp, err := proxy.Client().ExecuteJob(ctx, &protocol.ExecuteJobRequest{
+		JobId:       fmt.Sprintf("watcher-%d", time.Now().UnixNano()),
+		HandlerName: handlerName,
+		Payload:     payload,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "gRPC ExecuteJob failed for plugin %s handler %s", pluginName, handlerName)
+	}
+
+	if !resp.Success {
+		return nil, errors.Newf("plugin %s handler %s returned error: %s", pluginName, handlerName, resp.Error)
+	}
+
+	return resp.Result, nil
 }

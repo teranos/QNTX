@@ -38,6 +38,12 @@ type EmbeddingSearcher interface {
 	Search(queryEmbedding []byte, limit int, threshold float32, clusterID *int) ([]SemanticSearchResult, error)
 }
 
+// PluginExecutor dispatches job execution to a named plugin.
+// Optional — nil when no plugin manager is available.
+type PluginExecutor interface {
+	ExecutePluginJob(ctx context.Context, pluginName string, handlerName string, payload []byte) ([]byte, error)
+}
+
 // Engine manages watchers and executes actions when attestations match filters
 type Engine struct {
 	store  *storage.WatcherStore
@@ -62,6 +68,9 @@ type Engine struct {
 	// Broadcast callback for glyph execution events (optional)
 	// Called when a glyph_execute action fires, with status updates and execution result
 	broadcastGlyphFired func(glyphID string, attestationID string, status string, err error, result []byte)
+
+	// Plugin executor for plugin_execute action type (optional)
+	pluginExecutor PluginExecutor
 
 	// In-memory state
 	mu              sync.RWMutex
@@ -309,6 +318,11 @@ func (e *Engine) SetEmbeddingSearcher(searcher EmbeddingSearcher) {
 // SetGlyphFiredCallback sets the callback for glyph execution notifications
 func (e *Engine) SetGlyphFiredCallback(callback func(glyphID string, attestationID string, status string, err error, result []byte)) {
 	e.broadcastGlyphFired = callback
+}
+
+// SetPluginExecutor sets the plugin executor for plugin_execute action type.
+func (e *Engine) SetPluginExecutor(executor PluginExecutor) {
+	e.pluginExecutor = executor
 }
 
 // GetWatcher returns a watcher from the in-memory map if it exists

@@ -18,6 +18,7 @@ const (
 	ActionTypeWebhook       ActionType = "webhook"
 	ActionTypeLLMPrompt     ActionType = "llm_prompt"
 	ActionTypeGlyphExecute  ActionType = "glyph_execute"
+	ActionTypePluginExecute ActionType = "plugin_execute"
 	ActionTypeSemanticMatch ActionType = "semantic_match"
 )
 
