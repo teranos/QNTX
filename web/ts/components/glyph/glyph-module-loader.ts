@@ -18,8 +18,9 @@ import { loadPluginCSS } from './plugin-provided-glyphs';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { makeDraggable, makeResizable, storeCleanup, preventDrag } from './glyph-interaction';
-import { morphCanvasPlacedToWindow } from './manifestations/canvas-window';
+import { morphCanvasPlacedToWindow, placeWindowOnCanvas } from './manifestations/canvas-window';
 import { isInWindowState } from './dataset';
+import { glyphRun } from './run';
 import { uiState } from '../../state/ui';
 
 // Cache imported modules — one import per module_url
@@ -101,8 +102,36 @@ export function wrapInCanvasPlaced(glyph: Glyph, rendered: HTMLElement, opts: Wr
     });
     element.appendChild(rendered);
 
+    function restoreCanvasHandlers(el: HTMLElement) {
+        const titleBar = el.querySelector(':scope > .glyph-title-bar') as HTMLElement | null;
+        const dragHandle = titleBar ?? el;
+        const cleanupDrag = makeDraggable(el, dragHandle, glyph, {
+            logLabel: `Plugin:${opts.plugin}`,
+        });
+        storeCleanup(el, cleanupDrag);
+
+        const resizeHandle = el.querySelector('.glyph-resize-handle') as HTMLElement | null;
+        if (resizeHandle) {
+            const cleanupResize = makeResizable(el, resizeHandle, glyph, {
+                logLabel: `Plugin:${opts.plugin}`,
+            });
+            storeCleanup(el, cleanupResize);
+        }
+
+        expandBtn.textContent = '\u2B06'; // ⬆
+        expandBtn.title = 'Expand to window';
+    }
+
     expandBtn.addEventListener('click', () => {
-        if (isInWindowState(element)) return;
+        if (isInWindowState(element)) {
+            // In window mode: place back on canvas
+            placeWindowOnCanvas(element, {
+                onRestoreComplete: restoreCanvasHandlers,
+            });
+            return;
+        }
+
+        // On canvas: morph to window
         const canvas = element.closest('.canvas-workspace') as HTMLElement | null;
         const canvasId = (canvas?.closest('[data-canvas-id]') as HTMLElement | null)?.dataset?.canvasId ?? 'canvas-workspace';
 
@@ -113,24 +142,20 @@ export function wrapInCanvasPlaced(glyph: Glyph, rendered: HTMLElement, opts: Wr
                 element.remove();
                 uiState.removeCanvasGlyph(glyph.id);
             },
-            onRestoreComplete: (el) => {
-                // Re-attach drag/resize handlers torn down by morph
-                const titleBar = el.querySelector(':scope > .glyph-title-bar') as HTMLElement | null;
-                const dragHandle = titleBar ?? el;
-                const cleanupDrag = makeDraggable(el, dragHandle, glyph, {
-                    logLabel: `Plugin:${opts.plugin}`,
+            onMinimize: (el: HTMLElement) => {
+                glyphRun.adopt(el, {
+                    id: glyph.id,
+                    title,
+                    symbol: opts.symbol || glyph.symbol || '',
+                    renderContent: () => rendered,
+                    manifestationType: 'window',
                 });
-                storeCleanup(el, cleanupDrag);
-
-                const resizeHandle = el.querySelector('.glyph-resize-handle') as HTMLElement | null;
-                if (resizeHandle) {
-                    const cleanupResize = makeResizable(el, resizeHandle, glyph, {
-                        logLabel: `Plugin:${opts.plugin}`,
-                    });
-                    storeCleanup(el, cleanupResize);
-                }
             },
+            onRestoreComplete: restoreCanvasHandlers,
         });
+
+        expandBtn.textContent = '\u2B07'; // ⬇
+        expandBtn.title = 'Place on canvas';
     });
 
     log.debug(SEG.GLYPH, `[GlyphModule] Wrapped ${opts.plugin} glyph ${glyph.id} in canvasPlaced`);
