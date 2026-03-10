@@ -22,6 +22,7 @@ const ALL_GLYPH_CLASSES = [
     'canvas-ax-glyph', 'canvas-se-glyph', 'canvas-py-glyph',
     'canvas-prompt-glyph', 'canvas-doc-glyph', 'canvas-note-glyph',
     'canvas-result-glyph', 'canvas-subcanvas-glyph',
+    'canvas-plugin-glyph',
 ] as const;
 
 /**
@@ -48,10 +49,13 @@ export const MELDABILITY: Record<string, readonly PortRule[]> = {
         { direction: 'bottom', targets: ['canvas-prompt-glyph', 'canvas-doc-glyph', 'canvas-subcanvas-glyph'] }
     ],
     'canvas-note-glyph': [
-        { direction: 'bottom', targets: ['canvas-prompt-glyph', 'canvas-subcanvas-glyph'] }
+        { direction: 'bottom', targets: ['canvas-prompt-glyph', 'canvas-plugin-glyph', 'canvas-subcanvas-glyph'] }
     ],
     'canvas-result-glyph': [
         { direction: 'bottom', targets: ['canvas-result-glyph'] }
+    ],
+    'canvas-plugin-glyph': [
+        { direction: 'bottom', targets: ['canvas-result-glyph', 'canvas-subcanvas-glyph'] }
     ],
     'canvas-subcanvas-glyph': [
         { direction: 'right', targets: ALL_GLYPH_CLASSES },
@@ -256,15 +260,17 @@ export function getMeldOptions(
         if (!cls) continue;
 
         // 1. Append: this glyph sends to the incoming glyph (outgoing port)
-        const appendDir = areClassesCompatible(cls, incomingClass);
-        if (appendDir && !outgoing.get(glyphId)?.has(appendDir)) {
-            options.push({ glyphId, direction: appendDir, incomingRole: 'to' });
+        for (const appendDir of getCompatibleDirections(cls, incomingClass)) {
+            if (!outgoing.get(glyphId)?.has(appendDir)) {
+                options.push({ glyphId, direction: appendDir, incomingRole: 'to' });
+            }
         }
 
         // 2. Prepend: the incoming glyph sends to this glyph (incoming port)
-        const prependDir = areClassesCompatible(incomingClass, cls);
-        if (prependDir && !incoming.get(glyphId)?.has(prependDir)) {
-            options.push({ glyphId, direction: prependDir, incomingRole: 'from' });
+        for (const prependDir of getCompatibleDirections(incomingClass, cls)) {
+            if (!incoming.get(glyphId)?.has(prependDir)) {
+                options.push({ glyphId, direction: prependDir, incomingRole: 'from' });
+            }
         }
     }
 
@@ -273,14 +279,26 @@ export function getMeldOptions(
 
 /**
  * Select the best meld option, preferring the one matching the anchor glyph
- * (the spatially nearest glyph from drag detection). Falls back to first option.
+ * AND the spatially-detected direction. Falls back to anchor match, then first option.
  */
 export function selectPreferredMeldOption(
     options: MeldOption[],
-    anchorGlyphId: string
+    anchorGlyphId: string,
+    preferredDirection?: EdgeDirection
 ): MeldOption | null {
     if (options.length === 0) return null;
-    return options.find(o => o.glyphId === anchorGlyphId) ?? options[0];
+
+    // Best: matches both anchor glyph and detected direction
+    if (preferredDirection) {
+        const exact = options.find(o => o.glyphId === anchorGlyphId && o.direction === preferredDirection);
+        if (exact) return exact;
+    }
+
+    // Good: matches anchor glyph
+    const anchorMatch = options.find(o => o.glyphId === anchorGlyphId);
+    if (anchorMatch) return anchorMatch;
+
+    return options[0];
 }
 
 /**

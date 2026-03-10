@@ -4,6 +4,7 @@ members = [
     "crates/qntx-core",
     "crates/qntx-ffi-common",
     "crates/qntx-grpc",
+    "crates/qntx-id",
     "crates/qntx-indexeddb",
     "crates/qntx-proto",
     "crates/qntx-sqlite",
@@ -17,7 +18,6 @@ exclude = [
     "ats/ax/fuzzy-ax",      # CGO library for Go, not part of Rust ecosystem
     "ats/vidstream",        # CGO library for Go, not part of Rust ecosystem
     "ats/embeddings",       # CGO library for Go, not part of Rust ecosystem
-    "crates/qntx-ax-ext",  # SQLite loadable extension, independent build to avoid feature conflicts
 ]
 
 [workspace.package]

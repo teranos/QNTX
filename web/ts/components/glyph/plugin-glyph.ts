@@ -265,6 +265,7 @@ export function createPluginPlaceholderGlyph(
         `;
     } else {
         const displayName = pluginName === 'unknown' ? 'This plugin' : `Plugin "${pluginName}"`;
+        // Default message — overwritten if we can fetch actual state
         content.innerHTML = `
             <div>${displayName} is not enabled</div>
             <div style="font-size: 11px; color: #999; max-width: 320px;">
@@ -278,6 +279,9 @@ export function createPluginPlaceholderGlyph(
                 </code>
             ` : ''}
         `;
+
+        // Fetch actual plugin state to show real error
+        fetchPluginState(pluginName, content, displayName);
     }
 
     element.appendChild(content);
@@ -285,4 +289,38 @@ export function createPluginPlaceholderGlyph(
     log.debug(SEG.GLYPH, `[PluginPlaceholder] Created placeholder for ${pluginName} plugin`);
 
     return element;
+}
+
+/** Fetch plugin state from API and update placeholder content with actual error */
+function fetchPluginState(pluginName: string, content: HTMLElement, displayName: string): void {
+    apiFetch('/api/plugins')
+        .then(resp => resp.ok ? resp.json() : null)
+        .then((data: { plugins?: Array<{ name: string; state: string; message?: string }> } | null) => {
+            if (!data?.plugins) return;
+            const info = data.plugins.find(p => p.name === pluginName);
+            if (!info) return; // Not in registry at all — "not enabled" is correct
+
+            if (info.state === 'loading') {
+                content.textContent = '';
+                const title = document.createElement('div');
+                title.textContent = `${displayName} is loading...`;
+                const sub = document.createElement('div');
+                sub.style.cssText = 'font-size: 11px; color: #999;';
+                sub.textContent = 'Plugin is starting up, glyph will appear when ready';
+                content.appendChild(title);
+                content.appendChild(sub);
+            } else if (info.state === 'failed' && info.message) {
+                content.textContent = '';
+                const title = document.createElement('div');
+                title.textContent = `${displayName} failed to load`;
+                const errEl = document.createElement('div');
+                errEl.style.cssText = 'font-size: 11px; color: #ef4444; max-width: 360px; word-break: break-word; overflow-wrap: break-word;';
+                errEl.textContent = info.message;
+                content.appendChild(title);
+                content.appendChild(errEl);
+            }
+        })
+        .catch(() => {
+            // API unreachable — keep default "not enabled" message
+        });
 }

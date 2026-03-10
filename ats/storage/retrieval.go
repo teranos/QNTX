@@ -195,3 +195,49 @@ func GetAttestationByID(db *sql.DB, id string) (*types.As, error) {
 	}
 	return as, nil
 }
+
+// GetAttestationsByIDs fetches multiple attestations in a single query.
+// Results are returned in the order of the input IDs; missing IDs are skipped.
+func GetAttestationsByIDs(db *sql.DB, ids []string) ([]*types.As, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	placeholders := make([]byte, 0, len(ids)*2-1)
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		if i > 0 {
+			placeholders = append(placeholders, ',')
+		}
+		placeholders = append(placeholders, '?')
+		args[i] = id
+	}
+
+	query := AttestationSelectQuery + " WHERE id IN (" + string(placeholders) + ")"
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to batch query %d attestations", len(ids))
+	}
+	defer rows.Close()
+
+	// Index results by ID for ordered output
+	byID := make(map[string]*types.As, len(ids))
+	for rows.Next() {
+		as, err := ScanAttestation(rows)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to scan attestation in batch query")
+		}
+		byID[as.ID] = as
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "error iterating batch attestation results")
+	}
+
+	result := make([]*types.As, 0, len(ids))
+	for _, id := range ids {
+		if as, ok := byID[id]; ok {
+			result = append(result, as)
+		}
+	}
+	return result, nil
+}

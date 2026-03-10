@@ -22,7 +22,9 @@ export type { Glyph } from '../../web/ts/components/glyph/glyph';
 export type {
     GlyphUI,
     GlyphModule,
+    GlyphDef,
     RenderFn,
     ContainerOpts,
     FetchOpts,
+    MeldEvent,
 } from '../../web/ts/components/glyph/glyph-ui';

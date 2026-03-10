@@ -15,6 +15,7 @@ type Registry struct {
 	mu      sync.RWMutex
 	plugins map[string]DomainPlugin
 	states  map[string]PluginState // Track state of each plugin
+	errors  map[string]string      // Load/init failure reasons by plugin name
 	version string                 // QNTX version
 	logger  *zap.SugaredLogger
 }
@@ -24,6 +25,7 @@ func NewRegistry(qntxVersion string, logger *zap.SugaredLogger) *Registry {
 	return &Registry{
 		plugins: make(map[string]DomainPlugin),
 		states:  make(map[string]PluginState),
+		errors:  make(map[string]string),
 		version: qntxVersion,
 		logger:  logger,
 	}
@@ -319,7 +321,27 @@ func (r *Registry) MarkReady(name string) {
 	defer r.mu.Unlock()
 
 	r.states[name] = StateRunning
+	delete(r.errors, name)
 	r.logger.Debugf("Marked plugin '%s' as ready", name)
+}
+
+// MarkFailed marks a plugin as failed and stores the error reason.
+// Used when a pre-registered plugin fails to load or connect.
+func (r *Registry) MarkFailed(name string, reason string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.states[name] = StateFailed
+	r.errors[name] = reason
+	r.logger.Warnf("Marked plugin '%s' as failed: %s", name, reason)
+}
+
+// GetError returns the error message for a failed plugin, if any.
+func (r *Registry) GetError(name string) (string, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	errMsg, ok := r.errors[name]
+	return errMsg, ok
 }
 
 // validateVersion checks if plugin version is compatible with QNTX version

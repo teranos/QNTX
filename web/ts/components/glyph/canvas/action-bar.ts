@@ -36,6 +36,8 @@ export function showActionBar(
 
     const bar = document.createElement('div');
     bar.className = 'canvas-action-bar';
+    bar.setAttribute('role', 'toolbar');
+    bar.setAttribute('aria-label', 'Glyph actions');
 
     // Check if any selected glyphs are in a meld
     // Uses .closest() to handle glyphs inside sub-containers within compositions
@@ -84,9 +86,10 @@ export function showActionBar(
 
     // Add unmeld button if glyphs are in a meld
     if (meldedComposition) {
+        const isSingleInsideComposition = selectedGlyphIds.length === 1;
         const unmeldBtn = document.createElement('button');
         unmeldBtn.className = 'canvas-action-button canvas-action-unmeld has-tooltip';
-        unmeldBtn.dataset.tooltip = 'Break meld';
+        unmeldBtn.dataset.tooltip = isSingleInsideComposition ? 'Detach from meld' : 'Break meld';
         unmeldBtn.textContent = '⋈'; // Bowtie/join symbol
         unmeldBtn.addEventListener('click', (e) => {
             e.stopPropagation();

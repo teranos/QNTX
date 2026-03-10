@@ -16,6 +16,7 @@ package wasm
 
 import (
 	"context"
+	"crypto/rand"
 	_ "embed"
 	"encoding/json"
 	"sync"
@@ -428,6 +429,63 @@ func (e *Engine) DedupSourceIDs(input DedupInput) (*DedupOutput, error) {
 	}
 
 	return &output, nil
+}
+
+// AsuidResult holds the full and short forms of a generated ASUID.
+type AsuidResult struct {
+	Full  string `json:"full"`
+	Short string `json:"short"`
+}
+
+// GenerateASUID generates an Attestation System Unique ID via the WASM engine.
+// The caller provides the SPC components and a prefix; randomness comes from
+// crypto/rand. Returns the full ASUID (e.g. "AS-SARAH-AUTHOR-GITHUB-7K4M3B9X").
+func (e *Engine) GenerateASUID(prefix, subject, predicate, context string) (string, error) {
+	randomBytes := make([]byte, 8)
+	if _, err := rand.Read(randomBytes); err != nil {
+		return "", errors.Wrap(err, "crypto/rand failed for ASUID generation")
+	}
+
+	// Convert to int array for JSON (Go []byte marshals as base64, WASM expects number array)
+	byteArray := make([]int, len(randomBytes))
+	for i, b := range randomBytes {
+		byteArray[i] = int(b)
+	}
+
+	input, err := json.Marshal(struct {
+		Prefix      string `json:"prefix"`
+		Subject     string `json:"subject"`
+		Predicate   string `json:"predicate"`
+		Context     string `json:"context"`
+		RandomBytes []int  `json:"random_bytes"`
+	}{
+		Prefix:      prefix,
+		Subject:     subject,
+		Predicate:   predicate,
+		Context:     context,
+		RandomBytes: byteArray,
+	})
+	if err != nil {
+		return "", errors.Wrap(err, "marshal generate_asuid input")
+	}
+
+	raw, err := e.Call("generate_asuid", string(input))
+	if err != nil {
+		return "", err
+	}
+
+	var result struct {
+		AsuidResult
+		Error string `json:"error,omitempty"`
+	}
+	if err := json.Unmarshal([]byte(raw), &result); err != nil {
+		return "", errors.Wrapf(err, "unmarshal generate_asuid result: %s", raw)
+	}
+	if result.Error != "" {
+		return "", errors.Newf("generate_asuid: %s", result.Error)
+	}
+
+	return result.Full, nil
 }
 
 // GetWASMSize returns the size of the embedded WASM module in bytes.

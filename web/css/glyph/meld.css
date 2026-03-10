@@ -3,12 +3,8 @@
  * Respects the axiom: styles modify existing elements, never create new ones
  */
 
-/* Melded composition container */
+/* Melded composition container — children are absolutely positioned */
 .melded-composition {
-    display: grid;
-    grid-auto-rows: auto;
-    grid-auto-columns: auto;
-    gap: 0;
     position: absolute;
     background: transparent;
     cursor: grab;
