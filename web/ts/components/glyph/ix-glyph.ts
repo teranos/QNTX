@@ -77,7 +77,7 @@ function loadIxStatus(glyphId: string): IxGlyphStatus | null {
  */
 export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Load saved input from canvas state
-    const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+    const existingGlyph = uiState.getCanvasGlyph(glyph.id);
     const savedInput = existingGlyph?.content ?? '';
 
     // Load saved execution status
@@ -150,7 +150,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
         }
         saveTimeout = window.setTimeout(() => {
             const currentInput = input.value;
-            const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+            const existing = uiState.getCanvasGlyph(glyph.id);
             if (existing) {
                 uiState.addCanvasGlyph({ ...existing, content: currentInput });
                 log.debug(SEG.GLYPH, `[IX Glyph] Auto-saved input for ${glyph.id}`);

@@ -46,7 +46,7 @@ describe('canvas_id Isolation - Tim (Happy Path)', () => {
         });
 
         // Simulate what drag handler does: spread existing + override position
-        const existing = uiState.getCanvasGlyphs().find(g => g.id === 'inner-note-1');
+        const existing = uiState.getCanvasGlyph('inner-note-1');
         uiState.addCanvasGlyph({
             ...existing!,
             id: 'inner-note-1',
@@ -56,7 +56,7 @@ describe('canvas_id Isolation - Tim (Happy Path)', () => {
         });
 
         // canvas_id and content must survive the drag
-        const updated = uiState.getCanvasGlyphs().find(g => g.id === 'inner-note-1');
+        const updated = uiState.getCanvasGlyph('inner-note-1');
         expect(updated?.canvas_id).toBe('subcanvas-test-1');
         expect(updated?.content).toBe('my note');
         expect(updated?.x).toBe(200);
@@ -70,7 +70,7 @@ describe('canvas_id Isolation - Tim (Happy Path)', () => {
         });
 
         // Simulate what resize handler does: spread existing + override size
-        const existing = uiState.getCanvasGlyphs().find(g => g.id === 'inner-note-2');
+        const existing = uiState.getCanvasGlyph('inner-note-2');
         uiState.addCanvasGlyph({
             ...existing!,
             id: 'inner-note-2',
@@ -81,7 +81,7 @@ describe('canvas_id Isolation - Tim (Happy Path)', () => {
             height: 200,
         });
 
-        const updated = uiState.getCanvasGlyphs().find(g => g.id === 'inner-note-2');
+        const updated = uiState.getCanvasGlyph('inner-note-2');
         expect(updated?.canvas_id).toBe('subcanvas-test-1');
         expect(updated?.content).toBe('resize me');
         expect(updated?.width).toBe(300);

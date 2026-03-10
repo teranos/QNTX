@@ -77,7 +77,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
  */
 export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Promise<void> {
     // Load saved template from canvas state
-    const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+    const existingGlyph = uiState.getCanvasGlyph(glyph.id);
     const savedTemplate = existingGlyph?.content ?? PROMPT_DEFAULT_TEMPLATE;
 
     // Load saved status
@@ -107,7 +107,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
             clearTimeout(saveTimeout);
         }
         saveTimeout = window.setTimeout(() => {
-            const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+            const existing = uiState.getCanvasGlyph(glyph.id);
             if (existing) {
                 uiState.addCanvasGlyph({ ...existing, content: textarea.value });
                 log.debug(SEG.GLYPH, `[Prompt Glyph] Auto-saved template for ${glyph.id}`);
@@ -220,7 +220,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
                 const memberIds = extractGlyphIds(comp.edges);
                 for (const mid of memberIds) {
                     if (mid === glyph.id) continue; // skip self
-                    const g = uiState.getCanvasGlyphs().find(cg => cg.id === mid);
+                    const g = uiState.getCanvasGlyph(mid);
                     if (!g?.content) continue;
 
                     if (g.symbol === Doc) {
@@ -319,7 +319,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
 
     // Save initial template if new glyph
     if (!existingGlyph?.content) {
-        const canvasGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+        const canvasGlyph = uiState.getCanvasGlyph(glyph.id);
         if (canvasGlyph) {
             uiState.addCanvasGlyph({ ...canvasGlyph, content: PROMPT_DEFAULT_TEMPLATE });
         }

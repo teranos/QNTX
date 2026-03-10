@@ -124,7 +124,7 @@ function buildQntxApi(outputLines: string[]) {
  */
 export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Load code from canvas state or use default
-    const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+    const existingGlyph = uiState.getCanvasGlyph(glyph.id);
     const code = existingGlyph?.content ?? TS_DEFAULT_CODE;
 
     const lineCount = code.split('\n').length;
@@ -231,7 +231,7 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
                 if (saveTimeout !== undefined) clearTimeout(saveTimeout);
                 saveTimeout = window.setTimeout(() => {
                     const currentCode = update.state.doc.toString();
-                    const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+                    const existing = uiState.getCanvasGlyph(glyph.id);
                     if (existing) {
                         uiState.addCanvasGlyph({ ...existing, content: currentCode });
                         log.debug(SEG.GLYPH, `[TsGlyph] Auto-saved code for ${glyph.id}`);
@@ -257,7 +257,7 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
         (element as any).editor = editor;
 
         if (!existingGlyph?.content) {
-            const canvasGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+            const canvasGlyph = uiState.getCanvasGlyph(glyph.id);
             if (canvasGlyph) {
                 uiState.addCanvasGlyph({ ...canvasGlyph, content: code });
                 log.debug(SEG.GLYPH, `[TsGlyph] Saved initial code for new glyph ${glyph.id}`);

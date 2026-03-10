@@ -134,7 +134,7 @@ export function createResultGlyph(
 
                     // Update canvas state with new position
                     const contentStr = (glyph as any).content
-                        || uiState.getCanvasGlyphs().find(g => g.id === glyph.id)?.content;
+                        || uiState.getCanvasGlyph(glyph.id)?.content;
                     uiState.addCanvasGlyph({
                         id: glyph.id,
                         symbol: 'result',
@@ -355,7 +355,7 @@ export function createResultGlyph(
                 const memberIds = extractGlyphIds(comp.edges);
                 for (const mid of memberIds) {
                     if (mid === glyph.id) continue;
-                    const g = uiState.getCanvasGlyphs().find(cg => cg.id === mid);
+                    const g = uiState.getCanvasGlyph(mid);
                     if (!g?.content) continue;
 
                     if (g.symbol === Doc) {
@@ -412,7 +412,7 @@ export function createResultGlyph(
                     // Clear persisted error
                     const glyphId = element.getAttribute('data-glyph-id');
                     if (glyphId) {
-                        const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+                        const existing = uiState.getCanvasGlyph(glyphId);
                         if (existing?.content) {
                             try {
                                 const payload = JSON.parse(existing.content) as ResultGlyphContent;
@@ -444,7 +444,7 @@ export function createResultGlyph(
                     // Persist error so it survives page refresh
                     const glyphId = element.getAttribute('data-glyph-id');
                     if (glyphId) {
-                        const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+                        const existing = uiState.getCanvasGlyph(glyphId);
                         if (existing?.content) {
                             try {
                                 const payload = JSON.parse(existing.content) as ResultGlyphContent;
@@ -662,7 +662,7 @@ export function updateResultGlyphContent(resultElement: HTMLElement, result: Exe
     // Update persisted content (preserve promptConfig and prompt if present)
     const glyphId = resultElement.getAttribute('data-glyph-id');
     if (glyphId) {
-        const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+        const existing = uiState.getCanvasGlyph(glyphId);
         if (existing) {
             let promptConfig: PromptConfig | undefined;
             try {

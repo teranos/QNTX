@@ -479,7 +479,7 @@ export function makeDraggable(
                 g.y = y;
 
                 if (g.symbol) {
-                    const existing = uiState.getCanvasGlyphs().find(cg => cg.id === g.id);
+                    const existing = uiState.getCanvasGlyph(g.id);
                     uiState.addCanvasGlyph({
                         ...existing,
                         id: g.id,
@@ -503,7 +503,7 @@ export function makeDraggable(
             glyph.y = y;
 
             if (glyph.symbol) {
-                const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+                const existing = uiState.getCanvasGlyph(glyph.id);
                 uiState.addCanvasGlyph({
                     ...existing,
                     id: glyph.id,
@@ -671,7 +671,7 @@ export function makeResizable(
 
         // Persist to uiState (read existing content from state, not glyph object)
         if (glyph.symbol && glyph.x !== undefined && glyph.y !== undefined) {
-            const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+            const existing = uiState.getCanvasGlyph(glyph.id);
             uiState.addCanvasGlyph({
                 ...existing,
                 id: glyph.id,
