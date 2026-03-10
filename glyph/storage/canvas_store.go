@@ -68,6 +68,21 @@ func fromProtoEdge(e *pb.CompositionEdge) *compositionEdge {
 	}
 }
 
+// parseTimestamp parses a timestamp string stored in the database.
+// Tries RFC3339Nano first, then falls back to SQLite's default fractional-seconds format.
+func parseTimestamp(raw string, entityType string, entityID string, field string) (time.Time, error) {
+	t, err := time.Parse(time.RFC3339Nano, raw)
+	if err == nil {
+		return t, nil
+	}
+	// Fallback: SQLite default format uses fractional seconds without timezone
+	t, err2 := time.Parse("2006-01-02T15:04:05.000", raw)
+	if err2 == nil {
+		return t, nil
+	}
+	return time.Time{}, errors.Wrapf(err, "invalid %s timestamp for %s %s: %s", field, entityType, entityID, raw)
+}
+
 // CanvasStore provides storage operations for canvas state
 type CanvasStore struct {
 	db *sql.DB
@@ -136,13 +151,11 @@ func (s *CanvasStore) GetGlyph(ctx context.Context, id string) (*CanvasGlyph, er
 	}
 
 	var parseErr error
-	glyph.CreatedAt, parseErr = time.Parse(time.RFC3339Nano, createdAt)
-	if parseErr != nil {
-		return nil, errors.Wrapf(parseErr, "invalid created_at timestamp for glyph %s: %s", glyph.ID, createdAt)
+	if glyph.CreatedAt, parseErr = parseTimestamp(createdAt, "glyph", glyph.ID, "created_at"); parseErr != nil {
+		return nil, parseErr
 	}
-	glyph.UpdatedAt, parseErr = time.Parse(time.RFC3339Nano, updatedAt)
-	if parseErr != nil {
-		return nil, errors.Wrapf(parseErr, "invalid updated_at timestamp for glyph %s: %s", glyph.ID, updatedAt)
+	if glyph.UpdatedAt, parseErr = parseTimestamp(updatedAt, "glyph", glyph.ID, "updated_at"); parseErr != nil {
+		return nil, parseErr
 	}
 
 	return &glyph, nil
@@ -173,13 +186,11 @@ func (s *CanvasStore) ListGlyphs(ctx context.Context) ([]*CanvasGlyph, error) {
 		}
 
 		var parseErr error
-		glyph.CreatedAt, parseErr = time.Parse(time.RFC3339Nano, createdAt)
-		if parseErr != nil {
-			return nil, errors.Wrapf(parseErr, "invalid created_at timestamp for glyph %s: %s", glyph.ID, createdAt)
+		if glyph.CreatedAt, parseErr = parseTimestamp(createdAt, "glyph", glyph.ID, "created_at"); parseErr != nil {
+			return nil, parseErr
 		}
-		glyph.UpdatedAt, parseErr = time.Parse(time.RFC3339Nano, updatedAt)
-		if parseErr != nil {
-			return nil, errors.Wrapf(parseErr, "invalid updated_at timestamp for glyph %s: %s", glyph.ID, updatedAt)
+		if glyph.UpdatedAt, parseErr = parseTimestamp(updatedAt, "glyph", glyph.ID, "updated_at"); parseErr != nil {
+			return nil, parseErr
 		}
 
 		glyphs = append(glyphs, &glyph)
@@ -290,13 +301,11 @@ func (s *CanvasStore) GetComposition(ctx context.Context, id string) (*CanvasCom
 	}
 
 	var parseErr error
-	comp.CreatedAt, parseErr = time.Parse(time.RFC3339Nano, createdAt)
-	if parseErr != nil {
-		return nil, errors.Wrapf(parseErr, "invalid created_at timestamp for composition %s: %s", comp.ID, createdAt)
+	if comp.CreatedAt, parseErr = parseTimestamp(createdAt, "composition", comp.ID, "created_at"); parseErr != nil {
+		return nil, parseErr
 	}
-	comp.UpdatedAt, parseErr = time.Parse(time.RFC3339Nano, updatedAt)
-	if parseErr != nil {
-		return nil, errors.Wrapf(parseErr, "invalid updated_at timestamp for composition %s: %s", comp.ID, updatedAt)
+	if comp.UpdatedAt, parseErr = parseTimestamp(updatedAt, "composition", comp.ID, "updated_at"); parseErr != nil {
+		return nil, parseErr
 	}
 
 	// Query edges table
@@ -356,13 +365,11 @@ func (s *CanvasStore) ListCompositions(ctx context.Context) ([]*CanvasCompositio
 		}
 
 		var parseErr error
-		comp.CreatedAt, parseErr = time.Parse(time.RFC3339Nano, createdAt)
-		if parseErr != nil {
-			return nil, errors.Wrapf(parseErr, "invalid created_at timestamp for composition %s: %s", comp.ID, createdAt)
+		if comp.CreatedAt, parseErr = parseTimestamp(createdAt, "composition", comp.ID, "created_at"); parseErr != nil {
+			return nil, parseErr
 		}
-		comp.UpdatedAt, parseErr = time.Parse(time.RFC3339Nano, updatedAt)
-		if parseErr != nil {
-			return nil, errors.Wrapf(parseErr, "invalid updated_at timestamp for composition %s: %s", comp.ID, updatedAt)
+		if comp.UpdatedAt, parseErr = parseTimestamp(updatedAt, "composition", comp.ID, "updated_at"); parseErr != nil {
+			return nil, parseErr
 		}
 
 		comps = append(comps, &comp)
@@ -454,13 +461,8 @@ func (s *CanvasStore) ListMinimizedWindows(ctx context.Context) ([]*MinimizedWin
 			return nil, errors.Wrap(err, "failed to scan minimized window")
 		}
 		var parseErr error
-		w.CreatedAt, parseErr = time.Parse(time.RFC3339Nano, createdAt)
-		if parseErr != nil {
-			// Fallback: SQLite default format uses fractional seconds without timezone
-			w.CreatedAt, parseErr = time.Parse("2006-01-02T15:04:05.000", createdAt)
-			if parseErr != nil {
-				return nil, errors.Wrapf(parseErr, "invalid created_at timestamp for minimized window %s: %s", w.GlyphID, createdAt)
-			}
+		if w.CreatedAt, parseErr = parseTimestamp(createdAt, "minimized window", w.GlyphID, "created_at"); parseErr != nil {
+			return nil, parseErr
 		}
 		windows = append(windows, &w)
 	}
