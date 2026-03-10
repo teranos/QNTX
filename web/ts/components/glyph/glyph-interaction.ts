@@ -31,17 +31,6 @@ import { addComposition, findCompositionByGlyph } from '../../state/compositions
 // ── Composition anchor selection ────────────────────────────────────
 
 /**
- * Simple center-to-center distance between two rects.
- * Used for anchor selection within a composition — no angular filtering
- * needed since direction is derived from port compatibility, not spatial inference.
- */
-function centerDistance(a: DOMRect, b: DOMRect): number {
-    const dx = (a.left + a.width / 2) - (b.left + b.width / 2);
-    const dy = (a.top + a.height / 2) - (b.top + b.height / 2);
-    return Math.sqrt(dx * dx + dy * dy);
-}
-
-/**
  * Find the spatially-nearest glyph in a composition that has a free port
  * compatible with the standalone element, in ANY valid direction.
  *
