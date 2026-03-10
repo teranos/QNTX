@@ -3,20 +3,11 @@
  * Respects the axiom: styles modify existing elements, never create new ones
  */
 
-/* Melded composition container — horizontal flex of column wrappers */
+/* Melded composition container — children are absolutely positioned */
 .melded-composition {
-    display: flex;
-    flex-direction: row;
-    align-items: flex-start;
     position: absolute;
     background: transparent;
     cursor: grab;
-}
-
-/* Column wrapper — stacks glyphs vertically at natural heights */
-.meld-column {
-    display: flex;
-    flex-direction: column;
 }
 
 /* Visual feedback during approach */
