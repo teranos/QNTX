@@ -270,11 +270,13 @@ export function makeDraggable(
                     renderContent: () => nearbyElement
                 };
 
-                // Clean up event listeners and animations before melding
+                // Clean up event listeners, animations, and meld feedback before melding
                 if (rafId !== null) {
                     cancelAnimationFrame(rafId);
                     rafId = null;
                 }
+                clearMeldFeedback(element);
+                clearMeldFeedback(nearbyElement);
                 setupController.abort();
                 dragController?.abort();
 
