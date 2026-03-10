@@ -234,6 +234,14 @@ func (c *Config) GetServerAllowedOrigins() []string {
 	return merged
 }
 
+// GetLogPath returns the file log path. If not configured, defaults to tmp/qntx-{port}.log.
+func (c *Config) GetLogPath(port int) string {
+	if c.Server.LogPath != "" {
+		return c.Server.LogPath
+	}
+	return fmt.Sprintf("tmp/qntx-%d.log", port)
+}
+
 // GetServerLogTheme returns the log theme (default: everforest)
 func (c *Config) GetServerLogTheme() string {
 	if c.Server.LogTheme == "" {
