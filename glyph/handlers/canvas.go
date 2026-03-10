@@ -54,6 +54,54 @@ func WithServerPort(port int) CanvasHandlerOption {
 	}
 }
 
+// resourceHandlers defines the CRUD callbacks for a canvas resource.
+type resourceHandlers struct {
+	prefix     string // URL prefix to strip for ID extraction
+	entityName string // e.g. "glyph", "composition" — used in error messages
+	list       func(w http.ResponseWriter, r *http.Request)
+	get        func(w http.ResponseWriter, r *http.Request, id string)
+	upsert     func(w http.ResponseWriter, r *http.Request)
+	delete     func(w http.ResponseWriter, r *http.Request, id string)
+}
+
+// handleResource routes a request to the appropriate CRUD handler.
+// Nil callbacks are treated as unsupported — GET with an ID when get is nil
+// falls through to list, and nil upsert/delete return method not allowed.
+func (h *CanvasHandler) handleResource(w http.ResponseWriter, r *http.Request, rh resourceHandlers) {
+	path := strings.TrimPrefix(r.URL.Path, rh.prefix)
+	path = strings.TrimPrefix(path, "/")
+	id := path
+
+	switch r.Method {
+	case http.MethodGet:
+		if id != "" && rh.get != nil {
+			rh.get(w, r, id)
+		} else if rh.list != nil {
+			rh.list(w, r)
+		} else {
+			h.writeError(w, errors.NewMethodNotAllowedError(r.Method), http.StatusMethodNotAllowed)
+		}
+	case http.MethodPost:
+		if rh.upsert != nil {
+			rh.upsert(w, r)
+		} else {
+			h.writeError(w, errors.NewMethodNotAllowedError(r.Method), http.StatusMethodNotAllowed)
+		}
+	case http.MethodDelete:
+		if id == "" {
+			h.writeError(w, errors.Newf("%s ID required for delete", rh.entityName), http.StatusBadRequest)
+			return
+		}
+		if rh.delete != nil {
+			rh.delete(w, r, id)
+		} else {
+			h.writeError(w, errors.NewMethodNotAllowedError(r.Method), http.StatusMethodNotAllowed)
+		}
+	default:
+		h.writeError(w, errors.NewMethodNotAllowedError(r.Method), http.StatusMethodNotAllowed)
+	}
+}
+
 // HandleGlyphs handles glyph CRUD operations
 // Routes:
 //
@@ -62,29 +110,14 @@ func WithServerPort(port int) CanvasHandlerOption {
 //	GET    /api/canvas/glyphs/{id}  - Get a glyph by ID
 //	DELETE /api/canvas/glyphs/{id}  - Delete a glyph
 func (h *CanvasHandler) HandleGlyphs(w http.ResponseWriter, r *http.Request) {
-	// Extract ID from path if present
-	path := strings.TrimPrefix(r.URL.Path, "/api/canvas/glyphs")
-	path = strings.TrimPrefix(path, "/")
-	glyphID := path
-
-	switch r.Method {
-	case http.MethodGet:
-		if glyphID == "" {
-			h.handleListGlyphs(w, r)
-		} else {
-			h.handleGetGlyph(w, r, glyphID)
-		}
-	case http.MethodPost:
-		h.handleUpsertGlyph(w, r)
-	case http.MethodDelete:
-		if glyphID == "" {
-			h.writeError(w, errors.New("glyph ID required for delete"), http.StatusBadRequest)
-			return
-		}
-		h.handleDeleteGlyph(w, r, glyphID)
-	default:
-		h.writeError(w, errors.NewMethodNotAllowedError(r.Method), http.StatusMethodNotAllowed)
-	}
+	h.handleResource(w, r, resourceHandlers{
+		prefix:     "/api/canvas/glyphs",
+		entityName: "glyph",
+		list:       h.handleListGlyphs,
+		get:        h.handleGetGlyph,
+		upsert:     h.handleUpsertGlyph,
+		delete:     h.handleDeleteGlyph,
+	})
 }
 
 // HandleCompositions handles composition CRUD operations
@@ -95,29 +128,14 @@ func (h *CanvasHandler) HandleGlyphs(w http.ResponseWriter, r *http.Request) {
 //	GET    /api/canvas/compositions/{id}  - Get a composition by ID
 //	DELETE /api/canvas/compositions/{id}  - Delete a composition
 func (h *CanvasHandler) HandleCompositions(w http.ResponseWriter, r *http.Request) {
-	// Extract ID from path if present
-	path := strings.TrimPrefix(r.URL.Path, "/api/canvas/compositions")
-	path = strings.TrimPrefix(path, "/")
-	compID := path
-
-	switch r.Method {
-	case http.MethodGet:
-		if compID == "" {
-			h.handleListCompositions(w, r)
-		} else {
-			h.handleGetComposition(w, r, compID)
-		}
-	case http.MethodPost:
-		h.handleUpsertComposition(w, r)
-	case http.MethodDelete:
-		if compID == "" {
-			h.writeError(w, errors.New("composition ID required for delete"), http.StatusBadRequest)
-			return
-		}
-		h.handleDeleteComposition(w, r, compID)
-	default:
-		h.writeError(w, errors.NewMethodNotAllowedError(r.Method), http.StatusMethodNotAllowed)
-	}
+	h.handleResource(w, r, resourceHandlers{
+		prefix:     "/api/canvas/compositions",
+		entityName: "composition",
+		list:       h.handleListCompositions,
+		get:        h.handleGetComposition,
+		upsert:     h.handleUpsertComposition,
+		delete:     h.handleDeleteComposition,
+	})
 }
 
 // === Glyph handlers ===
@@ -135,11 +153,7 @@ func (h *CanvasHandler) handleListGlyphs(w http.ResponseWriter, r *http.Request)
 func (h *CanvasHandler) handleGetGlyph(w http.ResponseWriter, r *http.Request, id string) {
 	glyph, err := h.store.GetGlyph(r.Context(), id)
 	if err != nil {
-		if errors.Is(err, glyphstorage.ErrNotFound) {
-			h.writeError(w, err, http.StatusNotFound)
-		} else {
-			h.writeError(w, err, http.StatusInternalServerError)
-		}
+		h.writeStorageError(w, err)
 		return
 	}
 
@@ -166,12 +180,8 @@ func (h *CanvasHandler) handleUpsertGlyph(w http.ResponseWriter, r *http.Request
 
 func (h *CanvasHandler) handleDeleteGlyph(w http.ResponseWriter, r *http.Request, id string) {
 	if err := h.store.DeleteGlyph(r.Context(), id); err != nil {
-		if errors.Is(err, glyphstorage.ErrNotFound) {
-			h.writeError(w, err, http.StatusNotFound)
-		} else {
-			// TODO(#431): Queue deletion for retry when offline
-			h.writeError(w, err, http.StatusInternalServerError)
-		}
+		// TODO(#431): Queue deletion for retry when offline
+		h.writeStorageError(w, err)
 		return
 	}
 
@@ -193,11 +203,7 @@ func (h *CanvasHandler) handleListCompositions(w http.ResponseWriter, r *http.Re
 func (h *CanvasHandler) handleGetComposition(w http.ResponseWriter, r *http.Request, id string) {
 	comp, err := h.store.GetComposition(r.Context(), id)
 	if err != nil {
-		if errors.Is(err, glyphstorage.ErrNotFound) {
-			h.writeError(w, err, http.StatusNotFound)
-		} else {
-			h.writeError(w, err, http.StatusInternalServerError)
-		}
+		h.writeStorageError(w, err)
 		return
 	}
 
@@ -256,12 +262,8 @@ func (h *CanvasHandler) handleDeleteComposition(w http.ResponseWriter, r *http.R
 	}
 
 	if err := h.store.DeleteComposition(r.Context(), id); err != nil {
-		if errors.Is(err, glyphstorage.ErrNotFound) {
-			h.writeError(w, err, http.StatusNotFound)
-		} else {
-			// TODO(#431): Queue deletion for retry when offline
-			h.writeError(w, err, http.StatusInternalServerError)
-		}
+		// TODO(#431): Queue deletion for retry when offline
+		h.writeStorageError(w, err)
 		return
 	}
 
@@ -275,24 +277,13 @@ func (h *CanvasHandler) handleDeleteComposition(w http.ResponseWriter, r *http.R
 //	POST   /api/canvas/minimized-windows       - Add a minimized window
 //	DELETE /api/canvas/minimized-windows/{id}  - Remove a minimized window
 func (h *CanvasHandler) HandleMinimizedWindows(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, "/api/canvas/minimized-windows")
-	path = strings.TrimPrefix(path, "/")
-	glyphID := path
-
-	switch r.Method {
-	case http.MethodGet:
-		h.handleListMinimizedWindows(w, r)
-	case http.MethodPost:
-		h.handleAddMinimizedWindow(w, r)
-	case http.MethodDelete:
-		if glyphID == "" {
-			h.writeError(w, errors.New("glyph ID required for delete"), http.StatusBadRequest)
-			return
-		}
-		h.handleRemoveMinimizedWindow(w, r, glyphID)
-	default:
-		h.writeError(w, errors.NewMethodNotAllowedError(r.Method), http.StatusMethodNotAllowed)
-	}
+	h.handleResource(w, r, resourceHandlers{
+		prefix:     "/api/canvas/minimized-windows",
+		entityName: "glyph",
+		list:       h.handleListMinimizedWindows,
+		upsert:     h.handleAddMinimizedWindow,
+		delete:     h.handleRemoveMinimizedWindow,
+	})
 }
 
 func (h *CanvasHandler) handleListMinimizedWindows(w http.ResponseWriter, r *http.Request) {
@@ -329,11 +320,7 @@ func (h *CanvasHandler) handleAddMinimizedWindow(w http.ResponseWriter, r *http.
 
 func (h *CanvasHandler) handleRemoveMinimizedWindow(w http.ResponseWriter, r *http.Request, glyphID string) {
 	if err := h.store.RemoveMinimizedWindow(r.Context(), glyphID); err != nil {
-		if errors.Is(err, glyphstorage.ErrNotFound) {
-			h.writeError(w, err, http.StatusNotFound)
-		} else {
-			h.writeError(w, err, http.StatusInternalServerError)
-		}
+		h.writeStorageError(w, err)
 		return
 	}
 
@@ -775,4 +762,14 @@ func (h *CanvasHandler) writeError(w http.ResponseWriter, err error, status int)
 	json.NewEncoder(w).Encode(map[string]string{
 		"error": err.Error(),
 	})
+}
+
+// writeStorageError maps storage errors to HTTP status codes.
+// ErrNotFound → 404, everything else → 500.
+func (h *CanvasHandler) writeStorageError(w http.ResponseWriter, err error) {
+	if errors.Is(err, glyphstorage.ErrNotFound) {
+		h.writeError(w, err, http.StatusNotFound)
+	} else {
+		h.writeError(w, err, http.StatusInternalServerError)
+	}
 }
