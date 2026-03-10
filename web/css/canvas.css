@@ -244,7 +244,7 @@
     filter: saturate(var(--mode-glyph-saturation)) hue-rotate(var(--mode-glyph-hue));
     transition: filter var(--mode-transition-duration) var(--mode-transition-timing),
                 outline-color var(--mode-transition-duration) var(--mode-transition-timing);
-    outline-color: rgba(220, 222, 221, var(--mode-glyph-border-opacity));
+    outline-color: rgba(220, 222, 221, calc(var(--mode-glyph-border-opacity) * var(--glyph-border-opacity, 0.4)));
 }
 
 /* Totally monochrome while dragging offline (indicates unsaved local change) */
