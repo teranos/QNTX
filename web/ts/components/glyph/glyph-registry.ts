@@ -11,11 +11,11 @@ import type { Glyph } from './glyph';
 import { AX, IX, SO, SE, AS, Prose, Doc, Subcanvas } from '@generated/sym.js';
 import { createAxGlyph } from './ax-glyph';
 import { createSemanticGlyph } from './semantic-glyph';
-import { createPyGlyph } from './py-glyph';
+import { createPyGlyph, PY_DEFAULT_CODE } from './py-glyph';
 import { createIxGlyph } from './ix-glyph';
-import { createPromptGlyph } from './prompt-glyph';
+import { createPromptGlyph, PROMPT_DEFAULT_TEMPLATE } from './prompt-glyph';
 import { createNoteGlyph } from './note-glyph';
-import { createTsGlyph } from './ts-glyph';
+import { createTsGlyph, TS_DEFAULT_CODE } from './ts-glyph';
 import { createDocGlyph } from './doc-glyph';
 import { createSubcanvasGlyph } from './subcanvas-glyph';
 import { createAttestationGlyph } from './attestation-glyph';
@@ -33,19 +33,25 @@ export interface GlyphTypeEntry {
     render: (glyph: Glyph) => Promise<HTMLElement> | HTMLElement;
     /** Plugin name for plugin-provided glyphs (undefined for built-in glyphs) */
     pluginName?: string;
+    /** Initial content persisted with the glyph (e.g., default code template) */
+    defaultContent?: string;
+    /** Position in spawn menu. If undefined, not shown in spawn menu. Lower = earlier. */
+    spawnMenuOrder?: number;
+    /** Command aliases for search-bar spawning (e.g., 'so' → Prompt, 'prose' → Note) */
+    commandAliases?: string[];
 }
 
 const GLYPH_TYPES: GlyphTypeEntry[] = [
-    { symbol: AX,       className: 'canvas-ax-glyph',      title: 'AX Query',         label: 'AX',     render: createAxGlyph },
-    { symbol: SE,       className: 'canvas-se-glyph',      title: 'Semantic Search',  label: 'SE',     render: createSemanticGlyph },
-    { symbol: 'py',     className: 'canvas-py-glyph',      title: 'Python',   label: 'Py',     render: createPyGlyph },
-    { symbol: IX,       className: 'canvas-ix-glyph',      title: 'Ingest',   label: 'IX',     render: createIxGlyph },
-    { symbol: SO,       className: 'canvas-prompt-glyph',  title: 'Prompt',   label: 'Prompt', render: createPromptGlyph },
-    { symbol: 'ts',     className: 'canvas-ts-glyph',      title: 'TypeScript', label: 'TS',   render: createTsGlyph },
-    { symbol: Prose,    className: 'canvas-note-glyph',    title: 'Note',     label: 'Note',   render: createNoteGlyph },
-    { symbol: Doc,      className: 'canvas-doc-glyph',     title: 'Document', label: 'Doc',    render: createDocGlyph },
-    { symbol: Subcanvas, className: 'canvas-subcanvas-glyph', title: 'Subcanvas', label: 'Subcanvas', render: createSubcanvasGlyph },
-    { symbol: AS,        className: 'canvas-attestation-glyph', title: 'Attestation', label: 'AS', render: createAttestationGlyph },
+    { symbol: IX,       className: 'canvas-ix-glyph',      title: 'Ingest',          label: 'IX',        render: createIxGlyph,        spawnMenuOrder: 0 },
+    { symbol: AX,       className: 'canvas-ax-glyph',      title: 'AX Query',        label: 'AX',        render: createAxGlyph,        spawnMenuOrder: 1 },
+    { symbol: SE,       className: 'canvas-se-glyph',      title: 'Semantic Search', label: 'SE',        render: createSemanticGlyph,  spawnMenuOrder: 2 },
+    { symbol: 'py',     className: 'canvas-py-glyph',      title: 'Python',          label: 'Py',        render: createPyGlyph,        spawnMenuOrder: 3, defaultContent: PY_DEFAULT_CODE },
+    { symbol: 'ts',     className: 'canvas-ts-glyph',      title: 'TypeScript',      label: 'TS',        render: createTsGlyph,        spawnMenuOrder: 4, defaultContent: TS_DEFAULT_CODE },
+    { symbol: SO,       className: 'canvas-prompt-glyph',  title: 'Prompt',          label: 'Prompt',    render: createPromptGlyph,    spawnMenuOrder: 5, defaultContent: PROMPT_DEFAULT_TEMPLATE, commandAliases: ['so'] },
+    { symbol: Prose,    className: 'canvas-note-glyph',    title: 'Note',            label: 'Note',      render: createNoteGlyph,      spawnMenuOrder: 6, defaultContent: 'Write here — select and click ⟶ to convert to a prompt glyph.', commandAliases: ['prose'] },
+    { symbol: Subcanvas, className: 'canvas-subcanvas-glyph', title: 'Subcanvas',    label: 'Subcanvas', render: createSubcanvasGlyph, spawnMenuOrder: 7 },
+    { symbol: Doc,      className: 'canvas-doc-glyph',     title: 'Document',        label: 'Doc',       render: createDocGlyph },
+    { symbol: AS,       className: 'canvas-attestation-glyph', title: 'Attestation', label: 'AS',        render: createAttestationGlyph },
 ];
 
 const _bySymbol = new Map(GLYPH_TYPES.map(e => [e.symbol, e]));
@@ -81,6 +87,47 @@ export function getAllGlyphTypes(): readonly GlyphTypeEntry[] {
 /** Look up glyph type by symbol (e.g., AX, 'py', SO) */
 export function getGlyphTypeBySymbol(symbol: string): GlyphTypeEntry | undefined {
     return _bySymbol.get(symbol);
+}
+
+/** Get glyph types that appear in the spawn menu, sorted by spawnMenuOrder */
+export function getSpawnableGlyphs(): GlyphTypeEntry[] {
+    return GLYPH_TYPES
+        .filter(e => e.spawnMenuOrder !== undefined)
+        .sort((a, b) => a.spawnMenuOrder! - b.spawnMenuOrder!);
+}
+
+/** Look up a spawnable glyph type by command name (label or alias) */
+export function getCommandEntry(command: string): GlyphTypeEntry | undefined {
+    const cmd = command.toLowerCase().trim();
+    for (const entry of GLYPH_TYPES) {
+        if (entry.spawnMenuOrder === undefined) continue;
+        if (entry.label.toLowerCase() === cmd) return entry;
+        if (entry.commandAliases?.includes(cmd)) return entry;
+    }
+    return undefined;
+}
+
+/** Return command names that prefix-match the query */
+export function getMatchingCommandNames(query: string): string[] {
+    if (!query) return [];
+    const q = query.toLowerCase();
+    const names: string[] = [];
+    for (const entry of GLYPH_TYPES) {
+        if (entry.spawnMenuOrder === undefined) continue;
+        const label = entry.label.toLowerCase();
+        if (label.startsWith(q)) names.push(label);
+        for (const alias of entry.commandAliases ?? []) {
+            if (alias.startsWith(q)) names.push(alias);
+        }
+    }
+    return names;
+}
+
+/** Human-readable label for a command name */
+export function getCommandLabel(command: string): string {
+    const entry = getCommandEntry(command);
+    if (!entry) return command;
+    return `${entry.label} — ${entry.title}`;
 }
 
 /** Look up glyph type by DOM element's class list */
