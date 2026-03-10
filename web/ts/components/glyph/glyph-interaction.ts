@@ -374,13 +374,25 @@ export function makeDraggable(
                     const existingComp = findCompositionByGlyph(fallbackAnchorId);
 
                     if (existingComp && standaloneClass) {
-                        // Pick the spatially-nearest glyph with a free port as anchor,
-                        // rather than trusting findMeldTarget's single result
-                        const bestAnchor = findBestAnchorInComposition(
-                            standaloneElement, compositionElement, existingComp.edges
+                        // If a glyph inside the composition is selected, use it as the anchor —
+                        // the user is explicitly saying "connect to this one"
+                        const selectedIds = getSelectedGlyphIds(dragCanvasId);
+                        const selectedAnchor = selectedIds.find(id =>
+                            compositionElement.querySelector(`[data-glyph-id="${id}"]`) !== null
                         );
-                        const bestAnchorId = bestAnchor?.anchorId || fallbackAnchorId;
-                        const bestDirection = bestAnchor?.direction || meldInfo.direction;
+
+                        let bestAnchorId: string;
+                        let bestDirection: EdgeDirection;
+                        if (selectedAnchor) {
+                            bestAnchorId = selectedAnchor;
+                            bestDirection = meldInfo.direction;
+                        } else {
+                            const bestAnchor = findBestAnchorInComposition(
+                                standaloneElement, compositionElement, existingComp.edges
+                            );
+                            bestAnchorId = bestAnchor?.anchorId || fallbackAnchorId;
+                            bestDirection = bestAnchor?.direction || meldInfo.direction;
+                        }
 
                         const options = getMeldOptions(standaloneClass, compositionElement, existingComp.edges);
                         const option = selectPreferredMeldOption(options, bestAnchorId, bestDirection);
