@@ -14,6 +14,7 @@ import {
     canInitiateMeld,
     canReceiveMeld,
     findMeldTarget,
+    checkDirectionalProximity,
     applyMeldFeedback,
     clearMeldFeedback,
     performMeld,
@@ -55,13 +56,14 @@ function findBestAnchorInComposition(
     standaloneElement: HTMLElement,
     compositionElement: HTMLElement,
     edges: Array<{ from: string; to: string; direction: string }>,
-): { anchorId: string; direction: EdgeDirection } | null {
+): { anchorId: string; direction: EdgeDirection; role: 'from' | 'to' } | null {
     const standaloneRect = standaloneElement.getBoundingClientRect();
     const standaloneClass = getGlyphClass(standaloneElement);
     if (!standaloneClass) return null;
 
     let bestId: string | null = null;
     let bestDirection: EdgeDirection = 'right';
+    let bestRole: 'from' | 'to' = 'to';
     let bestDistance = Infinity;
 
     const glyphElements = compositionElement.querySelectorAll('[data-glyph-id]');
@@ -74,31 +76,35 @@ function findBestAnchorInComposition(
         if (!glyphClass) continue;
 
         const glyphRect = glyphEl.getBoundingClientRect();
-        const dist = centerDistance(glyphRect, standaloneRect);
 
         // Append: composition glyph → standalone (outgoing port)
+        // Use directional proximity so spatial relationship determines direction
         for (const dir of getCompatibleDirections(glyphClass, standaloneClass)) {
             if (!isPortFree(glyphId, dir, 'outgoing', edges)) continue;
+            const dist = checkDirectionalProximity(glyphRect, standaloneRect, dir);
             if (dist < bestDistance) {
                 bestDistance = dist;
                 bestId = glyphId;
                 bestDirection = dir;
+                bestRole = 'to';
             }
         }
 
         // Prepend: standalone → composition glyph (incoming port)
         for (const dir of getCompatibleDirections(standaloneClass, glyphClass)) {
             if (!isPortFree(glyphId, dir, 'incoming', edges)) continue;
+            const dist = checkDirectionalProximity(standaloneRect, glyphRect, dir);
             if (dist < bestDistance) {
                 bestDistance = dist;
                 bestId = glyphId;
                 bestDirection = dir;
+                bestRole = 'from';
             }
         }
     }
 
     if (!bestId) return null;
-    return { anchorId: bestId, direction: bestDirection };
+    return { anchorId: bestId, direction: bestDirection, role: bestRole };
 }
 
 // ── Options ─────────────────────────────────────────────────────────
