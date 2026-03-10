@@ -190,7 +190,7 @@ class CanvasSyncQueueImpl {
     }
 
     private async syncGlyphUpsert(id: string): Promise<boolean> {
-        const glyph = uiState.getCanvasGlyphs().find(g => g.id === id);
+        const glyph = uiState.getCanvasGlyph(id);
         if (!glyph) {
             log.warn(SEG.GLYPH, `[CanvasSync] Glyph ${id} not found in UIState, dropping`);
             return true;

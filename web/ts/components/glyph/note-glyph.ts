@@ -40,7 +40,7 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
  */
 export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promise<void> {
     // Load saved content from canvas state
-    const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+    const existingGlyph = uiState.getCanvasGlyph(glyph.id);
     const defaultContent = '# Note\n\nStart typing...';
     const savedContent = existingGlyph?.content;
 
@@ -206,7 +206,7 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
                 }
                 saveTimeout = window.setTimeout(() => {
                     const markdown = noteMarkdownSerializer.serialize(editorView.state.doc);
-                    const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+                    const existing = uiState.getCanvasGlyph(glyph.id);
                     if (existing) {
                         uiState.addCanvasGlyph({ ...existing, content: markdown });
                         log.debug(SEG.GLYPH, `[Note Glyph] Auto-saved content for ${glyph.id}`);

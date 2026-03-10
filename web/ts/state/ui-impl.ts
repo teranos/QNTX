@@ -438,6 +438,13 @@ export class UIState {
     // ========================================================================
 
     /**
+     * Get a single canvas glyph by ID, or undefined if not found.
+     */
+    getCanvasGlyph(id: string): CanvasGlyphState | undefined {
+        return this.state.canvasGlyphs.find(g => g.id === id);
+    }
+
+    /**
      * Get canvas glyphs, optionally filtered by canvas_id.
      * Without argument: returns all glyphs (backward compatible).
      * With canvasId: returns only glyphs belonging to that canvas.

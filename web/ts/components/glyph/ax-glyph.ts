@@ -58,7 +58,7 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
     const glyphId = glyph.id;
 
     // Load persisted query from canvas state (or glyph argument on restore)
-    const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+    const existingGlyph = uiState.getCanvasGlyph(glyphId);
     let currentQuery = existingGlyph?.content ?? glyph.content ?? '';
 
     // Symbol (draggable area) — created before canvasPlaced to use as drag handle
@@ -207,7 +207,7 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
 
         // Debounce save and watcher update for 500ms
         saveTimeout = window.setTimeout(async () => {
-            const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+            const existing = uiState.getCanvasGlyph(glyphId);
             if (existing) {
                 uiState.addCanvasGlyph({ ...existing, content: currentQuery });
             }
