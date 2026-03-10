@@ -41,9 +41,28 @@ export async function createPluginGlyphFromModule(
         // Create GlyphUI scoped to this glyph + plugin
         const ui = createGlyphUI(glyph, def.plugin);
 
-        // The module's render() calls ui.container() to create its own
-        // canvasPlaced wrapper — the loader must not double-wrap.
+        // The module's render() may call ui.container() for a canvasPlaced
+        // wrapper, or return a raw element. If the returned element lacks
+        // data-glyph-id, wrap it so selection/deletion work on the canvas.
         const rendered = await mod.render(glyph, ui);
+
+        if (!rendered.dataset.glyphId) {
+            const { element } = canvasPlaced({
+                glyph,
+                className: `canvas-plugin-glyph plugin-${def.plugin}`,
+                defaults: {
+                    x: glyph.x ?? 200,
+                    y: glyph.y ?? 200,
+                    width: def.default_width ?? 400,
+                    height: def.default_height ?? 300,
+                },
+                resizable: true,
+                logLabel: `Plugin:${def.plugin}`,
+            });
+            element.appendChild(rendered);
+            log.debug(SEG.GLYPH, `[GlyphModule] Wrapped ${def.plugin} glyph ${glyph.id} in canvasPlaced`);
+            return element;
+        }
 
         log.debug(SEG.GLYPH, `[GlyphModule] Rendered ${def.plugin} glyph ${glyph.id} from module`);
         return rendered;
