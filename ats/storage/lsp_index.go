@@ -118,15 +118,18 @@ func (idx *SymbolIndex) queryJSONArrayColumn(ctx context.Context, column string,
 		whereClause = "WHERE value IS NOT NULL AND value != ''"
 	}
 
+	// Subquery filters out rows with malformed JSON before json_each sees them.
+	// Synced melded attestations can have bare strings instead of JSON arrays,
+	// which causes json_each() to fail on the entire query.
 	query := fmt.Sprintf(`
 		SELECT value, COUNT(*) as count
-		FROM attestations,
-		json_each(%s)
+		FROM (SELECT %s AS col FROM attestations WHERE json_valid(%s)),
+		json_each(col)
 		%s
 		GROUP BY value
 		ORDER BY count DESC
 		LIMIT %d
-	`, column, whereClause, MaxSymbolQueryResults)
+	`, column, column, whereClause, MaxSymbolQueryResults)
 
 	rows, err := idx.db.QueryContext(ctx, query)
 	if err != nil {

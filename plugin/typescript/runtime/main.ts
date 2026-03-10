@@ -171,15 +171,22 @@ async function startServer(pluginPath: string, port: number) {
                 const res = {
                     json: (data: any) => {
                         responseData = {
-                            status_code: 200,
+                            status_code: responseData.status_code || 200,
                             headers: [{ name: 'Content-Type', values: ['application/json'] }],
                             body: Buffer.from(JSON.stringify(data)),
                         };
                     },
                     text: (data: string) => {
                         responseData = {
-                            status_code: 200,
+                            status_code: responseData.status_code || 200,
                             headers: [{ name: 'Content-Type', values: ['text/plain'] }],
+                            body: Buffer.from(data),
+                        };
+                    },
+                    send: (data: string, contentType: string) => {
+                        responseData = {
+                            status_code: responseData.status_code || 200,
+                            headers: [{ name: 'Content-Type', values: [contentType] }],
                             body: Buffer.from(data),
                         };
                     },
@@ -221,7 +228,7 @@ async function startServer(pluginPath: string, port: number) {
         },
 
         RegisterGlyphs: (call: any, callback: any) => {
-            callback(null, { glyphs: [] });
+            callback(null, { glyphs: plugin.glyphs || [] });
         },
 
         ExecuteJob: async (call: any, callback: any) => {

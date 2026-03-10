@@ -367,7 +367,7 @@ func (s *QNTXServer) HandleStatic(w http.ResponseWriter, r *http.Request) {
 
 // HandleLogDownload serves the debug log file for download
 func (s *QNTXServer) HandleLogDownload(w http.ResponseWriter, r *http.Request) {
-	logPath := "tmp/graph-debug.log"
+	logPath := s.logPath
 
 	// Check if file logging is enabled
 	verbosity := int(s.verbosity.Load())
@@ -392,7 +392,7 @@ func (s *QNTXServer) HandleLogDownload(w http.ResponseWriter, r *http.Request) {
 
 	// Serve the file
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Content-Disposition", "attachment; filename=graph-debug.log")
+	w.Header().Set("Content-Disposition", "attachment; filename=qntx.log")
 	w.Header().Set("Cache-Control", "no-cache")
 
 	http.ServeFile(w, r, logPath)
@@ -633,6 +633,47 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 // Helper for calling queue.ListJobs which requires *JobStatus
 func asyncJobStatusPtr(status async.JobStatus) *async.JobStatus {
 	return &status
+}
+
+// HandleGraph returns the current graph as JSON.
+// If no graph has been broadcast yet (fresh server start), builds one from
+// recent attestations in the database so the glyph renders immediately.
+func (s *QNTXServer) HandleGraph(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+
+	s.mu.RLock()
+	g := s.lastGraph
+	s.mu.RUnlock()
+
+	// No cached graph — build from DB so the glyph works on first load
+	if g == nil && s.builder != nil {
+		limit := int(s.graphLimit.Load())
+		built, err := s.builder.BuildFromRecentAttestations(r.Context(), limit)
+		if err != nil {
+			s.logger.Warnw("HandleGraph: failed to build graph from DB", "error", err)
+		} else {
+			g = built
+			// Cache it for subsequent requests
+			s.mu.Lock()
+			if s.lastGraph == nil {
+				s.lastGraph = g
+			}
+			s.mu.Unlock()
+		}
+	}
+
+	if g == nil {
+		writeJSON(w, http.StatusOK, &graph.Graph{
+			Nodes: []graph.Node{},
+			Links: []graph.Link{},
+			Meta:  graph.Meta{},
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, g)
 }
 
 // HandlePlugins serves plugin information endpoint

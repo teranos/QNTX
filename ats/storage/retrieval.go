@@ -18,6 +18,17 @@ const (
 		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
 		FROM attestations`
 
+	// ValidAttestationSelectQuery filters out rows with malformed JSON in
+	// semantic columns (subjects/predicates/contexts/actors). Synced melded
+	// attestations can have bare strings instead of JSON arrays, which causes
+	// json.Unmarshal to fail during scan. Use this for queries that scan all
+	// rows (e.g., graph building, listing) where a single bad row shouldn't
+	// abort the entire result set.
+	ValidAttestationSelectQuery = `
+		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
+		FROM attestations
+		WHERE json_valid(subjects) AND json_valid(predicates) AND json_valid(contexts)`
+
 	// MaxAttestationLimit is the maximum number of attestations that can be retrieved in a single query
 	// This prevents resource exhaustion from unreasonably large queries
 	MaxAttestationLimit = 10000
