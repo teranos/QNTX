@@ -10,12 +10,12 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/internal/util"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/sym"
-	"github.com/teranos/vanity-id"
 )
 
 // NOTE: Ticker is now domain-agnostic (Issue #152 resolved)
@@ -317,7 +317,7 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 
 	// Create execution record
 	execution := &Execution{
-		ID:             id.GenerateExecutionID(),
+		ID:             identity.GenerateExecutionID(),
 		ScheduledJobID: scheduled.ID,
 		Status:         ExecutionStatusRunning,
 		StartedAt:      startTime.Format(time.RFC3339),
