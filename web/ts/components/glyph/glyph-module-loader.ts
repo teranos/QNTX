@@ -47,21 +47,13 @@ export async function createPluginGlyphFromModule(
         const rendered = await mod.render(glyph, ui);
 
         if (!rendered.dataset.glyphId) {
-            const { element } = canvasPlaced({
-                glyph,
-                className: `canvas-plugin-glyph plugin-${def.plugin}`,
-                defaults: {
-                    x: glyph.x ?? 200,
-                    y: glyph.y ?? 200,
-                    width: def.default_width ?? 400,
-                    height: def.default_height ?? 300,
-                },
-                resizable: true,
-                logLabel: `Plugin:${def.plugin}`,
+            return wrapInCanvasPlaced(glyph, rendered, {
+                plugin: def.plugin,
+                title: def.title,
+                symbol: def.symbol,
+                defaultWidth: def.default_width,
+                defaultHeight: def.default_height,
             });
-            element.appendChild(rendered);
-            log.debug(SEG.GLYPH, `[GlyphModule] Wrapped ${def.plugin} glyph ${glyph.id} in canvasPlaced`);
-            return element;
         }
 
         log.debug(SEG.GLYPH, `[GlyphModule] Rendered ${def.plugin} glyph ${glyph.id} from module`);
@@ -70,6 +62,34 @@ export async function createPluginGlyphFromModule(
         log.error(SEG.GLYPH, `[GlyphModule] Failed to load module for ${def.plugin}: ${moduleUrl}`, err);
         return createModuleErrorGlyph(glyph, def, err);
     }
+}
+
+interface WrapOpts {
+    plugin: string;
+    title?: string;
+    symbol?: string;
+    defaultWidth?: number;
+    defaultHeight?: number;
+}
+
+/** Wrap a raw plugin element in canvasPlaced with title bar for selection/drag/resize. */
+export function wrapInCanvasPlaced(glyph: Glyph, rendered: HTMLElement, opts: WrapOpts): HTMLElement {
+    const { element } = canvasPlaced({
+        glyph,
+        className: `canvas-plugin-glyph plugin-${opts.plugin}`,
+        defaults: {
+            x: glyph.x ?? 200,
+            y: glyph.y ?? 200,
+            width: opts.defaultWidth ?? 400,
+            height: opts.defaultHeight ?? 300,
+        },
+        titleBar: opts.title ? { label: opts.title } : undefined,
+        resizable: true,
+        logLabel: `Plugin:${opts.plugin}`,
+    });
+    element.appendChild(rendered);
+    log.debug(SEG.GLYPH, `[GlyphModule] Wrapped ${opts.plugin} glyph ${glyph.id} in canvasPlaced`);
+    return element;
 }
 
 /** Load and cache a plugin module. Only caches successful imports. */
