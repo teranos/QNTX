@@ -60,10 +60,11 @@
     display: flex;
     flex-direction: column;
     background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    /* Counter-scaled outline: stays visually 1px at any canvas zoom level */
+    outline: calc(1px / var(--canvas-scale, 1)) solid var(--border-color);
     border-radius: 4px;
     overflow: hidden;
-    transition: border-color 0.2s ease;
+    transition: outline-color 0.2s ease;
 }
 
 /* Shared resize handle for canvas glyphs (bottom-right corner) */
@@ -191,7 +192,7 @@
 
 /* Error border on the glyph itself — !important overrides inline styles */
 .canvas-result-glyph.glyph-error {
-    border-color: var(--glyph-status-error-text) !important;
+    outline-color: var(--glyph-status-error-text) !important;
     background-color: var(--glyph-status-error-section-bg) !important;
 }
 
