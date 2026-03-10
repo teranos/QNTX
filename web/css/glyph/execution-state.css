@@ -11,18 +11,18 @@
 /* --- Border color --- */
 
 .canvas-glyph[data-execution-state="running"]:not(.canvas-error-glyph) {
-    border-color: var(--glyph-status-running-text);
-    transition: border-color 0.2s ease;
+    outline-color: var(--glyph-status-running-text);
+    transition: outline-color 0.2s ease;
 }
 
 .canvas-glyph[data-execution-state="completed"]:not(.canvas-error-glyph) {
-    border-color: var(--glyph-status-success-text);
-    transition: border-color 0.2s ease;
+    outline-color: var(--glyph-status-success-text);
+    transition: outline-color 0.2s ease;
 }
 
 .canvas-glyph[data-execution-state="failed"]:not(.canvas-error-glyph) {
-    border-color: var(--glyph-status-error-text);
-    transition: border-color 0.2s ease;
+    outline-color: var(--glyph-status-error-text);
+    transition: outline-color 0.2s ease;
 }
 
 /* --- Sweep overlay --- */

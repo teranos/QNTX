@@ -64,6 +64,7 @@ function applyTransform(container: HTMLElement, canvasId: string): void {
     const contentLayer = container.querySelector('.canvas-content-layer') as HTMLElement;
     if (contentLayer) {
         contentLayer.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.scale})`;
+        contentLayer.style.setProperty('--canvas-scale', String(state.scale));
     }
 }
 
