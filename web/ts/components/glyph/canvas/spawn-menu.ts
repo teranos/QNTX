@@ -2,32 +2,27 @@
  * Canvas Spawn Menu
  *
  * Right-click menu for spawning new glyphs on the canvas.
- * Creates IX, AX, Python, and Prompt glyphs at the clicked position.
+ * Glyph types and their spawn configuration come from glyph-registry.ts.
  */
 
 import type { Glyph } from '../glyph';
-import { IX, AX, SE, SO, Prose, Subcanvas } from '@generated/sym.js';
 import { log, SEG } from '../../../logger';
 import { getMinimizeDuration } from '../glyph';
-import { createIxGlyph } from '../ix-glyph';
-import { createAxGlyph } from '../ax-glyph';
-import { createSemanticGlyph } from '../semantic-glyph';
-import { createPyGlyph, PY_DEFAULT_CODE } from '../py-glyph';
-import { createPromptGlyph, PROMPT_DEFAULT_TEMPLATE } from '../prompt-glyph';
-import { createNoteGlyph } from '../note-glyph';
-import { createTsGlyph, TS_DEFAULT_CODE } from '../ts-glyph';
-import { createSubcanvasGlyph } from '../subcanvas-glyph';
 import { uiState } from '../../../state/ui';
-import { getAllGlyphTypes, type GlyphTypeEntry } from '../glyph-registry';
+import {
+    type GlyphTypeEntry,
+    getAllGlyphTypes,
+    getSpawnableGlyphs,
+    getCommandEntry,
+    getMatchingCommandNames,
+    getCommandLabel,
+} from '../glyph-registry';
 
 /** Duration multiplier for spawn menu animation */
 const SPAWN_MENU_ANIMATION_SPEED = 0.5;
 
 /**
  * Show right-click spawn menu with available symbols
- *
- * Available glyphs: IX (ingest), AX (attestation query), py (python editor), SO (prompt)
- * Future: go, rs, ts programmature glyphs
  *
  * Architecture Note:
  * - Pulse glyph removed - IX glyphs now use forceTriggerJob() for execution
@@ -102,128 +97,27 @@ export function showSpawnMenu(
         };
     };
 
-    // Add IX symbol
-    const ixBtn = document.createElement('button');
-    ixBtn.className = 'canvas-spawn-button';
-    ixBtn.setAttribute('role', 'menuitem');
-    ixBtn.textContent = IX;
-    ixBtn.title = 'Spawn IX glyph';
+    // Add built-in spawnable glyphs (ordered by spawnMenuOrder)
+    for (const entry of getSpawnableGlyphs()) {
+        const btn = document.createElement('button');
+        btn.className = 'canvas-spawn-button';
+        btn.setAttribute('role', 'menuitem');
+        btn.textContent = entry.symbol;
+        btn.title = `Spawn ${entry.title} glyph`;
 
-    ixBtn.addEventListener('click', () => {
-        spawnIxGlyph(x, y, canvas, glyphs, canvasId);
-        removeMenu();
-    });
+        btn.addEventListener('click', () => {
+            void spawnGlyph(x, y, canvas, glyphs, canvasId, entry);
+            removeMenu();
+        });
 
-    menu.appendChild(ixBtn);
+        menu.appendChild(btn);
+    }
 
-    // Add AX symbol
-    const axBtn = document.createElement('button');
-    axBtn.className = 'canvas-spawn-button';
-    axBtn.setAttribute('role', 'menuitem');
-    axBtn.textContent = AX;
-    axBtn.title = 'Spawn AX query glyph';
-
-    axBtn.addEventListener('click', () => {
-        spawnAxGlyph(x, y, canvas, glyphs, canvasId);
-        removeMenu();
-    });
-
-    menu.appendChild(axBtn);
-
-    // Add SE (semantic search) symbol
-    const seBtn = document.createElement('button');
-    seBtn.className = 'canvas-spawn-button';
-    seBtn.setAttribute('role', 'menuitem');
-    seBtn.textContent = SE;
-    seBtn.title = 'Spawn Semantic Search glyph';
-
-    seBtn.addEventListener('click', () => {
-        spawnSemanticGlyph(x, y, canvas, glyphs, canvasId);
-        removeMenu();
-    });
-
-    menu.appendChild(seBtn);
-
-    // TODO: Refactor spawn menu to be data-driven
-    // Loop over available symbols (Pulse, py, go, rs, ts) instead of hardcoding buttons
-    // This will make it easier to add new programmature types (go, rs, ts)
-
-    // Add py button
-    const pyBtn = document.createElement('button');
-    pyBtn.className = 'canvas-spawn-button';
-    pyBtn.setAttribute('role', 'menuitem');
-    pyBtn.textContent = 'py';
-    pyBtn.title = 'Spawn Python glyph';
-
-    pyBtn.addEventListener('click', () => {
-        spawnPyGlyph(x, y, canvas, glyphs, canvasId);
-        removeMenu();
-    });
-
-    menu.appendChild(pyBtn);
-
-    // Add ts button
-    const tsBtn = document.createElement('button');
-    tsBtn.className = 'canvas-spawn-button';
-    tsBtn.setAttribute('role', 'menuitem');
-    tsBtn.textContent = 'ts';
-    tsBtn.title = 'Spawn TypeScript glyph';
-
-    tsBtn.addEventListener('click', () => {
-        spawnTsGlyph(x, y, canvas, glyphs, canvasId);
-        removeMenu();
-    });
-
-    menu.appendChild(tsBtn);
-
-    // Add prompt button
-    const promptBtn = document.createElement('button');
-    promptBtn.className = 'canvas-spawn-button';
-    promptBtn.setAttribute('role', 'menuitem');
-    promptBtn.textContent = SO;
-    promptBtn.title = 'Spawn Prompt glyph';
-
-    promptBtn.addEventListener('click', () => {
-        spawnPromptGlyph(x, y, canvas, glyphs, canvasId);
-        removeMenu();
-    });
-
-    menu.appendChild(promptBtn);
-
-    // Add note button
-    const noteBtn = document.createElement('button');
-    noteBtn.className = 'canvas-spawn-button';
-    noteBtn.setAttribute('role', 'menuitem');
-    noteBtn.textContent = Prose;
-    noteBtn.title = 'Spawn Note glyph';
-
-    noteBtn.addEventListener('click', () => {
-        spawnNoteGlyph(x, y, canvas, glyphs, canvasId);
-        removeMenu();
-    });
-
-    menu.appendChild(noteBtn);
-
-    // Add subcanvas button
-    const subcanvasBtn = document.createElement('button');
-    subcanvasBtn.className = 'canvas-spawn-button';
-    subcanvasBtn.setAttribute('role', 'menuitem');
-    subcanvasBtn.textContent = Subcanvas;
-    subcanvasBtn.title = 'Spawn Subcanvas glyph';
-
-    subcanvasBtn.addEventListener('click', () => {
-        spawnSubcanvasGlyph(x, y, canvas, glyphs, canvasId);
-        removeMenu();
-    });
-
-    menu.appendChild(subcanvasBtn);
-
-    // Add plugin glyphs grouped by plugin name
+    // Add plugin glyphs
     const pluginGlyphs = getAllGlyphTypes().filter(g =>
         g.className.includes('canvas-plugin-glyph')
     );
 
-    // Add plugin glyphs (no grouping, just buttons)
     for (const glyphType of pluginGlyphs) {
         const btn = document.createElement('button');
         btn.className = 'canvas-spawn-button';
@@ -232,7 +126,7 @@ export function showSpawnMenu(
         btn.title = `Spawn ${glyphType.title} glyph`;
 
         btn.addEventListener('click', () => {
-            void spawnPluginGlyph(x, y, canvas, glyphs, canvasId, glyphType);
+            void spawnGlyph(x, y, canvas, glyphs, canvasId, glyphType);
             removeMenu();
         });
 
@@ -295,133 +189,36 @@ export function showSpawnMenu(
     log.debug(SEG.GLYPH, `[Canvas] Spawn menu opened at (${x}, ${y})`);
 }
 
-/**
- * Spawn a new IX glyph at pixel position
- */
 /** Normalize canvasId for storage: 'canvas-workspace' → '' (root) */
 function storageCanvasId(canvasId: string): string {
     return canvasId === 'canvas-workspace' ? '' : canvasId;
 }
 
-async function spawnIxGlyph(
+/** Spawn a glyph of the given type at pixel position */
+async function spawnGlyph(
     x: number,
     y: number,
     canvas: HTMLElement,
     glyphs: Glyph[],
-    canvasId: string
+    canvasId: string,
+    entry: GlyphTypeEntry
 ): Promise<void> {
-    const ixGlyph: Glyph = {
-        id: `ix-${crypto.randomUUID()}`,
-        title: 'Ingest',
-        symbol: IX,
+    const glyph: Glyph = {
+        id: `${entry.label.toLowerCase()}-${crypto.randomUUID()}`,
+        title: entry.title,
+        symbol: entry.symbol,
         x,
         y,
         renderContent: () => {
             const content = document.createElement('div');
-            content.textContent = 'IX glyph';
+            content.textContent = `${entry.title} glyph`;
             return content;
         }
     };
 
-    // Add to glyphs array
-    glyphs.push(ixGlyph);
+    glyphs.push(glyph);
 
-    // Render IX glyph with form
-    const glyphElement = await createIxGlyph(ixGlyph);
-    canvas.appendChild(glyphElement);
-
-    // Get actual rendered size and persist
-    const rect = glyphElement.getBoundingClientRect();
-    const width = Math.round(rect.width);
-    const height = Math.round(rect.height);
-
-    uiState.addCanvasGlyph({
-        id: ixGlyph.id,
-        symbol: IX,
-        x,
-        y,
-        width,
-        height,
-        canvas_id: storageCanvasId(canvasId),
-    });
-
-    log.debug(SEG.GLYPH, `[Canvas] Spawned IX glyph at (${x}, ${y}) with size ${width}x${height}`);
-}
-
-/**
- * Spawn a new AX query glyph at pixel position
- */
-function spawnAxGlyph(
-    x: number,
-    y: number,
-    canvas: HTMLElement,
-    glyphs: Glyph[],
-    canvasId: string
-): void {
-    const axGlyph: Glyph = {
-        id: `ax-${crypto.randomUUID()}`,
-        title: 'AX Query',
-        symbol: AX,
-        x,
-        y,
-        renderContent: () => {
-            const content = document.createElement('div');
-            content.textContent = 'AX glyph';
-            return content;
-        }
-    };
-
-    // Add to glyphs array
-    glyphs.push(axGlyph);
-
-    // Render AX glyph with query form
-    const glyphElement = createAxGlyph(axGlyph);
-    canvas.appendChild(glyphElement);
-
-    // Get actual rendered size and persist
-    const rect = glyphElement.getBoundingClientRect();
-    const width = Math.round(rect.width);
-    const height = Math.round(rect.height);
-
-    uiState.addCanvasGlyph({
-        id: axGlyph.id,
-        symbol: AX,
-        x,
-        y,
-        width,
-        height,
-        canvas_id: storageCanvasId(canvasId),
-    });
-
-    log.debug(SEG.GLYPH, `[Canvas] Spawned AX glyph at (${x}, ${y}) with size ${width}x${height}`);
-}
-
-/**
- * Spawn a new Semantic Search glyph at pixel position
- */
-function spawnSemanticGlyph(
-    x: number,
-    y: number,
-    canvas: HTMLElement,
-    glyphs: Glyph[],
-    canvasId: string
-): void {
-    const seGlyph: Glyph = {
-        id: `se-${crypto.randomUUID()}`,
-        title: 'Semantic Search',
-        symbol: SE,
-        x,
-        y,
-        renderContent: () => {
-            const content = document.createElement('div');
-            content.textContent = 'SE glyph';
-            return content;
-        }
-    };
-
-    glyphs.push(seGlyph);
-
-    const glyphElement = createSemanticGlyph(seGlyph);
+    const glyphElement = await entry.render(glyph);
     canvas.appendChild(glyphElement);
 
     const rect = glyphElement.getBoundingClientRect();
@@ -429,287 +226,42 @@ function spawnSemanticGlyph(
     const height = Math.round(rect.height);
 
     uiState.addCanvasGlyph({
-        id: seGlyph.id,
-        symbol: SE,
+        id: glyph.id,
+        symbol: entry.symbol,
         x,
         y,
         width,
         height,
         canvas_id: storageCanvasId(canvasId),
+        ...(entry.defaultContent !== undefined && { content: entry.defaultContent }),
+        ...(entry.pluginName !== undefined && { plugin_name: entry.pluginName }),
     });
 
-    log.debug(SEG.GLYPH, `[Canvas] Spawned SE glyph at (${x}, ${y}) with size ${width}x${height}`);
+    log.debug(SEG.GLYPH, `[Canvas] Spawned ${entry.label} glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
 
-/**
- * Spawn a new Python glyph at pixel position
- */
-async function spawnPyGlyph(
-    x: number,
-    y: number,
-    canvas: HTMLElement,
-    glyphs: Glyph[],
-    canvasId: string
-): Promise<void> {
-    const pyGlyph: Glyph = {
-        id: `py-${crypto.randomUUID()}`,
-        title: 'Python',
-        symbol: 'py',
-        x,
-        y,
-        renderContent: () => {
-            const content = document.createElement('div');
-            content.textContent = 'Python glyph (TBD)';
-            return content;
-        }
-    };
-
-    // Add to glyphs array
-    glyphs.push(pyGlyph);
-
-    // Render Python editor glyph
-    const glyphElement = await createPyGlyph(pyGlyph);
-    canvas.appendChild(glyphElement);
-
-    // Get actual rendered size and persist (ensures default size is saved)
-    const rect = glyphElement.getBoundingClientRect();
-    const width = Math.round(rect.width);
-    const height = Math.round(rect.height);
-
-    uiState.addCanvasGlyph({
-        id: pyGlyph.id,
-        symbol: 'py',
-        x,
-        y,
-        width,
-        height,
-        content: PY_DEFAULT_CODE,
-        canvas_id: storageCanvasId(canvasId),
-    });
-
-    log.debug(SEG.GLYPH, `[Canvas] Spawned Python glyph at (${x}, ${y}) with size ${width}x${height}`);
-}
-
-/**
- * Spawn a new TypeScript glyph at pixel position
- */
-async function spawnTsGlyph(
-    x: number,
-    y: number,
-    canvas: HTMLElement,
-    glyphs: Glyph[],
-    canvasId: string
-): Promise<void> {
-    const tsGlyph: Glyph = {
-        id: `ts-${crypto.randomUUID()}`,
-        title: 'TypeScript',
-        symbol: 'ts',
-        x,
-        y,
-        renderContent: () => {
-            const content = document.createElement('div');
-            content.textContent = 'TypeScript glyph';
-            return content;
-        }
-    };
-
-    glyphs.push(tsGlyph);
-
-    const glyphElement = await createTsGlyph(tsGlyph);
-    canvas.appendChild(glyphElement);
-
-    const rect = glyphElement.getBoundingClientRect();
-    const width = Math.round(rect.width);
-    const height = Math.round(rect.height);
-
-    uiState.addCanvasGlyph({
-        id: tsGlyph.id,
-        symbol: 'ts',
-        x,
-        y,
-        width,
-        height,
-        content: TS_DEFAULT_CODE,
-        canvas_id: storageCanvasId(canvasId),
-    });
-
-    log.debug(SEG.GLYPH, `[Canvas] Spawned TypeScript glyph at (${x}, ${y}) with size ${width}x${height}`);
-}
-
-/**
- * Spawn a new Prompt glyph at pixel position
- */
-async function spawnPromptGlyph(
-    x: number,
-    y: number,
-    canvas: HTMLElement,
-    glyphs: Glyph[],
-    canvasId: string
-): Promise<void> {
-    const promptGlyph: Glyph = {
-        id: `prompt-${crypto.randomUUID()}`,
-        title: 'Prompt',
-        symbol: SO,
-        x,
-        y,
-        renderContent: () => {
-            const content = document.createElement('div');
-            content.textContent = 'Prompt glyph';
-            return content;
-        }
-    };
-
-    glyphs.push(promptGlyph);
-
-    const glyphElement = await createPromptGlyph(promptGlyph);
-    canvas.appendChild(glyphElement);
-
-    const rect = glyphElement.getBoundingClientRect();
-    const width = Math.round(rect.width);
-    const height = Math.round(rect.height);
-
-    uiState.addCanvasGlyph({
-        id: promptGlyph.id,
-        symbol: SO,
-        x,
-        y,
-        width,
-        height,
-        content: PROMPT_DEFAULT_TEMPLATE,
-        canvas_id: storageCanvasId(canvasId),
-    });
-
-    log.debug(SEG.GLYPH, `[Canvas] Spawned Prompt glyph at (${x}, ${y}) with size ${width}x${height}`);
-}
-
-/**
- * Spawn a new Note glyph at pixel position
- */
-async function spawnNoteGlyph(
-    x: number,
-    y: number,
-    canvas: HTMLElement,
-    glyphs: Glyph[],
-    canvasId: string
-): Promise<void> {
-    const noteGlyph: Glyph = {
-        id: `note-${crypto.randomUUID()}`,
-        title: 'Note',
-        symbol: Prose,
-        x,
-        y,
-        renderContent: () => {
-            const content = document.createElement('div');
-            content.textContent = 'Note glyph';
-            return content;
-        }
-    };
-
-    glyphs.push(noteGlyph);
-
-    const glyphElement = await createNoteGlyph(noteGlyph);
-    canvas.appendChild(glyphElement);
-
-    const rect = glyphElement.getBoundingClientRect();
-    const width = Math.round(rect.width);
-    const height = Math.round(rect.height);
-
-    uiState.addCanvasGlyph({
-        id: noteGlyph.id,
-        symbol: Prose,
-        x,
-        y,
-        width,
-        height,
-        content: 'Write here — select and click ⟶ to convert to a prompt glyph.',
-        canvas_id: storageCanvasId(canvasId),
-    });
-
-    log.debug(SEG.GLYPH, `[Canvas] Spawned Note glyph at (${x}, ${y}) with size ${width}x${height}`);
-}
-
-/**
- * Spawn a new Subcanvas glyph at pixel position
- */
-function spawnSubcanvasGlyph(
-    x: number,
-    y: number,
-    canvas: HTMLElement,
-    glyphs: Glyph[],
-    canvasId: string
-): void {
-    const subcanvasGlyph: Glyph = {
-        id: `subcanvas-${crypto.randomUUID()}`,
-        title: 'Subcanvas',
-        symbol: Subcanvas,
-        x,
-        y,
-        renderContent: () => {
-            const content = document.createElement('div');
-            content.textContent = 'Subcanvas glyph';
-            return content;
-        }
-    };
-
-    glyphs.push(subcanvasGlyph);
-
-    const glyphElement = createSubcanvasGlyph(subcanvasGlyph);
-    canvas.appendChild(glyphElement);
-
-    const rect = glyphElement.getBoundingClientRect();
-    const width = Math.round(rect.width);
-    const height = Math.round(rect.height);
-
-    uiState.addCanvasGlyph({
-        id: subcanvasGlyph.id,
-        symbol: Subcanvas,
-        x,
-        y,
-        width,
-        height,
-        canvas_id: storageCanvasId(canvasId),
-    });
-
-    log.debug(SEG.GLYPH, `[Canvas] Spawned Subcanvas glyph at (${x}, ${y}) with size ${width}x${height}`);
-}
+/** Re-export registry command helpers for existing callers */
+export { getMatchingCommandNames as getMatchingCommands, getCommandLabel };
 
 /** Human-readable labels for spawn commands */
-export const COMMAND_LABELS: Record<string, string> = {
-    'ix': 'IX — Ingest',
-    'ax': 'AX — Query',
-    'se': 'SE — Semantic Search',
-    'py': 'Python',
-    'ts': 'TypeScript',
-    'prompt': 'Prompt',
-    'so': 'Prompt',
-    'prose': 'Prose',
-    'note': 'Note',
-    'subcanvas': 'Subcanvas',
-};
-
-/** Command → spawn function lookup (lowercase keys) */
-type SpawnFn = (x: number, y: number, canvas: HTMLElement, glyphs: Glyph[], canvasId: string) => void | Promise<void>;
-
-const COMMAND_MAP: Record<string, SpawnFn> = {
-    'ix':        spawnIxGlyph,
-    'ax':        spawnAxGlyph,
-    'se':        spawnSemanticGlyph,
-    'py':        spawnPyGlyph,
-    'ts':        spawnTsGlyph,
-    'prompt':    spawnPromptGlyph,
-    'so':        spawnPromptGlyph,
-    'prose':     spawnNoteGlyph,
-    'note':      spawnNoteGlyph,
-    'subcanvas': spawnSubcanvasGlyph,
-};
+export const COMMAND_LABELS: Record<string, string> = (() => {
+    const labels: Record<string, string> = {};
+    for (const entry of getSpawnableGlyphs()) {
+        labels[entry.label.toLowerCase()] = getCommandLabel(entry.label.toLowerCase());
+        for (const alias of entry.commandAliases ?? []) {
+            labels[alias] = getCommandLabel(alias);
+        }
+    }
+    return labels;
+})();
 
 /**
  * Spawn a glyph on the active canvas by command name.
  * Returns true if a glyph was spawned.
  */
 export function spawnGlyphByCommand(command: string): boolean {
-    const fn = COMMAND_MAP[command.toLowerCase().trim()];
-    if (!fn) return false;
+    const entry = getCommandEntry(command);
+    if (!entry) return false;
 
     const workspace = document.querySelector('.canvas-workspace') as HTMLElement | null;
     if (!workspace) return false;
@@ -726,66 +278,7 @@ export function spawnGlyphByCommand(command: string): boolean {
     const y = Math.round(rect.height / 2);
 
     // TODO(#547): Glyph spawning from search bar needs refinement — ghost preview under cursor, click-to-place, visual distinction in search results
-    const result = fn(x, y, contentLayer, glyphs, canvasId);
-    if (result instanceof Promise) {
-        result.catch(err => log.error(SEG.GLYPH, `Failed to spawn glyph "${command}": ${err}`));
-    }
+    spawnGlyph(x, y, contentLayer, glyphs, canvasId, entry)
+        .catch(err => log.error(SEG.GLYPH, `Failed to spawn glyph "${command}": ${err}`));
     return true;
-}
-
-/** Return command names that prefix-match the query (for search result injection) */
-export function getMatchingCommands(query: string): string[] {
-    if (!query) return [];
-    const q = query.toLowerCase();
-    return Object.keys(COMMAND_MAP).filter(cmd => cmd.startsWith(q));
-}
-
-/**
- * Spawn a plugin glyph at pixel position
- */
-async function spawnPluginGlyph(
-    x: number,
-    y: number,
-    canvas: HTMLElement,
-    glyphs: Glyph[],
-    canvasId: string,
-    glyphType: GlyphTypeEntry
-): Promise<void> {
-    const pluginGlyph: Glyph = {
-        id: `${glyphType.label}-${crypto.randomUUID()}`,
-        title: glyphType.title,
-        symbol: glyphType.symbol,
-        x,
-        y,
-        renderContent: () => {
-            const content = document.createElement('div');
-            content.textContent = `${glyphType.title} glyph`;
-            return content;
-        }
-    };
-
-    // Add to glyphs array
-    glyphs.push(pluginGlyph);
-
-    // Render plugin glyph
-    const glyphElement = await glyphType.render(pluginGlyph);
-    canvas.appendChild(glyphElement);
-
-    // Get actual rendered size and persist
-    const rect = glyphElement.getBoundingClientRect();
-    const width = Math.round(rect.width);
-    const height = Math.round(rect.height);
-
-    uiState.addCanvasGlyph({
-        id: pluginGlyph.id,
-        symbol: glyphType.symbol,
-        x,
-        y,
-        width,
-        height,
-        canvas_id: storageCanvasId(canvasId),
-        plugin_name: glyphType.pluginName ?? '',
-    });
-
-    log.debug(SEG.GLYPH, `[Canvas] Spawned ${glyphType.label} plugin glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
