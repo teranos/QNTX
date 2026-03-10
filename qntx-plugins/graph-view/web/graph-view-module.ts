@@ -177,6 +177,7 @@ export function render(glyph: any, ui: any): HTMLElement {
     let nodePositions: number[] = [];
     let nodeColors: number[] = [];
     let edgePositions: number[] = [];
+    let edgeColors: number[] = [];
     let pollTimer: ReturnType<typeof setInterval> | null = null;
     let destroyed = false;
     let dragging = false;
@@ -193,8 +194,9 @@ export function render(glyph: any, ui: any): HTMLElement {
             nodeColors.push(c[0], c[1], c[2]);
         }
 
-        // Edge positions (pairs of vertices)
+        // Edge positions and colors (pairs of vertices, each gets same color)
         edgePositions = [];
+        edgeColors = [];
         const nodeMap = new Map<string, GraphNode>();
         for (const n of currentNodes) nodeMap.set(n.id, n);
         for (const link of currentLinks) {
@@ -202,6 +204,9 @@ export function render(glyph: any, ui: any): HTMLElement {
             const b = nodeMap.get(link.target);
             if (!a || !b) continue;
             edgePositions.push(a.x, a.y, b.x, b.y);
+            const c = colorForType(link.type || 'default');
+            // Both vertices of the line segment get the same color
+            edgeColors.push(c[0], c[1], c[2], c[0], c[1], c[2]);
         }
     }
 
@@ -257,21 +262,26 @@ export function render(glyph: any, ui: any): HTMLElement {
             vert: `
                 precision mediump float;
                 attribute vec2 position;
+                attribute vec3 color;
+                varying vec3 vColor;
                 uniform vec2 pan;
                 uniform float zoom;
                 void main() {
+                    vColor = color;
                     vec2 p = (position + pan) * zoom;
                     gl_Position = vec4(p, 0.0, 1.0);
                 }
             `,
             frag: `
                 precision mediump float;
+                varying vec3 vColor;
                 void main() {
-                    gl_FragColor = vec4(0.3, 0.3, 0.4, 0.5);
+                    gl_FragColor = vec4(vColor * 0.6, 0.5);
                 }
             `,
             attributes: {
                 position: regl.prop('positions'),
+                color: regl.prop('colors'),
             },
             uniforms: {
                 pan: regl.prop('pan'),
@@ -297,6 +307,7 @@ export function render(glyph: any, ui: any): HTMLElement {
         if (edgePositions.length > 0) {
             drawEdges({
                 positions: edgePositions,
+                colors: edgeColors,
                 pan: pan,
                 zoom: zoom,
                 count: edgePositions.length / 2,
@@ -327,6 +338,7 @@ export function render(glyph: any, ui: any): HTMLElement {
             nodePositions = [];
             nodeColors = [];
             edgePositions = [];
+            edgeColors = [];
             return;
         }
 

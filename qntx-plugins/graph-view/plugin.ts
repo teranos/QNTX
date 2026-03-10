@@ -12,7 +12,7 @@ const moduleJsPath = join(dirname(import.meta.path), 'web', 'dist', 'graph-view-
 
 export default {
     name: 'graph-view',
-    version: '1.0.0',
+    version: '1.1.0',
     qntx_version: '>= 0.1.0',
     description: 'WebGL graph visualization',
     author: 'QNTX',
