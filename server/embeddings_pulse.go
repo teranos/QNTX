@@ -565,19 +565,13 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 		detail = fmt.Sprintf("%d cluster(s) dissolved.\n", len(deaths))
 	}
 
-	// Show top 3 births with sample texts
-	showN := len(births)
-	if showN > 3 {
-		showN = 3
-	}
-	for i := 0; i < showN; i++ {
-		b := births[i]
+	// Show all births with sample texts
+	for _, b := range births {
 		detail += fmt.Sprintf("  cluster:%d (%d members)", b.clusterID, b.nMembers)
 		samples, err := embStore.SampleClusterTexts(b.clusterID, 2)
 		if err == nil && len(samples) > 0 {
 			detail += " — "
 			for j, s := range samples {
-				// Truncate long texts
 				if len(s) > 60 {
 					s = s[:60] + "..."
 				}
@@ -589,25 +583,15 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 		}
 		detail += "\n"
 	}
-	if len(births) > 3 {
-		detail += fmt.Sprintf("  ...and %d more\n", len(births)-3)
-	}
 
 	// Deaths
 	if len(deaths) > 0 {
 		detail += "Dissolved: "
-		showD := len(deaths)
-		if showD > 3 {
-			showD = 3
-		}
-		for i := 0; i < showD; i++ {
+		for i, d := range deaths {
 			if i > 0 {
 				detail += ", "
 			}
-			detail += fmt.Sprintf("cluster:%d", deaths[i])
-		}
-		if len(deaths) > 3 {
-			detail += fmt.Sprintf(" +%d more", len(deaths)-3)
+			detail += fmt.Sprintf("cluster:%d", d)
 		}
 		detail += "\n"
 	}
