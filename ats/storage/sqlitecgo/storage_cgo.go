@@ -36,9 +36,9 @@ import (
 	"unsafe"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
-	id "github.com/teranos/vanity-id"
 )
 
 // RustStore wraps the Rust SqliteStore via CGO.
@@ -306,7 +306,7 @@ func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *type
 		ctxStr = cmd.Contexts[0]
 	}
 
-	asid, err := id.GenerateASIDWithVanityAndRetry(subject, predicate, ctxStr, "", checkExists)
+	asid, err := identity.GenerateASUIDWithRetry("AS", subject, predicate, ctxStr, checkExists)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate vanity ASID")
 	}
