@@ -11,7 +11,7 @@
 
 import { registerGlyphType, getGlyphTypeBySymbol } from './glyph-registry';
 import { createPluginGlyph } from './plugin-glyph';
-import { createPluginGlyphFromModule } from './glyph-module-loader';
+import { createPluginGlyphFromModule, wrapInCanvasPlaced } from './glyph-module-loader';
 import { apiFetch } from '../../api';
 import { log, SEG } from '../../logger';
 import type { Glyph } from './glyph';
@@ -116,7 +116,17 @@ async function discoverTSPluginModules(): Promise<void> {
                 pluginName: name,
                 render: async (glyph: Glyph) => {
                     const ui = createGlyphUI(glyph, name);
-                    return cachedMod.render(glyph, ui);
+                    const rendered = await cachedMod.render(glyph, ui);
+                    if (!rendered.dataset.glyphId) {
+                        return wrapInCanvasPlaced(glyph, rendered, {
+                            plugin: name,
+                            title: def.title,
+                            symbol: def.symbol,
+                            defaultWidth: def.defaultWidth,
+                            defaultHeight: def.defaultHeight,
+                        });
+                    }
+                    return rendered;
                 },
             });
             count++;
