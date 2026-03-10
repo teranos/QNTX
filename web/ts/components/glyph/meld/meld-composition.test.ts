@@ -2,7 +2,7 @@
  * Tests for meld composition — create, extend, reconstruct, unmeld
  *
  * Validates the core axiom: proximity-based melding preserves element identity
- * Layout: Flexbox columns — each column stacks independently
+ * Layout: Absolute positioning from DAG grid positions
  *
  * Personas:
  * - Tim: Happy path user, normal workflows
@@ -15,12 +15,9 @@ import { MELD_THRESHOLD } from './meld-detect';
 import type { Glyph } from '../glyph';
 import { uiState } from '../../../state/ui';
 
-/** Get column wrappers and their glyph children */
-function getColumns(composition: HTMLElement): HTMLElement[][] {
-    const cols = composition.querySelectorAll('.meld-column');
-    return Array.from(cols).map(col =>
-        Array.from(col.querySelectorAll('[data-glyph-id]')) as HTMLElement[]
-    );
+/** Get direct glyph children of a composition (no column wrappers with absolute positioning) */
+function getGlyphChildren(composition: HTMLElement): HTMLElement[] {
+    return Array.from(composition.querySelectorAll('[data-glyph-id]')) as HTMLElement[];
 }
 
 describe('Meld System - Critical Behavior', () => {
@@ -62,11 +59,11 @@ describe('Meld System - Critical Behavior', () => {
         expect(composition.style.left).toBe('100px');
         expect(composition.style.top).toBe('100px');
 
-        // Column layout: 2 columns, one element each
-        const cols = getColumns(composition);
-        expect(cols.length).toBe(2);
-        expect(cols[0]).toEqual([originalAxElement]);
-        expect(cols[1]).toEqual([originalPromptElement]);
+        // Both elements are direct children (absolute positioning, no column wrappers)
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(originalAxElement);
+        expect(children).toContain(originalPromptElement);
+        expect(children.length).toBe(2);
 
         document.body.innerHTML = '';
     });
@@ -191,9 +188,10 @@ describe('Directional Melding', () => {
 
         expect(composition.contains(pyElement)).toBe(true);
         expect(composition.contains(resultElement)).toBe(true);
-        const cols = getColumns(composition);
-        expect(cols.length).toBe(1);
-        expect(cols[0]).toEqual([pyElement, resultElement]);
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(pyElement);
+        expect(children).toContain(resultElement);
+        expect(children.length).toBe(2);
 
         document.body.innerHTML = '';
     });
@@ -225,9 +223,10 @@ describe('Directional Melding', () => {
 
         expect(composition.contains(noteElement)).toBe(true);
         expect(composition.contains(promptElement)).toBe(true);
-        const cols = getColumns(composition);
-        expect(cols.length).toBe(1);
-        expect(cols[0]).toEqual([noteElement, promptElement]);
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(noteElement);
+        expect(children).toContain(promptElement);
+        expect(children.length).toBe(2);
 
         document.body.innerHTML = '';
     });
@@ -256,10 +255,10 @@ describe('Directional Melding', () => {
         const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => pyElement };
 
         const composition = performMeld(axElement, pyElement, axGlyph, pyGlyph, 'right');
-        const cols = getColumns(composition);
-        expect(cols.length).toBe(2);
-        expect(cols[0]).toEqual([axElement]);
-        expect(cols[1]).toEqual([pyElement]);
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(axElement);
+        expect(children).toContain(pyElement);
+        expect(children.length).toBe(2);
 
         document.body.innerHTML = '';
     });
@@ -312,10 +311,10 @@ describe('Direction-aware reconstructMeld', () => {
 
         expect(composition.style.left).toBe('50px');
         expect(composition.style.top).toBe('75px');
-        const cols = getColumns(composition);
-        expect(cols.length).toBe(2);
-        expect(cols[0]).toEqual([ax]);
-        expect(cols[1]).toEqual([py]);
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(ax);
+        expect(children).toContain(py);
+        expect(children.length).toBe(2);
 
         document.body.innerHTML = '';
     });
@@ -337,14 +336,15 @@ describe('Direction-aware reconstructMeld', () => {
 
         expect(composition.contains(py)).toBe(true);
         expect(composition.contains(result)).toBe(true);
-        const cols = getColumns(composition);
-        expect(cols.length).toBe(1);
-        expect(cols[0]).toEqual([py, result]);
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(py);
+        expect(children).toContain(result);
+        expect(children.length).toBe(2);
 
         document.body.innerHTML = '';
     });
 
-    test('mixed right+bottom edges — column wrappers with correct structure', () => {
+    test('mixed right+bottom edges — correct structure', () => {
         const canvas = document.createElement('div');
         document.body.appendChild(canvas);
 
@@ -366,11 +366,12 @@ describe('Direction-aware reconstructMeld', () => {
         ];
         const composition = reconstructMeld([ax, py, result], edges, 'comp3', 0, 0);
 
-        // 2 columns: col1=[ax], col2=[py, result]
-        const cols = getColumns(composition);
-        expect(cols.length).toBe(2);
-        expect(cols[0]).toEqual([ax]);
-        expect(cols[1]).toEqual([py, result]);
+        // All 3 elements are direct children
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(ax);
+        expect(children).toContain(py);
+        expect(children).toContain(result);
+        expect(children.length).toBe(3);
 
         document.body.innerHTML = '';
     });
@@ -395,7 +396,7 @@ describe('Direction-aware reconstructMeld', () => {
 
         expect(composition.contains(originalPy)).toBe(true);
         expect(composition.contains(originalResult)).toBe(true);
-        expect(originalPy.style.position).toBe('relative');
+        expect(originalPy.style.position).toBe('absolute');
 
         document.body.innerHTML = '';
     });
@@ -444,15 +445,15 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         extendComposition(composition, prompt, 'prompt1', 'py1', 'right', 'to');
 
         expect(composition.contains(prompt)).toBe(true);
-        expect(prompt.style.position).toBe('relative');
+        expect(prompt.style.position).toBe('absolute');
         expect(composition.getAttribute('data-glyph-id')).toBe('melded-py1-prompt1');
 
-        // 3 columns: ax | py | prompt
-        const cols = getColumns(composition);
-        expect(cols.length).toBe(3);
-        expect(cols[0]).toEqual([ax]);
-        expect(cols[1]).toEqual([py]);
-        expect(cols[2]).toEqual([prompt]);
+        // All 3 elements are direct children
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(ax);
+        expect(children).toContain(py);
+        expect(children).toContain(prompt);
+        expect(children.length).toBe(3);
 
         clearState();
     });
@@ -495,13 +496,13 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         canvas.appendChild(py2);
         extendComposition(composition, py2, 'py2', 'prompt1', 'right', 'to');
 
-        // 4 columns: ax | py | prompt | py2
-        const cols = getColumns(composition);
-        expect(cols.length).toBe(4);
-        expect(cols[0]).toEqual([ax]);
-        expect(cols[1]).toEqual([py]);
-        expect(cols[2]).toEqual([prompt]);
-        expect(cols[3]).toEqual([py2]);
+        // All 4 elements are direct children
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(ax);
+        expect(children).toContain(py);
+        expect(children).toContain(prompt);
+        expect(children).toContain(py2);
+        expect(children.length).toBe(4);
 
         clearState();
     });
@@ -540,12 +541,12 @@ describe('Composition Extension - Tim (Happy Path)', () => {
 
         expect(composition.getAttribute('data-glyph-id')).toBe('melded-ax1-py1');
 
-        // 3 columns: ax | py | prompt
-        const cols = getColumns(composition);
-        expect(cols.length).toBe(3);
-        expect(cols[0]).toEqual([ax]);
-        expect(cols[1]).toEqual([py]);
-        expect(cols[2]).toEqual([prompt]);
+        // All 3 elements are direct children
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(ax);
+        expect(children).toContain(py);
+        expect(children).toContain(prompt);
+        expect(children.length).toBe(3);
 
         clearState();
     });
@@ -584,11 +585,12 @@ describe('Composition Extension - Tim (Happy Path)', () => {
 
         extendComposition(composition, result, 'result1', 'py1', 'bottom', 'to');
 
-        // 2 columns: col1=[ax], col2=[py, result]
-        const cols = getColumns(composition);
-        expect(cols.length).toBe(2);
-        expect(cols[0]).toEqual([ax]);
-        expect(cols[1]).toEqual([py, result]);
+        // All 3 elements are direct children
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(ax);
+        expect(children).toContain(py);
+        expect(children).toContain(result);
+        expect(children.length).toBe(3);
 
         clearState();
     });
@@ -629,11 +631,13 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         canvas.appendChild(result2);
         extendComposition(composition, result2, 'r2', 'py1', 'bottom', 'to');
 
-        // 2 columns: col1=[ax], col2=[py, result1, result2]
-        const cols = getColumns(composition);
-        expect(cols.length).toBe(2);
-        expect(cols[0]).toEqual([ax]);
-        expect(cols[1]).toEqual([py, result1, result2]);
+        // All 4 elements are direct children
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(ax);
+        expect(children).toContain(py);
+        expect(children).toContain(result1);
+        expect(children).toContain(result2);
+        expect(children.length).toBe(4);
 
         clearState();
     });
