@@ -45,7 +45,7 @@ function getCompatible(initiator: HTMLElement, target: HTMLElement): EdgeDirecti
  * Check proximity between two elements for a given direction
  * Returns distance if elements are correctly oriented and aligned, Infinity otherwise
  */
-function checkDirectionalProximity(
+export function checkDirectionalProximity(
     initiatorRect: DOMRect,
     targetRect: DOMRect,
     direction: EdgeDirection

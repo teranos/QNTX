@@ -22,10 +22,84 @@ import {
     PROXIMITY_THRESHOLD,
     MELD_THRESHOLD
 } from './meld/meld-system';
-import { getMeldOptions, selectPreferredMeldOption, getGlyphClass } from './meld/meldability';
+import { getMeldOptions, selectPreferredMeldOption, getGlyphClass, getCompatibleDirections, isPortFree, type EdgeDirection } from './meld/meldability';
 import { isGlyphSelected, getSelectedGlyphIds } from './canvas/selection';
 import { getTransform } from './canvas/canvas-pan.js';
 import { addComposition, findCompositionByGlyph } from '../../state/compositions';
+
+// ── Composition anchor selection ────────────────────────────────────
+
+/**
+ * Simple center-to-center distance between two rects.
+ * Used for anchor selection within a composition — no angular filtering
+ * needed since direction is derived from port compatibility, not spatial inference.
+ */
+function centerDistance(a: DOMRect, b: DOMRect): number {
+    const dx = (a.left + a.width / 2) - (b.left + b.width / 2);
+    const dy = (a.top + a.height / 2) - (b.top + b.height / 2);
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+ * Find the spatially-nearest glyph in a composition that has a free port
+ * compatible with the standalone element, in ANY valid direction.
+ *
+ * This replaces trusting findMeldTarget's single result as the anchor —
+ * findMeldTarget picks the closest glyph on the entire canvas, which may
+ * not be the closest glyph *within* the composition the user is targeting.
+ * Its detected direction may also be wrong (e.g., 'bottom' when user meant 'right').
+ *
+ * Returns both the anchor ID and the best direction for that anchor.
+ */
+function findBestAnchorInComposition(
+    standaloneElement: HTMLElement,
+    compositionElement: HTMLElement,
+    edges: Array<{ from: string; to: string; direction: string }>,
+): { anchorId: string; direction: EdgeDirection } | null {
+    const standaloneRect = standaloneElement.getBoundingClientRect();
+    const standaloneClass = getGlyphClass(standaloneElement);
+    if (!standaloneClass) return null;
+
+    let bestId: string | null = null;
+    let bestDirection: EdgeDirection = 'right';
+    let bestDistance = Infinity;
+
+    const glyphElements = compositionElement.querySelectorAll('[data-glyph-id]');
+    for (const el of glyphElements) {
+        const glyphEl = el as HTMLElement;
+        const glyphId = glyphEl.dataset.glyphId;
+        if (!glyphId) continue;
+
+        const glyphClass = getGlyphClass(glyphEl);
+        if (!glyphClass) continue;
+
+        const glyphRect = glyphEl.getBoundingClientRect();
+        const dist = centerDistance(glyphRect, standaloneRect);
+
+        // Append: composition glyph → standalone (outgoing port)
+        for (const dir of getCompatibleDirections(glyphClass, standaloneClass)) {
+            if (!isPortFree(glyphId, dir, 'outgoing', edges)) continue;
+            if (dist < bestDistance) {
+                bestDistance = dist;
+                bestId = glyphId;
+                bestDirection = dir;
+            }
+        }
+
+        // Prepend: standalone → composition glyph (incoming port)
+        for (const dir of getCompatibleDirections(standaloneClass, glyphClass)) {
+            if (!isPortFree(glyphId, dir, 'incoming', edges)) continue;
+            if (dist < bestDistance) {
+                bestDistance = dist;
+                bestId = glyphId;
+                bestDirection = dir;
+            }
+        }
+    }
+
+    if (!bestId) return null;
+    return { anchorId: bestId, direction: bestDirection };
+}
 
 // ── Options ─────────────────────────────────────────────────────────
 
@@ -296,12 +370,20 @@ export function makeDraggable(
                     const standaloneElement = targetComp ? meldInitiator : meldTarget;
                     const standaloneId = standaloneElement.dataset.glyphId || '';
                     const standaloneClass = getGlyphClass(standaloneElement);
-                    const anchorId = (targetComp ? meldTarget : meldInitiator).dataset.glyphId || '';
-                    const existingComp = findCompositionByGlyph(anchorId);
+                    const fallbackAnchorId = (targetComp ? meldTarget : meldInitiator).dataset.glyphId || '';
+                    const existingComp = findCompositionByGlyph(fallbackAnchorId);
 
                     if (existingComp && standaloneClass) {
+                        // Pick the spatially-nearest glyph with a free port as anchor,
+                        // rather than trusting findMeldTarget's single result
+                        const bestAnchor = findBestAnchorInComposition(
+                            standaloneElement, compositionElement, existingComp.edges
+                        );
+                        const bestAnchorId = bestAnchor?.anchorId || fallbackAnchorId;
+                        const bestDirection = bestAnchor?.direction || meldInfo.direction;
+
                         const options = getMeldOptions(standaloneClass, compositionElement, existingComp.edges);
-                        const option = selectPreferredMeldOption(options, anchorId, meldInfo.direction);
+                        const option = selectPreferredMeldOption(options, bestAnchorId, bestDirection);
 
                         if (option) {
                             extendComposition(compositionElement, standaloneElement, standaloneId, option.glyphId, option.direction, option.incomingRole);
