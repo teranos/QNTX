@@ -860,6 +860,150 @@ func TestEngine_ExecutePlugin_NotConfigured(t *testing.T) {
 	}
 }
 
+func TestEngine_AttributeFilter_Equals(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zap.NewNop().Sugar()
+	engine := watcher.NewEngine(db, "http://localhost:877", logger)
+
+	var mu sync.Mutex
+	var fireCount int
+	engine.SetPluginExecutor(pluginExecutorFunc(func(ctx context.Context, pluginName, handlerName string, payload []byte) ([]byte, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		fireCount++
+		return nil, nil
+	}))
+
+	store := storage.NewWatcherStore(db)
+	actionData, _ := json.Marshal(watcher.PluginExecuteAction{PluginName: "test", HandlerName: "h"})
+	w := &storage.Watcher{
+		ID:                "attr-equals-test",
+		Name:              "Attr Equals Test",
+		ActionType:        storage.ActionTypePluginExecute,
+		ActionData:        string(actionData),
+		MaxFiresPerSecond: 105,
+		Enabled:           true,
+		Filter:            types.AxFilter{},
+		AttributeFilters: []storage.AttributeFilter{
+			{Path: "tool_name", Op: "equals", Value: "Bash"},
+		},
+	}
+	if err := store.Create(context.Background(), w); err != nil {
+		t.Fatalf("Create watcher failed: %v", err)
+	}
+
+	if err := engine.Start(); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+	defer engine.Stop()
+
+	// Should match — tool_name equals "Bash"
+	engine.OnAttestationCreated(&types.As{
+		ID:         "match-1",
+		Subjects:   []string{"s"},
+		Predicates: []string{"PostToolUse"},
+		Attributes: map[string]interface{}{"tool_name": "Bash", "other": "stuff"},
+	})
+
+	// Should NOT match — tool_name equals "Read"
+	engine.OnAttestationCreated(&types.As{
+		ID:         "no-match-1",
+		Subjects:   []string{"s"},
+		Predicates: []string{"PostToolUse"},
+		Attributes: map[string]interface{}{"tool_name": "Read"},
+	})
+
+	time.Sleep(100 * time.Millisecond)
+
+	mu.Lock()
+	defer mu.Unlock()
+	if fireCount != 1 {
+		t.Errorf("expected 1 fire (equals match only), got %d", fireCount)
+	}
+}
+
+func TestEngine_AttributeFilter_ContainsNestedPath(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zap.NewNop().Sugar()
+	engine := watcher.NewEngine(db, "http://localhost:877", logger)
+
+	var mu sync.Mutex
+	var firedAttestationIDs []string
+	engine.SetPluginExecutor(pluginExecutorFunc(func(ctx context.Context, pluginName, handlerName string, payload []byte) ([]byte, error) {
+		var as types.As
+		json.Unmarshal(payload, &as)
+		mu.Lock()
+		defer mu.Unlock()
+		firedAttestationIDs = append(firedAttestationIDs, as.ID)
+		return nil, nil
+	}))
+
+	store := storage.NewWatcherStore(db)
+	actionData, _ := json.Marshal(watcher.PluginExecuteAction{PluginName: "loom", HandlerName: "stitch"})
+	w := &storage.Watcher{
+		ID:                "attr-contains-test",
+		Name:              "Attr Contains Nested Test",
+		ActionType:        storage.ActionTypePluginExecute,
+		ActionData:        string(actionData),
+		MaxFiresPerSecond: 105,
+		Enabled:           true,
+		Filter:            types.AxFilter{Predicates: []string{"PostToolUse"}},
+		AttributeFilters: []storage.AttributeFilter{
+			{Path: "tool_input.command", Op: "contains", Value: "git commit"},
+		},
+	}
+	if err := store.Create(context.Background(), w); err != nil {
+		t.Fatalf("Create watcher failed: %v", err)
+	}
+
+	if err := engine.Start(); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+	defer engine.Stop()
+
+	// Should match — nested path contains "git commit"
+	engine.OnAttestationCreated(&types.As{
+		ID:         "commit-event",
+		Subjects:   []string{"branch"},
+		Predicates: []string{"PostToolUse"},
+		Attributes: map[string]interface{}{
+			"tool_input": map[string]interface{}{
+				"command": "git add . && git commit -m 'fix things'",
+			},
+		},
+	})
+
+	// Should NOT match — command is git status
+	engine.OnAttestationCreated(&types.As{
+		ID:         "status-event",
+		Subjects:   []string{"branch"},
+		Predicates: []string{"PostToolUse"},
+		Attributes: map[string]interface{}{
+			"tool_input": map[string]interface{}{
+				"command": "git status",
+			},
+		},
+	})
+
+	// Should NOT match — right predicate but no attributes
+	engine.OnAttestationCreated(&types.As{
+		ID:         "empty-attrs",
+		Subjects:   []string{"branch"},
+		Predicates: []string{"PostToolUse"},
+	})
+
+	time.Sleep(100 * time.Millisecond)
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(firedAttestationIDs) != 1 {
+		t.Fatalf("expected 1 fire, got %d", len(firedAttestationIDs))
+	}
+	if firedAttestationIDs[0] != "commit-event" {
+		t.Errorf("expected commit-event to fire, got %s", firedAttestationIDs[0])
+	}
+}
+
 // Helper function
 func contains(s, substr string) bool {
 	return len(s) > 0 && len(substr) > 0 && (s == substr || (len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || contains(s[1:], substr))))
