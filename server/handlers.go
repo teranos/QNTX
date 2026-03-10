@@ -635,6 +635,47 @@ func asyncJobStatusPtr(status async.JobStatus) *async.JobStatus {
 	return &status
 }
 
+// HandleGraph returns the current graph as JSON.
+// If no graph has been broadcast yet (fresh server start), builds one from
+// recent attestations in the database so the glyph renders immediately.
+func (s *QNTXServer) HandleGraph(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+
+	s.mu.RLock()
+	g := s.lastGraph
+	s.mu.RUnlock()
+
+	// No cached graph — build from DB so the glyph works on first load
+	if g == nil && s.builder != nil {
+		limit := int(s.graphLimit.Load())
+		built, err := s.builder.BuildFromRecentAttestations(r.Context(), limit)
+		if err != nil {
+			s.logger.Warnw("HandleGraph: failed to build graph from DB", "error", err)
+		} else {
+			g = built
+			// Cache it for subsequent requests
+			s.mu.Lock()
+			if s.lastGraph == nil {
+				s.lastGraph = g
+			}
+			s.mu.Unlock()
+		}
+	}
+
+	if g == nil {
+		writeJSON(w, http.StatusOK, &graph.Graph{
+			Nodes: []graph.Node{},
+			Links: []graph.Link{},
+			Meta:  graph.Meta{},
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, g)
+}
+
 // HandlePlugins serves plugin information endpoint
 // Returns list of installed plugins with their metadata and health status
 func (s *QNTXServer) HandlePlugins(w http.ResponseWriter, r *http.Request) {

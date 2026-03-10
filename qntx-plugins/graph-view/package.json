@@ -1,0 +1,7 @@
+{
+  "name": "qntx-graph-view",
+  "version": "1.0.0",
+  "type": "module",
+  "qntx-plugin": true,
+  "description": "WebGL graph visualization glyph for QNTX attestation graphs"
+}

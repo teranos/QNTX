@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin openrouter-plugin pty-glyph-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin openrouter-plugin pty-glyph-plugin graph-view-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -250,6 +250,9 @@ openrouter-plugin: ## Build and install OpenRouter plugin to ~/.qntx/plugins/
 
 pty-glyph-plugin: ## Build and install pty-glyph plugin to ~/.qntx/plugins/
 	@$(MAKE) -C qntx-plugins/pty-glyph install PREFIX=$(PREFIX)
+
+graph-view-plugin: ## Build graph-view glyph module (TypeScript → JS)
+	@$(MAKE) -C qntx-plugins/graph-view build-module
 
 rust-vidstream: ## Build Rust vidstream library with ONNX support (for CGO integration)
 	@echo "Building Rust vidstream library with ONNX..."

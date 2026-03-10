@@ -82,6 +82,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/lsp", wrapWS(s.HandleGLSPWebSocket)) // ATS LSP protocol (completions, hover, semantic tokens)
 	http.HandleFunc("/health", wrapPublic(s.HandleHealth)) // Health check always public
 	http.HandleFunc("/logs/download", wrap(s.HandleLogDownload))
+	http.HandleFunc("/api/graph", wrap(s.HandleGraph))
 	http.HandleFunc("/api/timeseries/usage", wrap(s.HandleUsageTimeSeries))
 	http.HandleFunc("/api/config", wrap(s.HandleConfig))
 	http.HandleFunc("/api/dev", wrap(s.HandleDevMode))                                              // Dev mode status
