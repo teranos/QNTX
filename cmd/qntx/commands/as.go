@@ -7,12 +7,12 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/sym"
-	id "github.com/teranos/vanity-id"
 )
 
 // AsCmd represents the as command
@@ -206,5 +206,5 @@ func generateVanityASID(cmd *types.AsCommand, database *sql.DB) (string, error) 
 	}
 
 	// Generate ASID with empty actor seed
-	return id.GenerateASIDWithVanityAndRetry(subject, predicate, context, "", checkExists)
+	return identity.GenerateASUIDWithRetry("AS", subject, predicate, context, checkExists)
 }

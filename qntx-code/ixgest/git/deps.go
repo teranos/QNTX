@@ -18,8 +18,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/identity"
 	atstypes "github.com/teranos/QNTX/ats/types"
-	id "github.com/teranos/vanity-id"
 )
 
 // ProjectFile represents a detected project file
@@ -748,7 +748,7 @@ func (p *DepsIxProcessor) storeAttestation(subject, predicate, object string, at
 	}
 
 	// Generate ASID
-	asid, err := id.GenerateASIDWithVanity(subject, predicate, object, p.actor)
+	asid, err := identity.GenerateASUID("AS", subject, predicate, object)
 	if err != nil {
 		return fmt.Errorf("failed to generate ASID: %w", err)
 	}

@@ -1,6 +1,6 @@
 //go:build qntxwasm
 
-package types
+package identity
 
 import (
 	"github.com/teranos/QNTX/ats/wasm"
@@ -11,7 +11,7 @@ import (
 func generateASUID(prefix, subject, predicate, context string) (string, error) {
 	engine, err := wasm.GetEngine()
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to get WASM engine for %s %s", predicate, subject)
+		return "", errors.Wrapf(err, "WASM engine unavailable for ASUID %s/%s/%s", subject, predicate, context)
 	}
 	return engine.GenerateASUID(prefix, subject, predicate, context)
 }

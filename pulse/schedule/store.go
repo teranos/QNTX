@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/errors"
-	id "github.com/teranos/vanity-id"
 )
 
 const (
@@ -851,7 +851,7 @@ func (s *Store) CreateForceTriggerExecution(params ForceTriggerParams) (*ForceTr
 		if err != nil || scheduledJobID == "" {
 			// Step 3: Create new temp scheduled job
 			if params.ATSCode != "" {
-				scheduledJobID, err = id.GenerateASID(params.ATSCode, "force-trigger", "pulse", "system")
+				scheduledJobID, err = identity.GenerateASUID("AS", params.ATSCode, "force-trigger", "pulse")
 				if err != nil {
 					return nil, errors.Wrapf(err, "failed to generate tracking job ID for %s", params.ATSCode)
 				}
@@ -871,7 +871,7 @@ func (s *Store) CreateForceTriggerExecution(params ForceTriggerParams) (*ForceTr
 	}
 
 	// Step 4: Create execution record
-	executionID := id.GenerateExecutionID()
+	executionID := identity.GenerateExecutionID()
 
 	_, err = tx.Exec(`
 		INSERT INTO pulse_executions (id, scheduled_job_id, async_job_id, status, started_at, created_at, updated_at)
