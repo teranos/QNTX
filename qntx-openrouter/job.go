@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/attrs"
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
-	vanity "github.com/teranos/vanity-id"
 )
 
 // PromptExecuteHandlerName is the registered name for the prompt handler
@@ -192,7 +192,7 @@ func createJobResultAttestation(
 		}
 	}
 
-	asid, err := vanity.GenerateASID(sourceAs.Subjects[0], predicate, sourceAs.ID, actor)
+	asid, err := identity.GenerateASUID("AS", sourceAs.Subjects[0], predicate, sourceAs.ID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to generate ASID for result of %s", sourceAs.ID)
 	}

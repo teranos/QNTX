@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/ingestion"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/vanity-id"
 )
 
 // AttestationItem represents an item that can be converted to an attestation.
@@ -60,7 +60,7 @@ func (bp *BatchPersister) PersistItems(items []AttestationItem, sourcePrefix str
 
 	for _, item := range items {
 		// Generate unique ASID
-		asid, err := id.GenerateASID(item.GetSubject(), item.GetPredicate(), sourcePrefix, bp.actor)
+		asid, err := identity.GenerateASUID("AS", item.GetSubject(), item.GetPredicate(), sourcePrefix)
 		if err != nil {
 			result.FailureCount++
 			errorMsg := fmt.Sprintf("Failed to generate ASID for %s %s: %v",

@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
-	id "github.com/teranos/vanity-id"
 )
 
 // Attestation size limits.
@@ -88,7 +88,7 @@ func (s *QNTXServer) HandleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		checkExists := func(asid string) bool {
 			return s.atsStore.AttestationExists(asid)
 		}
-		generated, err := id.GenerateASIDWithVanityAndRetry(subject, predicate, context, "", checkExists)
+		generated, err := identity.GenerateASUIDWithRetry("AS", subject, predicate, context, checkExists)
 		if err != nil {
 			writeWrappedError(w, s.logger, err,
 				fmt.Sprintf("failed to generate ASID for subjects %v", req.Subjects),

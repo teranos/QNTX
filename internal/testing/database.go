@@ -11,9 +11,9 @@ import (
 	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/db"
-	id "github.com/teranos/vanity-id"
 )
 
 func init() {
@@ -99,7 +99,7 @@ func (s *sqlTestStore) GenerateAndCreateAttestation(ctx context.Context, cmd *ty
 		ctxStr = cmd.Contexts[0]
 	}
 
-	asid, err := id.GenerateASID(subject, predicate, ctxStr, "")
+	asid, err := identity.GenerateASUID("AS", subject, predicate, ctxStr)
 	if err != nil {
 		return nil, err
 	}

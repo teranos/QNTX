@@ -15,10 +15,10 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/identity"
 	atstypes "github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/ixgest/types"
-	"github.com/teranos/vanity-id"
 )
 
 const (
@@ -681,7 +681,7 @@ func (p *GitIxProcessor) storeAttestationWithActor(actor string, subjects []stri
 	}
 
 	// Generate ASID with provided actor
-	asid, err := id.GenerateASIDWithVanity(subject, predicate, context, actor)
+	asid, err := identity.GenerateASUID("AS", subject, predicate, context)
 	if err != nil {
 		err = fmt.Errorf("failed to generate ASID: %w", err)
 		err = errors.WithDetail(err, fmt.Sprintf("Subject: %s", subject))

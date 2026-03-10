@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-
-	"github.com/teranos/vanity-id"
 )
 
 // ============================================================================
@@ -71,18 +69,12 @@ func TestNewJobWithPayload(t *testing.T) {
 			}
 
 			if err == nil {
-				// Validate ASID format (Job IDs are ASIDs)
+				// Validate ASUID format (Job IDs are ASUIDs with JB prefix)
 				if job.ID == "" {
 					t.Error("TAS Bot failed to generate job ID")
 				}
-				if len(job.ID) != 32 {
-					t.Errorf("Job ID length = %d, want 32 (ASID format)", len(job.ID))
-				}
 				if !strings.HasPrefix(job.ID, "JB") {
 					t.Errorf("Job ID prefix = %s, want 'JB'", job.ID[:2])
-				}
-				if !id.IsValidASID(job.ID) {
-					t.Errorf("Job ID = %s is not a valid ASID", job.ID)
 				}
 
 				// Validate job properties
