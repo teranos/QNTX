@@ -19,6 +19,7 @@ import type { EdgeDirection } from './meldability';
 import { computeGridPositions } from './meldability';
 import { addComposition, removeComposition, extractGlyphIds, findCompositionByGlyph } from '../../../state/compositions';
 import { clearMeldFeedback } from './meld-feedback';
+import { getTransform } from '../canvas/canvas-pan';
 
 const UNMELD_OFFSET = 20; // px - spacing between glyphs when unmelding
 
@@ -87,7 +88,13 @@ function applyColumnLayout(
     void composition.offsetHeight;
 
     // Measure element sizes (must be in DOM and laid out to get dimensions)
-    // Compute max width per column and max height per row
+    // getBoundingClientRect returns screen pixels (scaled by CSS transform),
+    // but element left/top are in the content layer's local coordinate space.
+    // Divide by scale to get unscaled dimensions.
+    const canvasEl = composition.closest('.canvas-workspace');
+    const canvasId = canvasEl?.getAttribute('data-canvas-id') || 'canvas-workspace';
+    const { scale } = getTransform(canvasId);
+
     const colWidths = new Map<number, number>();
     const rowHeights = new Map<number, number>();
 
@@ -95,8 +102,8 @@ function applyColumnLayout(
         const pos = positions.get(id);
         if (!pos) continue;
         const rect = el.getBoundingClientRect();
-        const w = rect.width || el.offsetWidth || 200;
-        const h = rect.height || el.offsetHeight || 150;
+        const w = (rect.width / scale) || el.offsetWidth || 200;
+        const h = (rect.height / scale) || el.offsetHeight || 150;
         colWidths.set(pos.col, Math.max(colWidths.get(pos.col) || 0, w));
         rowHeights.set(pos.row, Math.max(rowHeights.get(pos.row) || 0, h));
     }
