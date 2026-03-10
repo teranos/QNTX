@@ -62,10 +62,42 @@
           '';
         };
 
-        # Common preBuild hook for Go derivations: copy WASM module for go:embed
+        # Build qntx-sqlite as static library for CGO linking.
+        # Uses the same Rust toolchain as qntx-wasm (fenix stable).
+        qntx-sqlite-ffi = (pkgs.makeRustPlatform {
+          cargo = fenix.packages.${system}.stable.cargo;
+          rustc = fenix.packages.${system}.stable.rustc;
+        }).buildRustPackage {
+          pname = "qntx-sqlite-ffi";
+          version = self.rev or "dev";
+          src = ./.;
+
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+          };
+
+          cargoBuildFlags = [ "-p" "qntx-sqlite" "--features" "ffi" "--lib" ];
+          doCheck = false;
+
+          # buildRustPackage's default installPhase only copies binaries.
+          # We need the static/shared library from the build output.
+          postBuild = ''
+            mkdir -p $out/lib $out/include
+            find target -name 'libqntx_sqlite.a' -exec cp {} $out/lib/ \;
+            find target -name 'libqntx_sqlite.so' -exec cp {} $out/lib/ \;
+            cp crates/qntx-sqlite/include/storage_ffi.h $out/include/
+          '';
+
+          # Skip default install (tries to find binaries, there are none)
+          installPhase = "true";
+        };
+
+        # Common preBuild hook for Go derivations: copy WASM module and Rust FFI lib
         goWasmPreBuild = ''
           export GOWORK=off  # Build without workspace (use go.mod only)
           cp ${qntx-wasm}/lib/qntx_core.wasm ats/wasm/qntx_core.wasm
+          mkdir -p target/release
+          cp ${qntx-sqlite-ffi}/lib/libqntx_sqlite.a target/release/
         '';
 
         # Pre-commit hooks configuration

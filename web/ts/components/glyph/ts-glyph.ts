@@ -19,17 +19,27 @@ import { autoMeldResultBelow } from './meld/meld-system';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
 import { canvasPlaced } from './manifestations/canvas-placed';
-import { putAttestation, queryAttestations, parseQuery } from '../../qntx-wasm';
+import { putAttestation, queryAttestations, parseQuery, generateASUID } from '../../qntx-wasm';
 import type { Attestation } from '../../qntx-wasm';
 
-export const TS_DEFAULT_CODE = `// Create a local attestation — searchable offline via WASM fuzzy search
-await qntx.attest({
-    subjects: ["teranos"],
-    predicates: ["develops"],
-    contexts: ["decentralised attestation network"],
-    attributes: { description: "QNTX node running locally in browser" }
+export const TS_DEFAULT_CODE = `// Generate a random attestation — each run creates a unique ASUID
+const subjects = ["alice", "bob", "charlie", "diana", "eve"]
+const actions = ["discovered", "verified", "challenged", "confirmed", "witnessed"]
+const domains = ["cryptography", "graph-theory", "distributed-systems", "formal-proofs", "zero-knowledge"]
+
+const who = subjects[Math.floor(Math.random() * subjects.length)]
+const did = actions[Math.floor(Math.random() * actions.length)]
+const where = domains[Math.floor(Math.random() * domains.length)]
+const confidence = Math.round(Math.random() * 100)
+
+const result = await qntx.attest({
+    subjects: [who],
+    predicates: [did],
+    contexts: [where],
+    attributes: { confidence, note: who + " " + did + " something in " + where }
 })
-qntx.log("Attested!")
+qntx.log(result.id)
+qntx.log(who + " " + did + " [" + where + "] confidence=" + confidence + "%")
 `;
 
 /** AsyncFunction constructor — supports `await` in user code */
@@ -54,17 +64,22 @@ function buildQntxApi(outputLines: string[]) {
             attributes?: Record<string, unknown>;
         }): Promise<Attestation> {
             const now = Math.floor(Date.now() / 1000);
+            const subjects = opts.subjects;
+            const predicates = opts.predicates;
+            const contexts = opts.contexts ?? ['_'];
+            const actors = opts.actors ?? ['ts-glyph'];
+            const { full: asuid } = generateASUID('AS', subjects[0] ?? '', predicates[0] ?? '', contexts[0] ?? '');
             const attestation: Attestation = {
-                id: `AS-${crypto.randomUUID()}`,
-                subjects: opts.subjects,
-                predicates: opts.predicates,
-                contexts: opts.contexts ?? ['_'],
-                actors: opts.actors ?? ['ts-glyph'],
+                id: asuid,
+                subjects,
+                predicates,
+                contexts,
+                actors,
                 timestamp: now,
                 source: 'ts-glyph',
                 attributes: opts.attributes ?? {},
                 created_at: now,
-                signature: new Uint8Array(),
+                signature: '' as unknown as Uint8Array, // base64 string for proto JSON wire format
                 signer_did: '',
             };
 

@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin openrouter-plugin pty-glyph-plugin graph-view-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin openrouter-plugin pty-glyph-plugin graph-view-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -240,10 +240,13 @@ github-plugin: ## Build and install GitHub plugin to ~/.qntx/plugins/
 	@$(MAKE) -C qntx-github install PREFIX=$(PREFIX)
 
 ix-json-plugin: ## Build and install ix-json plugin to ~/.qntx/plugins/
-	@$(MAKE) -C qntx-ix-json install PREFIX=$(PREFIX)
+	@$(MAKE) -C qntx-plugins/ix-json install PREFIX=$(PREFIX)
 
 ix-bin-plugin: ## Build and install ix-bin D plugin to ~/.qntx/plugins/
 	@$(MAKE) -C qntx-plugins/ix-bin install PREFIX=$(PREFIX)
+
+ix-net-plugin: ## Build and install ix-net D plugin to ~/.qntx/plugins/
+	@$(MAKE) -C qntx-plugins/ix-net install PREFIX=$(PREFIX)
 
 openrouter-plugin: ## Build and install OpenRouter plugin to ~/.qntx/plugins/
 	@$(MAKE) -C qntx-openrouter install PREFIX=$(PREFIX)

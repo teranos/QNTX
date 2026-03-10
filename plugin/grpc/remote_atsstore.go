@@ -117,10 +117,12 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 		Limit:      &limit,
 	}
 	if filter.TimeStart != nil {
-		protoFilter.TimeStart = filter.TimeStart.UnixMilli()
+		ms := filter.TimeStart.UnixMilli()
+		protoFilter.TimeStart = &ms
 	}
 	if filter.TimeEnd != nil {
-		protoFilter.TimeEnd = filter.TimeEnd.UnixMilli()
+		ms := filter.TimeEnd.UnixMilli()
+		protoFilter.TimeEnd = &ms
 	}
 
 	req := &protocol.GetAttestationsRequest{

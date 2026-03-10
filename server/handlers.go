@@ -710,7 +710,11 @@ func (s *QNTXServer) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 	}
 
 	plugins := make([]PluginInfo, 0)
+
+	// Include all known plugins — both fully registered and failed/loading
+	seen := make(map[string]bool)
 	for _, name := range s.pluginRegistry.List() {
+		seen[name] = true
 		p, ok := s.pluginRegistry.Get(name)
 		if !ok {
 			continue
@@ -733,6 +737,22 @@ func (s *QNTXServer) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 			State:       string(state),
 			Pausable:    s.pluginRegistry.IsPausable(name),
 		})
+	}
+
+	// Add pre-registered plugins that failed to load (not in plugins map)
+	for _, name := range s.pluginRegistry.ListEnabled() {
+		if seen[name] {
+			continue
+		}
+		state := stateResults[name]
+		info := PluginInfo{
+			Name:  name,
+			State: string(state),
+		}
+		if errMsg, ok := s.pluginRegistry.GetError(name); ok {
+			info.Message = errMsg
+		}
+		plugins = append(plugins, info)
 	}
 
 	response := map[string]interface{}{

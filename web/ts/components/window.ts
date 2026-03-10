@@ -93,13 +93,13 @@ export class Window {
         win.style.zIndex = String(Window.zIndexCounter++);
 
         win.innerHTML = `
-            <div class="draggable-window-header">
+            <header class="draggable-window-header">
                 <span class="draggable-window-title">${this.config.title}</span>
                 <div class="draggable-window-controls">
                     <button class="panel-minimize" aria-label="Minimize">&minus;</button>
                     <button class="panel-close" aria-label="Close">&times;</button>
                 </div>
-            </div>
+            </header>
             <div class="draggable-window-content"></div>
             <div class="draggable-window-footer"></div>
         `;

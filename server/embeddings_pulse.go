@@ -339,6 +339,18 @@ func RunHDBSCANClustering(
 				"error", err)
 		}
 
+		// Add zero-member snapshots for dissolved clusters so timeline shows deaths
+		for _, ev := range matchResult.events {
+			if ev.EventType == "death" {
+				snapshots = append(snapshots, storage.ClusterSnapshot{
+					ClusterID: ev.ClusterID,
+					RunID:     runID,
+					Centroid:  []byte{},
+					NMembers:  0,
+				})
+			}
+		}
+
 		if err := store.SaveClusterSnapshots(snapshots); err != nil {
 			logger.Errorw("Failed to save cluster snapshots",
 				"count", len(snapshots),
@@ -553,19 +565,13 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 		detail = fmt.Sprintf("%d cluster(s) dissolved.\n", len(deaths))
 	}
 
-	// Show top 3 births with sample texts
-	showN := len(births)
-	if showN > 3 {
-		showN = 3
-	}
-	for i := 0; i < showN; i++ {
-		b := births[i]
+	// Show all births with sample texts
+	for _, b := range births {
 		detail += fmt.Sprintf("  cluster:%d (%d members)", b.clusterID, b.nMembers)
 		samples, err := embStore.SampleClusterTexts(b.clusterID, 2)
 		if err == nil && len(samples) > 0 {
 			detail += " — "
 			for j, s := range samples {
-				// Truncate long texts
 				if len(s) > 60 {
 					s = s[:60] + "..."
 				}
@@ -577,25 +583,15 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 		}
 		detail += "\n"
 	}
-	if len(births) > 3 {
-		detail += fmt.Sprintf("  ...and %d more\n", len(births)-3)
-	}
 
 	// Deaths
 	if len(deaths) > 0 {
 		detail += "Dissolved: "
-		showD := len(deaths)
-		if showD > 3 {
-			showD = 3
-		}
-		for i := 0; i < showD; i++ {
+		for i, d := range deaths {
 			if i > 0 {
 				detail += ", "
 			}
-			detail += fmt.Sprintf("cluster:%d", deaths[i])
-		}
-		if len(deaths) > 3 {
-			detail += fmt.Sprintf(" +%d more", len(deaths)-3)
+			detail += fmt.Sprintf("cluster:%d", d)
 		}
 		detail += "\n"
 	}
@@ -832,6 +828,13 @@ type ProjectionResult struct {
 	TimeMS  float64 `json:"time_ms"`
 }
 
+// ProjectionParams holds per-method tuning parameters for dimensionality reduction.
+type ProjectionParams struct {
+	NNeighbors *int     `json:"n_neighbors,omitempty"` // UMAP: local vs global (default 15)
+	MinDist    *float64 `json:"min_dist,omitempty"`    // UMAP: cluster tightness (default 0.1)
+	Perplexity *float64 `json:"perplexity,omitempty"`  // t-SNE: local vs global (default 30)
+}
+
 // RunProjection reads all embeddings, calls the reduce plugin /fit for the given method,
 // and writes 2D projections to DB.
 func RunProjection(
@@ -841,6 +844,7 @@ func RunProjection(
 	svc EmbeddingServiceForClustering,
 	callReduce ReducePluginCaller,
 	logger *zap.SugaredLogger,
+	params *ProjectionParams,
 ) (*ProjectionResult, error) {
 	startTime := time.Now()
 
@@ -862,10 +866,22 @@ func RunProjection(
 		allEmbeddings = append(allEmbeddings, vec)
 	}
 
-	fitReq, err := json.Marshal(map[string]interface{}{
+	fitBody := map[string]interface{}{
 		"embeddings": allEmbeddings,
 		"method":     method,
-	})
+	}
+	if params != nil {
+		if params.NNeighbors != nil {
+			fitBody["n_neighbors"] = *params.NNeighbors
+		}
+		if params.MinDist != nil {
+			fitBody["min_dist"] = *params.MinDist
+		}
+		if params.Perplexity != nil {
+			fitBody["perplexity"] = *params.Perplexity
+		}
+	}
+	fitReq, err := json.Marshal(fitBody)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal fit request")
 	}
@@ -941,11 +957,12 @@ func RunAllProjections(
 	svc EmbeddingServiceForClustering,
 	callReduce ReducePluginCaller,
 	logger *zap.SugaredLogger,
+	params *ProjectionParams,
 ) ([]ProjectionResult, error) {
 	var results []ProjectionResult
 	validated := validProjectionMethods(methods, logger)
 	for _, method := range validated {
-		result, err := RunProjection(ctx, method, store, svc, callReduce, logger)
+		result, err := RunProjection(ctx, method, store, svc, callReduce, logger, params)
 		if err != nil {
 			return results, errors.Wrapf(err, "projection failed for method %s", method)
 		}
@@ -972,7 +989,7 @@ func (h *ReprojectHandler) Execute(ctx context.Context, job *async.Job) error {
 	h.writeLog(job.ID, "projection", "info",
 		fmt.Sprintf("Starting re-projection for methods: %v", h.methods), "")
 
-	results, err := RunAllProjections(ctx, h.methods, h.store, h.svc, h.callReduce, h.logger)
+	results, err := RunAllProjections(ctx, h.methods, h.store, h.svc, h.callReduce, h.logger, nil)
 	if err != nil {
 		h.writeLog(job.ID, "projection", "error", fmt.Sprintf("Projection failed: %s", err), "")
 		return err

@@ -1,15 +1,21 @@
 /**
- * ix-json Glyph Module — TypeScript-first plugin glyph using the GlyphUI.
+ * ix-json Glyph Module — pure TypeScript plugin glyph using the GlyphUI.
  *
- * This replaces the server-rendered HTML pipeline (renderIXGlyphHTML in handlers.go).
- * The plugin's Go process still handles API logic (test-fetch, update-config, set-mode).
- * This module handles all rendering and user interaction.
+ * No Go backend required. Config is persisted via ui.saveConfig/loadConfig,
+ * API fetches happen directly from the browser (CORS-permitting).
  *
- * Served by the Go plugin at GET /ix-glyph-module.js (compiled from this .ts source)
- * Dynamically imported by the QNTX frontend when module_url is set in GlyphDef.
+ * Dynamically imported by the QNTX frontend when registered in glyph-registry.
  */
 
-import type { Glyph, GlyphUI, RenderFn } from '@qntx/glyphs';
+import type { Glyph, GlyphUI, GlyphDef, RenderFn, MeldEvent } from '@qntx/glyphs';
+
+export const glyphDef: GlyphDef = {
+    symbol: '🔄',
+    title: 'JSON API Ingestor',
+    label: 'ix-json',
+    defaultWidth: 600,
+    defaultHeight: 700,
+};
 
 export const render: RenderFn = async (glyph: Glyph, ui: GlyphUI): Promise<HTMLElement> => {
     const { element, titleBar } = ui.container({
@@ -42,7 +48,6 @@ export const render: RenderFn = async (glyph: Glyph, ui: GlyphUI): Promise<HTMLE
 
     const apiUrlInput = ui.input({ label: 'API URL', placeholder: 'https://api.example.com/data' });
     const authTokenInput = ui.input({ label: 'Auth Token (optional)', placeholder: 'Bearer token', type: 'password' });
-    const pollIntervalInput = ui.input({ label: 'Poll Interval (seconds, 0 = manual only)', value: '0', type: 'number' });
 
     const btnRow = document.createElement('div');
     btnRow.style.display = 'flex';
@@ -51,12 +56,12 @@ export const render: RenderFn = async (glyph: Glyph, ui: GlyphUI): Promise<HTMLE
 
     const saveBtn = ui.button({
         label: 'Save Config',
-        onClick: () => saveConfig(ui, glyph.id, apiUrlInput, authTokenInput, pollIntervalInput, status),
+        onClick: () => saveConfig(ui, apiUrlInput, authTokenInput, status),
     });
 
     const fetchBtn = ui.button({
         label: 'Test Fetch',
-        onClick: () => testFetch(ui, glyph.id, apiUrlInput, authTokenInput, responsePreview, status),
+        onClick: () => testFetch(apiUrlInput, authTokenInput, responsePreview, status),
     });
 
     btnRow.appendChild(saveBtn);
@@ -64,7 +69,6 @@ export const render: RenderFn = async (glyph: Glyph, ui: GlyphUI): Promise<HTMLE
 
     configSection.appendChild(apiUrlInput);
     configSection.appendChild(authTokenInput);
-    configSection.appendChild(pollIntervalInput);
     configSection.appendChild(btnRow);
     configSection.appendChild(status.element);
 
@@ -87,29 +91,9 @@ export const render: RenderFn = async (glyph: Glyph, ui: GlyphUI): Promise<HTMLE
     ui.preventDrag(responsePreview);
     responseSection.appendChild(responsePreview);
 
-    // ── Mode controls ────────────────────────────────────────────
-    const modeSection = section('Mode Controls');
-    const modeRow = document.createElement('div');
-    modeRow.style.display = 'flex';
-    modeRow.style.gap = '4px';
-
-    const pauseBtn = ui.button({
-        label: 'Pause',
-        onClick: () => setMode(ui, glyph.id, 'paused', apiUrlInput, authTokenInput, pollIntervalInput, status),
-    });
-    const activateBtn = ui.button({
-        label: 'Activate',
-        primary: true,
-        onClick: () => setMode(ui, glyph.id, 'active-running', apiUrlInput, authTokenInput, pollIntervalInput, status),
-    });
-    modeRow.appendChild(pauseBtn);
-    modeRow.appendChild(activateBtn);
-    modeSection.appendChild(modeRow);
-
     // Assemble
     content.appendChild(configSection);
     content.appendChild(responseSection);
-    content.appendChild(modeSection);
     element.appendChild(content);
 
     // Hydrate inputs from saved config
@@ -117,8 +101,18 @@ export const render: RenderFn = async (glyph: Glyph, ui: GlyphUI): Promise<HTMLE
     if (config) {
         setInputValue(apiUrlInput, (config.api_url as string) || '');
         setInputValue(authTokenInput, (config.auth_token as string) || '');
-        setInputValue(pollIntervalInput, String(config.poll_interval_seconds || 0));
     }
+
+    // React to melds — when a note/URL glyph melds from above, extract URL and use as API URL
+    ui.onMeld((event: MeldEvent) => {
+        const url = extractUrl(event.content);
+        if (url) {
+            setInputValue(apiUrlInput, url);
+            saveConfig(ui, apiUrlInput, authTokenInput, status).then(() => {
+                status.show(`URL received from melded glyph`);
+            });
+        }
+    });
 
     return element;
 };
@@ -155,6 +149,31 @@ function getInputValue(wrapper: HTMLElement): string {
     return input ? input.value : '';
 }
 
+/** Extract the first http/https URL from text that may contain markdown or other content. */
+function extractUrl(text: string): string | null {
+    const lines = text.split('\n');
+    for (const line of lines) {
+        // Split on whitespace without regex
+        const tokens = line.trim().split(' ').flatMap(t => t.split('\t'));
+        for (const token of tokens) {
+            if (!token) continue;
+            // Find http:// or https:// anywhere in the token
+            let idx = token.indexOf('https://');
+            if (idx === -1) idx = token.indexOf('http://');
+            if (idx === -1) continue;
+
+            // Take from the protocol start, strip trailing punctuation
+            let url = token.slice(idx);
+            const trailingChars = ')>].,;!';
+            while (url.length > 0 && trailingChars.includes(url[url.length - 1])) {
+                url = url.slice(0, -1);
+            }
+            return url;
+        }
+    }
+    return null;
+}
+
 function setInputValue(wrapper: HTMLElement, value: string): void {
     const input = wrapper.querySelector('input');
     if (input) input.value = value;
@@ -162,37 +181,22 @@ function setInputValue(wrapper: HTMLElement, value: string): void {
 
 async function saveConfig(
     ui: GlyphUI,
-    glyphId: string,
     apiUrlEl: HTMLElement,
     authTokenEl: HTMLElement,
-    pollIntervalEl: HTMLElement,
     status: StatusLine,
 ): Promise<void> {
     try {
-        // Legacy: uses plugin endpoint. Migrate to ui.saveConfig() (#641)
-        const resp = await ui.pluginFetch('/update-config', {
-            method: 'POST',
-            body: {
-                glyph_id: glyphId,
-                api_url: getInputValue(apiUrlEl),
-                auth_token: getInputValue(authTokenEl),
-                poll_interval_seconds: parseInt(getInputValue(pollIntervalEl)) || 0,
-            },
+        await ui.saveConfig({
+            api_url: getInputValue(apiUrlEl),
+            auth_token: getInputValue(authTokenEl),
         });
-        if (resp.ok) {
-            status.show('Configuration saved');
-        } else {
-            const body = await resp.json().catch(() => ({} as Record<string, string>));
-            status.show(body.error || 'Save failed', true);
-        }
+        status.show('Configuration saved');
     } catch (e) {
         status.show((e as Error).message, true);
     }
 }
 
 async function testFetch(
-    ui: GlyphUI,
-    glyphId: string,
     apiUrlEl: HTMLElement,
     authTokenEl: HTMLElement,
     preview: HTMLPreElement,
@@ -206,52 +210,19 @@ async function testFetch(
 
     status.show('Fetching...');
     try {
-        const resp = await ui.pluginFetch('/test-fetch', {
-            method: 'POST',
-            body: {
-                glyph_id: glyphId,
-                api_url: apiUrl,
-                auth_token: getInputValue(authTokenEl),
-            },
-        });
+        const headers: Record<string, string> = {};
+        const authToken = getInputValue(authTokenEl);
+        if (authToken) {
+            headers['Authorization'] = authToken;
+        }
+
+        const resp = await fetch(apiUrl, { headers });
         if (resp.ok) {
-            const body = await resp.json();
-            preview.textContent = JSON.stringify(body.data, null, 2);
+            const data = await resp.json();
+            preview.textContent = JSON.stringify(data, null, 2);
             status.show('Fetch successful');
         } else {
-            const body = await resp.json().catch(() => ({} as Record<string, string>));
-            status.show(body.error || 'Fetch failed', true);
-        }
-    } catch (e) {
-        status.show((e as Error).message, true);
-    }
-}
-
-async function setMode(
-    ui: GlyphUI,
-    glyphId: string,
-    mode: string,
-    apiUrlEl: HTMLElement,
-    authTokenEl: HTMLElement,
-    pollIntervalEl: HTMLElement,
-    status: StatusLine,
-): Promise<void> {
-    try {
-        const resp = await ui.pluginFetch('/set-mode', {
-            method: 'POST',
-            body: {
-                glyph_id: glyphId,
-                mode: mode,
-                api_url: getInputValue(apiUrlEl),
-                auth_token: getInputValue(authTokenEl),
-                poll_interval_seconds: parseInt(getInputValue(pollIntervalEl)) || 0,
-            },
-        });
-        const body = await resp.json().catch(() => ({} as Record<string, string>));
-        if (resp.ok) {
-            status.show(body.status || 'Mode: ' + mode);
-        } else {
-            status.show(body.error || 'Failed to set mode', true);
+            status.show(`HTTP ${resp.status}: ${resp.statusText}`, true);
         }
     } catch (e) {
         status.show((e as Error).message, true);

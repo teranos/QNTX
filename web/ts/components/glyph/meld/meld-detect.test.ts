@@ -106,6 +106,85 @@ describe('Reverse Meld Detection - Tim (Happy Path)', () => {
     });
 });
 
+describe('Subcanvas top/bottom disambiguation', () => {
+    test('Tim drags subcanvas below another subcanvas — detects bottom (not top)', () => {
+        // Bug: subcanvas has both 'top' and 'bottom' ports. Forward 'top' detection
+        // (AAA looks up at BBB) must not beat reverse 'bottom' (BBB looks down at AAA),
+        // otherwise the edge from=BBB,to=AAA,direction=top places AAA above BBB.
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const bbb = document.createElement('div');
+        bbb.className = 'canvas-subcanvas-glyph';
+        bbb.setAttribute('data-glyph-id', 'bbb');
+        canvas.appendChild(bbb);
+
+        const aaa = document.createElement('div');
+        aaa.className = 'canvas-subcanvas-glyph';
+        aaa.setAttribute('data-glyph-id', 'aaa');
+        canvas.appendChild(aaa);
+
+        // BBB on top, AAA directly below
+        mockRect(bbb, { left: 100, top: 100, width: 200, height: 150 });
+        mockRect(aaa, { left: 100, top: 280, width: 200, height: 150 });
+
+        const result = findMeldTarget(aaa);
+
+        expect(result.target).toBe(bbb);
+        // Must be 'bottom' (reverse: BBB→AAA) not 'top' (forward: AAA→BBB)
+        expect(result.direction).toBe('bottom');
+        expect(result.reversed).toBe(true);
+        expect(result.distance).toBeLessThan(PROXIMITY_THRESHOLD);
+
+        document.body.innerHTML = '';
+    });
+
+    test('Tim drags subcanvas below BBB in CCC-BBB composition — detects bottom on BBB', () => {
+        uiState.setCanvasCompositions([]);
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const ccc = document.createElement('div');
+        ccc.className = 'canvas-subcanvas-glyph';
+        ccc.setAttribute('data-glyph-id', 'ccc');
+        const bbb = document.createElement('div');
+        bbb.className = 'canvas-subcanvas-glyph';
+        bbb.setAttribute('data-glyph-id', 'bbb');
+
+        const comp = document.createElement('div');
+        comp.className = 'melded-composition';
+        comp.setAttribute('data-glyph-id', 'melded-ccc-bbb');
+        comp.appendChild(ccc);
+        comp.appendChild(bbb);
+        canvas.appendChild(comp);
+
+        uiState.setCanvasCompositions([{
+            id: 'melded-ccc-bbb',
+            edges: [{ from: 'ccc', to: 'bbb', direction: 'right', position: 0 }],
+            x: 100, y: 100,
+        }]);
+
+        const aaa = document.createElement('div');
+        aaa.className = 'canvas-subcanvas-glyph';
+        aaa.setAttribute('data-glyph-id', 'aaa');
+        canvas.appendChild(aaa);
+
+        mockRect(ccc, { left: 100, top: 100, width: 200, height: 150 });
+        mockRect(bbb, { left: 300, top: 100, width: 200, height: 150 });
+        mockRect(aaa, { left: 300, top: 280, width: 200, height: 150 });
+
+        const result = findMeldTarget(aaa);
+
+        expect(result.target).toBe(bbb);
+        expect(result.direction).toBe('bottom');
+        expect(result.reversed).toBe(true);
+        expect(result.distance).toBeLessThan(PROXIMITY_THRESHOLD);
+
+        document.body.innerHTML = '';
+        uiState.setCanvasCompositions([]);
+    });
+});
+
 describe('findMeldTarget detects composition targets', () => {
     test('standalone prompt finds py inside composition via reverse detection', () => {
         uiState.setCanvasCompositions([]);
@@ -151,3 +230,4 @@ describe('findMeldTarget detects composition targets', () => {
         uiState.setCanvasCompositions([]);
     });
 });
+

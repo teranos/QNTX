@@ -28,6 +28,7 @@ export function addWindowControls(titleBar: HTMLElement, config: WindowControlsC
     const minimizeBtn = document.createElement('button');
     minimizeBtn.textContent = '\u2212'; // −
     minimizeBtn.title = 'Minimize';
+    minimizeBtn.setAttribute('aria-label', 'Minimize');
     minimizeBtn.onclick = config.onMinimize;
     container.appendChild(minimizeBtn);
 
@@ -35,6 +36,7 @@ export function addWindowControls(titleBar: HTMLElement, config: WindowControlsC
         const closeBtn = document.createElement('button');
         closeBtn.textContent = '\u00d7'; // ×
         closeBtn.title = 'Close';
+        closeBtn.setAttribute('aria-label', 'Close');
         closeBtn.onclick = config.onClose;
         container.appendChild(closeBtn);
     }

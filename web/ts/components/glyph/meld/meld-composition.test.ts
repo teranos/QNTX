@@ -2,7 +2,7 @@
  * Tests for meld composition — create, extend, reconstruct, unmeld
  *
  * Validates the core axiom: proximity-based melding preserves element identity
- * Layout: CSS Grid with per-glyph grid-row/grid-column placement
+ * Layout: Absolute positioning from DAG grid positions
  *
  * Personas:
  * - Tim: Happy path user, normal workflows
@@ -10,10 +10,15 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { performMeld, unmeldComposition, isMeldedComposition, reconstructMeld, extendComposition } from './meld-composition';
+import { performMeld, unmeldComposition, isMeldedComposition, reconstructMeld, extendComposition, detachGlyph } from './meld-composition';
 import { MELD_THRESHOLD } from './meld-detect';
 import type { Glyph } from '../glyph';
 import { uiState } from '../../../state/ui';
+
+/** Get direct glyph children of a composition (no column wrappers with absolute positioning) */
+function getGlyphChildren(composition: HTMLElement): HTMLElement[] {
+    return Array.from(composition.querySelectorAll('[data-glyph-id]')) as HTMLElement[];
+}
 
 describe('Meld System - Critical Behavior', () => {
     test('compatible glyphs meld into composition preserving element identity', () => {
@@ -49,20 +54,16 @@ describe('Meld System - Critical Behavior', () => {
         expect(composition.parentElement).toBe(canvas);
         expect(composition.contains(originalAxElement)).toBe(true);
         expect(composition.contains(originalPromptElement)).toBe(true);
-        expect(composition.children.length).toBe(2);
-        expect(composition.children[0]).toBe(originalAxElement);
-        expect(composition.children[1]).toBe(originalPromptElement);
-        expect(originalAxElement.parentElement).toBe(composition);
-        expect(originalPromptElement.parentElement).toBe(composition);
+        expect(composition.contains(originalAxElement)).toBe(true);
+        expect(composition.contains(originalPromptElement)).toBe(true);
         expect(composition.style.left).toBe('100px');
         expect(composition.style.top).toBe('100px');
 
-        // Grid layout applied
-        expect(composition.style.display).toBe('grid');
-        expect(originalAxElement.style.gridRow).toBe('1');
-        expect(originalAxElement.style.gridColumn).toBe('1');
-        expect(originalPromptElement.style.gridRow).toBe('1');
-        expect(originalPromptElement.style.gridColumn).toBe('2');
+        // Both elements are direct children (absolute positioning, no column wrappers)
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(originalAxElement);
+        expect(children).toContain(originalPromptElement);
+        expect(children.length).toBe(2);
 
         document.body.innerHTML = '';
     });
@@ -185,18 +186,17 @@ describe('Directional Melding', () => {
 
         const composition = performMeld(pyElement, resultElement, pyGlyph, resultGlyph, 'bottom');
 
-        expect(composition.style.display).toBe('grid');
         expect(composition.contains(pyElement)).toBe(true);
         expect(composition.contains(resultElement)).toBe(true);
-        expect(pyElement.style.gridRow).toBe('1');
-        expect(pyElement.style.gridColumn).toBe('1');
-        expect(resultElement.style.gridRow).toBe('2');
-        expect(resultElement.style.gridColumn).toBe('1');
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(pyElement);
+        expect(children).toContain(resultElement);
+        expect(children.length).toBe(2);
 
         document.body.innerHTML = '';
     });
 
-    test('bottom meld: note above prompt uses grid layout', () => {
+    test('bottom meld: note above prompt uses column layout', () => {
         const canvas = document.createElement('div');
         document.body.appendChild(canvas);
 
@@ -221,16 +221,17 @@ describe('Directional Melding', () => {
 
         const composition = performMeld(noteElement, promptElement, noteGlyph, promptGlyph, 'bottom');
 
-        expect(composition.style.display).toBe('grid');
         expect(composition.contains(noteElement)).toBe(true);
         expect(composition.contains(promptElement)).toBe(true);
-        expect(noteElement.style.gridRow).toBe('1');
-        expect(promptElement.style.gridRow).toBe('2');
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(noteElement);
+        expect(children).toContain(promptElement);
+        expect(children.length).toBe(2);
 
         document.body.innerHTML = '';
     });
 
-    test('right meld: ax + py uses grid layout', () => {
+    test('right meld: ax + py uses column layout', () => {
         const canvas = document.createElement('div');
         document.body.appendChild(canvas);
 
@@ -254,11 +255,10 @@ describe('Directional Melding', () => {
         const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => pyElement };
 
         const composition = performMeld(axElement, pyElement, axGlyph, pyGlyph, 'right');
-        expect(composition.style.display).toBe('grid');
-        expect(axElement.style.gridRow).toBe('1');
-        expect(axElement.style.gridColumn).toBe('1');
-        expect(pyElement.style.gridRow).toBe('1');
-        expect(pyElement.style.gridColumn).toBe('2');
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(axElement);
+        expect(children).toContain(pyElement);
+        expect(children.length).toBe(2);
 
         document.body.innerHTML = '';
     });
@@ -309,16 +309,12 @@ describe('Direction-aware reconstructMeld', () => {
         const edges = [{ from: 'ax1', to: 'py1', direction: 'right', position: 0 }];
         const composition = reconstructMeld([ax, py], edges, 'comp1', 50, 75);
 
-        expect(composition.style.display).toBe('grid');
         expect(composition.style.left).toBe('50px');
         expect(composition.style.top).toBe('75px');
-        expect(composition.children.length).toBe(2);
-        expect(composition.children[0]).toBe(ax);
-        expect(composition.children[1]).toBe(py);
-        expect(ax.style.gridRow).toBe('1');
-        expect(ax.style.gridColumn).toBe('1');
-        expect(py.style.gridRow).toBe('1');
-        expect(py.style.gridColumn).toBe('2');
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(ax);
+        expect(children).toContain(py);
+        expect(children.length).toBe(2);
 
         document.body.innerHTML = '';
     });
@@ -338,18 +334,17 @@ describe('Direction-aware reconstructMeld', () => {
         const edges = [{ from: 'py1', to: 'result1', direction: 'bottom', position: 0 }];
         const composition = reconstructMeld([py, result], edges, 'comp2', 100, 100);
 
-        expect(composition.style.display).toBe('grid');
         expect(composition.contains(py)).toBe(true);
         expect(composition.contains(result)).toBe(true);
-        expect(py.style.gridRow).toBe('1');
-        expect(py.style.gridColumn).toBe('1');
-        expect(result.style.gridRow).toBe('2');
-        expect(result.style.gridColumn).toBe('1');
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(py);
+        expect(children).toContain(result);
+        expect(children.length).toBe(2);
 
         document.body.innerHTML = '';
     });
 
-    test('mixed right+bottom edges — flat children with grid positions, no sub-containers', () => {
+    test('mixed right+bottom edges — correct structure', () => {
         const canvas = document.createElement('div');
         document.body.appendChild(canvas);
 
@@ -371,20 +366,12 @@ describe('Direction-aware reconstructMeld', () => {
         ];
         const composition = reconstructMeld([ax, py, result], edges, 'comp3', 0, 0);
 
-        expect(composition.style.display).toBe('grid');
-        // All 3 are direct children — no sub-containers
-        expect(composition.children.length).toBe(3);
-        expect(composition.children[0]).toBe(ax);
-        expect(composition.children[1]).toBe(py);
-        expect(composition.children[2]).toBe(result);
-
-        // Grid positions
-        expect(ax.style.gridRow).toBe('1');
-        expect(ax.style.gridColumn).toBe('1');
-        expect(py.style.gridRow).toBe('1');
-        expect(py.style.gridColumn).toBe('2');
-        expect(result.style.gridRow).toBe('2');
-        expect(result.style.gridColumn).toBe('2');
+        // All 3 elements are direct children
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(ax);
+        expect(children).toContain(py);
+        expect(children).toContain(result);
+        expect(children.length).toBe(3);
 
         document.body.innerHTML = '';
     });
@@ -407,9 +394,9 @@ describe('Direction-aware reconstructMeld', () => {
         const edges = [{ from: 'py1', to: 'result1', direction: 'bottom', position: 0 }];
         const composition = reconstructMeld([py, result], edges, 'comp4', 0, 0);
 
-        expect(composition.children[0]).toBe(originalPy);
-        expect(composition.children[1]).toBe(originalResult);
-        expect(originalPy.style.position).toBe('relative');
+        expect(composition.contains(originalPy)).toBe(true);
+        expect(composition.contains(originalResult)).toBe(true);
+        expect(originalPy.style.position).toBe('absolute');
 
         document.body.innerHTML = '';
     });
@@ -457,21 +444,16 @@ describe('Composition Extension - Tim (Happy Path)', () => {
 
         extendComposition(composition, prompt, 'prompt1', 'py1', 'right', 'to');
 
-        expect(composition.children.length).toBe(3);
-        expect(composition.children[0]).toBe(ax);
-        expect(composition.children[1]).toBe(py);
-        expect(composition.children[2]).toBe(prompt);
-        expect(prompt.parentElement).toBe(composition);
-        expect(prompt.style.position).toBe('relative');
+        expect(composition.contains(prompt)).toBe(true);
+        expect(prompt.style.position).toBe('absolute');
         expect(composition.getAttribute('data-glyph-id')).toBe('melded-py1-prompt1');
 
-        // Grid positions
-        expect(ax.style.gridRow).toBe('1');
-        expect(ax.style.gridColumn).toBe('1');
-        expect(py.style.gridRow).toBe('1');
-        expect(py.style.gridColumn).toBe('2');
-        expect(prompt.style.gridRow).toBe('1');
-        expect(prompt.style.gridColumn).toBe('3');
+        // All 3 elements are direct children
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(ax);
+        expect(children).toContain(py);
+        expect(children).toContain(prompt);
+        expect(children.length).toBe(3);
 
         clearState();
     });
@@ -514,10 +496,13 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         canvas.appendChild(py2);
         extendComposition(composition, py2, 'py2', 'prompt1', 'right', 'to');
 
-        expect(composition.children.length).toBe(4);
-        expect(composition.children[3]).toBe(py2);
-        expect(py2.style.gridRow).toBe('1');
-        expect(py2.style.gridColumn).toBe('4');
+        // All 4 elements are direct children
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(ax);
+        expect(children).toContain(py);
+        expect(children).toContain(prompt);
+        expect(children).toContain(py2);
+        expect(children.length).toBe(4);
 
         clearState();
     });
@@ -554,16 +539,14 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         canvas.appendChild(ax);
         extendComposition(composition, ax, 'ax1', 'py1', 'right', 'from');
 
-        expect(composition.children.length).toBe(3);
         expect(composition.getAttribute('data-glyph-id')).toBe('melded-ax1-py1');
 
-        // Grid positions — ax prepended as new root
-        expect(ax.style.gridRow).toBe('1');
-        expect(ax.style.gridColumn).toBe('1');
-        expect(py.style.gridRow).toBe('1');
-        expect(py.style.gridColumn).toBe('2');
-        expect(prompt.style.gridRow).toBe('1');
-        expect(prompt.style.gridColumn).toBe('3');
+        // All 3 elements are direct children
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(ax);
+        expect(children).toContain(py);
+        expect(children).toContain(prompt);
+        expect(children.length).toBe(3);
 
         clearState();
     });
@@ -602,19 +585,12 @@ describe('Composition Extension - Tim (Happy Path)', () => {
 
         extendComposition(composition, result, 'result1', 'py1', 'bottom', 'to');
 
-        // All 3 are direct children — no sub-containers
-        expect(composition.children.length).toBe(3);
-        expect(composition.children[0]).toBe(ax);
-        expect(composition.children[1]).toBe(py);
-        expect(composition.children[2]).toBe(result);
-
-        // Grid positions
-        expect(ax.style.gridRow).toBe('1');
-        expect(ax.style.gridColumn).toBe('1');
-        expect(py.style.gridRow).toBe('1');
-        expect(py.style.gridColumn).toBe('2');
-        expect(result.style.gridRow).toBe('2');
-        expect(result.style.gridColumn).toBe('2');
+        // All 3 elements are direct children
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(ax);
+        expect(children).toContain(py);
+        expect(children).toContain(result);
+        expect(children.length).toBe(3);
 
         clearState();
     });
@@ -655,20 +631,13 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         canvas.appendChild(result2);
         extendComposition(composition, result2, 'r2', 'py1', 'bottom', 'to');
 
-        // All 4 are direct children
-        expect(composition.children.length).toBe(4);
-        expect(composition.children[0]).toBe(ax);
-        expect(composition.children[1]).toBe(py);
-        expect(composition.children[2]).toBe(result1);
-        expect(composition.children[3]).toBe(result2);
-
-        // Grid positions
-        expect(py.style.gridRow).toBe('1');
-        expect(py.style.gridColumn).toBe('2');
-        expect(result1.style.gridRow).toBe('2');
-        expect(result1.style.gridColumn).toBe('2');
-        expect(result2.style.gridRow).toBe('3');
-        expect(result2.style.gridColumn).toBe('2');
+        // All 4 elements are direct children
+        const children = getGlyphChildren(composition);
+        expect(children).toContain(ax);
+        expect(children).toContain(py);
+        expect(children).toContain(result1);
+        expect(children).toContain(result2);
+        expect(children.length).toBe(4);
 
         clearState();
     });
@@ -714,6 +683,297 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         expect(newComp!.edges.length).toBe(2);
         expect(newComp!.edges[0]).toEqual({ from: 'ax1', to: 'py1', direction: 'right', position: 0 });
         expect(newComp!.edges[1]).toEqual({ from: 'py1', to: 'prompt1', direction: 'right', position: 1 });
+
+        clearState();
+    });
+});
+
+describe('Detach Glyph - Tim (Happy Path)', () => {
+    function clearState() {
+        uiState.setCanvasCompositions([]);
+        document.body.innerHTML = '';
+    }
+
+    test('Tim detaches leaf from 3-glyph chain → remaining 2 stay melded', () => {
+        clearState();
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const ax = document.createElement('div');
+        ax.className = 'canvas-ax-glyph';
+        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.style.position = 'absolute';
+        ax.style.left = '100px';
+        ax.style.top = '100px';
+        canvas.appendChild(ax);
+
+        const py = document.createElement('div');
+        py.className = 'canvas-py-glyph';
+        py.setAttribute('data-glyph-id', 'py1');
+        py.style.position = 'absolute';
+        ax.style.left = '200px';
+        ax.style.top = '100px';
+        canvas.appendChild(py);
+
+        const prompt = document.createElement('div');
+        prompt.className = 'canvas-prompt-glyph';
+        prompt.setAttribute('data-glyph-id', 'prompt1');
+        prompt.style.position = 'absolute';
+        canvas.appendChild(prompt);
+
+        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+
+        const composition = performMeld(ax, py, axGlyph, pyGlyph, 'right');
+        extendComposition(composition, prompt, 'prompt1', 'py1', 'right', 'to');
+
+        // Detach the leaf (prompt1)
+        const result = detachGlyph('prompt1', composition);
+
+        expect(result).not.toBe(null);
+        expect(result!.detachedElement).toBe(prompt);
+        expect(result!.remainingComposition).toBe(composition);
+        expect(prompt.parentElement).toBe(canvas);
+        expect(prompt.style.position).toBe('absolute');
+        expect(composition.contains(ax)).toBe(true);
+        expect(composition.contains(py)).toBe(true);
+        expect(composition.contains(prompt)).toBe(false);
+
+        // Storage: remaining composition has 1 edge
+        const comps = uiState.getCanvasCompositions();
+        expect(comps.length).toBe(1);
+        expect(comps[0].edges.length).toBe(1);
+        expect(comps[0].edges[0].from).toBe('ax1');
+        expect(comps[0].edges[0].to).toBe('py1');
+
+        clearState();
+    });
+
+    test('Tim detaches root from 3-glyph chain → remaining 2 stay melded', () => {
+        clearState();
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const ax = document.createElement('div');
+        ax.className = 'canvas-ax-glyph';
+        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.style.position = 'absolute';
+        ax.style.left = '100px';
+        ax.style.top = '100px';
+        canvas.appendChild(ax);
+
+        const py = document.createElement('div');
+        py.className = 'canvas-py-glyph';
+        py.setAttribute('data-glyph-id', 'py1');
+        py.style.position = 'absolute';
+        canvas.appendChild(py);
+
+        const prompt = document.createElement('div');
+        prompt.className = 'canvas-prompt-glyph';
+        prompt.setAttribute('data-glyph-id', 'prompt1');
+        prompt.style.position = 'absolute';
+        canvas.appendChild(prompt);
+
+        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+
+        const composition = performMeld(ax, py, axGlyph, pyGlyph, 'right');
+        extendComposition(composition, prompt, 'prompt1', 'py1', 'right', 'to');
+
+        // Detach the root (ax1)
+        const result = detachGlyph('ax1', composition);
+
+        expect(result).not.toBe(null);
+        expect(result!.detachedElement).toBe(ax);
+        expect(result!.remainingComposition).toBe(composition);
+        expect(ax.parentElement).toBe(canvas);
+        expect(composition.contains(py)).toBe(true);
+        expect(composition.contains(prompt)).toBe(true);
+
+        // Storage: remaining composition has 1 edge (py1→prompt1)
+        const comps = uiState.getCanvasCompositions();
+        expect(comps.length).toBe(1);
+        expect(comps[0].edges.length).toBe(1);
+        expect(comps[0].edges[0].from).toBe('py1');
+        expect(comps[0].edges[0].to).toBe('prompt1');
+
+        clearState();
+    });
+
+    test('Tim detaches middle glyph → full unmeld fallback', () => {
+        clearState();
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const ax = document.createElement('div');
+        ax.className = 'canvas-ax-glyph';
+        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.style.position = 'absolute';
+        ax.style.left = '100px';
+        ax.style.top = '100px';
+        canvas.appendChild(ax);
+
+        const py = document.createElement('div');
+        py.className = 'canvas-py-glyph';
+        py.setAttribute('data-glyph-id', 'py1');
+        py.style.position = 'absolute';
+        canvas.appendChild(py);
+
+        const prompt = document.createElement('div');
+        prompt.className = 'canvas-prompt-glyph';
+        prompt.setAttribute('data-glyph-id', 'prompt1');
+        prompt.style.position = 'absolute';
+        canvas.appendChild(prompt);
+
+        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+
+        const composition = performMeld(ax, py, axGlyph, pyGlyph, 'right');
+        extendComposition(composition, prompt, 'prompt1', 'py1', 'right', 'to');
+
+        // Detach the middle (py1) → disconnects graph → full unmeld
+        const result = detachGlyph('py1', composition);
+
+        expect(result).not.toBe(null);
+        expect(result!.detachedElement).toBe(py);
+        expect(result!.remainingComposition).toBe(null); // full unmeld
+        expect(ax.parentElement).toBe(canvas);
+        expect(py.parentElement).toBe(canvas);
+        expect(prompt.parentElement).toBe(canvas);
+
+        // Storage: no compositions remain
+        expect(uiState.getCanvasCompositions().length).toBe(0);
+
+        clearState();
+    });
+
+    test('Tim detaches from 2-glyph composition → full unmeld', () => {
+        clearState();
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const ax = document.createElement('div');
+        ax.className = 'canvas-ax-glyph';
+        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.style.position = 'absolute';
+        ax.style.left = '100px';
+        ax.style.top = '100px';
+        canvas.appendChild(ax);
+
+        const py = document.createElement('div');
+        py.className = 'canvas-py-glyph';
+        py.setAttribute('data-glyph-id', 'py1');
+        py.style.position = 'absolute';
+        canvas.appendChild(py);
+
+        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+
+        const composition = performMeld(ax, py, axGlyph, pyGlyph, 'right');
+        const result = detachGlyph('py1', composition);
+
+        expect(result).not.toBe(null);
+        expect(result!.remainingComposition).toBe(null); // full unmeld
+        expect(ax.parentElement).toBe(canvas);
+        expect(py.parentElement).toBe(canvas);
+        expect(uiState.getCanvasCompositions().length).toBe(0);
+
+        clearState();
+    });
+
+    test('Tim detaches bottom leaf from cross-axis composition', () => {
+        clearState();
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const ax = document.createElement('div');
+        ax.className = 'canvas-ax-glyph';
+        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.style.position = 'absolute';
+        ax.style.left = '100px';
+        ax.style.top = '100px';
+        canvas.appendChild(ax);
+
+        const py = document.createElement('div');
+        py.className = 'canvas-py-glyph';
+        py.setAttribute('data-glyph-id', 'py1');
+        py.style.position = 'absolute';
+        canvas.appendChild(py);
+
+        const result = document.createElement('div');
+        result.className = 'canvas-result-glyph';
+        result.setAttribute('data-glyph-id', 'result1');
+        result.style.position = 'absolute';
+        canvas.appendChild(result);
+
+        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+
+        const composition = performMeld(ax, py, axGlyph, pyGlyph, 'right');
+        extendComposition(composition, result, 'result1', 'py1', 'bottom', 'to');
+
+        // Detach bottom leaf (result1) — ax→py stays connected
+        const detachResult = detachGlyph('result1', composition);
+
+        expect(detachResult).not.toBe(null);
+        expect(detachResult!.detachedElement).toBe(result);
+        expect(detachResult!.remainingComposition).toBe(composition);
+        expect(result.parentElement).toBe(canvas);
+        expect(composition.contains(ax)).toBe(true);
+        expect(composition.contains(py)).toBe(true);
+
+        const comps = uiState.getCanvasCompositions();
+        expect(comps.length).toBe(1);
+        expect(comps[0].edges.length).toBe(1);
+        expect(comps[0].edges[0].from).toBe('ax1');
+        expect(comps[0].edges[0].to).toBe('py1');
+
+        clearState();
+    });
+
+    test('Storage correctness after detach: old composition removed, new one created', () => {
+        clearState();
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const ax = document.createElement('div');
+        ax.className = 'canvas-ax-glyph';
+        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.style.position = 'absolute';
+        ax.style.left = '100px';
+        ax.style.top = '100px';
+        canvas.appendChild(ax);
+
+        const py = document.createElement('div');
+        py.className = 'canvas-py-glyph';
+        py.setAttribute('data-glyph-id', 'py1');
+        py.style.position = 'absolute';
+        canvas.appendChild(py);
+
+        const prompt = document.createElement('div');
+        prompt.className = 'canvas-prompt-glyph';
+        prompt.setAttribute('data-glyph-id', 'prompt1');
+        prompt.style.position = 'absolute';
+        canvas.appendChild(prompt);
+
+        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+
+        const composition = performMeld(ax, py, axGlyph, pyGlyph, 'right');
+        extendComposition(composition, prompt, 'prompt1', 'py1', 'right', 'to');
+
+        const oldId = composition.getAttribute('data-glyph-id');
+        detachGlyph('prompt1', composition);
+
+        const comps = uiState.getCanvasCompositions();
+        // Old composition ID should be gone
+        expect(comps.find(c => c.id === oldId)).toBeUndefined();
+        // New composition exists with correct data
+        const newComp = comps[0];
+        expect(newComp).toBeDefined();
+        expect(newComp.edges.length).toBe(1);
+        expect(newComp.x).toBe(100);
+        expect(newComp.y).toBe(100);
 
         clearState();
     });

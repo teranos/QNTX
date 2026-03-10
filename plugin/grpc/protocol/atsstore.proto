@@ -54,8 +54,8 @@ message AttestationFilter {
   repeated string predicates = 2;
   repeated string contexts = 3;
   repeated string actors = 4;
-  int64 time_start = 5;          // Unix timestamp in milliseconds (0 = no filter)
-  int64 time_end = 6;            // Unix timestamp in milliseconds (0 = no filter)
+  optional int64 time_start = 5;  // Unix timestamp in milliseconds. If not set, no lower bound.
+  optional int64 time_end = 6;    // Unix timestamp in milliseconds. If not set, no upper bound.
   optional int32 limit = 7;      // Maximum results. If not set, no limit applied.
 }
 
