@@ -221,6 +221,12 @@ export function extendComposition(
     incomingElement.style.top = '0';
     clearMeldFeedback(incomingElement);
 
+    // Clear feedback on all existing glyphs in the composition (anchor glyph may still glow)
+    compositionElement.querySelectorAll('[data-glyph-id]').forEach(el => {
+        (el as HTMLElement).style.boxShadow = '';
+        el.classList.remove('meld-ready', 'meld-target');
+    });
+
     // Append incoming as direct child — grid handles placement
     compositionElement.appendChild(incomingElement);
 

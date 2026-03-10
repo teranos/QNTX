@@ -50,20 +50,24 @@ export function applyMeldFeedback(
 }
 
 /**
- * Clear meld feedback from elements
- * TODO(#449): glow lingers after right-to-left meld
+ * Clear meld feedback from elements.
+ *
+ * Clears the element itself AND any elements tagged with .meld-ready or
+ * .meld-target on the canvas. Also clears boxShadow from both classes
+ * to catch the "approaching" state where boxShadow is set without a class.
  */
 export function clearMeldFeedback(element: HTMLElement): void {
     element.style.boxShadow = '';
     element.classList.remove('meld-ready');
+    element.classList.remove('meld-target');
 
-    // Clear from any potential targets — walk up to canvas to handle
-    // elements inside compositions or sub-containers
+    // Walk up to canvas and clear ALL elements with meld feedback classes or shadows
     const canvas = element.closest('.canvas-workspace') ?? element.parentElement;
     if (canvas) {
-        canvas.querySelectorAll('.meld-target').forEach(target => {
-            target.classList.remove('meld-target');
-            (target as HTMLElement).style.boxShadow = '';
+        canvas.querySelectorAll('.meld-target, .meld-ready').forEach(el => {
+            el.classList.remove('meld-target');
+            el.classList.remove('meld-ready');
+            (el as HTMLElement).style.boxShadow = '';
         });
     }
 }
