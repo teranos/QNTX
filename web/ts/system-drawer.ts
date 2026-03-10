@@ -7,7 +7,7 @@ import { connectivityManager } from './connectivity.ts';
 import { getCompletions, richSearch } from './qntx-wasm.ts';
 import { SearchView, STRATEGY_FUZZY, TYPE_COMMAND, TYPE_SUBCANVAS } from './search-view.ts';
 import type { SearchMatch, SearchResultsMessage } from './search-view.ts';
-import { spawnGlyphByCommand, getMatchingCommands, COMMAND_LABELS } from './components/glyph/canvas/spawn-menu.ts';
+import { spawnGlyphByCommand, getMatchingCommands, getCommandLabel } from './components/glyph/canvas/spawn-menu.ts';
 import { uiState } from './state/ui.ts';
 import { Subcanvas } from '@generated/sym.js';
 
@@ -71,7 +71,7 @@ function computeLocalResults(query: string): SearchMatch[] {
             type_label: '⌘',
             field_name: 'spawn',
             field_value: cmd,
-            excerpt: COMMAND_LABELS[cmd] || cmd,
+            excerpt: getCommandLabel(cmd),
             score: 1,
             strategy: 'local',
             display_label: cmd,

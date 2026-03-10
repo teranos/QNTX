@@ -243,18 +243,6 @@ async function spawnGlyph(
 /** Re-export registry command helpers for existing callers */
 export { getMatchingCommandNames as getMatchingCommands, getCommandLabel };
 
-/** Human-readable labels for spawn commands */
-export const COMMAND_LABELS: Record<string, string> = (() => {
-    const labels: Record<string, string> = {};
-    for (const entry of getSpawnableGlyphs()) {
-        labels[entry.label.toLowerCase()] = getCommandLabel(entry.label.toLowerCase());
-        for (const alias of entry.commandAliases ?? []) {
-            labels[alias] = getCommandLabel(alias);
-        }
-    }
-    return labels;
-})();
-
 /**
  * Spawn a glyph on the active canvas by command name.
  * Returns true if a glyph was spawned.
