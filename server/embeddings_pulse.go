@@ -224,6 +224,14 @@ func RunHDBSCANClustering(
 ) (*EmbeddingClusterResult, error) {
 	startTime := time.Now()
 
+	// Sweep stale embeddings before clustering so HDBSCAN operates on clean data
+	swept, err := store.SweepStaleEmbeddings()
+	if err != nil {
+		logger.Warnw("Stale embedding sweep failed, continuing with clustering", "error", err)
+	} else if swept > 0 {
+		logger.Infow("Swept stale embeddings before clustering", "count", swept)
+	}
+
 	// Read all embedding vectors
 	ids, blobs, err := store.GetAllEmbeddingVectors()
 	if err != nil {
@@ -381,7 +389,7 @@ func RunHDBSCANClustering(
 			}
 			emitClusterLifecycleAttestation(atsStore, ev, memberCounts[ev.ClusterID], runID, projectCtx, logger)
 		}
-		emitClusterDeferredNews(store, atsStore, matchResult.events, memberCounts, runID, projectCtx, logger)
+		emitClusterDeferredNews(store, atsStore, matchResult.events, memberCounts, swept, runID, projectCtx, logger)
 	}
 
 	summary, err := store.GetClusterSummary()
@@ -531,7 +539,7 @@ func getUndeliveredDetail(atsStore ats.AttestationStore, projectCtx string) stri
 
 // emitClusterDeferredNews writes a deferred message attestation for Graunde to pick up
 // on Stop. If there's undelivered news from a previous run, accumulates by prepending it.
-func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.AttestationStore, events []storage.ClusterEvent, memberCounts map[int]int, runID string, projectCtx string, logger *zap.SugaredLogger) {
+func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.AttestationStore, events []storage.ClusterEvent, memberCounts map[int]int, staleSwept int, runID string, projectCtx string, logger *zap.SugaredLogger) {
 	type birthInfo struct {
 		clusterID int
 		nMembers  int
@@ -547,7 +555,7 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 			deaths = append(deaths, ev.ClusterID)
 		}
 	}
-	if len(births) == 0 && len(deaths) == 0 {
+	if len(births) == 0 && len(deaths) == 0 && staleSwept == 0 {
 		return
 	}
 
@@ -562,7 +570,7 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 		detail = fmt.Sprintf("Embedding topology: %d born, %d died.\n", len(births), len(deaths))
 	case len(births) > 0:
 		detail = fmt.Sprintf("%d new cluster(s) emerged.\n", len(births))
-	default:
+	case len(deaths) > 0:
 		detail = fmt.Sprintf("%d cluster(s) dissolved.\n", len(deaths))
 	}
 
@@ -595,6 +603,10 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 			detail += fmt.Sprintf("cluster:%d", d)
 		}
 		detail += "\n"
+	}
+
+	if staleSwept > 0 {
+		detail += fmt.Sprintf("Swept %d stale embeddings (source attestations deleted).\n", staleSwept)
 	}
 
 	// Accumulate: if there's undelivered news from a previous run, prepend it
