@@ -87,15 +87,15 @@ let test_stitch_labels_human () =
   reset ();
   let payload = make_payload ~branch:"main" ~predicate:"UserPromptSubmit" ~text:"test" () in
   let _ = Stitcher.stitch payload in
-  let turns = Hashtbl.find Stitcher.buffers "main" in
-  Alcotest.(check string) "human label" "[human] test" (List.hd turns)
+  let entry = Hashtbl.find Stitcher.buffers "main" in
+  Alcotest.(check string) "human label" "[human] test" (List.hd entry.turns)
 
 let test_stitch_labels_assistant () =
   reset ();
   let payload = make_payload ~branch:"main" ~predicate:"Stop" ~text:"response" () in
   let _ = Stitcher.stitch payload in
-  let turns = Hashtbl.find Stitcher.buffers "main" in
-  Alcotest.(check string) "assistant label" "[assistant] response" (List.hd turns)
+  let entry = Hashtbl.find Stitcher.buffers "main" in
+  Alcotest.(check string) "assistant label" "[assistant] response" (List.hd entry.turns)
 
 let test_stitch_separate_branches () =
   reset ();
@@ -272,7 +272,7 @@ let () =
       Alcotest.test_case "at threshold" `Quick test_stitch_emits_at_threshold;
       Alcotest.test_case "below threshold" `Quick test_stitch_no_emit_below_threshold;
       Alcotest.test_case "accumulates" `Quick test_stitch_accumulates_to_threshold;
-Alcotest.test_case "chronological order" `Quick test_stitch_emission_order;
+      Alcotest.test_case "chronological order" `Quick test_stitch_emission_order;
       Alcotest.test_case "clears buffer" `Quick test_stitch_clears_buffer_after_emit;
     ];
     "flush_all", [
