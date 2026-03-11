@@ -54,7 +54,7 @@ let create_weave ~branch ~text ~word_count ~turn_count =
       ~actors:["loom"]
       ~attributes:attrs
       ~source:"loom"
-      ~source_version:"0.3.0"
+      ~source_version:Version.value
       () in
 
     let request = Protocol.GenerateAttestationRequest.make
