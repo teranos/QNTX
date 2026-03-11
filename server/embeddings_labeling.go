@@ -18,12 +18,12 @@ import (
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/attrs"
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
-	vanity "github.com/teranos/vanity-id"
 	"go.uber.org/zap"
 )
 
@@ -149,7 +149,7 @@ type clusterLabelAttrs struct {
 
 func (h *ClusterLabelHandler) createLabelAttestation(asStore ats.AttestationStore, clusterID int, label, model string, sampleSize, nMembers int) {
 	subject := fmt.Sprintf("cluster:%d", clusterID)
-	asid, err := vanity.GenerateASID(subject, "labeled", "embeddings", "qntx@embeddings")
+	asid, err := identity.GenerateASUID("AS", subject, "labeled", "embeddings")
 	if err != nil {
 		h.logger.Warnw("Failed to generate ASID for label attestation",
 			"cluster_id", clusterID, "error", err)
