@@ -7,10 +7,10 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/attrs"
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
-	id "github.com/teranos/vanity-id"
 )
 
 // StoredPrompt represents a prompt stored as an attestation.
@@ -77,7 +77,7 @@ func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, act
 	}
 
 	// Generate ASID for the prompt using filename as context
-	asid, err := id.GenerateASID(prompt.Name, PredicatePromptTemplate, prompt.Filename, actor)
+	asid, err := identity.GenerateASUID("AS", prompt.Name, PredicatePromptTemplate, prompt.Filename)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate prompt ID")
 	}

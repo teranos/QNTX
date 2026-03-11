@@ -9,6 +9,7 @@ import type { Glyph } from '../glyph';
 import { log, SEG } from '../../../logger';
 import { getMinimizeDuration } from '../glyph';
 import { uiState } from '../../../state/ui';
+import { getTransform } from './canvas-pan';
 import {
     type GlyphTypeEntry,
     getAllGlyphTypes,
@@ -56,10 +57,15 @@ export function showSpawnMenu(
         existingMenu.remove();
     }
 
-    // Calculate pixel position relative to canvas
-    const canvasRect = canvas.getBoundingClientRect();
-    const x = Math.round(mouseX - canvasRect.left);
-    const y = Math.round(mouseY - canvasRect.top);
+    // Calculate logical canvas position, accounting for pan and zoom.
+    // canvas is the content layer (has CSS transform for pan/zoom).
+    // Glyph left/top are in the content layer's LOCAL coordinate space,
+    // so we invert the transform relative to the container (parent).
+    const container = canvas.parentElement!;
+    const containerRect = container.getBoundingClientRect();
+    const { panX, panY, scale } = getTransform(canvasId);
+    const x = Math.round((mouseX - containerRect.left - panX) / scale);
+    const y = Math.round((mouseY - containerRect.top - panY) / scale);
 
     // Create spawn menu
     const menu = document.createElement('div');

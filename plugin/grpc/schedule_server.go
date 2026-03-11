@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/schedule"
-	id "github.com/teranos/vanity-id"
 	"go.uber.org/zap"
 )
 
@@ -39,7 +39,7 @@ func (s *ScheduleServer) CreateSchedule(ctx context.Context, req *protocol.Creat
 	}
 
 	// Generate schedule ID
-	scheduleID, err := id.GenerateASID(req.HandlerName, "schedule", "pulse", "plugin")
+	scheduleID, err := identity.GenerateASUID("AS", req.HandlerName, "schedule", "pulse")
 	if err != nil {
 		return &protocol.CreateScheduleResponse{
 			Success: false,

@@ -15,6 +15,7 @@ import (
 	"github.com/teranos/QNTX/ai/tracker"
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/alias"
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
@@ -22,7 +23,6 @@ import (
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	id "github.com/teranos/vanity-id"
 )
 
 const (
@@ -715,7 +715,7 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 			subject = "unknown-model"
 		}
 
-		asid, asidErr := id.GenerateASID(subject, "prompt-result", req.GlyphID, actor)
+		asid, asidErr := identity.GenerateASUID("AS", subject, "prompt-result", req.GlyphID)
 		if asidErr != nil {
 			s.logger.Warnw("Failed to generate ASID for prompt-result attestation",
 				"glyph_id", req.GlyphID, "error", asidErr)

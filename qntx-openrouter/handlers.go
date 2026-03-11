@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	vanity "github.com/teranos/vanity-id"
 )
 
 const (
@@ -692,7 +692,7 @@ func (h *Handlers) createResultAttestation(glyphID, modelName, template, respons
 		subject = "unknown-model"
 	}
 
-	asid, err := vanity.GenerateASID(subject, "prompt-result", glyphID, actor)
+	asid, err := identity.GenerateASUID("AS", subject, "prompt-result", glyphID)
 	if err != nil {
 		logger.Warnw("Failed to generate ASID for prompt-result attestation",
 			"glyph_id", glyphID, "error", err)

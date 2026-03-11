@@ -64,6 +64,10 @@ function applyTransform(container: HTMLElement, canvasId: string): void {
     const contentLayer = container.querySelector('.canvas-content-layer') as HTMLElement;
     if (contentLayer) {
         contentLayer.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.scale})`;
+        contentLayer.style.setProperty('--canvas-scale', String(state.scale));
+        // Border opacity: 0.4 at scale=1, 0.1 at scale=0.25 (fades when zoomed out)
+        const borderOpacity = 0.1 + Math.min(state.scale, 1) * 0.3;
+        contentLayer.style.setProperty('--glyph-border-opacity', String(borderOpacity.toFixed(3)));
     }
 }
 
