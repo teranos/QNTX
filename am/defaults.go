@@ -98,7 +98,7 @@ func SetDefaults(v *viper.Viper) {
 	// Plugin configuration defaults
 	v.SetDefault("plugin.enabled", []string{}) // No plugins enabled by default (explicit opt-in via am.toml)
 	pluginPaths := []string{"~/.qntx/plugins"}
-	// In dev mode (running from repo root), also search qntx-plugins/ for in-tree TS plugins
+	// If qntx-plugins/ exists in CWD, include it — typically present when running from repo root
 	if _, err := os.Stat("qntx-plugins"); err == nil {
 		pluginPaths = append(pluginPaths, "qntx-plugins")
 	}
