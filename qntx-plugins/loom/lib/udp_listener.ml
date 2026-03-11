@@ -8,6 +8,7 @@
  * via QNTX's watcher system is the "proper" alternative, but requires Graunde
  * to talk to QNTX over the network — which it currently doesn't do. *)
 
+(* TODO(#676): Handle port conflicts gracefully — retry or log clear error *)
 let udp_port = 19470
 
 let start () =
