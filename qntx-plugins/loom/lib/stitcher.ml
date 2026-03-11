@@ -143,11 +143,12 @@ let stitch payload =
 
 (* Serialize a stitch_result to JSON for the ExecuteJob response *)
 let result_to_json r =
+  let branch_escaped = Yojson.Safe.to_string (`String r.branch) in
   match r.emitted with
   | Some block ->
     let escaped = Yojson.Safe.to_string (`String block) in
-    Printf.sprintf {|{"success":true,"result":{"branch":"%s","buffered_words":0,"emitted":%s}}|}
-      r.branch escaped
+    Printf.sprintf {|{"success":true,"result":{"branch":%s,"buffered_words":0,"emitted":%s}}|}
+      branch_escaped escaped
   | None ->
-    Printf.sprintf {|{"success":true,"result":{"branch":"%s","buffered_words":%d}}|}
-      r.branch r.buffered_words
+    Printf.sprintf {|{"success":true,"result":{"branch":%s,"buffered_words":%d}}|}
+      branch_escaped r.buffered_words
