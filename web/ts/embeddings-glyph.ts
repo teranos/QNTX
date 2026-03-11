@@ -241,18 +241,31 @@ function mount3dView(container: HTMLElement, allPoints: Record<string, Projectio
         depth: { enable: true },
     });
 
-    let pointData: { positions: Float32Array; colors: Float32Array; count: number } | null = null;
+    let pointData: { posBuffer: any; colBuffer: any; count: number } | null = null;
 
     function loadMethod() {
         const pts = allPoints[activeMethod];
         if (!pts || pts.length === 0) {
+            if (pointData) {
+                pointData.posBuffer.destroy();
+                pointData.colBuffer.destroy();
+            }
             pointData = null;
             statusEl.textContent = `No ${activeMethod} data`;
             return;
         }
         const has3D = pts.some(p => p.z != null);
         const { positions, colors } = normalizePoints3d(pts);
-        pointData = { positions, colors, count: pts.length };
+        // Destroy old buffers before allocating new ones
+        if (pointData) {
+            pointData.posBuffer.destroy();
+            pointData.colBuffer.destroy();
+        }
+        pointData = {
+            posBuffer: regl.buffer({ data: positions, type: 'float' }),
+            colBuffer: regl.buffer({ data: colors, type: 'float' }),
+            count: pts.length,
+        };
         const clusters = new Set(pts.map(p => p.cluster_id).filter(id => id >= 0));
         statusEl.textContent = `${activeMethod.toUpperCase()} ${pts.length}pts ${clusters.size}cl${has3D ? ' 3D' : ' 2D'}`;
     }
@@ -269,8 +282,8 @@ function mount3dView(container: HTMLElement, allPoints: Record<string, Projectio
         regl.clear({ color: [0.1, 0.1, 0.18, 1], depth: 1 });
         if (pointData && pointData.count > 0) {
             drawPoints({
-                positions: { buffer: regl.buffer(pointData.positions), size: 3 },
-                colors: { buffer: regl.buffer(pointData.colors), size: 3 },
+                positions: { buffer: pointData.posBuffer, size: 3 },
+                colors: { buffer: pointData.colBuffer, size: 3 },
                 projection: perspective4(Math.PI / 4, w / h, 0.1, 100),
                 view: orbitViewMatrix(rotX, rotY, distance),
                 pointSize: 15 * devicePixelRatio,
