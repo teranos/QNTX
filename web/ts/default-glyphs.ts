@@ -970,6 +970,7 @@ function openAttestationWindow(attestation: any): void {
     glyphRun.add({
         id,
         title: titleText,
+        onClose: () => glyphRun.remove(id),
         renderContent: () => {
             const content = document.createElement('div');
             content.style.padding = '8px';
