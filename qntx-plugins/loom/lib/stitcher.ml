@@ -24,7 +24,8 @@ let max_chunk_words = 200
 (* Hashtbl is OCaml's mutable hash table — like Go's map or JS's Map.
  * We key by branch name and accumulate turns as a list of strings.
  * Lists in OCaml are prepend-only (immutable linked lists), so we
- * cons new turns onto the front and reverse when emitting. *)
+ * cons new turns onto the front and reverse when emitting.
+ * TODO(#677): Persist buffer to disk to survive restarts. *)
 let buffers : (string, string list) Hashtbl.t = Hashtbl.create 16
 
 let word_count s =
@@ -106,7 +107,6 @@ let stitch payload =
     let text = extract_text json predicate in
     match text with
     | None ->
-      Printf.printf "[loom] No text in %s for branch %s\n%!" predicate branch;
       { branch; buffered_words = 0; emitted = None; turn_count = 0 }
     | Some text ->
       (* Format the turn with a speaker label *)
