@@ -18,8 +18,20 @@ const (
 	ActionTypeWebhook       ActionType = "webhook"
 	ActionTypeLLMPrompt     ActionType = "llm_prompt"
 	ActionTypeGlyphExecute  ActionType = "glyph_execute"
+	ActionTypePluginExecute ActionType = "plugin_execute" // Added 2026-03-11, no active consumers yet (loom uses UDP instead)
 	ActionTypeSemanticMatch ActionType = "semantic_match"
 )
+
+// AttributeFilter matches against values inside an attestation's Attributes JSON.
+// Path uses dot-separated keys to navigate nested objects (e.g., "tool_input.command").
+// Op is "equals" or "contains" — no regex per QNTX LAW.
+// Added 2026-03-11, no active consumers yet. First consumer should remove this notice.
+// TODO(#672): Expose in AX glyph UI as attribute filter conditions.
+type AttributeFilter struct {
+	Path  string `json:"path"`  // Dot-separated JSON path (e.g., "tool_name", "tool_input.command")
+	Op    string `json:"op"`    // "equals" or "contains"
+	Value string `json:"value"` // Value to match against
+}
 
 // Watcher represents a reactive trigger that executes actions when attestations match a filter
 type Watcher struct {
@@ -39,6 +51,10 @@ type Watcher struct {
 	// Both upstream and downstream queries must pass for a match (intersection).
 	UpstreamSemanticQuery     string  `json:"upstream_semantic_query,omitempty"`
 	UpstreamSemanticThreshold float32 `json:"upstream_semantic_threshold,omitempty"`
+
+	// Attribute filters — match inside the attestation's Attributes JSON.
+	// All filters are ANDed: every filter must pass for the attestation to match.
+	AttributeFilters []AttributeFilter `json:"attribute_filters,omitempty"`
 
 	// Action - what to do when matched
 	ActionType ActionType `json:"action_type"`
@@ -120,20 +136,24 @@ func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
 		timeEnd = &s
 	}
 
+	attrFiltersJSON := marshalAttributeFilters(w.AttributeFilters)
+
 	_, err = ws.db.ExecContext(ctx, `
 		INSERT INTO watchers (
 			id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
 			semantic_query, semantic_threshold, semantic_cluster_id,
 			upstream_semantic_query, upstream_semantic_threshold,
+			attribute_filters,
 			action_type, action_data,
 			max_fires_per_second, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		w.ID, w.Name,
 		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd, w.AxQuery,
 		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold), w.SemanticClusterID,
 		nullIfEmpty(w.UpstreamSemanticQuery), nullIfZero(w.UpstreamSemanticThreshold),
+		attrFiltersJSON,
 		w.ActionType, w.ActionData,
 		w.MaxFiresPerSecond, w.Enabled,
 		w.CreatedAt.Format(time.RFC3339Nano), w.UpdatedAt.Format(time.RFC3339Nano), nil, 0, 0, nil,
@@ -191,20 +211,24 @@ func (ws *WatcherStore) CreateOrReplace(ctx context.Context, w *Watcher) error {
 		timeEnd = &s
 	}
 
+	attrFiltersJSON := marshalAttributeFilters(w.AttributeFilters)
+
 	_, err = ws.db.ExecContext(ctx, `
 		INSERT OR REPLACE INTO watchers (
 			id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
 			semantic_query, semantic_threshold, semantic_cluster_id,
 			upstream_semantic_query, upstream_semantic_threshold,
+			attribute_filters,
 			action_type, action_data,
 			max_fires_per_second, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		w.ID, w.Name,
 		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd, w.AxQuery,
 		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold), w.SemanticClusterID,
 		nullIfEmpty(w.UpstreamSemanticQuery), nullIfZero(w.UpstreamSemanticThreshold),
+		attrFiltersJSON,
 		w.ActionType, w.ActionData,
 		w.MaxFiresPerSecond, w.Enabled,
 		w.CreatedAt.Format(time.RFC3339Nano), w.UpdatedAt.Format(time.RFC3339Nano), nil, 0, 0, nil,
@@ -222,6 +246,7 @@ func (ws *WatcherStore) Get(ctx context.Context, id string) (*Watcher, error) {
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
 			semantic_query, semantic_threshold, semantic_cluster_id,
 			upstream_semantic_query, upstream_semantic_threshold,
+			attribute_filters,
 			action_type, action_data,
 			max_fires_per_second, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
@@ -237,6 +262,7 @@ func (ws *WatcherStore) List(ctx context.Context, enabledOnly bool) ([]*Watcher,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
 			semantic_query, semantic_threshold, semantic_cluster_id,
 			upstream_semantic_query, upstream_semantic_threshold,
+			attribute_filters,
 			action_type, action_data,
 			max_fires_per_second, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
@@ -305,12 +331,15 @@ func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
 		lastFiredAt = &s
 	}
 
+	attrFiltersJSON := marshalAttributeFilters(w.AttributeFilters)
+
 	_, err = ws.db.ExecContext(ctx, `
 		UPDATE watchers SET
 			name = ?,
 			subjects = ?, predicates = ?, contexts = ?, actors = ?, time_start = ?, time_end = ?, ax_query = ?,
 			semantic_query = ?, semantic_threshold = ?, semantic_cluster_id = ?,
 			upstream_semantic_query = ?, upstream_semantic_threshold = ?,
+			attribute_filters = ?,
 			action_type = ?, action_data = ?,
 			max_fires_per_second = ?, enabled = ?,
 			fire_count = ?, error_count = ?, last_error = ?, last_fired_at = ?,
@@ -320,6 +349,7 @@ func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
 		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd, w.AxQuery,
 		nullIfEmpty(w.SemanticQuery), nullIfZero(w.SemanticThreshold), w.SemanticClusterID,
 		nullIfEmpty(w.UpstreamSemanticQuery), nullIfZero(w.UpstreamSemanticThreshold),
+		attrFiltersJSON,
 		w.ActionType, w.ActionData,
 		w.MaxFiresPerSecond, w.Enabled,
 		w.FireCount, w.ErrorCount, w.LastError, lastFiredAt,
@@ -407,6 +437,7 @@ func scanWatcherFields(scan func(dest ...interface{}) error) (*Watcher, error) {
 	var semanticClusterID sql.NullInt64
 	var upstreamSemanticQuery sql.NullString
 	var upstreamSemanticThreshold sql.NullFloat64
+	var attrFiltersJSON sql.NullString
 	var createdAt, updatedAt string
 	var lastFiredAt sql.NullString
 	var lastError sql.NullString
@@ -417,6 +448,7 @@ func scanWatcherFields(scan func(dest ...interface{}) error) (*Watcher, error) {
 		&subjectsJSON, &predicatesJSON, &contextsJSON, &actorsJSON, &timeStart, &timeEnd, &axQuery,
 		&semanticQuery, &semanticThreshold, &semanticClusterID,
 		&upstreamSemanticQuery, &upstreamSemanticThreshold,
+		&attrFiltersJSON,
 		&actionType, &w.ActionData,
 		&w.MaxFiresPerSecond, &w.Enabled,
 		&createdAt, &updatedAt, &lastFiredAt, &w.FireCount, &w.ErrorCount, &lastError,
@@ -485,6 +517,11 @@ func scanWatcherFields(scan func(dest ...interface{}) error) (*Watcher, error) {
 	if upstreamSemanticThreshold.Valid {
 		w.UpstreamSemanticThreshold = float32(upstreamSemanticThreshold.Float64)
 	}
+	if attrFiltersJSON.Valid {
+		if err := json.Unmarshal([]byte(attrFiltersJSON.String), &w.AttributeFilters); err != nil {
+			return nil, errors.Wrapf(err, "failed to unmarshal attribute_filters for watcher %s", w.ID)
+		}
+	}
 
 	w.CreatedAt, err = time.Parse(time.RFC3339Nano, createdAt)
 	if err != nil {
@@ -521,6 +558,7 @@ func (ws *WatcherStore) FindCompoundWatchersForTarget(ctx context.Context, targe
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
 			semantic_query, semantic_threshold, semantic_cluster_id,
 			upstream_semantic_query, upstream_semantic_threshold,
+			attribute_filters,
 			action_type, action_data,
 			max_fires_per_second, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
@@ -542,6 +580,18 @@ func (ws *WatcherStore) FindCompoundWatchersForTarget(ctx context.Context, targe
 		watchers = append(watchers, w)
 	}
 	return watchers, rows.Err()
+}
+
+// marshalAttributeFilters returns nil (SQL NULL) for empty slices, JSON otherwise.
+func marshalAttributeFilters(filters []AttributeFilter) interface{} {
+	if len(filters) == 0 {
+		return nil
+	}
+	b, err := json.Marshal(filters)
+	if err != nil {
+		return nil
+	}
+	return string(b)
 }
 
 // nullIfZero returns nil for zero values, allowing SQL NULL storage.
