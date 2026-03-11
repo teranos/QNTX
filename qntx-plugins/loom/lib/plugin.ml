@@ -22,7 +22,7 @@
 open Qntx_loom_proto.Domain
 
 let name = "loom"
-let version = "0.1.0"
+let version = "0.3.0"
 
 (* State set during Initialize *)
 let ats_endpoint = ref ""
@@ -69,7 +69,11 @@ let handle_initialize raw =
   (match Protocol.InitializeRequest.from_proto reader with
    | Ok req ->
      ats_endpoint := req.ats_store_endpoint;
-     Printf.printf "[loom] Initialized with ATS endpoint: %s\n%!" req.ats_store_endpoint
+     Printf.printf "[loom] Initialized with ATS endpoint: %s\n%!" req.ats_store_endpoint;
+     (* Configure the ATS client so it can create weave attestations *)
+     Ats_client.configure
+       ~ats_endpoint:req.ats_store_endpoint
+       ~token:req.auth_token
    | Error _ ->
      Printf.printf "[loom] Warning: could not decode InitializeRequest\n%!");
   let resp = Protocol.InitializeResponse.make
@@ -79,6 +83,7 @@ let handle_initialize raw =
   Lwt.return (Grpc.Status.(v OK), Some encoded)
 
 let handle_execute_job raw =
+  let open Lwt.Syntax in
   let reader = Ocaml_protoc_plugin.Reader.create raw in
   match Protocol.ExecuteJobRequest.from_proto reader with
   | Ok req ->
@@ -87,10 +92,29 @@ let handle_execute_job raw =
     let payload_str = Bytes.to_string req.payload in
     (match req.handler_name with
      | "stitch" ->
-       let result_str = Stitcher.stitch payload_str in
+       let result = Stitcher.stitch payload_str in
+       (* If the stitcher emitted a weave, persist it via ATSStoreService.
+        * Lwt.async fires the RPC without blocking the ExecuteJob response —
+        * we don't want QNTX waiting on the ATS round-trip. *)
+       (match result.emitted with
+        | Some block ->
+          Lwt.async (fun () ->
+            let* ats_result = Ats_client.create_weave
+              ~branch:result.branch
+              ~text:block
+              ~word_count:(Stitcher.word_count block)
+              ~turn_count:result.turn_count
+            in
+            (match ats_result with
+             | Ok () -> ()
+             | Error msg ->
+               Printf.eprintf "[loom] Failed to persist weave: %s\n%!" msg);
+            Lwt.return_unit)
+        | None -> ());
+       let result_json = Stitcher.result_to_json result in
        let resp = Protocol.ExecuteJobResponse.make
          ~success:true
-         ~result:(Bytes.of_string result_str)
+         ~result:(Bytes.of_string result_json)
          ~plugin_version:version
          () in
        let encoded = proto_to_string (Protocol.ExecuteJobResponse.to_proto resp) in
@@ -227,6 +251,13 @@ let serve port =
   (* Announce actual port — QNTX reads this line to know where to connect *)
   Printf.printf "QNTX_PLUGIN_PORT=%d\n%!" actual_port;
   Printf.printf "[loom] gRPC server listening on port %d\n%!" actual_port;
+  (* Start UDP listener alongside the gRPC server *)
+  Lwt.async (fun () ->
+    Lwt.catch
+      (fun () -> Udp_listener.start ())
+      (fun exn ->
+        Printf.eprintf "[loom] UDP listener failed: %s\n%!" (Printexc.to_string exn);
+        Lwt.return_unit));
   (* Block forever — QNTX manages our lifecycle via the Shutdown RPC *)
   let forever, _ = Lwt.wait () in
   forever

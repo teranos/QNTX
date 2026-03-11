@@ -166,13 +166,18 @@ func (s *QNTXServer) handleCreateWatcher(w http.ResponseWriter, r *http.Request)
 			s.writeRichError(w, errors.New("action_data is required for python/webhook watchers"), http.StatusBadRequest)
 			return
 		}
+	case "plugin_execute", "glyph_execute":
+		if req.ActionData == "" {
+			s.writeRichError(w, errors.Newf("action_data is required for %s watchers", req.ActionType), http.StatusBadRequest)
+			return
+		}
 	case "semantic_match":
 		if req.SemanticQuery == "" {
 			s.writeRichError(w, errors.New("semantic_query is required for semantic_match watchers"), http.StatusBadRequest)
 			return
 		}
 	default:
-		s.writeRichError(w, errors.Newf("invalid action_type: %s (must be 'python', 'webhook', or 'semantic_match')", req.ActionType), http.StatusBadRequest)
+		s.writeRichError(w, errors.Newf("invalid action_type: %s", req.ActionType), http.StatusBadRequest)
 		return
 	}
 

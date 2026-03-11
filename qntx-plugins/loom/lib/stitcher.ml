@@ -85,6 +85,7 @@ type stitch_result = {
   branch : string;
   buffered_words : int;
   emitted : string option;  (* Some block when buffer exceeded max_chunk_words *)
+  turn_count : int;          (* Number of turns in the emitted block *)
 }
 
 let stitch payload =
@@ -97,7 +98,7 @@ let stitch payload =
   match json with
   | None ->
     Printf.printf "[loom] Skipping malformed payload\n%!";
-    {|{"success":false,"error":"malformed JSON payload"}|}
+    { branch = "unknown"; buffered_words = 0; emitted = None; turn_count = 0 }
   | Some json ->
     let branch = match extract_branch json with Some b -> b | None -> "unknown" in
     let predicate = match extract_predicate json with Some p -> p | None -> "unknown" in
@@ -105,7 +106,7 @@ let stitch payload =
     match text with
     | None ->
       Printf.printf "[loom] No text in %s for branch %s\n%!" predicate branch;
-      Printf.sprintf {|{"success":true,"result":{"branch":"%s","buffered_words":0}}|} branch
+      { branch; buffered_words = 0; emitted = None; turn_count = 0 }
     | Some text ->
       (* Format the turn with a speaker label *)
       let label = match predicate with
@@ -129,13 +130,22 @@ let stitch payload =
         let block = turns |> List.rev |> String.concat "\n\n" in
         Hashtbl.remove buffers branch;
         Printf.printf "[loom] Emitting %d-word block for branch %s\n%!" total_words branch;
-        let escaped = Yojson.Safe.to_string (`String block) in
-        Printf.sprintf {|{"success":true,"result":{"branch":"%s","buffered_words":0,"emitted":%s}}|}
-          branch escaped
+        let num_turns = List.length turns in
+        { branch; buffered_words = 0; emitted = Some block; turn_count = num_turns }
       ) else (
         Hashtbl.replace buffers branch turns;
         Printf.printf "[loom] Buffered %d words for branch %s (%d total)\n%!"
           (word_count turn) branch total_words;
-        Printf.sprintf {|{"success":true,"result":{"branch":"%s","buffered_words":%d}}|}
-          branch total_words
+        { branch; buffered_words = total_words; emitted = None; turn_count = 0 }
       )
+
+(* Serialize a stitch_result to JSON for the ExecuteJob response *)
+let result_to_json r =
+  match r.emitted with
+  | Some block ->
+    let escaped = Yojson.Safe.to_string (`String block) in
+    Printf.sprintf {|{"success":true,"result":{"branch":"%s","buffered_words":0,"emitted":%s}}|}
+      r.branch escaped
+  | None ->
+    Printf.sprintf {|{"success":true,"result":{"branch":"%s","buffered_words":%d}}|}
+      r.branch r.buffered_words
