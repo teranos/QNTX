@@ -80,6 +80,7 @@ func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Reque
 		clusterMatchThreshold,
 		s.atsStore,
 		projectCtx,
+		s.graundeDBPath,
 		s.logger,
 	)
 	if err != nil {
