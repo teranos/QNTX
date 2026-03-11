@@ -14,6 +14,7 @@ let udp_port = 19470
 let start () =
   let open Lwt.Syntax in
   let socket = Lwt_unix.socket Unix.PF_INET Unix.SOCK_DGRAM 0 in
+  Unix.setsockopt (Lwt_unix.unix_file_descr socket) Unix.SO_REUSEADDR true;
   let addr = Unix.(ADDR_INET (inet_addr_loopback, udp_port)) in
   let* () = Lwt_unix.bind socket addr in
   Printf.printf "[loom] UDP listener on port %d\n%!" udp_port;
