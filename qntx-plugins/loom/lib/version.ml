@@ -1,1 +1,1 @@
-let value = "0.3.5"
+let value = "0.3.6"
