@@ -850,7 +850,7 @@ type ProjectionResult struct {
 
 // ProjectionParams holds per-method tuning parameters for dimensionality reduction.
 type ProjectionParams struct {
-	NComponents *int     `json:"n_components,omitempty"` // Output dimensions: 2 (default) or 3
+	NComponents *int     `json:"n_components,omitempty"` // Output dimensions (default 3)
 	NNeighbors  *int     `json:"n_neighbors,omitempty"`  // UMAP: local vs global (default 15)
 	MinDist     *float64 `json:"min_dist,omitempty"`     // UMAP: cluster tightness (default 0.1)
 	Perplexity  *float64 `json:"perplexity,omitempty"`   // t-SNE: local vs global (default 30)
@@ -890,7 +890,7 @@ func RunProjection(
 	fitBody := map[string]interface{}{
 		"embeddings":   allEmbeddings,
 		"method":       method,
-		"n_components": 3, // EXPLORE: hardcoded 3D for 3d-embeddings-explore branch — move to config before merging
+		"n_components": 3,
 	}
 	if params != nil {
 		if params.NComponents != nil {
