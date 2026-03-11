@@ -31,28 +31,7 @@ let () =
     let shutdown =
       let* () = sigterm_waiter in
       Printf.printf "[loom] SIGTERM received — flushing buffered weaves\n%!";
-      let flushed = Qntx_loom.Stitcher.flush_all () in
-      let* () = Lwt_list.iter_p (fun (result : Qntx_loom.Stitcher.stitch_result) ->
-        match result.emitted with
-        | Some block ->
-          let* ats_result = Qntx_loom.Ats_client.create_weave
-            ~branch:result.branch
-            ~context:result.context
-            ~text:block
-            ~word_count:(Qntx_loom.Stitcher.word_count block)
-            ~turn_count:result.turn_count
-          in
-          (match ats_result with
-           | Ok () ->
-             Printf.printf "[loom] Persisted %d-word weave for branch %s\n%!"
-               (Qntx_loom.Stitcher.word_count block) result.branch
-           | Error msg ->
-             Printf.eprintf "[loom] Failed to persist weave for %s: %s\n%!" result.branch msg);
-          Lwt.return_unit
-        | None -> Lwt.return_unit
-      ) flushed in
-      Printf.printf "[loom] Flushed %d buffer(s) — exiting\n%!" (List.length flushed);
-      Lwt.return_unit
+      Qntx_loom.Plugin.flush_and_persist ()
     in
     Lwt.pick [serve; shutdown]
   )

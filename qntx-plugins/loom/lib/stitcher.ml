@@ -25,8 +25,13 @@ let max_chunk_words = 100
  * We key by branch name and accumulate turns as a list of strings.
  * Lists in OCaml are prepend-only (immutable linked lists), so we
  * cons new turns onto the front and reverse when emitting.
- * TODO(#677): Persist buffer to disk to survive restarts. *)
-let buffers : (string, string list) Hashtbl.t = Hashtbl.create 16
+ *)
+type buffer_entry = {
+  context : string;
+  turns : string list;
+}
+
+let buffers : (string, buffer_entry) Hashtbl.t = Hashtbl.create 16
 
 let word_count s =
   let len = String.length s in
@@ -129,42 +134,41 @@ let stitch payload =
       let turn = Printf.sprintf "[%s] %s" label text in
 
       (* Get or create buffer for this branch *)
-      let turns =
+      let entry =
         match Hashtbl.find_opt buffers branch with
-        | Some existing -> existing
-        | None -> []
+        | Some existing -> { context; turns = turn :: existing.turns }
+        | None -> { context; turns = [turn] }
       in
-      let turns = turn :: turns in
-      let total_words = buffer_word_count turns in
+      let total_words = buffer_word_count entry.turns in
 
       (* Emit when buffer exceeds threshold *)
       if total_words >= max_chunk_words then (
         (* Emit: reverse to chronological order, join into a single block *)
-        let block = turns |> List.rev |> String.concat "\n\n" in
+        let block = entry.turns |> List.rev |> String.concat "\n\n" in
         Hashtbl.remove buffers branch;
         Printf.printf "[loom] Emitting %d-word block for branch %s (threshold)\n%!"
           total_words branch;
-        let num_turns = List.length turns in
-        { branch; context; buffered_words = 0; emitted = Some block; turn_count = num_turns }
+        let num_turns = List.length entry.turns in
+        { branch; context = entry.context; buffered_words = 0; emitted = Some block; turn_count = num_turns }
       ) else (
-        Hashtbl.replace buffers branch turns;
+        Hashtbl.replace buffers branch entry;
         Printf.printf "[loom] Buffered %d words for branch %s (%d total)\n%!"
           (word_count turn) branch total_words;
-        { branch; context; buffered_words = total_words; emitted = None; turn_count = 0 }
+        { branch; context = entry.context; buffered_words = total_words; emitted = None; turn_count = 0 }
       )
 
 (* Flush all buffered turns as weaves. Called on plugin shutdown
  * to prevent data loss when the server stops. *)
 let flush_all () =
   let results = ref [] in
-  Hashtbl.iter (fun branch turns ->
-    if turns <> [] then (
-      let block = turns |> List.rev |> String.concat "\n\n" in
-      let total_words = buffer_word_count turns in
-      let num_turns = List.length turns in
+  Hashtbl.iter (fun branch entry ->
+    if entry.turns <> [] then (
+      let block = entry.turns |> List.rev |> String.concat "\n\n" in
+      let total_words = buffer_word_count entry.turns in
+      let num_turns = List.length entry.turns in
       Printf.printf "[loom] Flushing %d-word buffer for branch %s (shutdown)\n%!"
         total_words branch;
-      results := { branch; context = "_"; buffered_words = 0;
+      results := { branch; context = entry.context; buffered_words = 0;
                    emitted = Some block; turn_count = num_turns } :: !results
     )
   ) buffers;
