@@ -18,13 +18,14 @@ const (
 	ActionTypeWebhook       ActionType = "webhook"
 	ActionTypeLLMPrompt     ActionType = "llm_prompt"
 	ActionTypeGlyphExecute  ActionType = "glyph_execute"
-	ActionTypePluginExecute ActionType = "plugin_execute"
+	ActionTypePluginExecute ActionType = "plugin_execute" // Added 2026-03-11, no active consumers yet (loom uses UDP instead)
 	ActionTypeSemanticMatch ActionType = "semantic_match"
 )
 
 // AttributeFilter matches against values inside an attestation's Attributes JSON.
 // Path uses dot-separated keys to navigate nested objects (e.g., "tool_input.command").
 // Op is "equals" or "contains" — no regex per QNTX LAW.
+// Added 2026-03-11, no active consumers yet. First consumer should remove this notice.
 // TODO(#672): Expose in AX glyph UI as attribute filter conditions.
 type AttributeFilter struct {
 	Path  string `json:"path"`  // Dot-separated JSON path (e.g., "tool_name", "tool_input.command")
