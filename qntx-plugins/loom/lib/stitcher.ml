@@ -17,7 +17,7 @@
 
 (* --- Configuration --- *)
 
-let max_chunk_words = 200
+let max_chunk_words = 100
 
 (* --- Per-branch buffer --- *)
 
@@ -61,6 +61,15 @@ let extract_predicate json =
      | _ -> None)
   | _ -> None
 
+(* Extract context from contexts array (e.g. "session:abc-123") *)
+let extract_context json =
+  match json with
+  | `Assoc fields ->
+    (match List.assoc_opt "contexts" fields with
+     | Some (`List ((`String ctx) :: _)) -> Some ctx
+     | _ -> None)
+  | _ -> None
+
 (* Extract the conversational text based on event type.
  * UserPromptSubmit → attributes.prompt
  * Stop → attributes.last_assistant_message
@@ -85,6 +94,7 @@ let extract_text json predicate =
 
 type stitch_result = {
   branch : string;
+  context : string;          (* Session context from Graunde (e.g. "session:abc-123") *)
   buffered_words : int;
   emitted : string option;  (* Some block when buffer exceeded max_chunk_words *)
   turn_count : int;          (* Number of turns in the emitted block *)
@@ -100,14 +110,15 @@ let stitch payload =
   match json with
   | None ->
     Printf.printf "[loom] Skipping malformed payload\n%!";
-    { branch = "unknown"; buffered_words = 0; emitted = None; turn_count = 0 }
+    { branch = "unknown"; context = "_"; buffered_words = 0; emitted = None; turn_count = 0 }
   | Some json ->
     let branch = match extract_branch json with Some b -> b | None -> "unknown" in
     let predicate = match extract_predicate json with Some p -> p | None -> "unknown" in
+    let context = match extract_context json with Some c -> c | None -> "_" in
     let text = extract_text json predicate in
     match text with
     | None ->
-      { branch; buffered_words = 0; emitted = None; turn_count = 0 }
+      { branch; context; buffered_words = 0; emitted = None; turn_count = 0 }
     | Some text ->
       (* Format the turn with a speaker label *)
       let label = match predicate with
@@ -126,20 +137,39 @@ let stitch payload =
       let turns = turn :: turns in
       let total_words = buffer_word_count turns in
 
-      (* TODO(#675): Also break on semantic boundaries (git commit, push) not just word count *)
+      (* Emit when buffer exceeds threshold *)
       if total_words >= max_chunk_words then (
         (* Emit: reverse to chronological order, join into a single block *)
         let block = turns |> List.rev |> String.concat "\n\n" in
         Hashtbl.remove buffers branch;
-        Printf.printf "[loom] Emitting %d-word block for branch %s\n%!" total_words branch;
+        Printf.printf "[loom] Emitting %d-word block for branch %s (threshold)\n%!"
+          total_words branch;
         let num_turns = List.length turns in
-        { branch; buffered_words = 0; emitted = Some block; turn_count = num_turns }
+        { branch; context; buffered_words = 0; emitted = Some block; turn_count = num_turns }
       ) else (
         Hashtbl.replace buffers branch turns;
         Printf.printf "[loom] Buffered %d words for branch %s (%d total)\n%!"
           (word_count turn) branch total_words;
-        { branch; buffered_words = total_words; emitted = None; turn_count = 0 }
+        { branch; context; buffered_words = total_words; emitted = None; turn_count = 0 }
       )
+
+(* Flush all buffered turns as weaves. Called on plugin shutdown
+ * to prevent data loss when the server stops. *)
+let flush_all () =
+  let results = ref [] in
+  Hashtbl.iter (fun branch turns ->
+    if turns <> [] then (
+      let block = turns |> List.rev |> String.concat "\n\n" in
+      let total_words = buffer_word_count turns in
+      let num_turns = List.length turns in
+      Printf.printf "[loom] Flushing %d-word buffer for branch %s (shutdown)\n%!"
+        total_words branch;
+      results := { branch; context = "_"; buffered_words = 0;
+                   emitted = Some block; turn_count = num_turns } :: !results
+    )
+  ) buffers;
+  Hashtbl.clear buffers;
+  !results
 
 (* Serialize a stitch_result to JSON for the ExecuteJob response *)
 let result_to_json r =
