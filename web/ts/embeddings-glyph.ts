@@ -29,6 +29,9 @@ type TimelinePoint = { run_id: string; run_time: string; n_points: number; n_noi
 let timelineData: TimelinePoint[] = [];
 
 // ── 3D regl viewer state ──
+// TODO(#679): recency visualization — fade/pulse points by attestation age.
+//   Requires wiring: ProjectionPoint has no timestamp today. Would need
+//   a server-side join on attestation created_at or a separate fetch by source_id.
 let regl3d: { regl: any; animFrame: number; observer: ResizeObserver; cleanup: () => void } | null = null;
 let view3dActive = false;
 
