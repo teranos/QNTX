@@ -32,7 +32,7 @@ let timelineData: TimelinePoint[] = [];
 // TODO(#679): recency visualization — fade/pulse points by attestation age.
 //   Requires wiring: ProjectionPoint has no timestamp today. Would need
 //   a server-side join on attestation created_at or a separate fetch by source_id.
-let regl3d: { regl: any; animFrame: number; observer: ResizeObserver; cleanup: () => void } | null = null;
+let regl3d: { cleanup: () => void } | null = null;
 let view3dActive = false;
 
 // Convert d3.schemeTableau10 hex to [r,g,b] floats for regl — matches 2D scatter colors
@@ -123,9 +123,7 @@ function normalizePoints3d(points: ProjectionPoint[]): { positions: Float32Array
 
 function destroy3dView(): void {
     if (!regl3d) return;
-    cancelAnimationFrame(regl3d.animFrame);
-    regl3d.observer.disconnect();
-    regl3d.regl.destroy();
+    regl3d.cleanup();
     regl3d = null;
 }
 
@@ -299,9 +297,6 @@ function mount3dView(container: HTMLElement, allPoints: Record<string, Projectio
     frame();
 
     regl3d = {
-        regl,
-        animFrame,
-        observer,
         cleanup: () => {
             cancelAnimationFrame(animFrame);
             observer.disconnect();
