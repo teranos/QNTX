@@ -25,6 +25,8 @@ func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 		err = e.executeWebhook(watcher, as)
 	case storage.ActionTypeGlyphExecute:
 		err = e.executeGlyph(watcher, as)
+	case storage.ActionTypePluginExecute:
+		err = e.executePlugin(watcher, as)
 	case storage.ActionTypeSemanticMatch:
 		// Semantic match watchers only broadcast — no separate action to execute.
 		// The match was already broadcast in OnAttestationCreated.
@@ -271,6 +273,42 @@ func (e *Engine) executeGlyphPrompt(glyphID string, template string, attestation
 	}
 
 	return body, nil
+}
+
+// PluginExecuteAction is the JSON structure stored in ActionData for plugin_execute watchers
+type PluginExecuteAction struct {
+	PluginName  string `json:"plugin_name"`
+	HandlerName string `json:"handler_name"`
+}
+
+// executePlugin dispatches a job to a named plugin via gRPC ExecuteJob
+func (e *Engine) executePlugin(watcher *storage.Watcher, as *types.As) error {
+	if e.pluginExecutor == nil {
+		return errors.New("plugin executor not configured")
+	}
+
+	var action PluginExecuteAction
+	if err := json.Unmarshal([]byte(watcher.ActionData), &action); err != nil {
+		return errors.Wrapf(err, "failed to parse plugin_execute action data for watcher %s", watcher.ID)
+	}
+	if action.PluginName == "" {
+		return errors.Newf("plugin_execute action for watcher %s has empty plugin_name", watcher.ID)
+	}
+	if action.HandlerName == "" {
+		return errors.Newf("plugin_execute action for watcher %s has empty handler_name", watcher.ID)
+	}
+
+	payload, err := json.Marshal(as)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal attestation for plugin execution")
+	}
+
+	_, err = e.pluginExecutor.ExecutePluginJob(e.ctx, action.PluginName, action.HandlerName, payload)
+	if err != nil {
+		return errors.Wrapf(err, "plugin %s handler %s failed for watcher %s", action.PluginName, action.HandlerName, watcher.ID)
+	}
+
+	return nil
 }
 
 // executeWebhook sends the attestation to a webhook URL
