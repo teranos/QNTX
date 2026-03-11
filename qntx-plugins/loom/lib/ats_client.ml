@@ -25,7 +25,7 @@ let configure ~ats_endpoint ~token =
 
 (* --- Create a weave attestation --- *)
 
-let create_weave ~branch ~text ~word_count ~turn_count =
+let create_weave ~branch ~context ~text ~word_count ~turn_count =
   if !endpoint = "" then (
     Printf.eprintf "[loom] ATS client not configured, dropping weave\n%!";
     Lwt.return_error "ATS client not configured"
@@ -50,7 +50,7 @@ let create_weave ~branch ~text ~word_count ~turn_count =
     let command = Protocol.AttestationCommand.make
       ~subjects:[branch]
       ~predicates:["Weave"]
-      ~contexts:[]
+      ~contexts:[context]
       ~actors:["loom"]
       ~attributes:attrs
       ~source:"loom"

@@ -32,6 +32,7 @@ let start () =
        Lwt.async (fun () ->
          let* ats_result = Ats_client.create_weave
            ~branch:result.branch
+           ~context:result.context
            ~text:block
            ~word_count:(Stitcher.word_count block)
            ~turn_count:result.turn_count
