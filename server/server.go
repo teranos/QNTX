@@ -122,6 +122,7 @@ type QNTXServer struct {
 	}
 	embeddingStore              *storage.EmbeddingStore
 	embeddingClusterInvalidator func() // called after re-cluster to invalidate centroid cache
+	graundeDBPath               string
 }
 
 // handleClientRegister handles a new client connection

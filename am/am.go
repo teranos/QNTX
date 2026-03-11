@@ -13,6 +13,7 @@ type Config struct {
 	Embeddings     EmbeddingsConfig     `mapstructure:"embeddings"`
 	Watcher        WatcherConfig        `mapstructure:"watcher"`
 	Sync           SyncConfig           `mapstructure:"sync"`
+	GraundeDBPath  string               `mapstructure:"graunde_db_path"` // Path to Graunde's database for deferred news delivery
 }
 
 // WatcherConfig configures the watcher engine

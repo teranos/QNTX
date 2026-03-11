@@ -3,6 +3,16 @@
 # All settings shown here are defaults - uncomment to override
 
 # ════════════════════════════════════════════════════════════════
+# Graunde Integration
+# ════════════════════════════════════════════════════════════════
+
+# Path to Graunde's database for deferred news delivery.
+# When set, QNTX writes cluster lifecycle and Pulse news directly
+# to Graunde's db so it can deliver them on session Stop.
+# Default: "" (disabled)
+# graunde_db_path = "/Users/you/.local/share/graunde/graunde.db"
+
+# ════════════════════════════════════════════════════════════════
 # Database Configuration
 # ════════════════════════════════════════════════════════════════
 

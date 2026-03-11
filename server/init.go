@@ -385,6 +385,7 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	serverLogger.Infow("Canvas state handlers initialized")
 
 	// Initialize embedding service for semantic search (optional)
+	server.graundeDBPath = deps.config.GraundeDBPath
 	server.SetupEmbeddingService()
 	server.setupEmbeddingReclusterSchedule(deps.config)
 	server.setupEmbeddingReprojectSchedule(deps.config)
