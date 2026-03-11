@@ -9,7 +9,7 @@ import (
 )
 
 // printStartupBanner prints the user-friendly startup message
-func printStartupBanner(verbosity int, dbPath string) {
+func printStartupBanner(verbosity int, dbPath string, logPath string) {
 	// ANSI escape codes
 	cyan := "\033[36m"
 	green := "\033[32m"
@@ -51,7 +51,7 @@ func printStartupBanner(verbosity int, dbPath string) {
 		fmt.Printf("%s│%s Database:  %s\n", green, reset, dbPath)
 	}
 	if verbosity >= 2 {
-		fmt.Printf("%s│%s Logs:      tmp/graph-debug.log\n", green, reset)
+		fmt.Printf("%s│%s Logs:      %s\n", green, reset, logPath)
 	}
 	fmt.Printf("%s└─────────────────────────────────────────────────────┘%s\n", green, reset)
 

@@ -6,10 +6,10 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
-	id "github.com/teranos/vanity-id"
 )
 
 // HandlerCmd represents the handler command
@@ -100,7 +100,7 @@ func runHandlerCreate(cmd *cobra.Command, args []string) error {
 
 	// Generate ASID with self-certifying pattern
 	// Actor is empty string to create self-certifying ASID
-	asid, err := id.GenerateASID(handlerName, "handler", "python", "")
+	asid, err := identity.GenerateASUID("AS", handlerName, "handler", "python")
 	if err != nil {
 		return errors.Wrap(err, "failed to generate ASID")
 	}

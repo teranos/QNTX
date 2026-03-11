@@ -37,6 +37,7 @@ import (
 type QNTXServer struct {
 	db                  *sql.DB
 	dbPath              string               // Database file path (for display in banner)
+	logPath             string               // File log path (for download endpoint and banner)
 	atsStore            ats.AttestationStore // Attestation store (Rust FFI or Go SQLite)
 	bindAddress         string               // Network interface (e.g., "127.0.0.1" or "0.0.0.0")
 	authHandler         *auth.Handler        // nil when auth.enabled = false

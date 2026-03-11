@@ -17,6 +17,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/ats/embeddings/embeddings"
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
@@ -465,7 +466,7 @@ func emitClusterLifecycleAttestation(atsStore ats.AttestationStore, ev storage.C
 	}
 
 	subject := fmt.Sprintf("cluster:%d", ev.ClusterID)
-	asid, err := vanity.GenerateASID(subject, predicate, projectCtx, "qntx@embeddings")
+	asid, err := identity.GenerateASUID("AS", subject, predicate, projectCtx)
 	if err != nil {
 		logger.Warnw("Failed to generate ASID for cluster lifecycle attestation",
 			"cluster_id", ev.ClusterID, "event", ev.EventType, "error", err)
@@ -602,7 +603,7 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 		logger.Infow("Accumulating with undelivered prior news")
 	}
 
-	asid, err := vanity.GenerateASID("embeddings", "deferred:cluster-update", projectCtx, "qntx@embeddings")
+	asid, err := identity.GenerateASUID("AS", "embeddings", "deferred:cluster-update", projectCtx)
 	if err != nil {
 		logger.Warnw("Failed to generate ASID for cluster deferred news", "error", err)
 		return
@@ -694,7 +695,7 @@ func emitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx
 		}
 	}
 
-	asid, err := vanity.GenerateASID("pulse", "deferred:pulse-summary", projectCtx, "qntx@pulse")
+	asid, err := identity.GenerateASUID("AS", "pulse", "deferred:pulse-summary", projectCtx)
 	if err != nil {
 		logger.Warnw("Failed to generate ASID for Pulse deferred news", "error", err)
 		return
