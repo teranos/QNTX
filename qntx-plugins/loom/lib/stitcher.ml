@@ -62,7 +62,8 @@ let extract_predicate json =
 
 (* Extract the conversational text based on event type.
  * UserPromptSubmit → attributes.prompt
- * Stop → attributes.last_assistant_message *)
+ * Stop → attributes.last_assistant_message
+ * TODO(#674): Extract semantic content from tool calls (Bash, Edit, etc.) *)
 let extract_text json predicate =
   match json with
   | `Assoc fields ->
@@ -125,6 +126,7 @@ let stitch payload =
       let turns = turn :: turns in
       let total_words = buffer_word_count turns in
 
+      (* TODO(#675): Also break on semantic boundaries (git commit, push) not just word count *)
       if total_words >= max_chunk_words then (
         (* Emit: reverse to chronological order, join into a single block *)
         let block = turns |> List.rev |> String.concat "\n\n" in
