@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/errors"
-	"github.com/teranos/vanity-id"
 )
 
 // JobStatus represents the current state of a job
@@ -112,7 +112,7 @@ func NewChildJobWithPayload(handlerName string, source string, payload json.RawM
 
 	// Generate unique job ASID
 	// Format: JB + random(2) + handler(5) + random(2) + process(7) + random(2) + source(5) + random(4) + actor(3)
-	jobID, err := id.GenerateJobASID(handlerName, source, actor)
+	jobID, err := identity.GenerateJobID(handlerName, source)
 	if err != nil {
 		err = errors.Wrap(err, "failed to generate job ASID")
 		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", handlerName))

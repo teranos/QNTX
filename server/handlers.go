@@ -365,9 +365,10 @@ func (s *QNTXServer) HandleStatic(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-// HandleLogDownload serves the debug log file for download
+// HandleLogDownload serves the log file for download.
+// Deprecated: log download UI has been removed. Scheduled for deletion.
 func (s *QNTXServer) HandleLogDownload(w http.ResponseWriter, r *http.Request) {
-	logPath := "tmp/graph-debug.log"
+	logPath := s.logPath
 
 	// Check if file logging is enabled
 	verbosity := int(s.verbosity.Load())
@@ -392,7 +393,7 @@ func (s *QNTXServer) HandleLogDownload(w http.ResponseWriter, r *http.Request) {
 
 	// Serve the file
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Content-Disposition", "attachment; filename=graph-debug.log")
+	w.Header().Set("Content-Disposition", "attachment; filename=qntx.log")
 	w.Header().Set("Cache-Control", "no-cache")
 
 	http.ServeFile(w, r, logPath)

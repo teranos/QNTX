@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
-	id "github.com/teranos/vanity-id"
 )
 
 // HandlePulseSchedules handles requests to /api/pulse/schedules
@@ -154,7 +154,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 	if req.ATSCode != "" {
 		// ATS code path: parse to extract handler, payload, source URL
 		var err error
-		jobID, err = id.GenerateASID(req.ATSCode, "scheduled", "pulse", "system")
+		jobID, err = identity.GenerateASUID("AS", req.ATSCode, "scheduled", "pulse")
 		if err != nil {
 			writeWrappedError(w, s.logger, err, "failed to generate job ID", http.StatusInternalServerError)
 			return

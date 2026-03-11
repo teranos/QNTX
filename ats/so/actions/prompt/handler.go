@@ -13,11 +13,11 @@ import (
 	"github.com/teranos/QNTX/ats/alias"
 	"github.com/teranos/QNTX/ats/attrs"
 	"github.com/teranos/QNTX/ats/ax"
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
-	id "github.com/teranos/vanity-id"
 )
 
 // HandlerName is the registered name for the prompt handler
@@ -380,7 +380,7 @@ func (h *Handler) createResultAttestation(
 	}
 
 	// Generate ASID: subject, predicate, context, actor
-	asid, err := id.GenerateASID(sourceAs.Subjects[0], predicate, sourceAs.ID, actor)
+	asid, err := identity.GenerateASUID("AS", sourceAs.Subjects[0], predicate, sourceAs.ID)
 	if err != nil {
 		err = errors.Wrap(err, "failed to generate ASID")
 		err = errors.WithDetail(err, fmt.Sprintf("Source attestation: %s", sourceAs.ID))

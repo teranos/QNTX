@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/attrs"
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/errors"
 )
 
@@ -97,7 +98,7 @@ func AttestType(store AttestationStore, typeName, source, context string, attrib
 	}
 
 	// Generate ASUID (WASM engine with qntxwasm tag, vanity-id fallback without)
-	asuid, err := generateASUID("AS", typeName, "type", context)
+	asuid, err := identity.GenerateASUID("AS", typeName, "type", context)
 	if err != nil {
 		return errors.Wrapf(err, "failed to generate ASUID for type %s", typeName)
 	}
@@ -198,7 +199,7 @@ func AttestRelationshipType(store AttestationStore, predicateName, source string
 	}
 
 	// Generate ASUID (WASM engine with qntxwasm tag, vanity-id fallback without)
-	asuid, err := generateASUID("AS", predicateName, "relationship_type", "graph")
+	asuid, err := identity.GenerateASUID("AS", predicateName, "relationship_type", "graph")
 	if err != nil {
 		return errors.Wrapf(err, "failed to generate ASUID for relationship type %s", predicateName)
 	}
