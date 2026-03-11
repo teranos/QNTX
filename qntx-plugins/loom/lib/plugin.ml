@@ -22,7 +22,7 @@
 open Qntx_loom_proto.Domain
 
 let name = "loom"
-let version = "0.3.0"
+let version = "0.3.1"
 
 (* State set during Initialize *)
 let ats_endpoint = ref ""
