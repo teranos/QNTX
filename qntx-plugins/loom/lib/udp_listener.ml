@@ -22,7 +22,6 @@ let start () =
   let rec loop () =
     let* (len, _sender) = Lwt_unix.recvfrom socket buf 0 65536 [] in
     let payload = Bytes.sub_string buf 0 len in
-    Printf.printf "[loom] UDP packet: %d bytes\n%!" len;
 
     let result = Stitcher.stitch payload in
 
