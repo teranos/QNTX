@@ -11,8 +11,9 @@
  *
  * Attestation structure (from Graunde):
  *   subjects:   ["branch-name"]
- *   predicates: ["UserPromptSubmit"] or ["Stop"]
+ *   predicates: ["UserPromptSubmit"] or ["Stop"] or ["PreToolUse"]
  *   attributes: { "prompt": "..." } or { "last_assistant_message": "..." }
+ *               or { "tool_input": { "command": "..." }, ... }
  *)
 
 (* --- Configuration --- *)
@@ -75,22 +76,50 @@ let extract_context json =
      | _ -> None)
   | _ -> None
 
+(* Whitelist of commands that carry semantic meaning for weaves *)
+let weave_worthy_prefixes = [
+  "git checkout -b"; "git checkout main"; "git checkout master";
+  "git add"; "git commit"; "git push";
+  "git tag"; "git merge";
+  "gh pr create"; "gh pr edit"; "gh pr ready";
+  "gh run list"; "gh run view"; "gh run watch"; "gh run rerun";
+  "gh issue close"; "gh issue create";
+]
+
+let is_weave_worthy_command cmd =
+  List.exists (fun prefix ->
+    let plen = String.length prefix in
+    String.length cmd >= plen && String.sub cmd 0 plen = prefix
+  ) weave_worthy_prefixes
+
+let extract_tool_command attrs =
+  match List.assoc_opt "tool_input" attrs with
+  | Some (`Assoc tool_input) ->
+    (match List.assoc_opt "command" tool_input with
+     | Some (`String cmd) when is_weave_worthy_command cmd -> Some cmd
+     | _ -> None)
+  | _ -> None
+
 (* Extract the conversational text based on event type.
  * UserPromptSubmit → attributes.prompt
  * Stop → attributes.last_assistant_message
- * TODO(#674): Extract semantic content from tool calls (Bash, Edit, etc.) *)
+ * PreToolUse → attributes.tool_input.command (filtered by whitelist) *)
 let extract_text json predicate =
   match json with
   | `Assoc fields ->
     (match List.assoc_opt "attributes" fields with
      | Some (`Assoc attrs) ->
-       let key = match predicate with
-         | "UserPromptSubmit" -> "prompt"
-         | "Stop" -> "last_assistant_message"
-         | _ -> ""
-       in
-       (match List.assoc_opt key attrs with
-        | Some (`String text) -> Some text
+       (match predicate with
+        | "UserPromptSubmit" ->
+          (match List.assoc_opt "prompt" attrs with
+           | Some (`String text) -> Some text
+           | _ -> None)
+        | "Stop" ->
+          (match List.assoc_opt "last_assistant_message" attrs with
+           | Some (`String text) -> Some text
+           | _ -> None)
+        | "PreToolUse" | "GraundedPreToolUse" ->
+          extract_tool_command attrs
         | _ -> None)
      | _ -> None)
   | _ -> None
@@ -129,6 +158,7 @@ let stitch payload =
       let label = match predicate with
         | "UserPromptSubmit" -> "human"
         | "Stop" -> "assistant"
+        | "PreToolUse" | "GraundedPreToolUse" -> "tool"
         | other -> other
       in
       let turn = Printf.sprintf "[%s] %s" label text in
