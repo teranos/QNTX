@@ -224,7 +224,61 @@ func (e *Engine) matchesFilter(as *types.As, watcher *storage.Watcher) bool {
 	if filter.TimeEnd != nil && as.Timestamp.After(*filter.TimeEnd) {
 		return false
 	}
+
+	// Attribute filters — match inside Attributes JSON
+	for _, af := range watcher.AttributeFilters {
+		if !matchesAttributeFilter(as.Attributes, af) {
+			return false
+		}
+	}
+
 	return true
+}
+
+// matchesAttributeFilter checks a single attribute filter against an attestation's attributes.
+// Path uses dot-separated keys (e.g., "tool_input.command") to navigate nested maps.
+func matchesAttributeFilter(attrs map[string]interface{}, af storage.AttributeFilter) bool {
+	if attrs == nil {
+		return false
+	}
+
+	value := resolveAttrPath(attrs, af.Path)
+	if value == "" {
+		return false
+	}
+
+	switch af.Op {
+	case "equals":
+		return value == af.Value
+	case "contains":
+		return strings.Contains(value, af.Value)
+	default:
+		return false
+	}
+}
+
+// resolveAttrPath navigates a dot-separated path through nested maps and returns the string value.
+// Returns "" if the path doesn't resolve to a string.
+func resolveAttrPath(attrs map[string]interface{}, path string) string {
+	parts := strings.Split(path, ".")
+	var current interface{} = attrs
+
+	for _, part := range parts {
+		m, ok := current.(map[string]interface{})
+		if !ok {
+			return ""
+		}
+		current, ok = m[part]
+		if !ok {
+			return ""
+		}
+	}
+
+	s, ok := current.(string)
+	if !ok {
+		return ""
+	}
+	return s
 }
 
 // matchesSemantic checks using the cached query embedding.
