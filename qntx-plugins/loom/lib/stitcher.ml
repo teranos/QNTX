@@ -84,6 +84,7 @@ let weave_worthy_prefixes = [
   "gh pr create"; "gh pr edit"; "gh pr ready";
   "gh run list"; "gh run view"; "gh run watch"; "gh run rerun";
   "gh issue close"; "gh issue create";
+  "make";
 ]
 
 let is_weave_worthy_command cmd =
@@ -103,7 +104,13 @@ let extract_tool_command attrs =
 (* Extract the conversational text based on event type.
  * UserPromptSubmit → attributes.prompt
  * Stop → attributes.last_assistant_message
- * PreToolUse → attributes.tool_input.command (filtered by whitelist) *)
+ * PreToolUse → attributes.tool_input.command (filtered by whitelist)
+ *
+ * SessionStart / SessionEnd → session boundary markers
+ *
+ * TODO: SubagentStart / SubagentStop — agent delegation boundaries
+ * TODO: TaskCompleted — work unit finished
+ * TODO: PreCompact — context window compressed *)
 let extract_text json predicate =
   match json with
   | `Assoc fields ->
@@ -120,6 +127,14 @@ let extract_text json predicate =
            | _ -> None)
         | "PreToolUse" | "GraundedPreToolUse" ->
           extract_tool_command attrs
+        | "SessionStart" ->
+          (match List.assoc_opt "session_id" attrs with
+           | Some (`String id) -> Some (Printf.sprintf "Start Session: %s" id)
+           | _ -> None)
+        | "SessionEnd" ->
+          (match List.assoc_opt "session_id" attrs with
+           | Some (`String id) -> Some (Printf.sprintf "End Session: %s" id)
+           | _ -> None)
         | _ -> None)
      | _ -> None)
   | _ -> None
@@ -159,25 +174,30 @@ let stitch payload =
         | "UserPromptSubmit" -> "human"
         | "Stop" -> "assistant"
         | "PreToolUse" | "GraundedPreToolUse" -> "tool"
+        | "SessionStart" | "SessionEnd" -> "session"
         | other -> other
       in
       let turn = Printf.sprintf "[%s] %s" label text in
 
-      (* Get or create buffer for this branch *)
+      (* Get or create buffer for this branch, dedup consecutive identical turns *)
       let entry =
         match Hashtbl.find_opt buffers branch with
+        | Some existing when existing.turns <> [] && List.hd existing.turns = turn ->
+          existing (* Skip duplicate *)
         | Some existing -> { context; turns = turn :: existing.turns }
         | None -> { context; turns = [turn] }
       in
       let total_words = buffer_word_count entry.turns in
 
-      (* Emit when buffer exceeds threshold *)
-      if total_words >= max_chunk_words then (
+      (* Emit when buffer exceeds threshold or session ends *)
+      let should_emit = total_words >= max_chunk_words || predicate = "SessionEnd" in
+      if should_emit && total_words > 0 then (
         (* Emit: reverse to chronological order, join into a single block *)
         let block = entry.turns |> List.rev |> String.concat "\n\n" in
         Hashtbl.remove buffers branch;
-        Printf.printf "[loom] Emitting %d-word block for branch %s (threshold)\n%!"
-          total_words branch;
+        Printf.printf "[loom] Emitting %d-word block for branch %s (%s)\n%!"
+          total_words branch
+          (if predicate = "SessionEnd" then "session end" else "threshold");
         let num_turns = List.length entry.turns in
         { branch; context = entry.context; buffered_words = 0; emitted = Some block; turn_count = num_turns }
       ) else (
