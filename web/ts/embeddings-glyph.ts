@@ -3,7 +3,6 @@ import { apiFetch } from './api';
 import { escapeHtml } from './html-utils';
 import { glyphRun } from './components/glyph/run';
 import { tooltip } from './components/tooltip';
-import { log, SEG } from './logger';
 
 // Embeddings state
 let embeddingsElement: HTMLElement | null = null;
