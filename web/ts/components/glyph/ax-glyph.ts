@@ -12,6 +12,7 @@
  * CSS state) with a custom title bar (same pattern as IX glyph).
  *
  * TODO: Future enhancements
+ * - TODO(#672): Attribute filters — expose watcher attribute_filters as UI conditions
  * - Add result count badge (e.g., "42 attestations")
  * - Show mini type distribution (tiny bar chart or colored dots for node types)
  * - Click handler to spawn full ax manifestation (attestation explorer window)
