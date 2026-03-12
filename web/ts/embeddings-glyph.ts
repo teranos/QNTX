@@ -1,8 +1,10 @@
 import * as d3 from 'd3';
+import createREGL from 'regl';
 import { apiFetch } from './api';
 import { escapeHtml } from './html-utils';
 import { glyphRun } from './components/glyph/run';
 import { tooltip } from './components/tooltip';
+// log/SEG available if needed for debugging
 
 // Embeddings state
 let embeddingsElement: HTMLElement | null = null;
@@ -19,12 +21,291 @@ let embeddingsInfo: {
 let embeddingsReembedding = false;
 let embeddingsClustering = false;
 let embeddingsProjecting = false;
-type ProjectionPoint = { id: string; source_id: string; method: string; x: number; y: number; cluster_id: number };
+type ProjectionPoint = { id: string; source_id: string; method: string; x: number; y: number; z?: number; cluster_id: number };
 let projectionsData: Record<string, ProjectionPoint[]> = {};
 let clusterLabels: Map<number, string | null> = new Map();
 const clusterSamplesCache: Map<number, string[]> = new Map();
 type TimelinePoint = { run_id: string; run_time: string; n_points: number; n_noise: number; cluster_id: number; label: string | null; n_members: number; event_type: string };
 let timelineData: TimelinePoint[] = [];
+
+// ── 3D regl viewer state ──
+// TODO(#679): recency visualization — fade/pulse points by attestation age.
+//   Requires wiring: ProjectionPoint has no timestamp today. Would need
+//   a server-side join on attestation created_at or a separate fetch by source_id.
+let regl3d: { cleanup: () => void } | null = null;
+let view3dActive = false;
+
+// Convert d3.schemeTableau10 hex to [r,g,b] floats for regl — matches 2D scatter colors
+const NOISE_COLOR_3D: [number, number, number] = [0.42, 0.44, 0.47]; // #6b7280
+const tableau10rgb: [number, number, number][] = d3.schemeTableau10.map(hex => {
+    const c = d3.color(hex)!.rgb();
+    return [c.r / 255, c.g / 255, c.b / 255];
+});
+
+function clusterColor3d(id: number): [number, number, number] {
+    if (id < 0) return NOISE_COLOR_3D;
+    return tableau10rgb[id % tableau10rgb.length];
+}
+
+function perspective4(fov: number, aspect: number, near: number, far: number): number[] {
+    const f = 1.0 / Math.tan(fov / 2);
+    const rangeInv = 1 / (near - far);
+    return [
+        f / aspect, 0, 0, 0,
+        0, f, 0, 0,
+        0, 0, (near + far) * rangeInv, -1,
+        0, 0, near * far * rangeInv * 2, 0,
+    ];
+}
+
+function orbitViewMatrix(rotX: number, rotY: number, dist: number): number[] {
+    const cy = Math.cos(rotY), sy = Math.sin(rotY);
+    const cx = Math.cos(rotX), sx = Math.sin(rotX);
+
+    const eyeX = dist * cy * sx;
+    const eyeY = dist * sy;
+    const eyeZ = dist * cy * cx;
+
+    const fx = -eyeX, fy = -eyeY, fz = -eyeZ;
+    const flen = Math.sqrt(fx * fx + fy * fy + fz * fz) || 1;
+    const fxn = fx / flen, fyn = fy / flen, fzn = fz / flen;
+
+    let rx = fzn, ry = 0, rz = -fxn;
+    const rlen = Math.sqrt(rx * rx + rz * rz) || 1;
+    rx /= rlen; rz /= rlen;
+
+    const ux = ry * fzn - rz * fyn;
+    const uy = rz * fxn - rx * fzn;
+    const uz = rx * fyn - ry * fxn;
+
+    return [
+        rx, ux, -fxn, 0,
+        ry, uy, -fyn, 0,
+        rz, uz, -fzn, 0,
+        -(rx * eyeX + ry * eyeY + rz * eyeZ),
+        -(ux * eyeX + uy * eyeY + uz * eyeZ),
+        -(-fxn * eyeX + -fyn * eyeY + -fzn * eyeZ),
+        1,
+    ];
+}
+
+function normalizePoints3d(points: ProjectionPoint[]): { positions: Float32Array; colors: Float32Array } {
+    if (points.length === 0) return { positions: new Float32Array(0), colors: new Float32Array(0) };
+
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+
+    for (const p of points) {
+        if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+        const z = p.z ?? 0;
+        if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+    }
+
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
+    const range = Math.max(maxX - minX, maxY - minY, maxZ - minZ) || 1;
+    const scale = 2 / range;
+
+    const positions = new Float32Array(points.length * 3);
+    const colors = new Float32Array(points.length * 3);
+
+    for (let i = 0; i < points.length; i++) {
+        const p = points[i];
+        positions[i * 3] = (p.x - cx) * scale;
+        positions[i * 3 + 1] = (p.y - cy) * scale;
+        positions[i * 3 + 2] = ((p.z ?? 0) - cz) * scale;
+        const c = clusterColor3d(p.cluster_id);
+        colors[i * 3] = c[0]; colors[i * 3 + 1] = c[1]; colors[i * 3 + 2] = c[2];
+    }
+    return { positions, colors };
+}
+
+function destroy3dView(): void {
+    if (!regl3d) return;
+    regl3d.cleanup();
+    regl3d = null;
+}
+
+function mount3dView(container: HTMLElement, allPoints: Record<string, ProjectionPoint[]>): void {
+    destroy3dView();
+
+    // Pick first method with data, prefer umap
+    const methods = Object.keys(allPoints).filter(m => allPoints[m]?.length > 0);
+    if (methods.length === 0) {
+        container.innerHTML = '<div style="color:#6b7280;font-size:12px;padding:8px">No projection data</div>';
+        return;
+    }
+    let activeMethod = methods.includes('umap') ? 'umap' : methods[0];
+
+    container.innerHTML = '';
+    container.style.position = 'relative';
+
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'width:100%;height:360px;display:block;border-radius:4px;';
+    container.appendChild(canvas);
+
+    // Status overlay
+    const statusEl = document.createElement('div');
+    statusEl.style.cssText = 'position:absolute;top:8px;left:8px;color:#888;font-size:11px;font-family:monospace;pointer-events:none;';
+    container.appendChild(statusEl);
+
+    // Method buttons
+    if (methods.length > 1) {
+        const bar = document.createElement('div');
+        bar.style.cssText = 'position:absolute;bottom:8px;left:8px;display:flex;gap:4px;';
+        const btns: HTMLButtonElement[] = [];
+        for (const m of methods) {
+            const btn = document.createElement('button');
+            btn.textContent = m.toUpperCase();
+            btn.style.cssText = 'padding:2px 8px;font-size:11px;font-family:monospace;border:1px solid #555;border-radius:3px;cursor:pointer;background:#2a2a3e;color:#ccc;';
+            btn.addEventListener('click', () => { activeMethod = m; updateMethodBtns(); loadMethod(); });
+            btns.push(btn);
+            bar.appendChild(btn);
+        }
+        container.appendChild(bar);
+
+        function updateMethodBtns() {
+            for (const b of btns) {
+                const active = b.textContent === activeMethod.toUpperCase();
+                b.style.background = active ? '#4a4a6e' : '#2a2a3e';
+                b.style.borderColor = active ? '#8888cc' : '#555';
+            }
+        }
+        updateMethodBtns();
+    }
+
+    const regl = createREGL({ canvas, extensions: [] });
+
+    // Orbit state
+    let rotX = 0.5, rotY = 0.3, distance = 4;
+    let dragging = false, lastMX = 0, lastMY = 0;
+
+    canvas.addEventListener('mousedown', (e) => { dragging = true; lastMX = e.clientX; lastMY = e.clientY; });
+    const onMouseMove = (e: MouseEvent) => {
+        if (!dragging) return;
+        rotX += (e.clientX - lastMX) * 0.005;
+        rotY = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, rotY + (e.clientY - lastMY) * 0.005));
+        lastMX = e.clientX; lastMY = e.clientY;
+    };
+    const onMouseUp = () => { dragging = false; };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        distance = Math.max(1, Math.min(20, distance + e.deltaY * 0.01));
+    }, { passive: false });
+
+    const drawPoints = regl({
+        vert: `
+            precision mediump float;
+            attribute vec3 position;
+            attribute vec3 color;
+            uniform mat4 projection, view;
+            uniform float pointSize;
+            varying vec3 vColor;
+            void main() {
+                vColor = color;
+                gl_Position = projection * view * vec4(position, 1.0);
+                gl_PointSize = pointSize / gl_Position.w;
+            }
+        `,
+        frag: `
+            precision mediump float;
+            varying vec3 vColor;
+            void main() {
+                vec2 cxy = 2.0 * gl_PointCoord - 1.0;
+                float r = dot(cxy, cxy);
+                if (r > 1.0) discard;
+                float alpha = 1.0 - smoothstep(0.6, 1.0, r);
+                gl_FragColor = vec4(vColor, alpha * 0.85);
+            }
+        `,
+        attributes: {
+            position: regl.prop<any, 'positions'>('positions'),
+            color: regl.prop<any, 'colors'>('colors'),
+        },
+        uniforms: {
+            projection: regl.prop<any, 'projection'>('projection'),
+            view: regl.prop<any, 'view'>('view'),
+            pointSize: regl.prop<any, 'pointSize'>('pointSize'),
+        },
+        count: regl.prop<any, 'count'>('count'),
+        primitive: 'points',
+        blend: {
+            enable: true,
+            func: { srcRGB: 'src alpha', dstRGB: 'one minus src alpha', srcAlpha: 1, dstAlpha: 'one minus src alpha' },
+        },
+        depth: { enable: true },
+    });
+
+    let pointData: { posBuffer: any; colBuffer: any; count: number } | null = null;
+
+    function loadMethod() {
+        const pts = allPoints[activeMethod];
+        if (!pts || pts.length === 0) {
+            if (pointData) {
+                pointData.posBuffer.destroy();
+                pointData.colBuffer.destroy();
+            }
+            pointData = null;
+            statusEl.textContent = `No ${activeMethod} data`;
+            return;
+        }
+        const has3D = pts.some(p => p.z != null);
+        const { positions, colors } = normalizePoints3d(pts);
+        // Destroy old buffers before allocating new ones
+        if (pointData) {
+            pointData.posBuffer.destroy();
+            pointData.colBuffer.destroy();
+        }
+        pointData = {
+            posBuffer: regl.buffer({ data: positions, type: 'float' }),
+            colBuffer: regl.buffer({ data: colors, type: 'float' }),
+            count: pts.length,
+        };
+        const clusters = new Set(pts.map(p => p.cluster_id).filter(id => id >= 0));
+        statusEl.textContent = `${activeMethod.toUpperCase()} ${pts.length}pts ${clusters.size}cl${has3D ? ' 3D' : ' 2D'}`;
+    }
+
+    let animFrame: number = 0;
+    function frame() {
+        animFrame = requestAnimationFrame(frame);
+        const w = canvas.clientWidth, h = canvas.clientHeight;
+        if (canvas.width !== w * devicePixelRatio || canvas.height !== h * devicePixelRatio) {
+            canvas.width = w * devicePixelRatio;
+            canvas.height = h * devicePixelRatio;
+        }
+        regl.poll();
+        regl.clear({ color: [0.1, 0.1, 0.18, 1], depth: 1 });
+        if (pointData && pointData.count > 0) {
+            drawPoints({
+                positions: { buffer: pointData.posBuffer, size: 3 },
+                colors: { buffer: pointData.colBuffer, size: 3 },
+                projection: perspective4(Math.PI / 4, w / h, 0.1, 100),
+                view: orbitViewMatrix(rotX, rotY, distance),
+                pointSize: 15 * devicePixelRatio,
+                count: pointData.count,
+            });
+        }
+    }
+
+    const observer = new ResizeObserver(() => regl.poll());
+    observer.observe(canvas);
+
+    loadMethod();
+    frame();
+
+    regl3d = {
+        cleanup: () => {
+            cancelAnimationFrame(animFrame);
+            observer.disconnect();
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+            regl.destroy();
+        },
+    };
+}
 
 export async function fetchEmbeddingsInfo(): Promise<void> {
     try {
@@ -63,6 +344,12 @@ export async function fetchEmbeddingsInfo(): Promise<void> {
 
 function renderEmbeddings(): void {
     if (!embeddingsElement) return;
+
+    // Destroy any active 3D view before replacing innerHTML
+    if (regl3d) {
+        regl3d.cleanup();
+        regl3d = null;
+    }
 
     if (!embeddingsInfo) {
         embeddingsElement.innerHTML = '<div class="glyph-loading">Loading...</div>';
@@ -166,10 +453,17 @@ function renderEmbeddings(): void {
                         ${params ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;font-size:11px;justify-content:center">${params}</div>` : ''}
                     </div>`;
                 }).join('');
+            const has3D = methodNames.some(m => projectionsData[m]?.some(p => p.z != null));
             scatterSection = `
                 <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
-                    <h3 class="glyph-section-title">Projections</h3>
-                    <div style="display:flex;gap:6px">${scatterSlots}</div>
+                    <div style="display:flex;align-items:center;justify-content:space-between">
+                        <h3 class="glyph-section-title" style="margin:0">Projections</h3>
+                        ${has3D ? `<button class="emb-3d-toggle panel-btn" style="padding:2px 10px;font-size:11px">${view3dActive ? '2D' : '3D'}</button>` : ''}
+                    </div>
+                    <div class="emb-scatter-2d" ${view3dActive ? 'style="display:none"' : ''}>
+                        <div style="display:flex;gap:6px">${scatterSlots}</div>
+                    </div>
+                    <div class="emb-scatter-3d" ${view3dActive ? '' : 'style="display:none"'}></div>
                     <div style="display:flex;justify-content:flex-end;margin-top:6px">
                         <button class="emb-project-btn panel-btn" style="padding:2px 10px;font-size:11px"
                             ${embeddingsProjecting ? 'disabled' : ''}>
@@ -259,6 +553,38 @@ function renderEmbeddings(): void {
     const projectBtn = embeddingsElement.querySelector('.emb-project-btn');
     if (projectBtn) {
         projectBtn.addEventListener('click', projectAll);
+    }
+
+    // 3D toggle
+    const toggle3dBtn = embeddingsElement.querySelector('.emb-3d-toggle');
+    if (toggle3dBtn) {
+        toggle3dBtn.addEventListener('click', () => {
+            view3dActive = !view3dActive;
+            const el2d = embeddingsElement?.querySelector('.emb-scatter-2d') as HTMLElement | null;
+            const el3d = embeddingsElement?.querySelector('.emb-scatter-3d') as HTMLElement | null;
+            if (view3dActive) {
+                if (el2d) el2d.style.display = 'none';
+                if (el3d) {
+                    el3d.style.display = '';
+                    mount3dView(el3d, projectionsData);
+                }
+                toggle3dBtn.textContent = '2D';
+            } else {
+                destroy3dView();
+                if (el2d) el2d.style.display = '';
+                if (el3d) el3d.style.display = 'none';
+                toggle3dBtn.textContent = '3D';
+            }
+        });
+    }
+
+    // If 3D was active before re-render, remount it
+    if (view3dActive) {
+        const el3d = embeddingsElement.querySelector('.emb-scatter-3d') as HTMLElement | null;
+        if (el3d) {
+            el3d.style.display = '';
+            mount3dView(el3d, projectionsData);
+        }
     }
 
     // Cluster pill hover tooltips — lazy-fetch sample texts on first hover
@@ -975,13 +1301,12 @@ export function createEmbeddingsGlyph() {
     return {
         id: 'embeddings-glyph',
         title: '\u29C9 Embeddings',
+        manifestationType: 'panel' as const,
         renderContent: () => {
             const content = document.createElement('div');
             embeddingsElement = content;
             fetchEmbeddingsInfo();
             return content;
         },
-        initialWidth: '720px',
-        initialHeight: '820px',
     };
 }
