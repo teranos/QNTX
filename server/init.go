@@ -322,6 +322,19 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	// IMPORTANT: This must happen during server startup, not lazily on first HTTP request,
 	// so that plugins can register type definitions before graph queries are executed.
 	serverLogger.Infow("Plugin manager check", "plugin_manager_is_nil", server.pluginManager == nil, "services_is_nil", server.services == nil)
+
+	// Log plugin registry state — plugins load asynchronously, so the manager
+	// is typically nil here. This captures the registry state in the structured
+	// log file (plugin-loader only writes to terminal).
+	if pluginRegistry != nil {
+		states := pluginRegistry.GetAllStates()
+		for name, state := range states {
+			errMsg, _ := pluginRegistry.GetError(name)
+			serverLogger.Infow("Plugin state at server startup",
+				"plugin", name, "state", state, "error", errMsg)
+		}
+	}
+
 	if server.pluginManager != nil && server.services != nil {
 		plugins := server.pluginManager.GetAllPlugins()
 		serverLogger.Infow("Plugin manager has plugins", "count", len(plugins))
