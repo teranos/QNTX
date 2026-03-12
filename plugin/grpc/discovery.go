@@ -94,6 +94,8 @@ type PluginManager struct {
 	nextPort          int        // Track the next port to allocate
 	portMu            sync.Mutex // Separate mutex for port allocation
 	typescriptRuntime string     // Path to TypeScript runtime (main.ts)
+	shutdownCtx       context.Context    // cancelled on Shutdown to stop retry goroutines
+	shutdownCancel    context.CancelFunc
 }
 
 // managedPlugin tracks a running plugin.
@@ -115,6 +117,7 @@ const (
 
 // NewPluginManager creates a new plugin manager.
 func NewPluginManager(logger *zap.SugaredLogger, typescriptRuntime string) *PluginManager {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &PluginManager{
 		plugins:           make(map[string]*managedPlugin),
 		failedPlugins:     make(map[string]string),
@@ -122,6 +125,8 @@ func NewPluginManager(logger *zap.SugaredLogger, typescriptRuntime string) *Plug
 		basePort:          DefaultPluginBasePort,
 		nextPort:          DefaultPluginBasePort,
 		typescriptRuntime: typescriptRuntime,
+		shutdownCtx:       ctx,
+		shutdownCancel:    cancel,
 	}
 }
 
@@ -146,10 +151,9 @@ func GetDefaultPluginManager() *PluginManager {
 }
 
 // LoadPlugins loads and connects to plugins from configuration.
-// If a plugin fails to load, it logs the error and continues with remaining plugins.
+// Enabled plugins are retried forever — enabled means the operator is certain
+// this plugin must run. Disabled plugins are skipped entirely.
 func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig) error {
-	var failedPlugins []string
-
 	for _, config := range configs {
 		if !config.Enabled {
 			m.logger.Infow("Skipping disabled plugin", "name", config.Name)
@@ -159,27 +163,76 @@ func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig)
 		if err := m.loadPlugin(ctx, config); err != nil {
 			m.logger.Errorf("Failed to load plugin '%s' (binary=%s, address=%s): %v",
 				config.Name, config.Binary, config.Address, err)
-			failedPlugins = append(failedPlugins, config.Name)
+			m.mu.Lock()
 			m.failedPlugins[config.Name] = err.Error()
+			m.mu.Unlock()
+
+			// Enabled means forever — retry until server shuts down
+			go m.retryPluginForever(m.shutdownCtx, config)
 			continue
 		}
-	}
-
-	if len(failedPlugins) > 0 {
-		m.logger.Warnf("Some plugins failed to load: %v", failedPlugins)
-		// Don't return error - plugin system is resilient, continue with loaded plugins
 	}
 
 	return nil
 }
 
-// loadPlugin loads a single plugin.
-func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+// retryPluginForever kills and relaunches a plugin process until it loads.
+// Each cycle: launch process → try connecting 3 times (1s, 3s, 9s) → if all fail, kill and relaunch.
+func (m *PluginManager) retryPluginForever(ctx context.Context, config PluginConfig) {
+	cycle := 0
+	for {
+		cycle++
+		select {
+		case <-ctx.Done():
+			m.logger.Warnf("Context cancelled, stopping retry for plugin '%s'", config.Name)
+			return
+		default:
+		}
 
+		m.logger.Infof("Restarting plugin '%s' process (cycle %d)", config.Name, cycle)
+
+		// Clean up previous state so loadPlugin doesn't see "already loaded"
+		m.mu.Lock()
+		if old, exists := m.plugins[config.Name]; exists {
+			if old.process != nil {
+				old.process.Kill()
+			}
+			delete(m.plugins, config.Name)
+		}
+		m.mu.Unlock()
+
+		err := m.loadPlugin(ctx, config)
+		if err == nil {
+			m.mu.Lock()
+			delete(m.failedPlugins, config.Name)
+			m.mu.Unlock()
+			m.logger.Infof("Plugin '%s' loaded successfully on restart cycle %d", config.Name, cycle)
+			return
+		}
+
+		m.logger.Errorf("Plugin '%s' restart cycle %d failed: %v", config.Name, cycle, err)
+		m.mu.Lock()
+		m.failedPlugins[config.Name] = err.Error()
+		m.mu.Unlock()
+
+		// Wait before next full restart cycle
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(5 * time.Second):
+		}
+	}
+}
+
+// loadPlugin loads a single plugin.
+// Lock is only held for state checks and the final registration — all I/O
+// (process launch, connection attempts, metadata fetch) runs unlocked.
+func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) error {
 	// Check if already loaded
-	if _, exists := m.plugins[config.Name]; exists {
+	m.mu.RLock()
+	_, exists := m.plugins[config.Name]
+	m.mu.RUnlock()
+	if exists {
 		err := errors.Newf("plugin already loaded: %s", config.Name)
 		return errors.WithHint(err, "check for duplicate plugin entries in am.plugins.toml or ~/.qntx/plugins/")
 	}
@@ -192,13 +245,10 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 	var logBuf *LogBuffer
 
 	if config.Address != "" {
-		// Plugin is already running at the specified address
 		addr = config.Address
 		m.logger.Infow("Connecting to existing plugin", "name", config.Name, "address", addr)
 	} else if config.Binary != "" && config.AutoStart {
-		// Launch the plugin binary
 		port = m.allocatePort()
-		// Use explicit IPv4 127.0.0.1 instead of "localhost" to avoid IPv6 [::1] resolution
 		addr = fmt.Sprintf("127.0.0.1:%d", port)
 
 		var err error
@@ -209,7 +259,6 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 				config.Name, config.Binary, port)
 		}
 
-		// Use the actual port if plugin reported a different one (due to auto-increment)
 		if actualPort != 0 && actualPort != port {
 			port = actualPort
 			addr = fmt.Sprintf("127.0.0.1:%d", port)
@@ -219,14 +268,12 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		m.logger.Infof("Started '%s' plugin process (pid=%d, port=%d, addr=%s)",
 			config.Name, process.Pid, port, addr)
 
-		// Wait for plugin to be ready (5 second timeout for faster failure detection)
 		if err := m.waitForPlugin(ctx, config.Name, addr, 5*time.Second); err != nil {
 			process.Kill()
 			return errors.Wrapf(err, "plugin %s failed to start (binary=%s, addr=%s, pid=%d)",
 				config.Name, config.Binary, addr, process.Pid)
 		}
 	} else if config.Binary != "" {
-		// Binary specified but auto_start is false
 		m.logger.Warnw("Plugin binary specified but auto_start is false",
 			"name", config.Name,
 			"binary", config.Binary,
@@ -237,29 +284,50 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		return errors.WithHint(err, "set 'address' for remote plugins or 'binary' with 'auto_start=true' in plugin config")
 	}
 
-	// Connect to the plugin
-	client, err := NewExternalDomainProxy(addr, m.logger)
-	if err != nil {
+	// Connect to the plugin with retry: 1s, 3s, 9s backoff.
+	// If all attempts fail, caller (retryPluginForever) kills the process and relaunches.
+	connectBackoffs := []time.Duration{1 * time.Second, 3 * time.Second, 9 * time.Second}
+	var client *ExternalDomainProxy
+	var connectErr error
+	for attempt, backoff := range connectBackoffs {
+		client, connectErr = NewExternalDomainProxy(addr, m.logger)
+		if connectErr == nil {
+			break
+		}
+		m.logger.Warnf("Connection attempt %d/%d to plugin '%s' at %s failed: %v",
+			attempt+1, len(connectBackoffs), config.Name, addr, connectErr)
+		if attempt < len(connectBackoffs)-1 {
+			select {
+			case <-ctx.Done():
+				if process != nil {
+					process.Kill()
+				}
+				return ctx.Err()
+			case <-time.After(backoff):
+			}
+		}
+	}
+	if connectErr != nil {
 		if process != nil {
 			process.Kill()
 		}
-		return errors.Wrapf(err, "failed to connect to plugin %s at %s", config.Name, addr)
+		return errors.Wrapf(connectErr, "failed to connect to plugin %s at %s after %d attempts",
+			config.Name, addr, len(connectBackoffs))
 	}
 
 	// Validate plugin metadata matches config
-	metadata := client.Metadata()
-	actualName := metadata.Name
-	if actualName != config.Name {
+	meta := client.Metadata()
+	if meta.Name != config.Name {
 		if process != nil {
 			process.Kill()
 		}
 		err := errors.Newf("plugin metadata mismatch: binary at %s reports name='%s' but config expects '%s'",
-			config.Binary, actualName, config.Name)
+			config.Binary, meta.Name, config.Name)
 		return errors.WithHint(err, "verify the correct plugin binary is installed or update the plugin name in config")
 	}
 
 	// Update logger names with version information
-	nameWithVersion := fmt.Sprintf("%s v%s", metadata.Name, metadata.Version)
+	nameWithVersion := fmt.Sprintf("%s v%s", meta.Name, meta.Version)
 	if stdoutLogger != nil {
 		stdoutLogger.updateName(nameWithVersion)
 	}
@@ -267,6 +335,8 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		stderrLogger.updateName(nameWithVersion)
 	}
 
+	// Register — lock only for the final state write
+	m.mu.Lock()
 	m.plugins[config.Name] = &managedPlugin{
 		config:       config,
 		client:       client,
@@ -276,9 +346,10 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		stderrLogger: stderrLogger,
 		logBuffer:    logBuf,
 	}
+	m.mu.Unlock()
 
 	m.logger.Infof("Plugin '%s' v%s loaded and ready - %s",
-		config.Name, metadata.Version, metadata.Description)
+		config.Name, meta.Version, meta.Description)
 
 	return nil
 }
@@ -607,8 +678,11 @@ func (m *PluginManager) ReinitializePlugin(ctx context.Context, pluginName strin
 	return nil
 }
 
-// Shutdown stops all managed plugins.
+// Shutdown stops all managed plugins and retry goroutines.
 func (m *PluginManager) Shutdown(ctx context.Context) error {
+	// Stop retry goroutines first
+	m.shutdownCancel()
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
