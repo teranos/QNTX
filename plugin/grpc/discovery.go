@@ -220,6 +220,9 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 			config.Name, process.Pid, port, addr)
 
 		// Wait for plugin to be ready (5 second timeout for faster failure detection)
+		// TODO: 5s is too tight — OCaml/loom intermittently fails here (context deadline exceeded).
+		// On timeout we kill the process and never retry. Compare with retryScheduleSetup which
+		// retries 30 times. Should retry the connection (not kill the process) before giving up.
 		if err := m.waitForPlugin(ctx, config.Name, addr, 5*time.Second); err != nil {
 			process.Kill()
 			return errors.Wrapf(err, "plugin %s failed to start (binary=%s, addr=%s, pid=%d)",
