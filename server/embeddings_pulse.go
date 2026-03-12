@@ -850,13 +850,14 @@ type ProjectionResult struct {
 
 // ProjectionParams holds per-method tuning parameters for dimensionality reduction.
 type ProjectionParams struct {
-	NNeighbors *int     `json:"n_neighbors,omitempty"` // UMAP: local vs global (default 15)
-	MinDist    *float64 `json:"min_dist,omitempty"`    // UMAP: cluster tightness (default 0.1)
-	Perplexity *float64 `json:"perplexity,omitempty"`  // t-SNE: local vs global (default 30)
+	NComponents *int     `json:"n_components,omitempty"` // Output dimensions (default 3)
+	NNeighbors  *int     `json:"n_neighbors,omitempty"`  // UMAP: local vs global (default 15)
+	MinDist     *float64 `json:"min_dist,omitempty"`     // UMAP: cluster tightness (default 0.1)
+	Perplexity  *float64 `json:"perplexity,omitempty"`   // t-SNE: local vs global (default 30)
 }
 
 // RunProjection reads all embeddings, calls the reduce plugin /fit for the given method,
-// and writes 2D projections to DB.
+// and writes projections (2D or 3D) to DB.
 func RunProjection(
 	ctx context.Context,
 	method string,
@@ -887,10 +888,14 @@ func RunProjection(
 	}
 
 	fitBody := map[string]interface{}{
-		"embeddings": allEmbeddings,
-		"method":     method,
+		"embeddings":   allEmbeddings,
+		"method":       method,
+		"n_components": 3,
 	}
 	if params != nil {
+		if params.NComponents != nil {
+			fitBody["n_components"] = *params.NComponents
+		}
 		if params.NNeighbors != nil {
 			fitBody["n_neighbors"] = *params.NNeighbors
 		}
@@ -913,6 +918,7 @@ func RunProjection(
 
 	var fitResult struct {
 		Projections [][]float64 `json:"projections"`
+		NComponents int         `json:"n_components"`
 		NPoints     int         `json:"n_points"`
 		FitMS       int64       `json:"fit_ms"`
 	}
@@ -927,11 +933,17 @@ func RunProjection(
 
 	assignments := make([]storage.ProjectionAssignment, len(ids))
 	for i, id := range ids {
-		assignments[i] = storage.ProjectionAssignment{
+		p := fitResult.Projections[i]
+		a := storage.ProjectionAssignment{
 			ID: id,
-			X:  fitResult.Projections[i][0],
-			Y:  fitResult.Projections[i][1],
+			X:  p[0],
+			Y:  p[1],
 		}
+		if len(p) >= 3 {
+			z := p[2]
+			a.Z = &z
+		}
+		assignments[i] = a
 	}
 
 	if err := store.UpdateProjections(method, assignments); err != nil {

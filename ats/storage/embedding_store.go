@@ -627,12 +627,13 @@ func (s *EmbeddingStore) GetAllClusterCentroids() ([]ClusterCentroid, error) {
 	return centroids, nil
 }
 
-// ProjectionAssignment maps an embedding ID to its 2D projection coordinates for a given method.
+// ProjectionAssignment maps an embedding ID to its projection coordinates for a given method.
 type ProjectionAssignment struct {
 	ID     string
 	Method string
 	X      float64
 	Y      float64
+	Z      *float64 // nil for 2D projections
 }
 
 // UpdateProjections batch-upserts projection coordinates for a given method.
@@ -654,8 +655,8 @@ func (s *EmbeddingStore) UpdateProjections(method string, assignments []Projecti
 	}()
 
 	stmt, err := tx.Prepare(`
-		INSERT OR REPLACE INTO embedding_projections (embedding_id, method, x, y, created_at)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT OR REPLACE INTO embedding_projections (embedding_id, method, x, y, z, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare projection upsert statement")
@@ -664,7 +665,7 @@ func (s *EmbeddingStore) UpdateProjections(method string, assignments []Projecti
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	for _, a := range assignments {
-		if _, err = stmt.Exec(a.ID, method, a.X, a.Y, now); err != nil {
+		if _, err = stmt.Exec(a.ID, method, a.X, a.Y, a.Z, now); err != nil {
 			return errors.Wrapf(err, "failed to upsert projection for embedding %s method %s", a.ID, method)
 		}
 	}
@@ -677,20 +678,21 @@ func (s *EmbeddingStore) UpdateProjections(method string, assignments []Projecti
 	return nil
 }
 
-// ProjectionWithCluster holds a 2D projection along with its cluster assignment.
+// ProjectionWithCluster holds a projection along with its cluster assignment.
 type ProjectionWithCluster struct {
-	ID        string  `json:"id"`
-	SourceID  string  `json:"source_id"`
-	Method    string  `json:"method"`
-	X         float64 `json:"x"`
-	Y         float64 `json:"y"`
-	ClusterID int     `json:"cluster_id"`
+	ID        string   `json:"id"`
+	SourceID  string   `json:"source_id"`
+	Method    string   `json:"method"`
+	X         float64  `json:"x"`
+	Y         float64  `json:"y"`
+	Z         *float64 `json:"z,omitempty"`
+	ClusterID int      `json:"cluster_id"`
 }
 
 // GetProjectionsByMethod returns all projections for a given method, joined with cluster info.
 func (s *EmbeddingStore) GetProjectionsByMethod(method string) ([]ProjectionWithCluster, error) {
 	rows, err := s.db.Query(`
-		SELECT ep.embedding_id, e.source_id, ep.method, ep.x, ep.y, e.cluster_id
+		SELECT ep.embedding_id, e.source_id, ep.method, ep.x, ep.y, ep.z, e.cluster_id
 		FROM embedding_projections ep
 		JOIN embeddings e ON ep.embedding_id = e.id
 		WHERE ep.method = ?
@@ -704,7 +706,7 @@ func (s *EmbeddingStore) GetProjectionsByMethod(method string) ([]ProjectionWith
 	var results []ProjectionWithCluster
 	for rows.Next() {
 		var p ProjectionWithCluster
-		if err := rows.Scan(&p.ID, &p.SourceID, &p.Method, &p.X, &p.Y, &p.ClusterID); err != nil {
+		if err := rows.Scan(&p.ID, &p.SourceID, &p.Method, &p.X, &p.Y, &p.Z, &p.ClusterID); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan projection row %d for method %s", len(results)+1, method)
 		}
 		results = append(results, p)

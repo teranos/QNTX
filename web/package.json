@@ -52,10 +52,11 @@
     "@lezer/common": "1.4.0"
   },
   "dependencies": {
-    "d3": "7.9.0",
     "@codemirror/lang-javascript": "6.2.2",
     "@codemirror/lang-python": "^6.2.1",
     "@codemirror/lang-yaml": "^6.1.2",
+    "d3": "7.9.0",
+    "regl": "2.1.0",
     "smol-toml": "^1.6.0"
   }
 }
