@@ -163,7 +163,9 @@ func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig)
 		if err := m.loadPlugin(ctx, config); err != nil {
 			m.logger.Errorf("Failed to load plugin '%s' (binary=%s, address=%s): %v",
 				config.Name, config.Binary, config.Address, err)
+			m.mu.Lock()
 			m.failedPlugins[config.Name] = err.Error()
+			m.mu.Unlock()
 
 			// Enabled means forever — retry until server shuts down
 			go m.retryPluginForever(m.shutdownCtx, config)
@@ -175,7 +177,7 @@ func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig)
 }
 
 // retryPluginForever kills and relaunches a plugin process until it loads.
-// Each cycle: launch process → try connecting 4 times (1s, 3s, 9s, 27s) → if all fail, kill and relaunch.
+// Each cycle: launch process → try connecting 3 times (1s, 3s, 9s) → if all fail, kill and relaunch.
 func (m *PluginManager) retryPluginForever(ctx context.Context, config PluginConfig) {
 	cycle := 0
 	for {
@@ -201,13 +203,17 @@ func (m *PluginManager) retryPluginForever(ctx context.Context, config PluginCon
 
 		err := m.loadPlugin(ctx, config)
 		if err == nil {
+			m.mu.Lock()
 			delete(m.failedPlugins, config.Name)
+			m.mu.Unlock()
 			m.logger.Infof("Plugin '%s' loaded successfully on restart cycle %d", config.Name, cycle)
 			return
 		}
 
 		m.logger.Errorf("Plugin '%s' restart cycle %d failed: %v", config.Name, cycle, err)
+		m.mu.Lock()
 		m.failedPlugins[config.Name] = err.Error()
+		m.mu.Unlock()
 
 		// Wait before next full restart cycle
 		select {
@@ -278,7 +284,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		return errors.WithHint(err, "set 'address' for remote plugins or 'binary' with 'auto_start=true' in plugin config")
 	}
 
-	// Connect to the plugin with retry: 1s, 3s, 9s, 27s backoff.
+	// Connect to the plugin with retry: 1s, 3s, 9s backoff.
 	// If all attempts fail, caller (retryPluginForever) kills the process and relaunches.
 	connectBackoffs := []time.Duration{1 * time.Second, 3 * time.Second, 9 * time.Second}
 	var client *ExternalDomainProxy
@@ -291,7 +297,14 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		m.logger.Warnf("Connection attempt %d/%d to plugin '%s' at %s failed: %v",
 			attempt+1, len(connectBackoffs), config.Name, addr, connectErr)
 		if attempt < len(connectBackoffs)-1 {
-			time.Sleep(backoff)
+			select {
+			case <-ctx.Done():
+				if process != nil {
+					process.Kill()
+				}
+				return ctx.Err()
+			case <-time.After(backoff):
+			}
 		}
 	}
 	if connectErr != nil {
