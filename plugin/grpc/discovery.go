@@ -450,6 +450,8 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 // It also verifies that the correct plugin (by name) is responding at the given address.
 func (m *PluginManager) waitForPlugin(ctx context.Context, expectedName string, addr string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
+	start := time.Now()
+	attempt := 0
 
 	for time.Now().Before(deadline) {
 		select {
@@ -457,6 +459,8 @@ func (m *PluginManager) waitForPlugin(ctx context.Context, expectedName string, 
 			return ctx.Err()
 		default:
 		}
+
+		attempt++
 
 		// Try gRPC connection with short timeout
 		connCtx, cancel := context.WithTimeout(ctx, time.Second)
@@ -466,34 +470,52 @@ func (m *PluginManager) waitForPlugin(ctx context.Context, expectedName string, 
 		)
 		cancel()
 
-		if err == nil {
-			// Connection succeeded, verify gRPC service is ready by calling metadata
-			client := protocol.NewDomainPluginServiceClient(conn)
-			metaCtx, metaCancel := context.WithTimeout(ctx, time.Second)
-			metaResp, metaErr := client.Metadata(metaCtx, &protocol.Empty{})
-			metaCancel()
-			conn.Close()
-
-			if metaErr == nil {
-				// gRPC service is ready, but is it the right plugin?
-				if metaResp.Name == expectedName {
-					// Correct plugin is responding
-					return nil
-				}
-				// Wrong plugin at this address (likely from another QNTX instance)
-				m.logger.Debugw("Found different plugin at address, waiting for correct one",
-					"expected", expectedName,
-					"found", metaResp.Name,
-					"addr", addr,
-				)
-			}
-			// gRPC service not ready yet or wrong plugin, continue waiting
+		if err != nil {
+			m.logger.Debugw("Plugin not yet reachable",
+				"plugin", expectedName, "addr", addr,
+				"attempt", attempt, "elapsed_ms", time.Since(start).Milliseconds(),
+				"error", err,
+			)
+			time.Sleep(100 * time.Millisecond)
+			continue
 		}
 
+		// Connection succeeded, verify gRPC service is ready by calling metadata
+		client := protocol.NewDomainPluginServiceClient(conn)
+		metaCtx, metaCancel := context.WithTimeout(ctx, time.Second)
+		metaResp, metaErr := client.Metadata(metaCtx, &protocol.Empty{})
+		metaCancel()
+		conn.Close()
+
+		if metaErr != nil {
+			m.logger.Debugw("Plugin connected but Metadata RPC failed",
+				"plugin", expectedName, "addr", addr,
+				"attempt", attempt, "elapsed_ms", time.Since(start).Milliseconds(),
+				"error", metaErr,
+			)
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+
+		// gRPC service is ready, but is it the right plugin?
+		if metaResp.Name == expectedName {
+			m.logger.Infow("Plugin ready",
+				"plugin", expectedName, "addr", addr,
+				"attempts", attempt, "elapsed_ms", time.Since(start).Milliseconds(),
+			)
+			return nil
+		}
+
+		// Wrong plugin at this address (likely from another QNTX instance)
+		m.logger.Warnw("Wrong plugin at address",
+			"expected", expectedName, "found", metaResp.Name,
+			"addr", addr, "attempt", attempt,
+		)
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	err := errors.Newf("timeout waiting for plugin '%s' gRPC service at %s", expectedName, addr)
+	err := errors.Newf("timeout after %d attempts (%dms) waiting for plugin '%s' gRPC service at %s",
+		attempt, time.Since(start).Milliseconds(), expectedName, addr)
 	return errors.WithHint(err, "check plugin logs for startup errors, verify no other plugin is using this port, or increase timeout")
 }
 
