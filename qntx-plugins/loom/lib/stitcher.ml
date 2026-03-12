@@ -23,7 +23,8 @@ let max_chunk_words = 100
 (* --- Per-branch buffer --- *)
 
 (* Hashtbl is OCaml's mutable hash table — like Go's map or JS's Map.
- * We key by branch name and accumulate turns as a list of strings.
+ * We key by branch:context (e.g. "main:session:abc-123") so that
+ * concurrent sessions on the same branch get separate buffers.
  * Lists in OCaml are prepend-only (immutable linked lists), so we
  * cons new turns onto the front and reverse when emitting.
  *)
@@ -33,6 +34,10 @@ type buffer_entry = {
 }
 
 let buffers : (string, buffer_entry) Hashtbl.t = Hashtbl.create 16
+
+(* Buffer key combines branch and session context so concurrent
+ * sessions on the same branch don't interleave turns. *)
+let buffer_key branch context = branch ^ ":" ^ context
 
 let word_count s =
   let len = String.length s in
@@ -113,8 +118,8 @@ let extract_tool_command attrs =
  *   by the subsequent SessionStart anyway. The marker records that turns
  *   before this point were compressed and the original content is lost.
  *
- * TODO: SubagentStart / SubagentStop — agent delegation boundaries
- * TODO: TaskCompleted — work unit finished *)
+ * SubagentStart / SubagentStop → agent delegation markers (agent_type)
+ * TaskCompleted → task completion marker (task_subject) *)
 let extract_text json predicate =
   match json with
   | `Assoc fields ->
@@ -141,6 +146,21 @@ let extract_text json predicate =
            | _ -> None)
         | "PreCompact" ->
           Some "Context compacted"
+        | "SubagentStart" ->
+          (match List.assoc_opt "agent_type" attrs with
+           | Some (`String t) -> Some (Printf.sprintf "Agent started: %s" t)
+           | _ -> Some "Agent started")
+        | "SubagentStop" ->
+          (* TODO: also stitch last_assistant_message from the subagent —
+           * skipped for now because it can be very long and would bloat weaves.
+           * Consider truncating or summarizing before including. *)
+          (match List.assoc_opt "agent_type" attrs with
+           | Some (`String t) -> Some (Printf.sprintf "Agent stopped: %s" t)
+           | _ -> Some "Agent stopped")
+        | "TaskCompleted" ->
+          (match List.assoc_opt "task_subject" attrs with
+           | Some (`String subj) -> Some (Printf.sprintf "Task completed: %s" subj)
+           | _ -> Some "Task completed")
         | _ -> None)
      | _ -> None)
   | _ -> None
@@ -182,14 +202,18 @@ let stitch payload =
         | "PreToolUse" | "GraundedPreToolUse" -> "tool"
         | "SessionStart" | "SessionEnd" -> "session"
         | "PreCompact" -> "compaction"
+        | "SubagentStart" | "SubagentStop" -> "agent"
+        | "TaskCompleted" -> "task"
         | other -> other
       in
       let turn = Printf.sprintf "[%s] %s" label text in
 
+      let key = buffer_key branch context in
+
       (* SessionStart: flush existing buffer first, then start fresh *)
       if predicate = "SessionStart" then (
         let emitted =
-          match Hashtbl.find_opt buffers branch with
+          match Hashtbl.find_opt buffers key with
           | Some existing when existing.turns <> [] ->
             let block = existing.turns |> List.rev |> String.concat "\n\n" in
             let total_words = buffer_word_count existing.turns in
@@ -200,7 +224,7 @@ let stitch payload =
           | _ -> None
         in
         (* Start fresh buffer with the SessionStart marker *)
-        Hashtbl.replace buffers branch { context; turns = [turn] };
+        Hashtbl.replace buffers key { context; turns = [turn] };
         match emitted with
         | Some (block, old_context, num_turns) ->
           { branch; context = old_context; buffered_words = 0; emitted = Some block; turn_count = num_turns }
@@ -209,9 +233,9 @@ let stitch payload =
             (word_count turn) branch (word_count turn);
           { branch; context; buffered_words = word_count turn; emitted = None; turn_count = 0 }
       ) else (
-        (* Get or create buffer for this branch, dedup consecutive identical turns *)
+        (* Get or create buffer for this session, dedup consecutive identical turns *)
         let entry =
-          match Hashtbl.find_opt buffers branch with
+          match Hashtbl.find_opt buffers key with
           | Some existing when existing.turns <> [] && List.hd existing.turns = turn ->
             existing (* Skip duplicate *)
           | Some existing -> { context; turns = turn :: existing.turns }
@@ -223,14 +247,14 @@ let stitch payload =
         let should_emit = total_words >= max_chunk_words || predicate = "SessionEnd" in
         if should_emit && total_words > 0 then (
           let block = entry.turns |> List.rev |> String.concat "\n\n" in
-          Hashtbl.remove buffers branch;
+          Hashtbl.remove buffers key;
           Printf.printf "[loom] Emitting %d-word block for branch %s (%s)\n%!"
             total_words branch
             (if predicate = "SessionEnd" then "session end" else "threshold");
           let num_turns = List.length entry.turns in
           { branch; context = entry.context; buffered_words = 0; emitted = Some block; turn_count = num_turns }
         ) else (
-          Hashtbl.replace buffers branch entry;
+          Hashtbl.replace buffers key entry;
           Printf.printf "[loom] Buffered %d words for branch %s (%d total)\n%!"
             (word_count turn) branch total_words;
           { branch; context = entry.context; buffered_words = total_words; emitted = None; turn_count = 0 }
@@ -241,13 +265,18 @@ let stitch payload =
  * to prevent data loss when the server stops. *)
 let flush_all () =
   let results = ref [] in
-  Hashtbl.iter (fun branch entry ->
+  Hashtbl.iter (fun key entry ->
     if entry.turns <> [] then (
       let block = entry.turns |> List.rev |> String.concat "\n\n" in
       let total_words = buffer_word_count entry.turns in
       let num_turns = List.length entry.turns in
-      Printf.printf "[loom] Flushing %d-word buffer for branch %s (shutdown)\n%!"
-        total_words branch;
+      (* Extract branch from composite key "branch:context" *)
+      let branch = match String.index_opt key ':' with
+        | Some i -> String.sub key 0 i
+        | None -> key
+      in
+      Printf.printf "[loom] Flushing %d-word buffer for %s (shutdown)\n%!"
+        total_words key;
       results := { branch; context = entry.context; buffered_words = 0;
                    emitted = Some block; turn_count = num_turns } :: !results
     )

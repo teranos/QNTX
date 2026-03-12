@@ -87,14 +87,14 @@ let test_stitch_labels_human () =
   reset ();
   let payload = make_payload ~branch:"main" ~predicate:"UserPromptSubmit" ~text:"test" () in
   let _ = Stitcher.stitch payload in
-  let entry = Hashtbl.find Stitcher.buffers "main" in
+  let entry = Hashtbl.find Stitcher.buffers "main:session:test-abc-123" in
   Alcotest.(check string) "human label" "[human] test" (List.hd entry.turns)
 
 let test_stitch_labels_assistant () =
   reset ();
   let payload = make_payload ~branch:"main" ~predicate:"Stop" ~text:"response" () in
   let _ = Stitcher.stitch payload in
-  let entry = Hashtbl.find Stitcher.buffers "main" in
+  let entry = Hashtbl.find Stitcher.buffers "main:session:test-abc-123" in
   Alcotest.(check string) "assistant label" "[assistant] response" (List.hd entry.turns)
 
 let test_stitch_separate_branches () =
@@ -165,7 +165,7 @@ let test_stitch_clears_buffer_after_emit () =
   let payload = make_payload ~branch:"main" ~predicate:"UserPromptSubmit" ~text () in
   let _ = Stitcher.stitch payload in
   Alcotest.(check bool) "buffer removed" true
-    (Hashtbl.find_opt Stitcher.buffers "main" = None)
+    (Hashtbl.find_opt Stitcher.buffers "main:session:test-abc-123" = None)
 
 (* --- flush_all --- *)
 
