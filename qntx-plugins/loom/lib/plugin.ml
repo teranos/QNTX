@@ -101,6 +101,7 @@ let handle_execute_job raw =
           Lwt.async (fun () ->
             let* ats_result = Ats_client.create_weave
               ~branch:result.branch
+              ~context:result.context
               ~text:block
               ~word_count:(Stitcher.word_count block)
               ~turn_count:result.turn_count
@@ -142,8 +143,33 @@ let handle_config_schema _raw =
   let encoded = proto_to_string (Protocol.ConfigSchemaResponse.to_proto resp) in
   Lwt.return (Grpc.Status.(v OK), Some encoded)
 
+let flush_and_persist () =
+  let open Lwt.Syntax in
+  let flushed = Stitcher.flush_all () in
+  let* () = Lwt_list.iter_p (fun (result : Stitcher.stitch_result) ->
+    match result.emitted with
+    | Some block ->
+      let* ats_result = Ats_client.create_weave
+        ~branch:result.branch
+        ~context:result.context
+        ~text:block
+        ~word_count:(Stitcher.word_count block)
+        ~turn_count:result.turn_count
+      in
+      (match ats_result with
+       | Ok () -> ()
+       | Error msg ->
+         Printf.eprintf "[loom] Failed to persist flushed weave for %s: %s\n%!" result.branch msg);
+      Lwt.return_unit
+    | None -> Lwt.return_unit
+  ) flushed in
+  Printf.printf "[loom] Flushed %d weave(s)\n%!" (List.length flushed);
+  Lwt.return_unit
+
 let handle_shutdown _raw =
-  Printf.printf "[loom] Shutting down\n%!";
+  let open Lwt.Syntax in
+  Printf.printf "[loom] Shutting down — flushing buffered weaves\n%!";
+  let* () = flush_and_persist () in
   let encoded = proto_to_string (Protocol.Empty.to_proto (Protocol.Empty.make ())) in
   Lwt.return (Grpc.Status.(v OK), Some encoded)
 

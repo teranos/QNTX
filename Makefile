@@ -254,8 +254,19 @@ openrouter-plugin: ## Build and install OpenRouter plugin to ~/.qntx/plugins/
 pty-glyph-plugin: ## Build and install pty-glyph plugin to ~/.qntx/plugins/
 	@$(MAKE) -C qntx-plugins/pty-glyph install PREFIX=$(PREFIX)
 
-loom-plugin: ## Build and install loom plugin (OCaml) to ~/.qntx/plugins/
+loom-plugin: _check-loom-version ## Build and install loom plugin (OCaml) to ~/.qntx/plugins/
 	@$(MAKE) -C qntx-plugins/loom install PREFIX=$(PREFIX)
+
+# TODO: Give all plugins this version-gate treatment (each plugin has its own version file)
+_check-loom-version:
+	@git diff --name-only HEAD -- qntx-plugins/loom/ | grep -q '\.ml$$' && \
+	 ! git diff --name-only HEAD -- qntx-plugins/loom/lib/version.ml | grep -q . && \
+	 echo "" && \
+	 echo "  Impossible to debug or develop if we don't know what version is running." && \
+	 echo "  You did not modify the version of this plugin in order to differentiate it." && \
+	 echo "  Do at least a patch or debug bump to version.ml" && \
+	 echo "" && \
+	 exit 1 || true
 
 rust-vidstream: ## Build Rust vidstream library with ONNX support (for CGO integration)
 	@echo "Building Rust vidstream library with ONNX..."

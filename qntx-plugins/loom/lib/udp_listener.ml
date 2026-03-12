@@ -8,7 +8,6 @@
  * via QNTX's watcher system is the "proper" alternative, but requires Graunde
  * to talk to QNTX over the network — which it currently doesn't do. *)
 
-(* TODO(#676): Handle port conflicts gracefully — retry or log clear error *)
 let udp_port = 19470
 
 let start () =
@@ -16,7 +15,12 @@ let start () =
   let socket = Lwt_unix.socket Unix.PF_INET Unix.SOCK_DGRAM 0 in
   Unix.setsockopt (Lwt_unix.unix_file_descr socket) Unix.SO_REUSEADDR true;
   let addr = Unix.(ADDR_INET (inet_addr_loopback, udp_port)) in
-  let* () = Lwt_unix.bind socket addr in
+  let* () = Lwt.catch
+    (fun () -> Lwt_unix.bind socket addr)
+    (fun exn ->
+      Printf.eprintf "[loom] Failed to bind UDP port %d: %s\n%!" udp_port (Printexc.to_string exn);
+      Lwt.fail exn)
+  in
   Printf.printf "[loom] UDP listener on port %d\n%!" udp_port;
 
   let buf = Bytes.create 65536 in
@@ -32,6 +36,7 @@ let start () =
        Lwt.async (fun () ->
          let* ats_result = Ats_client.create_weave
            ~branch:result.branch
+           ~context:result.context
            ~text:block
            ~word_count:(Stitcher.word_count block)
            ~turn_count:result.turn_count
