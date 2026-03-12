@@ -183,6 +183,18 @@ async function startServer(pluginPath: string, port: number) {
                             body: Buffer.from(data),
                         };
                     },
+                    send: (data: string | Buffer) => {
+                        responseData.body = typeof data === 'string' ? Buffer.from(data) : data;
+                    },
+                    setHeader: (name: string, value: string) => {
+                        // Replace existing header or add new one
+                        const existing = responseData.headers.findIndex((h: any) => h.name === name);
+                        if (existing >= 0) {
+                            responseData.headers[existing].values = [value];
+                        } else {
+                            responseData.headers.push({ name, values: [value] });
+                        }
+                    },
                     status: (code: number) => {
                         responseData.status_code = code;
                         return res;

@@ -16,6 +16,7 @@ const KNOWN_METHODS: &[&str] = &["umap", "tsne", "pca"];
 #[derive(Clone)]
 pub(crate) struct MethodState {
     pub n_points: usize,
+    pub n_components: usize,
     pub supports_transform: bool,
 }
 
@@ -34,13 +35,15 @@ impl HandlerContext {
         Self { state }
     }
 
-    /// POST /fit — fit a dimensionality reduction model and return 2D projections.
+    /// POST /fit — fit a dimensionality reduction model and return projections.
     pub fn handle_fit(&self, body: serde_json::Value) -> Result<HttpResponse, Status> {
         #[derive(Deserialize)]
         struct FitRequest {
             embeddings: Vec<Vec<f32>>,
             #[serde(default = "default_method")]
             method: String,
+            #[serde(default = "default_n_components")]
+            n_components: usize,
             #[serde(default = "default_n_neighbors")]
             n_neighbors: usize,
             #[serde(default = "default_min_dist")]
@@ -53,6 +56,9 @@ impl HandlerContext {
 
         fn default_method() -> String {
             "umap".to_string()
+        }
+        fn default_n_components() -> usize {
+            2
         }
         fn default_n_neighbors() -> usize {
             15
@@ -86,7 +92,8 @@ impl HandlerContext {
         let n_points = req.embeddings.len();
         let start = Instant::now();
 
-        let projections = Python::with_gil(|py| -> PyResult<Vec<[f32; 2]>> {
+        let n_components = req.n_components;
+        let projections = Python::with_gil(|py| -> PyResult<Vec<Vec<f32>>> {
             let np = py.import("numpy")?;
 
             // Build numpy array from embeddings
@@ -105,7 +112,7 @@ impl HandlerContext {
                     kwargs.set_item("n_neighbors", req.n_neighbors)?;
                     kwargs.set_item("min_dist", req.min_dist)?;
                     kwargs.set_item("metric", &req.metric)?;
-                    kwargs.set_item("n_components", 2)?;
+                    kwargs.set_item("n_components", n_components)?;
                     let reducer = umap_mod.getattr("UMAP")?.call((), Some(&kwargs))?;
                     let result = reducer.call_method1("fit_transform", (np_array,))?;
                     let builtins = py.import("builtins")?;
@@ -115,7 +122,7 @@ impl HandlerContext {
                 "tsne" => {
                     let manifold = py.import("sklearn.manifold")?;
                     let kwargs = pyo3::types::PyDict::new(py);
-                    kwargs.set_item("n_components", 2)?;
+                    kwargs.set_item("n_components", n_components)?;
                     kwargs.set_item("perplexity", req.perplexity)?;
                     let tsne = manifold.getattr("TSNE")?.call((), Some(&kwargs))?;
                     tsne.call_method1("fit_transform", (np_array,))?
@@ -123,7 +130,7 @@ impl HandlerContext {
                 "pca" => {
                     let decomposition = py.import("sklearn.decomposition")?;
                     let kwargs = pyo3::types::PyDict::new(py);
-                    kwargs.set_item("n_components", 2)?;
+                    kwargs.set_item("n_components", n_components)?;
                     let pca = decomposition.getattr("PCA")?.call((), Some(&kwargs))?;
                     let result = pca.call_method1("fit_transform", (np_array,))?;
                     let builtins = py.import("builtins")?;
@@ -133,13 +140,16 @@ impl HandlerContext {
                 _ => unreachable!(),
             };
 
-            // Extract 2D projections
+            // Extract projections (2D or 3D depending on n_components)
             let mut projections = Vec::with_capacity(n_points);
             for i in 0..n_points {
                 let row = result.call_method1("__getitem__", (i,))?;
-                let x: f32 = row.call_method1("__getitem__", (0,))?.extract()?;
-                let y: f32 = row.call_method1("__getitem__", (1,))?.extract()?;
-                projections.push([x, y]);
+                let mut point = Vec::with_capacity(n_components);
+                for j in 0..n_components {
+                    let v: f32 = row.call_method1("__getitem__", (j,))?.extract()?;
+                    point.push(v);
+                }
+                projections.push(point);
             }
             Ok(projections)
         })
@@ -157,6 +167,7 @@ impl HandlerContext {
                 method.clone(),
                 MethodState {
                     n_points,
+                    n_components,
                     supports_transform: method != "tsne",
                 },
             );
@@ -170,7 +181,8 @@ impl HandlerContext {
         #[derive(Serialize)]
         struct FitResponse {
             method: String,
-            projections: Vec<[f32; 2]>,
+            n_components: usize,
+            projections: Vec<Vec<f32>>,
             n_points: usize,
             fit_ms: u64,
         }
@@ -179,6 +191,7 @@ impl HandlerContext {
             200,
             &FitResponse {
                 method,
+                n_components,
                 projections,
                 n_points,
                 fit_ms,
@@ -228,7 +241,13 @@ impl HandlerContext {
         let n_points = req.embeddings.len();
         let start = Instant::now();
 
-        let projections = Python::with_gil(|py| -> PyResult<Vec<[f32; 2]>> {
+        // Get n_components from the fitted model's state
+        let n_components = {
+            let state = self.state.read();
+            state.fitted.get(&method).map_or(2, |s| s.n_components)
+        };
+
+        let projections = Python::with_gil(|py| -> PyResult<Vec<Vec<f32>>> {
             let np = py.import("numpy")?;
             let builtins = py.import("builtins")?;
 
@@ -249,9 +268,12 @@ impl HandlerContext {
             let mut projections = Vec::with_capacity(n_points);
             for i in 0..n_points {
                 let row = result.call_method1("__getitem__", (i,))?;
-                let x: f32 = row.call_method1("__getitem__", (0,))?.extract()?;
-                let y: f32 = row.call_method1("__getitem__", (1,))?.extract()?;
-                projections.push([x, y]);
+                let mut point = Vec::with_capacity(n_components);
+                for j in 0..n_components {
+                    let v: f32 = row.call_method1("__getitem__", (j,))?.extract()?;
+                    point.push(v);
+                }
+                projections.push(point);
             }
             Ok(projections)
         })
@@ -270,7 +292,8 @@ impl HandlerContext {
         #[derive(Serialize)]
         struct TransformResponse {
             method: String,
-            projections: Vec<[f32; 2]>,
+            n_components: usize,
+            projections: Vec<Vec<f32>>,
             n_points: usize,
             transform_ms: u64,
         }
@@ -279,6 +302,7 @@ impl HandlerContext {
             200,
             &TransformResponse {
                 method,
+                n_components,
                 projections,
                 n_points,
                 transform_ms,
@@ -294,6 +318,7 @@ impl HandlerContext {
         struct MethodStatus {
             fitted: bool,
             n_points: usize,
+            n_components: usize,
             supports_transform: bool,
         }
 
@@ -305,6 +330,7 @@ impl HandlerContext {
                 MethodStatus {
                     fitted: ms.is_some(),
                     n_points: ms.map_or(0, |s| s.n_points),
+                    n_components: ms.map_or(0, |s| s.n_components),
                     supports_transform: ms.map_or(m != "tsne", |s| s.supports_transform),
                 },
             );
