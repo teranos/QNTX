@@ -18,4 +18,20 @@ let () =
 
   Printf.printf "[loom] Starting on port %d\n%!" !port;
 
-  Lwt_main.run (Qntx_loom.Plugin.serve !port)
+  Lwt_main.run (
+    let open Lwt.Syntax in
+    (* Register SIGTERM handler inside the Lwt event loop so async
+     * operations (ATS persistence) can run before exit. *)
+    let sigterm_waiter, sigterm_wakener = Lwt.wait () in
+    let _sigterm_handler = Lwt_unix.on_signal Sys.sigterm (fun _signum ->
+      Lwt.wakeup sigterm_wakener ()
+    ) in
+    (* Race: serve forever OR SIGTERM arrives *)
+    let serve = Qntx_loom.Plugin.serve !port in
+    let shutdown =
+      let* () = sigterm_waiter in
+      Printf.printf "[loom] SIGTERM received — flushing buffered weaves\n%!";
+      Qntx_loom.Plugin.flush_and_persist ()
+    in
+    Lwt.pick [serve; shutdown]
+  )
