@@ -179,32 +179,55 @@ let stitch payload =
       in
       let turn = Printf.sprintf "[%s] %s" label text in
 
-      (* Get or create buffer for this branch, dedup consecutive identical turns *)
-      let entry =
-        match Hashtbl.find_opt buffers branch with
-        | Some existing when existing.turns <> [] && List.hd existing.turns = turn ->
-          existing (* Skip duplicate *)
-        | Some existing -> { context; turns = turn :: existing.turns }
-        | None -> { context; turns = [turn] }
-      in
-      let total_words = buffer_word_count entry.turns in
-
-      (* Emit when buffer exceeds threshold or session ends *)
-      let should_emit = total_words >= max_chunk_words || predicate = "SessionEnd" in
-      if should_emit && total_words > 0 then (
-        (* Emit: reverse to chronological order, join into a single block *)
-        let block = entry.turns |> List.rev |> String.concat "\n\n" in
-        Hashtbl.remove buffers branch;
-        Printf.printf "[loom] Emitting %d-word block for branch %s (%s)\n%!"
-          total_words branch
-          (if predicate = "SessionEnd" then "session end" else "threshold");
-        let num_turns = List.length entry.turns in
-        { branch; context = entry.context; buffered_words = 0; emitted = Some block; turn_count = num_turns }
+      (* SessionStart: flush existing buffer first, then start fresh *)
+      if predicate = "SessionStart" then (
+        let emitted =
+          match Hashtbl.find_opt buffers branch with
+          | Some existing when existing.turns <> [] ->
+            let block = existing.turns |> List.rev |> String.concat "\n\n" in
+            let total_words = buffer_word_count existing.turns in
+            let num_turns = List.length existing.turns in
+            Printf.printf "[loom] Emitting %d-word block for branch %s (session start)\n%!"
+              total_words branch;
+            Some (block, existing.context, num_turns)
+          | _ -> None
+        in
+        (* Start fresh buffer with the SessionStart marker *)
+        Hashtbl.replace buffers branch { context; turns = [turn] };
+        match emitted with
+        | Some (block, old_context, num_turns) ->
+          { branch; context = old_context; buffered_words = 0; emitted = Some block; turn_count = num_turns }
+        | None ->
+          Printf.printf "[loom] Buffered %d words for branch %s (%d total)\n%!"
+            (word_count turn) branch (word_count turn);
+          { branch; context; buffered_words = word_count turn; emitted = None; turn_count = 0 }
       ) else (
-        Hashtbl.replace buffers branch entry;
-        Printf.printf "[loom] Buffered %d words for branch %s (%d total)\n%!"
-          (word_count turn) branch total_words;
-        { branch; context = entry.context; buffered_words = total_words; emitted = None; turn_count = 0 }
+        (* Get or create buffer for this branch, dedup consecutive identical turns *)
+        let entry =
+          match Hashtbl.find_opt buffers branch with
+          | Some existing when existing.turns <> [] && List.hd existing.turns = turn ->
+            existing (* Skip duplicate *)
+          | Some existing -> { context; turns = turn :: existing.turns }
+          | None -> { context; turns = [turn] }
+        in
+        let total_words = buffer_word_count entry.turns in
+
+        (* Emit when buffer exceeds threshold or session ends *)
+        let should_emit = total_words >= max_chunk_words || predicate = "SessionEnd" in
+        if should_emit && total_words > 0 then (
+          let block = entry.turns |> List.rev |> String.concat "\n\n" in
+          Hashtbl.remove buffers branch;
+          Printf.printf "[loom] Emitting %d-word block for branch %s (%s)\n%!"
+            total_words branch
+            (if predicate = "SessionEnd" then "session end" else "threshold");
+          let num_turns = List.length entry.turns in
+          { branch; context = entry.context; buffered_words = 0; emitted = Some block; turn_count = num_turns }
+        ) else (
+          Hashtbl.replace buffers branch entry;
+          Printf.printf "[loom] Buffered %d words for branch %s (%d total)\n%!"
+            (word_count turn) branch total_words;
+          { branch; context = entry.context; buffered_words = total_words; emitted = None; turn_count = 0 }
+        )
       )
 
 (* Flush all buffered turns as weaves. Called on plugin shutdown
