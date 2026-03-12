@@ -1,0 +1,12 @@
+{
+    "name": "qntx-faal-plugin",
+    "description": "QNTX chaos testing plugin — configurable failure modes for plugin lifecycle testing",
+    "authors": ["QNTX"],
+    "license": "MIT",
+    "targetType": "executable",
+    "targetName": "qntx-faal-plugin",
+    "targetPath": "bin",
+    "sourcePaths": ["source"],
+    "mainSourceFile": "source/faal/app.d",
+    "dflags-ldc": ["-O2"]
+}
