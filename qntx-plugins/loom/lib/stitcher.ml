@@ -108,9 +108,13 @@ let extract_tool_command attrs =
  *
  * SessionStart / SessionEnd → session boundary markers
  *
+ * PreCompact → inline marker (no flush). Compaction in Claude Code triggers
+ *   a session restart (SessionEnd + SessionStart), so the buffer gets flushed
+ *   by the subsequent SessionStart anyway. The marker records that turns
+ *   before this point were compressed and the original content is lost.
+ *
  * TODO: SubagentStart / SubagentStop — agent delegation boundaries
- * TODO: TaskCompleted — work unit finished
- * TODO: PreCompact — context window compressed *)
+ * TODO: TaskCompleted — work unit finished *)
 let extract_text json predicate =
   match json with
   | `Assoc fields ->
@@ -135,6 +139,8 @@ let extract_text json predicate =
           (match List.assoc_opt "session_id" attrs with
            | Some (`String id) -> Some (Printf.sprintf "End Session: %s" id)
            | _ -> None)
+        | "PreCompact" ->
+          Some "Context compacted"
         | _ -> None)
      | _ -> None)
   | _ -> None
@@ -175,6 +181,7 @@ let stitch payload =
         | "Stop" -> "assistant"
         | "PreToolUse" | "GraundedPreToolUse" -> "tool"
         | "SessionStart" | "SessionEnd" -> "session"
+        | "PreCompact" -> "compaction"
         | other -> other
       in
       let turn = Printf.sprintf "[%s] %s" label text in
