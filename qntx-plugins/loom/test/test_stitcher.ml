@@ -134,9 +134,8 @@ let test_stitch_no_emit_below_threshold () =
 
 let test_stitch_accumulates_to_threshold () =
   reset ();
-  let text = long_text 60 in
-  let p1 = make_payload ~branch:"main" ~predicate:"UserPromptSubmit" ~text () in
-  let p2 = make_payload ~branch:"main" ~predicate:"UserPromptSubmit" ~text () in
+  let p1 = make_payload ~branch:"main" ~predicate:"UserPromptSubmit" ~text:(long_text 60) () in
+  let p2 = make_payload ~branch:"main" ~predicate:"Stop" ~text:(long_text 60) () in
   let r1 = Stitcher.stitch p1 in
   let r2 = Stitcher.stitch p2 in
   Alcotest.(check bool) "first: buffered" true (Option.is_none r1.emitted);
@@ -147,7 +146,7 @@ let test_stitch_accumulates_to_threshold () =
 let test_stitch_emission_order () =
   reset ();
   let p1 = make_payload ~branch:"main" ~predicate:"UserPromptSubmit" ~text:(long_text 60) () in
-  let p2 = make_payload ~branch:"main" ~predicate:"UserPromptSubmit" ~text:(long_text 60) () in
+  let p2 = make_payload ~branch:"main" ~predicate:"Stop" ~text:(long_text 60) () in
   let _ = Stitcher.stitch p1 in
   let r = Stitcher.stitch p2 in
   match r.emitted with
