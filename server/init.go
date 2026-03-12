@@ -73,7 +73,7 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	logPath := cfg.GetLogPath(appcfg.GetServerPort())
 
 	// Create logger with multi-output (console, WebSocket, file)
-	serverLogger, wsCore, wsTransport, err := createServerLogger(verbosity, logPath)
+	serverLogger, wsCore, wsTransport, err := createServerLogger(verbosity)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create logger")
 	}
@@ -497,30 +497,19 @@ func backfillSyncTree(store ats.AttestationStore, tree syncPkg.SyncTree, observe
 }
 
 // createServerLogger creates a multi-output zap logger (console + WebSocket + file)
-func createServerLogger(verbosity int, logPath string) (*zap.SugaredLogger, *wslogs.WebSocketCore, *wslogs.Transport, error) {
+func createServerLogger(verbosity int) (*zap.SugaredLogger, *wslogs.WebSocketCore, *wslogs.Transport, error) {
 	// Create WebSocket log transport
 	wsTransport := wslogs.NewTransport()
 
 	// Create WebSocket core for zap
 	wsCore := wslogs.NewWebSocketCore(logger.VerbosityToLevel(verbosity))
 
-	// Build multi-core logger: console + WebSocket + file (if verbosity >= 2)
-	cores := []zapcore.Core{
-		logger.Logger.Desugar().Core(), // Existing console/file core
+	// Build multi-core logger: global (console + file) + WebSocket
+	// File core is already part of the global logger (added in main.go init)
+	core := zapcore.NewTee(
+		logger.Logger.Desugar().Core(), // Console + file (from global logger)
 		wsCore,                         // WebSocket core for UI
-	}
-
-	// Add file logging for verbosity >= 2
-	if verbosity >= 2 {
-		fileCore, err := createFileCore(logPath, verbosity)
-		if err == nil {
-			cores = append(cores, fileCore)
-		}
-		// Don't fail if file creation fails, just skip file logging
-	}
-
-	// Create tee core (multi-output)
-	core := zapcore.NewTee(cores...)
+	)
 	serverLogger := zap.New(core).Sugar().Named("server")
 
 	return serverLogger, wsCore, wsTransport, nil
