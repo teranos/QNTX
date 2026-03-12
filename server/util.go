@@ -4,16 +4,11 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/gorilla/websocket"
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/errors"
-	"github.com/teranos/QNTX/logger"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 // getAxUpgrader creates a WebSocket upgrader with origin checking from config
@@ -106,31 +101,6 @@ func findAvailablePort(requestedPort int) (int, error) {
 	}
 
 	return 0, errors.Newf("no available ports found (tried %d, %d, %d, and range 56787-56796)", requestedPort, appcfg.DefaultServerPort, appcfg.FallbackServerPort)
-}
-
-// createFileCore creates a zap core for file logging without colors
-func createFileCore(path string, verbosity int) (zapcore.Core, error) {
-	// Ensure directory exists (os.OpenFile doesn't create intermediate directories)
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, errors.Wrapf(err, "failed to create log directory %s", dir)
-	}
-
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open log file %s", path)
-	}
-
-	// Create encoder config for plain file output (no colors)
-	encoderConfig := zap.NewDevelopmentEncoderConfig()
-	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder // No color codes in files
-	encoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("15:04:05.000")
-	encoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
-
-	encoder := zapcore.NewConsoleEncoder(encoderConfig)
-	writer := zapcore.AddSync(file)
-
-	return zapcore.NewCore(encoder, writer, logger.VerbosityToLevel(verbosity)), nil
 }
 
 // extractPathParts extracts path segments after removing a prefix
