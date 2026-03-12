@@ -347,7 +347,3 @@ func (s *QNTXServer) GetDB() *sql.DB {
 	return s.db
 }
 
-// GetLogger returns the server's structured logger (writes to console + file + WebSocket)
-func (s *QNTXServer) GetLogger() *zap.SugaredLogger {
-	return s.logger
-}
