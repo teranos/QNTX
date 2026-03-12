@@ -2,6 +2,7 @@ package logger
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/teranos/QNTX/errors"
@@ -148,6 +149,37 @@ func getLogLevel() string {
 		return "WARN+"
 	}
 	return "INFO+"
+}
+
+// AddFileOutput tees a file core onto the global logger so that everything
+// logged through logger.Logger (including Named children like plugin-loader)
+// is written to the structured log file from this point forward.
+func AddFileOutput(logPath string) error {
+	dir := filepath.Dir(logPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return errors.Wrapf(err, "failed to create log directory %s", dir)
+	}
+
+	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return errors.Wrapf(err, "failed to open log file %s", logPath)
+	}
+
+	encoderConfig := zap.NewDevelopmentEncoderConfig()
+	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+	encoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("15:04:05.000")
+	encoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
+
+	fileCore := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(encoderConfig),
+		zapcore.AddSync(file),
+		zap.InfoLevel,
+	)
+
+	combined := zapcore.NewTee(Logger.Desugar().Core(), fileCore)
+	Logger = zap.New(combined).Sugar()
+
+	return nil
 }
 
 // Cleanup flushes any buffered log entries.

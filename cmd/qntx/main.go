@@ -59,6 +59,15 @@ func init() {
 		fmt.Fprintf(os.Stderr, "Warning: Failed to initialize logger: %v\n", err)
 	}
 
+	// Add file output to the global logger before plugin loading starts.
+	// This makes plugin-loader logs visible in the structured log file.
+	if cfg, err := am.Load(); err == nil {
+		logPath := cfg.GetLogPath(am.GetServerPort())
+		if err := logger.AddFileOutput(logPath); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to add file output to logger: %v\n", err)
+		}
+	}
+
 	// Initialize domain plugin registry
 	initializePluginRegistry()
 
@@ -175,24 +184,6 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 	// Get the server's service registry (this is a bit hacky but necessary for async loading)
 	defaultServer := server.GetDefaultServer()
 
-	// Log plugin loading results through the server logger (writes to structured log file).
-	// The pluginLogger only writes to terminal, so failures are invisible in tmp/qntx-*.log.
-	if defaultServer != nil {
-		serverLogger := defaultServer.GetLogger()
-		if serverLogger != nil {
-			serverLogger.Infow("Plugin loading completed (async)",
-				"loaded", len(loadedPlugins), "enabled", len(cfg.Plugin.Enabled))
-			for name, reason := range manager.GetFailedPlugins() {
-				serverLogger.Errorw("Plugin failed to load",
-					"plugin", name, "error", reason)
-			}
-			for _, p := range loadedPlugins {
-				meta := p.Metadata()
-				serverLogger.Infow("Plugin loaded successfully",
-					"plugin", meta.Name, "version", meta.Version)
-			}
-		}
-	}
 	if defaultServer != nil && defaultServer.GetServices() != nil {
 		pluginLogger.Infow("Initializing loaded plugins with services", "count", len(loadedPlugins))
 		if err := registry.InitializeAll(context.Background(), defaultServer.GetServices()); err != nil {
