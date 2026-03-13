@@ -121,7 +121,8 @@ type QNTXServer struct {
 		Close() error
 	}
 	embeddingStore              *storage.EmbeddingStore
-	embeddingClusterInvalidator func() // called after re-cluster to invalidate centroid cache
+	embeddingClusterInvalidator func()                  // called after re-cluster to invalidate centroid cache
+	embeddingStats              schedule.EmbeddingStats // drained by ticker for periodic summary
 	graundeDBPath               string
 }
 

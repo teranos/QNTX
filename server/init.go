@@ -400,6 +400,9 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	// Initialize embedding service for semantic search (optional)
 	server.graundeDBPath = deps.config.GraundeDBPath
 	server.SetupEmbeddingService()
+	if server.embeddingStats != nil {
+		ticker.SetEmbeddingStats(server.embeddingStats)
+	}
 	server.setupEmbeddingReclusterSchedule(deps.config)
 	server.setupEmbeddingReprojectSchedule(deps.config)
 	server.setupClusterLabelSchedule(deps.config)
