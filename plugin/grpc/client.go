@@ -701,5 +701,20 @@ func (c *ExternalDomainProxy) Health(ctx context.Context) plugin.HealthStatus {
 	}
 }
 
+// ParseAxQuery calls the ParseAxQuery RPC on the remote plugin.
+// Returns the raw JSON AST bytes on success.
+func (c *ExternalDomainProxy) ParseAxQuery(ctx context.Context, query string) ([]byte, error) {
+	resp, err := c.client.ParseAxQuery(ctx, &protocol.ParseAxQueryRequest{
+		Query: query,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "ParseAxQuery RPC failed for plugin %s at %s", c.metadata.Name, c.addr)
+	}
+	if resp.Error != "" {
+		return nil, errors.Newf("ax parse: %s", resp.Error)
+	}
+	return resp.Result, nil
+}
+
 // Verify ExternalDomainProxy implements DomainPlugin
 var _ plugin.DomainPlugin = (*ExternalDomainProxy)(nil)

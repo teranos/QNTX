@@ -1,0 +1,3 @@
+(library
+ (name kern_proto)
+ (libraries ocaml-protoc-plugin ocaml-protoc-plugin.google_types))
