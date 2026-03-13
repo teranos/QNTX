@@ -230,46 +230,58 @@ proto-rust: ## Rust proto types are now generated automatically at build time
 	@echo "   No manual generation needed - uses protoc-bin-vendored at build time"
 	@echo "   See: crates/qntx-proto/build.rs"
 
+# check-plugin-version DIR EXT VERSION_FILE
+# Fails the build if source files changed but version file didn't.
+# Usage: @$(call check-plugin-version,qntx-plugins/loom,.ml,qntx-plugins/loom/lib/version.ml)
+define check-plugin-version
+	@git diff --name-only HEAD -- $(1)/ | grep -q '\.$(2)$$' && \
+	 ! git diff --name-only HEAD -- $(3) | grep -q . && \
+	 echo "" && \
+	 echo "  Impossible to debug or develop if we don't know what version is running." && \
+	 echo "  You did not modify the version of this plugin in order to differentiate it." && \
+	 echo "  Do at least a patch or debug bump to $(3)" && \
+	 echo "" && \
+	 exit 1 || true
+endef
+
 code-plugin: ## Build and install code plugin to ~/.qntx/plugins/
+	$(call check-plugin-version,qntx-code,go,qntx-code/plugin.go)
 	@$(MAKE) -C qntx-code install PREFIX=$(PREFIX)
 
 atproto-plugin: ## Build and install AT Protocol plugin to ~/.qntx/plugins/
+	$(call check-plugin-version,qntx-atproto,go,qntx-atproto/plugin.go)
 	@$(MAKE) -C qntx-atproto install PREFIX=$(PREFIX)
 
 github-plugin: ## Build and install GitHub plugin to ~/.qntx/plugins/
+	$(call check-plugin-version,qntx-github,go,qntx-github/plugin.go)
 	@$(MAKE) -C qntx-github install PREFIX=$(PREFIX)
 
 ix-json-plugin: ## Build and install ix-json plugin to ~/.qntx/plugins/
 	@$(MAKE) -C qntx-plugins/ix-json install PREFIX=$(PREFIX)
 
 ix-bin-plugin: ## Build and install ix-bin D plugin to ~/.qntx/plugins/
+	$(call check-plugin-version,qntx-plugins/ix-bin,d,qntx-plugins/ix-bin/source/ixbin/version_.d)
 	@$(MAKE) -C qntx-plugins/ix-bin install PREFIX=$(PREFIX)
 
 ix-net-plugin: ## Build and install ix-net D plugin to ~/.qntx/plugins/
+	$(call check-plugin-version,qntx-plugins/ix-net,d,qntx-plugins/ix-net/source/ixnet/version_.d)
 	@$(MAKE) -C qntx-plugins/ix-net install PREFIX=$(PREFIX)
 
 faal-plugin: ## Build and install faal chaos testing D plugin to ~/.qntx/plugins/
+	$(call check-plugin-version,qntx-plugins/faal,d,qntx-plugins/faal/source/faal/version_.d)
 	@$(MAKE) -C qntx-plugins/faal install PREFIX=$(PREFIX)
 
 openrouter-plugin: ## Build and install OpenRouter plugin to ~/.qntx/plugins/
+	$(call check-plugin-version,qntx-openrouter,go,qntx-openrouter/plugin.go)
 	@$(MAKE) -C qntx-openrouter install PREFIX=$(PREFIX)
 
 pty-glyph-plugin: ## Build and install pty-glyph plugin to ~/.qntx/plugins/
+	$(call check-plugin-version,qntx-plugins/pty-glyph,rs,qntx-plugins/pty-glyph/Cargo.toml)
 	@$(MAKE) -C qntx-plugins/pty-glyph install PREFIX=$(PREFIX)
 
-loom-plugin: _check-loom-version ## Build and install loom plugin (OCaml) to ~/.qntx/plugins/
+loom-plugin: ## Build and install loom plugin (OCaml) to ~/.qntx/plugins/
+	$(call check-plugin-version,qntx-plugins/loom,ml,qntx-plugins/loom/lib/version.ml)
 	@$(MAKE) -C qntx-plugins/loom install PREFIX=$(PREFIX)
-
-# TODO: Give all plugins this version-gate treatment (each plugin has its own version file)
-_check-loom-version:
-	@git diff --name-only HEAD -- qntx-plugins/loom/ | grep -q '\.ml$$' && \
-	 ! git diff --name-only HEAD -- qntx-plugins/loom/lib/version.ml | grep -q . && \
-	 echo "" && \
-	 echo "  Impossible to debug or develop if we don't know what version is running." && \
-	 echo "  You did not modify the version of this plugin in order to differentiate it." && \
-	 echo "  Do at least a patch or debug bump to version.ml" && \
-	 echo "" && \
-	 exit 1 || true
 
 rust-vidstream: ## Build Rust vidstream library with ONNX support (for CGO integration)
 	@echo "Building Rust vidstream library with ONNX..."
