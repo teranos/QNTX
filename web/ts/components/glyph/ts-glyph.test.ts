@@ -115,8 +115,8 @@ describe('TS Glyph - Tim (Happy Path)', () => {
         const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
         expect(titleBar).toBeTruthy();
         expect(titleBar.querySelector('span')?.textContent).toBe('ts');
-        expect(element.querySelector('.glyph-play-btn')).toBeTruthy();
-        expect(element.querySelector('.glyph-play-btn')?.textContent).toBe('\u25B6');
+        expect(element.querySelector('.titlebar-btn')).toBeTruthy();
+        expect(element.querySelector('.titlebar-btn')?.textContent).toBe('\u25B6');
     });
 
     test('Tim sees TS glyph is always orange (local-only, browser-native)', async () => {
