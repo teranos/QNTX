@@ -511,8 +511,10 @@ func emitClusterLifecycleAttestation(atsStore ats.AttestationStore, ev storage.C
 // getUndeliveredDetail returns the detail text from the most recent undelivered
 // deferred:cluster-update attestation. Returns empty string if all news has been
 // delivered or no prior news exists.
-func getUndeliveredDetail(atsStore ats.AttestationStore, projectCtx string) string {
-	// Find the latest deferred:cluster-update
+//
+// Delivery acks are written by Graunde into Graunde's DB, so we check there.
+func getUndeliveredDetail(atsStore ats.AttestationStore, projectCtx string, graundeDBPath string) string {
+	// Find the latest deferred:cluster-update in QNTX's store
 	deferred, err := atsStore.GetAttestations(ats.AttestationFilter{
 		Predicates: []string{"deferred:cluster-update"},
 		Contexts:   []string{projectCtx},
@@ -522,14 +524,21 @@ func getUndeliveredDetail(atsStore ats.AttestationStore, projectCtx string) stri
 		return ""
 	}
 
-	// Check if there's a delivery ack newer than the deferred news
-	acks, err := atsStore.GetAttestations(ats.AttestationFilter{
-		Predicates: []string{"delivered:cluster-update"},
-		Contexts:   []string{projectCtx},
-		Limit:      1,
-	})
-	if err == nil && len(acks) > 0 && !acks[0].Timestamp.Before(deferred[0].Timestamp) {
-		return "" // already delivered
+	// Check Graunde's DB for delivery ack
+	if graundeDBPath != "" {
+		db, err := sql.Open("sqlite3", graundeDBPath+"?_journal_mode=WAL&_busy_timeout=5000&mode=ro")
+		if err == nil {
+			defer db.Close()
+			var ackTS string
+			err = db.QueryRow(`SELECT timestamp FROM attestations
+				WHERE predicates LIKE '%delivered:cluster-update%'
+				AND contexts LIKE ?
+				ORDER BY rowid DESC LIMIT 1`, "%"+projectCtx+"%").Scan(&ackTS)
+			if err == nil {
+				// Ack exists — news was delivered
+				return ""
+			}
+		}
 	}
 
 	// Extract detail from the undelivered news
@@ -612,7 +621,7 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 	}
 
 	// Accumulate: if there's undelivered news from a previous run, prepend it
-	if prior := getUndeliveredDetail(atsStore, projectCtx); prior != "" {
+	if prior := getUndeliveredDetail(atsStore, projectCtx, graundeDBPath); prior != "" {
 		detail = prior + "\n" + detail
 		logger.Infow("Accumulating with undelivered prior news")
 	}
