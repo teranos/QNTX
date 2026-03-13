@@ -88,18 +88,18 @@
 }
 
 /* Shared title bar for canvas glyphs (ix, prompt, and similar) */
-/* Shared play/execute button for canvas glyphs (ix, prompt, py) */
+/* Shared small icon button for canvas glyphs (play, copy, dismiss, etc.) */
 .glyph-play-btn {
     width: 20px;
     height: 20px;
     padding: 0;
     font-size: 11px;
-    border-radius: 3px;
+    border-radius: var(--border-radius);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.15s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     background-color: var(--bg-hover);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
