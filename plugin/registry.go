@@ -55,6 +55,17 @@ func (r *Registry) Register(plugin DomainPlugin) error {
 	return nil
 }
 
+// Unregister removes a plugin from the registry so it can be re-registered after restart.
+func (r *Registry) Unregister(name string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	delete(r.plugins, name)
+	r.states[name] = StateRestarting
+	delete(r.errors, name)
+	r.logger.Infof("Unregistered plugin '%s' for restart", name)
+}
+
 // Get retrieves a domain plugin by name
 func (r *Registry) Get(name string) (DomainPlugin, bool) {
 	r.mu.RLock()

@@ -857,8 +857,23 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 		// Broadcast plugin health update to all clients
 		s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin resumed")
 
+	case "restart":
+		pm := s.getPluginManager()
+		if pm == nil {
+			writeError(w, http.StatusServiceUnavailable, "Plugin manager not available")
+			return
+		}
+		err = pm.RestartPlugin(ctx, name, s.pluginRegistry, s.services)
+		if err != nil {
+			s.logger.Warnw("Failed to restart plugin", "plugin", name, "error", err)
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		s.logger.Infow("Plugin restarted", "plugin", name)
+		s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin restarted")
+
 	default:
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("Unknown action: %s (expected 'pause' or 'resume')", action))
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("Unknown action: %s (expected 'pause', 'resume', or 'restart')", action))
 		return
 	}
 

@@ -188,8 +188,7 @@
 }
 
 .qntx-btn-ghost:hover:not(:disabled) {
-    background: rgba(0, 0, 0, 0.05);
-    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
 }
 
 /* States */
@@ -221,6 +220,12 @@
 .qntx-btn-warning.qntx-btn-confirming {
     background: #ffc107;
     border-color: #ffc107;
+}
+
+.qntx-btn-ghost.qntx-btn-confirming {
+    color: #e8a040;
+    background: transparent;
+    border-color: transparent;
 }
 
 /* Focus state */

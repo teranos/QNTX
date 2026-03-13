@@ -92,6 +92,8 @@ const (
 	StateStopped PluginState = "stopped"
 	// StateFailed indicates the plugin failed to initialize or encountered a fatal error
 	StateFailed PluginState = "failed"
+	// StateRestarting indicates the plugin is being intentionally killed and relaunched
+	StateRestarting PluginState = "restarting"
 )
 
 // PausablePlugin is an optional interface for plugins that support pause/resume.

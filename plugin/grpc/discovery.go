@@ -168,7 +168,9 @@ func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig)
 			m.mu.Unlock()
 
 			// Enabled means forever — retry until server shuts down
-			go m.retryPluginForever(m.shutdownCtx, config)
+			// Registry/services not yet available at boot — passed as nil,
+			// registration happens later in loadPluginsAsync.
+			go m.retryPluginForever(m.shutdownCtx, config, nil, nil)
 			continue
 		}
 	}
@@ -178,7 +180,8 @@ func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig)
 
 // retryPluginForever kills and relaunches a plugin process until it loads.
 // Each cycle: launch process → try connecting 3 times (1s, 3s, 9s) → if all fail, kill and relaunch.
-func (m *PluginManager) retryPluginForever(ctx context.Context, config PluginConfig) {
+// registry and services may be nil during early boot (before server is ready).
+func (m *PluginManager) retryPluginForever(ctx context.Context, config PluginConfig, registry *plugin.Registry, services plugin.ServiceRegistry) {
 	cycle := 0
 	for {
 		cycle++
@@ -206,6 +209,11 @@ func (m *PluginManager) retryPluginForever(ctx context.Context, config PluginCon
 			m.mu.Lock()
 			delete(m.failedPlugins, config.Name)
 			m.mu.Unlock()
+
+			if registry != nil {
+				m.registerRestarted(ctx, config.Name, registry, services)
+			}
+
 			m.logger.Infof("Plugin '%s' loaded successfully on restart cycle %d", config.Name, cycle)
 			return
 		}
@@ -214,6 +222,9 @@ func (m *PluginManager) retryPluginForever(ctx context.Context, config PluginCon
 		m.mu.Lock()
 		m.failedPlugins[config.Name] = err.Error()
 		m.mu.Unlock()
+		if registry != nil {
+			registry.MarkFailed(config.Name, err.Error())
+		}
 
 		// Wait before next full restart cycle
 		select {
@@ -676,6 +687,66 @@ func (m *PluginManager) ReinitializePlugin(ctx context.Context, pluginName strin
 
 	m.logger.Infof("Successfully reinitialized plugin '%s' with updated configuration", pluginName)
 	return nil
+}
+
+// RestartPlugin kills a running plugin and relaunches it from its binary.
+// The new process picks up whatever binary is on disk — use after rebuilding.
+// If the relaunch fails, retries forever in the background (same as boot).
+func (m *PluginManager) RestartPlugin(ctx context.Context, name string, registry *plugin.Registry, services plugin.ServiceRegistry) error {
+	// Grab config and kill old process
+	m.mu.Lock()
+	p, exists := m.plugins[name]
+	if !exists {
+		m.mu.Unlock()
+		return errors.Newf("plugin not loaded: %s", name)
+	}
+	config := p.config
+	if p.process != nil {
+		p.process.Kill()
+	}
+	delete(m.plugins, name)
+	m.mu.Unlock()
+
+	// Close old gRPC connection
+	p.client.Shutdown(ctx)
+
+	// Unregister from registry so Register doesn't hit "already registered"
+	registry.Unregister(name)
+
+	m.logger.Infof("Killed plugin '%s', relaunching from %s", name, config.Binary)
+
+	// Relaunch — if it fails, retry forever in background
+	if err := m.loadPlugin(ctx, config); err != nil {
+		m.logger.Errorf("Restart of '%s' failed: %v — retrying in background", name, err)
+		m.mu.Lock()
+		m.failedPlugins[name] = err.Error()
+		m.mu.Unlock()
+		registry.MarkFailed(name, err.Error())
+		go m.retryPluginForever(m.shutdownCtx, config, registry, services)
+		return nil // not an error to the caller — retry is in progress
+	}
+
+	m.registerRestarted(ctx, name, registry, services)
+	return nil
+}
+
+// registerRestarted re-registers a successfully relaunched plugin with the
+// registry and reinitializes it with services.
+func (m *PluginManager) registerRestarted(ctx context.Context, name string, registry *plugin.Registry, services plugin.ServiceRegistry) {
+	newPlugin, _ := m.GetPlugin(name)
+	if err := registry.Register(newPlugin); err != nil {
+		m.logger.Errorf("Failed to re-register plugin '%s': %v", name, err)
+		return
+	}
+	registry.MarkReady(name)
+
+	if services != nil {
+		if err := m.ReinitializePlugin(ctx, name, services); err != nil {
+			m.logger.Errorf("Failed to reinitialize plugin '%s' after restart: %v", name, err)
+		}
+	}
+
+	m.logger.Infof("Plugin '%s' restarted successfully", name)
 }
 
 // Shutdown stops all managed plugins and retry goroutines.

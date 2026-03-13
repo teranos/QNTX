@@ -305,25 +305,39 @@ function hydratePluginButtons(container: HTMLElement): void {
     const config: HydrateConfig = {};
 
     for (const plugin of plugins) {
-        if (!plugin.pausable) continue;
+        if (plugin.pausable) {
+            if (plugin.state === 'running') {
+                config[`plugin-pause-${plugin.name}`] = {
+                    label: '\u275A\u275A Pause',
+                    onClick: async () => {
+                        await pausePlugin(plugin.name);
+                    },
+                    variant: 'secondary',
+                    size: 'small'
+                };
+            } else if (plugin.state === 'paused') {
+                config[`plugin-resume-${plugin.name}`] = {
+                    label: '\u25B6 Resume',
+                    onClick: async () => {
+                        await resumePlugin(plugin.name);
+                    },
+                    variant: 'primary',
+                    size: 'small'
+                };
+            }
+        }
 
         if (plugin.state === 'running') {
-            config[`plugin-pause-${plugin.name}`] = {
-                label: '\u275A\u275A Pause',
+            config[`plugin-restart-${plugin.name}`] = {
+                label: 'Restart',
                 onClick: async () => {
-                    await pausePlugin(plugin.name);
+                    await restartPlugin(plugin.name);
                 },
-                variant: 'secondary',
-                size: 'small'
-            };
-        } else if (plugin.state === 'paused') {
-            config[`plugin-resume-${plugin.name}`] = {
-                label: '\u25B6 Resume',
-                onClick: async () => {
-                    await resumePlugin(plugin.name);
-                },
-                variant: 'primary',
-                size: 'small'
+                variant: 'ghost',
+                size: 'small',
+                confirmation: {
+                    label: 'Confirm'
+                }
             };
         }
     }
@@ -429,10 +443,15 @@ function renderPlugin(plugin: PluginInfo): string {
     let controls = '';
     if (plugin.pausable) {
         if (plugin.state === 'running') {
-            controls = buttonPlaceholder(`btn:plugin-pause:${plugin.name}`, '\u275A\u275A Pause', 'plugin-pause-btn');
+            controls = buttonPlaceholder(`plugin-pause-${plugin.name}`, '\u275A\u275A Pause', 'plugin-pause-btn');
         } else if (plugin.state === 'paused') {
-            controls = buttonPlaceholder(`btn:plugin-resume:${plugin.name}`, '\u25B6 Resume', 'plugin-resume-btn');
+            controls = buttonPlaceholder(`plugin-resume-${plugin.name}`, '\u25B6 Resume', 'plugin-resume-btn');
         }
+    }
+
+    let restartBtn = '';
+    if (plugin.state === 'running') {
+        restartBtn = buttonPlaceholder(`plugin-restart-${plugin.name}`, 'Restart', 'plugin-restart-btn');
     }
 
     return `
@@ -451,6 +470,7 @@ function renderPlugin(plugin: PluginInfo): string {
                         <span class="plugin-status-icon">${statusIcon}</span>
                         <span class="plugin-status-text">${statusText}</span>
                     </div>
+                    ${restartBtn}
                 </div>
             </div>
             ${controls ? `<div class="plugin-controls">${controls}</div>` : ''}
@@ -465,6 +485,7 @@ function getStateClass(state: string): string {
         case 'running': return 'plugin-state-running';
         case 'paused': return 'plugin-state-paused';
         case 'stopped': return 'plugin-state-stopped';
+        case 'restarting': return 'plugin-state-restarting';
         default: return '';
     }
 }
@@ -474,6 +495,7 @@ function getStateIcon(state: string): string {
         case 'running': return '&#9654;';
         case 'paused': return '&#10074;&#10074;';
         case 'stopped': return '&#9632;';
+        case 'restarting': return '&#8635;';
         default: return '';
     }
 }
@@ -516,6 +538,22 @@ async function resumePlugin(name: string): Promise<void> {
     } catch (error: unknown) {
         handleError(error, 'Failed to resume plugin', { context: SEG.UI });
     }
+}
+
+async function restartPlugin(name: string): Promise<void> {
+    log.debug(SEG.UI, 'Restarting plugin:', name);
+    const response = await apiFetch(`/api/plugins/${name}/restart`, {
+        method: 'POST'
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to restart ${name}: ${errorText}`);
+    }
+
+    await fetchPlugins();
+    render();
+    log.debug(SEG.UI, 'Plugin restarted:', name);
 }
 
 async function togglePluginConfig(pluginName: string): Promise<void> {
