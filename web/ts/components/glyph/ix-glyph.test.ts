@@ -85,7 +85,7 @@ describe('IX Glyph Auto-Sizing - Tim (Happy Path)', () => {
         container.appendChild(element);
 
         // Play button exists
-        const playBtn = element.querySelector('.glyph-play-btn');
+        const playBtn = element.querySelector('.titlebar-btn');
         expect(playBtn).toBeTruthy();
         expect(playBtn?.textContent).toBe('▶');
     });
