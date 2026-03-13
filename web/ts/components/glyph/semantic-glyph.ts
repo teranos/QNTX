@@ -25,16 +25,11 @@ import {
     CANVAS_GLYPH_TITLE_BAR_HEIGHT,
     MAX_VIEWPORT_HEIGHT_RATIO
 } from './glyph';
-
-function appendEmptyState(container: HTMLElement): void {
-    const empty = document.createElement('div');
-    empty.className = 'se-glyph-empty-state';
-    empty.textContent = 'No matches yet';
-    empty.style.color = 'var(--text-secondary)';
-    empty.style.textAlign = 'center';
-    empty.style.padding = '20px';
-    container.appendChild(empty);
-}
+import {
+    createColorStateSetter,
+    appendEmptyState,
+    showQueryError,
+} from './query-glyph-states';
 
 /**
  * Create a Semantic Search glyph using canvasPlaced() with custom title bar.
@@ -239,19 +234,8 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
 
     element.appendChild(titleBar);
 
-    // Color states (same palette as AX)
-    const COLOR_STATES = {
-        idle:    { container: 'rgba(30, 30, 35, 0.92)',  titleBar: 'var(--bg-tertiary)' },
-        pending: { container: 'rgba(42, 43, 61, 0.92)',  titleBar: 'rgba(42, 43, 61, 0.92)' },
-        orange:  { container: 'rgba(61, 45, 20, 0.92)',  titleBar: '#5c3d1a' },
-        teal:    { container: 'rgba(31, 61, 61, 0.92)',  titleBar: '#1f3d3d' },
-    } as const;
-
-    function setColorState(state: keyof typeof COLOR_STATES) {
-        element.style.backgroundColor = COLOR_STATES[state].container;
-        titleBar.style.backgroundColor = COLOR_STATES[state].titleBar;
-    }
-
+    // Color states (shared palette with AX)
+    const setColorState = createColorStateSetter(element, titleBar);
     setColorState('idle');
 
     // Results container
@@ -265,7 +249,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
     resultsContainer.style.fontSize = '12px';
     resultsContainer.style.fontFamily = 'monospace';
 
-    appendEmptyState(resultsContainer);
+    appendEmptyState(resultsContainer, 'se-glyph-empty-state');
 
     element.appendChild(resultsContainer);
 
@@ -315,7 +299,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
         setColorState('pending');
 
         resultsContainer.innerHTML = '';
-        appendEmptyState(resultsContainer);
+        appendEmptyState(resultsContainer, 'se-glyph-empty-state');
 
         saveTimeout = window.setTimeout(() => {
             commitQuery();
@@ -584,45 +568,5 @@ export function updateSemanticGlyphError(glyphId: string, errorMsg: string, seve
         return;
     }
 
-    // Remove empty state if present
-    const emptyState = resultsContainer.querySelector('.se-glyph-empty-state');
-    if (emptyState) {
-        emptyState.remove();
-    }
-
-    // Remove existing error display if present
-    const existingError = resultsContainer.querySelector('.se-glyph-error');
-    if (existingError) {
-        existingError.remove();
-    }
-
-    // Create error display
-    const errorDisplay = document.createElement('div');
-    errorDisplay.className = 'se-glyph-error';
-    errorDisplay.style.padding = '6px 8px';
-    errorDisplay.style.fontSize = '11px';
-    errorDisplay.style.fontFamily = 'monospace';
-    errorDisplay.style.backgroundColor = severity === 'error' ? 'var(--glyph-status-error-section-bg)' : '#2b2b1a';
-    errorDisplay.style.color = severity === 'error' ? '#ff9999' : '#ffcc66';
-    errorDisplay.style.whiteSpace = 'pre-wrap';
-    errorDisplay.style.wordBreak = 'break-word';
-    errorDisplay.style.overflowWrap = 'anywhere';
-    errorDisplay.style.maxWidth = '100%';
-
-    errorDisplay.textContent = `${severity.toUpperCase()}: ${errorMsg}`;
-
-    if (details && details.length > 0) {
-        errorDisplay.textContent += '\n\n' + details.map(d => `  ${d}`).join('\n');
-    }
-
-    resultsContainer.insertBefore(errorDisplay, resultsContainer.firstChild);
-
-    // Update glyph + title bar background to indicate error state
-    const errorBg = severity === 'error' ? 'rgba(61, 31, 31, 0.92)' : 'rgba(61, 61, 31, 0.92)';
-    const errorTitleBg = severity === 'error' ? '#3d1f1f' : '#3d3d1f';
-    glyph.style.backgroundColor = errorBg;
-    const errorTitleBar = glyph.querySelector('.glyph-title-bar') as HTMLElement;
-    if (errorTitleBar) errorTitleBar.style.backgroundColor = errorTitleBg;
-
-    log.debug(SEG.GLYPH, `[SeGlyph] Displayed ${severity} for ${glyphId}:`, errorMsg);
+    showQueryError(glyph, resultsContainer, 'se-glyph-empty-state', 'se-glyph-error', severity, errorMsg, 'SeGlyph', glyphId, details);
 }
