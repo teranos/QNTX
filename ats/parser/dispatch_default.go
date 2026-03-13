@@ -1,4 +1,4 @@
-//go:build !qntxwasm
+//go:build !qntxwasm && !kern
 
 package parser
 
