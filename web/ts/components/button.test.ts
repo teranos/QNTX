@@ -133,7 +133,7 @@ describe('Button', () => {
             expect(btn.element.classList.contains('qntx-btn-loading')).toBe(true);
             expect(btn.element.getAttribute('aria-busy')).toBe('true');
             expect(btn.element.disabled).toBe(true);
-            expect(btn.element.textContent).toContain('Save...');
+            expect(btn.element.querySelector('.qntx-btn-spinner')).not.toBeNull();
         });
 
         it('removes loading state', () => {
@@ -164,7 +164,7 @@ describe('Button', () => {
     });
 
     describe('error state', () => {
-        it('shows error display', () => {
+        it('shows error inline with title', () => {
             const btn = new Button({
                 label: 'Submit',
                 onClick: () => {}
@@ -173,9 +173,9 @@ describe('Button', () => {
 
             btn.setError(new Error('Network error'));
 
-            const errorDisplay = container.querySelector('.qntx-btn-error-display');
-            expect(errorDisplay).not.toBeNull();
-            expect(errorDisplay?.textContent).toContain('Network error');
+            expect(btn.element.classList.contains('qntx-btn-error')).toBe(true);
+            expect(btn.element.title).toBe('Network error');
+            expect(btn.element.textContent).toBe('Error');
         });
 
         it('clears error display', () => {

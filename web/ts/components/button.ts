@@ -95,7 +95,6 @@ export class Button {
     private state: ButtonState;
     private originalLabel: string;
     private confirmTimeout: number | null = null;
-    private errorElement: HTMLElement | null = null;
 
     constructor(config: ButtonConfig) {
         this.config = {
@@ -244,7 +243,9 @@ export class Button {
         this.element.setAttribute('aria-busy', String(this.state.loading));
 
         // Update tooltip
-        if (this.state.disabled && this.config.disabledTooltip) {
+        if (this.state.error) {
+            this.element.title = this.state.error.message;
+        } else if (this.state.disabled && this.config.disabledTooltip) {
             this.element.title = this.config.disabledTooltip;
         } else {
             this.element.title = '';
@@ -253,96 +254,39 @@ export class Button {
         // Build content
         this.element.innerHTML = '';
 
-        // Icon (if present)
-        if (this.config.icon && !this.state.loading) {
-            const iconSpan = document.createElement('span');
-            iconSpan.className = 'qntx-btn-icon';
-            iconSpan.textContent = this.config.icon;
-            this.element.appendChild(iconSpan);
-        }
-
-        // Loading spinner
         if (this.state.loading) {
+            // Loading: spinner only, no label change
             const spinner = document.createElement('span');
             spinner.className = 'qntx-btn-spinner';
             spinner.setAttribute('aria-hidden', 'true');
             this.element.appendChild(spinner);
-        }
-
-        // Label
-        const labelSpan = document.createElement('span');
-        labelSpan.className = 'qntx-btn-label';
-
-        if (this.state.loading) {
-            labelSpan.textContent = this.originalLabel + '...';
-        } else if (this.state.confirming && this.config.confirmation) {
-            labelSpan.textContent = this.config.confirmation.label;
         } else {
-            labelSpan.textContent = this.originalLabel;
+            // Icon (if present)
+            if (this.config.icon) {
+                const iconSpan = document.createElement('span');
+                iconSpan.className = 'qntx-btn-icon';
+                iconSpan.textContent = this.config.icon;
+                this.element.appendChild(iconSpan);
+            }
+
+            // Label
+            const labelSpan = document.createElement('span');
+            labelSpan.className = 'qntx-btn-label';
+
+            if (this.state.error) {
+                labelSpan.textContent = 'Error';
+            } else if (this.state.confirming && this.config.confirmation) {
+                labelSpan.textContent = this.config.confirmation.label;
+            } else {
+                labelSpan.textContent = this.originalLabel;
+            }
+
+            this.element.appendChild(labelSpan);
         }
-
-        this.element.appendChild(labelSpan);
-
-        // Render error if present
-        this.renderError();
     }
 
-    /**
-     * Render slide-out error display
-     */
-    private renderError(): void {
-        // Remove existing error element
-        if (this.errorElement) {
-            this.errorElement.remove();
-            this.errorElement = null;
-        }
-
-        if (!this.state.error) {
-            return;
-        }
-
-        // Create error element that slides out from button
-        this.errorElement = document.createElement('div');
-        this.errorElement.className = 'qntx-btn-error-display';
-        this.errorElement.setAttribute('role', 'alert');
-        this.errorElement.setAttribute('aria-live', 'polite');
-
-        const errorIcon = document.createElement('span');
-        errorIcon.className = 'qntx-btn-error-icon';
-        errorIcon.textContent = '⚠';
-        errorIcon.setAttribute('aria-hidden', 'true');
-
-        const errorMessage = document.createElement('span');
-        errorMessage.className = 'qntx-btn-error-message';
-        errorMessage.textContent = this.state.error.message;
-
-        const dismissBtn = document.createElement('button');
-        dismissBtn.className = 'qntx-btn-error-dismiss';
-        dismissBtn.setAttribute('aria-label', 'Dismiss error');
-        dismissBtn.textContent = '×';
-        dismissBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.clearError();
-        });
-
-        this.errorElement.appendChild(errorIcon);
-        this.errorElement.appendChild(errorMessage);
-        this.errorElement.appendChild(dismissBtn);
-
-        // Insert after button (requires wrapper or absolute positioning)
-        this.element.insertAdjacentElement('afterend', this.errorElement);
-
-        // Trigger animation (use setTimeout fallback for test environments)
-        const scheduleFrame = typeof requestAnimationFrame !== 'undefined'
-            ? requestAnimationFrame
-            : (cb: () => void) => setTimeout(cb, 0);
-
-        // Capture element in closure to avoid race condition with clearError()
-        const errorEl = this.errorElement;
-        scheduleFrame(() => {
-            errorEl?.classList.add('qntx-btn-error-visible');
-        });
-    }
+    // Error rendering is now inline — the button itself shows "Error" label
+    // with the full message on hover (title attribute). No external elements.
 
     // Public API
 
@@ -367,13 +311,6 @@ export class Button {
      */
     public clearError(): void {
         this.state.error = null;
-        if (this.errorElement) {
-            this.errorElement.classList.remove('qntx-btn-error-visible');
-            setTimeout(() => {
-                this.errorElement?.remove();
-                this.errorElement = null;
-            }, 200);
-        }
         this.render();
     }
 
@@ -426,9 +363,6 @@ export class Button {
     public destroy(): void {
         if (this.confirmTimeout) {
             clearTimeout(this.confirmTimeout);
-        }
-        if (this.errorElement) {
-            this.errorElement.remove();
         }
         this.element.remove();
 
