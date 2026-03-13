@@ -45,6 +45,11 @@ type CreationStats interface {
 	DrainCreationCounts() (total int, topPredicateContexts []string)
 }
 
+// EmbeddingStats drains accumulated embedding activity counters.
+type EmbeddingStats interface {
+	DrainEmbeddingCounts() (embedded int, clusterCounts []string, noise int)
+}
+
 // Ticker manages periodic execution of scheduled ATS jobs
 // Runs every second to check for jobs that need execution
 type Ticker struct {
@@ -64,6 +69,7 @@ type Ticker struct {
 	lastActiveWork  int // Track last active work count to detect changes
 	evictionStats   EvictionStats
 	creationStats   CreationStats
+	embeddingStats  EmbeddingStats
 }
 
 // TickerConfig contains configuration for the Pulse ticker
@@ -109,6 +115,11 @@ func (t *Ticker) SetEvictionStats(es EvictionStats) {
 // SetCreationStats injects a creation counter for periodic summary logging.
 func (t *Ticker) SetCreationStats(cs CreationStats) {
 	t.creationStats = cs
+}
+
+// SetEmbeddingStats injects an embedding counter for periodic summary logging.
+func (t *Ticker) SetEmbeddingStats(es EmbeddingStats) {
+	t.embeddingStats = es
 }
 
 // Start begins the ticker loop
@@ -247,7 +258,13 @@ func (t *Ticker) logActivitySummary() {
 		evictionEvents, evicted = t.evictionStats.DrainEvictionCounts()
 	}
 
-	if created == 0 && evictionEvents == 0 {
+	var embedded, noise int
+	var clusterCounts []string
+	if t.embeddingStats != nil {
+		embedded, clusterCounts, noise = t.embeddingStats.DrainEmbeddingCounts()
+	}
+
+	if created == 0 && evictionEvents == 0 && embedded == 0 {
 		return
 	}
 
@@ -258,11 +275,21 @@ func (t *Ticker) logActivitySummary() {
 	if evictionEvents > 0 {
 		parts = append(parts, fmt.Sprintf("evicted %d", evicted))
 	}
+	if embedded > 0 {
+		embPart := fmt.Sprintf("embedded %d", embedded)
+		if noise > 0 {
+			embPart += fmt.Sprintf(" (%d noise)", noise)
+		}
+		parts = append(parts, embPart)
+	}
 
 	msg := strings.Join(parts, ", ")
 
 	if len(topPCs) > 0 {
 		msg += " (top: " + strings.Join(topPCs, ", ") + ")"
+	}
+	if len(clusterCounts) > 0 {
+		msg += " [clusters: " + strings.Join(clusterCounts, ", ") + "]"
 	}
 
 	t.pulseLog.Infow(msg)

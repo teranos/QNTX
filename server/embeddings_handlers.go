@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	appcfg "github.com/teranos/QNTX/am"
@@ -665,6 +667,7 @@ func (s *QNTXServer) SetupEmbeddingService() {
 
 	storage.RegisterObserver(observer)
 	s.embeddingClusterInvalidator = observer.InvalidateClusterCache
+	s.embeddingStats = observer
 
 	s.logger.Infow("Embedding service initialized",
 		"path", modelPath,
@@ -702,6 +705,12 @@ type EmbeddingObserver struct {
 	// The watcher engine uses this to run semantic matching with the pre-computed
 	// embedding, eliminating redundant GenerateEmbedding FFI calls.
 	onEmbedded func(as *types.As, embedding []float32)
+
+	// Periodic summary counters (drained by ticker)
+	embedded      atomic.Int64
+	clusterHits   sync.Map // cluster display name (string) → *atomic.Int64
+	clusterNoise  atomic.Int64
+	clusterLabels sync.Map // cluster_id (int) → label (string), refreshed with centroid cache
 }
 
 // InvalidateClusterCache clears cached centroids so the next prediction reloads from DB.
@@ -765,7 +774,9 @@ func (o *EmbeddingObserver) OnAttestationCreated(as *types.As) {
 		return
 	}
 
-	o.logger.Infow("Auto-embedded attestation",
+	o.embedded.Add(1)
+
+	o.logger.Debugw("Auto-embedded attestation",
 		"attestation_id", as.ID,
 		"text_length", len(text),
 		"inference_ms", result.InferenceMS)
@@ -805,6 +816,9 @@ func (o *EmbeddingObserver) predictCluster(embeddingID, attestationID string, em
 		o.clusterCache = loaded
 		o.clusterMu.Unlock()
 		centroids = loaded
+
+		// Refresh cluster label cache
+		o.refreshClusterLabels()
 	}
 
 	clusterID, prob, err := o.embeddingStore.PredictCluster(
@@ -821,6 +835,7 @@ func (o *EmbeddingObserver) predictCluster(embeddingID, attestationID string, em
 	}
 
 	if clusterID == storage.ClusterNoise {
+		o.clusterNoise.Add(1)
 		return // below threshold, stays as noise
 	}
 
@@ -835,7 +850,12 @@ func (o *EmbeddingObserver) predictCluster(embeddingID, attestationID string, em
 		return
 	}
 
-	o.logger.Infow("Predicted cluster for new embedding",
+	// Track cluster hit for periodic summary
+	name := o.clusterDisplayName(clusterID)
+	val, _ := o.clusterHits.LoadOrStore(name, &atomic.Int64{})
+	val.(*atomic.Int64).Add(1)
+
+	o.logger.Debugw("Predicted cluster for new embedding",
 		"attestation_id", attestationID,
 		"embedding_id", embeddingID,
 		"cluster_id", clusterID,
@@ -856,6 +876,64 @@ func (o *EmbeddingObserver) extractRichText(as *types.As) string {
 	}
 
 	return extractRichTextFromAttributes(as.Attributes, richFields)
+}
+
+// clusterDisplayName returns a human-readable name for a cluster ID.
+// Uses the cached label if available, falls back to "cluster:<id>".
+func (o *EmbeddingObserver) clusterDisplayName(clusterID int) string {
+	if label, ok := o.clusterLabels.Load(clusterID); ok {
+		return label.(string)
+	}
+	return "cluster:" + strconv.Itoa(clusterID)
+}
+
+// refreshClusterLabels loads cluster labels from the DB into the label cache.
+func (o *EmbeddingObserver) refreshClusterLabels() {
+	clusters, err := o.embeddingStore.GetActiveClusterIdentities()
+	if err != nil {
+		o.logger.Debugw("Failed to refresh cluster labels", "error", err)
+		return
+	}
+	for _, c := range clusters {
+		if c.Label != nil && *c.Label != "" {
+			o.clusterLabels.Store(c.ID, *c.Label)
+		}
+	}
+}
+
+// DrainEmbeddingCounts atomically reads and resets embedding activity counters.
+// Returns total embedded, cluster assignment breakdown, and noise count.
+func (o *EmbeddingObserver) DrainEmbeddingCounts() (embedded int, clusterCounts []string, noise int) {
+	embedded = int(o.embedded.Swap(0))
+	noise = int(o.clusterNoise.Swap(0))
+
+	var pairs []pairCount
+	o.clusterHits.Range(func(key, value any) bool {
+		count := value.(*atomic.Int64).Swap(0)
+		if count > 0 {
+			pairs = append(pairs, pairCount{Key: key.(string), Count: count})
+		}
+		if count == 0 {
+			o.clusterHits.Delete(key)
+		}
+		return true
+	})
+
+	sort.Slice(pairs, func(i, j int) bool {
+		return pairs[i].Count > pairs[j].Count
+	})
+
+	// Show top 5 clusters
+	limit := 5
+	if len(pairs) < limit {
+		limit = len(pairs)
+	}
+	clusterCounts = make([]string, limit)
+	for i := 0; i < limit; i++ {
+		clusterCounts[i] = formatPairCount(pairs[i])
+	}
+
+	return embedded, clusterCounts, noise
 }
 
 // extractRichTextFromAttributes extracts text from the named rich fields in an
