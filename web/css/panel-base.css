@@ -28,7 +28,7 @@
     --panel-text-tertiary: var(--text-tertiary);
 
     /* Transitions */
-    --panel-transition-fast: all 0.15s ease;
+    --panel-transition-fast: all 0.2s ease;
     --panel-transition-normal: all 0.2s ease;
 
     /* Status colors */

@@ -510,8 +510,8 @@ function renderCreateContent(): HTMLElement {
             </div>
         </div>
         <div class="form-actions">
-            <button class="btn btn-primary" id="create-type-btn">Create Type</button>
-            <button class="btn btn-secondary" id="cancel-btn">Cancel</button>
+            <button class="qntx-btn qntx-btn-primary qntx-btn-small" id="create-type-btn">Create Type</button>
+            <button class="qntx-btn qntx-btn-secondary qntx-btn-small" id="cancel-btn">Cancel</button>
         </div>
     `;
     container.appendChild(form);

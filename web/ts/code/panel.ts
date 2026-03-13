@@ -162,14 +162,12 @@ class GoEditorPanel extends BasePanel {
         msg.style.flex = '1';
 
         const discardBtn = document.createElement('button');
-        discardBtn.className = 'btn btn-danger';
+        discardBtn.className = 'qntx-btn qntx-btn-danger qntx-btn-small';
         discardBtn.textContent = 'Discard and close';
-        discardBtn.style.cssText = 'font-size:12px;padding:2px 10px;';
 
         const cancelBtn = document.createElement('button');
-        cancelBtn.className = 'btn btn-secondary';
+        cancelBtn.className = 'qntx-btn qntx-btn-secondary qntx-btn-small';
         cancelBtn.textContent = 'Keep editing';
-        cancelBtn.style.cssText = 'font-size:12px;padding:2px 10px;';
 
         discardBtn.addEventListener('click', () => {
             this.hasUnsavedChanges = false;
