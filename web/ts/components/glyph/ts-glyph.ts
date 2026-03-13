@@ -14,6 +14,7 @@
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
+import { createAutoSave } from './glyph-autosave';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { autoMeldResultBelow } from './meld/meld-system';
 import { syncStateManager } from '../../state/sync-state';
@@ -225,19 +226,9 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
         const { oneDark } = await import('@codemirror/theme-one-dark');
         const { javascript } = await import('@codemirror/lang-javascript');
 
-        let saveTimeout: number | undefined;
+        const save = createAutoSave(glyph.id, () => editor.state.doc.toString(), 'TsGlyph');
         const autoSaveExtension = EditorView.updateListener.of((update) => {
-            if (update.docChanged) {
-                if (saveTimeout !== undefined) clearTimeout(saveTimeout);
-                saveTimeout = window.setTimeout(() => {
-                    const currentCode = update.state.doc.toString();
-                    const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
-                    if (existing) {
-                        uiState.addCanvasGlyph({ ...existing, content: currentCode });
-                        log.debug(SEG.GLYPH, `[TsGlyph] Auto-saved code for ${glyph.id}`);
-                    }
-                }, 500);
-            }
+            if (update.docChanged) save();
         });
 
         const editor = new EditorView({
