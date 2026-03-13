@@ -20,6 +20,7 @@ import { preventDrag, storeCleanup } from './glyph-interaction';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { autoMeldResultBelow } from './meld/meld-system';
 import { uiState } from '../../state/ui';
+import { createAutoSave } from './glyph-autosave';
 import { tooltip } from '../tooltip';
 import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
 import { createAttestationGlyph } from './attestation-glyph';
@@ -101,19 +102,8 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     textarea.style.resize = 'none';
 
     // Auto-save template with debouncing
-    let saveTimeout: number | undefined;
-    textarea.addEventListener('input', () => {
-        if (saveTimeout !== undefined) {
-            clearTimeout(saveTimeout);
-        }
-        saveTimeout = window.setTimeout(() => {
-            const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
-            if (existing) {
-                uiState.addCanvasGlyph({ ...existing, content: textarea.value });
-                log.debug(SEG.GLYPH, `[Prompt Glyph] Auto-saved template for ${glyph.id}`);
-            }
-        }, 500);
-    });
+    const save = createAutoSave(glyph.id, () => textarea.value, 'Prompt Glyph');
+    textarea.addEventListener('input', () => save());
 
     preventDrag(textarea);
 
