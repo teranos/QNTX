@@ -22,6 +22,7 @@
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
+import { createAutoSave } from './glyph-autosave';
 import { apiFetch } from '../../api';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { autoMeldResultBelow } from './meld/meld-system';
@@ -163,25 +164,9 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
         const { oneDark } = await import('@codemirror/theme-one-dark');
         const { python } = await import('@codemirror/lang-python');
 
-        // Debounced auto-save extension
-        let saveTimeout: number | undefined;
+        const save = createAutoSave(glyph.id, () => editor.state.doc.toString(), 'PyGlyph');
         const autoSaveExtension = EditorView.updateListener.of((update) => {
-            if (update.docChanged) {
-                // Clear existing timeout
-                if (saveTimeout !== undefined) {
-                    clearTimeout(saveTimeout);
-                }
-
-                // Debounce save for 500ms
-                saveTimeout = window.setTimeout(() => {
-                    const currentCode = update.state.doc.toString();
-                    const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
-                    if (existing) {
-                        uiState.addCanvasGlyph({ ...existing, content: currentCode });
-                        log.debug(SEG.GLYPH, `[PyGlyph] Auto-saved code for ${glyph.id}`);
-                    }
-                }, 500);
-            }
+            if (update.docChanged) save();
         });
 
         // Create editor and store reference for content access

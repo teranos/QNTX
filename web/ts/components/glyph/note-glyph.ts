@@ -13,6 +13,7 @@ import type { Glyph } from './glyph';
 import { MAX_VIEWPORT_HEIGHT_RATIO } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
+import { createAutoSave } from './glyph-autosave';
 import { storeCleanup } from './glyph-interaction';
 import { tooltip } from '../tooltip';
 import { canvasPlaced } from './manifestations/canvas-placed';
@@ -189,30 +190,15 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
         ]
     });
 
-    // Auto-save tracking
-    let saveTimeout: number | undefined;
+    // Create editor view with auto-save
+    const save = createAutoSave(glyph.id, () => noteMarkdownSerializer.serialize(editorView.state.doc), 'Note Glyph');
 
-    // Create editor view
     const editorView = new EditorView(editorContainer, {
         state,
         dispatchTransaction: (transaction) => {
             const newState = editorView.state.apply(transaction);
             editorView.updateState(newState);
-
-            // Auto-save on content change
-            if (transaction.docChanged) {
-                if (saveTimeout !== undefined) {
-                    clearTimeout(saveTimeout);
-                }
-                saveTimeout = window.setTimeout(() => {
-                    const markdown = noteMarkdownSerializer.serialize(editorView.state.doc);
-                    const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
-                    if (existing) {
-                        uiState.addCanvasGlyph({ ...existing, content: markdown });
-                        log.debug(SEG.GLYPH, `[Note Glyph] Auto-saved content for ${glyph.id}`);
-                    }
-                }, 500);
-            }
+            if (transaction.docChanged) save();
         },
         editable: () => true,
         attributes: {
