@@ -34,6 +34,7 @@ import { preventDrag, storeCleanup } from './glyph-interaction';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { forceTriggerJob } from '../../pulse/api';
 import { uiState } from '../../state/ui';
+import { createAutoSave } from './glyph-autosave';
 import { PULSE_EVENTS } from '../../pulse/events';
 import type { ExecutionStartedDetail, ExecutionCompletedDetail, ExecutionFailedDetail } from '../../pulse/events';
 
@@ -140,22 +141,10 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     };
 
     // Auto-save input with debouncing and resize
-    let saveTimeout: number | undefined;
+    const save = createAutoSave(glyph.id, () => input.value, 'IX Glyph');
     input.addEventListener('input', () => {
-        // Resize immediately for responsive feel
         resizeToFitText();
-
-        if (saveTimeout !== undefined) {
-            clearTimeout(saveTimeout);
-        }
-        saveTimeout = window.setTimeout(() => {
-            const currentInput = input.value;
-            const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
-            if (existing) {
-                uiState.addCanvasGlyph({ ...existing, content: currentInput });
-                log.debug(SEG.GLYPH, `[IX Glyph] Auto-saved input for ${glyph.id}`);
-            }
-        }, 500);
+        save();
     });
 
     // Initial resize based on saved content
