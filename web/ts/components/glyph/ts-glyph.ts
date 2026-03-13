@@ -137,7 +137,7 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Run button
     const runButton = document.createElement('button');
     runButton.textContent = '\u25B6';
-    runButton.className = 'glyph-play-btn';
+    runButton.className = 'titlebar-btn';
     runButton.title = 'Run JavaScript code';
 
     const { element } = canvasPlaced({

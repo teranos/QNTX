@@ -79,14 +79,16 @@ export function createResultGlyph(
         header.appendChild(promptLabel);
     }
 
-    // Button container
+    // Button container — right-aligned to match other glyph title bars
     const buttonContainer = document.createElement('div');
     buttonContainer.style.display = 'flex';
     buttonContainer.style.gap = '3px';
     buttonContainer.style.flexShrink = '0';
+    buttonContainer.style.marginLeft = 'auto';
 
     function headerBtn(label: string, title: string): HTMLButtonElement {
         const btn = document.createElement('button');
+        btn.className = 'titlebar-btn';
         btn.textContent = label;
         btn.title = title;
         return btn;
@@ -600,8 +602,10 @@ export function buildResultTitleBar(execResult: ExecutionResult, promptText?: st
     buttonContainer.style.display = 'flex';
     buttonContainer.style.gap = '3px';
     buttonContainer.style.flexShrink = '0';
+    buttonContainer.style.marginLeft = 'auto';
 
     const copyBtn = document.createElement('button');
+    copyBtn.className = 'titlebar-btn';
     copyBtn.textContent = '\u2398'; // ⎘
     copyBtn.title = 'Copy to clipboard';
     copyBtn.addEventListener('click', () => {

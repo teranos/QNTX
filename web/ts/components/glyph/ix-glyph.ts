@@ -235,7 +235,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Play button
     const playBtn = document.createElement('button');
     playBtn.textContent = '▶';
-    playBtn.className = 'glyph-play-btn';
+    playBtn.className = 'titlebar-btn';
     playBtn.title = 'Execute';
     playBtn.style.flexShrink = '0';
 

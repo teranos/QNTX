@@ -108,7 +108,7 @@ export function createErrorGlyph(
 
     // Copy button
     const copyBtn = document.createElement('button');
-    copyBtn.className = 'glyph-play-btn';
+    copyBtn.className = 'titlebar-btn';
     copyBtn.textContent = '📋';
     copyBtn.title = 'Copy error details';
     copyBtn.addEventListener('click', async (e) => {
@@ -121,7 +121,7 @@ export function createErrorGlyph(
 
     // Convert to prompt button
     const convertBtn = document.createElement('button');
-    convertBtn.className = 'glyph-play-btn';
+    convertBtn.className = 'titlebar-btn';
     convertBtn.textContent = '⟶';
     convertBtn.title = 'Convert to prompt for debugging';
     convertBtn.addEventListener('click', async (e) => {
@@ -142,7 +142,7 @@ export function createErrorGlyph(
 
     // Dismiss button
     const dismissBtn = document.createElement('button');
-    dismissBtn.className = 'glyph-play-btn';
+    dismissBtn.className = 'titlebar-btn';
     dismissBtn.textContent = '✕';
     dismissBtn.title = 'Dismiss and remove broken glyph from state';
     dismissBtn.addEventListener('click', (e) => {

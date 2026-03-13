@@ -67,7 +67,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Run button
     const runButton = document.createElement('button');
     runButton.textContent = '▶';
-    runButton.className = 'glyph-play-btn';
+    runButton.className = 'titlebar-btn';
     runButton.title = 'Run Python code';
 
     const { element } = canvasPlaced({

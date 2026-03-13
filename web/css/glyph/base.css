@@ -89,7 +89,7 @@
 
 /* Shared title bar for canvas glyphs (ix, prompt, and similar) */
 /* Shared small icon button for canvas glyphs (play, copy, dismiss, etc.) */
-.glyph-play-btn {
+.titlebar-btn {
     width: 20px;
     height: 20px;
     padding: 0;
@@ -105,11 +105,11 @@
     border: 1px solid var(--border-color);
 }
 
-.glyph-play-btn:hover {
+.titlebar-btn:hover {
     background-color: var(--bg-dark-light);
 }
 
-.glyph-play-btn:active {
+.titlebar-btn:active {
     border-color: var(--border-light);
 }
 
