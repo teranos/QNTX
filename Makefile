@@ -230,6 +230,16 @@ proto-rust: ## Rust proto types are now generated automatically at build time
 	@echo "   No manual generation needed - uses protoc-bin-vendored at build time"
 	@echo "   See: crates/qntx-proto/build.rs"
 
+# restart-plugin NAME
+# Tells running QNTX to kill and relaunch a plugin. Silent no-op if QNTX isn't running.
+define restart-plugin
+	@TOML_PORT=$$(grep -E '^port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
+	 PORT=$${BACKEND_PORT:-$${TOML_PORT:-877}}; \
+	 curl -sf -X POST http://127.0.0.1:$$PORT/api/plugins/$(1)/restart > /dev/null 2>&1 \
+		&& echo "  ↻ Restarted $(1) on running QNTX (port $$PORT)" \
+		|| true
+endef
+
 # check-plugin-version DIR EXT VERSION_FILE
 # Fails the build if source files changed but version file didn't.
 # Usage: @$(call check-plugin-version,qntx-plugins/loom,.ml,qntx-plugins/loom/lib/version.ml)
@@ -244,44 +254,54 @@ define check-plugin-version
 	 exit 1 || true
 endef
 
-code-plugin: ## Build and install code plugin to ~/.qntx/plugins/
+code-plugin: ## Build, install, and restart code plugin
 	$(call check-plugin-version,qntx-code,go,qntx-code/plugin.go)
 	@$(MAKE) -C qntx-code install PREFIX=$(PREFIX)
+	$(call restart-plugin,code)
 
-atproto-plugin: ## Build and install AT Protocol plugin to ~/.qntx/plugins/
+atproto-plugin: ## Build, install, and restart AT Protocol plugin
 	$(call check-plugin-version,qntx-atproto,go,qntx-atproto/plugin.go)
 	@$(MAKE) -C qntx-atproto install PREFIX=$(PREFIX)
+	$(call restart-plugin,atproto)
 
-github-plugin: ## Build and install GitHub plugin to ~/.qntx/plugins/
+github-plugin: ## Build, install, and restart GitHub plugin
 	$(call check-plugin-version,qntx-github,go,qntx-github/plugin.go)
 	@$(MAKE) -C qntx-github install PREFIX=$(PREFIX)
+	$(call restart-plugin,github)
 
-ix-json-plugin: ## Build and install ix-json plugin to ~/.qntx/plugins/
+ix-json-plugin: ## Build, install, and restart ix-json plugin
 	@$(MAKE) -C qntx-plugins/ix-json install PREFIX=$(PREFIX)
+	$(call restart-plugin,ix-json)
 
-ix-bin-plugin: ## Build and install ix-bin D plugin to ~/.qntx/plugins/
+ix-bin-plugin: ## Build, install, and restart ix-bin D plugin
 	$(call check-plugin-version,qntx-plugins/ix-bin,d,qntx-plugins/ix-bin/source/ixbin/version_.d)
 	@$(MAKE) -C qntx-plugins/ix-bin install PREFIX=$(PREFIX)
+	$(call restart-plugin,ix-bin)
 
-ix-net-plugin: ## Build and install ix-net D plugin to ~/.qntx/plugins/
+ix-net-plugin: ## Build, install, and restart ix-net D plugin
 	$(call check-plugin-version,qntx-plugins/ix-net,d,qntx-plugins/ix-net/source/ixnet/version_.d)
 	@$(MAKE) -C qntx-plugins/ix-net install PREFIX=$(PREFIX)
+	$(call restart-plugin,ix-net)
 
-faal-plugin: ## Build and install faal chaos testing D plugin to ~/.qntx/plugins/
+faal-plugin: ## Build, install, and restart faal chaos testing D plugin
 	$(call check-plugin-version,qntx-plugins/faal,d,qntx-plugins/faal/source/faal/version_.d)
 	@$(MAKE) -C qntx-plugins/faal install PREFIX=$(PREFIX)
+	$(call restart-plugin,faal)
 
-openrouter-plugin: ## Build and install OpenRouter plugin to ~/.qntx/plugins/
+openrouter-plugin: ## Build, install, and restart OpenRouter plugin
 	$(call check-plugin-version,qntx-openrouter,go,qntx-openrouter/plugin.go)
 	@$(MAKE) -C qntx-openrouter install PREFIX=$(PREFIX)
+	$(call restart-plugin,openrouter)
 
-pty-glyph-plugin: ## Build and install pty-glyph plugin to ~/.qntx/plugins/
+pty-glyph-plugin: ## Build, install, and restart pty-glyph plugin
 	$(call check-plugin-version,qntx-plugins/pty-glyph,rs,qntx-plugins/pty-glyph/Cargo.toml)
 	@$(MAKE) -C qntx-plugins/pty-glyph install PREFIX=$(PREFIX)
+	$(call restart-plugin,pty-glyph)
 
-loom-plugin: ## Build and install loom plugin (OCaml) to ~/.qntx/plugins/
+loom-plugin: ## Build, install, and restart loom plugin (OCaml)
 	$(call check-plugin-version,qntx-plugins/loom,ml,qntx-plugins/loom/lib/version.ml)
 	@$(MAKE) -C qntx-plugins/loom install PREFIX=$(PREFIX)
+	$(call restart-plugin,loom)
 
 rust-vidstream: ## Build Rust vidstream library with ONNX support (for CGO integration)
 	@echo "Building Rust vidstream library with ONNX..."

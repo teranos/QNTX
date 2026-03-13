@@ -67,6 +67,10 @@ export interface ButtonConfig {
     type?: 'button' | 'submit' | 'reset';
     /** Icon to display (text/emoji, displayed before label) */
     icon?: string;
+    /** Minimum width in CSS units (e.g., '80px') — prevents resize on confirm state */
+    minWidth?: string;
+    /** Maximum width in CSS units */
+    maxWidth?: string;
 }
 
 export interface ButtonState {
@@ -81,10 +85,12 @@ export interface ButtonState {
  */
 export class Button {
     public readonly element: HTMLButtonElement;
-    private config: Required<Omit<ButtonConfig, 'confirmation' | 'disabledTooltip' | 'icon'>> & {
+    private config: Required<Omit<ButtonConfig, 'confirmation' | 'disabledTooltip' | 'icon' | 'minWidth' | 'maxWidth'>> & {
         confirmation?: ButtonConfirmation;
         disabledTooltip?: string;
         icon?: string;
+        minWidth?: string;
+        maxWidth?: string;
     };
     private state: ButtonState;
     private originalLabel: string;
@@ -122,6 +128,14 @@ export class Button {
 
         if (this.config.ariaLabel) {
             btn.setAttribute('aria-label', this.config.ariaLabel);
+        }
+
+        if (this.config.minWidth) {
+            btn.style.minWidth = this.config.minWidth;
+        }
+        if (this.config.maxWidth) {
+            btn.style.maxWidth = this.config.maxWidth;
+            btn.style.overflow = 'hidden';
         }
 
         return btn;
