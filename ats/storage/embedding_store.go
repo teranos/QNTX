@@ -514,7 +514,9 @@ func (s *EmbeddingStore) UpdateClusterAssignments(assignments []ClusterAssignmen
 		return errors.Wrap(err, "failed to commit cluster assignments")
 	}
 
-	s.logger.Info("updated cluster assignments", zap.Int("count", len(assignments)))
+	if len(assignments) > 1 {
+		s.logger.Info("updated cluster assignments", zap.Int("count", len(assignments)))
+	}
 	return nil
 }
 
