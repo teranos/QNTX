@@ -28,6 +28,7 @@ const (
 	DomainPluginService_ConfigSchema_FullMethodName    = "/protocol.DomainPluginService/ConfigSchema"
 	DomainPluginService_RegisterGlyphs_FullMethodName  = "/protocol.DomainPluginService/RegisterGlyphs"
 	DomainPluginService_ExecuteJob_FullMethodName      = "/protocol.DomainPluginService/ExecuteJob"
+	DomainPluginService_ParseAxQuery_FullMethodName    = "/protocol.DomainPluginService/ParseAxQuery"
 )
 
 // DomainPluginServiceClient is the client API for DomainPluginService service.
@@ -55,6 +56,9 @@ type DomainPluginServiceClient interface {
 	// ExecuteJob executes an async job
 	// Used by Pulse to route jobs to plugin-registered handlers
 	ExecuteJob(ctx context.Context, in *ExecuteJobRequest, opts ...grpc.CallOption) (*ExecuteJobResponse, error)
+	// ParseAxQuery parses an Ax query string and returns the AST as JSON.
+	// Used by kern (OCaml parser) to replace the Rust WASM parser path.
+	ParseAxQuery(ctx context.Context, in *ParseAxQueryRequest, opts ...grpc.CallOption) (*ParseAxQueryResponse, error)
 }
 
 type domainPluginServiceClient struct {
@@ -158,6 +162,16 @@ func (c *domainPluginServiceClient) ExecuteJob(ctx context.Context, in *ExecuteJ
 	return out, nil
 }
 
+func (c *domainPluginServiceClient) ParseAxQuery(ctx context.Context, in *ParseAxQueryRequest, opts ...grpc.CallOption) (*ParseAxQueryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ParseAxQueryResponse)
+	err := c.cc.Invoke(ctx, DomainPluginService_ParseAxQuery_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DomainPluginServiceServer is the server API for DomainPluginService service.
 // All implementations must embed UnimplementedDomainPluginServiceServer
 // for forward compatibility.
@@ -183,6 +197,9 @@ type DomainPluginServiceServer interface {
 	// ExecuteJob executes an async job
 	// Used by Pulse to route jobs to plugin-registered handlers
 	ExecuteJob(context.Context, *ExecuteJobRequest) (*ExecuteJobResponse, error)
+	// ParseAxQuery parses an Ax query string and returns the AST as JSON.
+	// Used by kern (OCaml parser) to replace the Rust WASM parser path.
+	ParseAxQuery(context.Context, *ParseAxQueryRequest) (*ParseAxQueryResponse, error)
 	mustEmbedUnimplementedDomainPluginServiceServer()
 }
 
@@ -219,6 +236,9 @@ func (UnimplementedDomainPluginServiceServer) RegisterGlyphs(context.Context, *E
 }
 func (UnimplementedDomainPluginServiceServer) ExecuteJob(context.Context, *ExecuteJobRequest) (*ExecuteJobResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ExecuteJob not implemented")
+}
+func (UnimplementedDomainPluginServiceServer) ParseAxQuery(context.Context, *ParseAxQueryRequest) (*ParseAxQueryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ParseAxQuery not implemented")
 }
 func (UnimplementedDomainPluginServiceServer) mustEmbedUnimplementedDomainPluginServiceServer() {}
 func (UnimplementedDomainPluginServiceServer) testEmbeddedByValue()                             {}
@@ -392,6 +412,24 @@ func _DomainPluginService_ExecuteJob_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DomainPluginService_ParseAxQuery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ParseAxQueryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DomainPluginServiceServer).ParseAxQuery(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DomainPluginService_ParseAxQuery_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DomainPluginServiceServer).ParseAxQuery(ctx, req.(*ParseAxQueryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DomainPluginService_ServiceDesc is the grpc.ServiceDesc for DomainPluginService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -430,6 +468,10 @@ var DomainPluginService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ExecuteJob",
 			Handler:    _DomainPluginService_ExecuteJob_Handler,
+		},
+		{
+			MethodName: "ParseAxQuery",
+			Handler:    _DomainPluginService_ParseAxQuery_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

@@ -1,0 +1,18 @@
+(lang dune 3.0)
+(using menhir 2.1)
+(name kern)
+
+(generate_opam_files true)
+
+(package
+ (name kern)
+ (synopsis "OCaml Ax query parser plugin for QNTX")
+ (depends
+  (ocaml (>= 5.1.0))
+  grpc-lwt
+  ocaml-protoc-plugin
+  lwt
+  lwt_unix
+  sedlex
+  menhir
+  yojson))
