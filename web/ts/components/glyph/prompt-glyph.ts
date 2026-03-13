@@ -176,7 +176,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     // Title bar elements
     const playBtn = document.createElement('button');
     playBtn.textContent = '▶';
-    playBtn.className = 'glyph-play-btn has-tooltip';
+    playBtn.className = 'titlebar-btn has-tooltip';
     playBtn.dataset.tooltip = 'Execute prompt';
 
     playBtn.addEventListener('click', async (e) => {
