@@ -122,6 +122,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/embeddings/clusters", wrap(s.HandleEmbeddingClusters))                    // List stable clusters (GET)
 	http.HandleFunc("/api/embeddings/clusters/samples", wrap(s.HandleClusterSamples))               // Sample texts from a cluster (GET)
 	http.HandleFunc("/api/embeddings/clusters/members", wrap(s.HandleClusterMembers))               // Recent attestations in a cluster (GET)
+	http.HandleFunc("/api/embeddings/clusters/memberships", wrap(s.HandleClusterMemberships))       // Cluster assignments for attestation IDs (GET)
 	http.HandleFunc("/api/embeddings/cluster-timeline", wrap(s.HandleClusterTimeline))              // Cluster evolution timeline (GET)
 	http.HandleFunc("/api/embeddings/cluster", wrap(s.HandleEmbeddingCluster))                      // HDBSCAN clustering (POST)
 	http.HandleFunc("/api/embeddings/by-source", wrap(s.HandleEmbeddingsBySource))                  // Embeddings by attestation source IDs (POST)
