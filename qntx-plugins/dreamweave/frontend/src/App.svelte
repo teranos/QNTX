@@ -57,6 +57,20 @@
     return BRANCH_COLORS[Math.abs(h) % BRANCH_COLORS.length]
   }
 
+  // --- Session colors (deterministic by context) ---
+
+  const SESSION_COLORS = [
+    '#5e8a6a', '#5a7fa3', '#8a7ab3', '#b38a40',
+    '#a35a5a', '#4a9a6a', '#4a70b3', '#7a4a8a',
+    '#a37050', '#4a8a8a', '#8a7a40', '#9a5070',
+  ]
+
+  function sessionColor(context: string): string {
+    let h = 0
+    for (let i = 0; i < context.length; i++) h = ((h << 5) - h + context.charCodeAt(i)) | 0
+    return SESSION_COLORS[Math.abs(h) % SESSION_COLORS.length]
+  }
+
   // --- Cluster colors (low-opacity backgrounds, deterministic by cluster_id) ---
 
   const CLUSTER_COLORS = [
@@ -505,6 +519,12 @@
     weight: number
     gapHours?: number
     seam?: 'session' | 'compaction' | 'default'
+    tool?: boolean
+  }
+
+  function hasToolCall(w: Weave): boolean {
+    if (!w.text) return false
+    return w.text.includes('[tool]')
   }
 
   function firstSpeaker(w: Weave): string {
@@ -527,7 +547,7 @@
       }
       const speaker = firstSpeaker(weaves[i])
       const seam: 'session' | 'compaction' | 'default' = speaker === 'session' ? 'session' : speaker === 'compaction' ? 'compaction' : 'default'
-      items.push({ type: 'weave', weave: weaves[i], weight: 1, seam })
+      items.push({ type: 'weave', weave: weaves[i], weight: 1, seam, tool: hasToolCall(weaves[i]) })
     }
     return items
   }
@@ -684,7 +704,7 @@
         >
           {#each [computeMinimapItems(session.weaves)] as items}
           <div class="dw-minimap-lanes" style="height: {getZoom(si) * 100}%; transform: translateY({minimapStates[si] ? laneTranslate(minimapStates[si], getZoom(si)) : 0}%)">
-            <div class="dw-minimap-lane">
+            <div class="dw-minimap-lane dw-lane-branch">
               {#each items as item}
                 {#if item.type === 'gap'}
                   <div class="dw-minimap-seg dw-minimap-gap" style="height: {itemHeight(items, item)}%"></div>
@@ -693,7 +713,25 @@
                 {/if}
               {/each}
             </div>
-            <div class="dw-minimap-lane">
+            <div class="dw-minimap-lane dw-lane-session">
+              {#each items as item}
+                {#if item.type === 'gap'}
+                  <div class="dw-minimap-seg dw-minimap-gap" style="height: {itemHeight(items, item)}%"></div>
+                {:else if item.weave}
+                  <div class="dw-minimap-seg" style="height: {itemHeight(items, item)}%; background: {sessionColor(item.weave.context)}"></div>
+                {/if}
+              {/each}
+            </div>
+            <div class="dw-minimap-tool-overlay">
+              {#each items as item}
+                {#if item.type === 'gap'}
+                  <div class="dw-minimap-seg" style="height: {itemHeight(items, item)}%"></div>
+                {:else if item.weave}
+                  <div class="dw-minimap-seg" style="height: {itemHeight(items, item)}%">{#if item.tool}<span class="dw-minimap-tool">&#x25c6;</span>{/if}</div>
+                {/if}
+              {/each}
+            </div>
+            <div class="dw-minimap-lane dw-lane-cluster">
               {#each items as item}
                 {#if item.type === 'gap'}
                   <div class="dw-minimap-seg dw-minimap-gap" style="height: {itemHeight(items, item)}%"></div>
@@ -852,11 +890,13 @@
     will-change: transform;
   }
   .dw-minimap-lane {
-    width: 12px;
     height: 100%;
     display: flex;
     flex-direction: column;
   }
+  .dw-lane-branch { width: 10px; }
+  .dw-lane-session { width: 4px; }
+  .dw-lane-cluster { width: 10px; }
   .dw-minimap-seg {
     flex-shrink: 0;
     opacity: 0.7;
@@ -872,6 +912,27 @@
   }
   .dw-minimap-gap {
     background: #1a1b1a;
+  }
+  .dw-minimap-tool-overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .dw-minimap-tool-overlay .dw-minimap-seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .dw-minimap-tool {
+    color: #ffab00;
+    font-size: 8px;
+    line-height: 1;
   }
   .dw-minimap-view {
     position: absolute;
@@ -956,7 +1017,7 @@
 
   /* Turn */
   .dw-turn {
-    padding: 2px 3px;
+    padding: 0px 3px;
     cursor: pointer;
     user-select: none;
     overflow-wrap: break-word;
@@ -977,8 +1038,20 @@
   .dw-turn.tool .dw-speaker { color: #ffab00; }
   .dw-turn.marker .dw-speaker { color: #7b20a2; }
 
+  .dw-turn.tool {
+    background: #1a1b1a;
+    border-left: 2px solid #ffab00;
+    padding-left: 4px;
+    margin: 1px 0;
+  }
+  .dw-turn.tool .dw-text {
+    color: #a9abaa;
+    font-size: 8px;
+  }
+
   .dw-text {
-    font-size: 12px;
+    font-size: 9px;
+    line-height: 1.05;
     white-space: pre-wrap;
     overflow-wrap: break-word;
     word-break: break-word;
@@ -1014,9 +1087,9 @@
   @media (min-width: 768px) {
     .mobile-only { display: none; }
     .dw-col-wrap {
-      flex: 1 1 340px;
-      min-width: 300px;
-      max-width: 640px;
+      flex: 1 1 560px;
+      min-width: 480px;
+      max-width: 900px;
     }
     .dw-col-wrap.dw-hidden { display: flex; }
   }
