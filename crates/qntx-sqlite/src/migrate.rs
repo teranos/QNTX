@@ -22,6 +22,18 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "040",
         include_str!("../../../db/sqlite/migrations/040_add_signature_to_attestations.sql"),
     ),
+    (
+        "010",
+        include_str!("../../../db/sqlite/migrations/010_create_storage_events_table.sql"),
+    ),
+    (
+        "013",
+        include_str!("../../../db/sqlite/migrations/013_add_limit_value_to_storage_events.sql"),
+    ),
+    (
+        "014",
+        include_str!("../../../db/sqlite/migrations/014_add_eviction_details_to_storage_events.sql"),
+    ),
 ];
 
 /// Apply all pending migrations to the database
@@ -152,6 +164,6 @@ mod tests {
             })
             .unwrap();
 
-        assert_eq!(count, 3); // 000, 001, and 040
+        assert_eq!(count, 6); // 000, 001, 040, 010, 013, 014
     }
 }
