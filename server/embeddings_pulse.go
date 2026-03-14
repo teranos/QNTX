@@ -578,16 +578,16 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 	// Header
 	switch {
 	case len(births) > 0 && len(deaths) > 0:
-		detail = fmt.Sprintf("Embedding topology: %d born, %d died.\n", len(births), len(deaths))
+		detail = fmt.Sprintf("Embedding topology: %d born, %d died.", len(births), len(deaths))
 	case len(births) > 0:
-		detail = fmt.Sprintf("%d new cluster(s) emerged.\n", len(births))
+		detail = fmt.Sprintf("%d new cluster(s) emerged.", len(births))
 	case len(deaths) > 0:
-		detail = fmt.Sprintf("%d cluster(s) dissolved.\n", len(deaths))
+		detail = fmt.Sprintf("%d cluster(s) dissolved.", len(deaths))
 	}
 
 	// Show all births with sample texts
 	for _, b := range births {
-		detail += fmt.Sprintf("  cluster:%d (%d members)", b.clusterID, b.nMembers)
+		detail += fmt.Sprintf(" cluster:%d (%d members)", b.clusterID, b.nMembers)
 		samples, err := embStore.SampleClusterTexts(b.clusterID, 2)
 		if err == nil && len(samples) > 0 {
 			detail += " — "
@@ -601,28 +601,28 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 				detail += s
 			}
 		}
-		detail += "\n"
+		detail += "."
 	}
 
 	// Deaths
 	if len(deaths) > 0 {
-		detail += "Dissolved: "
+		detail += " Dissolved: "
 		for i, d := range deaths {
 			if i > 0 {
 				detail += ", "
 			}
 			detail += fmt.Sprintf("cluster:%d", d)
 		}
-		detail += "\n"
+		detail += "."
 	}
 
 	if staleSwept > 0 {
-		detail += fmt.Sprintf("Swept %d stale embeddings (source attestations deleted).\n", staleSwept)
+		detail += fmt.Sprintf(" Swept %d stale embeddings (source attestations deleted).", staleSwept)
 	}
 
 	// Accumulate: if there's undelivered news from a previous run, prepend it
 	if prior := getUndeliveredDetail(atsStore, projectCtx, graundeDBPath); prior != "" {
-		detail = prior + "\n" + detail
+		detail = prior + " " + detail
 		logger.Infow("Accumulating with undelivered prior news")
 	}
 
