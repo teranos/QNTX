@@ -167,7 +167,7 @@
 
   // --- Parse weave text into turns ---
 
-  const SPEAKERS = ['human', 'assistant', 'tool', 'session', 'compaction', 'agent', 'task']
+  const SPEAKERS = ['human', 'assistant', 'tool', 'hook', 'session', 'compaction', 'agent', 'task']
 
   function isSpeakerLine(s: string): boolean {
     if (s[0] !== '[') return false
@@ -520,11 +520,12 @@
     gapHours?: number
     seam?: 'session' | 'compaction' | 'default'
     tool?: boolean
+    hook?: boolean
   }
 
-  function hasToolCall(w: Weave): boolean {
-    if (!w.text) return false
-    return w.text.includes('[tool]')
+  function hasSpeaker(w: Weave, speaker: string): boolean {
+    const turns = parseTurns(w)
+    return turns.some(t => t.speaker === speaker)
   }
 
   function firstSpeaker(w: Weave): string {
@@ -547,7 +548,7 @@
       }
       const speaker = firstSpeaker(weaves[i])
       const seam: 'session' | 'compaction' | 'default' = speaker === 'session' ? 'session' : speaker === 'compaction' ? 'compaction' : 'default'
-      items.push({ type: 'weave', weave: weaves[i], weight: 1, seam, tool: hasToolCall(weaves[i]) })
+      items.push({ type: 'weave', weave: weaves[i], weight: 1, seam, tool: hasSpeaker(weaves[i], 'tool'), hook: hasSpeaker(weaves[i], 'hook') })
     }
     return items
   }
@@ -675,6 +676,7 @@
                       class:human={turn.speaker === 'human'}
                       class:assistant={turn.speaker === 'assistant'}
                       class:tool={turn.speaker === 'tool'}
+                      class:hook={turn.speaker === 'hook'}
                       class:marker={turn.speaker === 'session' || turn.speaker === 'compaction' || turn.speaker === 'agent' || turn.speaker === 'task'}
                       onclick={() => toggle(turn)}
                       role="button"
@@ -727,7 +729,7 @@
                 {#if item.type === 'gap'}
                   <div class="dw-warp-seg" style="height: {itemHeight(items, item)}%"></div>
                 {:else if item.weave}
-                  <div class="dw-warp-seg" style="height: {itemHeight(items, item)}%">{#if item.tool}<span class="dw-warp-tool">&#x25c6;</span>{/if}</div>
+                  <div class="dw-warp-seg" style="height: {itemHeight(items, item)}%">{#if item.hook}<span class="dw-warp-hook">&#x25cf;</span>{/if}{#if item.tool}<span class="dw-warp-tool">&#x25c6;</span>{/if}</div>
                 {/if}
               {/each}
             </div>
@@ -934,6 +936,11 @@
     font-size: 8px;
     line-height: 1;
   }
+  .dw-warp-hook {
+    color: #d94a4a;
+    font-size: 6px;
+    line-height: 1;
+  }
   .dw-warp-view {
     position: absolute;
     left: 0;
@@ -1045,6 +1052,18 @@
     margin: 1px 0;
   }
   .dw-turn.tool .dw-text {
+    color: #a9abaa;
+    font-size: 8px;
+  }
+
+  .dw-turn.hook {
+    background: #1a1b1a;
+    border-left: 2px solid #d94a4a;
+    padding-left: 4px;
+    margin: 1px 0;
+  }
+  .dw-turn.hook .dw-speaker { color: #d94a4a; }
+  .dw-turn.hook .dw-text {
     color: #a9abaa;
     font-size: 8px;
   }
