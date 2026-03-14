@@ -384,6 +384,7 @@
   // --- Custom minimap scrollbar ---
 
   let minimapStates: { scrollFraction: number, viewHeight: number }[] = $state([])
+  let minimapZoom: number[] = $state([])
 
   function updateMinimap(colIdx: number) {
     const col = columnEls[colIdx]
@@ -395,12 +396,34 @@
     minimapStates[colIdx] = { scrollFraction, viewHeight }
   }
 
+  function getZoom(colIdx: number): number {
+    return minimapZoom[colIdx] || 1
+  }
+
   // Centered viewport: lanes translate so the viewport rect stays at 50%
-  function laneTranslate(st: { scrollFraction: number, viewHeight: number }): number {
-    // At fraction=0, shift lanes down so top aligns with centered viewport
-    // At fraction=0.5, no shift (natural center)
-    // At fraction=1, shift lanes up so bottom aligns with centered viewport
-    return (50 - st.viewHeight / 2) - st.scrollFraction * (100 - st.viewHeight)
+  // translateY(%) is relative to the element's own height (zoom * minimap),
+  // so we divide by zoom to get the correct minimap-relative position
+  function laneTranslate(st: { scrollFraction: number, viewHeight: number }, zoom: number): number {
+    const laneTopMinimap = (50 - st.viewHeight / 2) - st.scrollFraction * (zoom * 100 - st.viewHeight)
+    return laneTopMinimap / zoom
+  }
+
+  function bindMinimapWheel(el: HTMLElement, colIdx: number) {
+    function handler(e: WheelEvent) {
+      e.preventDefault()
+      e.stopPropagation()
+      const current = getZoom(colIdx)
+      const delta = e.deltaY > 0 ? 0.3 : -0.3
+      const next = Math.max(1, Math.min(10, current + delta))
+      // Reassign full array for Svelte reactivity
+      const copy = [...minimapZoom]
+      copy[colIdx] = next
+      minimapZoom = copy
+    }
+    el.addEventListener('wheel', handler, { passive: false })
+    return {
+      destroy() { el.removeEventListener('wheel', handler) }
+    }
   }
 
   let dragCol: number = -1
@@ -586,8 +609,9 @@
           onpointerdown={(e) => onMinimapPointerDown(e, si)}
           onpointermove={(e) => onMinimapDrag(e, si)}
           onpointerup={onMinimapPointerUp}
+          use:bindMinimapWheel={si}
         >
-          <div class="dw-minimap-lanes" style="transform: translateY({minimapStates[si] ? laneTranslate(minimapStates[si]) : 0}%)">
+          <div class="dw-minimap-lanes" style="height: {getZoom(si) * 100}%; transform: translateY({minimapStates[si] ? laneTranslate(minimapStates[si], getZoom(si)) : 0}%)">
             <div class="dw-minimap-lane">
               {#each session.weaves as weave}
                 <div class="dw-minimap-seg" style="height: {100 / session.weaves.length}%; background: {branchColor(weave.branch)}"></div>
@@ -606,7 +630,7 @@
           {#if minimapStates[si]}
             <div
               class="dw-minimap-view"
-              style="top: {50 - minimapStates[si].viewHeight / 2}%; height: {minimapStates[si].viewHeight}%"
+              style="top: {50 - (minimapStates[si].viewHeight * getZoom(si)) / 2}%; height: {minimapStates[si].viewHeight * getZoom(si)}%"
             ></div>
           {/if}
         </div>
