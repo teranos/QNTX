@@ -40,6 +40,8 @@
   let selectedTurns: Set<string> = $state(new Set())
   let totalWeaves = $state(0)
   let mobileIdx = $state(0)
+  let showClusters = $state(true)
+  let clusterMap: Map<string, { cluster_id: number, label: string | null }> = $state(new Map())
 
   // --- Branch colors (deterministic, functional) ---
 
@@ -53,6 +55,100 @@
     let h = 0
     for (let i = 0; i < branch.length; i++) h = ((h << 5) - h + branch.charCodeAt(i)) | 0
     return BRANCH_COLORS[Math.abs(h) % BRANCH_COLORS.length]
+  }
+
+  // --- Cluster colors (low-opacity backgrounds, deterministic by cluster_id) ---
+
+  const CLUSTER_COLORS = [
+    'rgba(125,186,138,0.12)', 'rgba(107,155,209,0.12)', 'rgba(212,184,255,0.12)',
+    'rgba(255,171,0,0.12)', 'rgba(239,69,68,0.12)', 'rgba(34,198,94,0.12)',
+    'rgba(59,131,246,0.12)', 'rgba(123,32,162,0.12)', 'rgba(224,128,80,0.12)',
+    'rgba(80,176,176,0.12)', 'rgba(192,160,64,0.12)', 'rgba(208,96,144,0.12)',
+  ]
+
+  function clusterBg(weaveId: string): string {
+    const entry = clusterMap.get(weaveId)
+    if (!entry) return 'transparent'
+    return CLUSTER_COLORS[entry.cluster_id % CLUSTER_COLORS.length]
+  }
+
+  function clusterLabel(weaveId: string): string | null {
+    const entry = clusterMap.get(weaveId)
+    return entry?.label || null
+  }
+
+  async function loadClusters(weaveIds: string[]) {
+    if (weaveIds.length === 0) return
+    try {
+      const next = new Map(clusterMap)
+      // Batch into chunks of 50 to avoid URL length limits
+      const chunkSize = 50
+      for (let i = 0; i < weaveIds.length; i += chunkSize) {
+        const chunk = weaveIds.slice(i, i + chunkSize)
+        const res = await fetch('/qntx/embeddings/clusters/memberships?ids=' + chunk.join(','))
+        const data = await res.json()
+        for (const [id, m] of Object.entries(data.memberships as Record<string, { cluster_id: number, label: string | null }>)) {
+          next.set(id, m)
+        }
+      }
+      clusterMap = next
+    } catch {
+      // Clusters unavailable — silently degrade
+    }
+  }
+
+  // --- Minimal markdown rendering (string methods only, no regex) ---
+
+  function escapeHtml(s: string): string {
+    return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+  }
+
+  function renderText(text: string): string {
+    const lines = text.split('\n')
+    let out = ''
+    let inCode = false
+    for (const line of lines) {
+      if (line.startsWith('```')) {
+        if (inCode) {
+          out += '</code></pre>'
+          inCode = false
+        } else {
+          inCode = true
+          out += '<pre class="dw-code"><code>'
+        }
+        continue
+      }
+      if (inCode) {
+        out += escapeHtml(line) + '\n'
+        continue
+      }
+      // Bold: **text**
+      let rendered = escapeHtml(line)
+      let result = ''
+      let pos = 0
+      while (pos < rendered.length) {
+        const start = rendered.indexOf('**', pos)
+        if (start < 0) { result += rendered.substring(pos); break }
+        const end = rendered.indexOf('**', start + 2)
+        if (end < 0) { result += rendered.substring(pos); break }
+        result += rendered.substring(pos, start) + '<b>' + rendered.substring(start + 2, end) + '</b>'
+        pos = end + 2
+      }
+      // Inline code: `code`
+      let final = ''
+      pos = 0
+      while (pos < result.length) {
+        const start = result.indexOf('`', pos)
+        if (start < 0) { final += result.substring(pos); break }
+        const end = result.indexOf('`', start + 1)
+        if (end < 0) { final += result.substring(pos); break }
+        final += result.substring(pos, start) + '<code class="dw-inline-code">' + result.substring(start + 1, end) + '</code>'
+        pos = end + 1
+      }
+      out += final + '\n'
+    }
+    if (inCode) out += '</code></pre>'
+    return out
   }
 
   // --- Parse weave text into turns ---
@@ -195,6 +291,10 @@
       built.sort((a, b) => a.earliest - b.earliest)
       sessions = built
       loading = false
+
+      // Fetch cluster memberships for all weave IDs
+      const allIds = all.map(w => w.id)
+      loadClusters(allIds)
     } catch (e: any) {
       error = e.message || 'fetch failed'
       loading = false
@@ -204,26 +304,33 @@
   // --- Time-synchronized scrolling ---
 
   let columnEls: HTMLElement[] = []
-  let scrollDriver: number = -1
+  let hoverIdx: number = -1
   let scrollTimer: ReturnType<typeof setTimeout> | null = null
+
+  function onColumnEnter(e: Event) {
+    const el = e.currentTarget as HTMLElement
+    hoverIdx = columnEls.indexOf(el)
+  }
+
+  function onColumnLeave() {
+    hoverIdx = -1
+  }
 
   function onColumnScroll(e: Event) {
     const source = e.target as HTMLElement
     const sourceIdx = columnEls.indexOf(source)
     if (sourceIdx < 0) return
 
-    // If another column is driving, ignore this event (it's programmatic)
-    if (scrollDriver >= 0 && scrollDriver !== sourceIdx) return
+    // Only the column under the pointer can drive
+    if (sourceIdx !== hoverIdx) return
 
-    // Claim driver role, debounce the sync
-    scrollDriver = sourceIdx
     if (scrollTimer) clearTimeout(scrollTimer)
-    scrollTimer = setTimeout(() => syncColumns(sourceIdx), 30)
+    scrollTimer = setTimeout(() => syncColumns(sourceIdx), 50)
   }
 
   function syncColumns(sourceIdx: number) {
     const source = columnEls[sourceIdx]
-    if (!source) { scrollDriver = -1; return }
+    if (!source || sourceIdx !== hoverIdx) return
 
     // Find the weave element at the vertical center of the source column
     const centerY = source.getBoundingClientRect().top + source.clientHeight / 2
@@ -238,7 +345,7 @@
         centerTs = Number((weaves[i] as HTMLElement).dataset.ts)
       }
     }
-    if (!centerTs) { scrollDriver = -1; return }
+    if (!centerTs) return
 
     // Scroll all other columns to their closest-timestamp weave
     for (let i = 0; i < columnEls.length; i++) {
@@ -259,12 +366,9 @@
         const colRect = col.getBoundingClientRect()
         const bestRect = best.getBoundingClientRect()
         const offset = bestRect.top - colRect.top - col.clientHeight / 2 + bestRect.height / 2
-        col.scrollTop += offset
+        col.scrollTo({ top: col.scrollTop + offset, behavior: 'smooth' })
       }
     }
-
-    // Release driver after programmatic scrolls settle
-    setTimeout(() => { scrollDriver = -1 }, 100)
   }
 
   function bindColumn(el: HTMLElement, idx: number) {
@@ -314,6 +418,7 @@
       <span class="dw-stat">{sessions.length} sessions</span>
       <span class="dw-stat">{totalWeaves} weaves</span>
     {/if}
+    <button class="dw-toggle" class:active={showClusters} onclick={() => showClusters = !showClusters}>clusters</button>
     {#if selectedTurns.size > 0}
       <span class="dw-sel">
         {selectedTurns.size} selected
@@ -350,6 +455,8 @@
           class:dw-hidden={si !== mobileIdx}
           use:bindColumn={si}
           onscroll={onColumnScroll}
+          onpointerenter={onColumnEnter}
+          onpointerleave={onColumnLeave}
         >
           <div class="dw-session-hd">
             <div class="dw-session-top">
@@ -370,6 +477,9 @@
               <div class="dw-weave" data-ts={weave.timestamp} style="border-left-color: {branchColor(weave.branch)}">
                 <div class="dw-wmeta">
                   <span>{weave.branch}</span>
+                  {#if showClusters && clusterLabel(weave.id)}
+                    <span class="dw-cluster">{clusterLabel(weave.id)}</span>
+                  {/if}
                   <span>{fmtTime(weave.timestamp)}</span>
                   <span>{weave.word_count}w {weave.turn_count}t</span>
                 </div>
@@ -388,7 +498,11 @@
                     onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(turn) }}}
                   >
                     <span class="dw-speaker">[{turn.speaker}]</span>
-                    <span class="dw-text">{turn.text}</span>
+                    {#if turn.speaker === 'assistant'}
+                      <span class="dw-text">{@html renderText(turn.text)}</span>
+                    {:else}
+                      <span class="dw-text">{turn.text}</span>
+                    {/if}
                   </div>
                 {/each}
               </div>
@@ -440,6 +554,20 @@
   }
 
   .dw-stat { color: #878988; font-size: 11px; }
+
+  .dw-toggle {
+    background: #343534;
+    color: #656766;
+    border: 1px solid #3f4140;
+    padding: 1px 6px;
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .dw-toggle:hover { background: #3f4140; }
+  .dw-toggle.active { color: #7dba8a; border-color: #7dba8a; }
+
+  .dw-cluster { color: #878988; font-style: italic; }
 
   .dw-sel {
     margin-left: auto;
@@ -593,6 +721,25 @@
     font-style: italic;
   }
   .dw-turn.marker .dw-text { color: #656766; font-size: 10px; }
+
+  :global(.dw-code) {
+    background: #1a1b1a;
+    border: 1px solid #3f4140;
+    padding: 3px 6px;
+    margin: 2px 0;
+    font-size: 11px;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+  :global(.dw-code code) { color: #a9abaa; }
+
+  :global(.dw-inline-code) {
+    background: #1a1b1a;
+    padding: 0 3px;
+    color: #a9abaa;
+    font-size: 11px;
+  }
 
   /* Desktop: multi-column */
   @media (min-width: 768px) {
