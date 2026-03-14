@@ -40,7 +40,7 @@
   let selectedTurns: Set<string> = $state(new Set())
   let totalWeaves = $state(0)
   let mobileIdx = $state(0)
-  let showClusters = $state(true)
+  const showClusters = true
   let clusterMap: Map<string, { cluster_id: number, label: string | null }> = $state(new Map())
 
   // --- Branch colors (deterministic, functional) ---
@@ -431,7 +431,7 @@
   let dragActive: boolean = false
   const DRAG_DEADZONE = 4
 
-  function minimapScrollTo(e: PointerEvent, colIdx: number) {
+  function minimapScrollTo(e: PointerEvent, colIdx: number, smooth = false) {
     const col = columnEls[colIdx]
     const minimap = (e.currentTarget as HTMLElement)
     if (!col || !minimap) return
@@ -443,7 +443,8 @@
     const laneTopFrac = (t / 100) * zoom
     const contentFrac = (clickFrac - laneTopFrac) / zoom
     const scrollFrac = Math.max(0, Math.min(1, contentFrac))
-    col.scrollTop = scrollFrac * (col.scrollHeight - col.clientHeight)
+    const target = scrollFrac * (col.scrollHeight - col.clientHeight)
+    col.scrollTo({ top: target, behavior: smooth ? 'smooth' : 'instant' })
   }
 
   function onMinimapPointerDown(e: PointerEvent, colIdx: number) {
@@ -451,8 +452,9 @@
     dragStartY = e.clientY
     dragActive = false
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-    // Jump immediately on click
-    minimapScrollTo(e, colIdx)
+    // Temporarily set hoverIdx so the scroll event triggers sync
+    hoverIdx = colIdx
+    minimapScrollTo(e, colIdx, true)
   }
 
   function onMinimapDrag(e: PointerEvent, colIdx: number) {
@@ -575,7 +577,6 @@
       <span class="dw-stat">{sessions.length} sessions</span>
       <span class="dw-stat">{totalWeaves} weaves</span>
     {/if}
-    <button class="dw-toggle" class:active={showClusters} onclick={() => showClusters = !showClusters}>clusters</button>
     {#if selectedTurns.size > 0}
       <span class="dw-sel">
         {selectedTurns.size} selected
@@ -760,18 +761,6 @@
   }
 
   .dw-stat { color: #878988; font-size: 11px; }
-
-  .dw-toggle {
-    background: #343534;
-    color: #656766;
-    border: 1px solid #3f4140;
-    padding: 1px 6px;
-    font: inherit;
-    font-size: 11px;
-    cursor: pointer;
-  }
-  .dw-toggle:hover { background: #3f4140; }
-  .dw-toggle.active { color: #7dba8a; border-color: #7dba8a; }
 
   .dw-cluster { color: #878988; font-style: italic; }
 
