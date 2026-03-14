@@ -69,6 +69,7 @@ ats/embeddings/models/
 *.onnx
 
 # CTP prototypes (gitignored - for local development)
+ctp/
 web/ctpm1/
 web/css/ctpm1.css
 web/ctp2/
