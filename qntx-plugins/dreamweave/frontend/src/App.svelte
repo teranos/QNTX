@@ -427,26 +427,46 @@
   }
 
   let dragCol: number = -1
+  let dragStartY: number = 0
+  let dragActive: boolean = false
+  const DRAG_DEADZONE = 4
 
-  function onMinimapPointerDown(e: PointerEvent, colIdx: number) {
-    dragCol = colIdx
-    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-    onMinimapDrag(e, colIdx)
-  }
-
-  function onMinimapDrag(e: PointerEvent, colIdx: number) {
-    if (dragCol !== colIdx) return
+  function minimapScrollTo(e: PointerEvent, colIdx: number) {
     const col = columnEls[colIdx]
     const minimap = (e.currentTarget as HTMLElement)
     if (!col || !minimap) return
     const rect = minimap.getBoundingClientRect()
-    // Click position maps directly to scroll fraction
-    const fraction = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
-    col.scrollTop = fraction * (col.scrollHeight - col.clientHeight)
+    const clickFrac = (e.clientY - rect.top) / rect.height
+    const zoom = getZoom(colIdx)
+    const st = minimapStates[colIdx]
+    const t = st ? laneTranslate(st, zoom) : 0
+    const laneTopFrac = (t / 100) * zoom
+    const contentFrac = (clickFrac - laneTopFrac) / zoom
+    const scrollFrac = Math.max(0, Math.min(1, contentFrac))
+    col.scrollTop = scrollFrac * (col.scrollHeight - col.clientHeight)
+  }
+
+  function onMinimapPointerDown(e: PointerEvent, colIdx: number) {
+    dragCol = colIdx
+    dragStartY = e.clientY
+    dragActive = false
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    // Jump immediately on click
+    minimapScrollTo(e, colIdx)
+  }
+
+  function onMinimapDrag(e: PointerEvent, colIdx: number) {
+    if (dragCol !== colIdx) return
+    if (!dragActive) {
+      if (Math.abs(e.clientY - dragStartY) < DRAG_DEADZONE) return
+      dragActive = true
+    }
+    minimapScrollTo(e, colIdx)
   }
 
   function onMinimapPointerUp() {
     dragCol = -1
+    dragActive = false
   }
 
   function weaveMinimapColor(weave: Weave): string {
@@ -482,6 +502,15 @@
     weave?: Weave
     weight: number
     gapHours?: number
+    seam?: 'session' | 'compaction' | 'default'
+  }
+
+  function firstSpeaker(w: Weave): string {
+    if (!w.text) return ''
+    // Check what the first turn's speaker is
+    if (w.text.startsWith('[session]')) return 'session'
+    if (w.text.startsWith('[compaction]')) return 'compaction'
+    return ''
   }
 
   function computeMinimapItems(weaves: Weave[]): MinimapItem[] {
@@ -494,7 +523,9 @@
           items.push({ type: 'gap', weight: GAP_WEIGHT, gapHours: Math.round(gap / (60 * 60 * 1000)) })
         }
       }
-      items.push({ type: 'weave', weave: weaves[i], weight: 1 })
+      const speaker = firstSpeaker(weaves[i])
+      const seam: 'session' | 'compaction' | 'default' = speaker === 'session' ? 'session' : speaker === 'compaction' ? 'compaction' : 'default'
+      items.push({ type: 'weave', weave: weaves[i], weight: 1, seam })
     }
     return items
   }
@@ -657,7 +688,7 @@
                 {#if item.type === 'gap'}
                   <div class="dw-minimap-seg dw-minimap-gap" style="height: {itemHeight(items, item)}%"></div>
                 {:else if item.weave}
-                  <div class="dw-minimap-seg dw-minimap-seam" style="height: {itemHeight(items, item)}%; background: {branchColor(item.weave.branch)}"></div>
+                  <div class="dw-minimap-seg dw-minimap-seam seam-{item.seam}" style="height: {itemHeight(items, item)}%; background: {branchColor(item.weave.branch)}"></div>
                 {/if}
               {/each}
             </div>
@@ -667,9 +698,9 @@
                   <div class="dw-minimap-seg dw-minimap-gap" style="height: {itemHeight(items, item)}%"></div>
                 {:else if item.weave}
                   {#if clusterMap.get(item.weave.id)}
-                    <div class="dw-minimap-seg dw-minimap-seam" style="height: {itemHeight(items, item)}%; background: {BRANCH_COLORS[clusterMap.get(item.weave.id)!.cluster_id % BRANCH_COLORS.length]}"></div>
+                    <div class="dw-minimap-seg dw-minimap-seam seam-{item.seam}" style="height: {itemHeight(items, item)}%; background: {BRANCH_COLORS[clusterMap.get(item.weave.id)!.cluster_id % BRANCH_COLORS.length]}"></div>
                   {:else}
-                    <div class="dw-minimap-seg dw-minimap-seam" style="height: {itemHeight(items, item)}%; background: #252625"></div>
+                    <div class="dw-minimap-seg dw-minimap-seam seam-{item.seam}" style="height: {itemHeight(items, item)}%; background: #252625"></div>
                   {/if}
                 {/if}
               {/each}
@@ -842,7 +873,13 @@
     opacity: 0.7;
   }
   .dw-minimap-seam {
-    border-bottom: 1px solid rgba(223,225,224,0.15);
+    border-bottom: 1px solid rgba(223,225,224,0.1);
+  }
+  .dw-minimap-seam.seam-session {
+    border-bottom: 2px solid rgba(125,186,138,0.6);
+  }
+  .dw-minimap-seam.seam-compaction {
+    border-bottom: 2px solid rgba(255,171,0,0.6);
   }
   .dw-minimap-gap {
     background: #1a1b1a;
