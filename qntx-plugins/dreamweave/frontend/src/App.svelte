@@ -310,7 +310,7 @@
       const allIds = all.map(w => w.id)
       loadClusters(allIds)
 
-      // Init minimaps after DOM renders
+      // Init warps after DOM renders
       requestAnimationFrame(initMinimaps)
     } catch (e: any) {
       error = e.message || 'fetch failed'
@@ -395,10 +395,10 @@
     }
   }
 
-  // --- Custom minimap scrollbar ---
+  // --- Custom warp scrollbar ---
 
-  let minimapStates: { scrollFraction: number, viewHeight: number }[] = $state([])
-  let minimapZoom: number[] = $state([])
+  let warpStates: { scrollFraction: number, viewHeight: number }[] = $state([])
+  let warpZoom: number[] = $state([])
 
   function updateMinimap(colIdx: number) {
     const col = columnEls[colIdx]
@@ -406,17 +406,17 @@
     const ratio = col.clientHeight / col.scrollHeight
     const scrollFraction = col.scrollTop / (col.scrollHeight - col.clientHeight || 1)
     const viewHeight = ratio * 100
-    if (!minimapStates[colIdx]) minimapStates[colIdx] = { scrollFraction: 0, viewHeight: 100 }
-    minimapStates[colIdx] = { scrollFraction, viewHeight }
+    if (!warpStates[colIdx]) warpStates[colIdx] = { scrollFraction: 0, viewHeight: 100 }
+    warpStates[colIdx] = { scrollFraction, viewHeight }
   }
 
   function getZoom(colIdx: number): number {
-    return minimapZoom[colIdx] || 1
+    return warpZoom[colIdx] || 1
   }
 
   // Centered viewport: lanes translate so the viewport rect stays at 50%
-  // translateY(%) is relative to the element's own height (zoom * minimap),
-  // so we divide by zoom to get the correct minimap-relative position
+  // translateY(%) is relative to the element's own height (zoom * warp),
+  // so we divide by zoom to get the correct warp-relative position
   function laneTranslate(st: { scrollFraction: number, viewHeight: number }, zoom: number): number {
     const laneTopMinimap = (50 - st.viewHeight / 2) - st.scrollFraction * (zoom * 100 - st.viewHeight)
     return laneTopMinimap / zoom
@@ -430,9 +430,9 @@
       const delta = e.deltaY > 0 ? 0.3 : -0.3
       const next = Math.max(1, Math.min(10, current + delta))
       // Reassign full array for Svelte reactivity
-      const copy = [...minimapZoom]
+      const copy = [...warpZoom]
       copy[colIdx] = next
-      minimapZoom = copy
+      warpZoom = copy
     }
     el.addEventListener('wheel', handler, { passive: false })
     return {
@@ -445,14 +445,14 @@
   let dragActive: boolean = false
   const DRAG_DEADZONE = 4
 
-  function minimapScrollTo(e: PointerEvent, colIdx: number, smooth = false) {
+  function warpScrollTo(e: PointerEvent, colIdx: number, smooth = false) {
     const col = columnEls[colIdx]
-    const minimap = (e.currentTarget as HTMLElement)
-    if (!col || !minimap) return
-    const rect = minimap.getBoundingClientRect()
+    const warp = (e.currentTarget as HTMLElement)
+    if (!col || !warp) return
+    const rect = warp.getBoundingClientRect()
     const clickFrac = (e.clientY - rect.top) / rect.height
     const zoom = getZoom(colIdx)
-    const st = minimapStates[colIdx]
+    const st = warpStates[colIdx]
     const t = st ? laneTranslate(st, zoom) : 0
     const laneTopFrac = (t / 100) * zoom
     const contentFrac = (clickFrac - laneTopFrac) / zoom
@@ -468,7 +468,7 @@
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
     // Temporarily set hoverIdx so the scroll event triggers sync
     hoverIdx = colIdx
-    minimapScrollTo(e, colIdx, true)
+    warpScrollTo(e, colIdx, true)
   }
 
   function onMinimapDrag(e: PointerEvent, colIdx: number) {
@@ -477,7 +477,7 @@
       if (Math.abs(e.clientY - dragStartY) < DRAG_DEADZONE) return
       dragActive = true
     }
-    minimapScrollTo(e, colIdx)
+    warpScrollTo(e, colIdx)
   }
 
   function onMinimapPointerUp() {
@@ -493,7 +493,7 @@
     return branchColor(weave.branch)
   }
 
-  // Update minimaps on column scroll
+  // Update warps on column scroll
   function onColumnScrollWithMinimap(e: Event) {
     onColumnScroll(e)
     const source = e.target as HTMLElement
@@ -501,7 +501,7 @@
     if (idx >= 0) updateMinimap(idx)
   }
 
-  // Initialize minimaps after load
+  // Initialize warps after load
   function initMinimaps() {
     for (let i = 0; i < sessions.length; i++) {
       requestAnimationFrame(() => updateMinimap(i))
@@ -696,60 +696,60 @@
         </div>
 
         <div
-          class="dw-minimap"
+          class="dw-warp"
           onpointerdown={(e) => onMinimapPointerDown(e, si)}
           onpointermove={(e) => onMinimapDrag(e, si)}
           onpointerup={onMinimapPointerUp}
           use:bindMinimapWheel={si}
         >
           {#each [computeMinimapItems(session.weaves)] as items}
-          <div class="dw-minimap-lanes" style="height: {getZoom(si) * 100}%; transform: translateY({minimapStates[si] ? laneTranslate(minimapStates[si], getZoom(si)) : 0}%)">
-            <div class="dw-minimap-lane dw-lane-branch">
+          <div class="dw-warp-lanes" style="height: {getZoom(si) * 100}%; transform: translateY({warpStates[si] ? laneTranslate(warpStates[si], getZoom(si)) : 0}%)">
+            <div class="dw-warp-lane dw-lane-branch">
               {#each items as item}
                 {#if item.type === 'gap'}
-                  <div class="dw-minimap-seg dw-minimap-gap" style="height: {itemHeight(items, item)}%"></div>
+                  <div class="dw-warp-seg dw-warp-gap" style="height: {itemHeight(items, item)}%"></div>
                 {:else if item.weave}
-                  <div class="dw-minimap-seg dw-minimap-seam seam-{item.seam}" style="height: {itemHeight(items, item)}%; background: {branchColor(item.weave.branch)}"></div>
+                  <div class="dw-warp-seg dw-warp-seam seam-{item.seam}" style="height: {itemHeight(items, item)}%; background: {branchColor(item.weave.branch)}"></div>
                 {/if}
               {/each}
             </div>
-            <div class="dw-minimap-lane dw-lane-session">
+            <div class="dw-warp-lane dw-lane-session">
               {#each items as item}
                 {#if item.type === 'gap'}
-                  <div class="dw-minimap-seg dw-minimap-gap" style="height: {itemHeight(items, item)}%"></div>
+                  <div class="dw-warp-seg dw-warp-gap" style="height: {itemHeight(items, item)}%"></div>
                 {:else if item.weave}
-                  <div class="dw-minimap-seg" style="height: {itemHeight(items, item)}%; background: {sessionColor(item.weave.context)}"></div>
+                  <div class="dw-warp-seg" style="height: {itemHeight(items, item)}%; background: {sessionColor(item.weave.context)}"></div>
                 {/if}
               {/each}
             </div>
-            <div class="dw-minimap-tool-overlay">
+            <div class="dw-warp-tool-overlay">
               {#each items as item}
                 {#if item.type === 'gap'}
-                  <div class="dw-minimap-seg" style="height: {itemHeight(items, item)}%"></div>
+                  <div class="dw-warp-seg" style="height: {itemHeight(items, item)}%"></div>
                 {:else if item.weave}
-                  <div class="dw-minimap-seg" style="height: {itemHeight(items, item)}%">{#if item.tool}<span class="dw-minimap-tool">&#x25c6;</span>{/if}</div>
+                  <div class="dw-warp-seg" style="height: {itemHeight(items, item)}%">{#if item.tool}<span class="dw-warp-tool">&#x25c6;</span>{/if}</div>
                 {/if}
               {/each}
             </div>
-            <div class="dw-minimap-lane dw-lane-cluster">
+            <div class="dw-warp-lane dw-lane-cluster">
               {#each items as item}
                 {#if item.type === 'gap'}
-                  <div class="dw-minimap-seg dw-minimap-gap" style="height: {itemHeight(items, item)}%"></div>
+                  <div class="dw-warp-seg dw-warp-gap" style="height: {itemHeight(items, item)}%"></div>
                 {:else if item.weave}
                   {#if clusterMap.get(item.weave.id)}
-                    <div class="dw-minimap-seg dw-minimap-seam seam-{item.seam}" style="height: {itemHeight(items, item)}%; background: {BRANCH_COLORS[clusterMap.get(item.weave.id)!.cluster_id % BRANCH_COLORS.length]}"></div>
+                    <div class="dw-warp-seg dw-warp-seam seam-{item.seam}" style="height: {itemHeight(items, item)}%; background: {BRANCH_COLORS[clusterMap.get(item.weave.id)!.cluster_id % BRANCH_COLORS.length]}"></div>
                   {:else}
-                    <div class="dw-minimap-seg dw-minimap-seam seam-{item.seam}" style="height: {itemHeight(items, item)}%; background: #252625"></div>
+                    <div class="dw-warp-seg dw-warp-seam seam-{item.seam}" style="height: {itemHeight(items, item)}%; background: #252625"></div>
                   {/if}
                 {/if}
               {/each}
             </div>
           </div>
           {/each}
-          {#if minimapStates[si]}
+          {#if warpStates[si]}
             <div
-              class="dw-minimap-view"
-              style="top: {50 - (minimapStates[si].viewHeight * getZoom(si)) / 2}%; height: {minimapStates[si].viewHeight * getZoom(si)}%"
+              class="dw-warp-view"
+              style="top: {50 - (warpStates[si].viewHeight * getZoom(si)) / 2}%; height: {warpStates[si].viewHeight * getZoom(si)}%"
             ></div>
           {/if}
         </div>
@@ -872,7 +872,7 @@
   .dw-col::-webkit-scrollbar { display: none; }
 
   /* Minimap scrollbar */
-  .dw-minimap {
+  .dw-warp {
     width: 24px;
     height: calc(100vh - 33px);
     background: #1a1b1a;
@@ -882,14 +882,14 @@
     border-left: 1px solid #252625;
     overflow: hidden;
   }
-  .dw-minimap-lanes {
+  .dw-warp-lanes {
     display: flex;
     flex-direction: row;
     width: 100%;
     height: 100%;
     will-change: transform;
   }
-  .dw-minimap-lane {
+  .dw-warp-lane {
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -897,23 +897,23 @@
   .dw-lane-branch { width: 10px; }
   .dw-lane-session { width: 4px; }
   .dw-lane-cluster { width: 10px; }
-  .dw-minimap-seg {
+  .dw-warp-seg {
     flex-shrink: 0;
     opacity: 0.7;
   }
-  .dw-minimap-seam {
+  .dw-warp-seam {
     border-bottom: 1px solid rgba(223,225,224,0.1);
   }
-  .dw-minimap-seam.seam-session {
+  .dw-warp-seam.seam-session {
     border-bottom: 2px solid rgba(125,186,138,0.6);
   }
-  .dw-minimap-seam.seam-compaction {
+  .dw-warp-seam.seam-compaction {
     border-bottom: 2px solid rgba(255,171,0,0.6);
   }
-  .dw-minimap-gap {
+  .dw-warp-gap {
     background: #1a1b1a;
   }
-  .dw-minimap-tool-overlay {
+  .dw-warp-tool-overlay {
     position: absolute;
     left: 0;
     top: 0;
@@ -924,17 +924,17 @@
     pointer-events: none;
     z-index: 1;
   }
-  .dw-minimap-tool-overlay .dw-minimap-seg {
+  .dw-warp-tool-overlay .dw-warp-seg {
     display: flex;
     align-items: center;
     justify-content: center;
   }
-  .dw-minimap-tool {
+  .dw-warp-tool {
     color: #ffab00;
     font-size: 8px;
     line-height: 1;
   }
-  .dw-minimap-view {
+  .dw-warp-view {
     position: absolute;
     left: 0;
     width: 100%;
@@ -1098,6 +1098,6 @@
   @media (max-width: 767px) {
     .dw-col-wrap.dw-hidden { display: none; }
     .dw-col { height: calc(100vh - 51px); }
-    .dw-minimap { height: calc(100vh - 51px); }
+    .dw-warp { height: calc(100vh - 51px); }
   }
 </style>
