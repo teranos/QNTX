@@ -24,17 +24,22 @@ export function createAutoSave(
     glyphId: string,
     getContent: () => string,
     label: string,
-): () => void {
+): { save: () => void; cancel: () => void } {
     let saveTimeout: number | undefined;
 
-    return () => {
-        if (saveTimeout !== undefined) clearTimeout(saveTimeout);
-        saveTimeout = window.setTimeout(() => {
-            const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
-            if (existing) {
-                uiState.addCanvasGlyph({ ...existing, content: getContent() });
-                log.debug(SEG.GLYPH, `[${label}] Auto-saved content for ${glyphId}`);
-            }
-        }, AUTOSAVE_DELAY);
+    return {
+        save: () => {
+            if (saveTimeout !== undefined) clearTimeout(saveTimeout);
+            saveTimeout = window.setTimeout(() => {
+                const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+                if (existing) {
+                    uiState.addCanvasGlyph({ ...existing, content: getContent() });
+                    log.debug(SEG.GLYPH, `[${label}] Auto-saved content for ${glyphId}`);
+                }
+            }, AUTOSAVE_DELAY);
+        },
+        cancel: () => {
+            if (saveTimeout !== undefined) clearTimeout(saveTimeout);
+        },
     };
 }

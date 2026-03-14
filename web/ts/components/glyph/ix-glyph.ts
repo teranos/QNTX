@@ -141,7 +141,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     };
 
     // Auto-save input with debouncing and resize
-    const save = createAutoSave(glyph.id, () => input.value, 'IX Glyph');
+    const { save } = createAutoSave(glyph.id, () => input.value, 'IX Glyph');
     input.addEventListener('input', () => {
         resizeToFitText();
         save();

@@ -226,7 +226,7 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
         const { oneDark } = await import('@codemirror/theme-one-dark');
         const { javascript } = await import('@codemirror/lang-javascript');
 
-        const save = createAutoSave(glyph.id, () => editor.state.doc.toString(), 'TsGlyph');
+        const { save } = createAutoSave(glyph.id, () => editor.state.doc.toString(), 'TsGlyph');
         const autoSaveExtension = EditorView.updateListener.of((update) => {
             if (update.docChanged) save();
         });
