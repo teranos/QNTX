@@ -191,7 +191,7 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
     });
 
     // Create editor view with auto-save
-    const save = createAutoSave(glyph.id, () => noteMarkdownSerializer.serialize(editorView.state.doc), 'Note Glyph');
+    const { save, cancel: cancelAutoSave } = createAutoSave(glyph.id, () => noteMarkdownSerializer.serialize(editorView.state.doc), 'Note Glyph');
 
     const editorView = new EditorView(editorContainer, {
         state,
@@ -224,9 +224,7 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
 
     // Register cleanup for conversions (drag/resize cleanup handled by canvasPlaced)
     storeCleanup(element, () => editorView.destroy());
-    storeCleanup(element, () => {
-        if (saveTimeout !== undefined) clearTimeout(saveTimeout);
-    });
+    storeCleanup(element, cancelAutoSave);
     storeCleanup(element, () => {
         const observer = (element as any).__resizeObserver;
         if (observer) {
