@@ -436,6 +436,83 @@ pub extern "C" fn storage_query(
 }
 
 // ============================================================================
+// Enforcement & Stats
+// ============================================================================
+
+/// Enforce storage limits and log events. Returns JSON array of enforcement events.
+///
+/// Input JSON: `{"actors":["a"],"contexts":["c"],"subjects":["s"],"config":{...}}`
+/// Output JSON: `[{"event_type":"...","actor":"...","deleted_count":N,...},...]`
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn storage_enforce_limits(
+    store: *mut SqliteStore,
+    input_json: *const c_char,
+) -> AttestationResultC {
+    if store.is_null() {
+        return AttestationResultC::error("null store pointer");
+    }
+
+    let json_str = match unsafe { cstr_to_str(input_json) } {
+        Ok(s) => s,
+        Err(e) => return AttestationResultC::error(e),
+    };
+
+    if json_str.len() > MAX_JSON_LENGTH {
+        return AttestationResultC::error("enforcement input JSON exceeds maximum length");
+    }
+
+    let store = unsafe { &mut *store };
+
+    let input: qntx_core::storage::EnforcementInput = match serde_json::from_str(json_str) {
+        Ok(i) => i,
+        Err(e) => {
+            return AttestationResultC::error(&format!("invalid enforcement input JSON: {}", e))
+        }
+    };
+
+    match store.enforce_limits(&input) {
+        Ok(events) => match serde_json::to_string(&events) {
+            Ok(json) => AttestationResultC::ok(json),
+            Err(e) => {
+                AttestationResultC::error(&format!("failed to serialize enforcement events: {}", e))
+            }
+        },
+        Err(e) => AttestationResultC::error(&format!("enforcement failed: {}", e)),
+    }
+}
+
+/// Get storage statistics. Returns JSON with counts.
+///
+/// Output JSON: `{"total_attestations":N,"unique_subjects":N,...}`
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn storage_get_stats(store: *const SqliteStore) -> AttestationResultC {
+    if store.is_null() {
+        return AttestationResultC::error("null store pointer");
+    }
+
+    let store = unsafe { &*store };
+
+    use qntx_core::storage::QueryStore;
+    match store.stats() {
+        Ok(stats) => {
+            // Serialize StorageStats — it doesn't derive Serialize so do it manually
+            let json = format!(
+                r#"{{"total_attestations":{},"unique_subjects":{},"unique_predicates":{},"unique_contexts":{},"unique_actors":{}}}"#,
+                stats.total_attestations,
+                stats.unique_subjects,
+                stats.unique_predicates,
+                stats.unique_contexts,
+                stats.unique_actors,
+            );
+            AttestationResultC::ok(json)
+        }
+        Err(e) => AttestationResultC::error(&format!("failed to get stats: {}", e)),
+    }
+}
+
+// ============================================================================
 // Memory Management
 // ============================================================================
 
