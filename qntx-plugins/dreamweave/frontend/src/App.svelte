@@ -167,7 +167,7 @@
 
   // --- Parse weave text into turns ---
 
-  const SPEAKERS = ['human', 'assistant', 'tool', 'session', 'compaction', 'agent', 'task']
+  const SPEAKERS = ['human', 'assistant', 'tool', 'hook', 'session', 'compaction', 'agent', 'task']
 
   function isSpeakerLine(s: string): boolean {
     if (s[0] !== '[') return false
@@ -675,6 +675,7 @@
                       class:human={turn.speaker === 'human'}
                       class:assistant={turn.speaker === 'assistant'}
                       class:tool={turn.speaker === 'tool'}
+                      class:hook={turn.speaker === 'hook'}
                       class:marker={turn.speaker === 'session' || turn.speaker === 'compaction' || turn.speaker === 'agent' || turn.speaker === 'task'}
                       onclick={() => toggle(turn)}
                       role="button"
@@ -1045,6 +1046,18 @@
     margin: 1px 0;
   }
   .dw-turn.tool .dw-text {
+    color: #a9abaa;
+    font-size: 8px;
+  }
+
+  .dw-turn.hook {
+    background: #1a1b1a;
+    border-left: 2px solid #d94a4a;
+    padding-left: 4px;
+    margin: 1px 0;
+  }
+  .dw-turn.hook .dw-speaker { color: #d94a4a; }
+  .dw-turn.hook .dw-text {
     color: #a9abaa;
     font-size: 8px;
   }
