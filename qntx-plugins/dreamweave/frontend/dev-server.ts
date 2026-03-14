@@ -15,6 +15,7 @@ import http2 from 'http2'
 const execAsync = promisify(exec)
 
 const DREAMWEAVE_PORT = process.env.DREAMWEAVE_PORT || '38701'
+const QNTX_PORT = process.env.QNTX_PORT || '8773'
 const DEV_PORT = 5177
 const distDir = join(import.meta.dir, 'dist')
 
@@ -100,6 +101,20 @@ const server = Bun.serve({
         }),
         { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } },
       )
+    }
+
+    // Proxy /qntx/ to QNTX server (HTTP/1.1)
+    if (url.pathname.startsWith('/qntx/')) {
+      try {
+        const target = `http://127.0.0.1:${QNTX_PORT}/api/${url.pathname.substring(6)}${url.search}`
+        const resp = await fetch(target)
+        return new Response(resp.body, {
+          status: resp.status,
+          headers: { 'content-type': resp.headers.get('content-type') || 'application/json' },
+        })
+      } catch {
+        return new Response('QNTX server unavailable', { status: 503 })
+      }
     }
 
     // Proxy /api/ to dreamweave plugin (h2c — plugin speaks HTTP/2 only)
