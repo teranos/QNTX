@@ -123,7 +123,7 @@ GlyphDefResponse registerGlyphs() {
     glyph.symbol       = "\U0001F50D"; // magnifying glass: 🔍
     glyph.title        = "Network Inspector";
     glyph.label        = "ix-net";
-    glyph.modulePath   = "/net-inspector-module.js";
+    glyph.modulePath   = "/glyph-module.js";
     glyph.defaultWidth = 800;
     glyph.defaultHeight = 600;
     resp.glyphs = [glyph];
@@ -146,7 +146,7 @@ HTTPResponse handleHTTP(ref const HTTPRequest req) {
         return handleStop();
     } else if (method == "GET" && path == "/captures") {
         return handleCaptures();
-    } else if (method == "GET" && path == "/net-inspector-module.js") {
+    } else if (method == "GET" && path == "/glyph-module.js") {
         return serveGlyphModule();
     } else if (method == "GET" && path.length >= 7 && path[0 .. 7] == "/images") {
         return handleImages(path, req);
@@ -240,18 +240,97 @@ private HTTPResponse handleCaptures() {
     return jsonResponse(200, captures);
 }
 
-/// GET /net-inspector-module.js — serve the glyph UI module.
+/// GET /glyph-module.js — serve the glyph UI module.
+/// Source of truth: web/glyph-module.ts (keep in sync).
 private HTTPResponse serveGlyphModule() {
     HTTPResponse resp;
     resp.statusCode = 200;
-    // Minimal placeholder — will be expanded
     resp.body_ = cast(ubyte[])(
-        "export function render(glyph, ui) {\n" ~
-        "  const c = document.createElement('div');\n" ~
-        "  c.style.cssText = 'padding: 20px; font-family: monospace; color: #33ff33; background: #0a0a0f; height: 100%;';\n" ~
-        "  c.textContent = 'ix-net: Claude Code API Inspector';\n" ~
-        "  return c;\n" ~
-        "}\n"
+        "export const glyphDef = {\n" ~
+        "  symbol: '\\u{1F50D}',\n" ~
+        "  title: 'Network Inspector',\n" ~
+        "  label: 'ix-net',\n" ~
+        "  defaultWidth: 320,\n" ~
+        "  defaultHeight: 280,\n" ~
+        "};\n" ~
+        "\n" ~
+        "export const render = async (glyph, ui) => {\n" ~
+        "  const { element } = ui.container({\n" ~
+        "    defaults: {\n" ~
+        "      x: glyph.x ?? 100,\n" ~
+        "      y: glyph.y ?? 100,\n" ~
+        "      width: 320,\n" ~
+        "      height: 280,\n" ~
+        "    },\n" ~
+        "    titleBar: { label: 'ix-net' },\n" ~
+        "    resizable: true,\n" ~
+        "  });\n" ~
+        "\n" ~
+        "  const body = document.createElement('div');\n" ~
+        "  body.style.flex = '1';\n" ~
+        "  body.style.overflow = 'auto';\n" ~
+        "  body.style.padding = '12px';\n" ~
+        "  body.style.fontFamily = 'monospace';\n" ~
+        "  body.style.fontSize = '13px';\n" ~
+        "  element.appendChild(body);\n" ~
+        "\n" ~
+        "  const status = ui.statusLine();\n" ~
+        "  element.appendChild(status.element);\n" ~
+        "\n" ~
+        "  function row(parent, label, value) {\n" ~
+        "    const el = document.createElement('div');\n" ~
+        "    el.style.display = 'flex';\n" ~
+        "    el.style.justifyContent = 'space-between';\n" ~
+        "    el.style.padding = '2px 0';\n" ~
+        "    const lbl = document.createElement('span');\n" ~
+        "    lbl.style.color = 'var(--muted-foreground, #888)';\n" ~
+        "    lbl.textContent = label;\n" ~
+        "    const val = document.createElement('span');\n" ~
+        "    val.textContent = value;\n" ~
+        "    el.appendChild(lbl);\n" ~
+        "    el.appendChild(val);\n" ~
+        "    parent.appendChild(el);\n" ~
+        "  }\n" ~
+        "\n" ~
+        "  async function refresh() {\n" ~
+        "    try {\n" ~
+        "      const resp = await ui.pluginFetch('/captures');\n" ~
+        "      const data = await resp.json();\n" ~
+        "      const caps = data.captures || [];\n" ~
+        "      const total = data.total || 0;\n" ~
+        "      const withImages = caps.filter(c => c.has_images).length;\n" ~
+        "      const totalImages = caps.reduce((n, c) => n + c.image_count, 0);\n" ~
+        "      const totalIn = caps.reduce((n, c) => n + c.input_tokens, 0);\n" ~
+        "      const totalOut = caps.reduce((n, c) => n + c.output_tokens, 0);\n" ~
+        "\n" ~
+        "      body.innerHTML = '';\n" ~
+        "      row(body, 'Proxy', 'listening');\n" ~
+        "      row(body, 'Captures', String(total));\n" ~
+        "      row(body, 'With images', String(withImages));\n" ~
+        "      row(body, 'Total images', String(totalImages));\n" ~
+        "      row(body, 'Input tokens', totalIn.toLocaleString());\n" ~
+        "      row(body, 'Output tokens', totalOut.toLocaleString());\n" ~
+        "\n" ~
+        "      if (caps.length > 0) {\n" ~
+        "        const last = caps[caps.length - 1];\n" ~
+        "        row(body, 'Last model', last.model);\n" ~
+        "        row(body, 'Last status', String(last.status_code));\n" ~
+        "      }\n" ~
+        "\n" ~
+        "      status.clear();\n" ~
+        "    } catch {\n" ~
+        "      body.innerHTML = '';\n" ~
+        "      row(body, 'Proxy', 'not reachable');\n" ~
+        "      status.show('fetch failed', true);\n" ~
+        "    }\n" ~
+        "  }\n" ~
+        "\n" ~
+        "  await refresh();\n" ~
+        "  const interval = setInterval(refresh, 5000);\n" ~
+        "  ui.onCleanup(() => clearInterval(interval));\n" ~
+        "\n" ~
+        "  return element;\n" ~
+        "};\n"
     );
     resp.headers = [
         httpHeader("Content-Type", "application/javascript"),
@@ -639,6 +718,11 @@ private void autoStartProxy() {
     import ixnet.log;
 
     ushort proxyPort = 9100;
+    if (auto pp = "proxy_port" in state.config) {
+        import std.conv : to;
+        try { proxyPort = (*pp).to!ushort; }
+        catch (Exception) {}
+    }
 
     string certFile, keyFile;
     resolveCertPaths(certFile, keyFile);
