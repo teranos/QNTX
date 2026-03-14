@@ -1,0 +1,3 @@
+(library
+ (name qntx_dreamweave_proto)
+ (libraries ocaml-protoc-plugin ocaml-protoc-plugin.google_types))
