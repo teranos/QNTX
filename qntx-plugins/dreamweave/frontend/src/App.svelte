@@ -295,6 +295,9 @@
       // Fetch cluster memberships for all weave IDs
       const allIds = all.map(w => w.id)
       loadClusters(allIds)
+
+      // Init minimaps after DOM renders
+      requestAnimationFrame(initMinimaps)
     } catch (e: any) {
       error = e.message || 'fetch failed'
       loading = false
@@ -378,6 +381,74 @@
     }
   }
 
+  // --- Custom minimap scrollbar ---
+
+  let minimapStates: { viewTop: number, viewHeight: number }[] = $state([])
+
+  function updateMinimap(colIdx: number) {
+    const col = columnEls[colIdx]
+    if (!col) return
+    const ratio = col.clientHeight / col.scrollHeight
+    const viewTop = (col.scrollTop / col.scrollHeight) * 100
+    const viewHeight = ratio * 100
+    if (!minimapStates[colIdx]) minimapStates[colIdx] = { viewTop: 0, viewHeight: 100 }
+    minimapStates[colIdx] = { viewTop, viewHeight }
+  }
+
+  function onMinimapClick(e: MouseEvent, colIdx: number) {
+    const col = columnEls[colIdx]
+    const minimap = (e.currentTarget as HTMLElement)
+    if (!col || !minimap) return
+    const rect = minimap.getBoundingClientRect()
+    const fraction = (e.clientY - rect.top) / rect.height
+    col.scrollTop = fraction * col.scrollHeight - col.clientHeight / 2
+  }
+
+  let dragCol: number = -1
+
+  function onMinimapPointerDown(e: PointerEvent, colIdx: number) {
+    dragCol = colIdx
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    onMinimapDrag(e, colIdx)
+  }
+
+  function onMinimapDrag(e: PointerEvent, colIdx: number) {
+    if (dragCol !== colIdx) return
+    const col = columnEls[colIdx]
+    const minimap = (e.currentTarget as HTMLElement)
+    if (!col || !minimap) return
+    const rect = minimap.getBoundingClientRect()
+    const fraction = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
+    col.scrollTop = fraction * col.scrollHeight - col.clientHeight / 2
+  }
+
+  function onMinimapPointerUp() {
+    dragCol = -1
+  }
+
+  function weaveMinimapColor(weave: Weave): string {
+    if (showClusters) {
+      const entry = clusterMap.get(weave.id)
+      if (entry) return BRANCH_COLORS[entry.cluster_id % BRANCH_COLORS.length]
+    }
+    return branchColor(weave.branch)
+  }
+
+  // Update minimaps on column scroll
+  function onColumnScrollWithMinimap(e: Event) {
+    onColumnScroll(e)
+    const source = e.target as HTMLElement
+    const idx = columnEls.indexOf(source)
+    if (idx >= 0) updateMinimap(idx)
+  }
+
+  // Initialize minimaps after load
+  function initMinimaps() {
+    for (let i = 0; i < sessions.length; i++) {
+      requestAnimationFrame(() => updateMinimap(i))
+    }
+  }
+
   // --- Touch swipe for mobile ---
 
   let touchX = 0
@@ -450,11 +521,11 @@
       ontouchend={onTouchEnd}
     >
       {#each sessions as session, si}
+        <div class="dw-col-wrap" class:dw-hidden={si !== mobileIdx}>
         <div
           class="dw-col"
-          class:dw-hidden={si !== mobileIdx}
           use:bindColumn={si}
-          onscroll={onColumnScroll}
+          onscroll={onColumnScrollWithMinimap}
           onpointerenter={onColumnEnter}
           onpointerleave={onColumnLeave}
         >
@@ -508,6 +579,32 @@
               </div>
             {/each}
           </div>
+        </div>
+
+        <div
+          class="dw-minimap"
+          onpointerdown={(e) => onMinimapPointerDown(e, si)}
+          onpointermove={(e) => onMinimapDrag(e, si)}
+          onpointerup={onMinimapPointerUp}
+        >
+          <div class="dw-minimap-lane">
+            {#each session.weaves as weave}
+              <div class="dw-minimap-seg" style="height: {100 / session.weaves.length}%; background: {branchColor(weave.branch)}"></div>
+            {/each}
+          </div>
+          <div class="dw-minimap-lane">
+            {#each session.weaves as weave}
+              {@const entry = clusterMap.get(weave.id)}
+              <div class="dw-minimap-seg" style="height: {100 / session.weaves.length}%; background: {entry ? BRANCH_COLORS[entry.cluster_id % BRANCH_COLORS.length] : '#252625'}"></div>
+            {/each}
+          </div>
+          {#if minimapStates[si]}
+            <div
+              class="dw-minimap-view"
+              style="top: {minimapStates[si].viewTop}%; height: {minimapStates[si].viewHeight}%"
+            ></div>
+          {/if}
+        </div>
         </div>
       {/each}
     </div>
@@ -620,14 +717,53 @@
     overflow-y: hidden;
   }
 
+  /* Column wrapper */
+  .dw-col-wrap {
+    display: flex;
+    flex: 0 0 100%;
+    border-right: 1px solid #3f4140;
+  }
+
   /* Session column */
   .dw-col {
-    flex: 0 0 100%;
+    flex: 1;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
     height: calc(100vh - 33px);
-    border-right: 1px solid #3f4140;
+    scrollbar-width: none;
+  }
+  .dw-col::-webkit-scrollbar { display: none; }
+
+  /* Minimap scrollbar */
+  .dw-minimap {
+    width: 24px;
+    height: calc(100vh - 33px);
+    background: #1a1b1a;
+    display: flex;
+    flex-direction: row;
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+    border-left: 1px solid #252625;
+  }
+  .dw-minimap-lane {
+    width: 12px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .dw-minimap-seg {
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+  .dw-minimap-view {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    border: 1px solid #7dba8a;
+    background: rgba(125,186,138,0.08);
+    pointer-events: none;
   }
 
   /* Session header */
@@ -744,17 +880,18 @@
   /* Desktop: multi-column */
   @media (min-width: 768px) {
     .mobile-only { display: none; }
-    .dw-col {
+    .dw-col-wrap {
       flex: 1 1 340px;
       min-width: 300px;
       max-width: 640px;
     }
-    .dw-col.dw-hidden { display: flex; }
+    .dw-col-wrap.dw-hidden { display: flex; }
   }
 
   /* Mobile */
   @media (max-width: 767px) {
-    .dw-col.dw-hidden { display: none; }
+    .dw-col-wrap.dw-hidden { display: none; }
     .dw-col { height: calc(100vh - 51px); }
+    .dw-minimap { height: calc(100vh - 51px); }
   }
 </style>
