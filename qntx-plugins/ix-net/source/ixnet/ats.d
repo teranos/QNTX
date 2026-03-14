@@ -57,6 +57,34 @@ struct ATSClient {
         return true;
     }
 
+    /// Query attestations using a filter.
+    /// Returns attestations on success, empty array on failure.
+    Attestation[] getAttestations(ref const AttestationFilter filter, ref string error) {
+        if (!connected) {
+            error = "ATSStore client not connected to " ~ endpoint;
+            return [];
+        }
+
+        auto requestBytes = encodeGetAttestationsRequest(authToken, filter);
+        auto responseBytes = client.call(
+            "/protocol.ATSStoreService/GetAttestations",
+            requestBytes
+        );
+
+        if (responseBytes.length == 0) {
+            error = "empty response from ATSStore at " ~ endpoint;
+            return [];
+        }
+
+        auto resp = decode!GetAttestationsResponse(responseBytes);
+        if (!resp.success) {
+            error = resp.error;
+            logError("[ix-net] ATSStore: query failed: %s", resp.error);
+            return [];
+        }
+        return resp.attestations;
+    }
+
     void close() {
         client.close();
         connected = false;
