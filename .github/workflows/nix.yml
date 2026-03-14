@@ -12,6 +12,7 @@ on:
       - 'go.mod'
       - 'go.sum'
       - 'typegen/**'
+      - 'qntx-plugins/kern/**'
       - '.github/workflows/nix.yml'
 
 jobs:
@@ -167,6 +168,34 @@ jobs:
 
       - name: Push to Cachix
         run: nix build ./qntx-python#qntx-python-plugin --print-out-paths --no-link | cachix push qntx
+
+  # kern plugin (OCaml, own flake at qntx-plugins/kern/flake.nix)
+  build-kern:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: qntx
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Build kern plugin
+        run: nix build ./qntx-plugins/kern --show-trace
+
+      - name: Push to Cachix
+        run: nix build ./qntx-plugins/kern --print-out-paths --no-link | cachix push qntx
 
   # Documentation (single OS, includes link checking)
   build-docs:
