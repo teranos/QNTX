@@ -545,9 +545,9 @@
           <div class="dw-stream">
             {#each session.weaves as weave}
               {@const wturns = parseTurns(weave)}
-              <div class="dw-weave" data-ts={weave.timestamp} style="border-left-color: {branchColor(weave.branch)}">
+              <div class="dw-weave" data-ts={weave.timestamp}>
                 <div class="dw-wmeta">
-                  <span>{weave.branch}</span>
+                  <span class="dw-copyable" onclick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(weave.id) }}>{weave.branch}</span>
                   {#if showClusters && clusterLabel(weave.id)}
                     <span class="dw-cluster">{clusterLabel(weave.id)}</span>
                   {/if}
@@ -820,6 +820,8 @@
     margin-bottom: 1px;
   }
   .dw-wmeta span:last-child { margin-left: auto; }
+  .dw-copyable { cursor: pointer; }
+  .dw-copyable:hover { color: #a9abaa; }
 
   /* Turn */
   .dw-turn {
