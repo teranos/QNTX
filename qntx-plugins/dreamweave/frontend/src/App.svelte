@@ -383,25 +383,24 @@
 
   // --- Custom minimap scrollbar ---
 
-  let minimapStates: { viewTop: number, viewHeight: number }[] = $state([])
+  let minimapStates: { scrollFraction: number, viewHeight: number }[] = $state([])
 
   function updateMinimap(colIdx: number) {
     const col = columnEls[colIdx]
     if (!col) return
     const ratio = col.clientHeight / col.scrollHeight
-    const viewTop = (col.scrollTop / col.scrollHeight) * 100
+    const scrollFraction = col.scrollTop / (col.scrollHeight - col.clientHeight || 1)
     const viewHeight = ratio * 100
-    if (!minimapStates[colIdx]) minimapStates[colIdx] = { viewTop: 0, viewHeight: 100 }
-    minimapStates[colIdx] = { viewTop, viewHeight }
+    if (!minimapStates[colIdx]) minimapStates[colIdx] = { scrollFraction: 0, viewHeight: 100 }
+    minimapStates[colIdx] = { scrollFraction, viewHeight }
   }
 
-  function onMinimapClick(e: MouseEvent, colIdx: number) {
-    const col = columnEls[colIdx]
-    const minimap = (e.currentTarget as HTMLElement)
-    if (!col || !minimap) return
-    const rect = minimap.getBoundingClientRect()
-    const fraction = (e.clientY - rect.top) / rect.height
-    col.scrollTop = fraction * col.scrollHeight - col.clientHeight / 2
+  // Centered viewport: lanes translate so the viewport rect stays at 50%
+  function laneTranslate(st: { scrollFraction: number, viewHeight: number }): number {
+    // At fraction=0, shift lanes down so top aligns with centered viewport
+    // At fraction=0.5, no shift (natural center)
+    // At fraction=1, shift lanes up so bottom aligns with centered viewport
+    return (50 - st.viewHeight / 2) - st.scrollFraction * (100 - st.viewHeight)
   }
 
   let dragCol: number = -1
@@ -418,8 +417,9 @@
     const minimap = (e.currentTarget as HTMLElement)
     if (!col || !minimap) return
     const rect = minimap.getBoundingClientRect()
+    // Click position maps directly to scroll fraction
     const fraction = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
-    col.scrollTop = fraction * col.scrollHeight - col.clientHeight / 2
+    col.scrollTop = fraction * (col.scrollHeight - col.clientHeight)
   }
 
   function onMinimapPointerUp() {
@@ -587,21 +587,26 @@
           onpointermove={(e) => onMinimapDrag(e, si)}
           onpointerup={onMinimapPointerUp}
         >
-          <div class="dw-minimap-lane">
-            {#each session.weaves as weave}
-              <div class="dw-minimap-seg" style="height: {100 / session.weaves.length}%; background: {branchColor(weave.branch)}"></div>
-            {/each}
-          </div>
-          <div class="dw-minimap-lane">
-            {#each session.weaves as weave}
-              {@const entry = clusterMap.get(weave.id)}
-              <div class="dw-minimap-seg" style="height: {100 / session.weaves.length}%; background: {entry ? BRANCH_COLORS[entry.cluster_id % BRANCH_COLORS.length] : '#252625'}"></div>
-            {/each}
+          <div class="dw-minimap-lanes" style="transform: translateY({minimapStates[si] ? laneTranslate(minimapStates[si]) : 0}%)">
+            <div class="dw-minimap-lane">
+              {#each session.weaves as weave}
+                <div class="dw-minimap-seg" style="height: {100 / session.weaves.length}%; background: {branchColor(weave.branch)}"></div>
+              {/each}
+            </div>
+            <div class="dw-minimap-lane">
+              {#each session.weaves as weave}
+                {#if clusterMap.get(weave.id)}
+                  <div class="dw-minimap-seg" style="height: {100 / session.weaves.length}%; background: {BRANCH_COLORS[clusterMap.get(weave.id)!.cluster_id % BRANCH_COLORS.length]}"></div>
+                {:else}
+                  <div class="dw-minimap-seg" style="height: {100 / session.weaves.length}%; background: #252625"></div>
+                {/if}
+              {/each}
+            </div>
           </div>
           {#if minimapStates[si]}
             <div
               class="dw-minimap-view"
-              style="top: {minimapStates[si].viewTop}%; height: {minimapStates[si].viewHeight}%"
+              style="top: {50 - minimapStates[si].viewHeight / 2}%; height: {minimapStates[si].viewHeight}%"
             ></div>
           {/if}
         </div>
@@ -740,12 +745,18 @@
     width: 24px;
     height: calc(100vh - 33px);
     background: #1a1b1a;
-    display: flex;
-    flex-direction: row;
     position: relative;
     cursor: pointer;
     flex-shrink: 0;
     border-left: 1px solid #252625;
+    overflow: hidden;
+  }
+  .dw-minimap-lanes {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 100%;
+    will-change: transform;
   }
   .dw-minimap-lane {
     width: 12px;
