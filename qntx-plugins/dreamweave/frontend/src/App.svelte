@@ -472,6 +472,38 @@
     }
   }
 
+  // --- Minimap segment layout with time gaps ---
+
+  const GAP_THRESHOLD_MS = 12 * 60 * 60 * 1000  // 12 hours
+  const GAP_WEIGHT = 3  // a 12h gap occupies the space of 3 weaves
+
+  interface MinimapItem {
+    type: 'weave' | 'gap'
+    weave?: Weave
+    weight: number
+    gapHours?: number
+  }
+
+  function computeMinimapItems(weaves: Weave[]): MinimapItem[] {
+    if (weaves.length === 0) return []
+    const items: MinimapItem[] = []
+    for (let i = 0; i < weaves.length; i++) {
+      if (i > 0) {
+        const gap = weaves[i].timestamp - weaves[i - 1].timestamp
+        if (gap > GAP_THRESHOLD_MS) {
+          items.push({ type: 'gap', weight: GAP_WEIGHT, gapHours: Math.round(gap / (60 * 60 * 1000)) })
+        }
+      }
+      items.push({ type: 'weave', weave: weaves[i], weight: 1 })
+    }
+    return items
+  }
+
+  function itemHeight(items: MinimapItem[], item: MinimapItem): number {
+    const total = items.reduce((s, i) => s + i.weight, 0)
+    return (item.weight / total) * 100
+  }
+
   // --- Touch swipe for mobile ---
 
   let touchX = 0
@@ -566,40 +598,47 @@
           </div>
 
           <div class="dw-stream">
-            {#each session.weaves as weave}
-              {@const wturns = parseTurns(weave)}
-              <div class="dw-weave" data-ts={weave.timestamp}>
-                <div class="dw-wmeta">
-                  <span class="dw-copyable" onclick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(weave.id) }}>{weave.branch}</span>
-                  {#if showClusters && clusterLabel(weave.id)}
-                    <span class="dw-cluster">{clusterLabel(weave.id)}</span>
-                  {/if}
-                  <span>{fmtTime(weave.timestamp)}</span>
-                  <span>{weave.word_count}w {weave.turn_count}t</span>
+            {#each computeMinimapItems(session.weaves) as item}
+              {#if item.type === 'gap'}
+                <div class="dw-time-gap">
+                  <span class="dw-gap-label">{item.gapHours}h gap</span>
                 </div>
-                {#each wturns as turn}
-                  {@const k = turnKey(turn)}
-                  <div
-                    class="dw-turn"
-                    class:selected={selectedTurns.has(k)}
-                    class:human={turn.speaker === 'human'}
-                    class:assistant={turn.speaker === 'assistant'}
-                    class:tool={turn.speaker === 'tool'}
-                    class:marker={turn.speaker === 'session' || turn.speaker === 'compaction' || turn.speaker === 'agent' || turn.speaker === 'task'}
-                    onclick={() => toggle(turn)}
-                    role="button"
-                    tabindex="0"
-                    onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(turn) }}}
-                  >
-                    <span class="dw-speaker">[{turn.speaker}]</span>
-                    {#if turn.speaker === 'assistant'}
-                      <span class="dw-text">{@html renderText(turn.text)}</span>
-                    {:else}
-                      <span class="dw-text">{turn.text}</span>
+              {:else if item.weave}
+                {@const weave = item.weave}
+                {@const wturns = parseTurns(weave)}
+                <div class="dw-weave" data-ts={weave.timestamp}>
+                  <div class="dw-wmeta">
+                    <span class="dw-copyable" onclick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(weave.id) }}>{weave.branch}</span>
+                    {#if showClusters && clusterLabel(weave.id)}
+                      <span class="dw-cluster">{clusterLabel(weave.id)}</span>
                     {/if}
+                    <span>{fmtTime(weave.timestamp)}</span>
+                    <span>{weave.word_count}w {weave.turn_count}t</span>
                   </div>
-                {/each}
-              </div>
+                  {#each wturns as turn}
+                    {@const k = turnKey(turn)}
+                    <div
+                      class="dw-turn"
+                      class:selected={selectedTurns.has(k)}
+                      class:human={turn.speaker === 'human'}
+                      class:assistant={turn.speaker === 'assistant'}
+                      class:tool={turn.speaker === 'tool'}
+                      class:marker={turn.speaker === 'session' || turn.speaker === 'compaction' || turn.speaker === 'agent' || turn.speaker === 'task'}
+                      onclick={() => toggle(turn)}
+                      role="button"
+                      tabindex="0"
+                      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(turn) }}}
+                    >
+                      <span class="dw-speaker">[{turn.speaker}]</span>
+                      {#if turn.speaker === 'assistant'}
+                        <span class="dw-text">{@html renderText(turn.text)}</span>
+                      {:else}
+                        <span class="dw-text">{turn.text}</span>
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+              {/if}
             {/each}
           </div>
         </div>
@@ -611,22 +650,32 @@
           onpointerup={onMinimapPointerUp}
           use:bindMinimapWheel={si}
         >
+          {#each [computeMinimapItems(session.weaves)] as items}
           <div class="dw-minimap-lanes" style="height: {getZoom(si) * 100}%; transform: translateY({minimapStates[si] ? laneTranslate(minimapStates[si], getZoom(si)) : 0}%)">
             <div class="dw-minimap-lane">
-              {#each session.weaves as weave}
-                <div class="dw-minimap-seg" style="height: {100 / session.weaves.length}%; background: {branchColor(weave.branch)}"></div>
+              {#each items as item}
+                {#if item.type === 'gap'}
+                  <div class="dw-minimap-seg dw-minimap-gap" style="height: {itemHeight(items, item)}%"></div>
+                {:else if item.weave}
+                  <div class="dw-minimap-seg dw-minimap-seam" style="height: {itemHeight(items, item)}%; background: {branchColor(item.weave.branch)}"></div>
+                {/if}
               {/each}
             </div>
             <div class="dw-minimap-lane">
-              {#each session.weaves as weave}
-                {#if clusterMap.get(weave.id)}
-                  <div class="dw-minimap-seg" style="height: {100 / session.weaves.length}%; background: {BRANCH_COLORS[clusterMap.get(weave.id)!.cluster_id % BRANCH_COLORS.length]}"></div>
-                {:else}
-                  <div class="dw-minimap-seg" style="height: {100 / session.weaves.length}%; background: #252625"></div>
+              {#each items as item}
+                {#if item.type === 'gap'}
+                  <div class="dw-minimap-seg dw-minimap-gap" style="height: {itemHeight(items, item)}%"></div>
+                {:else if item.weave}
+                  {#if clusterMap.get(item.weave.id)}
+                    <div class="dw-minimap-seg dw-minimap-seam" style="height: {itemHeight(items, item)}%; background: {BRANCH_COLORS[clusterMap.get(item.weave.id)!.cluster_id % BRANCH_COLORS.length]}"></div>
+                  {:else}
+                    <div class="dw-minimap-seg dw-minimap-seam" style="height: {itemHeight(items, item)}%; background: #252625"></div>
+                  {/if}
                 {/if}
               {/each}
             </div>
           </div>
+          {/each}
           {#if minimapStates[si]}
             <div
               class="dw-minimap-view"
@@ -792,6 +841,12 @@
     flex-shrink: 0;
     opacity: 0.7;
   }
+  .dw-minimap-seam {
+    border-bottom: 1px solid rgba(223,225,224,0.15);
+  }
+  .dw-minimap-gap {
+    background: #1a1b1a;
+  }
   .dw-minimap-view {
     position: absolute;
     left: 0;
@@ -834,6 +889,21 @@
     padding-left: 4px;
     overflow-wrap: break-word;
     word-break: break-word;
+  }
+
+  /* Time gap */
+  .dw-time-gap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    margin: 0 6px;
+    border-left: 1px dashed #3f4140;
+    border-right: 1px dashed #3f4140;
+  }
+  .dw-gap-label {
+    color: #4a4b4a;
+    font-size: 9px;
   }
 
   /* Weave stream */
