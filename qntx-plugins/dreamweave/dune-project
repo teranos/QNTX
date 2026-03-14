@@ -1,0 +1,17 @@
+(lang dune 3.0)
+(name qntx-dreamweave)
+
+; Generate the .opam file from this dune-project
+(generate_opam_files true)
+
+(package
+ (name qntx-dreamweave)
+ (synopsis "Weave explorer — browse conversation history behind branches")
+ (depends
+  (ocaml (>= 5.1.0))
+  grpc-lwt
+  ocaml-protoc-plugin
+  lwt
+  lwt_unix
+  yojson
+  uri))

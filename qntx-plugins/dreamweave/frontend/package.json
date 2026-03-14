@@ -1,0 +1,12 @@
+{
+  "name": "dreamweave",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run dev-server.ts",
+    "build": "bun run build.ts"
+  },
+  "dependencies": {
+    "svelte": "5.53.11"
+  }
+}
