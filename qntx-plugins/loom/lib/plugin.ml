@@ -92,26 +92,30 @@ let handle_execute_job raw =
     let payload_str = Bytes.to_string req.payload in
     (match req.handler_name with
      | "stitch" ->
-       let result = Stitcher.stitch payload_str in
-       (* If the stitcher emitted a weave, persist it via ATSStoreService.
+       let results = Stitcher.stitch payload_str in
+       (* If the stitcher emitted weave(s), persist via ATSStoreService.
         * Lwt.async fires the RPC without blocking the ExecuteJob response —
         * we don't want QNTX waiting on the ATS round-trip. *)
-       (match result.emitted with
-        | Some block ->
-          Lwt.async (fun () ->
-            let* ats_result = Ats_client.create_weave
-              ~branch:result.branch
-              ~context:result.context
-              ~text:block
-              ~word_count:(Stitcher.word_count block)
-              ~turn_count:result.turn_count
-            in
-            (match ats_result with
-             | Ok () -> ()
-             | Error msg ->
-               Printf.eprintf "[loom] Failed to persist weave: %s\n%!" msg);
-            Lwt.return_unit)
-        | None -> ());
+       List.iter (fun (result : Stitcher.stitch_result) ->
+         match result.emitted with
+         | Some block ->
+           Lwt.async (fun () ->
+             let* ats_result = Ats_client.create_weave
+               ~branch:result.branch
+               ~context:result.context
+               ~text:block
+               ~word_count:(Stitcher.word_count block)
+               ~turn_count:result.turn_count
+             in
+             (match ats_result with
+              | Ok () -> ()
+              | Error msg ->
+                Printf.eprintf "[loom] Failed to persist weave: %s\n%!" msg);
+             Lwt.return_unit)
+         | None -> ()
+       ) results;
+       (* Return the last result for the ExecuteJob response *)
+       let result = List.nth results (List.length results - 1) in
        let result_json = Stitcher.result_to_json result in
        let resp = Protocol.ExecuteJobResponse.make
          ~success:true

@@ -28,25 +28,27 @@ let start () =
     let* (len, _sender) = Lwt_unix.recvfrom socket buf 0 65536 [] in
     let payload = Bytes.sub_string buf 0 len in
 
-    let result = Stitcher.stitch payload in
+    let results = Stitcher.stitch payload in
 
-    (* If the stitcher emitted a weave, persist it via ATSStoreService *)
-    (match result.emitted with
-     | Some block ->
-       Lwt.async (fun () ->
-         let* ats_result = Ats_client.create_weave
-           ~branch:result.branch
-           ~context:result.context
-           ~text:block
-           ~word_count:(Stitcher.word_count block)
-           ~turn_count:result.turn_count
-         in
-         (match ats_result with
-          | Ok () -> ()
-          | Error msg ->
-            Printf.eprintf "[loom] Failed to persist weave: %s\n%!" msg);
-         Lwt.return_unit)
-     | None -> ());
+    (* If the stitcher emitted weave(s), persist via ATSStoreService *)
+    List.iter (fun (result : Stitcher.stitch_result) ->
+      match result.emitted with
+      | Some block ->
+        Lwt.async (fun () ->
+          let* ats_result = Ats_client.create_weave
+            ~branch:result.branch
+            ~context:result.context
+            ~text:block
+            ~word_count:(Stitcher.word_count block)
+            ~turn_count:result.turn_count
+          in
+          (match ats_result with
+           | Ok () -> ()
+           | Error msg ->
+             Printf.eprintf "[loom] Failed to persist weave: %s\n%!" msg);
+          Lwt.return_unit)
+      | None -> ()
+    ) results;
 
     loop ()
   in
