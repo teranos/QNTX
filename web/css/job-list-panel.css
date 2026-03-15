@@ -13,7 +13,7 @@
     max-height: 500px;
     display: none; /* Hidden by default */
     flex-direction: column;
-    transition: var(--panel-transition-normal);
+    transition: var(--panel-transition);
     overflow: hidden;
 }
 
@@ -138,12 +138,12 @@
     padding: var(--panel-padding-sm);
     font-size: var(--font-size-sm);
     font-weight: 500;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: var(--border-radius);
     background: var(--bg-primary);
     color: var(--text-primary);
     cursor: pointer;
-    transition: var(--panel-transition-fast);
+    transition: var(--panel-transition);
 }
 
 .job-action-btn:hover {
@@ -241,7 +241,7 @@
     border: 1px solid #d0d0d0;
     border-radius: 2px;
     cursor: pointer;
-    transition: var(--panel-transition-normal);
+    transition: var(--panel-transition);
     position: relative;
     background: var(--bg-primary);
 }
@@ -299,7 +299,7 @@
 .job-list-footer {
     padding: var(--panel-padding-sm);
     background: var(--bg-almost-white);
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--border);
 }
 
 .new-ix-btn {
@@ -312,7 +312,7 @@
     background: var(--bg-primary);
     color: var(--text-primary);
     cursor: pointer;
-    transition: var(--panel-transition-fast);
+    transition: var(--panel-transition);
 }
 
 .new-ix-btn:hover {
@@ -396,7 +396,7 @@
     color: var(--text-primary);
     margin-bottom: 8px;
     padding-bottom: 6px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
 }
 
 .details-content {
