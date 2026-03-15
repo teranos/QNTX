@@ -115,7 +115,7 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
     resultsContainer.style.overflow = 'auto';
     resultsContainer.style.padding = '8px';
     resultsContainer.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
-    resultsContainer.style.borderTop = '1px solid var(--border-color)';
+    resultsContainer.style.borderTop = '1px solid var(--border)';
     resultsContainer.style.fontSize = '12px';
     resultsContainer.style.fontFamily = 'monospace';
 

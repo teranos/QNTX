@@ -13,7 +13,7 @@
     max-height: 400px;
     display: flex;
     flex-direction: column;
-    transition: var(--panel-transition-normal);
+    transition: var(--panel-transition);
     overflow: hidden;
 }
 
@@ -36,7 +36,7 @@
     justify-content: space-between;
     padding: var(--panel-padding-md);
     background: var(--bg-almost-white);
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
 }
 
 #command-explorer-panel .panel-title {
