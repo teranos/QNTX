@@ -174,7 +174,7 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
         content.style.overflow = 'auto';
         content.style.padding = '4px 8px';
         content.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
-        content.style.borderTop = '1px solid var(--border-color)';
+        content.style.borderTop = '1px solid var(--border)';
         content.style.fontSize = '12px';
         content.style.fontFamily = 'monospace';
 
