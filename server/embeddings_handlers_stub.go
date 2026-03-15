@@ -56,6 +56,11 @@ func (s *QNTXServer) HandleClusterMembers(w http.ResponseWriter, r *http.Request
 	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
 }
 
+// HandleClusterMemberships returns cluster assignments for attestation IDs (GET /api/embeddings/clusters/memberships)
+func (s *QNTXServer) HandleClusterMemberships(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
+}
+
 // HandleClusterTimeline serves cluster evolution data (GET /api/embeddings/cluster-timeline)
 func (s *QNTXServer) HandleClusterTimeline(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")

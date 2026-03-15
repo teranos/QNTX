@@ -4,6 +4,7 @@ let make_payload ?(context="session:test-abc-123") ~branch ~predicate ~text () =
   let attr_key = match predicate with
     | "UserPromptSubmit" -> "prompt"
     | "Stop" -> "last_assistant_message"
+    | "Hook" -> "hook_output"
     | _ -> "unknown"
   in
   Printf.sprintf
@@ -11,7 +12,15 @@ let make_payload ?(context="session:test-abc-123") ~branch ~predicate ~text () =
     branch predicate context attr_key text
 
 (* Clear global buffer state between tests *)
-let reset () = Hashtbl.clear Stitcher.buffers
+let reset () =
+  Hashtbl.clear Stitcher.buffers;
+  Hashtbl.clear Stitcher.last_branch
+
+(* Unwrap single-result stitch call *)
+let stitch_one payload =
+  match Stitcher.stitch payload with
+  | [r] -> r
+  | rs -> List.nth rs (List.length rs - 1)
 
 (* --- word_count --- *)
 
@@ -68,6 +77,10 @@ let test_extract_text_assistant () =
   let json = Yojson.Safe.from_string {|{"attributes":{"last_assistant_message":"response here"}}|} in
   Alcotest.(check (option string)) "assistant text" (Some "response here") (Stitcher.extract_text json "Stop")
 
+let test_extract_text_hook () =
+  let json = Yojson.Safe.from_string {|{"attributes":{"hook_output":"3 new clusters emerged"}}|} in
+  Alcotest.(check (option string)) "hook text" (Some "3 new clusters emerged") (Stitcher.extract_text json "Hook")
+
 let test_extract_text_unknown_predicate () =
   let json = Yojson.Safe.from_string {|{"attributes":{"prompt":"hello"}}|} in
   Alcotest.(check (option string)) "unknown predicate" None (Stitcher.extract_text json "Unknown")
@@ -77,7 +90,7 @@ let test_extract_text_unknown_predicate () =
 let test_stitch_buffers_single_turn () =
   reset ();
   let payload = make_payload ~branch:"main" ~predicate:"UserPromptSubmit" ~text:"hello world" () in
-  let result = Stitcher.stitch payload in
+  let result = stitch_one payload in
   Alcotest.(check string) "branch" "main" result.branch;
   Alcotest.(check string) "context" "session:test-abc-123" result.context;
   Alcotest.(check (option string)) "no emission" None result.emitted;
@@ -97,18 +110,26 @@ let test_stitch_labels_assistant () =
   let entry = Hashtbl.find Stitcher.buffers "main:session:test-abc-123" in
   Alcotest.(check string) "assistant label" "[assistant] response" (List.hd entry.turns)
 
+let test_stitch_labels_hook () =
+  reset ();
+  let payload = make_payload ~branch:"main" ~predicate:"Hook" ~text:"3 clusters born" () in
+  let _ = Stitcher.stitch payload in
+  let entry = Hashtbl.find Stitcher.buffers "main:session:test-abc-123" in
+  Alcotest.(check string) "hook label" "[hook] 3 clusters born" (List.hd entry.turns)
+
 let test_stitch_separate_branches () =
   reset ();
   let p1 = make_payload ~branch:"feat/a" ~predicate:"UserPromptSubmit" ~text:"hello" () in
   let p2 = make_payload ~branch:"feat/b" ~predicate:"UserPromptSubmit" ~text:"world" () in
   let _ = Stitcher.stitch p1 in
   let _ = Stitcher.stitch p2 in
-  Alcotest.(check int) "two branches" 2 (Hashtbl.length Stitcher.buffers)
+  (* feat/a buffer was flushed on branch change, only feat/b remains *)
+  Alcotest.(check int) "one branch after switch" 1 (Hashtbl.length Stitcher.buffers)
 
 let test_stitch_context_fallback () =
   reset ();
   let payload = {|{"subjects":["main"],"predicates":["UserPromptSubmit"],"attributes":{"prompt":"hello"}}|} in
-  let result = Stitcher.stitch payload in
+  let result = stitch_one payload in
   Alcotest.(check string) "fallback context" "_" result.context
 
 (* --- stitch: emission --- *)
@@ -118,9 +139,9 @@ let long_text n =
 
 let test_stitch_emits_at_threshold () =
   reset ();
-  let text = long_text 110 in
+  let text = long_text 160 in
   let payload = make_payload ~branch:"main" ~predicate:"UserPromptSubmit" ~text () in
-  let result = Stitcher.stitch payload in
+  let result = stitch_one payload in
   Alcotest.(check bool) "emitted" true (Option.is_some result.emitted);
   Alcotest.(check int) "turn count" 1 result.turn_count;
   Alcotest.(check int) "buffer cleared" 0 result.buffered_words
@@ -129,15 +150,15 @@ let test_stitch_no_emit_below_threshold () =
   reset ();
   let text = long_text 50 in
   let payload = make_payload ~branch:"main" ~predicate:"UserPromptSubmit" ~text () in
-  let result = Stitcher.stitch payload in
+  let result = stitch_one payload in
   Alcotest.(check bool) "not emitted" true (Option.is_none result.emitted)
 
 let test_stitch_accumulates_to_threshold () =
   reset ();
-  let p1 = make_payload ~branch:"main" ~predicate:"UserPromptSubmit" ~text:(long_text 60) () in
-  let p2 = make_payload ~branch:"main" ~predicate:"Stop" ~text:(long_text 60) () in
-  let r1 = Stitcher.stitch p1 in
-  let r2 = Stitcher.stitch p2 in
+  let p1 = make_payload ~branch:"main" ~predicate:"UserPromptSubmit" ~text:(long_text 80) () in
+  let p2 = make_payload ~branch:"main" ~predicate:"Stop" ~text:(long_text 80) () in
+  let r1 = stitch_one p1 in
+  let r2 = stitch_one p2 in
   Alcotest.(check bool) "first: buffered" true (Option.is_none r1.emitted);
   Alcotest.(check bool) "second: emitted" true (Option.is_some r2.emitted);
   Alcotest.(check int) "two turns" 2 r2.turn_count
@@ -145,10 +166,10 @@ let test_stitch_accumulates_to_threshold () =
 
 let test_stitch_emission_order () =
   reset ();
-  let p1 = make_payload ~branch:"main" ~predicate:"UserPromptSubmit" ~text:(long_text 60) () in
-  let p2 = make_payload ~branch:"main" ~predicate:"Stop" ~text:(long_text 60) () in
+  let p1 = make_payload ~branch:"main" ~predicate:"UserPromptSubmit" ~text:(long_text 80) () in
+  let p2 = make_payload ~branch:"main" ~predicate:"Stop" ~text:(long_text 80) () in
   let _ = Stitcher.stitch p1 in
-  let r = Stitcher.stitch p2 in
+  let r = stitch_one p2 in
   match r.emitted with
   | None -> Alcotest.fail "expected emission"
   | Some block ->
@@ -160,18 +181,38 @@ let test_stitch_emission_order () =
 
 let test_stitch_clears_buffer_after_emit () =
   reset ();
-  let text = long_text 110 in
+  let text = long_text 160 in
   let payload = make_payload ~branch:"main" ~predicate:"UserPromptSubmit" ~text () in
   let _ = Stitcher.stitch payload in
   Alcotest.(check bool) "buffer removed" true
     (Hashtbl.find_opt Stitcher.buffers "main:session:test-abc-123" = None)
 
+(* --- branch change flush --- *)
+
+let test_stitch_flushes_on_branch_change () =
+  reset ();
+  let p1 = make_payload ~branch:"main" ~predicate:"UserPromptSubmit" ~text:"hello world on main" () in
+  let _ = Stitcher.stitch p1 in
+  Alcotest.(check int) "main buffered" 1 (Hashtbl.length Stitcher.buffers);
+  (* Switch to feat branch — should flush main buffer *)
+  let p2 = make_payload ~branch:"feat/x" ~predicate:"UserPromptSubmit" ~text:"hello on feat" () in
+  let results = Stitcher.stitch p2 in
+  (* Should get two results: flushed main + buffered feat *)
+  Alcotest.(check int) "two results" 2 (List.length results);
+  let flushed = List.hd results in
+  Alcotest.(check string) "flushed branch" "main" flushed.branch;
+  Alcotest.(check bool) "flushed emitted" true (Option.is_some flushed.emitted);
+  (* Only feat buffer remains *)
+  Alcotest.(check int) "one buffer" 1 (Hashtbl.length Stitcher.buffers);
+  Alcotest.(check bool) "feat buffered" true
+    (Hashtbl.find_opt Stitcher.buffers "feat/x:session:test-abc-123" <> None)
+
 (* --- flush_all --- *)
 
 let test_flush_all_drains_buffers () =
   reset ();
-  let p1 = make_payload ~branch:"feat/a" ~predicate:"UserPromptSubmit" ~text:"hello world" () in
-  let p2 = make_payload ~branch:"feat/b" ~predicate:"UserPromptSubmit" ~text:"goodbye world" () in
+  let p1 = make_payload ~context:"session:a" ~branch:"feat/a" ~predicate:"UserPromptSubmit" ~text:"hello world" () in
+  let p2 = make_payload ~context:"session:b" ~branch:"feat/b" ~predicate:"UserPromptSubmit" ~text:"goodbye world" () in
   let _ = Stitcher.stitch p1 in
   let _ = Stitcher.stitch p2 in
   Alcotest.(check int) "two branches buffered" 2 (Hashtbl.length Stitcher.buffers);
@@ -191,7 +232,7 @@ let test_flush_all_empty () =
 
 let test_stitch_malformed_json () =
   reset ();
-  let result = Stitcher.stitch "not json" in
+  let result = List.hd (Stitcher.stitch "not json") in
   Alcotest.(check string) "unknown branch" "unknown" result.branch;
   Alcotest.(check string) "fallback context" "_" result.context;
   Alcotest.(check (option string)) "no emission" None result.emitted
@@ -199,7 +240,7 @@ let test_stitch_malformed_json () =
 let test_stitch_missing_text () =
   reset ();
   let payload = {|{"subjects":["main"],"predicates":["UserPromptSubmit"],"contexts":["session:x"],"attributes":{}}|} in
-  let result = Stitcher.stitch payload in
+  let result = stitch_one payload in
   Alcotest.(check string) "branch parsed" "main" result.branch;
   Alcotest.(check string) "context parsed" "session:x" result.context;
   Alcotest.(check (option string)) "no emission" None result.emitted;
@@ -208,7 +249,7 @@ let test_stitch_missing_text () =
 (* --- result_to_json --- *)
 
 let test_result_to_json_buffered () =
-  let r = Stitcher.{ branch = "main"; context = "session:x"; buffered_words = 42; emitted = None; turn_count = 0 } in
+  let r = Stitcher.{ branch = "main"; context = "session:x"; buffered_words = 42; emitted = None; turn_count = 0; paths = [] } in
   let json = Yojson.Safe.from_string (Stitcher.result_to_json r) in
   match json with
   | `Assoc fields ->
@@ -218,7 +259,7 @@ let test_result_to_json_buffered () =
   | _ -> Alcotest.fail "expected JSON object"
 
 let test_result_to_json_emitted () =
-  let r = Stitcher.{ branch = "main"; context = "session:x"; buffered_words = 0; emitted = Some "hello world"; turn_count = 1 } in
+  let r = Stitcher.{ branch = "main"; context = "session:x"; buffered_words = 0; emitted = Some "hello world"; turn_count = 1; paths = [] } in
   let json = Yojson.Safe.from_string (Stitcher.result_to_json r) in
   match json with
   | `Assoc fields ->
@@ -231,7 +272,7 @@ let test_result_to_json_emitted () =
   | _ -> Alcotest.fail "expected JSON object"
 
 let test_result_to_json_escapes_branch () =
-  let r = Stitcher.{ branch = {|feat/"quoted"|}; context = "session:x"; buffered_words = 10; emitted = None; turn_count = 0 } in
+  let r = Stitcher.{ branch = {|feat/"quoted"|}; context = "session:x"; buffered_words = 10; emitted = None; turn_count = 0; paths = [] } in
   let json_str = Stitcher.result_to_json r in
   (* Must parse as valid JSON — would fail if branch wasn't escaped *)
   let _json = Yojson.Safe.from_string json_str in
@@ -258,12 +299,14 @@ let () =
       Alcotest.test_case "context no field" `Quick test_extract_context_no_field;
       Alcotest.test_case "prompt text" `Quick test_extract_text_prompt;
       Alcotest.test_case "assistant text" `Quick test_extract_text_assistant;
+      Alcotest.test_case "hook text" `Quick test_extract_text_hook;
       Alcotest.test_case "unknown predicate" `Quick test_extract_text_unknown_predicate;
     ];
     "buffering", [
       Alcotest.test_case "single turn" `Quick test_stitch_buffers_single_turn;
       Alcotest.test_case "human label" `Quick test_stitch_labels_human;
       Alcotest.test_case "assistant label" `Quick test_stitch_labels_assistant;
+      Alcotest.test_case "hook label" `Quick test_stitch_labels_hook;
       Alcotest.test_case "separate branches" `Quick test_stitch_separate_branches;
       Alcotest.test_case "context fallback" `Quick test_stitch_context_fallback;
     ];
@@ -273,6 +316,9 @@ let () =
       Alcotest.test_case "accumulates" `Quick test_stitch_accumulates_to_threshold;
       Alcotest.test_case "chronological order" `Quick test_stitch_emission_order;
       Alcotest.test_case "clears buffer" `Quick test_stitch_clears_buffer_after_emit;
+    ];
+    "branch_change", [
+      Alcotest.test_case "flushes on switch" `Quick test_stitch_flushes_on_branch_change;
     ];
     "flush_all", [
       Alcotest.test_case "drains buffers" `Quick test_flush_all_drains_buffers;
