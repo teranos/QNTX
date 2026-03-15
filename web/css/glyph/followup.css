@@ -1,0 +1,86 @@
+/**
+ * Follow-up input zone at bottom of result glyphs.
+ *
+ * Hidden until hover/focus. Hover reveals a compact single-line input;
+ * focus-within switches to auto height so the textarea can grow as you
+ * type multiple lines.
+ *
+ * Also includes error state styling for result glyphs.
+ */
+.result-followup-zone {
+    flex-shrink: 0;
+    box-sizing: border-box;
+    height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: height 0.2s ease, opacity 0.15s ease, padding 0.15s ease;
+    padding: 0 8px;
+}
+
+/* Hover: reveal at compact height (but not when showing an error) */
+.canvas-result-glyph:hover .result-followup-zone:not(.has-error) {
+    height: 42px;
+    opacity: 1;
+    padding: 4px 8px;
+    border-top: 1px solid var(--border);
+}
+
+/* Focus-within: auto height so textarea can grow freely */
+.result-followup-zone:focus-within {
+    height: auto;
+    opacity: 1;
+    padding: 4px 8px;
+    border-top: 1px solid var(--border);
+    overflow: visible;
+}
+
+.result-followup-zone textarea {
+    width: 100%;
+    min-height: 28px;
+    max-height: 200px;
+    padding: 4px 6px;
+    font-family: monospace;
+    font-size: var(--font-size-sm);
+    background-color: var(--bg-almost-black);
+    color: var(--text-on-dark);
+    border: 1px solid var(--border);
+    border-radius: var(--border-radius);
+    resize: none;
+    box-sizing: border-box;
+    overflow-y: hidden;
+}
+
+.result-followup-zone textarea:focus {
+    outline: none;
+    border-color: var(--accent-lavender);
+}
+
+.result-followup-zone .followup-status {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    margin-top: 2px;
+    display: block;
+    min-height: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* Error state: keep zone visible, style error red */
+.result-followup-zone.has-error {
+    height: auto;
+    opacity: 1;
+    padding: 4px 8px;
+    border-top: 1px solid var(--glyph-status-error-text);
+    background-color: var(--glyph-status-error-section-bg);
+}
+
+.result-followup-zone.has-error .followup-status {
+    color: var(--glyph-status-error-text);
+    font-weight: bold;
+}
+
+/* Error border on the glyph itself — !important overrides inline styles */
+.canvas-result-glyph.glyph-error {
+    outline-color: var(--glyph-status-error-text) !important;
+    background-color: var(--glyph-status-error-section-bg) !important;
+}
