@@ -6,9 +6,15 @@ PREFIX ?= $(HOME)/.qntx
 # Use prebuilt qntx if available in PATH, otherwise use ./bin/qntx
 QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
+# Optional: KERN=1 make cli/dev to enable OCaml parser plugin
+BUILD_TAGS := rustvideo,rustsqlite,rustembeddings,qntxwasm
+ifdef KERN
+BUILD_TAGS := $(BUILD_TAGS),kern
+endif
+
 cli: rust-vidstream rust-sqlite rust-embeddings wasm ## Build QNTX CLI binary (with Rust optimizations, embeddings, and WASM parser)
 	@echo "Building QNTX CLI with Rust optimizations (video, sqlite, embeddings) and WASM (parser, fuzzy)..."
-	@go build -tags "rustvideo,rustsqlite,rustembeddings,qntxwasm,kern" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
+	@go build -tags "$(BUILD_TAGS)" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
 cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments without Rust toolchain)
 	@echo "Building QNTX CLI (pure Go, no CGO)..."
