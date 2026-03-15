@@ -1,24 +1,27 @@
-# ADR-011: OCaml Replaces Rust as Core Engine Language
+# ADR-011: OCaml Core Engine (kern)
 
 ## Status
-Proposed — parser proven, core migration not yet started
+Proposed — parser proven (PR #688), layered architecture emerging
 
 ## Context
 
 ATS has the semantics of a language but no formal grammar. Query, creation, and subscription are three separate code paths with ad-hoc string processing. The current Rust parser in `crates/qntx-core` is a hand-rolled state machine. The classifier and expander are structural transformations. These are language problems.
 
+Separately, database operations are migrating from Go to Rust (PR #691+). Rust is not being replaced — it is expanding into the engine layer.
+
 ## Decision
 
-Replace `crates/qntx-core` with OCaml. Parser via menhir, AST as algebraic types, classifier and expander as pattern matches. Build with dune.
+kern (OCaml) is the innermost layer — parser, classifier, expander. Rust is the engine — database, enforcement, query execution. Go is the shell — HTTP, plugins, UI.
 
-### Deployment: dual-target from one codebase
+Parser via menhir, AST as algebraic types, classifier and expander as pattern matches. Build with dune.
 
-- **Server**: native OCaml binary, gRPC plugin (same model as loom)
-- **Browser**: wasm_of_ocaml compiles to WASM, runs in the browser's native WebAssembly engine (WasmGC supported in Chrome 119+, Firefox 122+, Safari 18.2+)
+### Server deployment
 
-### Why not WASI + wazero
+kern currently runs as a gRPC plugin (same model as loom). The gRPC path works but adds latency for what should be a function call. The end state depends on how kern integrates with the Rust engine layer — see "Database ownership" below.
 
-wasm_of_ocaml outputs WasmGC instructions. wazero does not support WasmGC and has no timeline to add it ([#1860](https://github.com/tetratelabs/wazero/issues/1860), deprioritized behind simpler Wasm 3.0 proposals). The native gRPC path avoids this entirely — the server runs a native binary, the browser runs browser-native WASM.
+### Browser deployment
+
+See ADR-012.
 
 ### Fuzzy matching: deprecated
 
@@ -46,10 +49,11 @@ The hard question. To move beyond parsing into classification and expansion, ker
 
 1. **ATSStoreService expands massively** — kern calls back into Go for every DB operation. More gRPC surface, more latency, but the plugin boundary stays clean. This is the incremental path.
 2. **kern gets direct DB access** — breaks the plugin model. kern would need SQLite bindings in OCaml, or a shared DB connection. Worst of both worlds.
-3. **kern stops being a plugin** — it becomes a linked library (OCaml compiled to a C-compatible shared object, called from Go via CGO). No gRPC overhead, direct access to everything. But then it's not a plugin anymore. This is the end state if kern truly replaces qntx-core.
+3. **kern stops being a plugin** — it becomes a linked library (OCaml compiled to a C-compatible shared object, called into from Rust or Go). No gRPC overhead, direct access to everything. The Rust migration makes this more natural — kern links into the Rust layer rather than Go.
 
 ## Open questions
 
-- sync/merkle: OCaml or stays in Rust/Go
+- How kern integrates with the Rust engine layer (gRPC plugin → linked library → ?)
+- sync/merkle: Rust or stays in Go
 - Migration path during transition
 - When to decide on database ownership model (1 vs 3)
