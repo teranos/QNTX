@@ -164,7 +164,7 @@
     border: 1px solid var(--panel-border-color, #333);
     border-radius: var(--border-radius);
     cursor: pointer;
-    transition: var(--panel-transition-normal);
+    transition: var(--panel-transition);
 }
 
 .field-item:hover {

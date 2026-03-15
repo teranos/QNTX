@@ -102,7 +102,7 @@
     transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
     background-color: var(--bg-hover);
     color: var(--text-primary);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
 }
 
 .titlebar-btn:hover {
@@ -132,7 +132,7 @@
     height: 42px;
     opacity: 1;
     padding: 4px 8px;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--border);
 }
 
 /* Focus-within: auto height so textarea can grow freely */
@@ -140,7 +140,7 @@
     height: auto;
     opacity: 1;
     padding: 4px 8px;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--border);
     overflow: visible;
 }
 
@@ -153,7 +153,7 @@
     font-size: 12px;
     background-color: var(--bg-almost-black);
     color: var(--text-on-dark);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 3px;
     resize: none;
     box-sizing: border-box;

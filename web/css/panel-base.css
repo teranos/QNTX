@@ -9,7 +9,7 @@
     border: var(--panel-border);
     border-radius: var(--border-radius);
     padding: var(--panel-padding-md);
-    transition: var(--panel-transition-fast);
+    transition: var(--panel-transition);
 }
 
 .panel-card:hover {
@@ -195,7 +195,7 @@
     font-size: var(--font-size-sm);
     font-weight: 500;
     cursor: pointer;
-    transition: var(--panel-transition-fast);
+    transition: var(--panel-transition);
 }
 
 .panel-error-retry:hover {
@@ -340,7 +340,7 @@
     padding: var(--panel-padding-sm);
     font-size: var(--font-size-sm);
     cursor: pointer;
-    transition: var(--panel-transition-fast);
+    transition: var(--panel-transition);
 }
 
 .panel-btn:hover {
@@ -371,11 +371,11 @@
     font-size: var(--font-size-md);
     color: var(--panel-text-secondary);
     cursor: pointer;
-    transition: var(--panel-transition-fast);
+    transition: var(--panel-transition);
 }
 
 .panel-btn-accent:hover:not([disabled]) {
-    background: var(--bg-scheduled-tint);
+    background: var(--status-scheduled-bg);
     border-color: var(--color-scheduled);
     color: var(--color-scheduled);
 }
@@ -428,7 +428,7 @@
 
 /* Left accent borders for status indicators and emphasis */
 .accent-border-left {
-    border-left: 3px solid var(--border-color);
+    border-left: 3px solid var(--border);
 }
 
 .accent-border-scheduled {
@@ -558,7 +558,7 @@
 .has-tooltip {
     cursor: help;
     border-bottom: 1px dotted var(--panel-text-secondary);
-    transition: var(--panel-transition-fast);
+    transition: var(--panel-transition);
 }
 
 .has-tooltip:hover {

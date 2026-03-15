@@ -26,9 +26,9 @@
     font-size: var(--font-size-md); /* Default size for mobile */
     color: #000;
     background: var(--bg-almost-white);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     cursor: pointer;
-    transition: var(--panel-transition-fast);
+    transition: var(--panel-transition);
     position: relative;
     font-weight: 500; /* Slightly bolder for better visibility */
     /* Reset button defaults */

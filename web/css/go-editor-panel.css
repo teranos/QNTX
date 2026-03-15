@@ -11,10 +11,10 @@
 /* Info bar */
 .go-editor-info {
     padding: 10px;
-    background: var(--editor-info-bg);
+    background: var(--bg-secondary);
     color: var(--editor-text);
     font-size: var(--font-size-sm);
-    border-bottom: 1px solid var(--editor-border);
+    border-bottom: 1px solid var(--border-on-dark);
 }
 
 .go-editor-info-status {
@@ -28,7 +28,7 @@
 
 .gopls-status-connecting,
 .gopls-status-unavailable {
-    color: var(--status-neutral);
+    color: var(--text-on-dark-tertiary);
 }
 
 .gopls-status-ready {
@@ -70,7 +70,7 @@
 .go-editor-error-help {
     margin-top: 10px;
     font-size: var(--font-size-sm);
-    color: var(--editor-text-muted);
+    color: var(--text-on-dark-tertiary);
 }
 
 .go-editor-error-help code {
