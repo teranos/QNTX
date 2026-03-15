@@ -7,9 +7,7 @@
 //!
 //! Also handles telemetry logging to the storage_events table.
 
-use qntx_core::storage::enforcement::{
-    EnforcementEvent, EnforcementInput, EvictionDetails,
-};
+use qntx_core::storage::enforcement::{EnforcementEvent, EnforcementInput, EvictionDetails};
 
 use crate::error::SqliteError;
 use crate::SqliteStore;
@@ -213,9 +211,7 @@ impl SqliteStore {
         };
 
         for (i, cu) in contexts_to_delete.iter().enumerate() {
-            details
-                .evicted_contexts
-                .push(cu.context_array.clone());
+            details.evicted_contexts.push(cu.context_array.clone());
 
             // Collect sample data from first context being evicted
             if i == 0 {
@@ -226,8 +222,7 @@ impl SqliteStore {
                      ) AND contexts = ?2
                      LIMIT 3",
                 )?;
-                let mut rows =
-                    sample_stmt.query(rusqlite::params![actor, cu.context_array])?;
+                let mut rows = sample_stmt.query(rusqlite::params![actor, cu.context_array])?;
                 while let Some(row) = rows.next()? {
                     let pred_json: String = row.get(0)?;
                     let subj_json: String = row.get(1)?;
@@ -398,7 +393,6 @@ impl SqliteStore {
 
         Ok(())
     }
-
 }
 
 #[cfg(test)]

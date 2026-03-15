@@ -32,7 +32,9 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ),
     (
         "014",
-        include_str!("../../../db/sqlite/migrations/014_add_eviction_details_to_storage_events.sql"),
+        include_str!(
+            "../../../db/sqlite/migrations/014_add_eviction_details_to_storage_events.sql"
+        ),
     ),
 ];
 
