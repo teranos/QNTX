@@ -260,7 +260,7 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	storage.SetDefaultSigner(signing.NewSigner(nodeDIDHandler.PrivateKey, nodeDIDHandler.DID))
 
 	// Create the attestation store (Rust FFI when rustsqlite tag is active, Go SQLite otherwise)
-	atsStore, err := storage.NewStore(db, dbPath, serverLogger)
+	atsStore, err := storage.NewStore(dbPath, serverLogger)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create attestation store")
 	}

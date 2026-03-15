@@ -34,10 +34,12 @@
 //! - `qntx-indexeddb`: IndexedDB backend for browser WASM (async API matching
 //!   the same trait contract)
 
+pub mod enforcement;
 mod error;
 mod memory;
 mod traits;
 
+pub use enforcement::{EnforcementConfig, EnforcementEvent, EnforcementInput, EvictionDetails};
 pub use error::StoreError;
 pub use memory::MemoryStore;
 pub use traits::{AttestationStore, QueryStore, StorageStats};

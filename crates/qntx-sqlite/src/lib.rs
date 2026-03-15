@@ -63,6 +63,7 @@
 //! ```
 
 pub mod bounded;
+pub mod enforcement;
 pub mod error;
 pub mod json;
 pub mod migrate;
