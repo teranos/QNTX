@@ -10,6 +10,7 @@ import (
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/sym"
@@ -93,13 +94,17 @@ func runAsCommand(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Create Rust-backed store
-	atsStore, err := storage.NewStore(database, dbPath, nil)
+	// Create Rust-backed store with enforcement config
+	atsStore, err := storage.NewStoreWithConfig(dbPath, nil, &sqlitecgo.EnforcementConfig{
+		ActorContextLimit:  cfg.Database.BoundedStorage.ActorContextLimit,
+		ActorContextsLimit: cfg.Database.BoundedStorage.ActorContextsLimit,
+		EntityActorsLimit:  cfg.Database.BoundedStorage.EntityActorsLimit,
+	})
 	if err != nil {
 		return errors.Wrap(err, "failed to create attestation store")
 	}
 
-	// Create bounded store (enforces storage limits)
+	// BoundedStore wraps for CreateAttestationWithLimits (enforcement is in Rust now)
 	boundedStore := storage.NewBoundedStoreWithConfig(
 		database,
 		atsStore,
