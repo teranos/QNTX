@@ -64,15 +64,12 @@ func NewBoundedStoreWithConfig(db *sql.DB, store ats.AttestationStore, logger *z
 	}
 }
 
-// CreateAttestation inserts a new attestation into the database with quota enforcement (implements ats.AttestationStore)
-// Note: Observer notification is handled by RustBackedStore.CreateAttestation
+// CreateAttestation inserts a new attestation into the database (implements ats.AttestationStore).
+// Enforcement runs through Rust inside RustBackedStore.CreateAttestation.
 func (bs *BoundedStore) CreateAttestation(as *types.As) error {
 	if err := bs.store.CreateAttestation(as); err != nil {
 		return errors.Wrap(err, "failed to create attestation")
 	}
-
-	// Enforce bounded storage limits after insertion
-	bs.enforceLimits(as)
 
 	return nil
 }
@@ -93,17 +90,13 @@ func (bs *BoundedStore) GetAttestations(filters ats.AttestationFilter) ([]*types
 	return bs.store.GetAttestations(filters)
 }
 
-// CreateAttestationWithLimits creates an attestation and enforces storage limits (implements ats.BoundedStore)
-// Note: Observer notification is handled by RustBackedStore.CreateAttestation (called internally)
+// CreateAttestationWithLimits creates an attestation (implements ats.BoundedStore).
+// Enforcement runs through Rust inside RustBackedStore.CreateAttestation.
 func (bs *BoundedStore) CreateAttestationWithLimits(cmd *types.AsCommand) (*types.As, error) {
-	// First create the attestation (observer notification happens in RustBackedStore)
 	as, err := bs.store.GenerateAndCreateAttestation(context.Background(), cmd)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create attestation")
 	}
-
-	// Then enforce limits synchronously to avoid database connection issues
-	bs.enforceLimits(as)
 
 	return as, nil
 }

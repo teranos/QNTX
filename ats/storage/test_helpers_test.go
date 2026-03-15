@@ -19,7 +19,7 @@ func init() {
 }
 
 // createTestStore creates a file-backed RustBackedStore for testing.
-// Returns the store (for CRUD), the Go *sql.DB (for raw SQL queries and enforcement),
+// Returns the store (for CRUD), the Go *sql.DB (for raw SQL queries in tests),
 // and registers cleanup via t.Cleanup().
 func createTestStore(t *testing.T) (ats.AttestationStore, *sql.DB) {
 	t.Helper()
@@ -28,7 +28,7 @@ func createTestStore(t *testing.T) (ats.AttestationStore, *sql.DB) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "test.db")
 
-	// Open Go side
+	// Open Go side (still needed for tests that query storage_events, etc.)
 	goDb, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		t.Fatalf("failed to open Go test db: %v", err)
@@ -53,7 +53,12 @@ func createTestStore(t *testing.T) (ats.AttestationStore, *sql.DB) {
 		t.Fatalf("failed to create Rust store at %s: %v", dbPath, err)
 	}
 
-	store := &RustBackedStore{rust: rustStore, db: goDb, log: nil}
+	cfg := &sqlitecgo.EnforcementConfig{
+		ActorContextLimit:  DefaultActorContextLimit,
+		ActorContextsLimit: DefaultActorContextsLimit,
+		EntityActorsLimit:  DefaultEntityActorsLimit,
+	}
+	store := &RustBackedStore{rust: rustStore, enforcementCfg: cfg, log: nil}
 
 	t.Cleanup(func() {
 		rustStore.Close()
