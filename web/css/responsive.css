@@ -1,11 +1,5 @@
 /* Responsive Utilities - Centralized mobile behavior */
-
-:root {
-    /* Breakpoint documentation (can't use in @media, but documents standards) */
-    --breakpoint-mobile: 768px;
-    --breakpoint-tablet: 900px;
-    --breakpoint-desktop: 1200px;
-}
+/* Breakpoint tokens are in tokens.css */
 
 /* Mobile: Full-width panels and layout adjustments */
 @media (max-width: 768px) {
