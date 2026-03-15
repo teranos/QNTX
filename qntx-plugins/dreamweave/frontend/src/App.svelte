@@ -787,9 +787,9 @@
   :global(*) { box-sizing: border-box; margin: 0; padding: 0; }
 
   :global(body) {
-    background: #2d2e36;
-    color: #dfe1e0;
-    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg-canvas);
+    color: var(--text-on-dark);
+    font-family: var(--font-mono);
     font-size: 12px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
@@ -810,43 +810,43 @@
     align-items: center;
     gap: 12px;
     padding: 6px 12px;
-    background: #1a1b1a;
-    border-bottom: 1px solid #3f4140;
+    background: var(--bg-almost-black);
+    border-bottom: 1px solid var(--border-on-dark);
   }
 
   .dw-title {
-    color: #7dba8a;
+    color: var(--accent-on-dark);
     font-weight: 500;
-    font-size: 13px;
+    font-size: var(--font-size-md);
   }
 
-  .dw-stat { color: #878988; font-size: 11px; }
+  .dw-stat { color: var(--text-on-dark-tertiary); font-size: var(--font-size-sm); }
 
-  .dw-cluster { color: #878988; font-style: italic; }
+  .dw-cluster { color: var(--text-on-dark-tertiary); font-style: italic; }
 
   .dw-sel {
     margin-left: auto;
     display: flex;
     align-items: center;
     gap: 6px;
-    color: #dfe1e0;
-    font-size: 11px;
+    color: var(--text-on-dark);
+    font-size: var(--font-size-sm);
   }
 
   .dw-sel button {
-    background: #343534;
-    color: #dfe1e0;
-    border: 1px solid #3f4140;
+    background: var(--bg-dark-light);
+    color: var(--text-on-dark);
+    border: 1px solid var(--border-on-dark);
     padding: 1px 6px;
     font: inherit;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     cursor: pointer;
   }
-  .dw-sel button:hover { background: #3f4140; }
+  .dw-sel button:hover { background: var(--border-on-dark); }
 
   /* Status messages */
-  .dw-msg { padding: 24px; color: #878988; text-align: center; }
-  .dw-err { color: #ef4544; }
+  .dw-msg { padding: 24px; color: var(--text-on-dark-tertiary); text-align: center; }
+  .dw-err { color: var(--color-error); }
 
   /* Mobile session dots */
   .dw-dots {
@@ -854,18 +854,18 @@
     justify-content: center;
     gap: 6px;
     padding: 6px;
-    background: #1a1b1a;
-    border-bottom: 1px solid #3f4140;
+    background: var(--bg-almost-black);
+    border-bottom: 1px solid var(--border-on-dark);
   }
 
   .dw-dot {
     width: 6px; height: 6px;
-    border: 1px solid #3f4140;
+    border: 1px solid var(--border-on-dark);
     background: transparent;
     padding: 0;
     cursor: pointer;
   }
-  .dw-dot.active { background: #7dba8a; border-color: #7dba8a; }
+  .dw-dot.active { background: var(--accent-on-dark); border-color: var(--accent-on-dark); }
 
   /* Timeline container */
   .dw-timeline {
@@ -879,7 +879,7 @@
   .dw-col-wrap {
     display: flex;
     flex: 0 0 100%;
-    border-right: 1px solid #3f4140;
+    border-right: 1px solid var(--border-on-dark);
   }
 
   /* Session column */
@@ -897,11 +897,11 @@
   .dw-warp {
     width: 24px;
     height: calc(100vh - 33px);
-    background: #1a1b1a;
+    background: var(--bg-almost-black);
     position: relative;
     cursor: pointer;
     flex-shrink: 0;
-    border-left: 1px solid #252625;
+    border-left: 1px solid var(--bg-secondary);
     overflow: hidden;
   }
   .dw-warp-lanes {
@@ -933,7 +933,7 @@
     border-bottom: 2px solid rgba(255,171,0,0.6);
   }
   .dw-warp-gap {
-    background: #1a1b1a;
+    background: var(--bg-almost-black);
   }
   .dw-warp-tool-overlay {
     position: absolute;
@@ -952,7 +952,7 @@
     justify-content: center;
   }
   .dw-warp-tool {
-    color: #ffab00;
+    color: var(--color-warning);
     font-size: 8px;
     line-height: 1;
   }
@@ -965,7 +965,7 @@
     position: absolute;
     left: 0;
     width: 100%;
-    border: 1px solid #7dba8a;
+    border: 1px solid var(--accent-on-dark);
     background: rgba(125,186,138,0.08);
     pointer-events: none;
   }
@@ -976,8 +976,8 @@
     top: 0;
     z-index: 5;
     padding: 6px 10px;
-    background: #252625;
-    border-bottom: 1px solid #3f4140;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-on-dark);
   }
 
   .dw-session-top {
@@ -986,8 +986,8 @@
     align-items: baseline;
   }
 
-  .dw-sid { color: #a9abaa; font-size: 11px; font-weight: 500; }
-  .dw-smeta { color: #656766; font-size: 10px; }
+  .dw-sid { color: var(--text-on-dark-secondary); font-size: var(--font-size-sm); font-weight: 500; }
+  .dw-smeta { color: var(--text-secondary); font-size: var(--font-size-xs); }
 
   .dw-branches {
     display: flex;
@@ -997,8 +997,8 @@
   }
 
   .dw-branch {
-    font-size: 10px;
-    color: #878988;
+    font-size: var(--font-size-xs);
+    color: var(--text-on-dark-tertiary);
     border-left: 2px solid;
     padding-left: 4px;
     overflow-wrap: break-word;
@@ -1012,11 +1012,11 @@
     justify-content: center;
     height: 32px;
     margin: 0 6px;
-    border-left: 1px dashed #3f4140;
-    border-right: 1px dashed #3f4140;
+    border-left: 1px dashed var(--border-on-dark);
+    border-right: 1px dashed var(--border-on-dark);
   }
   .dw-gap-label {
-    color: #4a4b4a;
+    color: var(--border-on-dark);
     font-size: 9px;
   }
 
@@ -1024,7 +1024,7 @@
   .dw-stream { padding: 2px 0; flex: 1; }
 
   .dw-weave {
-    border-left: 3px solid #3f4140;
+    border-left: 3px solid var(--border-on-dark);
     margin: 0 6px 1px 6px;
     padding: 3px 6px;
   }
@@ -1032,15 +1032,15 @@
   .dw-wmeta {
     display: flex;
     gap: 8px;
-    color: #656766;
-    font-size: 10px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
     padding-bottom: 2px;
-    border-bottom: 1px solid #252625;
+    border-bottom: 1px solid var(--bg-secondary);
     margin-bottom: 1px;
   }
   .dw-wmeta span:last-child { margin-left: auto; }
   .dw-copyable { cursor: pointer; }
-  .dw-copyable:hover { color: #a9abaa; }
+  .dw-copyable:hover { color: var(--text-on-dark-secondary); }
 
   /* Turn */
   .dw-turn {
@@ -1051,28 +1051,28 @@
     word-break: break-word;
   }
 
-  .dw-turn:hover { background: #2a2b2a; }
-  .dw-turn.selected { background: #1f2a3d; }
+  .dw-turn:hover { background: var(--bg-dark-hover); }
+  .dw-turn.selected { background: var(--glyph-status-running-bg); }
 
   .dw-speaker {
     font-weight: 500;
-    font-size: 10px;
+    font-size: var(--font-size-xs);
     margin-right: 4px;
   }
 
-  .dw-turn.human .dw-speaker { color: #7dba8a; }
-  .dw-turn.assistant .dw-speaker { color: #6b9bd1; }
-  .dw-turn.tool .dw-speaker { color: #ffab00; }
-  .dw-turn.marker .dw-speaker { color: #7b20a2; }
+  .dw-turn.human .dw-speaker { color: var(--accent-on-dark); }
+  .dw-turn.assistant .dw-speaker { color: var(--glyph-status-running-text); }
+  .dw-turn.tool .dw-speaker { color: var(--color-warning); }
+  .dw-turn.marker .dw-speaker { color: var(--color-scheduled); }
 
   .dw-turn.tool {
-    background: #1a1b1a;
-    border-left: 2px solid #ffab00;
+    background: var(--bg-almost-black);
+    border-left: 2px solid var(--color-warning);
     padding-left: 4px;
     margin: 1px 0;
   }
   .dw-turn.tool .dw-text {
-    color: #a9abaa;
+    color: var(--text-on-dark-secondary);
     font-size: 8px;
   }
 
@@ -1080,7 +1080,7 @@
   .dw-turn.read,
   .dw-turn.search,
   .dw-turn.write {
-    background: #1a1b1a;
+    background: var(--bg-almost-black);
     border-left: 2px solid #5b8dd9;
     padding-left: 4px;
     margin: 1px 0;
@@ -1093,27 +1093,27 @@
   .dw-turn.read .dw-text,
   .dw-turn.search .dw-text,
   .dw-turn.write .dw-text {
-    color: #a9abaa;
+    color: var(--text-on-dark-secondary);
     font-size: 8px;
   }
   .dw-path {
     cursor: pointer;
-    border-bottom: 1px dotted #3f4140;
+    border-bottom: 1px dotted var(--border-on-dark);
   }
   .dw-path:hover {
-    color: #dfe1e0;
+    color: var(--text-on-dark);
     border-bottom-color: #5b8dd9;
   }
 
   .dw-turn.hook {
-    background: #1a1b1a;
+    background: var(--bg-almost-black);
     border-left: 2px solid #d94a4a;
     padding-left: 4px;
     margin: 1px 0;
   }
   .dw-turn.hook .dw-speaker { color: #d94a4a; }
   .dw-turn.hook .dw-text {
-    color: #a9abaa;
+    color: var(--text-on-dark-secondary);
     font-size: 8px;
   }
 
@@ -1127,14 +1127,14 @@
 
   .dw-turn.marker {
     font-size: 10px;
-    color: #656766;
+    color: var(--text-secondary);
     font-style: italic;
   }
-  .dw-turn.marker .dw-text { color: #656766; font-size: 10px; }
+  .dw-turn.marker .dw-text { color: var(--text-secondary); font-size: 10px; }
 
   :global(.dw-code) {
-    background: #1a1b1a;
-    border: 1px solid #3f4140;
+    background: var(--bg-almost-black);
+    border: 1px solid var(--border-on-dark);
     padding: 3px 6px;
     margin: 2px 0;
     font-size: 11px;
@@ -1142,12 +1142,12 @@
     word-break: break-word;
     white-space: pre-wrap;
   }
-  :global(.dw-code code) { color: #a9abaa; }
+  :global(.dw-code code) { color: var(--text-on-dark-secondary); }
 
   :global(.dw-inline-code) {
-    background: #1a1b1a;
+    background: var(--bg-almost-black);
     padding: 0 3px;
-    color: #a9abaa;
+    color: var(--text-on-dark-secondary);
     font-size: 11px;
   }
 

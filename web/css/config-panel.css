@@ -19,7 +19,7 @@
     border: var(--panel-border);
     border-radius: var(--border-radius);
     outline: none;
-    transition: var(--panel-transition-fast);
+    transition: var(--panel-transition);
     font-family: inherit;
 }
 
@@ -74,7 +74,7 @@
     color: #000;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    border-bottom: 2px solid var(--border-color);
+    border-bottom: 2px solid var(--border);
     padding-bottom: 6px;
 }
 
@@ -142,7 +142,7 @@
     text-decoration: underline;
     text-decoration-style: dotted;
     text-decoration-color: transparent;
-    transition: var(--panel-transition-fast);
+    transition: var(--panel-transition);
 }
 
 .source-clickable:hover {
@@ -199,7 +199,7 @@
     border: 1px solid #ccc;
     border-radius: var(--border-radius);
     cursor: pointer;
-    transition: var(--panel-transition-fast);
+    transition: var(--panel-transition);
 }
 
 .config-save-btn {
