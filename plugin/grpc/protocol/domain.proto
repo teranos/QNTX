@@ -33,6 +33,10 @@ service DomainPluginService {
   // ExecuteJob executes an async job
   // Used by Pulse to route jobs to plugin-registered handlers
   rpc ExecuteJob(ExecuteJobRequest) returns (ExecuteJobResponse);
+
+  // ParseAxQuery parses an Ax query string and returns the AST as JSON.
+  // Used by kern (OCaml parser) to replace the Rust WASM parser path.
+  rpc ParseAxQuery(ParseAxQueryRequest) returns (ParseAxQueryResponse);
 }
 
 message Empty {}
@@ -242,4 +246,15 @@ message GlyphDef {
   // When set, the frontend dynamically imports it with SDK injection,
   // bypassing the server-rendered HTML pipeline.
   string module_path = 8;
+}
+
+// ParseAxQueryRequest is sent to a parser plugin to parse an Ax query string.
+message ParseAxQueryRequest {
+  string query = 1;
+}
+
+// ParseAxQueryResponse contains the parsed result as JSON matching rustAxQuery shape.
+message ParseAxQueryResponse {
+  bytes result = 1;    // JSON AST (same shape as qntx-core Rust parser output)
+  string error = 2;    // Parse error message, empty on success
 }
