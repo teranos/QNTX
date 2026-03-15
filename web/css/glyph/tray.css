@@ -1,0 +1,56 @@
+/**
+ * GlyphRun Tray — fixed container on the right edge of the screen.
+ *
+ * Houses glyph indicators (dot manifestations). Non-interactive container;
+ * only child dots respond to pointer events.
+ *
+ * TODO: Tray position (right edge) should be configurable.
+ * TODO: Mobile layout only tested in browser responsive mode, not on real iPhone.
+ */
+
+.glyph-run {
+    position: fixed;
+    top: 50%;
+    right: 4px;
+    transform: translateY(-50%);
+    z-index: 100001; /* Above system drawer (100000) */
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+    /* Container itself is non-interactive - only dots respond.
+       Touch browse is handled at document level in run.ts. */
+    pointer-events: none;
+    padding: 0;
+    /* Prevent browser from intercepting vertical swipes as scroll
+       when touch browse activates near the tray */
+    touch-action: none;
+}
+
+/* Hide when empty */
+.glyph-run[data-empty="true"] {
+    pointer-events: none;
+}
+
+/* Container for glyph dot manifestations */
+.glyph-run-indicators {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0;
+    transition: opacity 0.2s ease;
+    /* Tight fit around dots only */
+    width: fit-content;
+    height: fit-content;
+}
+
+/* Mobile: wider gap between dots for touch distinguishability */
+@media (max-width: 768px) {
+    .glyph-run-indicators {
+        gap: 6px;
+    }
+}
+
+.glyph-run:hover .glyph-run-indicators {
+    opacity: 1;
+}
