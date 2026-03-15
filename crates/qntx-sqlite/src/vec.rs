@@ -142,7 +142,7 @@ mod tests {
 
         // Run the embeddings migration
         let migration_sql =
-            include_str!("../../../db/sqlite/migrations/024_create_embeddings_table.sql");
+            include_str!("../../../db/sqlite/migrations/024_optional_create_embeddings_table.sql");
         conn.execute_batch(migration_sql)?;
 
         // Verify tables were created
