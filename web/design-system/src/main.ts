@@ -347,8 +347,40 @@ function renderButtonGallery(root: HTMLElement) {
   section.className = 'token-group'
 
   const h2 = document.createElement('h2')
-  h2.textContent = 'Buttons'
+  h2.textContent = 'Components'
   section.appendChild(h2)
+
+  // ── SDK Primitives ──
+  const sdkHeader = document.createElement('h3')
+  sdkHeader.className = 'component-section-header'
+  sdkHeader.textContent = 'SDK Primitives'
+  const sdkDesc = document.createElement('p')
+  sdkDesc.className = 'component-section-desc'
+  sdkDesc.textContent = 'What plugins get through ui.* — the canonical components for plugin-authored glyphs'
+  section.appendChild(sdkHeader)
+  section.appendChild(sdkDesc)
+
+  // glyph-btn (SDK: ui.button())
+  const glyphBtnMatrix = buttonMatrix('ui.button()', 'glyph-btn — default and primary variants', ['default', 'primary'], [
+    {
+      rowLabel: '',
+      cells: [
+        { label: 'Cancel', classes: 'glyph-btn' },
+        { label: 'Execute', classes: 'glyph-btn glyph-btn--primary' },
+      ]
+    },
+  ])
+  section.appendChild(glyphBtnMatrix)
+
+  // ── Internal Systems ──
+  const internalHeader = document.createElement('h3')
+  internalHeader.className = 'component-section-header'
+  internalHeader.textContent = 'Internal Systems'
+  const internalDesc = document.createElement('p')
+  internalDesc.className = 'component-section-desc'
+  internalDesc.textContent = 'Used by QNTX core — not exposed to plugins'
+  section.appendChild(internalHeader)
+  section.appendChild(internalDesc)
 
   // qntx-btn: one matrix — variants + states as rows, sizes as columns
   const variants = ['default', 'primary', 'secondary', 'danger', 'warning', 'ghost']
@@ -454,18 +486,6 @@ function renderButtonGallery(root: HTMLElement) {
   ]))
 
   section.appendChild(titlebarSection)
-
-  // glyph-btn system
-  const glyphBtnMatrix = buttonMatrix('glyph-btn', 'Buttons inside glyph windows — dark surface context', ['default', 'primary'], [
-    {
-      rowLabel: '',
-      cells: [
-        { label: 'Cancel', classes: 'glyph-btn' },
-        { label: 'Execute', classes: 'glyph-btn glyph-btn--primary' },
-      ]
-    },
-  ])
-  section.appendChild(glyphBtnMatrix)
 
   root.appendChild(section)
 }
@@ -790,6 +810,21 @@ function injectStyles() {
       height: 40px;
       background: var(--bg-secondary);
       border-radius: var(--border-radius);
+    }
+
+    /* Component section headers */
+    .component-section-header {
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      color: var(--text-on-dark);
+      margin-top: 16px;
+      margin-bottom: 2px;
+    }
+
+    .component-section-desc {
+      font-size: 10px;
+      color: var(--text-on-dark-tertiary);
+      margin-bottom: 12px;
     }
 
     /* Button gallery */
