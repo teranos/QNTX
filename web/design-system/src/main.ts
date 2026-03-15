@@ -397,17 +397,63 @@ function renderButtonGallery(root: HTMLElement) {
   const qntxMatrix = buttonMatrix('qntx-btn', 'Primary button system — variants, states, sizes', sizes, [...variantRows, ...stateRows])
   section.appendChild(qntxMatrix)
 
-  // titlebar-btn
-  const titlebarMatrix = buttonMatrix('titlebar-btn', 'Small icon buttons for glyph title bars (20px)', ['play', 'close', 'maximize', 'refresh'], [{
-    rowLabel: '',
-    cells: [
-      { label: '▶', classes: 'titlebar-btn' },
-      { label: '✕', classes: 'titlebar-btn' },
-      { label: '⊞', classes: 'titlebar-btn' },
-      { label: '⟳', classes: 'titlebar-btn' },
-    ]
-  }])
-  section.appendChild(titlebarMatrix)
+  // titlebar — rendered as live title bar strips
+  const titlebarSection = document.createElement('div')
+  titlebarSection.className = 'button-group'
+
+  const tbHeader = document.createElement('div')
+  tbHeader.className = 'button-group-header'
+  const tbName = document.createElement('span')
+  tbName.className = 'button-group-name'
+  tbName.textContent = 'glyph-title-bar'
+  const tbDesc = document.createElement('span')
+  tbDesc.className = 'button-group-desc'
+  tbDesc.textContent = 'Unified title bar for all glyph manifestations'
+  tbHeader.appendChild(tbName)
+  tbHeader.appendChild(tbDesc)
+  titlebarSection.appendChild(tbHeader)
+
+  const tbRow = document.createElement('div')
+  tbRow.className = 'titlebar-row'
+
+  tbRow.appendChild(titleBarStrip('Standard', 'glyph-title-bar', 'ix-prompt', [
+    { label: '▶', cls: 'titlebar-btn' },
+    { label: '✕', cls: 'titlebar-btn' },
+  ]))
+
+  tbRow.appendChild(titleBarStrip('Generic buttons', 'glyph-title-bar', 'result-glyph', [
+    { label: '⊞', cls: '' },
+    { label: '✕', cls: '' },
+  ]))
+
+  const panelWrap = document.createElement('div')
+  panelWrap.className = 'glyph-panel titlebar-specimen'
+  const panelLabel = document.createElement('span')
+  panelLabel.className = 'titlebar-specimen-label'
+  panelLabel.textContent = 'Panel (no drag cursor)'
+  panelWrap.appendChild(panelLabel)
+  const panelBar = document.createElement('div')
+  panelBar.className = 'glyph-title-bar'
+  const panelTitle = document.createElement('span')
+  panelTitle.textContent = 'plugin-config'
+  panelTitle.style.flex = '1'
+  panelBar.appendChild(panelTitle)
+  const panelBtn = document.createElement('button')
+  panelBtn.className = 'titlebar-btn'
+  panelBtn.textContent = '✕'
+  panelBar.appendChild(panelBtn)
+  panelWrap.appendChild(panelBar)
+  tbRow.appendChild(panelWrap)
+
+  titlebarSection.appendChild(tbRow)
+
+  // Auto-height on its own (wider to show wrapping)
+  titlebarSection.appendChild(titleBarStrip('Auto-height (--auto)', 'glyph-title-bar glyph-title-bar--auto', 'attestation with a longer title that wraps to demonstrate auto-height behavior', [
+    { label: '⟳', cls: 'titlebar-btn' },
+    { label: '✕', cls: 'titlebar-btn' },
+  ]))
+
+  section.appendChild(titlebarSection)
 
   root.appendChild(section)
 }
@@ -499,6 +545,34 @@ function buttonMatrix(name: string, description: string, columnLabels: string[],
 
   container.appendChild(table)
   return container
+}
+
+function titleBarStrip(label: string, barClasses: string, title: string, buttons: {label: string, cls: string}[]): HTMLElement {
+  const row = document.createElement('div')
+  row.className = 'titlebar-specimen'
+
+  const desc = document.createElement('span')
+  desc.className = 'titlebar-specimen-label'
+  desc.textContent = label
+  row.appendChild(desc)
+
+  const bar = document.createElement('div')
+  bar.className = barClasses
+
+  const titleSpan = document.createElement('span')
+  titleSpan.textContent = title
+  titleSpan.style.flex = '1'
+  bar.appendChild(titleSpan)
+
+  for (const b of buttons) {
+    const btn = document.createElement('button')
+    if (b.cls) btn.className = b.cls
+    btn.textContent = b.label
+    bar.appendChild(btn)
+  }
+
+  row.appendChild(bar)
+  return row
 }
 
 function isLightColor(hex: string): boolean {
@@ -761,6 +835,25 @@ function injectStyles() {
       display: flex;
       align-items: center;
       justify-content: center;
+    }
+
+    /* Title bar specimens */
+    .titlebar-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .titlebar-specimen {
+      margin-bottom: 0;
+    }
+
+    .titlebar-specimen-label {
+      display: block;
+      font-size: 10px;
+      color: var(--text-on-dark-tertiary);
+      margin-bottom: 4px;
     }
   `
   document.head.appendChild(style)
