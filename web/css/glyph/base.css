@@ -7,8 +7,7 @@
  *
  * DONE: .canvas-glyph → states/canvas-placed.css
  *
- * TODO: .glyph-resize-handle → resize.css
- *       Shared resize handle for canvas glyphs.
+ * DONE: .glyph-resize-handle → resize.css
  *
  * TODO: .titlebar-btn → title-bar.css (already references it)
  *       Small icon buttons used in title bars.
@@ -21,27 +20,6 @@
  * Each move: extract section → create new file → add to index.html → remove from here.
  * When empty, delete base.css and remove its index.html import.
  */
-
-/* Shared resize handle for canvas glyphs (bottom-right corner) */
-.glyph-resize-handle {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 16px;
-    height: 16px;
-    cursor: nwse-resize;
-    background-color: var(--bg-tertiary);
-    border-top-left-radius: 4px;
-}
-
-
-/* Smaller variant for note glyphs (sits over folded corner) */
-.glyph-resize-handle--small {
-    width: 10px;
-    height: 10px;
-    background-color: transparent;
-    border-top-left-radius: 0;
-}
 
 /* Shared title bar for canvas glyphs (ix, prompt, and similar) */
 /* Shared small icon button for canvas glyphs (play, copy, dismiss, etc.) */
