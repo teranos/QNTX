@@ -40,11 +40,11 @@
     max-height: 200px;
     padding: 4px 6px;
     font-family: monospace;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     background-color: var(--bg-almost-black);
     color: var(--text-on-dark);
     border: 1px solid var(--border);
-    border-radius: 3px;
+    border-radius: var(--border-radius);
     resize: none;
     box-sizing: border-box;
     overflow-y: hidden;

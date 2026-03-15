@@ -44,7 +44,7 @@
     background: rgba(104, 105, 105, 0.67);
     color: #9fa0a0;
     border: 1px solid #999a99;
-    border-radius: 3px;
+    border-radius: var(--border-radius);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -105,7 +105,7 @@
     .glyph-title-bar .titlebar-btn {
         width: 44px;
         height: 44px;
-        font-size: 14px;
+        font-size: var(--font-size-lg);
     }
 }
 
