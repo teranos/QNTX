@@ -162,6 +162,8 @@
     background: rgba(0, 0, 0, 0.05);
 }
 
+/* TODO: Danger should feel more dangerous — current red is too generic/Bootstrap.
+ * Consider darker red, bolder border, or a visual weight that conveys irreversibility. */
 .qntx-btn-danger {
     background: #dc3545;
     border-color: #dc3545;
@@ -214,7 +216,10 @@
     50% { opacity: 0.7; }
 }
 
-/* Confirmation state colors */
+/* Confirmation state colors
+ * TODO: Confirming is visually indistinct from danger — just a pulse animation
+ * on the same red. Needs its own color identity to communicate "are you sure?"
+ * separately from "this is destructive." */
 .qntx-btn-danger.qntx-btn-confirming {
     background: #ff4757;
     border-color: #ff4757;
