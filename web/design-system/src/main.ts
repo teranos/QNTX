@@ -329,6 +329,154 @@ function render(groups: TokenGroup[]) {
     section.appendChild(grid)
     root.appendChild(section)
   }
+
+  // Component galleries — simpler first, then more complex
+  renderButtonGallery(root)
+}
+
+// --- Button gallery ---
+
+interface ButtonSpec {
+  label: string
+  classes: string
+  disabled?: boolean
+}
+
+function renderButtonGallery(root: HTMLElement) {
+  const section = document.createElement('section')
+  section.className = 'token-group'
+
+  const h2 = document.createElement('h2')
+  h2.textContent = 'Buttons'
+  section.appendChild(h2)
+
+  // qntx-btn matrix: rows = variants, columns = sizes
+  const variants = ['default', 'primary', 'secondary', 'danger', 'warning', 'ghost']
+  const sizes = ['small', 'medium', 'large']
+
+  const qntxMatrix = buttonMatrix('qntx-btn', 'Primary button system', sizes, variants.map(v => ({
+    rowLabel: v,
+    cells: sizes.map(s => ({
+      label: v,
+      classes: `qntx-btn qntx-btn-${s} qntx-btn-${v}`,
+    }))
+  })))
+  section.appendChild(qntxMatrix)
+
+  // States row
+  const stateMatrix = buttonMatrix('qntx-btn states', 'Interactive states at medium size', ['disabled', 'confirming', 'loading', 'error'], [{
+    rowLabel: '',
+    cells: [
+      { label: 'Disabled', classes: 'qntx-btn qntx-btn-medium qntx-btn-default', disabled: true },
+      { label: 'Confirming', classes: 'qntx-btn qntx-btn-medium qntx-btn-danger qntx-btn-confirming' },
+      { label: 'Loading', classes: 'qntx-btn qntx-btn-medium qntx-btn-default qntx-btn-loading' },
+      { label: 'Error', classes: 'qntx-btn qntx-btn-medium qntx-btn-error' },
+    ]
+  }])
+  section.appendChild(stateMatrix)
+
+  // titlebar-btn
+  const titlebarMatrix = buttonMatrix('titlebar-btn', 'Small icon buttons for glyph title bars (20px)', ['play', 'close', 'maximize', 'refresh'], [{
+    rowLabel: '',
+    cells: [
+      { label: '▶', classes: 'titlebar-btn' },
+      { label: '✕', classes: 'titlebar-btn' },
+      { label: '⊞', classes: 'titlebar-btn' },
+      { label: '⟳', classes: 'titlebar-btn' },
+    ]
+  }])
+  section.appendChild(titlebarMatrix)
+
+  root.appendChild(section)
+}
+
+interface MatrixRow {
+  rowLabel: string
+  cells: ButtonSpec[]
+}
+
+function buttonMatrix(name: string, description: string, columnLabels: string[], rows: MatrixRow[]): HTMLElement {
+  const container = document.createElement('div')
+  container.className = 'button-group'
+
+  const header = document.createElement('div')
+  header.className = 'button-group-header'
+
+  const nameEl = document.createElement('span')
+  nameEl.className = 'button-group-name'
+  nameEl.textContent = name
+
+  const descEl = document.createElement('span')
+  descEl.className = 'button-group-desc'
+  descEl.textContent = description
+
+  header.appendChild(nameEl)
+  header.appendChild(descEl)
+  container.appendChild(header)
+
+  const table = document.createElement('div')
+  table.className = 'button-matrix'
+  const hasRowLabels = rows.some(r => r.rowLabel)
+  table.style.gridTemplateColumns = hasRowLabels
+    ? `80px repeat(${columnLabels.length}, 1fr)`
+    : `repeat(${columnLabels.length}, 1fr)`
+
+  // Column headers
+  if (hasRowLabels) {
+    const corner = document.createElement('div')
+    corner.className = 'button-matrix-header'
+    table.appendChild(corner)
+  }
+  for (const col of columnLabels) {
+    const colHeader = document.createElement('div')
+    colHeader.className = 'button-matrix-header'
+    colHeader.textContent = col
+    table.appendChild(colHeader)
+  }
+
+  // Rows
+  for (const row of rows) {
+    if (hasRowLabels) {
+      const rowLabel = document.createElement('div')
+      rowLabel.className = 'button-matrix-rowlabel'
+      rowLabel.textContent = row.rowLabel
+      table.appendChild(rowLabel)
+    }
+
+    for (const spec of row.cells) {
+      const cell = document.createElement('div')
+      cell.className = 'button-matrix-cell'
+
+      const btn = document.createElement('button')
+      btn.className = spec.classes
+      if (spec.disabled) btn.disabled = true
+
+      if (spec.classes.includes('qntx-btn-loading')) {
+        const spinner = document.createElement('span')
+        spinner.className = 'qntx-btn-spinner'
+        btn.appendChild(spinner)
+      }
+
+      const label = document.createElement('span')
+      label.className = 'qntx-btn-label'
+      label.textContent = spec.label
+      btn.appendChild(label)
+
+      cell.appendChild(btn)
+
+      // Click cell to copy full class string
+      cell.title = spec.classes
+      cell.addEventListener('click', (e) => {
+        if (e.target === btn || btn.contains(e.target as Node)) return
+        navigator.clipboard.writeText(spec.classes)
+      })
+
+      table.appendChild(cell)
+    }
+  }
+
+  container.appendChild(table)
+  return container
 }
 
 function isLightColor(hex: string): boolean {
@@ -534,6 +682,63 @@ function injectStyles() {
       height: 40px;
       background: var(--bg-secondary);
       border-radius: var(--border-radius);
+    }
+
+    /* Button gallery */
+    .button-group {
+      margin-bottom: 16px;
+    }
+
+    .button-group-header {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .button-group-name {
+      color: var(--accent-on-dark);
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+    }
+
+    .button-group-desc {
+      color: var(--text-on-dark-tertiary);
+      font-size: 10px;
+    }
+
+    .button-matrix {
+      display: grid;
+      gap: 1px;
+      background: var(--border-on-dark);
+      border: var(--panel-border);
+      border-radius: var(--border-radius);
+      overflow: hidden;
+    }
+
+    .button-matrix-header {
+      background: var(--bg-tertiary);
+      padding: 4px 8px;
+      font-size: 10px;
+      color: var(--text-on-dark-tertiary);
+      text-align: center;
+    }
+
+    .button-matrix-rowlabel {
+      background: var(--bg-secondary);
+      padding: 8px;
+      font-size: 10px;
+      color: var(--accent-on-dark);
+      display: flex;
+      align-items: center;
+    }
+
+    .button-matrix-cell {
+      background: var(--bg-secondary);
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
   `
   document.head.appendChild(style)
