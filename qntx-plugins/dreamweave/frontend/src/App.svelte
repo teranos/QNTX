@@ -11,6 +11,7 @@
     text: string | null
     word_count: number | null
     turn_count: number | null
+    paths?: Record<string, string>
   }
 
   interface Turn {
@@ -20,6 +21,7 @@
     index: number
     timestamp: number
     branch: string
+    fullPath?: string
   }
 
   interface Session {
@@ -167,7 +169,7 @@
 
   // --- Parse weave text into turns ---
 
-  const SPEAKERS = ['human', 'assistant', 'tool', 'hook', 'session', 'compaction', 'agent', 'task']
+  const SPEAKERS = ['human', 'assistant', 'tool', 'edit', 'read', 'search', 'write', 'hook', 'session', 'compaction', 'agent', 'task']
 
   function isSpeakerLine(s: string): boolean {
     if (s[0] !== '[') return false
@@ -194,13 +196,21 @@
       if (!chunk) continue
       const end = chunk.indexOf('] ')
       if (chunk[0] === '[' && end > 0) {
+        const speaker = chunk.substring(1, end)
+        const text = chunk.substring(end + 2)
+        // Look up full path for file-related turns
+        let fullPath: string | undefined
+        if (weave.paths && (speaker === 'edit' || speaker === 'read' || speaker === 'write' || speaker === 'search')) {
+          fullPath = weave.paths[text]
+        }
         turns.push({
-          speaker: chunk.substring(1, end),
-          text: chunk.substring(end + 2),
+          speaker,
+          text,
           weaveId: weave.id,
           index: i,
           timestamp: weave.timestamp,
           branch: weave.branch,
+          fullPath,
         })
       } else {
         turns.push({
@@ -676,6 +686,10 @@
                       class:human={turn.speaker === 'human'}
                       class:assistant={turn.speaker === 'assistant'}
                       class:tool={turn.speaker === 'tool'}
+                      class:edit={turn.speaker === 'edit'}
+                      class:read={turn.speaker === 'read'}
+                      class:search={turn.speaker === 'search'}
+                      class:write={turn.speaker === 'write'}
                       class:hook={turn.speaker === 'hook'}
                       class:marker={turn.speaker === 'session' || turn.speaker === 'compaction' || turn.speaker === 'agent' || turn.speaker === 'task'}
                       onclick={() => toggle(turn)}
@@ -686,6 +700,12 @@
                       <span class="dw-speaker">[{turn.speaker}]</span>
                       {#if turn.speaker === 'assistant'}
                         <span class="dw-text">{@html renderText(turn.text)}</span>
+                      {:else if turn.fullPath}
+                        <span
+                          class="dw-text dw-path"
+                          title={turn.fullPath}
+                          onclick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(turn.fullPath!) }}
+                        >{turn.text}</span>
                       {:else}
                         <span class="dw-text">{turn.text}</span>
                       {/if}
@@ -1054,6 +1074,35 @@
   .dw-turn.tool .dw-text {
     color: #a9abaa;
     font-size: 8px;
+  }
+
+  .dw-turn.edit,
+  .dw-turn.read,
+  .dw-turn.search,
+  .dw-turn.write {
+    background: #1a1b1a;
+    border-left: 2px solid #5b8dd9;
+    padding-left: 4px;
+    margin: 1px 0;
+  }
+  .dw-turn.edit .dw-speaker { color: #5b8dd9; }
+  .dw-turn.read .dw-speaker { color: #5b8dd9; }
+  .dw-turn.search .dw-speaker { color: #5b8dd9; }
+  .dw-turn.write .dw-speaker { color: #5b8dd9; }
+  .dw-turn.edit .dw-text,
+  .dw-turn.read .dw-text,
+  .dw-turn.search .dw-text,
+  .dw-turn.write .dw-text {
+    color: #a9abaa;
+    font-size: 8px;
+  }
+  .dw-path {
+    cursor: pointer;
+    border-bottom: 1px dotted #3f4140;
+  }
+  .dw-path:hover {
+    color: #dfe1e0;
+    border-bottom-color: #5b8dd9;
   }
 
   .dw-turn.hook {
