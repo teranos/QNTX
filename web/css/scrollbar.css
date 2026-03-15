@@ -33,7 +33,7 @@
 .job-list-content,
 .job-detail-content {
     scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar-light-thumb) transparent;
+    scrollbar-color: var(--border) transparent;
 }
 
 /* WebKit fine-tuning (Chromium) */
@@ -64,7 +64,7 @@
 .panel-content::-webkit-scrollbar-thumb,
 .job-list-content::-webkit-scrollbar-thumb,
 .job-detail-content::-webkit-scrollbar-thumb {
-    background: var(--scrollbar-light-thumb);
+    background: var(--border);
 }
 
 .config-panel-content::-webkit-scrollbar-thumb:hover,

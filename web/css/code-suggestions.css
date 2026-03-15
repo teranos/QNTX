@@ -20,7 +20,7 @@
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 500;
-  transition: var(--panel-transition-normal);
+  transition: var(--panel-transition);
   position: relative;
 }
 
@@ -110,7 +110,7 @@
   background: var(--color-bg-secondary, #1a1a1a);
   border-radius: var(--border-radius);
   cursor: pointer;
-  transition: var(--panel-transition-fast);
+  transition: var(--panel-transition);
 }
 
 .suggestion-item:hover {

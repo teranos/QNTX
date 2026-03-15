@@ -97,7 +97,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     textarea.style.fontFamily = 'monospace';
     textarea.style.backgroundColor = 'var(--bg-almost-black)';
     textarea.style.color = 'var(--accent-lavender)';
-    textarea.style.border = '1px solid var(--border-color)';
+    textarea.style.border = '1px solid var(--border)';
     textarea.style.borderRadius = '4px';
     textarea.style.resize = 'none';
 
