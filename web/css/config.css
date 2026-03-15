@@ -94,7 +94,7 @@
     cursor: pointer;
     border: 1px solid rgba(255, 255, 255, 0.2);
     font-family: inherit;
-    transition: var(--panel-transition-fast);
+    transition: var(--panel-transition);
 }
 
 .config-actions button[type="button"] {
