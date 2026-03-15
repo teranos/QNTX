@@ -46,7 +46,7 @@ export function renderComponentGallery(root: HTMLElement) {
   ])
   section.appendChild(glyphBtnMatrix)
 
-  // ui.input() — with and without label
+  // ui.input() + ui.statusLine() — how they work together
   const inputGroup = document.createElement('div')
   inputGroup.className = 'button-group'
 
@@ -54,41 +54,95 @@ export function renderComponentGallery(root: HTMLElement) {
   inputHeader.className = 'button-group-header'
   const inputName = document.createElement('span')
   inputName.className = 'button-group-name'
-  inputName.textContent = 'ui.input()'
+  inputName.textContent = 'ui.input() + ui.statusLine()'
   const inputDesc = document.createElement('span')
   inputDesc.className = 'button-group-desc'
-  inputDesc.textContent = 'glyph-input — text input with drag protection'
+  inputDesc.textContent = 'Input with contextual feedback — as used by ix-json'
   inputHeader.appendChild(inputName)
   inputHeader.appendChild(inputDesc)
   inputGroup.appendChild(inputHeader)
 
   const inputRow = document.createElement('div')
   inputRow.className = 'sdk-specimen-row'
+  inputRow.style.gridTemplateColumns = '1fr'
 
-  // Without label
-  const input1 = document.createElement('div')
-  input1.className = 'glyph-form-group'
-  const inp1 = document.createElement('input')
-  inp1.className = 'glyph-input'
-  inp1.type = 'text'
-  inp1.placeholder = 'Enter URL...'
-  input1.appendChild(inp1)
-  inputRow.appendChild(input1)
+  // Simulate the ix-json pattern: input + button + status line
+  const ixJsonDemo = document.createElement('div')
+  ixJsonDemo.style.display = 'flex'
+  ixJsonDemo.style.flexDirection = 'column'
+  ixJsonDemo.style.gap = '8px'
 
-  // With label
-  const input2 = document.createElement('div')
-  input2.className = 'glyph-form-group'
-  const lbl = document.createElement('label')
-  lbl.className = 'glyph-label'
-  lbl.textContent = 'API Endpoint'
-  input2.appendChild(lbl)
-  const inp2 = document.createElement('input')
-  inp2.className = 'glyph-input'
-  inp2.type = 'text'
-  inp2.placeholder = 'https://...'
-  inp2.value = 'https://api.example.com/v1'
-  input2.appendChild(inp2)
-  inputRow.appendChild(input2)
+  const urlInput = document.createElement('div')
+  urlInput.className = 'glyph-form-group'
+  const urlLabel = document.createElement('label')
+  urlLabel.className = 'glyph-label'
+  urlLabel.textContent = 'API URL'
+  urlInput.appendChild(urlLabel)
+  const urlInp = document.createElement('input')
+  urlInp.className = 'glyph-input'
+  urlInp.type = 'text'
+  urlInp.placeholder = 'https://api.example.com/data'
+  urlInput.appendChild(urlInp)
+  ixJsonDemo.appendChild(urlInput)
+
+  const fetchBtn = document.createElement('button')
+  fetchBtn.className = 'glyph-btn glyph-btn--primary'
+  fetchBtn.textContent = 'Fetch'
+  ixJsonDemo.appendChild(fetchBtn)
+
+  const statusEl = document.createElement('div')
+  statusEl.className = 'glyph-status'
+  statusEl.style.fontSize = '11px'
+  statusEl.style.minHeight = '16px'
+  ixJsonDemo.appendChild(statusEl)
+
+  // Interactive: click Fetch to cycle through status states
+  let demoState = 0
+  fetchBtn.addEventListener('click', () => {
+    if (demoState === 0) {
+      statusEl.textContent = 'Fetching...'
+      statusEl.style.color = 'var(--text-on-dark-tertiary)'
+      demoState = 1
+      setTimeout(() => fetchBtn.click(), 800)
+    } else if (demoState === 1) {
+      if (urlInp.value) {
+        statusEl.textContent = 'OK — 200, 1.4kb'
+        statusEl.style.color = 'var(--color-success, #22c55e)'
+        demoState = 2
+        setTimeout(() => { statusEl.textContent = ''; demoState = 0 }, 4000)
+      } else {
+        statusEl.textContent = 'No URL provided'
+        statusEl.style.color = 'var(--color-error, #ef4444)'
+        demoState = 0
+      }
+    }
+  })
+
+  inputRow.appendChild(ixJsonDemo)
+
+  // Standalone input without status (simpler use case)
+  const plainInput = document.createElement('div')
+  plainInput.style.display = 'flex'
+  plainInput.style.flexDirection = 'column'
+  plainInput.style.gap = '8px'
+
+  const plainInp1 = document.createElement('div')
+  plainInp1.className = 'glyph-form-group'
+  const plainInpEl = document.createElement('input')
+  plainInpEl.className = 'glyph-input'
+  plainInpEl.type = 'text'
+  plainInpEl.placeholder = 'Enter URL...'
+  plainInp1.appendChild(plainInpEl)
+  plainInput.appendChild(plainInp1)
+
+  const plainLabel = document.createElement('span')
+  plainLabel.style.fontSize = '10px'
+  plainLabel.style.color = 'var(--text-on-dark-tertiary)'
+  plainLabel.textContent = 'ui.input() alone — no status feedback'
+  plainInput.appendChild(plainLabel)
+
+  inputRow.style.gridTemplateColumns = '1fr 1fr'
+  inputRow.appendChild(plainInput)
 
   inputGroup.appendChild(inputRow)
   section.appendChild(inputGroup)
