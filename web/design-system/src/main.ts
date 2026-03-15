@@ -455,6 +455,18 @@ function renderButtonGallery(root: HTMLElement) {
 
   section.appendChild(titlebarSection)
 
+  // glyph-btn system
+  const glyphBtnMatrix = buttonMatrix('glyph-btn', 'Buttons inside glyph windows — dark surface context', ['default', 'primary'], [
+    {
+      rowLabel: '',
+      cells: [
+        { label: 'Cancel', classes: 'glyph-btn' },
+        { label: 'Execute', classes: 'glyph-btn glyph-btn--primary' },
+      ]
+    },
+  ])
+  section.appendChild(glyphBtnMatrix)
+
   root.appendChild(section)
 }
 
