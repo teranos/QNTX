@@ -792,7 +792,7 @@ th {
     }
 
     h1 {
-        border-color: var(--border-color);
+        border-color: var(--border);
     }
 
     h2 {
@@ -800,13 +800,13 @@ th {
     }
 
     pre {
-        background: var(--bg-code);
+        background: var(--bg-hover);
         border-color: var(--border-light);
-        scrollbar-color: var(--scrollbar-light-thumb) transparent;
+        scrollbar-color: var(--border) transparent;
     }
 
     code {
-        background: var(--bg-code);
+        background: var(--bg-hover);
     }
 
     a {
@@ -867,7 +867,7 @@ th {
     }
 
     .doc-header {
-        border-color: var(--border-color);
+        border-color: var(--border);
     }
 
     .doc-header-subtitle {
@@ -883,7 +883,7 @@ th {
     }
 
     .build-info-section h2 {
-        border-color: var(--border-color);
+        border-color: var(--border);
     }
 
     .build-info-list li {
@@ -892,7 +892,7 @@ th {
 
     .quick-link {
         background: var(--bg-almost-white);
-        border-color: var(--border-color);
+        border-color: var(--border);
         color: var(--accent-color);
     }
 
@@ -901,12 +901,12 @@ th {
     }
 
     .download-section h2 {
-        border-color: var(--border-color);
+        border-color: var(--border);
     }
 
     .download-section.quick-download {
         background: var(--bg-almost-white);
-        border-color: var(--border-color);
+        border-color: var(--border);
     }
 
     .download-section.quick-download h2 {
@@ -915,7 +915,7 @@ th {
 
     .download-section.quick-download .download-link {
         background: var(--bg-primary);
-        border-color: var(--border-color);
+        border-color: var(--border);
         color: var(--text-primary);
     }
 
@@ -979,7 +979,7 @@ th {
     }
 
     .category-header {
-        border-color: var(--border-color);
+        border-color: var(--border);
     }
 
     .category-title {
@@ -1020,7 +1020,7 @@ th {
 
     .nix-table code,
     .container-details code {
-        background: var(--bg-code);
+        background: var(--bg-hover);
     }
 }
 
