@@ -6,8 +6,8 @@
  */
 
 import { compile } from 'svelte/compiler'
-import { join } from 'path'
-import { rm, mkdir } from 'fs/promises'
+import { join, resolve } from 'path'
+import { rm, mkdir, copyFile } from 'fs/promises'
 
 const srcDir = join(import.meta.dir, 'src')
 const outDir = join(import.meta.dir, 'dist')
@@ -53,6 +53,10 @@ if (!result.success) {
   for (const msg of result.logs) console.error(msg)
   process.exit(1)
 }
+
+// Copy shared design tokens from main web frontend
+const tokensSource = resolve(import.meta.dir, '../../../web/css/tokens.css')
+await copyFile(tokensSource, join(outDir, 'tokens.css'))
 
 // Copy index.html, rewrite script src
 const html = await Bun.file(join(import.meta.dir, 'index.html')).text()
