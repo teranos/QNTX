@@ -41,6 +41,7 @@ let start () =
             ~text:block
             ~word_count:(Stitcher.word_count block)
             ~turn_count:result.turn_count
+            ~paths:result.paths
           in
           (match ats_result with
            | Ok () -> ()

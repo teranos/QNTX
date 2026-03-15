@@ -25,7 +25,7 @@ let configure ~ats_endpoint ~token =
 
 (* --- Create a weave attestation --- *)
 
-let create_weave ~branch ~context ~text ~word_count ~turn_count =
+let create_weave ~branch ~context ~text ~word_count ~turn_count ~paths =
   if !endpoint = "" then (
     Printf.eprintf "[loom] ATS client not configured, dropping weave\n%!";
     Lwt.return_error "ATS client not configured"
@@ -41,10 +41,18 @@ let create_weave ~branch ~context ~text ~word_count ~turn_count =
     let number_val n =
       Value.make ~kind:(`Number_value (Float.of_int n)) ()
     in
+    (* Paths: map of file tail → full path, stored as a nested Struct *)
+    let paths_fields = List.map (fun (tail, full) ->
+      (tail, Some (string_val full))
+    ) paths in
+    let paths_val =
+      Value.make ~kind:(`Struct_value (Struct.make ~fields:paths_fields ())) ()
+    in
     let attrs = Struct.make ~fields:[
       ("text", Some (string_val text));
       ("word_count", Some (number_val word_count));
       ("turn_count", Some (number_val turn_count));
+      ("paths", Some paths_val);
     ] () in
 
     let command = Protocol.AttestationCommand.make
