@@ -56,52 +56,54 @@ function injectStyles() {
       background: var(--bg-canvas);
       color: var(--text-on-dark);
       font-family: var(--font-mono);
-      font-size: 12px;
-      line-height: 1.5;
+      font-size: var(--font-size-sm);
+      line-height: 1.4;
       -webkit-font-smoothing: antialiased;
     }
 
     #root {
-      max-width: 1200px;
+      max-width: 1400px;
       margin: 0 auto;
-      padding: 20px;
+      padding: 12px 16px;
     }
 
     header {
-      margin-bottom: 24px;
-      padding-bottom: 12px;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
       border-bottom: 1px solid var(--border-on-dark);
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
     }
 
     header h1 {
       color: var(--accent-on-dark);
-      font-size: 16px;
+      font-size: var(--font-size-md);
       font-weight: 500;
     }
 
     header p {
       color: var(--text-on-dark-tertiary);
-      font-size: 11px;
-      margin-top: 4px;
+      font-size: var(--font-size-xs);
     }
 
     .token-group {
-      margin-bottom: 28px;
+      margin-bottom: 14px;
     }
 
     .token-group h2 {
-      font-size: 13px;
+      font-size: var(--font-size-sm);
       font-weight: 500;
       color: var(--text-on-dark-secondary);
-      margin-bottom: 8px;
-      padding-bottom: 4px;
+      margin-bottom: 4px;
+      padding-bottom: 2px;
       border-bottom: 1px solid var(--border-on-dark);
     }
 
     .token-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: var(--gap);
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 3px;
     }
 
     .token-card {
@@ -114,22 +116,22 @@ function injectStyles() {
     }
 
     .token-swatch {
-      width: 48px;
-      min-height: 40px;
+      width: 36px;
+      min-height: 28px;
       flex-shrink: 0;
     }
 
     .token-info {
-      padding: 4px 8px;
+      padding: 2px 6px;
       display: flex;
       flex-direction: column;
-      gap: 1px;
+      gap: 0;
       min-width: 0;
     }
 
     .token-name {
       color: var(--accent-on-dark);
-      font-size: 11px;
+      font-size: var(--font-size-xs);
       font-weight: 500;
       cursor: pointer;
       overflow-wrap: break-word;
@@ -141,19 +143,19 @@ function injectStyles() {
 
     .token-value {
       color: var(--text-on-dark);
-      font-size: 10px;
+      font-size: var(--font-size-xs);
       overflow-wrap: break-word;
       word-break: break-word;
     }
 
     .token-resolved {
       color: var(--text-on-dark-tertiary);
-      font-size: 10px;
+      font-size: var(--font-size-xs);
     }
 
     .token-comment {
       color: var(--text-on-dark-tertiary);
-      font-size: 10px;
+      font-size: var(--font-size-xs);
       font-style: italic;
       overflow-wrap: break-word;
       word-break: break-word;
@@ -165,8 +167,8 @@ function injectStyles() {
     }
 
     .token-demo {
-      padding: var(--panel-padding-sm);
-      min-height: 40px;
+      padding: 4px 8px;
+      min-height: 28px;
       display: flex;
       align-items: center;
     }
@@ -178,7 +180,7 @@ function injectStyles() {
     }
 
     .token-spacing-bar {
-      height: 16px;
+      height: 12px;
       min-width: 4px;
       background: var(--accent-on-dark);
       opacity: 0.5;
@@ -188,11 +190,11 @@ function injectStyles() {
       background: var(--bg-tertiary);
       border: 1px dashed var(--border-on-dark);
       color: var(--text-on-dark-tertiary);
-      font-size: 10px;
+      font-size: var(--font-size-xs);
     }
 
     .token-demo--row {
-      gap: var(--gap);
+      gap: 4px;
     }
 
     .token-demo--center {
@@ -206,8 +208,8 @@ function injectStyles() {
     }
 
     .token-shadow-box {
-      width: 80px;
-      height: 48px;
+      width: 60px;
+      height: 36px;
       background: var(--bg-tertiary);
       border: var(--panel-border);
       border-radius: var(--border-radius);
@@ -219,8 +221,8 @@ function injectStyles() {
     }
 
     .token-transition-box {
-      width: 48px;
-      height: 32px;
+      width: 36px;
+      height: 24px;
       background: var(--bg-tertiary);
       border: var(--panel-border);
       border-radius: var(--border-radius);
@@ -233,8 +235,8 @@ function injectStyles() {
     }
 
     .token-border-box {
-      width: 80px;
-      height: 40px;
+      width: 60px;
+      height: 28px;
       background: var(--bg-secondary);
       border-radius: var(--border-radius);
     }
@@ -244,22 +246,22 @@ function injectStyles() {
       font-size: var(--font-size-sm);
       font-weight: 500;
       color: var(--text-on-dark);
-      margin-top: 16px;
-      margin-bottom: 2px;
+      margin-top: 10px;
+      margin-bottom: 1px;
     }
 
     .component-section-desc {
-      font-size: 10px;
+      font-size: var(--font-size-xs);
       color: var(--text-on-dark-tertiary);
-      margin-bottom: 12px;
+      margin-bottom: 6px;
     }
 
     /* SDK specimen row */
     .sdk-specimen-row {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 12px;
-      padding: var(--panel-padding-sm);
+      gap: 8px;
+      padding: 6px 8px;
       background: var(--bg-secondary);
       border: var(--panel-border);
       border-radius: var(--border-radius);
@@ -267,14 +269,14 @@ function injectStyles() {
 
     /* Button gallery */
     .button-group {
-      margin-bottom: 16px;
+      margin-bottom: 10px;
     }
 
     .button-group-header {
       display: flex;
       align-items: baseline;
       gap: 8px;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
     }
 
     .button-group-name {
@@ -285,7 +287,7 @@ function injectStyles() {
 
     .button-group-desc {
       color: var(--text-on-dark-tertiary);
-      font-size: 10px;
+      font-size: var(--font-size-xs);
     }
 
     .button-matrix {
@@ -299,16 +301,16 @@ function injectStyles() {
 
     .button-matrix-header {
       background: var(--bg-tertiary);
-      padding: 4px 8px;
-      font-size: 10px;
+      padding: 2px 6px;
+      font-size: var(--font-size-xs);
       color: var(--text-on-dark-tertiary);
       text-align: center;
     }
 
     .button-matrix-rowlabel {
       background: var(--bg-secondary);
-      padding: 8px;
-      font-size: 10px;
+      padding: 4px 6px;
+      font-size: var(--font-size-xs);
       color: var(--accent-on-dark);
       display: flex;
       align-items: center;
@@ -316,7 +318,7 @@ function injectStyles() {
 
     .button-matrix-cell {
       background: var(--bg-secondary);
-      padding: 8px;
+      padding: 4px 6px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -326,8 +328,8 @@ function injectStyles() {
     .titlebar-row {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      margin-bottom: 8px;
+      gap: 8px;
+      margin-bottom: 4px;
     }
 
     .titlebar-specimen {
@@ -336,9 +338,9 @@ function injectStyles() {
 
     .titlebar-specimen-label {
       display: block;
-      font-size: 10px;
+      font-size: var(--font-size-xs);
       color: var(--text-on-dark-tertiary);
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
   `
   document.head.appendChild(style)
