@@ -107,7 +107,10 @@
     position: relative;
 }
 
-/* Sizes */
+/* Sizes
+ * TODO: Each size needs a fixed min-width so buttons don't reflow when labels
+ * change on state transitions (e.g. "Run" → "Running..." → "Error").
+ * Currently worked around by choosing labels of similar length. */
 .qntx-btn-small {
     padding: 4px 8px;
     font-size: var(--font-size-sm);
