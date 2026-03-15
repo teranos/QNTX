@@ -85,7 +85,11 @@ export interface GlyphUI {
     /** Create a button. */
     button(opts: { label: string; onClick: () => void; primary?: boolean }): HTMLButtonElement;
 
-    /** Create a status line for showing feedback messages. */
+    /**
+     * Create a status line for showing feedback messages.
+     * TODO: Weak design element — useful concept (contextual feedback next to the
+     * action that caused it) but visually underwhelming. Rethink the presentation.
+     */
     statusLine(): { element: HTMLElement; show(msg: string, isError?: boolean): void; clear(): void };
 
     /**

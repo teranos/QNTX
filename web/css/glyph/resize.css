@@ -1,0 +1,24 @@
+/**
+ * Shared resize handle for canvas-placed glyphs (bottom-right corner).
+ *
+ * Used by canvasPlaced() in manifestations/canvas-placed.ts.
+ * Note glyphs use the --small variant which sits over the folded corner.
+ */
+.glyph-resize-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 16px;
+    height: 16px;
+    cursor: nwse-resize;
+    background-color: var(--bg-tertiary);
+    border-top-left-radius: 4px;
+}
+
+/* Smaller variant for note glyphs (sits over folded corner) */
+.glyph-resize-handle--small {
+    width: 10px;
+    height: 10px;
+    background-color: transparent;
+    border-top-left-radius: 0;
+}

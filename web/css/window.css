@@ -260,7 +260,7 @@
 .glyph-label {
     font-weight: normal;
     color: var(--text-on-dark-secondary, #a9abaa);
-    font-size: 12px;
+    font-size: var(--font-size-md);
 }
 
 /* GlyphUI form primitives — dark-mode first */
@@ -275,7 +275,7 @@
     min-width: 0;
     padding: 6px 8px;
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     background: var(--bg-dark-light, #343534);
     border: 1px solid var(--border-on-dark, #3f4140);
     border-radius: 4px;
@@ -293,7 +293,7 @@
 
 .glyph-btn {
     padding: 5px 12px;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 500;
     font-family: var(--font-mono);
     background: var(--bg-dark-light, #343534);
@@ -330,7 +330,7 @@
 
 .glyph-section-title {
     margin: 0 0 8px 0;
-    font-size: 14px;
+    font-size: var(--font-size-lg);
     font-weight: 600;
     color: #e8e8e8;
 }

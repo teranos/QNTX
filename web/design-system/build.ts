@@ -26,9 +26,15 @@ if (!result.success) {
   process.exit(1)
 }
 
-// Copy tokens.css from web/css/
+// Copy CSS from web/css/
 const tokensSource = resolve(import.meta.dir, '../css/tokens.css')
 await copyFile(tokensSource, join(outDir, 'tokens.css'))
+const componentsSource = resolve(import.meta.dir, '../css/components.css')
+await copyFile(componentsSource, join(outDir, 'components.css'))
+const titleBarSource = resolve(import.meta.dir, '../css/glyph/title-bar.css')
+await copyFile(titleBarSource, join(outDir, 'title-bar.css'))
+const windowSource = resolve(import.meta.dir, '../css/window.css')
+await copyFile(windowSource, join(outDir, 'window.css'))
 
 // Copy index.html, rewrite script src
 const html = await Bun.file(join(import.meta.dir, 'index.html')).text()
