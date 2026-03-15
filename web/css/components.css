@@ -107,7 +107,10 @@
     position: relative;
 }
 
-/* Sizes */
+/* Sizes
+ * TODO: Each size needs a fixed min-width so buttons don't reflow when labels
+ * change on state transitions (e.g. "Run" → "Running..." → "Error").
+ * Currently worked around by choosing labels of similar length. */
 .qntx-btn-small {
     padding: 4px 8px;
     font-size: var(--font-size-sm);
@@ -159,6 +162,8 @@
     background: rgba(0, 0, 0, 0.05);
 }
 
+/* TODO: Danger should feel more dangerous — current red is too generic/Bootstrap.
+ * Consider darker red, bolder border, or a visual weight that conveys irreversibility. */
 .qntx-btn-danger {
     background: #dc3545;
     border-color: #dc3545;
@@ -183,7 +188,7 @@
 
 .qntx-btn-ghost {
     background: transparent;
-    border-color: transparent;
+    border-color: rgba(255, 255, 255, 0.1);
     color: var(--text-secondary);
 }
 
@@ -196,6 +201,13 @@
 .qntx-btn-disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    background-image: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 4px,
+        rgba(0, 0, 0, 0.08) 4px,
+        rgba(0, 0, 0, 0.08) 6px
+    );
 }
 
 .qntx-btn-loading {
@@ -211,7 +223,10 @@
     50% { opacity: 0.7; }
 }
 
-/* Confirmation state colors */
+/* Confirmation state colors
+ * TODO: Confirming is visually indistinct from danger — just a pulse animation
+ * on the same red. Needs its own color identity to communicate "are you sure?"
+ * separately from "this is destructive." */
 .qntx-btn-danger.qntx-btn-confirming {
     background: #ff4757;
     border-color: #ff4757;
