@@ -413,6 +413,89 @@ func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As,
 	return attestations, nil
 }
 
+// EnforceLimits runs bounded enforcement through Rust and returns enforcement events as JSON.
+func (rs *RustStore) EnforceLimits(actors, contexts, subjects []string, config *EnforcementConfig) ([]EnforcementEvent, error) {
+	input := enforcementInput{
+		Actors:   actors,
+		Contexts: contexts,
+		Subjects: subjects,
+		Config:   *config,
+	}
+
+	inputJSON, err := json.Marshal(input)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal enforcement input")
+	}
+
+	cJSON := C.CString(string(inputJSON))
+	defer C.free(unsafe.Pointer(cJSON))
+
+	rs.mu.Lock()
+	if rs.store == nil {
+		rs.mu.Unlock()
+		return nil, errors.New("store is closed")
+	}
+
+	result := C.storage_enforce_limits(rs.store, cJSON)
+	var success bool
+	var errMsg, jsonStr string
+	success = bool(result.success)
+	if !success {
+		errMsg = C.GoString(result.error_msg)
+	} else if result.attestation_json != nil {
+		jsonStr = C.GoString(result.attestation_json)
+	}
+	C.attestation_result_free(result)
+	rs.mu.Unlock()
+
+	if !success {
+		return nil, errors.New(errMsg)
+	}
+
+	if jsonStr == "" || jsonStr == "[]" {
+		return nil, nil
+	}
+
+	var events []EnforcementEvent
+	if err := json.Unmarshal([]byte(jsonStr), &events); err != nil {
+		return nil, errors.Wrap(err, "failed to parse enforcement events")
+	}
+
+	return events, nil
+}
+
+// GetStorageStats returns storage statistics from Rust.
+func (rs *RustStore) GetStorageStats() (*StorageStats, error) {
+	rs.mu.Lock()
+	if rs.store == nil {
+		rs.mu.Unlock()
+		return nil, errors.New("store is closed")
+	}
+
+	result := C.storage_get_stats(rs.store)
+	var success bool
+	var errMsg, jsonStr string
+	success = bool(result.success)
+	if !success {
+		errMsg = C.GoString(result.error_msg)
+	} else if result.attestation_json != nil {
+		jsonStr = C.GoString(result.attestation_json)
+	}
+	C.attestation_result_free(result)
+	rs.mu.Unlock()
+
+	if !success {
+		return nil, errors.New(errMsg)
+	}
+
+	var stats StorageStats
+	if err := json.Unmarshal([]byte(jsonStr), &stats); err != nil {
+		return nil, errors.Wrap(err, "failed to parse storage stats")
+	}
+
+	return &stats, nil
+}
+
 // Version returns the library version.
 func Version() string {
 	return C.GoString(C.storage_version())
