@@ -9,8 +9,7 @@
  *
  * DONE: .glyph-resize-handle → resize.css
  *
- * TODO: .titlebar-btn → title-bar.css (already references it)
- *       Small icon buttons used in title bars.
+ * DONE: .titlebar-btn → title-bar.css
  *
  * TODO: .result-followup-zone → followup.css
  *       Follow-up input at bottom of result glyphs.
@@ -20,33 +19,6 @@
  * Each move: extract section → create new file → add to index.html → remove from here.
  * When empty, delete base.css and remove its index.html import.
  */
-
-/* Shared title bar for canvas glyphs (ix, prompt, and similar) */
-/* Shared small icon button for canvas glyphs (play, copy, dismiss, etc.) */
-.titlebar-btn {
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    font-size: 11px;
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-    background-color: var(--bg-hover);
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-}
-
-.titlebar-btn:hover {
-    background-color: var(--bg-dark-light);
-}
-
-.titlebar-btn:active {
-    border-color: var(--border-light);
-}
-
 
 /* Follow-up input zone at bottom of result glyphs — hidden until hover/focus.
  * Hover reveals a compact single-line input; focus-within switches to auto height
