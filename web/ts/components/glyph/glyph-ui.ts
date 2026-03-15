@@ -85,6 +85,9 @@ export interface GlyphUI {
     /** Create a button. */
     button(opts: { label: string; onClick: () => void; primary?: boolean }): HTMLButtonElement;
 
+    /** Create a status line for showing feedback messages. */
+    statusLine(): { element: HTMLElement; show(msg: string, isError?: boolean): void; clear(): void };
+
     /**
      * Open a WebSocket to this plugin's WS endpoint.
      * Constructs the full URL from backend config — no hardcoded ports.
@@ -240,6 +243,28 @@ export function createGlyphUI(glyph: Glyph, pluginName: string): GlyphUI {
             btn.addEventListener('click', opts.onClick);
             preventDrag(btn);
             return btn;
+        },
+
+        statusLine() {
+            const el = document.createElement('div');
+            el.className = 'glyph-status';
+            let timer: ReturnType<typeof setTimeout> | null = null;
+
+            return {
+                element: el,
+                show(msg: string, isError = false) {
+                    el.textContent = msg;
+                    el.style.color = isError ? 'var(--color-error, #ef4444)' : 'var(--color-success, #22c55e)';
+                    if (timer) clearTimeout(timer);
+                    if (!isError) {
+                        timer = setTimeout(() => { el.textContent = ''; }, 4000);
+                    }
+                },
+                clear() {
+                    if (timer) clearTimeout(timer);
+                    el.textContent = '';
+                },
+            };
         },
 
         onMeld(callback: (event: MeldEvent) => void): () => void {
