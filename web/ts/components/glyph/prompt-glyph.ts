@@ -102,7 +102,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     textarea.style.resize = 'none';
 
     // Auto-save template with debouncing
-    const save = createAutoSave(glyph.id, () => textarea.value, 'Prompt Glyph');
+    const { save, cancel: cancelAutoSave } = createAutoSave(glyph.id, () => textarea.value, 'Prompt Glyph');
     textarea.addEventListener('input', () => save());
 
     preventDrag(textarea);
@@ -317,7 +317,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
 
     // Register cleanup for conversions (drag/resize handled by canvasPlaced)
     storeCleanup(element, () => {
-        if (saveTimeout !== undefined) clearTimeout(saveTimeout);
+        cancelAutoSave();
     });
 
     // Attach tooltip support
