@@ -249,7 +249,7 @@ let test_stitch_missing_text () =
 (* --- result_to_json --- *)
 
 let test_result_to_json_buffered () =
-  let r = Stitcher.{ branch = "main"; context = "session:x"; buffered_words = 42; emitted = None; turn_count = 0 } in
+  let r = Stitcher.{ branch = "main"; context = "session:x"; buffered_words = 42; emitted = None; turn_count = 0; paths = [] } in
   let json = Yojson.Safe.from_string (Stitcher.result_to_json r) in
   match json with
   | `Assoc fields ->
@@ -259,7 +259,7 @@ let test_result_to_json_buffered () =
   | _ -> Alcotest.fail "expected JSON object"
 
 let test_result_to_json_emitted () =
-  let r = Stitcher.{ branch = "main"; context = "session:x"; buffered_words = 0; emitted = Some "hello world"; turn_count = 1 } in
+  let r = Stitcher.{ branch = "main"; context = "session:x"; buffered_words = 0; emitted = Some "hello world"; turn_count = 1; paths = [] } in
   let json = Yojson.Safe.from_string (Stitcher.result_to_json r) in
   match json with
   | `Assoc fields ->
@@ -272,7 +272,7 @@ let test_result_to_json_emitted () =
   | _ -> Alcotest.fail "expected JSON object"
 
 let test_result_to_json_escapes_branch () =
-  let r = Stitcher.{ branch = {|feat/"quoted"|}; context = "session:x"; buffered_words = 10; emitted = None; turn_count = 0 } in
+  let r = Stitcher.{ branch = {|feat/"quoted"|}; context = "session:x"; buffered_words = 10; emitted = None; turn_count = 0; paths = [] } in
   let json_str = Stitcher.result_to_json r in
   (* Must parse as valid JSON — would fail if branch wasn't escaped *)
   let _json = Yojson.Safe.from_string json_str in

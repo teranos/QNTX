@@ -151,25 +151,25 @@ let handle_http reqd =
   | _ ->
     respond_json reqd `Not_found {|{"error":"not found"}|}
 
-(* --- Request router --- *)
-
-let route_request reqd =
-  let request = H2.Reqd.request reqd in
-  match request.meth with
-  | `POST ->
-    (match H2.Headers.get request.headers "content-type" with
-     | Some s when String.length s >= 16 && String.sub s 0 16 = "application/grpc" ->
-       Grpc_lwt.Server.Service.handle_request (Lazy.force service) reqd
-     | _ ->
-       handle_http reqd)
-  | _ ->
-    handle_http reqd
-
 (* --- HTTP/2 server --- *)
 
+let http_port = 5178
+
 let serve port =
-  let request_handler _addr reqd =
-    route_request reqd
+  let grpc_handler _addr reqd =
+    let request = H2.Reqd.request reqd in
+    match request.meth with
+    | `POST ->
+      (match H2.Headers.get request.headers "content-type" with
+       | Some s when String.length s >= 16 && String.sub s 0 16 = "application/grpc" ->
+         Grpc_lwt.Server.Service.handle_request (Lazy.force service) reqd
+       | _ ->
+         H2.Reqd.respond_with_string reqd (H2.Response.create `Not_found) "")
+    | _ ->
+      H2.Reqd.respond_with_string reqd (H2.Response.create `Not_found) ""
+  in
+  let http_handler _addr reqd =
+    handle_http reqd
   in
   let error_handler _addr ?request:_ error respond =
     let msg = match error with
@@ -182,9 +182,14 @@ let serve port =
     let body = respond H2.Headers.empty in
     H2.Body.Writer.close body
   in
-  let connection_handler =
+  let grpc_connection =
     H2_lwt_unix.Server.create_connection_handler
-      ~request_handler
+      ~request_handler:grpc_handler
+      ~error_handler
+  in
+  let http_connection =
+    H2_lwt_unix.Server.create_connection_handler
+      ~request_handler:http_handler
       ~error_handler
   in
   let max_attempts = 10 in
@@ -198,7 +203,7 @@ let serve port =
       Lwt.catch
         (fun () ->
           let* _server =
-            Lwt_io.establish_server_with_client_socket listen_addr connection_handler
+            Lwt_io.establish_server_with_client_socket listen_addr grpc_connection
           in
           Lwt.return current_port)
         (fun _exn ->
@@ -207,6 +212,18 @@ let serve port =
   in
   let* actual_port = try_bind 0 port in
   Printf.printf "QNTX_PLUGIN_PORT=%d\n%!" actual_port;
-  Printf.printf "[dreamweave] gRPC + HTTP server listening on port %d\n%!" actual_port;
+  Printf.printf "[dreamweave] gRPC server listening on port %d\n%!" actual_port;
+  (* Start fixed HTTP API server for the frontend *)
+  let http_addr = Unix.(ADDR_INET (inet_addr_loopback, http_port)) in
+  let* _http_server =
+    Lwt.catch
+      (fun () ->
+        let* s = Lwt_io.establish_server_with_client_socket http_addr http_connection in
+        Printf.printf "[dreamweave] HTTP API listening on port %d\n%!" http_port;
+        Lwt.return s)
+      (fun exn ->
+        Printf.eprintf "[dreamweave] Failed to bind HTTP port %d: %s\n%!" http_port (Printexc.to_string exn);
+        Lwt.fail exn)
+  in
   let forever, _ = Lwt.wait () in
   forever
