@@ -188,7 +188,7 @@
 
 .qntx-btn-ghost {
     background: transparent;
-    border-color: transparent;
+    border-color: rgba(255, 255, 255, 0.1);
     color: var(--text-secondary);
 }
 
@@ -201,6 +201,13 @@
 .qntx-btn-disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    background-image: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 4px,
+        rgba(0, 0, 0, 0.08) 4px,
+        rgba(0, 0, 0, 0.08) 6px
+    );
 }
 
 .qntx-btn-loading {
