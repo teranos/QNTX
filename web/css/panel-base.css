@@ -1,52 +1,5 @@
 /* Panel Base Styles - Shared components for all panels */
-
-/* Design System Tokens */
-:root {
-    /* Spacing */
-    --panel-padding-sm: 8px 12px;
-    --panel-padding-md: 12px 16px;
-    --panel-padding-lg: 16px 20px;
-
-    /* Borders */
-    --panel-border: 1px solid var(--border-color);
-    --border-radius: 3px;
-    --border-radius-lg: 7px;
-
-    /* Typography */
-    --font-size-xs: 10px;
-    --font-size-sm: 11px;
-    --font-size-md: 13px;
-
-    /* Spacing */
-    --gap: 7px;
-
-    /* Colors */
-    --panel-bg: var(--bg-primary);
-    --panel-bg-secondary: var(--bg-almost-white);
-    --panel-text-primary: var(--text-primary);
-    --panel-text-secondary: var(--text-secondary);
-    --panel-text-tertiary: var(--text-tertiary);
-
-    /* Transitions */
-    --panel-transition-fast: all 0.2s ease;
-    --panel-transition-normal: all 0.2s ease;
-
-    /* Status colors */
-    --status-pending-bg: #fff3e0;
-    --status-pending-text: var(--color-warning);
-    --status-running-bg: #e3f2fd;
-    --status-running-text: var(--color-info);
-    --status-completed-bg: #e8f5e9;
-    --status-completed-text: var(--color-success);
-    --status-failed-bg: #ffebee;
-    --status-failed-text: var(--color-error);
-    --status-paused-text: #ef6c00;
-    --status-stopped-text: #757575;
-    --status-scheduled-bg: #f3e5f5;
-
-    /* Accent/scheduled tint for hover states */
-    --bg-scheduled-tint: #f3e5f5;
-}
+/* Design tokens are in tokens.css */
 
 /* === CARDS === */
 
