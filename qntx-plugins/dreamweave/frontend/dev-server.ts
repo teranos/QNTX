@@ -14,7 +14,7 @@ import http2 from 'http2'
 
 const execAsync = promisify(exec)
 
-const DREAMWEAVE_PORT = process.env.DREAMWEAVE_PORT || '38701'
+const DREAMWEAVE_PORT = process.env.DREAMWEAVE_PORT || '5178'
 const QNTX_PORT = process.env.QNTX_PORT || '8773'
 const DEV_PORT = 5177
 const distDir = join(import.meta.dir, 'dist')

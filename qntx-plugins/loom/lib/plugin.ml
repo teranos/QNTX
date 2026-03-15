@@ -106,6 +106,7 @@ let handle_execute_job raw =
                ~text:block
                ~word_count:(Stitcher.word_count block)
                ~turn_count:result.turn_count
+               ~paths:result.paths
              in
              (match ats_result with
               | Ok () -> ()
@@ -159,6 +160,7 @@ let flush_and_persist () =
         ~text:block
         ~word_count:(Stitcher.word_count block)
         ~turn_count:result.turn_count
+        ~paths:result.paths
       in
       (match ats_result with
        | Ok () -> ()

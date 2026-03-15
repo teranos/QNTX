@@ -19,6 +19,18 @@ let extract_number (fields : Google_types.Struct.Google.Protobuf.Struct.t) key =
   | Some (Some (`Number_value n)) -> Some (int_of_float n)
   | _ -> None
 
+(* Extract a nested Struct as a string→string JSON object *)
+let extract_string_map (fields : Google_types.Struct.Google.Protobuf.Struct.t) key =
+  match List.assoc_opt key fields with
+  | Some (Some (`Struct_value nested)) ->
+    let pairs = List.filter_map (fun (k, v) ->
+      match v with
+      | Some (`String_value s) -> Some (k, `String s)
+      | _ -> None
+    ) nested in
+    `Assoc pairs
+  | _ -> `Assoc []
+
 (* Convert a single attestation to a Yojson object *)
 let attestation_to_json (a : Protocol.Attestation.t) =
   let fields : Google_types.Struct.Google.Protobuf.Struct.t = match a.attributes with
@@ -47,6 +59,7 @@ let attestation_to_json (a : Protocol.Attestation.t) =
     ("turn_count", match extract_number fields "turn_count" with
       | Some n -> `Int n
       | None -> `Null);
+    ("paths", extract_string_map fields "paths");
   ]
 
 (* Convert a list of attestations into a JSON response *)
