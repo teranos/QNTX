@@ -372,6 +372,53 @@ function renderButtonGallery(root: HTMLElement) {
   ])
   section.appendChild(glyphBtnMatrix)
 
+  // ui.input() — with and without label
+  const inputGroup = document.createElement('div')
+  inputGroup.className = 'button-group'
+
+  const inputHeader = document.createElement('div')
+  inputHeader.className = 'button-group-header'
+  const inputName = document.createElement('span')
+  inputName.className = 'button-group-name'
+  inputName.textContent = 'ui.input()'
+  const inputDesc = document.createElement('span')
+  inputDesc.className = 'button-group-desc'
+  inputDesc.textContent = 'glyph-input — text input with drag protection'
+  inputHeader.appendChild(inputName)
+  inputHeader.appendChild(inputDesc)
+  inputGroup.appendChild(inputHeader)
+
+  const inputRow = document.createElement('div')
+  inputRow.className = 'sdk-specimen-row'
+
+  // Without label
+  const input1 = document.createElement('div')
+  input1.className = 'glyph-form-group'
+  const inp1 = document.createElement('input')
+  inp1.className = 'glyph-input'
+  inp1.type = 'text'
+  inp1.placeholder = 'Enter URL...'
+  input1.appendChild(inp1)
+  inputRow.appendChild(input1)
+
+  // With label
+  const input2 = document.createElement('div')
+  input2.className = 'glyph-form-group'
+  const lbl = document.createElement('label')
+  lbl.className = 'glyph-label'
+  lbl.textContent = 'API Endpoint'
+  input2.appendChild(lbl)
+  const inp2 = document.createElement('input')
+  inp2.className = 'glyph-input'
+  inp2.type = 'text'
+  inp2.placeholder = 'https://...'
+  inp2.value = 'https://api.example.com/v1'
+  input2.appendChild(inp2)
+  inputRow.appendChild(input2)
+
+  inputGroup.appendChild(inputRow)
+  section.appendChild(inputGroup)
+
   // ── Internal Systems ──
   const internalHeader = document.createElement('h3')
   internalHeader.className = 'component-section-header'
@@ -825,6 +872,17 @@ function injectStyles() {
       font-size: 10px;
       color: var(--text-on-dark-tertiary);
       margin-bottom: 12px;
+    }
+
+    /* SDK specimen row */
+    .sdk-specimen-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      padding: var(--panel-padding-sm);
+      background: var(--bg-secondary);
+      border: var(--panel-border);
+      border-radius: var(--border-radius);
     }
 
     /* Button gallery */
