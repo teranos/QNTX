@@ -215,7 +215,7 @@ export function createPluginPlaceholderGlyph(
 
     // Muted styling (not alarming red)
     element.style.backgroundColor = 'rgba(30, 30, 35, 0.92)';
-    element.style.border = '1px solid var(--border-color)';
+    element.style.border = '1px solid var(--border)';
     element.style.pointerEvents = 'auto'; // Allow dragging
 
     // Custom title bar (same style as working plugin glyph)

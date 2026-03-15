@@ -12,7 +12,7 @@
     z-index: 100;
     display: none; /* Hidden by default */
     flex-direction: column;
-    transition: var(--panel-transition-normal);
+    transition: var(--panel-transition);
     overflow: hidden;
 }
 
@@ -28,7 +28,7 @@
 /* Provider configuration sections */
 .provider-config {
     padding: 12px;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--border);
 }
 
 .provider-config.hidden {
@@ -51,7 +51,7 @@
 .api-key-input {
     flex: 1;
     padding: 6px 10px;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: var(--border-radius);
     background: var(--bg-color);
     color: var(--text-color);
@@ -62,7 +62,7 @@
 .api-key-toggle,
 .api-key-save {
     padding: 4px 8px;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: var(--border-radius);
     background: var(--button-bg);
     cursor: pointer;
@@ -177,10 +177,10 @@
     gap: var(--gap);
     padding: 16px 12px;
     background: var(--panel-bg);
-    border: 2px solid var(--border-color);
+    border: 2px solid var(--border);
     border-radius: var(--border-radius-lg);
     cursor: pointer;
-    transition: var(--panel-transition-normal);
+    transition: var(--panel-transition);
     font-family: inherit;
 }
 
