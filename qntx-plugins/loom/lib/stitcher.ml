@@ -1,6 +1,6 @@
 (* Stitcher — weaves conversation turns into embedding-ready text blocks
  *
- * Triggered by a watcher on UserPromptSubmit and Stop attestations.
+ * Triggered by a watcher on UserPromptSubmit, Stop, Hook, and PreToolUse attestations.
  * Each invocation receives one attestation as JSON payload. The stitcher
  * extracts the conversational text (prompt or last_assistant_message),
  * buffers turns per branch, and emits a "woven" block when the buffer
@@ -11,14 +11,15 @@
  *
  * Attestation structure (from Graunde):
  *   subjects:   ["branch-name"]
- *   predicates: ["UserPromptSubmit"] or ["Stop"] or ["PreToolUse"]
+ *   predicates: ["UserPromptSubmit"] or ["Stop"] or ["PreToolUse"] or ["Hook"]
  *   attributes: { "prompt": "..." } or { "last_assistant_message": "..." }
  *               or { "tool_input": { "command": "..." }, ... }
+ *               or { "hook_output": "..." }
  *)
 
 (* --- Configuration --- *)
 
-let max_chunk_words = 100
+let max_chunk_words = 150
 
 (* --- Per-branch buffer --- *)
 
@@ -31,9 +32,13 @@ let max_chunk_words = 100
 type buffer_entry = {
   context : string;
   turns : string list;
+  paths : (string * string) list;  (* (tail, full_path) for edit/read/write/search turns *)
 }
 
 let buffers : (string, buffer_entry) Hashtbl.t = Hashtbl.create 16
+
+(* Track last branch per session context to detect branch switches *)
+let last_branch : (string, string) Hashtbl.t = Hashtbl.create 16
 
 (* Buffer key combines branch and session context so concurrent
  * sessions on the same branch don't interleave turns. *)
@@ -106,6 +111,55 @@ let extract_tool_command attrs =
      | _ -> None)
   | _ -> None
 
+(* Extract file path tail — last two components for embedding readability *)
+let file_tail path =
+  match String.rindex_opt path '/' with
+  | None -> path
+  | Some i ->
+    let parent_end = i in
+    match String.rindex_from_opt path (parent_end - 1) '/' with
+    | None -> path
+    | Some j -> String.sub path (j + 1) (String.length path - j - 1)
+
+(* Extract tool use as (label, tail_text, full_path option) based on tool_name *)
+let extract_tool_use attrs =
+  let tool_name = match List.assoc_opt "tool_name" attrs with
+    | Some (`String n) -> Some n | _ -> None in
+  let tool_input = match List.assoc_opt "tool_input" attrs with
+    | Some (`Assoc ti) -> Some ti | _ -> None in
+  match tool_name, tool_input with
+  | Some "Edit", Some ti ->
+    (match List.assoc_opt "file_path" ti with
+     | Some (`String fp) -> Some ("edit", file_tail fp, Some fp)
+     | _ -> None)
+  | Some "Read", Some ti ->
+    (match List.assoc_opt "file_path" ti with
+     | Some (`String fp) -> Some ("read", file_tail fp, Some fp)
+     | _ -> None)
+  | Some "Grep", Some ti ->
+    (match List.assoc_opt "pattern" ti with
+     | Some (`String pat) ->
+       let path = match List.assoc_opt "path" ti with
+         | Some (`String p) -> p | _ -> "." in
+       Some ("search", Printf.sprintf "%s in %s" pat (file_tail path), Some path)
+     | _ -> None)
+  | Some "Glob", Some ti ->
+    (match List.assoc_opt "pattern" ti with
+     | Some (`String pat) ->
+       let path = match List.assoc_opt "path" ti with
+         | Some (`String p) -> p | _ -> "." in
+       Some ("search", Printf.sprintf "%s in %s" pat (file_tail path), Some path)
+     | _ -> None)
+  | Some "Write", Some ti ->
+    (match List.assoc_opt "file_path" ti with
+     | Some (`String fp) -> Some ("write", file_tail fp, Some fp)
+     | _ -> None)
+  | Some "Bash", Some ti ->
+    (match List.assoc_opt "command" ti with
+     | Some (`String cmd) when is_weave_worthy_command cmd -> Some ("tool", cmd, None)
+     | _ -> None)
+  | _ -> None
+
 (* Extract the conversational text based on event type.
  * UserPromptSubmit → attributes.prompt
  * Stop → attributes.last_assistant_message
@@ -135,7 +189,10 @@ let extract_text json predicate =
            | Some (`String text) -> Some text
            | _ -> None)
         | "PreToolUse" | "GraundedPreToolUse" ->
-          extract_tool_command attrs
+          (* Tool use handled separately via extract_tool_use for label routing *)
+          (match extract_tool_use attrs with
+           | Some (_, text, _) -> Some text
+           | None -> None)
         | "SessionStart" ->
           (match List.assoc_opt "session_id" attrs with
            | Some (`String id) -> Some (Printf.sprintf "Start Session: %s" id)
@@ -161,6 +218,10 @@ let extract_text json predicate =
           (match List.assoc_opt "task_subject" attrs with
            | Some (`String subj) -> Some (Printf.sprintf "Task completed: %s" subj)
            | _ -> Some "Task completed")
+        | "Hook" ->
+          (match List.assoc_opt "hook_output" attrs with
+           | Some (`String text) -> Some text
+           | _ -> None)
         | _ -> None)
      | _ -> None)
   | _ -> None
@@ -173,6 +234,7 @@ type stitch_result = {
   buffered_words : int;
   emitted : string option;  (* Some block when buffer exceeded max_chunk_words *)
   turn_count : int;          (* Number of turns in the emitted block *)
+  paths : (string * string) list;  (* (tail, full_path) mapping for frontend hover *)
 }
 
 let stitch payload =
@@ -185,7 +247,7 @@ let stitch payload =
   match json with
   | None ->
     Printf.printf "[loom] Skipping malformed payload\n%!";
-    { branch = "unknown"; context = "_"; buffered_words = 0; emitted = None; turn_count = 0 }
+    [{ branch = "unknown"; context = "_"; buffered_words = 0; emitted = None; turn_count = 0; paths = [] }]
   | Some json ->
     let branch = match extract_branch json with Some b -> b | None -> "unknown" in
     let predicate = match extract_predicate json with Some p -> p | None -> "unknown" in
@@ -193,73 +255,113 @@ let stitch payload =
     let text = extract_text json predicate in
     match text with
     | None ->
-      { branch; context; buffered_words = 0; emitted = None; turn_count = 0 }
+      [{ branch; context; buffered_words = 0; emitted = None; turn_count = 0; paths = [] }]
     | Some text ->
-      (* Format the turn with a speaker label *)
+      (* Extract tool use info once for label and path *)
+      let tool_info = match predicate with
+        | "PreToolUse" | "GraundedPreToolUse" ->
+          (match json with
+           | `Assoc fields ->
+             (match List.assoc_opt "attributes" fields with
+              | Some (`Assoc attrs) -> extract_tool_use attrs
+              | _ -> None)
+           | _ -> None)
+        | _ -> None
+      in
       let label = match predicate with
         | "UserPromptSubmit" -> "human"
         | "Stop" -> "assistant"
-        | "PreToolUse" | "GraundedPreToolUse" -> "tool"
+        | "PreToolUse" | "GraundedPreToolUse" ->
+          (match tool_info with Some (lbl, _, _) -> lbl | None -> "tool")
         | "SessionStart" | "SessionEnd" -> "session"
         | "PreCompact" -> "compaction"
         | "SubagentStart" | "SubagentStop" -> "agent"
         | "TaskCompleted" -> "task"
+        | "Hook" -> "hook"
         | other -> other
+      in
+      (* Collect path mapping if this turn has one *)
+      let turn_path = match tool_info with
+        | Some (_, tail, Some full) -> [(tail, full)]
+        | _ -> []
       in
       let turn = Printf.sprintf "[%s] %s" label text in
 
       let key = buffer_key branch context in
 
-      (* SessionStart: flush existing buffer first, then start fresh *)
-      if predicate = "SessionStart" then (
-        let emitted =
-          match Hashtbl.find_opt buffers key with
-          | Some existing when existing.turns <> [] ->
-            let block = existing.turns |> List.rev |> String.concat "\n\n" in
-            let total_words = buffer_word_count existing.turns in
-            let num_turns = List.length existing.turns in
-            Printf.printf "[loom] Emitting %d-word block for branch %s (session start)\n%!"
-              total_words branch;
-            Some (block, existing.context, num_turns)
-          | _ -> None
-        in
-        (* Start fresh buffer with the SessionStart marker *)
-        Hashtbl.replace buffers key { context; turns = [turn] };
-        match emitted with
-        | Some (block, old_context, num_turns) ->
-          { branch; context = old_context; buffered_words = 0; emitted = Some block; turn_count = num_turns }
-        | None ->
-          Printf.printf "[loom] Buffered %d words for branch %s (%d total)\n%!"
-            (word_count turn) branch (word_count turn);
-          { branch; context; buffered_words = word_count turn; emitted = None; turn_count = 0 }
-      ) else (
-        (* Get or create buffer for this session, dedup consecutive identical turns *)
-        let entry =
-          match Hashtbl.find_opt buffers key with
-          | Some existing when existing.turns <> [] && List.hd existing.turns = turn ->
-            existing (* Skip duplicate *)
-          | Some existing -> { context; turns = turn :: existing.turns }
-          | None -> { context; turns = [turn] }
-        in
-        let total_words = buffer_word_count entry.turns in
+      (* Branch change: flush old branch's buffer for this session *)
+      let branch_flush =
+        match Hashtbl.find_opt last_branch context with
+        | Some prev when prev <> branch ->
+          let old_key = buffer_key prev context in
+          (match Hashtbl.find_opt buffers old_key with
+           | Some existing when existing.turns <> [] ->
+             let block = existing.turns |> List.rev |> String.concat "\n\n" in
+             let total_words = buffer_word_count existing.turns in
+             let num_turns = List.length existing.turns in
+             Hashtbl.remove buffers old_key;
+             Printf.printf "[loom] Emitting %d-word block for branch %s (branch change to %s)\n%!"
+               total_words prev branch;
+             [{ branch = prev; context = existing.context; buffered_words = 0;
+                emitted = Some block; turn_count = num_turns; paths = existing.paths }]
+           | _ -> [])
+        | _ -> []
+      in
+      Hashtbl.replace last_branch context branch;
 
-        (* Emit when buffer exceeds threshold or session ends *)
-        let should_emit = total_words >= max_chunk_words || predicate = "SessionEnd" in
-        if should_emit && total_words > 0 then (
-          let block = entry.turns |> List.rev |> String.concat "\n\n" in
-          Hashtbl.remove buffers key;
-          Printf.printf "[loom] Emitting %d-word block for branch %s (%s)\n%!"
-            total_words branch
-            (if predicate = "SessionEnd" then "session end" else "threshold");
-          let num_turns = List.length entry.turns in
-          { branch; context = entry.context; buffered_words = 0; emitted = Some block; turn_count = num_turns }
+      (* SessionStart: flush existing buffer first, then start fresh *)
+      let current_result =
+        if predicate = "SessionStart" then (
+          let emitted =
+            match Hashtbl.find_opt buffers key with
+            | Some existing when existing.turns <> [] ->
+              let block = existing.turns |> List.rev |> String.concat "\n\n" in
+              let total_words = buffer_word_count existing.turns in
+              let num_turns = List.length existing.turns in
+              Printf.printf "[loom] Emitting %d-word block for branch %s (session start)\n%!"
+                total_words branch;
+              Some (block, existing.context, num_turns, existing.paths)
+            | _ -> None
+          in
+          (* Start fresh buffer with the SessionStart marker *)
+          Hashtbl.replace buffers key { context; turns = [turn]; paths = turn_path };
+          match emitted with
+          | Some (block, old_context, num_turns, old_paths) ->
+            { branch; context = old_context; buffered_words = 0; emitted = Some block; turn_count = num_turns; paths = old_paths }
+          | None ->
+            Printf.printf "[loom] Buffered %d words for branch %s (%d total)\n%!"
+              (word_count turn) branch (word_count turn);
+            { branch; context; buffered_words = word_count turn; emitted = None; turn_count = 0; paths = [] }
         ) else (
-          Hashtbl.replace buffers key entry;
-          Printf.printf "[loom] Buffered %d words for branch %s (%d total)\n%!"
-            (word_count turn) branch total_words;
-          { branch; context = entry.context; buffered_words = total_words; emitted = None; turn_count = 0 }
+          (* Get or create buffer for this session, dedup consecutive identical turns *)
+          let entry =
+            match Hashtbl.find_opt buffers key with
+            | Some existing when existing.turns <> [] && List.hd existing.turns = turn ->
+              existing (* Skip duplicate *)
+            | Some existing -> { context; turns = turn :: existing.turns; paths = turn_path @ existing.paths }
+            | None -> { context; turns = [turn]; paths = turn_path }
+          in
+          let total_words = buffer_word_count entry.turns in
+
+          (* Emit when buffer exceeds threshold or session ends *)
+          let should_emit = total_words >= max_chunk_words || predicate = "SessionEnd" in
+          if should_emit && total_words > 0 then (
+            let block = entry.turns |> List.rev |> String.concat "\n\n" in
+            Hashtbl.remove buffers key;
+            Printf.printf "[loom] Emitting %d-word block for branch %s (%s)\n%!"
+              total_words branch
+              (if predicate = "SessionEnd" then "session end" else "threshold");
+            let num_turns = List.length entry.turns in
+            { branch; context = entry.context; buffered_words = 0; emitted = Some block; turn_count = num_turns; paths = entry.paths }
+          ) else (
+            Hashtbl.replace buffers key entry;
+            Printf.printf "[loom] Buffered %d words for branch %s (%d total)\n%!"
+              (word_count turn) branch total_words;
+            { branch; context = entry.context; buffered_words = total_words; emitted = None; turn_count = 0; paths = [] }
+          )
         )
-      )
+      in
+      branch_flush @ [current_result]
 
 (* Flush all buffered turns as weaves. Called on plugin shutdown
  * to prevent data loss when the server stops. *)
@@ -278,7 +380,7 @@ let flush_all () =
       Printf.printf "[loom] Flushing %d-word buffer for %s (shutdown)\n%!"
         total_words key;
       results := { branch; context = entry.context; buffered_words = 0;
-                   emitted = Some block; turn_count = num_turns } :: !results
+                   emitted = Some block; turn_count = num_turns; paths = entry.paths } :: !results
     )
   ) buffers;
   Hashtbl.clear buffers;

@@ -76,6 +76,17 @@ func Migrate(db *sql.DB, logger *zap.SugaredLogger) error {
 
 		if _, err := tx.Exec(string(sqlBytes)); err != nil {
 			tx.Rollback()
+			// Migrations with "optional" in the name are allowed to fail —
+			// they depend on extensions (e.g. sqlite-vec) that may not be loaded.
+			if strings.Contains(filename, "optional") {
+				if logger != nil {
+					logger.Warnw("Optional migration skipped (extension not available)",
+						"migration", filename,
+						"error", err,
+					)
+				}
+				continue
+			}
 			return errors.Wrapf(err, "execute %s", filename)
 		}
 
