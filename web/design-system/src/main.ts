@@ -350,30 +350,52 @@ function renderButtonGallery(root: HTMLElement) {
   h2.textContent = 'Buttons'
   section.appendChild(h2)
 
-  // qntx-btn matrix: rows = variants, columns = sizes
+  // qntx-btn: one matrix — variants + states as rows, sizes as columns
   const variants = ['default', 'primary', 'secondary', 'danger', 'warning', 'ghost']
   const sizes = ['small', 'medium', 'large']
 
-  const qntxMatrix = buttonMatrix('qntx-btn', 'Primary button system', sizes, variants.map(v => ({
+  const variantRows: MatrixRow[] = variants.map(v => ({
     rowLabel: v,
     cells: sizes.map(s => ({
       label: v,
       classes: `qntx-btn qntx-btn-${s} qntx-btn-${v}`,
     }))
-  })))
-  section.appendChild(qntxMatrix)
+  }))
 
-  // States row
-  const stateMatrix = buttonMatrix('qntx-btn states', 'Interactive states at medium size', ['disabled', 'confirming', 'loading', 'error'], [{
-    rowLabel: '',
-    cells: [
-      { label: 'Disabled', classes: 'qntx-btn qntx-btn-medium qntx-btn-default', disabled: true },
-      { label: 'Confirming', classes: 'qntx-btn qntx-btn-medium qntx-btn-danger qntx-btn-confirming' },
-      { label: 'Loading', classes: 'qntx-btn qntx-btn-medium qntx-btn-default qntx-btn-loading' },
-      { label: 'Error', classes: 'qntx-btn qntx-btn-medium qntx-btn-error' },
-    ]
-  }])
-  section.appendChild(stateMatrix)
+  const stateRows: MatrixRow[] = [
+    {
+      rowLabel: 'disabled',
+      cells: sizes.map(s => ({
+        label: 'disabled',
+        classes: `qntx-btn qntx-btn-${s} qntx-btn-default`,
+        disabled: true,
+      }))
+    },
+    {
+      rowLabel: 'confirming',
+      cells: sizes.map(s => ({
+        label: 'confirming',
+        classes: `qntx-btn qntx-btn-${s} qntx-btn-danger qntx-btn-confirming`,
+      }))
+    },
+    {
+      rowLabel: 'loading',
+      cells: sizes.map(s => ({
+        label: 'loading',
+        classes: `qntx-btn qntx-btn-${s} qntx-btn-default qntx-btn-loading`,
+      }))
+    },
+    {
+      rowLabel: 'error',
+      cells: sizes.map(s => ({
+        label: 'error',
+        classes: `qntx-btn qntx-btn-${s} qntx-btn-error`,
+      }))
+    },
+  ]
+
+  const qntxMatrix = buttonMatrix('qntx-btn', 'Primary button system — variants, states, sizes', sizes, [...variantRows, ...stateRows])
+  section.appendChild(qntxMatrix)
 
   // titlebar-btn
   const titlebarMatrix = buttonMatrix('titlebar-btn', 'Small icon buttons for glyph title bars (20px)', ['play', 'close', 'maximize', 'refresh'], [{
