@@ -58,7 +58,33 @@
     background: #808281;
 }
 
-/* Play/execute buttons — reset the generic title bar button margin */
+/* ── Titlebar icon buttons (play, copy, dismiss, etc.) ────────── */
+
+.titlebar-btn {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    font-size: 11px;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+}
+
+.titlebar-btn:hover {
+    background-color: var(--bg-dark-light);
+}
+
+.titlebar-btn:active {
+    border-color: var(--border-light);
+}
+
+/* Reset the generic title bar button margin */
 .glyph-title-bar .titlebar-btn {
     margin-left: 0;
 }
