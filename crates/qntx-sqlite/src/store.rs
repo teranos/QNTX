@@ -32,7 +32,7 @@ type StoreResult<T> = Result<T, StoreError>;
 
 /// SQLite-backed attestation store
 pub struct SqliteStore {
-    conn: Connection,
+    pub(crate) conn: Connection,
 }
 
 impl SqliteStore {
