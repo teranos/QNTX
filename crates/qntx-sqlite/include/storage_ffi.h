@@ -159,6 +159,28 @@ StorageResultC storage_clear(SqliteStore *store);
 AttestationResultC storage_query(const SqliteStore *store, const char *filter_json);
 
 // ============================================================================
+// Enforcement & Stats
+// ============================================================================
+
+/**
+ * Enforce storage limits and log events to storage_events table.
+ * Returns JSON array of enforcement events that occurred.
+ *
+ * @param store Store handle
+ * @param input_json JSON with actors, contexts, subjects, and config
+ * @return Result with JSON array of enforcement events
+ */
+AttestationResultC storage_enforce_limits(SqliteStore *store, const char *input_json);
+
+/**
+ * Get storage statistics (counts of attestations, unique actors/subjects/contexts).
+ *
+ * @param store Store handle
+ * @return Result with JSON stats object
+ */
+AttestationResultC storage_get_stats(const SqliteStore *store);
+
+// ============================================================================
 // Memory Management
 // ============================================================================
 

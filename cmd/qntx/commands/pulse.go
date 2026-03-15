@@ -74,7 +74,7 @@ The daemon will:
 		defer database.Close()
 
 		// Create attestation store for Pulse handlers
-		atsStore, err := storage.NewStore(database, dbPath, logger.Logger)
+		atsStore, err := storage.NewStore(dbPath, logger.Logger)
 		if err != nil {
 			return errors.Wrap(err, "failed to create attestation store for pulse")
 		}
