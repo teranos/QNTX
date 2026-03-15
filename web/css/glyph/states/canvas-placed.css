@@ -1,0 +1,19 @@
+/**
+ * Canvas-Placed — shared base for glyphs on the canvas workspace.
+ *
+ * Every glyph placed on the canvas (ix, prompt, py, ax, result, note) gets
+ * this class via canvasPlaced() in manifestations/canvas-placed.ts.
+ * Provides the standard dark-surface look. Individual glyphs override
+ * properties as needed (e.g. note overrides background for its post-it
+ * aesthetic).
+ */
+.canvas-glyph {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-secondary);
+    outline: calc(1px / var(--canvas-scale, 1)) solid rgba(220, 222, 221, var(--glyph-border-opacity, 0.4));
+    border-radius: 4px;
+    overflow: hidden;
+    transition: outline-color 0.2s ease;
+}
