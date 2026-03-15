@@ -118,7 +118,7 @@ func runIxGit(cmd *cobra.Command, repoInput string, dryRun bool, actor string, v
 	}
 	defer database.Close()
 
-	atsStore, err := storage.NewStore(database, dbPath, logger.Logger)
+	atsStore, err := storage.NewStore(dbPath, logger.Logger)
 	if err != nil {
 		return errors.Wrap(err, "failed to create attestation store")
 	}
