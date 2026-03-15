@@ -476,6 +476,82 @@ function renderButtonGallery(root: HTMLElement) {
   const qntxMatrix = buttonMatrix('qntx-btn', 'Primary button system — variants, states, sizes', sizes, [...variantRows, ...stateRows])
   section.appendChild(qntxMatrix)
 
+  // Interactive two-stage confirmation demo
+  const confirmGroup = document.createElement('div')
+  confirmGroup.className = 'button-group'
+
+  const confirmHeader = document.createElement('div')
+  confirmHeader.className = 'button-group-header'
+  const confirmName = document.createElement('span')
+  confirmName.className = 'button-group-name'
+  confirmName.textContent = 'Two-stage confirmation'
+  const confirmDesc = document.createElement('span')
+  confirmDesc.className = 'button-group-desc'
+  confirmDesc.textContent = 'First click enters confirming state, second click executes. Auto-reverts after 3s.'
+  confirmHeader.appendChild(confirmName)
+  confirmHeader.appendChild(confirmDesc)
+  confirmGroup.appendChild(confirmHeader)
+
+  const confirmRow = document.createElement('div')
+  confirmRow.className = 'sdk-specimen-row'
+
+  for (const variant of ['danger', 'warning', 'ghost'] as const) {
+    const wrapper = document.createElement('div')
+    wrapper.className = 'two-stage-demo'
+
+    const btn = document.createElement('button')
+    btn.className = `qntx-btn qntx-btn-medium qntx-btn-${variant}`
+    btn.style.minWidth = '120px'
+
+    const label = document.createElement('span')
+    label.className = 'qntx-btn-label'
+    label.textContent = variant === 'danger' ? 'Delete' : variant === 'warning' ? 'Reset' : 'Clear'
+    btn.appendChild(label)
+
+    const originalText = label.textContent
+    const confirmText = 'Are you sure?'
+    let confirming = false
+    let timeout: ReturnType<typeof setTimeout> | null = null
+
+    btn.addEventListener('click', () => {
+      if (!confirming) {
+        confirming = true
+        label.textContent = confirmText
+        btn.classList.add('qntx-btn-confirming')
+        timeout = setTimeout(() => {
+          confirming = false
+          label.textContent = originalText
+          btn.classList.remove('qntx-btn-confirming')
+        }, 3000)
+      } else {
+        confirming = false
+        if (timeout) clearTimeout(timeout)
+        btn.classList.remove('qntx-btn-confirming')
+        label.textContent = 'Done!'
+        btn.classList.add('qntx-btn-loading')
+        setTimeout(() => {
+          label.textContent = originalText
+          btn.classList.remove('qntx-btn-loading')
+        }, 1000)
+      }
+    })
+
+    const variantLabel = document.createElement('span')
+    variantLabel.className = 'button-class-label'
+    variantLabel.textContent = `qntx-btn-${variant}`
+    variantLabel.style.marginTop = '4px'
+    variantLabel.style.display = 'block'
+    variantLabel.style.fontSize = '9px'
+    variantLabel.style.color = 'var(--text-on-dark-tertiary)'
+
+    wrapper.appendChild(btn)
+    wrapper.appendChild(variantLabel)
+    confirmRow.appendChild(wrapper)
+  }
+
+  confirmGroup.appendChild(confirmRow)
+  section.appendChild(confirmGroup)
+
   // titlebar — rendered as live title bar strips
   const titlebarSection = document.createElement('div')
   titlebarSection.className = 'button-group'
