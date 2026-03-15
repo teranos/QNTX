@@ -3,7 +3,6 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
-	"time"
 
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
@@ -39,10 +38,10 @@ func writeToGraundeDB(dbPath string, as *types.As, logger *zap.SugaredLogger) {
 		string(predicates),
 		string(contexts),
 		string(actors),
-		as.Timestamp.Format(time.RFC3339Nano),
+		as.Timestamp.UTC().Format("2006-01-02 15:04:05"),
 		as.Source,
 		string(attributes),
-		as.CreatedAt.Format(time.RFC3339Nano),
+		as.CreatedAt.UTC().Format("2006-01-02 15:04:05"),
 	)
 	if err != nil {
 		logger.Warnw("Failed to write deferred news to Graunde db",

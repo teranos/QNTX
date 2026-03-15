@@ -10,7 +10,7 @@
 /* Morphing from dot/proximity to window */
 .glyph-morphing-to-window {
     position: fixed !important;
-    z-index: 10000 !important;
+    z-index: 10004 !important;
     pointer-events: auto;
     /* Transition timing set dynamically in JavaScript for reduced motion support */
 }
@@ -18,7 +18,7 @@
 /* Morphing from window back to dot */
 .window-morphing-to-glyph {
     position: fixed !important;
-    z-index: 10000 !important;
+    z-index: 10004 !important;
     pointer-events: auto;
     /* Transition timing set dynamically in JavaScript for proper sequencing */
 }

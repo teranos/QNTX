@@ -164,7 +164,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
         const { oneDark } = await import('@codemirror/theme-one-dark');
         const { python } = await import('@codemirror/lang-python');
 
-        const save = createAutoSave(glyph.id, () => editor.state.doc.toString(), 'PyGlyph');
+        const { save } = createAutoSave(glyph.id, () => editor.state.doc.toString(), 'PyGlyph');
         const autoSaveExtension = EditorView.updateListener.of((update) => {
             if (update.docChanged) save();
         });

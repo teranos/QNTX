@@ -1,0 +1,4 @@
+(executable
+ (name main)
+ (public_name qntx-dreamweave)
+ (libraries qntx_dreamweave lwt lwt.unix grpc-lwt))
