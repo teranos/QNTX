@@ -54,7 +54,7 @@ Svelte 5 single-file app. No bundler dependencies beyond Bun and svelte.
 - Git moments: commits and merges as distinct timeline events.
 - Favorite weaves: bookmark and return to specific weaves.
 - Freeze columns: toggle time-sync per column, pin a view in place.
-- Hook/system messages: graunde hook messages are part of the conversation but not captured by loom yet.
+- ~~Hook/system messages~~: done — graunde hook messages flow as `[hook]` turns in weaves, rendered with red accent.
 - Images: screenshots as part of weave data, rendered inline.
 - Branch click navigation: clicking a branch name should scroll to its weaves.
 - Cluster legend: surface cluster labels, make cluster intelligence actionable.
@@ -83,7 +83,7 @@ gRPC plugin implementing `DomainPluginService`. Queries ATS for attestations wit
 
 DreamWeave as consumer reveals what the upstream producers don't capture yet:
 
-- **Hooks/system messages**: graunde and other hook messages are part of the conversation but loom doesn't include them in the weave.
+- ~~**Hooks/system messages**~~: done — loom captures `[hook]` turns via UDP from graunde, dreamweave renders them with red accent and warp dot.
 - **Diffs**: code changes during a session are not recorded.
 - **Git events**: commits, merges, branch operations are not weave events.
 - **Images/screenshots**: not part of the weave data model.
