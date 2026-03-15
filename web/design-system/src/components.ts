@@ -92,7 +92,7 @@ export function renderComponentGallery(root: HTMLElement) {
 
   const statusEl = document.createElement('div')
   statusEl.className = 'glyph-status'
-  statusEl.style.fontSize = '11px'
+  statusEl.style.fontSize = 'var(--font-size-sm)'
   statusEl.style.minHeight = '16px'
   ixJsonDemo.appendChild(statusEl)
 
@@ -136,7 +136,7 @@ export function renderComponentGallery(root: HTMLElement) {
   plainInput.appendChild(plainInp1)
 
   const plainLabel = document.createElement('span')
-  plainLabel.style.fontSize = '10px'
+  plainLabel.style.fontSize = 'var(--font-size-xs)'
   plainLabel.style.color = 'var(--text-on-dark-tertiary)'
   plainLabel.textContent = 'ui.input() alone — no status feedback'
   plainInput.appendChild(plainLabel)
@@ -269,7 +269,7 @@ export function renderComponentGallery(root: HTMLElement) {
     variantLabel.textContent = `qntx-btn-${variant}`
     variantLabel.style.marginTop = '4px'
     variantLabel.style.display = 'block'
-    variantLabel.style.fontSize = '9px'
+    variantLabel.style.fontSize = 'var(--font-size-xs)'
     variantLabel.style.color = 'var(--text-on-dark-tertiary)'
 
     wrapper.appendChild(btn)
