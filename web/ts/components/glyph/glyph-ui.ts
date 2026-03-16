@@ -146,7 +146,7 @@ export interface MeldEvent {
 
 export interface GlyphOpts {
     defaults: { x: number; y: number; width: number; height: number };
-    titleBar?: { label: string; actions?: HTMLElement[]; color?: string };
+    titleBar?: { label: string; actions?: HTMLElement[]; color?: string; labelColor?: string };
     resizable?: boolean | { minWidth?: number; minHeight?: number };
     className?: string;
     /** Custom drag handle element. Falls back to title bar, then container. */
@@ -193,6 +193,10 @@ export function createGlyphUI(glyph: Glyph, pluginName: string): GlyphUI {
 
             if (opts.titleBar?.color && result.titleBar) {
                 result.titleBar.style.backgroundColor = opts.titleBar.color;
+            }
+            if (opts.titleBar?.labelColor && result.titleBar) {
+                const label = result.titleBar.querySelector('span:first-child') as HTMLElement | null;
+                if (label) label.style.color = opts.titleBar.labelColor;
             }
 
             // Flush any cleanups registered before container() was called
@@ -381,7 +385,8 @@ export function createGlyphUI(glyph: Glyph, pluginName: string): GlyphUI {
                 return;
             }
             const detail: SpawnResultDetail = { glyphId: glyph.id, pluginName, result };
-            rootElement.dispatchEvent(new CustomEvent('glyph:spawn-result', {
+            const CE = rootElement.ownerDocument.defaultView?.CustomEvent ?? CustomEvent;
+            rootElement.dispatchEvent(new CE('glyph:spawn-result', {
                 bubbles: true,
                 detail,
             }));

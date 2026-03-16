@@ -72,20 +72,13 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     const ui = createGlyphUI(glyph, 'python');
     const { element, content } = ui.glyph({
         defaults: { x: 200, y: 200, width: 400, height: calculatedHeight },
-        titleBar: { label: 'py', actions: [runButton], color: '#2a5578' },
+        titleBar: { label: 'py', actions: [runButton], color: '#2a5578', labelColor: '#FFD43B' },
         resizable: true,
         className: 'canvas-py-glyph',
     });
     element.style.minWidth = '200px';
     element.style.minHeight = '120px';
     element.style.zIndex = '1';
-
-    // Python brand label color
-    const labelSpan = element.querySelector('.glyph-title-bar span:first-child') as HTMLElement;
-    if (labelSpan) {
-        labelSpan.style.color = '#FFD43B';
-        labelSpan.style.fontWeight = 'bold';
-    }
 
     // Execute Python code on click
     runButton.addEventListener('click', async () => {
