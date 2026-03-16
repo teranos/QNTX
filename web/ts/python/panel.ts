@@ -1,6 +1,8 @@
 /**
  * Python Editor Panel - Python code execution with PyO3-based plugin
  *
+ * TODO: Migrate to glyph panel manifestation, then delete. See base-panel.ts.
+ *
  * Provides a code editor for writing and executing Python code via
  * the qntx-python-plugin gRPC service.
  */

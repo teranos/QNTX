@@ -43,7 +43,6 @@ import { toggleGoEditor } from './code/panel.js';
 import { togglePythonEditor } from './python/panel.js';
 import { glyphRun } from './components/glyph/run.ts';
 import { VidStreamWindow } from './vidstream-window.js';
-import { toggleJobList } from './hixtory-panel.js';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
 type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'vidstream' | 'db';
@@ -63,15 +62,9 @@ function getSymbol(cmd: string): string {
     return CommandToSymbol[cmd] || cmd;
 }
 
-// Extend window interface for global functions
-interface CommandExplorerPanel {
-    toggle: (mode: string) => void;
-}
-
 declare global {
     interface Window {
         setActiveModality: (cmd: string) => void;
-        commandExplorerPanel?: CommandExplorerPanel;
     }
 }
 
@@ -235,24 +228,14 @@ function handleSymbolClick(e: Event): void {
             showConfigPanel();
             break;
         case 'ax':
-            // Expand - show ax command explorer
-            if (window.commandExplorerPanel) {
-                window.commandExplorerPanel.toggle(cmd);
-            } else {
-                activateSearchMode(cmd);
-            }
+            activateSearchMode(cmd);
             break;
         case 'ix':
-            // Ingest - show running IX jobs
-            activateIngestMode(cmd);
+            // Ingest - job visibility moved to Pulse
+            togglePulsePanel();
             break;
         case 'as':
-            // Assert - show query history
-            if (window.commandExplorerPanel) {
-                window.commandExplorerPanel.toggle(cmd);
-            } else {
-                activateAttestationMode(cmd);
-            }
+            activateAttestationMode(cmd);
             break;
         case 'is':
             // Identity - insert segment
@@ -436,14 +419,6 @@ function showVidStreamWindow(): void {
     } catch (error: unknown) {
         handleError(error, 'Failed to show VidStream window', { context: SEG.VID });
     }
-}
-
-/**
- * Activate ingestion mode - show running IX jobs panel
- */
-function activateIngestMode(mode: string): void {
-    toggleJobList();
-    log.debug(SEG.SELF, `${getSymbol(mode)} ingest mode - showing job list`);
 }
 
 /**

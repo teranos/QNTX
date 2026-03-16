@@ -1,6 +1,8 @@
 /**
  * Prompt Preview Panel - Side-by-side prompt output comparison
  *
+ * TODO: Migrate to glyph panel manifestation, then delete. See base-panel.ts.
+ *
  * Shows a preview panel on the right side of the Prose editor when editing prompt files.
  * Displays sampled attestations with old outputs vs new outputs for visual comparison.
  * Supports fullscreen expansion for focused prompt development sessions.
