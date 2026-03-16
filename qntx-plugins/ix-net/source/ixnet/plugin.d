@@ -239,24 +239,155 @@ private HTTPResponse handleCaptures() {
 }
 
 /// GET /net-inspector-module.js — serve the glyph UI module.
+///
+/// Live capture viewer: polls /status + /captures, renders a scrollable
+/// table of API exchanges with model, tokens, size, and timing.
 private HTTPResponse serveGlyphModule() {
     HTTPResponse resp;
     resp.statusCode = 200;
-    // Minimal placeholder — will be expanded
-    resp.body_ = cast(ubyte[])(
-        "export function render(glyph, ui) {\n" ~
-        "  const c = document.createElement('div');\n" ~
-        "  c.style.cssText = 'padding: 20px; font-family: monospace; color: #33ff33; background: #0a0a0f; height: 100%;';\n" ~
-        "  c.textContent = 'ix-net: Claude Code API Inspector';\n" ~
-        "  return c;\n" ~
-        "}\n"
-    );
+    resp.body_ = cast(ubyte[])(glyphModuleSource);
     resp.headers = [
         httpHeader("Content-Type", "application/javascript"),
         httpHeader("Cache-Control", "no-cache"),
     ];
     return resp;
 }
+
+/// Glyph module JS source — inline to avoid filesystem dependencies.
+private enum glyphModuleSource = `
+export async function render(glyph, ui) {
+  const { element, content } = ui.container({
+    defaults: { x: glyph.x || 100, y: glyph.y || 100, width: 800, height: 600 },
+    titleBar: { label: 'Network Inspector' },
+    resizable: { minWidth: 500, minHeight: 300 },
+  });
+
+  content.style.display = 'flex';
+  content.style.flexDirection = 'column';
+  content.style.gap = '0';
+  content.style.padding = '0';
+  content.style.fontFamily = 'monospace';
+  content.style.fontSize = '12px';
+  content.style.color = '#d4d4d4';
+  content.style.backgroundColor = 'rgba(10, 10, 15, 0.95)';
+
+  // ── Status bar ──
+  const statusBar = document.createElement('div');
+  statusBar.style.cssText = 'padding: 6px 10px; border-bottom: 1px solid #2a2a2f; display: flex; gap: 12px; align-items: center; flex-shrink: 0;';
+  content.appendChild(statusBar);
+
+  // ── Capture list (scrollable) ──
+  const list = document.createElement('div');
+  list.style.cssText = 'flex: 1; overflow: auto;';
+  content.appendChild(list);
+
+  // ── Render helpers ──
+  function dot(color) {
+    return '<span style="color:' + color + ';">&#9679;</span> ';
+  }
+
+  function renderStatus(data) {
+    var html = '';
+    if (data.capturing) {
+      html += dot('#22c55e') + 'Capturing on :' + data.proxy_port;
+      html += '<span style="color:#666; margin-left:8px;">' + (data.captures || 0) + ' exchanges</span>';
+    } else {
+      html += dot('#ef4444') + 'Proxy idle';
+    }
+    if (data.ats_connected) {
+      html += '<span style="color:#666; margin-left:auto;">ATS ' + dot('#22c55e') + '</span>';
+    }
+    statusBar.innerHTML = html;
+  }
+
+  function fmtBytes(n) {
+    if (n < 1024) return n + 'B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + 'KB';
+    return (n / 1048576).toFixed(1) + 'MB';
+  }
+
+  function fmtTime(ts) {
+    var d = new Date(ts * 1000);
+    var h = d.getHours().toString().padStart(2, '0');
+    var m = d.getMinutes().toString().padStart(2, '0');
+    var s = d.getSeconds().toString().padStart(2, '0');
+    return h + ':' + m + ':' + s;
+  }
+
+  function statusColor(code) {
+    if (code >= 200 && code < 300) return '#22c55e';
+    if (code >= 400) return '#ef4444';
+    return '#eab308';
+  }
+
+  function renderCaptures(captures) {
+    if (!captures || captures.length === 0) {
+      list.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">No captures yet</div>';
+      return;
+    }
+
+    var html = '<table style="width: 100%; border-collapse: collapse;">';
+    html += '<tr style="color: #666; font-size: 11px; text-align: left; border-bottom: 1px solid #2a2a2f;">';
+    html += '<th style="padding: 4px 8px;">Time</th>';
+    html += '<th style="padding: 4px 8px;">Status</th>';
+    html += '<th style="padding: 4px 8px;">Model</th>';
+    html += '<th style="padding: 4px 8px;">Tokens</th>';
+    html += '<th style="padding: 4px 8px;">Size</th>';
+    html += '<th style="padding: 4px 8px;">Flags</th>';
+    html += '</tr>';
+
+    for (var i = captures.length - 1; i >= 0; i--) {
+      var c = captures[i];
+      var flags = '';
+      if (c.streaming) flags += 'S';
+      if (c.has_images) flags += ' img:' + c.image_count;
+
+      html += '<tr style="border-bottom: 1px solid #1a1a1f;">';
+      html += '<td style="padding: 4px 8px; color: #888;">' + fmtTime(c.timestamp) + '</td>';
+      html += '<td style="padding: 4px 8px; color:' + statusColor(c.status_code) + ';">' + c.status_code + '</td>';
+      html += '<td style="padding: 4px 8px; color: #7dba8a;">' + (c.model || '-') + '</td>';
+      html += '<td style="padding: 4px 8px;">' + c.input_tokens + ' / ' + c.output_tokens + '</td>';
+      html += '<td style="padding: 4px 8px; color: #888;">' + fmtBytes(c.request_bytes) + ' / ' + fmtBytes(c.response_bytes) + '</td>';
+      html += '<td style="padding: 4px 8px; color: #666;">' + flags + '</td>';
+      html += '</tr>';
+    }
+    html += '</table>';
+    list.innerHTML = html;
+  }
+
+  // ── Polling ──
+  var lastTotal = -1;
+
+  async function poll() {
+    try {
+      var statusResp = await ui.pluginFetch('/status');
+      if (statusResp.ok) {
+        var data = await statusResp.json();
+        renderStatus(data);
+
+        // Only fetch captures when count changed
+        var total = data.captures || 0;
+        if (total !== lastTotal) {
+          lastTotal = total;
+          var capturesResp = await ui.pluginFetch('/captures');
+          if (capturesResp.ok) {
+            var capData = await capturesResp.json();
+            renderCaptures(capData.captures);
+          }
+        }
+      }
+    } catch (e) {
+      statusBar.innerHTML = dot('#ef4444') + 'Connection error';
+    }
+  }
+
+  await poll();
+  var interval = setInterval(poll, 2000);
+  ui.onCleanup(function() { clearInterval(interval); });
+
+  return element;
+}
+`;
 
 // ---------------------------------------------------------------------------
 // RPC dispatcher
