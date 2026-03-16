@@ -92,8 +92,7 @@
             hash = "sha256-Rqh3iNOeCdXoJPyrKXGPliV4f1sP+4+tO7QSVnwB7PY=";
           };
           # We only need the runtime library, not the protoc plugin binary or
-          # google_types (which need omd >= 2.0, protoc, pkg-config).
-          # Remove dirs that pull in those deps before dune sees them.
+          # google_types (which needs protoc to regenerate from .proto files).
           postPatch = ''
             rm -rf src/plugin src/google_types test
           '';
@@ -104,6 +103,20 @@
             ocamlPkgs.ppx_inline_test
           ];
           doCheck = false;
+        };
+
+        # Shared gRPC plugin library — proto types + H2 server boilerplate
+        qntx-plugin = ocamlPkgs.buildDunePackage {
+          pname = "qntx-plugin";
+          version = "0.1.0";
+          src = ../../plugin/grpc/ocaml;
+
+          propagatedBuildInputs = [
+            ocaml-protoc-plugin
+            grpc-lwt
+            h2-lwt-unix-compat
+            ocamlPkgs.lwt
+          ];
         };
 
         kern = ocamlPkgs.buildDunePackage {
@@ -117,11 +130,7 @@
             ocamlPkgs.menhirLib
             ocamlPkgs.sedlex
             ocamlPkgs.yojson
-            ocaml-protoc-plugin
-            ocamlPkgs.lwt
-            ocamlPkgs.lwt_ppx
-            grpc-lwt
-            h2-lwt-unix-compat
+            qntx-plugin
           ];
 
           # sedlex requires ppx preprocessing
