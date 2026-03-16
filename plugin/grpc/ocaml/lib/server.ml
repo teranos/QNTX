@@ -38,7 +38,7 @@ let handle_shutdown ?(on_shutdown = fun () -> Lwt.return_unit) ~name () =
     let encoded = proto_to_string (Protocol.Empty.to_proto (Protocol.Empty.make ())) in
     Lwt.return (Grpc.Status.(v OK), Some encoded)
 
-let handle_initialize ?(on_init = fun _req -> ()) ~name () =
+let handle_initialize ?(on_init = fun _req -> ()) ?(handler_names = []) ~name () =
   fun raw ->
     let reader = Ocaml_protoc_plugin.Reader.create raw in
     (match Protocol.InitializeRequest.from_proto reader with
@@ -47,7 +47,7 @@ let handle_initialize ?(on_init = fun _req -> ()) ~name () =
        on_init req
      | Error _ ->
        Printf.printf "[%s] Warning: could not decode InitializeRequest\n%!" name);
-    let resp = Protocol.InitializeResponse.make () in
+    let resp = Protocol.InitializeResponse.make ~handler_names () in
     let encoded = proto_to_string (Protocol.InitializeResponse.to_proto resp) in
     Lwt.return (Grpc.Status.(v OK), Some encoded)
 
@@ -117,7 +117,7 @@ let serve ~name ~service port =
 
 (* --- Main entrypoint --- *)
 
-let run ~name ~build_service () =
+let run ~name ~build_service ?(on_start = fun () -> ()) ?(on_shutdown = fun () -> Lwt.return_unit) () =
   let port = ref 0 in
   let spec = [
     ("--port", Arg.Set_int port, "gRPC listen port (assigned by QNTX)");
@@ -139,10 +139,11 @@ let run ~name ~build_service () =
     ) in
     let service = build_service () in
     let srv = serve ~name ~service !port in
+    on_start ();
     let shutdown =
       let* () = sigterm_waiter in
       Printf.printf "[%s] SIGTERM received — shutting down\n%!" name;
-      Lwt.return_unit
+      on_shutdown ()
     in
     Lwt.pick [srv; shutdown]
   )
