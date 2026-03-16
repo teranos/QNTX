@@ -8,6 +8,7 @@ let () =
           (fun () -> Qntx_loom.Udp_listener.start ())
           (fun exn ->
             Printf.eprintf "[loom] UDP listener failed: %s\n%!" (Printexc.to_string exn);
-            Lwt.return_unit)))
+            Lwt.return_unit));
+      Qntx_loom.Http_api.start ())
     ~on_shutdown:Qntx_loom.Plugin.flush_and_persist
     ()
