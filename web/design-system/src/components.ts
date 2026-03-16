@@ -6,7 +6,12 @@
  *
  * The gallery itself is built from glyph primitives — title bars
  * as section headers, glyph containers as specimen wrappers.
+ * Mini glyphs use the real GlyphUI SDK — actual ui.glyph(), ui.input(),
+ * ui.button(), ui.statusLine() calls on a mini canvas.
  */
+
+import { createGlyphUI } from '../../ts/components/glyph/glyph-ui'
+import type { Glyph } from '../../ts/components/glyph/glyph'
 
 interface ButtonSpec {
   label: string
@@ -42,89 +47,85 @@ export function renderComponentGallery(root: HTMLElement) {
   ])
   section.appendChild(glyphBtnMatrix)
 
-  // Three mini glyphs side by side — showing colored title bars + content
-  const glyphRow = document.createElement('div')
-  glyphRow.className = 'glyph-specimen-row'
+  // Three mini glyphs on a mini canvas — real SDK calls
+  const canvas = document.createElement('div')
+  canvas.className = 'canvas-workspace'
+  canvas.style.position = 'relative'
+  canvas.style.height = '210px'
+  canvas.style.marginBottom = '10px'
+  canvas.style.border = '1px solid var(--border-on-dark)'
+  canvas.style.borderRadius = 'var(--border-radius)'
+  canvas.style.overflow = 'hidden'
 
   // ix-json: default title bar + SDK primitives
-  const ixJsonGlyph = miniGlyph('ix-json', undefined, 180, (content) => {
-    const urlInput = document.createElement('div')
-    urlInput.className = 'glyph-form-group'
-    const urlLbl = document.createElement('label')
-    urlLbl.className = 'glyph-label'
-    urlLbl.textContent = 'API URL'
-    urlInput.appendChild(urlLbl)
-    const urlInp = document.createElement('input')
-    urlInp.className = 'glyph-input'
-    urlInp.type = 'text'
-    urlInp.placeholder = 'https://api.example.com/data'
-    urlInput.appendChild(urlInp)
-    content.appendChild(urlInput)
-
-    const fetchBtn = document.createElement('button')
-    fetchBtn.className = 'glyph-btn glyph-btn--primary'
-    fetchBtn.textContent = 'Fetch'
-    content.appendChild(fetchBtn)
-
-    const statusEl = document.createElement('div')
-    statusEl.className = 'glyph-status'
-    statusEl.style.fontFamily = 'monospace'
-    statusEl.style.fontSize = 'var(--font-size-xs)'
-    statusEl.style.minHeight = '16px'
-    statusEl.style.lineHeight = '16px'
-    content.appendChild(statusEl)
-
-    // Interactive: click Fetch to cycle through status states
-    let demoState = 0
-    fetchBtn.addEventListener('click', () => {
-      if (demoState === 0) {
-        statusEl.textContent = 'Fetching...'
-        statusEl.style.color = 'var(--text-on-dark-tertiary)'
-        demoState = 1
-        setTimeout(() => fetchBtn.click(), 800)
-      } else if (demoState === 1) {
-        if (urlInp.value) {
-          statusEl.textContent = 'OK — 200, 1.4kb'
-          statusEl.style.color = 'var(--color-success, #22c55e)'
-          demoState = 2
-          setTimeout(() => { statusEl.textContent = ''; demoState = 0 }, 4000)
-        } else {
-          statusEl.textContent = 'No URL provided'
-          statusEl.style.color = 'var(--color-error, #ef4444)'
-          demoState = 0
-        }
-      }
-    })
+  const ixJsonGlyph: Glyph = { id: 'demo-ix-json', title: 'ix-json', symbol: 'ix-json', x: 10, y: 10, renderContent: () => document.createElement('div') }
+  const ixJsonUI = createGlyphUI(ixJsonGlyph, 'ix-json')
+  const ixJson = ixJsonUI.glyph({
+    defaults: { x: 10, y: 10, width: 280, height: 190 },
+    titleBar: { label: 'ix-json' },
   })
-  glyphRow.appendChild(ixJsonGlyph)
 
-  // py-glyph: Python blue title bar + code placeholder
-  const pyGlyph = miniGlyph('py-glyph', '#2a5578', 180, (content) => {
-    const code = document.createElement('pre')
-    code.style.fontFamily = 'monospace'
-    code.style.fontSize = 'var(--font-size-sm)'
-    code.style.color = 'var(--text-on-dark)'
-    code.style.whiteSpace = 'pre-wrap'
-    code.style.wordBreak = 'break-word'
-    code.textContent = 'import time\nimport secrets\n\nfoo = [\'teach\', \'meld\']\nprint(secrets.choice(foo))'
-    content.appendChild(code)
-  }, [{ label: '\u25B6', cls: 'titlebar-btn' }])
-  glyphRow.appendChild(pyGlyph)
+  const urlInput = ixJsonUI.input({ label: 'API URL', placeholder: 'https://api.example.com/data' })
+  ixJson.content.appendChild(urlInput)
 
-  // ts-glyph: TypeScript amber title bar + code placeholder
-  const tsGlyph = miniGlyph('ts-glyph', '#5c3d1a', 180, (content) => {
-    const code = document.createElement('pre')
-    code.style.fontFamily = 'monospace'
-    code.style.fontSize = 'var(--font-size-sm)'
-    code.style.color = 'var(--text-on-dark)'
-    code.style.whiteSpace = 'pre-wrap'
-    code.style.wordBreak = 'break-word'
-    code.textContent = 'const subjects = ["alice", "bob"]\nconst id = generateASUID()\nconsole.log(id)'
-    content.appendChild(code)
-  }, [{ label: '\u25B6', cls: 'titlebar-btn' }])
-  glyphRow.appendChild(tsGlyph)
+  const status = ixJsonUI.statusLine()
+  let demoState = 0
+  const fetchBtn = ixJsonUI.button({ label: 'Fetch', primary: true, onClick: () => {
+    if (demoState === 0) {
+      status.show('Fetching...')
+      demoState = 1
+      setTimeout(() => fetchBtn.click(), 800)
+    } else if (demoState === 1) {
+      const inp = urlInput.querySelector('input')
+      if (inp?.value) {
+        status.show('OK — 200, 1.4kb')
+        demoState = 2
+        setTimeout(() => { status.clear(); demoState = 0 }, 4000)
+      } else {
+        status.show('No URL provided', true)
+        demoState = 0
+      }
+    }
+  }})
+  ixJson.content.appendChild(fetchBtn)
+  ixJson.content.appendChild(status.element)
+  canvas.appendChild(ixJson.element)
 
-  section.appendChild(glyphRow)
+  // py-glyph: Python blue title bar
+  const pyGlyphData: Glyph = { id: 'demo-py', title: 'py-glyph', symbol: 'py', x: 300, y: 10, renderContent: () => document.createElement('div') }
+  const pyUI = createGlyphUI(pyGlyphData, 'py')
+  const py = pyUI.glyph({
+    defaults: { x: 300, y: 10, width: 280, height: 190 },
+    titleBar: { label: 'py-glyph', color: '#2a5578' },
+  })
+  const pyCode = document.createElement('pre')
+  pyCode.style.fontFamily = 'monospace'
+  pyCode.style.fontSize = 'var(--font-size-sm)'
+  pyCode.style.color = 'var(--text-on-dark)'
+  pyCode.style.whiteSpace = 'pre-wrap'
+  pyCode.style.wordBreak = 'break-word'
+  pyCode.textContent = 'import time\nimport secrets\n\nfoo = [\'teach\', \'meld\']\nprint(secrets.choice(foo))'
+  py.content.appendChild(pyCode)
+  canvas.appendChild(py.element)
+
+  // ts-glyph: TypeScript amber title bar
+  const tsGlyphData: Glyph = { id: 'demo-ts', title: 'ts-glyph', symbol: 'ts', x: 590, y: 10, renderContent: () => document.createElement('div') }
+  const tsUI = createGlyphUI(tsGlyphData, 'ts')
+  const ts = tsUI.glyph({
+    defaults: { x: 590, y: 10, width: 280, height: 190 },
+    titleBar: { label: 'ts-glyph', color: '#5c3d1a' },
+  })
+  const tsCode = document.createElement('pre')
+  tsCode.style.fontFamily = 'monospace'
+  tsCode.style.fontSize = 'var(--font-size-sm)'
+  tsCode.style.color = 'var(--text-on-dark)'
+  tsCode.style.whiteSpace = 'pre-wrap'
+  tsCode.style.wordBreak = 'break-word'
+  tsCode.textContent = 'const subjects = ["alice", "bob"]\nconst id = generateASUID()\nconsole.log(id)'
+  ts.content.appendChild(tsCode)
+  canvas.appendChild(ts.element)
+
+  section.appendChild(canvas)
 
   // ── Internal Systems ──
   section.appendChild(sectionGlyph('Internal Systems', 'Used by QNTX core — not exposed to plugins'))
@@ -345,58 +346,6 @@ function glyphSection(title: string, description: string, buildContent: (body: H
   return container
 }
 
-/** Mini glyph specimen — title bar + content area */
-function miniGlyph(
-  title: string,
-  titleBarColor: string | undefined,
-  height: number,
-  buildContent: (content: HTMLElement) => void,
-  actions?: { label: string, cls: string }[],
-): HTMLElement {
-  const glyph = document.createElement('div')
-  glyph.style.display = 'flex'
-  glyph.style.flexDirection = 'column'
-  glyph.style.border = '1px solid var(--border-on-dark)'
-  glyph.style.borderRadius = 'var(--border-radius)'
-  glyph.style.height = `${height}px`
-  glyph.style.overflow = 'hidden'
-  glyph.style.background = 'var(--bg-secondary)'
-
-  const bar = document.createElement('div')
-  bar.className = 'glyph-title-bar'
-  if (titleBarColor) bar.style.backgroundColor = titleBarColor
-
-  const label = document.createElement('span')
-  label.textContent = title
-  label.style.flex = '1'
-  bar.appendChild(label)
-
-  if (actions) {
-    for (const a of actions) {
-      const btn = document.createElement('button')
-      if (a.cls) btn.className = a.cls
-      btn.textContent = a.label
-      bar.appendChild(btn)
-    }
-  }
-
-  const closeBtn = document.createElement('button')
-  closeBtn.className = 'titlebar-btn'
-  closeBtn.textContent = '\u2715'
-  bar.appendChild(closeBtn)
-
-  glyph.appendChild(bar)
-
-  const content = document.createElement('div')
-  content.className = 'glyph-content-area'
-  content.style.display = 'flex'
-  content.style.flexDirection = 'column'
-  content.style.gap = '8px'
-  buildContent(content)
-  glyph.appendChild(content)
-
-  return glyph
-}
 
 function buttonMatrix(name: string, description: string, columnLabels: string[], rows: MatrixRow[]): HTMLElement {
   const container = glyphSection(name, description, (body) => {
