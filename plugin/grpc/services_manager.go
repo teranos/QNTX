@@ -21,6 +21,7 @@ type ServiceEndpoints struct {
 	QueueAddress       string
 	ScheduleAddress    string
 	FileServiceAddress string
+	LLMAddress         string
 	AuthToken          string
 }
 
@@ -30,6 +31,8 @@ type ServicesManager struct {
 	queueServer       *grpc.Server
 	scheduleServer    *grpc.Server
 	fileServiceServer *grpc.Server
+	llmServer         *grpc.Server
+	llmRouter         *LLMServer // Exposed for provider registration after plugin init
 	endpoints         ServiceEndpoints
 	logger            *zap.SugaredLogger
 }
@@ -92,11 +95,19 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 		return nil, errors.Wrap(err, "failed to start file service")
 	}
 
+	// Start LLM service (starts empty, providers register after plugin init)
+	llmAddr, err := m.startLLMService(ctx)
+	if err != nil {
+		m.logger.Warnw("Failed to start LLM service, plugins will not have LLM access", "error", err)
+		llmAddr = ""
+	}
+
 	m.endpoints = ServiceEndpoints{
 		ATSStoreAddress:    atsStoreAddr,
 		QueueAddress:       queueAddr,
 		ScheduleAddress:    scheduleAddr,
 		FileServiceAddress: fileServiceAddr,
+		LLMAddress:         llmAddr,
 		AuthToken:          authToken,
 	}
 
@@ -234,6 +245,42 @@ func (m *ServicesManager) startFileService(ctx context.Context, filesDir string,
 	return addr, nil
 }
 
+// startLLMService starts the LLM routing gRPC service.
+// The server starts empty — providers register after their own initialization completes.
+func (m *ServicesManager) startLLMService(ctx context.Context) (string, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to listen")
+	}
+
+	m.llmRouter = NewLLMServer(m.logger)
+	m.llmServer = grpc.NewServer()
+	protocol.RegisterLLMServiceServer(m.llmServer, m.llmRouter)
+
+	go func() {
+		<-ctx.Done()
+		m.logger.Debug("Context cancelled, stopping LLM service")
+		m.llmServer.GracefulStop()
+	}()
+
+	go func() {
+		if err := m.llmServer.Serve(listener); err != nil {
+			m.logger.Errorw("LLM service error", "error", err)
+		}
+	}()
+
+	addr := listener.Addr().String()
+	m.logger.Infow("LLM service started", "address", addr)
+
+	return addr, nil
+}
+
+// GetLLMRouter returns the LLM router for provider registration.
+// Returns nil if the LLM service is not running.
+func (m *ServicesManager) GetLLMRouter() *LLMServer {
+	return m.llmRouter
+}
+
 // Shutdown gracefully stops all service servers
 func (m *ServicesManager) Shutdown() {
 	m.logger.Info("Shutting down plugin services")
@@ -252,6 +299,10 @@ func (m *ServicesManager) Shutdown() {
 
 	if m.fileServiceServer != nil {
 		m.fileServiceServer.GracefulStop()
+	}
+
+	if m.llmServer != nil {
+		m.llmServer.GracefulStop()
 	}
 
 	m.logger.Info("Plugin services stopped")
