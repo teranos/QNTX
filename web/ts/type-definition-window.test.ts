@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from 'vitest';
-import { typeDefinitionWindow, openTypeDefinition } from './type-definition-window';
+import { getFieldInfo, openTypeDefinition } from './type-definition-window';
 
 describe('TypeDefinitionWindow', () => {
     beforeEach(() => {
@@ -15,8 +15,8 @@ describe('TypeDefinitionWindow', () => {
             array_fields: []
         });
 
-        expect(typeDefinitionWindow.getFieldInfo('name')?.isRichString).toBe(true);
-        expect(typeDefinitionWindow.getFieldInfo('cuisine_type')?.isRichString).toBe(true);
+        expect(getFieldInfo('name')?.isRichString).toBe(true);
+        expect(getFieldInfo('cuisine_type')?.isRichString).toBe(true);
     });
 
     test('marks fields from array_fields as arrays', () => {
@@ -28,7 +28,7 @@ describe('TypeDefinitionWindow', () => {
             array_fields: ['allergens']
         });
 
-        expect(typeDefinitionWindow.getFieldInfo('allergens')?.isArray).toBe(true);
+        expect(getFieldInfo('allergens')?.isArray).toBe(true);
     });
 
     test('preserves both rich and array field types', () => {
@@ -40,8 +40,8 @@ describe('TypeDefinitionWindow', () => {
             array_fields: ['tags']
         });
 
-        expect(typeDefinitionWindow.getFieldInfo('review_text')?.isRichString).toBe(true);
-        expect(typeDefinitionWindow.getFieldInfo('reviewer_name')?.isRichString).toBe(true);
-        expect(typeDefinitionWindow.getFieldInfo('tags')?.isArray).toBe(true);
+        expect(getFieldInfo('review_text')?.isRichString).toBe(true);
+        expect(getFieldInfo('reviewer_name')?.isRichString).toBe(true);
+        expect(getFieldInfo('tags')?.isArray).toBe(true);
     });
 });

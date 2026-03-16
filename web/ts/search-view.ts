@@ -4,7 +4,7 @@
  * Supports local results (commands, subcanvas navigation) alongside server search results
  */
 
-import { typeDefinitionWindow } from './type-definition-window.ts';
+import { createNewType } from './type-definition-window.ts';
 import { escapeHtml } from './html-utils.ts';
 import type { RichSearchMatch, RichSearchResultsMessage } from './generated/proto/plugin/grpc/protocol/server.ts';
 
@@ -167,7 +167,7 @@ export class SearchView {
             newTypeBtn.title = 'Define new type';
             newTypeBtn.onclick = (e) => {
                 e.stopPropagation();
-                typeDefinitionWindow.createNewType();
+                createNewType();
             };
             header.appendChild(newTypeBtn);
 
