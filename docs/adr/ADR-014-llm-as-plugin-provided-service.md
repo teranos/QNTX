@@ -13,5 +13,8 @@ Refactor LLM access into a first-class service on `ServiceRegistry`. Plugins cal
 
 Multiple providers can run simultaneously. The caller specifies which backend to use.
 
+## Protocol
+[`plugin/grpc/protocol/llm.proto`](../../plugin/grpc/protocol/llm.proto)
+
 ## Consequences
 This is the first service in `ServiceRegistry` provided by a plugin rather than by core. The routing and registration pattern must be designed with that in mind.

@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// LLMService provides provider-agnostic LLM access for plugins.
+// Provider plugins (OpenRouter, Ollama) register as backends.
+// Core routes requests to the appropriate provider.
+service LLMService {
+  rpc Chat(LLMChatRequest) returns (LLMChatResponse);
+}
+
+message LLMChatRequest {
+  string system_prompt = 1;
+  string user_prompt = 2;
+  string model = 3;
+  double temperature = 4;
+  int32 max_tokens = 5;
+  string provider = 6;
+  repeated Attachment attachments = 7;
+}
+
+message Attachment {
+  string mime_type = 1;
+  string data = 2;
+  string filename = 3;
+}
+
+message LLMChatResponse {
+  string content = 1;
+  string model = 2;
+  int32 prompt_tokens = 3;
+  int32 completion_tokens = 4;
+  int32 total_tokens = 5;
+}
