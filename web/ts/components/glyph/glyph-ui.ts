@@ -129,6 +129,12 @@ export interface ContainerOpts {
     titleBar?: { label: string; actions?: HTMLElement[] };
     resizable?: boolean | { minWidth?: number; minHeight?: number };
     className?: string;
+    /** Custom drag handle element. Falls back to title bar, then container. */
+    dragHandle?: HTMLElement;
+    /** Extra options forwarded to makeDraggable (e.g. ignoreButtons). */
+    draggableOptions?: Partial<import('./glyph-interaction').MakeDraggableOptions>;
+    /** Use minHeight instead of fixed height (for auto-sizing glyphs). */
+    useMinHeight?: boolean;
 }
 
 export interface FetchOpts {
@@ -155,7 +161,10 @@ export function createGlyphUI(glyph: Glyph, pluginName: string): GlyphUI {
                 className: opts.className ?? `canvas-plugin-glyph plugin-${pluginName}`,
                 defaults: opts.defaults,
                 titleBar: opts.titleBar,
+                dragHandle: opts.dragHandle,
+                draggableOptions: opts.draggableOptions,
                 resizable: opts.resizable ?? false,
+                useMinHeight: opts.useMinHeight,
                 logLabel: `Plugin:${pluginName}`,
             };
 

@@ -46,97 +46,72 @@ export function renderComponentGallery(root: HTMLElement) {
   ])
   section.appendChild(glyphBtnMatrix)
 
-  // ui.container() — returns { element, titleBar, content }
-  const containerGroup = document.createElement('div')
-  containerGroup.className = 'button-group'
+  // SDK glyph specimen — container + input + button + statusLine together
+  const sdkGroup = document.createElement('div')
+  sdkGroup.className = 'button-group'
 
-  const containerHeader = document.createElement('div')
-  containerHeader.className = 'button-group-header'
-  const containerName = document.createElement('span')
-  containerName.className = 'button-group-name'
-  containerName.textContent = 'ui.container()'
-  const containerDesc = document.createElement('span')
-  containerDesc.className = 'button-group-desc'
-  containerDesc.textContent = 'Returns { element, titleBar, content } — content is a scrollable .glyph-content-area'
-  containerHeader.appendChild(containerName)
-  containerHeader.appendChild(containerDesc)
-  containerGroup.appendChild(containerHeader)
+  const glyphHeader = document.createElement('div')
+  glyphHeader.className = 'button-group-header'
+  const glyphName = document.createElement('span')
+  glyphName.className = 'button-group-name'
+  glyphName.textContent = 'Plugin glyph'
+  const glyphDescEl = document.createElement('span')
+  glyphDescEl.className = 'button-group-desc'
+  glyphDescEl.textContent = 'ui.container() + ui.input() + ui.button() + ui.statusLine() — as used by ix-json'
+  glyphHeader.appendChild(glyphName)
+  glyphHeader.appendChild(glyphDescEl)
+  sdkGroup.appendChild(glyphHeader)
 
-  const containerDemo = document.createElement('div')
-  containerDemo.style.display = 'flex'
-  containerDemo.style.flexDirection = 'column'
-  containerDemo.style.border = '1px solid var(--border-on-dark)'
-  containerDemo.style.borderRadius = '4px'
-  containerDemo.style.height = '160px'
-  containerDemo.style.overflow = 'hidden'
+  // Mini glyph: title bar + content area with input, button, status
+  const glyphDemo = document.createElement('div')
+  glyphDemo.style.display = 'flex'
+  glyphDemo.style.flexDirection = 'column'
+  glyphDemo.style.border = '1px solid var(--border-on-dark)'
+  glyphDemo.style.borderRadius = 'var(--border-radius)'
+  glyphDemo.style.height = '200px'
+  glyphDemo.style.overflow = 'hidden'
+  glyphDemo.style.background = 'var(--bg-secondary)'
 
   const demoTitleBar = document.createElement('div')
   demoTitleBar.className = 'glyph-title-bar'
   const demoLabel = document.createElement('span')
-  demoLabel.textContent = 'My Plugin'
+  demoLabel.textContent = 'ix-json'
   demoTitleBar.appendChild(demoLabel)
-  containerDemo.appendChild(demoTitleBar)
+  const closeBtn = document.createElement('button')
+  closeBtn.className = 'titlebar-btn'
+  closeBtn.textContent = '\u2715'
+  demoTitleBar.appendChild(closeBtn)
+  glyphDemo.appendChild(demoTitleBar)
 
   const demoContent = document.createElement('div')
   demoContent.className = 'glyph-content-area'
-  demoContent.style.fontFamily = 'var(--font-mono)'
-  demoContent.style.fontSize = 'var(--font-size-sm)'
-  demoContent.style.color = 'var(--text-on-dark-secondary)'
-  demoContent.textContent = 'content.appendChild(myStuff) — this div scrolls, fills remaining space (flex:1; overflow:auto; padding:8px)'
-  containerDemo.appendChild(demoContent)
-
-  containerGroup.appendChild(containerDemo)
-  section.appendChild(containerGroup)
-
-  // ui.input() + ui.statusLine() — how they work together
-  const inputGroup = document.createElement('div')
-  inputGroup.className = 'button-group'
-
-  const inputHeader = document.createElement('div')
-  inputHeader.className = 'button-group-header'
-  const inputName = document.createElement('span')
-  inputName.className = 'button-group-name'
-  inputName.textContent = 'ui.input() + ui.statusLine()'
-  const inputDesc = document.createElement('span')
-  inputDesc.className = 'button-group-desc'
-  inputDesc.textContent = 'Input with contextual feedback — as used by ix-json'
-  inputHeader.appendChild(inputName)
-  inputHeader.appendChild(inputDesc)
-  inputGroup.appendChild(inputHeader)
-
-  const inputRow = document.createElement('div')
-  inputRow.className = 'sdk-specimen-row'
-  inputRow.style.gridTemplateColumns = '1fr'
-
-  // Simulate the ix-json pattern: input + button + status line
-  const ixJsonDemo = document.createElement('div')
-  ixJsonDemo.style.display = 'flex'
-  ixJsonDemo.style.flexDirection = 'column'
-  ixJsonDemo.style.gap = '8px'
+  demoContent.style.display = 'flex'
+  demoContent.style.flexDirection = 'column'
+  demoContent.style.gap = '8px'
 
   const urlInput = document.createElement('div')
   urlInput.className = 'glyph-form-group'
-  const urlLabel = document.createElement('label')
-  urlLabel.className = 'glyph-label'
-  urlLabel.textContent = 'API URL'
-  urlInput.appendChild(urlLabel)
+  const urlLbl = document.createElement('label')
+  urlLbl.className = 'glyph-label'
+  urlLbl.textContent = 'API URL'
+  urlInput.appendChild(urlLbl)
   const urlInp = document.createElement('input')
   urlInp.className = 'glyph-input'
   urlInp.type = 'text'
   urlInp.placeholder = 'https://api.example.com/data'
   urlInput.appendChild(urlInp)
-  ixJsonDemo.appendChild(urlInput)
+  demoContent.appendChild(urlInput)
 
   const fetchBtn = document.createElement('button')
   fetchBtn.className = 'glyph-btn glyph-btn--primary'
   fetchBtn.textContent = 'Fetch'
-  ixJsonDemo.appendChild(fetchBtn)
+  demoContent.appendChild(fetchBtn)
 
   const statusEl = document.createElement('div')
   statusEl.className = 'glyph-status'
   statusEl.style.fontSize = 'var(--font-size-sm)'
   statusEl.style.minHeight = '16px'
-  ixJsonDemo.appendChild(statusEl)
+  demoContent.appendChild(statusEl)
 
   // Interactive: click Fetch to cycle through status states
   let demoState = 0
@@ -160,34 +135,9 @@ export function renderComponentGallery(root: HTMLElement) {
     }
   })
 
-  inputRow.appendChild(ixJsonDemo)
-
-  // Standalone input without status (simpler use case)
-  const plainInput = document.createElement('div')
-  plainInput.style.display = 'flex'
-  plainInput.style.flexDirection = 'column'
-  plainInput.style.gap = '8px'
-
-  const plainInp1 = document.createElement('div')
-  plainInp1.className = 'glyph-form-group'
-  const plainInpEl = document.createElement('input')
-  plainInpEl.className = 'glyph-input'
-  plainInpEl.type = 'text'
-  plainInpEl.placeholder = 'Enter URL...'
-  plainInp1.appendChild(plainInpEl)
-  plainInput.appendChild(plainInp1)
-
-  const plainLabel = document.createElement('span')
-  plainLabel.style.fontSize = 'var(--font-size-xs)'
-  plainLabel.style.color = 'var(--text-on-dark-tertiary)'
-  plainLabel.textContent = 'ui.input() alone — no status feedback'
-  plainInput.appendChild(plainLabel)
-
-  inputRow.style.gridTemplateColumns = '1fr 1fr'
-  inputRow.appendChild(plainInput)
-
-  inputGroup.appendChild(inputRow)
-  section.appendChild(inputGroup)
+  glyphDemo.appendChild(demoContent)
+  sdkGroup.appendChild(glyphDemo)
+  section.appendChild(sdkGroup)
 
   // ── Internal Systems ──
   const internalHeader = document.createElement('h3')
