@@ -7,10 +7,7 @@
  * attestation payloads via ExecuteJob (server role) and emits weaves back
  * via ATSStoreService (client role). *)
 
-open Qntx_loom_proto.Atsstore
-
-let proto_to_string writer =
-  Ocaml_protoc_plugin.Writer.contents writer
+open Qntx_plugin_proto.Atsstore
 
 (* --- Connection state --- *)
 
@@ -71,7 +68,7 @@ let create_weave ~branch ~context ~text ~word_count ~turn_count ~paths =
       () in
 
     (* Serialize the request to protobuf bytes *)
-    let request_bytes = proto_to_string
+    let request_bytes = Qntx_plugin.Server.proto_to_string
       (Protocol.GenerateAttestationRequest.to_proto request) in
 
     (* Parse the endpoint to extract host and port *)
