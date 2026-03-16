@@ -1,6 +1,8 @@
 /**
  * Job Detail Panel - Shows execution history for a scheduled job
  *
+ * TODO: Migrate to glyph panel manifestation, then delete. See base-panel.ts.
+ *
  * Displays:
  * - Job details (ATS code, interval, state)
  * - Execution history list (paginated)

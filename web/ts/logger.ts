@@ -23,7 +23,7 @@
  *   - Core infrastructure: main.ts, qntx-wasm.ts, dev-mode.ts
  *   - WebSocket handlers: storage-warning.ts, storage-eviction.ts, system-capabilities.ts
  *   - Graph visualization: renderer.ts, focus.ts, focus/dimensions.ts, focus/physics.ts, tile/controls.ts
- *   - Panels: pulse-panel.ts, prose/panel.ts, config-panel.ts, command-explorer-panel.ts
+ *   - Panels: pulse-panel.ts, prose/panel.ts, config-panel.ts
  *   - Editors: prose/editor.ts, code/panel.ts, code/suggestions.ts, codemirror-editor.ts
  *   - Components: type-attestations.ts, base-panel-error.ts, glyph/py-glyph.ts
  *   - Prose nodes: ats-code-block.ts, go-code-block.ts, frontmatter-block.ts

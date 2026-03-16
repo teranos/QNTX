@@ -1,9 +1,9 @@
 /**
  * Database Statistics Window
  *
- * Displays database statistics similar to `qntx db stats` output
+ * TODO: Migrate to glyph manifestation (database-glyph exists in test-glyphs.ts), then delete. See components/window.ts.
  *
- * TODO: This will be removed in favor of the database-glyph in test-glyphs.ts
+ * Displays database statistics similar to `qntx db stats` output
  */
 
 import { Window } from './components/window.ts';
