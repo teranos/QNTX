@@ -1,5 +1,5 @@
 /**
- * Dreamweave frontend builder
+ * Loom frontend builder
  *
  * Compiles Svelte 5 components via Bun.build() plugin,
  * outputs bundled JS + index.html to dist/
@@ -62,4 +62,4 @@ await copyFile(tokensSource, join(outDir, 'tokens.css'))
 const html = await Bun.file(join(import.meta.dir, 'index.html')).text()
 await Bun.write(join(outDir, 'index.html'), html.replace('/src/main.ts', '/main.js'))
 
-console.log('dreamweave built -> dist/')
+console.log('loom built -> dist/')

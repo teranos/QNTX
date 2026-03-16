@@ -603,7 +603,7 @@
 
 <div class="dw">
   <header>
-    <span class="dw-title">dreamweave</span>
+    <span class="dw-title">loom</span>
     {#if !loading}
       <span class="dw-stat">{sessions.length} sessions</span>
       <span class="dw-stat">{totalWeaves} weaves</span>
