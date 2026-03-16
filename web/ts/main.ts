@@ -21,7 +21,6 @@ import {
     handlePulseExecutionCompleted,
     handlePulseExecutionLogStream
 } from './pulse/realtime-handlers.ts';
-import { handleStorageWarning } from './websocket-handlers/storage-warning.ts';
 import { handleStorageEviction } from './websocket-handlers/storage-eviction.ts';
 import './symbol-palette.ts';
 import { toggleConfig } from './config-panel.ts';
@@ -144,7 +143,6 @@ async function init(): Promise<void> {
         'pulse_execution_failed': handlePulseExecutionFailed,
         'pulse_execution_completed': handlePulseExecutionCompleted,
         'pulse_execution_log_stream': handlePulseExecutionLogStream,
-        'storage_warning': handleStorageWarning,
         'storage_eviction': handleStorageEviction,
     };
 
