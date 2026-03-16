@@ -18,7 +18,8 @@
         plugin/grpc/protocol/queue.proto \
         plugin/grpc/protocol/schedule.proto \
         plugin/grpc/protocol/server.proto \
-        plugin/grpc/protocol/fileservice.proto
+        plugin/grpc/protocol/fileservice.proto \
+        plugin/grpc/protocol/llm.proto
 
       echo "✓ Plugin proto files generated in plugin/grpc/protocol/"
 
