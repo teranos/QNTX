@@ -91,10 +91,10 @@
             url = "https://github.com/andersfugmann/ocaml-protoc-plugin/releases/download/6.2.0/ocaml-protoc-plugin-6.2.0.tbz";
             hash = "sha256-Rqh3iNOeCdXoJPyrKXGPliV4f1sP+4+tO7QSVnwB7PY=";
           };
-          # We only need the runtime + google_types libraries, not the protoc
-          # plugin binary (which needs omd >= 2.0, protoc, pkg-config).
+          # We only need the runtime library, not the protoc plugin binary or
+          # google_types (which needs protoc to regenerate from .proto files).
           postPatch = ''
-            rm -rf src/plugin test
+            rm -rf src/plugin src/google_types test
           '';
           propagatedBuildInputs = [
             ocamlPkgs.base64
