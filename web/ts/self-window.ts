@@ -1,6 +1,8 @@
 /**
  * Self Diagnostic Window (⍟ i)
  *
+ * TODO: Migrate to glyph manifestation (self-glyph exists in test-glyphs.ts), then delete. See components/window.ts.
+ *
  * Runtime introspection and diagnostic information.
  * Shows system state that is NOT configuration (am handles config).
  *
