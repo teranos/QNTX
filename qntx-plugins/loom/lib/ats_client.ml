@@ -7,10 +7,7 @@
  * attestation payloads via ExecuteJob (server role) and emits weaves back
  * via ATSStoreService (client role). *)
 
-open Qntx_loom_proto.Atsstore
-
-let proto_to_string writer =
-  Ocaml_protoc_plugin.Writer.contents writer
+open Qntx_plugin_proto.Atsstore
 
 (* --- Connection state --- *)
 
@@ -34,7 +31,7 @@ let create_weave ~branch ~context ~text ~word_count ~turn_count ~paths =
      * Struct is a map of string → Value, where Value can be
      * string, number, bool, list, or nested struct.
      * ocaml-protoc-plugin represents oneof fields as polymorphic variants. *)
-    let open Google_types.Struct.Google.Protobuf in
+    let open Qntx_plugin_proto.Struct.Google.Protobuf in
     let string_val s =
       Value.make ~kind:(`String_value s) ()
     in
@@ -71,7 +68,7 @@ let create_weave ~branch ~context ~text ~word_count ~turn_count ~paths =
       () in
 
     (* Serialize the request to protobuf bytes *)
-    let request_bytes = proto_to_string
+    let request_bytes = Qntx_plugin.Server.proto_to_string
       (Protocol.GenerateAttestationRequest.to_proto request) in
 
     (* Parse the endpoint to extract host and port *)

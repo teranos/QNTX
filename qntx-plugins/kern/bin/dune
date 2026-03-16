@@ -2,4 +2,4 @@
  (name main)
  (public_name qntx-kern)
  (package kern)
- (libraries kern lwt lwt.unix grpc-lwt))
+ (libraries kern qntx-plugin))
