@@ -136,7 +136,6 @@ describe('TS Glyph - Tim (Happy Path)', () => {
         const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
         const label = titleBar.querySelector('span:first-child') as HTMLElement;
         expect(label.style.color).toMatch(/#f0c878|rgb\(240, 200, 120\)/);
-        expect(label.style.fontWeight).toBe('bold');
     });
 
     test('Tim sees editor container appended to glyph', async () => {

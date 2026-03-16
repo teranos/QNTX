@@ -10,6 +10,10 @@
  * - AX glyphs (separate) flow attestations to Prompt glyphs via watchers
  * - Watchers keep executing prompts as matching attestations arrive
  * - For now: simple one-shot execution for testing
+ *
+ * TODO: Migrate to GlyphUI SDK (like py-glyph and ts-glyph).
+ *   Spawns attestation glyphs (not ExecutionResult), so needs a
+ *   spawnGlyph event or generalized spawn mechanism beyond spawnResult.
  */
 
 import type { Glyph } from './glyph';
