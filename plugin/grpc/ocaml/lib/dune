@@ -1,0 +1,4 @@
+(library
+ (name qntx_plugin)
+ (public_name qntx-plugin)
+ (libraries qntx-plugin.proto grpc-lwt h2-lwt-unix lwt lwt.unix))
