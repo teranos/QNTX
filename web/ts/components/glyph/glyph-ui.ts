@@ -11,14 +11,14 @@
  *   import type { GlyphUI, RenderFn } from '@qntx/glyphs';
  *
  *   export const render: RenderFn = (glyph, ui) => {
- *       const { element } = ui.container({
+ *       const { element, content } = ui.container({
  *           defaults: { x: 200, y: 200, width: 600, height: 700 },
  *           titleBar: { label: 'My Plugin' },
  *           resizable: true,
  *       });
  *
  *       const input = ui.input({ placeholder: 'Enter URL...' });
- *       element.appendChild(input);
+ *       content.appendChild(input);
  *
  *       return element;
  *   };
@@ -55,9 +55,10 @@ export interface GlyphDef {
 export interface GlyphUI {
     /**
      * Create a canvas-placed container with title bar, drag, and resize.
-     * This is the root element — the plugin appends its content into it.
+     * Returns a content area — the scrollable body below the title bar.
+     * Append plugin content into `content`, not `element`.
      */
-    container(opts: ContainerOpts): { element: HTMLElement; titleBar: HTMLElement | null };
+    container(opts: ContainerOpts): { element: HTMLElement; titleBar: HTMLElement | null; content: HTMLElement };
 
     /** Prevent drag from starting on interactive children. */
     preventDrag(...elements: HTMLElement[]): void;
@@ -167,7 +168,12 @@ export function createGlyphUI(glyph: Glyph, pluginName: string): GlyphUI {
             }
             pendingCleanups.length = 0;
 
-            return result;
+            // Create the content area — scrollable body below the title bar
+            const content = document.createElement('div');
+            content.className = 'glyph-content-area';
+            rootElement.appendChild(content);
+
+            return { ...result, content };
         },
 
         preventDrag(...elements: HTMLElement[]) {
