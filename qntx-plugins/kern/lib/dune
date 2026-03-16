@@ -1,7 +1,7 @@
 (library
  (name kern)
  (public_name kern)
- (libraries kern_proto sedlex yojson grpc-lwt h2-lwt-unix lwt lwt.unix)
+ (libraries qntx-plugin sedlex yojson)
  (preprocess (pps sedlex.ppx)))
 
 (menhir

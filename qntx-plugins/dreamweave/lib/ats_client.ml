@@ -5,10 +5,7 @@
  *
  * Mirrors loom's ats_client.ml pattern but reads instead of writes. *)
 
-open Qntx_dreamweave_proto.Atsstore
-
-let proto_to_string writer =
-  Ocaml_protoc_plugin.Writer.contents writer
+open Qntx_plugin_proto.Atsstore
 
 (* --- Connection state --- *)
 
@@ -123,7 +120,7 @@ let get_weaves ?subjects ?contexts ?limit () =
       ~auth_token:!auth_token
       ~filter
       () in
-    let request_bytes = proto_to_string
+    let request_bytes = Qntx_plugin.Server.proto_to_string
       (Protocol.GetAttestationsRequest.to_proto request) in
 
     let* result = grpc_call
