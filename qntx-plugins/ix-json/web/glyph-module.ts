@@ -18,7 +18,7 @@ export const glyphDef: GlyphDef = {
 };
 
 export const render: RenderFn = async (glyph: Glyph, ui: GlyphUI): Promise<HTMLElement> => {
-    const { element, titleBar, content } = ui.container({
+    const { element, titleBar, content } = ui.glyph({
         defaults: {
             x: glyph.x ?? 200,
             y: glyph.y ?? 200,
