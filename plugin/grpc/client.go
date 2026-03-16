@@ -36,6 +36,9 @@ type ExternalDomainProxy struct {
 	// Schedules this plugin wants QNTX to create (populated during Initialize)
 	schedules []*protocol.ScheduleInfo
 
+	// llmProvider indicates this plugin implements LLMProvider (populated during Initialize)
+	llmProvider bool
+
 	// WebSocket configuration (set via SetWebSocketConfig)
 	keepaliveConfig *KeepaliveConfig
 	wsConfig        *WebSocketConfig
@@ -134,6 +137,11 @@ func (c *ExternalDomainProxy) Client() protocol.DomainPluginServiceClient {
 	return c.client
 }
 
+// IsLLMProvider returns true if this plugin declared LLM provider capability during Initialize.
+func (c *ExternalDomainProxy) IsLLMProvider() bool {
+	return c.llmProvider
+}
+
 // Initialize initializes the remote plugin. Idempotent — safe to call from multiple code paths.
 func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
 	c.initOnce.Do(func() {
@@ -218,6 +226,11 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		fileServiceEndpoint = ep
 		c.logger.Debugw("Extracted FileService endpoint from config", "endpoint", ep)
 	}
+	llmEndpoint := ""
+	if ep := pluginConfig.GetString("_llm_endpoint"); ep != "" {
+		llmEndpoint = ep
+		c.logger.Debugw("Extracted LLM endpoint from config", "endpoint", ep)
+	}
 	if token := pluginConfig.GetString("_auth_token"); token != "" {
 		authToken = token
 	}
@@ -227,6 +240,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		QueueEndpoint:       queueEndpoint,
 		ScheduleEndpoint:    scheduleEndpoint,
 		FileServiceEndpoint: fileServiceEndpoint,
+		LlmEndpoint:         llmEndpoint,
 		AuthToken:           authToken,
 		Config:              config,
 	}
@@ -237,6 +251,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		"queue_endpoint", queueEndpoint,
 		"schedule_endpoint", scheduleEndpoint,
 		"file_service_endpoint", fileServiceEndpoint,
+		"llm_endpoint", llmEndpoint,
 	)
 
 	resp, err := c.client.Initialize(ctx, req)
@@ -251,10 +266,14 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	// Store schedules announced by plugin
 	c.schedules = resp.GetSchedules()
 
+	// Store LLM provider capability
+	c.llmProvider = resp.GetLlmProvider()
+
 	c.logger.Infow("Plugin initialized",
 		"name", c.metadata.Name,
 		"handlers", len(c.handlerNames),
 		"schedules", len(c.schedules),
+		"llm_provider", c.llmProvider,
 	)
 	return nil
 }

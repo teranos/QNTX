@@ -22,7 +22,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "openrouter",
-			Version:     "0.3.1",
+			Version:     "0.4.0",
 			QNTXVersion: ">= 0.1.0",
 			Description: "OpenRouter LLM gateway for prompt execution, usage tracking, and model pricing",
 			Author:      "QNTX Team",
@@ -121,7 +121,48 @@ func (p *Plugin) ExecuteJob(ctx context.Context, handlerName string, jobID strin
 	}
 }
 
+// Chat implements plugin.LLMProvider — delegates to the existing OpenRouter client.
+func (p *Plugin) Chat(ctx context.Context, req plugin.LLMRequest) (*plugin.LLMResponse, error) {
+	// Convert plugin.LLMAttachment → ContentPart for the OpenRouter client
+	var attachments []ContentPart
+	for _, a := range req.Attachments {
+		attachments = append(attachments, ContentPart{
+			Type:     "image_url",
+			ImageURL: &ContentPartImage{URL: fmt.Sprintf("data:%s;base64,%s", a.MimeType, a.Data)},
+		})
+	}
+
+	chatReq := ChatRequest{
+		SystemPrompt: req.SystemPrompt,
+		UserPrompt:   req.UserPrompt,
+		Attachments:  attachments,
+	}
+	if req.Model != "" {
+		chatReq.Model = &req.Model
+	}
+	if req.Temperature != 0 {
+		chatReq.Temperature = &req.Temperature
+	}
+	if req.MaxTokens != 0 {
+		chatReq.MaxTokens = &req.MaxTokens
+	}
+
+	resp, err := p.client.Chat(ctx, chatReq)
+	if err != nil {
+		return nil, err
+	}
+
+	return &plugin.LLMResponse{
+		Content:          resp.Content,
+		Model:            resp.Model,
+		PromptTokens:     resp.Usage.PromptTokens,
+		CompletionTokens: resp.Usage.CompletionTokens,
+		TotalTokens:      resp.Usage.TotalTokens,
+	}, nil
+}
+
 // Verify Plugin implements required interfaces at compile time
 var _ plugin.DomainPlugin = (*Plugin)(nil)
 var _ plugin.PausablePlugin = (*Plugin)(nil)
 var _ plugin.ConfigurablePlugin = (*Plugin)(nil)
+var _ plugin.LLMProvider = (*Plugin)(nil)
