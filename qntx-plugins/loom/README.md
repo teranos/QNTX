@@ -12,8 +12,9 @@ QNTX Server
   │                            ├── UDP listener (port 19470) — receives events from Graunde
   │                            ├── Stitcher — chunks turns into weaves, writes to ATS
   │                            ├── HTTP API (port 5178)
-  │                            │     ├── /api/weaves — all weaves grouped by branch
-  │                            │     └── /api/weaves/branch?name= — single branch
+  │                            │     ├── GET /api/weaves — all weaves grouped by branch
+  │                            │     ├── GET /api/weaves/branch?name= — single branch
+  │                            │     └── POST /api/import — JSONL import (in-process)
   │                            └── Serialize UI — attestation-to-JSON for the frontend
   └── /api/embeddings/clusters/memberships — cluster data
 
@@ -101,7 +102,7 @@ Svelte 5 single-file app. No bundler dependencies beyond Bun and svelte.
 
 ## HTTP API (OCaml)
 
-Queries ATS for attestations with predicate `["Weave"]`, serves them as JSON over HTTP/2 on port 5178.
+Serves JSON over HTTP/2 on port 5178. Read endpoints query ATS for `["Weave"]` attestations. The import endpoint reads JSONL files in-process, feeds the stitcher pipeline, and writes weaves to ATS.
 
 ### HTTP API limitations
 
@@ -148,11 +149,10 @@ Completeness tracked via `WeaveComplete` attestation written by loom after impor
 1. Frontend "N sessions" is clickable → opens session browser
 2. Session browser lists all projects and their JSONL sessions with state indicators
 3. User selects an unweaved or stale session to import
-4. Frontend POSTs file path to QNTX
-5. QNTX dispatches to loom via ExecuteJob (`ingest-jsonl` handler)
-6. Loom reads the JSONL, extracts turns, chunks via existing pipeline, writes weaves to ATS
-7. Loom writes `WeaveComplete` attestation on success
-8. Frontend refreshes, shows the new weaves
+4. Frontend POSTs file path to loom's HTTP API (`POST /api/import`)
+5. Loom reads the JSONL in-process, extracts turns, chunks via existing pipeline, writes weaves to ATS
+6. Loom writes `WeaveComplete` attestation on success
+7. Frontend refreshes, shows the new weaves
 
 ## Development
 
