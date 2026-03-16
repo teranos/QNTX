@@ -1,6 +1,8 @@
 /**
  * VidStreamWindow - Draggable video inference window
  *
+ * TODO: Migrate to glyph manifestation, then delete. See components/window.ts.
+ *
  * Real-time webcam + ONNX inference in a draggable/resizable window.
  * Uses VID (⮀) segment for logging.
  *
