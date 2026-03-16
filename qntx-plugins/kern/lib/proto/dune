@@ -1,0 +1,4 @@
+(library
+ (name kern_proto)
+ (public_name kern.proto)
+ (libraries ocaml-protoc-plugin))
