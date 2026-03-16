@@ -60,10 +60,7 @@ export async function createPluginGlyph(
 
     // Content container
     const content = document.createElement('div');
-    content.className = 'plugin-glyph-content';
-    content.style.flex = '1';
-    content.style.overflow = 'auto';
-    content.style.padding = '8px';
+    content.className = 'plugin-glyph-content glyph-content-area';
     element.appendChild(content);
 
     // Fetch and render plugin content

@@ -46,6 +46,48 @@ export function renderComponentGallery(root: HTMLElement) {
   ])
   section.appendChild(glyphBtnMatrix)
 
+  // ui.container() — returns { element, titleBar, content }
+  const containerGroup = document.createElement('div')
+  containerGroup.className = 'button-group'
+
+  const containerHeader = document.createElement('div')
+  containerHeader.className = 'button-group-header'
+  const containerName = document.createElement('span')
+  containerName.className = 'button-group-name'
+  containerName.textContent = 'ui.container()'
+  const containerDesc = document.createElement('span')
+  containerDesc.className = 'button-group-desc'
+  containerDesc.textContent = 'Returns { element, titleBar, content } — content is a scrollable .glyph-content-area'
+  containerHeader.appendChild(containerName)
+  containerHeader.appendChild(containerDesc)
+  containerGroup.appendChild(containerHeader)
+
+  const containerDemo = document.createElement('div')
+  containerDemo.style.display = 'flex'
+  containerDemo.style.flexDirection = 'column'
+  containerDemo.style.border = '1px solid var(--border-on-dark)'
+  containerDemo.style.borderRadius = '4px'
+  containerDemo.style.height = '160px'
+  containerDemo.style.overflow = 'hidden'
+
+  const demoTitleBar = document.createElement('div')
+  demoTitleBar.className = 'glyph-title-bar'
+  const demoLabel = document.createElement('span')
+  demoLabel.textContent = 'My Plugin'
+  demoTitleBar.appendChild(demoLabel)
+  containerDemo.appendChild(demoTitleBar)
+
+  const demoContent = document.createElement('div')
+  demoContent.className = 'glyph-content-area'
+  demoContent.style.fontFamily = 'var(--font-mono)'
+  demoContent.style.fontSize = 'var(--font-size-sm)'
+  demoContent.style.color = 'var(--text-on-dark-secondary)'
+  demoContent.textContent = 'content.appendChild(myStuff) — this div scrolls, fills remaining space (flex:1; overflow:auto; padding:8px)'
+  containerDemo.appendChild(demoContent)
+
+  containerGroup.appendChild(containerDemo)
+  section.appendChild(containerGroup)
+
   // ui.input() + ui.statusLine() — how they work together
   const inputGroup = document.createElement('div')
   inputGroup.className = 'button-group'
