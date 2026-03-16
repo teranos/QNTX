@@ -27,4 +27,5 @@ export type {
     GlyphOpts,
     FetchOpts,
     MeldEvent,
+    SpawnResultDetail,
 } from '../../web/ts/components/glyph/glyph-ui';

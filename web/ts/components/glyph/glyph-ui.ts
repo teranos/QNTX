@@ -110,6 +110,26 @@ export interface GlyphUI {
 
     /** Save config for this glyph to the server. */
     saveConfig(config: Record<string, unknown>): Promise<void>;
+
+    /**
+     * Spawn a result glyph below this glyph on the canvas.
+     * Fires a DOM event — the canvas workspace handles positioning, state, and meld.
+     */
+    spawnResult(result: SpawnResultDetail['result']): void;
+}
+
+/** Detail payload for the glyph:spawn-result DOM event. */
+export interface SpawnResultDetail {
+    glyphId: string;
+    pluginName: string;
+    result: {
+        success: boolean;
+        stdout: string;
+        stderr: string;
+        result: unknown;
+        error: string | null;
+        duration_ms: number;
+    };
 }
 
 /** Data passed to onMeld callbacks when a glyph melds onto this one. */
@@ -353,6 +373,18 @@ export function createGlyphUI(glyph: Glyph, pluginName: string): GlyphUI {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ plugin: pluginName, glyph_id: glyph.id, config }),
             });
+        },
+
+        spawnResult(result) {
+            if (!rootElement) {
+                log.error(SEG.GLYPH, `${prefix} spawnResult called before glyph() — no root element`);
+                return;
+            }
+            const detail: SpawnResultDetail = { glyphId: glyph.id, pluginName, result };
+            rootElement.dispatchEvent(new CustomEvent('glyph:spawn-result', {
+                bubbles: true,
+                detail,
+            }));
         },
     };
 
