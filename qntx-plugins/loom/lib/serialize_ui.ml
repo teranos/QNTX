@@ -1,7 +1,7 @@
-(* Weave data extraction and JSON serialization
+(* Serialize weave attestations to JSON for the frontend
  *
  * Converts raw ATS attestations (predicate "Weave") into structured
- * JSON for the explorer frontend. *)
+ * JSON that the Svelte timeline explorer consumes. *)
 
 open Qntx_plugin_proto.Atsstore
 
@@ -19,7 +19,7 @@ let extract_number (fields : Qntx_plugin_proto.Struct.Google.Protobuf.Struct.t) 
   | Some (Some (`Number_value n)) -> Some (int_of_float n)
   | _ -> None
 
-(* Extract a nested Struct as a string→string JSON object *)
+(* Extract a nested Struct as a string->string JSON object *)
 let extract_string_map (fields : Qntx_plugin_proto.Struct.Google.Protobuf.Struct.t) key =
   match List.assoc_opt key fields with
   | Some (Some (`Struct_value nested)) ->
