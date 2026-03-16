@@ -11,7 +11,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 
 export const render: RenderFn = async (glyph: Glyph, ui: GlyphUI): Promise<HTMLElement> => {
-    const { element, content } = ui.container({
+    const { element, content } = ui.glyph({
         defaults: {
             x: glyph.x ?? 200,
             y: glyph.y ?? 200,

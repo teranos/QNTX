@@ -265,7 +265,7 @@
 
 /**
  * Glyph content area — the scrollable body below the title bar.
- * Created by ui.container() and returned as `content` in the result.
+ * Created by ui.glyph() and returned as `content` in the result.
  * Fills remaining space, scrolls vertically, standard padding.
  */
 .glyph-content-area {
