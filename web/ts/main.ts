@@ -26,7 +26,6 @@ import './symbol-palette.ts';
 import { toggleConfig } from './config-panel.ts';
 import { Window } from './components/window.ts';
 import './ai-provider-window.ts';
-import './command-explorer-panel.ts';
 // Note: Panel toggle functions are dynamically imported in Tauri event listeners below
 // to avoid unused import warnings. Menu items use "show" events with dynamic imports,
 // while keyboard shortcuts in individual panels use the toggle functions directly.
@@ -48,7 +47,6 @@ declare global {
         logLoaderStep?: (message: string, isLoading?: boolean, isSubStep?: boolean) => void;
         hideLoadingScreen?: () => void;
         __TAURI__?: unknown;
-        commandExplorerPanel?: { toggle: (mode: string) => void };
     }
 }
 
