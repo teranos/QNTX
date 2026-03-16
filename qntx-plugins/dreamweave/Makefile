@@ -1,8 +1,14 @@
-.PHONY: build install clean
+.PHONY: build install clean shared-lib
 
 PREFIX ?= $(HOME)/.qntx
+SHARED_LIB_DIR := ../../plugin/grpc/ocaml
 
-build: ## Build dreamweave plugin binary
+shared-lib: ## Install shared qntx-plugin library into opam switch
+	@echo "Installing shared qntx-plugin library..."
+	@cd $(SHARED_LIB_DIR) && opam exec -- dune build && opam exec -- dune install 2>/dev/null
+	@echo "✓ qntx-plugin installed"
+
+build: shared-lib ## Build dreamweave plugin binary
 	@echo "Building qntx-dreamweave-plugin..."
 	@opam exec -- dune build
 	@echo "✓ _build/default/bin/main.exe"
@@ -16,4 +22,4 @@ install: build ## Install dreamweave plugin to ~/.qntx/plugins/
 	@echo "✓ qntx-dreamweave-plugin → $(PREFIX)/plugins/qntx-dreamweave-plugin"
 
 clean: ## Clean build artifacts
-	@dune clean
+	@opam exec -- dune clean

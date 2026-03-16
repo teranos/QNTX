@@ -3,7 +3,7 @@
  * Converts raw ATS attestations (predicate "Weave") into structured
  * JSON for the explorer frontend. *)
 
-open Qntx_dreamweave_proto.Atsstore
+open Qntx_plugin_proto.Atsstore
 
 module GValue = Google_types.Struct.Google.Protobuf.Value
 
