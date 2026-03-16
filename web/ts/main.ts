@@ -12,7 +12,6 @@ import { appState } from './state/app.ts';
 import { initUsageBadge, handleUsageUpdate } from './usage-badge.ts';
 import { initSyncBadge } from './sync-badge.ts';
 import { handleParseResponse } from './ats-semantic-tokens-client.ts';
-import { handleJobUpdate } from './hixtory-panel.ts';
 import { handleDaemonStatus } from './websocket-handlers/daemon-status.ts';
 import { statusIndicators } from './status-indicators.ts';
 import {
@@ -139,7 +138,6 @@ async function init(): Promise<void> {
         'usage_update': handleUsageUpdate,
         'parse_response': handleParseResponse,
         'daemon_status': handleDaemonStatus,
-        'job_update': handleJobUpdate,
         'pulse_execution_started': handlePulseExecutionStarted,
         'pulse_execution_failed': handlePulseExecutionFailed,
         'pulse_execution_completed': handlePulseExecutionCompleted,
@@ -354,12 +352,6 @@ async function init(): Promise<void> {
         listen('show-code-panel', () => {
             import('./code/panel.ts').then(({ showGoEditor }) => {
                 showGoEditor();
-            });
-        });
-
-        listen('show-hixtory-panel', () => {
-            import('./hixtory-panel.ts').then(({ showJobList }) => {
-                showJobList();
             });
         });
 
