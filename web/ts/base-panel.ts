@@ -2,6 +2,17 @@
  * @deprecated Use glyph panel manifestation instead.
  * See https://github.com/teranos/QNTX/pull/598 for the migration pattern.
  *
+ * TODO: Migrate all consumers to glyph manifestations, then delete this file.
+ * Consumers blocking deletion:
+ *   - prose/panel.ts (ProsePanel)
+ *   - code/panel.ts (GoEditorPanel)
+ *   - python/panel.ts (PythonEditorPanel)
+ *   - config-panel.ts (ConfigPanel)
+ *   - pulse-panel.ts (PulsePanel)
+ *   - prose/prompt-preview-panel.ts (PromptPreviewPanel)
+ *   - pulse/job-detail-panel.ts (JobDetailPanel — similar pattern, not direct extend)
+ * Also delete: base-panel-error.ts, css/panel-base.css, css/components/base-panel.css
+ *
  * BasePanel - Abstract base class for slide-in panels
  *
  * Handles common lifecycle, visibility, and event patterns:
