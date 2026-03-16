@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /**
- * Dreamweave dev server
+ * Loom dev server
  *
  * Builds the frontend, serves from dist/, proxies /api/ to the
- * dreamweave plugin, watches for source changes with live reload.
+ * loom plugin, watches for source changes with live reload.
  */
 
 import { watch } from 'fs'
@@ -14,7 +14,7 @@ import http2 from 'http2'
 
 const execAsync = promisify(exec)
 
-const DREAMWEAVE_PORT = process.env.DREAMWEAVE_PORT || '5178'
+const LOOM_PORT = process.env.LOOM_PORT || '5178'
 const QNTX_PORT = process.env.QNTX_PORT || '8773'
 const DEV_PORT = 5177
 const distDir = join(import.meta.dir, 'dist')
@@ -58,7 +58,7 @@ watch(join(import.meta.dir, 'index.html'), () => {
 // h2c proxy helper — connects via HTTP/2 cleartext to the plugin
 function h2cRequest(path: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const client = http2.connect(`http://127.0.0.1:${DREAMWEAVE_PORT}`)
+    const client = http2.connect(`http://127.0.0.1:${LOOM_PORT}`)
     client.on('error', (err) => {
       client.close()
       reject(err)
@@ -117,7 +117,7 @@ const server = Bun.serve({
       }
     }
 
-    // Proxy /api/ to dreamweave plugin (h2c — plugin speaks HTTP/2 only)
+    // Proxy /api/ to loom plugin (h2c — plugin speaks HTTP/2 only)
     if (url.pathname.startsWith('/api/')) {
       try {
         const body = await h2cRequest(url.pathname + url.search)
@@ -125,7 +125,7 @@ const server = Bun.serve({
           headers: { 'content-type': 'application/json' },
         })
       } catch {
-        return new Response('dreamweave plugin unavailable', { status: 503 })
+        return new Response('loom plugin unavailable', { status: 503 })
       }
     }
 
@@ -153,5 +153,5 @@ const server = Bun.serve({
   },
 })
 
-console.log(`dreamweave dev: http://localhost:${server.port}`)
-console.log(`proxying /api/ -> http://127.0.0.1:${DREAMWEAVE_PORT}`)
+console.log(`loom dev: http://localhost:${server.port}`)
+console.log(`proxying /api/ -> http://127.0.0.1:${LOOM_PORT}`)
