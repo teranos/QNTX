@@ -256,7 +256,7 @@ private HTTPResponse serveGlyphModule() {
 /// Glyph module JS source — inline to avoid filesystem dependencies.
 private enum glyphModuleSource = `
 export async function render(glyph, ui) {
-  const { element, content } = ui.container({
+  const { element, content } = ui.glyph({
     defaults: { x: glyph.x || 100, y: glyph.y || 100, width: 800, height: 600 },
     titleBar: { label: 'Network Inspector' },
     resizable: { minWidth: 500, minHeight: 300 },

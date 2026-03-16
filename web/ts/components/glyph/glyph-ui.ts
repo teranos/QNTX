@@ -11,7 +11,7 @@
  *   import type { GlyphUI, RenderFn } from '@qntx/glyphs';
  *
  *   export const render: RenderFn = (glyph, ui) => {
- *       const { element, content } = ui.container({
+ *       const { element, content } = ui.glyph({
  *           defaults: { x: 200, y: 200, width: 600, height: 700 },
  *           titleBar: { label: 'My Plugin' },
  *           resizable: true,
@@ -54,11 +54,11 @@ export interface GlyphDef {
 /** UI interface injected into plugin render functions. */
 export interface GlyphUI {
     /**
-     * Create a canvas-placed container with title bar, drag, and resize.
+     * Create a canvas-placed glyph with title bar, drag, and resize.
      * Returns a content area — the scrollable body below the title bar.
      * Append plugin content into `content`, not `element`.
      */
-    container(opts: ContainerOpts): { element: HTMLElement; titleBar: HTMLElement | null; content: HTMLElement };
+    glyph(opts: GlyphOpts): { element: HTMLElement; titleBar: HTMLElement | null; content: HTMLElement };
 
     /** Prevent drag from starting on interactive children. */
     preventDrag(...elements: HTMLElement[]): void;
@@ -124,7 +124,7 @@ export interface MeldEvent {
     content: string;
 }
 
-export interface ContainerOpts {
+export interface GlyphOpts {
     defaults: { x: number; y: number; width: number; height: number };
     titleBar?: { label: string; actions?: HTMLElement[] };
     resizable?: boolean | { minWidth?: number; minHeight?: number };
@@ -155,7 +155,7 @@ export function createGlyphUI(glyph: Glyph, pluginName: string): GlyphUI {
     const prefix = `[Plugin:${pluginName}]`;
 
     const ui: GlyphUI = {
-        container(opts: ContainerOpts) {
+        glyph(opts: GlyphOpts) {
             const config: CanvasPlacedConfig = {
                 glyph,
                 className: opts.className ?? `canvas-plugin-glyph plugin-${pluginName}`,

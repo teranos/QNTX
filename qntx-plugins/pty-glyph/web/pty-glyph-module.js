@@ -6700,7 +6700,7 @@ var require_addon_fit = __commonJS((exports, module) => {
 var import_xterm = __toESM(require_xterm(), 1);
 var import_addon_fit = __toESM(require_addon_fit(), 1);
 var render = async (glyph, ui) => {
-  const { element } = ui.container({
+  const { element, content } = ui.glyph({
     defaults: {
       x: glyph.x ?? 200,
       y: glyph.y ?? 200,
@@ -6711,10 +6711,9 @@ var render = async (glyph, ui) => {
     resizable: { minWidth: 300, minHeight: 200 },
     className: "canvas-pty-glyph"
   });
-  const termDiv = document.createElement("div");
-  termDiv.style.flex = "1";
-  termDiv.style.overflow = "hidden";
-  element.appendChild(termDiv);
+  content.style.padding = "0";
+  content.style.overflow = "hidden";
+  const termDiv = content;
   ui.preventDrag(termDiv);
   const term = new import_xterm.Terminal({
     cursorBlink: true,
