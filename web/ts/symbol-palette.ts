@@ -62,15 +62,9 @@ function getSymbol(cmd: string): string {
     return CommandToSymbol[cmd] || cmd;
 }
 
-// Extend window interface for global functions
-interface CommandExplorerPanel {
-    toggle: (mode: string) => void;
-}
-
 declare global {
     interface Window {
         setActiveModality: (cmd: string) => void;
-        commandExplorerPanel?: CommandExplorerPanel;
     }
 }
 
@@ -234,24 +228,14 @@ function handleSymbolClick(e: Event): void {
             showConfigPanel();
             break;
         case 'ax':
-            // Expand - show ax command explorer
-            if (window.commandExplorerPanel) {
-                window.commandExplorerPanel.toggle(cmd);
-            } else {
-                activateSearchMode(cmd);
-            }
+            activateSearchMode(cmd);
             break;
         case 'ix':
             // Ingest - job visibility moved to Pulse
             togglePulsePanel();
             break;
         case 'as':
-            // Assert - show query history
-            if (window.commandExplorerPanel) {
-                window.commandExplorerPanel.toggle(cmd);
-            } else {
-                activateAttestationMode(cmd);
-            }
+            activateAttestationMode(cmd);
             break;
         case 'is':
             // Identity - insert segment
