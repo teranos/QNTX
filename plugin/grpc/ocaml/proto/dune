@@ -1,0 +1,4 @@
+(library
+ (name qntx_plugin_proto)
+ (public_name qntx-plugin.proto)
+ (libraries ocaml-protoc-plugin ocaml-protoc-plugin.google_types))
