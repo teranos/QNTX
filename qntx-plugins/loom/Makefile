@@ -1,8 +1,14 @@
-.PHONY: build install clean
+.PHONY: build install clean shared-lib
 
 PREFIX ?= $(HOME)/.qntx
+SHARED_LIB_DIR := ../../plugin/grpc/ocaml
 
-build: ## Build loom plugin binary
+shared-lib: ## Install shared qntx-plugin library into opam switch
+	@echo "Installing shared qntx-plugin library..."
+	@cd $(SHARED_LIB_DIR) && opam exec -- dune build && opam exec -- dune install 2>/dev/null
+	@echo "✓ qntx-plugin installed"
+
+build: shared-lib ## Build loom plugin binary
 	@echo "Building qntx-loom-plugin..."
 	@opam exec -- dune build
 	@echo "✓ _build/default/bin/main.exe"
@@ -16,4 +22,4 @@ install: build ## Install loom plugin to ~/.qntx/plugins/
 	@echo "✓ qntx-loom-plugin → $(PREFIX)/plugins/qntx-loom-plugin"
 
 clean: ## Clean build artifacts
-	@dune clean
+	@opam exec -- dune clean
