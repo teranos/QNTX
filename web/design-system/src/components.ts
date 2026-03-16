@@ -96,7 +96,7 @@ export function renderComponentGallery(root: HTMLElement) {
   const pyUI = createGlyphUI(pyGlyphData, 'py')
   const py = pyUI.glyph({
     defaults: { x: 300, y: 10, width: 280, height: 190 },
-    titleBar: { label: 'py-glyph', color: '#2a5578', actions: [runBtn()] },
+    titleBar: { label: 'py-glyph', color: '#2a5578', labelColor: '#FFD43B', actions: [runBtn()] },
   })
   const pyCode = document.createElement('pre')
   pyCode.style.fontFamily = 'monospace'
@@ -113,7 +113,7 @@ export function renderComponentGallery(root: HTMLElement) {
   const tsUI = createGlyphUI(tsGlyphData, 'ts')
   const ts = tsUI.glyph({
     defaults: { x: 590, y: 10, width: 280, height: 190 },
-    titleBar: { label: 'ts-glyph', color: '#5c3d1a', actions: [runBtn()] },
+    titleBar: { label: 'ts-glyph', color: '#5c3d1a', labelColor: '#f0c878', actions: [runBtn()] },
   })
   const tsCode = document.createElement('pre')
   tsCode.style.fontFamily = 'monospace'

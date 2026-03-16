@@ -15,7 +15,6 @@ import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
-import type { ExecutionResult } from './result-glyph';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
 import { createGlyphUI } from './glyph-ui';
@@ -143,7 +142,7 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
     const ui = createGlyphUI(glyph, 'ts');
     const { element, content } = ui.glyph({
         defaults: { x: 200, y: 200, width: 400, height: calculatedHeight },
-        titleBar: { label: 'ts', actions: [runButton], color: '#5c3d1a' },
+        titleBar: { label: 'ts', actions: [runButton], color: '#5c3d1a', labelColor: '#f0c878' },
         resizable: true,
         className: 'canvas-ts-glyph',
     });
@@ -155,12 +154,6 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
     element.dataset.localActive = 'true';
     element.style.backgroundColor = 'rgba(61, 45, 20, 0.92)';
 
-    // Warm label color to match orange tint
-    const labelSpan = element.querySelector('.glyph-title-bar span:first-child') as HTMLElement;
-    if (labelSpan) {
-        labelSpan.style.color = '#f0c878';
-        labelSpan.style.fontWeight = 'bold';
-    }
 
     // Execute JavaScript on click
     runButton.addEventListener('click', async () => {
