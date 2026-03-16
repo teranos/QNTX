@@ -72,7 +72,7 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
     symbol.textContent = SE;
     symbol.style.cursor = 'move';
     symbol.style.fontWeight = 'bold';
-    symbol.style.flexShrink = '0';
+    symbol.style.flex = 'none';
     symbol.style.color = 'var(--glyph-status-running-text)';
 
     const { element } = canvasPlaced({
