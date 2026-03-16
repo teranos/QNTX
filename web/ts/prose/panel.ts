@@ -1,6 +1,8 @@
 /**
  * Prose Panel - Markdown Documentation Viewer/Editor
  *
+ * TODO: Migrate to glyph panel manifestation, then delete. See base-panel.ts.
+ *
  * Shows markdown content with ProseMirror when clicking ▣ (prose) in the symbol palette.
  * Supports rich text editing of documentation and other markdown content.
  *
