@@ -241,14 +241,6 @@ function injectStyles() {
       border-radius: var(--border-radius);
     }
 
-    /* Glyph specimen row — side-by-side mini glyphs */
-    .glyph-specimen-row {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
     /* SDK specimen row */
     .sdk-specimen-row {
       display: grid;
