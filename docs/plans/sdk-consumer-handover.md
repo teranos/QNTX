@@ -30,9 +30,9 @@ Remaining points below, in priority order for making the SDK the canonical path 
 
 `query-glyph-states.ts` has `createColorStateSetter()` and `QUERY_COLOR_STATES` — a pattern for tinting container + titleBar based on state (idle, pending, success, error). Every glyph that shows async state reimplements this by hand.
 
-**Simple**: Add `ui.setState(name)` that applies the triple-color pattern (container bg, section bg, text) from `QUERY_COLOR_STATES` to the container returned by `ui.container()`. One function, reuses existing palette.
+**Simple**: Add `ui.setState(name)` that applies the triple-color pattern (container bg, section bg, text) from `QUERY_COLOR_STATES` to the container returned by `ui.glyph()`. One function, reuses existing palette.
 
-**Advanced**: Make state a first-class concept on the container — `ui.container()` accepts a `states` map, returns a `setState(name)` handle, and transitions between states with the CSS transition tokens already in `tokens.css`.
+**Advanced**: Make state a first-class concept on the container — `ui.glyph()` accepts a `states` map, returns a `setState(name)` handle, and transitions between states with the CSS transition tokens already in `tokens.css`.
 
 ---
 

@@ -57,7 +57,7 @@ export function renderComponentGallery(root: HTMLElement) {
   glyphName.textContent = 'Plugin glyph'
   const glyphDescEl = document.createElement('span')
   glyphDescEl.className = 'button-group-desc'
-  glyphDescEl.textContent = 'ui.container() + ui.input() + ui.button() + ui.statusLine() — as used by ix-json'
+  glyphDescEl.textContent = 'ui.glyph() + ui.input() + ui.button() + ui.statusLine() — as used by ix-json'
   glyphHeader.appendChild(glyphName)
   glyphHeader.appendChild(glyphDescEl)
   sdkGroup.appendChild(glyphHeader)
