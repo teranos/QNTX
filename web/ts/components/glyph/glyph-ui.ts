@@ -267,6 +267,10 @@ export function createGlyphUI(glyph: Glyph, pluginName: string): GlyphUI {
         statusLine() {
             const el = document.createElement('div');
             el.className = 'glyph-status';
+            el.style.fontFamily = 'monospace';
+            el.style.fontSize = 'var(--font-size-xs, 10px)';
+            el.style.minHeight = '16px';
+            el.style.lineHeight = '16px';
             let timer: ReturnType<typeof setTimeout> | null = null;
 
             return {
