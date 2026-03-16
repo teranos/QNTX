@@ -4,6 +4,8 @@ package protocol;
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
+import "plugin/grpc/protocol/llm.proto";
+
 // DomainPluginService is the gRPC service for external domain plugins
 service DomainPluginService {
   // Metadata returns plugin metadata
@@ -37,6 +39,10 @@ service DomainPluginService {
   // ParseAxQuery parses an Ax query string and returns the AST as JSON.
   // Used by kern (OCaml parser) to replace the Rust WASM parser path.
   rpc ParseAxQuery(ParseAxQueryRequest) returns (ParseAxQueryResponse);
+
+  // Chat handles an LLM chat request (for plugins implementing LLMProvider).
+  // Messages defined in llm.proto (same package).
+  rpc Chat(LLMChatRequest) returns (LLMChatResponse);
 }
 
 message Empty {}
@@ -82,6 +88,10 @@ message InitializeRequest {
   // file_service_endpoint: gRPC endpoint for FileService
   // Provides: Read stored files (for multimodal attachments)
   string file_service_endpoint = 6;
+
+  // llm_endpoint: gRPC endpoint for LLMService
+  // Provides: Provider-agnostic LLM chat (routed through core to provider plugins)
+  string llm_endpoint = 7;
 }
 
 message HTTPRequest {
@@ -176,6 +186,10 @@ message InitializeResponse {
   // Schedules this plugin wants QNTX to create
   // QNTX will auto-create schedule.Job entries for these
   repeated ScheduleInfo schedules = 2;
+
+  // llm_provider indicates this plugin implements LLMProvider (Chat RPC).
+  // Core registers it as an LLM backend in the service mesh.
+  bool llm_provider = 3;
 }
 
 // ExecuteJobRequest is sent to plugins to execute an async job

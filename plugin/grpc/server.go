@@ -177,6 +177,7 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 			req.QueueEndpoint,
 			req.ScheduleEndpoint,
 			req.FileServiceEndpoint,
+			req.LlmEndpoint,
 			req.AuthToken,
 			req.Config,
 			s.logger,
@@ -220,9 +221,12 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		handlerNames = ha.GetHandlerNames()
 	}
 
+	_, isLLMProvider := s.plugin.(plugin.LLMProvider)
+
 	return &protocol.InitializeResponse{
 		HandlerNames: handlerNames,
 		Schedules:    schedules,
+		LlmProvider:  isLLMProvider,
 	}, nil
 }
 
@@ -439,6 +443,46 @@ func (s *PluginServer) RegisterGlyphs(ctx context.Context, _ *protocol.Empty) (*
 
 	return &protocol.GlyphDefResponse{
 		Glyphs: protoGlyphs,
+	}, nil
+}
+
+// Chat handles an LLM chat request via gRPC.
+// If the wrapped plugin implements LLMProvider, forwards the call. Otherwise unimplemented.
+func (s *PluginServer) Chat(ctx context.Context, req *protocol.LLMChatRequest) (*protocol.LLMChatResponse, error) {
+	provider, ok := s.plugin.(plugin.LLMProvider)
+	if !ok {
+		return nil, fmt.Errorf("plugin %s does not implement LLMProvider", s.plugin.Metadata().Name)
+	}
+
+	// Convert proto to Go types
+	attachments := make([]plugin.LLMAttachment, len(req.Attachments))
+	for i, a := range req.Attachments {
+		attachments[i] = plugin.LLMAttachment{
+			MimeType: a.MimeType,
+			Data:     a.Data,
+			Filename: a.Filename,
+		}
+	}
+
+	resp, err := provider.Chat(ctx, plugin.LLMRequest{
+		SystemPrompt: req.SystemPrompt,
+		UserPrompt:   req.UserPrompt,
+		Model:        req.Model,
+		Temperature:  req.Temperature,
+		MaxTokens:    int(req.MaxTokens),
+		Provider:     req.Provider,
+		Attachments:  attachments,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "LLM chat failed in plugin %s", s.plugin.Metadata().Name)
+	}
+
+	return &protocol.LLMChatResponse{
+		Content:          resp.Content,
+		Model:            resp.Model,
+		PromptTokens:     int32(resp.PromptTokens),
+		CompletionTokens: int32(resp.CompletionTokens),
+		TotalTokens:      int32(resp.TotalTokens),
 	}, nil
 }
 

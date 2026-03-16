@@ -348,3 +348,7 @@ func (s *QNTXServer) GetDB() *sql.DB {
 	return s.db
 }
 
+// GetServicesManager returns the gRPC services manager for plugin service access
+func (s *QNTXServer) GetServicesManager() *grpcplugin.ServicesManager {
+	return s.servicesManager
+}
