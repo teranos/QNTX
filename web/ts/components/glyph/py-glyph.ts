@@ -80,6 +80,13 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     element.style.minHeight = '120px';
     element.style.zIndex = '1';
 
+    // Python brand label color
+    const labelSpan = element.querySelector('.glyph-title-bar span:first-child') as HTMLElement;
+    if (labelSpan) {
+        labelSpan.style.color = '#FFD43B';
+        labelSpan.style.fontWeight = 'bold';
+    }
+
     // Execute Python code on click
     runButton.addEventListener('click', async () => {
         const editor = (element as any).editor;
