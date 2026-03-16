@@ -1,6 +1,8 @@
 /**
  * Config Panel - Shows active configuration and sources
  *
+ * TODO: Migrate to glyph panel manifestation, then delete. See base-panel.ts.
+ *
  * Displays configuration introspection when clicking ≡ (am) in the symbol palette:
  * - Shows active config file path
  * - Lists all settings with their sources (environment, config_file, default)
