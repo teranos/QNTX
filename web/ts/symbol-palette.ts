@@ -279,8 +279,8 @@ function handleSymbolClick(e: Event): void {
             showPulsePanel();
             break;
         case 'db':
-            // Database - show database statistics window
-            showDatabaseWindow();
+            // Database - show database statistics glyph
+            glyphRun.openGlyph('database-glyph');
             break;
         case 'prose':
             // Prose - show documentation panel
@@ -339,18 +339,6 @@ function showAIProviderPanel(): void {
  */
 function showPulsePanel(): void {
     togglePulsePanel();
-}
-
-/**
- * Show database window - displays database statistics
- */
-let databaseWindowInstance: any = null;
-async function showDatabaseWindow(): Promise<void> {
-    if (!databaseWindowInstance) {
-        const module = await import('./database-stats-window.js');
-        databaseWindowInstance = module.databaseStatsWindow;
-    }
-    databaseWindowInstance.toggle();
 }
 
 /**

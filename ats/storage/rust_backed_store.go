@@ -80,6 +80,11 @@ func (s *RustBackedStore) enforceLimitsViaRust(as *types.As) {
 	}
 }
 
+// GetStorageStats returns storage statistics via Rust FFI.
+func (s *RustBackedStore) GetStorageStats() (*sqlitecgo.StorageStats, error) {
+	return s.rust.GetStorageStats()
+}
+
 // AttestationExists checks if an attestation with the given ID exists.
 func (s *RustBackedStore) AttestationExists(asid string) bool {
 	return s.rust.AttestationExists(asid)

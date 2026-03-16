@@ -47,9 +47,6 @@ type BoundedStore interface {
 
 	// CreateAttestationWithLimits creates an attestation and enforces storage limits
 	CreateAttestationWithLimits(cmd *types.AsCommand) (*types.As, error)
-
-	// GetStorageStats returns current storage statistics
-	GetStorageStats() (*StorageStats, error)
 }
 
 // AliasResolver defines alias resolution operations
@@ -78,33 +75,12 @@ type AttestationFilter struct {
 	Limit      int        // Maximum results
 }
 
-// StorageStats represents current storage statistics
-type StorageStats struct {
-	TotalAttestations int `json:"total_attestations"`
-	UniqueActors      int `json:"unique_actors"`
-	UniqueSubjects    int `json:"unique_subjects"`
-	UniqueContexts    int `json:"unique_contexts"`
-}
-
 // PersistenceResult contains the results of a batch persistence operation
 type PersistenceResult struct {
 	PersistedCount int
 	FailureCount   int
 	Errors         []string
 	SuccessRate    float64
-	// Warnings contains predictive storage warnings for (actor, context) pairs approaching limits
-	Warnings []*StorageWarning
-}
-
-// StorageWarning represents a bounded storage warning condition
-// Used for predictive warnings when storage approaches limits
-type StorageWarning struct {
-	Actor         string  // Actor approaching limit
-	Context       string  // Context approaching limit
-	Current       int     // Current attestation count
-	Limit         int     // Configured limit
-	FillPercent   float64 // Percentage full (0.0-1.0)
-	TimeUntilFull string  // Human-readable time until hitting limit
 }
 
 // AttestationQueryStore defines query operations for attestation retrieval.

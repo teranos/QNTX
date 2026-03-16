@@ -20,11 +20,10 @@ type AttestationItem = ingestion.Item
 
 // BatchPersister handles batch attestation persistence with error tracking and statistics
 type BatchPersister struct {
-	db           *sql.DB
-	store        ats.AttestationStore
-	actor        string
-	source       string
-	boundedStore *BoundedStore // Optional: for predictive storage warnings
+	db     *sql.DB
+	store  ats.AttestationStore
+	actor  string
+	source string
 }
 
 // NewBatchPersister creates a new batch attestation persister
@@ -35,13 +34,6 @@ func NewBatchPersister(db *sql.DB, store ats.AttestationStore, actor, source str
 		actor:  actor,
 		source: source,
 	}
-}
-
-// WithBoundedStore adds a bounded store for predictive storage warnings
-// When set, PersistItems will check for storage limits approaching and include warnings
-func (bp *BatchPersister) WithBoundedStore(bs *BoundedStore) *BatchPersister {
-	bp.boundedStore = bs
-	return bp
 }
 
 // PersistItems converts AttestationItems to attestations and persists them to the database
@@ -105,21 +97,6 @@ func (bp *BatchPersister) PersistItems(items []AttestationItem, sourcePrefix str
 		}
 
 		result.PersistedCount++
-
-		// Check for predictive storage warnings if bounded store is configured
-		if bp.boundedStore != nil {
-			warnings := bp.boundedStore.CheckStorageStatus(&attestation)
-			for _, w := range warnings {
-				result.Warnings = append(result.Warnings, &ats.StorageWarning{
-					Actor:         w.Actor,
-					Context:       w.Context,
-					Current:       w.Current,
-					Limit:         w.Limit,
-					FillPercent:   w.FillPercent,
-					TimeUntilFull: w.TimeUntilFull.String(),
-				})
-			}
-		}
 	}
 
 	// Calculate success rate
@@ -128,28 +105,5 @@ func (bp *BatchPersister) PersistItems(items []AttestationItem, sourcePrefix str
 		result.SuccessRate = float64(result.PersistedCount) / float64(totalItems) * 100
 	}
 
-	// Deduplicate warnings (same actor/context pair may appear multiple times)
-	result.Warnings = deduplicateWarnings(result.Warnings)
-
 	return result
-}
-
-// deduplicateWarnings removes duplicate warnings for the same actor/context pair
-func deduplicateWarnings(warnings []*ats.StorageWarning) []*ats.StorageWarning {
-	if len(warnings) == 0 {
-		return warnings
-	}
-
-	seen := make(map[string]bool)
-	var unique []*ats.StorageWarning
-
-	for _, w := range warnings {
-		key := w.Actor + "|" + w.Context
-		if !seen[key] {
-			seen[key] = true
-			unique = append(unique, w)
-		}
-	}
-
-	return unique
 }
