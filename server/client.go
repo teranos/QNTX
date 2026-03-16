@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/graph"
 	grapherr "github.com/teranos/QNTX/graph/error"
@@ -783,31 +784,45 @@ func (c *Client) handleJobControl(msg QueryMessage) {
 	}
 }
 
-// handleGetDatabaseStats retrieves database statistics and sends them to the client
+// handleGetDatabaseStats retrieves database statistics and sends them to the client.
+// Stats are fetched via Rust FFI to avoid dual-connection issues with Go's *sql.DB.
 func (c *Client) handleGetDatabaseStats() {
 	c.server.logger.Infow("Database stats request",
 		"client_id", c.id,
 	)
 
-	// Get basic storage statistics from database
-	var totalAttestations, uniqueActors, uniqueSubjects, uniqueContexts int
-	err := c.server.db.QueryRow(`
-		SELECT
-			COUNT(*) as total_attestations,
-			COUNT(DISTINCT json_extract(actors, '$[0]')) as unique_actors,
-			COUNT(DISTINCT json_extract(subjects, '$')) as unique_subjects,
-			COUNT(DISTINCT json_extract(contexts, '$')) as unique_contexts
-		FROM attestations
-	`).Scan(&totalAttestations, &uniqueActors, &uniqueSubjects, &uniqueContexts)
+	// Get stats via Rust FFI through the attestation store
+	type statsProvider interface {
+		GetStorageStats() (*sqlitecgo.StorageStats, error)
+	}
 
-	if err != nil {
-		c.server.logger.Errorw("Failed to query database stats",
-			"error", err,
+	var totalAttestations, uniqueActors, uniqueSubjects, uniqueContexts int
+
+	if sp, ok := c.server.atsStore.(statsProvider); ok {
+		stats, err := sp.GetStorageStats()
+		if err != nil {
+			c.server.logger.Errorw("Attestations table unreadable — database may be corrupted (run PRAGMA integrity_check)",
+				"error", err,
+				"client_id", c.id,
+				"db_path", c.server.dbPath,
+			)
+			c.sendJSON(map[string]interface{}{
+				"type":  "database_stats",
+				"error": fmt.Sprintf("Attestations table unreadable: %v", err),
+			})
+			return
+		}
+		totalAttestations = stats.TotalAttestations
+		uniqueActors = stats.UniqueActors
+		uniqueSubjects = stats.UniqueSubjects
+		uniqueContexts = stats.UniqueContexts
+	} else {
+		c.server.logger.Errorw("Attestation store does not support GetStorageStats",
 			"client_id", c.id,
 		)
 		c.sendJSON(map[string]interface{}{
 			"type":  "error",
-			"error": fmt.Sprintf("Failed to retrieve database statistics: %v", err),
+			"error": "Storage stats not available",
 		})
 		return
 	}

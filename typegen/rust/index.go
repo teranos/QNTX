@@ -210,7 +210,7 @@ func GenerateLibRs(outputDir string, exports []PackageExport) error {
 		case "schedule":
 			typesToExport = []string{"Execution"}
 		case "server":
-			typesToExport = []string{"DaemonStatusMessage", "JobUpdateMessage", "StorageWarningMessage"}
+			typesToExport = []string{"DaemonStatusMessage", "JobUpdateMessage"}
 		}
 
 		if len(typesToExport) > 0 {
