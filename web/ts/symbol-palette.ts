@@ -43,7 +43,6 @@ import { toggleGoEditor } from './code/panel.js';
 import { togglePythonEditor } from './python/panel.js';
 import { glyphRun } from './components/glyph/run.ts';
 import { VidStreamWindow } from './vidstream-window.js';
-import { toggleJobList } from './hixtory-panel.js';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
 type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'vidstream' | 'db';
@@ -243,8 +242,8 @@ function handleSymbolClick(e: Event): void {
             }
             break;
         case 'ix':
-            // Ingest - show running IX jobs
-            activateIngestMode(cmd);
+            // Ingest - job visibility moved to Pulse
+            togglePulsePanel();
             break;
         case 'as':
             // Assert - show query history
@@ -436,14 +435,6 @@ function showVidStreamWindow(): void {
     } catch (error: unknown) {
         handleError(error, 'Failed to show VidStream window', { context: SEG.VID });
     }
-}
-
-/**
- * Activate ingestion mode - show running IX jobs panel
- */
-function activateIngestMode(mode: string): void {
-    toggleJobList();
-    log.debug(SEG.SELF, `${getSymbol(mode)} ingest mode - showing job list`);
 }
 
 /**
