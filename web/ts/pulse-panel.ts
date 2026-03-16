@@ -1,6 +1,8 @@
 /**
  * Pulse Panel - Scheduled Jobs Dashboard
  *
+ * TODO: Migrate to glyph panel manifestation, then delete. See base-panel.ts.
+ *
  * Displays all scheduled Pulse jobs when clicking pulse (꩜) in the symbol palette:
  * - Lists all scheduled jobs with their intervals
  * - Shows job state (active, paused, stopping, inactive)
