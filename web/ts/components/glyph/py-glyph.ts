@@ -23,12 +23,10 @@ import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
-import { apiFetch } from '../../api';
-import { createResultGlyph, type ExecutionResult } from './result-glyph';
-import { autoMeldResultBelow } from './meld/meld-system';
+import type { ExecutionResult } from './result-glyph';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
-import { canvasPlaced } from './manifestations/canvas-placed';
+import { createGlyphUI } from './glyph-ui';
 
 export const PY_DEFAULT_CODE = `import time
 import secrets
@@ -71,81 +69,56 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     runButton.className = 'titlebar-btn';
     runButton.title = 'Run Python code';
 
-    const { element } = canvasPlaced({
-        glyph,
-        className: 'canvas-py-glyph',
+    const ui = createGlyphUI(glyph, 'python');
+    const { element, content } = ui.glyph({
         defaults: { x: 200, y: 200, width: 400, height: calculatedHeight },
-        titleBar: { label: 'py', actions: [runButton] },
+        titleBar: { label: 'py', actions: [runButton], color: '#2a5578' },
         resizable: true,
-        logLabel: 'PyGlyph',
+        className: 'canvas-py-glyph',
     });
     element.style.minWidth = '200px';
     element.style.minHeight = '120px';
     element.style.zIndex = '1';
 
-    // Python brand colors on title bar
-    const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
-    if (titleBar) {
-        titleBar.style.backgroundColor = '#2a5578';
-        const labelSpan = titleBar.querySelector('span:first-child') as HTMLElement;
-        if (labelSpan) {
-            labelSpan.style.color = '#FFD43B';
-            labelSpan.style.fontWeight = 'bold';
-            labelSpan.style.flex = '1';
-        }
-    }
-
     // Execute Python code on click
     runButton.addEventListener('click', async () => {
         const editor = (element as any).editor;
         if (!editor) {
-            log.error(SEG.GLYPH, '[PyGlyph] Editor not initialized');
+            ui.log.error('Editor not initialized');
             return;
         }
 
         const currentCode = editor.state.doc.toString();
 
         try {
-            const response = await apiFetch('/api/python/execute', {
+            const response = await ui.pluginFetch('/execute', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    content: currentCode,
-                    capture_variables: false,
-                    glyph_id: glyph.id,
-                })
+                body: { content: currentCode, capture_variables: false, glyph_id: glyph.id },
             });
 
-            // Try to parse response body as ExecutionResult (even on 400)
             let result: ExecutionResult;
             try {
                 result = await response.json();
-            } catch (e) {
-                // If we can't parse the body, throw a generic error
+            } catch {
                 throw new Error(`Execution failed: ${response.statusText}`);
             }
 
-            // If response is not ok and we don't have a valid ExecutionResult, throw
             if (!response.ok && !result) {
                 throw new Error(`Execution failed: ${response.statusText}`);
             }
 
-            // Create result glyph for successful execution
-            createAndDisplayResultGlyph(element, result);
+            ui.spawnResult(result);
         } catch (error) {
-            log.error(SEG.GLYPH, '[PyGlyph] Execution failed:', error);
-            log.error(SEG.ERROR, '[Python Execution Error]', error);
+            ui.log.error('Execution failed:', error);
 
-            // Create error result glyph for network/parse failures
-            const errorResult: ExecutionResult = {
+            ui.spawnResult({
                 success: false,
                 stdout: '',
                 stderr: '',
                 result: null,
                 error: error instanceof Error ? error.message : String(error),
-                duration_ms: 0
-            };
-            createAndDisplayResultGlyph(element, errorResult);
+                duration_ms: 0,
+            });
         }
     });
 
@@ -154,7 +127,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     editorContainer.className = 'py-glyph-editor';
     editorContainer.style.flex = '1';
     editorContainer.style.overflow = 'hidden';
-    element.appendChild(editorContainer);
+    content.appendChild(editorContainer);
 
     // Initialize CodeMirror with loaded code
     try {
@@ -215,54 +188,4 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     return element;
 }
 
-/**
- * Create and display a result glyph for Python execution results
- */
-function createAndDisplayResultGlyph(pyElement: HTMLElement, result: ExecutionResult): void {
-    // Calculate position for result glyph (directly below the py glyph)
-    const pyRect = pyElement.getBoundingClientRect();
-    const canvas = pyElement.closest('.canvas-workspace') as HTMLElement;
-    if (!canvas) {
-        log.error(SEG.GLYPH, '[PyGlyph] Cannot spawn result glyph: no canvas-workspace ancestor');
-        return;
-    }
-    const canvasRect = canvas.getBoundingClientRect();
-
-    const x = Math.round(pyRect.left - canvasRect.left);
-    const y = Math.round(pyRect.bottom - canvasRect.top);
-
-    // Create result glyph metadata
-    const resultGlyphId = `result-${crypto.randomUUID()}`;
-    const resultGlyph: Glyph = {
-        id: resultGlyphId,
-        title: 'Python Result',
-        symbol: 'result',
-        x,
-        y,
-        width: Math.round(pyRect.width),
-        renderContent: () => document.createElement('div')
-    };
-
-    // Render result glyph and add to canvas (performMeld needs both on canvas)
-    const resultElement = createResultGlyph(resultGlyph, result);
-    canvas.appendChild(resultElement);
-
-    // Persist to uiState with execution result
-    const resultRect = resultElement.getBoundingClientRect();
-    uiState.addCanvasGlyph({
-        id: resultGlyphId,
-        symbol: 'result',
-        x,
-        y,
-        width: Math.round(resultRect.width),
-        height: Math.round(resultRect.height),
-        content: JSON.stringify(result),
-    });
-
-    // Auto-meld result below py glyph (bottom port)
-    const pyGlyphId = pyElement.dataset.glyphId;
-    if (pyGlyphId) {
-        autoMeldResultBelow(pyElement, pyGlyphId, 'py', 'Python', resultElement, resultGlyphId, 'PyGlyph');
-    }
-}
 
