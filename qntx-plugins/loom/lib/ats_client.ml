@@ -31,7 +31,7 @@ let create_weave ~branch ~context ~text ~word_count ~turn_count ~paths =
      * Struct is a map of string → Value, where Value can be
      * string, number, bool, list, or nested struct.
      * ocaml-protoc-plugin represents oneof fields as polymorphic variants. *)
-    let open Google_types.Struct.Google.Protobuf in
+    let open Qntx_plugin_proto.Struct.Google.Protobuf in
     let string_val s =
       Value.make ~kind:(`String_value s) ()
     in
