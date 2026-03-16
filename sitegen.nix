@@ -212,6 +212,7 @@ let
 
   # Static assets as attrsets (single source of truth)
   cssFiles = {
+    tokens = ./web/css/tokens.css;
     core = ./web/css/core.css;
     utilities = ./web/css/utilities.css;
     docs = ./web/css/docs.css;
@@ -1277,9 +1278,9 @@ let
   # Extract CSS variable value from core.css
   extractCssVar = varName:
     let
-      coreCss = builtins.readFile cssFiles.core;
+      tokensCss = builtins.readFile cssFiles.tokens;
       # Match --var-name: value; (handles spaces, colors, etc)
-      lines = lib.splitString "\n" coreCss;
+      lines = lib.splitString "\n" tokensCss;
       matchingLines = lib.filter (line: lib.hasInfix "--${varName}:" line) lines;
       extractValue = line:
         let
@@ -1294,7 +1295,7 @@ let
     in
     if matchingLines != [ ]
     then extractValue (lib.head matchingLines)
-    else throw "CSS variable --${varName} not found in core.css";
+    else throw "CSS variable --${varName} not found in tokens.css";
 
   # XSLT colors automatically extracted from core.css (single source of truth!)
   xsltColors = {
