@@ -221,7 +221,7 @@ function handleSymbolClick(e: Event): void {
     switch(cmd) {
         case 'i':
             // Self - operator vantage point, system diagnostic
-            showSelfWindow();
+            glyphRun.openGlyph('self-glyph');
             break;
         case 'am':
             // Configuration - system configuration introspection
@@ -334,18 +334,6 @@ async function showDatabaseWindow(): Promise<void> {
         databaseWindowInstance = module.databaseStatsWindow;
     }
     databaseWindowInstance.toggle();
-}
-
-/**
- * Show self window - displays system diagnostic information
- */
-let selfWindowInstance: any = null;
-async function showSelfWindow(): Promise<void> {
-    if (!selfWindowInstance) {
-        const module = await import('./self-window.js');
-        selfWindowInstance = module.selfWindow;
-    }
-    selfWindowInstance.toggle();
 }
 
 /**
