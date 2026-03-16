@@ -5,7 +5,7 @@
  * - ax (⋈): Shows ax statement types with descriptions
  * - as (+): Shows previously executed ATS query history
  *
- * For ix (⨳) operations, see job-list-panel.js
+ * For ix (⨳) operations, see pulse-panel.ts
  */
 
 import { BasePanel } from './base-panel.ts';
