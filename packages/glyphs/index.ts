@@ -10,7 +10,7 @@
  *   import type { Glyph, GlyphUI, RenderFn } from '@qntx/glyphs';
  *
  *   export const render: RenderFn = (glyph, ui) => {
- *       const { element } = ui.container({ ... });
+ *       const { element } = ui.glyph({ ... });
  *       return element;
  *   };
  */
@@ -24,7 +24,8 @@ export type {
     GlyphModule,
     GlyphDef,
     RenderFn,
-    ContainerOpts,
+    GlyphOpts,
     FetchOpts,
     MeldEvent,
+    SpawnResultDetail,
 } from '../../web/ts/components/glyph/glyph-ui';
