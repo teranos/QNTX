@@ -126,7 +126,7 @@ export interface MeldEvent {
 
 export interface GlyphOpts {
     defaults: { x: number; y: number; width: number; height: number };
-    titleBar?: { label: string; actions?: HTMLElement[] };
+    titleBar?: { label: string; actions?: HTMLElement[]; color?: string };
     resizable?: boolean | { minWidth?: number; minHeight?: number };
     className?: string;
     /** Custom drag handle element. Falls back to title bar, then container. */
@@ -170,6 +170,10 @@ export function createGlyphUI(glyph: Glyph, pluginName: string): GlyphUI {
 
             const result = canvasPlaced(config);
             rootElement = result.element;
+
+            if (opts.titleBar?.color && result.titleBar) {
+                result.titleBar.style.backgroundColor = opts.titleBar.color;
+            }
 
             // Flush any cleanups registered before container() was called
             for (const fn of pendingCleanups) {
