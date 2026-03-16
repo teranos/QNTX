@@ -18,7 +18,7 @@ export const glyphDef: GlyphDef = {
 };
 
 export const render: RenderFn = async (glyph: Glyph, ui: GlyphUI): Promise<HTMLElement> => {
-    const { element, titleBar } = ui.container({
+    const { element, titleBar, content } = ui.container({
         defaults: {
             x: glyph.x ?? 200,
             y: glyph.y ?? 200,
@@ -29,11 +29,7 @@ export const render: RenderFn = async (glyph: Glyph, ui: GlyphUI): Promise<HTMLE
         resizable: true,
     });
 
-    // Content wrapper
-    const content = document.createElement('div');
-    content.style.flex = '1';
-    content.style.overflow = 'auto';
-    content.style.padding = '8px';
+    // Content wrapper — SDK provides flex:1, overflow:auto, padding:8px
     content.style.display = 'flex';
     content.style.flexDirection = 'column';
     content.style.gap = '8px';
@@ -94,7 +90,6 @@ export const render: RenderFn = async (glyph: Glyph, ui: GlyphUI): Promise<HTMLE
     // Assemble
     content.appendChild(configSection);
     content.appendChild(responseSection);
-    element.appendChild(content);
 
     // Hydrate inputs from saved config
     const config = await ui.loadConfig();

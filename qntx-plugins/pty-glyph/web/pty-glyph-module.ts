@@ -11,7 +11,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 
 export const render: RenderFn = async (glyph: Glyph, ui: GlyphUI): Promise<HTMLElement> => {
-    const { element } = ui.container({
+    const { element, content } = ui.container({
         defaults: {
             x: glyph.x ?? 200,
             y: glyph.y ?? 200,
@@ -23,10 +23,10 @@ export const render: RenderFn = async (glyph: Glyph, ui: GlyphUI): Promise<HTMLE
         className: 'canvas-pty-glyph',
     });
 
-    const termDiv = document.createElement('div');
-    termDiv.style.flex = '1';
-    termDiv.style.overflow = 'hidden';
-    element.appendChild(termDiv);
+    // Terminal manages its own scrolling — override content area defaults
+    content.style.padding = '0';
+    content.style.overflow = 'hidden';
+    const termDiv = content;
 
     // Tells the canvas click handler to skip focus theft and glyph selection
     ui.preventDrag(termDiv);

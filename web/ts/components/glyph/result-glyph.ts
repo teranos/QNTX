@@ -264,10 +264,7 @@ export function createResultGlyph(
 
     // Output container
     const outputContainer = document.createElement('div');
-    outputContainer.className = 'result-glyph-output';
-    outputContainer.style.flex = '1';
-    outputContainer.style.overflow = 'auto';
-    outputContainer.style.padding = '8px';
+    outputContainer.className = 'result-glyph-output glyph-content-area';
     outputContainer.style.fontFamily = 'monospace';
     outputContainer.style.fontSize = '12px';
     outputContainer.style.whiteSpace = 'pre-wrap';

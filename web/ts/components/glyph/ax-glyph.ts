@@ -110,10 +110,7 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
 
     // Results container - scrollable list of matched attestations (gets all remaining space)
     const resultsContainer = document.createElement('div');
-    resultsContainer.className = 'ax-glyph-results';
-    resultsContainer.style.flex = '1';
-    resultsContainer.style.overflow = 'auto';
-    resultsContainer.style.padding = '8px';
+    resultsContainer.className = 'ax-glyph-results glyph-content-area';
     resultsContainer.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
     resultsContainer.style.borderTop = '1px solid var(--border)';
     resultsContainer.style.fontSize = '12px';
