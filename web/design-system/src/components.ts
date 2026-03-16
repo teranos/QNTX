@@ -3,6 +3,9 @@
  *
  * Split into SDK Primitives (what plugins get through ui.*)
  * and Internal Systems (used by QNTX core).
+ *
+ * The gallery itself is built from glyph primitives — title bars
+ * as section headers, glyph containers as specimen wrappers.
  */
 
 interface ButtonSpec {
@@ -25,14 +28,7 @@ export function renderComponentGallery(root: HTMLElement) {
   section.appendChild(h2)
 
   // ── SDK Primitives ──
-  const sdkHeader = document.createElement('h3')
-  sdkHeader.className = 'component-section-header'
-  sdkHeader.textContent = 'SDK Primitives'
-  const sdkDesc = document.createElement('p')
-  sdkDesc.className = 'component-section-desc'
-  sdkDesc.textContent = 'What plugins get through ui.* — the canonical components for plugin-authored glyphs'
-  section.appendChild(sdkHeader)
-  section.appendChild(sdkDesc)
+  section.appendChild(sectionGlyph('SDK Primitives', 'What plugins get through ui.* — the canonical components for plugin-authored glyphs'))
 
   // glyph-btn (SDK: ui.button())
   const glyphBtnMatrix = buttonMatrix('ui.button()', 'glyph-btn — default and primary variants', ['default', 'primary'], [
@@ -46,108 +42,92 @@ export function renderComponentGallery(root: HTMLElement) {
   ])
   section.appendChild(glyphBtnMatrix)
 
-  // SDK glyph specimen — container + input + button + statusLine together
-  const sdkGroup = document.createElement('div')
-  sdkGroup.className = 'button-group'
+  // Three mini glyphs side by side — showing colored title bars + content
+  const glyphRow = document.createElement('div')
+  glyphRow.className = 'glyph-specimen-row'
 
-  const glyphHeader = document.createElement('div')
-  glyphHeader.className = 'button-group-header'
-  const glyphName = document.createElement('span')
-  glyphName.className = 'button-group-name'
-  glyphName.textContent = 'Plugin glyph'
-  const glyphDescEl = document.createElement('span')
-  glyphDescEl.className = 'button-group-desc'
-  glyphDescEl.textContent = 'ui.glyph() + ui.input() + ui.button() + ui.statusLine() — as used by ix-json'
-  glyphHeader.appendChild(glyphName)
-  glyphHeader.appendChild(glyphDescEl)
-  sdkGroup.appendChild(glyphHeader)
+  // ix-json: default title bar + SDK primitives
+  const ixJsonGlyph = miniGlyph('ix-json', undefined, 180, (content) => {
+    const urlInput = document.createElement('div')
+    urlInput.className = 'glyph-form-group'
+    const urlLbl = document.createElement('label')
+    urlLbl.className = 'glyph-label'
+    urlLbl.textContent = 'API URL'
+    urlInput.appendChild(urlLbl)
+    const urlInp = document.createElement('input')
+    urlInp.className = 'glyph-input'
+    urlInp.type = 'text'
+    urlInp.placeholder = 'https://api.example.com/data'
+    urlInput.appendChild(urlInp)
+    content.appendChild(urlInput)
 
-  // Mini glyph: title bar + content area with input, button, status
-  const glyphDemo = document.createElement('div')
-  glyphDemo.style.display = 'flex'
-  glyphDemo.style.flexDirection = 'column'
-  glyphDemo.style.border = '1px solid var(--border-on-dark)'
-  glyphDemo.style.borderRadius = 'var(--border-radius)'
-  glyphDemo.style.height = '200px'
-  glyphDemo.style.overflow = 'hidden'
-  glyphDemo.style.background = 'var(--bg-secondary)'
+    const fetchBtn = document.createElement('button')
+    fetchBtn.className = 'glyph-btn glyph-btn--primary'
+    fetchBtn.textContent = 'Fetch'
+    content.appendChild(fetchBtn)
 
-  const demoTitleBar = document.createElement('div')
-  demoTitleBar.className = 'glyph-title-bar'
-  const demoLabel = document.createElement('span')
-  demoLabel.textContent = 'ix-json'
-  demoTitleBar.appendChild(demoLabel)
-  const closeBtn = document.createElement('button')
-  closeBtn.className = 'titlebar-btn'
-  closeBtn.textContent = '\u2715'
-  demoTitleBar.appendChild(closeBtn)
-  glyphDemo.appendChild(demoTitleBar)
+    const statusEl = document.createElement('div')
+    statusEl.className = 'glyph-status'
+    statusEl.style.fontFamily = 'monospace'
+    statusEl.style.fontSize = 'var(--font-size-xs)'
+    statusEl.style.minHeight = '16px'
+    statusEl.style.lineHeight = '16px'
+    content.appendChild(statusEl)
 
-  const demoContent = document.createElement('div')
-  demoContent.className = 'glyph-content-area'
-  demoContent.style.display = 'flex'
-  demoContent.style.flexDirection = 'column'
-  demoContent.style.gap = '8px'
-
-  const urlInput = document.createElement('div')
-  urlInput.className = 'glyph-form-group'
-  const urlLbl = document.createElement('label')
-  urlLbl.className = 'glyph-label'
-  urlLbl.textContent = 'API URL'
-  urlInput.appendChild(urlLbl)
-  const urlInp = document.createElement('input')
-  urlInp.className = 'glyph-input'
-  urlInp.type = 'text'
-  urlInp.placeholder = 'https://api.example.com/data'
-  urlInput.appendChild(urlInp)
-  demoContent.appendChild(urlInput)
-
-  const fetchBtn = document.createElement('button')
-  fetchBtn.className = 'glyph-btn glyph-btn--primary'
-  fetchBtn.textContent = 'Fetch'
-  demoContent.appendChild(fetchBtn)
-
-  const statusEl = document.createElement('div')
-  statusEl.className = 'glyph-status'
-  statusEl.style.fontSize = 'var(--font-size-sm)'
-  statusEl.style.minHeight = '16px'
-  demoContent.appendChild(statusEl)
-
-  // Interactive: click Fetch to cycle through status states
-  let demoState = 0
-  fetchBtn.addEventListener('click', () => {
-    if (demoState === 0) {
-      statusEl.textContent = 'Fetching...'
-      statusEl.style.color = 'var(--text-on-dark-tertiary)'
-      demoState = 1
-      setTimeout(() => fetchBtn.click(), 800)
-    } else if (demoState === 1) {
-      if (urlInp.value) {
-        statusEl.textContent = 'OK — 200, 1.4kb'
-        statusEl.style.color = 'var(--color-success, #22c55e)'
-        demoState = 2
-        setTimeout(() => { statusEl.textContent = ''; demoState = 0 }, 4000)
-      } else {
-        statusEl.textContent = 'No URL provided'
-        statusEl.style.color = 'var(--color-error, #ef4444)'
-        demoState = 0
+    // Interactive: click Fetch to cycle through status states
+    let demoState = 0
+    fetchBtn.addEventListener('click', () => {
+      if (demoState === 0) {
+        statusEl.textContent = 'Fetching...'
+        statusEl.style.color = 'var(--text-on-dark-tertiary)'
+        demoState = 1
+        setTimeout(() => fetchBtn.click(), 800)
+      } else if (demoState === 1) {
+        if (urlInp.value) {
+          statusEl.textContent = 'OK — 200, 1.4kb'
+          statusEl.style.color = 'var(--color-success, #22c55e)'
+          demoState = 2
+          setTimeout(() => { statusEl.textContent = ''; demoState = 0 }, 4000)
+        } else {
+          statusEl.textContent = 'No URL provided'
+          statusEl.style.color = 'var(--color-error, #ef4444)'
+          demoState = 0
+        }
       }
-    }
+    })
   })
+  glyphRow.appendChild(ixJsonGlyph)
 
-  glyphDemo.appendChild(demoContent)
-  sdkGroup.appendChild(glyphDemo)
-  section.appendChild(sdkGroup)
+  // py-glyph: Python blue title bar + code placeholder
+  const pyGlyph = miniGlyph('py-glyph', '#2a5578', 180, (content) => {
+    const code = document.createElement('pre')
+    code.style.fontFamily = 'monospace'
+    code.style.fontSize = 'var(--font-size-sm)'
+    code.style.color = 'var(--text-on-dark)'
+    code.style.whiteSpace = 'pre-wrap'
+    code.style.wordBreak = 'break-word'
+    code.textContent = 'import time\nimport secrets\n\nfoo = [\'teach\', \'meld\']\nprint(secrets.choice(foo))'
+    content.appendChild(code)
+  }, [{ label: '\u25B6', cls: 'titlebar-btn' }])
+  glyphRow.appendChild(pyGlyph)
+
+  // ts-glyph: TypeScript amber title bar + code placeholder
+  const tsGlyph = miniGlyph('ts-glyph', '#5c3d1a', 180, (content) => {
+    const code = document.createElement('pre')
+    code.style.fontFamily = 'monospace'
+    code.style.fontSize = 'var(--font-size-sm)'
+    code.style.color = 'var(--text-on-dark)'
+    code.style.whiteSpace = 'pre-wrap'
+    code.style.wordBreak = 'break-word'
+    code.textContent = 'const subjects = ["alice", "bob"]\nconst id = generateASUID()\nconsole.log(id)'
+    content.appendChild(code)
+  }, [{ label: '\u25B6', cls: 'titlebar-btn' }])
+  glyphRow.appendChild(tsGlyph)
+
+  section.appendChild(glyphRow)
 
   // ── Internal Systems ──
-  const internalHeader = document.createElement('h3')
-  internalHeader.className = 'component-section-header'
-  internalHeader.textContent = 'Internal Systems'
-  const internalDesc = document.createElement('p')
-  internalDesc.className = 'component-section-desc'
-  internalDesc.textContent = 'Used by QNTX core — not exposed to plugins'
-  section.appendChild(internalHeader)
-  section.appendChild(internalDesc)
+  section.appendChild(sectionGlyph('Internal Systems', 'Used by QNTX core — not exposed to plugins'))
 
   // qntx-btn: one matrix — variants + states as rows, sizes as columns
   const variants = ['default', 'primary', 'secondary', 'danger', 'warning', 'ghost']
@@ -197,227 +177,297 @@ export function renderComponentGallery(root: HTMLElement) {
   section.appendChild(qntxMatrix)
 
   // Interactive two-stage confirmation demo
-  const confirmGroup = document.createElement('div')
-  confirmGroup.className = 'button-group'
+  section.appendChild(glyphSection('Two-stage confirmation', 'First click enters confirming state, second click executes. Auto-reverts after 3s.', (body) => {
+    const confirmRow = document.createElement('div')
+    confirmRow.className = 'sdk-specimen-row'
 
-  const confirmHeader = document.createElement('div')
-  confirmHeader.className = 'button-group-header'
-  const confirmName = document.createElement('span')
-  confirmName.className = 'button-group-name'
-  confirmName.textContent = 'Two-stage confirmation'
-  const confirmDesc = document.createElement('span')
-  confirmDesc.className = 'button-group-desc'
-  confirmDesc.textContent = 'First click enters confirming state, second click executes. Auto-reverts after 3s.'
-  confirmHeader.appendChild(confirmName)
-  confirmHeader.appendChild(confirmDesc)
-  confirmGroup.appendChild(confirmHeader)
+    for (const variant of ['danger', 'warning', 'ghost'] as const) {
+      const wrapper = document.createElement('div')
+      wrapper.className = 'two-stage-demo'
 
-  const confirmRow = document.createElement('div')
-  confirmRow.className = 'sdk-specimen-row'
+      const btn = document.createElement('button')
+      btn.className = `qntx-btn qntx-btn-medium qntx-btn-${variant}`
+      btn.style.minWidth = '120px'
 
-  for (const variant of ['danger', 'warning', 'ghost'] as const) {
-    const wrapper = document.createElement('div')
-    wrapper.className = 'two-stage-demo'
+      const label = document.createElement('span')
+      label.className = 'qntx-btn-label'
+      label.textContent = variant === 'danger' ? 'Delete' : variant === 'warning' ? 'Reset' : 'Clear'
+      btn.appendChild(label)
 
-    const btn = document.createElement('button')
-    btn.className = `qntx-btn qntx-btn-medium qntx-btn-${variant}`
-    btn.style.minWidth = '120px'
+      const originalText = label.textContent
+      const confirmText = 'Are you sure?'
+      let confirming = false
+      let timeout: ReturnType<typeof setTimeout> | null = null
 
-    const label = document.createElement('span')
-    label.className = 'qntx-btn-label'
-    label.textContent = variant === 'danger' ? 'Delete' : variant === 'warning' ? 'Reset' : 'Clear'
-    btn.appendChild(label)
-
-    const originalText = label.textContent
-    const confirmText = 'Are you sure?'
-    let confirming = false
-    let timeout: ReturnType<typeof setTimeout> | null = null
-
-    btn.addEventListener('click', () => {
-      if (!confirming) {
-        confirming = true
-        label.textContent = confirmText
-        btn.classList.add('qntx-btn-confirming')
-        timeout = setTimeout(() => {
+      btn.addEventListener('click', () => {
+        if (!confirming) {
+          confirming = true
+          label.textContent = confirmText
+          btn.classList.add('qntx-btn-confirming')
+          timeout = setTimeout(() => {
+            confirming = false
+            label.textContent = originalText
+            btn.classList.remove('qntx-btn-confirming')
+          }, 3000)
+        } else {
           confirming = false
-          label.textContent = originalText
+          if (timeout) clearTimeout(timeout)
           btn.classList.remove('qntx-btn-confirming')
-        }, 3000)
-      } else {
-        confirming = false
-        if (timeout) clearTimeout(timeout)
-        btn.classList.remove('qntx-btn-confirming')
-        label.textContent = 'Done!'
-        btn.classList.add('qntx-btn-loading')
-        setTimeout(() => {
-          label.textContent = originalText
-          btn.classList.remove('qntx-btn-loading')
-        }, 1000)
-      }
-    })
+          label.textContent = 'Done!'
+          btn.classList.add('qntx-btn-loading')
+          setTimeout(() => {
+            label.textContent = originalText
+            btn.classList.remove('qntx-btn-loading')
+          }, 1000)
+        }
+      })
 
-    const variantLabel = document.createElement('span')
-    variantLabel.className = 'button-class-label'
-    variantLabel.textContent = `qntx-btn-${variant}`
-    variantLabel.style.marginTop = '4px'
-    variantLabel.style.display = 'block'
-    variantLabel.style.fontSize = 'var(--font-size-xs)'
-    variantLabel.style.color = 'var(--text-on-dark-tertiary)'
+      const variantLabel = document.createElement('span')
+      variantLabel.style.marginTop = '4px'
+      variantLabel.style.display = 'block'
+      variantLabel.style.fontSize = 'var(--font-size-xs)'
+      variantLabel.style.color = 'var(--text-on-dark-tertiary)'
+      variantLabel.textContent = `qntx-btn-${variant}`
 
-    wrapper.appendChild(btn)
-    wrapper.appendChild(variantLabel)
-    confirmRow.appendChild(wrapper)
-  }
+      wrapper.appendChild(btn)
+      wrapper.appendChild(variantLabel)
+      confirmRow.appendChild(wrapper)
+    }
 
-  confirmGroup.appendChild(confirmRow)
-  section.appendChild(confirmGroup)
+    body.appendChild(confirmRow)
+  }))
 
-  // titlebar — rendered as live title bar strips
-  const titlebarSection = document.createElement('div')
-  titlebarSection.className = 'button-group'
+  // titlebar specimens
+  section.appendChild(glyphSection('glyph-title-bar', 'Unified title bar for all glyph manifestations', (body) => {
+    const tbRow = document.createElement('div')
+    tbRow.className = 'titlebar-row'
 
-  const tbHeader = document.createElement('div')
-  tbHeader.className = 'button-group-header'
-  const tbName = document.createElement('span')
-  tbName.className = 'button-group-name'
-  tbName.textContent = 'glyph-title-bar'
-  const tbDesc = document.createElement('span')
-  tbDesc.className = 'button-group-desc'
-  tbDesc.textContent = 'Unified title bar for all glyph manifestations'
-  tbHeader.appendChild(tbName)
-  tbHeader.appendChild(tbDesc)
-  titlebarSection.appendChild(tbHeader)
+    tbRow.appendChild(titleBarStrip('Standard', 'glyph-title-bar', 'ix-prompt', [
+      { label: '\u25B6', cls: 'titlebar-btn' },
+      { label: '\u2715', cls: 'titlebar-btn' },
+    ]))
 
-  const tbRow = document.createElement('div')
-  tbRow.className = 'titlebar-row'
+    tbRow.appendChild(titleBarStrip('Generic buttons', 'glyph-title-bar', 'result-glyph', [
+      { label: '\u229E', cls: '' },
+      { label: '\u2715', cls: '' },
+    ]))
 
-  tbRow.appendChild(titleBarStrip('Standard', 'glyph-title-bar', 'ix-prompt', [
-    { label: '▶', cls: 'titlebar-btn' },
-    { label: '✕', cls: 'titlebar-btn' },
-  ]))
+    const panelWrap = document.createElement('div')
+    panelWrap.className = 'glyph-panel titlebar-specimen'
+    const panelLabel = document.createElement('span')
+    panelLabel.className = 'titlebar-specimen-label'
+    panelLabel.textContent = 'Panel (no drag cursor)'
+    panelWrap.appendChild(panelLabel)
+    const panelBar = document.createElement('div')
+    panelBar.className = 'glyph-title-bar'
+    const panelTitle = document.createElement('span')
+    panelTitle.textContent = 'plugin-config'
+    panelTitle.style.flex = '1'
+    panelBar.appendChild(panelTitle)
+    const panelBtn = document.createElement('button')
+    panelBtn.className = 'titlebar-btn'
+    panelBtn.textContent = '\u2715'
+    panelBar.appendChild(panelBtn)
+    panelWrap.appendChild(panelBar)
+    tbRow.appendChild(panelWrap)
 
-  tbRow.appendChild(titleBarStrip('Generic buttons', 'glyph-title-bar', 'result-glyph', [
-    { label: '⊞', cls: '' },
-    { label: '✕', cls: '' },
-  ]))
+    body.appendChild(tbRow)
 
-  const panelWrap = document.createElement('div')
-  panelWrap.className = 'glyph-panel titlebar-specimen'
-  const panelLabel = document.createElement('span')
-  panelLabel.className = 'titlebar-specimen-label'
-  panelLabel.textContent = 'Panel (no drag cursor)'
-  panelWrap.appendChild(panelLabel)
-  const panelBar = document.createElement('div')
-  panelBar.className = 'glyph-title-bar'
-  const panelTitle = document.createElement('span')
-  panelTitle.textContent = 'plugin-config'
-  panelTitle.style.flex = '1'
-  panelBar.appendChild(panelTitle)
-  const panelBtn = document.createElement('button')
-  panelBtn.className = 'titlebar-btn'
-  panelBtn.textContent = '✕'
-  panelBar.appendChild(panelBtn)
-  panelWrap.appendChild(panelBar)
-  tbRow.appendChild(panelWrap)
-
-  titlebarSection.appendChild(tbRow)
-
-  // Auto-height on its own (wider to show wrapping)
-  titlebarSection.appendChild(titleBarStrip('Auto-height (--auto)', 'glyph-title-bar glyph-title-bar--auto', 'attestation with a longer title that wraps to demonstrate auto-height behavior', [
-    { label: '⟳', cls: 'titlebar-btn' },
-    { label: '✕', cls: 'titlebar-btn' },
-  ]))
-
-  section.appendChild(titlebarSection)
+    // Auto-height
+    body.appendChild(titleBarStrip('Auto-height (--auto)', 'glyph-title-bar glyph-title-bar--auto', 'attestation with a longer title that wraps to demonstrate auto-height behavior', [
+      { label: '\u27F3', cls: 'titlebar-btn' },
+      { label: '\u2715', cls: 'titlebar-btn' },
+    ]))
+  }))
 
   root.appendChild(section)
 }
 
-function buttonMatrix(name: string, description: string, columnLabels: string[], rows: MatrixRow[]): HTMLElement {
+// ── Helpers ──
+
+/** Section header rendered as a glyph title bar */
+function sectionGlyph(title: string, description: string): HTMLElement {
+  const wrapper = document.createElement('div')
+  wrapper.style.marginTop = '10px'
+  wrapper.style.marginBottom = '6px'
+
+  const bar = document.createElement('div')
+  bar.className = 'glyph-title-bar'
+
+  const titleSpan = document.createElement('span')
+  titleSpan.style.flex = '1'
+  titleSpan.textContent = title
+  bar.appendChild(titleSpan)
+
+  wrapper.appendChild(bar)
+
+  if (description) {
+    const desc = document.createElement('div')
+    desc.style.fontSize = 'var(--font-size-xs)'
+    desc.style.color = 'var(--text-on-dark-tertiary)'
+    desc.style.padding = '2px 8px'
+    desc.textContent = description
+    wrapper.appendChild(desc)
+  }
+
+  return wrapper
+}
+
+/** Component section wrapped in a glyph-like container with title bar */
+function glyphSection(title: string, description: string, buildContent: (body: HTMLElement) => void): HTMLElement {
   const container = document.createElement('div')
-  container.className = 'button-group'
+  container.style.border = '1px solid var(--border-on-dark)'
+  container.style.borderRadius = 'var(--border-radius)'
+  container.style.overflow = 'hidden'
+  container.style.marginBottom = '10px'
 
-  const header = document.createElement('div')
-  header.className = 'button-group-header'
+  const bar = document.createElement('div')
+  bar.className = 'glyph-title-bar'
 
-  const nameEl = document.createElement('span')
-  nameEl.className = 'button-group-name'
-  nameEl.textContent = name
+  const titleSpan = document.createElement('span')
+  titleSpan.style.flex = '1'
+  titleSpan.textContent = title
+  bar.appendChild(titleSpan)
 
-  const descEl = document.createElement('span')
-  descEl.className = 'button-group-desc'
-  descEl.textContent = description
+  const descSpan = document.createElement('span')
+  descSpan.style.fontSize = 'var(--font-size-xs)'
+  descSpan.style.color = 'var(--text-on-dark-tertiary)'
+  descSpan.textContent = description
+  bar.appendChild(descSpan)
 
-  header.appendChild(nameEl)
-  header.appendChild(descEl)
-  container.appendChild(header)
+  container.appendChild(bar)
 
-  const table = document.createElement('div')
-  table.className = 'button-matrix'
-  const hasRowLabels = rows.some(r => r.rowLabel)
-  table.style.gridTemplateColumns = hasRowLabels
-    ? `80px repeat(${columnLabels.length}, 1fr)`
-    : `repeat(${columnLabels.length}, 1fr)`
+  const body = document.createElement('div')
+  body.className = 'glyph-content-area'
+  buildContent(body)
+  container.appendChild(body)
 
-  // Column headers
-  if (hasRowLabels) {
-    const corner = document.createElement('div')
-    corner.className = 'button-matrix-header'
-    table.appendChild(corner)
-  }
-  for (const col of columnLabels) {
-    const colHeader = document.createElement('div')
-    colHeader.className = 'button-matrix-header'
-    colHeader.textContent = col
-    table.appendChild(colHeader)
-  }
-
-  // Rows
-  for (const row of rows) {
-    if (hasRowLabels) {
-      const rowLabel = document.createElement('div')
-      rowLabel.className = 'button-matrix-rowlabel'
-      rowLabel.textContent = row.rowLabel
-      table.appendChild(rowLabel)
-    }
-
-    for (const spec of row.cells) {
-      const cell = document.createElement('div')
-      cell.className = 'button-matrix-cell'
-
-      const btn = document.createElement('button')
-      btn.className = spec.classes
-      if (spec.disabled) btn.disabled = true
-
-      if (spec.classes.includes('qntx-btn-loading')) {
-        const spinner = document.createElement('span')
-        spinner.className = 'qntx-btn-spinner'
-        btn.appendChild(spinner)
-      }
-
-      const label = document.createElement('span')
-      label.className = 'qntx-btn-label'
-      label.textContent = spec.label
-      btn.appendChild(label)
-
-      cell.appendChild(btn)
-
-      // Click cell to copy full class string
-      cell.title = spec.classes
-      cell.addEventListener('click', (e) => {
-        if (e.target === btn || btn.contains(e.target as Node)) return
-        navigator.clipboard.writeText(spec.classes)
-      })
-
-      table.appendChild(cell)
-    }
-  }
-
-  container.appendChild(table)
   return container
 }
 
-function titleBarStrip(label: string, barClasses: string, title: string, buttons: {label: string, cls: string}[]): HTMLElement {
+/** Mini glyph specimen — title bar + content area */
+function miniGlyph(
+  title: string,
+  titleBarColor: string | undefined,
+  height: number,
+  buildContent: (content: HTMLElement) => void,
+  actions?: { label: string, cls: string }[],
+): HTMLElement {
+  const glyph = document.createElement('div')
+  glyph.style.display = 'flex'
+  glyph.style.flexDirection = 'column'
+  glyph.style.border = '1px solid var(--border-on-dark)'
+  glyph.style.borderRadius = 'var(--border-radius)'
+  glyph.style.height = `${height}px`
+  glyph.style.overflow = 'hidden'
+  glyph.style.background = 'var(--bg-secondary)'
+
+  const bar = document.createElement('div')
+  bar.className = 'glyph-title-bar'
+  if (titleBarColor) bar.style.backgroundColor = titleBarColor
+
+  const label = document.createElement('span')
+  label.textContent = title
+  label.style.flex = '1'
+  bar.appendChild(label)
+
+  if (actions) {
+    for (const a of actions) {
+      const btn = document.createElement('button')
+      if (a.cls) btn.className = a.cls
+      btn.textContent = a.label
+      bar.appendChild(btn)
+    }
+  }
+
+  const closeBtn = document.createElement('button')
+  closeBtn.className = 'titlebar-btn'
+  closeBtn.textContent = '\u2715'
+  bar.appendChild(closeBtn)
+
+  glyph.appendChild(bar)
+
+  const content = document.createElement('div')
+  content.className = 'glyph-content-area'
+  content.style.display = 'flex'
+  content.style.flexDirection = 'column'
+  content.style.gap = '8px'
+  buildContent(content)
+  glyph.appendChild(content)
+
+  return glyph
+}
+
+function buttonMatrix(name: string, description: string, columnLabels: string[], rows: MatrixRow[]): HTMLElement {
+  const container = glyphSection(name, description, (body) => {
+    const table = document.createElement('div')
+    table.className = 'button-matrix'
+    const hasRowLabels = rows.some(r => r.rowLabel)
+    table.style.gridTemplateColumns = hasRowLabels
+      ? `80px repeat(${columnLabels.length}, 1fr)`
+      : `repeat(${columnLabels.length}, 1fr)`
+
+    // Column headers
+    if (hasRowLabels) {
+      const corner = document.createElement('div')
+      corner.className = 'button-matrix-header'
+      table.appendChild(corner)
+    }
+    for (const col of columnLabels) {
+      const colHeader = document.createElement('div')
+      colHeader.className = 'button-matrix-header'
+      colHeader.textContent = col
+      table.appendChild(colHeader)
+    }
+
+    // Rows
+    for (const row of rows) {
+      if (hasRowLabels) {
+        const rowLabel = document.createElement('div')
+        rowLabel.className = 'button-matrix-rowlabel'
+        rowLabel.textContent = row.rowLabel
+        table.appendChild(rowLabel)
+      }
+
+      for (const spec of row.cells) {
+        const cell = document.createElement('div')
+        cell.className = 'button-matrix-cell'
+
+        const btn = document.createElement('button')
+        btn.className = spec.classes
+        if (spec.disabled) btn.disabled = true
+
+        if (spec.classes.includes('qntx-btn-loading')) {
+          const spinner = document.createElement('span')
+          spinner.className = 'qntx-btn-spinner'
+          btn.appendChild(spinner)
+        }
+
+        const label = document.createElement('span')
+        label.className = 'qntx-btn-label'
+        label.textContent = spec.label
+        btn.appendChild(label)
+
+        cell.appendChild(btn)
+
+        // Click cell to copy full class string
+        cell.title = spec.classes
+        cell.addEventListener('click', (e) => {
+          if (e.target === btn || btn.contains(e.target as Node)) return
+          navigator.clipboard.writeText(spec.classes)
+        })
+
+        table.appendChild(cell)
+      }
+    }
+
+    body.appendChild(table)
+  })
+
+  return container
+}
+
+function titleBarStrip(label: string, barClasses: string, title: string, buttons: {label: string, cls: string}[], bgColor?: string): HTMLElement {
   const row = document.createElement('div')
   row.className = 'titlebar-specimen'
 
@@ -428,6 +478,7 @@ function titleBarStrip(label: string, barClasses: string, title: string, buttons
 
   const bar = document.createElement('div')
   bar.className = barClasses
+  if (bgColor) bar.style.backgroundColor = bgColor
 
   const titleSpan = document.createElement('span')
   titleSpan.textContent = title
