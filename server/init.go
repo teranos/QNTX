@@ -372,6 +372,13 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	creationStats := NewCreationStatsObserver()
 	storage.RegisterObserver(creationStats)
 	ticker.SetCreationStats(creationStats)
+
+	// Configure periodic database backup via Rust's hot backup API
+	backupInterval := time.Duration(deps.config.Database.BackupIntervalSeconds) * time.Second
+	if bp, ok := atsStore.(schedule.BackupProvider); ok && backupInterval > 0 {
+		ticker.SetBackupProvider(bp, dbPath, backupInterval)
+		// TODO: make backup retention count configurable
+	}
 	server.wg.Add(1)
 	go func() {
 		defer server.wg.Done()

@@ -224,6 +224,20 @@ AttestationResultC storage_query_raw(const SqliteStore *store, const char *sql, 
 StringArrayResultC storage_integrity_check(const SqliteStore *store);
 
 // ============================================================================
+// Backup
+// ============================================================================
+
+/**
+ * Create a hot backup of the database to the given path.
+ * Uses SQLite's online backup API — safe to call while the database is in use.
+ *
+ * @param store Store handle
+ * @param dest_path Filesystem path for the backup file
+ * @return Result indicating success/failure
+ */
+StorageResultC storage_backup(const SqliteStore *store, const char *dest_path);
+
+// ============================================================================
 // Memory Management
 // ============================================================================
 

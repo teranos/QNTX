@@ -155,3 +155,9 @@ func (s *RustBackedStore) GenerateAndCreateAttestation(ctx context.Context, cmd 
 
 	return as, nil
 }
+
+// Backup creates a hot backup of the database to destPath.
+// Implements schedule.BackupProvider.
+func (s *RustBackedStore) Backup(destPath string) error {
+	return s.rust.Backup(destPath)
+}
