@@ -1,0 +1,5 @@
+(executable
+ (name main)
+ (public_name qntx-kern)
+ (package kern)
+ (libraries kern qntx-plugin))

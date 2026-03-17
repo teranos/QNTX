@@ -95,7 +95,7 @@ fn handle_deep_link(app: &tauri::AppHandle, url: &str) {
         "config" | "settings" | "preferences" => show_window_and_emit(app, "show-config-panel", ()),
         "docs" | "prose" | "documentation" => show_window_and_emit(app, "show-prose-panel", ()),
         "code" | "editor" => show_window_and_emit(app, "show-code-panel", ()),
-        "hixtory" | "history" => show_window_and_emit(app, "show-hixtory-panel", ()),
+        "hixtory" | "history" => show_window_and_emit(app, "show-pulse-panel", ()),
         _ if path.starts_with("job/") => {
             // qntx://job/<id> - emit event with job ID
             let job_id = path.strip_prefix("job/").unwrap_or("");
@@ -104,7 +104,7 @@ fn handle_deep_link(app: &tauri::AppHandle, url: &str) {
                 // This would provide full job details instead of just the ID
                 show_window_and_emit(app, "deep-link-job", job_id.to_string())
             } else {
-                show_window_and_emit(app, "show-hixtory-panel", ())
+                show_window_and_emit(app, "show-pulse-panel", ())
             }
         }
         _ => {
@@ -702,10 +702,9 @@ fn main() {
                             }
                         }
                         "hixtory_panel" => {
-                            if let Err(e) =
-                                show_window_and_emit(app_handle, "show-hixtory-panel", ())
+                            if let Err(e) = show_window_and_emit(app_handle, "show-pulse-panel", ())
                             {
-                                log::warn!("[menu] Failed to show hixtory panel: {}", e);
+                                log::warn!("[menu] Failed to show pulse panel: {}", e);
                             }
                         }
                         "refresh_graph" => {

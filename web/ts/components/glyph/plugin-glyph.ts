@@ -60,10 +60,7 @@ export async function createPluginGlyph(
 
     // Content container
     const content = document.createElement('div');
-    content.className = 'plugin-glyph-content';
-    content.style.flex = '1';
-    content.style.overflow = 'auto';
-    content.style.padding = '8px';
+    content.className = 'plugin-glyph-content glyph-content-area';
     element.appendChild(content);
 
     // Fetch and render plugin content
@@ -215,7 +212,7 @@ export function createPluginPlaceholderGlyph(
 
     // Muted styling (not alarming red)
     element.style.backgroundColor = 'rgba(30, 30, 35, 0.92)';
-    element.style.border = '1px solid var(--border-color)';
+    element.style.border = '1px solid var(--border)';
     element.style.pointerEvents = 'auto'; // Allow dragging
 
     // Custom title bar (same style as working plugin glyph)
