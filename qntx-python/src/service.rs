@@ -22,8 +22,9 @@ use crate::handlers::{HandlerContext, PluginState};
 use crate::proto::{
     domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, Empty,
     ExecuteJobRequest, ExecuteJobResponse, GlyphDefResponse, HealthResponse, HttpHeader,
-    HttpRequest, HttpResponse, InitializeRequest, InitializeResponse, MetadataResponse,
-    ParseAxQueryRequest, ParseAxQueryResponse, WebSocketMessage,
+    HttpRequest, HttpResponse, InitializeRequest, InitializeResponse, LlmChatRequest,
+    LlmChatResponse, MetadataResponse, ParseAxQueryRequest, ParseAxQueryResponse,
+    WebSocketMessage,
 };
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -321,7 +322,8 @@ impl DomainPluginService for PythonPluginService {
 
         Ok(Response::new(InitializeResponse {
             handler_names,
-            schedules: vec![], // Python plugin doesn't announce schedules yet
+            schedules: vec![],
+            ..Default::default()
         }))
     }
 
@@ -477,6 +479,15 @@ impl DomainPluginService for PythonPluginService {
         _request: Request<ParseAxQueryRequest>,
     ) -> Result<Response<ParseAxQueryResponse>, Status> {
         Err(Status::unimplemented("ParseAxQuery is handled by kern"))
+    }
+
+    async fn chat(
+        &self,
+        _request: Request<LlmChatRequest>,
+    ) -> Result<Response<LlmChatResponse>, Status> {
+        Err(Status::unimplemented(
+            "Python plugin does not implement LLM provider",
+        ))
     }
 
     /// Execute an async job
