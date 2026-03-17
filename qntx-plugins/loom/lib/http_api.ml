@@ -82,6 +82,12 @@ let handle_http reqd =
          respond_json reqd `Internal_server_error
            (Printf.sprintf {|{"error":"%s"}|} msg));
       Lwt.return_unit)
+  | `GET, "/api/sessions" ->
+    Lwt.async (fun () ->
+      let* sessions = Session_discovery.discover () in
+      let json = Session_discovery.sessions_to_json sessions in
+      respond_json reqd `OK (Yojson.Safe.to_string json);
+      Lwt.return_unit)
   | `POST, "/api/import" ->
     read_body reqd (fun body ->
       Lwt.async (fun () ->
@@ -102,10 +108,22 @@ let handle_http reqd =
           let results = Jsonl_reader.ingest ~file_path ~branch_override:None in
           let weave_count = List.length results in
           let* () = persist_weaves results in
+          (* Get file stats for WeaveComplete attestation *)
+          let file_size = (Unix.stat file_path).st_size in
+          let line_count = let ic = open_in file_path in
+            let n = ref 0 in
+            (try while true do ignore (input_line ic); incr n done
+             with End_of_file -> close_in ic);
+            !n in
+          (* Extract session ID from filename (uuid.jsonl) *)
+          let basename = Filename.basename file_path in
+          let session_id = Filename.remove_extension basename in
+          let* _wc = Ats_client.create_weave_complete
+            ~session_id ~file_path ~file_size ~line_count ~weave_count in
           Printf.printf "[loom] Import complete: %d weaves from %s\n%!" weave_count file_path;
           respond_json reqd `OK
-            (Printf.sprintf {|{"success":true,"weaves_created":%d,"file":"%s"}|}
-               weave_count file_path);
+            (Printf.sprintf {|{"success":true,"weaves_created":%d,"file":"%s","session_id":"%s"}|}
+               weave_count file_path session_id);
           Lwt.return_unit))
   | `OPTIONS, _ ->
     respond_json reqd `OK "{}"

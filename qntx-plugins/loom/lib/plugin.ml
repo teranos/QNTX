@@ -19,7 +19,7 @@ let handle_initialize raw =
    | Error _ ->
      Printf.printf "[loom] Warning: could not decode InitializeRequest\n%!");
   let resp = Protocol.InitializeResponse.make
-    ~handler_names:["stitch"; "ingest-jsonl"]
+    ~handler_names:["stitch"]
     () in
   let encoded = Qntx_plugin.Server.proto_to_string (Protocol.InitializeResponse.to_proto resp) in
   Lwt.return (Grpc.Status.(v OK), Some encoded)
