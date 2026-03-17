@@ -11,9 +11,18 @@ import (
 	"github.com/teranos/QNTX/errors"
 )
 
+// RawQuerier executes attestation queries through a single connection (Rust FFI).
+// When set on SQLQueryStore, all attestation queries route through this instead of *sql.DB.
+type RawQuerier interface {
+	QueryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error)
+	GetAllPredicates() ([]string, error)
+	GetAllContexts() ([]string, error)
+}
+
 // SQLQueryStore implements ats.AttestationQueryStore for SQL databases
 type SQLQueryStore struct {
 	db            *sql.DB
+	rawQuerier    RawQuerier        // Optional: routes queries through Rust FFI
 	queryExpander ats.QueryExpander // Optional query expander for NL queries
 }
 
@@ -33,8 +42,18 @@ func NewSQLQueryStoreWithExpander(db *sql.DB, expander ats.QueryExpander) *SQLQu
 	}
 }
 
+// SetRawQuerier sets the raw query executor (Rust FFI).
+// When set, all attestation queries route through this instead of *sql.DB.
+func (s *SQLQueryStore) SetRawQuerier(rq RawQuerier) {
+	s.rawQuerier = rq
+}
+
 // GetAllPredicates returns all distinct predicates in the database
 func (s *SQLQueryStore) GetAllPredicates(ctx context.Context) ([]string, error) {
+	if s.rawQuerier != nil {
+		return s.rawQuerier.GetAllPredicates()
+	}
+
 	query := `
 		SELECT DISTINCT predicates
 		FROM attestations
@@ -60,7 +79,6 @@ func (s *SQLQueryStore) GetAllPredicates(ctx context.Context) ([]string, error) 
 			return nil, err
 		}
 
-		// Simple JSON parsing - extract predicates from JSON array
 		predicates := parsePredicatesFromJSON(predicatesJSON)
 		for _, predicate := range predicates {
 			if predicate != "_" && predicate != "" && !seenPredicates[predicate] {
@@ -75,6 +93,10 @@ func (s *SQLQueryStore) GetAllPredicates(ctx context.Context) ([]string, error) 
 
 // GetAllContexts returns all distinct contexts in the database
 func (s *SQLQueryStore) GetAllContexts(ctx context.Context) ([]string, error) {
+	if s.rawQuerier != nil {
+		return s.rawQuerier.GetAllContexts()
+	}
+
 	query := `
 		SELECT DISTINCT contexts
 		FROM attestations
@@ -100,8 +122,7 @@ func (s *SQLQueryStore) GetAllContexts(ctx context.Context) ([]string, error) {
 			return nil, err
 		}
 
-		// Simple JSON parsing - extract contexts from JSON array
-		contexts := parsePredicatesFromJSON(contextsJSON) // Reuse the JSON parser
+		contexts := parsePredicatesFromJSON(contextsJSON)
 		for _, context := range contexts {
 			if context != "_" && context != "" && !seenContexts[context] {
 				allContexts = append(allContexts, context)
@@ -160,7 +181,22 @@ func (s *SQLQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilte
 		query += fmt.Sprintf(" LIMIT %d", limit)
 	}
 
-	// Execute query
+	// Execute query — route through Rust FFI when available
+	if s.rawQuerier != nil {
+		attestations, err := s.rawQuerier.QueryAttestationsRaw(query, qb.args)
+		if err != nil {
+			err = errors.Wrap(err, "failed to execute query via Rust")
+			err = errors.WithDetail(err, fmt.Sprintf("Subjects: %v", filter.Subjects))
+			err = errors.WithDetail(err, fmt.Sprintf("Predicates: %v", filter.Predicates))
+			err = errors.WithDetail(err, fmt.Sprintf("Contexts: %v", filter.Contexts))
+			err = errors.WithDetail(err, fmt.Sprintf("Actors: %v", filter.Actors))
+			err = errors.WithDetail(err, fmt.Sprintf("Limit: %d", filter.Limit))
+			err = errors.WithDetail(err, "Operation: ExecuteAxQuery")
+			return nil, err
+		}
+		return attestations, nil
+	}
+
 	rows, err := s.db.QueryContext(ctx, query, qb.args...)
 	if err != nil {
 		err = errors.Wrap(err, "failed to execute query")

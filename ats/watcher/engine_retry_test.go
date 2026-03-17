@@ -41,7 +41,7 @@ func TestEngine_RetryLogic(t *testing.T) {
 	}))
 	defer server.Close()
 
-	engine := watcher.NewEngine(db, server.URL, logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), server.URL, logger)
 
 	// Create watcher
 	store := storage.NewWatcherStore(db)
@@ -111,7 +111,7 @@ func TestEngine_RateLimitDrain(t *testing.T) {
 	}))
 	defer server.Close()
 
-	engine := watcher.NewEngine(db, server.URL, logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), server.URL, logger)
 
 	// 2 fires per second — one token every 500ms
 	store := storage.NewWatcherStore(db)

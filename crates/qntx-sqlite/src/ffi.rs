@@ -513,6 +513,94 @@ pub extern "C" fn storage_get_stats(store: *const SqliteStore) -> AttestationRes
 }
 
 // ============================================================================
+// Distinct Value Queries
+// ============================================================================
+
+/// Get all distinct predicates.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn storage_predicates(store: *const SqliteStore) -> StringArrayResultC {
+    if store.is_null() {
+        return StringArrayResultC::error("null store pointer");
+    }
+    let store = unsafe { &*store };
+    use qntx_core::storage::QueryStore;
+    match store.predicates() {
+        Ok(values) => StringArrayResultC::ok(values),
+        Err(e) => StringArrayResultC::error(&format!("{}", e)),
+    }
+}
+
+/// Get all distinct contexts.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn storage_contexts(store: *const SqliteStore) -> StringArrayResultC {
+    if store.is_null() {
+        return StringArrayResultC::error("null store pointer");
+    }
+    let store = unsafe { &*store };
+    use qntx_core::storage::QueryStore;
+    match store.contexts() {
+        Ok(values) => StringArrayResultC::ok(values),
+        Err(e) => StringArrayResultC::error(&format!("{}", e)),
+    }
+}
+
+// ============================================================================
+// Raw Query (Go query builder → Rust connection)
+// ============================================================================
+
+/// Execute a raw SQL query against attestations through Rust's connection.
+///
+/// Go keeps its query builder logic; Rust just executes the SQL.
+/// The query MUST select standard attestation columns in order.
+/// `params_json` is a JSON array of bind parameters, e.g. `["value1", 42]`.
+/// Returns JSON array of matching attestations.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn storage_query_raw(
+    store: *const SqliteStore,
+    sql: *const c_char,
+    params_json: *const c_char,
+) -> AttestationResultC {
+    if store.is_null() {
+        return AttestationResultC::error("null store pointer");
+    }
+
+    let sql_str = match unsafe { cstr_to_str(sql) } {
+        Ok(s) => s,
+        Err(e) => return AttestationResultC::error(e),
+    };
+
+    let params_str = match unsafe { cstr_to_str(params_json) } {
+        Ok(s) => s,
+        Err(e) => return AttestationResultC::error(e),
+    };
+
+    // Safety: reject writes through the raw query path
+    let sql_upper = sql_str.trim().to_uppercase();
+    if !sql_upper.starts_with("SELECT") {
+        return AttestationResultC::error("raw query must be a SELECT statement");
+    }
+
+    let store = unsafe { &*store };
+
+    match store.query_attestations_raw(sql_str, params_str) {
+        Ok(attestations) => {
+            let protos: Vec<qntx_proto::Attestation> = attestations
+                .into_iter()
+                .map(proto_convert::to_proto)
+                .collect();
+            match serde_json::to_string(&protos) {
+                Ok(json) => AttestationResultC::ok(json),
+                Err(e) => AttestationResultC::error(&format!("failed to serialize results: {}", e)),
+            }
+        }
+        Err(e) => AttestationResultC::error(&format!("raw query failed: {}", e)),
+    }
+}
+
+// ============================================================================
 // Memory Management
 // ============================================================================
 
@@ -542,6 +630,55 @@ pub extern "C" fn string_array_result_free(result: StringArrayResultC) {
 #[no_mangle]
 pub extern "C" fn count_result_free(result: CountResultC) {
     unsafe { free_cstring(result.error_msg) };
+}
+
+// ============================================================================
+// Integrity
+// ============================================================================
+
+/// Run PRAGMA integrity_check and return result lines.
+/// A healthy database returns a single-element array: ["ok"].
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn storage_integrity_check(store: *const SqliteStore) -> StringArrayResultC {
+    let store = unsafe {
+        match store.as_ref() {
+            Some(s) => s,
+            None => return StringArrayResultC::error("null store pointer"),
+        }
+    };
+    match store.integrity_check() {
+        Ok(lines) => StringArrayResultC::ok(lines),
+        Err(e) => StringArrayResultC::error(&format!("integrity check failed: {}", e)),
+    }
+}
+
+// ============================================================================
+// Backup
+// ============================================================================
+
+/// Create a hot backup of the database to the given path.
+/// Safe to call while the database is in use.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn storage_backup(
+    store: *const SqliteStore,
+    dest_path: *const c_char,
+) -> StorageResultC {
+    let store = unsafe {
+        match store.as_ref() {
+            Some(s) => s,
+            None => return StorageResultC::error("null store pointer"),
+        }
+    };
+    let dest = match unsafe { cstr_to_str(dest_path) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    match store.backup(dest) {
+        Ok(()) => StorageResultC::ok(),
+        Err(e) => StorageResultC::error(&format!("backup failed: {}", e)),
+    }
 }
 
 // ============================================================================
