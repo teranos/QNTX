@@ -1,0 +1,16 @@
+# Shared gRPC plugin library for QNTX OCaml plugins
+opam-version: "2.0"
+name: "qntx-plugin"
+version: "0.1.0"
+synopsis: "Shared gRPC server and proto types for QNTX OCaml plugins"
+depends: [
+  "ocaml" {>= "5.1.0"}
+  "dune" {>= "3.0"}
+  "ocaml-protoc-plugin" {>= "6.2.0"}
+  "grpc"
+  "grpc-lwt"
+  "h2"
+  "h2-lwt-unix"
+  "lwt"
+]
+build: ["dune" "build" "-p" "qntx-plugin"]

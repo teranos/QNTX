@@ -1,0 +1,8 @@
+(library
+ (name kern)
+ (public_name kern)
+ (libraries qntx-plugin sedlex yojson)
+ (preprocess (pps sedlex.ppx)))
+
+(menhir
+ (modules parser))

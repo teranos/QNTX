@@ -112,8 +112,8 @@ describe('AX Glyph - Tim (Happy Path)', () => {
         const element = createAxGlyph(makeGlyph('ax-tim-3'));
         const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
 
-        expect(element.style.backgroundColor).toBe('rgba(30, 30, 35, 0.92)');
-        expect(titleBar.style.backgroundColor).toBe('var(--bg-tertiary)');
+        expect(element.style.backgroundColor).toBe('var(--glyph-status-idle-bg)');
+        expect(titleBar.style.backgroundColor).toBe('var(--glyph-status-idle-section-bg)');
     });
 
     test('Tim creates glyph with persisted query from uiState', () => {

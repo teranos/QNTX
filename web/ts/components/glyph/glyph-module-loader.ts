@@ -46,7 +46,7 @@ export async function createPluginGlyphFromModule(
         // Create GlyphUI scoped to this glyph + plugin
         const ui = createGlyphUI(glyph, def.plugin);
 
-        // The module's render() may call ui.container() for a canvasPlaced
+        // The module's render() may call ui.glyph() for a canvasPlaced
         // wrapper, or return a raw element. If the returned element lacks
         // data-glyph-id, wrap it so selection/deletion work on the canvas.
         const rendered = await mod.render(glyph, ui);
