@@ -654,6 +654,34 @@ pub extern "C" fn storage_integrity_check(store: *const SqliteStore) -> StringAr
 }
 
 // ============================================================================
+// Backup
+// ============================================================================
+
+/// Create a hot backup of the database to the given path.
+/// Safe to call while the database is in use.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn storage_backup(
+    store: *const SqliteStore,
+    dest_path: *const c_char,
+) -> StorageResultC {
+    let store = unsafe {
+        match store.as_ref() {
+            Some(s) => s,
+            None => return StorageResultC::error("null store pointer"),
+        }
+    };
+    let dest = match unsafe { cstr_to_str(dest_path) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    match store.backup(dest) {
+        Ok(()) => StorageResultC::ok(),
+        Err(e) => StorageResultC::error(&format!("backup failed: {}", e)),
+    }
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 

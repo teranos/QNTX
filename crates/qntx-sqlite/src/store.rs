@@ -4,7 +4,7 @@ use qntx_core::{
     attestation::{Attestation, AxFilter, AxResult, AxSummary},
     storage::{AttestationStore, QueryStore, StorageStats, StoreError},
 };
-use rusqlite::{Connection, OptionalExtension};
+use rusqlite::{backup, Connection, OptionalExtension};
 use std::collections::HashMap;
 
 use crate::error::SqliteError;
@@ -82,6 +82,16 @@ impl SqliteStore {
             results.push(row.map_err(SqliteError::from)?);
         }
         Ok(results)
+    }
+
+    /// Create a hot backup of the database to the given path.
+    /// Uses SQLite's online backup API — safe to call while the database is in use.
+    pub fn backup(&self, dest_path: &str) -> StoreResult<()> {
+        let mut dest = Connection::open(dest_path).map_err(SqliteError::from)?;
+        let b = backup::Backup::new(&self.conn, &mut dest).map_err(SqliteError::from)?;
+        b.run_to_completion(100, std::time::Duration::from_millis(10), None)
+            .map_err(SqliteError::from)?;
+        Ok(())
     }
 
     /// Get a reference to the underlying connection
