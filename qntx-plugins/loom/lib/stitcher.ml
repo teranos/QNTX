@@ -1,20 +1,11 @@
 (* Stitcher — weaves conversation turns into embedding-ready text blocks
  *
- * Triggered by a watcher on UserPromptSubmit, Stop, Hook, and PreToolUse attestations.
- * Each invocation receives one attestation as JSON payload. The stitcher
- * extracts the conversational text (prompt or last_assistant_message),
- * buffers turns per branch, and emits a "woven" block when the buffer
- * exceeds max_chunk_words.
+ * Format-agnostic core: stitch_turn accepts pre-parsed turn data (branch,
+ * context, label, text) and handles buffering, chunking, and emission.
  *
- * The woven block is returned as the ExecuteJob result. The watcher
- * infrastructure or a future ATSStoreService call handles persistence.
- *
- * Attestation structure (from Graunde):
- *   subjects:   ["branch-name"]
- *   predicates: ["UserPromptSubmit"] or ["Stop"] or ["PreToolUse"] or ["Hook"]
- *   attributes: { "prompt": "..." } or { "last_assistant_message": "..." }
- *               or { "tool_input": { "command": "..." }, ... }
- *               or { "hook_output": "..." }
+ * Format-specific parsers call stitch_turn:
+ *   - stitch: parses Graunde attestation JSON (UDP listener path)
+ *   - jsonl_reader: parses Claude Code JSONL (historical import path)
  *)
 
 (* --- Configuration --- *)
@@ -226,17 +217,106 @@ let extract_text json predicate =
      | _ -> None)
   | _ -> None
 
-(* --- Core stitch logic --- *)
+(* --- Core stitch logic (format-agnostic) --- *)
 
 type stitch_result = {
   branch : string;
-  context : string;          (* Session context from Graunde (e.g. "session:abc-123") *)
+  context : string;          (* Session context (e.g. "session:abc-123") *)
   buffered_words : int;
   emitted : string option;  (* Some block when buffer exceeded max_chunk_words *)
   turn_count : int;          (* Number of turns in the emitted block *)
   paths : (string * string) list;  (* (tail, full_path) mapping for frontend hover *)
 }
 
+(* stitch_turn — format-agnostic entry point.
+ * Accepts pre-parsed turn data from any format parser (Graunde attestation,
+ * Claude Code JSONL, etc.) and handles buffering, chunking, and emission.
+ *
+ * predicate: controls boundary behavior ("SessionStart" flushes and restarts,
+ *            "SessionEnd" forces emit). Other values have no special meaning. *)
+let stitch_turn ~branch ~context ~predicate ~label ~text ~paths:turn_path =
+  let turn = Printf.sprintf "[%s] %s" label text in
+
+  let key = buffer_key branch context in
+
+  (* Branch change: flush old branch's buffer for this session *)
+  let branch_flush =
+    match Hashtbl.find_opt last_branch context with
+    | Some prev when prev <> branch ->
+      let old_key = buffer_key prev context in
+      (match Hashtbl.find_opt buffers old_key with
+       | Some existing when existing.turns <> [] ->
+         let block = existing.turns |> List.rev |> String.concat "\n\n" in
+         let total_words = buffer_word_count existing.turns in
+         let num_turns = List.length existing.turns in
+         Hashtbl.remove buffers old_key;
+         Printf.printf "[loom] Emitting %d-word block for branch %s (branch change to %s)\n%!"
+           total_words prev branch;
+         [{ branch = prev; context = existing.context; buffered_words = 0;
+            emitted = Some block; turn_count = num_turns; paths = existing.paths }]
+       | _ -> [])
+    | _ -> []
+  in
+  Hashtbl.replace last_branch context branch;
+
+  (* SessionStart: flush existing buffer first, then start fresh *)
+  let current_result =
+    if predicate = "SessionStart" then (
+      let emitted =
+        match Hashtbl.find_opt buffers key with
+        | Some existing when existing.turns <> [] ->
+          let block = existing.turns |> List.rev |> String.concat "\n\n" in
+          let total_words = buffer_word_count existing.turns in
+          let num_turns = List.length existing.turns in
+          Printf.printf "[loom] Emitting %d-word block for branch %s (session start)\n%!"
+            total_words branch;
+          Some (block, existing.context, num_turns, existing.paths)
+        | _ -> None
+      in
+      (* Start fresh buffer with the SessionStart marker *)
+      Hashtbl.replace buffers key { context; turns = [turn]; paths = turn_path };
+      match emitted with
+      | Some (block, old_context, num_turns, old_paths) ->
+        { branch; context = old_context; buffered_words = 0; emitted = Some block; turn_count = num_turns; paths = old_paths }
+      | None ->
+        Printf.printf "[loom] Buffered %d words for branch %s (%d total)\n%!"
+          (word_count turn) branch (word_count turn);
+        { branch; context; buffered_words = word_count turn; emitted = None; turn_count = 0; paths = [] }
+    ) else (
+      (* Get or create buffer for this session, dedup consecutive identical turns *)
+      let entry =
+        match Hashtbl.find_opt buffers key with
+        | Some existing when existing.turns <> [] && List.hd existing.turns = turn ->
+          existing (* Skip duplicate *)
+        | Some existing -> { context; turns = turn :: existing.turns; paths = turn_path @ existing.paths }
+        | None -> { context; turns = [turn]; paths = turn_path }
+      in
+      let total_words = buffer_word_count entry.turns in
+
+      (* Emit when buffer exceeds threshold or session ends *)
+      let should_emit = total_words >= max_chunk_words || predicate = "SessionEnd" in
+      if should_emit && total_words > 0 then (
+        let block = entry.turns |> List.rev |> String.concat "\n\n" in
+        Hashtbl.remove buffers key;
+        Printf.printf "[loom] Emitting %d-word block for branch %s (%s)\n%!"
+          total_words branch
+          (if predicate = "SessionEnd" then "session end" else "threshold");
+        let num_turns = List.length entry.turns in
+        { branch; context = entry.context; buffered_words = 0; emitted = Some block; turn_count = num_turns; paths = entry.paths }
+      ) else (
+        Hashtbl.replace buffers key entry;
+        Printf.printf "[loom] Buffered %d words for branch %s (%d total)\n%!"
+          (word_count turn) branch total_words;
+        { branch; context = entry.context; buffered_words = total_words; emitted = None; turn_count = 0; paths = [] }
+      )
+    )
+  in
+  branch_flush @ [current_result]
+
+(* --- Graunde attestation parser --- *)
+
+(* stitch — parses a Graunde attestation JSON payload and feeds stitch_turn.
+ * This is the entry point for the UDP listener (live weaving path). *)
 let stitch payload =
   let json =
     try Some (Yojson.Safe.from_string payload)
@@ -280,88 +360,11 @@ let stitch payload =
         | "Hook" -> "hook"
         | other -> other
       in
-      (* Collect path mapping if this turn has one *)
-      let turn_path = match tool_info with
+      let paths = match tool_info with
         | Some (_, tail, Some full) -> [(tail, full)]
         | _ -> []
       in
-      let turn = Printf.sprintf "[%s] %s" label text in
-
-      let key = buffer_key branch context in
-
-      (* Branch change: flush old branch's buffer for this session *)
-      let branch_flush =
-        match Hashtbl.find_opt last_branch context with
-        | Some prev when prev <> branch ->
-          let old_key = buffer_key prev context in
-          (match Hashtbl.find_opt buffers old_key with
-           | Some existing when existing.turns <> [] ->
-             let block = existing.turns |> List.rev |> String.concat "\n\n" in
-             let total_words = buffer_word_count existing.turns in
-             let num_turns = List.length existing.turns in
-             Hashtbl.remove buffers old_key;
-             Printf.printf "[loom] Emitting %d-word block for branch %s (branch change to %s)\n%!"
-               total_words prev branch;
-             [{ branch = prev; context = existing.context; buffered_words = 0;
-                emitted = Some block; turn_count = num_turns; paths = existing.paths }]
-           | _ -> [])
-        | _ -> []
-      in
-      Hashtbl.replace last_branch context branch;
-
-      (* SessionStart: flush existing buffer first, then start fresh *)
-      let current_result =
-        if predicate = "SessionStart" then (
-          let emitted =
-            match Hashtbl.find_opt buffers key with
-            | Some existing when existing.turns <> [] ->
-              let block = existing.turns |> List.rev |> String.concat "\n\n" in
-              let total_words = buffer_word_count existing.turns in
-              let num_turns = List.length existing.turns in
-              Printf.printf "[loom] Emitting %d-word block for branch %s (session start)\n%!"
-                total_words branch;
-              Some (block, existing.context, num_turns, existing.paths)
-            | _ -> None
-          in
-          (* Start fresh buffer with the SessionStart marker *)
-          Hashtbl.replace buffers key { context; turns = [turn]; paths = turn_path };
-          match emitted with
-          | Some (block, old_context, num_turns, old_paths) ->
-            { branch; context = old_context; buffered_words = 0; emitted = Some block; turn_count = num_turns; paths = old_paths }
-          | None ->
-            Printf.printf "[loom] Buffered %d words for branch %s (%d total)\n%!"
-              (word_count turn) branch (word_count turn);
-            { branch; context; buffered_words = word_count turn; emitted = None; turn_count = 0; paths = [] }
-        ) else (
-          (* Get or create buffer for this session, dedup consecutive identical turns *)
-          let entry =
-            match Hashtbl.find_opt buffers key with
-            | Some existing when existing.turns <> [] && List.hd existing.turns = turn ->
-              existing (* Skip duplicate *)
-            | Some existing -> { context; turns = turn :: existing.turns; paths = turn_path @ existing.paths }
-            | None -> { context; turns = [turn]; paths = turn_path }
-          in
-          let total_words = buffer_word_count entry.turns in
-
-          (* Emit when buffer exceeds threshold or session ends *)
-          let should_emit = total_words >= max_chunk_words || predicate = "SessionEnd" in
-          if should_emit && total_words > 0 then (
-            let block = entry.turns |> List.rev |> String.concat "\n\n" in
-            Hashtbl.remove buffers key;
-            Printf.printf "[loom] Emitting %d-word block for branch %s (%s)\n%!"
-              total_words branch
-              (if predicate = "SessionEnd" then "session end" else "threshold");
-            let num_turns = List.length entry.turns in
-            { branch; context = entry.context; buffered_words = 0; emitted = Some block; turn_count = num_turns; paths = entry.paths }
-          ) else (
-            Hashtbl.replace buffers key entry;
-            Printf.printf "[loom] Buffered %d words for branch %s (%d total)\n%!"
-              (word_count turn) branch total_words;
-            { branch; context = entry.context; buffered_words = total_words; emitted = None; turn_count = 0; paths = [] }
-          )
-        )
-      in
-      branch_flush @ [current_result]
+      stitch_turn ~branch ~context ~predicate ~label ~text ~paths
 
 (* Flush all buffered turns as weaves. Called on plugin shutdown
  * to prevent data loss when the server stops. *)
