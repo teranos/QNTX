@@ -40,13 +40,14 @@ Examples:
   qntx db stats            # Show database statistics
   qntx server              # Start graph visualization server`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// Initialize global logger before any command runs
-		// Skip for commands that don't need logging output (like 'am show')
-		if cmd.Name() != "show" {
-			if err := logger.Initialize(false); err != nil {
-				return fmt.Errorf("failed to initialize logger: %w", err)
-			}
+		// Logger is already initialized in init() with file output.
+		// Re-initializing here would overwrite the file-enabled logger
+		// with a console-only logger, breaking server file logging.
+		// Only initialize for commands that somehow run before init().
+		if cmd.Name() == "show" {
+			return nil
 		}
+		// Theme reload (Initialize already ran in init())
 		return nil
 	},
 }
@@ -305,7 +306,7 @@ func retryScheduleSetup(plugins []plugin.DomainPlugin, logger *zap.SugaredLogger
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		logger.Errorw("Fatal error", "error", err)
 		os.Exit(1)
 	}
 }

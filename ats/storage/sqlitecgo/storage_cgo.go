@@ -562,6 +562,40 @@ func (rs *RustStore) GetAllContexts() ([]string, error) {
 	return values, nil
 }
 
+// IntegrityCheck runs PRAGMA integrity_check via Rust FFI.
+// A healthy database returns []string{"ok"}.
+func (rs *RustStore) IntegrityCheck() ([]string, error) {
+	rs.mu.Lock()
+	if rs.store == nil {
+		rs.mu.Unlock()
+		return nil, errors.New("store is closed")
+	}
+
+	result := C.storage_integrity_check(rs.store)
+	var success bool
+	var errMsg string
+	success = bool(result.success)
+	if !success {
+		errMsg = C.GoString(result.error_msg)
+	}
+
+	var values []string
+	if success && result.strings_len > 0 {
+		cStrings := unsafe.Slice(result.strings, result.strings_len)
+		values = make([]string, result.strings_len)
+		for i, cs := range cStrings {
+			values[i] = C.GoString(cs)
+		}
+	}
+	C.string_array_result_free(result)
+	rs.mu.Unlock()
+
+	if !success {
+		return nil, errors.Newf("integrity check failed: %s", errMsg)
+	}
+	return values, nil
+}
+
 // QueryAttestationsRaw executes a raw SQL query through Rust's connection.
 // The query must select standard attestation columns in order.
 // params is a slice of bind parameters (strings, ints, floats, nil).
