@@ -63,6 +63,7 @@ impl SqliteStore {
 
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
+        conn.pragma_update(None, "busy_timeout", "5000")?;
         crate::migrate::migrate(&conn)?;
         Ok(Self::new(conn))
     }
