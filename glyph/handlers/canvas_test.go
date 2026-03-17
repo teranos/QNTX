@@ -829,10 +829,10 @@ func TestGlyphSymbolToType(t *testing.T) {
 		expected string
 	}{
 		{"py", "py"},
-		{sym.AX, "ax"},     // ⋈ → ax
+		{sym.AX, "ax"},       // ⋈ → ax
 		{sym.SE, "semantic"}, // ⊨ → semantic
-		{sym.SO, "prompt"}, // ⟶ → prompt
-		{"note", "note"},   // Unknown passes through
+		{sym.SO, "prompt"},   // ⟶ → prompt
+		{"note", "note"},     // Unknown passes through
 		{"result", "result"},
 	}
 
@@ -853,7 +853,7 @@ func setupSEtoSE(t *testing.T) (*CanvasHandler, *storage.WatcherStore, context.C
 	db := qntxtest.CreateTestDB(t)
 	canvasStore := glyphstorage.NewCanvasStore(db)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
 	if err := engine.Start(); err != nil {
 		t.Fatalf("Engine start failed: %v", err)
 	}
@@ -1022,7 +1022,7 @@ func TestCompileSubscriptions_SEtoSEtoPrompt_PropagatesUpstream(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	canvasStore := glyphstorage.NewCanvasStore(db)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
 	if err := engine.Start(); err != nil {
 		t.Fatalf("Engine start failed: %v", err)
 	}
