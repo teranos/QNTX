@@ -211,6 +211,19 @@ StringArrayResultC storage_contexts(const SqliteStore *store);
 AttestationResultC storage_query_raw(const SqliteStore *store, const char *sql, const char *params_json);
 
 // ============================================================================
+// Integrity
+// ============================================================================
+
+/**
+ * Run PRAGMA integrity_check on the database.
+ * A healthy database returns a single string: "ok".
+ *
+ * @param store Store handle
+ * @return Result with string array of integrity check lines
+ */
+StringArrayResultC storage_integrity_check(const SqliteStore *store);
+
+// ============================================================================
 // Memory Management
 // ============================================================================
 
