@@ -104,21 +104,39 @@
     const next = new Set(expandedProjects)
     next.add(projectName)
     expandedProjects = next
+    // Mouse is over the header when opening, so not ready to close yet
+    drawerMouseOut.delete(projectName)
   }
 
   function closeDrawer(projectName: string) {
     const next = new Set(expandedProjects)
     next.delete(projectName)
     expandedProjects = next
+    drawerMouseOut.delete(projectName)
   }
 
-  // Scroll down on header → open drawer above, mouse-out → close
-  // Always eat vertical wheel on the header zone so the column never scrolls
+  // Track which drawers have had mouse-out (ready to close on scroll-up)
+  let drawerMouseOut: Set<string> = $state(new Set())
+
+  // Close drawers that are open + mouse-out when the column scrolls up
+  let lastScrollTop: number[] = $state([])
+
+  function onColumnScrollCloseDrawer(e: Event, projectName: string) {
+    const el = e.target as HTMLElement
+    const idx = columnEls.indexOf(el)
+    if (idx < 0) return
+    const prev = lastScrollTop[idx] ?? 0
+    const cur = el.scrollTop
+    lastScrollTop[idx] = cur
+    if (cur < prev && drawerMouseOut.has(projectName)) {
+      closeDrawer(projectName)
+    }
+  }
+
+  // Scroll down on header → open drawer, mouse-out marks ready, scroll-up closes
   function bindHdDrawer(el: HTMLElement, project: string) {
     function onWheel(e: WheelEvent) {
-      // Let horizontal scroll pass through
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
-      // Always block vertical scroll from reaching the column
       e.preventDefault()
       e.stopPropagation()
       if (!expandedProjects.has(project) && e.deltaY > 2) {
@@ -132,17 +150,29 @@
     }
 
     function onLeave() {
-      closeDrawer(project)
+      if (expandedProjects.has(project)) {
+        const next = new Set(drawerMouseOut)
+        next.add(project)
+        drawerMouseOut = next
+      }
+    }
+
+    function onEnter() {
+      const next = new Set(drawerMouseOut)
+      next.delete(project)
+      drawerMouseOut = next
     }
 
     el.addEventListener('wheel', onWheel, { passive: false, capture: true })
     el.addEventListener('click', onClick)
     el.addEventListener('mouseleave', onLeave)
+    el.addEventListener('mouseenter', onEnter)
     return {
       destroy() {
         el.removeEventListener('wheel', onWheel, { capture: true } as EventListenerOptions)
         el.removeEventListener('click', onClick)
         el.removeEventListener('mouseleave', onLeave)
+        el.removeEventListener('mouseenter', onEnter)
       }
     }
   }
@@ -421,7 +451,9 @@
   async function load() {
     try {
       const res = await fetch('/api/weaves')
+      if (!res.ok) throw new Error(`/api/weaves ${res.status}: ${await res.text()}`)
       const data = await res.json()
+      if (!data.branches) throw new Error(`/api/weaves returned no branches: ${JSON.stringify(data).substring(0, 500)}`)
       totalWeaves = data.total_weaves
 
       // Flatten all weaves, filter out pre-standard (no context or bare branch)
@@ -471,7 +503,8 @@
       // Init warps after DOM renders
       requestAnimationFrame(initMinimaps)
     } catch (e: any) {
-      error = e.message || 'fetch failed'
+      error = `${e.message || 'fetch failed'}\n${e.stack || ''}`
+      console.error('load() failed:', e)
       loading = false
     }
   }
@@ -848,7 +881,7 @@
         <div
           class="dw-col"
           use:bindColumn={si}
-          onscroll={onColumnScrollWithMinimap}
+          onscroll={(e) => { onColumnScrollWithMinimap(e); onColumnScrollCloseDrawer(e, session.context) }}
           onpointerenter={onColumnEnter}
           onpointerleave={onColumnLeave}
         >
@@ -1040,7 +1073,7 @@
 
   /* Status messages */
   .dw-msg { padding: 24px; color: var(--text-on-dark-tertiary); text-align: center; }
-  .dw-err { color: var(--color-error); }
+  .dw-err { color: var(--color-error); white-space: pre-wrap; font-size: 11px; }
 
   /* Mobile session dots */
   .dw-dots {
