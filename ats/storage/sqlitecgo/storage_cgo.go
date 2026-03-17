@@ -496,6 +496,193 @@ func (rs *RustStore) GetStorageStats() (*StorageStats, error) {
 	return &stats, nil
 }
 
+// GetAllPredicates returns all distinct predicates via Rust FFI.
+func (rs *RustStore) GetAllPredicates() ([]string, error) {
+	rs.mu.Lock()
+	if rs.store == nil {
+		rs.mu.Unlock()
+		return nil, errors.New("store is closed")
+	}
+
+	result := C.storage_predicates(rs.store)
+	var success bool
+	var errMsg string
+	success = bool(result.success)
+	if !success {
+		errMsg = C.GoString(result.error_msg)
+	}
+
+	var values []string
+	if success && result.strings_len > 0 {
+		cStrings := unsafe.Slice(result.strings, result.strings_len)
+		values = make([]string, result.strings_len)
+		for i, cs := range cStrings {
+			values[i] = C.GoString(cs)
+		}
+	}
+	C.string_array_result_free(result)
+	rs.mu.Unlock()
+
+	if !success {
+		return nil, errors.Newf("failed to get predicates: %s", errMsg)
+	}
+	return values, nil
+}
+
+// GetAllContexts returns all distinct contexts via Rust FFI.
+func (rs *RustStore) GetAllContexts() ([]string, error) {
+	rs.mu.Lock()
+	if rs.store == nil {
+		rs.mu.Unlock()
+		return nil, errors.New("store is closed")
+	}
+
+	result := C.storage_contexts(rs.store)
+	var success bool
+	var errMsg string
+	success = bool(result.success)
+	if !success {
+		errMsg = C.GoString(result.error_msg)
+	}
+
+	var values []string
+	if success && result.strings_len > 0 {
+		cStrings := unsafe.Slice(result.strings, result.strings_len)
+		values = make([]string, result.strings_len)
+		for i, cs := range cStrings {
+			values[i] = C.GoString(cs)
+		}
+	}
+	C.string_array_result_free(result)
+	rs.mu.Unlock()
+
+	if !success {
+		return nil, errors.Newf("failed to get contexts: %s", errMsg)
+	}
+	return values, nil
+}
+
+// IntegrityCheck runs PRAGMA integrity_check via Rust FFI.
+// A healthy database returns []string{"ok"}.
+func (rs *RustStore) IntegrityCheck() ([]string, error) {
+	rs.mu.Lock()
+	if rs.store == nil {
+		rs.mu.Unlock()
+		return nil, errors.New("store is closed")
+	}
+
+	result := C.storage_integrity_check(rs.store)
+	var success bool
+	var errMsg string
+	success = bool(result.success)
+	if !success {
+		errMsg = C.GoString(result.error_msg)
+	}
+
+	var values []string
+	if success && result.strings_len > 0 {
+		cStrings := unsafe.Slice(result.strings, result.strings_len)
+		values = make([]string, result.strings_len)
+		for i, cs := range cStrings {
+			values[i] = C.GoString(cs)
+		}
+	}
+	C.string_array_result_free(result)
+	rs.mu.Unlock()
+
+	if !success {
+		return nil, errors.Newf("integrity check failed: %s", errMsg)
+	}
+	return values, nil
+}
+
+// Backup creates a hot backup of the database to destPath.
+// Safe to call while the database is in use.
+func (rs *RustStore) Backup(destPath string) error {
+	rs.mu.Lock()
+	if rs.store == nil {
+		rs.mu.Unlock()
+		return errors.New("store is closed")
+	}
+
+	cDest := C.CString(destPath)
+	defer C.free(unsafe.Pointer(cDest))
+
+	result := C.storage_backup(rs.store, cDest)
+	success := bool(result.success)
+	var errMsg string
+	if !success {
+		errMsg = C.GoString(result.error_msg)
+	}
+	C.storage_result_free(result)
+	rs.mu.Unlock()
+
+	if !success {
+		return errors.Newf("backup failed for %s: %s", destPath, errMsg)
+	}
+	return nil
+}
+
+// QueryAttestationsRaw executes a raw SQL query through Rust's connection.
+// The query must select standard attestation columns in order.
+// params is a slice of bind parameters (strings, ints, floats, nil).
+func (rs *RustStore) QueryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error) {
+	if params == nil {
+		params = []interface{}{}
+	}
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal query params")
+	}
+
+	cSQL := C.CString(sql)
+	defer C.free(unsafe.Pointer(cSQL))
+	cParams := C.CString(string(paramsJSON))
+	defer C.free(unsafe.Pointer(cParams))
+
+	rs.mu.Lock()
+	if rs.store == nil {
+		rs.mu.Unlock()
+		return nil, errors.New("store is closed")
+	}
+
+	result := C.storage_query_raw(rs.store, cSQL, cParams)
+	var success bool
+	var errMsg, jsonStr string
+	success = bool(result.success)
+	if !success {
+		errMsg = C.GoString(result.error_msg)
+	} else if result.attestation_json != nil {
+		jsonStr = C.GoString(result.attestation_json)
+	}
+	C.attestation_result_free(result)
+	rs.mu.Unlock()
+
+	if !success {
+		return nil, errors.Newf("raw query failed: %s", errMsg)
+	}
+
+	if jsonStr == "" {
+		return []*types.As{}, nil
+	}
+
+	var rustAttestations []json.RawMessage
+	if err := json.Unmarshal([]byte(jsonStr), &rustAttestations); err != nil {
+		return nil, errors.Wrap(err, "failed to parse attestation array")
+	}
+
+	attestations := make([]*types.As, 0, len(rustAttestations))
+	for _, raw := range rustAttestations {
+		as, err := fromRustJSON([]byte(raw))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to convert attestation from Rust JSON")
+		}
+		attestations = append(attestations, as)
+	}
+
+	return attestations, nil
+}
+
 // Version returns the library version.
 func Version() string {
 	return C.GoString(C.storage_version())
