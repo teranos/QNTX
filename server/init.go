@@ -82,8 +82,15 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		return nil, errors.New("logger creation returned nil components")
 	}
 
+	// Create the attestation store (Rust FFI when rustsqlite tag is active, Go SQLite otherwise)
+	// Created before dependencies so the builder can route queries through Rust.
+	atsStore, err := storage.NewStore(dbPath, serverLogger)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create attestation store")
+	}
+
 	// Create all server dependencies (builder, services, trackers, daemon)
-	deps, err := createServerDependencies(db, verbosity, wsCore, wsTransport, serverLogger)
+	deps, err := createServerDependencies(db, atsStore, verbosity, wsCore, wsTransport, serverLogger)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create server dependencies")
 	}
@@ -259,11 +266,6 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	// Set global signer so all attestations are signed with the node's DID key
 	storage.SetDefaultSigner(signing.NewSigner(nodeDIDHandler.PrivateKey, nodeDIDHandler.DID))
 
-	// Create the attestation store (Rust FFI when rustsqlite tag is active, Go SQLite otherwise)
-	atsStore, err := storage.NewStore(dbPath, serverLogger)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create attestation store")
-	}
 	server.atsStore = atsStore
 
 	// Register system type definitions so attestations render in the graph
@@ -519,11 +521,11 @@ func createServerLogger(verbosity int) (*zap.SugaredLogger, *wslogs.WebSocketCor
 }
 
 // createServerDependencies creates all components needed for QNTXServer initialization
-func createServerDependencies(db *sql.DB, verbosity int, wsCore zapcore.Core, wsTransport *wslogs.Transport, serverLogger *zap.SugaredLogger) (*serverDependencies, error) {
+func createServerDependencies(db *sql.DB, atsStore ats.AttestationStore, verbosity int, wsCore zapcore.Core, wsTransport *wslogs.Transport, serverLogger *zap.SugaredLogger) (*serverDependencies, error) {
 	start := time.Now()
 
-	// Create builder with server logger
-	builder, err := graph.NewAxGraphBuilder(db, verbosity, serverLogger)
+	// Create builder with server logger — atsStore routes attestation queries through Rust FFI
+	builder, err := graph.NewAxGraphBuilder(db, verbosity, serverLogger, atsStore)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create graph builder")
 	}

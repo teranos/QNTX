@@ -87,14 +87,17 @@ func (c *watcherReloadCoalescer) flush() {
 		return
 	}
 
-	// Pre-flight: check if the DB is readable before spawning per-watcher queries.
+	// Pre-flight: check if attestations are readable through Rust before spawning per-watcher queries.
 	// A corrupted database would produce N identical errors (one per watcher).
-	if err := s.db.QueryRow("SELECT 1 FROM attestations LIMIT 1").Err(); err != nil {
-		s.logger.Errorw("Attestations table unreadable — skipping historical queries for batch",
-			"error", err,
-			"batch_size", len(batch),
-		)
-		return
+	type counter interface{ CountAttestations() (int, error) }
+	if c, ok := s.atsStore.(counter); ok {
+		if _, err := c.CountAttestations(); err != nil {
+			s.logger.Errorw("Attestations table unreadable — skipping historical queries for batch",
+				"error", err,
+				"batch_size", len(batch),
+			)
+			return
+		}
 	}
 
 	// Post-reload processing for each watcher
