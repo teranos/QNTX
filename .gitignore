@@ -3,7 +3,7 @@
 *.db-shm
 *.db-wal
 
-.qntx/files
+.qntx/
 
 am.toml
 
