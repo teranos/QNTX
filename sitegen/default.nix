@@ -473,6 +473,7 @@ let
         <meta name="description" content="${html.escape description}">
         <link rel="icon" type="image/jpeg" href="${prefix}/qntx.jpg">
         <link rel="canonical" href="${canonicalUrl}">
+        <link rel="stylesheet" href="${prefix}/css/tokens.css">
         <link rel="stylesheet" href="${prefix}/css/core.css">
         <link rel="stylesheet" href="${prefix}/css/docs.css">
         <link rel="stylesheet" href="${prefix}/css/prism.css">
@@ -1453,6 +1454,7 @@ let
       <title>404 - Unattested State | QNTX</title>
       <meta name="robots" content="noindex">
       <link rel="icon" type="image/jpeg" href="./qntx.jpg">
+      <link rel="stylesheet" href="./css/tokens.css">
       <link rel="stylesheet" href="./css/core.css">
       <link rel="stylesheet" href="./css/docs.css">
     </head>
