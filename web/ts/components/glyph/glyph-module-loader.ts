@@ -43,7 +43,7 @@ export async function createPluginGlyphFromModule(
         // window.location.origin (dev server in dev, backend in production)
         const mod = await loadModule(moduleUrl);
 
-        // Create GlyphUI scoped to this glyph + plugin
+        // Create GlyphUI scoped to this glyph
         const ui = createGlyphUI(glyph, def.plugin);
 
         // The module's render() may call ui.glyph() for a canvasPlaced

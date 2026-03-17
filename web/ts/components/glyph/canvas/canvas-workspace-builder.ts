@@ -408,9 +408,9 @@ export function buildCanvasWorkspace(
         }
     });
 
-    // SDK spawn-result: plugins fire this event via ui.spawnResult(), canvas handles the rest
+    // SDK spawn-result: glyphs fire this event via ui.spawnResult(), canvas handles the rest
     container.addEventListener('glyph:spawn-result', ((e: CustomEvent<SpawnResultDetail>) => {
-        const { glyphId, pluginName, result } = e.detail;
+        const { glyphId, name, result } = e.detail;
         const parentElement = (e.target as HTMLElement).closest('[data-glyph-id]') as HTMLElement | null;
         if (!parentElement) {
             log.error(SEG.GLYPH, `[Canvas] spawn-result: no parent glyph element for ${glyphId}`);
@@ -425,7 +425,7 @@ export function buildCanvasWorkspace(
         const resultGlyphId = `result-${crypto.randomUUID()}`;
         const resultGlyph: Glyph = {
             id: resultGlyphId,
-            title: `${pluginName} Result`,
+            title: `${name} Result`,
             symbol: 'result',
             x, y,
             width: Math.round(parentRect.width),
@@ -446,11 +446,11 @@ export function buildCanvasWorkspace(
         });
 
         autoMeldResultBelow(
-            parentElement, glyphId, pluginName, pluginName,
-            resultElement, resultGlyphId, `Plugin:${pluginName}`,
+            parentElement, glyphId, name, name,
+            resultElement, resultGlyphId, name,
         );
 
-        log.info(SEG.GLYPH, `[Canvas] Spawned result for ${pluginName} glyph ${glyphId} at (${x}, ${y})`);
+        log.info(SEG.GLYPH, `[Canvas] Spawned result for ${name} glyph ${glyphId} at (${x}, ${y})`);
     }) as EventListener);
 
     // Selection: click on a glyph to select, Shift+click for multi-select, click background to deselect
