@@ -1016,7 +1016,7 @@ func (c *Client) searchSemantic(query string) []storage.RichSearchMatch {
 			continue
 		}
 
-		attestation, err := storage.GetAttestationByID(c.server.db, result.SourceID)
+		attestation, err := c.server.getAttestationByID(result.SourceID)
 		if err != nil || attestation == nil {
 			continue
 		}
