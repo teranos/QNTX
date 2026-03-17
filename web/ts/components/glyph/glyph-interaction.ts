@@ -703,7 +703,7 @@ export function makeResizable(
 
         startX = e.clientX;
         startY = e.clientY;
-        resizeCanvasId = (element.closest('[data-canvas-id]') as HTMLElement | null)?.dataset?.canvasId ?? 'canvas-workspace';
+        resizeCanvasId = (element.closest('[data-canvas-id]') as HTMLElement | null)?.dataset?.canvasId ?? '';
         startWidth = element.offsetWidth;
         startHeight = element.offsetHeight;
 
