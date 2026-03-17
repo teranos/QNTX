@@ -27,6 +27,19 @@ func NewStoreWithConfig(dbPath string, logger *zap.SugaredLogger, config *sqlite
 		return nil, errors.Wrapf(err, "failed to open Rust storage at %s", dbPath)
 	}
 
+	// Run integrity check before accepting the database
+	lines, err := rustStore.IntegrityCheck()
+	if err != nil {
+		logger.Errorw("SQLite integrity check failed to execute", "error", err, "db_path", dbPath)
+	} else if len(lines) != 1 || lines[0] != "ok" {
+		logger.Errorw("SQLite integrity check detected corruption — database may be damaged",
+			"db_path", dbPath,
+			"integrity_lines", lines,
+		)
+	} else {
+		logger.Infow("SQLite integrity check passed", "db_path", dbPath)
+	}
+
 	if config == nil {
 		config = &sqlitecgo.EnforcementConfig{
 			ActorContextLimit:  DefaultActorContextLimit,

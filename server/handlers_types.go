@@ -4,13 +4,12 @@ package server
 // Provides API endpoints for managing type definitions in QNTX
 
 import (
-	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 )
@@ -42,46 +41,34 @@ func (s *QNTXServer) HandleTypes(w http.ResponseWriter, r *http.Request) {
 
 // handleGetTypes returns all type attestations
 func (s *QNTXServer) handleGetTypes(w http.ResponseWriter, r *http.Request) {
-	// Query type attestations from the database using SQLite JSON functions
-	query := `
-		SELECT type_name, attributes FROM (
-			SELECT json_extract(subjects, '$[0]') as type_name, attributes,
-				ROW_NUMBER() OVER (PARTITION BY json_extract(subjects, '$[0]') ORDER BY created_at DESC) as rn
-			FROM attestations
-			WHERE json_extract(predicates, '$[0]') = 'type'
-			  AND json_valid(attributes) = 1
-		) WHERE rn = 1
-		ORDER BY type_name
-	`
-
-	rows, err := s.db.Query(query)
+	// Query all type attestations through the store (Rust FFI)
+	filter := ats.AttestationFilter{
+		Predicates: []string{"type"},
+	}
+	allTypes, err := s.atsStore.GetAttestations(filter)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "failed to query type attestations", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
 
-	types := make([]map[string]interface{}, 0)
-	for rows.Next() {
-		var typeName string
-		var attributesJSON string
-		if err := rows.Scan(&typeName, &attributesJSON); err != nil {
-			s.logger.Errorw("Failed to scan type attestation", "error", err)
+	// Deduplicate: keep latest per type name (attestations come sorted by timestamp DESC)
+	seen := make(map[string]bool)
+	typeList := make([]map[string]interface{}, 0)
+	for _, as := range allTypes {
+		if len(as.Subjects) == 0 {
 			continue
 		}
+		typeName := as.Subjects[0]
+		if seen[typeName] {
+			continue
+		}
+		seen[typeName] = true
 
-		// Parse attributes JSON
-		var attributes map[string]interface{}
-		if attributesJSON != "" && attributesJSON != "null" {
-			if err := json.Unmarshal([]byte(attributesJSON), &attributes); err != nil {
-				s.logger.Errorw("Failed to unmarshal attributes", "error", err, "json", attributesJSON)
-				attributes = make(map[string]interface{})
-			}
-		} else {
+		attributes := as.Attributes
+		if attributes == nil {
 			attributes = make(map[string]interface{})
 		}
 
-		// Build type response object
 		typeObj := map[string]interface{}{
 			"name":               typeName,
 			"label":              attributes["display_label"],
@@ -91,47 +78,35 @@ func (s *QNTXServer) handleGetTypes(w http.ResponseWriter, r *http.Request) {
 			"rich_string_fields": attributes["rich_string_fields"],
 			"array_fields":       attributes["array_fields"],
 		}
-		types = append(types, typeObj)
+		typeList = append(typeList, typeObj)
 	}
 
-	writeJSON(w, http.StatusOK, types)
+	writeJSON(w, http.StatusOK, typeList)
 }
 
 // handleGetType returns a specific type attestation
 func (s *QNTXServer) handleGetType(w http.ResponseWriter, r *http.Request, typeName string) {
-	query := `
-		SELECT attributes
-		FROM attestations
-		WHERE json_extract(subjects, '$[0]') = ?
-		  AND json_extract(predicates, '$[0]') = 'type'
-		  AND json_valid(attributes) = 1
-		ORDER BY rowid DESC
-		LIMIT 1
-	`
-
-	var attributesJSON string
-	err := s.db.QueryRow(query, typeName).Scan(&attributesJSON)
+	// Query through the store (Rust FFI)
+	filter := ats.AttestationFilter{
+		Subjects:   []string{typeName},
+		Predicates: []string{"type"},
+		Limit:      1,
+	}
+	results, err := s.atsStore.GetAttestations(filter)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			writeError(w, http.StatusNotFound, fmt.Sprintf("Type %q not found", typeName))
-		} else {
-			writeWrappedError(w, s.logger, err, fmt.Sprintf("failed to fetch type attestation %q", typeName), http.StatusInternalServerError)
-		}
+		writeWrappedError(w, s.logger, err, fmt.Sprintf("failed to fetch type attestation %q", typeName), http.StatusInternalServerError)
+		return
+	}
+	if len(results) == 0 {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("Type %q not found", typeName))
 		return
 	}
 
-	// Parse attributes JSON
-	var attributes map[string]interface{}
-	if attributesJSON != "" && attributesJSON != "null" {
-		if err := json.Unmarshal([]byte(attributesJSON), &attributes); err != nil {
-			s.logger.Errorw("Failed to unmarshal attributes", "error", err)
-			attributes = make(map[string]interface{})
-		}
-	} else {
+	attributes := results[0].Attributes
+	if attributes == nil {
 		attributes = make(map[string]interface{})
 	}
 
-	// Build type response object
 	typeObj := map[string]interface{}{
 		"name":               typeName,
 		"label":              attributes["display_label"],
