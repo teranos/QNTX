@@ -10,7 +10,6 @@ import type {
     JobUpdateMessage,
     DaemonStatusMessage,
     LLMStreamMessage,
-    StorageWarningMessage,
     PluginHealthMessage,
     SystemCapabilitiesMessage,
     DatabaseStatsMessage,
@@ -21,7 +20,7 @@ import type {
     WatcherQueueStatusMessage,
 } from '../types/websocket';
 import type { RichSearchResultsMessage } from './generated/proto/plugin/grpc/protocol/server.ts';
-import { handleJobNotification, notifyStorageWarning, handleDaemonStatusNotification } from './tauri-notifications';
+import { handleJobNotification, handleDaemonStatusNotification } from './tauri-notifications';
 import { handlePluginHealth } from './websocket-handlers/plugin-health';
 import { handleSystemCapabilities } from './websocket-handlers/system-capabilities';
 import { handleWatcherQueueStatus } from './websocket-handlers/watcher-queue-status';
@@ -119,16 +118,6 @@ const MESSAGE_HANDLERS = {
         messageHandlers['llm_stream']?.(data);
     },
 
-    storage_warning: (data: StorageWarningMessage) => {
-        log.warn(SEG.DB, 'Storage warning:', data.actor, `${(data.fill_percent * 100).toFixed(0)}%`);
-
-        // Send native desktop notification if in Tauri
-        notifyStorageWarning(data.actor, data.fill_percent);
-
-        // Invoke registered handler
-        messageHandlers['storage_warning']?.(data);
-    },
-
     plugin_health: (data: PluginHealthMessage) => {
         log.info(SEG.PULSE, 'Plugin health:', data.name, data.state, data.healthy ? 'healthy' : 'unhealthy');
 
@@ -156,21 +145,6 @@ const MESSAGE_HANDLERS = {
         log.info(SEG.DB, 'Database stats:', {
             total_attestations: data.total_attestations,
             path: data.path
-        });
-
-        // Update database stats window with response
-        import('./database-stats-window.js').then(({ databaseStatsWindow }) => {
-            databaseStatsWindow.updateStats({
-                path: data.path,
-                storage_backend: data.storage_backend,
-                storage_optimized: data.storage_optimized,
-                storage_version: data.storage_version,
-                total_attestations: data.total_attestations,
-                unique_actors: data.unique_actors,
-                unique_subjects: data.unique_subjects,
-                unique_contexts: data.unique_contexts,
-                rich_fields: data.rich_fields as (string[] | undefined)
-            });
         });
 
         // Update database stats glyph

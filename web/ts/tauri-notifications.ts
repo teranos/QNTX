@@ -201,20 +201,6 @@ export async function notifyJobFailed(
 }
 
 /**
- * Send a notification for storage warning
- * Only sends if in Tauri environment
- */
-export async function notifyStorageWarning(
-    actor: string,
-    fillPercent: number
-): Promise<void> {
-    await invokeIfTauri('notify_storage_warning', {
-        actor,
-        fillPercent
-    });
-}
-
-/**
  * Handle a job update message and send appropriate notifications
  * This is the main entry point called from the WebSocket handler
  */

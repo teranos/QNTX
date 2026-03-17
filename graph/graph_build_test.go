@@ -14,7 +14,7 @@ func createTestBuilder(t *testing.T) *AxGraphBuilder {
 	t.Helper()
 	db := qntxtest.CreateTestDB(t)
 	testLogger := logger.Logger.Named("test")
-	builder, err := NewAxGraphBuilder(db, 0, testLogger)
+	builder, err := NewAxGraphBuilder(db, 0, testLogger, nil)
 	if err != nil {
 		t.Fatalf("Failed to create builder: %v", err)
 	}

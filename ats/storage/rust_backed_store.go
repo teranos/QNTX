@@ -80,6 +80,11 @@ func (s *RustBackedStore) enforceLimitsViaRust(as *types.As) {
 	}
 }
 
+// GetStorageStats returns storage statistics via Rust FFI.
+func (s *RustBackedStore) GetStorageStats() (*sqlitecgo.StorageStats, error) {
+	return s.rust.GetStorageStats()
+}
+
 // AttestationExists checks if an attestation with the given ID exists.
 func (s *RustBackedStore) AttestationExists(asid string) bool {
 	return s.rust.AttestationExists(asid)
@@ -88,6 +93,31 @@ func (s *RustBackedStore) AttestationExists(asid string) bool {
 // GetAttestations retrieves attestations based on filters.
 func (s *RustBackedStore) GetAttestations(filters ats.AttestationFilter) ([]*types.As, error) {
 	return s.rust.GetAttestations(filters)
+}
+
+// GetAllPredicates returns all distinct predicates via Rust FFI.
+func (s *RustBackedStore) GetAllPredicates() ([]string, error) {
+	return s.rust.GetAllPredicates()
+}
+
+// GetAllContexts returns all distinct contexts via Rust FFI.
+func (s *RustBackedStore) GetAllContexts() ([]string, error) {
+	return s.rust.GetAllContexts()
+}
+
+// CountAttestations returns the total count of attestations via Rust FFI.
+func (s *RustBackedStore) CountAttestations() (int, error) {
+	return s.rust.CountAttestations()
+}
+
+// GetAttestation retrieves a single attestation by ID via Rust FFI.
+func (s *RustBackedStore) GetAttestation(id string) (*types.As, error) {
+	return s.rust.GetAttestation(id)
+}
+
+// QueryAttestationsRaw executes a raw SQL query through Rust's connection.
+func (s *RustBackedStore) QueryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error) {
+	return s.rust.QueryAttestationsRaw(sql, params)
 }
 
 // GenerateAndCreateAttestation generates a vanity ASID and creates a self-certifying attestation.
@@ -124,4 +154,10 @@ func (s *RustBackedStore) GenerateAndCreateAttestation(ctx context.Context, cmd 
 	}
 
 	return as, nil
+}
+
+// Backup creates a hot backup of the database to destPath.
+// Implements schedule.BackupProvider.
+func (s *RustBackedStore) Backup(destPath string) error {
+	return s.rust.Backup(destPath)
 }

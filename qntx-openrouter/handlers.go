@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/ats/ax"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
@@ -192,9 +193,11 @@ func (h *Handlers) HandlePromptPreview(w http.ResponseWriter, r *http.Request) {
 		filter = parsedFilter
 	}
 
-	// Execute the query
+	// Execute the query — routes through Rust FFI when available
 	db := h.plugin.Services().Database()
-	executor := storage.NewExecutor(db)
+	executor := storage.NewExecutorWithOptions(db, ax.AxExecutorOptions{
+		RawQuerier: h.plugin.Services().ATSStore(),
+	})
 	result, err := executor.ExecuteAsk(r.Context(), *filter)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to execute ax query: %v", err))
@@ -365,9 +368,11 @@ func (h *Handlers) HandlePromptExecute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Execute query
+	// Execute query — routes through Rust FFI when available
 	db := h.plugin.Services().Database()
-	executor := storage.NewExecutor(db)
+	executor := storage.NewExecutorWithOptions(db, ax.AxExecutorOptions{
+		RawQuerier: h.plugin.Services().ATSStore(),
+	})
 	result, err := executor.ExecuteAsk(r.Context(), *filter)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to execute ax query: %v", err))
