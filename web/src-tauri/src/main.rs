@@ -702,8 +702,7 @@ fn main() {
                             }
                         }
                         "hixtory_panel" => {
-                            if let Err(e) =
-                                show_window_and_emit(app_handle, "show-pulse-panel", ())
+                            if let Err(e) = show_window_and_emit(app_handle, "show-pulse-panel", ())
                             {
                                 log::warn!("[menu] Failed to show pulse panel: {}", e);
                             }
