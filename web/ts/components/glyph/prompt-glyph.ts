@@ -10,6 +10,10 @@
  * - AX glyphs (separate) flow attestations to Prompt glyphs via watchers
  * - Watchers keep executing prompts as matching attestations arrive
  * - For now: simple one-shot execution for testing
+ *
+ * TODO: Migrate to GlyphUI SDK (like py-glyph and ts-glyph).
+ *   Spawns attestation glyphs (not ExecutionResult), so needs a
+ *   spawnGlyph event or generalized spawn mechanism beyond spawnResult.
  */
 
 import type { Glyph } from './glyph';
@@ -97,7 +101,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     textarea.style.fontFamily = 'monospace';
     textarea.style.backgroundColor = 'var(--bg-almost-black)';
     textarea.style.color = 'var(--accent-lavender)';
-    textarea.style.border = '1px solid var(--border-color)';
+    textarea.style.border = '1px solid var(--border)';
     textarea.style.borderRadius = '4px';
     textarea.style.resize = 'none';
 

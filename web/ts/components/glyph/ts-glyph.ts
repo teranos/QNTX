@@ -15,11 +15,9 @@ import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
-import { createResultGlyph, type ExecutionResult } from './result-glyph';
-import { autoMeldResultBelow } from './meld/meld-system';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
-import { canvasPlaced } from './manifestations/canvas-placed';
+import { createGlyphUI } from './glyph-ui';
 import { putAttestation, queryAttestations, parseQuery, generateASUID } from '../../qntx-wasm';
 import type { Attestation } from '../../qntx-wasm';
 
@@ -141,13 +139,12 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
     runButton.className = 'titlebar-btn';
     runButton.title = 'Run JavaScript code';
 
-    const { element } = canvasPlaced({
-        glyph,
-        className: 'canvas-ts-glyph',
+    const ui = createGlyphUI(glyph, 'ts');
+    const { element, content } = ui.glyph({
         defaults: { x: 200, y: 200, width: 400, height: calculatedHeight },
-        titleBar: { label: 'ts', actions: [runButton] },
+        titleBar: { label: 'ts', actions: [runButton], color: '#5c3d1a', labelColor: '#f0c878' },
         resizable: true,
-        logLabel: 'TsGlyph',
+        className: 'canvas-ts-glyph',
     });
     element.style.minWidth = '200px';
     element.style.minHeight = '120px';
@@ -156,22 +153,13 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Orange = local-only glyph (ts-glyph always runs in-browser)
     element.dataset.localActive = 'true';
     element.style.backgroundColor = 'rgba(61, 45, 20, 0.92)';
-    const titleBar = element.querySelector('.glyph-title-bar') as HTMLElement;
-    if (titleBar) {
-        titleBar.style.backgroundColor = '#5c3d1a';
-        const labelSpan = titleBar.querySelector('span:first-child') as HTMLElement;
-        if (labelSpan) {
-            labelSpan.style.color = '#f0c878';
-            labelSpan.style.fontWeight = 'bold';
-            labelSpan.style.flex = '1';
-        }
-    }
+
 
     // Execute JavaScript on click
     runButton.addEventListener('click', async () => {
         const editor = (element as any).editor;
         if (!editor) {
-            log.error(SEG.GLYPH, '[TsGlyph] Editor not initialized');
+            ui.log.error('Editor not initialized');
             return;
         }
 
@@ -188,26 +176,24 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
             const stdout = outputLines.join('\n') +
                 (returnValue !== undefined ? `\n${typeof returnValue === 'object' ? JSON.stringify(returnValue, null, 2) : String(returnValue)}` : '');
 
-            const result: ExecutionResult = {
+            ui.spawnResult({
                 success: true,
                 stdout: stdout.trim(),
                 stderr: '',
                 result: returnValue,
                 error: null,
                 duration_ms: duration,
-            };
-            createAndDisplayResultGlyph(element, result);
+            });
         } catch (error) {
             const duration = Math.round(performance.now() - startTime);
-            const result: ExecutionResult = {
+            ui.spawnResult({
                 success: false,
                 stdout: outputLines.join('\n'),
                 stderr: '',
                 result: null,
                 error: error instanceof Error ? error.message : String(error),
                 duration_ms: duration,
-            };
-            createAndDisplayResultGlyph(element, result);
+            });
         }
     });
 
@@ -216,7 +202,7 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
     editorContainer.className = 'ts-glyph-editor';
     editorContainer.style.flex = '1';
     editorContainer.style.overflow = 'hidden';
-    element.appendChild(editorContainer);
+    content.appendChild(editorContainer);
 
     // Initialize CodeMirror
     try {
@@ -271,45 +257,3 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
     return element;
 }
 
-function createAndDisplayResultGlyph(tsElement: HTMLElement, result: ExecutionResult): void {
-    const tsRect = tsElement.getBoundingClientRect();
-    const canvas = tsElement.closest('.canvas-workspace') as HTMLElement;
-    if (!canvas) {
-        log.error(SEG.GLYPH, '[TsGlyph] Cannot spawn result glyph: no canvas-workspace ancestor');
-        return;
-    }
-    const canvasRect = canvas.getBoundingClientRect();
-
-    const x = tsRect.left - canvasRect.left;
-    const y = tsRect.bottom - canvasRect.top;
-
-    const resultGlyphId = `result-${crypto.randomUUID()}`;
-    const resultGlyph: Glyph = {
-        id: resultGlyphId,
-        title: 'TS Result',
-        symbol: 'result',
-        x,
-        y,
-        width: Math.round(tsRect.width),
-        renderContent: () => document.createElement('div'),
-    };
-
-    const resultElement = createResultGlyph(resultGlyph, result);
-    canvas.appendChild(resultElement);
-
-    const resultRect = resultElement.getBoundingClientRect();
-    uiState.addCanvasGlyph({
-        id: resultGlyphId,
-        symbol: 'result',
-        x,
-        y,
-        width: Math.round(resultRect.width),
-        height: Math.round(resultRect.height),
-        content: JSON.stringify(result),
-    });
-
-    const tsGlyphId = tsElement.dataset.glyphId;
-    if (tsGlyphId) {
-        autoMeldResultBelow(tsElement, tsGlyphId, 'ts', 'TypeScript', resultElement, resultGlyphId, 'TsGlyph');
-    }
-}

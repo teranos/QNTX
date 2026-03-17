@@ -68,7 +68,7 @@
     padding-top: 12px;
     border-top: 1px solid rgba(255, 255, 255, 0.06);
     color: #4b5563;
-    font-size: 12px;
+    font-size: var(--font-size-md);
 }
 
 /* Summary card */
@@ -120,7 +120,7 @@
 }
 
 .plugin-server-value {
-    font-size: 12px;
+    font-size: var(--font-size-md);
     color: #9ca3af;
 }
 
@@ -194,7 +194,7 @@
     display: flex;
     gap: 10px;
     align-items: center;
-    font-size: 12px;
+    font-size: var(--font-size-md);
 }
 
 .plugin-state,
@@ -585,7 +585,7 @@
     background: rgba(0, 0, 0, 0.3);
     padding: 8px;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: var(--font-size-md);
     color: #fca5a5;
     overflow-x: auto;
     overflow-wrap: break-word;
@@ -616,7 +616,7 @@
     border-radius: 4px;
     padding: 6px 0;
     font-family: var(--font-mono, monospace);
-    font-size: 12px;
+    font-size: var(--font-size-md);
     line-height: 1.5;
 }
 

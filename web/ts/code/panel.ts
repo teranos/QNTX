@@ -1,6 +1,8 @@
 /**
  * Go Editor Panel - Go code editor with gopls LSP integration
  *
+ * TODO: Migrate to glyph panel manifestation, then delete. See base-panel.ts.
+ *
  * Provides file browsing, editing, and saving of Go code files with
  * gopls LSP features (autocomplete, hover, diagnostics).
  */

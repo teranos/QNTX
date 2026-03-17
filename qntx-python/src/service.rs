@@ -23,7 +23,7 @@ use crate::proto::{
     domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, Empty,
     ExecuteJobRequest, ExecuteJobResponse, GlyphDefResponse, HealthResponse, HttpHeader,
     HttpRequest, HttpResponse, InitializeRequest, InitializeResponse, MetadataResponse,
-    WebSocketMessage,
+    ParseAxQueryRequest, ParseAxQueryResponse, WebSocketMessage,
 };
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -469,6 +469,14 @@ impl DomainPluginService for PythonPluginService {
         _request: Request<Empty>,
     ) -> Result<Response<GlyphDefResponse>, Status> {
         Ok(Response::new(GlyphDefResponse { glyphs: vec![] }))
+    }
+
+    /// Parse an Ax query (not implemented — kern handles parsing)
+    async fn parse_ax_query(
+        &self,
+        _request: Request<ParseAxQueryRequest>,
+    ) -> Result<Response<ParseAxQueryResponse>, Status> {
+        Err(Status::unimplemented("ParseAxQuery is handled by kern"))
     }
 
     /// Execute an async job

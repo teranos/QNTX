@@ -170,11 +170,10 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
     // Attributes content — only when there are attributes to show
     if (attestation && attrs) {
         const content = document.createElement('div');
-        content.style.flex = '1';
-        content.style.overflow = 'auto';
+        content.className = 'glyph-content-area';
         content.style.padding = '4px 8px';
         content.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
-        content.style.borderTop = '1px solid var(--border-color)';
+        content.style.borderTop = '1px solid var(--border)';
         content.style.fontSize = '12px';
         content.style.fontFamily = 'monospace';
 

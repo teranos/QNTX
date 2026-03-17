@@ -20,10 +20,10 @@
     background: transparent;
     border: none;
     border-bottom: 2px solid transparent;
-    color: var(--editor-text-muted, #858585);
+    color: var(--text-on-dark-tertiary);
     cursor: pointer;
     font-size: var(--font-size-sm);
-    transition: var(--panel-transition-normal);
+    transition: var(--panel-transition);
 }
 
 .python-editor-tab:hover {
@@ -85,22 +85,22 @@
 .python-example-btn {
     padding: var(--panel-padding-sm);
     background: transparent;
-    color: var(--editor-text-muted, #858585);
+    color: var(--text-on-dark-tertiary);
     border: 1px solid var(--editor-border, #3e3e42);
     border-radius: var(--border-radius);
     cursor: pointer;
     font-size: var(--font-size-sm);
-    transition: var(--panel-transition-normal);
+    transition: var(--panel-transition);
 }
 
 .python-example-btn:hover {
     color: var(--editor-text, #cccccc);
-    border-color: var(--editor-text-muted, #858585);
+    border-color: var(--text-on-dark-tertiary);
 }
 
 .python-shortcut-hint {
     font-size: var(--font-size-sm);
-    color: var(--editor-text-muted, #858585);
+    color: var(--text-on-dark-tertiary);
 }
 
 /* Editor container */
@@ -131,7 +131,7 @@
 
 .python-output-label {
     font-size: var(--font-size-sm);
-    color: var(--editor-text-muted, #858585);
+    color: var(--text-on-dark-tertiary);
     text-transform: uppercase;
     margin-bottom: 6px;
 }
@@ -161,7 +161,7 @@
 }
 
 .python-output-placeholder {
-    color: var(--editor-text-muted, #858585);
+    color: var(--text-on-dark-tertiary);
     font-style: italic;
 }
 
@@ -185,7 +185,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--status-neutral, #858585);
+    background: var(--text-on-dark-tertiary);
 }
 
 .python-status-dot.running {
@@ -214,7 +214,7 @@
 .python-error-help {
     margin-top: 10px;
     font-size: var(--font-size-sm);
-    color: var(--editor-text-muted, #858585);
+    color: var(--text-on-dark-tertiary);
 }
 
 .python-error-help code {
