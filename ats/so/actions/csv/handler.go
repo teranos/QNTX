@@ -8,15 +8,19 @@ import (
 	"os"
 	"strings"
 
+	"github.com/teranos/QNTX/ats/ax"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 )
 
-// Execute generates a CSV file from attestations matching the filter
-func Execute(ctx context.Context, db *sql.DB, payload Payload) error {
-	// Execute the query
-	executor := storage.NewExecutor(db)
+// Execute generates a CSV file from attestations matching the filter.
+// rawQuerier optionally routes attestation queries through Rust FFI (pass nil to use Go SQL).
+func Execute(ctx context.Context, db *sql.DB, rawQuerier interface{}, payload Payload) error {
+	// Execute the query — routes through Rust FFI when available
+	executor := storage.NewExecutorWithOptions(db, ax.AxExecutorOptions{
+		RawQuerier: rawQuerier,
+	})
 	result, err := executor.ExecuteAsk(ctx, payload.AxFilter)
 	if err != nil {
 		err = errors.Wrap(err, "failed to execute query")

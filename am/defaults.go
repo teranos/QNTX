@@ -16,6 +16,7 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("database.bounded_storage.actor_context_limit", 16)  // 16 attestations per (actor, context)
 	v.SetDefault("database.bounded_storage.actor_contexts_limit", 64) // 64 contexts per actor
 	v.SetDefault("database.bounded_storage.entity_actors_limit", 64)  // 64 actors per entity
+	v.SetDefault("database.backup_interval_seconds", 3600)            // hourly backup (0 = disabled)
 
 	// Code defaults
 	v.SetDefault("code.gopls.enabled", true)

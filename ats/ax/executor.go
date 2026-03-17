@@ -40,6 +40,7 @@ type AxExecutorOptions struct {
 	QueryExpander  ats.QueryExpander  // Optional query expansion (default: NoOpQueryExpander)
 	Logger         *zap.SugaredLogger // Optional logger for debug output (default: nil, no logging)
 	Matcher        Matcher            // Optional fuzzy matcher (default: WasmMatcher via wazero)
+	RawQuerier     interface{}        // Optional: routes attestation queries through Rust FFI (storage.RawQuerier)
 }
 
 // NewAxExecutorWithOptions creates an executor with custom options.
