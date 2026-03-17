@@ -44,11 +44,19 @@ type PluginExecutor interface {
 	ExecutePluginJob(ctx context.Context, pluginName string, handlerName string, payload []byte) ([]byte, error)
 }
 
+// AttestationReader provides read access to attestations through Rust's single connection.
+// Eliminates Go's *sql.DB from touching the attestations table.
+type AttestationReader interface {
+	GetAttestation(id string) (*types.As, error)
+	QueryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error)
+}
+
 // Engine manages watchers and executes actions when attestations match filters
 type Engine struct {
 	store  *storage.WatcherStore
 	logger *zap.SugaredLogger
-	db     *sql.DB // Direct database access for querying historical attestations
+	reader AttestationReader // Attestation reads through Rust FFI
+	db     *sql.DB           // Legacy: still used for non-attestation tables (edge cursors, queue)
 
 	// Base URL for API calls (e.g., "http://localhost:877")
 	apiBaseURL string
@@ -89,21 +97,22 @@ type Engine struct {
 }
 
 const (
-	maxRetries          = 5
-	initialBackoff      = 1 * time.Second
-	maxBackoff          = 60 * time.Second
-	drainInterval       = 200 * time.Millisecond
-	drainBatchSize      = 50
-	purgeRetention      = 1 * time.Hour
-	purgeEveryNthTick   = 100 // purge completed entries every 100th drain tick
+	maxRetries        = 5
+	initialBackoff    = 1 * time.Second
+	maxBackoff        = 60 * time.Second
+	drainInterval     = 200 * time.Millisecond
+	drainBatchSize    = 50
+	purgeRetention    = 1 * time.Hour
+	purgeEveryNthTick = 100 // purge completed entries every 100th drain tick
 )
 
 // NewEngine creates a new watcher engine
-func NewEngine(db *sql.DB, apiBaseURL string, logger *zap.SugaredLogger) *Engine {
+func NewEngine(db *sql.DB, reader AttestationReader, apiBaseURL string, logger *zap.SugaredLogger) *Engine {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Engine{
 		store:      storage.NewWatcherStore(db),
 		logger:     logger,
+		reader:     reader,
 		db:         db,
 		apiBaseURL: strings.TrimSuffix(apiBaseURL, "/"),
 		httpClient: &http.Client{
@@ -494,36 +503,21 @@ func (e *Engine) queryHistoricalSemantic(watcherID string, watcher *storage.Watc
 
 // queryHistoricalStructural scans all attestations and applies structural filters.
 func (e *Engine) queryHistoricalStructural(watcherID string, watcher *storage.Watcher) error {
-	query := `SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes
-	          FROM attestations
-	          ORDER BY timestamp DESC`
+	query := storage.AttestationSelectQuery + ` ORDER BY timestamp DESC`
 
-	rows, err := e.db.Query(query)
+	attestations, err := e.reader.QueryAttestationsRaw(query, nil)
 	if err != nil {
-		return errors.Wrap(err, "failed to query attestations")
+		return errors.Wrap(err, "failed to query attestations via Rust")
 	}
-	defer rows.Close()
 
 	matchCount := 0
-	for rows.Next() {
-		as, err := scanAttestation(rows)
-		if err != nil {
-			e.logger.Warnw("Failed to scan attestation row",
-				"watcher_id", watcherID,
-				"error", err)
-			continue
-		}
-
+	for _, as := range attestations {
 		if matched, score := e.matchesWatcher(as, watcher); matched {
 			matchCount++
 			if e.broadcastMatch != nil {
 				e.broadcastMatch(watcherID, as, score)
 			}
 		}
-	}
-
-	if err := rows.Err(); err != nil {
-		return errors.Wrap(err, "error iterating attestation rows")
 	}
 
 	e.logger.Infow("Historical structural query completed",
@@ -533,84 +527,9 @@ func (e *Engine) queryHistoricalStructural(watcherID string, watcher *storage.Wa
 	return nil
 }
 
-// loadAttestation fetches a single attestation by ID from the database.
+// loadAttestation fetches a single attestation by ID through Rust's connection.
 func (e *Engine) loadAttestation(id string) (*types.As, error) {
-	query := `SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes
-	          FROM attestations WHERE id = ?`
-	row := e.db.QueryRow(query, id)
-
-	var as types.As
-	var subjectsJSON, predicatesJSON, contextsJSON, actorsJSON, attributesJSON []byte
-
-	err := row.Scan(
-		&as.ID,
-		&subjectsJSON,
-		&predicatesJSON,
-		&contextsJSON,
-		&actorsJSON,
-		&as.Timestamp,
-		&as.Source,
-		&attributesJSON,
-	)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to load attestation %s", id)
-	}
-
-	if err := json.Unmarshal(subjectsJSON, &as.Subjects); err != nil {
-		return nil, errors.Wrapf(err, "failed to unmarshal subjects for %s", id)
-	}
-	if err := json.Unmarshal(predicatesJSON, &as.Predicates); err != nil {
-		return nil, errors.Wrapf(err, "failed to unmarshal predicates for %s", id)
-	}
-	if err := json.Unmarshal(contextsJSON, &as.Contexts); err != nil {
-		return nil, errors.Wrapf(err, "failed to unmarshal contexts for %s", id)
-	}
-	if err := json.Unmarshal(actorsJSON, &as.Actors); err != nil {
-		return nil, errors.Wrapf(err, "failed to unmarshal actors for %s", id)
-	}
-	if len(attributesJSON) > 0 && string(attributesJSON) != "null" {
-		_ = json.Unmarshal(attributesJSON, &as.Attributes)
-	}
-
-	return &as, nil
-}
-
-// scanAttestation scans a single attestation from a database row.
-func scanAttestation(rows *sql.Rows) (*types.As, error) {
-	var as types.As
-	var subjectsJSON, predicatesJSON, contextsJSON, actorsJSON, attributesJSON []byte
-
-	err := rows.Scan(
-		&as.ID,
-		&subjectsJSON,
-		&predicatesJSON,
-		&contextsJSON,
-		&actorsJSON,
-		&as.Timestamp,
-		&as.Source,
-		&attributesJSON,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := json.Unmarshal(subjectsJSON, &as.Subjects); err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal(predicatesJSON, &as.Predicates); err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal(contextsJSON, &as.Contexts); err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal(actorsJSON, &as.Actors); err != nil {
-		return nil, err
-	}
-	if len(attributesJSON) > 0 && string(attributesJSON) != "null" {
-		_ = json.Unmarshal(attributesJSON, &as.Attributes)
-	}
-
-	return &as, nil
+	return e.reader.GetAttestation(id)
 }
 
 // enqueueAttestation serializes an attestation and inserts it into the persistent queue.

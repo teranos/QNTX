@@ -17,7 +17,7 @@ qntx-core = { path = "../qntx-core" }
 qntx-ffi-common = { path = "../qntx-ffi-common" }
 
 # SQLite database
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.32", features = ["bundled", "backup"] }
 
 # SQLite vector search extension
 sqlite-vec = "0.1.5"

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -50,6 +51,11 @@ type EmbeddingStats interface {
 	DrainEmbeddingCounts() (embedded int, clusterCounts []string, noise int)
 }
 
+// BackupProvider performs hot database backups.
+type BackupProvider interface {
+	Backup(destPath string) error
+}
+
 // Ticker manages periodic execution of scheduled ATS jobs
 // Runs every second to check for jobs that need execution
 type Ticker struct {
@@ -70,6 +76,10 @@ type Ticker struct {
 	evictionStats   EvictionStats
 	creationStats   CreationStats
 	embeddingStats  EmbeddingStats
+	backupProvider  BackupProvider
+	backupDBPath    string        // source db path, used to derive backup destination
+	backupInterval  time.Duration // how often to backup (0 = disabled)
+	lastBackupAt    time.Time
 }
 
 // TickerConfig contains configuration for the Pulse ticker
@@ -122,6 +132,14 @@ func (t *Ticker) SetEmbeddingStats(es EmbeddingStats) {
 	t.embeddingStats = es
 }
 
+// SetBackupProvider configures periodic database backups via the ticker.
+// interval of 0 disables backups.
+func (t *Ticker) SetBackupProvider(bp BackupProvider, dbPath string, interval time.Duration) {
+	t.backupProvider = bp
+	t.backupDBPath = dbPath
+	t.backupInterval = interval
+}
+
 // Start begins the ticker loop
 func (t *Ticker) Start() {
 	t.wg.Add(1)
@@ -156,6 +174,9 @@ func (t *Ticker) run() {
 			// TODO(#478): Add a health check that verifies sync tree size matches attestation count
 			// periodically. If the WASM engine fails, the Merkle tree drifts from storage silently.
 			// See https://github.com/teranos/QNTX/pull/478 for context.
+
+			// Periodic backup
+			t.checkBackup(tickTime)
 
 			// Log time until next job
 			t.logNextJobInfo(tickTime)
@@ -293,6 +314,33 @@ func (t *Ticker) logActivitySummary() {
 	}
 
 	t.pulseLog.Infow(msg)
+}
+
+// checkBackup runs a hot backup if the backup interval has elapsed.
+// Rotates .bak1 → .bak2, keeping 2 backups. .bak1 is always the newest.
+func (t *Ticker) checkBackup(now time.Time) {
+	if t.backupProvider == nil || t.backupInterval == 0 {
+		return
+	}
+	if !t.lastBackupAt.IsZero() && now.Sub(t.lastBackupAt) < t.backupInterval {
+		return
+	}
+
+	bak1 := t.backupDBPath + ".bak1"
+	bak2 := t.backupDBPath + ".bak2"
+
+	// Rotate: .bak1 → .bak2
+	os.Rename(bak1, bak2)
+
+	start := time.Now()
+	if err := t.backupProvider.Backup(bak1); err != nil {
+		t.pulseLog.Errorw("Database backup failed", "dest", bak1, "error", err)
+		return
+	}
+	duration := time.Since(start)
+
+	t.lastBackupAt = now
+	t.pulseLog.Infow("Database backup complete", "dest", bak1, "duration", duration.Round(time.Millisecond))
 }
 
 // checkScheduledJobs finds scheduled jobs ready to run and enqueues them

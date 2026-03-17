@@ -20,6 +20,9 @@ var (
 	Logger *zap.SugaredLogger
 	// Flag to track if JSON output is enabled
 	JSONOutput bool
+	// fileOutputAdded is set by AddFileOutput. Once true, Initialize() panics
+	// to prevent accidentally replacing the file-enabled logger with a console-only one.
+	fileOutputAdded bool
 )
 
 func init() {
@@ -28,8 +31,12 @@ func init() {
 	Logger = zap.NewNop().Sugar()
 }
 
-// Initialize sets up the global logger based on the JSON output preference
+// Initialize sets up the global logger based on the JSON output preference.
+// Panics if called after AddFileOutput — re-initializing would silently discard the file core.
 func Initialize(jsonOutput bool) error {
+	if fileOutputAdded {
+		panic("logger.Initialize called after AddFileOutput — this would discard file logging. Initialize must only be called once, before AddFileOutput.")
+	}
 	JSONOutput = jsonOutput
 
 	// Load theme from config if available
@@ -178,6 +185,7 @@ func AddFileOutput(logPath string) error {
 
 	combined := zapcore.NewTee(Logger.Desugar().Core(), fileCore)
 	Logger = zap.New(combined).Sugar()
+	fileOutputAdded = true
 
 	return nil
 }
