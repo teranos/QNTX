@@ -15,6 +15,7 @@ import (
 	"github.com/teranos/QNTX/ai/tracker"
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/alias"
+	"github.com/teranos/QNTX/ats/ax"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
@@ -328,8 +329,10 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 		filter = parsedFilter
 	}
 
-	// Execute the query using storage executor
-	executor := storage.NewExecutor(s.db)
+	// Execute the query using storage executor — routes through Rust FFI when available
+	executor := storage.NewExecutorWithOptions(s.db, ax.AxExecutorOptions{
+		RawQuerier: s.atsStore,
+	})
 	result, err := executor.ExecuteAsk(r.Context(), *filter)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "Failed to execute ax query", http.StatusInternalServerError)

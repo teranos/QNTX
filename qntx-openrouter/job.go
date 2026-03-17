@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/attrs"
+	"github.com/teranos/QNTX/ats/ax"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
@@ -73,9 +74,11 @@ func (p *Plugin) executePromptJob(ctx context.Context, jobID string, payload []b
 		filter.TimeStart = jobPayload.TemporalCursor
 	}
 
-	// Execute query
+	// Execute query — routes through Rust FFI when available
 	db := p.Services().Database()
-	executor := storage.NewExecutor(db)
+	executor := storage.NewExecutorWithOptions(db, ax.AxExecutorOptions{
+		RawQuerier: p.Services().ATSStore(),
+	})
 	result, err := executor.ExecuteAsk(ctx, filter)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to execute ax query for job %s", jobID)

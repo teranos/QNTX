@@ -111,6 +111,79 @@ impl SqliteStore {
         })
     }
 
+    /// Execute a raw SQL query with parameters, returning attestation rows as JSON.
+    ///
+    /// The query MUST select the standard attestation columns in order:
+    ///   id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
+    ///
+    /// Parameters are passed as a JSON array of values (strings, numbers, nulls).
+    /// This allows Go to keep its query builder while Rust owns the connection.
+    pub fn query_attestations_raw(
+        &self,
+        sql: &str,
+        params_json: &str,
+    ) -> StoreResult<Vec<Attestation>> {
+        let params: Vec<serde_json::Value> = if params_json.is_empty() || params_json == "[]" {
+            Vec::new()
+        } else {
+            serde_json::from_str(params_json)
+                .map_err(|e| StoreError::Backend(format!("invalid params JSON: {}", e)))?
+        };
+
+        let mut stmt = self.conn.prepare(sql).map_err(SqliteError::from)?;
+
+        // Convert JSON values to rusqlite params
+        let param_refs: Vec<Box<dyn rusqlite::types::ToSql>> = params
+            .iter()
+            .map(|v| -> Box<dyn rusqlite::types::ToSql> {
+                match v {
+                    serde_json::Value::String(s) => Box::new(s.clone()),
+                    serde_json::Value::Number(n) => {
+                        if let Some(i) = n.as_i64() {
+                            Box::new(i)
+                        } else if let Some(f) = n.as_f64() {
+                            Box::new(f)
+                        } else {
+                            Box::new(n.to_string())
+                        }
+                    }
+                    serde_json::Value::Bool(b) => Box::new(*b),
+                    serde_json::Value::Null => Box::new(rusqlite::types::Null),
+                    _ => Box::new(v.to_string()),
+                }
+            })
+            .collect();
+
+        let param_slice: Vec<&dyn rusqlite::types::ToSql> =
+            param_refs.iter().map(|p| p.as_ref()).collect();
+
+        let rows = stmt
+            .query_map(param_slice.as_slice(), |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, String>(6)?,
+                    row.get::<_, Option<String>>(7)?,
+                    row.get::<_, String>(8)?,
+                    row.get::<_, Option<Vec<u8>>>(9)?,
+                    row.get::<_, Option<String>>(10)?,
+                ))
+            })
+            .map_err(SqliteError::from)?;
+
+        let mut attestations = Vec::new();
+        for row_result in rows {
+            let row_data = row_result.map_err(SqliteError::from)?;
+            attestations.push(Self::row_to_attestation(row_data)?);
+        }
+
+        Ok(attestations)
+    }
+
     /// Helper to query rows from a prepared statement.
     fn query_distinct_values(&self, sql: &str) -> StoreResult<Vec<String>> {
         let mut stmt = self.conn.prepare(sql).map_err(SqliteError::from)?;
