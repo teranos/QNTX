@@ -596,6 +596,33 @@ func (rs *RustStore) IntegrityCheck() ([]string, error) {
 	return values, nil
 }
 
+// Backup creates a hot backup of the database to destPath.
+// Safe to call while the database is in use.
+func (rs *RustStore) Backup(destPath string) error {
+	rs.mu.Lock()
+	if rs.store == nil {
+		rs.mu.Unlock()
+		return errors.New("store is closed")
+	}
+
+	cDest := C.CString(destPath)
+	defer C.free(unsafe.Pointer(cDest))
+
+	result := C.storage_backup(rs.store, cDest)
+	success := bool(result.success)
+	var errMsg string
+	if !success {
+		errMsg = C.GoString(result.error_msg)
+	}
+	C.storage_result_free(result)
+	rs.mu.Unlock()
+
+	if !success {
+		return errors.Newf("backup failed for %s: %s", destPath, errMsg)
+	}
+	return nil
+}
+
 // QueryAttestationsRaw executes a raw SQL query through Rust's connection.
 // The query must select standard attestation columns in order.
 // params is a slice of bind parameters (strings, ints, floats, nil).
