@@ -90,6 +90,10 @@ Svelte 5 single-file app. No bundler dependencies beyond Bun and svelte.
 
 ### Missing features (frontend)
 
+- **All detected projects as columns**: show every Claude project from session discovery, not just ones with existing weaves. Unweaved projects appear as empty columns ready for import.
+- **Cluster distribution per project**: in the expanded project header, show how the project's weaves distribute across available clusters (% membership per cluster).
+- **Temporal alignment across columns**: columns should visually offset based on real time distance. A March 4 weave in one column should not sit at the same scroll height as a March 11 weave in another — the gap should reflect the actual time delta, shrinking dynamically as timestamps converge.
+- **Collapsible project columns**: minimize a project to a thin vertical strip showing just the project name (rotated). Click to restore. Keeps the column present but out of the way.
 - Diffs: show code changes that happened during the conversation.
 - Git moments: commits and merges as distinct timeline events.
 - Favorite weaves: bookmark and return to specific weaves.

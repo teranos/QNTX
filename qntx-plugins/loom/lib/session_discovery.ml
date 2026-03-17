@@ -18,6 +18,7 @@ type session_file = {
   file_path : string;      (* full path to .jsonl *)
   file_size : int;         (* bytes *)
   line_count : int;        (* number of lines *)
+  modified_at : float;     (* mtime as unix epoch seconds *)
 }
 
 type session_state =
@@ -48,9 +49,11 @@ let scan_project project_dir project_name =
     if Filename.check_suffix name ".jsonl" then
       let session_id = Filename.remove_extension name in
       let file_path = Filename.concat project_dir name in
-      let file_size = (Unix.stat file_path).st_size in
+      let st = Unix.stat file_path in
+      let file_size = st.st_size in
+      let modified_at = st.st_mtime in
       let line_count = count_lines file_path in
-      Some { project = project_name; session_id; file_path; file_size; line_count }
+      Some { project = project_name; session_id; file_path; file_size; line_count; modified_at }
     else
       None)
 
@@ -158,6 +161,7 @@ let sessions_to_json sessions =
       ("file_path", `String s.file.file_path);
       ("file_size", `Int s.file.file_size);
       ("line_count", `Int s.file.line_count);
+      ("modified_at", `Int (int_of_float (s.file.modified_at *. 1000.0)));
       ("state", `String (state_to_string s.state));
       ("weave_count", `Int s.weave_count);
     ]

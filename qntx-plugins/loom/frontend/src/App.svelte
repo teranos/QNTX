@@ -42,6 +42,7 @@
     file_path: string
     file_size: number
     line_count: number
+    modified_at: number
     state: 'unweaved' | 'partial' | 'complete' | 'stale'
     weave_count: number
   }
@@ -68,27 +69,82 @@
   const showClusters = true
   let clusterMap: Map<string, { cluster_id: number, label: string | null }> = $state(new Map())
 
-  // Session browser state
-  let browserOpen = $state(false)
-  let browserData: SessionsResponse | null = $state(null)
-  let browserLoading = $state(false)
+  // Session browser state (per-project, inline in headers)
+  let sessionsData: SessionsResponse | null = $state(null)
+  let expandedProjects: Set<string> = $state(new Set())
   let importingSession: string | null = $state(null)
   let importResult: { session_id: string, weaves: number } | null = $state(null)
 
   async function fetchSessions() {
-    browserLoading = true
     try {
       const res = await fetch('/api/sessions')
-      browserData = await res.json()
-    } catch (e: any) {
-      browserData = null
+      sessionsData = await res.json()
+    } catch {
+      sessionsData = null
     }
-    browserLoading = false
   }
 
-  function toggleBrowser() {
-    browserOpen = !browserOpen
-    if (browserOpen && !browserData) fetchSessions()
+  // Match a timeline project name (e.g. "tmp3/QNTX") to Claude project slugs
+  // Slug format: -Users-s-b-vanhouten-SBVH-teranos-tmp3-QNTX
+  // Convert project name slashes to dashes and check if slug ends with it
+  function sessionsForProject(projectName: string): SessionFile[] {
+    if (!sessionsData) return []
+    const suffix = projectName.split('/').join('-')
+    const results: SessionFile[] = []
+    for (const [slug, info] of Object.entries(sessionsData.projects)) {
+      if (slug.endsWith(suffix)) {
+        results.push(...info.sessions)
+      }
+    }
+    results.sort((a, b) => b.modified_at - a.modified_at)
+    return results
+  }
+
+  function openDrawer(projectName: string) {
+    const next = new Set(expandedProjects)
+    next.add(projectName)
+    expandedProjects = next
+  }
+
+  function closeDrawer(projectName: string) {
+    const next = new Set(expandedProjects)
+    next.delete(projectName)
+    expandedProjects = next
+  }
+
+  // Scroll down on header → open drawer above, mouse-out → close
+  // Always eat vertical wheel on the header zone so the column never scrolls
+  function bindHdDrawer(el: HTMLElement, project: string) {
+    function onWheel(e: WheelEvent) {
+      // Let horizontal scroll pass through
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
+      // Always block vertical scroll from reaching the column
+      e.preventDefault()
+      e.stopPropagation()
+      if (!expandedProjects.has(project) && e.deltaY > 2) {
+        openDrawer(project)
+      }
+    }
+
+    function onClick() {
+      if (expandedProjects.has(project)) closeDrawer(project)
+      else openDrawer(project)
+    }
+
+    function onLeave() {
+      closeDrawer(project)
+    }
+
+    el.addEventListener('wheel', onWheel, { passive: false, capture: true })
+    el.addEventListener('click', onClick)
+    el.addEventListener('mouseleave', onLeave)
+    return {
+      destroy() {
+        el.removeEventListener('wheel', onWheel, { capture: true } as EventListenerOptions)
+        el.removeEventListener('click', onClick)
+        el.removeEventListener('mouseleave', onLeave)
+      }
+    }
   }
 
   async function importSession(file: SessionFile) {
@@ -103,7 +159,6 @@
       const data = await res.json()
       if (data.success) {
         importResult = { session_id: file.session_id, weaves: data.weaves_created }
-        // Refresh both the session list and the weave view
         await Promise.all([fetchSessions(), load()])
       }
     } catch {
@@ -527,8 +582,9 @@
 
   function bindMinimapWheel(el: HTMLElement, colIdx: number) {
     function handler(e: WheelEvent) {
+      // Only intercept vertical scroll for zoom — let horizontal through for column navigation
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
       e.preventDefault()
-      e.stopPropagation()
       const current = getZoom(colIdx)
       const delta = e.deltaY > 0 ? 0.3 : -0.3
       const next = Math.max(1, Math.min(10, current + delta))
@@ -685,13 +741,14 @@
       copySelected()
     }
     if (e.key === 'Escape') {
-      if (browserOpen) { browserOpen = false; return }
+      if (expandedProjects.size > 0) { expandedProjects = new Set(); return }
       clearSelection()
     }
   }
 
   onMount(() => {
     load()
+    fetchSessions()
     document.addEventListener('keydown', onKeydown)
     return () => document.removeEventListener('keydown', onKeydown)
   })
@@ -701,7 +758,7 @@
   <header>
     <span class="dw-title">loom</span>
     {#if !loading}
-      <button class="dw-stat dw-stat-btn" onclick={toggleBrowser}>{sessions.length} sessions</button>
+      <span class="dw-stat">{sessions.length} sessions</span>
       <span class="dw-stat">{totalWeaves} weaves</span>
     {/if}
     {#if selectedTurns.size > 0}
@@ -736,6 +793,58 @@
     >
       {#each sessions as session, si}
         <div class="dw-col-wrap" class:dw-hidden={si !== mobileIdx}>
+          <div
+            class="dw-session-hd-zone"
+            class:dw-hd-expandable={sessionsForProject(session.context).length > 0}
+            use:bindHdDrawer={session.context}
+          >
+            <div class="dw-drawer" class:dw-drawer-open={expandedProjects.has(session.context)}>
+              <div class="dw-drawer-inner">
+                <div class="dw-branches">
+                  {#each session.branches as branch}
+                    <span class="dw-branch" style="border-left-color: {branchColor(branch)}">{branch}</span>
+                  {/each}
+                </div>
+                {#if sessionsForProject(session.context).length > 0}
+                  <div class="dw-jsonl-list">
+                    {#each sessionsForProject(session.context) as sf}
+                      <div class="dw-jsonl-row">
+                        <span class="dw-jsonl-state" style="color: {stateColor(sf.state)}">{stateIndicator(sf.state)}</span>
+                        <span class="dw-jsonl-sid">{sf.session_id.substring(0, 8)}</span>
+                        <span class="dw-jsonl-detail">{fmtTime(sf.modified_at)}</span>
+                        <span class="dw-jsonl-detail">{sf.line_count}L {formatBytes(sf.file_size)}</span>
+                        {#if sf.weave_count > 0}
+                          <span class="dw-jsonl-detail">{sf.weave_count}w</span>
+                        {/if}
+                        <span class="dw-jsonl-detail">{sf.state}</span>
+                        {#if importingSession === sf.session_id}
+                          <span class="dw-jsonl-importing">importing...</span>
+                        {:else if sf.state === 'unweaved'}
+                          <button class="dw-jsonl-import" onclick={() => importSession(sf)}>import</button>
+                        {:else if sf.state === 'stale' || sf.state === 'complete'}
+                          <button class="dw-jsonl-import" onclick={() => importSession(sf)}>reimport</button>
+                        {/if}
+                        {#if importResult && importResult.session_id === sf.session_id}
+                          <span class="dw-jsonl-result">+{importResult.weaves}w</span>
+                        {/if}
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+            </div>
+            <div class="dw-session-hd">
+              <div class="dw-session-top">
+                <span class="dw-sid">{session.context === '_' ? 'untracked' : session.context.substring(0, 16)}</span>
+                <span class="dw-smeta">{fmtTime(session.earliest)}</span>
+                <span class="dw-smeta">{session.weaves.length}w {session.totalWords} words</span>
+                {#if sessionsForProject(session.context).length > 0}
+                  <span class="dw-smeta dw-jsonl-count">{sessionsForProject(session.context).length} jsonl</span>
+                {/if}
+              </div>
+            </div>
+          </div>
+          <div class="dw-col-body">
         <div
           class="dw-col"
           use:bindColumn={si}
@@ -743,19 +852,6 @@
           onpointerenter={onColumnEnter}
           onpointerleave={onColumnLeave}
         >
-          <div class="dw-session-hd">
-            <div class="dw-session-top">
-              <span class="dw-sid">{session.context === '_' ? 'untracked' : session.context.substring(0, 16)}</span>
-              <span class="dw-smeta">{fmtTime(session.earliest)}</span>
-              <span class="dw-smeta">{session.weaves.length}w {session.totalWords} words</span>
-            </div>
-            <div class="dw-branches">
-              {#each session.branches as branch}
-                <span class="dw-branch" style="border-left-color: {branchColor(branch)}">{branch}</span>
-              {/each}
-            </div>
-          </div>
-
           <div class="dw-stream">
             {#each computeMinimapItems(session.weaves) as item}
               {#if item.type === 'gap'}
@@ -871,60 +967,12 @@
             ></div>
           {/if}
         </div>
+          </div>
         </div>
       {/each}
     </div>
   {/if}
 
-  {#if browserOpen}
-    <div class="sb-overlay" onclick={toggleBrowser}></div>
-    <div class="sb-panel">
-      <div class="sb-header">
-        <span class="sb-title">sessions</span>
-        {#if browserData}
-          <span class="sb-meta">{browserData.total_sessions} across {browserData.project_count} projects</span>
-        {/if}
-        <button class="sb-close" onclick={toggleBrowser}>x</button>
-      </div>
-      <div class="sb-body">
-        {#if browserLoading}
-          <div class="sb-loading">scanning...</div>
-        {:else if browserData}
-          {#each Object.entries(browserData.projects) as [project, info]}
-            <div class="sb-project">
-              <div class="sb-project-hd">
-                <span class="sb-project-name">{project}</span>
-                <span class="sb-project-count">{info.session_count}</span>
-              </div>
-              {#each info.sessions as sf}
-                <div class="sb-session">
-                  <span class="sb-state" style="color: {stateColor(sf.state)}">{stateIndicator(sf.state)}</span>
-                  <span class="sb-sid">{sf.session_id.substring(0, 8)}</span>
-                  <span class="sb-sdetail">{sf.line_count} lines {formatBytes(sf.file_size)}</span>
-                  {#if sf.weave_count > 0}
-                    <span class="sb-sdetail">{sf.weave_count}w</span>
-                  {/if}
-                  <span class="sb-sstate">{sf.state}</span>
-                  {#if sf.state === 'unweaved' || sf.state === 'stale'}
-                    {#if importingSession === sf.session_id}
-                      <span class="sb-importing">importing...</span>
-                    {:else}
-                      <button class="sb-import" onclick={() => importSession(sf)}>
-                        {sf.state === 'stale' ? 'reimport' : 'import'}
-                      </button>
-                    {/if}
-                  {/if}
-                  {#if importResult && importResult.session_id === sf.session_id}
-                    <span class="sb-result">+{importResult.weaves}w</span>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-          {/each}
-        {/if}
-      </div>
-    </div>
-  {/if}
 </div>
 
 <style>
@@ -966,9 +1014,7 @@
     font-size: var(--font-size-md);
   }
 
-  .dw-stat { color: var(--text-on-dark-tertiary); font-size: var(--font-size-sm); background: none; border: none; font: inherit; }
-  .dw-stat-btn { cursor: pointer; }
-  .dw-stat-btn:hover { color: var(--accent-on-dark); }
+  .dw-stat { color: var(--text-on-dark-tertiary); font-size: var(--font-size-sm); }
 
   .dw-cluster { color: var(--text-on-dark-tertiary); font-style: italic; }
 
@@ -1023,11 +1069,20 @@
     overflow-y: hidden;
   }
 
-  /* Column wrapper */
+  /* Column wrapper — vertical: header on top, body below */
   .dw-col-wrap {
     display: flex;
+    flex-direction: column;
     flex: 0 0 100%;
+    height: calc(100vh - 33px);
     border-right: 1px solid var(--border-on-dark);
+  }
+
+  /* Body row: weaves + warp side by side, fills remaining height */
+  .dw-col-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
   }
 
   /* Session column */
@@ -1036,15 +1091,13 @@
     display: flex;
     flex-direction: column;
     overflow-y: auto;
-    height: calc(100vh - 33px);
     scrollbar-width: none;
   }
   .dw-col::-webkit-scrollbar { display: none; }
 
-  /* Minimap scrollbar */
+  /* Minimap scrollbar — fills body height, not viewport */
   .dw-warp {
     width: 24px;
-    height: calc(100vh - 33px);
     background: var(--bg-almost-black);
     position: relative;
     cursor: pointer;
@@ -1119,13 +1172,31 @@
   }
 
   /* Session header */
+  .dw-session-hd-zone {
+    flex-shrink: 0;
+  }
+
   .dw-session-hd {
-    position: sticky;
-    top: 0;
-    z-index: 5;
     padding: 6px 10px;
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border-on-dark);
+  }
+
+  .dw-hd-expandable { cursor: ns-resize; }
+
+  .dw-drawer {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease-out;
+    background: var(--bg-dark);
+    border-bottom: 1px solid var(--border-on-dark);
+  }
+  .dw-drawer-open {
+    max-height: 300px;
+    transition: max-height 0.3s ease-in;
+  }
+  .dw-drawer-inner {
+    padding: 4px 10px 6px;
   }
 
   .dw-session-top {
@@ -1299,143 +1370,69 @@
     font-size: 11px;
   }
 
-  /* Session browser overlay */
-  .sb-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 50;
-  }
-
-  .sb-panel {
-    position: fixed;
-    top: 33px;
-    right: 0;
-    bottom: 0;
-    width: 520px;
-    max-width: 100vw;
-    background: var(--bg-almost-black);
-    border-left: 1px solid var(--border-on-dark);
-    z-index: 51;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .sb-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
-    border-bottom: 1px solid var(--border-on-dark);
-  }
-
-  .sb-title {
-    color: var(--accent-on-dark);
-    font-weight: 500;
-  }
-
-  .sb-meta {
-    color: var(--text-on-dark-tertiary);
-    font-size: var(--font-size-xs);
-  }
-
-  .sb-close {
-    margin-left: auto;
+  /* Inline session list (per-project, in header) */
+  .dw-sessions-btn {
     background: none;
     border: 1px solid var(--border-on-dark);
     color: var(--text-on-dark-tertiary);
-    padding: 0 6px;
+    padding: 0 4px;
     font: inherit;
+    font-size: var(--font-size-xs);
     cursor: pointer;
-    font-size: var(--font-size-sm);
-  }
-  .sb-close:hover { color: var(--text-on-dark); }
-
-  .sb-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 4px 0;
-  }
-
-  .sb-loading {
-    padding: 24px;
-    color: var(--text-on-dark-tertiary);
-    text-align: center;
-  }
-
-  .sb-project {
-    border-bottom: 1px solid var(--bg-secondary);
-  }
-
-  .sb-project-hd {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    background: var(--bg-secondary);
-  }
-
-  .sb-project-name {
-    color: var(--text-on-dark-secondary);
-    font-size: var(--font-size-xs);
-    font-weight: 500;
-    overflow-wrap: break-word;
-    word-break: break-word;
-  }
-
-  .sb-project-count {
     margin-left: auto;
-    color: var(--text-on-dark-tertiary);
-    font-size: var(--font-size-xs);
+  }
+  .dw-sessions-btn:hover { color: var(--accent-on-dark); border-color: var(--accent-on-dark); }
+
+  .dw-jsonl-list {
+    margin-top: 4px;
+    border-top: 1px solid var(--border-on-dark);
+    padding-top: 2px;
   }
 
-  .sb-session {
+  .dw-jsonl-row {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 3px 10px 3px 14px;
+    padding: 2px 4px;
     font-size: var(--font-size-xs);
   }
-  .sb-session:hover { background: var(--bg-dark-hover); }
+  .dw-jsonl-row:hover { background: var(--bg-dark-hover); }
 
-  .sb-state {
+  .dw-jsonl-state {
     font-weight: 500;
     font-size: 10px;
     width: 16px;
     flex-shrink: 0;
   }
 
-  .sb-sid {
+  .dw-jsonl-sid {
     color: var(--text-on-dark-secondary);
     font-weight: 500;
   }
 
-  .sb-sdetail {
+  .dw-jsonl-detail {
     color: var(--text-on-dark-tertiary);
   }
 
-  .sb-sstate {
-    color: var(--text-on-dark-tertiary);
+  .dw-jsonl-import {
     margin-left: auto;
-  }
-
-  .sb-import {
     background: none;
     border: 1px solid var(--accent-on-dark);
     color: var(--accent-on-dark);
-    padding: 0 6px;
+    padding: 0 4px;
     font: inherit;
     font-size: var(--font-size-xs);
     cursor: pointer;
   }
-  .sb-import:hover { background: rgba(125, 186, 138, 0.15); }
+  .dw-jsonl-import:hover { background: rgba(125, 186, 138, 0.15); }
 
-  .sb-importing {
+  .dw-jsonl-importing {
+    margin-left: auto;
     color: var(--color-warning);
     font-size: var(--font-size-xs);
   }
 
-  .sb-result {
+  .dw-jsonl-result {
     color: var(--accent-on-dark);
     font-weight: 500;
     font-size: var(--font-size-xs);
@@ -1455,7 +1452,6 @@
   /* Mobile */
   @media (max-width: 767px) {
     .dw-col-wrap.dw-hidden { display: none; }
-    .dw-col { height: calc(100vh - 51px); }
-    .dw-warp { height: calc(100vh - 51px); }
+    .dw-col-wrap { height: calc(100vh - 51px); }
   }
 </style>
