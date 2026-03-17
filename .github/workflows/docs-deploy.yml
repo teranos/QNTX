@@ -6,7 +6,7 @@ on:
     branches: [main]
     paths:
       - 'docs/**'
-      - 'sitegen.nix'
+      - 'sitegen/**'
       - 'web/css/**'
       - 'types/generated/**'
       - '.github/workflows/docs-deploy.yml'
