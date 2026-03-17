@@ -12,6 +12,7 @@ import type { DaemonStatusMessage } from '../types/websocket';
 import { DB } from '@generated/sym.js';
 import { connectivityManager, type ConnectivityState } from './connectivity';
 import { spawnAuthGlyph } from './components/glyph/auth-glyph';
+import { glyphRun } from './components/glyph/run.ts';
 
 interface StatusIndicator {
     id: string;
@@ -305,9 +306,8 @@ class StatusIndicatorManager {
     /**
      * Show database information modal
      */
-    private async showDatabaseInfo(): Promise<void> {
-        const module = await import('./database-stats-window.js');
-        module.databaseStatsWindow.toggle();
+    private showDatabaseInfo(): void {
+        glyphRun.openGlyph('database-glyph');
     }
 
     /**

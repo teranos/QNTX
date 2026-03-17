@@ -13,12 +13,13 @@ import (
 
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/types"
 )
 
 // ClusterRequest represents a clustering API request
 type ClusterRequest struct {
-	MinClusterSize       int      `json:"min_cluster_size,omitempty"`
-	ClusterThreshold     *float64 `json:"cluster_threshold,omitempty"`
+	MinClusterSize        int      `json:"min_cluster_size,omitempty"`
+	ClusterThreshold      *float64 `json:"cluster_threshold,omitempty"`
 	ClusterMatchThreshold *float64 `json:"cluster_match_threshold,omitempty"`
 }
 
@@ -224,11 +225,17 @@ func (s *QNTXServer) HandleClusterMembers(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	attestations, err := storage.GetAttestationsByIDs(s.db, sourceIDs)
-	if err != nil {
-		s.logger.Errorw("Failed to resolve cluster member attestations", "cluster_id", clusterID, "error", err)
-		http.Error(w, fmt.Sprintf("Failed to resolve attestations for cluster %d", clusterID), http.StatusInternalServerError)
-		return
+	// Fetch each attestation through Rust FFI (not a hot path — cluster member display)
+	var attestations []*types.As
+	for _, id := range sourceIDs {
+		as, err := s.getAttestationByID(id)
+		if err != nil {
+			s.logger.Warnw("Failed to resolve cluster member attestation", "attestation_id", id, "error", err)
+			continue
+		}
+		if as != nil {
+			attestations = append(attestations, as)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
