@@ -366,6 +366,30 @@ let stitch payload =
       in
       stitch_turn ~branch ~context ~predicate ~label ~text ~paths
 
+(* Flush buffers for a specific session context (e.g. "session:abc-123").
+ * Used by JSONL import to emit remaining turns without affecting live sessions. *)
+let flush_context target_context =
+  let results = ref [] in
+  let keys_to_remove = ref [] in
+  Hashtbl.iter (fun key (entry : buffer_entry) ->
+    if entry.context = target_context && entry.turns <> [] then (
+      let block = entry.turns |> List.rev |> String.concat "\n\n" in
+      let total_words = buffer_word_count entry.turns in
+      let num_turns = List.length entry.turns in
+      let branch = match String.index_opt key ':' with
+        | Some i -> String.sub key 0 i
+        | None -> key
+      in
+      Printf.printf "[loom] Flushing %d-word buffer for %s (import complete)\n%!"
+        total_words key;
+      results := { branch; context = entry.context; buffered_words = 0;
+                   emitted = Some block; turn_count = num_turns; paths = entry.paths } :: !results;
+      keys_to_remove := key :: !keys_to_remove
+    )
+  ) buffers;
+  List.iter (Hashtbl.remove buffers) !keys_to_remove;
+  !results
+
 (* Flush all buffered turns as weaves. Called on plugin shutdown
  * to prevent data loss when the server stops. *)
 let flush_all () =
