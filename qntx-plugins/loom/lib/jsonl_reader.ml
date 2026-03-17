@@ -80,16 +80,52 @@ let tool_to_turn name input =
 (* Process a single JSONL line into stitch_turn calls.
  * Returns a list of stitch_results (may be empty for skipped lines,
  * or multiple if a line contains both text and tool_use). *)
-let process_line json ~branch_override =
+(* Parse ISO 8601 timestamp to milliseconds since epoch.
+ * e.g. "2026-02-26T09:06:04.887Z" → 1772024764887 *)
+let parse_iso_timestamp s =
+  try
+    (* Extract components: YYYY-MM-DDThh:mm:ss.mmmZ *)
+    let year = int_of_string (String.sub s 0 4) in
+    let month = int_of_string (String.sub s 5 2) in
+    let day = int_of_string (String.sub s 8 2) in
+    let hour = int_of_string (String.sub s 11 2) in
+    let min = int_of_string (String.sub s 14 2) in
+    let sec = int_of_string (String.sub s 17 2) in
+    let millis = match String.index_opt s '.' with
+      | Some dot_pos ->
+        let end_pos = match String.index_opt s 'Z' with
+          | Some z -> z | None -> String.length s in
+        let frac = String.sub s (dot_pos + 1) (end_pos - dot_pos - 1) in
+        (* Pad or truncate to 3 digits *)
+        let padded = if String.length frac >= 3 then String.sub frac 0 3
+          else frac ^ String.make (3 - String.length frac) '0' in
+        int_of_string padded
+      | None -> 0
+    in
+    let tm = Unix.{ tm_sec = sec; tm_min = min; tm_hour = hour;
+                    tm_mday = day; tm_mon = month - 1; tm_year = year - 1900;
+                    tm_wday = 0; tm_yday = 0; tm_isdst = false } in
+    let epoch, _ = Unix.mktime tm in
+    (* mktime uses local time, adjust to UTC *)
+    let utc_offset = let _, gm = Unix.mktime (Unix.gmtime 0.0) in
+      Unix.mktime gm |> fst in
+    int_of_float ((epoch -. utc_offset) *. 1000.0) + millis
+  with _ -> 0
+
+let process_line json ~branch_override ~project_prefix =
   match json with
   | `Assoc fields ->
     let line_type = match List.assoc_opt "type" fields with
       | Some (`String t) -> t | _ -> "" in
-    let branch = match branch_override with
+    let git_branch = match branch_override with
       | Some b -> b
       | None ->
         (match List.assoc_opt "gitBranch" fields with
          | Some (`String b) -> b | _ -> "unknown") in
+    let branch = project_prefix ^ ":" ^ git_branch in
+    let timestamp = match List.assoc_opt "timestamp" fields with
+      | Some (`String ts) -> parse_iso_timestamp ts
+      | _ -> 0 in
     let session_id = match List.assoc_opt "sessionId" fields with
       | Some (`String s) -> s | _ -> "unknown" in
     let context = "session:" ^ session_id in
@@ -109,7 +145,7 @@ let process_line json ~branch_override =
        let text = String.concat "\n\n" texts in
        if String.length text > 0 then
          Stitcher.stitch_turn ~branch ~context ~predicate:"UserPromptSubmit"
-           ~label:"human" ~text ~paths:[]
+           ~label:"human" ~text ~paths:[] ~timestamp ()
        else
          []
 
@@ -121,7 +157,7 @@ let process_line json ~branch_override =
          let text = String.concat "\n\n" texts in
          if String.length text > 0 then
            Stitcher.stitch_turn ~branch ~context ~predicate:"Stop"
-             ~label:"assistant" ~text ~paths:[]
+             ~label:"assistant" ~text ~paths:[] ~timestamp ()
          else
            []
        in
@@ -130,7 +166,7 @@ let process_line json ~branch_override =
          match tool_to_turn name input with
          | Some (label, text, paths) ->
            Stitcher.stitch_turn ~branch ~context ~predicate:"PreToolUse"
-             ~label ~text ~paths
+             ~label ~text ~paths ~timestamp ()
          | None -> []
        ) (extract_tool_use_blocks content) in
        text_results @ tool_results
@@ -143,7 +179,34 @@ let process_line json ~branch_override =
 (* Ingest a complete JSONL session file.
  * Reads all lines, feeds turns to stitch_turn, flushes remaining buffer.
  * Returns only stitch_results that emitted weave blocks. *)
+(* Extract project prefix from cwd field in JSONL.
+ * Takes last two path components: /Users/x/SBVH/teranos/tmp5/qntx → tmp5/qntx
+ * Falls back to parent directory name if no cwd found. *)
+let derive_project_prefix file_path =
+  let ic = open_in file_path in
+  let prefix = ref "" in
+  (try
+    while !prefix = "" do
+      let line = input_line ic in
+      if String.length line > 0 then
+        match Yojson.Safe.from_string line with
+        | `Assoc fields ->
+          (match List.assoc_opt "cwd" fields with
+           | Some (`String cwd) ->
+             let parent = Filename.dirname cwd in
+             let last = Filename.basename cwd in
+             let second = Filename.basename parent in
+             prefix := second ^ "/" ^ last
+           | _ -> ())
+        | _ -> ()
+    done
+  with _ -> ());
+  close_in ic;
+  if !prefix = "" then Filename.basename (Filename.dirname file_path)
+  else !prefix
+
 let ingest ~file_path ~branch_override =
+  let project_prefix = derive_project_prefix file_path in
   let ic = open_in file_path in
   let all_results = ref [] in
   (try
@@ -152,7 +215,7 @@ let ingest ~file_path ~branch_override =
       if String.length line > 0 then (
         match Yojson.Safe.from_string line with
         | json ->
-          let results = process_line json ~branch_override in
+          let results = process_line json ~branch_override ~project_prefix in
           all_results := results @ !all_results
         | exception Yojson.Json_error msg ->
           Printf.eprintf "[loom] JSONL parse error at %s: %s\n%!" file_path msg

@@ -40,6 +40,8 @@ let persist_weaves results =
         ~word_count:(Stitcher.word_count block)
         ~turn_count:result.turn_count
         ~paths:result.paths
+        ~original_timestamp:result.timestamp
+        ()
       in
       (match ats_result with
        | Ok () -> ()

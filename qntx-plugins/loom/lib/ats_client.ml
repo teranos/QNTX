@@ -103,7 +103,7 @@ let grpc_call ~path ~request_bytes =
 
 (* --- Create a weave attestation --- *)
 
-let create_weave ~branch ~context ~text ~word_count ~turn_count ~paths =
+let create_weave ~branch ~context ~text ~word_count ~turn_count ~paths ?(original_timestamp=0) () =
   if !endpoint = "" then (
     Printf.eprintf "[loom] ATS client not configured, dropping weave\n%!";
     Lwt.return_error "ATS client not configured"
@@ -118,12 +118,16 @@ let create_weave ~branch ~context ~text ~word_count ~turn_count ~paths =
     let paths_val =
       Value.make ~kind:(`Struct_value (Struct.make ~fields:paths_fields ())) ()
     in
-    let attrs = Struct.make ~fields:[
+    let base_fields = [
       ("text", Some (string_val text));
       ("word_count", Some (number_val word_count));
       ("turn_count", Some (number_val turn_count));
       ("paths", Some paths_val);
-    ] () in
+    ] in
+    let fields = if original_timestamp > 0 then
+      ("original_timestamp", Some (number_val original_timestamp)) :: base_fields
+    else base_fields in
+    let attrs = Struct.make ~fields () in
 
     let command = Protocol.AttestationCommand.make
       ~subjects:[branch]

@@ -56,14 +56,16 @@ watch(join(import.meta.dir, 'index.html'), () => {
 })
 
 // h2c proxy helper — connects via HTTP/2 cleartext to the plugin
-function h2cRequest(path: string): Promise<string> {
+function h2cRequest(method: string, path: string, body?: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const client = http2.connect(`http://127.0.0.1:${LOOM_PORT}`)
     client.on('error', (err) => {
       client.close()
       reject(err)
     })
-    const req = client.request({ ':method': 'GET', ':path': path })
+    const headers: Record<string, string> = { ':method': method, ':path': path }
+    if (body) headers['content-type'] = 'application/json'
+    const req = client.request(headers)
     const chunks: Buffer[] = []
     req.on('data', (chunk: Buffer) => chunks.push(chunk))
     req.on('end', () => {
@@ -74,6 +76,7 @@ function h2cRequest(path: string): Promise<string> {
       client.close()
       reject(err)
     })
+    if (body) req.write(body)
     req.end()
   })
 }
@@ -120,8 +123,9 @@ const server = Bun.serve({
     // Proxy /api/ to loom plugin (h2c — plugin speaks HTTP/2 only)
     if (url.pathname.startsWith('/api/')) {
       try {
-        const body = await h2cRequest(url.pathname + url.search)
-        return new Response(body, {
+        const reqBody = req.method === 'POST' ? await req.text() : undefined
+        const respBody = await h2cRequest(req.method, url.pathname + url.search, reqBody)
+        return new Response(respBody, {
           headers: { 'content-type': 'application/json' },
         })
       } catch {

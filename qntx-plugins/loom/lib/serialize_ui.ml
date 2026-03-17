@@ -49,7 +49,9 @@ let attestation_to_json (a : Protocol.Attestation.t) =
     ("id", `String a.id);
     ("branch", `String branch);
     ("context", `String context);
-    ("timestamp", `Int a.timestamp);
+    ("timestamp", match extract_number fields "original_timestamp" with
+      | Some ts when ts > 0 -> `Int ts
+      | _ -> `Int a.timestamp);
     ("text", match extract_string fields "text" with
       | Some s -> `String s
       | None -> `Null);

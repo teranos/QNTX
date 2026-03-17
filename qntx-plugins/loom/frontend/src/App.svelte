@@ -34,6 +34,29 @@
     totalWords: number
   }
 
+  // --- Session browser types ---
+
+  interface SessionFile {
+    session_id: string
+    project: string
+    file_path: string
+    file_size: number
+    line_count: number
+    state: 'unweaved' | 'partial' | 'complete' | 'stale'
+    weave_count: number
+  }
+
+  interface ProjectInfo {
+    sessions: SessionFile[]
+    session_count: number
+  }
+
+  interface SessionsResponse {
+    projects: Record<string, ProjectInfo>
+    project_count: number
+    total_sessions: number
+  }
+
   // --- State ---
 
   let sessions: Session[] = $state([])
@@ -44,6 +67,76 @@
   let mobileIdx = $state(0)
   const showClusters = true
   let clusterMap: Map<string, { cluster_id: number, label: string | null }> = $state(new Map())
+
+  // Session browser state
+  let browserOpen = $state(false)
+  let browserData: SessionsResponse | null = $state(null)
+  let browserLoading = $state(false)
+  let importingSession: string | null = $state(null)
+  let importResult: { session_id: string, weaves: number } | null = $state(null)
+
+  async function fetchSessions() {
+    browserLoading = true
+    try {
+      const res = await fetch('/api/sessions')
+      browserData = await res.json()
+    } catch (e: any) {
+      browserData = null
+    }
+    browserLoading = false
+  }
+
+  function toggleBrowser() {
+    browserOpen = !browserOpen
+    if (browserOpen && !browserData) fetchSessions()
+  }
+
+  async function importSession(file: SessionFile) {
+    importingSession = file.session_id
+    importResult = null
+    try {
+      const res = await fetch('/api/import', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ file_path: file.file_path }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        importResult = { session_id: file.session_id, weaves: data.weaves_created }
+        // Refresh both the session list and the weave view
+        await Promise.all([fetchSessions(), load()])
+      }
+    } catch {
+      // import failed silently
+    }
+    importingSession = null
+  }
+
+  function stateIndicator(state: string): string {
+    switch (state) {
+      case 'unweaved': return '--'
+      case 'partial': return '..'
+      case 'complete': return 'ok'
+      case 'stale': return '!!'
+      default: return '??'
+    }
+  }
+
+  function stateColor(state: string): string {
+    switch (state) {
+      case 'unweaved': return 'var(--text-on-dark-tertiary)'
+      case 'partial': return 'var(--color-warning)'
+      case 'complete': return 'var(--accent-on-dark)'
+      case 'stale': return '#ef4544'
+      default: return 'var(--text-on-dark-tertiary)'
+    }
+  }
+
+  function formatBytes(bytes: number): string {
+    if (bytes < 1024) return bytes + 'B'
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + 'KB'
+    return (bytes / (1024 * 1024)).toFixed(1) + 'MB'
+  }
 
   // --- Branch colors (deterministic, functional) ---
 
@@ -591,7 +684,10 @@
       e.preventDefault()
       copySelected()
     }
-    if (e.key === 'Escape') clearSelection()
+    if (e.key === 'Escape') {
+      if (browserOpen) { browserOpen = false; return }
+      clearSelection()
+    }
   }
 
   onMount(() => {
@@ -605,7 +701,7 @@
   <header>
     <span class="dw-title">loom</span>
     {#if !loading}
-      <span class="dw-stat">{sessions.length} sessions</span>
+      <button class="dw-stat dw-stat-btn" onclick={toggleBrowser}>{sessions.length} sessions</button>
       <span class="dw-stat">{totalWeaves} weaves</span>
     {/if}
     {#if selectedTurns.size > 0}
@@ -779,6 +875,56 @@
       {/each}
     </div>
   {/if}
+
+  {#if browserOpen}
+    <div class="sb-overlay" onclick={toggleBrowser}></div>
+    <div class="sb-panel">
+      <div class="sb-header">
+        <span class="sb-title">sessions</span>
+        {#if browserData}
+          <span class="sb-meta">{browserData.total_sessions} across {browserData.project_count} projects</span>
+        {/if}
+        <button class="sb-close" onclick={toggleBrowser}>x</button>
+      </div>
+      <div class="sb-body">
+        {#if browserLoading}
+          <div class="sb-loading">scanning...</div>
+        {:else if browserData}
+          {#each Object.entries(browserData.projects) as [project, info]}
+            <div class="sb-project">
+              <div class="sb-project-hd">
+                <span class="sb-project-name">{project}</span>
+                <span class="sb-project-count">{info.session_count}</span>
+              </div>
+              {#each info.sessions as sf}
+                <div class="sb-session">
+                  <span class="sb-state" style="color: {stateColor(sf.state)}">{stateIndicator(sf.state)}</span>
+                  <span class="sb-sid">{sf.session_id.substring(0, 8)}</span>
+                  <span class="sb-sdetail">{sf.line_count} lines {formatBytes(sf.file_size)}</span>
+                  {#if sf.weave_count > 0}
+                    <span class="sb-sdetail">{sf.weave_count}w</span>
+                  {/if}
+                  <span class="sb-sstate">{sf.state}</span>
+                  {#if sf.state === 'unweaved' || sf.state === 'stale'}
+                    {#if importingSession === sf.session_id}
+                      <span class="sb-importing">importing...</span>
+                    {:else}
+                      <button class="sb-import" onclick={() => importSession(sf)}>
+                        {sf.state === 'stale' ? 'reimport' : 'import'}
+                      </button>
+                    {/if}
+                  {/if}
+                  {#if importResult && importResult.session_id === sf.session_id}
+                    <span class="sb-result">+{importResult.weaves}w</span>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {/each}
+        {/if}
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -820,7 +966,9 @@
     font-size: var(--font-size-md);
   }
 
-  .dw-stat { color: var(--text-on-dark-tertiary); font-size: var(--font-size-sm); }
+  .dw-stat { color: var(--text-on-dark-tertiary); font-size: var(--font-size-sm); background: none; border: none; font: inherit; }
+  .dw-stat-btn { cursor: pointer; }
+  .dw-stat-btn:hover { color: var(--accent-on-dark); }
 
   .dw-cluster { color: var(--text-on-dark-tertiary); font-style: italic; }
 
@@ -1149,6 +1297,148 @@
     padding: 0 3px;
     color: var(--text-on-dark-secondary);
     font-size: 11px;
+  }
+
+  /* Session browser overlay */
+  .sb-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 50;
+  }
+
+  .sb-panel {
+    position: fixed;
+    top: 33px;
+    right: 0;
+    bottom: 0;
+    width: 520px;
+    max-width: 100vw;
+    background: var(--bg-almost-black);
+    border-left: 1px solid var(--border-on-dark);
+    z-index: 51;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sb-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border-on-dark);
+  }
+
+  .sb-title {
+    color: var(--accent-on-dark);
+    font-weight: 500;
+  }
+
+  .sb-meta {
+    color: var(--text-on-dark-tertiary);
+    font-size: var(--font-size-xs);
+  }
+
+  .sb-close {
+    margin-left: auto;
+    background: none;
+    border: 1px solid var(--border-on-dark);
+    color: var(--text-on-dark-tertiary);
+    padding: 0 6px;
+    font: inherit;
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+  }
+  .sb-close:hover { color: var(--text-on-dark); }
+
+  .sb-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 0;
+  }
+
+  .sb-loading {
+    padding: 24px;
+    color: var(--text-on-dark-tertiary);
+    text-align: center;
+  }
+
+  .sb-project {
+    border-bottom: 1px solid var(--bg-secondary);
+  }
+
+  .sb-project-hd {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--bg-secondary);
+  }
+
+  .sb-project-name {
+    color: var(--text-on-dark-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  .sb-project-count {
+    margin-left: auto;
+    color: var(--text-on-dark-tertiary);
+    font-size: var(--font-size-xs);
+  }
+
+  .sb-session {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px 3px 14px;
+    font-size: var(--font-size-xs);
+  }
+  .sb-session:hover { background: var(--bg-dark-hover); }
+
+  .sb-state {
+    font-weight: 500;
+    font-size: 10px;
+    width: 16px;
+    flex-shrink: 0;
+  }
+
+  .sb-sid {
+    color: var(--text-on-dark-secondary);
+    font-weight: 500;
+  }
+
+  .sb-sdetail {
+    color: var(--text-on-dark-tertiary);
+  }
+
+  .sb-sstate {
+    color: var(--text-on-dark-tertiary);
+    margin-left: auto;
+  }
+
+  .sb-import {
+    background: none;
+    border: 1px solid var(--accent-on-dark);
+    color: var(--accent-on-dark);
+    padding: 0 6px;
+    font: inherit;
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+  }
+  .sb-import:hover { background: rgba(125, 186, 138, 0.15); }
+
+  .sb-importing {
+    color: var(--color-warning);
+    font-size: var(--font-size-xs);
+  }
+
+  .sb-result {
+    color: var(--accent-on-dark);
+    font-weight: 500;
+    font-size: var(--font-size-xs);
   }
 
   /* Desktop: multi-column */
