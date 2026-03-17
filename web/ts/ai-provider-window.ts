@@ -1,6 +1,8 @@
 /**
  * AI Provider Panel - Actor/Agent Configuration
  *
+ * TODO: Migrate to glyph manifestation, then delete. See components/window.ts.
+ *
  * Shows AI inference provider selection when clicking ⌬ (by/actor) in the symbol palette.
  * Allows switching between OpenRouter (cloud) and Ollama (local) providers.
  */

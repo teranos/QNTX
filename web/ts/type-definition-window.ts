@@ -659,11 +659,6 @@ function attachCreateListeners(container: HTMLElement): void {
     });
 }
 
-// ── Backwards-compatible singleton ───────────────────────────────────
-
-/** @deprecated Use createNewType() and openTypeDefinition() directly. */
-export const typeDefinitionWindow = {
-    createNewType,
-    open: openTypeDefinition,
-    getFieldInfo: (name: string): FieldInfo | undefined => fields.get(name),
-};
+export function getFieldInfo(name: string): FieldInfo | undefined {
+    return fields.get(name);
+}

@@ -80,9 +80,8 @@ export function morphCanvasPlacedToWindow(
 
     // 5. Wrap non-title-bar children into a scrollable content div
     const contentDiv = document.createElement('div');
-    contentDiv.className = 'canvas-window-content';
-    contentDiv.style.flex = '1';
-    contentDiv.style.overflow = 'auto';
+    contentDiv.className = 'canvas-window-content glyph-content-area';
+    contentDiv.style.padding = '0';
     const children = Array.from(element.childNodes);
     for (const child of children) {
         if (child === existingTitleBar) continue;

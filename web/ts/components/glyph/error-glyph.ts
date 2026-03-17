@@ -161,12 +161,10 @@ export function createErrorGlyph(
 
     // Content area - auto-sizing
     const content = document.createElement('div');
-    content.className = 'error-glyph-content';
+    content.className = 'error-glyph-content glyph-content-area';
     content.style.padding = '12px';
     content.style.whiteSpace = 'pre-wrap';
     content.style.lineHeight = '1.5';
-    content.style.flex = '1';
-    content.style.overflow = 'auto';
     content.style.backgroundColor = 'rgba(36, 18, 18, 0.85)'; // 15% transparency
     content.style.color = '#ff8282'; // More pure red
     content.style.fontSize = '11px';
