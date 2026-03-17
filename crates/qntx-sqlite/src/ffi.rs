@@ -633,6 +633,27 @@ pub extern "C" fn count_result_free(result: CountResultC) {
 }
 
 // ============================================================================
+// Integrity
+// ============================================================================
+
+/// Run PRAGMA integrity_check and return result lines.
+/// A healthy database returns a single-element array: ["ok"].
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn storage_integrity_check(store: *const SqliteStore) -> StringArrayResultC {
+    let store = unsafe {
+        match store.as_ref() {
+            Some(s) => s,
+            None => return StringArrayResultC::error("null store pointer"),
+        }
+    };
+    match store.integrity_check() {
+        Ok(lines) => StringArrayResultC::ok(lines),
+        Err(e) => StringArrayResultC::error(&format!("integrity check failed: {}", e)),
+    }
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 

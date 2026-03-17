@@ -67,6 +67,23 @@ impl SqliteStore {
         Ok(Self::new(conn))
     }
 
+    /// Run PRAGMA integrity_check and return the result lines.
+    /// A healthy database returns a single line: "ok".
+    pub fn integrity_check(&self) -> StoreResult<Vec<String>> {
+        let mut stmt = self
+            .conn
+            .prepare("PRAGMA integrity_check")
+            .map_err(SqliteError::from)?;
+        let rows = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(SqliteError::from)?;
+        let mut results = Vec::new();
+        for row in rows {
+            results.push(row.map_err(SqliteError::from)?);
+        }
+        Ok(results)
+    }
+
     /// Get a reference to the underlying connection
     pub fn connection(&self) -> &Connection {
         &self.conn
