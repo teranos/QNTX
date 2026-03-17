@@ -212,10 +212,10 @@ let
 
   # Static assets as attrsets (single source of truth)
   cssFiles = {
-    tokens = ./web/css/tokens.css;
-    core = ./web/css/core.css;
-    utilities = ./web/css/utilities.css;
-    docs = ./web/css/docs.css;
+    tokens = ../web/css/tokens.css;
+    core = ../web/css/core.css;
+    utilities = ../web/css/utilities.css;
+    docs = ../web/css/docs.css;
     prism = pkgs.fetchurl {
       url = "https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css";
       hash = "sha256-GxX+KXGZigSK67YPJvbu12EiBx257zuZWr0AMiT1Kpg=";
@@ -233,7 +233,7 @@ let
     };
   };
 
-  logo = ./web/qntx.jpg;
+  logo = ../web/qntx.jpg;
 
   # Default OpenGraph description
   defaultDescription = "Continuous Intelligence - systems that continuously evolve their understanding through verifiable attestations.";
@@ -360,7 +360,7 @@ let
   # Markdown Discovery
   # ============================================================================
 
-  docsDir = ./docs;
+  docsDir = ../docs;
 
   markdownFiles =
     let
@@ -1058,7 +1058,7 @@ let
           <p>Uses <code>lib.filesystem.listFilesRecursive</code> to find all <code>.md</code> files in <code>docs/</code>:</p>
           ${html.codeBlock ''
             markdownFiles = lib.filter (path: lib.hasSuffix ".md" (toString path))
-              (lib.filesystem.listFilesRecursive ./docs);''}
+              (lib.filesystem.listFilesRecursive ../docs);''}
 
           <h3>2. Per-file Derivations</h3>
           <p>Each markdown file becomes its own Nix derivation, enabling incremental builds:</p>
