@@ -1112,13 +1112,9 @@
 
   /* Time spacer (temporal alignment) */
   .dw-time-spacer {
-    display: flex;
-    align-items: center;
-    justify-content: center;
     margin: 0 6px;
     border-left: 1px dashed var(--border-on-dark);
     border-right: 1px dashed var(--border-on-dark);
-    opacity: 0.5;
   }
   .dw-gap-label {
     color: var(--border-on-dark);
