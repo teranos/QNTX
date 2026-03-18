@@ -884,15 +884,15 @@
                           <span class="dw-jsonl-detail">{sf.weave_count}w</span>
                         {/if}
                         <span class="dw-jsonl-detail" style="color: {stateColor(sf.state)}; opacity: 1">{sf.state}</span>
+                        {#if importResult && importResult.session_id === sf.session_id}
+                          <span class="dw-jsonl-result">+{importResult.weaves}w</span>
+                        {/if}
                         {#if importingSession === sf.session_id}
                           <span class="dw-jsonl-importing">importing...</span>
                         {:else if sf.state === 'unweaved' || sf.state === 'partial'}
                           <button class="dw-jsonl-import" onclick={(e: MouseEvent) => { e.stopPropagation(); importSession(sf) }}>import</button>
                         {:else if sf.state === 'stale' || sf.state === 'complete'}
                           <button class="dw-jsonl-import" onclick={(e: MouseEvent) => { e.stopPropagation(); importSession(sf) }}>reimport</button>
-                        {/if}
-                        {#if importResult && importResult.session_id === sf.session_id}
-                          <span class="dw-jsonl-result">+{importResult.weaves}w</span>
                         {/if}
                       </div>
                     {/each}
