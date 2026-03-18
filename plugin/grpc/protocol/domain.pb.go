@@ -1424,7 +1424,7 @@ var File_plugin_grpc_protocol_domain_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\n" +
-	"!plugin/grpc/protocol/domain.proto\x12\bprotocol\x1a\x1eplugin/grpc/protocol/llm.proto\"\a\n" +
+	"!plugin/grpc/protocol/domain.proto\x12\bprotocol\"\a\n" +
 	"\x05Empty\"\xb7\x01\n" +
 	"\x10MetadataResponse\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
@@ -1544,7 +1544,7 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x05query\x18\x01 \x01(\tR\x05query\"D\n" +
 	"\x14ParseAxQueryResponse\x12\x16\n" +
 	"\x06result\x18\x01 \x01(\fR\x06result\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error2\xdb\x05\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error2\x9e\x05\n" +
 	"\x13DomainPluginService\x127\n" +
 	"\bMetadata\x12\x0f.protocol.Empty\x1a\x1a.protocol.MetadataResponse\x12G\n" +
 	"\n" +
@@ -1558,8 +1558,7 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x0eRegisterGlyphs\x12\x0f.protocol.Empty\x1a\x1a.protocol.GlyphDefResponse\x12G\n" +
 	"\n" +
 	"ExecuteJob\x12\x1b.protocol.ExecuteJobRequest\x1a\x1c.protocol.ExecuteJobResponse\x12M\n" +
-	"\fParseAxQuery\x12\x1d.protocol.ParseAxQueryRequest\x1a\x1e.protocol.ParseAxQueryResponse\x12;\n" +
-	"\x04Chat\x12\x18.protocol.LLMChatRequest\x1a\x19.protocol.LLMChatResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
+	"\fParseAxQuery\x12\x1d.protocol.ParseAxQueryRequest\x1a\x1e.protocol.ParseAxQueryResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
 var (
 	file_plugin_grpc_protocol_domain_proto_rawDescOnce sync.Once
@@ -1600,8 +1599,6 @@ var file_plugin_grpc_protocol_domain_proto_goTypes = []any{
 	nil,                          // 21: protocol.WebSocketMessage.HeadersEntry
 	nil,                          // 22: protocol.HealthResponse.DetailsEntry
 	nil,                          // 23: protocol.ConfigSchemaResponse.FieldsEntry
-	(*LLMChatRequest)(nil),       // 24: protocol.LLMChatRequest
-	(*LLMChatResponse)(nil),      // 25: protocol.LLMChatResponse
 }
 var file_plugin_grpc_protocol_domain_proto_depIdxs = []int32{
 	20, // 0: protocol.InitializeRequest.config:type_name -> protocol.InitializeRequest.ConfigEntry
@@ -1625,20 +1622,18 @@ var file_plugin_grpc_protocol_domain_proto_depIdxs = []int32{
 	1,  // 18: protocol.DomainPluginService.RegisterGlyphs:input_type -> protocol.Empty
 	13, // 19: protocol.DomainPluginService.ExecuteJob:input_type -> protocol.ExecuteJobRequest
 	18, // 20: protocol.DomainPluginService.ParseAxQuery:input_type -> protocol.ParseAxQueryRequest
-	24, // 21: protocol.DomainPluginService.Chat:input_type -> protocol.LLMChatRequest
-	2,  // 22: protocol.DomainPluginService.Metadata:output_type -> protocol.MetadataResponse
-	12, // 23: protocol.DomainPluginService.Initialize:output_type -> protocol.InitializeResponse
-	1,  // 24: protocol.DomainPluginService.Shutdown:output_type -> protocol.Empty
-	5,  // 25: protocol.DomainPluginService.HandleHTTP:output_type -> protocol.HTTPResponse
-	7,  // 26: protocol.DomainPluginService.HandleWebSocket:output_type -> protocol.WebSocketMessage
-	8,  // 27: protocol.DomainPluginService.Health:output_type -> protocol.HealthResponse
-	9,  // 28: protocol.DomainPluginService.ConfigSchema:output_type -> protocol.ConfigSchemaResponse
-	16, // 29: protocol.DomainPluginService.RegisterGlyphs:output_type -> protocol.GlyphDefResponse
-	14, // 30: protocol.DomainPluginService.ExecuteJob:output_type -> protocol.ExecuteJobResponse
-	19, // 31: protocol.DomainPluginService.ParseAxQuery:output_type -> protocol.ParseAxQueryResponse
-	25, // 32: protocol.DomainPluginService.Chat:output_type -> protocol.LLMChatResponse
-	22, // [22:33] is the sub-list for method output_type
-	11, // [11:22] is the sub-list for method input_type
+	2,  // 21: protocol.DomainPluginService.Metadata:output_type -> protocol.MetadataResponse
+	12, // 22: protocol.DomainPluginService.Initialize:output_type -> protocol.InitializeResponse
+	1,  // 23: protocol.DomainPluginService.Shutdown:output_type -> protocol.Empty
+	5,  // 24: protocol.DomainPluginService.HandleHTTP:output_type -> protocol.HTTPResponse
+	7,  // 25: protocol.DomainPluginService.HandleWebSocket:output_type -> protocol.WebSocketMessage
+	8,  // 26: protocol.DomainPluginService.Health:output_type -> protocol.HealthResponse
+	9,  // 27: protocol.DomainPluginService.ConfigSchema:output_type -> protocol.ConfigSchemaResponse
+	16, // 28: protocol.DomainPluginService.RegisterGlyphs:output_type -> protocol.GlyphDefResponse
+	14, // 29: protocol.DomainPluginService.ExecuteJob:output_type -> protocol.ExecuteJobResponse
+	19, // 30: protocol.DomainPluginService.ParseAxQuery:output_type -> protocol.ParseAxQueryResponse
+	21, // [21:31] is the sub-list for method output_type
+	11, // [11:21] is the sub-list for method input_type
 	11, // [11:11] is the sub-list for extension type_name
 	11, // [11:11] is the sub-list for extension extendee
 	0,  // [0:11] is the sub-list for field type_name
@@ -1649,7 +1644,6 @@ func file_plugin_grpc_protocol_domain_proto_init() {
 	if File_plugin_grpc_protocol_domain_proto != nil {
 		return
 	}
-	file_plugin_grpc_protocol_llm_proto_init()
 	file_plugin_grpc_protocol_domain_proto_msgTypes[12].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
