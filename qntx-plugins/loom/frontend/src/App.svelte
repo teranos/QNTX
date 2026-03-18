@@ -160,13 +160,16 @@
       if (e.deltaY > 2) {
         if (!expandedProjects.has(project)) {
           openDrawer(project)
-          // Lock tier promotion for 500ms so a single swipe doesn't jump to full
           expandLocked = true
           setTimeout(() => { expandLocked = false }, 600)
         } else if (!fullDrawers.has(project) && !expandLocked) {
           const nf = new Set(fullDrawers)
           nf.add(project)
           fullDrawers = nf
+        }
+      } else if (e.deltaY < -2) {
+        if (expandedProjects.has(project) && !fullDrawers.has(project)) {
+          closeDrawer(project)
         }
       }
     }
