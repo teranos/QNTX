@@ -325,6 +325,69 @@ export function spawnAttestationGlyph(attestation: Attestation, mouseX?: number,
 }
 
 /**
+ * Spawn an attestation glyph and immediately morph it to window.
+ * Used by the embeddings panel to open attestations as windows that can later be placed on canvas.
+ */
+export function spawnAttestationAsWindow(attestation: Attestation): void {
+    const glyphId = `as-${attestation.id || crypto.randomUUID()}`;
+
+    // Dedup: if this attestation is already open (canvas, window, or tray), do nothing
+    const existing = document.querySelector(`[data-glyph-id="${glyphId}"]`);
+    if (existing) {
+        log.debug(SEG.GLYPH, `[AsGlyph] Attestation ${glyphId} already exists, skipping`);
+        return;
+    }
+
+    const contentLayer = document.querySelector('.canvas-content-layer') as HTMLElement;
+    if (!contentLayer) {
+        log.warn(SEG.GLYPH, '[AsGlyph] Cannot spawn as window: no canvas-content-layer found');
+        return;
+    }
+
+    const attrs = parseAttributes(attestation);
+    const x = Math.round(window.innerWidth / 2 - 210);
+    const y = Math.round(window.innerHeight / 2 - 150);
+
+    const glyph: Glyph = {
+        id: glyphId,
+        title: 'Attestation',
+        symbol: AS,
+        x,
+        y,
+        content: JSON.stringify(attestation),
+        renderContent: () => document.createElement('div'),
+    };
+
+    const entry = getGlyphTypeBySymbol(AS);
+    if (!entry) {
+        log.error(SEG.GLYPH, '[AsGlyph] AS not found in glyph registry');
+        return;
+    }
+
+    const glyphElement = entry.render(glyph) as HTMLElement;
+    contentLayer.appendChild(glyphElement);
+
+    const rect = glyphElement.getBoundingClientRect();
+    uiState.addCanvasGlyph({
+        id: glyphId,
+        symbol: AS,
+        x,
+        y,
+        width: Math.round(rect.width) || 420,
+        height: Math.round(rect.height) || (attrs ? 200 : 28),
+        content: JSON.stringify(attestation),
+    });
+
+    // Immediately morph to window by clicking the expand button
+    const expandBtn = glyphElement.querySelector('.titlebar-btn') as HTMLElement | null;
+    if (expandBtn) {
+        expandBtn.click();
+    }
+
+    log.debug(SEG.GLYPH, `[AsGlyph] Spawned attestation ${glyphId} as window`);
+}
+
+/**
  * Build attestation content for tray restoration.
  */
 function buildAttestationContent(
