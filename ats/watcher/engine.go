@@ -458,6 +458,9 @@ func (e *Engine) queryHistoricalSemantic(watcherID string, watcher *storage.Watc
 				"error", err)
 			continue
 		}
+		if as == nil {
+			continue
+		}
 
 		// Only broadcast attestations with rich text content
 		if extractAttestationText(as) == "" {
