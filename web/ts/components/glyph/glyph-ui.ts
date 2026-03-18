@@ -1,12 +1,10 @@
 /**
- * GlyphUI — the interface plugins use to build their glyphs.
+ * GlyphUI — the interface for building glyphs.
  *
- * Instead of serving raw HTML from Go, plugins ship a TypeScript module
- * that exports a render function. The frontend dynamically imports it
- * and injects this UI interface, giving the plugin type-safe access to QNTX
- * primitives: canvasPlaced, drag protection, plugin fetch, logging, cleanup.
+ * Provides type-safe access to QNTX primitives: canvasPlaced, drag protection,
+ * scoped fetch, logging, cleanup. Used by plugin modules and internal glyphs alike.
  *
- * Usage from a plugin module:
+ * Usage:
  *
  *   import type { GlyphUI, RenderFn } from '@qntx/glyphs';
  *
@@ -31,7 +29,7 @@ import { apiFetch, getBackendUrl } from '../../api';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 
-// ── Public types (plugin-facing) ────────────────────────────────────
+// ── Public types ────────────────────────────────────────────────────
 
 /** The render function a plugin module must export. */
 export type RenderFn = (glyph: Glyph, ui: GlyphUI) => HTMLElement | Promise<HTMLElement>;
@@ -51,7 +49,7 @@ export interface GlyphDef {
     defaultHeight?: number;
 }
 
-/** UI interface injected into plugin render functions. */
+/** UI interface injected into glyph render functions. */
 export interface GlyphUI {
     /**
      * Create a canvas-placed glyph with title bar, drag, and resize.
@@ -64,12 +62,12 @@ export interface GlyphUI {
     preventDrag(...elements: HTMLElement[]): void;
 
     /**
-     * Fetch from this plugin's HTTP endpoints.
-     * Path is relative to /api/{plugin}/ — e.g., pluginFetch('/test-fetch', ...).
+     * Fetch from this glyph's HTTP endpoints.
+     * Path is relative to /api/{name}/ — e.g., pluginFetch('/execute', ...).
      */
     pluginFetch(path: string, opts?: FetchOpts): Promise<Response>;
 
-    /** Structured logging with [Plugin:{name}] prefix. */
+    /** Structured logging with [{name}] prefix. */
     log: {
         debug(msg: string, ...args: unknown[]): void;
         info(msg: string, ...args: unknown[]): void;
@@ -94,7 +92,7 @@ export interface GlyphUI {
     statusLine(): { element: HTMLElement; show(msg: string, isError?: boolean): void; clear(): void };
 
     /**
-     * Open a WebSocket to this plugin's WS endpoint.
+     * Open a WebSocket to this glyph's WS endpoint.
      * Constructs the full URL from backend config — no hardcoded ports.
      */
     pluginWebSocket(params?: Record<string, string>): WebSocket;
@@ -121,7 +119,7 @@ export interface GlyphUI {
 /** Detail payload for the glyph:spawn-result DOM event. */
 export interface SpawnResultDetail {
     glyphId: string;
-    pluginName: string;
+    name: string;
     result: {
         success: boolean;
         stdout: string;
@@ -165,27 +163,27 @@ export interface FetchOpts {
 
 // ── Factory ─────────────────────────────────────────────────────────
 
-/** Create a GlyphUI instance scoped to a specific glyph and plugin. */
-export function createGlyphUI(glyph: Glyph, pluginName: string): GlyphUI {
+/** Create a GlyphUI instance scoped to a specific glyph. */
+export function createGlyphUI(glyph: Glyph, name: string): GlyphUI {
     // Element reference — set when container() is called
     let rootElement: HTMLElement | null = null;
     // Cleanups registered before container() — flushed when container is created
     const pendingCleanups: Array<() => void> = [];
 
-    const prefix = `[Plugin:${pluginName}]`;
+    const prefix = `[${name}]`;
 
     const ui: GlyphUI = {
         glyph(opts: GlyphOpts) {
             const config: CanvasPlacedConfig = {
                 glyph,
-                className: opts.className ?? `canvas-plugin-glyph plugin-${pluginName}`,
+                className: opts.className ?? `canvas-glyph glyph-${name}`,
                 defaults: opts.defaults,
                 titleBar: opts.titleBar,
                 dragHandle: opts.dragHandle,
                 draggableOptions: opts.draggableOptions,
                 resizable: opts.resizable ?? false,
                 useMinHeight: opts.useMinHeight,
-                logLabel: `Plugin:${pluginName}`,
+                logLabel: name,
             };
 
             const result = canvasPlaced(config);
@@ -218,7 +216,7 @@ export function createGlyphUI(glyph: Glyph, pluginName: string): GlyphUI {
         },
 
         async pluginFetch(path: string, opts?: FetchOpts): Promise<Response> {
-            const url = `/api/${pluginName}${path}`;
+            const url = `/api/${name}${path}`;
             const init: RequestInit = {};
 
             if (opts?.method) init.method = opts.method;
@@ -235,7 +233,7 @@ export function createGlyphUI(glyph: Glyph, pluginName: string): GlyphUI {
         pluginWebSocket(params?: Record<string, string>): WebSocket {
             const base = getBackendUrl().replace(/^http/, 'ws');
             const qs = params ? '?' + new URLSearchParams(params).toString() : '';
-            return new WebSocket(`${base}/ws/${pluginName}${qs}`);
+            return new WebSocket(`${base}/ws/${name}${qs}`);
         },
 
         log: {
@@ -364,7 +362,7 @@ export function createGlyphUI(glyph: Glyph, pluginName: string): GlyphUI {
 
         async loadConfig(): Promise<Record<string, unknown> | null> {
             const resp = await apiFetch(
-                `/api/glyph-config?plugin=${encodeURIComponent(pluginName)}&glyph_id=${encodeURIComponent(glyph.id)}`
+                `/api/glyph-config?plugin=${encodeURIComponent(name)}&glyph_id=${encodeURIComponent(glyph.id)}`
             );
             if (!resp.ok) return null;
             const data = await resp.json();
@@ -375,7 +373,7 @@ export function createGlyphUI(glyph: Glyph, pluginName: string): GlyphUI {
             await apiFetch('/api/glyph-config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plugin: pluginName, glyph_id: glyph.id, config }),
+                body: JSON.stringify({ plugin: name, glyph_id: glyph.id, config }),
             });
         },
 
@@ -384,7 +382,7 @@ export function createGlyphUI(glyph: Glyph, pluginName: string): GlyphUI {
                 log.error(SEG.GLYPH, `${prefix} spawnResult called before glyph() — no root element`);
                 return;
             }
-            const detail: SpawnResultDetail = { glyphId: glyph.id, pluginName, result };
+            const detail: SpawnResultDetail = { glyphId: glyph.id, name, result };
             const CE = rootElement.ownerDocument.defaultView?.CustomEvent ?? CustomEvent;
             rootElement.dispatchEvent(new CE('glyph:spawn-result', {
                 bubbles: true,

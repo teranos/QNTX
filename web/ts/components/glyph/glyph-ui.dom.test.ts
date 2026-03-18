@@ -83,7 +83,7 @@ describe('GlyphUI SDK - Tim (Happy Path)', () => {
 
         expect(received).not.toBeNull();
         expect(received!.glyphId).toBe('test-spawn-1');
-        expect(received!.pluginName).toBe('myPlugin');
+        expect(received!.name).toBe('myPlugin');
         expect(received!.result.success).toBe(true);
         expect(received!.result.stdout).toBe('hello world');
         expect(received!.result.duration_ms).toBe(42);
