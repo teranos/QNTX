@@ -7,11 +7,50 @@ let respond_json reqd status json_str =
   let headers = H2.Headers.of_list [
     ("content-type", "application/json");
     ("access-control-allow-origin", "*");
-    ("access-control-allow-methods", "GET, OPTIONS");
+    ("access-control-allow-methods", "GET, POST, OPTIONS");
     ("access-control-allow-headers", "content-type");
   ] in
   let response = H2.Response.create ~headers status in
   H2.Reqd.respond_with_string reqd response json_str
+
+(* Read entire request body from H2 *)
+let read_body reqd callback =
+  let body = H2.Reqd.request_body reqd in
+  let buf = Buffer.create 256 in
+  let rec read () =
+    H2.Body.Reader.schedule_read body
+      ~on_eof:(fun () -> callback (Buffer.contents buf))
+      ~on_read:(fun bigstring ~off ~len ->
+        let chunk = Bigstringaf.substring bigstring ~off ~len in
+        Buffer.add_string buf chunk;
+        read ())
+  in
+  read ()
+
+(* Persist emitted weave blocks to ATS *)
+let persist_weaves results =
+  let open Lwt.Syntax in
+  Lwt_list.iter_p (fun (result : Stitcher.stitch_result) ->
+    match result.emitted with
+    | Some block ->
+      let* ats_result = Ats_client.create_weave
+        ~branch:result.branch
+        ~context:result.context
+        ~text:block
+        ~word_count:(Stitcher.word_count block)
+        ~turn_count:result.turn_count
+        ~paths:result.paths
+        ~original_timestamp:result.timestamp
+        ~weave_source:"jsonl"
+        ()
+      in
+      (match ats_result with
+       | Ok () -> ()
+       | Error msg ->
+         Printf.eprintf "[loom] Failed to persist imported weave for %s: %s\n%!" result.branch msg);
+      Lwt.return_unit
+    | None -> Lwt.return_unit
+  ) results
 
 let handle_http reqd =
   let request = H2.Reqd.request reqd in
@@ -21,9 +60,21 @@ let handle_http reqd =
   | `GET, "/api/weaves" ->
     Lwt.async (fun () ->
       let* result = Ats_client.get_weaves () in
+      let* wc_result = Ats_client.get_weave_completes () in
       (match result with
        | Ok attestations ->
-         let json = Serialize_ui.group_by_branch attestations in
+         (* Build set of session contexts that have been fully imported *)
+         let completed_contexts = Hashtbl.create 16 in
+         (match wc_result with
+          | Ok wc_attestations ->
+            List.iter (fun (wc : Qntx_plugin_proto.Atsstore.Protocol.Attestation.t) ->
+              List.iter (fun subj ->
+                Hashtbl.replace completed_contexts ("session:" ^ subj) true
+              ) wc.subjects
+            ) wc_attestations
+          | Error _ -> ());
+         let filtered = Serialize_ui.filter_superseded ~completed_contexts attestations in
+         let json = Serialize_ui.group_by_branch filtered in
          respond_json reqd `OK (Yojson.Safe.to_string json)
        | Error msg ->
          respond_json reqd `Internal_server_error
@@ -46,6 +97,49 @@ let handle_http reqd =
          respond_json reqd `Internal_server_error
            (Printf.sprintf {|{"error":"%s"}|} msg));
       Lwt.return_unit)
+  | `GET, "/api/sessions" ->
+    Lwt.async (fun () ->
+      let* sessions = Session_discovery.discover () in
+      let json = Session_discovery.sessions_to_json sessions in
+      respond_json reqd `OK (Yojson.Safe.to_string json);
+      Lwt.return_unit)
+  | `POST, "/api/import" ->
+    read_body reqd (fun body ->
+      Lwt.async (fun () ->
+        let json = try Some (Yojson.Safe.from_string body)
+          with _ -> None in
+        let file_path = match json with
+          | Some (`Assoc fields) ->
+            (match List.assoc_opt "file_path" fields with
+             | Some (`String p) -> Some p | _ -> None)
+          | _ -> None
+        in
+        match file_path with
+        | None ->
+          respond_json reqd `Bad_request {|{"error":"missing file_path"}|};
+          Lwt.return_unit
+        | Some file_path ->
+          Printf.printf "[loom] Importing JSONL: %s\n%!" file_path;
+          let results = Jsonl_reader.ingest ~file_path ~branch_override:None in
+          let weave_count = List.length results in
+          let* () = persist_weaves results in
+          (* Get file stats for WeaveComplete attestation *)
+          let file_size = (Unix.stat file_path).st_size in
+          let line_count = let ic = open_in file_path in
+            let n = ref 0 in
+            (try while true do ignore (input_line ic); incr n done
+             with End_of_file -> close_in ic);
+            !n in
+          (* Extract session ID from filename (uuid.jsonl) *)
+          let basename = Filename.basename file_path in
+          let session_id = Filename.remove_extension basename in
+          let* _wc = Ats_client.create_weave_complete
+            ~session_id ~file_path ~file_size ~line_count ~weave_count in
+          Printf.printf "[loom] Import complete: %d weaves from %s\n%!" weave_count file_path;
+          respond_json reqd `OK
+            (Printf.sprintf {|{"success":true,"weaves_created":%d,"file":"%s","session_id":"%s"}|}
+               weave_count file_path session_id);
+          Lwt.return_unit))
   | `OPTIONS, _ ->
     respond_json reqd `OK "{}"
   | `GET, "/" ->

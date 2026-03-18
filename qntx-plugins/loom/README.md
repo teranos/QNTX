@@ -12,8 +12,9 @@ QNTX Server
   │                            ├── UDP listener (port 19470) — receives events from Graunde
   │                            ├── Stitcher — chunks turns into weaves, writes to ATS
   │                            ├── HTTP API (port 5178)
-  │                            │     ├── /api/weaves — all weaves grouped by branch
-  │                            │     └── /api/weaves/branch?name= — single branch
+  │                            │     ├── GET /api/weaves — all weaves grouped by branch
+  │                            │     ├── GET /api/weaves/branch?name= — single branch
+  │                            │     └── POST /api/import — JSONL import (in-process)
   │                            └── Serialize UI — attestation-to-JSON for the frontend
   └── /api/embeddings/clusters/memberships — cluster data
 
@@ -62,17 +63,20 @@ Bash `[tool]` turns are filtered by a command whitelist (git, gh, make). All oth
 
 ## Frontend
 
-Svelte 5 single-file app. No bundler dependencies beyond Bun and svelte.
+Svelte 5 app with extracted components. No bundler dependencies beyond Bun and svelte.
 
 ### What it does
 
 - Vertical chronology, horizontal projects (grouped by branch prefix before `:`)
-- TimeWarp: zoomable scrollbar with branch/session/cluster lanes, tool call diamonds, session/compaction seams, 12h time gaps
+- All detected projects as columns: unweaved projects appear as empty columns ready for import
+- Temporal alignment: discrete time spacers between weaves (1h base, exponential doubling, ~11 month range in 192px)
+- TimeWarp: zoomable scrollbar with branch/session/cluster lanes, tool call diamonds, session/compaction seams
+- Cluster distribution per project in drawer header
 - Pointer-driven time-synchronized scrolling across columns
 - Minimal markdown rendering for assistant turns (code blocks, bold, inline code)
 - Click-to-copy weave attestation ID
 - Turn selection with CMD+C copy
-- Cluster membership visualization via QNTX embeddings API
+- Session browser with JSONL import from project headers
 
 ### Frontend limitations
 
@@ -82,18 +86,18 @@ Svelte 5 single-file app. No bundler dependencies beyond Bun and svelte.
 - **Cluster data is stale**: fetched once, never refreshed.
 - **No search**: cannot find weaves by content, branch, or time range.
 - **No URL routing**: no deep links to specific weaves or scroll positions. State lost on refresh.
+- **No client-side persistence**: column order, expanded/collapsed state, scroll positions, favorites, and UI preferences are lost on refresh. Column positions jump after import because the sort key changes when a project transitions from empty to woven. IndexedDB is the key next step — it unblocks favorites, stable column order, collapsible columns, frozen columns, and scroll position recall.
 - **Warp click math is fragile**: translateY/content fraction mapping breaks if CSS layout changes.
-- **Time sync is coarse**: timestamp-nearest matching causes jumpy behavior with uneven weave density.
 - **Raw text parsing**: `[speaker]` prefix parsing with string methods is fragile if text contains those patterns literally. A structured format from the API would be better.
-- **Single file**: everything in App.svelte. Should split into components (WeaveCard, Turn, Warp, SessionHeader).
 
 ### Missing features (frontend)
 
+- **Interactive cluster chips**: cluster distribution shows in the drawer but clicking a chip does nothing yet. Should filter/highlight weaves belonging to that cluster, scroll to them, or cross-highlight across columns.
+- **Collapsible project columns**: minimize a project to a thin vertical strip showing just the project name (rotated). Click to restore. Keeps the column present but out of the way.
+- **Favorite weaves**: bookmark and return to specific weaves. Requires IndexedDB for persistence.
 - Diffs: show code changes that happened during the conversation.
 - Git moments: commits and merges as distinct timeline events.
-- Favorite weaves: bookmark and return to specific weaves.
 - Freeze columns: toggle time-sync per column, pin a view in place.
-- ~~Hook/system messages~~: done — graunde hook messages flow as `[hook]` turns in weaves, rendered with red accent.
 - Images: screenshots as part of weave data, rendered inline.
 - Branch click navigation: clicking a branch name should scroll to its weaves.
 - Cluster legend: surface cluster labels, make cluster intelligence actionable.
@@ -101,7 +105,7 @@ Svelte 5 single-file app. No bundler dependencies beyond Bun and svelte.
 
 ## HTTP API (OCaml)
 
-Queries ATS for attestations with predicate `["Weave"]`, serves them as JSON over HTTP/2 on port 5178.
+Serves JSON over HTTP/2 on port 5178. Read endpoints query ATS for `["Weave"]` attestations. The import endpoint reads JSONL files in-process, feeds the stitcher pipeline, and writes weaves to ATS.
 
 ### HTTP API limitations
 
@@ -119,7 +123,6 @@ Queries ATS for attestations with predicate `["Weave"]`, serves them as JSON ove
 
 Loom as consumer reveals what the upstream producers don't capture yet:
 
-- ~~**Hooks/system messages**~~: done — loom captures `[hook]` turns via UDP from graunde, renders them with red accent and warp dot.
 - **Diffs**: code changes during a session are not recorded.
 - **Git events**: commits, merges, branch operations are not weave events.
 - **Images/screenshots**: not part of the weave data model.
@@ -128,7 +131,7 @@ Loom as consumer reveals what the upstream producers don't capture yet:
 
 ## JSONL Import (historical weaving)
 
-Loom currently only weaves live sessions via UDP from Graunde. The JSONL import path enables weaving historical conversations — sessions that predate Graunde/Loom, or completing sessions where UDP delivery was partial.
+Weaves historical conversations — sessions that predate Graunde/Loom, or completing sessions where UDP delivery was partial. Imports the full JSONL file each time (not incremental).
 
 One JSONL file = one session. Claude Code writes all turns to `~/.claude/projects/{project-slug}/{session-uuid}.jsonl`. The format is Claude Code native (not attestation format): `type: "user"` / `"assistant"` / `"progress"`, with `message`, `gitBranch`, `sessionId`, `cwd`, `timestamp`.
 
@@ -141,18 +144,18 @@ Each session has one of four states, derivable from ATS + filesystem:
 3. **Complete** — `WeaveComplete` attestation exists, JSONL was fully imported at that point
 4. **Stale** — `WeaveComplete` exists but JSONL has grown since import (file size > recorded size), new unweaved content at the tail
 
-Completeness tracked via `WeaveComplete` attestation written by loom after import, recording file size/line count. Re-import processes only lines past the previous import point.
+Completeness tracked via `WeaveComplete` attestation written by loom after import, recording file size/line count.
+
+### Weave source precedence
+
+Weaves carry a `weave_source` attribute: `"graunde"` (live UDP) or `"jsonl"` (JSONL import). When a `WeaveComplete` exists for a session, JSONL weaves take precedence — graunde weaves for that session are suppressed in the read path. No attestations are deleted.
 
 ### Import flow
 
-1. Frontend "N sessions" is clickable → opens session browser
-2. Session browser lists all projects and their JSONL sessions with state indicators
-3. User selects an unweaved or stale session to import
-4. Frontend POSTs file path to QNTX
-5. QNTX dispatches to loom via ExecuteJob (`ingest-jsonl` handler)
-6. Loom reads the JSONL, extracts turns, chunks via existing pipeline, writes weaves to ATS
-7. Loom writes `WeaveComplete` attestation on success
-8. Frontend refreshes, shows the new weaves
+1. Open the session browser from a project header
+2. Click import on any unweaved, partial, or stale session
+3. Loom reads the JSONL, chunks via the stitcher, writes weaves to ATS
+4. `WeaveComplete` attestation records the import; weaves appear immediately
 
 ## Development
 
