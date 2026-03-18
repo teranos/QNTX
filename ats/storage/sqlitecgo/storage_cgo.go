@@ -153,7 +153,7 @@ func (rs *RustStore) GetAttestation(id string) (*types.As, error) {
 	}
 
 	if result.attestation_json == nil {
-		return nil, nil // Not found
+		return nil, errors.Newf("attestation %s not found", id)
 	}
 
 	jsonStr := C.GoString(result.attestation_json)
