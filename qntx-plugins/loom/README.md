@@ -84,6 +84,7 @@ Svelte 5 single-file app. No bundler dependencies beyond Bun and svelte.
 - **Cluster data is stale**: fetched once, never refreshed.
 - **No search**: cannot find weaves by content, branch, or time range.
 - **No URL routing**: no deep links to specific weaves or scroll positions. State lost on refresh.
+- **No client-side persistence**: column order, expanded/collapsed state, scroll positions, and UI preferences are lost on refresh. Column positions jump after import because the sort key changes when a project transitions from empty to woven. IndexedDB would make column order and UI state durable.
 - **Warp click math is fragile**: translateY/content fraction mapping breaks if CSS layout changes.
 - **Time sync is coarse**: timestamp-nearest matching causes jumpy behavior with uneven weave density.
 - **Raw text parsing**: `[speaker]` prefix parsing with string methods is fragile if text contains those patterns literally. A structured format from the API would be better.

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { flip } from 'svelte/animate'
 
   // --- Types ---
 
@@ -171,9 +172,9 @@
     }
 
     function onClick(e: MouseEvent) {
-      // Ignore clicks from inside the drawer content (e.g. import buttons)
+      // Ignore clicks from inside the drawer or expanded body (e.g. import buttons)
       const target = e.target as HTMLElement
-      if (target.closest('.dw-drawer')) return
+      if (target.closest('.dw-drawer') || target.closest('.dw-col-expanded-body')) return
       if (expandedProjects.has(project)) closeDrawer(project)
       else openDrawer(project)
     }
@@ -531,29 +532,50 @@
       if (sessionsData) {
         const existingProjects = new Set(built.map(s => s.context))
         for (const [slug, info] of Object.entries(sessionsData.projects)) {
-          // Derive project name from slug: last two dash-separated path components joined with /
-          // e.g. -Users-s-b-vanhouten-SBVH-teranos-tmp3-QNTX → tmp3/QNTX
+          // Check if this slug is already covered by an existing weave project.
+          // Can't just split slug by '-' because directory names may contain dashes
+          // (e.g. slug -...-ctf-bsides-2026 for dir ctf-bsides/2026).
+          // Instead, check if slug ends with any existing project's dash-form.
+          const slugCovered = [...existingProjects].some(p => {
+            const suffix = p.split('/').join('-')
+            return slug.endsWith(suffix)
+          })
+          if (slugCovered || info.sessions.length === 0) continue
+
+          // Derive display name: last two dash-separated components (best effort)
           const parts = slug.split('-').filter(p => p.length > 0)
           const projectName = parts.length >= 2
             ? parts[parts.length - 2] + '/' + parts[parts.length - 1]
             : parts[parts.length - 1] || slug
-          if (!existingProjects.has(projectName) && info.sessions.length > 0) {
-            const latest = info.sessions.reduce((max, s) => Math.max(max, s.modified_at), 0)
-            const earliest = info.sessions.reduce((min, s) => Math.min(min, s.modified_at), Infinity)
-            built.push({
-              context: projectName,
-              weaves: [],
-              turns: [],
-              branches: [],
-              earliest,
-              latest,
-              totalWords: 0,
-            })
-          }
+          existingProjects.add(projectName)
+          const latest = info.sessions.reduce((max, s) => Math.max(max, s.modified_at), 0)
+          const earliest = info.sessions.reduce((min, s) => Math.min(min, s.modified_at), Infinity)
+          built.push({
+            context: projectName,
+            weaves: [],
+            turns: [],
+            branches: [],
+            earliest,
+            latest,
+            totalWords: 0,
+          })
         }
       }
 
-      built.sort((a, b) => a.earliest - b.earliest)
+      // Preserve existing column order if reloading, new columns go to end
+      if (sessions.length > 0) {
+        const prevOrder = sessions.map(s => s.context)
+        built.sort((a, b) => {
+          const ai = prevOrder.indexOf(a.context)
+          const bi = prevOrder.indexOf(b.context)
+          if (ai === -1 && bi === -1) return a.earliest - b.earliest
+          if (ai === -1) return 1
+          if (bi === -1) return -1
+          return ai - bi
+        })
+      } else {
+        built.sort((a, b) => a.earliest - b.earliest)
+      }
       sessions = built
       loading = false
 
@@ -885,46 +907,41 @@
       ontouchstart={onTouchStart}
       ontouchend={onTouchEnd}
     >
-      {#each sessions as session, si}
-        {#if session.weaves.length === 0}
-          <div
-            class="dw-col-collapsed"
-            class:dw-col-expanded={expandedProjects.has(session.context)}
-            class:dw-hidden={si !== mobileIdx}
-            use:bindHdDrawer={session.context}
-          >
-            <span class="dw-col-collapsed-name">{session.context}</span>
-            <span class="dw-col-collapsed-count">{sessionsForProject(session.context).length} jsonl</span>
-            {#if expandedProjects.has(session.context)}
-              <div class="dw-col-expanded-body">
-                {#each sessionsForProject(session.context) as sf}
-                  <div class="dw-jsonl-row">
-                    <span class="dw-jsonl-sid">{sf.session_id.substring(0, 8)}</span>
-                    <span class="dw-jsonl-detail">{fmtTime(sf.modified_at)}</span>
-                    <span class="dw-jsonl-detail">{sf.line_count}L {formatBytes(sf.file_size)}</span>
-                    {#if sf.weave_count > 0}
-                      <span class="dw-jsonl-detail">{sf.weave_count}w</span>
-                    {/if}
-                    {#if sf.state !== 'unweaved'}
-                      <span class="dw-jsonl-detail" style="color: {stateColor(sf.state)}; opacity: 1">{sf.state}</span>
-                    {/if}
-                    {#if importResult && importResult.session_id === sf.session_id}
-                      <span class="dw-jsonl-result">+{importResult.weaves}w</span>
-                    {/if}
-                    {#if importingSession === sf.session_id}
-                      <span class="dw-jsonl-importing">importing...</span>
-                    {:else if sf.state === 'unweaved' || sf.state === 'partial'}
-                      <button class="dw-jsonl-import" onclick={(e: MouseEvent) => { e.stopPropagation(); importSession(sf) }}>import</button>
-                    {:else if sf.state === 'stale' || sf.state === 'complete'}
-                      <button class="dw-jsonl-import" onclick={(e: MouseEvent) => { e.stopPropagation(); importSession(sf) }}>reimport</button>
-                    {/if}
-                  </div>
-                {/each}
-              </div>
-            {/if}
-          </div>
-        {:else}
-        <div class="dw-col-wrap" class:dw-hidden={si !== mobileIdx}>
+      {#each sessions as session, si (session.context)}
+        <div class="dw-col-wrap" class:dw-col-empty={session.weaves.length === 0} class:dw-col-expanded={session.weaves.length === 0 && expandedProjects.has(session.context)} class:dw-hidden={si !== mobileIdx} animate:flip={{ duration: 400 }}>
+          {#if session.weaves.length === 0}
+            <div class="dw-col-empty-inner" use:bindHdDrawer={session.context}>
+              <span class="dw-col-collapsed-name">{session.context}</span>
+              <span class="dw-col-collapsed-count">{sessionsForProject(session.context).length} jsonl</span>
+              {#if expandedProjects.has(session.context)}
+                <div class="dw-col-expanded-body">
+                  {#each sessionsForProject(session.context) as sf}
+                    <div class="dw-jsonl-row">
+                      <span class="dw-jsonl-sid">{sf.session_id.substring(0, 8)}</span>
+                      <span class="dw-jsonl-detail">{fmtTime(sf.modified_at)}</span>
+                      <span class="dw-jsonl-detail">{sf.line_count}L {formatBytes(sf.file_size)}</span>
+                      {#if sf.weave_count > 0}
+                        <span class="dw-jsonl-detail">{sf.weave_count}w</span>
+                      {/if}
+                      {#if sf.state !== 'unweaved'}
+                        <span class="dw-jsonl-detail" style="color: {stateColor(sf.state)}; opacity: 1">{sf.state}</span>
+                      {/if}
+                      {#if importResult && importResult.session_id === sf.session_id}
+                        <span class="dw-jsonl-result">+{importResult.weaves}w</span>
+                      {/if}
+                      {#if importingSession === sf.session_id}
+                        <span class="dw-jsonl-importing">importing...</span>
+                      {:else if sf.state === 'unweaved' || sf.state === 'partial'}
+                        <button class="dw-jsonl-import" onclick={(e: MouseEvent) => { e.stopPropagation(); importSession(sf) }}>import</button>
+                      {:else if sf.state === 'stale' || sf.state === 'complete'}
+                        <button class="dw-jsonl-import" onclick={(e: MouseEvent) => { e.stopPropagation(); importSession(sf) }}>reimport</button>
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {:else}
           <div
             class="dw-session-hd-zone"
             class:dw-hd-expandable={sessionsForProject(session.context).length > 0}
@@ -1099,8 +1116,8 @@
           {/if}
         </div>
           </div>
-        </div>
         {/if}
+        </div>
       {/each}
     </div>
   {/if}
@@ -1578,20 +1595,21 @@
     font-size: var(--font-size-xs);
   }
 
-  /* Collapsed column (empty projects) */
-  .dw-col-collapsed {
+  /* Empty column (no weaves yet) — same wrapper element, CSS transition on flex */
+  .dw-col-wrap.dw-col-empty {
+    flex: 0 0 36px;
+    cursor: pointer;
+    overflow: hidden;
+    transition: flex-basis 0.4s ease, min-width 0.4s ease;
+    min-width: 0;
+  }
+  .dw-col-wrap.dw-col-empty:hover { background: var(--bg-dark-hover); }
+  .dw-col-empty-inner {
     display: flex;
     flex-direction: column;
     align-items: center;
-    flex: 0 0 36px;
-    height: calc(100vh - 33px);
-    border-right: 1px solid var(--border-on-dark);
-    background: var(--bg-dark);
-    cursor: pointer;
-    transition: flex-basis 0.25s ease;
-    overflow: hidden;
+    height: 100%;
   }
-  .dw-col-collapsed:hover { background: var(--bg-dark-hover); }
   .dw-col-collapsed-name {
     writing-mode: vertical-rl;
     text-orientation: mixed;
@@ -1608,9 +1626,11 @@
     opacity: 0.6;
     margin-top: 8px;
   }
-  /* Expanded state */
-  .dw-col-expanded {
+  /* Expanded empty column */
+  .dw-col-wrap.dw-col-expanded {
     flex: 0 0 280px;
+  }
+  .dw-col-expanded .dw-col-empty-inner {
     align-items: stretch;
   }
   .dw-col-expanded .dw-col-collapsed-name {
@@ -1631,6 +1651,10 @@
     overflow-y: auto;
     padding: 0 6px;
   }
+  /* Transition from empty to full column */
+  .dw-col-wrap {
+    transition: flex-basis 0.4s ease, min-width 0.4s ease, flex-grow 0.4s ease;
+  }
 
   /* Desktop: multi-column */
   @media (min-width: 768px) {
@@ -1640,8 +1664,15 @@
       min-width: 480px;
       max-width: 900px;
     }
+    .dw-col-wrap.dw-col-empty {
+      flex: 0 0 36px;
+      min-width: 0;
+      max-width: none;
+    }
+    .dw-col-wrap.dw-col-expanded {
+      flex: 0 0 280px;
+    }
     .dw-col-wrap.dw-hidden { display: flex; }
-    .dw-col-collapsed.dw-hidden { display: flex; }
   }
 
   /* Mobile */
