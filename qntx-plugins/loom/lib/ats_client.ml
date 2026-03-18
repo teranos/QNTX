@@ -103,7 +103,7 @@ let grpc_call ~path ~request_bytes =
 
 (* --- Create a weave attestation --- *)
 
-let create_weave ~branch ~context ~text ~word_count ~turn_count ~paths ?(original_timestamp=0) () =
+let create_weave ~branch ~context ~text ~word_count ~turn_count ~paths ?(original_timestamp=0) ~weave_source () =
   if !endpoint = "" then (
     Printf.eprintf "[loom] ATS client not configured, dropping weave\n%!";
     Lwt.return_error "ATS client not configured"
@@ -123,6 +123,7 @@ let create_weave ~branch ~context ~text ~word_count ~turn_count ~paths ?(origina
       ("word_count", Some (number_val word_count));
       ("turn_count", Some (number_val turn_count));
       ("paths", Some paths_val);
+      ("weave_source", Some (string_val weave_source));
     ] in
     let fields = if original_timestamp > 0 then
       ("original_timestamp", Some (number_val original_timestamp)) :: base_fields

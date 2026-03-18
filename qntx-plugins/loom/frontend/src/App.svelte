@@ -144,7 +144,10 @@
       }
     }
 
-    function onClick() {
+    function onClick(e: MouseEvent) {
+      // Ignore clicks from inside the drawer content (e.g. import buttons)
+      const target = e.target as HTMLElement
+      if (target.closest('.dw-drawer')) return
       if (expandedProjects.has(project)) closeDrawer(project)
       else openDrawer(project)
     }
@@ -189,7 +192,11 @@
       const data = await res.json()
       if (data.success) {
         importResult = { session_id: file.session_id, weaves: data.weaves_created }
+        const savedExpanded = new Set(expandedProjects)
+        const savedMouseOut = new Set(drawerMouseOut)
         await Promise.all([fetchSessions(), load()])
+        expandedProjects = savedExpanded
+        drawerMouseOut = savedMouseOut
       }
     } catch {
       // import failed silently
@@ -209,7 +216,7 @@
 
   function stateColor(state: string): string {
     switch (state) {
-      case 'unweaved': return 'var(--text-on-dark-tertiary)'
+      case 'unweaved': return '#e07030'
       case 'partial': return 'var(--color-warning)'
       case 'complete': return 'var(--accent-on-dark)'
       case 'stale': return '#ef4544'
@@ -842,20 +849,19 @@
                   <div class="dw-jsonl-list">
                     {#each sessionsForProject(session.context) as sf}
                       <div class="dw-jsonl-row">
-                        <span class="dw-jsonl-state" style="color: {stateColor(sf.state)}">{stateIndicator(sf.state)}</span>
                         <span class="dw-jsonl-sid">{sf.session_id.substring(0, 8)}</span>
                         <span class="dw-jsonl-detail">{fmtTime(sf.modified_at)}</span>
                         <span class="dw-jsonl-detail">{sf.line_count}L {formatBytes(sf.file_size)}</span>
                         {#if sf.weave_count > 0}
                           <span class="dw-jsonl-detail">{sf.weave_count}w</span>
                         {/if}
-                        <span class="dw-jsonl-detail">{sf.state}</span>
+                        <span class="dw-jsonl-detail" style="color: {stateColor(sf.state)}; opacity: 1">{sf.state}</span>
                         {#if importingSession === sf.session_id}
                           <span class="dw-jsonl-importing">importing...</span>
-                        {:else if sf.state === 'unweaved'}
-                          <button class="dw-jsonl-import" onclick={() => importSession(sf)}>import</button>
+                        {:else if sf.state === 'unweaved' || sf.state === 'partial'}
+                          <button class="dw-jsonl-import" onclick={(e: MouseEvent) => { e.stopPropagation(); importSession(sf) }}>import</button>
                         {:else if sf.state === 'stale' || sf.state === 'complete'}
-                          <button class="dw-jsonl-import" onclick={() => importSession(sf)}>reimport</button>
+                          <button class="dw-jsonl-import" onclick={(e: MouseEvent) => { e.stopPropagation(); importSession(sf) }}>reimport</button>
                         {/if}
                         {#if importResult && importResult.session_id === sf.session_id}
                           <span class="dw-jsonl-result">+{importResult.weaves}w</span>

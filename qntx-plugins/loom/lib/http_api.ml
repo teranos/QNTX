@@ -41,6 +41,7 @@ let persist_weaves results =
         ~turn_count:result.turn_count
         ~paths:result.paths
         ~original_timestamp:result.timestamp
+        ~weave_source:"jsonl"
         ()
       in
       (match ats_result with
@@ -59,9 +60,21 @@ let handle_http reqd =
   | `GET, "/api/weaves" ->
     Lwt.async (fun () ->
       let* result = Ats_client.get_weaves () in
+      let* wc_result = Ats_client.get_weave_completes () in
       (match result with
        | Ok attestations ->
-         let json = Serialize_ui.group_by_branch attestations in
+         (* Build set of session contexts that have been fully imported *)
+         let completed_contexts = Hashtbl.create 16 in
+         (match wc_result with
+          | Ok wc_attestations ->
+            List.iter (fun (wc : Qntx_plugin_proto.Atsstore.Protocol.Attestation.t) ->
+              List.iter (fun subj ->
+                Hashtbl.replace completed_contexts ("session:" ^ subj) true
+              ) wc.subjects
+            ) wc_attestations
+          | Error _ -> ());
+         let filtered = Serialize_ui.filter_superseded ~completed_contexts attestations in
+         let json = Serialize_ui.group_by_branch filtered in
          respond_json reqd `OK (Yojson.Safe.to_string json)
        | Error msg ->
          respond_json reqd `Internal_server_error
