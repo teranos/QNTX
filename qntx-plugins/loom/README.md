@@ -65,14 +65,6 @@ Bash `[tool]` turns are filtered by a command whitelist (git, gh, make). All oth
 
 Svelte 5 app with extracted components. No bundler dependencies beyond Bun and svelte.
 
-### Components
-
-- `App.svelte` — layout, data fetching, session/column management, weave rendering
-- `Warp.svelte` — zoomable minimap sidebar with branch/session/cluster/tool lanes
-- `SessionList.svelte` — JSONL session rows with import buttons and state indicators
-- `ClusterBar.svelte` — cluster distribution chips per project (percentage breakdown)
-- `timespacers.ts` — discrete time spacer math for temporal alignment
-
 ### What it does
 
 - Vertical chronology, horizontal projects (grouped by branch prefix before `:`)

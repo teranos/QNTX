@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import { flip } from 'svelte/animate'
   import SessionList from './SessionList.svelte'
+  import BranchBar from './BranchBar.svelte'
   import ClusterBar from './ClusterBar.svelte'
   import Warp from './Warp.svelte'
   import { timeSpacers } from './timespacers'
@@ -826,11 +827,7 @@
           >
             <div class="dw-drawer" class:dw-drawer-open={expandedProjects.has(session.context) && !fullDrawers.has(session.context)} class:dw-drawer-full={fullDrawers.has(session.context)}>
               <div class="dw-drawer-inner">
-                <div class="dw-branches">
-                  {#each session.branches as branch}
-                    <span class="dw-branch" style="border-left-color: {branchColor(branch)}">{branch}</span>
-                  {/each}
-                </div>
+                <BranchBar branches={session.branches} {branchColor} />
                 <ClusterBar weaves={session.weaves} {clusterMap} />
                 {#if sessionsForProject(session.context).length > 0}
                   <div class="dw-jsonl-list">
@@ -1095,20 +1092,6 @@
   .dw-sid { color: var(--text-on-dark-secondary); font-size: var(--font-size-sm); font-weight: 500; }
   .dw-smeta { color: var(--text-secondary); font-size: var(--font-size-xs); }
 
-  .dw-branches {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 4px;
-  }
-
-  .dw-branch {
-    font-size: var(--font-size-xs);
-    color: var(--text-on-dark-tertiary);
-    border-left: 2px solid;
-    padding-left: 4px;
-    overflow-wrap: break-word;
-  }
 
   /* Time spacer (temporal alignment) */
   .dw-time-spacer {
