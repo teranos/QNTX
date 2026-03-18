@@ -74,6 +74,7 @@ Svelte 5 single-file app. No bundler dependencies beyond Bun and svelte.
 - Click-to-copy weave attestation ID
 - Turn selection with CMD+C copy
 - Cluster membership visualization via QNTX embeddings API
+- Session browser with JSONL import from project headers
 
 ### Frontend limitations
 
@@ -98,7 +99,6 @@ Svelte 5 single-file app. No bundler dependencies beyond Bun and svelte.
 - Git moments: commits and merges as distinct timeline events.
 - Favorite weaves: bookmark and return to specific weaves.
 - Freeze columns: toggle time-sync per column, pin a view in place.
-- ~~Hook/system messages~~: done — graunde hook messages flow as `[hook]` turns in weaves, rendered with red accent.
 - Images: screenshots as part of weave data, rendered inline.
 - Branch click navigation: clicking a branch name should scroll to its weaves.
 - Cluster legend: surface cluster labels, make cluster intelligence actionable.
@@ -124,7 +124,6 @@ Serves JSON over HTTP/2 on port 5178. Read endpoints query ATS for `["Weave"]` a
 
 Loom as consumer reveals what the upstream producers don't capture yet:
 
-- ~~**Hooks/system messages**~~: done — loom captures `[hook]` turns via UDP from graunde, renders them with red accent and warp dot.
 - **Diffs**: code changes during a session are not recorded.
 - **Git events**: commits, merges, branch operations are not weave events.
 - **Images/screenshots**: not part of the weave data model.
@@ -133,7 +132,7 @@ Loom as consumer reveals what the upstream producers don't capture yet:
 
 ## JSONL Import (historical weaving)
 
-Loom currently only weaves live sessions via UDP from Graunde. The JSONL import path enables weaving historical conversations — sessions that predate Graunde/Loom, or completing sessions where UDP delivery was partial.
+Weaves historical conversations — sessions that predate Graunde/Loom, or completing sessions where UDP delivery was partial. Imports the full JSONL file each time (not incremental).
 
 One JSONL file = one session. Claude Code writes all turns to `~/.claude/projects/{project-slug}/{session-uuid}.jsonl`. The format is Claude Code native (not attestation format): `type: "user"` / `"assistant"` / `"progress"`, with `message`, `gitBranch`, `sessionId`, `cwd`, `timestamp`.
 
@@ -146,17 +145,18 @@ Each session has one of four states, derivable from ATS + filesystem:
 3. **Complete** — `WeaveComplete` attestation exists, JSONL was fully imported at that point
 4. **Stale** — `WeaveComplete` exists but JSONL has grown since import (file size > recorded size), new unweaved content at the tail
 
-Completeness tracked via `WeaveComplete` attestation written by loom after import, recording file size/line count. Re-import processes only lines past the previous import point.
+Completeness tracked via `WeaveComplete` attestation written by loom after import, recording file size/line count.
+
+### Weave source precedence
+
+Weaves carry a `weave_source` attribute: `"graunde"` (live UDP) or `"jsonl"` (JSONL import). When a `WeaveComplete` exists for a session, JSONL weaves take precedence — graunde weaves for that session are suppressed in the read path. No attestations are deleted.
 
 ### Import flow
 
-1. Frontend "N sessions" is clickable → opens session browser
-2. Session browser lists all projects and their JSONL sessions with state indicators
-3. User selects an unweaved or stale session to import
-4. Frontend POSTs file path to loom's HTTP API (`POST /api/import`)
-5. Loom reads the JSONL in-process, extracts turns, chunks via existing pipeline, writes weaves to ATS
-6. Loom writes `WeaveComplete` attestation on success
-7. Frontend refreshes, shows the new weaves
+1. Open the session browser from a project header
+2. Click import on any unweaved, partial, or stale session
+3. Loom reads the JSONL, chunks via the stitcher, writes weaves to ATS
+4. `WeaveComplete` attestation records the import; weaves appear immediately
 
 ## Development
 
