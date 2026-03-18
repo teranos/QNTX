@@ -4,6 +4,7 @@
   import SessionList from './SessionList.svelte'
   import ClusterBar from './ClusterBar.svelte'
   import Warp from './Warp.svelte'
+  import { timeSpacers } from './timespacers'
 
   // --- Types ---
 
@@ -73,34 +74,7 @@
   const showClusters = true
   let clusterMap: Map<string, { cluster_id: number, label: string | null }> = $state(new Map())
 
-  // Global time range for temporal alignment across columns
-  let globalEarliest = $state(0)
-  let globalLatest = $state(0)
 
-  // Discrete time spacers: one 24px bar per 3h block, diminishing beyond 12h
-  const SPACER_PX = 24
-  const SPACER_HOURS = 3
-  const SPACER_FULL_BLOCKS = 4 // 12h at full size
-  const SPACER_SHRINK = 2 // px reduction per block beyond 12h
-
-  function timeSpacers(prevTs: number, curTs: number): number[] {
-    if (prevTs === 0) return []
-    const deltaMs = Math.max(0, curTs - prevTs)
-    const hours = deltaMs / (60 * 60 * 1000)
-    const blocks = Math.floor(hours / SPACER_HOURS)
-    if (blocks === 0) return []
-    const result: number[] = []
-    for (let i = 0; i < blocks; i++) {
-      if (i < SPACER_FULL_BLOCKS) {
-        result.push(SPACER_PX)
-      } else {
-        const shrunk = SPACER_PX - (i - SPACER_FULL_BLOCKS + 1) * SPACER_SHRINK
-        if (shrunk <= 0) break
-        result.push(shrunk)
-      }
-    }
-    return result
-  }
 
   // Session browser state (per-project, inline in headers)
   let sessionsData: SessionsResponse | null = $state(null)
@@ -609,12 +583,6 @@
         built.sort((a, b) => a.earliest - b.earliest)
       }
       sessions = built
-      // Compute global time range for temporal alignment
-      const wovenSessions = built.filter(s => s.weaves.length > 0)
-      if (wovenSessions.length > 0) {
-        globalEarliest = Math.min(...wovenSessions.map(s => s.earliest))
-        globalLatest = Math.max(...wovenSessions.map(s => s.latest))
-      }
       loading = false
 
       // Fetch cluster memberships for all weave IDs
