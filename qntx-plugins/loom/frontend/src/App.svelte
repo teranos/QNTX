@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import { flip } from 'svelte/animate'
   import SessionList from './SessionList.svelte'
+  import ClusterBar from './ClusterBar.svelte'
 
   // --- Types ---
 
@@ -933,6 +934,7 @@
                     <span class="dw-branch" style="border-left-color: {branchColor(branch)}">{branch}</span>
                   {/each}
                 </div>
+                <ClusterBar weaves={session.weaves} {clusterMap} />
                 {#if sessionsForProject(session.context).length > 0}
                   <div class="dw-jsonl-list">
                     <SessionList sessions={sessionsForProject(session.context)} {importingSession} {importResult} onImport={importSession} />
@@ -1337,7 +1339,6 @@
     border-left: 2px solid;
     padding-left: 4px;
     overflow-wrap: break-word;
-    word-break: break-word;
   }
 
   /* Time gap */
