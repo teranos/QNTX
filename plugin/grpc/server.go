@@ -122,6 +122,13 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 	grpcServer := grpc.NewServer()
 	protocol.RegisterDomainPluginServiceServer(grpcServer, s)
 
+	// If plugin implements LLMProvider, register LLMService on the same server
+	if provider, ok := s.plugin.(plugin.LLMProvider); ok {
+		llmSrv := &llmPluginServer{provider: provider, name: s.plugin.Metadata().Name}
+		protocol.RegisterLLMServiceServer(grpcServer, llmSrv)
+		s.logger.Infow("Registered LLMService on plugin server", "plugin", s.plugin.Metadata().Name)
+	}
+
 	s.logger.Infow("Starting gRPC plugin server", "address", actualAddr, "port", actualPort)
 
 	// Handle graceful shutdown
@@ -446,46 +453,6 @@ func (s *PluginServer) RegisterGlyphs(ctx context.Context, _ *protocol.Empty) (*
 	}, nil
 }
 
-// Chat handles an LLM chat request via gRPC.
-// If the wrapped plugin implements LLMProvider, forwards the call. Otherwise unimplemented.
-func (s *PluginServer) Chat(ctx context.Context, req *protocol.LLMChatRequest) (*protocol.LLMChatResponse, error) {
-	provider, ok := s.plugin.(plugin.LLMProvider)
-	if !ok {
-		return nil, fmt.Errorf("plugin %s does not implement LLMProvider", s.plugin.Metadata().Name)
-	}
-
-	// Convert proto to Go types
-	attachments := make([]plugin.LLMAttachment, len(req.Attachments))
-	for i, a := range req.Attachments {
-		attachments[i] = plugin.LLMAttachment{
-			MimeType: a.MimeType,
-			Data:     a.Data,
-			Filename: a.Filename,
-		}
-	}
-
-	resp, err := provider.Chat(ctx, plugin.LLMRequest{
-		SystemPrompt: req.SystemPrompt,
-		UserPrompt:   req.UserPrompt,
-		Model:        req.Model,
-		Temperature:  req.Temperature,
-		MaxTokens:    int(req.MaxTokens),
-		Provider:     req.Provider,
-		Attachments:  attachments,
-	})
-	if err != nil {
-		return nil, errors.Wrapf(err, "LLM chat failed in plugin %s", s.plugin.Metadata().Name)
-	}
-
-	return &protocol.LLMChatResponse{
-		Content:          resp.Content,
-		Model:            resp.Model,
-		PromptTokens:     int32(resp.PromptTokens),
-		CompletionTokens: int32(resp.CompletionTokens),
-		TotalTokens:      int32(resp.TotalTokens),
-	}, nil
-}
-
 // ExecuteJob executes an async job routed from Pulse.
 func (s *PluginServer) ExecuteJob(ctx context.Context, req *protocol.ExecuteJobRequest) (*protocol.ExecuteJobResponse, error) {
 	// Check if plugin implements job execution
@@ -519,5 +486,45 @@ func (s *PluginServer) ExecuteJob(ctx context.Context, req *protocol.ExecuteJobR
 		Result:        result,
 		LogEntries:    logs,
 		PluginVersion: version,
+	}, nil
+}
+
+// llmPluginServer implements protocol.LLMServiceServer by wrapping a plugin.LLMProvider.
+// Registered as a separate gRPC service on the same server, only for provider plugins.
+type llmPluginServer struct {
+	protocol.UnimplementedLLMServiceServer
+	provider plugin.LLMProvider
+	name     string
+}
+
+func (s *llmPluginServer) Chat(ctx context.Context, req *protocol.LLMChatRequest) (*protocol.LLMChatResponse, error) {
+	attachments := make([]plugin.LLMAttachment, len(req.Attachments))
+	for i, a := range req.Attachments {
+		attachments[i] = plugin.LLMAttachment{
+			MimeType: a.MimeType,
+			Data:     a.Data,
+			Filename: a.Filename,
+		}
+	}
+
+	resp, err := s.provider.Chat(ctx, plugin.LLMRequest{
+		SystemPrompt: req.SystemPrompt,
+		UserPrompt:   req.UserPrompt,
+		Model:        req.Model,
+		Temperature:  req.Temperature,
+		MaxTokens:    int(req.MaxTokens),
+		Provider:     req.Provider,
+		Attachments:  attachments,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "LLM chat failed in plugin %s", s.name)
+	}
+
+	return &protocol.LLMChatResponse{
+		Content:          resp.Content,
+		Model:            resp.Model,
+		PromptTokens:     int32(resp.PromptTokens),
+		CompletionTokens: int32(resp.CompletionTokens),
+		TotalTokens:      int32(resp.TotalTokens),
 	}, nil
 }
