@@ -4,8 +4,6 @@ package protocol;
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
-import "plugin/grpc/protocol/llm.proto";
-
 // DomainPluginService is the gRPC service for external domain plugins
 service DomainPluginService {
   // Metadata returns plugin metadata
@@ -39,10 +37,6 @@ service DomainPluginService {
   // ParseAxQuery parses an Ax query string and returns the AST as JSON.
   // Used by kern (OCaml parser) to replace the Rust WASM parser path.
   rpc ParseAxQuery(ParseAxQueryRequest) returns (ParseAxQueryResponse);
-
-  // Chat handles an LLM chat request (for plugins implementing LLMProvider).
-  // Messages defined in llm.proto (same package).
-  rpc Chat(LLMChatRequest) returns (LLMChatResponse);
 }
 
 message Empty {}

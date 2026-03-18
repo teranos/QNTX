@@ -10,13 +10,13 @@ import (
 )
 
 // LLMServer is the core-side gRPC server that routes LLM requests to provider plugins.
-// It implements protocol.LLMServiceServer and holds connections to provider plugins'
-// DomainPluginService clients (which expose Chat on the same service).
+// It implements protocol.LLMServiceServer and holds LLMServiceClient connections
+// to provider plugins that registered a separate LLMService on their gRPC server.
 type LLMServer struct {
 	protocol.UnimplementedLLMServiceServer
 
 	mu              sync.RWMutex
-	providers       map[string]protocol.DomainPluginServiceClient // provider name → client
+	providers       map[string]protocol.LLMServiceClient // provider name → client
 	defaultProvider string
 	logger          *zap.SugaredLogger
 }
@@ -24,14 +24,14 @@ type LLMServer struct {
 // NewLLMServer creates a new LLM routing server. Starts empty — providers register after init.
 func NewLLMServer(logger *zap.SugaredLogger) *LLMServer {
 	return &LLMServer{
-		providers: make(map[string]protocol.DomainPluginServiceClient),
+		providers: make(map[string]protocol.LLMServiceClient),
 		logger:    logger,
 	}
 }
 
 // RegisterProvider adds a provider plugin's client connection.
 // If this is the first provider, it becomes the default.
-func (s *LLMServer) RegisterProvider(name string, client protocol.DomainPluginServiceClient) {
+func (s *LLMServer) RegisterProvider(name string, client protocol.LLMServiceClient) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

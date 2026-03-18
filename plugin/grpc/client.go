@@ -142,6 +142,12 @@ func (c *ExternalDomainProxy) IsLLMProvider() bool {
 	return c.llmProvider
 }
 
+// LLMServiceClient returns an LLMServiceClient using this plugin's existing gRPC connection.
+// Only meaningful when IsLLMProvider() is true.
+func (c *ExternalDomainProxy) LLMServiceClient() protocol.LLMServiceClient {
+	return protocol.NewLLMServiceClient(c.conn)
+}
+
 // Initialize initializes the remote plugin. Idempotent — safe to call from multiple code paths.
 func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
 	c.initOnce.Do(func() {
