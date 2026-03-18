@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { flip } from 'svelte/animate'
+  import SessionList from './SessionList.svelte'
 
   // --- Types ---
 
@@ -915,29 +916,7 @@
               <span class="dw-col-collapsed-count">{sessionsForProject(session.context).length} jsonl</span>
               {#if expandedProjects.has(session.context)}
                 <div class="dw-col-expanded-body">
-                  {#each sessionsForProject(session.context) as sf}
-                    <div class="dw-jsonl-row">
-                      <span class="dw-jsonl-sid">{sf.session_id.substring(0, 8)}</span>
-                      <span class="dw-jsonl-detail">{fmtTime(sf.modified_at)}</span>
-                      <span class="dw-jsonl-detail">{sf.line_count}L {formatBytes(sf.file_size)}</span>
-                      {#if sf.weave_count > 0}
-                        <span class="dw-jsonl-detail">{sf.weave_count}w</span>
-                      {/if}
-                      {#if sf.state !== 'unweaved'}
-                        <span class="dw-jsonl-detail" style="color: {stateColor(sf.state)}; opacity: 1">{sf.state}</span>
-                      {/if}
-                      {#if importResult && importResult.session_id === sf.session_id}
-                        <span class="dw-jsonl-result">+{importResult.weaves}w</span>
-                      {/if}
-                      {#if importingSession === sf.session_id}
-                        <span class="dw-jsonl-importing">importing...</span>
-                      {:else if sf.state === 'unweaved' || sf.state === 'partial'}
-                        <button class="dw-jsonl-import" onclick={(e: MouseEvent) => { e.stopPropagation(); importSession(sf) }}>import</button>
-                      {:else if sf.state === 'stale' || sf.state === 'complete'}
-                        <button class="dw-jsonl-import" onclick={(e: MouseEvent) => { e.stopPropagation(); importSession(sf) }}>reimport</button>
-                      {/if}
-                    </div>
-                  {/each}
+                  <SessionList sessions={sessionsForProject(session.context)} {importingSession} {importResult} onImport={importSession} hideUnweavedState={true} />
                 </div>
               {/if}
             </div>
@@ -956,27 +935,7 @@
                 </div>
                 {#if sessionsForProject(session.context).length > 0}
                   <div class="dw-jsonl-list">
-                    {#each sessionsForProject(session.context) as sf}
-                      <div class="dw-jsonl-row">
-                        <span class="dw-jsonl-sid">{sf.session_id.substring(0, 8)}</span>
-                        <span class="dw-jsonl-detail">{fmtTime(sf.modified_at)}</span>
-                        <span class="dw-jsonl-detail">{sf.line_count}L {formatBytes(sf.file_size)}</span>
-                        {#if sf.weave_count > 0}
-                          <span class="dw-jsonl-detail">{sf.weave_count}w</span>
-                        {/if}
-                        <span class="dw-jsonl-detail" style="color: {stateColor(sf.state)}; opacity: 1">{sf.state}</span>
-                        {#if importResult && importResult.session_id === sf.session_id}
-                          <span class="dw-jsonl-result">+{importResult.weaves}w</span>
-                        {/if}
-                        {#if importingSession === sf.session_id}
-                          <span class="dw-jsonl-importing">importing...</span>
-                        {:else if sf.state === 'unweaved' || sf.state === 'partial'}
-                          <button class="dw-jsonl-import" onclick={(e: MouseEvent) => { e.stopPropagation(); importSession(sf) }}>import</button>
-                        {:else if sf.state === 'stale' || sf.state === 'complete'}
-                          <button class="dw-jsonl-import" onclick={(e: MouseEvent) => { e.stopPropagation(); importSession(sf) }}>reimport</button>
-                        {/if}
-                      </div>
-                    {/each}
+                    <SessionList sessions={sessionsForProject(session.context)} {importingSession} {importResult} onImport={importSession} />
                   </div>
                 {/if}
               </div>
@@ -1544,55 +1503,6 @@
     margin-top: 4px;
     border-top: 1px solid var(--border-on-dark);
     padding-top: 2px;
-  }
-
-  .dw-jsonl-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 2px 4px;
-    font-size: var(--font-size-xs);
-  }
-  .dw-jsonl-row:hover { background: var(--bg-dark-hover); }
-
-  .dw-jsonl-state {
-    font-weight: 500;
-    font-size: 10px;
-    width: 16px;
-    flex-shrink: 0;
-  }
-
-  .dw-jsonl-sid {
-    color: var(--text-on-dark-secondary);
-    font-weight: 500;
-  }
-
-  .dw-jsonl-detail {
-    color: var(--text-on-dark-tertiary);
-  }
-
-  .dw-jsonl-import {
-    margin-left: auto;
-    background: none;
-    border: 1px solid var(--accent-on-dark);
-    color: var(--accent-on-dark);
-    padding: 0 4px;
-    font: inherit;
-    font-size: var(--font-size-xs);
-    cursor: pointer;
-  }
-  .dw-jsonl-import:hover { background: rgba(125, 186, 138, 0.15); }
-
-  .dw-jsonl-importing {
-    margin-left: auto;
-    color: var(--color-warning);
-    font-size: var(--font-size-xs);
-  }
-
-  .dw-jsonl-result {
-    color: var(--accent-on-dark);
-    font-weight: 500;
-    font-size: var(--font-size-xs);
   }
 
   /* Empty column (no weaves yet) — same wrapper element, CSS transition on flex */
