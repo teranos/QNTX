@@ -517,7 +517,10 @@ func (s *QNTXServer) broadcastGlyphFired(glyphID string, attestationID string, s
 func (s *QNTXServer) initWatcherEngine() error {
 	apiBaseURL := fmt.Sprintf("http://127.0.0.1:%d", am.GetServerPort())
 
-	s.watcherEngine = watcher.NewEngine(s.db, apiBaseURL, s.logger)
+	// Pass atsStore as AttestationReader so watcher queries go through Rust's connection,
+	// eliminating dual-driver access to the attestations table.
+	reader, _ := s.atsStore.(watcher.AttestationReader)
+	s.watcherEngine = watcher.NewEngine(s.db, reader, apiBaseURL, s.logger)
 	s.reloadCoalescer = newWatcherReloadCoalescer(s, 50*time.Millisecond)
 
 	// Set broadcast callback for live results

@@ -181,6 +181,63 @@ AttestationResultC storage_enforce_limits(SqliteStore *store, const char *input_
 AttestationResultC storage_get_stats(const SqliteStore *store);
 
 // ============================================================================
+// Distinct Value Queries
+// ============================================================================
+
+/**
+ * Get all distinct predicates.
+ */
+StringArrayResultC storage_predicates(const SqliteStore *store);
+
+/**
+ * Get all distinct contexts.
+ */
+StringArrayResultC storage_contexts(const SqliteStore *store);
+
+// ============================================================================
+// Raw Query (Go query builder → Rust connection)
+// ============================================================================
+
+/**
+ * Execute a raw SELECT query against attestations through Rust's connection.
+ * Go keeps its query builder; Rust just executes the SQL.
+ * Query MUST select standard attestation columns in order.
+ *
+ * @param store Store handle
+ * @param sql SQL SELECT query string
+ * @param params_json JSON array of bind parameters, e.g. ["value1", 42]
+ * @return Result with JSON array of matching attestations
+ */
+AttestationResultC storage_query_raw(const SqliteStore *store, const char *sql, const char *params_json);
+
+// ============================================================================
+// Integrity
+// ============================================================================
+
+/**
+ * Run PRAGMA integrity_check on the database.
+ * A healthy database returns a single string: "ok".
+ *
+ * @param store Store handle
+ * @return Result with string array of integrity check lines
+ */
+StringArrayResultC storage_integrity_check(const SqliteStore *store);
+
+// ============================================================================
+// Backup
+// ============================================================================
+
+/**
+ * Create a hot backup of the database to the given path.
+ * Uses SQLite's online backup API — safe to call while the database is in use.
+ *
+ * @param store Store handle
+ * @param dest_path Filesystem path for the backup file
+ * @return Result indicating success/failure
+ */
+StorageResultC storage_backup(const SqliteStore *store, const char *dest_path);
+
+// ============================================================================
 // Memory Management
 // ============================================================================
 

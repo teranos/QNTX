@@ -63,6 +63,13 @@ func NewExecutorWithOptions(db *sql.DB, opts ax.AxExecutorOptions) *ax.AxExecuto
 		queryStore = NewSQLQueryStore(db)
 	}
 
+	// Wire raw querier if provided (routes attestation queries through Rust FFI)
+	if opts.RawQuerier != nil {
+		if rq, ok := opts.RawQuerier.(RawQuerier); ok {
+			queryStore.SetRawQuerier(rq)
+		}
+	}
+
 	aliasStore := NewAliasStore(db)
 	aliasResolver := alias.NewResolver(aliasStore)
 

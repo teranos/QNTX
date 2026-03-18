@@ -68,8 +68,7 @@ describe('Window ResizeObserver', () => {
 
         // Create content structure that matches window manifestation
         const contentElement = document.createElement('div');
-        contentElement.style.flex = '1';
-        contentElement.style.padding = '8px';
+        contentElement.className = 'glyph-content-area';
 
         const innerContent = document.createElement('div');
         innerContent.className = 'glyph-content';

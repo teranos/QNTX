@@ -89,7 +89,7 @@ describe('AX Query Meld - Jenny (Complex Scenarios)', () => {
         input.dispatchEvent(inputEvent);
 
         // Verify query is pending (background color changes during debounce)
-        expect(axElement.style.backgroundColor).toContain('rgba(42, 43, 61'); // Pending state
+        expect(axElement.style.backgroundColor).toBe('var(--glyph-status-pending-bg)'); // Pending state
 
         // 4. Advance timers past 500ms debounce
         jest.advanceTimersByTime(500);

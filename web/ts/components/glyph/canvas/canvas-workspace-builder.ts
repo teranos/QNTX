@@ -14,12 +14,13 @@ import { toast } from '../../../toast';
 import { getGlyphTypeBySymbol, getGlyphTypeByElement } from '../glyph-registry';
 import { createErrorGlyph } from '../error-glyph';
 import { createPluginPlaceholderGlyph } from '../plugin-glyph';
-import { createResultGlyph, type PromptConfig } from '../result-glyph';
+import { createResultGlyph, type ExecutionResult, type PromptConfig } from '../result-glyph';
+import type { SpawnResultDetail } from '../glyph-ui';
 import { uploadFile } from '../../../api/files';
 import { createDocGlyph, type DocGlyphContent } from '../doc-glyph';
 import { uiState } from '../../../state/ui';
 import { getMinimizeDuration } from '../glyph';
-import { unmeldComposition, reconstructMeld, detachGlyph } from '../meld/meld-system';
+import { unmeldComposition, reconstructMeld, detachGlyph, autoMeldResultBelow } from '../meld/meld-system';
 import { makeDraggable } from '../glyph-interaction';
 import { showActionBar, hideActionBar } from './action-bar';
 import { showSpawnMenu } from './spawn-menu';
@@ -406,6 +407,51 @@ export function buildCanvasWorkspace(
             })();
         }
     });
+
+    // SDK spawn-result: glyphs fire this event via ui.spawnResult(), canvas handles the rest
+    container.addEventListener('glyph:spawn-result', ((e: CustomEvent<SpawnResultDetail>) => {
+        const { glyphId, name, result } = e.detail;
+        const parentElement = (e.target as HTMLElement).closest('[data-glyph-id]') as HTMLElement | null;
+        if (!parentElement) {
+            log.error(SEG.GLYPH, `[Canvas] spawn-result: no parent glyph element for ${glyphId}`);
+            return;
+        }
+
+        const parentRect = parentElement.getBoundingClientRect();
+        const canvasRect = container.getBoundingClientRect();
+        const x = Math.round(parentRect.left - canvasRect.left);
+        const y = Math.round(parentRect.bottom - canvasRect.top);
+
+        const resultGlyphId = `result-${crypto.randomUUID()}`;
+        const resultGlyph: Glyph = {
+            id: resultGlyphId,
+            title: `${name} Result`,
+            symbol: 'result',
+            x, y,
+            width: Math.round(parentRect.width),
+            renderContent: () => document.createElement('div'),
+        };
+
+        const resultElement = createResultGlyph(resultGlyph, result as ExecutionResult);
+        contentLayer.appendChild(resultElement);
+
+        const resultRect = resultElement.getBoundingClientRect();
+        uiState.addCanvasGlyph({
+            id: resultGlyphId,
+            symbol: 'result',
+            x, y,
+            width: Math.round(resultRect.width),
+            height: Math.round(resultRect.height),
+            content: JSON.stringify(result),
+        });
+
+        autoMeldResultBelow(
+            parentElement, glyphId, name, name,
+            resultElement, resultGlyphId, name,
+        );
+
+        log.info(SEG.GLYPH, `[Canvas] Spawned result for ${name} glyph ${glyphId} at (${x}, ${y})`);
+    }) as EventListener);
 
     // Selection: click on a glyph to select, Shift+click for multi-select, click background to deselect
     container.addEventListener('click', (e) => {

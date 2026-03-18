@@ -7,12 +7,12 @@
 
 import { log, SEG } from '../../logger';
 
-/** Color palette for query glyph states */
+/** Color palette for query glyph states — references tokens.css */
 export const QUERY_COLOR_STATES = {
-    idle:    { container: 'rgba(30, 30, 35, 0.92)',  titleBar: 'var(--bg-tertiary)' },
-    pending: { container: 'rgba(42, 43, 61, 0.92)',  titleBar: 'rgba(42, 43, 61, 0.92)' },
-    orange:  { container: 'rgba(61, 45, 20, 0.92)',  titleBar: '#5c3d1a' },
-    teal:    { container: 'rgba(31, 61, 61, 0.92)',  titleBar: '#1f3d3d' },
+    idle:    { container: 'var(--glyph-status-idle-bg)',    titleBar: 'var(--glyph-status-idle-section-bg)' },
+    pending: { container: 'var(--glyph-status-pending-bg)', titleBar: 'var(--glyph-status-pending-section-bg)' },
+    orange:  { container: 'rgba(61, 45, 20, 0.92)',         titleBar: '#5c3d1a' },
+    teal:    { container: 'rgba(31, 61, 61, 0.92)',         titleBar: '#1f3d3d' },
 } as const;
 
 export type QueryColorState = keyof typeof QUERY_COLOR_STATES;
