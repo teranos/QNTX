@@ -73,6 +73,35 @@
   const showClusters = true
   let clusterMap: Map<string, { cluster_id: number, label: string | null }> = $state(new Map())
 
+  // Global time range for temporal alignment across columns
+  let globalEarliest = $state(0)
+  let globalLatest = $state(0)
+
+  // Discrete time spacers: one 24px bar per 3h block, diminishing beyond 12h
+  const SPACER_PX = 24
+  const SPACER_HOURS = 3
+  const SPACER_FULL_BLOCKS = 4 // 12h at full size
+  const SPACER_SHRINK = 2 // px reduction per block beyond 12h
+
+  function timeSpacers(prevTs: number, curTs: number): number[] {
+    if (prevTs === 0) return []
+    const deltaMs = Math.max(0, curTs - prevTs)
+    const hours = deltaMs / (60 * 60 * 1000)
+    const blocks = Math.floor(hours / SPACER_HOURS)
+    if (blocks === 0) return []
+    const result: number[] = []
+    for (let i = 0; i < blocks; i++) {
+      if (i < SPACER_FULL_BLOCKS) {
+        result.push(SPACER_PX)
+      } else {
+        const shrunk = SPACER_PX - (i - SPACER_FULL_BLOCKS + 1) * SPACER_SHRINK
+        if (shrunk <= 0) break
+        result.push(shrunk)
+      }
+    }
+    return result
+  }
+
   // Session browser state (per-project, inline in headers)
   let sessionsData: SessionsResponse | null = $state(null)
   let expandedProjects: Set<string> = $state(new Set())
@@ -580,6 +609,12 @@
         built.sort((a, b) => a.earliest - b.earliest)
       }
       sessions = built
+      // Compute global time range for temporal alignment
+      const wovenSessions = built.filter(s => s.weaves.length > 0)
+      if (wovenSessions.length > 0) {
+        globalEarliest = Math.min(...wovenSessions.map(s => s.earliest))
+        globalLatest = Math.max(...wovenSessions.map(s => s.latest))
+      }
       loading = false
 
       // Fetch cluster memberships for all weave IDs
@@ -856,14 +891,13 @@
           onpointerleave={onColumnLeave}
         >
           <div class="dw-stream">
-            {#each computeMinimapItems(session.weaves) as item}
-              {#if item.type === 'gap'}
-                <div class="dw-time-gap">
-                  <span class="dw-gap-label">{item.gapHours}h gap</span>
-                </div>
-              {:else if item.weave}
-                {@const weave = item.weave}
-                {@const wturns = parseTurns(weave)}
+            {#each session.weaves as weave, wi}
+              {@const prevTs = wi > 0 ? session.weaves[wi - 1].timestamp : 0}
+              {@const spacers = timeSpacers(prevTs, weave.timestamp)}
+              {#each spacers as sz}
+                <div class="dw-time-spacer" style="height: {sz}px"></div>
+              {/each}
+              {@const wturns = parseTurns(weave)}
                 <div class="dw-weave" data-ts={weave.timestamp}>
                   <div class="dw-wmeta">
                     <span class="dw-copyable" onclick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(weave.id) }}>{weave.branch}</span>
@@ -907,7 +941,6 @@
                     </div>
                   {/each}
                 </div>
-              {/if}
             {/each}
           </div>
         </div>
@@ -1109,15 +1142,15 @@
     overflow-wrap: break-word;
   }
 
-  /* Time gap */
-  .dw-time-gap {
+  /* Time spacer (temporal alignment) */
+  .dw-time-spacer {
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 32px;
     margin: 0 6px;
     border-left: 1px dashed var(--border-on-dark);
     border-right: 1px dashed var(--border-on-dark);
+    opacity: 0.5;
   }
   .dw-gap-label {
     color: var(--border-on-dark);
