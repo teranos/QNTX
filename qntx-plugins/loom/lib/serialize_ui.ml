@@ -49,7 +49,9 @@ let attestation_to_json (a : Protocol.Attestation.t) =
     ("id", `String a.id);
     ("branch", `String branch);
     ("context", `String context);
-    ("timestamp", `Int a.timestamp);
+    ("timestamp", match extract_number fields "original_timestamp" with
+      | Some ts when ts > 0 -> `Int ts
+      | _ -> `Int a.timestamp);
     ("text", match extract_string fields "text" with
       | Some s -> `String s
       | None -> `Null);
@@ -61,6 +63,26 @@ let attestation_to_json (a : Protocol.Attestation.t) =
       | None -> `Null);
     ("paths", extract_string_map fields "paths");
   ]
+
+(* Check if a weave attestation has source "graunde" *)
+let is_graunde_weave (a : Protocol.Attestation.t) =
+  match a.attributes with
+  | Some fields -> extract_string fields "weave_source" = Some "graunde"
+  | None -> false
+
+(* Get the session context from a weave attestation *)
+let weave_context (a : Protocol.Attestation.t) =
+  match a.contexts with
+  | c :: _ -> c
+  | [] -> ""
+
+(* Filter out graunde weaves for sessions that have been imported via JSONL.
+ * When a WeaveComplete exists for a session, JSONL weaves are the authoritative
+ * source — graunde weaves for that session are suppressed. *)
+let filter_superseded ~completed_contexts attestations =
+  List.filter (fun a ->
+    not (is_graunde_weave a && Hashtbl.mem completed_contexts (weave_context a))
+  ) attestations
 
 (* Convert a list of attestations into a JSON response *)
 let attestations_to_json attestations =
