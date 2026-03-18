@@ -527,6 +527,32 @@
         })
       }
 
+      // Add empty columns for projects from session discovery that have no weaves yet
+      if (sessionsData) {
+        const existingProjects = new Set(built.map(s => s.context))
+        for (const [slug, info] of Object.entries(sessionsData.projects)) {
+          // Derive project name from slug: last two dash-separated path components joined with /
+          // e.g. -Users-s-b-vanhouten-SBVH-teranos-tmp3-QNTX → tmp3/QNTX
+          const parts = slug.split('-').filter(p => p.length > 0)
+          const projectName = parts.length >= 2
+            ? parts[parts.length - 2] + '/' + parts[parts.length - 1]
+            : parts[parts.length - 1] || slug
+          if (!existingProjects.has(projectName) && info.sessions.length > 0) {
+            const latest = info.sessions.reduce((max, s) => Math.max(max, s.modified_at), 0)
+            const earliest = info.sessions.reduce((min, s) => Math.min(min, s.modified_at), Infinity)
+            built.push({
+              context: projectName,
+              weaves: [],
+              turns: [],
+              branches: [],
+              earliest,
+              latest,
+              totalWords: 0,
+            })
+          }
+        }
+      }
+
       built.sort((a, b) => a.earliest - b.earliest)
       sessions = built
       loading = false
@@ -814,9 +840,9 @@
     }
   }
 
-  onMount(() => {
+  onMount(async () => {
+    await fetchSessions()
     load()
-    fetchSessions()
     document.addEventListener('keydown', onKeydown)
     return () => document.removeEventListener('keydown', onKeydown)
   })
@@ -860,6 +886,44 @@
       ontouchend={onTouchEnd}
     >
       {#each sessions as session, si}
+        {#if session.weaves.length === 0}
+          <div
+            class="dw-col-collapsed"
+            class:dw-col-expanded={expandedProjects.has(session.context)}
+            class:dw-hidden={si !== mobileIdx}
+            use:bindHdDrawer={session.context}
+          >
+            <span class="dw-col-collapsed-name">{session.context}</span>
+            <span class="dw-col-collapsed-count">{sessionsForProject(session.context).length} jsonl</span>
+            {#if expandedProjects.has(session.context)}
+              <div class="dw-col-expanded-body">
+                {#each sessionsForProject(session.context) as sf}
+                  <div class="dw-jsonl-row">
+                    <span class="dw-jsonl-sid">{sf.session_id.substring(0, 8)}</span>
+                    <span class="dw-jsonl-detail">{fmtTime(sf.modified_at)}</span>
+                    <span class="dw-jsonl-detail">{sf.line_count}L {formatBytes(sf.file_size)}</span>
+                    {#if sf.weave_count > 0}
+                      <span class="dw-jsonl-detail">{sf.weave_count}w</span>
+                    {/if}
+                    {#if sf.state !== 'unweaved'}
+                      <span class="dw-jsonl-detail" style="color: {stateColor(sf.state)}; opacity: 1">{sf.state}</span>
+                    {/if}
+                    {#if importResult && importResult.session_id === sf.session_id}
+                      <span class="dw-jsonl-result">+{importResult.weaves}w</span>
+                    {/if}
+                    {#if importingSession === sf.session_id}
+                      <span class="dw-jsonl-importing">importing...</span>
+                    {:else if sf.state === 'unweaved' || sf.state === 'partial'}
+                      <button class="dw-jsonl-import" onclick={(e: MouseEvent) => { e.stopPropagation(); importSession(sf) }}>import</button>
+                    {:else if sf.state === 'stale' || sf.state === 'complete'}
+                      <button class="dw-jsonl-import" onclick={(e: MouseEvent) => { e.stopPropagation(); importSession(sf) }}>reimport</button>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {:else}
         <div class="dw-col-wrap" class:dw-hidden={si !== mobileIdx}>
           <div
             class="dw-session-hd-zone"
@@ -1036,6 +1100,7 @@
         </div>
           </div>
         </div>
+        {/if}
       {/each}
     </div>
   {/if}
@@ -1513,6 +1578,60 @@
     font-size: var(--font-size-xs);
   }
 
+  /* Collapsed column (empty projects) */
+  .dw-col-collapsed {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 0 0 36px;
+    height: calc(100vh - 33px);
+    border-right: 1px solid var(--border-on-dark);
+    background: var(--bg-dark);
+    cursor: pointer;
+    transition: flex-basis 0.25s ease;
+    overflow: hidden;
+  }
+  .dw-col-collapsed:hover { background: var(--bg-dark-hover); }
+  .dw-col-collapsed-name {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    color: var(--text-on-dark-tertiary);
+    font-size: 11px;
+    padding-top: 12px;
+    white-space: nowrap;
+  }
+  .dw-col-collapsed-count {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    color: var(--text-on-dark-tertiary);
+    font-size: 9px;
+    opacity: 0.6;
+    margin-top: 8px;
+  }
+  /* Expanded state */
+  .dw-col-expanded {
+    flex: 0 0 280px;
+    align-items: stretch;
+  }
+  .dw-col-expanded .dw-col-collapsed-name {
+    writing-mode: horizontal-tb;
+    text-orientation: initial;
+    padding: 6px 10px 2px;
+    font-weight: 500;
+    color: var(--text-on-dark-secondary);
+  }
+  .dw-col-expanded .dw-col-collapsed-count {
+    writing-mode: horizontal-tb;
+    text-orientation: initial;
+    padding: 0 10px 4px;
+    margin-top: 0;
+  }
+  .dw-col-expanded-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 6px;
+  }
+
   /* Desktop: multi-column */
   @media (min-width: 768px) {
     .mobile-only { display: none; }
@@ -1522,6 +1641,7 @@
       max-width: 900px;
     }
     .dw-col-wrap.dw-hidden { display: flex; }
+    .dw-col-collapsed.dw-hidden { display: flex; }
   }
 
   /* Mobile */
