@@ -7,7 +7,9 @@ CREATE TABLE IF NOT EXISTS attestations (
     timestamp DATETIME NOT NULL,
     source TEXT NOT NULL DEFAULT 'cli',
     attributes JSON,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    signature BLOB, -- #576 Sign attestations with node DID key
+    signer_did TEXT -- #576 Sign attestations with node DID key
 );
 
 CREATE INDEX IF NOT EXISTS idx_attestations_subjects ON attestations(json_extract(subjects, '$'));

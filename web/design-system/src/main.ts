@@ -241,21 +241,6 @@ function injectStyles() {
       border-radius: var(--border-radius);
     }
 
-    /* Component section headers */
-    .component-section-header {
-      font-size: var(--font-size-sm);
-      font-weight: 500;
-      color: var(--text-on-dark);
-      margin-top: 10px;
-      margin-bottom: 1px;
-    }
-
-    .component-section-desc {
-      font-size: var(--font-size-xs);
-      color: var(--text-on-dark-tertiary);
-      margin-bottom: 6px;
-    }
-
     /* SDK specimen row */
     .sdk-specimen-row {
       display: grid;
@@ -265,29 +250,6 @@ function injectStyles() {
       background: var(--bg-secondary);
       border: var(--panel-border);
       border-radius: var(--border-radius);
-    }
-
-    /* Button gallery */
-    .button-group {
-      margin-bottom: 10px;
-    }
-
-    .button-group-header {
-      display: flex;
-      align-items: baseline;
-      gap: 8px;
-      margin-bottom: 4px;
-    }
-
-    .button-group-name {
-      color: var(--accent-on-dark);
-      font-size: var(--font-size-sm);
-      font-weight: 500;
-    }
-
-    .button-group-desc {
-      color: var(--text-on-dark-tertiary);
-      font-size: var(--font-size-xs);
     }
 
     .button-matrix {

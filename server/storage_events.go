@@ -21,8 +21,8 @@ type StorageEventsPoller struct {
 	lastID   int64 // Track last processed event ID
 
 	// Accumulated eviction counters, drained by the Pulse ticker for periodic summaries
-	evictionEvents       atomic.Int64
-	evictedAttestations  atomic.Int64
+	evictionEvents      atomic.Int64
+	evictedAttestations atomic.Int64
 }
 
 // NewStorageEventsPoller creates a new storage events poller
@@ -96,21 +96,16 @@ func (p *StorageEventsPoller) pollEvents() {
 			continue
 		}
 
-		// Broadcast notification based on event type
+		// Broadcast eviction notification (skip old warning events)
 		if eventType == "storage_warning" {
-			limit := int(limitValue.Int64)
-			if !limitValue.Valid {
-				limit = 16 // Fallback to default for old events
-			}
-			p.broadcastWarning(actor.String, context.String, deletionsCount, limit)
-		} else {
-			limit := int(limitValue.Int64)
-			if !limitValue.Valid {
-				// Fallback to defaults for old events
-				limit = getDefaultLimit(eventType)
-			}
-			p.broadcastEviction(eventType, actor.String, context.String, entity.String, deletionsCount, limit, evictionDetails.String)
+			p.lastID = id
+			continue
 		}
+		limit := int(limitValue.Int64)
+		if !limitValue.Valid {
+			limit = getDefaultLimit(eventType)
+		}
+		p.broadcastEviction(eventType, actor.String, context.String, entity.String, deletionsCount, limit, evictionDetails.String)
 
 		// Update last processed ID
 		p.lastID = id
@@ -178,34 +173,6 @@ func (p *StorageEventsPoller) broadcastEviction(eventType, actor, context, entit
 	}
 	if detailsMap != nil {
 		msg["eviction_details"] = detailsMap
-	}
-
-	p.server.broadcastMessage(msg)
-}
-
-// broadcastWarning sends a storage warning notification to WebSocket clients
-func (p *StorageEventsPoller) broadcastWarning(actor, context string, current, limit int) {
-	// For warnings, deletionsCount field contains current attestation count
-	fillPercent := float64(current) / float64(limit)
-
-	logger.AddDBSymbol(p.logger).Infow("Storage warning",
-		"actor", actor,
-		"context", context,
-		"fill_percent", int(fillPercent*100),
-		"current", current,
-		"limit", limit,
-	)
-
-	// Broadcast using existing storage_warning message type
-	msg := map[string]interface{}{
-		"type":            "storage_warning",
-		"actor":           actor,
-		"context":         context,
-		"current":         current,
-		"limit":           limit,
-		"fill_percent":    fillPercent,
-		"time_until_full": "unknown", // Could be calculated if needed
-		"timestamp":       time.Now().Unix(),
 	}
 
 	p.server.broadcastMessage(msg)

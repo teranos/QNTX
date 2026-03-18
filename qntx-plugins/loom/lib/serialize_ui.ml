@@ -1,26 +1,26 @@
-(* Weave data extraction and JSON serialization
+(* Serialize weave attestations to JSON for the frontend
  *
  * Converts raw ATS attestations (predicate "Weave") into structured
- * JSON for the explorer frontend. *)
+ * JSON that the Svelte timeline explorer consumes. *)
 
-open Qntx_dreamweave_proto.Atsstore
+open Qntx_plugin_proto.Atsstore
 
-module GValue = Google_types.Struct.Google.Protobuf.Value
+module GValue = Qntx_plugin_proto.Struct.Google.Protobuf.Value
 
 (* Extract a string value from a protobuf Struct (which is a (string * Value.t option) list) *)
-let extract_string (fields : Google_types.Struct.Google.Protobuf.Struct.t) key =
+let extract_string (fields : Qntx_plugin_proto.Struct.Google.Protobuf.Struct.t) key =
   match List.assoc_opt key fields with
   | Some (Some (`String_value s)) -> Some s
   | _ -> None
 
 (* Extract a number value from a protobuf Struct *)
-let extract_number (fields : Google_types.Struct.Google.Protobuf.Struct.t) key =
+let extract_number (fields : Qntx_plugin_proto.Struct.Google.Protobuf.Struct.t) key =
   match List.assoc_opt key fields with
   | Some (Some (`Number_value n)) -> Some (int_of_float n)
   | _ -> None
 
-(* Extract a nested Struct as a string→string JSON object *)
-let extract_string_map (fields : Google_types.Struct.Google.Protobuf.Struct.t) key =
+(* Extract a nested Struct as a string->string JSON object *)
+let extract_string_map (fields : Qntx_plugin_proto.Struct.Google.Protobuf.Struct.t) key =
   match List.assoc_opt key fields with
   | Some (Some (`Struct_value nested)) ->
     let pairs = List.filter_map (fun (k, v) ->
@@ -33,7 +33,7 @@ let extract_string_map (fields : Google_types.Struct.Google.Protobuf.Struct.t) k
 
 (* Convert a single attestation to a Yojson object *)
 let attestation_to_json (a : Protocol.Attestation.t) =
-  let fields : Google_types.Struct.Google.Protobuf.Struct.t = match a.attributes with
+  let fields : Qntx_plugin_proto.Struct.Google.Protobuf.Struct.t = match a.attributes with
     | Some attrs -> attrs
     | None -> []
   in

@@ -18,9 +18,11 @@ type AxGraphBuilder struct {
 
 // NewAxGraphBuilder creates a new Ax graph builder.
 // Node types are determined purely from attested node_type predicates.
-func NewAxGraphBuilder(db *sql.DB, verbosity int, logger *zap.SugaredLogger) (*AxGraphBuilder, error) {
+// rawQuerier optionally routes attestation queries through Rust FFI (storage.RawQuerier).
+func NewAxGraphBuilder(db *sql.DB, verbosity int, logger *zap.SugaredLogger, rawQuerier interface{}) (*AxGraphBuilder, error) {
 	executor := storage.NewExecutorWithOptions(db, ax.AxExecutorOptions{
-		Logger: logger.Named("ax"),
+		Logger:     logger.Named("ax"),
+		RawQuerier: rawQuerier,
 	})
 
 	return &AxGraphBuilder{

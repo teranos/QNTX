@@ -12,7 +12,7 @@ import { log, SEG } from '../logger';
  * Handle system capabilities message from backend
  * Updates ax button to show degraded state if using Go fallback
  * Updates vidstream button to show degraded state if ONNX unavailable
- * Updates Self diagnostic window with system capabilities
+ * Updates Self diagnostic glyph with system capabilities
  */
 export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void {
     log.debug(SEG.PULSE, 'System capabilities received:', {
@@ -25,11 +25,6 @@ export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void 
         storage_backend: data.storage_backend,
         storage_optimized: data.storage_optimized,
         storage_version: data.storage_version,
-    });
-
-    // Update Self diagnostic window
-    import('../self-window.js').then(({ selfWindow }) => {
-        selfWindow.updateCapabilities(data);
     });
 
     // Update Self diagnostic glyph

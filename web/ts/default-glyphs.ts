@@ -310,6 +310,28 @@ phone = "http://phone.local:877"</pre>
 let dbStatsElement: HTMLElement | null = null;
 let dbStats: any = null;
 
+// Eviction tracking — recent evictions shown in database glyph
+interface EvictionRecord {
+    event_type: string;
+    actor: string;
+    context: string;
+    entity: string;
+    deletions_count: number;
+    message: string;
+    timestamp: number;
+}
+const recentEvictions: EvictionRecord[] = [];
+const MAX_EVICTIONS = 20;
+
+function formatTimeAgo(ts: number): string {
+    const seconds = Math.floor((Date.now() - ts) / 1000);
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ago`;
+}
+
 // Self diagnostics state
 let selfElement: HTMLElement | null = null;
 let selfVersion: VersionMessage | null = null;
@@ -317,6 +339,19 @@ let selfCapabilities: SystemCapabilitiesMessage | null = null;
 
 export function updateDatabaseStats(stats: any): void {
     dbStats = stats;
+    if (dbStatsElement) {
+        renderDbStats();
+    }
+}
+
+export function recordEviction(data: { event_type: string; actor: string; context: string; entity: string; deletions_count: number; message: string }): void {
+    recentEvictions.unshift({
+        ...data,
+        timestamp: Date.now(),
+    });
+    if (recentEvictions.length > MAX_EVICTIONS) {
+        recentEvictions.length = MAX_EVICTIONS;
+    }
     if (dbStatsElement) {
         renderDbStats();
     }
@@ -344,9 +379,55 @@ function renderDbStats(): void {
         return;
     }
 
+    if (dbStats.error) {
+        dbStatsElement.innerHTML = `<div class="glyph-error">${dbStats.error}</div>`;
+        return;
+    }
+
     const storageBackend = dbStats.storage_optimized
         ? `rust (optimized) v${dbStats.storage_version}`
         : 'go (fallback)';
+
+    // Build rich fields / types section
+    let typesSection = '';
+    const richFields = dbStats.rich_fields;
+    if (richFields && richFields.length > 0) {
+        const isEnhanced = typeof richFields[0] === 'object' && 'field' in richFields[0];
+        const fieldItems = isEnhanced
+            ? richFields
+                .sort((a: any, b: any) => b.count - a.count)
+                .map((f: any) => `<span class="glyph-type-link" data-type="${f.field}" style="cursor: pointer; text-decoration: underline; margin-right: 8px;">${f.field} (${f.count})</span>`)
+                .join('')
+            : richFields.sort().map((f: string) => `<span class="glyph-type-link" data-type="${f}" style="cursor: pointer; text-decoration: underline; margin-right: 8px;">${f}</span>`).join('');
+
+        typesSection = `
+            <div class="glyph-row" style="margin-top: 8px; border-top: 1px solid var(--border-color, #333); padding-top: 8px;">
+                <span class="glyph-label">Types (${richFields.length}):</span>
+                <span class="glyph-value" style="display: flex; flex-wrap: wrap; gap: 4px;">${fieldItems}</span>
+            </div>
+        `;
+    }
+
+    // Build eviction section
+    let evictionSection = '';
+    if (recentEvictions.length > 0) {
+        const totalEvicted = recentEvictions.reduce((sum, e) => sum + e.deletions_count, 0);
+        const evictionRows = recentEvictions.slice(0, 10).map(e => {
+            const ago = formatTimeAgo(e.timestamp);
+            return `<div class="glyph-row" style="font-size: 0.85em; opacity: 0.85;">
+                <span class="glyph-label" style="min-width: auto;">${ago}</span>
+                <span class="glyph-value">${e.message}</span>
+            </div>`;
+        }).join('');
+
+        evictionSection = `
+            <div class="glyph-row" style="margin-top: 8px; border-top: 1px solid var(--border-color, #333); padding-top: 8px;">
+                <span class="glyph-label">Evictions (session):</span>
+                <span class="glyph-value">${recentEvictions.length} events, ${totalEvicted.toLocaleString()} attestations</span>
+            </div>
+            ${evictionRows}
+        `;
+    }
 
     dbStatsElement.innerHTML = `
         <div class="glyph-content">
@@ -374,8 +455,22 @@ function renderDbStats(): void {
                 <span class="glyph-label">Unique Contexts:</span>
                 <span class="glyph-value">${dbStats.unique_contexts.toLocaleString()}</span>
             </div>
+            ${typesSection}
+            ${evictionSection}
         </div>
     `;
+
+    // Wire up type links to open type definition window
+    dbStatsElement.querySelectorAll('.glyph-type-link').forEach(el => {
+        el.addEventListener('click', () => {
+            const typeName = (el as HTMLElement).dataset.type;
+            if (typeName) {
+                import('./type-definition-window.js').then(({ openTypeDefinition }) => {
+                    openTypeDefinition(typeName);
+                });
+            }
+        });
+    });
 }
 
 function renderSelf(): void {
