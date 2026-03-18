@@ -63,17 +63,27 @@ Bash `[tool]` turns are filtered by a command whitelist (git, gh, make). All oth
 
 ## Frontend
 
-Svelte 5 single-file app. No bundler dependencies beyond Bun and svelte.
+Svelte 5 app with extracted components. No bundler dependencies beyond Bun and svelte.
+
+### Components
+
+- `App.svelte` — layout, data fetching, session/column management, weave rendering
+- `Warp.svelte` — zoomable minimap sidebar with branch/session/cluster/tool lanes
+- `SessionList.svelte` — JSONL session rows with import buttons and state indicators
+- `ClusterBar.svelte` — cluster distribution chips per project (percentage breakdown)
+- `timespacers.ts` — discrete time spacer math for temporal alignment
 
 ### What it does
 
 - Vertical chronology, horizontal projects (grouped by branch prefix before `:`)
-- TimeWarp: zoomable scrollbar with branch/session/cluster lanes, tool call diamonds, session/compaction seams, 12h time gaps
+- All detected projects as columns: unweaved projects appear as empty columns ready for import
+- Temporal alignment: discrete time spacers between weaves (1h base, exponential doubling, ~11 month range in 192px)
+- TimeWarp: zoomable scrollbar with branch/session/cluster lanes, tool call diamonds, session/compaction seams
+- Cluster distribution per project in drawer header
 - Pointer-driven time-synchronized scrolling across columns
 - Minimal markdown rendering for assistant turns (code blocks, bold, inline code)
 - Click-to-copy weave attestation ID
 - Turn selection with CMD+C copy
-- Cluster membership visualization via QNTX embeddings API
 - Session browser with JSONL import from project headers
 
 ### Frontend limitations
@@ -84,21 +94,17 @@ Svelte 5 single-file app. No bundler dependencies beyond Bun and svelte.
 - **Cluster data is stale**: fetched once, never refreshed.
 - **No search**: cannot find weaves by content, branch, or time range.
 - **No URL routing**: no deep links to specific weaves or scroll positions. State lost on refresh.
-- **No client-side persistence**: column order, expanded/collapsed state, scroll positions, and UI preferences are lost on refresh. Column positions jump after import because the sort key changes when a project transitions from empty to woven. IndexedDB would make column order and UI state durable.
+- **No client-side persistence**: column order, expanded/collapsed state, scroll positions, favorites, and UI preferences are lost on refresh. Column positions jump after import because the sort key changes when a project transitions from empty to woven. IndexedDB is the key next step — it unblocks favorites, stable column order, collapsible columns, frozen columns, and scroll position recall.
 - **Warp click math is fragile**: translateY/content fraction mapping breaks if CSS layout changes.
-- **Time sync is coarse**: timestamp-nearest matching causes jumpy behavior with uneven weave density.
 - **Raw text parsing**: `[speaker]` prefix parsing with string methods is fragile if text contains those patterns literally. A structured format from the API would be better.
-- **Single file**: everything in App.svelte. Should split into components (WeaveCard, Turn, Warp, SessionHeader).
 
 ### Missing features (frontend)
 
-- **All detected projects as columns**: show every Claude project from session discovery, not just ones with existing weaves. Unweaved projects appear as empty columns ready for import.
-- **Cluster distribution per project**: in the expanded project header, show how the project's weaves distribute across available clusters (% membership per cluster).
-- **Temporal alignment across columns**: columns should visually offset based on real time distance. A March 4 weave in one column should not sit at the same scroll height as a March 11 weave in another — the gap should reflect the actual time delta, shrinking dynamically as timestamps converge.
+- **Interactive cluster chips**: cluster distribution shows in the drawer but clicking a chip does nothing yet. Should filter/highlight weaves belonging to that cluster, scroll to them, or cross-highlight across columns.
 - **Collapsible project columns**: minimize a project to a thin vertical strip showing just the project name (rotated). Click to restore. Keeps the column present but out of the way.
+- **Favorite weaves**: bookmark and return to specific weaves. Requires IndexedDB for persistence.
 - Diffs: show code changes that happened during the conversation.
 - Git moments: commits and merges as distinct timeline events.
-- Favorite weaves: bookmark and return to specific weaves.
 - Freeze columns: toggle time-sync per column, pin a view in place.
 - Images: screenshots as part of weave data, rendered inline.
 - Branch click navigation: clicking a branch name should scroll to its weaves.
