@@ -22,9 +22,8 @@ use crate::handlers::{HandlerContext, PluginState};
 use crate::proto::{
     domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, Empty,
     ExecuteJobRequest, ExecuteJobResponse, GlyphDefResponse, HealthResponse, HttpHeader,
-    HttpRequest, HttpResponse, InitializeRequest, InitializeResponse,
-    MetadataResponse, ParseAxQueryRequest, ParseAxQueryResponse,
-    WebSocketMessage,
+    HttpRequest, HttpResponse, InitializeRequest, InitializeResponse, MetadataResponse,
+    ParseAxQueryRequest, ParseAxQueryResponse, WebSocketMessage,
 };
 use parking_lot::RwLock;
 use std::collections::HashMap;
