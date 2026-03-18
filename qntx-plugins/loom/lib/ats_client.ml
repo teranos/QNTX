@@ -103,7 +103,7 @@ let grpc_call ~path ~request_bytes =
 
 (* --- Create a weave attestation --- *)
 
-let create_weave ~branch ~context ~text ~word_count ~turn_count ~paths =
+let create_weave ~branch ~context ~text ~word_count ~turn_count ~paths ?(original_timestamp=0) ~weave_source () =
   if !endpoint = "" then (
     Printf.eprintf "[loom] ATS client not configured, dropping weave\n%!";
     Lwt.return_error "ATS client not configured"
@@ -118,12 +118,17 @@ let create_weave ~branch ~context ~text ~word_count ~turn_count ~paths =
     let paths_val =
       Value.make ~kind:(`Struct_value (Struct.make ~fields:paths_fields ())) ()
     in
-    let attrs = Struct.make ~fields:[
+    let base_fields = [
       ("text", Some (string_val text));
       ("word_count", Some (number_val word_count));
       ("turn_count", Some (number_val turn_count));
       ("paths", Some paths_val);
-    ] () in
+      ("weave_source", Some (string_val weave_source));
+    ] in
+    let fields = if original_timestamp > 0 then
+      ("original_timestamp", Some (number_val original_timestamp)) :: base_fields
+    else base_fields in
+    let attrs = Struct.make ~fields () in
 
     let command = Protocol.AttestationCommand.make
       ~subjects:[branch]
@@ -162,6 +167,100 @@ let create_weave ~branch ~context ~text ~word_count ~turn_count ~paths =
          let msg = Ocaml_protoc_plugin.Result.show_error e in
          Printf.eprintf "[loom] Proto decode error: %s\n%!" msg;
          Lwt.return_error msg)
+
+(* --- WeaveComplete attestation --- *)
+
+(* Written after a successful JSONL import. Records file size and line count
+ * so we can detect stale sessions (file grew since last import). *)
+let create_weave_complete ~session_id ~file_path ~file_size ~line_count ~weave_count =
+  if !endpoint = "" then (
+    Printf.eprintf "[loom] ATS client not configured, dropping WeaveComplete\n%!";
+    Lwt.return_error "ATS client not configured"
+  ) else
+    let open Lwt.Syntax in
+    let open Qntx_plugin_proto.Struct.Google.Protobuf in
+    let string_val s = Value.make ~kind:(`String_value s) () in
+    let number_val n = Value.make ~kind:(`Number_value (Float.of_int n)) () in
+    let attrs = Struct.make ~fields:[
+      ("file_path", Some (string_val file_path));
+      ("file_size", Some (number_val file_size));
+      ("line_count", Some (number_val line_count));
+      ("weave_count", Some (number_val weave_count));
+    ] () in
+
+    let command = Protocol.AttestationCommand.make
+      ~subjects:[session_id]
+      ~predicates:["WeaveComplete"]
+      ~contexts:["import"]
+      ~actors:["loom"]
+      ~attributes:attrs
+      ~source:"loom"
+      ~source_version:Version.value
+      () in
+
+    let request = Protocol.GenerateAttestationRequest.make
+      ~auth_token:!auth_token
+      ~command
+      () in
+
+    let request_bytes = Qntx_plugin.Server.proto_to_string
+      (Protocol.GenerateAttestationRequest.to_proto request) in
+
+    let* result = grpc_call
+      ~path:"/protocol.ATSStoreService/GenerateAndCreateAttestation"
+      ~request_bytes in
+
+    match result with
+    | Error msg -> Lwt.return_error msg
+    | Ok payload ->
+      let reader = Ocaml_protoc_plugin.Reader.create payload in
+      (match Protocol.GenerateAttestationResponse.from_proto reader with
+       | Ok resp when resp.success ->
+         Printf.printf "[loom] WeaveComplete attestation created for session %s\n%!" session_id;
+         Lwt.return_ok ()
+       | Ok resp ->
+         Printf.eprintf "[loom] WeaveComplete creation failed: %s\n%!" resp.error;
+         Lwt.return_error resp.error
+       | Error e ->
+         let msg = Ocaml_protoc_plugin.Result.show_error e in
+         Printf.eprintf "[loom] Proto decode error: %s\n%!" msg;
+         Lwt.return_error msg)
+
+(* --- Query WeaveComplete attestations --- *)
+
+let get_weave_completes ?subjects () =
+  if !endpoint = "" then (
+    Printf.eprintf "[loom] ATS client not configured\n%!";
+    Lwt.return_error "ATS client not configured"
+  ) else
+    let open Lwt.Syntax in
+    let filter = Protocol.AttestationFilter.make
+      ?subjects
+      ~predicates:["WeaveComplete"]
+      () in
+    let request = Protocol.GetAttestationsRequest.make
+      ~auth_token:!auth_token
+      ~filter
+      () in
+    let request_bytes = Qntx_plugin.Server.proto_to_string
+      (Protocol.GetAttestationsRequest.to_proto request) in
+
+    let* result = grpc_call
+      ~path:"/protocol.ATSStoreService/GetAttestations"
+      ~request_bytes in
+
+    match result with
+    | Error msg -> Lwt.return_error msg
+    | Ok payload ->
+      let reader = Ocaml_protoc_plugin.Reader.create payload in
+      (match Protocol.GetAttestationsResponse.from_proto reader with
+       | Ok resp when resp.success ->
+         Lwt.return_ok resp.attestations
+       | Ok resp ->
+         Lwt.return_error resp.error
+       | Error e ->
+         let msg = Ocaml_protoc_plugin.Result.show_error e in
+         Lwt.return_error (Printf.sprintf "proto decode error: %s" msg))
 
 (* --- Query weaves --- *)
 
