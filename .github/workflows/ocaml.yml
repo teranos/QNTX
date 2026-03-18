@@ -1,0 +1,66 @@
+name: OCaml
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'qntx-plugins/kern/**'
+      - 'qntx-plugins/loom/**'
+      - 'plugin/grpc/ocaml/**'
+      - '.github/workflows/ocaml.yml'
+
+jobs:
+  build-kern:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: qntx
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Build kern plugin
+        run: nix build ./qntx-plugins/kern --show-trace
+
+      - name: Push to Cachix
+        run: nix build ./qntx-plugins/kern --print-out-paths --no-link | cachix push qntx
+
+  build-loom:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: qntx
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Build loom plugin (with tests)
+        run: nix build ./qntx-plugins/loom --show-trace
+
+      - name: Push to Cachix
+        run: nix build ./qntx-plugins/loom --print-out-paths --no-link | cachix push qntx
