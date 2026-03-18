@@ -211,6 +211,70 @@ StringArrayResultC storage_contexts(const SqliteStore *store);
 AttestationResultC storage_query_raw(const SqliteStore *store, const char *sql, const char *params_json);
 
 // ============================================================================
+// Generic SQL Execution (Go database/sql/driver)
+// ============================================================================
+
+typedef struct {
+    bool success;
+    char *error_msg;
+    int64_t last_insert_id;
+    int64_t rows_affected;
+} ExecResultC;
+
+typedef struct {
+    bool success;
+    char *error_msg;
+    char *columns_json; // JSON array of column names
+    char *rows_json;    // JSON array of row arrays
+} QueryResultC;
+
+/**
+ * Execute a non-query SQL statement (INSERT, UPDATE, DELETE, DDL).
+ *
+ * @param store Store handle
+ * @param sql SQL statement
+ * @param params_json JSON array of bind parameters
+ * @return Result with last_insert_id and rows_affected
+ */
+ExecResultC sql_exec(SqliteStore *store, const char *sql, const char *params_json);
+
+/**
+ * Execute a query SQL statement (SELECT).
+ * Returns all rows pre-fetched as JSON.
+ *
+ * @param store Store handle
+ * @param sql SQL SELECT query
+ * @param params_json JSON array of bind parameters
+ * @return Result with columns_json and rows_json
+ */
+QueryResultC sql_query(const SqliteStore *store, const char *sql, const char *params_json);
+
+/**
+ * Begin an immediate transaction (BEGIN IMMEDIATE).
+ */
+ExecResultC sql_begin(SqliteStore *store);
+
+/**
+ * Commit the current transaction.
+ */
+ExecResultC sql_commit(SqliteStore *store);
+
+/**
+ * Rollback the current transaction.
+ */
+ExecResultC sql_rollback(SqliteStore *store);
+
+/**
+ * Free an ExecResultC.
+ */
+void exec_result_free(ExecResultC result);
+
+/**
+ * Free a QueryResultC.
+ */
+void query_result_free(QueryResultC result);
+
+// ============================================================================
 // Integrity
 // ============================================================================
 

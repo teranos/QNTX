@@ -77,6 +77,10 @@ pub use qntx_proto::proto_convert;
 #[cfg(feature = "ffi")]
 pub mod ffi;
 
+// Generic SQL execution FFI for Go's database/sql/driver
+#[cfg(feature = "ffi")]
+pub mod sql_ffi;
+
 // Re-export main types
 pub use bounded::{BoundedStore, StorageQuotas};
 pub use error::{Result, SqliteError};
