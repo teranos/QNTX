@@ -355,6 +355,20 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 
 				serverLogger.Infow("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
 			}
+
+			// Register LLM providers with the core LLM router
+			if server.servicesManager != nil {
+				llmRouter := server.servicesManager.GetLLMRouter()
+				if llmRouter != nil {
+					for _, p := range plugins {
+						proxy, ok := p.(*grpcplugin.ExternalDomainProxy)
+						if !ok || !proxy.IsLLMProvider() {
+							continue
+						}
+						llmRouter.RegisterProvider(p.Metadata().Name, proxy.LLMServiceClient())
+					}
+				}
+			}
 		}
 	}
 

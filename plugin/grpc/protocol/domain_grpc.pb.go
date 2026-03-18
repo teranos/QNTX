@@ -29,7 +29,6 @@ const (
 	DomainPluginService_RegisterGlyphs_FullMethodName  = "/protocol.DomainPluginService/RegisterGlyphs"
 	DomainPluginService_ExecuteJob_FullMethodName      = "/protocol.DomainPluginService/ExecuteJob"
 	DomainPluginService_ParseAxQuery_FullMethodName    = "/protocol.DomainPluginService/ParseAxQuery"
-	DomainPluginService_Chat_FullMethodName            = "/protocol.DomainPluginService/Chat"
 )
 
 // DomainPluginServiceClient is the client API for DomainPluginService service.
@@ -60,9 +59,6 @@ type DomainPluginServiceClient interface {
 	// ParseAxQuery parses an Ax query string and returns the AST as JSON.
 	// Used by kern (OCaml parser) to replace the Rust WASM parser path.
 	ParseAxQuery(ctx context.Context, in *ParseAxQueryRequest, opts ...grpc.CallOption) (*ParseAxQueryResponse, error)
-	// Chat handles an LLM chat request (for plugins implementing LLMProvider).
-	// Messages defined in llm.proto (same package).
-	Chat(ctx context.Context, in *LLMChatRequest, opts ...grpc.CallOption) (*LLMChatResponse, error)
 }
 
 type domainPluginServiceClient struct {
@@ -176,16 +172,6 @@ func (c *domainPluginServiceClient) ParseAxQuery(ctx context.Context, in *ParseA
 	return out, nil
 }
 
-func (c *domainPluginServiceClient) Chat(ctx context.Context, in *LLMChatRequest, opts ...grpc.CallOption) (*LLMChatResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(LLMChatResponse)
-	err := c.cc.Invoke(ctx, DomainPluginService_Chat_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // DomainPluginServiceServer is the server API for DomainPluginService service.
 // All implementations must embed UnimplementedDomainPluginServiceServer
 // for forward compatibility.
@@ -214,9 +200,6 @@ type DomainPluginServiceServer interface {
 	// ParseAxQuery parses an Ax query string and returns the AST as JSON.
 	// Used by kern (OCaml parser) to replace the Rust WASM parser path.
 	ParseAxQuery(context.Context, *ParseAxQueryRequest) (*ParseAxQueryResponse, error)
-	// Chat handles an LLM chat request (for plugins implementing LLMProvider).
-	// Messages defined in llm.proto (same package).
-	Chat(context.Context, *LLMChatRequest) (*LLMChatResponse, error)
 	mustEmbedUnimplementedDomainPluginServiceServer()
 }
 
@@ -256,9 +239,6 @@ func (UnimplementedDomainPluginServiceServer) ExecuteJob(context.Context, *Execu
 }
 func (UnimplementedDomainPluginServiceServer) ParseAxQuery(context.Context, *ParseAxQueryRequest) (*ParseAxQueryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ParseAxQuery not implemented")
-}
-func (UnimplementedDomainPluginServiceServer) Chat(context.Context, *LLMChatRequest) (*LLMChatResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method Chat not implemented")
 }
 func (UnimplementedDomainPluginServiceServer) mustEmbedUnimplementedDomainPluginServiceServer() {}
 func (UnimplementedDomainPluginServiceServer) testEmbeddedByValue()                             {}
@@ -450,24 +430,6 @@ func _DomainPluginService_ParseAxQuery_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DomainPluginService_Chat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(LLMChatRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DomainPluginServiceServer).Chat(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: DomainPluginService_Chat_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DomainPluginServiceServer).Chat(ctx, req.(*LLMChatRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // DomainPluginService_ServiceDesc is the grpc.ServiceDesc for DomainPluginService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -510,10 +472,6 @@ var DomainPluginService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ParseAxQuery",
 			Handler:    _DomainPluginService_ParseAxQuery_Handler,
-		},
-		{
-			MethodName: "Chat",
-			Handler:    _DomainPluginService_Chat_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
