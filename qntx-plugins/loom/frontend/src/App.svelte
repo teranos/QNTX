@@ -108,11 +108,17 @@
     drawerMouseOut.delete(projectName)
   }
 
+  // Track which drawers are in "full" mode (75vh, scrollable)
+  let fullDrawers: Set<string> = $state(new Set())
+
   function closeDrawer(projectName: string) {
     const next = new Set(expandedProjects)
     next.delete(projectName)
     expandedProjects = next
     drawerMouseOut.delete(projectName)
+    const nf = new Set(fullDrawers)
+    nf.delete(projectName)
+    fullDrawers = nf
   }
 
   // Track which drawers have had mouse-out (ready to close on scroll-up)
@@ -135,12 +141,32 @@
 
   // Scroll down on header → open drawer, mouse-out marks ready, scroll-up closes
   function bindHdDrawer(el: HTMLElement, project: string) {
+    let expandLocked = false
     function onWheel(e: WheelEvent) {
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
+      // When drawer is full, let it scroll internally
+      if (fullDrawers.has(project)) {
+        const drawer = el.querySelector('.dw-drawer-inner') as HTMLElement
+        if (drawer) {
+          e.preventDefault()
+          e.stopPropagation()
+          drawer.scrollTop += e.deltaY
+        }
+        return
+      }
       e.preventDefault()
       e.stopPropagation()
-      if (!expandedProjects.has(project) && e.deltaY > 2) {
-        openDrawer(project)
+      if (e.deltaY > 2) {
+        if (!expandedProjects.has(project)) {
+          openDrawer(project)
+          // Lock tier promotion for 500ms so a single swipe doesn't jump to full
+          expandLocked = true
+          setTimeout(() => { expandLocked = false }, 600)
+        } else if (!fullDrawers.has(project) && !expandLocked) {
+          const nf = new Set(fullDrawers)
+          nf.add(project)
+          fullDrawers = nf
+        }
       }
     }
 
@@ -194,9 +220,11 @@
         importResult = { session_id: file.session_id, weaves: data.weaves_created }
         const savedExpanded = new Set(expandedProjects)
         const savedMouseOut = new Set(drawerMouseOut)
+        const savedFull = new Set(fullDrawers)
         await Promise.all([fetchSessions(), load()])
         expandedProjects = savedExpanded
         drawerMouseOut = savedMouseOut
+        fullDrawers = savedFull
       }
     } catch {
       // import failed silently
@@ -838,7 +866,7 @@
             class:dw-hd-expandable={sessionsForProject(session.context).length > 0}
             use:bindHdDrawer={session.context}
           >
-            <div class="dw-drawer" class:dw-drawer-open={expandedProjects.has(session.context)}>
+            <div class="dw-drawer" class:dw-drawer-open={expandedProjects.has(session.context) && !fullDrawers.has(session.context)} class:dw-drawer-full={fullDrawers.has(session.context)}>
               <div class="dw-drawer-inner">
                 <div class="dw-branches">
                   {#each session.branches as branch}
@@ -1233,6 +1261,14 @@
   .dw-drawer-open {
     max-height: 300px;
     transition: max-height 0.3s ease-in;
+  }
+  .dw-drawer-full {
+    max-height: 75vh;
+    transition: max-height 0.3s ease-in;
+  }
+  .dw-drawer-full .dw-drawer-inner {
+    max-height: calc(75vh - 12px);
+    overflow-y: auto;
   }
   .dw-drawer-inner {
     padding: 4px 10px 6px;
