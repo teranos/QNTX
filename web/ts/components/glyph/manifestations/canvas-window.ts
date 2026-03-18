@@ -24,7 +24,6 @@ import {
     WINDOW_BORDER_RADIUS,
     WINDOW_BOX_SHADOW,
 } from '../glyph';
-import { runCleanup } from '../glyph-interaction';
 import { addWindowControls, removeWindowControls } from './title-bar-controls';
 import { stashContent } from './stash';
 
@@ -44,6 +43,7 @@ export interface CanvasWindowConfig {
     onClose?: () => void;
     /** When provided, the − button minimizes to tray instead of returning to canvas. Receives the element for adoption. */
     onMinimize?: (element: HTMLElement) => void;
+    /** Called after restore completes. Drag/resize handlers persist through morphs — use this for UI updates only. */
     onRestoreComplete: (element: HTMLElement) => void;
 }
 
@@ -72,17 +72,13 @@ export function morphCanvasPlacedToWindow(
     const fromRect = element.getBoundingClientRect();
     const originalParent = element.parentElement;
 
-    // 3. Tear down canvas drag/resize handlers
-    runCleanup(element);
-
-    // 4. Detect existing glyph title bar (belongs to the glyph, not the manifestation)
+    // 3. Detect existing glyph title bar (belongs to the glyph, not the manifestation)
     const existingTitleBar = element.querySelector(':scope > .glyph-title-bar') as HTMLElement | null;
 
     // 5. Wrap non-title-bar children into a scrollable content div
     const contentDiv = document.createElement('div');
-    contentDiv.className = 'canvas-window-content';
-    contentDiv.style.flex = '1';
-    contentDiv.style.overflow = 'auto';
+    contentDiv.className = 'canvas-window-content glyph-content-area';
+    contentDiv.style.padding = '0';
     const children = Array.from(element.childNodes);
     for (const child of children) {
         if (child === existingTitleBar) continue;
@@ -246,7 +242,7 @@ export function morphWindowToCanvasPlaced(
                 savedParent.appendChild(element);
             }
 
-            // 10. Notify caller to re-attach drag/resize handlers
+            // 10. Notify caller (drag/resize handlers persist through morph)
             onRestoreComplete(element);
 
             log.debug(SEG.GLYPH, `[CanvasWindow] Restored to canvas at ${origin.x},${origin.y}`);

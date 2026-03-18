@@ -276,7 +276,7 @@
 
           # Static documentation site with provenance and infrastructure docs
           # For CI builds with full provenance, pass additional args
-          docs-site = pkgs.callPackage ./sitegen.nix {
+          docs-site = pkgs.callPackage ./sitegen {
             gitRevision = self.rev or self.dirtyRev or "unknown";
             gitShortRev = self.shortRev or self.dirtyShortRev or "unknown";
             gitCommitDate = if self ? lastModified then self.lastModified else null;

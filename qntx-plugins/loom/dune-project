@@ -9,9 +9,6 @@
  (synopsis "Commit-scoped transcript stitcher for QNTX")
  (depends
   (ocaml (>= 5.1.0))
-  grpc-lwt
-  ocaml-protoc-plugin
-  lwt
-  lwt_unix
+  qntx-plugin
   yojson
   uri))

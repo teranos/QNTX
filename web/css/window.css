@@ -263,6 +263,17 @@
     font-size: var(--font-size-md);
 }
 
+/**
+ * Glyph content area — the scrollable body below the title bar.
+ * Created by ui.glyph() and returned as `content` in the result.
+ * Fills remaining space, scrolls vertically, standard padding.
+ */
+.glyph-content-area {
+    flex: 1;
+    overflow: auto;
+    padding: 8px;
+}
+
 /* GlyphUI form primitives — dark-mode first */
 .glyph-form-group {
     display: flex;

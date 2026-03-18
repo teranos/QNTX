@@ -71,17 +71,14 @@ export function renderGlyphContent(
         // Add content area with error boundary
         try {
             const content = glyph.renderContent();
+            content.classList.add('glyph-content-area');
             content.style.padding = `${CANVAS_GLYPH_CONTENT_PADDING}px`;
-            content.style.flex = '1';
-            content.style.overflow = 'auto';
             element.appendChild(content);
             contentElement = content;
         } catch (error) {
             log.error(SEG.GLYPH, `[${logLabel} ${glyph.id}] Error rendering content:`, error);
             const errorContent = document.createElement('div');
-            errorContent.style.padding = '8px';
-            errorContent.style.flex = '1';
-            errorContent.style.overflow = 'auto';
+            errorContent.className = 'glyph-content-area';
             errorContent.style.color = 'var(--color-error)';
             errorContent.style.fontFamily = 'var(--font-mono)';
             errorContent.innerHTML = `

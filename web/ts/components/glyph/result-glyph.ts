@@ -14,7 +14,7 @@ import { Doc, Prose } from '@generated/sym.js';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { unmeldComposition } from './meld/meld-composition';
 import { autoMeldResultBelow } from './meld/meld-system';
-import { makeDraggable, makeResizable, preventDrag, storeCleanup } from './glyph-interaction';
+import { makeDraggable, preventDrag, storeCleanup } from './glyph-interaction';
 import { morphCanvasPlacedToWindow, placeWindowOnCanvas } from './manifestations/canvas-window';
 import { isInWindowState } from './dataset';
 import { glyphRun } from './run';
@@ -117,23 +117,6 @@ export function createResultGlyph(
             // Place on currently visible canvas at the window's screen position
             placeWindowOnCanvas(element, {
                 onRestoreComplete: (el) => {
-                    const cleanupDrag = makeDraggable(el, header, glyph, {
-                        logLabel: 'ResultGlyph',
-                        ignoreButtons: true,
-                    });
-                    storeCleanup(el, cleanupDrag);
-
-                    // Re-attach resize handler (torn down by morph)
-                    const resizeHandle = el.querySelector('.glyph-resize-handle') as HTMLElement | null;
-                    if (resizeHandle) {
-                        const cleanupResize = makeResizable(el, resizeHandle, glyph, {
-                            logLabel: 'ResultGlyph',
-                            minWidth: 200,
-                            minHeight: 80,
-                        });
-                        storeCleanup(el, cleanupResize);
-                    }
-
                     // Update canvas state with new position
                     const contentStr = (glyph as any).content
                         || uiState.getCanvasGlyphs().find(g => g.id === glyph.id)?.content;
@@ -179,24 +162,7 @@ export function createResultGlyph(
                     });
                     log.debug(SEG.GLYPH, `[ResultGlyph] Minimized to tray ${glyph.id}`);
                 },
-                onRestoreComplete: (el) => {
-                    const cleanupDrag = makeDraggable(el, header, glyph, {
-                        logLabel: 'ResultGlyph',
-                        ignoreButtons: true,
-                    });
-                    storeCleanup(el, cleanupDrag);
-
-                    // Re-attach resize handler (torn down by morph)
-                    const resizeHandle = el.querySelector('.glyph-resize-handle') as HTMLElement | null;
-                    if (resizeHandle) {
-                        const cleanupResize = makeResizable(el, resizeHandle, glyph, {
-                            logLabel: 'ResultGlyph',
-                            minWidth: 200,
-                            minHeight: 80,
-                        });
-                        storeCleanup(el, cleanupResize);
-                    }
-
+                onRestoreComplete: () => {
                     log.debug(SEG.GLYPH, `[ResultGlyph] Restored to canvas ${glyph.id}`);
                 },
             });
@@ -264,10 +230,7 @@ export function createResultGlyph(
 
     // Output container
     const outputContainer = document.createElement('div');
-    outputContainer.className = 'result-glyph-output';
-    outputContainer.style.flex = '1';
-    outputContainer.style.overflow = 'auto';
-    outputContainer.style.padding = '8px';
+    outputContainer.className = 'result-glyph-output glyph-content-area';
     outputContainer.style.fontFamily = 'monospace';
     outputContainer.style.fontSize = '12px';
     outputContainer.style.whiteSpace = 'pre-wrap';

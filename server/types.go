@@ -215,18 +215,6 @@ type PulseExecutionLogStreamMessage struct {
 	Timestamp      int64  `json:"timestamp"`        // Unix timestamp
 }
 
-// StorageWarningMessage represents a bounded storage warning for approaching limits
-type StorageWarningMessage struct {
-	Type          string  `json:"type"`            // "storage_warning"
-	Actor         string  `json:"actor"`           // Actor approaching limit
-	Context       string  `json:"context"`         // Context approaching limit
-	Current       int     `json:"current"`         // Current attestation count
-	Limit         int     `json:"limit"`           // Configured limit
-	FillPercent   float64 `json:"fill_percent"`    // Percentage full (0.0-1.0)
-	TimeUntilFull string  `json:"time_until_full"` // Human-readable time until hitting limit
-	Timestamp     int64   `json:"timestamp"`       // Unix timestamp
-}
-
 // PluginHealthMessage represents a plugin health status update
 // Broadcast when plugin state changes (pause/resume) or health check fails
 type PluginHealthMessage struct {
@@ -281,11 +269,11 @@ type WatcherBroadcastStats struct {
 
 // WatcherQueueStatusMessage represents the execution queue status broadcast
 type WatcherQueueStatusMessage struct {
-	Type             string                           `json:"type"`                     // "watcher_queue_status"
+	Type             string                           `json:"type"` // "watcher_queue_status"
 	TotalQueued      int                              `json:"total_queued"`
 	PerWatcher       map[string]int                   `json:"per_watcher"`
-	TargetGlyphs     map[string]string                `json:"target_glyphs,omitempty"`  // meld-edge watcher ID → target glyph ID
-	WatcherStats     map[string]WatcherBroadcastStats `json:"watcher_stats,omitempty"`  // per-watcher execution stats
+	TargetGlyphs     map[string]string                `json:"target_glyphs,omitempty"` // meld-edge watcher ID → target glyph ID
+	WatcherStats     map[string]WatcherBroadcastStats `json:"watcher_stats,omitempty"` // per-watcher execution stats
 	OldestAgeSeconds float64                          `json:"oldest_age_seconds"`
 	Timestamp        int64                            `json:"timestamp"`
 }
