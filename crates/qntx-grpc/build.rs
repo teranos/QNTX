@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // Compile only gRPC services (not message types - those come from qntx-proto)
-        // Use project root as include path so domain.proto's import of llm.proto resolves.
+        // Use project root as include path so proto imports resolve.
         tonic_build::configure()
             .build_server(true)
             .build_client(true)
