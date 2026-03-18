@@ -8,7 +8,6 @@
 | GET | `/api/debug` | HandleDebug |
 | GET | `/api/dev` | HandleDevMode |
 | GET | `/api/timeseries/usage` | HandleUsageTimeSeries |
-| GET | `/health` | HandleHealth |
 | GET | `/logs/download` | HandleLogDownload |
 
 ---
@@ -39,17 +38,10 @@ HandleUsageTimeSeries serves time-series usage data for charting
 
 ---
 
-### `GET` /health
-
-HandleHealth serves health check endpoint with version info
-
-**Handler**: `HandleHealth`
-
----
-
 ### `GET` /logs/download
 
-HandleLogDownload serves the debug log file for download
+HandleLogDownload serves the log file for download.
+Deprecated: log download UI has been removed. Scheduled for deletion.
 
 **Handler**: `HandleLogDownload`
 

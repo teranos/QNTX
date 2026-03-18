@@ -71,7 +71,7 @@ type FlakeLock struct {
 
 ## GitBranchResult {#gitbranchresult}
 
-**Source**: [`qntx-code/ixgest/git/ingest.go:86`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/ingest.go#L86)
+**Source**: [`qntx-code/ixgest/git/ingest.go:83`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/ingest.go#L83)
 
 
 ```go
@@ -85,7 +85,7 @@ type GitBranchResult struct {
 
 ## GitCommitResult {#gitcommitresult}
 
-**Source**: [`qntx-code/ixgest/git/ingest.go:74`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/ingest.go#L74)
+**Source**: [`qntx-code/ixgest/git/ingest.go:71`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/ingest.go#L71)
 
 
 ```go
@@ -103,7 +103,7 @@ type GitCommitResult struct {
 
 ## GitIngestionHandler {#gitingestionhandler}
 
-**Source**: [`qntx-code/ixgest/git/async.go:16`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/async.go#L16)
+**Source**: [`qntx-code/ixgest/git/async.go:17`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/async.go#L17)
 
 
 ```go
@@ -113,7 +113,7 @@ type GitIngestionHandler struct {
 
 ## GitIngestionPayload {#gitingestionpayload}
 
-**Source**: [`qntx-code/ixgest/git/async.go:30`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/async.go#L30)
+**Source**: [`qntx-code/ixgest/git/async.go:33`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/async.go#L33)
 
 
 ```go
@@ -128,7 +128,7 @@ type GitIngestionPayload struct {
 
 ## GitIxProcessor {#gitixprocessor}
 
-**Source**: [`qntx-code/ixgest/git/ingest.go:45`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/ingest.go#L45)
+**Source**: [`qntx-code/ixgest/git/ingest.go:43`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/ingest.go#L43)
 
 
 ```go
@@ -138,7 +138,7 @@ type GitIxProcessor struct {
 
 ## GitProcessingResult {#gitprocessingresult}
 
-**Source**: [`qntx-code/ixgest/git/ingest.go:58`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/ingest.go#L58)
+**Source**: [`qntx-code/ixgest/git/ingest.go:55`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/ingest.go#L55)
 
 
 ```go
@@ -160,7 +160,7 @@ type GitProcessingResult struct {
 
 ## GoPackageInfo {#gopackageinfo}
 
-**Source**: [`qntx-code/ixgest/git/ingest.go:804`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/ingest.go#L804)
+**Source**: [`qntx-code/ixgest/git/ingest.go:785`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/ingest.go#L785)
 
 
 ```go
