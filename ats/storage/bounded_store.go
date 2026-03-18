@@ -18,17 +18,6 @@ import (
 	"github.com/teranos/QNTX/errors"
 )
 
-const (
-	// SQL query to get storage statistics (counts of attestations, actors, subjects, contexts)
-	queryStorageStats = `
-		SELECT
-			COUNT(*) as total_attestations,
-			COUNT(DISTINCT json_extract(actors, '$[0]')) as unique_actors,
-			COUNT(DISTINCT json_extract(subjects, '$')) as unique_subjects,
-			COUNT(DISTINCT json_extract(contexts, '$')) as unique_contexts
-		FROM attestations`
-)
-
 // BoundedStore implements configurable storage limits for attestations
 type BoundedStore struct {
 	db     *sql.DB
@@ -101,20 +90,10 @@ func (bs *BoundedStore) CreateAttestationWithLimits(cmd *types.AsCommand) (*type
 	return as, nil
 }
 
-// GetStorageStats returns current storage statistics (implements ats.BoundedStore)
-func (bs *BoundedStore) GetStorageStats() (*ats.StorageStats, error) {
-	stats := &ats.StorageStats{}
-
-	// Combine all counts into a single query to reduce database round trips
-	err := bs.db.QueryRow(queryStorageStats).Scan(
-		&stats.TotalAttestations,
-		&stats.UniqueActors,
-		&stats.UniqueSubjects,
-		&stats.UniqueContexts,
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to query storage stats")
+// nullIfEmpty returns nil for empty strings (for nullable SQL columns)
+func nullIfEmpty(s string) interface{} {
+	if s == "" {
+		return nil
 	}
-
-	return stats, nil
+	return s
 }

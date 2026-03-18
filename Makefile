@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin dreamweave-plugin kern-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -242,8 +242,8 @@ define restart-plugin
 	@TOML_PORT=$$(grep -E '^port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
 	 PORT=$${BACKEND_PORT:-$${TOML_PORT:-877}}; \
 	 curl -sf -X POST http://127.0.0.1:$$PORT/api/plugins/$(1)/restart > /dev/null 2>&1 \
-		&& echo "  ↻ Restarted $(1) on running QNTX (port $$PORT)" \
-		|| true
+		&& echo "  ↻ $(1) restarted — live at http://127.0.0.1:$$PORT (no restart needed)" \
+		|| echo "  ⊘ QNTX not running — restart make dev to pick up new binary"
 endef
 
 # check-plugin-version DIR EXT VERSION_FILE
@@ -308,11 +308,6 @@ loom-plugin: ## Build, install, and restart loom plugin (OCaml)
 	$(call check-plugin-version,qntx-plugins/loom,ml,qntx-plugins/loom/lib/version.ml)
 	@$(MAKE) -C qntx-plugins/loom install PREFIX=$(PREFIX)
 	$(call restart-plugin,loom)
-
-dreamweave-plugin: ## Build, install, and restart dreamweave plugin (OCaml)
-	$(call check-plugin-version,qntx-plugins/dreamweave,ml,qntx-plugins/dreamweave/lib/version.ml)
-	@$(MAKE) -C qntx-plugins/dreamweave install PREFIX=$(PREFIX)
-	$(call restart-plugin,dreamweave)
 
 kern-plugin: ## Build, install, and restart kern plugin (OCaml Ax parser)
 	$(call check-plugin-version,qntx-plugins/kern,ml,qntx-plugins/kern/lib/version.ml)

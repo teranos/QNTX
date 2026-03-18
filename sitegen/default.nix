@@ -212,9 +212,10 @@ let
 
   # Static assets as attrsets (single source of truth)
   cssFiles = {
-    core = ./web/css/core.css;
-    utilities = ./web/css/utilities.css;
-    docs = ./web/css/docs.css;
+    tokens = ../web/css/tokens.css;
+    core = ../web/css/core.css;
+    utilities = ../web/css/utilities.css;
+    docs = ../web/css/docs.css;
     prism = pkgs.fetchurl {
       url = "https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css";
       hash = "sha256-GxX+KXGZigSK67YPJvbu12EiBx257zuZWr0AMiT1Kpg=";
@@ -232,7 +233,7 @@ let
     };
   };
 
-  logo = ./web/qntx.jpg;
+  logo = ../web/qntx.jpg;
 
   # Default OpenGraph description
   defaultDescription = "Continuous Intelligence - systems that continuously evolve their understanding through verifiable attestations.";
@@ -262,104 +263,15 @@ let
     "vision"
   ];
 
-  # ============================================================================
-  # HTML Utilities
-  # ============================================================================
-
-  html = rec {
-    escape = s: builtins.replaceStrings
-      [ "<" ">" "&" "\"" "'" ]
-      [ "&lt;" "&gt;" "&amp;" "&quot;" "&#39;" ]
-      s;
-
-    escapeJson = s: builtins.replaceStrings
-      [ "\\" "\"" "\n" "\r" "\t" ]
-      [ "\\\\" "\\\"" "\\n" "\\r" "\\t" ]
-      s;
-
-    tag = name: attrs: content:
-      let
-        attrStr = lib.concatStringsSep " "
-          (lib.mapAttrsToList (k: v: ''${k}="${v}"'') attrs);
-      in
-      "<${name}${lib.optionalString (attrs != { }) " ${attrStr}"}>${content}</${name}>";
-
-    table = { class ? "nix-table", headers, rows }:
-      let
-        headerRow = "<tr>" + lib.concatMapStringsSep "" (h: "<th>${h}</th>") headers + "</tr>";
-        bodyRows = lib.concatMapStringsSep "\n"
-          (row:
-            "<tr>" + lib.concatMapStringsSep "" (cell: "<td>${cell}</td>") row + "</tr>"
-          )
-          rows;
-      in
-      ''
-        <table class="${class}">
-          <thead>${headerRow}</thead>
-          <tbody>
-            ${bodyRows}
-          </tbody>
-        </table>'';
-
-    section = { title, content, class ? "download-section" }: ''
-      <section class="${class}">
-        <h2>${title}</h2>
-        ${content}
-      </section>'';
-
-    codeBlock = content: ''<div class="install-code">${content}</div>'';
-  };
-
-  # ============================================================================
-  # Text Utilities
-  # ============================================================================
-
-  toTitleCase = s:
-    let
-      capitalize = w:
-        lib.toUpper (lib.substring 0 1 w) + lib.substring 1 (lib.stringLength w) w;
-    in
-    lib.concatMapStringsSep " " capitalize (lib.splitString "-" s);
-
-  stripMarkdown = s: lib.pipe s [
-    (builtins.replaceStrings [ "```" ] [ "" ])
-    (builtins.replaceStrings [ "# " "## " "### " "#### " ] [ "" "" "" "" ])
-    (builtins.replaceStrings [ "**" "__" "*" "_" "`" ] [ "" "" "" "" "" ])
-    (builtins.replaceStrings [ "[" "](" ] [ "" " " ])
-  ];
-
-  # ============================================================================
-  # Date Utilities
-  # ============================================================================
-
-  # Convert Unix timestamp to RFC 822 format for RSS using shell date utility
-  # Example: 1737244800 -> "Mon, 19 Jan 2026 00:00:00 +0000"
-  timestampToRfc822 = ts:
-    let
-      dateFile = pkgs.runCommand "timestamp-to-rfc822-${toString ts}"
-        { nativeBuildInputs = [ pkgs.coreutils ]; }
-        ''
-          date -u -d @${toString ts} '+%a, %d %b %Y %H:%M:%S +0000' > $out
-        '';
-    in
-    lib.trim (builtins.readFile dateFile);
-
-  # Convert Unix timestamp to YYYY-MM-DD format for sitemaps
-  timestampToDate = ts:
-    let
-      dateFile = pkgs.runCommand "timestamp-to-date-${toString ts}"
-        { nativeBuildInputs = [ pkgs.coreutils ]; }
-        ''
-          date -u -d @${toString ts} '+%Y-%m-%d' > $out
-        '';
-    in
-    lib.trim (builtins.readFile dateFile);
+  # HTML, text, and date utilities (split to utils.nix)
+  utils = import ./utils.nix { inherit pkgs lib; };
+  inherit (utils) html toTitleCase stripMarkdown timestampToRfc822 timestampToDate;
 
   # ============================================================================
   # Markdown Discovery
   # ============================================================================
 
-  docsDir = ./docs;
+  docsDir = ../docs;
 
   markdownFiles =
     let
@@ -472,6 +384,7 @@ let
         <meta name="description" content="${html.escape description}">
         <link rel="icon" type="image/jpeg" href="${prefix}/qntx.jpg">
         <link rel="canonical" href="${canonicalUrl}">
+        <link rel="stylesheet" href="${prefix}/css/tokens.css">
         <link rel="stylesheet" href="${prefix}/css/core.css">
         <link rel="stylesheet" href="${prefix}/css/docs.css">
         <link rel="stylesheet" href="${prefix}/css/prism.css">
@@ -1057,7 +970,7 @@ let
           <p>Uses <code>lib.filesystem.listFilesRecursive</code> to find all <code>.md</code> files in <code>docs/</code>:</p>
           ${html.codeBlock ''
             markdownFiles = lib.filter (path: lib.hasSuffix ".md" (toString path))
-              (lib.filesystem.listFilesRecursive ./docs);''}
+              (lib.filesystem.listFilesRecursive ../docs);''}
 
           <h3>2. Per-file Derivations</h3>
           <p>Each markdown file becomes its own Nix derivation, enabling incremental builds:</p>
@@ -1277,9 +1190,9 @@ let
   # Extract CSS variable value from core.css
   extractCssVar = varName:
     let
-      coreCss = builtins.readFile cssFiles.core;
+      tokensCss = builtins.readFile cssFiles.tokens;
       # Match --var-name: value; (handles spaces, colors, etc)
-      lines = lib.splitString "\n" coreCss;
+      lines = lib.splitString "\n" tokensCss;
       matchingLines = lib.filter (line: lib.hasInfix "--${varName}:" line) lines;
       extractValue = line:
         let
@@ -1294,7 +1207,7 @@ let
     in
     if matchingLines != [ ]
     then extractValue (lib.head matchingLines)
-    else throw "CSS variable --${varName} not found in core.css";
+    else throw "CSS variable --${varName} not found in tokens.css";
 
   # XSLT colors automatically extracted from core.css (single source of truth!)
   xsltColors = {
@@ -1452,6 +1365,7 @@ let
       <title>404 - Unattested State | QNTX</title>
       <meta name="robots" content="noindex">
       <link rel="icon" type="image/jpeg" href="./qntx.jpg">
+      <link rel="stylesheet" href="./css/tokens.css">
       <link rel="stylesheet" href="./css/core.css">
       <link rel="stylesheet" href="./css/docs.css">
     </head>

@@ -20,7 +20,6 @@ import {
     handlePulseExecutionCompleted,
     handlePulseExecutionLogStream
 } from './pulse/realtime-handlers.ts';
-import { handleStorageWarning } from './websocket-handlers/storage-warning.ts';
 import { handleStorageEviction } from './websocket-handlers/storage-eviction.ts';
 import './symbol-palette.ts';
 import { toggleConfig } from './config-panel.ts';
@@ -98,11 +97,6 @@ function handleVersion(data: VersionMessage): void {
         logVersion.textContent = data.commit.substring(0, 7);
     }
 
-    // Update Self diagnostic window if loaded
-    import('./self-window.js').then(({ selfWindow }) => {
-        selfWindow.updateVersion(data);
-    });
-
     // Update Self diagnostic glyph
     import('./default-glyphs.js').then(({ updateSelfVersion }) => {
         updateSelfVersion(data);
@@ -140,7 +134,6 @@ async function init(): Promise<void> {
         'pulse_execution_failed': handlePulseExecutionFailed,
         'pulse_execution_completed': handlePulseExecutionCompleted,
         'pulse_execution_log_stream': handlePulseExecutionLogStream,
-        'storage_warning': handleStorageWarning,
         'storage_eviction': handleStorageEviction,
     };
 

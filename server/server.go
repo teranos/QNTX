@@ -14,6 +14,7 @@ import (
 	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/vidstream/vidstream"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/glyph/handlers"
@@ -351,4 +352,30 @@ func (s *QNTXServer) GetDB() *sql.DB {
 // GetServicesManager returns the gRPC services manager for plugin service access
 func (s *QNTXServer) GetServicesManager() *grpcplugin.ServicesManager {
 	return s.servicesManager
+}
+
+// getAttestationByID retrieves a single attestation through the attestation store (Rust FFI).
+// Falls back to Go's *sql.DB if the store doesn't support direct get.
+func (s *QNTXServer) getAttestationByID(id string) (*types.As, error) {
+	type singleGetter interface {
+		GetAttestation(id string) (*types.As, error)
+	}
+	if sg, ok := s.atsStore.(singleGetter); ok {
+		return sg.GetAttestation(id)
+	}
+	// Fallback for non-Rust stores (tests)
+	return storage.GetAttestationByID(s.db, id)
+}
+
+// queryAttestationsRaw executes a raw SQL query through the attestation store (Rust FFI).
+// Falls back to Go's *sql.DB if the store doesn't support raw queries.
+func (s *QNTXServer) queryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error) {
+	type rawQuerier interface {
+		QueryAttestationsRaw(sql string, params []interface{}) ([]*types.As, error)
+	}
+	if rq, ok := s.atsStore.(rawQuerier); ok {
+		return rq.QueryAttestationsRaw(sql, params)
+	}
+	// Fallback for non-Rust stores (tests)
+	return storage.GetAttestationsRaw(s.db, sql, params)
 }

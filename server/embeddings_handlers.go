@@ -144,7 +144,7 @@ func (s *QNTXServer) HandleSemanticSearch(w http.ResponseWriter, r *http.Request
 
 	for _, result := range searchResults {
 		if result.SourceType == "attestation" {
-			attestation, err := storage.GetAttestationByID(s.db, result.SourceID)
+			attestation, err := s.getAttestationByID(result.SourceID)
 			if err != nil {
 				s.logger.Warnw("Failed to fetch attestation for search result",
 					"attestation_id", result.SourceID,
@@ -328,7 +328,7 @@ func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request
 		}
 
 		// Fetch attestation
-		attestation, err := storage.GetAttestationByID(s.db, attestationID)
+		attestation, err := s.getAttestationByID(attestationID)
 		if err != nil {
 			errorMessages = append(errorMessages, errors.Wrapf(err, "failed to fetch attestation %s",
 				attestationID).Error())
@@ -541,10 +541,12 @@ func (s *QNTXServer) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Failed to retrieve embedding count", http.StatusInternalServerError)
 		return
 	}
-	if err := s.db.QueryRow("SELECT COUNT(*) FROM attestations").Scan(&atsCount); err != nil {
-		s.logger.Errorw("Failed to count attestations", "error", err)
-		http.Error(w, "Failed to retrieve attestation count", http.StatusInternalServerError)
-		return
+	// Count attestations through the store (Rust FFI when available)
+	type counter interface{ CountAttestations() (int, error) }
+	if c, ok := s.atsStore.(counter); ok {
+		if cnt, err := c.CountAttestations(); err == nil {
+			atsCount = cnt
+		}
 	}
 	resp.EmbeddingCount = embCount
 	resp.AttestationCount = atsCount

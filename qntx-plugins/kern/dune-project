@@ -9,10 +9,7 @@
  (synopsis "OCaml Ax query parser plugin for QNTX")
  (depends
   (ocaml (>= 5.1.0))
-  grpc-lwt
-  ocaml-protoc-plugin
-  lwt
-  lwt_unix
+  qntx-plugin
   sedlex
   menhir
   yojson))

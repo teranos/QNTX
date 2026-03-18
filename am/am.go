@@ -36,8 +36,9 @@ type SyncConfig struct {
 
 // DatabaseConfig configures the SQLite database
 type DatabaseConfig struct {
-	Path           string               `mapstructure:"path"`
-	BoundedStorage BoundedStorageConfig `mapstructure:"bounded_storage"`
+	Path                  string               `mapstructure:"path"`
+	BackupIntervalSeconds int                  `mapstructure:"backup_interval_seconds"` // 0 = disabled, default 3600 (hourly)
+	BoundedStorage        BoundedStorageConfig `mapstructure:"bounded_storage"`
 }
 
 // BoundedStorageConfig configures storage limits for attestations.

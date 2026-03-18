@@ -17,7 +17,7 @@ import { createGlyphUI } from './glyph-ui';
 import { loadPluginCSS } from './plugin-provided-glyphs';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from './manifestations/canvas-placed';
-import { makeDraggable, makeResizable, storeCleanup, preventDrag } from './glyph-interaction';
+import { preventDrag } from './glyph-interaction';
 import { morphCanvasPlacedToWindow, placeWindowOnCanvas } from './manifestations/canvas-window';
 import { isInWindowState } from './dataset';
 import { glyphRun } from './run';
@@ -43,10 +43,10 @@ export async function createPluginGlyphFromModule(
         // window.location.origin (dev server in dev, backend in production)
         const mod = await loadModule(moduleUrl);
 
-        // Create GlyphUI scoped to this glyph + plugin
+        // Create GlyphUI scoped to this glyph
         const ui = createGlyphUI(glyph, def.plugin);
 
-        // The module's render() may call ui.container() for a canvasPlaced
+        // The module's render() may call ui.glyph() for a canvasPlaced
         // wrapper, or return a raw element. If the returned element lacks
         // data-glyph-id, wrap it so selection/deletion work on the canvas.
         const rendered = await mod.render(glyph, ui);
@@ -102,22 +102,7 @@ export function wrapInCanvasPlaced(glyph: Glyph, rendered: HTMLElement, opts: Wr
     });
     element.appendChild(rendered);
 
-    function restoreCanvasHandlers(el: HTMLElement) {
-        const titleBar = el.querySelector(':scope > .glyph-title-bar') as HTMLElement | null;
-        const dragHandle = titleBar ?? el;
-        const cleanupDrag = makeDraggable(el, dragHandle, glyph, {
-            logLabel: `Plugin:${opts.plugin}`,
-        });
-        storeCleanup(el, cleanupDrag);
-
-        const resizeHandle = el.querySelector('.glyph-resize-handle') as HTMLElement | null;
-        if (resizeHandle) {
-            const cleanupResize = makeResizable(el, resizeHandle, glyph, {
-                logLabel: `Plugin:${opts.plugin}`,
-            });
-            storeCleanup(el, cleanupResize);
-        }
-
+    function restoreCanvasUI() {
         expandBtn.textContent = '\u2B06'; // ⬆
         expandBtn.title = 'Expand to window';
     }
@@ -126,7 +111,7 @@ export function wrapInCanvasPlaced(glyph: Glyph, rendered: HTMLElement, opts: Wr
         if (isInWindowState(element)) {
             // In window mode: place back on canvas
             placeWindowOnCanvas(element, {
-                onRestoreComplete: restoreCanvasHandlers,
+                onRestoreComplete: restoreCanvasUI,
             });
             return;
         }
@@ -151,7 +136,7 @@ export function wrapInCanvasPlaced(glyph: Glyph, rendered: HTMLElement, opts: Wr
                     manifestationType: 'window',
                 });
             },
-            onRestoreComplete: restoreCanvasHandlers,
+            onRestoreComplete: restoreCanvasUI,
         });
 
         expandBtn.textContent = '\u2B07'; // ⬇
