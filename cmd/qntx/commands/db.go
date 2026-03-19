@@ -48,7 +48,7 @@ func runDbStats(cmd *cobra.Command, args []string) error {
 	}
 
 	// Open and migrate database
-	database, _, err := openDatabase("")
+	database, _, _, err := openDatabase("")
 	if err != nil {
 		return errors.Wrap(err, "failed to open database")
 	}

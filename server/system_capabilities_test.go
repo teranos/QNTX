@@ -12,9 +12,9 @@ import (
 
 // TestSendSystemCapabilities verifies that system capabilities are sent to clients
 func TestSendSystemCapabilities(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -66,9 +66,9 @@ func TestSendSystemCapabilities(t *testing.T) {
 
 // TestSendSystemCapabilities_ClosedClient verifies graceful handling when client disconnects
 func TestSendSystemCapabilities_ClosedClient(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -97,9 +97,9 @@ func TestSendSystemCapabilities_ClosedClient(t *testing.T) {
 
 // TestSendSystemCapabilities_FullChannel verifies handling of full channel
 func TestSendSystemCapabilities_FullChannel(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}

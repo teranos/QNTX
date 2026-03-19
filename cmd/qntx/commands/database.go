@@ -3,21 +3,27 @@ package commands
 import (
 	"database/sql"
 	"fmt"
+	"sync"
 
 	"github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/db"
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
+	"github.com/teranos/QNTX/db/rustdriver"
 	"github.com/teranos/QNTX/logger"
 )
 
-// openDatabase opens and migrates a database using the specified path.
-// If dbPath is empty, it loads from am config. Uses logger.Logger for db operations.
-// Returns the database handle and the resolved path.
-func openDatabase(dbPath string) (*sql.DB, string, error) {
+var driverOnce sync.Once
+
+// openDatabase creates a unified database setup: Rust owns the SQLite connection,
+// Go's *sql.DB routes all SQL through Rust via the "rustsqlite" driver.
+// Returns the sql.DB handle, the attestation store, and the resolved path.
+func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, error) {
 	// Determine database path
 	if dbPath == "" {
 		path, err := am.GetDatabasePath()
 		if err != nil {
-			return nil, "", fmt.Errorf("failed to get database path: %w", err)
+			return nil, nil, "", fmt.Errorf("failed to get database path: %w", err)
 		}
 		if path == "" {
 			dbPath = "qntx.db"
@@ -26,17 +32,32 @@ func openDatabase(dbPath string) (*sql.DB, string, error) {
 		}
 	}
 
-	// Open database with logger
-	database, err := db.Open(dbPath, logger.Logger)
+	// Create Rust store (runs all migrations, sets up WAL/FK/busy_timeout)
+	rustStore, err := sqlitecgo.NewFileStore(dbPath)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to open database: %w", err)
+		return nil, nil, "", fmt.Errorf("failed to create Rust store at %s: %w", dbPath, err)
 	}
 
-	// Run migrations with logger
-	if err := db.Migrate(database, logger.Logger); err != nil {
+	// Register the Rust SQL driver (once per process)
+	driverOnce.Do(func() {
+		rustdriver.Register(rustStore.StorePtr(), rustStore.Mu())
+	})
+
+	// Open *sql.DB through the Rust driver — single connection, no pooling
+	database, err := sql.Open("rustsqlite", dbPath)
+	if err != nil {
+		rustStore.Close()
+		return nil, nil, "", fmt.Errorf("failed to open rustsqlite driver: %w", err)
+	}
+	database.SetMaxOpenConns(1)
+
+	// Create attestation store wrapping the Rust backend
+	atsStore, err := storage.NewStoreFromRust(rustStore, logger.Logger)
+	if err != nil {
 		database.Close()
-		return nil, "", fmt.Errorf("failed to run migrations: %w", err)
+		rustStore.Close()
+		return nil, nil, "", fmt.Errorf("failed to create attestation store: %w", err)
 	}
 
-	return database, dbPath, nil
+	return database, atsStore, dbPath, nil
 }

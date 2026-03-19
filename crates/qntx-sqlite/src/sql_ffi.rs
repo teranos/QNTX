@@ -117,6 +117,18 @@ fn parse_params(params_json: &str) -> Result<Vec<Box<dyn rusqlite::types::ToSql>
                 }
                 serde_json::Value::Bool(b) => Box::new(*b),
                 serde_json::Value::Null => Box::new(rusqlite::types::Null),
+                // Decode {"$blob": "base64data"} back to raw bytes
+                serde_json::Value::Object(map) => {
+                    if let Some(serde_json::Value::String(b64)) = map.get("$blob") {
+                        use base64::Engine;
+                        match base64::engine::general_purpose::STANDARD.decode(b64) {
+                            Ok(bytes) => Box::new(bytes),
+                            Err(_) => Box::new(v.to_string()),
+                        }
+                    } else {
+                        Box::new(v.to_string())
+                    }
+                }
                 _ => Box::new(v.to_string()),
             }
         })
@@ -246,7 +258,10 @@ pub extern "C" fn sql_query(
                 ValueRef::Blob(b) => {
                     use base64::Engine;
                     let encoded = base64::engine::general_purpose::STANDARD.encode(b);
-                    serde_json::Value::String(encoded)
+                    // Wrap in object to distinguish from regular strings
+                    let mut map = serde_json::Map::new();
+                    map.insert("$blob".to_string(), serde_json::Value::String(encoded));
+                    serde_json::Value::Object(map)
                 }
             };
             values.push(val);

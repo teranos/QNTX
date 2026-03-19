@@ -10,7 +10,7 @@ import (
 // TestStorageEventsPoller_InitializesWithMaxID verifies that the poller
 // starts with MAX(id) to avoid broadcasting historical events on server startup
 func TestStorageEventsPoller_InitializesWithMaxID(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 
 	// Insert historical storage events (simulating events from previous server run)
 	_, err := db.Exec(`
@@ -36,7 +36,7 @@ func TestStorageEventsPoller_InitializesWithMaxID(t *testing.T) {
 	}
 
 	// Create server (not needed for poller creation, but follows production pattern)
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}

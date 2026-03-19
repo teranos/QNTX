@@ -50,9 +50,10 @@ type serverDependencies struct {
 	config        *appcfg.Config
 }
 
-// NewQNTXServer creates a new QNTX server
-// Optional initialQuery can be provided to pre-load an Ax query on connection
-func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...string) (*QNTXServer, error) {
+// NewQNTXServer creates a new QNTX server.
+// atsStore is the pre-created attestation store (shared with the Rust SQL driver).
+// Optional initialQuery can be provided to pre-load an Ax query on connection.
+func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, verbosity int, initialQuery ...string) (*QNTXServer, error) {
 	query := ""
 	if len(initialQuery) > 0 {
 		query = initialQuery[0]
@@ -60,6 +61,9 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	// Defensive: Validate critical inputs
 	if db == nil {
 		return nil, errors.New("database connection cannot be nil")
+	}
+	if atsStore == nil {
+		return nil, errors.New("attestation store cannot be nil")
 	}
 	if verbosity < 0 || verbosity > 4 {
 		return nil, errors.Newf("verbosity must be 0-4, got %d", verbosity)
@@ -80,13 +84,6 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	// Defensive: Verify logger components
 	if serverLogger == nil || wsCore == nil || wsTransport == nil {
 		return nil, errors.New("logger creation returned nil components")
-	}
-
-	// Create the attestation store (Rust FFI when rustsqlite tag is active, Go SQLite otherwise)
-	// Created before dependencies so the builder can route queries through Rust.
-	atsStore, err := storage.NewStore(dbPath, serverLogger)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create attestation store")
 	}
 
 	// Create all server dependencies (builder, services, trackers, daemon)
