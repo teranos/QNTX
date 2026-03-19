@@ -2,7 +2,7 @@ import * as d3 from 'd3';
 import createREGL from 'regl';
 import { apiFetch } from './api';
 import { escapeHtml } from './html-utils';
-import { glyphRun } from './components/glyph/run';
+import { spawnAttestationAsWindow } from './components/glyph/attestation-glyph';
 import { tooltip } from './components/tooltip';
 // log/SEG available if needed for debugging
 
@@ -807,60 +807,7 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
 }
 
 function openAttestationWindow(attestation: any): void {
-    const id = `as-win-${attestation.id || crypto.randomUUID()}`;
-    if (glyphRun.has(id)) {
-        glyphRun.openGlyph(id);
-        return;
-    }
-
-    const subjects = attestation.subjects?.join(', ') || '?';
-    const predicates = attestation.predicates?.join(', ') || '?';
-    const titleText = `${subjects} is ${predicates}`;
-
-    glyphRun.add({
-        id,
-        title: titleText,
-        onClose: () => glyphRun.remove(id),
-        renderContent: () => {
-            const content = document.createElement('div');
-            content.style.padding = '8px';
-            content.style.fontSize = '11px';
-            content.style.fontFamily = 'monospace';
-            content.style.color = '#e2e8f0';
-            content.style.wordBreak = 'break-word';
-            content.style.overflowWrap = 'break-word';
-
-            const lines: string[] = [];
-            lines.push(`<div style="margin-bottom:6px"><span style="color:#60a5fa">${escapeHtml(attestation.subjects?.join(', ') || '')}</span> <span style="color:#9ca3af">is</span> <span style="color:#4ade80">${escapeHtml(attestation.predicates?.join(', ') || '')}</span> <span style="color:#9ca3af">of</span> <span style="color:#c084fc">${escapeHtml(attestation.contexts?.join(', ') || '')}</span></div>`);
-
-            if (attestation.actors?.length > 0) {
-                lines.push(`<div style="color:#9ca3af">actors: ${escapeHtml(attestation.actors.join(', '))}</div>`);
-            }
-            if (attestation.source) {
-                lines.push(`<div style="color:#9ca3af">source: ${escapeHtml(attestation.source)}</div>`);
-            }
-            if (attestation.id) {
-                lines.push(`<div style="color:#6b7280;font-size:10px;margin-top:4px">${escapeHtml(attestation.id)}</div>`);
-            }
-
-            // Attributes
-            if (attestation.attributes && typeof attestation.attributes === 'object') {
-                lines.push('<div style="margin-top:6px;border-top:1px solid #333;padding-top:6px">');
-                for (const [key, value] of Object.entries(attestation.attributes)) {
-                    if (key === 'rich_string_fields') continue;
-                    const display = typeof value === 'string' ? value : JSON.stringify(value);
-                    lines.push(`<div><span style="color:#fbbf24">${escapeHtml(key)}:</span> ${escapeHtml(display)}</div>`);
-                }
-                lines.push('</div>');
-            }
-
-            content.innerHTML = lines.join('');
-            return content;
-        },
-        initialWidth: '420px',
-        initialHeight: '300px',
-    });
-    glyphRun.openGlyph(id);
+    spawnAttestationAsWindow(attestation);
 }
 
 function renderScatterHighlighted(container: HTMLElement, data: ProjectionPoint[], highlightCluster: number): void {
