@@ -2,7 +2,7 @@
 
 HTTPS MITM proxy for Claude Code API traffic capture.
 
-Intercepts `api.anthropic.com` traffic, extracts model, token usage, and base64 images from request/response payloads.
+Intercepts `api.anthropic.com` traffic, extracts model, token usage, prompt text, and base64 images from request/response payloads.
 
 ## Usage
 
