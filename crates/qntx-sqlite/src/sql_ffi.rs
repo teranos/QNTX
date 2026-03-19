@@ -98,8 +98,7 @@ fn parse_params(params_json: &str) -> Result<Vec<Box<dyn rusqlite::types::ToSql>
     let params: Vec<serde_json::Value> = if params_json.is_empty() || params_json == "[]" {
         Vec::new()
     } else {
-        serde_json::from_str(params_json)
-            .map_err(|e| format!("invalid params JSON: {}", e))?
+        serde_json::from_str(params_json).map_err(|e| format!("invalid params JSON: {}", e))?
     };
 
     Ok(params
@@ -222,11 +221,7 @@ pub extern "C" fn sql_query(
     };
 
     // Extract column names
-    let columns: Vec<String> = stmt
-        .column_names()
-        .iter()
-        .map(|c| c.to_string())
-        .collect();
+    let columns: Vec<String> = stmt.column_names().iter().map(|c| c.to_string()).collect();
 
     let columns_json = match serde_json::to_string(&columns) {
         Ok(j) => j,
@@ -241,9 +236,9 @@ pub extern "C" fn sql_query(
             let val = match row.get_ref(i)? {
                 ValueRef::Null => serde_json::Value::Null,
                 ValueRef::Integer(i) => serde_json::Value::Number(i.into()),
-                ValueRef::Real(f) => {
-                    serde_json::Value::Number(serde_json::Number::from_f64(f).unwrap_or_else(|| 0i64.into()))
-                }
+                ValueRef::Real(f) => serde_json::Value::Number(
+                    serde_json::Number::from_f64(f).unwrap_or_else(|| 0i64.into()),
+                ),
                 ValueRef::Text(t) => {
                     let s = String::from_utf8_lossy(t).into_owned();
                     serde_json::Value::String(s)
@@ -363,7 +358,8 @@ mod tests {
     #[test]
     fn test_sql_exec_create_and_insert() {
         with_store(|store| {
-            let sql = CString::new("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)").unwrap();
+            let sql =
+                CString::new("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)").unwrap();
             let params = CString::new("[]").unwrap();
             let result = sql_exec(store, sql.as_ptr(), params.as_ptr());
             assert!(result.success, "CREATE TABLE failed");
@@ -383,7 +379,8 @@ mod tests {
     fn test_sql_query_returns_typed_values() {
         with_store(|store| {
             // Create and populate
-            let sql = CString::new("CREATE TABLE test (id INTEGER, name TEXT, score REAL)").unwrap();
+            let sql =
+                CString::new("CREATE TABLE test (id INTEGER, name TEXT, score REAL)").unwrap();
             let params = CString::new("[]").unwrap();
             let r = sql_exec(store, sql.as_ptr(), params.as_ptr());
             assert!(r.success);
