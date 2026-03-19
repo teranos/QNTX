@@ -24,6 +24,7 @@ extern(C) nothrow @nogc {
     SSL_CTX* SSL_CTX_new(const SSL_METHOD* method);
     void SSL_CTX_free(SSL_CTX* ctx);
     int SSL_CTX_use_certificate_file(SSL_CTX* ctx, const char* file, int type);
+    int SSL_CTX_use_certificate_chain_file(SSL_CTX* ctx, const char* file);
     int SSL_CTX_use_PrivateKey_file(SSL_CTX* ctx, const char* file, int type);
     int SSL_CTX_check_private_key(const SSL_CTX* ctx);
 
@@ -105,9 +106,10 @@ private __gshared SSL_CTX* serverCtx = null;  // for client-facing (leaf cert)
 private __gshared SSL_CTX* clientCtx = null;  // for upstream connections
 
 /// Initialize OpenSSL and load certificates.
-/// certFile/keyFile = leaf cert for MITM.
+/// certFile/keyFile = leaf cert for MITM, caFile = CA cert.
+/// The leaf + CA are sent as a chain so clients can verify.
 /// Returns true on success.
-bool tlsInit(string certFile, string keyFile) {
+bool tlsInit(string certFile, string keyFile, string caFile = "") {
     if (tlsInitialized) return true;
 
     OPENSSL_init_ssl(
@@ -123,8 +125,15 @@ bool tlsInit(string certFile, string keyFile) {
         return false;
     }
 
-    if (SSL_CTX_use_certificate_file(serverCtx, toStringz(certFile), SSL_FILETYPE_PEM) != 1) {
-        logError("[ix-net] tls: failed to load cert %s", certFile);
+    // If CA file provided, use certificate chain (leaf + CA) so clients
+    // can verify the full chain during TLS handshake
+    string chainFile = certFile;
+    if (caFile.length > 0) {
+        chainFile = buildChainFile(certFile, caFile);
+    }
+
+    if (SSL_CTX_use_certificate_chain_file(serverCtx, toStringz(chainFile)) != 1) {
+        logError("[ix-net] tls: failed to load cert chain %s", chainFile);
         logOpenSSLError();
         return false;
     }
@@ -157,8 +166,19 @@ bool tlsInit(string certFile, string keyFile) {
     SSL_CTX_set_alpn_protos(clientCtx, alpn.ptr, cast(uint)alpn.length);
 
     tlsInitialized = true;
-    logInfo("[ix-net] tls: initialized (cert=%s)", certFile);
+    logInfo("[ix-net] tls: initialized (cert=%s, chain=%s)", certFile, caFile.length > 0 ? "yes" : "no");
     return true;
+}
+
+/// Concatenate leaf + CA into a temporary chain PEM file.
+private string buildChainFile(string certFile, string caFile) {
+    import std.file : read, write, tempDir;
+    import std.path : buildPath;
+    auto leaf = cast(string) read(certFile);
+    auto ca = cast(string) read(caFile);
+    auto chainPath = buildPath(tempDir(), "ix-net-chain.pem");
+    write(chainPath, leaf ~ ca);
+    return chainPath;
 }
 
 /// Clean up OpenSSL contexts.
