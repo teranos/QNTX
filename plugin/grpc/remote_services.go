@@ -23,6 +23,7 @@ type RemoteServiceRegistry struct {
 	queueEndpoint       string
 	scheduleEndpoint    string
 	fileServiceEndpoint string
+	llmEndpoint         string
 	authToken           string
 	config              map[string]string
 	logger              *zap.SugaredLogger
@@ -30,6 +31,7 @@ type RemoteServiceRegistry struct {
 	queueClient         plugin.QueueService    // Lazy-initialized gRPC client
 	scheduleClient      plugin.ScheduleService // Lazy-initialized gRPC client
 	fileServiceClient   plugin.FileService     // Lazy-initialized gRPC client
+	llmClient           plugin.LLMService      // Lazy-initialized gRPC client
 	pluginRef           plugin.DomainPlugin    // Reference to plugin for metadata lookup
 }
 
@@ -43,6 +45,7 @@ func NewRemoteServiceRegistry(
 	queueEndpoint string,
 	scheduleEndpoint string,
 	fileServiceEndpoint string,
+	llmEndpoint string,
 	authToken string,
 	config map[string]string,
 	logger *zap.SugaredLogger,
@@ -54,6 +57,7 @@ func NewRemoteServiceRegistry(
 		queueEndpoint:       queueEndpoint,
 		scheduleEndpoint:    scheduleEndpoint,
 		fileServiceEndpoint: fileServiceEndpoint,
+		llmEndpoint:         llmEndpoint,
 		authToken:           authToken,
 		config:              config,
 		logger:              logger,
@@ -143,6 +147,20 @@ func (r *RemoteServiceRegistry) FileService() plugin.FileService {
 		r.fileServiceClient = client
 	}
 	return r.fileServiceClient
+}
+
+// LLM returns a gRPC client for LLM operations.
+// The client is lazy-initialized on first access.
+func (r *RemoteServiceRegistry) LLM() plugin.LLMService {
+	if r.llmClient == nil && r.llmEndpoint != "" {
+		client, err := NewRemoteLLM(r.ctx, r.llmEndpoint, r.logger)
+		if err != nil {
+			r.logger.Errorw("Failed to create LLM client", "error", err)
+			return nil
+		}
+		r.llmClient = client
+	}
+	return r.llmClient
 }
 
 // remoteConfig provides configuration for remote plugins using viper for parsing.

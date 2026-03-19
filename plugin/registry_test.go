@@ -653,6 +653,7 @@ func (m *mockServiceRegistry) ATSStore() ats.AttestationStore { return m.store }
 func (m *mockServiceRegistry) Queue() QueueService            { return m.queue }
 func (m *mockServiceRegistry) Schedule() ScheduleService      { return nil }
 func (m *mockServiceRegistry) FileService() FileService       { return nil }
+func (m *mockServiceRegistry) LLM() LLMService                { return nil }
 
 // Verify mockServiceRegistry implements ServiceRegistry
 var _ ServiceRegistry = (*mockServiceRegistry)(nil)

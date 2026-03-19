@@ -349,6 +349,11 @@ func (s *QNTXServer) GetDB() *sql.DB {
 	return s.db
 }
 
+// GetServicesManager returns the gRPC services manager for plugin service access
+func (s *QNTXServer) GetServicesManager() *grpcplugin.ServicesManager {
+	return s.servicesManager
+}
+
 // getAttestationByID retrieves a single attestation through the attestation store (Rust FFI).
 // Falls back to Go's *sql.DB if the store doesn't support direct get.
 func (s *QNTXServer) getAttestationByID(id string) (*types.As, error) {

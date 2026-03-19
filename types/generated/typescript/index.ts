@@ -128,7 +128,6 @@ export type {
   Result,
   ScheduledJobResponse,
   StatsMessage,
-  StorageWarningMessage,
   TaskLogsResponse,
   UpdateScheduledJobRequest,
   UsageUpdateMessage,

@@ -5,7 +5,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         use std::path::PathBuf;
 
         // Proto files are relative to workspace root
-        let proto_dir = PathBuf::from("../../plugin/grpc/protocol");
+        let project_root = PathBuf::from("../../");
+        let proto_dir = project_root.join("plugin/grpc/protocol");
 
         let protos = [
             proto_dir.join("domain.proto"),
@@ -21,6 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // Compile only gRPC services (not message types - those come from qntx-proto)
+        // Use project root as include path so proto imports resolve.
         tonic_build::configure()
             .build_server(true)
             .build_client(true)
@@ -28,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .compile_well_known_types(false)
             // Use extern_path to reference types from qntx-proto instead of generating
             .extern_path(".protocol", "::qntx_proto")
-            .compile_protos(&protos, &[&proto_dir])?;
+            .compile_protos(&protos, &[&project_root])?;
 
         // Rerun if proto files change
         for proto in &protos {

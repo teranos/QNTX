@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/teranos/QNTX/ats"
@@ -51,6 +52,40 @@ type FileService interface {
 	ReadFileBase64(fileID string) (mimeType, base64Data string, err error)
 }
 
+// LLMService provides provider-agnostic LLM access for plugins.
+// Core routes requests to the appropriate provider plugin.
+type LLMService interface {
+	// Chat sends a chat completion request and returns the response.
+	Chat(ctx context.Context, req LLMRequest) (*LLMResponse, error)
+}
+
+// LLMRequest is a provider-agnostic LLM chat request.
+type LLMRequest struct {
+	SystemPrompt string
+	UserPrompt   string
+	Model        string
+	Temperature  float64
+	MaxTokens    int
+	Provider     string          // Target provider (empty = default)
+	Attachments  []LLMAttachment // Multimodal attachments
+}
+
+// LLMAttachment is a file attached to an LLM request.
+type LLMAttachment struct {
+	MimeType string
+	Data     string
+	Filename string
+}
+
+// LLMResponse is a provider-agnostic LLM chat response.
+type LLMResponse struct {
+	Content          string
+	Model            string
+	PromptTokens     int
+	CompletionTokens int
+	TotalTokens      int
+}
+
 // ServiceRegistry provides access to QNTX core services for domain plugins.
 // Plugins use this registry to look up services they need.
 type ServiceRegistry interface {
@@ -74,6 +109,10 @@ type ServiceRegistry interface {
 
 	// FileService returns the file storage service for reading uploaded files
 	FileService() FileService
+
+	// LLM returns the LLM service for provider-agnostic chat completions.
+	// Returns nil if no LLM provider is available.
+	LLM() LLMService
 }
 
 // Config provides access to plugin configuration
@@ -171,5 +210,10 @@ func (r *DefaultServiceRegistry) Schedule() ScheduleService {
 
 // FileService returns nil for in-process plugins (they share the filesystem with core).
 func (r *DefaultServiceRegistry) FileService() FileService {
+	return nil
+}
+
+// LLM returns nil for in-process plugins (LLM is a gRPC-only service).
+func (r *DefaultServiceRegistry) LLM() LLMService {
 	return nil
 }
