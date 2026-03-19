@@ -221,8 +221,11 @@ type InitializeRequest struct {
 	// file_service_endpoint: gRPC endpoint for FileService
 	// Provides: Read stored files (for multimodal attachments)
 	FileServiceEndpoint string `protobuf:"bytes,6,opt,name=file_service_endpoint,json=fileServiceEndpoint,proto3" json:"file_service_endpoint,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// llm_endpoint: gRPC endpoint for LLMService
+	// Provides: Provider-agnostic LLM chat (routed through core to provider plugins)
+	LlmEndpoint   string `protobuf:"bytes,7,opt,name=llm_endpoint,json=llmEndpoint,proto3" json:"llm_endpoint,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *InitializeRequest) Reset() {
@@ -293,6 +296,13 @@ func (x *InitializeRequest) GetScheduleEndpoint() string {
 func (x *InitializeRequest) GetFileServiceEndpoint() string {
 	if x != nil {
 		return x.FileServiceEndpoint
+	}
+	return ""
+}
+
+func (x *InitializeRequest) GetLlmEndpoint() string {
+	if x != nil {
+		return x.LlmEndpoint
 	}
 	return ""
 }
@@ -846,7 +856,10 @@ type InitializeResponse struct {
 	HandlerNames []string `protobuf:"bytes,1,rep,name=handler_names,json=handlerNames,proto3" json:"handler_names,omitempty"`
 	// Schedules this plugin wants QNTX to create
 	// QNTX will auto-create schedule.Job entries for these
-	Schedules     []*ScheduleInfo `protobuf:"bytes,2,rep,name=schedules,proto3" json:"schedules,omitempty"`
+	Schedules []*ScheduleInfo `protobuf:"bytes,2,rep,name=schedules,proto3" json:"schedules,omitempty"`
+	// llm_provider indicates this plugin implements LLMProvider (Chat RPC).
+	// Core registers it as an LLM backend in the service mesh.
+	LlmProvider   bool `protobuf:"varint,3,opt,name=llm_provider,json=llmProvider,proto3" json:"llm_provider,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -893,6 +906,13 @@ func (x *InitializeResponse) GetSchedules() []*ScheduleInfo {
 		return x.Schedules
 	}
 	return nil
+}
+
+func (x *InitializeResponse) GetLlmProvider() bool {
+	if x != nil {
+		return x.LlmProvider
+	}
+	return false
 }
 
 // ExecuteJobRequest is sent to plugins to execute an async job
@@ -1412,7 +1432,7 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\fqntx_version\x18\x03 \x01(\tR\vqntxVersion\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x16\n" +
 	"\x06author\x18\x05 \x01(\tR\x06author\x12\x18\n" +
-	"\alicense\x18\x06 \x01(\tR\alicense\"\xe4\x02\n" +
+	"\alicense\x18\x06 \x01(\tR\alicense\"\x87\x03\n" +
 	"\x11InitializeRequest\x12,\n" +
 	"\x12ats_store_endpoint\x18\x01 \x01(\tR\x10atsStoreEndpoint\x12%\n" +
 	"\x0equeue_endpoint\x18\x02 \x01(\tR\rqueueEndpoint\x12\x1d\n" +
@@ -1420,7 +1440,8 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"auth_token\x18\x03 \x01(\tR\tauthToken\x12?\n" +
 	"\x06config\x18\x04 \x03(\v2'.protocol.InitializeRequest.ConfigEntryR\x06config\x12+\n" +
 	"\x11schedule_endpoint\x18\x05 \x01(\tR\x10scheduleEndpoint\x122\n" +
-	"\x15file_service_endpoint\x18\x06 \x01(\tR\x13fileServiceEndpoint\x1a9\n" +
+	"\x15file_service_endpoint\x18\x06 \x01(\tR\x13fileServiceEndpoint\x12!\n" +
+	"\fllm_endpoint\x18\a \x01(\tR\vllmEndpoint\x1a9\n" +
 	"\vConfigEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"}\n" +
@@ -1479,10 +1500,11 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x10interval_seconds\x18\x02 \x01(\x05R\x0fintervalSeconds\x12,\n" +
 	"\x12enabled_by_default\x18\x03 \x01(\bR\x10enabledByDefault\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x19\n" +
-	"\bats_code\x18\x05 \x01(\tR\aatsCode\"o\n" +
+	"\bats_code\x18\x05 \x01(\tR\aatsCode\"\x92\x01\n" +
 	"\x12InitializeResponse\x12#\n" +
 	"\rhandler_names\x18\x01 \x03(\tR\fhandlerNames\x124\n" +
-	"\tschedules\x18\x02 \x03(\v2\x16.protocol.ScheduleInfoR\tschedules\"\xa0\x01\n" +
+	"\tschedules\x18\x02 \x03(\v2\x16.protocol.ScheduleInfoR\tschedules\x12!\n" +
+	"\fllm_provider\x18\x03 \x01(\bR\vllmProvider\"\xa0\x01\n" +
 	"\x11ExecuteJobRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12!\n" +
 	"\fhandler_name\x18\x02 \x01(\tR\vhandlerName\x12\x18\n" +

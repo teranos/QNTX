@@ -321,7 +321,8 @@ impl DomainPluginService for PythonPluginService {
 
         Ok(Response::new(InitializeResponse {
             handler_names,
-            schedules: vec![], // Python plugin doesn't announce schedules yet
+            schedules: vec![],
+            ..Default::default()
         }))
     }
 

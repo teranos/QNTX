@@ -152,6 +152,17 @@ type UIPlugin interface {
 	RegisterGlyphs() []GlyphDef
 }
 
+// LLMProvider is an optional interface for plugins that provide LLM services.
+// Plugins implementing this interface register as LLM backends in the core
+// service mesh. Other plugins can then call services.LLM().Chat() to make
+// LLM requests routed through the provider.
+type LLMProvider interface {
+	DomainPlugin
+
+	// Chat handles an LLM chat request.
+	Chat(ctx context.Context, req LLMRequest) (*LLMResponse, error)
+}
+
 // GlyphDef defines a custom glyph type provided by a plugin.
 type GlyphDef struct {
 	// Symbol is the glyph identifier (e.g., "⚗" for a chemistry plugin).

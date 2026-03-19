@@ -819,41 +819,6 @@ export interface StatsMessage {
   companies: number;
 }
 
-export interface StorageWarningMessage {
-  /**
-   * "storage_warning"
-   */
-  type: string;
-  /**
-   * Actor approaching limit
-   */
-  actor: string;
-  /**
-   * Context approaching limit
-   */
-  context: string;
-  /**
-   * Current attestation count
-   */
-  current: number;
-  /**
-   * Configured limit
-   */
-  limit: number;
-  /**
-   * Percentage full (0.0-1.0)
-   */
-  fill_percent: number;
-  /**
-   * Human-readable time until hitting limit
-   */
-  time_until_full: string;
-  /**
-   * Unix timestamp
-   */
-  timestamp: number;
-}
-
 export interface TaskLogsResponse {
   task_id: string;
   logs: LogEntry[];
