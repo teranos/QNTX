@@ -12,6 +12,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/graph"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/server/wslogs"
@@ -22,11 +23,16 @@ func createTestDB(t *testing.T) *sql.DB {
 	return qntxtest.CreateTestDB(t)
 }
 
+// createTestStore is a local alias for qntxtest.CreateTestStore
+func createTestStore(t *testing.T) (ats.AttestationStore, *sql.DB) {
+	return qntxtest.CreateTestStore(t)
+}
+
 // Test basic server creation and initialization
 func TestNewQNTXServer(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 
-	srv, err := NewQNTXServer(db, ":memory:", 1)
+	srv, err := NewQNTXServer(db, store, ":memory:", 1)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -58,10 +64,10 @@ func TestNewQNTXServer(t *testing.T) {
 
 // Test that the hub goroutine handles client registration
 func TestServerHubRegistration(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -106,10 +112,10 @@ func TestServerHubRegistration(t *testing.T) {
 
 // Test that the hub goroutine handles client unregistration
 func TestServerHubUnregistration(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -174,10 +180,10 @@ func TestServerHubUnregistration(t *testing.T) {
 
 // Test concurrent client registration
 func TestServerConcurrentRegistration(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -234,10 +240,10 @@ func TestIsPortAvailable(t *testing.T) {
 
 // Test WebSocket upgrade handler
 func TestHandleWebSocket(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -290,7 +296,7 @@ func TestHandleWebSocket(t *testing.T) {
 
 // Test query message handling
 func TestHandleQueryMessage(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	defer db.Close()
 
 	// Insert test data using production schema
@@ -302,7 +308,7 @@ func TestHandleQueryMessage(t *testing.T) {
 		t.Fatalf("Failed to insert test data: %v", err)
 	}
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -353,10 +359,10 @@ func TestHandleQueryMessage(t *testing.T) {
 
 // Test ping/pong message handling
 func TestHandlePingMessage(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -420,10 +426,10 @@ func TestHandlePingMessage(t *testing.T) {
 
 // Test multiple concurrent WebSocket clients
 func TestMultipleWebSocketClients(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -496,10 +502,10 @@ func getKeys(m map[string]interface{}) []string {
 
 // Test broadcast to multiple clients
 func TestBroadcastToMultipleClients(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -551,10 +557,10 @@ func TestBroadcastToMultipleClients(t *testing.T) {
 
 // Test slow client removal during broadcast
 func TestSlowClientRemoval(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -632,10 +638,10 @@ func TestSlowClientRemoval(t *testing.T) {
 
 // Test broadcast message helper
 func TestBroadcastMessage(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -701,9 +707,9 @@ func TestBroadcastMessage(t *testing.T) {
 
 // TestGetDaemon verifies that GetDaemon returns the Pulse worker pool
 func TestGetDaemon(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 
-	srv, err := NewQNTXServer(db, ":memory:", 1)
+	srv, err := NewQNTXServer(db, store, ":memory:", 1)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
