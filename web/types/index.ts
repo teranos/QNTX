@@ -50,7 +50,6 @@ export type {
   PulseExecutionFailedMessage,
   PulseExecutionCompletedMessage,
   PulseExecutionLogStreamMessage,
-  StorageWarningMessage,
   ErrorResponse,
   // Scheduled job types (server)
   ScheduledJobResponse,
