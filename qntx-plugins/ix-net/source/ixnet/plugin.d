@@ -199,10 +199,10 @@ private HTTPResponse handleStart(ref const HTTPRequest req) {
         }
     }
 
-    string certFile, keyFile;
-    resolveCertPaths(certFile, keyFile);
+    string certFile, keyFile, caFile;
+    resolveCertPaths(certFile, keyFile, caFile);
 
-    if (startProxy(state.proxy, proxyPort, certFile, keyFile)) {
+    if (startProxy(state.proxy, proxyPort, certFile, keyFile, caFile)) {
         state.capturing = true;
         auto mode = state.proxy.tlsEnabled ? "intercept" : "passthrough";
         logInfo("[ix-net] HTTPS proxy started on port %d (mode=%s)",
@@ -473,13 +473,13 @@ private void autoStartProxy() {
 
     ushort proxyPort = 9100;
 
-    string certFile, keyFile;
-    resolveCertPaths(certFile, keyFile);
+    string certFile, keyFile, caFile;
+    resolveCertPaths(certFile, keyFile, caFile);
 
     // Pass ATSClient to proxy for attestation writes
     state.proxy.atsClient = cast(void*)&state.atsClient;
 
-    if (startProxy(state.proxy, proxyPort, certFile, keyFile)) {
+    if (startProxy(state.proxy, proxyPort, certFile, keyFile, caFile)) {
         state.capturing = true;
         auto mode = state.proxy.tlsEnabled ? "intercept" : "passthrough";
         logInfo("[ix-net] proxy auto-started on port %d (mode=%s)",
@@ -489,23 +489,29 @@ private void autoStartProxy() {
     }
 }
 
-/// Resolve leaf cert/key paths relative to the executable.
-/// Sets certFile/keyFile to empty strings if not found (passthrough mode).
-private void resolveCertPaths(out string certFile, out string keyFile) {
+/// Resolve leaf cert/key/CA paths relative to the executable.
+/// Sets certFile/keyFile/caFile to empty strings if not found (passthrough mode).
+private void resolveCertPaths(out string certFile, out string keyFile, out string caFile) {
     import ixnet.log;
     certFile = "";
     keyFile = "";
+    caFile = "";
     auto exeDir = getExeDir();
     if (exeDir.length > 0) {
         auto certsDir = exeDir ~ "/../certs/";
         certFile = certsDir ~ "leaf.pem";
         keyFile = certsDir ~ "leaf.key";
+        caFile = certsDir ~ "ca.pem";
 
         import std.file : exists;
         if (!exists(certFile) || !exists(keyFile)) {
             logWarn("[ix-net] certs not found at %s — running in passthrough mode", certsDir);
             certFile = "";
             keyFile = "";
+            caFile = "";
+        } else if (!exists(caFile)) {
+            logWarn("[ix-net] ca.pem not found at %s — TLS chain will be incomplete", certsDir);
+            caFile = "";
         }
     }
 }

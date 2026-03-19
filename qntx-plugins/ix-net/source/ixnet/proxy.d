@@ -68,6 +68,7 @@ struct ProxyState {
     bool tlsEnabled;                 // true if TLS interception is active
     string certFile;                 // path to leaf cert
     string keyFile;                  // path to leaf key
+    string caFile;                   // path to CA cert
     Capture[MAX_CAPTURES] captures;  // ring buffer
     int captureHead;                 // next write index
     Thread listenerThread;
@@ -78,18 +79,21 @@ struct ProxyState {
 
 /// Start the HTTPS proxy on the given port.
 /// certFile/keyFile enable TLS interception (MITM). Pass empty strings for passthrough mode.
+/// caFile is the CA cert — sent in the TLS chain so clients can verify.
 bool startProxy(ref ProxyState state, ushort port,
-                string certFile = "", string keyFile = "") {
+                string certFile = "", string keyFile = "",
+                string caFile = "") {
 
     import core.sync.mutex : Mutex;
     state.captureMutex = new Mutex();
 
     // Initialize TLS if cert paths provided
     if (certFile.length > 0 && keyFile.length > 0) {
-        if (tlsInit(certFile, keyFile)) {
+        if (tlsInit(certFile, keyFile, caFile)) {
             state.tlsEnabled = true;
             state.certFile = certFile;
             state.keyFile = keyFile;
+            state.caFile = caFile;
             logInfo("[ix-net] proxy: TLS interception enabled");
         } else {
             logWarn("[ix-net] proxy: TLS init failed, falling back to passthrough");
