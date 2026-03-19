@@ -447,7 +447,7 @@ impl QueryStore for SqliteStore {
         }
 
         // Apply ordering and limit
-        sql.push_str(" ORDER BY created_at DESC");
+        sql.push_str(" ORDER BY created_at DESC, rowid DESC");
         if let Some(limit) = filter.limit {
             sql.push_str(&format!(" LIMIT {}", limit));
         }
