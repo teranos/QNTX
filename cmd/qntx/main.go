@@ -229,6 +229,19 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 				}
 			}
 			pluginLogger.Infow("Plugin async handler registration complete")
+
+			// Register LLM providers with the core LLM router
+			if sm := defaultServer.GetServicesManager(); sm != nil {
+				if llmRouter := sm.GetLLMRouter(); llmRouter != nil {
+					for _, p := range loadedPlugins {
+						proxy, ok := p.(*grpc.ExternalDomainProxy)
+						if !ok || !proxy.IsLLMProvider() {
+							continue
+						}
+						llmRouter.RegisterProvider(p.Metadata().Name, proxy.LLMServiceClient())
+					}
+				}
+			}
 		} else {
 			pluginLogger.Warnw("Cannot register handlers - Pulse daemon not available, will retry")
 			// Retry schedule setup after Pulse starts

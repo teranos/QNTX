@@ -1,0 +1,125 @@
+package grpc
+
+import (
+	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"go.uber.org/zap/zaptest"
+	"google.golang.org/grpc"
+)
+
+// stubDomainClient implements protocol.DomainPluginServiceClient for testing.
+// Only Chat is wired; other methods panic.
+type stubDomainClient struct {
+	protocol.DomainPluginServiceClient // embed to satisfy interface
+	chatResp                           *protocol.LLMChatResponse
+	chatErr                            error
+}
+
+func (s *stubDomainClient) Chat(ctx context.Context, in *protocol.LLMChatRequest, opts ...grpc.CallOption) (*protocol.LLMChatResponse, error) {
+	return s.chatResp, s.chatErr
+}
+
+func TestLLMServer_NoProviders(t *testing.T) {
+	logger := zaptest.NewLogger(t).Sugar()
+	srv := NewLLMServer(logger)
+
+	_, err := srv.Chat(context.Background(), &protocol.LLMChatRequest{
+		UserPrompt: "hello",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no LLM providers registered")
+}
+
+func TestLLMServer_DefaultProvider(t *testing.T) {
+	logger := zaptest.NewLogger(t).Sugar()
+	srv := NewLLMServer(logger)
+
+	stub := &stubDomainClient{
+		chatResp: &protocol.LLMChatResponse{
+			Content:     "world",
+			Model:       "test-model",
+			TotalTokens: 42,
+		},
+	}
+	srv.RegisterProvider("openrouter", stub)
+
+	resp, err := srv.Chat(context.Background(), &protocol.LLMChatRequest{
+		UserPrompt: "hello",
+		// provider empty → uses default
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "world", resp.Content)
+	assert.Equal(t, "test-model", resp.Model)
+	assert.Equal(t, int32(42), resp.TotalTokens)
+}
+
+func TestLLMServer_ExplicitProvider(t *testing.T) {
+	logger := zaptest.NewLogger(t).Sugar()
+	srv := NewLLMServer(logger)
+
+	stubA := &stubDomainClient{
+		chatResp: &protocol.LLMChatResponse{Content: "from-a"},
+	}
+	stubB := &stubDomainClient{
+		chatResp: &protocol.LLMChatResponse{Content: "from-b"},
+	}
+
+	srv.RegisterProvider("a", stubA)
+	srv.RegisterProvider("b", stubB)
+
+	// Explicit provider=b
+	resp, err := srv.Chat(context.Background(), &protocol.LLMChatRequest{
+		UserPrompt: "test",
+		Provider:   "b",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "from-b", resp.Content)
+
+	// Default should be "a" (first registered)
+	resp, err = srv.Chat(context.Background(), &protocol.LLMChatRequest{
+		UserPrompt: "test",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "from-a", resp.Content)
+}
+
+func TestLLMServer_UnknownProvider(t *testing.T) {
+	logger := zaptest.NewLogger(t).Sugar()
+	srv := NewLLMServer(logger)
+
+	stub := &stubDomainClient{
+		chatResp: &protocol.LLMChatResponse{Content: "ok"},
+	}
+	srv.RegisterProvider("openrouter", stub)
+
+	_, err := srv.Chat(context.Background(), &protocol.LLMChatRequest{
+		UserPrompt: "test",
+		Provider:   "nonexistent",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "nonexistent")
+	assert.Contains(t, err.Error(), "not found")
+}
+
+func TestLLMServer_FirstRegisteredIsDefault(t *testing.T) {
+	logger := zaptest.NewLogger(t).Sugar()
+	srv := NewLLMServer(logger)
+
+	srv.RegisterProvider("first", &stubDomainClient{
+		chatResp: &protocol.LLMChatResponse{Content: "first"},
+	})
+	srv.RegisterProvider("second", &stubDomainClient{
+		chatResp: &protocol.LLMChatResponse{Content: "second"},
+	})
+
+	// Empty provider → default → "first"
+	resp, err := srv.Chat(context.Background(), &protocol.LLMChatRequest{
+		UserPrompt: "test",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "first", resp.Content)
+}

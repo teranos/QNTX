@@ -297,6 +297,7 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 				"queue", endpoints.QueueAddress,
 				"schedule", endpoints.ScheduleAddress,
 				"file_service", endpoints.FileServiceAddress,
+				"llm", endpoints.LLMAddress,
 			)
 		}
 
@@ -355,6 +356,20 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 				}
 
 				serverLogger.Infow("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
+			}
+
+			// Register LLM providers with the core LLM router
+			if server.servicesManager != nil {
+				llmRouter := server.servicesManager.GetLLMRouter()
+				if llmRouter != nil {
+					for _, p := range plugins {
+						proxy, ok := p.(*grpcplugin.ExternalDomainProxy)
+						if !ok || !proxy.IsLLMProvider() {
+							continue
+						}
+						llmRouter.RegisterProvider(p.Metadata().Name, proxy.LLMServiceClient())
+					}
+				}
 			}
 		}
 	}
@@ -734,6 +749,8 @@ func (c *pluginConfigWithEndpoints) GetString(key string) string {
 			return c.endpoints.ScheduleAddress
 		case "_file_service_endpoint":
 			return c.endpoints.FileServiceAddress
+		case "_llm_endpoint":
+			return c.endpoints.LLMAddress
 		case "_auth_token":
 			return c.endpoints.AuthToken
 		}
@@ -765,6 +782,8 @@ func (c *pluginConfigWithEndpoints) Get(key string) interface{} {
 			return c.endpoints.ScheduleAddress
 		case "_file_service_endpoint":
 			return c.endpoints.FileServiceAddress
+		case "_llm_endpoint":
+			return c.endpoints.LLMAddress
 		case "_auth_token":
 			return c.endpoints.AuthToken
 		}

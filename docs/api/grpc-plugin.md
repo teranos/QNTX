@@ -20,6 +20,7 @@ gRPC interface for external QNTX domain plugins.
 | ConfigSchema | Empty | ConfigSchemaResponse | No |
 | RegisterGlyphs | Empty | GlyphDefResponse | No |
 | ExecuteJob | ExecuteJobRequest | ExecuteJobResponse | No |
+| ParseAxQuery | ParseAxQueryRequest | ParseAxQueryResponse | No |
 
 ### Metadata
 
@@ -103,6 +104,15 @@ ExecuteJob executes an async job Used by Pulse to route jobs to plugin-registere
 
 ---
 
+### ParseAxQuery
+
+ParseAxQuery parses an Ax query string and returns the AST as JSON. Used by kern (OCaml parser) to replace the Rust WASM parser path.
+
+- **Request**: `ParseAxQueryRequest`
+- **Response**: `ParseAxQueryResponse`
+
+---
+
 ## Message Types
 
 ### MetadataResponse
@@ -126,6 +136,7 @@ ExecuteJob executes an async job Used by Pulse to route jobs to plugin-registere
 | config | map<string, string> | Plugin-specific configuration values Simple types (string, int, bool) passed as string representations Complex types (maps, slices) JSON-encoded as strings Plugins should parse and validate values appropriate to their schema |
 | schedule_endpoint | string | schedule_endpoint: gRPC endpoint for ScheduleService Provides: Runtime schedule creation, pause, resume, delete |
 | file_service_endpoint | string | file_service_endpoint: gRPC endpoint for FileService Provides: Read stored files (for multimodal attachments) |
+| llm_endpoint | string | llm_endpoint: gRPC endpoint for LLMService Provides: Provider-agnostic LLM chat (routed through core to provider plugins) |
 
 ### HTTPRequest
 
@@ -202,6 +213,7 @@ InitializeResponse is returned by Initialize RPC
 |-------|------|-------------|
 | handler_names | string | Handler names this plugin can execute Examples: ["python.script", "python.webhook", "ixgest.git"] Empty list means plugin provides no async handlers (backward compatible) |
 | schedules | ScheduleInfo | Schedules this plugin wants QNTX to create QNTX will auto-create schedule.Job entries for these |
+| llm_provider | bool | llm_provider indicates this plugin implements LLMProvider (Chat RPC). Core registers it as an LLM backend in the service mesh. |
 
 ### ExecuteJobRequest
 
@@ -212,7 +224,6 @@ ExecuteJobRequest is sent to plugins to execute an async job
 | job_id | string | - |
 | handler_name | string | - |
 | payload | bytes | - |
-| timeout_secs | int64 | - |
 
 ### ExecuteJobResponse
 
@@ -263,5 +274,22 @@ GlyphDef defines a custom glyph type provided by a plugin
 | default_width | int32 | DefaultWidth and DefaultHeight in pixels (0 = use system default) |
 | default_height | int32 | - |
 | module_path | string | ModulePath is the HTTP path to a JS/TS module exporting a render function. When set, the frontend dynamically imports it with SDK injection, bypassing the server-rendered HTML pipeline. |
+
+### ParseAxQueryRequest
+
+ParseAxQueryRequest is sent to a parser plugin to parse an Ax query string.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| query | string | - |
+
+### ParseAxQueryResponse
+
+ParseAxQueryResponse contains the parsed result as JSON matching rustAxQuery shape.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| result | bytes | - |
+| error | string | - |
 
 [← Back to API Index](./README.md)

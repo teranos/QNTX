@@ -5,7 +5,6 @@
 
 | Method | Endpoint | Handler |
 |--------|----------|----------|
-| GET | `/.well-known/did.json` | nodeDID.HandleDIDDocument |
 | GET | `/api/attestations` | HandleCreateAttestation |
 | GET | `/api/canvas/compositions` | canvasHandler.HandleCompositions |
 | GET | `/api/canvas/compositions/` | canvasHandler.HandleCompositions |
@@ -20,6 +19,9 @@
 | GET | `/api/embeddings/cluster` | HandleEmbeddingCluster |
 | GET | `/api/embeddings/cluster-timeline` | HandleClusterTimeline |
 | GET | `/api/embeddings/clusters` | HandleEmbeddingClusters |
+| GET | `/api/embeddings/clusters/members` | HandleClusterMembers |
+| GET | `/api/embeddings/clusters/memberships` | HandleClusterMemberships |
+| GET | `/api/embeddings/clusters/samples` | HandleClusterSamples |
 | GET | `/api/embeddings/generate` | HandleEmbeddingGenerate |
 | GET | `/api/embeddings/info` | HandleEmbeddingInfo |
 | GET | `/api/embeddings/project` | HandleEmbeddingProject |
@@ -35,12 +37,6 @@
 | GET | `/api/watchers` | HandleWatchers |
 | GET | `/api/watchers/` | HandleWatchers |
 | GET | `/api/watchers/queue/stats` | HandleWatcherQueueStats |
-
----
-
-### `GET` /.well-known/did.json
-
-**Handler**: `nodeDID.HandleDIDDocument`
 
 ---
 
@@ -144,6 +140,30 @@ HandleClusterTimeline serves cluster evolution data (GET /api/embeddings/cluster
 HandleEmbeddingClusters lists stable clusters (GET /api/embeddings/clusters)
 
 **Handler**: `HandleEmbeddingClusters`
+
+---
+
+### `GET` /api/embeddings/clusters/members
+
+HandleClusterMembers returns recent attestations in a cluster (GET /api/embeddings/clusters/members)
+
+**Handler**: `HandleClusterMembers`
+
+---
+
+### `GET` /api/embeddings/clusters/memberships
+
+HandleClusterMemberships returns cluster assignments for attestation IDs (GET /api/embeddings/clusters/memberships)
+
+**Handler**: `HandleClusterMemberships`
+
+---
+
+### `GET` /api/embeddings/clusters/samples
+
+HandleClusterSamples returns sample texts from a cluster (GET /api/embeddings/clusters/samples)
+
+**Handler**: `HandleClusterSamples`
 
 ---
 
