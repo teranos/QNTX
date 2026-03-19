@@ -67,3 +67,13 @@
         opacity: 0;
     }
 }
+
+@keyframes glyphPulse {
+    0% { box-shadow: 0 0 0 0 rgba(173, 188, 193, 0.6); }
+    40% { box-shadow: 0 0 12px 4px rgba(173, 188, 193, 0.4); }
+    100% { box-shadow: 0 0 0 0 rgba(173, 188, 193, 0); }
+}
+
+.glyph-pulse {
+    animation: glyphPulse 1.2s ease-out;
+}
