@@ -9,7 +9,7 @@
 
 **Guides Read:**
 - [TypeScript Plugin Support](../development/ts-plugin.md) - Reference implementation plan
-- [External Plugin Guide](../development/external-plugin-guide.md) - gRPC protocol details
+- [ADR-001: Domain Plugin Architecture](../adr/ADR-001-domain-plugin-architecture.md) - gRPC protocol details
 
 ## Context
 
