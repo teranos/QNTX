@@ -58,7 +58,17 @@ func (s *RustBackedStore) enforceLimitsViaRust(as *types.As) {
 		return
 	}
 
-	events, err := s.rust.EnforceLimits(as.Actors, as.Contexts, as.Subjects, s.enforcementCfg)
+	actors, contexts, subjects := as.Actors, as.Contexts, as.Subjects
+	if actors == nil {
+		actors = []string{}
+	}
+	if contexts == nil {
+		contexts = []string{}
+	}
+	if subjects == nil {
+		subjects = []string{}
+	}
+	events, err := s.rust.EnforceLimits(actors, contexts, subjects, s.enforcementCfg)
 	if err != nil {
 		if s.log != nil {
 			s.log.Warnw("Rust enforcement failed", "error", err, "attestation", as.ID)
