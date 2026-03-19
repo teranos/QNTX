@@ -18,9 +18,9 @@ import (
 //
 // Run with: go test -race -run TestRace_BroadcastDuringUnregister ./server
 func TestRace_BroadcastDuringUnregister(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -96,9 +96,9 @@ func TestRace_BroadcastDuringUnregister(t *testing.T) {
 // This simulates what happens in broadcastMessage when a client
 // is unregistered mid-iteration.
 func TestRace_ConcurrentBroadcastAndChannelClose(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -150,9 +150,9 @@ func TestRace_ConcurrentBroadcastAndChannelClose(t *testing.T) {
 // TestRace_UsageBroadcastDuringClientDisconnect tests the race
 // in broadcastUsageUpdate where the lock is released before broadcast.
 func TestRace_UsageBroadcastDuringClientDisconnect(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -205,9 +205,9 @@ func TestRace_UsageBroadcastDuringClientDisconnect(t *testing.T) {
 // TestRace_GraphBroadcastToDisconnectingClients tests the graph broadcast
 // path which uses client.send channel
 func TestRace_GraphBroadcastToDisconnectingClients(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -266,9 +266,9 @@ func TestRace_GraphBroadcastToDisconnectingClients(t *testing.T) {
 // multiple goroutines try to send to client channels while
 // the client might be getting unregistered.
 func TestRace_MultipleWritersToClientChannels(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
