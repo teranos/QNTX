@@ -24,7 +24,6 @@ import {
   DaemonStatusMessage as GeneratedDaemonStatusMessage,
   JobUpdateMessage as GeneratedJobUpdateMessage,
   LLMStreamMessage as GeneratedLLMStreamMessage,
-  StorageWarningMessage as GeneratedStorageWarningMessage,
   PulseExecutionStartedMessage as GeneratedPulseExecutionStartedMessage,
   PulseExecutionFailedMessage as GeneratedPulseExecutionFailedMessage,
   PulseExecutionCompletedMessage as GeneratedPulseExecutionCompletedMessage,
@@ -132,13 +131,6 @@ export interface LLMStreamMessage extends Omit<GeneratedLLMStreamMessage, 'type'
     completion_tokens?: number;
     total_tokens?: number;
   };
-}
-
-/**
- * Storage warning (from server/types.go:StorageWarningMessage)
- */
-export interface StorageWarningMessage extends Omit<GeneratedStorageWarningMessage, 'type'> {
-  type: 'storage_warning';
 }
 
 /**
@@ -614,7 +606,6 @@ export type WebSocketMessage =
   | PulseExecutionFailedMessage
   | PulseExecutionCompletedMessage
   | PulseExecutionLogStreamMessage
-  | StorageWarningMessage
   | StorageEvictionMessage
   | PluginHealthMessage
   | SystemCapabilitiesMessage
@@ -665,7 +656,6 @@ export interface MessageHandlers {
   pulse_execution_failed?: MessageHandler<PulseExecutionFailedMessage>;
   pulse_execution_completed?: MessageHandler<PulseExecutionCompletedMessage>;
   pulse_execution_log_stream?: MessageHandler<PulseExecutionLogStreamMessage>;
-  storage_warning?: MessageHandler<StorageWarningMessage>;
   storage_eviction?: MessageHandler<StorageEvictionMessage>;
   plugin_health?: MessageHandler<PluginHealthMessage>;
   system_capabilities?: MessageHandler<SystemCapabilitiesMessage>;
