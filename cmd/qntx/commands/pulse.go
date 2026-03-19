@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
@@ -67,17 +66,11 @@ The daemon will:
 		}
 
 		// Open and migrate database
-		database, dbPath, err := openDatabase("")
+		database, atsStore, _, err := openDatabase("")
 		if err != nil {
 			return errors.Wrap(err, "failed to open pulse database")
 		}
 		defer database.Close()
-
-		// Create attestation store for Pulse handlers
-		atsStore, err := storage.NewStore(dbPath, logger.Logger)
-		if err != nil {
-			return errors.Wrap(err, "failed to create attestation store for pulse")
-		}
 
 		// Create worker pool config
 		poolCfg := async.DefaultWorkerPoolConfig()

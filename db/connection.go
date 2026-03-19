@@ -23,8 +23,8 @@ import (
 )
 
 func init() {
-	// Initialize sqlite-vec extension for vector similarity search
-	// This registers the vec0 module globally for all SQLite connections
+	// Initialize sqlite-vec extension for vector similarity search.
+	// Still needed for test helpers and graunde_bridge.go (separate DB files).
 	sqlite_vec.Auto()
 }
 

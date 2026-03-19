@@ -17,11 +17,11 @@ import (
 // createFileTestServer creates a QNTXServer with a temp directory for file storage.
 func createFileTestServer(t *testing.T) *QNTXServer {
 	t.Helper()
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "qntx.db")
 
-	srv, err := NewQNTXServer(db, dbPath, 0)
+	srv, err := NewQNTXServer(db, store, dbPath, 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}

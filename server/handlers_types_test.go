@@ -43,8 +43,11 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 	err = db.Migrate(testDB, nil)
 	require.NoError(t, err)
 
+	// Create test attestation store (uses separate in-memory DB, only needed for interface compliance)
+	testStore, _ := createTestStore(t)
+
 	// Create server instance with file-backed DB
-	srv, err := NewQNTXServer(testDB, dbPath, 0, "")
+	srv, err := NewQNTXServer(testDB, testStore, dbPath, 0, "")
 	require.NoError(t, err)
 	defer srv.Stop()
 

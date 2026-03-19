@@ -15,10 +15,10 @@ import (
 
 // TestGLSPHandlerLifecycle tests the complete LSP lifecycle: Initialize → Initialized → Shutdown
 func TestGLSPHandlerLifecycle(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -136,7 +136,7 @@ func TestGLSPHandlerLifecycle(t *testing.T) {
 
 // TestGLSPSemanticTokensWithDatabase tests semantic tokens with real database content
 func TestGLSPSemanticTokensWithDatabase(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	defer db.Close()
 
 	// Insert test attestations for "engineer" subject
@@ -165,7 +165,7 @@ func TestGLSPSemanticTokensWithDatabase(t *testing.T) {
 
 	insertTestAttestations(t, db, testAttestations)
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -274,10 +274,10 @@ func TestGLSPSemanticTokensWithDatabase(t *testing.T) {
 
 // TestGLSPConcurrentClients tests multiple LSP clients connected simultaneously
 func TestGLSPConcurrentClients(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -387,10 +387,10 @@ func TestGLSPConcurrentClients(t *testing.T) {
 
 // TestGLSPDocumentSync tests didOpen, didChange, didClose document lifecycle
 func TestGLSPDocumentSync(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -498,10 +498,10 @@ func TestGLSPDocumentSync(t *testing.T) {
 
 // TestGLSPLargeDocument tests handling of documents with 1000+ lines
 func TestGLSPLargeDocument(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -588,7 +588,7 @@ func TestGLSPLargeDocument(t *testing.T) {
 
 // TestGLSPContextCompletions tests that context completions work correctly
 func TestGLSPContextCompletions(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	defer db.Close()
 
 	// Insert attestations with contexts
@@ -637,7 +637,7 @@ func TestGLSPContextCompletions(t *testing.T) {
 
 	insertTestAttestations(t, db, testAttestations)
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -741,7 +741,7 @@ func TestGLSPContextCompletions(t *testing.T) {
 
 // TestGLSPActorCompletions tests that actor completions work correctly
 func TestGLSPActorCompletions(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	defer db.Close()
 
 	// Insert attestations with actors
@@ -790,7 +790,7 @@ func TestGLSPActorCompletions(t *testing.T) {
 
 	insertTestAttestations(t, db, testAttestations)
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
@@ -894,10 +894,10 @@ func TestGLSPActorCompletions(t *testing.T) {
 
 // TestGLSPContextActorSemanticTokens tests semantic token classification for contexts and actors
 func TestGLSPContextActorSemanticTokens(t *testing.T) {
-	db := createTestDB(t)
+	store, db := createTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create QNTXServer: %v", err)
 	}
