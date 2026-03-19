@@ -28,4 +28,4 @@ This plugin will be extracted to its own repository:
 - Binary: `qntx-code-plugin`
 - Installation: `~/.qntx/plugins/qntx-code-plugin`
 
-See [External Plugin Development Guide](../docs/development/external-plugin-guide.md)
+See [ADR-001: Domain Plugin Architecture](../docs/adr/ADR-001-domain-plugin-architecture.md)
