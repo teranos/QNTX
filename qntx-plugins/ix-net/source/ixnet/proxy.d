@@ -52,6 +52,7 @@ struct Capture {
     int outputTokens;      // from response usage
     int statusCode;        // HTTP response status
     bool streaming;        // was this a streaming response?
+    string prompt;         // user's prompt text (truncated)
 }
 
 enum MAX_CAPTURES = 256;
@@ -167,7 +168,8 @@ string getRecentCaptures(ref ProxyState state) {
                 `","input_tokens":` ~ c.inputTokens.to!string ~
                 `,"output_tokens":` ~ c.outputTokens.to!string ~
                 `,"status_code":` ~ c.statusCode.to!string ~
-                `,"streaming":` ~ (c.streaming ? "true" : "false") ~ `}`;
+                `,"streaming":` ~ (c.streaming ? "true" : "false") ~
+                `,"prompt":"` ~ jsonEscape(c.prompt) ~ `"}`;
         first = false;
     }
     json ~= `],"total":` ~ state.captureCount.to!string ~ `}`;
@@ -348,6 +350,7 @@ private void tlsRelay(ProxyState* state, ref TLSConn clientTLS,
         cap.imageCount = reqInfo.imageCount;
         cap.streaming = reqInfo.streaming || isChunked;
         cap.statusCode = statusCode;
+        cap.prompt = reqInfo.prompt;
         cap.inputTokens = respInfo.inputTokens;
         cap.outputTokens = respInfo.outputTokens;
         {

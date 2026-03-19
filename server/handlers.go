@@ -869,6 +869,10 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+		// Invalidate cached HTTP mux and sync.Once so next request
+		// re-initializes with the new gRPC connection
+		s.pluginMuxes.Delete(name)
+		s.pluginMuxInit.Delete(name)
 		s.logger.Infow("Plugin restarted", "plugin", name)
 		s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin restarted")
 
