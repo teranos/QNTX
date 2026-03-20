@@ -142,7 +142,7 @@ function mount3dView(container: HTMLElement, allPoints: Record<string, Projectio
     container.style.position = 'relative';
 
     const canvas = document.createElement('canvas');
-    canvas.style.cssText = 'width:100%;height:360px;display:block;border-radius:4px;';
+    canvas.style.cssText = 'width:100%;height:min(500px, 50vh);display:block;border-radius:4px;';
     container.appendChild(canvas);
 
     // Status overlay
@@ -345,176 +345,26 @@ export async function fetchEmbeddingsInfo(): Promise<void> {
 function renderEmbeddings(): void {
     if (!embeddingsElement) return;
 
-    // Destroy any active 3D view before replacing innerHTML
-    if (regl3d) {
-        regl3d.cleanup();
-        regl3d = null;
+    // If sections don't exist yet (e.g., restored from stash), recreate them
+    if (!sectionInfo) {
+        createSections(embeddingsElement);
     }
 
     if (!embeddingsInfo) {
-        embeddingsElement.innerHTML = '<div class="glyph-loading">Loading...</div>';
+        if (sectionInfo) sectionInfo.innerHTML = '<div class="glyph-loading">Loading...</div>';
+        if (sectionReembed) sectionReembed.innerHTML = '';
+        if (sectionCluster) sectionCluster.innerHTML = '';
+        if (sectionScatter) sectionScatter.innerHTML = '';
+        if (sectionTimeline) sectionTimeline.innerHTML = '';
         return;
     }
 
     const { available, model_name, dimensions, embedding_count, attestation_count } = embeddingsInfo;
     const unembedded = attestation_count - embedding_count;
 
-    let reembedSection = '';
-    if (available && unembedded > 0) {
-        reembedSection = `
-            <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
-                <button class="emb-reembed-btn panel-btn" style="width:100%"
-                    ${embeddingsReembedding ? 'disabled' : ''}>
-                    ${embeddingsReembedding ? 'Embedding...' : `Embed ${unembedded} unembedded attestations`}
-                </button>
-                <div class="emb-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
-            </div>
-        `;
-    }
-
-    // Cluster info section
-    const ci = embeddingsInfo.cluster_info;
-    let clusterSection = '';
-    if (available && embedding_count >= 2) {
-        let clusterRows = '';
-        if (ci && ci.n_clusters > 0) {
-            const pillColor = d3.scaleOrdinal(d3.schemeTableau10);
-            const clusterPills = Object.entries(ci.clusters)
-                .sort(([a], [b]) => Number(a) - Number(b))
-                .map(([id, count]) => {
-                    const c = pillColor(id);
-                    const label = clusterLabels.get(Number(id));
-                    const labelText = label ? ` ${escapeHtml(label)}` : '';
-                    const tooltipDefault = label ? `#${id} ${escapeHtml(label)}` : `#${id}`;
-                    return `<span class="emb-cluster-pill has-tooltip" data-cluster-id="${id}" data-tooltip="${escapeHtml(tooltipDefault)}" style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:${c}22;border:1px solid ${c}55;cursor:pointer;white-space:nowrap;font-size:11px;line-height:1.4"><span style="color:${c};font-weight:bold">#${id}</span>${labelText ? `<span style="color:#a0aec0">${labelText}</span>` : ''}<span style="color:#9ca3af">:${count}</span></span>`;
-                })
-                .join('');
-            clusterRows = `
-                <div class="glyph-row">
-                    <span class="glyph-label">Clusters:</span>
-                    <span class="glyph-value">${ci.n_clusters}</span>
-                </div>
-                <div class="glyph-row">
-                    <span class="glyph-label">Noise:</span>
-                    <span class="glyph-value">${ci.n_noise}</span>
-                </div>
-                <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${clusterPills}</div>
-            `;
-        } else {
-            clusterRows = `
-                <div class="glyph-row">
-                    <span class="glyph-label">Clusters:</span>
-                    <span class="glyph-value" style="color:#6b7280">not computed</span>
-                </div>
-            `;
-        }
-        const hc = embeddingsInfo.hdbscan_config;
-        const minCS = hc?.min_cluster_size ?? 5;
-        const ct = hc?.cluster_threshold ?? 0.5;
-        const cmt = hc?.cluster_match_threshold ?? 0.7;
-        clusterSection = `
-            <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
-                <h3 class="glyph-section-title">HDBSCAN Clustering</h3>
-                ${clusterRows}
-                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;font-size:11px;align-items:center">
-                    <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">size<input class="emb-param emb-param-min-cluster-size" type="number" min="2" max="50" step="1" value="${minCS}" style="width:36px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
-                    <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">thresh<input class="emb-param emb-param-cluster-threshold" type="number" min="0.1" max="1.0" step="0.05" value="${ct}" style="width:42px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
-                    <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">match<input class="emb-param emb-param-match-threshold" type="number" min="0.1" max="1.0" step="0.05" value="${cmt}" style="width:42px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
-                    <button class="emb-cluster-btn panel-btn" style="margin-left:auto;padding:2px 10px;font-size:11px"
-                        ${embeddingsClustering ? 'disabled' : ''}>
-                        ${embeddingsClustering ? 'Clustering...' : 'Recompute'}
-                    </button>
-                </div>
-                <div class="emb-cluster-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
-            </div>
-        `;
-    }
-
-    // Scatter section: side-by-side projections or project button
-    const methodNames = Object.keys(projectionsData);
-    const hasProjections = methodNames.some(m => projectionsData[m]?.length > 0);
-    let scatterSection = '';
-    if (available && embedding_count >= 2) {
-        if (hasProjections) {
-            const inputStyle = 'padding:2px 4px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right;-moz-appearance:textfield';
-            const methodParams: Record<string, string> = {
-                umap: `<label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">neighbors<input class="emb-param emb-param-n-neighbors" type="number" min="2" max="200" step="1" value="15" style="width:40px;${inputStyle}"></label> <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">min_dist<input class="emb-param emb-param-min-dist" type="number" min="0.0" max="1.0" step="0.05" value="0.1" style="width:42px;${inputStyle}"></label>`,
-                tsne: `<label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">perplexity<input class="emb-param emb-param-perplexity" type="number" min="5" max="100" step="5" value="30" style="width:40px;${inputStyle}"></label>`,
-            };
-            const scatterSlots = methodNames
-                .filter(m => projectionsData[m]?.length > 0)
-                .map(m => {
-                    const pts = projectionsData[m];
-                    const nClusters = new Set(pts.filter(p => p.cluster_id !== -1).map(p => p.cluster_id)).size;
-                    const params = methodParams[m] || '';
-                    return `<div style="flex:1;min-width:0">
-                        <div style="font-size:11px;color:#9ca3af;text-align:center;margin-bottom:4px">${m.toUpperCase()} (${pts.length}pts, ${nClusters}cl)</div>
-                        <div class="emb-scatter" data-method="${m}"></div>
-                        ${params ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;font-size:11px;justify-content:center">${params}</div>` : ''}
-                    </div>`;
-                }).join('');
-            const has3D = methodNames.some(m => projectionsData[m]?.some(p => p.z != null));
-            scatterSection = `
-                <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
-                    <div style="display:flex;align-items:center;justify-content:space-between">
-                        <h3 class="glyph-section-title" style="margin:0">Projections</h3>
-                        ${has3D ? `<button class="emb-3d-toggle panel-btn" style="padding:2px 10px;font-size:11px">${view3dActive ? '2D' : '3D'}</button>` : ''}
-                    </div>
-                    <div class="emb-scatter-2d" ${view3dActive ? 'style="display:none"' : ''}>
-                        <div style="display:flex;gap:6px">${scatterSlots}</div>
-                    </div>
-                    <div class="emb-scatter-3d" ${view3dActive ? '' : 'style="display:none"'}></div>
-                    <div style="display:flex;justify-content:flex-end;margin-top:6px">
-                        <button class="emb-project-btn panel-btn" style="padding:2px 10px;font-size:11px"
-                            ${embeddingsProjecting ? 'disabled' : ''}>
-                            ${embeddingsProjecting ? 'Projecting...' : 'Re-project'}
-                        </button>
-                    </div>
-                    <div class="emb-project-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
-                </div>
-            `;
-        } else {
-            scatterSection = `
-                <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
-                    <h3 class="glyph-section-title">Projections</h3>
-                    <div class="glyph-row">
-                        <span class="glyph-label">Status:</span>
-                        <span class="glyph-value" style="color:#6b7280">not computed</span>
-                    </div>
-                    <div style="display:flex;justify-content:flex-end;margin-top:6px">
-                        <button class="emb-project-btn panel-btn" style="padding:2px 10px;font-size:11px"
-                            ${embeddingsProjecting ? 'disabled' : ''}>
-                            ${embeddingsProjecting ? 'Projecting...' : 'Project'}
-                        </button>
-                    </div>
-                    <div class="emb-project-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
-                </div>
-            `;
-        }
-    }
-
-    // Timeline section: stacked area chart showing cluster evolution across runs
-    const runIDs = new Set(timelineData.map(p => p.run_id));
-    let timelineSection = '';
-    if (available && runIDs.size >= 2) {
-        timelineSection = `
-            <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
-                <h3 class="glyph-section-title">Cluster Timeline</h3>
-                <div class="emb-timeline"></div>
-            </div>
-        `;
-    } else if (available && runIDs.size === 1) {
-        timelineSection = `
-            <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
-                <h3 class="glyph-section-title">Cluster Timeline</h3>
-                <div style="font-size:12px;color:#6b7280">Need 2+ clustering runs for timeline</div>
-            </div>
-        `;
-    }
-
-    embeddingsElement.innerHTML = `
-        <style>.emb-param::-webkit-inner-spin-button,.emb-param::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.emb-param{-moz-appearance:textfield}</style>
-        <div class="glyph-content">
+    // ── Info section (always safe to replace — no user state) ──
+    if (sectionInfo) {
+        sectionInfo.innerHTML = `
             <div class="glyph-row">
                 <span class="glyph-label">Status:</span>
                 <span class="glyph-value">${available ? '<span style="color:#4ade80">Active</span>' : '<span style="color:#fbbf24">Unavailable</span>'}</span>
@@ -533,97 +383,268 @@ function renderEmbeddings(): void {
                 <span class="glyph-label">Embedded:</span>
                 <span class="glyph-value">${embedding_count} / ${attestation_count}</span>
             </div>
-            ${reembedSection}
-            ${clusterSection}
-            ${scatterSection}
-            ${timelineSection}
-        </div>
-    `;
-
-    const btn = embeddingsElement.querySelector('.emb-reembed-btn');
-    if (btn) {
-        btn.addEventListener('click', reembedAll);
+        `;
     }
 
-    const clusterBtn = embeddingsElement.querySelector('.emb-cluster-btn');
-    if (clusterBtn) {
-        clusterBtn.addEventListener('click', recluster);
+    // ── Reembed section ──
+    if (sectionReembed) {
+        if (available && unembedded > 0) {
+            sectionReembed.innerHTML = `
+                <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
+                    <button class="emb-reembed-btn panel-btn" style="width:100%"
+                        ${embeddingsReembedding ? 'disabled' : ''}>
+                        ${embeddingsReembedding ? 'Embedding...' : `Embed ${unembedded} unembedded attestations`}
+                    </button>
+                    <div class="emb-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
+                </div>
+            `;
+            sectionReembed.querySelector('.emb-reembed-btn')?.addEventListener('click', reembedAll);
+        } else {
+            sectionReembed.innerHTML = '';
+        }
     }
 
-    const projectBtn = embeddingsElement.querySelector('.emb-project-btn');
-    if (projectBtn) {
-        projectBtn.addEventListener('click', projectAll);
+    // ── Cluster section — preserve parameter inputs if they exist ──
+    if (sectionCluster) {
+        // Read current param values before replacing (preserves user edits)
+        const prevMinCS = (sectionCluster.querySelector('.emb-param-min-cluster-size') as HTMLInputElement)?.value;
+        const prevCT = (sectionCluster.querySelector('.emb-param-cluster-threshold') as HTMLInputElement)?.value;
+        const prevCMT = (sectionCluster.querySelector('.emb-param-match-threshold') as HTMLInputElement)?.value;
+
+        const ci = embeddingsInfo.cluster_info;
+        if (available && embedding_count >= 2) {
+            let clusterRows = '';
+            if (ci && ci.n_clusters > 0) {
+                const pillColor = d3.scaleOrdinal(d3.schemeTableau10);
+                const clusterPills = Object.entries(ci.clusters)
+                    .sort(([a], [b]) => Number(a) - Number(b))
+                    .map(([id, count]) => {
+                        const c = pillColor(id);
+                        const label = clusterLabels.get(Number(id));
+                        const labelText = label ? ` ${escapeHtml(label)}` : '';
+                        const tooltipDefault = label ? `#${id} ${escapeHtml(label)}` : `#${id}`;
+                        return `<span class="emb-cluster-pill has-tooltip" data-cluster-id="${id}" data-tooltip="${escapeHtml(tooltipDefault)}" style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:${c}22;border:1px solid ${c}55;cursor:pointer;white-space:nowrap;font-size:11px;line-height:1.4"><span style="color:${c};font-weight:bold">#${id}</span>${labelText ? `<span style="color:#a0aec0">${labelText}</span>` : ''}<span style="color:#9ca3af">:${count}</span></span>`;
+                    })
+                    .join('');
+                clusterRows = `
+                    <div class="glyph-row">
+                        <span class="glyph-label">Clusters:</span>
+                        <span class="glyph-value">${ci.n_clusters}</span>
+                    </div>
+                    <div class="glyph-row">
+                        <span class="glyph-label">Noise:</span>
+                        <span class="glyph-value">${ci.n_noise}</span>
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${clusterPills}</div>
+                `;
+            } else {
+                clusterRows = `
+                    <div class="glyph-row">
+                        <span class="glyph-label">Clusters:</span>
+                        <span class="glyph-value" style="color:#6b7280">not computed</span>
+                    </div>
+                `;
+            }
+            const hc = embeddingsInfo.hdbscan_config;
+            const minCS = prevMinCS ?? String(hc?.min_cluster_size ?? 5);
+            const ct = prevCT ?? String(hc?.cluster_threshold ?? 0.5);
+            const cmt = prevCMT ?? String(hc?.cluster_match_threshold ?? 0.7);
+            sectionCluster.innerHTML = `
+                <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
+                    <h3 class="glyph-section-title">HDBSCAN Clustering</h3>
+                    ${clusterRows}
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;font-size:11px;align-items:center">
+                        <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">size<input class="emb-param emb-param-min-cluster-size" type="number" min="2" max="50" step="1" value="${minCS}" style="width:36px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
+                        <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">thresh<input class="emb-param emb-param-cluster-threshold" type="number" min="0.1" max="1.0" step="0.05" value="${ct}" style="width:42px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
+                        <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">match<input class="emb-param emb-param-match-threshold" type="number" min="0.1" max="1.0" step="0.05" value="${cmt}" style="width:42px;padding:1px 3px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right"></label>
+                        <button class="emb-cluster-btn panel-btn" style="margin-left:auto;padding:2px 10px;font-size:11px"
+                            ${embeddingsClustering ? 'disabled' : ''}>
+                            ${embeddingsClustering ? 'Clustering...' : 'Recompute'}
+                        </button>
+                    </div>
+                    <div class="emb-cluster-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
+                </div>
+            `;
+            sectionCluster.querySelector('.emb-cluster-btn')?.addEventListener('click', recluster);
+
+            // Cluster pill tooltips and click handlers
+            tooltip.attach(sectionCluster, '.emb-cluster-pill');
+            sectionCluster.querySelectorAll('.emb-cluster-pill').forEach(pill => {
+                const el = pill as HTMLElement;
+                const cid = Number(el.dataset.clusterId);
+                el.addEventListener('mouseenter', async () => {
+                    if (clusterSamplesCache.has(cid)) return;
+                    try {
+                        const resp = await apiFetch(`/api/embeddings/clusters/samples?cluster_id=${cid}&size=5`);
+                        if (!resp.ok) return;
+                        const data = await resp.json();
+                        const samples = data.samples as string[];
+                        clusterSamplesCache.set(cid, samples);
+                        const label = clusterLabels.get(cid);
+                        const header = label ? `#${cid} ${label}` : `#${cid}`;
+                        el.dataset.tooltip = header + '\n' + samples.map((s, i) => `${i + 1}. ${s}`).join('\n');
+                    } catch { /* ignore */ }
+                }, { once: true });
+                el.addEventListener('click', () => renderClusterDetail(cid));
+            });
+        } else {
+            sectionCluster.innerHTML = '';
+        }
     }
 
-    // 3D toggle
-    const toggle3dBtn = embeddingsElement.querySelector('.emb-3d-toggle');
-    if (toggle3dBtn) {
-        toggle3dBtn.addEventListener('click', () => {
-            view3dActive = !view3dActive;
-            const el2d = embeddingsElement?.querySelector('.emb-scatter-2d') as HTMLElement | null;
-            const el3d = embeddingsElement?.querySelector('.emb-scatter-3d') as HTMLElement | null;
-            if (view3dActive) {
-                if (el2d) el2d.style.display = 'none';
+    // ── Scatter section — preserve 3D viewer if active ──
+    if (sectionScatter) {
+        const methodNames = Object.keys(projectionsData);
+        const hasProjections = methodNames.some(m => projectionsData[m]?.length > 0);
+
+        if (available && embedding_count >= 2) {
+            // If 3D is active, just update buffers instead of destroying
+            if (view3dActive && regl3d) {
+                // 3D viewer is still alive — don't touch scatter section DOM
+                // Just update the project button state
+                const projectBtn = sectionScatter.querySelector('.emb-project-btn') as HTMLButtonElement | null;
+                if (projectBtn) {
+                    projectBtn.disabled = embeddingsProjecting;
+                    projectBtn.textContent = embeddingsProjecting ? 'Projecting...' : 'Re-project';
+                }
+            } else if (hasProjections) {
+                // Destroy 3D if switching back to 2D
+                if (regl3d) { regl3d.cleanup(); regl3d = null; }
+
+                const inputStyle = 'padding:2px 4px;background:var(--input-bg, #1a1a2e);border:1px solid var(--border-color, #333);color:var(--text-color, #e0e0e0);border-radius:3px;font-size:11px;text-align:right;-moz-appearance:textfield';
+
+                // Read current projection param values before replacing
+                const prevNeighbors = (sectionScatter.querySelector('.emb-param-n-neighbors') as HTMLInputElement)?.value;
+                const prevMinDist = (sectionScatter.querySelector('.emb-param-min-dist') as HTMLInputElement)?.value;
+                const prevPerplexity = (sectionScatter.querySelector('.emb-param-perplexity') as HTMLInputElement)?.value;
+
+                const methodParams: Record<string, string> = {
+                    umap: `<label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">neighbors<input class="emb-param emb-param-n-neighbors" type="number" min="2" max="200" step="1" value="${prevNeighbors ?? '15'}" style="width:40px;${inputStyle}"></label> <label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">min_dist<input class="emb-param emb-param-min-dist" type="number" min="0.0" max="1.0" step="0.05" value="${prevMinDist ?? '0.1'}" style="width:42px;${inputStyle}"></label>`,
+                    tsne: `<label style="color:#9ca3af;display:inline-flex;align-items:center;gap:3px">perplexity<input class="emb-param emb-param-perplexity" type="number" min="5" max="100" step="5" value="${prevPerplexity ?? '30'}" style="width:40px;${inputStyle}"></label>`,
+                };
+                const scatterSlots = methodNames
+                    .filter(m => projectionsData[m]?.length > 0)
+                    .map(m => {
+                        const pts = projectionsData[m];
+                        const nClusters = new Set(pts.filter(p => p.cluster_id !== -1).map(p => p.cluster_id)).size;
+                        const params = methodParams[m] || '';
+                        return `<div style="flex:1;min-width:0">
+                            <div style="font-size:11px;color:#9ca3af;text-align:center;margin-bottom:4px">${m.toUpperCase()} (${pts.length}pts, ${nClusters}cl)</div>
+                            <div class="emb-scatter" data-method="${m}"></div>
+                            ${params ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;font-size:11px;justify-content:center">${params}</div>` : ''}
+                        </div>`;
+                    }).join('');
+                const has3D = methodNames.some(m => projectionsData[m]?.some(p => p.z != null));
+                sectionScatter.innerHTML = `
+                    <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
+                        <div style="display:flex;align-items:center;justify-content:space-between">
+                            <h3 class="glyph-section-title" style="margin:0">Projections</h3>
+                            ${has3D ? `<button class="emb-3d-toggle panel-btn" style="padding:2px 10px;font-size:11px">${view3dActive ? '2D' : '3D'}</button>` : ''}
+                        </div>
+                        <div class="emb-scatter-2d" ${view3dActive ? 'style="display:none"' : ''}>
+                            <div style="display:flex;gap:6px">${scatterSlots}</div>
+                        </div>
+                        <div class="emb-scatter-3d" ${view3dActive ? '' : 'style="display:none"'}></div>
+                        <div style="display:flex;justify-content:flex-end;margin-top:6px">
+                            <button class="emb-project-btn panel-btn" style="padding:2px 10px;font-size:11px"
+                                ${embeddingsProjecting ? 'disabled' : ''}>
+                                ${embeddingsProjecting ? 'Projecting...' : 'Re-project'}
+                            </button>
+                        </div>
+                        <div class="emb-project-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
+                    </div>
+                `;
+
+                // Wire up scatter plots with responsive sizing
+                sectionScatter.querySelectorAll('.emb-scatter[data-method]').forEach(el => {
+                    const container = el as HTMLElement;
+                    const method = container.dataset.method!;
+                    const data = projectionsData[method];
+                    if (data?.length > 0) {
+                        renderScatter(container, data);
+                    }
+                });
+            } else {
+                sectionScatter.innerHTML = `
+                    <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
+                        <h3 class="glyph-section-title">Projections</h3>
+                        <div class="glyph-row">
+                            <span class="glyph-label">Status:</span>
+                            <span class="glyph-value" style="color:#6b7280">not computed</span>
+                        </div>
+                        <div style="display:flex;justify-content:flex-end;margin-top:6px">
+                            <button class="emb-project-btn panel-btn" style="padding:2px 10px;font-size:11px"
+                                ${embeddingsProjecting ? 'disabled' : ''}>
+                                ${embeddingsProjecting ? 'Projecting...' : 'Project'}
+                            </button>
+                        </div>
+                        <div class="emb-project-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
+                    </div>
+                `;
+            }
+
+            // Wire up project button and 3D toggle (both paths)
+            sectionScatter.querySelector('.emb-project-btn')?.addEventListener('click', projectAll);
+
+            const toggle3dBtn = sectionScatter.querySelector('.emb-3d-toggle');
+            if (toggle3dBtn) {
+                toggle3dBtn.addEventListener('click', () => {
+                    view3dActive = !view3dActive;
+                    const el2d = sectionScatter?.querySelector('.emb-scatter-2d') as HTMLElement | null;
+                    const el3d = sectionScatter?.querySelector('.emb-scatter-3d') as HTMLElement | null;
+                    if (view3dActive) {
+                        if (el2d) el2d.style.display = 'none';
+                        if (el3d) {
+                            el3d.style.display = '';
+                            mount3dView(el3d, projectionsData);
+                        }
+                        toggle3dBtn.textContent = '2D';
+                    } else {
+                        destroy3dView();
+                        if (el2d) el2d.style.display = '';
+                        if (el3d) el3d.style.display = 'none';
+                        toggle3dBtn.textContent = '3D';
+                    }
+                });
+            }
+
+            // If 3D was active, remount
+            if (view3dActive && !regl3d) {
+                const el3d = sectionScatter.querySelector('.emb-scatter-3d') as HTMLElement | null;
                 if (el3d) {
                     el3d.style.display = '';
                     mount3dView(el3d, projectionsData);
                 }
-                toggle3dBtn.textContent = '2D';
-            } else {
-                destroy3dView();
-                if (el2d) el2d.style.display = '';
-                if (el3d) el3d.style.display = 'none';
-                toggle3dBtn.textContent = '3D';
             }
-        });
-    }
-
-    // If 3D was active before re-render, remount it
-    if (view3dActive) {
-        const el3d = embeddingsElement.querySelector('.emb-scatter-3d') as HTMLElement | null;
-        if (el3d) {
-            el3d.style.display = '';
-            mount3dView(el3d, projectionsData);
+        } else {
+            sectionScatter.innerHTML = '';
         }
     }
 
-    // Cluster pill hover tooltips — lazy-fetch sample texts on first hover
-    tooltip.attach(embeddingsElement, '.emb-cluster-pill');
-    embeddingsElement.querySelectorAll('.emb-cluster-pill').forEach(pill => {
-        const el = pill as HTMLElement;
-        const cid = Number(el.dataset.clusterId);
-        el.addEventListener('mouseenter', async () => {
-            if (clusterSamplesCache.has(cid)) return;
-            try {
-                const resp = await apiFetch(`/api/embeddings/clusters/samples?cluster_id=${cid}&size=5`);
-                if (!resp.ok) return;
-                const data = await resp.json();
-                const samples = data.samples as string[];
-                clusterSamplesCache.set(cid, samples);
-                const label = clusterLabels.get(cid);
-                const header = label ? `#${cid} ${label}` : `#${cid}`;
-                el.dataset.tooltip = header + '\n' + samples.map((s, i) => `${i + 1}. ${s}`).join('\n');
-            } catch { /* ignore */ }
-        }, { once: true });
-
-        // Click → drill-down into cluster detail view
-        el.addEventListener('click', () => {
-            renderClusterDetail(cid);
-        });
-    });
-
-    embeddingsElement.querySelectorAll('.emb-scatter[data-method]').forEach(el => {
-        const container = el as HTMLElement;
-        const method = container.dataset.method!;
-        const data = projectionsData[method];
-        if (data?.length > 0) {
-            renderScatter(container, data);
+    // ── Timeline section ──
+    if (sectionTimeline) {
+        const runIDs = new Set(timelineData.map(p => p.run_id));
+        if (available && runIDs.size >= 2) {
+            sectionTimeline.innerHTML = `
+                <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
+                    <h3 class="glyph-section-title">Cluster Timeline</h3>
+                    <div class="emb-timeline"></div>
+                </div>
+            `;
+            const timelineContainer = sectionTimeline.querySelector('.emb-timeline') as HTMLElement | null;
+            if (timelineContainer && timelineData.length > 0) {
+                renderTimeline(timelineContainer, timelineData);
+            }
+        } else if (available && runIDs.size === 1) {
+            sectionTimeline.innerHTML = `
+                <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
+                    <h3 class="glyph-section-title">Cluster Timeline</h3>
+                    <div style="font-size:12px;color:#6b7280">Need 2+ clustering runs for timeline</div>
+                </div>
+            `;
+        } else {
+            sectionTimeline.innerHTML = '';
         }
-    });
-
-    const timelineContainer = embeddingsElement.querySelector('.emb-timeline') as HTMLElement | null;
-    if (timelineContainer && timelineData.length > 0) {
-        renderTimeline(timelineContainer, timelineData);
     }
 }
 
@@ -657,8 +678,16 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
     const prevID = idx > 0 ? clusterIDs[idx - 1] : null;
     const nextID = idx < clusterIDs.length - 1 ? clusterIDs[idx + 1] : null;
 
-    embeddingsElement.innerHTML = `
-        <div class="glyph-content">
+    // Hide main sections, show detail view
+    const mainContent = embeddingsElement.querySelector('.glyph-content') as HTMLElement | null;
+    if (mainContent) mainContent.style.display = 'none';
+
+    // Remove any existing detail container
+    embeddingsElement.querySelector('.emb-detail-view')?.remove();
+
+    const detailView = document.createElement('div');
+    detailView.className = 'emb-detail-view glyph-content';
+    detailView.innerHTML = `
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
                 <button class="emb-back-btn panel-btn" style="padding:2px 10px;font-size:12px">\u2190 Back</button>
                 ${prevID !== null ? `<button class="emb-prev-btn panel-btn" style="padding:2px 8px;font-size:12px">\u2190</button>` : ''}
@@ -680,29 +709,29 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
 
             <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
                 <h3 class="glyph-section-title">Recent Attestations</h3>
-                <div class="emb-detail-members" style="max-height:300px;overflow-y:auto">
+                <div class="emb-detail-members" style="overflow-y:auto">
                     <div class="glyph-loading">Loading...</div>
                 </div>
             </div>
-        </div>
-    `;
+    embeddingsElement.appendChild(detailView);
 
-    // Back button
+    // Back button — restore main sections view
     const cleanupAndBack = () => {
         if (clusterDetailKeyHandler) {
             document.removeEventListener('keydown', clusterDetailKeyHandler);
             clusterDetailKeyHandler = null;
         }
-        renderEmbeddings();
+        detailView.remove();
+        if (mainContent) mainContent.style.display = '';
     };
-    embeddingsElement.querySelector('.emb-back-btn')?.addEventListener('click', cleanupAndBack);
+    detailView.querySelector('.emb-back-btn')?.addEventListener('click', cleanupAndBack);
 
     // Prev/next navigation
     if (prevID !== null) {
-        embeddingsElement.querySelector('.emb-prev-btn')?.addEventListener('click', () => renderClusterDetail(prevID));
+        detailView.querySelector('.emb-prev-btn')?.addEventListener('click', () => renderClusterDetail(prevID));
     }
     if (nextID !== null) {
-        embeddingsElement.querySelector('.emb-next-btn')?.addEventListener('click', () => renderClusterDetail(nextID));
+        detailView.querySelector('.emb-next-btn')?.addEventListener('click', () => renderClusterDetail(nextID));
     }
 
     // Keyboard navigation: left/right arrows, Escape to go back
@@ -718,7 +747,7 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
     document.addEventListener('keydown', clusterDetailKeyHandler);
 
     // Projection scatter — highlight this cluster, dim rest
-    const scatterContainer = embeddingsElement.querySelector('.emb-detail-scatters') as HTMLElement;
+    const scatterContainer = detailView.querySelector('.emb-detail-scatters') as HTMLElement;
     if (scatterContainer) {
         for (const method of Object.keys(projectionsData)) {
             const pts = projectionsData[method];
@@ -741,7 +770,7 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
     }
 
     // Fetch member attestations
-    const membersContainer = embeddingsElement.querySelector('.emb-detail-members') as HTMLElement;
+    const membersContainer = detailView.querySelector('.emb-detail-members') as HTMLElement;
     try {
         const resp = await apiFetch(`/api/embeddings/clusters/members?cluster_id=${clusterID}&limit=20`);
         if (resp.ok) {
@@ -795,7 +824,7 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
     } catch { membersContainer.textContent = 'Failed to load'; }
 
     // Cluster history — filter timeline data for this cluster
-    const tlContainer = embeddingsElement.querySelector('.emb-detail-timeline') as HTMLElement;
+    const tlContainer = detailView.querySelector('.emb-detail-timeline') as HTMLElement;
     const clusterTimeline = timelineData.filter(p => p.cluster_id === clusterID);
     if (clusterTimeline.length >= 2) {
         renderClusterHistoryChart(tlContainer, clusterTimeline);
@@ -811,8 +840,8 @@ function openAttestationWindow(attestation: any): void {
 }
 
 function renderScatterHighlighted(container: HTMLElement, data: ProjectionPoint[], highlightCluster: number): void {
-    const width = 280;
-    const height = 220;
+    const width = Math.max(280, container.clientWidth || 280);
+    const height = Math.max(220, Math.round(width * 0.78));
     const pad = 12;
 
     const svg = d3.select(container)
@@ -991,8 +1020,8 @@ async function recluster(): Promise<void> {
 }
 
 function renderScatter(container: HTMLElement, data: ProjectionPoint[]): void {
-    const width = 155;
-    const height = 180;
+    const width = Math.max(155, container.clientWidth || 155);
+    const height = Math.max(180, Math.round(width * 1.1));
     const pad = 8;
 
     const svg = d3.select(container)
@@ -1244,6 +1273,45 @@ async function projectAll(): Promise<void> {
     }
 }
 
+// ── Stable section containers ──
+// Created once, updated in-place. Never destroyed by re-render.
+let sectionInfo: HTMLElement | null = null;
+let sectionReembed: HTMLElement | null = null;
+let sectionCluster: HTMLElement | null = null;
+let sectionScatter: HTMLElement | null = null;
+let sectionTimeline: HTMLElement | null = null;
+
+function createSections(root: HTMLElement): void {
+    root.innerHTML = '';
+    const content = document.createElement('div');
+    content.className = 'glyph-content';
+    content.style.display = 'flex';
+    content.style.flexDirection = 'column';
+    content.style.gap = '0';
+
+    sectionInfo = document.createElement('div');
+    sectionInfo.className = 'emb-section-info';
+
+    sectionReembed = document.createElement('div');
+    sectionReembed.className = 'emb-section-reembed';
+
+    sectionCluster = document.createElement('div');
+    sectionCluster.className = 'emb-section-cluster';
+
+    sectionScatter = document.createElement('div');
+    sectionScatter.className = 'emb-section-scatter';
+
+    sectionTimeline = document.createElement('div');
+    sectionTimeline.className = 'emb-section-timeline';
+
+    content.appendChild(sectionInfo);
+    content.appendChild(sectionReembed);
+    content.appendChild(sectionCluster);
+    content.appendChild(sectionScatter);
+    content.appendChild(sectionTimeline);
+    root.appendChild(content);
+}
+
 export function createEmbeddingsGlyph() {
     return {
         id: 'embeddings-glyph',
@@ -1252,6 +1320,7 @@ export function createEmbeddingsGlyph() {
         renderContent: () => {
             const content = document.createElement('div');
             embeddingsElement = content;
+            createSections(content);
             fetchEmbeddingsInfo();
             return content;
         },
