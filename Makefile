@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin sentry-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -313,6 +313,11 @@ kern-plugin: ## Build, install, and restart kern plugin (OCaml Ax parser)
 	$(call check-plugin-version,qntx-plugins/kern,ml,qntx-plugins/kern/lib/version.ml)
 	@$(MAKE) -C qntx-plugins/kern install PREFIX=$(PREFIX)
 	$(call restart-plugin,kern)
+
+sentry-plugin: ## Build, install, and restart sentry plugin (Erlang/OTP supervisor)
+	$(call check-plugin-version,qntx-plugins/sentry,erl,qntx-plugins/sentry/src/sentry_plugin.erl)
+	@$(MAKE) -C qntx-plugins/sentry install PREFIX=$(PREFIX)
+	$(call restart-plugin,sentry)
 
 rust-vidstream: ## Build Rust vidstream library with ONNX support (for CGO integration)
 	@echo "Building Rust vidstream library with ONNX..."

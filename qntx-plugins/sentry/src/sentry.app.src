@@ -1,0 +1,9 @@
+{application, sentry,
+ [{description, "QNTX process supervisor plugin — OTP supervision for plugin health"},
+  {vsn, "0.1.0"},
+  {registered, [sentry_sup, sentry_monitor]},
+  {mod, {sentry_app, []}},
+  {applications, [kernel, stdlib]},
+  {modules, [sentry_app, sentry_sup, sentry_monitor, sentry_plugin,
+             sentry_h2, sentry_hpack, sentry_proto, sentry_main]}
+ ]}.
