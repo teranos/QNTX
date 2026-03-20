@@ -1,7 +1,7 @@
 # ADR-013: Rust as Sole SQLite Owner
 
 Date: 2026-03-18
-Status: Accepted
+Status: Implemented
 
 ## Context
 
