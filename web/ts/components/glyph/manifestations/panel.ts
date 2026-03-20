@@ -1,11 +1,16 @@
 /**
- * Panel Manifestation - Full-width slide-in panel with overlay
+ * Panel Manifestation - Full-width resizable workspace panel
  *
  * A glyph with manifestationType 'panel' morphs from its tray dot into
- * a full-width slide-in panel, emerging from the OPPOSITE edge of the
+ * a full-width panel, emerging from the OPPOSITE edge of the
  * system drawer (#system-drawer):
  * - Desktop: system drawer at bottom -> panel slides from top
  * - Mobile: system drawer flips to top -> panel slides from bottom
+ *
+ * The panel is the primary interaction surface for sustained work.
+ * It opens at full viewport height, can be resized by dragging the
+ * bottom edge, and snaps to fullscreen when dragged past 90% height.
+ * No overlay — the panel is a workspace, not a modal.
  *
  * Same single DOM element axiom as window.ts — the glyph element itself
  * becomes the panel, no cloning.
@@ -31,6 +36,12 @@ import {
 // Type-safe element state — avoids `as any` on DOM elements
 const escapeHandlers = new WeakMap<HTMLElement, (e: KeyboardEvent) => void>();
 const minimizing = new WeakSet<HTMLElement>();
+const resizeCleanups = new WeakMap<HTMLElement, () => void>();
+
+/** Fraction of viewport height at which panel snaps to fullscreen */
+const FULLSCREEN_SNAP_THRESHOLD = 0.9;
+/** Minimum panel height as fraction of viewport */
+const MIN_PANEL_HEIGHT_FRACTION = 0.3;
 
 /**
  * Detect whether panel should slide from top or bottom.
@@ -48,7 +59,91 @@ function detectSlideDirection(): 'from-top' | 'from-bottom' {
 }
 
 /**
- * Morph a glyph to a full-width panel with overlay
+ * Attach a resize handle to the panel's bottom (from-top) or top (from-bottom) edge.
+ * Dragging adjusts panel height. Snaps to fullscreen past 90% viewport height.
+ * Returns a cleanup function.
+ */
+function attachResizeHandle(
+    panelElement: HTMLElement,
+    direction: 'from-top' | 'from-bottom'
+): () => void {
+    const handle = document.createElement('div');
+    handle.className = direction === 'from-top'
+        ? 'glyph-panel-resize-handle glyph-panel-resize-handle--bottom'
+        : 'glyph-panel-resize-handle glyph-panel-resize-handle--top';
+    panelElement.appendChild(handle);
+
+    const controller = new AbortController();
+    let isDragging = false;
+    let startY = 0;
+    let startHeight = 0;
+    let dragController: AbortController | null = null;
+
+    const onMouseMove = (e: MouseEvent) => {
+        if (!isDragging) return;
+
+        const delta = direction === 'from-top'
+            ? e.clientY - startY    // Dragging bottom edge down = taller
+            : startY - e.clientY;   // Dragging top edge up = taller
+
+        let newHeight = startHeight + delta;
+        const vh = window.innerHeight;
+        const minHeight = Math.round(vh * MIN_PANEL_HEIGHT_FRACTION);
+
+        newHeight = Math.max(minHeight, Math.min(vh, newHeight));
+
+        // Snap to fullscreen
+        const isFullscreen = newHeight / vh >= FULLSCREEN_SNAP_THRESHOLD;
+        if (isFullscreen) {
+            newHeight = vh;
+        }
+
+        panelElement.style.height = `${newHeight}px`;
+        panelElement.classList.toggle('glyph-panel--fullscreen', isFullscreen);
+
+        // For from-bottom panels, also adjust top position
+        if (direction === 'from-bottom') {
+            panelElement.style.top = `${vh - newHeight}px`;
+        }
+    };
+
+    const onMouseUp = () => {
+        if (!isDragging) return;
+        isDragging = false;
+        panelElement.classList.remove('glyph-panel--resizing');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        dragController?.abort();
+        dragController = null;
+
+        log.debug(SEG.GLYPH, `[Panel] Resized to ${panelElement.offsetHeight}px`);
+    };
+
+    handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isDragging = true;
+        startY = e.clientY;
+        startHeight = panelElement.offsetHeight;
+
+        panelElement.classList.add('glyph-panel--resizing');
+        document.body.style.cursor = direction === 'from-top' ? 'ns-resize' : 'ns-resize';
+        document.body.style.userSelect = 'none';
+
+        dragController = new AbortController();
+        document.addEventListener('mousemove', onMouseMove, { signal: dragController.signal });
+        document.addEventListener('mouseup', onMouseUp, { signal: dragController.signal });
+    }, { signal: controller.signal });
+
+    return () => {
+        controller.abort();
+        dragController?.abort();
+        handle.remove();
+    };
+}
+
+/**
+ * Morph a glyph to a full-width panel (no overlay)
  */
 export function morphToPanel(
     glyphElement: HTMLElement,
@@ -61,29 +156,13 @@ export function morphToPanel(
 
     const direction = detectSlideDirection();
 
-    // Panel dimensions: full viewport width, 70% height
+    // Panel dimensions: full viewport width, full viewport height
     const panelWidth = window.innerWidth;
-    const panelHeight = Math.round(window.innerHeight * 0.7);
+    const panelHeight = window.innerHeight;
 
     // Target position based on slide direction
     const targetX = 0;
     const targetY = direction === 'from-top' ? 0 : window.innerHeight - panelHeight;
-
-    // Create overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'glyph-panel-overlay';
-    overlay.dataset.forGlyph = glyph.id;
-    document.body.appendChild(overlay);
-    // Fade in overlay
-    requestAnimationFrame(() => overlay.classList.add('glyph-panel-overlay--visible'));
-
-    // Close on overlay click
-    overlay.addEventListener('click', () => morphFromPanel(
-        glyphElement,
-        glyph,
-        verifyElement,
-        onMinimize
-    ));
 
     // Close on Escape
     const escapeHandler = (e: KeyboardEvent) => {
@@ -104,7 +183,7 @@ export function morphToPanel(
         log.debug(SEG.GLYPH, `[Panel] Animation committed for ${glyph.id}`);
 
         const directionClass = direction === 'from-top' ? 'glyph-panel--from-top' : 'glyph-panel--from-bottom';
-        glyphElement.className = `glyph-panel ${directionClass}`;
+        glyphElement.className = `glyph-panel glyph-panel--fullscreen ${directionClass}`;
         glyphElement.style.cssText = '';
         glyphElement.style.position = 'fixed';
         glyphElement.style.left = `${targetX}px`;
@@ -120,12 +199,12 @@ export function morphToPanel(
         addWindowControls(titleBar, {
             onMinimize: () => morphFromPanel(glyphElement, glyph, verifyElement, onMinimize),
             onClose: glyph.onClose ? () => {
-                removeOverlay(glyph.id);
                 const handler = escapeHandlers.get(glyphElement);
                 if (handler) {
                     document.removeEventListener('keydown', handler);
                     escapeHandlers.delete(glyphElement);
                 }
+                cleanupResize(glyphElement);
                 onRemove(glyph.id);
                 glyphElement.remove();
                 try { glyph.onClose!(); } catch (error) {
@@ -133,9 +212,12 @@ export function morphToPanel(
                 }
             } : undefined,
         });
+
+        // Attach resize handle
+        const cleanupFn = attachResizeHandle(glyphElement, direction);
+        resizeCleanups.set(glyphElement, cleanupFn);
     }).catch(error => {
         log.warn(SEG.GLYPH, `[Panel] Animation failed for ${glyph.id}:`, error);
-        removeOverlay(glyph.id);
         const handler = escapeHandlers.get(glyphElement);
         if (handler) {
             document.removeEventListener('keydown', handler);
@@ -151,6 +233,15 @@ export function morphToPanel(
     });
 }
 
+/** Clean up resize handler for a panel element */
+function cleanupResize(element: HTMLElement): void {
+    const cleanup = resizeCleanups.get(element);
+    if (cleanup) {
+        cleanup();
+        resizeCleanups.delete(element);
+    }
+}
+
 /**
  * Morph a panel back into a glyph (dot)
  */
@@ -160,7 +251,7 @@ export function morphFromPanel(
     verifyElement: (id: string, element: HTMLElement) => void,
     onMorphComplete: (element: HTMLElement, glyph: Glyph) => void
 ): void {
-    // Re-entrance guard: overlay click + Escape can fire in quick succession
+    // Re-entrance guard: Escape can fire in quick succession
     if (minimizing.has(panelElement)) return;
     minimizing.add(panelElement);
 
@@ -176,8 +267,8 @@ export function morphFromPanel(
         escapeHandlers.delete(panelElement);
     }
 
-    // Fade out overlay
-    removeOverlay(glyph.id);
+    // Clean up resize handle
+    cleanupResize(panelElement);
 
     // Stash content (strips window controls, preserves glyph identity off-DOM)
     stashContent(panelElement);
@@ -193,16 +284,4 @@ export function morphFromPanel(
             log.warn(SEG.GLYPH, `[Panel] Animation failed for ${glyph.id}:`, error);
             minimizing.delete(panelElement);
         });
-}
-
-/**
- * Remove the overlay for a given glyph
- */
-function removeOverlay(glyphId: string): void {
-    const overlay = document.querySelector(`.glyph-panel-overlay[data-for-glyph="${glyphId}"]`);
-    if (overlay) {
-        overlay.classList.remove('glyph-panel-overlay--visible');
-        // Remove after fade-out transition
-        setTimeout(() => overlay.remove(), 200);
-    }
 }

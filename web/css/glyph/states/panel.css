@@ -1,9 +1,12 @@
 /**
- * Glyph Panel State - Full-width slide-in panel
+ * Glyph Panel State - Full-width resizable workspace panel
  *
  * Panel slides from the opposite edge of the system drawer:
  * - Desktop (drawer at bottom): panel from top
  * - Mobile (drawer at top): panel from bottom
+ *
+ * Opens at full viewport height. Resizable via edge drag handle.
+ * Snaps to fullscreen when dragged past 90% viewport height.
  */
 
 /* Panel container - full width, fixed position */
@@ -32,21 +35,44 @@
     border-radius: 12px 12px 0 0;
 }
 
-/* Panel title bar cursor override now in /css/glyph/title-bar.css */
-
-/* Semi-transparent overlay backdrop */
-.glyph-panel-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0);
-    z-index: 10002;
-    transition: background 200ms ease;
-    pointer-events: auto;
+/* Fullscreen: no border radius */
+.glyph-panel--fullscreen {
+    border-radius: 0;
 }
 
-.glyph-panel-overlay--visible {
-    background: rgba(0, 0, 0, 0.4);
+/* Panel title bar cursor override now in /css/glyph/title-bar.css */
+
+/* ── Resize handle ── */
+
+/* Invisible drag zone on the panel edge for resizing */
+.glyph-panel-resize-handle {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 6px;
+    cursor: ns-resize;
+    z-index: 1;
+    /* Subtle visual hint on hover */
+    background: transparent;
+    transition: background 150ms ease;
+}
+
+.glyph-panel-resize-handle:hover,
+.glyph-panel--resizing .glyph-panel-resize-handle {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* Bottom handle: for panels sliding from top */
+.glyph-panel-resize-handle--bottom {
+    bottom: 0;
+}
+
+/* Top handle: for panels sliding from bottom */
+.glyph-panel-resize-handle--top {
+    top: 0;
+}
+
+/* During resize, prevent pointer events on content so mouse tracking is smooth */
+.glyph-panel--resizing .glyph-content-area {
+    pointer-events: none;
 }
