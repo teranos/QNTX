@@ -11,9 +11,9 @@ import (
 
 // TestServerInitialization verifies that NewQNTXServer correctly initializes all dependencies
 func TestServerInitialization(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 
-	server, err := NewQNTXServer(db, "test.db", 1)
+	server, err := NewQNTXServer(db, store, "test.db", 1)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestServerInitialization(t *testing.T) {
 
 // TestServerWithPluginManager verifies plugin manager is correctly wired up when set globally
 func TestServerWithPluginManager(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 
 	// Create and set a plugin manager globally (simulating main.go behavior)
 	logger := zap.NewNop().Sugar()
@@ -59,7 +59,7 @@ func TestServerWithPluginManager(t *testing.T) {
 		grpcplugin.SetDefaultPluginManager(nil) // Clean up global state
 	})
 
-	server, err := NewQNTXServer(db, "test.db", 1)
+	server, err := NewQNTXServer(db, store, "test.db", 1)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -75,9 +75,9 @@ func TestServerWithPluginManager(t *testing.T) {
 
 // TestServerWithPluginRegistry verifies plugin registry field exists
 func TestServerWithPluginRegistry(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 
-	server, err := NewQNTXServer(db, "test.db", 1)
+	server, err := NewQNTXServer(db, store, "test.db", 1)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestServerWithPluginRegistry(t *testing.T) {
 // This test documents the fix for a nil pointer panic that occurred when reinitializing plugins
 // The panic happened in plugin/grpc/client.go:107 when services.Config() was called with nil services
 func TestServerServicesRegistry(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 
 	// Set plugin manager globally (simulating main.go behavior)
 	logger := zap.NewNop().Sugar()
@@ -106,7 +106,7 @@ func TestServerServicesRegistry(t *testing.T) {
 	// If not set, services will be nil which is expected
 	existingRegistry := plugin.GetDefaultRegistry()
 
-	server, err := NewQNTXServer(db, "test.db", 1)
+	server, err := NewQNTXServer(db, store, "test.db", 1)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestServerServicesRegistry(t *testing.T) {
 
 // TestServerInitializationWithInvalidDB verifies proper error handling
 func TestServerInitializationWithInvalidDB(t *testing.T) {
-	_, err := NewQNTXServer(nil, "test.db", 1)
+	_, err := NewQNTXServer(nil, nil, "test.db", 1)
 	if err == nil {
 		t.Error("Expected error when creating server with nil database")
 	}
@@ -131,7 +131,7 @@ func TestServerInitializationWithInvalidDB(t *testing.T) {
 
 // TestServerInitializationWithInvalidVerbosity verifies verbosity validation
 func TestServerInitializationWithInvalidVerbosity(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 
 	tests := []struct {
 		verbosity int
@@ -146,7 +146,7 @@ func TestServerInitializationWithInvalidVerbosity(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		_, err := NewQNTXServer(db, "test.db", tt.verbosity)
+		_, err := NewQNTXServer(db, store, "test.db", tt.verbosity)
 		if tt.wantErr && err == nil {
 			t.Errorf("verbosity=%d: expected error, got nil", tt.verbosity)
 		}

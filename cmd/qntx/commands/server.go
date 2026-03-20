@@ -60,7 +60,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	// If dbPath still empty, openDatabase will use am.GetDatabasePath()
 
 	// Open and migrate database
-	database, dbPath, err := openDatabase(dbPath)
+	database, atsStore, dbPath, err := openDatabase(dbPath)
 	if err != nil {
 		return errors.Wrap(err, "failed to open database")
 	}
@@ -85,8 +85,8 @@ func runServer(cmd *cobra.Command, args []string) error {
 		os.Setenv("DEV", "true")
 	}
 
-	// Create server
-	srv, err := server.NewQNTXServer(database, dbPath, verbosity, serverAtsQuery)
+	// Create server with pre-created attestation store
+	srv, err := server.NewQNTXServer(database, atsStore, dbPath, verbosity, serverAtsQuery)
 	if err != nil {
 		return errors.Wrap(err, "failed to create server")
 	}

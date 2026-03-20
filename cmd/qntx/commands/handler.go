@@ -78,17 +78,11 @@ func runHandlerCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Open database
-	database, dbPath, err := openDatabase("")
+	database, atsStore, _, err := openDatabase("")
 	if err != nil {
 		return errors.Wrap(err, "failed to open database")
 	}
 	defer database.Close()
-
-	// Create Rust-backed store (enforcement runs through Rust)
-	atsStore, err := storage.NewStore(dbPath, nil)
-	if err != nil {
-		return errors.Wrap(err, "failed to create attestation store")
-	}
 
 	// BoundedStore wraps for CreateAttestationWithLimits (enforcement is in Rust now)
 	boundedStore := storage.NewBoundedStoreWithConfig(

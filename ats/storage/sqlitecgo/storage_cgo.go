@@ -87,6 +87,18 @@ func NewFileStore(path string) (*RustStore, error) {
 	return rs, nil
 }
 
+// StorePtr returns the raw C store pointer for sharing with the Rust SQL driver.
+// The caller must hold the mutex (via Mu()) while using this pointer.
+func (rs *RustStore) StorePtr() unsafe.Pointer {
+	return unsafe.Pointer(rs.store)
+}
+
+// Mu returns the mutex that serializes access to the Rust store.
+// The SQL driver shares this mutex to ensure single-threaded access.
+func (rs *RustStore) Mu() *sync.Mutex {
+	return &rs.mu
+}
+
 // Close frees the underlying Rust store.
 // Safe to call multiple times.
 func (rs *RustStore) Close() error {
