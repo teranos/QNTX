@@ -111,6 +111,21 @@ bool writeFrame(Socket sock, FrameType type, ubyte flags, uint streamId, const u
     return true;
 }
 
+/// Send DATA payload split into HTTP/2 frames of at most 16384 bytes.
+void writeDataChunked(Socket sock, uint streamId, const ubyte[] data) {
+    enum MAX_FRAME = 16_384;
+    size_t offset = 0;
+    while (offset < data.length) {
+        size_t end = offset + MAX_FRAME;
+        if (end > data.length) end = data.length;
+        writeFrame(sock, FrameType.DATA, 0, streamId, data[offset .. end]);
+        offset = end;
+    }
+    if (data.length == 0) {
+        writeFrame(sock, FrameType.DATA, 0, streamId, []);
+    }
+}
+
 /// Send a SETTINGS frame.
 bool sendSettings(Socket sock, uint streamId = 0) {
     // Send empty SETTINGS (use defaults)
@@ -347,9 +362,9 @@ struct GrpcServer {
         auto responseHeaders = encodeResponseHeaders();
         writeFrame(sock, FrameType.HEADERS, FrameFlags.END_HEADERS, streamId, responseHeaders);
 
-        // Send DATA (gRPC-framed protobuf)
+        // Send DATA (gRPC-framed protobuf), chunked to respect HTTP/2 frame size
         auto grpcData = grpcFrame(responseProto);
-        writeFrame(sock, FrameType.DATA, 0, streamId, grpcData);
+        writeDataChunked(sock, streamId, grpcData);
 
         // Send HEADERS (trailers with grpc-status: 0)
         auto trailers = encodeGrpcTrailers();
@@ -459,9 +474,11 @@ struct GrpcClient {
         // Send HEADERS
         writeFrame(sock, FrameType.HEADERS, FrameFlags.END_HEADERS, streamId, headerBlock);
 
-        // Send DATA with gRPC framing
+        // Send DATA with gRPC framing, chunked for large payloads
         auto grpcData = grpcFrame(requestProto);
-        writeFrame(sock, FrameType.DATA, FrameFlags.END_STREAM, streamId, grpcData);
+        writeDataChunked(sock, streamId, grpcData);
+        // Send empty DATA with END_STREAM to signal end
+        writeFrame(sock, FrameType.DATA, FrameFlags.END_STREAM, streamId, []);
 
         // Read response frames
         ubyte[] responseData;
