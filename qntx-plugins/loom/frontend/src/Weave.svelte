@@ -186,14 +186,14 @@
   .dw-turn.search,
   .dw-turn.write {
     background: var(--bg-almost-black);
-    border-left: 2px solid #5b8dd9;
+    border-left: 2px solid var(--glyph-status-running-text);
     padding-left: 4px;
     margin: 1px 0;
   }
-  .dw-turn.edit .dw-speaker { color: #5b8dd9; }
-  .dw-turn.read .dw-speaker { color: #5b8dd9; }
-  .dw-turn.search .dw-speaker { color: #5b8dd9; }
-  .dw-turn.write .dw-speaker { color: #5b8dd9; }
+  .dw-turn.edit .dw-speaker { color: var(--glyph-status-running-text); }
+  .dw-turn.read .dw-speaker { color: var(--glyph-status-running-text); }
+  .dw-turn.search .dw-speaker { color: var(--glyph-status-running-text); }
+  .dw-turn.write .dw-speaker { color: var(--glyph-status-running-text); }
   .dw-turn.edit .dw-text,
   .dw-turn.read .dw-text,
   .dw-turn.search .dw-text,
@@ -207,16 +207,16 @@
   }
   .dw-path:hover {
     color: var(--text-on-dark);
-    border-bottom-color: #5b8dd9;
+    border-bottom-color: var(--glyph-status-running-text);
   }
 
   .dw-turn.hook {
     background: var(--bg-almost-black);
-    border-left: 2px solid #d94a4a;
+    border-left: 2px solid var(--color-error);
     padding-left: 4px;
     margin: 1px 0;
   }
-  .dw-turn.hook .dw-speaker { color: #d94a4a; }
+  .dw-turn.hook .dw-speaker { color: var(--color-error); }
   .dw-turn.hook .dw-text {
     color: var(--text-on-dark-secondary);
     font-size: 8px;

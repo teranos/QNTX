@@ -2,27 +2,23 @@
    No selectors, no component styles, no layout. Only tokens. */
 
 :root {
-    /* Font Stacks */
-    --font-mono: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Fira Code', 'Consolas', monospace;
-
     /* Typography */
+    --font-mono: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Fira Code', 'Consolas', monospace;
     --font-size-xs: 10px;
     --font-size-sm: 11px;
     --font-size-md: 13px;
     --font-size-lg: 14px;
 
-    /* Spacing */
+    /* Spacing & Shape */
     --gap: 7px;
     --panel-padding-sm: 8px 12px;
     --panel-padding-md: 12px 16px;
     --panel-padding-lg: 16px 20px;
-
-    /* Borders */
-    --panel-border: 1px solid var(--border);
     --border-radius: 3px;
     --border-radius-lg: 7px;
 
     /* Core Colors */
+    --panel-border: 1px solid var(--border);
     --text-primary: #333433;
     --text-secondary: #656766;
     --text-tertiary: #989a99;
@@ -55,10 +51,11 @@
 
     /* Status Colors */
     --color-success: #22c65e;
-    --color-error: #ef4544;
+    --color-error: #e44747;
     --color-warning: #ffab00;
     --color-info: #3b83f6;
     --color-scheduled: #7b20a2;
+    --color-burnt-orange: #e07840;
 
     /* Glyph Status Colors - dark-bg tints for lifecycle states */
     --glyph-status-idle-bg: rgba(30, 30, 35, 0.92);
@@ -69,7 +66,7 @@
     --glyph-status-pending-text: #8b8fd1;
     --glyph-status-running-bg: #1f2a3d;
     --glyph-status-running-section-bg: #1a2332;
-    --glyph-status-running-text: #6b9bd1;
+    --glyph-status-running-text: #6394d5;
     --glyph-status-success-bg: #1f3d1f;
     --glyph-status-success-section-bg: #1a2b1a;
     --glyph-status-success-text: #a8e6a1;
