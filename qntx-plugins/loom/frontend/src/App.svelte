@@ -248,10 +248,10 @@
 
   function stateColor(state: string): string {
     switch (state) {
-      case 'unweaved': return '#e07030'
+      case 'unweaved': return 'var(--color-burnt-orange)'
       case 'partial': return 'var(--color-warning)'
       case 'complete': return 'var(--accent-on-dark)'
-      case 'stale': return '#ef4544'
+      case 'stale': return 'var(--color-error)'
       default: return 'var(--text-on-dark-tertiary)'
     }
   }
@@ -265,9 +265,9 @@
   // --- Branch colors (deterministic, functional) ---
 
   const BRANCH_COLORS = [
-    '#7dba8a', '#6b9bd1', '#d4b8ff', '#ffab00',
-    '#ef4544', '#22c65e', '#3b83f6', '#7b20a2',
-    '#e08050', '#50b0b0', '#c0a040', '#d06090',
+    'var(--accent-on-dark)', 'var(--glyph-status-running-text)', 'var(--accent-lavender)', 'var(--color-warning)',
+    'var(--color-error)', 'var(--color-success)', 'var(--color-info)', 'var(--color-scheduled)',
+    'var(--color-burnt-orange)', '#50b0b0', '#c0a040', '#d06090',
   ]
 
   function branchColor(branch: string): string {
@@ -293,9 +293,9 @@
   // --- Cluster colors (low-opacity backgrounds, deterministic by cluster_id) ---
 
   const CLUSTER_COLORS = [
-    'rgba(125,186,138,0.12)', 'rgba(107,155,209,0.12)', 'rgba(212,184,255,0.12)',
-    'rgba(255,171,0,0.12)', 'rgba(239,69,68,0.12)', 'rgba(34,198,94,0.12)',
-    'rgba(59,131,246,0.12)', 'rgba(123,32,162,0.12)', 'rgba(224,128,80,0.12)',
+    'rgba(125,186,138,0.12)', 'rgba(99,148,213,0.12)', 'rgba(212,184,255,0.12)',
+    'rgba(255,171,0,0.12)', 'rgba(228,71,71,0.12)', 'rgba(34,198,94,0.12)',
+    'rgba(59,131,246,0.12)', 'rgba(123,32,162,0.12)', 'rgba(224,120,64,0.12)',
     'rgba(80,176,176,0.12)', 'rgba(192,160,64,0.12)', 'rgba(208,96,144,0.12)',
   ]
 

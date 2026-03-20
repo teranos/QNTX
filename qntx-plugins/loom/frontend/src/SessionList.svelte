@@ -46,10 +46,10 @@
 
   function stateColor(state: string): string {
     switch (state) {
-      case 'unweaved': return '#e07030'
+      case 'unweaved': return 'var(--color-burnt-orange)'
       case 'partial': return 'var(--color-warning)'
       case 'complete': return 'var(--accent-on-dark)'
-      case 'stale': return '#ef4544'
+      case 'stale': return 'var(--color-error)'
       default: return 'var(--text-on-dark-tertiary)'
     }
   }

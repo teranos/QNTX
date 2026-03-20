@@ -164,7 +164,7 @@
           {#if clusterMap.get(item.weave.id)}
             <div class="dw-warp-seg dw-warp-seam seam-{item.seam}" style="height: {itemHeight(item)}%; background: {branchColors[clusterMap.get(item.weave.id)!.cluster_id % branchColors.length]}"></div>
           {:else}
-            <div class="dw-warp-seg dw-warp-seam seam-{item.seam}" style="height: {itemHeight(item)}%; background: #252625"></div>
+            <div class="dw-warp-seg dw-warp-seam seam-{item.seam}" style="height: {itemHeight(item)}%; background: var(--bg-secondary)"></div>
           {/if}
         {/if}
       {/each}
@@ -241,7 +241,7 @@
     line-height: 1;
   }
   .dw-warp-hook {
-    color: #d94a4a;
+    color: var(--color-error);
     font-size: 6px;
     line-height: 1;
   }
