@@ -14,10 +14,10 @@ func TestVidStreamMessageRouting(t *testing.T) {
 		t.Skip("Skipping vidstream test: rustvideo build tag not set")
 	}
 
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -50,10 +50,10 @@ func TestVidStreamFrameWithoutInit(t *testing.T) {
 		t.Skip("Skipping vidstream test: rustvideo build tag not set")
 	}
 
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -103,10 +103,10 @@ func TestVidStreamInvalidFormat(t *testing.T) {
 		t.Skip("Skipping vidstream test: rustvideo build tag not set")
 	}
 
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -149,10 +149,10 @@ func TestVidStreamAsyncInitSendsResponse(t *testing.T) {
 		t.Skip("Skipping vidstream test: rustvideo build tag not set")
 	}
 
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -218,10 +218,10 @@ func TestVidStreamEngineReinitClosesOldEngine(t *testing.T) {
 		t.Skip("Skipping slow test in short mode")
 	}
 
-	db := qntxtest.CreateTestDB(t)
+	store, db := qntxtest.CreateTestStore(t)
 	defer db.Close()
 
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}

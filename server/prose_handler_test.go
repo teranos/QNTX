@@ -11,8 +11,8 @@ import (
 
 // Test validateProsePath with various inputs
 func TestValidateProsePath(t *testing.T) {
-	db := createTestDB(t)
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	store, db := createTestStore(t)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -97,8 +97,8 @@ func TestValidateProsePath(t *testing.T) {
 
 // Test readRequestBody with size limits
 func TestReadRequestBody(t *testing.T) {
-	db := createTestDB(t)
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	store, db := createTestStore(t)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -153,8 +153,8 @@ func TestReadRequestBody(t *testing.T) {
 
 // Test writeProseFile
 func TestWriteProseFile(t *testing.T) {
-	db := createTestDB(t)
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	store, db := createTestStore(t)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}

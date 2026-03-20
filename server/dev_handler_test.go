@@ -12,8 +12,8 @@ func TestHandleDevMode_ReturnsTrue(t *testing.T) {
 	os.Setenv("DEV", "true")
 	defer os.Unsetenv("DEV")
 
-	db := createTestDB(t)
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	store, db := createTestStore(t)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -42,8 +42,8 @@ func TestHandleDevMode_ReturnsFalse(t *testing.T) {
 	// Ensure DEV is not set
 	os.Unsetenv("DEV")
 
-	db := createTestDB(t)
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	store, db := createTestStore(t)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -69,8 +69,8 @@ func TestHandleDevMode_ReturnsFalse(t *testing.T) {
 }
 
 func TestHandleDevMode_RejectsNonGetRequests(t *testing.T) {
-	db := createTestDB(t)
-	srv, err := NewQNTXServer(db, ":memory:", 0)
+	store, db := createTestStore(t)
+	srv, err := NewQNTXServer(db, store, ":memory:", 0)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
