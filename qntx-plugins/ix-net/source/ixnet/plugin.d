@@ -331,6 +331,7 @@ export async function render(glyph, ui) {
     html += '<th style="padding: 4px 8px;">Time</th>';
     html += '<th style="padding: 4px 8px;">Status</th>';
     html += '<th style="padding: 4px 8px;">Model</th>';
+    html += '<th style="padding: 4px 8px; min-width: 200px;">Content</th>';
     html += '<th style="padding: 4px 8px;">Tokens</th>';
     html += '<th style="padding: 4px 8px;">Size</th>';
     html += '<th style="padding: 4px 8px;">Flags</th>';
@@ -346,6 +347,7 @@ export async function render(glyph, ui) {
       html += '<td style="padding: 4px 8px; color: #888;">' + fmtTime(c.timestamp) + '</td>';
       html += '<td style="padding: 4px 8px; color:' + statusColor(c.status_code) + ';">' + c.status_code + '</td>';
       html += '<td style="padding: 4px 8px; color: #7dba8a;">' + (c.model || '-') + '</td>';
+      html += '<td style="padding: 4px 8px; color: #a0a0a0; max-width: 400px; overflow-wrap: break-word; word-break: break-word;">' + (c.prompt || '-') + '</td>';
       html += '<td style="padding: 4px 8px;">' + c.input_tokens + ' / ' + c.output_tokens + '</td>';
       html += '<td style="padding: 4px 8px; color: #888;">' + fmtBytes(c.request_bytes) + ' / ' + fmtBytes(c.response_bytes) + '</td>';
       html += '<td style="padding: 4px 8px; color: #666;">' + flags + '</td>';
@@ -470,6 +472,12 @@ private ptrdiff_t indexOf(string haystack, string needle) {
 /// Auto-start the proxy during plugin initialization.
 private void autoStartProxy() {
     import ixnet.log;
+
+    // Guard against double-init — plugin loader may call Initialize twice
+    if (state.capturing) {
+        logInfo("[ix-net] proxy already running, skipping auto-start");
+        return;
+    }
 
     ushort proxyPort = 9100;
 
