@@ -2,4 +2,4 @@
 module ixnet.version_;
 
 enum PLUGIN_NAME    = "ix-net";
-enum PLUGIN_VERSION = "0.9.1";
+enum PLUGIN_VERSION = "0.11.1";

@@ -12,6 +12,7 @@ struct RequestInfo {
     bool hasImages;
     bool streaming;      // "stream": true
     string sessionId;    // from metadata.user_id "_session_<uuid>"
+    string prompt;       // last user message text (truncated)
 }
 
 /// Extracted fields from a Claude API response body.
@@ -56,6 +57,9 @@ RequestInfo extractRequest(const(ubyte)[] body_) {
         }
         pos = idx + 6; // skip past `"type"`
     }
+
+    // Extract last user message text as prompt
+    info.prompt = extractLastUserPrompt(json);
 
     return info;
 }
@@ -181,6 +185,57 @@ int extractImages(const(ubyte)[] body_, string outputDir, int captureNum) {
     return saved;
 }
 
+/// Extract the last user message text from a Claude API request.
+/// Finds the last "role" with value "user" and extracts the text content after it.
+private string extractLastUserPrompt(string json) {
+    // Find the last "role" key whose value is "user"
+    // Handles both "role":"user" and "role": "user" (with spaces)
+    ptrdiff_t lastUserIdx = -1;
+    size_t searchPos = 0;
+    while (searchPos < json.length) {
+        auto idx = findSubstring(json, `"role"`, searchPos);
+        if (idx < 0) break;
+        auto val = extractStringValue(json[idx .. $], `"role"`);
+        if (val == "user") {
+            lastUserIdx = idx;
+        }
+        searchPos = idx + 6;
+    }
+    if (lastUserIdx < 0) return "";
+
+    // From the user role, scan forward for text content blocks.
+    // Stop at the next "role" key (next message boundary).
+    auto afterUser = json[lastUserIdx + 6 .. $];
+    auto nextRole = findSubstring(afterUser, `"role"`, 0);
+    if (nextRole > 0) afterUser = afterUser[0 .. nextRole];
+
+    // Look for the FIRST "type":"text" block in this message.
+    // The user's actual prompt comes before system reminders.
+    size_t tpos = 0;
+    while (tpos < afterUser.length) {
+        auto idx = findSubstring(afterUser, `"type"`, tpos);
+        if (idx < 0) break;
+        auto typeVal = extractStringValue(afterUser[idx .. $], `"type"`);
+        if (typeVal == "text") {
+            auto nearText = afterUser[idx .. $];
+            auto val = extractStringValue(nearText, `"text"`);
+            if (val.length > 0) return truncate(val, 200);
+        }
+        tpos = idx + 6;
+    }
+
+    // Fallback: simple string content like {"role":"user","content":"quota"}
+    auto contentVal = extractStringValue(afterUser, `"content"`);
+    if (contentVal.length > 0) return truncate(contentVal, 200);
+    return "";
+}
+
+/// Truncate a string to maxLen chars.
+private string truncate(string s, size_t maxLen) {
+    if (s.length <= maxLen) return s.idup;
+    return s[0 .. maxLen].idup;
+}
+
 // ---------------------------------------------------------------------------
 // Base64 decoder
 // ---------------------------------------------------------------------------
@@ -233,36 +288,44 @@ private string extractStringValue(string json, string key) {
 /// Extract the raw value token after "key": in JSON.
 /// Returns the value portion (could be string, number, bool, object, array).
 private string extractRawValue(string json, string key) {
-    auto keyIdx = findSubstring(json, key, 0);
-    if (keyIdx < 0) return "";
+    // Search for key followed by ':' — skip occurrences that are values, not keys
+    size_t searchFrom = 0;
+    while (searchFrom < json.length) {
+        auto keyIdx = findSubstring(json, key, searchFrom);
+        if (keyIdx < 0) return "";
 
-    // Skip past key and find ':'
-    size_t pos = keyIdx + key.length;
-    while (pos < json.length && json[pos] == ' ') pos++;
-    if (pos >= json.length || json[pos] != ':') return "";
-    pos++; // skip ':'
-    while (pos < json.length && json[pos] == ' ') pos++;
-    if (pos >= json.length) return "";
+        size_t pos = keyIdx + key.length;
+        while (pos < json.length && json[pos] == ' ') pos++;
+        if (pos < json.length && json[pos] == ':') {
+            // Found a real key — extract value
+            pos++; // skip ':'
+            while (pos < json.length && json[pos] == ' ') pos++;
+            if (pos >= json.length) return "";
 
-    // Determine value type and extract
-    if (json[pos] == '"') {
-        // String value — find closing quote (handle escaped quotes)
-        size_t end = pos + 1;
-        while (end < json.length) {
-            if (json[end] == '\\') { end += 2; continue; }
-            if (json[end] == '"') { end++; break; }
-            end++;
+            // Determine value type and extract
+            if (json[pos] == '"') {
+                // String value — find closing quote (handle escaped quotes)
+                size_t end = pos + 1;
+                while (end < json.length) {
+                    if (json[end] == '\\') { end += 2; continue; }
+                    if (json[end] == '"') { end++; break; }
+                    end++;
+                }
+                return cast(string)json[pos .. end];
+            } else {
+                // Number, bool, null — read until delimiter
+                size_t end = pos;
+                while (end < json.length && json[end] != ',' && json[end] != '}'
+                       && json[end] != ']' && json[end] != ' ' && json[end] != '\n') {
+                    end++;
+                }
+                return cast(string)json[pos .. end];
+            }
         }
-        return cast(string)json[pos .. end];
-    } else {
-        // Number, bool, null — read until delimiter
-        size_t end = pos;
-        while (end < json.length && json[end] != ',' && json[end] != '}'
-               && json[end] != ']' && json[end] != ' ' && json[end] != '\n') {
-            end++;
-        }
-        return cast(string)json[pos .. end];
+        // Not followed by ':' — this was a value, not a key. Skip past it.
+        searchFrom = keyIdx + key.length;
     }
+    return "";
 }
 
 /// Find substring starting at offset. Returns index or -1.

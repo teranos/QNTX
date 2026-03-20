@@ -52,6 +52,7 @@ struct Capture {
     int outputTokens;      // from response usage
     int statusCode;        // HTTP response status
     bool streaming;        // was this a streaming response?
+    string prompt;         // user's prompt text (truncated)
 }
 
 enum MAX_CAPTURES = 256;
@@ -167,7 +168,8 @@ string getRecentCaptures(ref ProxyState state) {
                 `","input_tokens":` ~ c.inputTokens.to!string ~
                 `,"output_tokens":` ~ c.outputTokens.to!string ~
                 `,"status_code":` ~ c.statusCode.to!string ~
-                `,"streaming":` ~ (c.streaming ? "true" : "false") ~ `}`;
+                `,"streaming":` ~ (c.streaming ? "true" : "false") ~
+                `,"prompt":"` ~ jsonEscape(c.prompt) ~ `"}`;
         first = false;
     }
     json ~= `],"total":` ~ state.captureCount.to!string ~ `}`;
@@ -183,9 +185,13 @@ private void acceptLoop(ProxyState* state) {
         try {
             auto client = state.listener.accept();
             if (client !is null) {
-                // Handle each connection in a new thread
+                // Handle each connection in a new thread.
+                // Copy socket ref — D closures capture by reference,
+                // so without this the next accept() overwrites client
+                // before the thread reads from it.
+                auto conn = client;
                 auto t = new Thread(() {
-                    handleConnection(state, client);
+                    handleConnection(state, conn);
                 });
                 t.isDaemon = true;
                 t.start();
@@ -348,6 +354,7 @@ private void tlsRelay(ProxyState* state, ref TLSConn clientTLS,
         cap.imageCount = reqInfo.imageCount;
         cap.streaming = reqInfo.streaming || isChunked;
         cap.statusCode = statusCode;
+        cap.prompt = reqInfo.prompt;
         cap.inputTokens = respInfo.inputTokens;
         cap.outputTokens = respInfo.outputTokens;
         {
