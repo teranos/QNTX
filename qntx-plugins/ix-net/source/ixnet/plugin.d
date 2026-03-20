@@ -331,7 +331,7 @@ export async function render(glyph, ui) {
     html += '<th style="padding: 4px 8px;">Time</th>';
     html += '<th style="padding: 4px 8px;">Status</th>';
     html += '<th style="padding: 4px 8px;">Model</th>';
-    html += '<th style="padding: 4px 8px; min-width: 200px;">Prompt</th>';
+    html += '<th style="padding: 4px 8px; min-width: 200px;">Content</th>';
     html += '<th style="padding: 4px 8px;">Tokens</th>';
     html += '<th style="padding: 4px 8px;">Size</th>';
     html += '<th style="padding: 4px 8px;">Flags</th>';

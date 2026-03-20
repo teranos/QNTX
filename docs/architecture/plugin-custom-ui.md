@@ -23,6 +23,10 @@ Plugins implement the [`UIPlugin`](https://github.com/teranos/QNTX/blob/main/plu
 
 AT Protocol plugin ([`qntx-atproto`](https://github.com/teranos/QNTX/tree/main/qntx-atproto)) provides a feed glyph (🦋) showing Bluesky posts.
 
+## TODO
+
+- Panel manifestation: plugins should be able to open persistent panels (sidebar, bottom dock)
+
 ## Status
 
 Python plugin has not been migrated to custom UI yet.
