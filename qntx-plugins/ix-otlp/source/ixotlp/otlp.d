@@ -101,7 +101,7 @@ private string[string] extractOTLPAttrs(ref JSONValue attrsArray) {
     foreach (ref attr; attrsArray.array) {
         if (attr.type != JSONType.object) continue;
         auto keyPtr = "key" in attr;
-        if (keyPtr is null || keyPtr.type != JSONType.string_) continue;
+        if (keyPtr is null || keyPtr.type != JSONType.string) continue;
         string key = keyPtr.str;
 
         auto valuePtr = "value" in attr;
@@ -118,11 +118,11 @@ private string[string] extractOTLPAttrs(ref JSONValue attrsArray) {
 /// Extract a single OTLP typed value to string.
 private string extractOTLPValue(ref JSONValue v) {
     auto sv = "stringValue" in v;
-    if (sv !is null && sv.type == JSONType.string_) return sv.str;
+    if (sv !is null && sv.type == JSONType.string) return sv.str;
 
     auto iv = "intValue" in v;
     if (iv !is null) {
-        if (iv.type == JSONType.string_) return iv.str;
+        if (iv.type == JSONType.string) return iv.str;
         if (iv.type == JSONType.integer) return to!string(iv.integer);
     }
 
@@ -231,7 +231,113 @@ private AttestationCommand spanToAttestation(
 private string jsonStr(ref JSONValue obj, string key) {
     auto ptr = key in obj;
     if (ptr is null) return "";
-    if (ptr.type == JSONType.string_) return ptr.str;
+    if (ptr.type == JSONType.string) return ptr.str;
     if (ptr.type == JSONType.integer) return to!string(ptr.integer);
     return "";
+}
+
+// ---------------------------------------------------------------------------
+// Unit tests
+// ---------------------------------------------------------------------------
+
+unittest {
+    // Test: minimal valid ExportTraceServiceRequest with one span
+    auto result = ingestOTLP(`{
+        "resourceSpans": [{
+            "resource": {
+                "attributes": [
+                    {"key": "service.name", "value": {"stringValue": "test-agent"}},
+                    {"key": "qntx.project", "value": {"stringValue": "myproject"}}
+                ]
+            },
+            "scopeSpans": [{
+                "spans": [{
+                    "traceId": "abc123",
+                    "spanId": "span001",
+                    "parentSpanId": "",
+                    "name": "agent_run",
+                    "startTimeUnixNano": "1700000000000000000",
+                    "endTimeUnixNano": "1700000001000000000",
+                    "attributes": [
+                        {"key": "gen_ai.operation.name", "value": {"stringValue": "invoke_agent"}},
+                        {"key": "gen_ai.agent.name", "value": {"stringValue": "research-bot"}}
+                    ]
+                }]
+            }]
+        }]
+    }`);
+
+    assert(result.spanCount == 1, "expected 1 span, got " ~ to!string(result.spanCount));
+    assert(result.traceCount == 1, "expected 1 trace");
+    assert(result.lastError.length == 0, "unexpected error: " ~ result.lastError);
+
+    auto cmd = result.attestations[0];
+    assert(cmd.subjects.length == 1);
+    assert(cmd.subjects[0] == "myproject:research-bot",
+           "expected myproject:research-bot, got " ~ cmd.subjects[0]);
+    assert(cmd.predicates[0] == "OTLPSpan");
+    assert(cmd.contexts[0] == "trace:abc123");
+    assert(cmd.source == "ix-otlp");
+
+    // Test: multiple spans across two traces
+    auto result2 = ingestOTLP(`{
+        "resourceSpans": [{
+            "resource": {"attributes": [
+                {"key": "service.name", "value": {"stringValue": "svc"}}
+            ]},
+            "scopeSpans": [{
+                "spans": [
+                    {"traceId": "t1", "spanId": "s1", "name": "op1",
+                     "startTimeUnixNano": "100", "endTimeUnixNano": "200", "attributes": []},
+                    {"traceId": "t2", "spanId": "s2", "name": "op2",
+                     "startTimeUnixNano": "300", "endTimeUnixNano": "400", "attributes": []}
+                ]
+            }]
+        }]
+    }`);
+
+    assert(result2.spanCount == 2);
+    assert(result2.traceCount == 2);
+
+    // Test: empty body
+    auto result3 = ingestOTLP(`{}`);
+    assert(result3.spanCount == 0);
+    assert(result3.lastError.length > 0); // "missing or invalid resourceSpans"
+
+    // Test: invalid JSON
+    auto result4 = ingestOTLP(`not json`);
+    assert(result4.spanCount == 0);
+    assert(result4.lastError.length > 0);
+
+    // Test: chat span with prompt/completion events
+    auto result5 = ingestOTLP(`{
+        "resourceSpans": [{
+            "resource": {"attributes": []},
+            "scopeSpans": [{
+                "spans": [{
+                    "traceId": "t5",
+                    "spanId": "s5",
+                    "name": "chat",
+                    "startTimeUnixNano": "500",
+                    "endTimeUnixNano": "600",
+                    "attributes": [
+                        {"key": "gen_ai.operation.name", "value": {"stringValue": "chat"}},
+                        {"key": "gen_ai.request.model", "value": {"stringValue": "gpt-4"}}
+                    ],
+                    "events": [
+                        {"name": "gen_ai.content.prompt",
+                         "attributes": [{"key": "gen_ai.prompt", "value": {"stringValue": "Hello world"}}]},
+                        {"name": "gen_ai.content.completion",
+                         "attributes": [{"key": "gen_ai.completion", "value": {"stringValue": "Hi there"}}]}
+                    ]
+                }]
+            }]
+        }]
+    }`);
+
+    assert(result5.spanCount == 1);
+    assert(result5.traceCount == 1);
+    // Subject falls back to "agno:agent" (no service.name, no project, no agent_name)
+    assert(result5.attestations[0].subjects[0] == "agno:agent",
+           "got: " ~ result5.attestations[0].subjects[0]);
 }
