@@ -3,6 +3,7 @@
 Receives conversation events from [Graunde](https://github.com/teranos/graunde) over UDP and stitches them into embedding-sized text blocks (weaves). Serves a timeline explorer frontend for browsing conversation history across projects and sessions.
 
 **UDP port: 19470** — Graunde sends attestation JSON datagrams here. Fire-and-forget, no response.
+**OTLP port: 4318** — Agno (or any OTLP-compatible agent framework) sends trace exports here via HTTP/JSON.
 
 ## Architecture
 
@@ -10,6 +11,7 @@ Receives conversation events from [Graunde](https://github.com/teranos/graunde) 
 QNTX Server
   ├── gRPC plugin protocol → loom (OCaml, HTTP/2)
   │                            ├── UDP listener (port 19470) — receives events from Graunde
+  │                            ├── OTLP receiver (port 4318) — receives OpenTelemetry traces
   │                            ├── Stitcher — chunks turns into weaves, writes to ATS
   │                            ├── HTTP API (port 5178)
   │                            │     ├── GET /api/weaves — all weaves grouped by branch
@@ -156,6 +158,43 @@ Weaves carry a `weave_source` attribute: `"graunde"` (live UDP) or `"jsonl"` (JS
 2. Click import on any unweaved, partial, or stale session
 3. Loom reads the JSONL, chunks via the stitcher, writes weaves to ATS
 4. `WeaveComplete` attestation records the import; weaves appear immediately
+
+## OTLP Ingestion (Agno / OpenTelemetry)
+
+Third ingestion path. Receives OpenTelemetry trace exports over HTTP/JSON on port 4318 (`POST /v1/traces`). Any OTLP-compatible agent framework can export here — designed for Agno with `tracing=True`.
+
+### Span → turn mapping
+
+| Span attribute / name | Label | Source |
+|---|---|---|
+| `gen_ai.operation.name = "invoke_agent"` | `[session]` | `gen_ai.agent.name` |
+| `gen_ai.operation.name = "chat"` (events) | `[human]` + `[assistant]` | prompt/completion events |
+| `tool.*` | `[tool]` / `[read]` / `[edit]` / `[search]` | tool name + input |
+| Other spans with `gen_ai.agent.name` | `[agent]` | agent name + span name |
+
+### Branch/context derivation
+
+- **Branch**: `{qntx.project || service.name || "agno"}:{agent_name}` from resource and span attributes
+- **Context**: `trace:{trace_id}` — each OTLP trace maps to one session
+
+### Agno configuration
+
+Point the OTLP HTTP exporter at loom:
+
+```python
+from opentelemetry.sdk.trace.export import BatchSpanExporter
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
+exporter = OTLPSpanExporter(endpoint="http://127.0.0.1:4318/v1/traces")
+```
+
+Or set the environment variable:
+
+```sh
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318
+```
+
+Weaves created from OTLP traces have `weave_source: "agno-otel"`.
 
 ## Development
 
