@@ -13,8 +13,12 @@ pub fn serialize_string_vec(vec: &[String]) -> Result<String> {
     Ok(serde_json::to_string(vec)?)
 }
 
-/// Deserialize a JSON string from SQLite to Vec<String>
+/// Deserialize a JSON string from SQLite to Vec<String>.
+/// Handles JSON "null" and empty strings as empty vec.
 pub fn deserialize_string_vec(json: &str) -> Result<Vec<String>> {
+    if json == "null" || json.is_empty() {
+        return Ok(Vec::new());
+    }
     Ok(serde_json::from_str(json)?)
 }
 
@@ -27,11 +31,14 @@ pub fn serialize_attributes(attrs: &HashMap<String, Value>) -> Result<Option<Str
     }
 }
 
-/// Deserialize attributes from SQLite JSON string to HashMap
+/// Deserialize attributes from SQLite JSON string to HashMap.
+/// Handles SQL NULL, JSON "null", and empty strings as empty attributes.
 pub fn deserialize_attributes(json: Option<String>) -> Result<HashMap<String, Value>> {
     match json {
-        Some(json_str) => Ok(serde_json::from_str(&json_str)?),
-        None => Ok(HashMap::new()),
+        Some(json_str) if json_str != "null" && !json_str.is_empty() => {
+            Ok(serde_json::from_str(&json_str)?)
+        }
+        _ => Ok(HashMap::new()),
     }
 }
 
@@ -74,6 +81,18 @@ mod tests {
         let json = r#"["ALICE","BOB"]"#;
         let vec = deserialize_string_vec(json).unwrap();
         assert_eq!(vec, vec!["ALICE", "BOB"]);
+    }
+
+    #[test]
+    fn test_deserialize_string_vec_null() {
+        let vec = deserialize_string_vec("null").unwrap();
+        assert!(vec.is_empty());
+    }
+
+    #[test]
+    fn test_deserialize_string_vec_empty() {
+        let vec = deserialize_string_vec("").unwrap();
+        assert!(vec.is_empty());
     }
 
     #[test]

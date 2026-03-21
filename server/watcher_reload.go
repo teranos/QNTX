@@ -88,11 +88,10 @@ func (c *watcherReloadCoalescer) flush() {
 	}
 
 	// Pre-flight: check if attestations are readable through Rust before spawning per-watcher queries.
-	// A corrupted database would produce N identical errors (one per watcher).
 	type counter interface{ CountAttestations() (int, error) }
 	if c, ok := s.atsStore.(counter); ok {
 		if _, err := c.CountAttestations(); err != nil {
-			s.logger.Errorw("Attestations table unreadable — skipping historical queries for batch",
+			s.logger.Errorw("Failed to count attestations — skipping historical queries for batch",
 				"error", err,
 				"batch_size", len(batch),
 			)

@@ -801,14 +801,14 @@ func (c *Client) handleGetDatabaseStats() {
 	if sp, ok := c.server.atsStore.(statsProvider); ok {
 		stats, err := sp.GetStorageStats()
 		if err != nil {
-			c.server.logger.Errorw("Attestations table unreadable — database may be corrupted (run PRAGMA integrity_check)",
+			c.server.logger.Errorw("Failed to query database stats",
 				"error", err,
 				"client_id", c.id,
 				"db_path", c.server.dbPath,
 			)
 			c.sendJSON(map[string]interface{}{
 				"type":  "database_stats",
-				"error": fmt.Sprintf("Attestations table unreadable: %v", err),
+				"error": fmt.Sprintf("Failed to query database stats: %v", err),
 			})
 			return
 		}
