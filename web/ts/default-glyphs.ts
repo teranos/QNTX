@@ -59,6 +59,7 @@ import { sendMessage } from './websocket';
 import { apiFetch } from './api';
 import { escapeHtml } from './html-utils';
 import { DB } from '@generated/sym.js';
+import { seedEvictions, recordEviction as recordEvictionEvent, getEvictionSummary, hasEvictions, renderEvictionChart } from './eviction-chart';
 import { log, SEG } from './logger.ts';
 import { formatBuildTime } from './components/tooltip.ts';
 import type { VersionMessage, SystemCapabilitiesMessage, SyncStatusMessage } from '../types/websocket';
@@ -310,27 +311,6 @@ phone = "http://phone.local:877"</pre>
 let dbStatsElement: HTMLElement | null = null;
 let dbStats: any = null;
 
-// Eviction tracking — recent evictions shown in database glyph
-interface EvictionRecord {
-    event_type: string;
-    actor: string;
-    context: string;
-    entity: string;
-    deletions_count: number;
-    message: string;
-    timestamp: number;
-}
-const recentEvictions: EvictionRecord[] = [];
-const MAX_EVICTIONS = 20;
-
-function formatTimeAgo(ts: number): string {
-    const seconds = Math.floor((Date.now() - ts) / 1000);
-    if (seconds < 60) return `${seconds}s ago`;
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    return `${hours}h ago`;
-}
 
 // Self diagnostics state
 let selfElement: HTMLElement | null = null;
@@ -339,19 +319,16 @@ let selfCapabilities: SystemCapabilitiesMessage | null = null;
 
 export function updateDatabaseStats(stats: any): void {
     dbStats = stats;
+    if (stats.recent_evictions) {
+        seedEvictions(stats.recent_evictions);
+    }
     if (dbStatsElement) {
         renderDbStats();
     }
 }
 
 export function recordEviction(data: { event_type: string; actor: string; context: string; entity: string; deletions_count: number; message: string }): void {
-    recentEvictions.unshift({
-        ...data,
-        timestamp: Date.now(),
-    });
-    if (recentEvictions.length > MAX_EVICTIONS) {
-        recentEvictions.length = MAX_EVICTIONS;
-    }
+    recordEvictionEvent(data);
     if (dbStatsElement) {
         renderDbStats();
     }
@@ -408,24 +385,16 @@ function renderDbStats(): void {
         `;
     }
 
-    // Build eviction section
+    // Build eviction section — bar chart aggregated by hour
     let evictionSection = '';
-    if (recentEvictions.length > 0) {
-        const totalEvicted = recentEvictions.reduce((sum, e) => sum + e.deletions_count, 0);
-        const evictionRows = recentEvictions.slice(0, 10).map(e => {
-            const ago = formatTimeAgo(e.timestamp);
-            return `<div class="glyph-row" style="font-size: 0.85em; opacity: 0.85;">
-                <span class="glyph-label" style="min-width: auto;">${ago}</span>
-                <span class="glyph-value">${e.message}</span>
-            </div>`;
-        }).join('');
-
+    if (hasEvictions()) {
+        const summary = getEvictionSummary();
         evictionSection = `
             <div class="glyph-row" style="margin-top: 8px; border-top: 1px solid var(--border-color, #333); padding-top: 8px;">
-                <span class="glyph-label">Evictions (session):</span>
-                <span class="glyph-value">${recentEvictions.length} events, ${totalEvicted.toLocaleString()} attestations</span>
+                <span class="glyph-label">Evictions:</span>
+                <span class="glyph-value">${summary.count} events, ${summary.totalEvicted.toLocaleString()} attestations evicted</span>
             </div>
-            ${evictionRows}
+            <div class="eviction-chart-container"></div>
         `;
     }
 
@@ -471,6 +440,12 @@ function renderDbStats(): void {
             }
         });
     });
+
+    // Render eviction bar chart
+    const chartContainer = dbStatsElement.querySelector('.eviction-chart-container');
+    if (chartContainer && hasEvictions()) {
+        renderEvictionChart(chartContainer as HTMLElement);
+    }
 }
 
 function renderSelf(): void {
