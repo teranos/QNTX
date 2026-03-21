@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-otlp-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -283,6 +283,11 @@ ix-bin-plugin: ## Build, install, and restart ix-bin D plugin
 	$(call check-plugin-version,qntx-plugins/ix-bin,d,qntx-plugins/ix-bin/source/ixbin/version_.d)
 	@$(MAKE) -C qntx-plugins/ix-bin install PREFIX=$(PREFIX)
 	$(call restart-plugin,ix-bin)
+
+ix-otlp-plugin: ## Build, install, and restart ix-otlp D plugin
+	$(call check-plugin-version,qntx-plugins/ix-otlp,d,qntx-plugins/ix-otlp/source/ixotlp/version_.d)
+	@$(MAKE) -C qntx-plugins/ix-otlp install PREFIX=$(PREFIX)
+	$(call restart-plugin,ix-otlp)
 
 ix-net-plugin: ## Build, install, and restart ix-net D plugin
 	$(call check-plugin-version,qntx-plugins/ix-net,d,qntx-plugins/ix-net/source/ixnet/version_.d)

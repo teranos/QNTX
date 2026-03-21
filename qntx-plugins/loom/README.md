@@ -3,7 +3,6 @@
 Receives conversation events from [Graunde](https://github.com/teranos/graunde) over UDP and stitches them into embedding-sized text blocks (weaves). Serves a timeline explorer frontend for browsing conversation history across projects and sessions.
 
 **UDP port: 19470** — Graunde sends attestation JSON datagrams here. Fire-and-forget, no response.
-**OTLP port: 4318** — Agno (or any OTLP-compatible agent framework) sends trace exports here via HTTP/JSON.
 
 ## Architecture
 
@@ -11,12 +10,13 @@ Receives conversation events from [Graunde](https://github.com/teranos/graunde) 
 QNTX Server
   ├── gRPC plugin protocol → loom (OCaml, HTTP/2)
   │                            ├── UDP listener (port 19470) — receives events from Graunde
-  │                            ├── OTLP receiver (port 4318) — receives OpenTelemetry traces
+  │                            ├── ATS reader — weaves OTLPSpan attestations from ix-otlp
   │                            ├── Stitcher — chunks turns into weaves, writes to ATS
   │                            ├── HTTP API (port 5178)
   │                            │     ├── GET /api/weaves — all weaves grouped by branch
   │                            │     ├── GET /api/weaves/branch?name= — single branch
-  │                            │     └── POST /api/import — JSONL import (in-process)
+  │                            │     ├── POST /api/import — JSONL import (in-process)
+  │                            │     └── POST /api/import/otlp — weave OTLPSpan attestations
   │                            └── Serialize UI — attestation-to-JSON for the frontend
   └── /api/embeddings/clusters/memberships — cluster data
 
@@ -161,7 +161,15 @@ Weaves carry a `weave_source` attribute: `"graunde"` (live UDP) or `"jsonl"` (JS
 
 ## OTLP Ingestion (Agno / OpenTelemetry)
 
-Third ingestion path. Receives OpenTelemetry trace exports over HTTP/JSON on port 4318 (`POST /v1/traces`). Any OTLP-compatible agent framework can export here — designed for Agno with `tracing=True`.
+Third ingestion path. The `ix-otlp` plugin receives OTLP/HTTP JSON trace exports and persists each span as an `OTLPSpan` attestation in ATS. Loom reads these attestations and weaves them — either automatically on startup (catch-up) or on demand via `POST /api/import/otlp`.
+
+```
+Agno Agent → OTLP exporter → ix-otlp plugin → OTLPSpan attestations (ATS)
+                                                        ↓
+                              loom (ats_reader.ml) → stitcher → Weaves
+```
+
+Traces persist as attestations regardless of whether loom is running. Loom catches up on startup.
 
 ### Span → turn mapping
 
@@ -174,24 +182,15 @@ Third ingestion path. Receives OpenTelemetry trace exports over HTTP/JSON on por
 
 ### Branch/context derivation
 
-- **Branch**: `{qntx.project || service.name || "agno"}:{agent_name}` from resource and span attributes
+- **Branch**: `{qntx.project || service.name || "agno"}:{agent_name}` — derived by ix-otlp from OTLP resource attributes
 - **Context**: `trace:{trace_id}` — each OTLP trace maps to one session
 
 ### Agno configuration
 
-Point the OTLP HTTP exporter at loom:
-
-```python
-from opentelemetry.sdk.trace.export import BatchSpanExporter
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-
-exporter = OTLPSpanExporter(endpoint="http://127.0.0.1:4318/v1/traces")
-```
-
-Or set the environment variable:
+Point the OTLP HTTP exporter at ix-otlp via QNTX:
 
 ```sh
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:877/api/ix-otlp
 ```
 
 Weaves created from OTLP traces have `weave_source: "agno-otel"`.

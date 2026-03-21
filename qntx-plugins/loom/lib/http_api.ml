@@ -52,6 +52,30 @@ let persist_weaves results =
     | None -> Lwt.return_unit
   ) results
 
+let persist_otlp_weaves results =
+  let open Lwt.Syntax in
+  Lwt_list.iter_p (fun (result : Stitcher.stitch_result) ->
+    match result.emitted with
+    | Some block ->
+      let* ats_result = Ats_client.create_weave
+        ~branch:result.branch
+        ~context:result.context
+        ~text:block
+        ~word_count:(Stitcher.word_count block)
+        ~turn_count:result.turn_count
+        ~paths:result.paths
+        ~original_timestamp:result.timestamp
+        ~weave_source:"agno-otel"
+        ()
+      in
+      (match ats_result with
+       | Ok () -> ()
+       | Error msg ->
+         Printf.eprintf "[loom] Failed to persist OTLP weave for %s: %s\n%!" result.branch msg);
+      Lwt.return_unit
+    | None -> Lwt.return_unit
+  ) results
+
 let handle_http reqd =
   let request = H2.Reqd.request reqd in
   let path = request.target in
@@ -140,6 +164,17 @@ let handle_http reqd =
             (Printf.sprintf {|{"success":true,"weaves_created":%d,"file":"%s","session_id":"%s"}|}
                weave_count file_path session_id);
           Lwt.return_unit))
+  | `POST, "/api/import/otlp" ->
+    Lwt.async (fun () ->
+      let open Lwt.Syntax in
+      Printf.printf "[loom] Importing OTLPSpan attestations from ATS\n%!";
+      let* results = Ats_reader.ingest () in
+      let weave_count = List.length results in
+      let* () = persist_otlp_weaves results in
+      Printf.printf "[loom] OTLP import complete: %d weaves\n%!" weave_count;
+      respond_json reqd `OK
+        (Printf.sprintf {|{"success":true,"weaves_created":%d}|} weave_count);
+      Lwt.return_unit)
   | `OPTIONS, _ ->
     respond_json reqd `OK "{}"
   | `GET, "/" ->

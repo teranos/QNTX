@@ -1,0 +1,12 @@
+{
+    "name": "qntx-ix-otlp-plugin",
+    "description": "QNTX OpenTelemetry trace ingestion plugin — D language",
+    "authors": ["QNTX"],
+    "license": "MIT",
+    "targetType": "executable",
+    "targetName": "qntx-ix-otlp-plugin",
+    "targetPath": "bin",
+    "sourcePaths": ["source"],
+    "mainSourceFile": "source/ixotlp/app.d",
+    "dflags-ldc": ["-O2"]
+}
