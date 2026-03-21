@@ -494,25 +494,25 @@ impl QueryStore for SqliteStore {
 
     fn predicates(&self) -> StoreResult<Vec<String>> {
         self.query_distinct_values(
-            "SELECT DISTINCT value FROM attestations, json_each(predicates) ORDER BY value",
+            "SELECT DISTINCT value FROM attestations, json_each(predicates) WHERE predicates != 'null' AND value IS NOT NULL ORDER BY value",
         )
     }
 
     fn contexts(&self) -> StoreResult<Vec<String>> {
         self.query_distinct_values(
-            "SELECT DISTINCT value FROM attestations, json_each(contexts) ORDER BY value",
+            "SELECT DISTINCT value FROM attestations, json_each(contexts) WHERE contexts != 'null' AND value IS NOT NULL ORDER BY value",
         )
     }
 
     fn subjects(&self) -> StoreResult<Vec<String>> {
         self.query_distinct_values(
-            "SELECT DISTINCT value FROM attestations, json_each(subjects) ORDER BY value",
+            "SELECT DISTINCT value FROM attestations, json_each(subjects) WHERE subjects != 'null' AND value IS NOT NULL ORDER BY value",
         )
     }
 
     fn actors(&self) -> StoreResult<Vec<String>> {
         self.query_distinct_values(
-            "SELECT DISTINCT value FROM attestations, json_each(actors) ORDER BY value",
+            "SELECT DISTINCT value FROM attestations, json_each(actors) WHERE actors != 'null' AND value IS NOT NULL ORDER BY value",
         )
     }
 
