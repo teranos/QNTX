@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -855,6 +856,57 @@ func (c *Client) handleGetDatabaseStats() {
 		storageBackend = "rust"
 	}
 
+	// Get recent eviction events from storage_events table
+	var recentEvictions []map[string]interface{}
+	evictionRows, err := c.server.db.Query(`
+		SELECT event_type, actor, context, entity, deletions_count, limit_value, timestamp
+		FROM storage_events
+		WHERE event_type != 'storage_warning'
+		ORDER BY id DESC
+		LIMIT 1000
+	`)
+	if err == nil {
+		defer evictionRows.Close()
+		for evictionRows.Next() {
+			var (
+				eventType      string
+				actor          sql.NullString
+				ctx            sql.NullString
+				entity         sql.NullString
+				deletionsCount int
+				limitValue     sql.NullInt64
+				timestamp      string
+			)
+			if err := evictionRows.Scan(&eventType, &actor, &ctx, &entity, &deletionsCount, &limitValue, &timestamp); err != nil {
+				continue
+			}
+			limit := int(limitValue.Int64)
+			if !limitValue.Valid {
+				limit = 0
+			}
+			var message string
+			switch eventType {
+			case "actor_context_limit":
+				message = fmt.Sprintf("Evicted %d old attestations for %s/%s (limit: %d)", deletionsCount, actor.String, ctx.String, limit)
+			case "actor_contexts_limit":
+				message = fmt.Sprintf("Evicted %d attestations for actor %s (contexts limit: %d)", deletionsCount, actor.String, limit)
+			case "entity_actors_limit":
+				message = fmt.Sprintf("Evicted %d attestations for entity %s (actors limit: %d)", deletionsCount, entity.String, limit)
+			default:
+				message = fmt.Sprintf("Evicted %d attestations (%s)", deletionsCount, eventType)
+			}
+			recentEvictions = append(recentEvictions, map[string]interface{}{
+				"event_type":      eventType,
+				"actor":           actor.String,
+				"context":         ctx.String,
+				"entity":          entity.String,
+				"deletions_count": deletionsCount,
+				"message":         message,
+				"timestamp":       timestamp,
+			})
+		}
+	}
+
 	// Send stats to client with enhanced field information
 	c.sendJSON(map[string]interface{}{
 		"type":               "database_stats",
@@ -867,6 +919,7 @@ func (c *Client) handleGetDatabaseStats() {
 		"unique_subjects":    uniqueSubjects,
 		"unique_contexts":    uniqueContexts,
 		"rich_fields":        richFieldsWithStats,
+		"recent_evictions":   recentEvictions,
 	})
 
 	c.server.logger.Infow("Database stats sent",
