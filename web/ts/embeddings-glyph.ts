@@ -713,6 +713,7 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
                     <div class="glyph-loading">Loading...</div>
                 </div>
             </div>
+    `;
     embeddingsElement.appendChild(detailView);
 
     // Back button — restore main sections view
@@ -840,14 +841,15 @@ function openAttestationWindow(attestation: any): void {
 }
 
 function renderScatterHighlighted(container: HTMLElement, data: ProjectionPoint[], highlightCluster: number): void {
-    const width = Math.max(280, container.clientWidth || 280);
-    const height = Math.max(220, Math.round(width * 0.78));
+    const width = 280;
+    const height = 220;
     const pad = 12;
 
     const svg = d3.select(container)
         .append('svg')
-        .attr('width', width)
-        .attr('height', height)
+        .attr('viewBox', `0 0 ${width} ${height}`)
+        .style('width', '100%')
+        .style('height', 'auto')
         .style('background', '#1e293b')
         .style('border-radius', '4px');
 
@@ -871,7 +873,7 @@ function renderScatterHighlighted(container: HTMLElement, data: ProjectionPoint[
 }
 
 function renderClusterHistoryChart(container: HTMLElement, data: TimelinePoint[]): void {
-    const width = container.clientWidth || 600;
+    const width = 600;
     const height = 120;
     const margin = { top: 8, right: 8, bottom: 24, left: 36 };
     const innerW = width - margin.left - margin.right;
@@ -881,8 +883,9 @@ function renderClusterHistoryChart(container: HTMLElement, data: TimelinePoint[]
 
     const svg = d3.select(container)
         .append('svg')
-        .attr('width', width)
-        .attr('height', height)
+        .attr('viewBox', `0 0 ${width} ${height}`)
+        .style('width', '100%')
+        .style('height', 'auto')
         .style('background', '#1e293b')
         .style('border-radius', '4px');
 
@@ -1020,14 +1023,15 @@ async function recluster(): Promise<void> {
 }
 
 function renderScatter(container: HTMLElement, data: ProjectionPoint[]): void {
-    const width = Math.max(155, container.clientWidth || 155);
-    const height = Math.max(180, Math.round(width * 1.1));
+    const width = 280;
+    const height = 280;
     const pad = 8;
 
     const svg = d3.select(container)
         .append('svg')
-        .attr('width', width)
-        .attr('height', height)
+        .attr('viewBox', `0 0 ${width} ${height}`)
+        .style('width', '100%')
+        .style('height', 'auto')
         .style('background', '#1e293b')
         .style('border-radius', '4px');
 
@@ -1050,7 +1054,7 @@ function renderScatter(container: HTMLElement, data: ProjectionPoint[]): void {
 }
 
 function renderTimeline(container: HTMLElement, data: TimelinePoint[]): void {
-    const width = container.clientWidth || 680;
+    const width = 680;
     const height = 320;
     const margin = { top: 12, right: 12, bottom: 28, left: 42 };
     const innerW = width - margin.left - margin.right;
@@ -1103,8 +1107,9 @@ function renderTimeline(container: HTMLElement, data: TimelinePoint[]): void {
 
     const svg = d3.select(container)
         .append('svg')
-        .attr('width', width)
-        .attr('height', height)
+        .attr('viewBox', `0 0 ${width} ${height}`)
+        .style('width', '100%')
+        .style('height', 'auto')
         .style('background', '#1e293b')
         .style('border-radius', '4px');
 

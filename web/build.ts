@@ -42,15 +42,28 @@ try {
 
   // Bundle TypeScript with Bun
   console.log(`${darkPeach}Bundling JavaScript...${reset}`);
-  await Bun.build({
+  const result = await Bun.build({
     entrypoints: [join(sourceDir, "ts", "main.ts")],
     outdir: join(outputDir, "js"),
     minify: false,
     sourcemap: "inline",
     splitting: false, // Disable code splitting to ensure single bundle
-    // Define aliases to force single instance of CodeMirror modules
     external: [], // Bundle everything, don't externalize anything
+    throw: false, // Return errors in result.logs instead of throwing
   });
+
+  if (!result.success) {
+    console.error(`\n${red}${'='.repeat(80)}${reset}`);
+    console.error(`${red}███ BUNDLE ERRORS ███${reset}`);
+    console.error(`${red}${'='.repeat(80)}${reset}`);
+    for (const log of result.logs) {
+      const pos = log.position;
+      const loc = pos ? `${pos.file}:${pos.line}:${pos.column} ` : '';
+      console.error(`  ${loc}${log.message}`);
+    }
+    console.error(`${red}${'='.repeat(80)}${reset}\n`);
+    process.exit(1);
+  }
 
   // Copy CSS
   console.log(`${darkPeach}Copying CSS...${reset}`);
