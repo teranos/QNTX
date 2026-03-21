@@ -27,6 +27,7 @@ import (
 	"encoding/json"
 	"io"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/teranos/QNTX/errors"
@@ -269,10 +270,18 @@ func (r *RustRows) Next(dest []driver.Value) error {
 			} else {
 				dest[i] = v
 			}
+		case string:
+			// SQLite stores timestamps as text. The old CGO driver auto-converted
+			// to time.Time; replicate that here so callers scanning into *time.Time work.
+			if t, ok := tryParseTime(v); ok {
+				dest[i] = t
+			} else {
+				dest[i] = v
+			}
 		case nil:
 			dest[i] = nil
 		default:
-			// []byte (decoded blobs), string, bool, etc.
+			// []byte (decoded blobs), bool, etc.
 			dest[i] = v
 		}
 	}
@@ -297,6 +306,38 @@ func (r *RustResult) RowsAffected() (int64, error) {
 // base64Decode decodes a standard base64 string to raw bytes.
 func base64Decode(s string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(s)
+}
+
+// SQLite timestamp formats, ordered by likelihood.
+// Covers: datetime('now'), strftime, and RFC3339 variants.
+var timeFormats = []string{
+	"2006-01-02 15:04:05.999999999-07:00",
+	"2006-01-02 15:04:05.999999999+07:00",
+	"2006-01-02 15:04:05.999999999Z07:00",
+	"2006-01-02T15:04:05.999999999Z07:00",
+	"2006-01-02 15:04:05.999999999",
+	"2006-01-02T15:04:05.999999999",
+	"2006-01-02 15:04:05",
+	"2006-01-02T15:04:05",
+	"2006-01-02",
+}
+
+// tryParseTime attempts to parse a string as a timestamp.
+// Returns the parsed time and true if successful.
+func tryParseTime(s string) (time.Time, bool) {
+	if len(s) < 10 {
+		return time.Time{}, false
+	}
+	// Quick check: must start with a digit (year)
+	if s[0] < '0' || s[0] > '9' {
+		return time.Time{}, false
+	}
+	for _, format := range timeFormats {
+		if t, err := time.Parse(format, s); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
 }
 
 // marshalParams converts driver.Value slice to JSON array string.
