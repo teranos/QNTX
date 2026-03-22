@@ -1,0 +1,48 @@
+name: llama-cpp
+
+on:
+  pull_request:
+    paths:
+      - 'qntx-plugins/llama-cpp/**'
+      - 'plugin/grpc/protocol/domain.proto'
+      - 'plugin/grpc/protocol/llm.proto'
+      - '.github/workflows/llama-cpp.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'qntx-plugins/llama-cpp/**'
+      - 'plugin/grpc/protocol/domain.proto'
+      - 'plugin/grpc/protocol/llm.proto'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: qntx
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Build llama-cpp plugin
+        run: nix build ./qntx-plugins/llama-cpp --show-trace
+
+      - name: Verify binary
+        run: ./result/bin/qntx-llama-cpp-plugin --version
+
+      - name: Push to Cachix
+        run: nix build ./qntx-plugins/llama-cpp --print-out-paths --no-link | cachix push qntx
