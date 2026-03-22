@@ -1,6 +1,6 @@
 # qntx-llama-cpp-plugin
 
-Local LLM inference via llama.cpp with Metal acceleration. C++ because llama.cpp is C++ — direct sampler chain access for custom logit processors (#NNN — create this issue) live visualization of logits/attention during generation (#NNN — create this issue), and branching on alternative token paths (#NNN — create this issue).
+Local LLM inference via llama.cpp with Metal acceleration. C++ because llama.cpp is C++ — direct sampler chain access for custom logit processors (#715), live visualization of logits/attention during generation (#716), and branching on alternative token paths (#717).
 
 ## Configuration
 
@@ -16,7 +16,7 @@ n_ctx = "2048"
 log_level = "info"  # error | warn | info | debug
 ```
 
-## Bias glyph (#NNN — create this issue)
+## Bias glyph (#718)
 
 Like ax and se glyphs but with an added bias dimension. Two columns: left is a fuzzy search over the model's vocabulary (exposed via `llama_model_get_vocab`), right is selected tokens with bias weights. Meld it onto a prompt glyph and the biases feed into the sampler chain before the token is selected.
 
