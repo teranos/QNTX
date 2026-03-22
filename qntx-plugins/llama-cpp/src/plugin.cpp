@@ -144,6 +144,9 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
     float temperature = req->temperature() > 0 ? req->temperature() : 0.7;
     int max_tokens = req->max_tokens() > 0 ? req->max_tokens() : 512;
 
+    // TODO: support streaming — return partial tokens as they're sampled
+    // TODO: support multi-turn — gRPC protocol currently carries no message history
+    // TODO: process attachments — req->attachments() is available but ignored
     auto result = engine.chat(req->system_prompt(),
                               req->user_prompt(),
                               temperature,

@@ -326,6 +326,8 @@ kern-plugin: ## Build, install, and restart kern plugin (OCaml Ax parser)
 	$(call restart-plugin,kern)
 
 llama-cpp-plugin: ## Build, install, and restart llama-cpp plugin (C++ local LLM)
+	$(call check-plugin-version,qntx-plugins/llama-cpp,cpp,qntx-plugins/llama-cpp/src/plugin.h)
+	$(call check-plugin-version,qntx-plugins/llama-cpp,h,qntx-plugins/llama-cpp/src/plugin.h)
 	@$(MAKE) -C qntx-plugins/llama-cpp install PREFIX=$(PREFIX)
 	$(call restart-plugin,llama-cpp)
 
