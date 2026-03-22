@@ -16,6 +16,10 @@ n_ctx = "2048"
 log_level = "info"  # error | warn | info | debug
 ```
 
+## Bias glyph (#NNN — create this issue)
+
+Like ax and se glyphs but with an added bias dimension. Two columns: left is a fuzzy search over the model's vocabulary (exposed via `llama_model_get_vocab`), right is selected tokens with bias weights. Meld it onto a prompt glyph and the biases feed into the sampler chain before the token is selected.
+
 ## Limitations
 
 1. **No streaming** — the full response is generated before returning. The UI blocks until generation completes.
