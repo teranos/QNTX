@@ -1,14 +1,6 @@
 # qntx-llama-cpp-plugin
 
-Local LLM inference via llama.cpp with Metal acceleration. First C++ plugin for QNTX.
-
-## Build
-
-```
-make llama-cpp-plugin
-```
-
-Build parallelism is capped at 3 to avoid OOM on 8GB machines.
+Local LLM inference via llama.cpp with Metal acceleration. C++ because llama.cpp is C++ — direct sampler chain access for custom logit processors (#NNN — create this issue) live visualization of logits/attention during generation (#NNN — create this issue), and branching on alternative token paths (#NNN — create this issue).
 
 ## Configuration
 
