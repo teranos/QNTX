@@ -16,6 +16,7 @@ type ChatRequest struct {
 // ChatResponse represents the LLM response.
 type ChatResponse struct {
 	Content string
+	Model   string
 	Usage   Usage
 }
 

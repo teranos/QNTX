@@ -67,6 +67,7 @@ func (c *GRPCLLMClient) Chat(ctx context.Context, req ChatRequest) (*ChatRespons
 
 	return &ChatResponse{
 		Content: resp.Content,
+		Model:   resp.Model,
 		Usage: Usage{
 			PromptTokens:     int(resp.PromptTokens),
 			CompletionTokens: int(resp.CompletionTokens),

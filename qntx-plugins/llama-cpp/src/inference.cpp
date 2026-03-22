@@ -96,16 +96,27 @@ InferenceEngine::ChatResult InferenceEngine::chat(
         return result;
     }
 
-    // TODO: make chat template configurable via plugin config instead of hardcoding
-    // Format prompt in Llama 3 format
-    std::string prompt = "<|begin_of_text|>";
+    // Build chat messages
+    std::vector<llama_chat_message> messages;
     if (!system_prompt.empty()) {
-        prompt += "<|start_header_id|>system<|end_header_id|>\n\n"
-                + system_prompt + "<|eot_id|>";
+        messages.push_back({"system", system_prompt.c_str()});
     }
-    prompt += "<|start_header_id|>user<|end_header_id|>\n\n"
-            + user_prompt + "<|eot_id|>"
-            + "<|start_header_id|>assistant<|end_header_id|>\n\n";
+    messages.push_back({"user", user_prompt.c_str()});
+
+    // Apply the model's own chat template
+    const char* tmpl = llama_model_chat_template(model_, nullptr);
+    int alloc = 2 * (system_prompt.size() + user_prompt.size()) + 256;
+    std::vector<char> buf(alloc);
+    int n_written = llama_chat_apply_template(tmpl, messages.data(), messages.size(), true, buf.data(), buf.size());
+    if (n_written > (int)buf.size()) {
+        buf.resize(n_written + 1);
+        n_written = llama_chat_apply_template(tmpl, messages.data(), messages.size(), true, buf.data(), buf.size());
+    }
+    if (n_written < 0) {
+        result.content = "error: chat template failed";
+        return result;
+    }
+    std::string prompt(buf.data(), n_written);
 
     // Tokenize
     const llama_vocab* vocab = llama_model_get_vocab(model_);

@@ -627,6 +627,9 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Invalidate cached config so subsequent reads pick up the new values
+	appcfg.Reset()
+
 	// Return updated config
 	s.handleGetConfig(w, r)
 }

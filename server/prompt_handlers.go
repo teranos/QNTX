@@ -714,6 +714,11 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Use model name from response if not known from request (e.g. gRPC plugin reports it)
+	if modelName == "" && resp.Model != "" {
+		modelName = resp.Model
+	}
+
 	// Create prompt-result attestation so the response is discoverable in the graph
 	var attestationID string
 	var createdAttestation *protocol.Attestation
