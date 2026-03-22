@@ -5,7 +5,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # llama.cpp — built as a library
-set(GGML_METAL ON CACHE BOOL "Enable Metal acceleration" FORCE)
+if(APPLE)
+    set(GGML_METAL ON CACHE BOOL "Enable Metal acceleration" FORCE)
+else()
+    set(GGML_METAL OFF CACHE BOOL "Metal is macOS-only" FORCE)
+endif()
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
@@ -15,8 +19,10 @@ add_subdirectory(vendor/llama.cpp)
 find_package(protobuf CONFIG REQUIRED)
 find_package(gRPC CONFIG REQUIRED)
 
-# Proto generation
-set(PROTO_DIR "${CMAKE_SOURCE_DIR}/../../plugin/grpc/protocol")
+# Proto generation — PROTO_DIR can be overridden for sandboxed builds (Nix)
+if(NOT DEFINED PROTO_DIR)
+    set(PROTO_DIR "${CMAKE_SOURCE_DIR}/../../plugin/grpc/protocol")
+endif()
 set(PROTO_GEN_DIR "${CMAKE_BINARY_DIR}/generated")
 file(MAKE_DIRECTORY ${PROTO_GEN_DIR})
 
