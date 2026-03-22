@@ -47,7 +47,7 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
 
     model_path_ = model_path;
 
-    // Extract model name from path (last component without extension)
+    // TODO: read model name from GGUF metadata (general.name) instead of deriving from filename
     auto pos = model_path.find_last_of('/');
     model_name_ = (pos != std::string::npos) ? model_path.substr(pos + 1) : model_path;
     auto dot = model_name_.find_last_of('.');
