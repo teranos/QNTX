@@ -195,6 +195,29 @@ func UpdateLocalInferenceONNXModelPath(path string) error {
 	return nil
 }
 
+// UpdateLLMProvider updates the llm.provider setting in UI config.
+func UpdateLLMProvider(provider string) error {
+	config, configPath, err := loadOrInitializeUIConfig()
+	if err != nil {
+		return errors.Wrapf(err, "failed to load UI config for llm.provider update (provider=%s)", provider)
+	}
+
+	var llm map[string]interface{}
+	if l, ok := config["llm"].(map[string]interface{}); ok {
+		llm = l
+	} else {
+		llm = make(map[string]interface{})
+	}
+
+	llm["provider"] = provider
+	config["llm"] = llm
+
+	if err := saveUIConfig(config, configPath); err != nil {
+		return errors.Wrapf(err, "failed to save llm.provider=%s to %s", provider, configPath)
+	}
+	return nil
+}
+
 // UpdateEmbeddingsEnabled updates the embeddings.enabled setting in UI config.
 // Rejects enabled=true if the configured path does not exist on disk.
 func UpdateEmbeddingsEnabled(enabled bool) error {

@@ -126,11 +126,13 @@ type PromptExecuteResponse struct {
 }
 
 // resolveProvider returns the effective AI provider name.
-// Explicit request value takes priority; otherwise falls back to config.
-// When local_inference is disabled (default), returns "openrouter".
+// Explicit request value takes priority, then llm.provider config, then legacy fallbacks.
 func resolveProvider(explicit string) string {
 	if explicit != "" {
 		return explicit
+	}
+	if configured := appcfg.GetString("llm.provider"); configured != "" {
+		return configured
 	}
 	if appcfg.GetBool("local_inference.enabled") {
 		return "local"
@@ -144,6 +146,10 @@ func resolveProvider(explicit string) string {
 func (s *QNTXServer) forwardToProviderPlugin(w http.ResponseWriter, r *http.Request, providerName string, body any, endpoint string) bool {
 	if providerName == "local" {
 		// TODO(#639): Track local Ollama usage to quantify cost savings vs paid APIs.
+		return false
+	}
+	// gRPC LLM providers (e.g. llama-cpp) are handled by createAIClient, not HTTP forwarding.
+	if router := s.servicesManager.GetLLMRouter(); router != nil && router.HasProvider(providerName) {
 		return false
 	}
 	if s.pluginRegistry == nil || !s.pluginRegistry.IsReady(providerName) {
@@ -539,7 +545,7 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 	aliasResolver := alias.NewResolver(aliasStore)
 
 	// Create AI client based on request or config
-	client := s.createPromptAIClient(req.Provider, req.Model)
+	client := s.createPromptAIClient(resolveProvider(req.Provider), req.Model)
 
 	// Execute the prompt using one-shot mode
 	promptResults, err := prompt.ExecuteOneShot(
@@ -642,7 +648,7 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Create AI client
-	client := s.createAIClient(req.Provider, modelName, "prompt-direct")
+	client := s.createAIClient(resolveProvider(req.Provider), modelName, "prompt-direct")
 
 	// Call LLM using Chat method
 	chatReq := provider.ChatRequest{
@@ -706,6 +712,11 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		)
 		writeWrappedError(w, s.logger, err, "Prompt execution failed", http.StatusInternalServerError)
 		return
+	}
+
+	// Use model name from response if not known from request (e.g. gRPC plugin reports it)
+	if modelName == "" && resp.Model != "" {
+		modelName = resp.Model
 	}
 
 	// Create prompt-result attestation so the response is discoverable in the graph
@@ -961,12 +972,17 @@ func (s *QNTXServer) createPromptAIClientForPreview(req PromptPreviewRequest, do
 	if model == "" && doc.Metadata.Model != "" {
 		model = doc.Metadata.Model
 	}
-	return s.createAIClient(req.Provider, model, "prompt-preview")
+	return s.createAIClient(resolveProvider(req.Provider), model, "prompt-preview")
 }
 
 // createAIClient creates an AI client using config defaults with optional overrides.
-// Only local inference is supported in core. For OpenRouter, use the qntx-openrouter plugin.
+// Returns a gRPC-backed client for LLM plugin providers, or a local Ollama client otherwise.
 func (s *QNTXServer) createAIClient(providerName, model, operationType string) provider.AIClient {
+	// Check if this provider is a gRPC LLM plugin (e.g. llama-cpp)
+	if router := s.servicesManager.GetLLMRouter(); router != nil && router.HasProvider(providerName) {
+		return provider.NewGRPCLLMClient(router, providerName)
+	}
+
 	localBaseURL := appcfg.GetString("local_inference.base_url")
 	localModel := appcfg.GetString("local_inference.model")
 	localTimeout := appcfg.GetInt("local_inference.timeout_seconds")

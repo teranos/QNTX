@@ -528,6 +528,7 @@ type configUpdateEntry struct {
 
 // configUpdateRegistry defines supported config keys and their update functions.
 var configUpdateRegistry = map[string]configUpdateEntry{
+	"llm.provider":                    {typ: "string", updateFn: appcfg.UpdateLLMProvider},
 	"local_inference.enabled":         {typ: "bool", updateFn: appcfg.UpdateLocalInferenceEnabled},
 	"local_inference.model":           {typ: "string", updateFn: appcfg.UpdateLocalInferenceModel},
 	"local_inference.onnx_model_path": {typ: "string", updateFn: appcfg.UpdateLocalInferenceONNXModelPath},
@@ -625,6 +626,9 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 	if !applyBudgetUpdate(w, pulseLog, req.Pulse.MonthlyBudgetUSD, "monthly", s.budgetTracker.UpdateMonthlyBudget, r.RemoteAddr) {
 		return
 	}
+
+	// Invalidate cached config so subsequent reads pick up the new values
+	appcfg.Reset()
 
 	// Return updated config
 	s.handleGetConfig(w, r)
