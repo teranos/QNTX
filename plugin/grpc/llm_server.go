@@ -42,6 +42,14 @@ func (s *LLMServer) RegisterProvider(name string, client protocol.LLMServiceClie
 	s.logger.Infow("LLM provider registered", "provider", name, "is_default", s.defaultProvider == name)
 }
 
+// HasProvider returns true if the named provider is registered.
+func (s *LLMServer) HasProvider(name string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, ok := s.providers[name]
+	return ok
+}
+
 // Chat routes an LLM chat request to the appropriate provider plugin.
 func (s *LLMServer) Chat(ctx context.Context, req *protocol.LLMChatRequest) (*protocol.LLMChatResponse, error) {
 	s.mu.RLock()

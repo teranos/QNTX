@@ -30,7 +30,7 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
     auto model_params = llama_model_default_params();
     model_ = llama_model_load_from_file(model_path.c_str(), model_params);
     if (!model_) {
-        std::cerr << "[llama-cpp] Failed to load model from " << model_path << std::endl;
+        std::cout << "[llama-cpp] Failed to load model from " << model_path << std::endl;
         return false;
     }
 
@@ -39,7 +39,7 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
     ctx_params.n_ctx = n_ctx;
     ctx_ = llama_init_from_model(model_, ctx_params);
     if (!ctx_) {
-        std::cerr << "[llama-cpp] Failed to create context for " << model_path << std::endl;
+        std::cout << "[llama-cpp] Failed to create context for " << model_path << std::endl;
         llama_model_free(model_);
         model_ = nullptr;
         return false;
@@ -55,7 +55,7 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
         model_name_ = model_name_.substr(0, dot);
     }
 
-    std::cerr << "[llama-cpp] Model loaded: " << model_name_
+    std::cout << "[llama-cpp] Model loaded: " << model_name_
               << " (ctx=" << n_ctx << ")" << std::endl;
     return true;
 }

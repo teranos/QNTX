@@ -1,4 +1,5 @@
 #include "plugin.h"
+#include "log_capture.h"
 
 #include <iostream>
 
@@ -20,27 +21,25 @@ grpc::Status LlamaCppPlugin::Metadata(grpc::ServerContext* ctx,
 grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
                                          const protocol::InitializeRequest* req,
                                          protocol::InitializeResponse* resp) {
-    // Load model from config
+    // Load model from config — gather all params first, load once
     auto config = req->config();
     auto it = config.find("model_path");
     if (it != config.end() && !it->second.empty()) {
-        if (!engine_.load_model(it->second)) {
-            std::cerr << "[llama-cpp] Failed to load model: " << it->second << std::endl;
-        } else {
-            std::cerr << "[llama-cpp] Model loaded: " << it->second << std::endl;
+        int n_ctx = 2048;
+        auto ctx_it = config.find("n_ctx");
+        if (ctx_it != config.end()) {
+            try { n_ctx = std::stoi(ctx_it->second); } catch (...) {}
+            if (n_ctx <= 0) n_ctx = 2048;
+        }
+        if (!engine_.load_model(it->second, n_ctx)) {
+            std::cout << "[llama-cpp] Failed to load model: " << it->second << std::endl;
         }
     }
 
-    // Context size override
-    auto ctx_it = config.find("n_ctx");
-    if (ctx_it != config.end()) {
-        // Re-load with custom context if model already loaded
-        int n_ctx = std::stoi(ctx_it->second);
-        if (engine_.is_loaded() && n_ctx > 0) {
-            engine_.unload();
-            engine_.load_model(it->second, n_ctx);
-        }
-    }
+    // Flush condensed log summary — replaces 1000+ lines of stderr with a few stdout lines
+    auto log_it = config.find("log_level");
+    std::string log_level = (log_it != config.end()) ? log_it->second : "info";
+    LogCapture::instance().flush_summary(log_level);
 
     // This plugin is an LLM provider
     resp->set_llm_provider(true);
@@ -52,7 +51,7 @@ grpc::Status LlamaCppPlugin::Shutdown(grpc::ServerContext* ctx,
                                        const protocol::Empty* req,
                                        protocol::Empty* resp) {
     engine_.unload();
-    std::cerr << "[llama-cpp] Shutdown complete" << std::endl;
+    std::cout << "[llama-cpp] Shutdown complete" << std::endl;
     return grpc::Status::OK;
 }
 

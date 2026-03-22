@@ -7,6 +7,7 @@
 #include <grpcpp/grpcpp.h>
 
 #include "plugin.h"
+#include "log_capture.h"
 
 static std::unique_ptr<grpc::Server> g_server;
 
@@ -45,6 +46,9 @@ int main(int argc, char* argv[]) {
             return 0;
         }
     }
+
+    // Install log capture before any llama.cpp calls
+    LogCapture::instance().install();
 
     // Signal handling for graceful shutdown
     std::signal(SIGINT, signal_handler);

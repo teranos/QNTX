@@ -52,6 +52,11 @@ class AIProviderPanel {
                         <span class="provider-name">OpenRouter</span>
                         <span class="provider-detail">Cloud API</span>
                     </button>
+                    <button id="provider-llama-cpp-btn" class="provider-btn">
+                        <span class="provider-icon">🦙</span>
+                        <span class="provider-name">llama.cpp</span>
+                        <span class="provider-detail" id="llama-cpp-status">Local Metal</span>
+                    </button>
                     <button id="provider-ollama-btn" class="provider-btn">
                         <span class="provider-icon">🖥️</span>
                         <span class="provider-name">Ollama</span>
@@ -118,10 +123,12 @@ class AIProviderPanel {
 
         // AI Provider toggle buttons
         const openrouterBtn = windowEl.querySelector('#provider-openrouter-btn');
+        const llamaCppBtn = windowEl.querySelector('#provider-llama-cpp-btn');
         const ollamaBtn = windowEl.querySelector('#provider-ollama-btn');
         const modelSelect = windowEl.querySelector<HTMLSelectElement>('#ollama-model-select');
 
         openrouterBtn?.addEventListener('click', () => this.switchToOpenRouter());
+        llamaCppBtn?.addEventListener('click', () => this.switchToLlamaCpp());
         ollamaBtn?.addEventListener('click', () => this.switchToOllama());
         modelSelect?.addEventListener('change', (e: Event) => {
             const target = e.target as HTMLSelectElement;
@@ -184,7 +191,11 @@ class AIProviderPanel {
     private setupProviderButtons(): void {
         if (!this.appConfig?.settings) return;
 
-        // Find local_inference.enabled setting
+        // Find llm.provider setting (new unified provider config)
+        const providerSetting = this.appConfig.settings.find(s => s.key === 'llm.provider');
+        const configuredProvider = providerSetting?.value as string;
+
+        // Find legacy local_inference settings
         const localInferenceSetting = this.appConfig.settings.find(s => s.key === 'local_inference.enabled');
         const isOllamaEnabled = localInferenceSetting?.value === true;
 
@@ -192,8 +203,17 @@ class AIProviderPanel {
         const modelSetting = this.appConfig.settings.find(s => s.key === 'local_inference.model');
         const effectiveModel = (modelSetting?.value as string) || 'llama3.2:3b';
 
-        // Update UI
-        this.updateProviderUI(isOllamaEnabled ? 'ollama' : 'openrouter');
+        // Determine active provider
+        let activeProvider: 'openrouter' | 'llama-cpp' | 'ollama' = 'openrouter';
+        if (configuredProvider === 'llama-cpp') {
+            activeProvider = 'llama-cpp';
+        } else if (configuredProvider === 'local' || isOllamaEnabled) {
+            activeProvider = 'ollama';
+        } else if (configuredProvider === 'openrouter' || !configuredProvider) {
+            activeProvider = 'openrouter';
+        }
+
+        this.updateProviderUI(activeProvider);
 
         // Update model dropdown
         const windowEl = this.window.getElement();
@@ -210,12 +230,31 @@ class AIProviderPanel {
 
         try {
             await this.updateConfig({
+                'llm.provider': 'openrouter',
                 'local_inference.enabled': false
             });
 
             this.updateStatus('Using OpenRouter (cloud API)', 'success');
         } catch (error: unknown) {
             handleError(error, 'Failed to switch to OpenRouter', { context: SEG.ACTOR, silent: true });
+            this.updateStatus('Failed to update config', 'error');
+        }
+    }
+
+    private async switchToLlamaCpp(): Promise<void> {
+        log.debug(SEG.ACTOR, 'Switching to llama.cpp');
+
+        this.updateProviderUI('llama-cpp');
+
+        try {
+            await this.updateConfig({
+                'llm.provider': 'llama-cpp',
+                'local_inference.enabled': false
+            });
+
+            this.updateStatus('Using llama.cpp (local Metal)', 'success');
+        } catch (error: unknown) {
+            handleError(error, 'Failed to switch to llama.cpp', { context: SEG.ACTOR, silent: true });
             this.updateStatus('Failed to update config', 'error');
         }
     }
@@ -231,6 +270,7 @@ class AIProviderPanel {
 
         try {
             await this.updateConfig({
+                'llm.provider': 'local',
                 'local_inference.enabled': true,
                 'local_inference.model': model
             });
@@ -257,23 +297,29 @@ class AIProviderPanel {
         }
     }
 
-    private updateProviderUI(provider: 'openrouter' | 'ollama'): void {
+    private updateProviderUI(provider: 'openrouter' | 'llama-cpp' | 'ollama'): void {
         const windowEl = this.window.getElement();
         const openrouterBtn = windowEl.querySelector('#provider-openrouter-btn');
+        const llamaCppBtn = windowEl.querySelector('#provider-llama-cpp-btn');
         const ollamaBtn = windowEl.querySelector('#provider-ollama-btn');
         const modelSelector = windowEl.querySelector('#ollama-model-selector');
         const openrouterConfig = windowEl.querySelector('#openrouter-config');
 
+        // Reset all
+        openrouterBtn?.classList.remove('active');
+        llamaCppBtn?.classList.remove('active');
+        ollamaBtn?.classList.remove('active');
+        modelSelector?.classList.add('u-hidden');
+        openrouterConfig?.classList.add('u-hidden');
+
         if (provider === 'openrouter') {
             openrouterBtn?.classList.add('active');
-            ollamaBtn?.classList.remove('active');
-            modelSelector?.classList.add('u-hidden');
             openrouterConfig?.classList.remove('u-hidden');
+        } else if (provider === 'llama-cpp') {
+            llamaCppBtn?.classList.add('active');
         } else {
-            openrouterBtn?.classList.remove('active');
             ollamaBtn?.classList.add('active');
             modelSelector?.classList.remove('u-hidden');
-            openrouterConfig?.classList.add('u-hidden');
         }
     }
 
