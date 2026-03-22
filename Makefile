@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -141,6 +141,17 @@ test: ## Run all tests (Go + TypeScript)
 	fi
 	@cd web && USE_JSDOM=1 bun test
 	@echo "✓ All tests complete"
+
+test-ocaml: ## Run OCaml plugin tests (loom, kern)
+	@echo "Running OCaml tests..."
+	@cd qntx-plugins/loom && opam exec -- dune runtest
+	@cd qntx-plugins/kern && opam exec -- dune runtest
+	@echo "✓ OCaml tests complete"
+
+test-d: ## Run D plugin tests (ix-net)
+	@echo "Running D tests..."
+	@$(MAKE) -C qntx-plugins/ix-net test
+	@echo "✓ D tests complete"
 
 test-coverage: ## Run all tests (Go + TypeScript) with coverage
 	@echo "Running Go tests with coverage..."
