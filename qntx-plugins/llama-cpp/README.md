@@ -21,18 +21,15 @@ enabled = ["llama-cpp"]
 [llama-cpp]
 model_path = "/path/to/model.gguf"
 n_ctx = "2048"
+log_level = "info"  # error | warn | info | debug
 ```
 
 ## Limitations
 
-1. **Model name not reported** — prompt-result attestations show "unknown-model" instead of the actual model name.
+1. **No streaming** — the full response is generated before returning. The UI blocks until generation completes.
 
-2. **Chat template hardcoded** — uses Llama 3 format (`<|start_header_id|>`, `<|eot_id|>`). Other model families (ChatML, Mistral, etc.) will produce incorrect output.
+2. **Single-turn only** — each prompt is a fresh context. The gRPC `LLMChatRequest` has no message history array. In QNTX, conversation history is spatial — result glyphs can be dragged to rearrange or splice turns — but the protocol has no way to carry that context to the plugin.
 
-3. **No streaming** — the full response is generated before returning. The UI blocks until generation completes.
+3. **No attachment support** — attachments (images, files) are passed through the gRPC protocol but the C++ plugin ignores them. Only text prompts are processed.
 
-4. **Single-turn only** — each prompt is a fresh context. The gRPC `LLMChatRequest` has no message history array. In QNTX, conversation history is spatial — result glyphs can be dragged to rearrange or splice turns — but the protocol has no way to carry that context to the plugin.
-
-5. **No attachment support** — attachments (images, files) are passed through the gRPC protocol but the C++ plugin ignores them. Only text prompts are processed.
-
-6. **Shutdown race** — mutex recursion between gRPC teardown and llama.cpp destructor on kill. Cosmetic log noise, not a data issue.
+4. **Shutdown race** — mutex recursion between gRPC teardown and llama.cpp destructor on kill. Cosmetic log noise, not a data issue.
