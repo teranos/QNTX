@@ -47,12 +47,19 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
 
     model_path_ = model_path;
 
-    // TODO: read model name from GGUF metadata (general.name) instead of deriving from filename
-    auto pos = model_path.find_last_of('/');
-    model_name_ = (pos != std::string::npos) ? model_path.substr(pos + 1) : model_path;
-    auto dot = model_name_.find_last_of('.');
-    if (dot != std::string::npos) {
-        model_name_ = model_name_.substr(0, dot);
+    // Read model name from GGUF metadata
+    char name_buf[256];
+    int n = llama_model_meta_val_str(model_, "general.name", name_buf, sizeof(name_buf));
+    if (n > 0) {
+        model_name_ = std::string(name_buf, n);
+    } else {
+        // Fallback: derive from filename
+        auto pos = model_path.find_last_of('/');
+        model_name_ = (pos != std::string::npos) ? model_path.substr(pos + 1) : model_path;
+        auto dot = model_name_.find_last_of('.');
+        if (dot != std::string::npos) {
+            model_name_ = model_name_.substr(0, dot);
+        }
     }
 
     std::cout << "[llama-cpp] Model loaded: " << model_name_
