@@ -65,6 +65,7 @@ import { formatBuildTime } from './components/tooltip.ts';
 import type { VersionMessage, SystemCapabilitiesMessage, SyncStatusMessage } from '../types/websocket';
 import { browserSync, type BrowserSyncState } from './browser-sync';
 import { createPluginGlyph } from './plugin-panel.ts';
+import { createLlmProviderGlyph } from './llm-provider-glyph.ts';
 
 // Sync status state
 let syncElement: HTMLElement | null = null;
@@ -641,6 +642,9 @@ export function registerDefaultGlyphs(): void {
     // Plugin Panel Glyph — panel manifestation
     glyphRun.add(createPluginGlyph());
 
+    // LLM Provider Glyph — provider selection (replaces ai-provider-window)
+    glyphRun.add(createLlmProviderGlyph());
+
     log.debug(SEG.UI, 'Default glyphs registered:', {
         canvas: 'Spatial canvas grid',
         database: 'Database statistics',
@@ -648,6 +652,7 @@ export function registerDefaultGlyphs(): void {
         sync: 'Attestation sync status',
         self: 'Self diagnostics',
         usage: 'API usage and costs',
-        plugins: 'Domain plugin panel'
+        plugins: 'Domain plugin panel',
+        llm: 'LLM provider selection'
     });
 }
