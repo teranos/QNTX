@@ -23,7 +23,7 @@ OpenRouter provides access to 100+ models (OpenAI, Anthropic, Google, etc.) thro
 ### provider
 **Why**: Switch between local inference and cloud APIs seamlessly.
 
-Users want to run models locally (Ollama, LocalAI) for privacy/cost, or use cloud APIs for convenience. The provider factory abstracts this choice - same interface, different backends.
+Users want to run models locally (llama.cpp) for privacy/cost, or use cloud APIs for convenience. The provider factory abstracts this choice - same interface, different backends.
 
 ## Design Non-Goals
 
