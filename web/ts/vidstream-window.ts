@@ -181,11 +181,10 @@ export class VidStreamWindow {
         const startBtn = windowEl.querySelector('#vs-start-btn') as HTMLButtonElement;
         const stopBtn = windowEl.querySelector('#vs-stop-btn') as HTMLButtonElement;
 
-        // Configure button - opens AI Provider panel
+        // Configure button - opens LLM Provider glyph
         configBtn?.addEventListener('click', () => {
-            // Import and call toggleAIProvider
-            import('./ai-provider-window.ts').then(module => {
-                module.toggleAIProvider();
+            import('./components/glyph/run.ts').then(({ glyphRun }) => {
+                glyphRun.openGlyph('llm-provider-glyph');
             });
         });
 

@@ -24,7 +24,7 @@ import { handleStorageEviction } from './websocket-handlers/storage-eviction.ts'
 import './symbol-palette.ts';
 import { toggleConfig } from './config-panel.ts';
 import { Window } from './components/window.ts';
-import './ai-provider-window.ts';
+// ai-provider-window.ts removed — LLM provider is now a tray glyph (llm-provider-glyph.ts)
 // Note: Panel toggle functions are dynamically imported in Tauri event listeners below
 // to avoid unused import warnings. Menu items use "show" events with dynamic imports,
 // while keyboard shortcuts in individual panels use the toggle functions directly.
