@@ -502,10 +502,6 @@ function renderSelf(): void {
             `<span style="color: #4ade80;">✓ Optimized (${fuzzyBackendLabel})</span>` :
             `<span style="color: #fbbf24;">⚠ Fallback (Go)</span>`;
 
-        const vidstreamStatus = caps.vidstream_optimized ?
-            `<span style="color: #4ade80;">✓ Available (ONNX)</span>` :
-            `<span style="color: #fbbf24;">⚠ Unavailable</span>`;
-
         const storageStatus = caps.storage_optimized ?
             `<span style="color: #4ade80;">✓ Optimized (Rust)</span>` :
             `<span style="color: #fbbf24;">⚠ Fallback (Go)</span>`;
@@ -525,13 +521,6 @@ function renderSelf(): void {
                     <span class="glyph-value">
                         ${caps.fuzzy_version ? `v${caps.fuzzy_version}` : 'unknown'}
                         ${fuzzyStatus}
-                    </span>
-                </div>
-                <div class="glyph-row">
-                    <span class="glyph-label">vidstream:</span>
-                    <span class="glyph-value">
-                        ${caps.vidstream_version ? `v${caps.vidstream_version}` : 'unknown'}
-                        ${vidstreamStatus}
                     </span>
                 </div>
                 <div class="glyph-row">

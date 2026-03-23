@@ -213,4 +213,4 @@ describe('YourComponent', () => {
 });
 ```
 
-See `ts/vidstream-window.dom.test.ts` for example.
+See existing DOM test files for examples.
