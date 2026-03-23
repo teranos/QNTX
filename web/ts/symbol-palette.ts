@@ -36,7 +36,7 @@ import { tooltip } from './components/tooltip.ts';
 
 // Import all panel/window modules statically
 import { toggleConfig } from './config-panel.js';
-import { toggleAIProvider } from './ai-provider-window.js';
+// ai-provider-window.ts removed — LLM provider is now a tray glyph
 import { togglePulsePanel } from './pulse-panel.js';
 import { toggleProsePanel } from './prose/panel.js';
 import { toggleGoEditor } from './code/panel.js';
@@ -292,10 +292,10 @@ function showConfigPanel(): void {
 }
 
 /**
- * Show AI provider panel - displays actor/agent configuration
+ * Show LLM provider glyph - opens the tray glyph for provider selection
  */
 function showAIProviderPanel(): void {
-    toggleAIProvider();
+    glyphRun.openGlyph('llm-provider-glyph');
 }
 
 /**
