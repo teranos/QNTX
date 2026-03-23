@@ -316,6 +316,11 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		// Store services manager and registry for shutdown and reinitialization
 		server.servicesManager = servicesManager
 		server.services = services
+
+		// Wire services manager to plugin manager for LLM provider re-registration after restart
+		if server.pluginManager != nil {
+			server.pluginManager.SetServicesManager(servicesManager)
+		}
 	}
 
 	// Initialize gRPC plugins (if any are loaded)

@@ -31,7 +31,7 @@ No configuration changes. It scales to available resources automatically.
 ## AI-Native Architecture
 
 QNTX provides:
-- Local inference with Ollama/ONNX
+- Local inference with llama.cpp
 - Cloud inference via OpenRouter
 - Persistent memory for LLMs via attestations
 - Tool-callable interface for AI agents

@@ -22,7 +22,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "openrouter",
-			Version:     "0.4.0",
+			Version:     "0.4.3",
 			QNTXVersion: ">= 0.1.0",
 			Description: "OpenRouter LLM gateway for prompt execution, usage tracking, and model pricing",
 			Author:      "QNTX Team",
@@ -126,10 +126,22 @@ func (p *Plugin) Chat(ctx context.Context, req plugin.LLMRequest) (*plugin.LLMRe
 	// Convert plugin.LLMAttachment → ContentPart for the OpenRouter client
 	var attachments []ContentPart
 	for _, a := range req.Attachments {
-		attachments = append(attachments, ContentPart{
-			Type:     "image_url",
-			ImageURL: &ContentPartImage{URL: fmt.Sprintf("data:%s;base64,%s", a.MimeType, a.Data)},
-		})
+		if a.MimeType == "application/pdf" || a.MimeType == "file" {
+			// Anthropic document format — OpenRouter passes through to Anthropic models
+			attachments = append(attachments, ContentPart{
+				Type: "document",
+				Source: &ContentPartSource{
+					Type:      "base64",
+					MediaType: "application/pdf",
+					Data:      a.Data,
+				},
+			})
+		} else {
+			attachments = append(attachments, ContentPart{
+				Type:     "image_url",
+				ImageURL: &ContentPartImage{URL: fmt.Sprintf("data:%s;base64,%s", a.MimeType, a.Data)},
+			})
+		}
 	}
 
 	chatReq := ChatRequest{
