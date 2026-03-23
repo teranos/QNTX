@@ -22,17 +22,6 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("code.gopls.enabled", true)
 	v.SetDefault("code.gopls.workspace_root", ".")
 
-	// Local Inference (Ollama/LocalAI) defaults
-	v.SetDefault("local_inference.enabled", false) // Disabled by default - users should opt-in to local providers
-	v.SetDefault("local_inference.base_url", "http://localhost:11434")
-	v.SetDefault("local_inference.model", "llama3.2:3b")
-	// context_size is optional: nil = model default (checked in ai/provider/local_provider.go)
-	v.SetDefault("local_inference.timeout_seconds", 360) // 6 minutes - reasonable for slow inference
-	v.SetDefault("local_inference.onnx_model_path", "ats/vidstream/models/yolo11n.onnx")
-
-	// OpenRouter configuration is now handled by the qntx-openrouter plugin.
-	// Plugin config keys are read via plugin.Config.GetString("api_key") etc.
-
 	// Ax (attestation query) defaults
 	v.SetDefault("ax.default_actor", "ax@user")
 
@@ -163,10 +152,6 @@ func BindSensitiveEnvVars(v *viper.Viper) {
 	// Server bind address (e.g., "0.0.0.0" for all interfaces — requires auth.enabled)
 	v.BindEnv("server.bind_address", "QNTX_BIND_ADDRESS")
 
-	// Local inference configuration
-	v.BindEnv("local_inference.enabled", "QNTX_LOCAL_INFERENCE_ENABLED")
-	v.BindEnv("local_inference.base_url", "QNTX_LOCAL_INFERENCE_BASE_URL")
-	v.BindEnv("local_inference.model", "QNTX_LOCAL_INFERENCE_MODEL")
 }
 
 // IsLoopbackAddress returns true if the address is a loopback address (127.0.0.1, ::1, localhost)

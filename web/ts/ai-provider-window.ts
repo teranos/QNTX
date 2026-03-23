@@ -4,7 +4,7 @@
  * TODO: Migrate to glyph manifestation, then delete. See components/window.ts.
  *
  * Shows AI inference provider selection when clicking ⌬ (by/actor) in the symbol palette.
- * Allows switching between OpenRouter (cloud) and Ollama (local) providers.
+ * Allows switching between OpenRouter (cloud) and llama.cpp (local) providers.
  */
 
 import { Window } from './components/window.ts';
@@ -26,7 +26,6 @@ interface ConfigResponse {
 class AIProviderPanel {
     private window: Window;
     private appConfig: ConfigResponse | null = null;
-    private ollamaAvailable: boolean = false;
 
     constructor() {
         this.window = new Window({
@@ -57,11 +56,6 @@ class AIProviderPanel {
                         <span class="provider-name">llama.cpp</span>
                         <span class="provider-detail" id="llama-cpp-status">Local Metal</span>
                     </button>
-                    <button id="provider-ollama-btn" class="provider-btn">
-                        <span class="provider-icon">🖥️</span>
-                        <span class="provider-name">Ollama</span>
-                        <span class="provider-detail" id="ollama-status">Local GPU/CPU</span>
-                    </button>
                 </div>
                 <div id="openrouter-config" class="provider-config">
                     <div class="api-key-section">
@@ -80,31 +74,6 @@ class AIProviderPanel {
                         <div class="api-key-hint">Get your key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a></div>
                     </div>
                 </div>
-                <div id="ollama-model-selector" class="ollama-model-selector provider-config hidden">
-                    <label for="ollama-model-select">Ollama Model:</label>
-                    <select id="ollama-model-select">
-                        <option value="llama3.2:3b">llama3.2:3b (3B, very fast)</option>
-                        <option value="mistral">mistral (7B, fast, general)</option>
-                        <option value="qwen2.5-coder:7b">qwen2.5-coder:7b (code/technical)</option>
-                        <option value="deepseek-r1:7b">deepseek-r1:7b (reasoning)</option>
-                    </select>
-                </div>
-                <div class="config-toggle-header" style="margin-top: 16px;">
-                    <span class="config-toggle-title">Computer Vision (ONNX)</span>
-                </div>
-                <div id="onnx-model-config" class="provider-config">
-                    <label for="onnx-model-path">ONNX Model Path (VidStream):</label>
-                    <div class="api-key-input-group">
-                        <input
-                            type="text"
-                            id="onnx-model-path"
-                            class="api-key-input"
-                            placeholder="ats/vidstream/models/yolo11n.onnx"
-                            autocomplete="off"
-                        />
-                        <button id="onnx-model-save" class="api-key-save has-tooltip" data-tooltip="Save">💾</button>
-                    </div>
-                </div>
             </div>
         `;
 
@@ -121,19 +90,11 @@ class AIProviderPanel {
     private setupEventListeners(): void {
         const windowEl = this.window.getElement();
 
-        // AI Provider toggle buttons
         const openrouterBtn = windowEl.querySelector('#provider-openrouter-btn');
         const llamaCppBtn = windowEl.querySelector('#provider-llama-cpp-btn');
-        const ollamaBtn = windowEl.querySelector('#provider-ollama-btn');
-        const modelSelect = windowEl.querySelector<HTMLSelectElement>('#ollama-model-select');
 
         openrouterBtn?.addEventListener('click', () => this.switchToOpenRouter());
         llamaCppBtn?.addEventListener('click', () => this.switchToLlamaCpp());
-        ollamaBtn?.addEventListener('click', () => this.switchToOllama());
-        modelSelect?.addEventListener('change', (e: Event) => {
-            const target = e.target as HTMLSelectElement;
-            this.updateOllamaModel(target.value);
-        });
 
         // OpenRouter API key handling
         const keyInput = windowEl.querySelector<HTMLInputElement>('#openrouter-api-key');
@@ -155,25 +116,12 @@ class AIProviderPanel {
                 this.saveOpenRouterKey();
             }
         });
-
-        // ONNX model path handling
-        const onnxPathInput = windowEl.querySelector<HTMLInputElement>('#onnx-model-path');
-        const onnxSave = windowEl.querySelector('#onnx-model-save');
-
-        onnxSave?.addEventListener('click', () => this.saveONNXModelPath());
-        onnxPathInput?.addEventListener('keypress', (e: KeyboardEvent) => {
-            if (e.key === 'Enter') {
-                this.saveONNXModelPath();
-            }
-        });
     }
 
     private async onShow(): Promise<void> {
         await this.fetchConfig();
         this.setupProviderButtons();
         await this.loadOpenRouterKey();
-        await this.loadONNXModelPath();
-        await this.checkOllamaStatus();
     }
 
     private async fetchConfig(): Promise<void> {
@@ -191,36 +139,15 @@ class AIProviderPanel {
     private setupProviderButtons(): void {
         if (!this.appConfig?.settings) return;
 
-        // Find llm.provider setting (new unified provider config)
         const providerSetting = this.appConfig.settings.find(s => s.key === 'llm.provider');
         const configuredProvider = providerSetting?.value as string;
 
-        // Find legacy local_inference settings
-        const localInferenceSetting = this.appConfig.settings.find(s => s.key === 'local_inference.enabled');
-        const isOllamaEnabled = localInferenceSetting?.value === true;
-
-        // Find local_inference.model setting
-        const modelSetting = this.appConfig.settings.find(s => s.key === 'local_inference.model');
-        const effectiveModel = (modelSetting?.value as string) || 'llama3.2:3b';
-
-        // Determine active provider
-        let activeProvider: 'openrouter' | 'llama-cpp' | 'ollama' = 'openrouter';
+        let activeProvider: 'openrouter' | 'llama-cpp' = 'openrouter';
         if (configuredProvider === 'llama-cpp') {
             activeProvider = 'llama-cpp';
-        } else if (configuredProvider === 'local' || isOllamaEnabled) {
-            activeProvider = 'ollama';
-        } else if (configuredProvider === 'openrouter' || !configuredProvider) {
-            activeProvider = 'openrouter';
         }
 
         this.updateProviderUI(activeProvider);
-
-        // Update model dropdown
-        const windowEl = this.window.getElement();
-        const modelSelect = windowEl.querySelector<HTMLSelectElement>('#ollama-model-select');
-        if (modelSelect) {
-            modelSelect.value = effectiveModel;
-        }
     }
 
     private async switchToOpenRouter(): Promise<void> {
@@ -231,7 +158,6 @@ class AIProviderPanel {
         try {
             await this.updateConfig({
                 'llm.provider': 'openrouter',
-                'local_inference.enabled': false
             });
 
             this.updateStatus('Using OpenRouter (cloud API)', 'success');
@@ -249,7 +175,6 @@ class AIProviderPanel {
         try {
             await this.updateConfig({
                 'llm.provider': 'llama-cpp',
-                'local_inference.enabled': false
             });
 
             this.updateStatus('Using llama.cpp (local Metal)', 'success');
@@ -259,67 +184,21 @@ class AIProviderPanel {
         }
     }
 
-    private async switchToOllama(): Promise<void> {
-        log.debug(SEG.ACTOR, 'Switching to Ollama');
-
-        this.updateProviderUI('ollama');
-
-        const windowEl = this.window.getElement();
-        const modelSelect = windowEl.querySelector<HTMLSelectElement>('#ollama-model-select');
-        const model = modelSelect ? modelSelect.value : 'llama3.2:3b';
-
-        try {
-            await this.updateConfig({
-                'llm.provider': 'local',
-                'local_inference.enabled': true,
-                'local_inference.model': model
-            });
-
-            this.updateStatus(`Using Ollama (${model})`, 'success');
-        } catch (error: unknown) {
-            handleError(error, 'Failed to switch to Ollama', { context: SEG.ACTOR, silent: true });
-            this.updateStatus('Failed to update config - is Ollama running?', 'error');
-        }
-    }
-
-    private async updateOllamaModel(model: string): Promise<void> {
-        log.debug(SEG.ACTOR, 'Updating Ollama model to:', model);
-
-        try {
-            await this.updateConfig({
-                'local_inference.model': model
-            });
-
-            this.updateStatus(`Using Ollama (${model})`, 'success');
-        } catch (error: unknown) {
-            handleError(error, 'Failed to update Ollama model', { context: SEG.ACTOR, silent: true });
-            this.updateStatus('Failed to update model', 'error');
-        }
-    }
-
-    private updateProviderUI(provider: 'openrouter' | 'llama-cpp' | 'ollama'): void {
+    private updateProviderUI(provider: 'openrouter' | 'llama-cpp'): void {
         const windowEl = this.window.getElement();
         const openrouterBtn = windowEl.querySelector('#provider-openrouter-btn');
         const llamaCppBtn = windowEl.querySelector('#provider-llama-cpp-btn');
-        const ollamaBtn = windowEl.querySelector('#provider-ollama-btn');
-        const modelSelector = windowEl.querySelector('#ollama-model-selector');
         const openrouterConfig = windowEl.querySelector('#openrouter-config');
 
-        // Reset all
         openrouterBtn?.classList.remove('active');
         llamaCppBtn?.classList.remove('active');
-        ollamaBtn?.classList.remove('active');
-        modelSelector?.classList.add('u-hidden');
         openrouterConfig?.classList.add('u-hidden');
 
         if (provider === 'openrouter') {
             openrouterBtn?.classList.add('active');
             openrouterConfig?.classList.remove('u-hidden');
-        } else if (provider === 'llama-cpp') {
-            llamaCppBtn?.classList.add('active');
         } else {
-            ollamaBtn?.classList.add('active');
-            modelSelector?.classList.remove('u-hidden');
+            llamaCppBtn?.classList.add('active');
         }
     }
 
@@ -330,7 +209,6 @@ class AIProviderPanel {
             statusEl.textContent = message;
             statusEl.className = `config-toggle-status status-${type}`;
 
-            // Don't auto-clear warning messages
             if (type !== 'warning') {
                 setTimeout(() => {
                     statusEl.textContent = '';
@@ -359,14 +237,12 @@ class AIProviderPanel {
     private async loadOpenRouterKey(): Promise<void> {
         if (!this.appConfig?.settings) return;
 
-        // Find the OpenRouter API key setting
         const keySetting = this.appConfig.settings.find(s => s.key === 'openrouter.api_key');
         const windowEl = this.window.getElement();
         const keyInput = windowEl.querySelector<HTMLInputElement>('#openrouter-api-key');
 
         if (keyInput && keySetting?.value) {
             const keyValue = keySetting.value as string;
-            // Show masked version of key (first 10 chars + ...)
             if (keyValue.length > 10) {
                 keyInput.placeholder = keyValue.substring(0, 10) + '...(configured)';
             }
@@ -384,7 +260,6 @@ class AIProviderPanel {
             return;
         }
 
-        // Basic validation for OpenRouter key format
         if (!apiKey.startsWith('sk-or-')) {
             this.updateStatus('Invalid key format (should start with sk-or-)', 'error');
             return;
@@ -396,90 +271,11 @@ class AIProviderPanel {
             });
 
             this.updateStatus('API key saved successfully', 'success');
-            keyInput.value = ''; // Clear the input
+            keyInput.value = '';
             keyInput.placeholder = apiKey.substring(0, 10) + '...(configured)';
         } catch (error: unknown) {
             handleError(error, 'Failed to save API key', { context: SEG.ACTOR, silent: true });
             this.updateStatus('Failed to save API key', 'error');
-        }
-    }
-
-    private async loadONNXModelPath(): Promise<void> {
-        if (!this.appConfig?.settings) return;
-
-        const pathSetting = this.appConfig.settings.find(s => s.key === 'local_inference.onnx_model_path');
-        const windowEl = this.window.getElement();
-        const pathInput = windowEl.querySelector<HTMLInputElement>('#onnx-model-path');
-
-        if (pathInput && pathSetting?.value) {
-            pathInput.value = pathSetting.value as string;
-        }
-    }
-
-    private async saveONNXModelPath(): Promise<void> {
-        const windowEl = this.window.getElement();
-        const pathInput = windowEl.querySelector<HTMLInputElement>('#onnx-model-path');
-        if (!pathInput) return;
-
-        const path = pathInput.value.trim();
-        if (!path) {
-            this.updateStatus('Please enter a model path', 'warning');
-            return;
-        }
-
-        try {
-            await this.updateConfig({
-                'local_inference.onnx_model_path': path
-            });
-
-            this.updateStatus('ONNX model path saved', 'success');
-        } catch (error: unknown) {
-            handleError(error, 'Failed to save ONNX model path', { context: SEG.ACTOR, silent: true });
-            // Extract error message from Error object to show server-side error details
-            const errorMsg = error instanceof Error ? error.message : 'Failed to save model path';
-            this.updateStatus(errorMsg, 'error');
-        }
-    }
-
-    private async checkOllamaStatus(): Promise<void> {
-        try {
-            // Try to connect to Ollama API
-            const response = await fetch('http://localhost:11434/api/tags', {
-                method: 'GET',
-                signal: AbortSignal.timeout(2000), // 2 second timeout
-            });
-
-            this.ollamaAvailable = response.ok;
-
-            const windowEl = this.window.getElement();
-            const ollamaBtn = windowEl.querySelector('#provider-ollama-btn');
-            const ollamaStatus = windowEl.querySelector('#ollama-status');
-
-            if (this.ollamaAvailable) {
-                ollamaBtn?.classList.remove('ollama-unavailable');
-                if (ollamaStatus) {
-                    ollamaStatus.textContent = 'Local GPU/CPU';
-                }
-            } else {
-                ollamaBtn?.classList.add('ollama-unavailable');
-                if (ollamaStatus) {
-                    ollamaStatus.textContent = 'Offline';
-                }
-            }
-        } catch (error: unknown) {
-            // Ollama is not running or unreachable
-            this.ollamaAvailable = false;
-
-            const windowEl = this.window.getElement();
-            const ollamaBtn = windowEl.querySelector('#provider-ollama-btn');
-            const ollamaStatus = windowEl.querySelector('#ollama-status');
-
-            ollamaBtn?.classList.add('ollama-unavailable');
-            if (ollamaStatus) {
-                ollamaStatus.textContent = 'Offline';
-            }
-
-            handleError(error, 'Ollama not available', { context: SEG.ACTOR, silent: true });
         }
     }
 

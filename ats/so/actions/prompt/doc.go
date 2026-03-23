@@ -4,7 +4,7 @@
 //
 //  1. Query attestations using ax filter
 //  2. Interpolate a template with attestation fields for each result
-//  3. Execute the prompt against an LLM (OpenRouter or local Ollama)
+//  3. Execute the prompt against an LLM via gRPC plugin (OpenRouter, llama.cpp)
 //  4. Create result attestations linking back to the source
 //
 // # Template Syntax

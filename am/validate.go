@@ -25,19 +25,6 @@ func (c *Config) Validate() error {
 		return errors.Newf("pulse.ticker_interval_seconds must be >= 0, got %d", c.Pulse.TickerIntervalSeconds)
 	}
 
-	// Validate local inference configuration only when enabled
-	if c.LocalInference.Enabled {
-		if c.LocalInference.BaseURL == "" {
-			return errors.New("local_inference.base_url cannot be empty when enabled")
-		}
-		if c.LocalInference.Model == "" {
-			return errors.New("local_inference.model cannot be empty when enabled")
-		}
-		if c.LocalInference.TimeoutSeconds <= 0 {
-			return errors.Newf("local_inference.timeout_seconds must be > 0, got %d", c.LocalInference.TimeoutSeconds)
-		}
-	}
-
 	// Budget values: 0 = no budget (valid per "zero means zero"), negative = invalid
 	if c.Pulse.DailyBudgetUSD < 0 {
 		return errors.Newf("pulse.daily_budget_usd must be >= 0, got %f", c.Pulse.DailyBudgetUSD)
