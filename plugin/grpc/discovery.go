@@ -91,11 +91,12 @@ type PluginManager struct {
 	failedPlugins     map[string]string // plugin name → error message for plugins that failed to load
 	logger            *zap.SugaredLogger
 	basePort          int
-	nextPort          int        // Track the next port to allocate
-	portMu            sync.Mutex // Separate mutex for port allocation
-	typescriptRuntime string     // Path to TypeScript runtime (main.ts)
-	shutdownCtx       context.Context    // cancelled on Shutdown to stop retry goroutines
+	nextPort          int             // Track the next port to allocate
+	portMu            sync.Mutex      // Separate mutex for port allocation
+	typescriptRuntime string          // Path to TypeScript runtime (main.ts)
+	shutdownCtx       context.Context // cancelled on Shutdown to stop retry goroutines
 	shutdownCancel    context.CancelFunc
+	servicesManager   *ServicesManager // for re-registering LLM providers after restart
 }
 
 // managedPlugin tracks a running plugin.
@@ -148,6 +149,11 @@ func GetDefaultPluginManager() *PluginManager {
 	pluginManagerMu.RLock()
 	defer pluginManagerMu.RUnlock()
 	return defaultPluginManager
+}
+
+// SetServicesManager sets the services manager for LLM provider re-registration after restart.
+func (m *PluginManager) SetServicesManager(sm *ServicesManager) {
+	m.servicesManager = sm
 }
 
 // LoadPlugins loads and connects to plugins from configuration.
@@ -743,6 +749,20 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 	if services != nil {
 		if err := m.ReinitializePlugin(ctx, name, services); err != nil {
 			m.logger.Errorf("Failed to reinitialize plugin '%s' after restart: %v", name, err)
+		}
+	}
+
+	// Re-register LLM provider if applicable
+	m.mu.RLock()
+	p, exists := m.plugins[name]
+	m.mu.RUnlock()
+	if exists && m.servicesManager != nil {
+		proxy := p.client
+		if proxy.IsLLMProvider() {
+			if llmRouter := m.servicesManager.GetLLMRouter(); llmRouter != nil {
+				llmRouter.RegisterProvider(name, proxy.LLMServiceClient())
+				m.logger.Infof("Re-registered LLM provider '%s' after restart", name)
+			}
 		}
 	}
 
