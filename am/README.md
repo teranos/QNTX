@@ -61,7 +61,7 @@ Infrastructure configured by `am`:
 - **`server`** - Web UI ports, CORS origins, log themes
 - **`pulse`** - Async job workers, scheduling, HTTP rate limiting
 - **`code`** - Code review system (GitHub, gopls integration)
-- **`local_inference`** - Local LLM support (Ollama, LocalAI)
+- **`local_inference`** - Local LLM support (llama.cpp plugin)
 - **`ax`** - Attestation query defaults
 
 See `am.go` for complete type definitions.
