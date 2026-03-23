@@ -21,7 +21,7 @@ Current subsystems:
 - **ATS** — Attestation Type System: attest your own types, store and retrieve them (⋈ ax/ask)
 - **꩜ Pulse** — provides async execution with resource-aware scheduling
 - **Glyphs ⧉** — persistent interactive UI primitive
-- **Plugins** — domain logic via gRPC, isolated from core (e.g. local AI via Ollama/ONNX)
+- **Plugins** — domain logic via gRPC, isolated from core (e.g. local AI via llama.cpp)
 
 ### Quality Goals
 
@@ -41,7 +41,7 @@ See [Design Philosophy](design-philosophy.md).
 |-------------|-------------|
 | Creator / steward | System works, vision intact, honest documentation |
 | Community (forming) | Participation, transparency, shared governance |
-| Organizations wanting local AI | Private LLM capabilities, no cloud dependency, Ollama integration |
+| Organizations wanting local AI | Private LLM capabilities, no cloud dependency, llama.cpp integration |
 | The public | A public good — intelligence tooling |
 
 The intent is public good. Governance is centralized now, with decentralized stakeholdership as a future direction.
@@ -123,7 +123,7 @@ See [Understanding QNTX](understanding-qntx.md).
 Key technical decisions and why:
 
 - **Attestations as the primitive** — not documents, not rows, not objects. Structured claims that compose, sync, and verify.
-- **Local-first** — SQLite on your machine, Ollama on your machine. Cloud is opt-in, not required.
+- **Local-first** — SQLite on your machine, llama.cpp on your machine. Cloud is opt-in, not required.
 - **Core is minimal** — ATS, DB, ≡ am, ꩜ Pulse, ⋈ ax. Everything else is a plugin over gRPC.
 - **Rust/WASM for cross-runtime logic** — parser, fuzzy engine, Merkle tree. One implementation, three runtimes (server via wazero, browser via wasm-bindgen, native tests via cargo).
 See [Design Philosophy](design-philosophy.md) and [Distribution Strategy](distribution-strategy.md).

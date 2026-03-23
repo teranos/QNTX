@@ -132,36 +132,6 @@ ticker_interval_seconds = 1
 enabled = true
 
 # ════════════════════════════════════════════════════════════════
-# Local Inference Configuration (Ollama, LocalAI, etc.)
-# ════════════════════════════════════════════════════════════════
-
-[local_inference]
-# Enable local model inference instead of cloud APIs
-# Default: true
-# Environment: QNTX_LOCAL_INFERENCE_ENABLED
-enabled = true
-
-# Local inference server URL
-# Default: "http://localhost:11434" (Ollama default)
-# Environment: QNTX_LOCAL_INFERENCE_BASE_URL
-base_url = "http://localhost:11434"
-
-# Model to use for local inference
-# Examples: "llama3.2:3b", "mistral", "qwen2.5-coder:7b"
-# Default: "llama3.2:3b"
-# Environment: QNTX_LOCAL_INFERENCE_MODEL
-model = "llama3.2:3b"
-
-# Context window size (0 = model default)
-# Examples: 16384, 32768, 131072
-# Default: 16384
-context_size = 16384
-
-# Request timeout in seconds
-# Default: 3600 (1 hour)
-timeout_seconds = 3600
-
-# ════════════════════════════════════════════════════════════════
 # Ax Configuration (Attestation Query System)
 # ════════════════════════════════════════════════════════════════
 

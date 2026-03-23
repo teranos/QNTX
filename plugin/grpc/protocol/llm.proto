@@ -5,7 +5,7 @@ package protocol;
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
 // LLMService provides provider-agnostic LLM access for plugins.
-// Provider plugins (OpenRouter, Ollama) register as backends.
+// Provider plugins (OpenRouter, llama.cpp) register as backends.
 // Core routes requests to the appropriate provider.
 service LLMService {
   rpc Chat(LLMChatRequest) returns (LLMChatResponse);

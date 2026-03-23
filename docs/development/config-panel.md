@@ -117,12 +117,12 @@ Current backend capabilities:
 │ ▼ UI Config (Editable)              │
 │   (Managed by UI, ~/.qntx/config... │
 │   ┌─────────────────────────────┐   │
-│   │ local_inference.enabled     │   │
-│   │ [✓] true            [Edit]  │   │
+│   │ llm.provider               │   │
+│   │ llama.cpp           [Edit]  │   │
 │   │ [user_ui] ✅ Active         │   │
 │   └─────────────────────────────┘   │
 │   ┌─────────────────────────────┐   │
-│   │ local_inference.model       │   │
+│   │ llm.model                   │   │
 │   │ mistral          [▼ Edit]   │   │
 │   │ [user_ui] ✅ Active         │   │
 │   └─────────────────────────────┘   │
@@ -283,7 +283,7 @@ pulse.daily_budget_usd = 10.0         [USER_UI] ✓
 │                                                             │
 │ Related Settings:                                           │
 │   • openrouter.api_key - Required for OpenRouter access    │
-│   • local_inference.enabled - Alternative to cloud         │
+│   • llm.provider - LLM provider selection                  │
 │                                                             │
 │ Cost Impact: Varies by model (see OpenRouter pricing)      │
 │                                                             │

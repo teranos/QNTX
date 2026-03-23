@@ -2,7 +2,6 @@ package prompt
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -94,8 +93,7 @@ type Handler struct {
 	queryStore    ats.AttestationQueryStore
 	store         ats.AttestationStore
 	aliasResolver *alias.Resolver
-	config        *am.Config
-	db            *sql.DB
+	llmRouter     provider.GRPCLLMRouter
 }
 
 // NewHandler creates a new prompt handler
@@ -103,15 +101,13 @@ func NewHandler(
 	queryStore ats.AttestationQueryStore,
 	store ats.AttestationStore,
 	aliasResolver *alias.Resolver,
-	config *am.Config,
-	db *sql.DB,
+	llmRouter provider.GRPCLLMRouter,
 ) *Handler {
 	return &Handler{
 		queryStore:    queryStore,
 		store:         store,
 		aliasResolver: aliasResolver,
-		config:        config,
-		db:            db,
+		llmRouter:     llmRouter,
 	}
 }
 
@@ -322,31 +318,18 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 // createAIClient creates the appropriate AI client based on payload and frontmatter configuration
 // Priority: payload.Provider > config default
 //
-// OpenRouter is now a gRPC plugin (qntx-openrouter). This handler uses
-// the in-process provider factory which only supports local inference.
+// createAIClient creates an AI client for prompt execution.
+// All LLM providers are gRPC plugins — requires an LLM router on the handler.
 func (h *Handler) createAIClient(payload Payload, doc *PromptDocument) provider.AIClient {
-	// Determine model to use (payload overrides frontmatter overrides config)
-	model := ""
-	if payload.Model != "" {
-		model = payload.Model
-	} else if doc.Metadata.Model != "" {
-		model = doc.Metadata.Model
+	providerName := payload.Provider
+	if providerName == "" {
+		providerName = am.GetString("llm.provider")
+	}
+	if providerName == "" {
+		providerName = "openrouter"
 	}
 
-	// Determine which provider to use
-	providerType := provider.DetermineProvider(h.config, payload.Provider)
-
-	// Create the appropriate client with model override
-	return provider.NewAIClientForProviderWithModel(
-		providerType,
-		h.config,
-		model, // Can be empty string, provider will use default
-		h.db,
-		0, // verbosity
-		"prompt-execute",
-		"", // entityType
-		"", // entityID
-	)
+	return provider.NewGRPCLLMClient(h.llmRouter, providerName)
 }
 
 // createResultAttestation creates an attestation from the LLM response
@@ -362,16 +345,18 @@ func (h *Handler) createResultAttestation(
 
 	actor := payload.ResultActor
 	if actor == "" {
-		// Determine the model being used
-		var model string
-		if payload.Model != "" {
-			model = payload.Model
-		} else {
-			model = h.config.LocalInference.Model
+		// Use model from payload, or fall back to provider name
+		model := payload.Model
+		if model == "" {
+			model = payload.Provider
+		}
+		if model == "" {
+			model = am.GetString("llm.provider")
+		}
+		if model == "" {
+			model = "unknown"
 		}
 
-		// Construct actor as model@promptID if we have a prompt ID
-		// This represents the actual "agent" - the model running with this specific prompt
 		if payload.PromptID != "" {
 			actor = model + "@" + payload.PromptID
 		} else {
