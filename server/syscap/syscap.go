@@ -11,15 +11,6 @@ func Get(fuzzyBackend ax.MatcherBackend) Message {
 	fuzzyOptimized := (fuzzyBackend == ax.MatcherBackendWasm)
 	fuzzyVersion := fuzzyBackendVersion()
 
-	// Detect vidstream/ONNX availability (requires CGO build with rustvideo tag)
-	vidstreamOptimized := vidstreamAvailable()
-	vidstreamBackend := "onnx"
-	vidstreamVersion := vidstreamBackendVersion()
-	if !vidstreamOptimized {
-		vidstreamBackend = "unavailable"
-		vidstreamVersion = "n/a"
-	}
-
 	// Detect storage backend (requires CGO build with rustsqlite tag)
 	storageOptimized := storageAvailable()
 	storageBackend := "rust"
@@ -40,20 +31,17 @@ func Get(fuzzyBackend ax.MatcherBackend) Message {
 	}
 
 	return Message{
-		Type:               "system_capabilities",
-		FuzzyBackend:       string(fuzzyBackend),
-		FuzzyOptimized:     fuzzyOptimized,
-		FuzzyVersion:       fuzzyVersion,
-		VidStreamBackend:   vidstreamBackend,
-		VidStreamOptimized: vidstreamOptimized,
-		VidStreamVersion:   vidstreamVersion,
-		StorageBackend:     storageBackend,
-		StorageOptimized:   storageOptimized,
-		StorageVersion:     storageVersion,
-		ParserBackend:      parserBackend,
-		ParserOptimized:    parserOptimized,
-		ParserVersion:      parserVersion,
-		ParserSize:         parserSize,
+		Type:             "system_capabilities",
+		FuzzyBackend:     string(fuzzyBackend),
+		FuzzyOptimized:   fuzzyOptimized,
+		FuzzyVersion:     fuzzyVersion,
+		StorageBackend:   storageBackend,
+		StorageOptimized: storageOptimized,
+		StorageVersion:   storageVersion,
+		ParserBackend:    parserBackend,
+		ParserOptimized:  parserOptimized,
+		ParserVersion:    parserVersion,
+		ParserSize:       parserSize,
 	}
 }
 

@@ -624,7 +624,7 @@ export interface PulseExecutionStartedMessage {
 
 export interface QueryMessage {
   /**
-   * "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility", "vidstream_init", "vidstream_frame", "rich_search"
+   * "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility", "rich_search"
    */
   type: string;
   /**
@@ -687,34 +687,6 @@ export interface QueryMessage {
    * For visibility messages: whether to hide the node type/isolated nodes
    */
   hidden: boolean;
-  /**
-   * VidStream fields (for vidstream_init and vidstream_frame messages)
-   */
-  model_path: string;
-  /**
-   * For vidstream_init: detection confidence threshold
-   */
-  confidence_threshold: number;
-  /**
-   * For vidstream_init: NMS IoU threshold
-   */
-  nms_threshold: number;
-  /**
-   * For vidstream_frame: raw frame bytes (RGBA)
-   */
-  frame_data: number[];
-  /**
-   * For vidstream_frame: frame width
-   */
-  width: number;
-  /**
-   * For vidstream_frame: frame height
-   */
-  height: number;
-  /**
-   * For vidstream_frame: "rgba8", "rgb8", etc.
-   */
-  format: string;
   /**
    * Watcher fields (for watcher_upsert messages)
    */
