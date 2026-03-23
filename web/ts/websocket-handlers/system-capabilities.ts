@@ -11,7 +11,6 @@ import { log, SEG } from '../logger';
 /**
  * Handle system capabilities message from backend
  * Updates ax button to show degraded state if using Go fallback
- * Updates vidstream button to show degraded state if ONNX unavailable
  * Updates Self diagnostic glyph with system capabilities
  */
 export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void {
@@ -19,9 +18,6 @@ export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void 
         fuzzy_backend: data.fuzzy_backend,
         fuzzy_optimized: data.fuzzy_optimized,
         fuzzy_version: data.fuzzy_version,
-        vidstream_backend: data.vidstream_backend,
-        vidstream_optimized: data.vidstream_optimized,
-        vidstream_version: data.vidstream_version,
         storage_backend: data.storage_backend,
         storage_optimized: data.storage_optimized,
         storage_version: data.storage_version,
@@ -52,33 +48,4 @@ export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void 
         }
     }
 
-    // Handle vidstream button (ONNX video inference)
-    const vidButton = document.querySelector('.palette-cell[data-cmd="vidstream"]') as HTMLElement;
-    if (!vidButton) {
-        log.warn(SEG.UI, '[System Capabilities] vidstream button not found');
-    } else {
-        if (!data.vidstream_optimized) {
-            // ONNX unavailable - show degraded state
-            vidButton.classList.add('degraded');
-            vidButton.setAttribute('data-vidstream-backend', 'unavailable');
-            vidButton.setAttribute('data-tooltip', '⮀ VidStream - video inference\nUnavailable (requires CGO build)\nClick for details');
-            log.debug(SEG.PULSE, 'ONNX unavailable - showing degraded state');
-        } else {
-            // ONNX available - normal state
-            vidButton.classList.remove('degraded');
-            vidButton.setAttribute('data-vidstream-backend', 'onnx');
-            vidButton.setAttribute('data-tooltip', `⮀ VidStream - real-time video inference\nvidstream v${data.vidstream_version} (ONNX)`);
-            log.debug(SEG.PULSE, 'ONNX available');
-
-            // Store version (updates window if exists, or stores for later creation)
-            if (data.vidstream_version) {
-                import('../symbol-palette.js').then(({ setVidStreamVersion }) => {
-                    setVidStreamVersion(data.vidstream_version);
-                    log.debug(SEG.PULSE, `VidStream version set: ${data.vidstream_version}`);
-                }).catch(() => {
-                    // Silently fail if symbol-palette not loaded yet
-                });
-            }
-        }
-    }
 }
