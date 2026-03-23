@@ -6,7 +6,6 @@
  *
  * TODO: Migrate all consumers to glyph manifestations, then delete this file.
  * Consumers blocking deletion:
- *   - vidstream-window.ts (VidStreamWindow)
  *   - database-stats-window.ts (DatabaseStatsWindow — database-glyph exists in test-glyphs.ts)
  *   - ai-provider-window.ts (AIProviderPanel)
  * Also delete: css/window.css
