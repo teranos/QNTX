@@ -2,18 +2,17 @@ package am
 
 // Config represents the core QNTX configuration
 type Config struct {
-	Database       DatabaseConfig       `mapstructure:"database"`
-	Server         ServerConfig         `mapstructure:"server"`
-	Auth           AuthConfig           `mapstructure:"auth"`
-	Pulse          PulseConfig          `mapstructure:"pulse"`
-	Code           CodeConfig           `mapstructure:"code"`
-	LocalInference LocalInferenceConfig `mapstructure:"local_inference"`
-	Ax             AxConfig             `mapstructure:"ax"`
-	Plugin         PluginConfig         `mapstructure:"plugin"`
-	Embeddings     EmbeddingsConfig     `mapstructure:"embeddings"`
-	Watcher        WatcherConfig        `mapstructure:"watcher"`
-	Sync           SyncConfig           `mapstructure:"sync"`
-	GraundeDBPath  string               `mapstructure:"graunde_db_path"` // Path to Graunde's database for deferred news delivery
+	Database      DatabaseConfig   `mapstructure:"database"`
+	Server        ServerConfig     `mapstructure:"server"`
+	Auth          AuthConfig       `mapstructure:"auth"`
+	Pulse         PulseConfig      `mapstructure:"pulse"`
+	Code          CodeConfig       `mapstructure:"code"`
+	Ax            AxConfig         `mapstructure:"ax"`
+	Plugin        PluginConfig     `mapstructure:"plugin"`
+	Embeddings    EmbeddingsConfig `mapstructure:"embeddings"`
+	Watcher       WatcherConfig    `mapstructure:"watcher"`
+	Sync          SyncConfig       `mapstructure:"sync"`
+	GraundeDBPath string           `mapstructure:"graunde_db_path"` // Path to Graunde's database for deferred news delivery
 }
 
 // WatcherConfig configures the watcher engine
@@ -118,16 +117,6 @@ type CodeGitHubConfig struct {
 type CodeGoplsConfig struct {
 	WorkspaceRoot string `mapstructure:"workspace_root"` // Workspace root for gopls (default: project root)
 	Enabled       bool   `mapstructure:"enabled"`        // Enable gopls integration (default: true)
-}
-
-// LocalInferenceConfig configures local model inference (Ollama, LocalAI, etc.)
-type LocalInferenceConfig struct {
-	Enabled        bool   `mapstructure:"enabled"`         // Enable local inference instead of cloud APIs
-	BaseURL        string `mapstructure:"base_url"`        // e.g., "http://localhost:11434" for Ollama
-	Model          string `mapstructure:"model"`           // e.g., "mistral", "qwen2.5-coder:7b"
-	TimeoutSeconds int    `mapstructure:"timeout_seconds"` // Request timeout in seconds
-	ContextSize    *int   `mapstructure:"context_size"`    // Context window size (nil = model default, e.g., 16384, 32768)
-	ONNXModelPath  string `mapstructure:"onnx_model_path"` // Path to ONNX model for vidstream (default: ats/vidstream/models/yolo11n.onnx)
 }
 
 // AxConfig configures the attestation query system

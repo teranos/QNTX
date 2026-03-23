@@ -519,10 +519,11 @@ func (h *Handlers) HandlePromptDirect(w http.ResponseWriter, r *http.Request) {
 				})
 			case mime == "application/pdf":
 				chatReq.Attachments = append(chatReq.Attachments, ContentPart{
-					Type: "file",
-					File: &ContentPartFile{
-						Filename: fid,
-						FileData: "data:" + mime + ";base64," + b64,
+					Type: "document",
+					Source: &ContentPartSource{
+						Type:      "base64",
+						MediaType: "application/pdf",
+						Data:      b64,
 					},
 				})
 			default:

@@ -89,35 +89,6 @@
     text-decoration: underline;
 }
 
-/* Ollama unavailable state - diagonal stripes like ax degraded */
-.provider-btn.ollama-unavailable {
-    position: relative;
-    opacity: 0.7;
-}
-
-.provider-btn.ollama-unavailable::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-image: repeating-linear-gradient(
-        45deg,
-        transparent,
-        transparent 10px,
-        rgba(128, 128, 128, 0.15) 10px,
-        rgba(128, 128, 128, 0.15) 20px
-    );
-    border-radius: inherit;
-    pointer-events: none;
-}
-
-.provider-btn.ollama-unavailable .provider-detail {
-    color: var(--text-error);
-    font-size: var(--font-size-sm);
-}
-
 /* Header - uses .panel-header and .panel-title from panel-base.css */
 
 /* Content */
@@ -214,32 +185,3 @@
     color: var(--text-on-dark-secondary);
 }
 
-.ollama-model-selector {
-    padding: var(--panel-padding-md);
-    background: var(--bg-almost-white);
-    border: var(--panel-border);
-    border-radius: var(--border-radius-lg);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: var(--font-size-sm);
-}
-
-.ollama-model-selector.hidden {
-    display: none;
-}
-
-.ollama-model-selector label {
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-#ollama-model-select {
-    flex: 1;
-    padding: 6px 10px;
-    font-size: var(--font-size-sm);
-    border: var(--panel-border);
-    border-radius: var(--border-radius);
-    background: var(--panel-bg);
-    font-family: var(--font-mono);
-}

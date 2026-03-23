@@ -42,7 +42,7 @@ Each layer overrides values from lower layers. For example:
 - **Auto-generated** - created and managed by the web UI
 - Comments are not preserved (regenerated on each UI change)
 - Git-safe: Never accidentally committed to project repos
-- Example: Ollama vs OpenRouter toggle, model selection
+- Example: LLM provider selection, model selection
 
 ### Project Config (`./config.toml`)
 - Project-specific configuration
@@ -62,8 +62,8 @@ Each layer overrides values from lower layers. For example:
 All UI changes write to `~/.qntx/am_from_ui.toml`:
 
 ```go
-// Example: Toggle Ollama
-config.UpdateLocalInferenceEnabled(true)
+// Example: Set LLM provider
+config.UpdateLLMProvider("llama.cpp")
 ```
 
 **Implementation:**
@@ -92,7 +92,7 @@ Users edit `~/.qntx/config.toml` directly:
 
 **SRE approach to configuration.** Multi-source config creates observability problems. When something doesn't work, you need to know *why*.
 
-**Debugging**: "Why isn't my config working?" User toggles Ollama in UI, nothing happens. Introspection shows project config is overriding user_ui. Now they know what to fix.
+**Debugging**: "Why isn't my config working?" User sets LLM provider in UI, nothing happens. Introspection shows project config is overriding user_ui. Now they know what to fix.
 
 **Trust/transparency**: Without visibility, UI changes feel broken. Introspection proves changes took effect (or shows what's overriding them).
 
@@ -104,11 +104,11 @@ The introspection endpoint (`/api/config`) shows where each value comes from:
 
 ```json
 {
-  "local_inference": {
-    "enabled": {
-      "value": true,
+  "llm": {
+    "provider": {
+      "value": "llama.cpp",
       "source": "user_ui",        // From ~/.qntx/am_from_ui.toml
-      "type": "bool"
+      "type": "string"
     },
     "model": {
       "value": "llama3.2:3b",
@@ -156,7 +156,7 @@ func LoadConfig() (*Config, error) {
 
 ```go
 // Internal/config/persist.go
-func UpdateLocalInferenceEnabled(enabled bool) error {
+func UpdateLLMProvider(provider string) error {
     // Get UI config path
     path := GetUIConfigPath()  // ~/.qntx/am_from_ui.toml
 
@@ -167,7 +167,7 @@ func UpdateLocalInferenceEnabled(enabled bool) error {
     }
 
     // Update field (type-safe)
-    config.LocalInference.Enabled = enabled
+    config.LLM.Provider = provider
 
     // Save with backups
     return saveUIConfig(path, config)
@@ -204,7 +204,7 @@ No migration required:
 
 **Original approach:** Regex pattern matching to preserve comments:
 ```go
-re := regexp.MustCompile(`(?sm)(\[local_inference\][^\[]*?^enabled\s*=\s*)(true|false)(.*)`)
+re := regexp.MustCompile(`(?sm)(\[llm\][^\[]*?^provider\s*=\s*)(".*?")(.*)`)
 updated := re.ReplaceAllString(content, fmt.Sprintf("${1}%s${3}", newValue))
 ```
 
@@ -216,7 +216,7 @@ updated := re.ReplaceAllString(content, fmt.Sprintf("${1}%s${3}", newValue))
 
 **Current approach:** Proper TOML marshaling:
 ```go
-config.LocalInference.Enabled = enabled
+config.LLM.Provider = provider
 toml.Marshal(config)
 ```
 

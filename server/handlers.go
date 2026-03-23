@@ -528,13 +528,10 @@ type configUpdateEntry struct {
 
 // configUpdateRegistry defines supported config keys and their update functions.
 var configUpdateRegistry = map[string]configUpdateEntry{
-	"llm.provider":                    {typ: "string", updateFn: appcfg.UpdateLLMProvider},
-	"local_inference.enabled":         {typ: "bool", updateFn: appcfg.UpdateLocalInferenceEnabled},
-	"local_inference.model":           {typ: "string", updateFn: appcfg.UpdateLocalInferenceModel},
-	"local_inference.onnx_model_path": {typ: "string", updateFn: appcfg.UpdateLocalInferenceONNXModelPath},
-	"embeddings.enabled":              {typ: "bool", updateFn: appcfg.UpdateEmbeddingsEnabled},
-	"embeddings.path":                 {typ: "string", updateFn: appcfg.UpdateEmbeddingsPath},
-	"embeddings.name":                 {typ: "string", updateFn: appcfg.UpdateEmbeddingsName},
+	"llm.provider":       {typ: "string", updateFn: appcfg.UpdateLLMProvider},
+	"embeddings.enabled": {typ: "bool", updateFn: appcfg.UpdateEmbeddingsEnabled},
+	"embeddings.path":    {typ: "string", updateFn: appcfg.UpdateEmbeddingsPath},
+	"embeddings.name":    {typ: "string", updateFn: appcfg.UpdateEmbeddingsName},
 }
 
 // applyConfigKeyUpdate validates the value type and applies a single config key update.

@@ -103,10 +103,10 @@ type ChatResponse struct {
 
 // ContentPart represents a single part in a multimodal message content array.
 type ContentPart struct {
-	Type     string            `json:"type"`
-	Text     string            `json:"text,omitempty"`
-	ImageURL *ContentPartImage `json:"image_url,omitempty"`
-	File     *ContentPartFile  `json:"file,omitempty"`
+	Type     string             `json:"type"`
+	Text     string             `json:"text,omitempty"`
+	ImageURL *ContentPartImage  `json:"image_url,omitempty"`
+	Source   *ContentPartSource `json:"source,omitempty"`
 }
 
 // ContentPartImage holds a data URI for an image attachment.
@@ -114,10 +114,11 @@ type ContentPartImage struct {
 	URL string `json:"url"`
 }
 
-// ContentPartFile holds a file attachment (e.g. PDF).
-type ContentPartFile struct {
-	Filename string `json:"filename"`
-	FileData string `json:"file_data"`
+// ContentPartSource holds a base64 document source (Anthropic format for PDFs).
+type ContentPartSource struct {
+	Type      string `json:"type"`
+	MediaType string `json:"media_type"`
+	Data      string `json:"data"`
 }
 
 // Message represents a message in a chat completion.

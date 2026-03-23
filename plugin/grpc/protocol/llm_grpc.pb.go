@@ -27,7 +27,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // LLMService provides provider-agnostic LLM access for plugins.
-// Provider plugins (OpenRouter, Ollama) register as backends.
+// Provider plugins (OpenRouter, llama.cpp) register as backends.
 // Core routes requests to the appropriate provider.
 type LLMServiceClient interface {
 	Chat(ctx context.Context, in *LLMChatRequest, opts ...grpc.CallOption) (*LLMChatResponse, error)
@@ -56,7 +56,7 @@ func (c *lLMServiceClient) Chat(ctx context.Context, in *LLMChatRequest, opts ..
 // for forward compatibility.
 //
 // LLMService provides provider-agnostic LLM access for plugins.
-// Provider plugins (OpenRouter, Ollama) register as backends.
+// Provider plugins (OpenRouter, llama.cpp) register as backends.
 // Core routes requests to the appropriate provider.
 type LLMServiceServer interface {
 	Chat(context.Context, *LLMChatRequest) (*LLMChatResponse, error)
