@@ -18,7 +18,6 @@ import { sendMessage, registerHandler, unregisterHandler } from './websocket.ts'
 import { Window } from './components/window.ts';
 import { apiFetch } from './api.ts';
 import { tooltip } from './components/tooltip.ts';
-import type { QueryMessage } from '@generated/server.js';
 import type {
     VidStreamInitSuccessMessage,
     VidStreamInitErrorMessage,
@@ -233,7 +232,7 @@ export class VidStreamWindow {
     }
 
     private async initializeEngine(config: VidStreamConfig): Promise<void> {
-        const payload: Pick<QueryMessage, 'type' | 'model_path' | 'confidence_threshold' | 'nms_threshold'> = {
+        const payload: Record<string, unknown> = {
             type: 'vidstream_init',
             model_path: config.model_path,
             confidence_threshold: config.confidence_threshold || 0.5,
@@ -349,7 +348,7 @@ export class VidStreamWindow {
 
         try {
             const frameArray = Array.from(imageData.data);
-            const payload: Pick<QueryMessage, 'type' | 'frame_data' | 'width' | 'height' | 'format'> = {
+            const payload: Record<string, unknown> = {
                 type: 'vidstream_frame',
                 frame_data: frameArray,
                 width: this.canvas.width,

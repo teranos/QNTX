@@ -3,7 +3,7 @@
 // TODO: Migrate to proto generation
 // Source package: types
 // Source last modified: 2026-02-27T02:39:43+01:00
-// Source version: d94dbc12
+// Source version: 6a264f2c
 
 //! # types module
 //!

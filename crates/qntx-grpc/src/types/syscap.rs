@@ -3,7 +3,7 @@
 // TODO: Migrate to proto generation
 // Source package: syscap
 // Source last modified: 2026-02-09T21:59:10+01:00
-// Source version: 42fb811c
+// Source version: b646ca20
 
 //! # syscap module
 //!
@@ -28,15 +28,6 @@ pub struct Message {
     pub fuzzy_optimized: bool,
     /// fuzzy-ax library version (e.g., "0.1.0")
     pub fuzzy_version: String,
-    #[serde(rename = "vidstream_backend")]
-    /// "onnx" or "unavailable" - video inference availability
-    pub vid_stream_backend: String,
-    #[serde(rename = "vidstream_optimized")]
-    /// true if ONNX Runtime available (CGO build)
-    pub vid_stream_optimized: bool,
-    #[serde(rename = "vidstream_version")]
-    /// vidstream library version (e.g., "0.1.0")
-    pub vid_stream_version: String,
     /// "rust" or "go" - which storage implementation is active
     pub storage_backend: String,
     /// true if using Rust SQLite (optimized), false if Go fallback
