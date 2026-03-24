@@ -243,3 +243,80 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
 
     return grpc::Status::OK;
 }
+
+grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
+                                             const protocol::LLMChatRequest* req,
+                                             grpc::ServerWriter<protocol::LLMChatChunk>* writer) {
+    auto& engine = plugin_->engine();
+
+    if (!engine.is_loaded()) {
+        return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION,
+                            "no model loaded — set model_path in plugin config");
+    }
+
+    float temperature = req->temperature() > 0 ? req->temperature() : 0.7;
+    int max_tokens = req->max_tokens() > 0 ? req->max_tokens() : 512;
+
+    // Extract attachment context (same as Chat)
+    std::string context;
+    for (const auto& att : req->attachments()) {
+        const auto& uri = att.data();
+        if (uri.empty()) continue;
+        auto comma = uri.find(',');
+        if (comma == std::string::npos) continue;
+        auto header = uri.substr(0, comma);
+        auto payload = uri.substr(comma + 1);
+
+        if (header.find("application/pdf") != std::string::npos) {
+            auto bytes = base64_decode(payload);
+            auto text = extract_pdf_text(bytes.data(), bytes.size());
+            if (!text.empty()) {
+                context += "[Document: " + att.filename() + "]\n" + text + "\n\n";
+            }
+        } else if (header.find("text/plain") != std::string::npos) {
+            auto bytes = base64_decode(payload);
+            std::string text(bytes.begin(), bytes.end());
+            if (!text.empty()) {
+                context += "[Document: " + att.filename() + "]\n" + text + "\n\n";
+            }
+        }
+    }
+
+    std::string user_prompt = context.empty()
+        ? req->user_prompt()
+        : context + req->user_prompt();
+
+    // Stream tokens as they're generated
+    auto result = engine.stream_chat(
+        req->system_prompt(), user_prompt, temperature, max_tokens,
+        [&](const std::string& token_text, const TokenSignal& sig) -> bool {
+            protocol::LLMChatChunk chunk;
+            chunk.set_token(token_text);
+            chunk.set_done(false);
+            chunk.set_model(engine.model_name());
+
+            auto* signal = chunk.mutable_signal();
+            signal->set_confidence(sig.confidence);
+            signal->set_entropy(sig.entropy);
+            signal->set_top_gap(sig.top_gap);
+            for (const auto& cand : sig.top_k) {
+                auto* tc = signal->add_top_k();
+                tc->set_id(cand.id);
+                tc->set_text(cand.text);
+                tc->set_prob(cand.prob);
+            }
+
+            return writer->Write(chunk);
+        });
+
+    // Final chunk with totals
+    protocol::LLMChatChunk final_chunk;
+    final_chunk.set_done(true);
+    final_chunk.set_model(engine.model_name());
+    final_chunk.set_prompt_tokens(result.prompt_tokens);
+    final_chunk.set_completion_tokens(result.completion_tokens);
+    final_chunk.set_total_tokens(result.prompt_tokens + result.completion_tokens);
+    writer->Write(final_chunk);
+
+    return grpc::Status::OK;
+}

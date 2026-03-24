@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -55,9 +56,22 @@ public:
                     float temperature,
                     int max_tokens);
 
+    // Callback receives token text + signal per step. Return false to abort.
+    using TokenCallback = std::function<bool(const std::string& token_text, const TokenSignal& signal)>;
+
+    // Streaming chat — calls on_token for each generated token
+    ChatResult stream_chat(const std::string& system_prompt,
+                           const std::string& user_prompt,
+                           float temperature,
+                           int max_tokens,
+                           TokenCallback on_token);
+
     std::string model_name() const { return model_name_; }
 
 private:
+    int prepare_prompt(const std::string& system_prompt,
+                       const std::string& user_prompt,
+                       ChatResult& result);
     llama_model* model_ = nullptr;
     llama_context* ctx_ = nullptr;
     std::string model_path_;
@@ -125,6 +139,10 @@ public:
     grpc::Status Chat(grpc::ServerContext* ctx,
                       const protocol::LLMChatRequest* req,
                       protocol::LLMChatResponse* resp) override;
+
+    grpc::Status StreamChat(grpc::ServerContext* ctx,
+                            const protocol::LLMChatRequest* req,
+                            grpc::ServerWriter<protocol::LLMChatChunk>* writer) override;
 
 private:
     LlamaCppPlugin* plugin_;

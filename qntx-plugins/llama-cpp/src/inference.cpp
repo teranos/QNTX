@@ -142,19 +142,12 @@ bool InferenceEngine::is_loaded() const {
     return model_ != nullptr && ctx_ != nullptr;
 }
 
-InferenceEngine::ChatResult InferenceEngine::chat(
+// Prepare prompt: build chat template, tokenize, decode prompt into KV cache.
+// Returns prompt token count, or -1 on error (with result.content set).
+int InferenceEngine::prepare_prompt(
     const std::string& system_prompt,
     const std::string& user_prompt,
-    float temperature,
-    int max_tokens) {
-
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    ChatResult result;
-    if (!model_ || !ctx_) {
-        result.content = "error: no model loaded";
-        return result;
-    }
+    ChatResult& result) {
 
     // Build chat messages
     std::vector<llama_chat_message> messages;
@@ -174,7 +167,7 @@ InferenceEngine::ChatResult InferenceEngine::chat(
     }
     if (n_written < 0) {
         result.content = "error: chat template failed";
-        return result;
+        return -1;
     }
     std::string prompt(buf.data(), n_written);
 
@@ -186,10 +179,9 @@ InferenceEngine::ChatResult InferenceEngine::chat(
                                    tokens.data(), n_prompt_max, true, true);
     if (n_tokens < 0) {
         result.content = "error: tokenization failed";
-        return result;
+        return -1;
     }
     tokens.resize(n_tokens);
-    result.prompt_tokens = n_tokens;
 
     // Clear KV cache
     llama_memory_clear(llama_get_memory(ctx_), true);
@@ -198,10 +190,31 @@ InferenceEngine::ChatResult InferenceEngine::chat(
     llama_batch batch = llama_batch_get_one(tokens.data(), n_tokens);
     if (llama_decode(ctx_, batch) != 0) {
         result.content = "error: prompt decode failed";
+        return -1;
+    }
+
+    return n_tokens;
+}
+
+InferenceEngine::ChatResult InferenceEngine::chat(
+    const std::string& system_prompt,
+    const std::string& user_prompt,
+    float temperature,
+    int max_tokens) {
+
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    ChatResult result;
+    if (!model_ || !ctx_) {
+        result.content = "error: no model loaded";
         return result;
     }
 
-    // Sample tokens
+    int n_tokens = prepare_prompt(system_prompt, user_prompt, result);
+    if (n_tokens < 0) return result;
+    result.prompt_tokens = n_tokens;
+
+    const llama_vocab* vocab = llama_model_get_vocab(model_);
     auto sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
     llama_sampler_chain_add(sampler, llama_sampler_init_temp(temperature));
     llama_sampler_chain_add(sampler, llama_sampler_init_dist(0));
@@ -210,16 +223,11 @@ InferenceEngine::ChatResult InferenceEngine::chat(
     int n_generated = 0;
 
     for (int i = 0; i < max_tokens; i++) {
-        // Capture raw logit distribution before the sampler modifies it
         TokenSignal sig = capture_signal(ctx_, vocab, SIGNAL_TOP_K);
-
         llama_token new_token = llama_sampler_sample(sampler, ctx_, -1);
 
-        if (llama_vocab_is_eog(vocab, new_token)) {
-            break;
-        }
+        if (llama_vocab_is_eog(vocab, new_token)) break;
 
-        // Record which token was actually chosen
         char buf[256];
         int n = llama_token_to_piece(vocab, new_token, buf, sizeof(buf), 0, true);
         sig.token_id = new_token;
@@ -229,17 +237,70 @@ InferenceEngine::ChatResult InferenceEngine::chat(
         }
         result.signals.push_back(std::move(sig));
 
-        // Decode next token
         llama_batch next = llama_batch_get_one(&new_token, 1);
-        if (llama_decode(ctx_, next) != 0) {
-            break;
-        }
-
+        if (llama_decode(ctx_, next) != 0) break;
         n_generated++;
     }
 
     llama_sampler_free(sampler);
+    result.content = output.str();
+    result.completion_tokens = n_generated;
+    return result;
+}
 
+InferenceEngine::ChatResult InferenceEngine::stream_chat(
+    const std::string& system_prompt,
+    const std::string& user_prompt,
+    float temperature,
+    int max_tokens,
+    TokenCallback on_token) {
+
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    ChatResult result;
+    if (!model_ || !ctx_) {
+        result.content = "error: no model loaded";
+        return result;
+    }
+
+    int n_tokens = prepare_prompt(system_prompt, user_prompt, result);
+    if (n_tokens < 0) return result;
+    result.prompt_tokens = n_tokens;
+
+    const llama_vocab* vocab = llama_model_get_vocab(model_);
+    auto sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
+    llama_sampler_chain_add(sampler, llama_sampler_init_temp(temperature));
+    llama_sampler_chain_add(sampler, llama_sampler_init_dist(0));
+
+    std::ostringstream output;
+    int n_generated = 0;
+
+    for (int i = 0; i < max_tokens; i++) {
+        TokenSignal sig = capture_signal(ctx_, vocab, SIGNAL_TOP_K);
+        llama_token new_token = llama_sampler_sample(sampler, ctx_, -1);
+
+        if (llama_vocab_is_eog(vocab, new_token)) break;
+
+        char buf[256];
+        int n = llama_token_to_piece(vocab, new_token, buf, sizeof(buf), 0, true);
+        sig.token_id = new_token;
+        if (n > 0) {
+            sig.token_text = std::string(buf, n);
+            output.write(buf, n);
+        }
+        result.signals.push_back(sig);
+
+        // Stream the token to the caller
+        if (on_token && !on_token(sig.token_text, sig)) {
+            break; // Caller requested abort
+        }
+
+        llama_batch next = llama_batch_get_one(&new_token, 1);
+        if (llama_decode(ctx_, next) != 0) break;
+        n_generated++;
+    }
+
+    llama_sampler_free(sampler);
     result.content = output.str();
     result.completion_tokens = n_generated;
     return result;
