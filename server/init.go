@@ -317,7 +317,9 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		server.servicesManager = servicesManager
 		server.services = services
 
-		// Wire services manager to plugin manager for LLM provider re-registration after restart
+		// Wire services manager to plugin manager for LLM provider re-registration after restart.
+		// Note: server.pluginManager is often nil here because plugins load asynchronously.
+		// getPluginManager() handles the lazy wiring for the global default plugin manager.
 		if server.pluginManager != nil {
 			server.pluginManager.SetServicesManager(servicesManager)
 		}
