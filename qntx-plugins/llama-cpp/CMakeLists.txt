@@ -15,6 +15,12 @@ set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
 add_subdirectory(vendor/llama.cpp)
 
+# MuPDF — system/nix library for PDF text extraction.
+# Install via: brew install mupdf-tools (macOS) or nix with flake.
+find_library(MUPDF_LIB mupdf REQUIRED)
+find_library(MUPDF_THIRD_LIB mupdf-third)
+find_path(MUPDF_INCLUDE_DIR mupdf/fitz.h REQUIRED)
+
 # gRPC + Protobuf
 find_package(protobuf CONFIG REQUIRED)
 find_package(gRPC CONFIG REQUIRED)
@@ -57,18 +63,26 @@ add_executable(qntx-llama-cpp-plugin
     src/main.cpp
     src/plugin.cpp
     src/inference.cpp
+    src/pdf_extract.cpp
     ${GENERATED_SRCS}
 )
 
 target_include_directories(qntx-llama-cpp-plugin PRIVATE
     ${PROTO_GEN_DIR}
     vendor/llama.cpp/include
+    ${MUPDF_INCLUDE_DIR}
 )
 
 target_link_libraries(qntx-llama-cpp-plugin PRIVATE
     llama
     gRPC::grpc++
     protobuf::libprotobuf
+    ${MUPDF_LIB}
 )
+
+# mupdf-third bundles freetype/zlib/etc — only present with static MuPDF installs
+if(MUPDF_THIRD_LIB)
+    target_link_libraries(qntx-llama-cpp-plugin PRIVATE ${MUPDF_THIRD_LIB})
+endif()
 
 install(TARGETS qntx-llama-cpp-plugin DESTINATION bin)
