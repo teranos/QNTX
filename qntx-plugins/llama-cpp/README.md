@@ -28,4 +28,10 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 
 3. **Text attachments only** — PDF and plain text attachments are extracted (via MuPDF) and prepended to the prompt as context. Goal: use a multimodal GGUF model (e.g. LLaVA, Qwen2-VL) to process images and PDFs natively through llama.cpp's vision pipeline, bypassing text extraction entirely.
 
-4. **Shutdown race** — mutex recursion between gRPC teardown and llama.cpp destructor on kill. Cosmetic log noise, not a data issue.
+4. **Image-based PDFs** — MuPDF extracts text objects from the PDF structure. PDFs where text is baked into images (scanned documents, designed flyers) return empty. OCR (e.g. Tesseract) would be needed for those.
+
+5. **Context overflow** — extracted PDF text is prepended to the prompt. A large document can exceed the context window (default 2048 tokens) and get silently truncated by llama.cpp. No warning is given.
+
+6. **No extraction feedback** — if MuPDF returns no text from a PDF, the prompt runs without context and the user gets no indication the attachment was empty.
+
+7. **Shutdown race** — mutex recursion between gRPC teardown and llama.cpp destructor on kill. Cosmetic log noise, not a data issue.

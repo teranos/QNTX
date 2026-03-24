@@ -1,5 +1,7 @@
 #include "plugin.h"
+#include "base64.h"
 #include "log_capture.h"
+#include "pdf_extract.h"
 
 #include <iostream>
 
@@ -144,11 +146,58 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
     float temperature = req->temperature() > 0 ? req->temperature() : 0.7;
     int max_tokens = req->max_tokens() > 0 ? req->max_tokens() : 512;
 
+    // Extract text from attachments and prepend as context.
+    //
+    // The Go core sends file attachments as data URIs:
+    //   data:application/pdf;base64,JVBERi0xLjQg...
+    //
+    // We parse the URI with string methods (find/substr), decode the
+    // base64 payload, then extract text depending on the MIME type.
+    // PDF goes through MuPDF; plain text is used directly.
+    std::string context;
+    for (const auto& att : req->attachments()) {
+        const auto& uri = att.data();
+        if (uri.empty()) continue;
+
+        // Data URI format: "data:<mime>;base64,<payload>"
+        // Find the comma that separates header from payload.
+        auto comma = uri.find(',');
+        if (comma == std::string::npos) continue;
+
+        // The header is everything before the comma: "data:application/pdf;base64"
+        // We check for known MIME types using find() — no regex needed.
+        auto header = uri.substr(0, comma);
+        auto payload = uri.substr(comma + 1);
+
+        if (header.find("application/pdf") != std::string::npos) {
+            // base64_decode returns vector<uint8_t> — contiguous memory,
+            // so .data() gives us the raw byte pointer MuPDF needs.
+            auto bytes = base64_decode(payload);
+            auto text = extract_pdf_text(bytes.data(), bytes.size());
+            if (!text.empty()) {
+                context += "[Document: " + att.filename() + "]\n" + text + "\n\n";
+            }
+        } else if (header.find("text/plain") != std::string::npos) {
+            auto bytes = base64_decode(payload);
+            // std::string constructor from iterators — works because
+            // uint8_t is just unsigned char, which char can hold.
+            std::string text(bytes.begin(), bytes.end());
+            if (!text.empty()) {
+                context += "[Document: " + att.filename() + "]\n" + text + "\n\n";
+            }
+        }
+    }
+
+    // If we extracted context, prepend it to the user prompt so the
+    // model sees the document content before the user's question.
+    std::string user_prompt = context.empty()
+        ? req->user_prompt()
+        : context + req->user_prompt();
+
     // TODO: support streaming — return partial tokens as they're sampled
     // TODO: support multi-turn — gRPC protocol currently carries no message history
-    // TODO: process attachments — req->attachments() is available but ignored
     auto result = engine.chat(req->system_prompt(),
-                              req->user_prompt(),
+                              user_prompt,
                               temperature,
                               max_tokens);
 

@@ -44,6 +44,7 @@
             protobuf
             abseil-cpp
             openssl
+            mupdf
           ];
 
           cmakeFlags = [
