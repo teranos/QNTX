@@ -273,7 +273,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
                 model: data.model,
                 provider: undefined,
             };
-            spawnResultBelow(element, glyph, execResult, promptConfig, textarea.value.trim());
+            spawnResultBelow(element, execResult, promptConfig, textarea.value.trim());
 
         } catch (error) {
             log.error(SEG.GLYPH, '[Prompt] Execution failed:', error);
@@ -340,7 +340,6 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
      */
     function spawnResultBelow(
         promptEl: HTMLElement,
-        promptGlyphData: Glyph,
         result: ExecutionResult,
         promptConfig: { model?: string; provider?: string },
         promptText: string,
