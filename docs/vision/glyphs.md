@@ -19,7 +19,7 @@ A single entity that exists in three visual states, morphing between them throug
 
 - As the mouse approaches, the glyph smoothly morphs larger ✓
 - The transformation is proximity-based: closer = larger ✓
-- Text fades in showing what the glyph represents (e.g., "VidStream", "Database Statistics") ✓
+- Text fades in showing what the glyph represents (e.g., "Database Statistics") ✓
 - Background color transitions from gray to darker as it expands ✓
 - The existing run.ts already implements this perfectly ✓
 - Carefully tuned easing curves, thresholds, and baseline boost logic ✓
