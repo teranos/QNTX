@@ -270,6 +270,13 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
         }
     }
 
+    // Stream glyphs: skip if no saved content (orphaned empty stream)
+    if (glyph.symbol === 'stream' && !glyph.content) {
+        log.debug(SEG.GLYPH, `[Canvas] Skipping empty stream glyph ${glyph.id}`);
+        uiState.removeCanvasGlyph(glyph.id);
+        return document.createElement('div'); // invisible placeholder
+    }
+
     // Look up glyph type in registry
     const entry = glyph.symbol ? getGlyphTypeBySymbol(glyph.symbol) : undefined;
     if (entry) return await entry.render(glyph);

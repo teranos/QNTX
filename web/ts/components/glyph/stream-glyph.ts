@@ -7,14 +7,19 @@
  *
  * Multiplexer pattern: one WebSocket handler routes messages to many
  * stream glyph instances by job_id.
+ *
+ * Persists token data to canvas state so content survives page refresh.
  */
 
 import type { Glyph } from './glyph';
 import type { LLMStreamMessage } from '../../../types/websocket';
+import type { LLMTokenSignal } from '../../../types/generated/typescript/server';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { storeCleanup } from './glyph-interaction';
+import { uiState } from '../../state/ui';
 import { registerHandler, unregisterHandler } from '../../websocket';
+import { createFollowUpZone } from './glyph-followup';
 
 // ── Multiplexer ─────────────────────────────────────────────────────
 
@@ -66,17 +71,59 @@ export function confidenceToColor(confidence: number): string {
     return `hsla(30, 100%, 50%, ${alpha.toFixed(3)})`;
 }
 
+// ── Persisted token data ────────────────────────────────────────────
+
+interface StreamToken {
+    text: string;
+    signal?: LLMTokenSignal | null;
+}
+
+export interface StreamGlyphContent {
+    tokens: StreamToken[];
+    model?: string;
+}
+
+// ── Token rendering ─────────────────────────────────────────────────
+
+function renderToken(token: StreamToken): HTMLSpanElement {
+    const span = document.createElement('span');
+    span.textContent = token.text;
+
+    if (token.signal) {
+        span.style.backgroundColor = confidenceToColor(token.signal.confidence);
+        span.dataset.confidence = String(token.signal.confidence);
+        span.dataset.entropy = String(token.signal.entropy);
+        span.dataset.topGap = String(token.signal.top_gap);
+        if (token.signal.top_k) {
+            span.dataset.topK = JSON.stringify(token.signal.top_k);
+        }
+    }
+
+    return span;
+}
+
+/** Collect all text from token spans in the output container */
+function collectText(output: HTMLElement): string {
+    let text = '';
+    for (const child of output.children) {
+        text += child.textContent ?? '';
+    }
+    return text;
+}
+
 // ── Stream Glyph Factory ────────────────────────────────────────────
 
 /**
  * Create a stream glyph that renders live LLM tokens with confidence coloring.
  *
  * @param glyph - Glyph metadata (id, position, etc.)
- * @param promptGlyphId - The prompt glyph's ID, used as the WebSocket job_id key
+ * @param promptGlyphId - The prompt glyph's ID, used as the WebSocket job_id key.
+ *                         Empty string for restored glyphs (no active stream).
  * @returns The DOM element (canvas-placed)
  */
 export function createStreamGlyph(glyph: Glyph, promptGlyphId: string): HTMLElement {
-    let tokenCount = 0;
+    const tokens: StreamToken[] = [];
+    let streamModel: string | undefined;
 
     // Close button
     const closeBtn = document.createElement('button');
@@ -84,8 +131,9 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string): HTMLElem
     closeBtn.textContent = '×';
     closeBtn.title = 'Close stream';
     closeBtn.addEventListener('click', () => {
-        unsubscribeStream(promptGlyphId);
+        if (promptGlyphId) unsubscribeStream(promptGlyphId);
         element.remove();
+        uiState.removeCanvasGlyph(glyph.id);
     });
 
     const { element } = canvasPlaced({
@@ -103,7 +151,7 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string): HTMLElem
     element.style.borderTop = 'none';
     element.style.zIndex = '1';
 
-    // Output container — same visual style as result glyph
+    // Output container
     const output = document.createElement('div');
     output.className = 'stream-glyph-output glyph-content-area';
     output.style.fontFamily = 'monospace';
@@ -115,41 +163,65 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string): HTMLElem
     output.style.color = 'var(--text-on-dark)';
     element.appendChild(output);
 
-    // Subscribe to stream messages
-    subscribeStream(promptGlyphId, (msg: LLMStreamMessage) => {
-        if (msg.done) {
-            unsubscribeStream(promptGlyphId);
-            log.debug(SEG.GLYPH, `[StreamGlyph] Stream complete for ${promptGlyphId}, ${tokenCount} tokens`);
-            return;
-        }
-
-        if (!msg.content) return;
-
-        const span = document.createElement('span');
-        span.textContent = msg.content;
-
-        if (msg.signal) {
-            span.style.backgroundColor = confidenceToColor(msg.signal.confidence);
-
-            // Store signal data for future hover popup (Step 4)
-            span.dataset.confidence = String(msg.signal.confidence);
-            span.dataset.entropy = String(msg.signal.entropy);
-            span.dataset.topGap = String(msg.signal.top_gap);
-            if (msg.signal.top_k) {
-                span.dataset.topK = JSON.stringify(msg.signal.top_k);
+    // Restore saved tokens if this glyph has persisted content
+    const saved = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+    if (saved?.content) {
+        try {
+            const content = JSON.parse(saved.content) as StreamGlyphContent;
+            streamModel = content.model;
+            for (const token of content.tokens) {
+                tokens.push(token);
+                output.appendChild(renderToken(token));
             }
+            log.debug(SEG.GLYPH, `[StreamGlyph] Restored ${content.tokens.length} tokens for ${glyph.id}`);
+        } catch (e) {
+            log.error(SEG.GLYPH, `[StreamGlyph] Failed to parse saved content for ${glyph.id}:`, e);
         }
+    }
 
-        output.appendChild(span);
-        tokenCount++;
+    /** Persist current tokens to canvas state */
+    function persistContent(): void {
+        const content: StreamGlyphContent = { tokens, model: streamModel };
+        const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+        if (existing) {
+            uiState.addCanvasGlyph({ ...existing, content: JSON.stringify(content) });
+        }
+    }
 
-        // Auto-scroll to bottom
-        output.scrollTop = output.scrollHeight;
+    // Subscribe to live stream (only if actively streaming)
+    if (promptGlyphId) {
+        subscribeStream(promptGlyphId, (msg: LLMStreamMessage) => {
+            if (msg.model) streamModel = msg.model;
+
+            if (msg.done) {
+                unsubscribeStream(promptGlyphId);
+                persistContent();
+                log.debug(SEG.GLYPH, `[StreamGlyph] Stream complete for ${promptGlyphId}, ${tokens.length} tokens`);
+                return;
+            }
+
+            if (!msg.content) return;
+
+            const token: StreamToken = { text: msg.content, signal: msg.signal };
+            tokens.push(token);
+            output.appendChild(renderToken(token));
+            output.scrollTop = output.scrollHeight;
+        });
+    }
+
+    // Follow-up input zone (shared infra)
+    const followupZone = createFollowUpZone({
+        element,
+        glyph,
+        getSystemPrompt: () => collectText(output),
+        model: streamModel,
+        logLabel: 'StreamGlyph',
     });
+    element.appendChild(followupZone);
 
-    // Cleanup on removal
+    // Cleanup
     storeCleanup(element, () => {
-        unsubscribeStream(promptGlyphId);
+        if (promptGlyphId) unsubscribeStream(promptGlyphId);
     });
 
     return element;
