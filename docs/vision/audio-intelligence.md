@@ -1,6 +1,6 @@
 # Audio Intelligence
 
-Audio is a missing sensory dimension in QNTX. Video has vidstream, text has embeddings — but sound is unaddressed. Audio intelligence means the canvas can hear: speech becomes attestations, sounds become classified events, and voice becomes an input modality alongside keyboard and mouse.
+Audio is a missing sensory dimension in QNTX. Text has embeddings — but sound is unaddressed. Audio intelligence means the canvas can hear: speech becomes attestations, sounds become classified events, and voice becomes an input modality alongside keyboard and mouse.
 
 ## The Attestation is Meant to be Spoken
 

@@ -16,7 +16,7 @@ Watch knowledge evolution - how the system's understanding developed over time t
 
 ## Temporal Dimensions
 - **System Time** - When events occurred in QNTX's overall timeline
-- **Stream Time** - Position within a video/data stream (e.g., VidStream frame timestamps)
+- **Stream Time** - Position within a data stream
 - **Window Width** - How much temporal context to show (affects graph filtering)
 - **Cumulative State** - Query accumulated values across time windows, not just point-in-time snapshots
 
@@ -27,10 +27,8 @@ Watch knowledge evolution - how the system's understanding developed over time t
 - Rolling window follows scrubber position
 
 ## AI Integration
-- VidStream replay synchronized with attestation timeline
 - AI inference results tied to both stream time and system time
-- Graph evolution animated as video plays
-- All three layers (video, AI predictions, graph) move together
+- Graph evolution animated as stream plays
 - Future: semantic-aware temporal queries using ML-derived relatedness scores
 
 ## Technical Foundation
