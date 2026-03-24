@@ -26,6 +26,6 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 
 2. **Single-turn only** — each prompt is a fresh context. The gRPC `LLMChatRequest` has no message history array. In QNTX, conversation history is spatial — result glyphs can be dragged to rearrange or splice turns — but the protocol has no way to carry that context to the plugin.
 
-3. **No attachment support** — attachments (images, files) are passed through the gRPC protocol but the C++ plugin ignores them. Only text prompts are processed.
+3. **Text attachments only** — PDF and plain text attachments are extracted (via MuPDF) and prepended to the prompt as context. Goal: use a multimodal GGUF model (e.g. LLaVA, Qwen2-VL) to process images and PDFs natively through llama.cpp's vision pipeline, bypassing text extraction entirely.
 
 4. **Shutdown race** — mutex recursion between gRPC teardown and llama.cpp destructor on kill. Cosmetic log noise, not a data issue.
