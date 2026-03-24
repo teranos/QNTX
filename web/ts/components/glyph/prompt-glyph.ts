@@ -444,6 +444,16 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
         const streamElement = createStreamGlyph(streamGlyph, promptGlyphId);
         canvas.appendChild(streamElement);
 
+        // Register in canvas state for persistence
+        uiState.addCanvasGlyph({
+            id: streamGlyphId,
+            symbol: 'stream',
+            x: sx,
+            y: sy,
+            width: Math.round(promptRect.width),
+            height: 200,
+        });
+
         // Auto-meld stream below prompt glyph
         autoMeldResultBelow(promptEl, promptGlyphId, 'prompt', 'Prompt', streamElement, streamGlyphId, 'StreamGlyph');
 

@@ -18,7 +18,8 @@
 }
 
 /* Hover: reveal at compact height (but not when showing an error) */
-.canvas-result-glyph:hover .result-followup-zone:not(.has-error) {
+.canvas-result-glyph:hover .result-followup-zone:not(.has-error),
+.canvas-stream-glyph:hover .result-followup-zone:not(.has-error) {
     height: 42px;
     opacity: 1;
     padding: 4px 8px;
@@ -80,7 +81,8 @@
 }
 
 /* Error border on the glyph itself — !important overrides inline styles */
-.canvas-result-glyph.glyph-error {
+.canvas-result-glyph.glyph-error,
+.canvas-stream-glyph.glyph-error {
     outline-color: var(--glyph-status-error-text) !important;
     background-color: var(--glyph-status-error-section-bg) !important;
 }
