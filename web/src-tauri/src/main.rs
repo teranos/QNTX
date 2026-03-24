@@ -26,7 +26,6 @@ use qntx_proto::protocol::{DaemonStatusMessage, MessageType, StorageWarningMessa
 #[allow(unused_imports)]
 use qntx_grpc::types::async_types::{Job, JobStatus};
 
-
 const SERVER_PORT: &str = "877";
 
 struct ServerState {
@@ -459,7 +458,6 @@ fn main() {
                     child: Arc::new(Mutex::new(Some(child))),
                     port: SERVER_PORT.to_string(),
                 });
-
 
                 // Set up deep link handler for macOS (events) and check startup URL
                 // On Windows/Linux, deep links come through single-instance CLI args
