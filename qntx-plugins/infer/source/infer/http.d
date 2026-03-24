@@ -332,12 +332,13 @@ private string decodeChunked(string data) {
 }
 
 /// Extract a double from a JSONValue that might be integer or floating.
-private double jsonToDouble(scope const std.json.JSONValue* v) {
-    import std.json : JSONType;
+private double jsonToDouble(scope const JSONValue* v) {
     if (v.type == JSONType.float_) return v.floating;
     if (v.type == JSONType.integer) return cast(double)v.integer;
     return 0.0;
 }
+
+private import std.json : JSONValue, JSONType;
 
 /// Find first occurrence of substring.
 private ptrdiff_t indexOf(string haystack, string needle) {
