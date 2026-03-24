@@ -13,7 +13,7 @@
 
 import type { Glyph } from './glyph';
 import type { LLMStreamMessage } from '../../../types/websocket';
-import type { LLMTokenSignal } from '../../../types/generated/typescript/server';
+import type { LLMTokenSignal } from '@generated/server';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { storeCleanup } from './glyph-interaction';
