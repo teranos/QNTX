@@ -150,7 +150,7 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		// ReadTimeout and WriteTimeout must be 0 — non-zero values kill
-		// long-lived WebSocket connections (graph, sync, LSP, VidStream).
+		// long-lived WebSocket connections (graph, sync, LSP).
 	}
 	s.logger.Infow(fmt.Sprintf("HTTP server listening on %s:%d", s.bindAddress, actualPort))
 	return s.httpServer.ListenAndServe()
@@ -275,15 +275,6 @@ func (s *QNTXServer) Stop() error {
 			s.logger.Infow("Config watcher stopped")
 		}
 	}
-
-	// Clean up VidStream engine (ONNX resources)
-	s.vidstreamMu.Lock()
-	if s.vidstreamEngine != nil {
-		s.vidstreamEngine.Close()
-		s.vidstreamEngine = nil
-		s.logger.Infow("VidStream engine closed")
-	}
-	s.vidstreamMu.Unlock()
 
 	// Opening/Closing Phase 4: Mark shutdown complete
 	s.setState(ServerStateStopped)

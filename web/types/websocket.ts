@@ -79,7 +79,11 @@ export type MessageType =
   | 'watcher_queue_status'
   | 'database_stats'
   | 'sync_status'
-  | 'rich_search_results';
+  | 'rich_search_results'
+  | 'vidstream_init_success'
+  | 'vidstream_init_error'
+  | 'vidstream_detections'
+  | 'vidstream_frame_error';
 
 // ============================================================================
 // Base Message Interface
@@ -475,6 +479,50 @@ export interface RichSearchResultsMessage extends ProtoRichSearchResultsMessage,
   type: 'rich_search_results';
 }
 
+/**
+ * VidStream engine initialization success
+ */
+export interface VidStreamInitSuccessMessage extends BaseMessage {
+  type: 'vidstream_init_success';
+}
+
+/**
+ * VidStream engine initialization error
+ */
+export interface VidStreamInitErrorMessage extends BaseMessage {
+  type: 'vidstream_init_error';
+  error: string;
+}
+
+/**
+ * VidStream detection results for a processed frame
+ */
+export interface VidStreamDetectionsMessage extends BaseMessage {
+  type: 'vidstream_detections';
+  detections: Array<{
+    ClassID: number;
+    Label: string;
+    Confidence: number;
+    BBox: {
+      X: number;
+      Y: number;
+      Width: number;
+      Height: number;
+    };
+  }>;
+  stats: {
+    total_us: number;
+  };
+}
+
+/**
+ * VidStream frame processing error
+ */
+export interface VidStreamFrameErrorMessage extends BaseMessage {
+  type: 'vidstream_frame_error';
+  error: string;
+}
+
 // ============================================================================
 // Type Definitions for Parse Components
 // ============================================================================
@@ -618,6 +666,10 @@ export interface MessageHandlers {
   database_stats?: MessageHandler<DatabaseStatsMessage>;
   sync_status?: MessageHandler<SyncStatusMessage>;
   rich_search_results?: MessageHandler<RichSearchResultsMessage>;
+  vidstream_init_success?: MessageHandler<VidStreamInitSuccessMessage>;
+  vidstream_init_error?: MessageHandler<VidStreamInitErrorMessage>;
+  vidstream_detections?: MessageHandler<VidStreamDetectionsMessage>;
+  vidstream_frame_error?: MessageHandler<VidStreamFrameErrorMessage>;
 }
 
 // ============================================================================
