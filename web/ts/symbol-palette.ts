@@ -31,7 +31,6 @@ import {
 } from '@generated/sym.js';
 import { uiState } from './state/ui.ts';
 import { log, SEG } from './logger';
-import { handleError } from './error-handler.ts';
 import { tooltip } from './components/tooltip.ts';
 
 // Import all panel/window modules statically
