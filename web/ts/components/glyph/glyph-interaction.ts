@@ -3,7 +3,7 @@
  *
  * All glyphs that live on the canvas need the same pointer-driven
  * move / resize behaviour.  The logic was previously duplicated
- * across py-glyph, ix-glyph and result-glyph.
+ * across py-glyph and result-glyph.
  */
 
 import type { Glyph } from './glyph';
@@ -126,7 +126,7 @@ export interface CanvasGlyphLayoutOptions {
     y: number;
     width: number;
     height: number;
-    /** Use minHeight instead of height (e.g. ix-glyph grows with content) */
+    /** Use minHeight instead of height (glyph grows with content) */
     useMinHeight?: boolean;
 }
 
@@ -622,7 +622,7 @@ export function makeDraggable(
  *
  * @example
  * // Basic usage with default min size (200x120)
- * makeResizable(element, resizeHandle, glyph, { logLabel: 'IX Glyph' });
+ * makeResizable(element, resizeHandle, glyph, { logLabel: 'AX Glyph' });
  *
  * @example
  * // Custom minimum dimensions

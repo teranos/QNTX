@@ -38,7 +38,6 @@ import { toggleConfig } from './config-panel.js';
 // ai-provider-window.ts removed — LLM provider is now a tray glyph
 import { togglePulsePanel } from './pulse-panel.js';
 import { toggleProsePanel } from './prose/panel.js';
-import { toggleGoEditor } from './code/panel.js';
 import { togglePythonEditor } from './python/panel.js';
 import { glyphRun } from './components/glyph/run.ts';
 
@@ -156,7 +155,6 @@ function getInitialTooltip(cmd: string): string {
         'pulse': '꩜ Pulse — Async operations',
         'db': '⊔ Database — Storage layer',
         'prose': '⚇ Prose — Documentation',
-        'go': 'Go — Code editor',
         'py': 'py — Python editor',
         'plugins': '⚙ Plugins — Domain extensions',
     };
@@ -255,10 +253,6 @@ function handleSymbolClick(e: Event): void {
             // Prose - show documentation panel
             showProsePanel();
             break;
-        case 'go':
-            // Go - show Go code editor with gopls integration
-            showGoEditor();
-            break;
         case 'py':
             // Python - show Python code editor/executor
             showPythonEditor();
@@ -310,13 +304,6 @@ function showPulsePanel(): void {
  */
 function showProsePanel(): void {
     toggleProsePanel();
-}
-
-/**
- * Show Go editor - displays Go code editor with gopls LSP integration
- */
-function showGoEditor(): void {
-    toggleGoEditor();
 }
 
 /**

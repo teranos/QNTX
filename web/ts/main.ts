@@ -340,12 +340,6 @@ async function init(): Promise<void> {
             });
         });
 
-        listen('show-code-panel', () => {
-            import('./code/panel.ts').then(({ showGoEditor }) => {
-                showGoEditor();
-            });
-        });
-
         listen('show-plugin-panel', () => {
             glyphRun.openGlyph('plugin-glyph');
         });

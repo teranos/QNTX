@@ -354,8 +354,8 @@ describe('Port-aware MELDABILITY registry', () => {
 
             const edges = [{ from: 'ax1', to: 'py1', direction: 'right' }];
 
-            // ix glyph has no meld compatibility
-            const options = getMeldOptions('canvas-ix-glyph', composition, edges);
+            // unknown glyph type has no meld compatibility
+            const options = getMeldOptions('canvas-unknown-glyph', composition, edges);
             expect(options).toEqual([]);
         });
     });

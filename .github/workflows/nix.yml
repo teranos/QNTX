@@ -106,37 +106,6 @@ jobs:
       - name: Push to Cachix
         run: nix build ./typegen --print-out-paths --no-link | cachix push qntx
 
-  # qntx-code plugin (Go, parallel builds per OS)
-  build-qntx-code:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v30
-        with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-
-      - name: Setup Cachix
-        uses: cachix/cachix-action@v14
-        with:
-          name: qntx
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-
-      - name: Update flake lock
-        run: nix flake lock --update-input fenix
-
-      - name: Build qntx-code plugin
-        run: nix build ./qntx-code#qntx-code-plugin --show-trace
-
-      - name: Push to Cachix
-        run: nix build ./qntx-code#qntx-code-plugin --print-out-paths --no-link | cachix push qntx
-
   # qntx-python plugin (Rust, parallel builds per OS)
   build-qntx-python:
     strategy:

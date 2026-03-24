@@ -82,9 +82,7 @@
 //   - ats/types/     - Data models and type definitions
 //   - ats/parser/    - Natural language command parsing
 //   - ats/ax/        - Query execution and retrieval
-//   - ats/ix/        - Data ingestion framework
 //   - ats/alias/     - Entity alias resolution
-//   - ats/lsp/       - Language Server Protocol support
 //
 // For detailed documentation, see README.md files in each package.
 package ats

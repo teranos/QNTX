@@ -7,14 +7,16 @@ import (
 	"context"
 	"time"
 
-	"github.com/teranos/QNTX/ats/ingestion"
 	"github.com/teranos/QNTX/ats/types"
 )
 
 // AttestationItem represents an item that can be converted to an attestation.
-// This is an alias for ingestion.Item, enabling domain-agnostic data producers
-// to work with attestation persistence without tight coupling.
-type AttestationItem = ingestion.Item
+type AttestationItem interface {
+	GetSubject() string
+	GetPredicate() string
+	GetContext() string
+	GetMeta() map[string]string
+}
 
 // AttestationStore defines storage operations for attestations.
 // Implementations can use any backend (SQLite, Postgres, S3, in-memory, etc.)

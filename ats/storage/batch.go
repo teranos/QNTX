@@ -9,14 +9,11 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
-	"github.com/teranos/QNTX/ats/ingestion"
 	"github.com/teranos/QNTX/ats/types"
 )
 
-// AttestationItem represents an item that can be converted to an attestation.
-// This is an alias for ingestion.Item, enabling domain-agnostic data producers
-// to work with attestation persistence without tight coupling.
-type AttestationItem = ingestion.Item
+// AttestationItem is a local alias for the interface defined in ats.
+type AttestationItem = ats.AttestationItem
 
 // BatchPersister handles batch attestation persistence with error tracking and statistics
 type BatchPersister struct {
