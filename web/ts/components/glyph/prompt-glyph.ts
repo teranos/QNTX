@@ -12,12 +12,10 @@
  * - For now: simple one-shot execution for testing
  *
  * TODO: Migrate to GlyphUI SDK (like py-glyph and ts-glyph).
- *   Spawns attestation glyphs (not ExecutionResult), so needs a
- *   spawnGlyph event or generalized spawn mechanism beyond spawnResult.
  */
 
 import type { Glyph } from './glyph';
-import { SO, AS, Doc, Prose } from '@generated/sym.js';
+import { SO, Doc, Prose } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { apiFetch } from '../../api';
 import { preventDrag, storeCleanup } from './glyph-interaction';
@@ -27,8 +25,7 @@ import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
 import { tooltip } from '../tooltip';
 import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
-import { createAttestationGlyph } from './attestation-glyph';
-import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
+import { createResultGlyph, type ExecutionResult, type ResultGlyphContent } from './result-glyph';
 
 /**
  * Prompt glyph execution status
@@ -263,10 +260,20 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
 
             if (data.error) return;
 
-            // Use the attestation from the API response (includes signature fields)
-            if (data.attestation) {
-                spawnAttestationBelow(element, data.attestation);
-            }
+            // Spawn a result glyph with the LLM response
+            const execResult: ExecutionResult = {
+                success: true,
+                stdout: data.response ?? '',
+                stderr: '',
+                result: null,
+                error: null,
+                duration_ms: elapsedMs,
+            };
+            const promptConfig = {
+                model: data.model,
+                provider: undefined,
+            };
+            spawnResultBelow(element, glyph, execResult, promptConfig, textarea.value.trim());
 
         } catch (error) {
             log.error(SEG.GLYPH, '[Prompt] Execution failed:', error);
@@ -328,14 +335,20 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     tooltip.attach(element);
 
     /**
-     * Spawn an attestation glyph directly below this prompt glyph.
+     * Spawn a result glyph directly below this prompt glyph.
      * Composition-aware: extends existing composition or creates new meld.
      */
-    function spawnAttestationBelow(promptEl: HTMLElement, attestation: Attestation): void {
+    function spawnResultBelow(
+        promptEl: HTMLElement,
+        promptGlyphData: Glyph,
+        result: ExecutionResult,
+        promptConfig: { model?: string; provider?: string },
+        promptText: string,
+    ): void {
         const promptRect = promptEl.getBoundingClientRect();
         const canvas = promptEl.closest('.canvas-workspace') as HTMLElement;
         if (!canvas) {
-            log.error(SEG.GLYPH, '[Prompt] Cannot spawn attestation glyph: no canvas-workspace ancestor');
+            log.error(SEG.GLYPH, '[Prompt] Cannot spawn result glyph: no canvas-workspace ancestor');
             return;
         }
         const canvasRect = canvas.getBoundingClientRect();
@@ -343,36 +356,36 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
         const rx = promptRect.left - canvasRect.left;
         const ry = promptRect.bottom - canvasRect.top;
 
-        const asGlyphId = `as-${crypto.randomUUID()}`;
-        const asGlyph: Glyph = {
-            id: asGlyphId,
-            title: 'Attestation',
-            symbol: AS,
+        const resultGlyphId = `result-${crypto.randomUUID()}`;
+        const resultGlyph: Glyph = {
+            id: resultGlyphId,
+            title: 'Result',
+            symbol: 'result',
             x: rx,
             y: ry,
             width: Math.round(promptRect.width),
-            content: JSON.stringify(attestation),
             renderContent: () => document.createElement('div'),
         };
 
-        const asElement = createAttestationGlyph(asGlyph);
-        canvas.appendChild(asElement);
+        const resultElement = createResultGlyph(resultGlyph, result, promptConfig, promptText);
+        canvas.appendChild(resultElement);
 
-        const asRect = asElement.getBoundingClientRect();
+        const resultRect = resultElement.getBoundingClientRect();
+        const contentPayload: ResultGlyphContent = { result, promptConfig, prompt: promptText };
         uiState.addCanvasGlyph({
-            id: asGlyphId,
-            symbol: AS,
+            id: resultGlyphId,
+            symbol: 'result',
             x: rx,
             y: ry,
-            width: Math.round(asRect.width) || Math.round(promptRect.width),
-            height: Math.round(asRect.height) || 200,
-            content: JSON.stringify(attestation),
+            width: Math.round(resultRect.width) || Math.round(promptRect.width),
+            height: Math.round(resultRect.height) || 200,
+            content: JSON.stringify(contentPayload),
         });
 
-        // Auto-meld attestation below prompt glyph
+        // Auto-meld result below prompt glyph
         const promptGlyphId = promptEl.dataset.glyphId;
         if (promptGlyphId) {
-            autoMeldResultBelow(promptEl, promptGlyphId, 'prompt', 'Prompt', asElement, asGlyphId, 'Prompt');
+            autoMeldResultBelow(promptEl, promptGlyphId, 'prompt', 'Prompt', resultElement, resultGlyphId, 'Prompt');
         }
     }
 }
