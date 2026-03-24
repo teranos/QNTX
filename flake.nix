@@ -341,7 +341,7 @@
           # Make Python available to PyO3 builds in dev shell
           PYO3_PYTHON = "${pkgs.python313}/bin/python3";
 
-          # Make ONNX Runtime available to Rust builds (vidstream)
+          # Make ONNX Runtime available to Rust builds (embeddings)
           shellHook = pre-commit-check.shellHook + ''
             export LD_LIBRARY_PATH="${pkgs.onnxruntime}/lib:''${LD_LIBRARY_PATH:-}"
             export DYLD_LIBRARY_PATH="${pkgs.onnxruntime}/lib:''${DYLD_LIBRARY_PATH:-}"
