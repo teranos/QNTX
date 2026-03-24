@@ -3,7 +3,7 @@ package storage
 import (
 	"testing"
 
-	"github.com/teranos/QNTX/ats/ingestion"
+	"github.com/teranos/QNTX/ats"
 )
 
 // mockItem implements AttestationItem interface for testing
@@ -20,7 +20,7 @@ func (m *mockItem) GetContext() string         { return m.context }
 func (m *mockItem) GetMeta() map[string]string { return m.meta }
 
 // Ensure mockItem implements AttestationItem
-var _ ingestion.Item = (*mockItem)(nil)
+var _ ats.AttestationItem = (*mockItem)(nil)
 
 // TestNewBatchPersister tests batch persister creation
 func TestNewBatchPersister(t *testing.T) {

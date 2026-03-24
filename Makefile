@@ -271,11 +271,6 @@ define check-plugin-version
 	 exit 1 || true
 endef
 
-code-plugin: ## Build, install, and restart code plugin
-	$(call check-plugin-version,qntx-code,go,qntx-code/plugin.go)
-	@$(MAKE) -C qntx-code install PREFIX=$(PREFIX)
-	$(call restart-plugin,code)
-
 atproto-plugin: ## Build, install, and restart AT Protocol plugin
 	$(call check-plugin-version,qntx-atproto,go,qntx-atproto/plugin.go)
 	@$(MAKE) -C qntx-atproto install PREFIX=$(PREFIX)

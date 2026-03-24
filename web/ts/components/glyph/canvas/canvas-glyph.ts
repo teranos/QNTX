@@ -20,7 +20,7 @@
  */
 
 import type { Glyph } from '../glyph';
-import { Pulse, IX, AX } from '@generated/sym.js';
+import { Pulse, AX } from '@generated/sym.js';
 import { log, SEG } from '../../../logger';
 import { getGlyphTypeBySymbol } from '../glyph-registry';
 import { uiState } from '../../../state/ui';
@@ -81,7 +81,7 @@ export function createCanvasGlyph(): Glyph {
         manifestationType: 'fullscreen', // Full-viewport, no chrome
         layoutStrategy: 'grid',
         children: glyphs,
-        onSpawnMenu: () => [Pulse, IX, AX], // TODO: Remove Pulse when IX wired up
+        onSpawnMenu: () => [Pulse, AX],
 
         renderContent: () => buildCanvasWorkspace('canvas-workspace', glyphs)
     };

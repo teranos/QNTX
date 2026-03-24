@@ -9,7 +9,7 @@
  * They serve as visual markers on the spatial canvas to show active ax queries.
  *
  * Uses canvasPlaced() for shared infrastructure (positioning, drag, resize, cleanup,
- * CSS state) with a custom title bar (same pattern as IX glyph).
+ * CSS state) with a custom title bar.
  *
  * TODO: Future enhancements
  * - TODO(#672): Attribute filters — expose watcher attribute_filters as UI conditions
@@ -45,7 +45,7 @@ import {
 } from './query-glyph-states';
 
 /**
- * Create an AX glyph using canvasPlaced() with custom title bar (IX pattern).
+ * Create an AX glyph using canvasPlaced() with custom title bar.
  *
  * @param glyph - Glyph model with id, position, and size
  * @returns The canvas-placed HTMLElement

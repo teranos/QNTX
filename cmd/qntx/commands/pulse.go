@@ -13,7 +13,6 @@ import (
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
-	"github.com/teranos/QNTX/qntx-code/ixgest/git"
 	"github.com/teranos/QNTX/sym"
 )
 
@@ -66,7 +65,7 @@ The daemon will:
 		}
 
 		// Open and migrate database
-		database, atsStore, _, err := openDatabase("")
+		database, _, _, err := openDatabase("")
 		if err != nil {
 			return errors.Wrap(err, "failed to open pulse database")
 		}
@@ -82,7 +81,6 @@ The daemon will:
 
 		// Create handler registry and register handlers
 		registry := async.NewHandlerRegistry()
-		registry.Register(git.NewGitIngestionHandler(database, atsStore, logger.Logger))
 
 		// Create worker pool with registered handlers
 		pool := async.NewWorkerPoolWithRegistry(ctx, database, cfg, poolCfg, logger.Logger, registry, nil, nil)

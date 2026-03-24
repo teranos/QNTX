@@ -8,11 +8,10 @@
  */
 
 import type { Glyph } from './glyph';
-import { AX, IX, SO, SE, AS, Prose, Doc, Subcanvas } from '@generated/sym.js';
+import { AX, SO, SE, AS, Prose, Doc, Subcanvas } from '@generated/sym.js';
 import { createAxGlyph } from './ax-glyph';
 import { createSemanticGlyph } from './semantic-glyph';
 import { createPyGlyph, PY_DEFAULT_CODE } from './py-glyph';
-import { createIxGlyph } from './ix-glyph';
 import { createPromptGlyph, PROMPT_DEFAULT_TEMPLATE } from './prompt-glyph';
 import { createNoteGlyph } from './note-glyph';
 import { createTsGlyph, TS_DEFAULT_CODE } from './ts-glyph';
@@ -42,14 +41,13 @@ export interface GlyphTypeEntry {
 }
 
 const GLYPH_TYPES: GlyphTypeEntry[] = [
-    { symbol: IX,       className: 'canvas-ix-glyph',      title: 'Ingest',          label: 'IX',        render: createIxGlyph,        spawnMenuOrder: 0 },
-    { symbol: AX,       className: 'canvas-ax-glyph',      title: 'AX Query',        label: 'AX',        render: createAxGlyph,        spawnMenuOrder: 1 },
-    { symbol: SE,       className: 'canvas-se-glyph',      title: 'Semantic Search', label: 'SE',        render: createSemanticGlyph,  spawnMenuOrder: 2 },
-    { symbol: 'py',     className: 'canvas-py-glyph',      title: 'Python',          label: 'Py',        render: createPyGlyph,        spawnMenuOrder: 3, defaultContent: PY_DEFAULT_CODE },
-    { symbol: 'ts',     className: 'canvas-ts-glyph',      title: 'TypeScript',      label: 'TS',        render: createTsGlyph,        spawnMenuOrder: 4, defaultContent: TS_DEFAULT_CODE },
-    { symbol: SO,       className: 'canvas-prompt-glyph',  title: 'Prompt',          label: 'Prompt',    render: createPromptGlyph,    spawnMenuOrder: 5, defaultContent: PROMPT_DEFAULT_TEMPLATE, commandAliases: ['so'] },
-    { symbol: Prose,    className: 'canvas-note-glyph',    title: 'Note',            label: 'Note',      render: createNoteGlyph,      spawnMenuOrder: 6, defaultContent: 'Write here — select and click ⟶ to convert to a prompt glyph.', commandAliases: ['prose'] },
-    { symbol: Subcanvas, className: 'canvas-subcanvas-glyph', title: 'Subcanvas',    label: 'Subcanvas', render: createSubcanvasGlyph, spawnMenuOrder: 7 },
+    { symbol: AX,       className: 'canvas-ax-glyph',      title: 'AX Query',        label: 'AX',        render: createAxGlyph,        spawnMenuOrder: 0 },
+    { symbol: SE,       className: 'canvas-se-glyph',      title: 'Semantic Search', label: 'SE',        render: createSemanticGlyph,  spawnMenuOrder: 1 },
+    { symbol: 'py',     className: 'canvas-py-glyph',      title: 'Python',          label: 'Py',        render: createPyGlyph,        spawnMenuOrder: 2, defaultContent: PY_DEFAULT_CODE },
+    { symbol: 'ts',     className: 'canvas-ts-glyph',      title: 'TypeScript',      label: 'TS',        render: createTsGlyph,        spawnMenuOrder: 3, defaultContent: TS_DEFAULT_CODE },
+    { symbol: SO,       className: 'canvas-prompt-glyph',  title: 'Prompt',          label: 'Prompt',    render: createPromptGlyph,    spawnMenuOrder: 4, defaultContent: PROMPT_DEFAULT_TEMPLATE, commandAliases: ['so'] },
+    { symbol: Prose,    className: 'canvas-note-glyph',    title: 'Note',            label: 'Note',      render: createNoteGlyph,      spawnMenuOrder: 5, defaultContent: 'Write here — select and click ⟶ to convert to a prompt glyph.', commandAliases: ['prose'] },
+    { symbol: Subcanvas, className: 'canvas-subcanvas-glyph', title: 'Subcanvas',    label: 'Subcanvas', render: createSubcanvasGlyph, spawnMenuOrder: 6 },
     { symbol: Doc,      className: 'canvas-doc-glyph',     title: 'Document',        label: 'Doc',       render: createDocGlyph },
     { symbol: AS,       className: 'canvas-attestation-glyph', title: 'Attestation', label: 'AS',        render: createAttestationGlyph },
 ];

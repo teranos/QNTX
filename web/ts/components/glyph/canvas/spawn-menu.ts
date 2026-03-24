@@ -25,13 +25,6 @@ const SPAWN_MENU_ANIMATION_SPEED = 0.5;
 /**
  * Show right-click spawn menu with available symbols
  *
- * Architecture Note:
- * - Pulse glyph removed - IX glyphs now use forceTriggerJob() for execution
- * - Pulse (scheduling system) remains the execution layer for both IX and ATS
- * - Execution paths:
- *   - One-time execution: IX glyphs on canvas → forceTriggerJob() → Pulse
- *   - Scheduled execution: ATS blocks in Prose → createScheduledJob() → Pulse
- *
  * TODO: Spawn menu as glyph with morphing mini-glyphs
  *
  * Vision: Menu container is a glyph, menu items are tiny glyphs (8px) that use
@@ -40,7 +33,7 @@ const SPAWN_MENU_ANIMATION_SPEED = 0.5;
  *
  * Implementation:
  * - Menu container: Glyph entity with renderContent
- * - Menu items: Array of tiny glyphs with symbols (IX, "py", "go", "rs", "ts")
+ * - Menu items: Array of tiny glyphs with symbols ("py", "go", "rs", "ts")
  * - Reuse GlyphRun proximity morphing logic (window-tray.ts:164-285)
  * - Priority: Medium (after core window↔glyph morphing works)
  */
