@@ -180,7 +180,7 @@ Could LLM embeddings plug into the same HDBSCAN/UMAP infra? Technically yes — 
 
 ### Tier 1 Visualizations
 
-- [ ] Confidence heatmap — color token spans by P(chosen) or entropy
+- [x] Confidence heatmap — color token spans by P(chosen) or entropy
 - [ ] Top-K alternatives popup — hover/click a token to see candidates + probability bars
 - [ ] Entropy sparkline — rolling SVG line chart of entropy per token position
 - [ ] Runner-up ghost trail — inline muted annotation of second-place tokens
@@ -208,3 +208,7 @@ Could LLM embeddings plug into the same HDBSCAN/UMAP infra? Technically yes — 
 - [ ] Port D prototype signal computation (entropy spikes, low-confidence spans) to C++
 - [ ] Write per-generation attestations with signal attributes to ATS
 - [ ] Connect live visualizations to the same signal data that feeds attestations
+
+## Future Direction: Token-as-Glyph
+
+Each LLM token carries signal data (confidence, entropy, top-gap, top-k candidates). The stream glyph currently renders tokens as `<span>` elements with signal data stored in `data-*` attributes. The signal data structure already supports treating every token as its own glyph entity — a token-glyph carrying its full decision context as content, positioned in a text flow rather than on the canvas grid. This isn't for now: the `<span>` representation is sufficient for heatmap visualization and hover popups. But the data contract (per-token signal in `LLMStreamMessage`) is designed so that the transition from span-per-token to glyph-per-token requires no backend changes.

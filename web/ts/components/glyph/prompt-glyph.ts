@@ -26,6 +26,7 @@ import { createAutoSave } from './glyph-autosave';
 import { tooltip } from '../tooltip';
 import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
 import { createResultGlyph, type ExecutionResult, type ResultGlyphContent } from './result-glyph';
+import { createStreamGlyph, getStreamTokenCount, unsubscribeStream } from './stream-glyph';
 
 /**
  * Prompt glyph execution status
@@ -233,6 +234,9 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
                 finalTemplate = noteTexts.join('\n\n') + '\n\n' + template;
             }
 
+            // Spawn stream glyph below prompt before fetch starts
+            const streamElement = spawnStreamBelow(element, glyph.id);
+
             const response = await apiFetch('/api/prompt/direct', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -245,6 +249,11 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
 
             if (!response.ok) {
                 const errorText = await response.text();
+                // Remove stream glyph on error
+                if (streamElement) {
+                    unsubscribeStream(glyph.id);
+                    streamElement.remove();
+                }
                 throw new Error(`API error: ${response.status} - ${errorText}`);
             }
 
@@ -258,22 +267,39 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
                 timestamp: Date.now(),
             });
 
-            if (data.error) return;
+            if (data.error) {
+                // Remove stream glyph on API-level error
+                if (streamElement) {
+                    unsubscribeStream(glyph.id);
+                    streamElement.remove();
+                }
+                return;
+            }
 
-            // Spawn a result glyph with the LLM response
-            const execResult: ExecutionResult = {
-                success: true,
-                stdout: data.response ?? '',
-                stderr: '',
-                result: null,
-                error: null,
-                duration_ms: elapsedMs,
-            };
-            const promptConfig = {
-                model: data.model,
-                provider: undefined,
-            };
-            spawnResultBelow(element, execResult, promptConfig, textarea.value.trim());
+            // If stream glyph received tokens, keep it; otherwise fall back to result glyph
+            const streamTokens = streamElement ? getStreamTokenCount(streamElement) : 0;
+            if (streamTokens > 0) {
+                log.debug(SEG.GLYPH, `[Prompt] Stream glyph received ${streamTokens} tokens, keeping`);
+            } else {
+                // Non-streaming provider — remove empty stream glyph, spawn result glyph
+                if (streamElement) {
+                    unsubscribeStream(glyph.id);
+                    streamElement.remove();
+                }
+                const execResult: ExecutionResult = {
+                    success: true,
+                    stdout: data.response ?? '',
+                    stderr: '',
+                    result: null,
+                    error: null,
+                    duration_ms: elapsedMs,
+                };
+                const promptConfig = {
+                    model: data.model,
+                    provider: undefined,
+                };
+                spawnResultBelow(element, execResult, promptConfig, textarea.value.trim());
+            }
 
         } catch (error) {
             log.error(SEG.GLYPH, '[Prompt] Execution failed:', error);
@@ -386,5 +412,41 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
         if (promptGlyphId) {
             autoMeldResultBelow(promptEl, promptGlyphId, 'prompt', 'Prompt', resultElement, resultGlyphId, 'Prompt');
         }
+    }
+
+    /**
+     * Spawn a stream glyph directly below this prompt glyph.
+     * Returns the stream element, or null if canvas not found.
+     */
+    function spawnStreamBelow(promptEl: HTMLElement, promptGlyphId: string): HTMLElement | null {
+        const promptRect = promptEl.getBoundingClientRect();
+        const canvas = promptEl.closest('.canvas-workspace') as HTMLElement;
+        if (!canvas) {
+            log.error(SEG.GLYPH, '[Prompt] Cannot spawn stream glyph: no canvas-workspace ancestor');
+            return null;
+        }
+        const canvasRect = canvas.getBoundingClientRect();
+
+        const sx = promptRect.left - canvasRect.left;
+        const sy = promptRect.bottom - canvasRect.top;
+
+        const streamGlyphId = `stream-${crypto.randomUUID()}`;
+        const streamGlyph: Glyph = {
+            id: streamGlyphId,
+            title: 'Stream',
+            symbol: 'stream',
+            x: sx,
+            y: sy,
+            width: Math.round(promptRect.width),
+            renderContent: () => document.createElement('div'),
+        };
+
+        const streamElement = createStreamGlyph(streamGlyph, promptGlyphId);
+        canvas.appendChild(streamElement);
+
+        // Auto-meld stream below prompt glyph
+        autoMeldResultBelow(promptEl, promptGlyphId, 'prompt', 'Prompt', streamElement, streamGlyphId, 'StreamGlyph');
+
+        return streamElement;
     }
 }
