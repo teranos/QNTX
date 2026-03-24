@@ -3,7 +3,9 @@
  *
  * Replaces ai-provider-window.ts (Window component → glyph system).
  * Tray glyph: dot in GlyphRun, morphs to window on click.
- * Provider selection: OpenRouter (cloud) and llama.cpp (local Metal).
+ * Provider selection: OpenRouter (cloud) and llama.cpp (local).
+ * llama.cpp sub-option: inference attestation routes through the infer
+ * plugin which captures per-token probabilities from llama-server.
  */
 
 import type { Glyph } from './components/glyph/glyph';
@@ -43,6 +45,13 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
                 <div class="llm-provider-buttons" style="display: flex; gap: 8px; margin: 8px 0;"></div>
                 <div class="llm-provider-status-line" style="min-height: 20px; font-size: 12px; margin: 4px 0;"></div>
             </div>
+            <div class="llm-provider-llama-config glyph-section" style="display: none;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text-primary, #e2e8f0);">
+                    <input type="checkbox" class="llm-provider-infer-toggle" style="cursor: pointer; accent-color: #60a5fa;" />
+                    <span>Inference attestation</span>
+                    <span style="font-size: 11px; color: #94a3b8;">— capture per-token entropy and confidence via llama-server</span>
+                </label>
+            </div>
             <div class="llm-provider-openrouter-config glyph-section" style="display: none;">
                 <h3 class="glyph-section-title">OpenRouter API Key</h3>
                 <div style="display: flex; gap: 4px; align-items: center;">
@@ -65,6 +74,8 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
 
     const btnGroup = content.querySelector('.llm-provider-buttons')!;
     const statusEl = content.querySelector('.llm-provider-status-line')!;
+    const llamaConfig = content.querySelector('.llm-provider-llama-config') as HTMLElement;
+    const inferToggle = content.querySelector('.llm-provider-infer-toggle') as HTMLInputElement;
     const openrouterConfig = content.querySelector('.llm-provider-openrouter-config') as HTMLElement;
     const keyInput = content.querySelector('.llm-provider-key-input') as HTMLInputElement;
     const keyToggle = content.querySelector('.llm-provider-key-toggle')!;
@@ -72,16 +83,23 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
 
     // Create provider buttons
     const openrouterBtn = makeProviderButton('OpenRouter', 'Cloud API');
-    const llamaCppBtn = makeProviderButton('llama.cpp', 'Local Metal');
+    const llamaCppBtn = makeProviderButton('llama.cpp', 'Local');
     btnGroup.appendChild(openrouterBtn);
     btnGroup.appendChild(llamaCppBtn);
 
+    // Track whether inference attestation is active
+    let inferActive = false;
+
     // --- Behavior ---
 
-    function updateProviderUI(provider: 'openrouter' | 'llama-cpp'): void {
+    function updateProviderUI(provider: 'openrouter' | 'llama-cpp' | 'infer'): void {
+        const isLocal = provider === 'llama-cpp' || provider === 'infer';
         openrouterBtn.classList.toggle('active', provider === 'openrouter');
-        llamaCppBtn.classList.toggle('active', provider === 'llama-cpp');
+        llamaCppBtn.classList.toggle('active', isLocal);
+        llamaConfig.style.display = isLocal ? '' : 'none';
         openrouterConfig.style.display = provider === 'openrouter' ? '' : 'none';
+        inferToggle.checked = provider === 'infer';
+        inferActive = provider === 'infer';
     }
 
     function showStatus(message: string, type: 'success' | 'error' | 'warning'): void {
@@ -117,13 +135,32 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
     });
 
     llamaCppBtn.addEventListener('click', async () => {
-        log.debug(SEG.ACTOR, 'Switching to llama.cpp');
-        updateProviderUI('llama-cpp');
+        // Preserve inference attestation state when clicking the llama.cpp button
+        const provider = inferActive ? 'infer' : 'llama-cpp';
+        log.debug(SEG.ACTOR, 'Switching to %s', provider);
+        updateProviderUI(provider);
         try {
-            await updateConfig({ 'llm.provider': 'llama-cpp' });
-            showStatus('Using llama.cpp (local Metal)', 'success');
+            await updateConfig({ 'llm.provider': provider });
+            const label = inferActive ? 'llama.cpp + inference attestation' : 'llama.cpp (local)';
+            showStatus(`Using ${label}`, 'success');
         } catch (error: unknown) {
             handleError(error, 'Failed to switch to llama.cpp', { context: SEG.ACTOR, silent: true });
+            showStatus('Failed to update config', 'error');
+        }
+    });
+
+    inferToggle.addEventListener('change', async () => {
+        const provider = inferToggle.checked ? 'infer' : 'llama-cpp';
+        inferActive = inferToggle.checked;
+        log.debug(SEG.ACTOR, 'Inference attestation: %s', inferToggle.checked ? 'enabled' : 'disabled');
+        try {
+            await updateConfig({ 'llm.provider': provider });
+            const label = inferToggle.checked
+                ? 'Inference attestation enabled — routing through llama-server'
+                : 'Inference attestation disabled — direct llama.cpp';
+            showStatus(label, 'success');
+        } catch (error: unknown) {
+            handleError(error, 'Failed to toggle inference attestation', { context: SEG.ACTOR, silent: true });
             showStatus('Failed to update config', 'error');
         }
     });
@@ -160,7 +197,9 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
             const providerSetting = settings.find(s => s.key === 'llm.provider');
             const configuredProvider = providerSetting?.value as string;
 
-            if (configuredProvider === 'llama-cpp') {
+            if (configuredProvider === 'infer') {
+                updateProviderUI('infer');
+            } else if (configuredProvider === 'llama-cpp') {
                 updateProviderUI('llama-cpp');
             } else {
                 updateProviderUI('openrouter');
