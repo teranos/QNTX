@@ -1,10 +1,70 @@
 #include "plugin.h"
 
+#include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <sstream>
 #include <vector>
 
 #include "llama.h"
+
+static constexpr int SIGNAL_TOP_K = 10;
+
+// Softmax in-place over n floats, returns max for numerical stability
+static void softmax(float* data, int n) {
+    float max_val = *std::max_element(data, data + n);
+    float sum = 0.0f;
+    for (int i = 0; i < n; i++) {
+        data[i] = std::exp(data[i] - max_val);
+        sum += data[i];
+    }
+    for (int i = 0; i < n; i++) {
+        data[i] /= sum;
+    }
+}
+
+// Capture pre-sampler signal from raw logits at the current position
+static TokenSignal capture_signal(llama_context* ctx, const llama_vocab* vocab, int top_k) {
+    int n_vocab = llama_vocab_n_tokens(vocab);
+    float* logits = llama_get_logits_ith(ctx, -1);
+
+    // Copy logits — we need to softmax without mutating the originals
+    // that the sampler will read
+    std::vector<float> probs(logits, logits + n_vocab);
+    softmax(probs.data(), n_vocab);
+
+    // Build index array, partial sort for top-k
+    std::vector<int> indices(n_vocab);
+    for (int i = 0; i < n_vocab; i++) indices[i] = i;
+    int k = std::min(top_k, n_vocab);
+    std::partial_sort(indices.begin(), indices.begin() + k, indices.end(),
+                      [&probs](int a, int b) { return probs[a] > probs[b]; });
+
+    TokenSignal sig;
+    sig.confidence = probs[indices[0]];
+    sig.top_gap = (k >= 2) ? probs[indices[0]] - probs[indices[1]] : sig.confidence;
+
+    // Shannon entropy over top-k
+    float h = 0.0f;
+    for (int i = 0; i < k; i++) {
+        float p = probs[indices[i]];
+        if (p > 0.0f) {
+            h -= p * std::log2(p);
+        }
+    }
+    sig.entropy = h;
+
+    // Top-k candidates
+    sig.top_k.resize(k);
+    for (int i = 0; i < k; i++) {
+        int id = indices[i];
+        char buf[256];
+        int len = llama_token_to_piece(vocab, id, buf, sizeof(buf), 0, true);
+        sig.top_k[i] = {id, std::string(buf, std::max(0, len)), probs[id]};
+    }
+
+    return sig;
+}
 
 InferenceEngine::InferenceEngine() {}
 
@@ -150,18 +210,24 @@ InferenceEngine::ChatResult InferenceEngine::chat(
     int n_generated = 0;
 
     for (int i = 0; i < max_tokens; i++) {
+        // Capture raw logit distribution before the sampler modifies it
+        TokenSignal sig = capture_signal(ctx_, vocab, SIGNAL_TOP_K);
+
         llama_token new_token = llama_sampler_sample(sampler, ctx_, -1);
 
         if (llama_vocab_is_eog(vocab, new_token)) {
             break;
         }
 
-        // Convert token to text
+        // Record which token was actually chosen
         char buf[256];
         int n = llama_token_to_piece(vocab, new_token, buf, sizeof(buf), 0, true);
+        sig.token_id = new_token;
         if (n > 0) {
+            sig.token_text = std::string(buf, n);
             output.write(buf, n);
         }
+        result.signals.push_back(std::move(sig));
 
         // Decode next token
         llama_batch next = llama_batch_get_one(&new_token, 1);

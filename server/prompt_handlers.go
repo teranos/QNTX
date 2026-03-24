@@ -705,7 +705,10 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Use model name from response if not known from request (e.g. gRPC plugin reports it)
+	// TODO: attestation subject should reflect the actual model that ran, not the
+	// requested model from frontmatter. When frontmatter says "anthropic/claude-haiku-4.5"
+	// but the request routes through llama.cpp, the attestation subject is wrong.
+	// Fix: prefer resp.Model (actual) over req/frontmatter model (requested).
 	if modelName == "" && resp.Model != "" {
 		modelName = resp.Model
 	}

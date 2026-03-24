@@ -7,7 +7,7 @@ build: ## Build qntx-llama-cpp-plugin
 	@echo "Building qntx-llama-cpp-plugin..."
 	@mkdir -p $(BUILD_DIR)
 	@cd $(BUILD_DIR) && cmake .. -DCMAKE_BUILD_TYPE=Release
-	@cd $(BUILD_DIR) && cmake --build . --parallel 3
+	@cd $(BUILD_DIR) && cmake --build . --parallel 6
 	@echo "✓ $(BUILD_DIR)/qntx-llama-cpp-plugin"
 
 install: build ## Install to ~/.qntx/plugins/
