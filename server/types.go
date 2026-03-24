@@ -155,14 +155,30 @@ type DaemonStatusMessage struct {
 
 // LLMStreamMessage represents streaming LLM output
 type LLMStreamMessage struct {
-	Type    string `json:"type"`              // "llm_stream"
-	JobID   string `json:"job_id"`            // Job ID this stream belongs to
-	TaskID  string `json:"task_id,omitempty"` // Optional task ID within job (for sub-tasks)
-	Content string `json:"content"`           // Token/chunk of text
-	Done    bool   `json:"done"`              // True when stream is complete
-	Model   string `json:"model,omitempty"`   // Model name
-	Stage   string `json:"stage,omitempty"`   // Current stage (e.g., "extraction")
-	Error   string `json:"error,omitempty"`   // Error message if streaming failed
+	Type    string          `json:"type"`              // "llm_stream"
+	JobID   string          `json:"job_id"`            // Job ID this stream belongs to
+	TaskID  string          `json:"task_id,omitempty"` // Optional task ID within job (for sub-tasks)
+	Content string          `json:"content"`           // Token/chunk of text
+	Done    bool            `json:"done"`              // True when stream is complete
+	Model   string          `json:"model,omitempty"`   // Model name
+	Stage   string          `json:"stage,omitempty"`   // Current stage (e.g., "extraction")
+	Error   string          `json:"error,omitempty"`   // Error message if streaming failed
+	Signal  *LLMTokenSignal `json:"signal,omitempty"`  // Per-token signal data
+}
+
+// LLMTokenSignal carries per-token inference signal data for visualization
+type LLMTokenSignal struct {
+	Confidence float32             `json:"confidence"`      // P(chosen) from raw distribution
+	Entropy    float32             `json:"entropy"`         // Shannon entropy in bits
+	TopGap     float32             `json:"top_gap"`         // P(top1) - P(top2)
+	TopK       []LLMTokenCandidate `json:"top_k,omitempty"` // Top-k candidates
+}
+
+// LLMTokenCandidate is a candidate token from the top-k distribution
+type LLMTokenCandidate struct {
+	ID   int32   `json:"id"`
+	Text string  `json:"text"`
+	Prob float32 `json:"prob"`
 }
 
 // PulseExecutionStartedMessage represents a Pulse execution that just started

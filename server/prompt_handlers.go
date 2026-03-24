@@ -694,15 +694,86 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	// Execute prompt
-	resp, err := client.Chat(r.Context(), chatReq)
-	if err != nil {
-		s.logger.Errorw("Prompt direct execution failed",
-			"error", err,
-			"provider", req.Provider,
-		)
-		writeWrappedError(w, s.logger, err, "Prompt execution failed", http.StatusInternalServerError)
-		return
+	// Execute prompt — use streaming if available, fall back to unary
+	var resp *provider.ChatResponse
+
+	if streamClient, ok := client.(provider.StreamingAIClient); ok && req.GlyphID != "" {
+		// Streaming path: broadcast tokens as they arrive
+		streamChan := make(chan provider.StreamChunk, 32)
+
+		go func() {
+			if streamErr := streamClient.ChatStreaming(r.Context(), chatReq, streamChan); streamErr != nil {
+				s.logger.Errorw("Streaming prompt failed, channel will close",
+					"error", streamErr, "provider", req.Provider)
+			}
+		}()
+
+		var content strings.Builder
+		var streamModel string
+		var promptTokens, completionTokens, totalTokens int
+
+		for chunk := range streamChan {
+			if chunk.Error != nil {
+				s.logger.Errorw("Stream chunk error", "error", chunk.Error)
+				continue
+			}
+
+			content.WriteString(chunk.Content)
+
+			msg := LLMStreamMessage{
+				Type:    "llm_stream",
+				JobID:   req.GlyphID,
+				Content: chunk.Content,
+				Done:    chunk.Done,
+				Model:   chunk.Model,
+			}
+
+			if chunk.Signal != nil {
+				msg.Signal = &LLMTokenSignal{
+					Confidence: chunk.Signal.Confidence,
+					Entropy:    chunk.Signal.Entropy,
+					TopGap:     chunk.Signal.TopGap,
+				}
+				for _, tc := range chunk.Signal.TopK {
+					msg.Signal.TopK = append(msg.Signal.TopK, LLMTokenCandidate{
+						ID:   tc.ID,
+						Text: tc.Text,
+						Prob: tc.Prob,
+					})
+				}
+			}
+
+			s.broadcastLLMStream(msg)
+
+			if chunk.Done {
+				streamModel = chunk.Model
+				promptTokens = chunk.PromptTokens
+				completionTokens = chunk.CompletionTokens
+				totalTokens = chunk.TotalTokens
+			}
+		}
+
+		resp = &provider.ChatResponse{
+			Content: content.String(),
+			Model:   streamModel,
+			Usage: provider.Usage{
+				PromptTokens:     promptTokens,
+				CompletionTokens: completionTokens,
+				TotalTokens:      totalTokens,
+			},
+		}
+	} else {
+		// Unary path: wait for full response
+		var err error
+		resp, err = client.Chat(r.Context(), chatReq)
+		if err != nil {
+			s.logger.Errorw("Prompt direct execution failed",
+				"error", err,
+				"provider", req.Provider,
+			)
+			writeWrappedError(w, s.logger, err, "Prompt execution failed", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// TODO: attestation subject should reflect the actual model that ran, not the

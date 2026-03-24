@@ -133,13 +133,13 @@ Per generation step: chosen token (~20 bytes) + top-10 probabilities (~200 bytes
 
 ## Implementation Path
 
-The natural transport is the plugin's `HandleWebSocket` endpoint (currently `UNIMPLEMENTED` in plugin.cpp). Per-token metadata streams alongside generated text.
+Transport is gRPC server streaming (`StreamChat` RPC). The Go layer adapts the gRPC stream to WebSocket `llm_stream` messages with per-token signal data.
 
-**Step 1 — Extract.** After each `llama_decode()` in the sampling loop, call `llama_get_logits_ith(ctx_, -1)`. Softmax, take top-k, compute entropy. Extend `ChatResult` to carry per-token metadata.
+**Step 1 — Extract.** *(done)* After each `llama_decode()`, `capture_signal()` reads raw logits, softmax, partial-sorts top-10, computes entropy/confidence/top-gap. `stream_chat()` calls a per-token callback with `TokenSignal`.
 
-**Step 2 — Stream.** Implement `HandleWebSocket` or extend the gRPC `LLMChatResponse` to carry per-token signal data. ~230 bytes/step is negligible.
+**Step 2 — Stream.** *(done)* gRPC `StreamChat` RPC sends `LLMChatChunk` per token with `TokenSignalProto`. Go side: `LLMServer.StreamChatClient()` → `GRPCLLMClient.ChatStreaming()` → `prompt_handlers.go` broadcasts `llm_stream` WebSocket messages.
 
-**Step 3 — Confidence heatmap.** Lowest UI effort, highest density. Each token in the output becomes a colored `<span>`. No chart library, no extra panel.
+**Step 3 — Confidence heatmap.** Frontend receives `llm_stream` messages, renders each token as a `<span>` with `background-color` mapped from confidence/entropy. No chart library, no extra panel.
 
 **Step 4 — Top-K popup.** Hover/click interaction on heatmapped tokens. Shows the decision space at that position.
 
@@ -171,10 +171,11 @@ Could LLM embeddings plug into the same HDBSCAN/UMAP infra? Technically yes — 
 
 ### Infrastructure
 
-- [ ] Extract top-k logits after each `llama_decode()` in the sampling loop
-- [ ] Compute softmax, entropy, confidence, top-gap per token in C++
-- [ ] Extend `ChatResult` to carry per-token metadata
-- [ ] Implement streaming transport (WebSocket via `HandleWebSocket` or extended gRPC)
+- [x] Extract top-k logits after each `llama_decode()` in the sampling loop — `capture_signal()` in inference.cpp
+- [x] Compute softmax, entropy, confidence, top-gap per token in C++ — same function, top-10 candidates
+- [x] Extend `ChatResult` to carry per-token metadata — `TokenSignal` struct, `signals` vector
+- [x] Implement streaming transport — gRPC `StreamChat` RPC with `LLMChatChunk` + `TokenSignalProto`
+- [x] Go streaming adapter — `GRPCLLMClient.ChatStreaming()` → WebSocket `llm_stream` broadcast
 - [ ] Dump full vocabulary to frontend at model load
 
 ### Tier 1 Visualizations
