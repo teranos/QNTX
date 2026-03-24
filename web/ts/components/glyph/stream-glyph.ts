@@ -17,9 +17,11 @@ import type { LLMTokenSignal } from '../../../types/generated/typescript/server'
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { storeCleanup } from './glyph-interaction';
+import { autoMeldResultBelow } from './meld/meld-system';
 import { uiState } from '../../state/ui';
 import { registerHandler, unregisterHandler } from '../../websocket';
-import { createFollowUpZone } from './glyph-followup';
+import { apiFetch } from '../../api';
+import { createFollowUpZone, type FollowUpRequest, type FollowUpControls } from './glyph-followup';
 
 // ── Multiplexer ─────────────────────────────────────────────────────
 
@@ -81,6 +83,7 @@ interface StreamToken {
 export interface StreamGlyphContent {
     tokens: StreamToken[];
     model?: string;
+    prompt?: string;
 }
 
 // ── Token rendering ─────────────────────────────────────────────────
@@ -119,9 +122,10 @@ function collectText(output: HTMLElement): string {
  * @param glyph - Glyph metadata (id, position, etc.)
  * @param promptGlyphId - The prompt glyph's ID, used as the WebSocket job_id key.
  *                         Empty string for restored glyphs (no active stream).
+ * @param promptText - Optional prompt text to display in the header.
  * @returns The DOM element (canvas-placed)
  */
-export function createStreamGlyph(glyph: Glyph, promptGlyphId: string): HTMLElement {
+export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptText?: string): HTMLElement {
     const tokens: StreamToken[] = [];
     let streamModel: string | undefined;
 
@@ -151,6 +155,37 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string): HTMLElem
     element.style.borderTop = 'none';
     element.style.zIndex = '1';
 
+    // Restore saved tokens if this glyph has persisted content
+    const saved = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+    if (saved?.content) {
+        try {
+            const content = JSON.parse(saved.content) as StreamGlyphContent;
+            streamModel = content.model;
+            if (content.prompt && !promptText) promptText = content.prompt;
+            for (const token of content.tokens) {
+                tokens.push(token);
+            }
+            log.debug(SEG.GLYPH, `[StreamGlyph] Restored ${content.tokens.length} tokens for ${glyph.id}`);
+        } catch (e) {
+            log.error(SEG.GLYPH, `[StreamGlyph] Failed to parse saved content for ${glyph.id}:`, e);
+        }
+    }
+
+    // Prompt text header (like result glyph's prompt label)
+    if (promptText) {
+        const promptLabel = document.createElement('div');
+        promptLabel.className = 'stream-prompt-label';
+        promptLabel.style.padding = '4px 8px';
+        promptLabel.style.fontSize = '12px';
+        promptLabel.style.fontFamily = 'monospace';
+        promptLabel.style.color = 'var(--text-secondary)';
+        promptLabel.style.borderBottom = '1px solid var(--border-on-dark)';
+        promptLabel.style.whiteSpace = 'pre-wrap';
+        promptLabel.style.wordBreak = 'break-word';
+        promptLabel.textContent = promptText;
+        element.appendChild(promptLabel);
+    }
+
     // Output container
     const output = document.createElement('div');
     output.className = 'stream-glyph-output glyph-content-area';
@@ -163,25 +198,14 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string): HTMLElem
     output.style.color = 'var(--text-on-dark)';
     element.appendChild(output);
 
-    // Restore saved tokens if this glyph has persisted content
-    const saved = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
-    if (saved?.content) {
-        try {
-            const content = JSON.parse(saved.content) as StreamGlyphContent;
-            streamModel = content.model;
-            for (const token of content.tokens) {
-                tokens.push(token);
-                output.appendChild(renderToken(token));
-            }
-            log.debug(SEG.GLYPH, `[StreamGlyph] Restored ${content.tokens.length} tokens for ${glyph.id}`);
-        } catch (e) {
-            log.error(SEG.GLYPH, `[StreamGlyph] Failed to parse saved content for ${glyph.id}:`, e);
-        }
+    // Render restored tokens
+    for (const token of tokens) {
+        output.appendChild(renderToken(token));
     }
 
     /** Persist current tokens to canvas state */
     function persistContent(): void {
-        const content: StreamGlyphContent = { tokens, model: streamModel };
+        const content: StreamGlyphContent = { tokens, model: streamModel, prompt: promptText };
         const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
         if (existing) {
             uiState.addCanvasGlyph({ ...existing, content: JSON.stringify(content) });
@@ -209,13 +233,17 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string): HTMLElem
         });
     }
 
-    // Follow-up input zone (shared infra)
+    // Follow-up input zone — spawns a stream glyph before the API call
+    // so tokens flow in live with confidence coloring
     const followupZone = createFollowUpZone({
         element,
         glyph,
         getSystemPrompt: () => collectText(output),
-        model: streamModel,
+        getModel: () => streamModel,
         logLabel: 'StreamGlyph',
+        onExecute: (request: FollowUpRequest, controls: FollowUpControls) => {
+            executeStreamFollowUp(element, glyph, request, controls);
+        },
     });
     element.appendChild(followupZone);
 
@@ -234,4 +262,127 @@ export function getStreamTokenCount(streamElement: HTMLElement): number {
     const output = streamElement.querySelector('.stream-glyph-output');
     if (!output) return 0;
     return output.children.length;
+}
+
+// ── Streaming follow-up execution ───────────────────────────────────
+
+/**
+ * Execute a follow-up by spawning a stream glyph first, subscribing it,
+ * then firing the API call so tokens stream in live with heatmap coloring.
+ */
+function executeStreamFollowUp(
+    parentElement: HTMLElement,
+    parentGlyph: Glyph,
+    request: FollowUpRequest,
+    controls: FollowUpControls,
+): void {
+    const parentRect = parentElement.getBoundingClientRect();
+    const canvas = parentElement.closest('.canvas-workspace') as HTMLElement;
+    if (!canvas) {
+        controls.error('No canvas-workspace ancestor');
+        return;
+    }
+    const canvasRect = canvas.getBoundingClientRect();
+
+    const sx = parentRect.left - canvasRect.left;
+    const sy = parentRect.bottom - canvasRect.top;
+
+    const streamGlyphId = `stream-${crypto.randomUUID()}`;
+
+    // Register in canvas state
+    uiState.addCanvasGlyph({
+        id: streamGlyphId,
+        symbol: 'stream',
+        x: sx,
+        y: sy,
+        width: Math.round(parentRect.width),
+        height: 200,
+    });
+
+    const streamGlyph: Glyph = {
+        id: streamGlyphId,
+        title: 'Stream',
+        symbol: 'stream',
+        x: sx,
+        y: sy,
+        width: Math.round(parentRect.width),
+        renderContent: () => document.createElement('div'),
+    };
+
+    // Spawn stream glyph and subscribe it BEFORE firing the API call.
+    // The new stream glyph's own ID is used as both the subscription key
+    // and the glyph_id in the request — the backend keys llm_stream messages
+    // by the glyph_id from the request body.
+    const streamElement = createStreamGlyph(streamGlyph, streamGlyphId, request.text);
+    canvas.appendChild(streamElement);
+
+    const parentGlyphId = parentElement.dataset.glyphId;
+    if (parentGlyphId) {
+        autoMeldResultBelow(
+            parentElement, parentGlyphId, 'stream',
+            'StreamGlyph', streamElement, streamGlyphId, 'StreamFollowUp',
+        );
+    }
+
+    // Fire the API call — tokens will stream in via WebSocket
+    // glyph_id = streamGlyphId so backend's llm_stream job_id matches the subscription
+    const body: Record<string, unknown> = {
+        template: request.template,
+        system_prompt: request.systemPrompt,
+        glyph_id: streamGlyphId,
+    };
+    if (request.model) body.model = request.model;
+    if (request.provider) body.provider = request.provider;
+    if (request.fileIds.length > 0) body.file_ids = request.fileIds;
+
+    const startTime = Date.now();
+
+    apiFetch('/api/prompt/direct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    })
+        .then(async (response) => {
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`API error: ${response.status} - ${errorText}`);
+            }
+            return response.json();
+        })
+        .then((data: any) => {
+            const elapsedMs = Date.now() - startTime;
+            controls.success(elapsedMs);
+
+            if (data.error) {
+                // Remove stream glyph on API-level error
+                unsubscribeStream(streamGlyphId);
+                streamElement.remove();
+                uiState.removeCanvasGlyph(streamGlyphId);
+                controls.error(`Failed: ${data.error}`);
+                return;
+            }
+
+            // If stream glyph got no tokens (non-streaming provider), populate from response
+            const tokenCount = getStreamTokenCount(streamElement);
+            if (tokenCount === 0 && data.response) {
+                const output = streamElement.querySelector('.stream-glyph-output');
+                if (output) {
+                    const span = document.createElement('span');
+                    span.textContent = data.response;
+                    output.appendChild(span);
+                }
+            }
+
+            log.debug(SEG.GLYPH, `[StreamGlyph] Follow-up complete, ${tokenCount} streamed tokens`);
+        })
+        .catch((err) => {
+            // Remove stream glyph on network error
+            unsubscribeStream(request.glyphId);
+            streamElement.remove();
+            uiState.removeCanvasGlyph(streamGlyphId);
+
+            const errMsg = err instanceof Error ? err.message : String(err);
+            controls.error(`Failed: ${errMsg}`);
+            log.error(SEG.GLYPH, `[StreamGlyph] Follow-up failed for ${parentGlyph.id}: ${errMsg}`);
+        });
 }
