@@ -235,7 +235,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
             }
 
             // Spawn stream glyph below prompt before fetch starts
-            const streamElement = spawnStreamBelow(element, glyph.id);
+            const streamElement = spawnStreamBelow(element, glyph.id, template);
 
             const response = await apiFetch('/api/prompt/direct', {
                 method: 'POST',
@@ -418,7 +418,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
      * Spawn a stream glyph directly below this prompt glyph.
      * Returns the stream element, or null if canvas not found.
      */
-    function spawnStreamBelow(promptEl: HTMLElement, promptGlyphId: string): HTMLElement | null {
+    function spawnStreamBelow(promptEl: HTMLElement, promptGlyphId: string, promptText?: string): HTMLElement | null {
         const promptRect = promptEl.getBoundingClientRect();
         const canvas = promptEl.closest('.canvas-workspace') as HTMLElement;
         if (!canvas) {
@@ -441,7 +441,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
             renderContent: () => document.createElement('div'),
         };
 
-        const streamElement = createStreamGlyph(streamGlyph, promptGlyphId);
+        const streamElement = createStreamGlyph(streamGlyph, promptGlyphId, promptText);
         canvas.appendChild(streamElement);
 
         // Register in canvas state for persistence

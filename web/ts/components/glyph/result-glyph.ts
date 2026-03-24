@@ -284,8 +284,8 @@ export function createResultGlyph(
         element,
         glyph,
         getSystemPrompt: () => result.stdout,
-        model: promptConfig?.model,
-        provider: promptConfig?.provider,
+        getModel: () => promptConfig?.model,
+        getProvider: () => promptConfig?.provider,
         logLabel: 'ResultGlyph',
     });
     element.appendChild(followupZone);

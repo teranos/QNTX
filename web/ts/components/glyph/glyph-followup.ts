@@ -1,8 +1,9 @@
 /**
  * Shared follow-up input zone for glyphs that accept conversational follow-ups.
  *
- * Used by result-glyph and stream-glyph. Builds the DOM, handles the API call,
- * and spawns a result glyph below with the response.
+ * Used by result-glyph and stream-glyph. Builds the DOM, handles input,
+ * collects attachments, and either runs the default API flow (result glyph)
+ * or delegates to a custom onExecute (stream glyph).
  */
 
 import type { Glyph } from './glyph';
@@ -15,6 +16,31 @@ import { autoMeldResultBelow } from './meld/meld-system';
 import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 
+/** UI controls exposed to custom onExecute callbacks */
+export interface FollowUpControls {
+    /** Show success state: timing, re-enable input */
+    success: (elapsedMs: number) => void;
+    /** Show error state */
+    error: (message: string) => void;
+}
+
+export interface FollowUpRequest {
+    /** The user's follow-up text */
+    text: string;
+    /** Full template with melded note texts prepended */
+    template: string;
+    /** System prompt from the parent glyph */
+    systemPrompt: string;
+    /** Resolved model name */
+    model?: string;
+    /** Resolved provider name */
+    provider?: string;
+    /** Attached file IDs from melded doc glyphs */
+    fileIds: string[];
+    /** Parent glyph ID */
+    glyphId: string;
+}
+
 export interface FollowUpConfig {
     /** The parent glyph DOM element */
     element: HTMLElement;
@@ -22,11 +48,30 @@ export interface FollowUpConfig {
     glyph: Glyph;
     /** Returns the text to use as system_prompt for the follow-up */
     getSystemPrompt: () => string;
-    /** Model name (if known) */
-    model?: string;
-    /** Provider name (if known) */
-    provider?: string;
+    /** Returns model name at call time (may be set after construction) */
+    getModel?: () => string | undefined;
+    /** Returns provider name at call time (may be set after construction) */
+    getProvider?: () => string | undefined;
     /** Log label for debug messages */
+    logLabel: string;
+    /**
+     * Custom execution handler. If provided, completely replaces the default
+     * API call + result spawning. The callback receives the prepared request
+     * and UI controls for managing input state.
+     *
+     * Use this when the caller needs to own the request lifecycle
+     * (e.g., spawning a stream glyph before the API call fires).
+     */
+    onExecute?: (request: FollowUpRequest, controls: FollowUpControls) => void;
+}
+
+export interface FollowUpResult {
+    parentElement: HTMLElement;
+    parentGlyph: Glyph;
+    result: ExecutionResult;
+    model?: string;
+    provider?: string;
+    prompt: string;
     logLabel: string;
 }
 
@@ -53,6 +98,26 @@ export function createFollowUpZone(config: FollowUpConfig): HTMLElement {
 
     const followupStatus = document.createElement('span');
     followupStatus.className = 'followup-status';
+
+    // UI controls shared with custom onExecute
+    const controls: FollowUpControls = {
+        success(elapsedMs: number) {
+            followupStatus.textContent = `${(elapsedMs / 1000).toFixed(2)}s`;
+            isExecuting = false;
+            followupInput.value = '';
+            followupInput.style.height = 'auto';
+            followupInput.disabled = false;
+            followupZone.classList.remove('has-error');
+            element.classList.remove('glyph-error');
+        },
+        error(message: string) {
+            followupStatus.textContent = message;
+            isExecuting = false;
+            followupInput.disabled = false;
+            followupZone.classList.add('has-error');
+            element.classList.add('glyph-error');
+        },
+    };
 
     let isExecuting = false;
     followupInput.addEventListener('keydown', (e) => {
@@ -89,69 +154,31 @@ export function createFollowUpZone(config: FollowUpConfig): HTMLElement {
                 }
             }
 
-            let finalTemplate = text;
+            let template = text;
             if (noteTexts.length > 0) {
-                finalTemplate = noteTexts.join('\n\n') + '\n\n' + text;
+                template = noteTexts.join('\n\n') + '\n\n' + text;
             }
 
-            const body: Record<string, unknown> = {
-                template: finalTemplate,
-                system_prompt: getSystemPrompt(),
-                glyph_id: glyph.id,
+            const model = config.getModel?.();
+            const provider = config.getProvider?.();
+
+            const request: FollowUpRequest = {
+                text,
+                template,
+                systemPrompt: getSystemPrompt(),
+                model,
+                provider,
+                fileIds,
+                glyphId: glyph.id,
             };
-            if (config.model) body.model = config.model;
-            if (config.provider) body.provider = config.provider;
-            if (fileIds.length > 0) body.file_ids = fileIds;
 
-            const startTime = Date.now();
+            if (config.onExecute) {
+                config.onExecute(request, controls);
+                return;
+            }
 
-            apiFetch('/api/prompt/direct', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            })
-                .then(async (response) => {
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        throw new Error(`API error: ${response.status} - ${errorText}`);
-                    }
-                    return response.json();
-                })
-                .then((data: any) => {
-                    const elapsedMs = Date.now() - startTime;
-                    followupStatus.textContent = `${(elapsedMs / 1000).toFixed(2)}s`;
-                    isExecuting = false;
-                    followupInput.value = '';
-                    followupInput.style.height = 'auto';
-                    followupInput.disabled = false;
-                    followupZone.classList.remove('has-error');
-                    element.classList.remove('glyph-error');
-
-                    const followupResult: ExecutionResult = {
-                        success: !data.error,
-                        stdout: data.response ?? '',
-                        stderr: '',
-                        result: null,
-                        error: data.error ?? null,
-                        duration_ms: elapsedMs,
-                    };
-                    spawnFollowUpResult(
-                        element, glyph, followupResult,
-                        { model: config.model, provider: config.provider },
-                        text,
-                        logLabel,
-                    );
-                })
-                .catch((err) => {
-                    isExecuting = false;
-                    const errMsg = err instanceof Error ? err.message : String(err);
-                    const attachmentInfo = fileIds.length > 0 ? ` (${fileIds.length} file${fileIds.length > 1 ? 's' : ''} attached)` : '';
-                    followupStatus.textContent = `Failed${attachmentInfo}: ${errMsg}`;
-                    followupInput.disabled = false;
-                    followupZone.classList.add('has-error');
-                    element.classList.add('glyph-error');
-                    log.error(SEG.GLYPH, `[${logLabel}] Follow-up failed for ${glyph.id}${attachmentInfo}: ${errMsg}`);
-                });
+            // Default: fire API call and spawn result glyph
+            defaultExecute(request, controls, element, glyph, logLabel);
         }
     });
 
@@ -161,16 +188,76 @@ export function createFollowUpZone(config: FollowUpConfig): HTMLElement {
 }
 
 /**
- * Spawn a follow-up result glyph below a parent glyph element.
+ * Default execution: POST to /api/prompt/direct, spawn result glyph below.
  */
-function spawnFollowUpResult(
-    parentElement: HTMLElement,
-    parentGlyph: Glyph,
-    result: ExecutionResult,
-    promptConfig: { model?: string; provider?: string },
-    prompt: string,
+function defaultExecute(
+    request: FollowUpRequest,
+    controls: FollowUpControls,
+    element: HTMLElement,
+    glyph: Glyph,
     logLabel: string,
 ): void {
+    const body: Record<string, unknown> = {
+        template: request.template,
+        system_prompt: request.systemPrompt,
+        glyph_id: request.glyphId,
+    };
+    if (request.model) body.model = request.model;
+    if (request.provider) body.provider = request.provider;
+    if (request.fileIds.length > 0) body.file_ids = request.fileIds;
+
+    const startTime = Date.now();
+
+    apiFetch('/api/prompt/direct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    })
+        .then(async (response) => {
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`API error: ${response.status} - ${errorText}`);
+            }
+            return response.json();
+        })
+        .then((data: any) => {
+            const elapsedMs = Date.now() - startTime;
+            controls.success(elapsedMs);
+
+            const followupResult: ExecutionResult = {
+                success: !data.error,
+                stdout: data.response ?? '',
+                stderr: '',
+                result: null,
+                error: data.error ?? null,
+                duration_ms: elapsedMs,
+            };
+
+            spawnFollowUpResult({
+                parentElement: element,
+                parentGlyph: glyph,
+                result: followupResult,
+                model: request.model,
+                provider: request.provider,
+                prompt: request.text,
+                logLabel,
+            });
+        })
+        .catch((err) => {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            const attachmentInfo = request.fileIds.length > 0
+                ? ` (${request.fileIds.length} file${request.fileIds.length > 1 ? 's' : ''} attached)` : '';
+            controls.error(`Failed${attachmentInfo}: ${errMsg}`);
+            log.error(SEG.GLYPH, `[${logLabel}] Follow-up failed for ${glyph.id}${attachmentInfo}: ${errMsg}`);
+        });
+}
+
+/**
+ * Spawn a result glyph below the parent.
+ */
+export function spawnFollowUpResult(data: FollowUpResult): void {
+    const { parentElement, parentGlyph, result, model, provider, prompt, logLabel } = data;
+
     const parentRect = parentElement.getBoundingClientRect();
     const canvas = parentElement.closest('.canvas-workspace') as HTMLElement;
     if (!canvas) {
@@ -193,6 +280,7 @@ function spawnFollowUpResult(
         renderContent: () => document.createElement('div'),
     };
 
+    const promptConfig = { model, provider };
     const resultElement = createResultGlyph(resultGlyph, result, promptConfig, prompt);
     canvas.appendChild(resultElement);
 
