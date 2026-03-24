@@ -4,7 +4,22 @@ project(qntx-llama-cpp VERSION 0.1.0 LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# llama.cpp — built as a library
+# llama.cpp — fetched at build time if not already vendored.
+# Same commit pinned in flake.nix for reproducibility.
+include(FetchContent)
+if(EXISTS "${CMAKE_SOURCE_DIR}/vendor/llama.cpp/CMakeLists.txt")
+    set(LLAMA_SOURCE_DIR "${CMAKE_SOURCE_DIR}/vendor/llama.cpp")
+else()
+    FetchContent_Declare(
+        llama_cpp
+        GIT_REPOSITORY https://github.com/ggml-org/llama.cpp.git
+        GIT_TAG        db9d8aa428012cc5593e18635d4c3c54095f5138
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(llama_cpp)
+    set(LLAMA_SOURCE_DIR "${llama_cpp_SOURCE_DIR}")
+endif()
+
 if(APPLE)
     set(GGML_METAL ON CACHE BOOL "Enable Metal acceleration" FORCE)
 else()
@@ -13,7 +28,7 @@ endif()
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
-add_subdirectory(vendor/llama.cpp)
+add_subdirectory(${LLAMA_SOURCE_DIR} llama.cpp)
 
 # MuPDF — system/nix library for PDF text extraction.
 # Install via: brew install mupdf-tools (macOS) or nix with flake.
@@ -69,7 +84,7 @@ add_executable(qntx-llama-cpp-plugin
 
 target_include_directories(qntx-llama-cpp-plugin PRIVATE
     ${PROTO_GEN_DIR}
-    vendor/llama.cpp/include
+    ${LLAMA_SOURCE_DIR}/include
     ${MUPDF_INCLUDE_DIR}
 )
 

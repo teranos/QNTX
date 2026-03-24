@@ -80,4 +80,5 @@ test_fuzzy
 qntx-plugins/kern/_build/
 qntx-plugins/llama-cpp/build/
 qntx-plugins/llama-cpp/.cache/
+qntx-plugins/llama-cpp/vendor/
 plugin/grpc/ocaml/_build/
