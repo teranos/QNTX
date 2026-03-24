@@ -7,7 +7,6 @@ package pulse
 // Domain packages can:
 // 1. Use these methods directly for generic progress reporting
 // 2. Create wrapper emitters that add domain-specific convenience methods
-//    (see ats/ix/progress_domain_agnostic_test.go for examples)
 type ProgressEmitter interface {
 	// EmitStage announces the start of a processing stage
 	EmitStage(stage string, message string)

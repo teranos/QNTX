@@ -18,9 +18,7 @@ export interface Glyph {
     renderTitleBar?: () => HTMLElement;   // Glyph-specific title bar, enhanced by manifestations with window controls
 
     // Manifestation configuration
-    manifestationType?: 'window' | 'fullscreen' | 'canvas' | 'modal' | 'panel' | 'ix' | 'ax';  // Default: 'window'
-    // NOTE: 'ix' currently renders inline on canvas (like py), but reserved for future state-specific manifestations
-    // Rationale: IX has unique fail/success states (queued, running, preview, error) that may need special UI
+    manifestationType?: 'window' | 'fullscreen' | 'canvas' | 'modal' | 'panel' | 'ax';  // Default: 'window'
     // NOTE: 'ax' renders inline on canvas for query editing
     // TODO: Add 'programmature' manifestation type for full code editor that can minimize to tray
     initialWidth?: string;               // Initial dimensions (e.g., "800px")
@@ -88,7 +86,7 @@ export const PANEL_OVERLAY_BG = 'rgba(0, 0, 0, 0.4)';
 export const PANEL_Z_INDEX = '10003';  // Above system drawer (10002)
 
 // Canvas glyph dimensions
-export const CANVAS_GLYPH_TITLE_BAR_HEIGHT = 32; // Height in pixels for AX/IX glyphs
+export const CANVAS_GLYPH_TITLE_BAR_HEIGHT = 32; // Height in pixels for AX glyphs
 export const CANVAS_GLYPH_CONTENT_PADDING = 8; // Content element padding (reduced from CONTENT_PADDING)
 export const GLYPH_CONTENT_INNER_PADDING = 4; // .glyph-content CSS padding
 

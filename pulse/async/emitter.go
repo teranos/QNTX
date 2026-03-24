@@ -11,8 +11,7 @@ import (
 // like attestations, candidates, medical records, etc.
 //
 // Domain-specific code should create wrapper emitters that add convenience methods
-// while delegating to this base emitter. See ats/ix/progress_domain_agnostic_test.go
-// for examples of the wrapper pattern.
+// while delegating to this base emitter.
 type JobProgressEmitter struct {
 	job               *Job
 	queue             *Queue

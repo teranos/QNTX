@@ -2,13 +2,6 @@
 // Auto-generated barrel export - re-exports all generated types
 // This file is regenerated on every `make types` run
 
-// Types from ast
-export type {
-  ASTTransformation,
-  TransformationSet,
-  TransformationType,
-} from './ast';
-
 // Types from async
 export type {
   ErrorCode,
@@ -30,39 +23,6 @@ export type {
   Status,
   Tracker,
 } from './budget';
-
-// Types from git
-export type {
-  CargoLock,
-  CargoToml,
-  DepsIngestionResult,
-  DepsIxProcessor,
-  FlakeLock,
-  GitBranchResult,
-  GitCommitResult,
-  GitIngestionHandler,
-  GitIngestionPayload,
-  GitIxProcessor,
-  GitProcessingResult,
-  GoPackageInfo,
-  PackageJSON,
-  ProjectFile,
-  ProjectFileResult,
-  PyprojectToml,
-  RepoSource,
-} from './git';
-
-// Types from github
-export type {
-  CachedPatch,
-  FixContext,
-  FixResult,
-  FixSuggestion,
-  GitHubPR,
-  PRInfo,
-  PatchResult,
-  StalenessInfo,
-} from './github';
 
 // Types from graph
 export type {

@@ -515,7 +515,7 @@ export function buildCanvasWorkspace(
         if (idx !== -1) glyphs.splice(idx, 1);
     }) as EventListener);
 
-    // Render existing glyphs asynchronously (to support py and ix glyphs)
+    // Render existing glyphs asynchronously (to support py glyphs)
     (async () => {
         // Step 1: Render all individual glyphs (skip minimized — they live in the tray)
         const minimizedIds = new Set(uiState.getMinimizedWindows());
