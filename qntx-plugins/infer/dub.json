@@ -1,0 +1,12 @@
+{
+    "name": "qntx-infer-plugin",
+    "description": "QNTX inference attestation plugin — entropy and confidence signals from llama-server",
+    "authors": ["QNTX"],
+    "license": "MIT",
+    "targetType": "executable",
+    "targetName": "qntx-infer-plugin",
+    "targetPath": "bin",
+    "sourcePaths": ["source"],
+    "mainSourceFile": "source/infer/app.d",
+    "dflags-ldc": ["-O2"]
+}

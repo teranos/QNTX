@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin rust-sqlite rust-embeddings wasm rust-python rust-reduce
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin infer-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin rust-sqlite rust-embeddings wasm rust-python rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -148,9 +148,10 @@ test-ocaml: ## Run OCaml plugin tests (loom, kern)
 	@cd qntx-plugins/kern && opam exec -- dune runtest
 	@echo "✓ OCaml tests complete"
 
-test-d: ## Run D plugin tests (ix-net)
+test-d: ## Run D plugin tests (ix-net, infer)
 	@echo "Running D tests..."
 	@$(MAKE) -C qntx-plugins/ix-net test
+	@$(MAKE) -C qntx-plugins/infer test
 	@echo "✓ D tests complete"
 
 test-coverage: ## Run all tests (Go + TypeScript) with coverage
@@ -304,6 +305,11 @@ faal-plugin: ## Build, install, and restart faal chaos testing D plugin
 	$(call check-plugin-version,qntx-plugins/faal,d,qntx-plugins/faal/source/faal/version_.d)
 	@$(MAKE) -C qntx-plugins/faal install PREFIX=$(PREFIX)
 	$(call restart-plugin,faal)
+
+infer-plugin: ## Build, install, and restart infer inference attestation D plugin
+	$(call check-plugin-version,qntx-plugins/infer,d,qntx-plugins/infer/source/infer/version_.d)
+	@$(MAKE) -C qntx-plugins/infer install PREFIX=$(PREFIX)
+	$(call restart-plugin,infer)
 
 openrouter-plugin: ## Build, install, and restart OpenRouter plugin
 	$(call check-plugin-version,qntx-openrouter,go,qntx-openrouter/plugin.go)
