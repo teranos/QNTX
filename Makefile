@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin rust-vidstream rust-sqlite rust-embeddings wasm rust-python rust-reduce
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin rust-sqlite rust-embeddings wasm rust-python rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -7,13 +7,13 @@ PREFIX ?= $(HOME)/.qntx
 QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
 # Optional: KERN=1 make cli/dev to enable OCaml parser plugin
-BUILD_TAGS := rustvideo,rustsqlite,rustembeddings,qntxwasm
+BUILD_TAGS := rustsqlite,rustembeddings,qntxwasm
 ifdef KERN
 BUILD_TAGS := $(BUILD_TAGS),kern
 endif
 
-cli: rust-vidstream rust-sqlite rust-embeddings wasm ## Build QNTX CLI binary (with Rust optimizations, embeddings, and WASM parser)
-	@echo "Building QNTX CLI with Rust optimizations (video, sqlite, embeddings) and WASM (parser, fuzzy)..."
+cli: rust-sqlite rust-embeddings wasm ## Build QNTX CLI binary (with Rust optimizations, embeddings, and WASM parser)
+	@echo "Building QNTX CLI with Rust optimizations (sqlite, embeddings) and WASM (parser, fuzzy)..."
 	@go build -tags "$(BUILD_TAGS)" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
 cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments without Rust toolchain)
@@ -331,13 +331,6 @@ llama-cpp-plugin: ## Build, install, and restart llama-cpp plugin (C++ local LLM
 	@$(MAKE) -C qntx-plugins/llama-cpp install PREFIX=$(PREFIX)
 	$(call restart-plugin,llama-cpp)
 
-rust-vidstream: ## Build Rust vidstream library with ONNX support (for CGO integration)
-	@echo "Building Rust vidstream library with ONNX..."
-	@cd ats/vidstream && cargo build --release --features onnx --lib
-	@echo "✓ libqntx_vidstream built in ats/vidstream/target/release/"
-	@echo "  Static:  libqntx_vidstream.a"
-	@echo "  Shared:  libqntx_vidstream.so (Linux) / libqntx_vidstream.dylib (macOS)"
-	@echo "  Features: ONNX Runtime (download-binaries enabled)"
 
 rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO integration)
 	@echo "Building Rust SQLite storage library..."

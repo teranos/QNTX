@@ -3,7 +3,7 @@
 // TODO: Migrate to proto generation
 // Source package: schedule
 // Source last modified: 2025-12-27T22:59:44+01:00
-// Source version: 7492428e
+// Source version: 9b29ab68
 
 //! # schedule module
 //!

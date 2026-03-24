@@ -22,18 +22,6 @@ export interface Message {
    */
   fuzzy_version: string;
   /**
-   * "onnx" or "unavailable" - video inference availability
-   */
-  vidstream_backend: string;
-  /**
-   * true if ONNX Runtime available (CGO build)
-   */
-  vidstream_optimized: boolean;
-  /**
-   * vidstream library version (e.g., "0.1.0")
-   */
-  vidstream_version: string;
-  /**
    * "rust" or "go" - which storage implementation is active
    */
   storage_backend: string;
