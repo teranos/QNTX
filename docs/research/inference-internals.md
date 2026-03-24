@@ -1,0 +1,180 @@
+# Inference Internals Research
+
+What can we see inside a running model, and what's worth surfacing?
+
+## Context
+
+The llama-cpp plugin already loads models, tokenizes, decodes, and samples. The sampling loop (`inference.cpp:152`) generates tokens one at a time. After each `llama_decode()`, the full probability distribution over the vocabulary exists in memory — `llama_get_logits_ith(ctx, -1)` returns it. Today this data is consumed by the sampler and discarded. Everything below is about what happens if we keep it.
+
+The D prototype on `claude/review-weekend-work-lqvxU` validated three signals (entropy, confidence, top-gap) and their aggregate detections (spikes, low-confidence spans) as attestation material. That branch proxied through llama-server's HTTP API. The real implementation belongs inside the C++ sampling loop where the data is native.
+
+## Untapped API Surface
+
+### Logits and Probabilities
+
+| Function | What it gives you |
+|---|---|
+| `llama_get_logits(ctx)` | Raw float array for the full batch |
+| `llama_get_logits_ith(ctx, -1)` | Logits for the last decoded position — the one you're sampling from |
+| softmax (manual) | Convert logits to probabilities — trivial loop |
+
+One call after each decode. The array is `llama_vocab_n_tokens(vocab)` wide — typically 32k-128k floats. Softmax it, sort, take top-k.
+
+### Vocabulary Introspection
+
+| Function | What it gives you |
+|---|---|
+| `llama_vocab_n_tokens(vocab)` | Total vocabulary size |
+| `llama_token_to_piece(vocab, id, ...)` | Text representation of any token ID |
+| `llama_token_get_attr(vocab, id)` | Token attributes — control, special, byte-level |
+| `llama_token_get_score(vocab, id)` | Token score/frequency from the tokenizer |
+| `llama_vocab_is_eog/bos/eos(vocab, id)` | Special token identification |
+
+Full vocab enumeration is a loop from 0 to n_tokens. Enables: fuzzy search over the vocabulary (for the bias glyph, #718), token frequency analysis, special token inventories.
+
+### Embeddings
+
+| Function | What it gives you |
+|---|---|
+| `llama_get_embeddings(ctx)` | Hidden state vector after decode |
+| `llama_model_n_embd(model)` | Embedding dimension |
+
+Not used today. Potential uses: semantic similarity between generations, clustering attestations by meaning rather than keywords, comparing prompt variants.
+
+### Advanced Sampling
+
+The current sampler chain is minimal — temperature + categorical distribution. Available but unused:
+
+| Sampler | What it does |
+|---|---|
+| `llama_sampler_init_top_k(k)` | Keep only top-k tokens |
+| `llama_sampler_init_top_p(p)` | Nucleus sampling — keep tokens until cumulative probability exceeds p |
+| `llama_sampler_init_min_p(min_p)` | Drop tokens below min_p fraction of the top token |
+| `llama_sampler_init_penalties(...)` | Repetition, frequency, presence penalties |
+| `llama_sampler_init_grammar(grammar)` | Constrain output to a grammar (JSON, code, etc.) |
+
+These compose in a chain. Order matters — penalties before temperature before top-k before distribution is typical.
+
+### Model Introspection
+
+| Function | What it gives you |
+|---|---|
+| `llama_model_n_embd(model)` | Embedding dimension |
+| `llama_model_n_layer(model)` | Layer count |
+| `llama_model_desc(model, ...)` | Architecture description string |
+| `llama_model_meta_val_str(model, key, ...)` | Arbitrary GGUF metadata |
+
+### Not Accessible (without patching llama.cpp)
+
+- **Attention weights** — internal to ggml graph execution, no public API
+- **Hidden states per layer** — same, would need ggml tensor hooks
+- **Logit lens** (per-layer vocabulary projections) — requires intermediate hidden states
+
+## Visualization Ideas
+
+### Tier 1: High feasibility, high impact
+
+**Confidence heatmap on generated text.** Color each token `<span>` by P(chosen) or entropy. Uncertain tokens glow warm, confident tokens stay neutral. The generated text *is* the visualization — zero extra panels. CSS `background-color` per token, no chart library.
+
+**Top-K alternatives on hover.** Click or hover a token in the output to see a popup with the top-10 candidates and their probability bars. Answers: "why did the model pick this token? what else was it considering?" Horizontal bars, chosen token highlighted.
+
+**Entropy sparkline.** Small rolling SVG line chart — x-axis is token position, y-axis is entropy. Spikes correspond to moments of indecision. Sits above or beside the output text. Pairs with the heatmap: sparkline gives macro view, heatmap gives micro.
+
+**Runner-up ghost trail.** Show the second-place token as a muted annotation inline with the output: `the [a] cat [dog] sat [stood] on`. Surfaces the branching nature of autoregressive generation. Toggle on/off. Most interesting when the runner-up would have taken the sentence in a completely different direction.
+
+### Tier 2: Medium feasibility, high impact
+
+**Logit trajectories.** Track how specific tokens' probabilities evolve across generation steps. A token might start at 0.001, rise as context builds, and eventually get selected. Multi-line chart, selected token bolded at the step it was chosen. Requires storing top-100 per step (~115KB for 512 tokens).
+
+**Token tree.** Top-3 candidates at each step rendered as branches. The selected path is the trunk; alternatives ghost off as side branches. For real continuations (not just single-step alternatives) you'd need speculative decoding down each branch — multiplies compute by k x depth. Could be on-demand: "explore alternatives at this token."
+
+**Cumulative perplexity.** Single running number: exp(average negative log-likelihood). Updates with each token. Low = fluent, high = struggled. Useful for comparing prompt strategies — same question with different system prompts yields different perplexity, indicating which framing the model handles better.
+
+### Tier 3: Needs llama.cpp patches (defer)
+
+**Attention heatmaps.** Classic BertViz-style head x seq_len x seq_len matrices. Requires hooking into ggml graph to capture per-layer attention tensors. Large data, version-fragile.
+
+**Logit lens.** Project intermediate hidden states through the unembedding matrix to see what the model "would have predicted" at each layer. Shows how the prediction forms layer by layer. Requires hidden state access at each transformer layer.
+
+**Activation / neuron visualization.** Per-neuron activation patterns, feature attribution. Requires full model internals. Research tool territory (TransformerLens, ecco).
+
+## Data Budget
+
+Per generation step: chosen token (~20 bytes) + top-10 probabilities (~200 bytes) + entropy (8 bytes) = **~230 bytes/step**. For 512 tokens: **~115KB total**. Trivially streamable over WebSocket.
+
+## Implementation Path
+
+The natural transport is the plugin's `HandleWebSocket` endpoint (currently `UNIMPLEMENTED` in plugin.cpp). Per-token metadata streams alongside generated text.
+
+**Step 1 — Extract.** After each `llama_decode()` in the sampling loop, call `llama_get_logits_ith(ctx_, -1)`. Softmax, take top-k, compute entropy. Extend `ChatResult` to carry per-token metadata.
+
+**Step 2 — Stream.** Implement `HandleWebSocket` or extend the gRPC `LLMChatResponse` to carry per-token signal data. ~230 bytes/step is negligible.
+
+**Step 3 — Confidence heatmap.** Lowest UI effort, highest density. Each token in the output becomes a colored `<span>`. No chart library, no extra panel.
+
+**Step 4 — Top-K popup.** Hover/click interaction on heatmapped tokens. Shows the decision space at that position.
+
+**Step 5 — Entropy sparkline.** Macro view of the generation's certainty profile. SVG strip.
+
+**Step 6 — Attestation integration.** The D branch signals (entropy spikes, low-confidence spans) become ATS attestations. The visualizations are the live rendering of those same signals — one for the record, one for the screen.
+
+## Open Questions
+
+**Sampling chain in the UI.** Yes — if the user is creating bias glyphs (#718), they're already touching sampling. Expose top-k, top-p, penalties as controls alongside the bias interface.
+
+**Vocab search.** Moving away from fuzzy search (deprecated pattern). Semantic search over the vocabulary instead. Dump the full vocab (32k-128k tokens) to the frontend at model load, use QNTX's existing semantic search infrastructure to navigate it.
+
+**Two embedding lenses.** MiniLM-L6-v2 (384-dim, ONNX) is a sentence-transformer trained for semantic similarity — it powers the current HDBSCAN clustering, UMAP projection, and semantic search. llama.cpp embeddings (`llama_get_embeddings`) are the generative model's hidden state (2048-4096 dim), optimized for next-token prediction. Different tools:
+
+| | MiniLM (current) | LLM embeddings |
+|---|---|---|
+| **Optimized for** | Semantic similarity | Next-token prediction |
+| **Dimensions** | 384 | 2048-4096 |
+| **Speed** | ~3ms/embed | Full model decode required |
+| **What it captures** | "These texts mean the same thing" | "These texts put the model in a similar state" |
+| **Requires** | Small ONNX model (80MB) | Full LLM loaded in memory |
+
+Could LLM embeddings plug into the same HDBSCAN/UMAP infra? Technically yes — the algorithms don't care where vectors come from, just that they're consistent. You'd change the dimension, re-embed everything with the same model, adjust UMAP parameters. But they'd answer a different question: MiniLM says "these attestations are semantically similar," LLM embeddings say "the model would continue these in similar ways." For inference attestation — where you're studying what the model does — the model's own embeddings might be the more honest representation. Two lenses, not a replacement.
+
+**Real-time only.** All visualizations stream live during inference. No post-hoc replay mode.
+
+## Checklist
+
+### Infrastructure
+
+- [ ] Extract top-k logits after each `llama_decode()` in the sampling loop
+- [ ] Compute softmax, entropy, confidence, top-gap per token in C++
+- [ ] Extend `ChatResult` to carry per-token metadata
+- [ ] Implement streaming transport (WebSocket via `HandleWebSocket` or extended gRPC)
+- [ ] Dump full vocabulary to frontend at model load
+
+### Tier 1 Visualizations
+
+- [ ] Confidence heatmap — color token spans by P(chosen) or entropy
+- [ ] Top-K alternatives popup — hover/click a token to see candidates + probability bars
+- [ ] Entropy sparkline — rolling SVG line chart of entropy per token position
+- [ ] Runner-up ghost trail — inline muted annotation of second-place tokens
+
+### Tier 2 Visualizations
+
+- [ ] Logit trajectories — multi-line chart of token probability evolution across steps
+- [ ] Token tree — branching visualization of top-3 candidates per step
+- [ ] Cumulative perplexity — running perplexity score during generation
+
+### Sampling Chain
+
+- [ ] Expose top-k, top-p, min-p, repetition penalty in the UI
+- [ ] Wire sampler chain configuration through to `llama_sampler_chain_add` calls
+- [ ] Integrate with bias glyph (#718)
+
+### Embeddings (Two Lenses)
+
+- [ ] Investigate LLM embeddings via `llama_get_embeddings` for inference-specific clustering
+- [ ] Evaluate whether LLM embedding clusters differ meaningfully from MiniLM clusters
+- [ ] Determine if both can coexist in the HDBSCAN/UMAP pipeline or need separate stores
+
+### Attestation Integration
+
+- [ ] Port D prototype signal computation (entropy spikes, low-confidence spans) to C++
+- [ ] Write per-generation attestations with signal attributes to ATS
+- [ ] Connect live visualizations to the same signal data that feeds attestations
