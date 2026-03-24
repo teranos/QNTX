@@ -63,7 +63,7 @@ export const SEG = {
     GLYPH: '⧉' as const,    // Glyph system
     GRAPH: '◇' as const,    // Graph visualization
     ERROR: '⚠' as const,    // Errors/warnings
-    VID: '⮀' as const,      // VidStream
+    VID: '⮀' as const,      // Video
     WASM: '⧩' as const,     // WebAssembly/WASM module
     TAU: 'τ' as const,      // Tauri native integration
 } as const;

@@ -1,6 +1,6 @@
 //! C-compatible FFI interface for EmbeddingEngine
 //!
-//! Follows the same pointer-based ownership pattern as qntx-sqlite and vidstream:
+//! Follows the same pointer-based ownership pattern as qntx-sqlite:
 //! - `embedding_engine_init()` allocates on Rust heap, caller owns pointer
 //! - `embedding_engine_free()` must be called to deallocate
 //! - All operations take the engine pointer as first argument

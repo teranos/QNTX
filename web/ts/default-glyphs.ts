@@ -24,7 +24,7 @@
  *    - Window state: full symbol details, relationships, attestations
  *
  * 3. Existing Windows → Glyph Migration
- *    Current windows (VidStream, Database, etc.) need to be converted to glyphs:
+ *    Current windows (Database, etc.) need to be converted to glyphs:
  *    - Add glyph registration with renderContent()
  *    - Remove old window creation code
  *    - Let the glyph system handle all morphing

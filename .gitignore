@@ -64,7 +64,6 @@ result
 web/site/
 
 # ML models (downloaded separately)
-ats/vidstream/models/
 ats/embeddings/models/
 *.onnx
 
