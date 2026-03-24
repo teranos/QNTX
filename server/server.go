@@ -323,11 +323,16 @@ func GetDefaultServer() *QNTXServer {
 
 // getPluginManager returns the plugin manager, falling back to the global default
 // if the server's field is nil (happens when plugins load asynchronously after server creation).
+// When falling back, lazily wires servicesManager so LLM provider re-registration works on restart.
 func (s *QNTXServer) getPluginManager() *grpcplugin.PluginManager {
 	if s.pluginManager != nil {
 		return s.pluginManager
 	}
-	return grpcplugin.GetDefaultPluginManager()
+	pm := grpcplugin.GetDefaultPluginManager()
+	if pm != nil && s.servicesManager != nil {
+		pm.SetServicesManager(s.servicesManager)
+	}
+	return pm
 }
 
 // GetServices returns the service registry for plugins

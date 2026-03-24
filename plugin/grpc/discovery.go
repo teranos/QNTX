@@ -756,14 +756,16 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 	m.mu.RLock()
 	p, exists := m.plugins[name]
 	m.mu.RUnlock()
-	if exists && m.servicesManager != nil {
-		proxy := p.client
-		if proxy.IsLLMProvider() {
-			if llmRouter := m.servicesManager.GetLLMRouter(); llmRouter != nil {
-				llmRouter.RegisterProvider(name, proxy.LLMServiceClient())
-				m.logger.Infof("Re-registered LLM provider '%s' after restart", name)
-			}
-		}
+	if !exists || m.servicesManager == nil {
+		return
+	}
+	proxy := p.client
+	if !proxy.IsLLMProvider() {
+		return
+	}
+	if llmRouter := m.servicesManager.GetLLMRouter(); llmRouter != nil {
+		llmRouter.RegisterProvider(name, proxy.LLMServiceClient())
+		m.logger.Infof("Re-registered LLM provider '%s' after restart", name)
 	}
 
 	m.logger.Infof("Plugin '%s' restarted successfully", name)
