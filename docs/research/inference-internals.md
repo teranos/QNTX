@@ -70,6 +70,35 @@ These compose in a chain. Order matters — penalties before temperature before 
 - **Hidden states per layer** — same, would need ggml tensor hooks
 - **Logit lens** (per-layer vocabulary projections) — requires intermediate hidden states
 
+## C++ Ecosystem
+
+The C++ ecosystem around llama.cpp is thin because llama.cpp itself absorbed most functionality. External libraries are only worth adopting where llama.cpp has genuine gaps.
+
+### Already in llama.cpp (unused by this plugin)
+
+**Custom sampler vtable (`llama_sampler_i`).** Implement `apply` and `accept` function pointers to create a sampler that sits in the chain. This is the idiomatic way to instrument the inference loop — rather than reading logits as a side effect before/after sampling, the signal computation becomes a sampler that observes the logit array as it flows through the chain.
+
+**GBNF grammar-constrained decoding (`llama_sampler_init_grammar`).** Enforce output structure — JSON, code, any BNF-expressible grammar. Already in `llama.h`.
+
+**JSON Schema to GBNF (`common/json-schema-to-grammar.h`).** Converts a JSON Schema to a GBNF grammar automatically. In llama.cpp's `common/` library.
+
+**Speculative decoding (`common/speculative.h`).** Draft model proposes tokens, main model verifies. Relevant if token tree visualization moves from "show alternatives" to "actually explore branches."
+
+**Minja template engine (`common/minja/`).** Jinja2-compatible chat template rendering. Handles ChatML, Llama, Mistral formats. The plugin currently uses `llama_model_chat_template` + `llama_chat_apply_template` which is simpler but less flexible.
+
+### External libraries worth considering
+
+**llguidance (Microsoft).** Rust library with C API for advanced constrained generation. Computes a token bitmask over the vocabulary at each step to enforce constraints. More powerful than GBNF for complex schemas. llama.cpp has initial integration. GitHub: `microsoft/llguidance`.
+
+**outlines-core (dottxt).** Rust core with C FFI. FSM-based token masking for JSON schema and regex patterns. Competes with llguidance for the same niche. GitHub: `dottxt-ai/outlines-core`.
+
+**usearch or hnswlib.** Header-only C++ approximate nearest neighbor search. Relevant if embedding similarity moves inside the plugin rather than staying in the Go layer. usearch: `unum-cloud/usearch`, hnswlib: `nmslib/hnswlib`.
+
+### Ecosystem gaps (no solution exists)
+
+- No C++ library for capturing attention weights or hidden states from llama.cpp — requires patching ggml internals
+- No standalone logit signal computation library — straightforward math on a float array, everyone writes it inline
+
 ## Visualization Ideas
 
 ### Tier 1: High feasibility, high impact
