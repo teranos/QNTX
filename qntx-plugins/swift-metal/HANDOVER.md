@@ -109,17 +109,20 @@ Is the goal to navigate what was already computed, or to ask the model "what wou
 
 ---
 
-### Q3: Where is the boundary between swift-metal and the stream glyph?
+### Q3: What can swift-metal show that the DOM never could?
 
-This is a real-time system for both understanding and steering — microscope and control surface at once. The inference research document (`docs/research/inference-internals.md`) already describes this convergence: the bias glyph (#718) is steering, the confidence heatmap is understanding, the sampling chain controls are both, and they all feed from the same `TokenSignal` data path. The research document's "token-as-glyph" vision takes this further — each token becomes a glyph entity carrying its full decision context, positioned in text flow rather than on the canvas grid.
+The stream glyph is text. It renders tokens as `<span>` elements with colored backgrounds — a reading experience with signal overlays. swift-metal is not a companion to this and not a replacement for it. It is a parallel system that the stream glyph's existence inspired but that operates in a space the DOM cannot enter.
 
-The data flow is bidirectional: llama-cpp → swift-metal (signals for visualization) and swift-metal → llama-cpp (bias weights, sampler chain adjustments, branch selection). The research document already defines the infrastructure for both directions — `StreamChat` gRPC for signals out, the sampler vtable (`llama_sampler_i`) for intervention in.
+The stream glyph proves that per-token signal data is valuable in real time. swift-metal takes the same `TokenSignal` data path — bidirectional, llama-cpp ↔ swift-metal via `StreamChat` gRPC and the `llama_sampler_i` vtable — and renders what text-in-a-browser fundamentally cannot:
 
-But the stream glyph (`stream-glyph.ts`) already renders confidence heatmaps, already receives `llm_stream` WebSocket messages, already persists token data to canvas state. Steps 3-5 of the research document's implementation path (confidence heatmap, top-K popup, entropy sparkline) are DOM-based visualizations that live in the stream glyph today.
+- **Spatial structure.** A token tree is not a list. The DOM can show a sequence of colored spans; Metal can render a branching graph where depth, angle, and thickness encode probability, and you navigate it by moving through 3D space.
+- **Continuous animation.** The softmax distribution shifting frame-by-frame as the model considers the next token — not a snapshot after the fact, but the probability mass flowing in real time at GPU framerate.
+- **Density.** 32k vocabulary entries as a probability landscape. The DOM chokes on 32k elements; a Metal compute shader processes them in one dispatch.
+- **Interaction at inference speed.** Clicking a branch in the token tree and seeing the model re-infer from that fork within the same render frame. The DOM round-trip (JS event → fetch → re-render) is too slow for this to feel like direct manipulation.
 
-So what does swift-metal own vs what does the stream glyph keep? The research document's checklist has items at every level — from CSS heatmaps (stream glyph territory) to token trees (Metal territory) to sampling chain UI (could be either). If swift-metal renders the same tokens the stream glyph already renders but on the GPU, there are two competing views of the same data.
+The stream glyph keeps doing what it does — text with heatmap coloring, readable output, follow-up input. swift-metal exists because some things about inference are not text and never will be.
 
-Is the ◈ glyph a replacement for the stream glyph (one view to rule them all, GPU-rendered), or a companion (stream glyph shows text with heatmap coloring, ◈ glyph shows the deeper structure — trees, trajectories, sampler state — that the DOM cannot handle)?
+What is the first thing you'd want to see in this space that you currently cannot? The token tree? The probability landscape? The semantic trajectory? Or something that hasn't been named yet?
 
 ---
 
