@@ -78,6 +78,7 @@ add_executable(qntx-llama-cpp-plugin
     src/main.cpp
     src/plugin.cpp
     src/inference.cpp
+    src/vocab_projection.cpp
     src/pdf_extract.cpp
     ${GENERATED_SRCS}
 )
@@ -85,6 +86,8 @@ add_executable(qntx-llama-cpp-plugin
 target_include_directories(qntx-llama-cpp-plugin PRIVATE
     ${PROTO_GEN_DIR}
     ${LLAMA_SOURCE_DIR}/include
+    ${LLAMA_SOURCE_DIR}/src
+    ${LLAMA_SOURCE_DIR}/ggml/include
     ${MUPDF_INCLUDE_DIR}
 )
 
@@ -94,6 +97,11 @@ target_link_libraries(qntx-llama-cpp-plugin PRIVATE
     protobuf::libprotobuf
     ${MUPDF_LIB}
 )
+
+if(APPLE)
+    target_link_libraries(qntx-llama-cpp-plugin PRIVATE "-framework Accelerate")
+    target_compile_definitions(qntx-llama-cpp-plugin PRIVATE ACCELERATE_NEW_LAPACK)
+endif()
 
 # mupdf-third bundles freetype/zlib/etc — only present with static MuPDF installs
 if(MUPDF_THIRD_LIB)
