@@ -10,7 +10,7 @@
  *
  * Persists token data to canvas state so content survives page refresh.
  *
- * TODO: Token hover/click popup showing signal data (entropy, top_gap, top-k candidates) — data is on each span already
+ * Token hover popup showing signal data and top-K candidates — see token-popup.ts
  * TODO: Copy button (result glyph has one, stream glyph doesn't)
  * TODO: Factor entropy and top_gap into color mapping, not just confidence
  * TODO: Window morph support (separate PR)
@@ -27,6 +27,7 @@ import { uiState } from '../../state/ui';
 import { registerHandler, unregisterHandler } from '../../websocket';
 import { apiFetch } from '../../api';
 import { createFollowUpZone, type FollowUpRequest, type FollowUpControls } from './glyph-followup';
+import { createTokenPopup } from './token-popup';
 
 // ── Multiplexer ─────────────────────────────────────────────────────
 
@@ -208,6 +209,21 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
         output.appendChild(renderToken(token));
     }
 
+    // Token hover popup — event delegation on the output container
+    const popup = createTokenPopup();
+    output.addEventListener('mouseenter', (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'SPAN' && target.dataset.confidence) {
+            popup.show(target as HTMLSpanElement);
+        }
+    }, true);
+    output.addEventListener('mouseleave', (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'SPAN') {
+            popup.hide();
+        }
+    }, true);
+
     /** Persist current tokens to canvas state */
     function persistContent(): void {
         const content: StreamGlyphContent = { tokens, model: streamModel, prompt: promptText };
@@ -255,6 +271,7 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
     // Cleanup
     storeCleanup(element, () => {
         if (promptGlyphId) unsubscribeStream(promptGlyphId);
+        popup.destroy();
     });
 
     return element;

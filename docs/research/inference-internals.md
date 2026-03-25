@@ -141,7 +141,7 @@ Transport is gRPC server streaming (`StreamChat` RPC). The Go layer adapts the g
 
 **Step 3 — Confidence heatmap.** *(done)* Stream glyph (`stream-glyph.ts`) renders each token as a `<span>` with `background-color` mapped from confidence via `confidenceToColor()` — linear HSL interpolation, amber glow at low confidence, transparent at high. Multiplexer pattern: one WebSocket handler routes `llm_stream` messages to many glyph instances by `job_id`. Follow-ups from a stream glyph spawn a new stream glyph with live heatmap (spawn-before-fetch pattern). Token data persists to canvas state across page refresh. Shared follow-up infrastructure (`glyph-followup.ts`) between result and stream glyphs.
 
-**Step 4 — Top-K popup.** Hover/click interaction on heatmapped tokens. Shows the decision space at that position.
+**Step 4 — Top-K popup.** *(done)* Hover interaction on heatmapped tokens (`token-popup.ts`). Shows signal values (P, H, Δ) and top-K candidates with horizontal probability bars. Chosen token highlighted. Event delegation on the output container — one listener for all tokens. Popup is viewport-constrained (flips up/left at edges). Data comes from `data-*` attributes already on each token span from Step 3.
 
 **Step 5 — Entropy sparkline.** Macro view of the generation's certainty profile. SVG strip.
 
@@ -181,7 +181,7 @@ Could LLM embeddings plug into the same HDBSCAN/UMAP infra? Technically yes — 
 ### Tier 1 Visualizations
 
 - [x] Confidence heatmap — color token spans by P(chosen) or entropy
-- [ ] Top-K alternatives popup — hover/click a token to see candidates + probability bars
+- [x] Top-K alternatives popup — hover a token to see signal data + candidate probability bars
 - [ ] Entropy sparkline — rolling SVG line chart of entropy per token position
 - [ ] Runner-up ghost trail — inline muted annotation of second-place tokens
 
