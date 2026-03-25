@@ -1,0 +1,81 @@
+/**
+ * Token popup — hover overlay showing signal data and top-K candidates.
+ *
+ * Appears on mouseenter over a token span in stream glyph output.
+ * Fixed position, viewport-constrained.
+ */
+.token-popup {
+    position: fixed;
+    z-index: 100000;
+    background: var(--bg-dark-hover);
+    border: 1px solid var(--border-on-dark);
+    padding: 6px 8px;
+    font-family: monospace;
+    font-size: var(--font-size-sm);
+    color: var(--text-on-dark);
+    pointer-events: none;
+    min-width: 180px;
+    max-width: 320px;
+}
+
+.token-popup-signals {
+    display: flex;
+    gap: 10px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.token-popup-candidates {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.token-popup-candidate {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 18px;
+}
+
+.token-popup-candidate.token-popup-chosen {
+    color: #fff;
+}
+
+.token-popup-candidate:not(.token-popup-chosen) {
+    color: var(--text-secondary);
+}
+
+.token-popup-token-text {
+    width: 72px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-align: right;
+    flex-shrink: 0;
+    font-size: 11px;
+}
+
+.token-popup-bar-track {
+    flex: 1;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    position: relative;
+}
+
+.token-popup-bar {
+    height: 100%;
+    background: hsla(30, 100%, 50%, 0.7);
+}
+
+.token-popup-chosen .token-popup-bar {
+    background: hsla(30, 100%, 60%, 0.9);
+}
+
+.token-popup-prob {
+    width: 40px;
+    text-align: right;
+    flex-shrink: 0;
+    font-size: 11px;
+}
