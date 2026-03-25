@@ -343,13 +343,14 @@ func (x *LLMChatChunk) GetSignal() *TokenSignalProto {
 }
 
 type TokenSignalProto struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Confidence    float32                `protobuf:"fixed32,1,opt,name=confidence,proto3" json:"confidence,omitempty"`       // P(chosen) from raw distribution
-	Entropy       float32                `protobuf:"fixed32,2,opt,name=entropy,proto3" json:"entropy,omitempty"`             // Shannon entropy in bits
-	TopGap        float32                `protobuf:"fixed32,3,opt,name=top_gap,json=topGap,proto3" json:"top_gap,omitempty"` // P(top1) - P(top2)
-	TopK          []*TokenCandidateProto `protobuf:"bytes,4,rep,name=top_k,json=topK,proto3" json:"top_k,omitempty"`         // Top-k candidates
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Confidence       float32                `protobuf:"fixed32,1,opt,name=confidence,proto3" json:"confidence,omitempty"`                                            // P(chosen) from raw distribution
+	Entropy          float32                `protobuf:"fixed32,2,opt,name=entropy,proto3" json:"entropy,omitempty"`                                                  // Shannon entropy in bits
+	TopGap           float32                `protobuf:"fixed32,3,opt,name=top_gap,json=topGap,proto3" json:"top_gap,omitempty"`                                      // P(top1) - P(top2)
+	TopK             []*TokenCandidateProto `protobuf:"bytes,4,rep,name=top_k,json=topK,proto3" json:"top_k,omitempty"`                                              // Top-k candidates
+	FullDistribution []float32              `protobuf:"fixed32,5,rep,packed,name=full_distribution,json=fullDistribution,proto3" json:"full_distribution,omitempty"` // Full softmax distribution (vocab_size floats)
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *TokenSignalProto) Reset() {
@@ -406,6 +407,13 @@ func (x *TokenSignalProto) GetTopGap() float32 {
 func (x *TokenSignalProto) GetTopK() []*TokenCandidateProto {
 	if x != nil {
 		return x.TopK
+	}
+	return nil
+}
+
+func (x *TokenSignalProto) GetFullDistribution() []float32 {
+	if x != nil {
+		return x.FullDistribution
 	}
 	return nil
 }
@@ -503,14 +511,15 @@ const file_plugin_grpc_protocol_llm_proto_rawDesc = "" +
 	"\rprompt_tokens\x18\x04 \x01(\x05R\fpromptTokens\x12+\n" +
 	"\x11completion_tokens\x18\x05 \x01(\x05R\x10completionTokens\x12!\n" +
 	"\ftotal_tokens\x18\x06 \x01(\x05R\vtotalTokens\x122\n" +
-	"\x06signal\x18\a \x01(\v2\x1a.protocol.TokenSignalProtoR\x06signal\"\x99\x01\n" +
+	"\x06signal\x18\a \x01(\v2\x1a.protocol.TokenSignalProtoR\x06signal\"\xc6\x01\n" +
 	"\x10TokenSignalProto\x12\x1e\n" +
 	"\n" +
 	"confidence\x18\x01 \x01(\x02R\n" +
 	"confidence\x12\x18\n" +
 	"\aentropy\x18\x02 \x01(\x02R\aentropy\x12\x17\n" +
 	"\atop_gap\x18\x03 \x01(\x02R\x06topGap\x122\n" +
-	"\x05top_k\x18\x04 \x03(\v2\x1d.protocol.TokenCandidateProtoR\x04topK\"M\n" +
+	"\x05top_k\x18\x04 \x03(\v2\x1d.protocol.TokenCandidateProtoR\x04topK\x12+\n" +
+	"\x11full_distribution\x18\x05 \x03(\x02R\x10fullDistribution\"M\n" +
 	"\x13TokenCandidateProto\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x12\n" +
 	"\x04text\x18\x02 \x01(\tR\x04text\x12\x12\n" +

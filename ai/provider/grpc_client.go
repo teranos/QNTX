@@ -143,9 +143,10 @@ func (c *GRPCLLMClient) ChatStreaming(ctx context.Context, req ChatRequest, stre
 
 		if chunk.Signal != nil {
 			sig := &TokenSignal{
-				Confidence: chunk.Signal.Confidence,
-				Entropy:    chunk.Signal.Entropy,
-				TopGap:     chunk.Signal.TopGap,
+				Confidence:       chunk.Signal.Confidence,
+				Entropy:          chunk.Signal.Entropy,
+				TopGap:           chunk.Signal.TopGap,
+				FullDistribution: chunk.Signal.FullDistribution,
 			}
 			for _, tc := range chunk.Signal.TopK {
 				sig.TopK = append(sig.TopK, TokenCandidate{
