@@ -7,7 +7,7 @@ import ImageIO
 ///
 /// This is the scaffold — the actual shader compilation, pipeline creation,
 /// and render passes will be implemented per-visualization type.
-final class MetalRenderer {
+final class MetalRenderer: @unchecked Sendable {
     private var device: MTLDevice?
     private var commandQueue: MTLCommandQueue?
 

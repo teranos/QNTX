@@ -1,11 +1,10 @@
 import Foundation
-import GRPC
-import NIOCore
-import NIOPosix
+import GRPCCore
+import GRPCNIOTransportHTTP2
 
 @main
 struct SwiftMetalPluginMain {
-    static func main() throws {
+    static func main() async throws {
         let args = CommandLine.arguments
         var port = 50200
         var logLevel = "info"
@@ -31,43 +30,43 @@ struct SwiftMetalPluginMain {
             i += 1
         }
 
-        // Signal handling
-        signal(SIGINT) { _ in exit(0) }
-        signal(SIGTERM) { _ in exit(0) }
-
-        let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
-        defer { try? group.syncShutdownGracefully() }
-
         let plugin = SwiftMetalPlugin()
 
-        // Try to bind, retry up to 64 times
-        var server: Server?
+        // Try ports in range until one binds
         var boundPort = 0
-
         for attempt in 0..<64 {
             let tryPort = port + attempt
+            let transport = HTTP2ServerTransport.Posix(
+                address: .ipv4(host: "127.0.0.1", port: tryPort),
+                transportSecurity: .plaintext
+            )
+            let server = GRPCServer(
+                transport: transport,
+                services: [plugin]
+            )
+
             do {
-                server = try Server.insecure(group: group)
-                    .withServiceProviders([plugin])
-                    .bind(host: "127.0.0.1", port: tryPort)
-                    .wait()
-                boundPort = tryPort
-                break
+                try await withThrowingTaskGroup(of: Void.self) { group in
+                    group.addTask { try await server.serve() }
+                    // If we get a listening address, the port bound successfully
+                    if let _ = try await server.listeningAddress {
+                        boundPort = tryPort
+                        // Port announcement — core discovers us via this line
+                        print("QNTX_PLUGIN_PORT=\(boundPort)")
+                        fflush(stdout)
+                        // Keep serving — don't cancel
+                        try await group.next()
+                    }
+                }
+                return // Server shut down cleanly
             } catch {
+                // Port likely in use, try next
                 continue
             }
         }
 
-        guard let server = server else {
-            fputs("Failed to bind to any port in range \(port)-\(port + 63)\n", stderr)
-            Foundation.exit(1)
-        }
-
-        // Port announcement — core discovers us via this line
-        print("QNTX_PLUGIN_PORT=\(boundPort)")
-        fflush(stdout)
-
-        try server.onClose.wait()
+        fputs("Failed to bind to any port in range \(port)-\(port + 63)\n", stderr)
+        Foundation.exit(1)
     }
 
     static func printUsage() {
