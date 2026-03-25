@@ -1,6 +1,6 @@
 # Focus
 
-Double-click a glyph to focus it. The glyph's DOM element transforms while the canvas zooms and pans to center it. Viewport width determines the split — how many glyphs are visible at once in equal columns: 2 at 50%, 3 at 33%, 4 at 25%, 5 at 20%. Portrait mobile: one glyph fills the screen. Landscape mobile: 50/50 split, same as narrow desktop. The split is a window into the meld — if a meld has more members than the split shows, scroll to bring adjacent glyphs into view. Escape unfocuses: the glyph transforms back down, zoom returns to its previous level, pan stays where you are.
+Double-click a glyph to focus it. The glyph's DOM element transforms while the canvas zooms and pans to center it. Viewport width determines the split — how many glyphs are visible at once in equal columns: 2 at 50%, 3 at 33%, 4 at 25%, 5 at 20%. Portrait mobile: one glyph fills the screen. Landscape mobile: 50/50 split, same as narrow desktop. On mobile portrait, the single column stacks vertically — a result glyph with its follow-ups forms a conversation chain you scroll through. The split is a window into the meld — if a meld has more members than the split shows, scroll to bring adjacent glyphs into view. Escape unfocuses: the glyph transforms back down, zoom returns to its previous level, pan stays where you are.
 
 Scroll direction maps to meld direction — left/right for horizontal melds, up/down for vertical. The layout reshapes continuously with scroll.
 

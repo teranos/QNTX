@@ -274,11 +274,198 @@ export function renderComponentGallery(root: HTMLElement) {
 
     body.appendChild(tbRow)
 
-    // Auto-height
-    body.appendChild(titleBarStrip('Auto-height (--auto)', 'glyph-title-bar glyph-title-bar--auto', 'attestation with a longer title that wraps to demonstrate auto-height behavior', [
+    // Auto-height — constrained width to force wrapping
+    const autoHeightWrapper = titleBarStrip('Auto-height (--auto)', 'glyph-title-bar glyph-title-bar--auto', 'attestation with a longer title that wraps to demonstrate auto-height behavior', [
       { label: '\u27F3', cls: 'titlebar-btn' },
       { label: '\u2715', cls: 'titlebar-btn' },
-    ]))
+    ])
+    autoHeightWrapper.style.maxWidth = '320px'
+    body.appendChild(autoHeightWrapper)
+  }))
+
+  // ── Focus ──
+  section.appendChild(sectionGlyph('Focus', 'Double-click a glyph to focus it. Escape to unfocus. Viewport width determines the split.'))
+
+  section.appendChild(glyphSection('Focus demo', 'Double-click any glyph below. Resize browser to see split change.', (body) => {
+    const canvas = document.createElement('div')
+    canvas.className = 'canvas-workspace'
+    canvas.style.position = 'relative'
+    canvas.style.height = '320px'
+    canvas.style.overflow = 'hidden'
+    canvas.tabIndex = 0
+
+    // Track focus state
+    let focusedElement: HTMLElement | null = null
+
+    // Compute split column count from viewport width
+    function getColumnCount(): number {
+      const w = canvas.clientWidth
+      if (w >= 960) return 4
+      if (w >= 720) return 3
+      if (w >= 480) return 2
+      return 1
+    }
+
+    function focusGlyph(el: HTMLElement) {
+      // Unfocus previous
+      if (focusedElement && focusedElement !== el) {
+        focusedElement.style.transition = 'transform 0.35s ease-out, width 0.35s ease-out, height 0.35s ease-out, left 0.35s ease-out, top 0.35s ease-out'
+        focusedElement.style.transform = ''
+        focusedElement.style.width = ''
+        focusedElement.style.height = ''
+        focusedElement.style.left = focusedElement.dataset.origLeft || ''
+        focusedElement.style.top = focusedElement.dataset.origTop || ''
+        focusedElement.style.zIndex = ''
+        const prev = focusedElement
+        setTimeout(() => { prev.style.transition = '' }, 350)
+      }
+
+      // Save original position on first focus of this element
+      if (!el.dataset.origLeft) {
+        el.dataset.origLeft = el.style.left
+        el.dataset.origTop = el.style.top
+      }
+
+      const cols = getColumnCount()
+      const colWidth = canvas.clientWidth / cols
+      const colIndex = Math.floor(cols / 2) // center column
+
+      el.style.transition = 'transform 0.35s ease-out, width 0.35s ease-out, height 0.35s ease-out, left 0.35s ease-out, top 0.35s ease-out'
+      el.style.left = `${colIndex * colWidth}px`
+      el.style.top = '0px'
+      el.style.width = `${colWidth}px`
+      el.style.height = `${canvas.clientHeight}px`
+      el.style.zIndex = '10'
+      setTimeout(() => { el.style.transition = '' }, 350)
+
+      focusedElement = el
+    }
+
+    function unfocus() {
+      if (!focusedElement) return
+      focusedElement.style.transition = 'transform 0.35s ease-out, width 0.35s ease-out, height 0.35s ease-out, left 0.35s ease-out, top 0.35s ease-out'
+      focusedElement.style.width = ''
+      focusedElement.style.height = ''
+      focusedElement.style.left = focusedElement.dataset.origLeft || ''
+      focusedElement.style.top = focusedElement.dataset.origTop || ''
+      focusedElement.style.zIndex = ''
+      const prev = focusedElement
+      setTimeout(() => { prev.style.transition = '' }, 350)
+      focusedElement = null
+    }
+
+    // Create demo glyphs using SDK
+    const glyphConfigs = [
+      { id: 'focus-a', label: 'Glyph A', x: 10, y: 10, color: '#2a5578', labelColor: '#88ccff' },
+      { id: 'focus-b', label: 'Glyph B', x: 300, y: 10, color: '#5c3d1a', labelColor: '#f0c878' },
+      { id: 'focus-c', label: 'Glyph C', x: 590, y: 10, color: '#2a4a3a', labelColor: '#88ddaa' },
+    ]
+
+    for (const cfg of glyphConfigs) {
+      const glyphData: Glyph = { id: cfg.id, title: cfg.label, x: cfg.x, y: cfg.y, renderContent: () => document.createElement('div') }
+      const ui = createGlyphUI(glyphData, cfg.id)
+      const g = ui.glyph({
+        defaults: { x: cfg.x, y: cfg.y, width: 280, height: 190 },
+        titleBar: { label: cfg.label, color: cfg.color, labelColor: cfg.labelColor },
+      })
+
+      const content = document.createElement('pre')
+      content.style.fontFamily = 'monospace'
+      content.style.fontSize = 'var(--font-size-sm)'
+      content.style.color = 'var(--text-on-dark)'
+      content.style.padding = '8px'
+      content.textContent = `Double-click to focus ${cfg.label}\nEscape to unfocus\n\nViewport columns: resize to see`
+
+      g.content.appendChild(content)
+      canvas.appendChild(g.element)
+    }
+
+    // Double-click to focus
+    canvas.addEventListener('dblclick', (e) => {
+      const target = (e.target as HTMLElement).closest('[data-glyph-id]') as HTMLElement | null
+      if (target && canvas.contains(target)) {
+        canvas.focus()
+        focusGlyph(target)
+      }
+    })
+
+    // Escape to unfocus
+    canvas.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && focusedElement) {
+        e.preventDefault()
+        unfocus()
+      }
+    })
+
+    // Click background to unfocus
+    canvas.addEventListener('click', (e) => {
+      const target = (e.target as HTMLElement).closest('[data-glyph-id]')
+      if (!target && focusedElement) unfocus()
+    })
+
+    // Viewport presets
+    const presets: [string, number, number][] = [
+      ['Phone', 375, 667],
+      ['Phone landscape', 667, 375],
+      ['Tablet', 768, 1024],
+      ['Desktop', 1100, 320],
+    ]
+
+    const controls = document.createElement('div')
+    controls.style.display = 'flex'
+    controls.style.gap = '4px'
+    controls.style.marginBottom = '6px'
+
+    let activePreset: string | null = null
+
+    for (const [label, w, h] of presets) {
+      const btn = document.createElement('button')
+      btn.className = 'qntx-btn qntx-btn-small qntx-btn-ghost'
+      const btnLabel = document.createElement('span')
+      btnLabel.className = 'qntx-btn-label'
+      btnLabel.textContent = label
+      btn.appendChild(btnLabel)
+
+      btn.addEventListener('click', () => {
+        if (activePreset === label) {
+          // Toggle off — restore full width
+          canvas.style.width = ''
+          canvas.style.height = '320px'
+          canvas.style.margin = ''
+          activePreset = null
+          controls.querySelectorAll('.qntx-btn').forEach(b => b.classList.remove('qntx-btn-primary'))
+        } else {
+          canvas.style.width = `${w}px`
+          canvas.style.height = `${h}px`
+          canvas.style.margin = '0 auto'
+          activePreset = label
+          controls.querySelectorAll('.qntx-btn').forEach(b => b.classList.remove('qntx-btn-primary'))
+          btn.classList.add('qntx-btn-primary')
+        }
+        if (focusedElement) unfocus()
+        updateIndicator()
+      })
+      controls.appendChild(btn)
+    }
+    body.appendChild(controls)
+
+    // Column indicator
+    const indicator = document.createElement('div')
+    indicator.style.position = 'absolute'
+    indicator.style.bottom = '4px'
+    indicator.style.right = '8px'
+    indicator.style.fontSize = 'var(--font-size-xs)'
+    indicator.style.color = 'var(--text-on-dark-tertiary)'
+    function updateIndicator() {
+      indicator.textContent = `${getColumnCount()} columns @ ${canvas.clientWidth}px`
+    }
+    canvas.appendChild(indicator)
+
+    const observer = new ResizeObserver(updateIndicator)
+    observer.observe(canvas)
+    setTimeout(updateIndicator, 0)
+
+    body.appendChild(canvas)
   }))
 
   root.appendChild(section)
