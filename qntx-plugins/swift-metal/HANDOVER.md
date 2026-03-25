@@ -17,57 +17,69 @@ The scaffold does **not** compile yet — it references `Protocol_*` generated t
 
 ---
 
+## Vision
+
+This plugin exists to visualise what is happening inside the model as it's happening. The llama-cpp plugin already captures pre-sampler logit signals per token — confidence, entropy, top-gap, top-k candidates — and streams them over gRPC. The stream glyph renders this as a DOM-based confidence heatmap. swift-metal replaces that with GPU-accelerated rendering that can keep up with token generation speed and, critically, support stepping back through tokens and selecting different paths in possibility space.
+
+The token stream is not just a sequence to watch — it's a tree. At each token position, the model considered alternatives. swift-metal should make that tree navigable: see where the model was confident, where it hesitated, branch into the roads not taken.
+
+**Performance is the priority.** Metal is chosen deliberately to eliminate the abstraction layers between data and pixels. This commits to the Apple ecosystem for this plugin. The same GPU running llama-cpp inference renders the visualization — zero-copy potential between inference output buffers and visualization input buffers.
+
+**Platform scope:** macOS-only via Metal. If this needs to run on Windows or Linux in the future, the viable paths are:
+- **Vulkan** — closest cross-platform equivalent to Metal compute + render. MoltenVK already translates Vulkan to Metal on macOS, so a Vulkan-first approach would run everywhere but add a translation layer on the primary target. The trade-off: universal reach at the cost of the zero-copy Metal↔llama.cpp path.
+- **WebGPU (wgpu/Dawn)** — browser-native GPU API with Rust (wgpu) or C++ (Dawn) implementations. Maps to Metal on macOS, Vulkan on Linux, D3D12 on Windows. Higher abstraction than raw Metal, but the same shader language (WGSL or translated SPIR-V). Would require rewriting shaders but not the data pipeline.
+- **Rewrite in Zig + WebGPU** — Zig's comptime could generate pipeline layouts at compile time (like D's CTFE for protobuf). Cross-platform from day one, but no ecosystem precedent in QNTX yet.
+
+For now, Metal is the right call — the llama-cpp plugin already uses Metal acceleration, Tauri targets macOS, and the inference-to-visualization data path benefits from staying on the same GPU API.
+
+**Build toolchain:** Nix flake for reproducibility, matching llama-cpp and kern. protoc-gen-swift for proto generation (standard codegen, not hand-rolled — the D plugins' CTFE approach was motivated by avoiding external toolchains entirely, which isn't a concern when Nix already manages the build).
+
+---
+
 ## Open questions
 
-### Q1: What is the first visualization?
+### Q1: What does "inside the model" mean to you?
 
-The stream glyph's confidence heatmap currently renders in the DOM — per-token colored spans based on `TokenSignal.confidence`. Should the first Metal visualization replace this exact heatmap (proving the data path from llama-cpp token signals through gRPC to Metal to PNG to canvas), or should it target a different dataset like embedding projections from qntx-reduce?
+llama-cpp currently exposes per-token signals: confidence (P of chosen token), entropy (how spread the distribution is), top-gap (margin between first and second choice), and top-k candidates with probabilities. These are post-softmax observations of the output layer.
 
-**Why this matters:** The heatmap is a 1D sequential visualization (tokens in reading order). Embedding projections are 2D scatter plots with clusters. The shader architecture differs: heatmap is a simple fragment shader coloring quads; scatter is a point-cloud renderer with possible compute-shader clustering. Choosing wrong means the first pipeline won't generalize.
+But "inside the model" could mean deeper things — attention patterns (which tokens attended to which), layer-by-layer activation magnitudes, or embedding-space trajectories as the prompt is processed. Each layer of depth requires llama-cpp to expose more internal state, which is additional C++ work before swift-metal can visualise it.
 
-**Adjustments to steps depending on answer:**
-
-- **If heatmap:** Step 1 adds `LLMTokenSignal` to the proto generation. Step 2 writes a fragment shader that maps confidence floats to a color ramp. Step 3 wires the stream glyph to request Metal-rendered frames instead of DOM spans. Step 4 adds WebSocket streaming so frames update live as tokens arrive.
-- **If scatter/embeddings:** Step 1 adds an endpoint to receive embedding arrays from qntx-reduce. Step 2 writes a compute shader for 2D projection layout + a render shader for point sprites. Step 3 replaces the current 3D embedding view. Step 4 adds interactive pan/zoom via Metal viewport transforms sent from the glyph module.
+Where on this spectrum does the first version need to be? Is the existing token-level signal data (confidence, entropy, top-k alternatives) enough to start, or does the visualization need to show something that isn't currently captured?
 
 ---
 
-### Q2: Server-rendered PNG or shared texture?
+### Q2: What does "stepping back" feel like?
 
-The scaffold renders to a Metal texture, exports to PNG, and serves it over HTTP. The glyph module draws the PNG onto a canvas. This works but adds encode/decode latency per frame. The alternative is a shared CAMetalLayer rendered directly into the Tauri webview — zero-copy, but deeply coupled to the Tauri/macOS windowing layer.
+You mentioned stepping back through tokens and selecting different paths. This could mean several things in practice:
 
-**Why this matters:** PNG round-trip caps at maybe 30fps for 800x600. Fine for static or slow-updating visualizations, insufficient for interactive rotation, zoom, or live streaming token signals. Shared texture is zero-latency but locks the plugin to Tauri on macOS.
+- **Passive replay:** Scrub a timeline slider backwards through generated tokens, seeing how the distribution evolved. Read-only, no re-inference. The data is already captured.
+- **Active branching:** Click on an alternative token at position N, and the model re-runs inference from that point forward. This is speculative decoding in reverse — "what if the model had said X instead?" Requires llama-cpp to support re-inference from a saved KV cache state.
+- **Tree exploration:** Every generation produces a tree (not a sequence). All top-k candidates at every position are already known. The visualizer renders the full tree and lets you walk branches without re-inference — you see what the model *would have said* based on its probability assignments, even though only one path was actually sampled.
 
-**Adjustments to steps depending on answer:**
-
-- **If PNG (keep scaffold approach):** Steps stay as-is. The `/render` endpoint gains query params for width/height/format. The glyph module polls or receives WebSocket push notifications to re-fetch.
-- **If shared texture:** Step 1 changes to creating a `CAMetalDrawable` from the webview's layer. Step 2 becomes wiring the Metal render pass to paint directly into that drawable. Step 3 adds a Tauri command bridging Swift plugin ↔ native view. Step 4 implements input forwarding (mouse events from webview JS → plugin → Metal viewport).
-
----
-
-### Q3: Proto generation — protoc-gen-swift or hand-rolled?
-
-grpc-swift provides `protoc-gen-swift` and `protoc-gen-grpc-swift` for generating Swift types from `.proto` files. The D plugins hand-rolled their protobuf codec via CTFE. The C++ and Rust plugins use standard protoc. Swift could go either way — Swift's `Codable` and `Mirror` could power a hand-rolled approach, but `protoc-gen-swift` is mature and well-maintained.
-
-**Why this matters:** Hand-rolling means no dependency on the protoc toolchain at build time, but adds maintenance surface every time `domain.proto` or `llm.proto` changes. Standard protoc generation means the Swift types auto-update from proto files, matching the C++ and Rust approach.
-
-**Adjustments to steps depending on answer:**
-
-- **If protoc-gen-swift:** Step 1 becomes adding a `generate-proto.sh` script that runs protoc with swift and grpc-swift plugins, outputting to `Sources/SwiftMetalPlugin/Generated/`. The Makefile gains a `proto` target. Nix flake includes protoc + plugins.
-- **If hand-rolled:** Step 1 becomes writing a Swift protobuf encoder/decoder using the field numbers from `domain.proto` directly. More work upfront, zero external tooling. The D plugins' `@Proto(N)` pattern translates to Swift property wrappers.
+The difference matters because passive replay is pure visualization (swift-metal only), active branching requires bidirectional communication with llama-cpp (save/restore KV cache snapshots), and tree exploration requires swift-metal to maintain and render a graph structure.
 
 ---
 
-### Q4: Nix or Swift-only toolchain?
+### Q3: Is this for understanding or for steering?
 
-llama-cpp and the OCaml plugins use Nix flakes for reproducible builds. Swift's SPM already handles dependency resolution. A Nix flake would pin the Swift toolchain version and ensure protoc/grpc plugins are available, but adds complexity. SPM-only means `swift build` just works on any Mac with Xcode.
+Visualising model internals can serve two different purposes:
 
-**Why this matters:** CI currently uses Nix for llama-cpp and kern. If swift-metal skips Nix, it can only build on macOS runners with Xcode. If it uses Nix, it gets the same reproducibility guarantees but requires nixpkgs swift support (which exists but is less battle-tested than OCaml/Rust/C++ in Nix).
+- **Understanding:** See what the model is doing, build intuition, debug behaviour. The user watches. The visualization is a microscope.
+- **Steering:** Intervene in the generation process. Boost or suppress tokens, adjust temperature mid-stream, apply bias weights at specific positions. The user acts. The visualization is a control surface.
 
-**Adjustments to steps depending on answer:**
+llama-cpp already has a bias glyph concept (fuzzy vocabulary search, selected tokens with bias weights). If swift-metal is a control surface, it needs to send commands back to llama-cpp during inference — not just receive signals. That changes the data flow from one-way (llama-cpp → swift-metal) to bidirectional (llama-cpp ↔ swift-metal).
 
-- **If Nix:** Step 1 includes writing `flake.nix` with swift toolchain, protobuf, grpc. CI workflow mirrors llama-cpp's nix build matrix. The flake manages Metal SDK headers for headless builds (Metal stubs for CI, real framework for dev).
-- **If SPM-only:** Step 1 skips Nix entirely. CI uses a macOS runner with `swift build`. Simpler, but no headless Linux CI. The plugin is macOS-only anyway, so this may be acceptable.
+---
+
+### Q4: One visualization or a visualization framework?
+
+The implementation steps below deliver one specific end-to-end vertical. But the scaffold is a plugin — it could register multiple glyph types, each rendering a different aspect of the model:
+
+- ◈ for the token probability tree
+- A different glyph for attention pattern heatmaps
+- Another for embedding-space trajectories
+
+Should the first vertical be built as a standalone visualization, or should it be structured from the start as the first renderer in a framework that expects more? The difference is whether `MetalRenderer` is a monolith or a protocol that multiple visualization types implement.
 
 ---
 
@@ -75,34 +87,34 @@ llama-cpp and the OCaml plugins use Nix flakes for reproducible builds. Swift's 
 
 These steps deliver one working visualization end-to-end: data in, Metal render, pixels on screen. They are written assuming Q1-Q4 have been answered and adjusted accordingly. **Do not start until all four questions are resolved.**
 
-### Step 1: Proto generation and gRPC bootstrap
+### Step 1: Proto generation, gRPC bootstrap, and Nix flake
 
-Generate Swift types from `domain.proto` (and `llm.proto` if targeting the token heatmap). Wire the generated types into `Plugin.swift` replacing the placeholder `Protocol_*` references. Verify the plugin starts, binds a port, announces `QNTX_PLUGIN_PORT=`, responds to `Metadata` and `Health` RPCs, and QNTX core discovers it in the plugin list.
+Write `flake.nix` pinning Swift toolchain, protobuf, and grpc-swift protoc plugins. Add `generate-proto.sh` that runs protoc-gen-swift and protoc-gen-grpc-swift against `domain.proto` and `llm.proto`, outputting to `Sources/SwiftMetalPlugin/Generated/`. Wire the generated types into `Plugin.swift` replacing the placeholder `Protocol_*` references. Add CI workflow mirroring llama-cpp's Nix build.
 
-**Files:** `generate-proto.sh` (or Nix flake), `Sources/SwiftMetalPlugin/Generated/*.swift`, updates to `Plugin.swift` imports, `Package.swift` if paths change.
+**Files:** `flake.nix`, `flake.lock`, `generate-proto.sh`, `Sources/SwiftMetalPlugin/Generated/*.swift`, updates to `Plugin.swift` imports, `.github/workflows/swift-metal.yml`.
 
 **Done when:** `make swift-metal-plugin` succeeds, plugin appears in QNTX UI plugin list with name "swift-metal" and version "0.1.0", health check returns "Metal device active" with the GPU name.
 
-### Step 2: Metal shader for the chosen visualization
+### Step 2: Metal shader for token signal visualization
 
-Write the `.metal` shader source (embedded as a Swift string constant, compiled at runtime via `MTLDevice.makeLibrary(source:)`). For heatmap: a fragment shader mapping a float buffer to a color ramp. For scatter: a vertex + fragment shader rendering point sprites from a position buffer. The shader reads from an `MTLBuffer` populated by `renderToImage()` from the JSON payload.
+Write the MSL shader source (embedded as a Swift string constant, compiled at runtime via `MTLDevice.makeLibrary(source:)`). The shader reads from an `MTLBuffer` of token signal data — confidence, entropy, top-gap — and renders a visualization that maps these signals to color, size, and position. The exact visual form depends on Q1-Q4 answers (heatmap, tree, scatter).
 
 **Files:** `Sources/SwiftMetalPlugin/Shaders.swift` (embedded MSL source), updates to `MetalRenderer.swift` to create pipeline state, set vertex/fragment functions, allocate buffers, encode draw/dispatch commands.
 
-**Done when:** `POST /render` with a test JSON payload returns a PNG that is not blank — the visualization is visible and data-driven. Manual test: `curl -X POST http://localhost:50200/render -d '{"values":[0.9,0.3,0.7,0.1,0.5]}' -o test.png && open test.png`.
+**Done when:** `POST /render` with a test JSON payload returns a PNG that is not blank — the visualization is visible and data-driven. Manual test: `curl -X POST http://localhost:50200/render -d '{"tokens":[{"text":"the","confidence":0.9,"entropy":1.2},{"text":"cat","confidence":0.3,"entropy":3.1}]}' -o test.png && open test.png`.
 
 ### Step 3: Wire the glyph into the QNTX canvas
 
-Update `GlyphModule.swift` so the ◈ glyph fetches real data (from attestations, from the stream glyph's token signals, or from qntx-reduce embeddings — depending on Q1) and passes it to `/render`. The glyph should re-render when its data source changes. Add the glyph to the spawn menu by confirming `RegisterGlyphs` returns the correct definition.
+Update `GlyphModule.swift` so the ◈ glyph subscribes to llama-cpp's token signal stream (via the existing WebSocket infrastructure or a new endpoint) and passes signal data to `/render`. The glyph should re-render as new tokens arrive. Add the glyph to the spawn menu by confirming `RegisterGlyphs` returns the correct definition.
 
-**Files:** `Sources/SwiftMetalPlugin/GlyphModule.swift` (JS module updates), possibly `Plugin.swift` (new HTTP endpoints for data queries).
+**Files:** `Sources/SwiftMetalPlugin/GlyphModule.swift` (JS module updates), possibly `Plugin.swift` (new HTTP endpoints for signal relay or data queries).
 
-**Done when:** Spawning a ◈ glyph from the QNTX canvas shows a Metal-rendered visualization with real data. The status bar shows "Rendered via Metal (800x600)". Resizing the glyph re-renders at the new dimensions.
+**Done when:** Spawning a ◈ glyph from the QNTX canvas shows a Metal-rendered visualization with real token signal data from a llama-cpp generation. The status bar shows "Rendered via Metal" with dimensions and frame timing.
 
-### Step 4: Live updates via WebSocket
+### Step 4: Live streaming via WebSocket
 
-Replace the HTTP polling loop with WebSocket streaming. The glyph module opens a WebSocket to `/api/swift-metal/ws`. The plugin's `HandleWebSocket` implementation sends new PNG frames (or raw RGBA pixel buffers, depending on Q2) whenever the underlying data changes. For the heatmap case, this means every time a new `TokenSignal` arrives from llama-cpp, the plugin re-renders and pushes a frame.
+Replace the HTTP request/response cycle with WebSocket streaming. The glyph module opens a WebSocket to `/api/swift-metal/ws`. The plugin's `HandleWebSocket` implementation receives token signals from llama-cpp's `StreamChat` gRPC stream, re-renders incrementally (appending new token data without re-rendering the full frame), and pushes updated frames to the glyph. Depending on Q2 answers, this may also include backwards navigation — scrubbing or branching through previously generated tokens.
 
-**Files:** `Sources/SwiftMetalPlugin/Plugin.swift` (WebSocket implementation), `Sources/SwiftMetalPlugin/MetalRenderer.swift` (incremental render support — append new data without re-rendering the full frame), `Sources/SwiftMetalPlugin/GlyphModule.swift` (WebSocket client in JS).
+**Files:** `Sources/SwiftMetalPlugin/Plugin.swift` (WebSocket implementation, llama-cpp signal subscription), `Sources/SwiftMetalPlugin/MetalRenderer.swift` (incremental render support), `Sources/SwiftMetalPlugin/GlyphModule.swift` (WebSocket client in JS, navigation controls if applicable).
 
 **Done when:** Running a prompt through llama-cpp with the ◈ glyph open shows the visualization updating in real time as tokens stream in. No manual refresh needed. Closing the glyph cleanly disconnects the WebSocket.
