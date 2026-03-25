@@ -32,10 +32,11 @@ type StreamChunk struct {
 
 // TokenSignal carries per-token inference signal data
 type TokenSignal struct {
-	Confidence float32
-	Entropy    float32
-	TopGap     float32
-	TopK       []TokenCandidate
+	Confidence       float32
+	Entropy          float32
+	TopGap           float32
+	TopK             []TokenCandidate
+	FullDistribution []float32
 }
 
 // TokenCandidate is a candidate token from the top-k distribution

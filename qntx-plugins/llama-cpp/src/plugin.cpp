@@ -305,6 +305,9 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
                 tc->set_text(cand.text);
                 tc->set_prob(cand.prob);
             }
+            for (float p : sig.full_distribution) {
+                signal->add_full_distribution(p);
+            }
 
             return writer->Write(chunk);
         });
