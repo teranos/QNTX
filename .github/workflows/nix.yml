@@ -132,10 +132,10 @@ jobs:
         run: nix flake lock --update-input fenix
 
       - name: Build qntx-python plugin
-        run: nix build ./qntx-python#qntx-python-plugin --show-trace
+        run: nix build ./qntx-plugins/qntx-python#qntx-python-plugin --show-trace
 
       - name: Push to Cachix
-        run: nix build ./qntx-python#qntx-python-plugin --print-out-paths --no-link | cachix push qntx
+        run: nix build ./qntx-plugins/qntx-python#qntx-python-plugin --print-out-paths --no-link | cachix push qntx
 
   # Documentation (single OS, includes link checking)
   build-docs:

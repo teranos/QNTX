@@ -8,7 +8,7 @@ package main
 
 import (
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
-	qntxopenrouter "github.com/teranos/QNTX/qntx-openrouter"
+	qntxopenrouter "github.com/teranos/QNTX/qntx-plugins/qntx-openrouter"
 )
 
 func main() {
