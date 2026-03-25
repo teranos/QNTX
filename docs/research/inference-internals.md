@@ -89,8 +89,6 @@ The C++ ecosystem around llama.cpp is thin because llama.cpp itself absorbed mos
 
 ### Remaining Tier 1
 
-**Entropy sparkline.** Small rolling SVG line chart — x-axis is token position, y-axis is entropy. Spikes correspond to moments of indecision. Sits above or beside the output text. Pairs with the heatmap: sparkline gives macro view, heatmap gives micro.
-
 **Runner-up ghost trail.** Show the second-place token as a muted annotation inline with the output: `the [a] cat [dog] sat [stood] on`. Surfaces the branching nature of autoregressive generation. Toggle on/off. Most interesting when the runner-up would have taken the sentence in a completely different direction.
 
 ### Tier 2
@@ -132,7 +130,6 @@ Could LLM embeddings plug into the same HDBSCAN/UMAP infra? Technically yes — 
 ## Checklist
 
 - [ ] Dump full vocabulary to frontend at model load
-- [ ] Entropy sparkline — rolling SVG line chart of entropy per token position
 - [ ] Runner-up ghost trail — inline muted annotation of second-place tokens
 - [ ] Logit trajectories — multi-line chart of token probability evolution across steps
 - [ ] Token tree — branching visualization of top-3 candidates per step
