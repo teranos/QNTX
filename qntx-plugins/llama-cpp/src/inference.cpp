@@ -63,6 +63,9 @@ static TokenSignal capture_signal(llama_context* ctx, const llama_vocab* vocab, 
         sig.top_k[i] = {id, std::string(buf, std::max(0, len)), probs[id]};
     }
 
+    // Keep the full softmax distribution for visualization
+    sig.full_distribution = std::move(probs);
+
     return sig;
 }
 

@@ -11,7 +11,7 @@
 #include "domain.grpc.pb.h"
 #include "llm.grpc.pb.h"
 
-#define PLUGIN_VERSION "0.6.0"
+#define PLUGIN_VERSION "0.7.0"
 
 // Forward declaration
 struct llama_model;
@@ -32,6 +32,7 @@ struct TokenSignal {
     float entropy;                         // Shannon entropy in bits
     float top_gap;                         // P(top1) - P(top2)
     std::vector<TokenCandidate> top_k;     // top-k candidates with probabilities
+    std::vector<float> full_distribution;  // Full softmax distribution (vocab_size floats)
 };
 
 // Inference engine wrapping llama.cpp
