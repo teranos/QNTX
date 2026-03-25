@@ -1,0 +1,268 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// DomainPluginService is the gRPC service for external domain plugins
+service DomainPluginService {
+  // Metadata returns plugin metadata
+  rpc Metadata(Empty) returns (MetadataResponse);
+
+  // Initialize initializes the plugin
+  rpc Initialize(InitializeRequest) returns (InitializeResponse);
+
+  // Shutdown shuts down the plugin
+  rpc Shutdown(Empty) returns (Empty);
+
+  // HandleHTTP handles an HTTP request
+  rpc HandleHTTP(HTTPRequest) returns (HTTPResponse);
+
+  // HandleWebSocket handles a WebSocket connection (bidirectional streaming)
+  rpc HandleWebSocket(stream WebSocketMessage) returns (stream WebSocketMessage);
+
+  // Health checks plugin health
+  rpc Health(Empty) returns (HealthResponse);
+
+  // ConfigSchema returns the configuration schema for this plugin
+  rpc ConfigSchema(Empty) returns (ConfigSchemaResponse);
+
+  // RegisterGlyphs returns custom glyph type definitions provided by this plugin
+  rpc RegisterGlyphs(Empty) returns (GlyphDefResponse);
+
+  // ExecuteJob executes an async job
+  // Used by Pulse to route jobs to plugin-registered handlers
+  rpc ExecuteJob(ExecuteJobRequest) returns (ExecuteJobResponse);
+
+  // ParseAxQuery parses an Ax query string and returns the AST as JSON.
+  // Used by kern (OCaml parser) to replace the Rust WASM parser path.
+  rpc ParseAxQuery(ParseAxQueryRequest) returns (ParseAxQueryResponse);
+}
+
+message Empty {}
+
+message MetadataResponse {
+  string name = 1;
+  string version = 2;
+  string qntx_version = 3;
+  string description = 4;
+  string author = 5;
+  string license = 6;
+}
+
+message InitializeRequest {
+  // Service endpoints the plugin can call back to QNTX core
+  // Format: "host:port" for TCP (e.g., "localhost:50051")
+  //
+  // Note: Database access is not provided - database is a hard boundary.
+  // Plugins should use attestations via ats_store_endpoint instead.
+
+  // ats_store_endpoint: gRPC endpoint for ATSStoreService
+  // Provides: Attestation creation, querying, and management
+  string ats_store_endpoint = 1;
+
+  // queue_endpoint: gRPC endpoint for QueueService
+  // Provides: Async job enqueue, status, and management
+  string queue_endpoint = 2;
+
+  // auth_token: Simple token for authenticating with service endpoints
+  // Plugins must include this token in all service RPC calls
+  string auth_token = 3;
+
+  // Plugin-specific configuration values
+  // Simple types (string, int, bool) passed as string representations
+  // Complex types (maps, slices) JSON-encoded as strings
+  // Plugins should parse and validate values appropriate to their schema
+  map<string, string> config = 4;
+
+  // schedule_endpoint: gRPC endpoint for ScheduleService
+  // Provides: Runtime schedule creation, pause, resume, delete
+  string schedule_endpoint = 5;
+
+  // file_service_endpoint: gRPC endpoint for FileService
+  // Provides: Read stored files (for multimodal attachments)
+  string file_service_endpoint = 6;
+
+  // llm_endpoint: gRPC endpoint for LLMService
+  // Provides: Provider-agnostic LLM chat (routed through core to provider plugins)
+  string llm_endpoint = 7;
+}
+
+message HTTPRequest {
+  string method = 1;
+  string path = 2;
+  repeated HTTPHeader headers = 3;
+  bytes body = 4;
+}
+
+message HTTPResponse {
+  int32 status_code = 1;
+  repeated HTTPHeader headers = 2;
+  bytes body = 3;
+}
+
+// HTTPHeader represents an HTTP header with support for multiple values.
+// HTTP headers can have multiple values (e.g., Set-Cookie, Accept).
+message HTTPHeader {
+  string name = 1;
+  repeated string values = 2;
+}
+
+message WebSocketMessage {
+  enum Type {
+    CONNECT = 0;
+    DATA = 1;
+    CLOSE = 2;
+    PING = 3;   // Client/Server can send for keepalive
+    PONG = 4;   // Response to PING
+    ERROR = 5;  // Error notification
+  }
+
+  Type type = 1;
+  bytes data = 2;
+  map<string, string> headers = 3;  // Optional headers/metadata
+  int64 timestamp = 4;              // For latency measurement (Unix timestamp in nanoseconds)
+}
+
+message HealthResponse {
+  bool healthy = 1;
+  string message = 2;
+  map<string, string> details = 3;
+}
+
+message ConfigSchemaResponse {
+  // Map of config field name to schema definition
+  map<string, ConfigFieldSchema> fields = 1;
+}
+
+message ConfigFieldSchema {
+  // Field type: "string", "number", "boolean", "array"
+  string type = 1;
+
+  // Human-readable description of what this field does
+  string description = 2;
+
+  // Default value (as string representation)
+  string default_value = 3;
+
+  // Whether this field is required
+  bool required = 4;
+
+  // For number types: minimum value (optional)
+  string min_value = 5;
+
+  // For number types: maximum value (optional)
+  string max_value = 6;
+
+  // For string types: validation pattern (regex, optional)
+  string pattern = 7;
+
+  // For array types: element type (optional)
+  string element_type = 8;
+}
+
+// ScheduleInfo describes a schedule that a plugin wants QNTX to create
+message ScheduleInfo {
+  string handler_name = 1;        // Handler to invoke
+  int32 interval_seconds = 2;     // Execution interval (0 = disabled)
+  bool enabled_by_default = 3;    // Whether schedule starts active
+  string description = 4;         // Human-readable description
+  string ats_code = 5;            // Optional ATS code
+}
+
+// InitializeResponse is returned by Initialize RPC
+message InitializeResponse {
+  // Handler names this plugin can execute
+  // Examples: ["python.script", "python.webhook", "ixgest.git"]
+  // Empty list means plugin provides no async handlers (backward compatible)
+  repeated string handler_names = 1;
+
+  // Schedules this plugin wants QNTX to create
+  // QNTX will auto-create schedule.Job entries for these
+  repeated ScheduleInfo schedules = 2;
+
+  // llm_provider indicates this plugin implements LLMProvider (Chat RPC).
+  // Core registers it as an LLM backend in the service mesh.
+  bool llm_provider = 3;
+}
+
+// ExecuteJobRequest is sent to plugins to execute an async job
+message ExecuteJobRequest {
+  string job_id = 1;           // For logging/tracking
+  string handler_name = 2;     // Which handler to invoke
+  bytes payload = 3;           // Job-specific data (JSON)
+  optional int64 timeout_secs = 4;  // Execution timeout. If not set, no timeout.
+}
+
+// ExecuteJobResponse is returned after job execution
+message ExecuteJobResponse {
+  bool success = 1;
+  string error = 2;            // Error message if failed
+  bytes result = 3;            // Optional result data (JSON)
+
+  // Progress tracking (optional) - Pulse updates job.Progress
+  int32 progress_current = 4;
+  int32 progress_total = 5;
+
+  // Cost tracking (optional) - Pulse updates job.CostActual
+  double cost_actual = 6;
+
+  // Execution logs — written to task_logs table by PluginProxyHandler
+  repeated JobLogEntry log_entries = 7;
+
+  // Plugin version that produced this result (e.g., "0.2.14")
+  string plugin_version = 8;
+}
+
+// JobLogEntry is a single log line from plugin job execution
+message JobLogEntry {
+  string timestamp = 1;  // RFC3339
+  string level = 2;      // "info", "warn", "error", "debug"
+  string message = 3;
+  string stage = 4;      // optional execution phase grouping
+  string metadata = 5;   // optional JSON blob
+}
+
+// GlyphDefResponse contains custom glyph type definitions from a plugin
+message GlyphDefResponse {
+  repeated GlyphDef glyphs = 1;
+}
+
+// GlyphDef defines a custom glyph type provided by a plugin
+message GlyphDef {
+  // Symbol is the glyph identifier (e.g., "⚗" for a chemistry plugin)
+  string symbol = 1;
+
+  // Title is the human-readable name shown in the title bar
+  string title = 2;
+
+  // Label is a short identifier for logs and the spawn menu
+  string label = 3;
+
+  // ContentPath is the HTTP path (relative to /api/{plugin}/) that
+  // returns the HTML fragment for this glyph's content area
+  string content_path = 4;
+
+  // CSSPath is an optional HTTP path to a stylesheet for this glyph type
+  string css_path = 5;
+
+  // DefaultWidth and DefaultHeight in pixels (0 = use system default)
+  int32 default_width = 6;
+  int32 default_height = 7;
+
+  // ModulePath is the HTTP path to a JS/TS module exporting a render function.
+  // When set, the frontend dynamically imports it with SDK injection,
+  // bypassing the server-rendered HTML pipeline.
+  string module_path = 8;
+}
+
+// ParseAxQueryRequest is sent to a parser plugin to parse an Ax query string.
+message ParseAxQueryRequest {
+  string query = 1;
+}
+
+// ParseAxQueryResponse contains the parsed result as JSON matching rustAxQuery shape.
+message ParseAxQueryResponse {
+  bytes result = 1;    // JSON AST (same shape as qntx-core Rust parser output)
+  string error = 2;    // Parse error message, empty on success
+}

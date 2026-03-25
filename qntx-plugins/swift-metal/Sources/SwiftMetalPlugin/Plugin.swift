@@ -1,28 +1,26 @@
 import Foundation
-import GRPC
-import NIOCore
-import SwiftProtobuf
+import GRPCCore
+import GRPCProtobuf
 
 /// DomainPluginService implementation for Swift + Metal visualization.
-final class SwiftMetalPlugin: Protocol_DomainPluginServiceProvider {
-    var interceptors: Protocol_DomainPluginServiceServerInterceptorFactoryProtocol? { nil }
-
-    private var config: [String: String] = [:]
-    private var atsEndpoint: String = ""
-    private var authToken: String = ""
+final class SwiftMetalPlugin: Protocol_DomainPluginService.SimpleServiceProtocol, Sendable {
     private let renderer = MetalRenderer()
+
+    private nonisolated(unsafe) var config: [String: String] = [:]
+    private nonisolated(unsafe) var atsEndpoint: String = ""
+    private nonisolated(unsafe) var authToken: String = ""
 
     // MARK: - Metadata
 
     func metadata(
         request: Protocol_Empty,
-        context: GRPCAsyncServerCallContext
+        context: ServerContext
     ) async throws -> Protocol_MetadataResponse {
         var resp = Protocol_MetadataResponse()
         resp.name = pluginName
         resp.version = pluginVersion
         resp.qntxVersion = ">= 0.1.0"
-        resp.description = "GPU-accelerated data visualization via Metal compute and render pipelines"
+        resp.description_p = "GPU-accelerated data visualization via Metal compute and render pipelines"
         resp.author = "QNTX"
         resp.license = "MIT"
         return resp
@@ -32,7 +30,7 @@ final class SwiftMetalPlugin: Protocol_DomainPluginServiceProvider {
 
     func initialize(
         request: Protocol_InitializeRequest,
-        context: GRPCAsyncServerCallContext
+        context: ServerContext
     ) async throws -> Protocol_InitializeResponse {
         self.atsEndpoint = request.atsStoreEndpoint
         self.authToken = request.authToken
@@ -40,7 +38,7 @@ final class SwiftMetalPlugin: Protocol_DomainPluginServiceProvider {
 
         try renderer.setup()
 
-        var resp = Protocol_InitializeResponse()
+        let resp = Protocol_InitializeResponse()
         return resp
     }
 
@@ -48,7 +46,7 @@ final class SwiftMetalPlugin: Protocol_DomainPluginServiceProvider {
 
     func shutdown(
         request: Protocol_Empty,
-        context: GRPCAsyncServerCallContext
+        context: ServerContext
     ) async throws -> Protocol_Empty {
         renderer.teardown()
         return Protocol_Empty()
@@ -58,7 +56,7 @@ final class SwiftMetalPlugin: Protocol_DomainPluginServiceProvider {
 
     func health(
         request: Protocol_Empty,
-        context: GRPCAsyncServerCallContext
+        context: ServerContext
     ) async throws -> Protocol_HealthResponse {
         var resp = Protocol_HealthResponse()
         resp.healthy = renderer.isReady
@@ -73,10 +71,9 @@ final class SwiftMetalPlugin: Protocol_DomainPluginServiceProvider {
 
     func configSchema(
         request: Protocol_Empty,
-        context: GRPCAsyncServerCallContext
+        context: ServerContext
     ) async throws -> Protocol_ConfigSchemaResponse {
-        var resp = Protocol_ConfigSchemaResponse()
-        // No required config fields yet — Metal device is auto-detected
+        let resp = Protocol_ConfigSchemaResponse()
         return resp
     }
 
@@ -84,7 +81,7 @@ final class SwiftMetalPlugin: Protocol_DomainPluginServiceProvider {
 
     func registerGlyphs(
         request: Protocol_Empty,
-        context: GRPCAsyncServerCallContext
+        context: ServerContext
     ) async throws -> Protocol_GlyphDefResponse {
         var resp = Protocol_GlyphDefResponse()
 
@@ -104,7 +101,7 @@ final class SwiftMetalPlugin: Protocol_DomainPluginServiceProvider {
 
     func handleHTTP(
         request: Protocol_HTTPRequest,
-        context: GRPCAsyncServerCallContext
+        context: ServerContext
     ) async throws -> Protocol_HTTPResponse {
         let path = request.path
         let method = request.method
@@ -128,21 +125,21 @@ final class SwiftMetalPlugin: Protocol_DomainPluginServiceProvider {
         return resp
     }
 
-    // MARK: - HandleWebSocket (stub)
+    // MARK: - HandleWebSocket (bidirectional streaming)
 
     func handleWebSocket(
-        requestStream: GRPCAsyncRequestStream<Protocol_WebSocketMessage>,
-        responseStream: GRPCAsyncResponseStreamWriter<Protocol_WebSocketMessage>,
-        context: GRPCAsyncServerCallContext
+        request: RPCAsyncSequence<Protocol_WebSocketMessage, any Error>,
+        response: RPCWriter<Protocol_WebSocketMessage>,
+        context: ServerContext
     ) async throws {
         // WebSocket streaming for live render updates — not yet implemented
     }
 
-    // MARK: - ExecuteJob (stub)
+    // MARK: - ExecuteJob
 
     func executeJob(
         request: Protocol_ExecuteJobRequest,
-        context: GRPCAsyncServerCallContext
+        context: ServerContext
     ) async throws -> Protocol_ExecuteJobResponse {
         var resp = Protocol_ExecuteJobResponse()
         resp.success = false
@@ -151,11 +148,11 @@ final class SwiftMetalPlugin: Protocol_DomainPluginServiceProvider {
         return resp
     }
 
-    // MARK: - ParseAxQuery (stub)
+    // MARK: - ParseAxQuery
 
     func parseAxQuery(
         request: Protocol_ParseAxQueryRequest,
-        context: GRPCAsyncServerCallContext
+        context: ServerContext
     ) async throws -> Protocol_ParseAxQueryResponse {
         var resp = Protocol_ParseAxQueryResponse()
         resp.error = "swift-metal does not parse Ax queries"
@@ -173,7 +170,6 @@ final class SwiftMetalPlugin: Protocol_DomainPluginServiceProvider {
     }
 
     private func handleRender(_ request: Protocol_HTTPRequest) async -> Protocol_HTTPResponse {
-        // Accepts JSON with visualization data, renders via Metal, returns PNG
         var resp = Protocol_HTTPResponse()
 
         guard renderer.isReady else {

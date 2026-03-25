@@ -1,0 +1,11 @@
+{
+  "generate": {
+    "clients": false,
+    "servers": true,
+    "messages": true
+  },
+  "visibility": "internal",
+  "protoc": {
+    "executablePath": "/usr/local/bin/protoc"
+  }
+}
