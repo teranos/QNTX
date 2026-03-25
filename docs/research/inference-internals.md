@@ -68,7 +68,7 @@ The C++ ecosystem around llama.cpp is thin because llama.cpp itself absorbed mos
 
 **JSON Schema to GBNF (`common/json-schema-to-grammar.h`).** Converts a JSON Schema to a GBNF grammar automatically. In llama.cpp's `common/` library.
 
-**Speculative decoding (`common/speculative.h`).** Draft model proposes tokens, main model verifies. Relevant if token tree visualization moves from "show alternatives" to "actually explore branches."
+**Speculative decoding (`common/speculative.h`).** Draft model proposes tokens, main model verifies. Not needed for token tree branching — branching forks the KV cache at a token position and generates forward with an alternative token.
 
 **Minja template engine (`common/minja/`).** Jinja2-compatible chat template rendering. Handles ChatML, Llama, Mistral formats. The plugin currently uses `llama_model_chat_template` + `llama_chat_apply_template` which is simpler but less flexible.
 
@@ -87,15 +87,11 @@ The C++ ecosystem around llama.cpp is thin because llama.cpp itself absorbed mos
 
 ## Visualization Ideas
 
-### Remaining Tier 1
-
-**Runner-up ghost trail.** Show the second-place token as a muted annotation inline with the output: `the [a] cat [dog] sat [stood] on`. Surfaces the branching nature of autoregressive generation. Toggle on/off. Most interesting when the runner-up would have taken the sentence in a completely different direction.
-
 ### Tier 2
 
 **Logit trajectories.** Track how specific tokens' probabilities evolve across generation steps. A token might start at 0.001, rise as context builds, and eventually get selected. Multi-line chart, selected token bolded at the step it was chosen. Requires storing top-100 per step (~115KB for 512 tokens).
 
-**Token tree.** Top-3 candidates at each step rendered as branches. The selected path is the trunk; alternatives ghost off as side branches. For real continuations (not just single-step alternatives) you'd need speculative decoding down each branch — multiplies compute by k x depth. Could be on-demand: "explore alternatives at this token."
+**Token tree branching.** The confidence heatmap already marks hesitation points — brown tokens are where the runner-up was close. The top-K popup shows what the alternatives were. Click a candidate to fork: the plugin generates forward from that token position with the alternative token injected. Each fork spawns a new stream glyph on the canvas, spatially rooted at the fork point. The original path is preserved — branches are additive, no undo needed. On-demand, not pre-computed: each branch is a full generation from the fork point.
 
 **Cumulative perplexity.** Single running number: exp(average negative log-likelihood). Updates with each token. Low = fluent, high = struggled. Useful for comparing prompt strategies — same question with different system prompts yields different perplexity, indicating which framing the model handles better.
 
@@ -130,9 +126,8 @@ Could LLM embeddings plug into the same HDBSCAN/UMAP infra? Technically yes — 
 ## Checklist
 
 - [ ] Dump full vocabulary to frontend at model load
-- [ ] Runner-up ghost trail — inline muted annotation of second-place tokens
 - [ ] Logit trajectories — multi-line chart of token probability evolution across steps
-- [ ] Token tree — branching visualization of top-3 candidates per step
+- [ ] Token tree branching — fork from heatmap token via top-K popup, spawn new stream glyphs per alternative path
 - [ ] Cumulative perplexity — running perplexity score during generation
 - [ ] Expose top-k, top-p, min-p, repetition penalty in the UI
 - [ ] Wire sampler chain configuration through to `llama_sampler_chain_add` calls
