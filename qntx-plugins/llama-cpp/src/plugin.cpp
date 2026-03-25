@@ -103,6 +103,39 @@ grpc::Status LlamaCppPlugin::RegisterGlyphs(grpc::ServerContext* ctx,
 grpc::Status LlamaCppPlugin::HandleHTTP(grpc::ServerContext* ctx,
                                          const protocol::HTTPRequest* req,
                                          protocol::HTTPResponse* resp) {
+    if (req->method() == "GET" && req->path() == "/vocab-positions") {
+        if (!engine_.is_loaded()) {
+            resp->set_status_code(503);
+            resp->set_body("{\"error\":\"no model loaded\"}");
+            auto* h = resp->add_headers();
+            h->set_name("Content-Type");
+            h->add_values("application/json");
+            return grpc::Status::OK;
+        }
+
+        const auto& positions = engine_.vocab_positions_3d();
+        if (positions.empty()) {
+            resp->set_status_code(500);
+            resp->set_body("{\"error\":\"failed to compute vocab positions\"}");
+            auto* h = resp->add_headers();
+            h->set_name("Content-Type");
+            h->add_values("application/json");
+            return grpc::Status::OK;
+        }
+
+        // Return as raw float32 array (n_vocab × 3), binary
+        int n_vocab = positions.size() / 3;
+        resp->set_status_code(200);
+        resp->set_body(positions.data(), positions.size() * sizeof(float));
+        auto* h = resp->add_headers();
+        h->set_name("Content-Type");
+        h->add_values("application/octet-stream");
+        auto* h2 = resp->add_headers();
+        h2->set_name("X-Vocab-Size");
+        h2->add_values(std::to_string(n_vocab));
+        return grpc::Status::OK;
+    }
+
     resp->set_status_code(404);
     resp->set_body("not found");
     return grpc::Status::OK;
