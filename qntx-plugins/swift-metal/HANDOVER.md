@@ -7,13 +7,15 @@ The scaffold in `qntx-plugins/swift-metal/` is a complete gRPC plugin skeleton i
 - **Package.swift** — SPM manifest linking Metal, MetalKit, CoreGraphics, ImageIO frameworks alongside grpc-swift and swift-protobuf.
 - **Main.swift** — Entry point with CLI arg parsing (`--port`, `--version`, `--log-level`), port retry loop (64 attempts), `QNTX_PLUGIN_PORT=` announcement on stdout.
 - **Plugin.swift** — Full `DomainPluginService` implementation: `Metadata`, `Initialize`, `Shutdown`, `Health`, `ConfigSchema`, `RegisterGlyphs`, `HandleHTTP`, `HandleWebSocket` (stub), `ExecuteJob` (stub), `ParseAxQuery` (stub). HTTP routing dispatches `/viz-module.js`, `/render`, `/status`.
-- **MetalRenderer.swift** — `MTLDevice` + `MTLCommandQueue` lifecycle, `renderToImage()` that creates a texture, runs a command buffer, and exports RGBA pixels to PNG via CoreGraphics.
+- **MetalRenderer.swift** — Compute + render pipeline. `setup()` compiles MSL shaders at runtime. `setVocabPositions()` caches position buffer. `renderNebula()` dispatches compute pass (probs + positions → particles), render pass (point sprites, additive blending, HDR), tonemaps to PNG. `renderTestNebula()` generates bimodal test distribution for 128k particles.
+- **ShaderSource.swift** — MSL shader source as Swift string for runtime compilation.
+- **Shaders.metal** — Canonical MSL source (reference copy, not compiled by SPM).
 - **GlyphModule.swift** — JS glyph module (symbol ◈) with canvas element that fetches rendered PNG frames from `/api/swift-metal/render`.
-- **Version.swift** — `pluginVersion = "0.1.0"`.
+- **Version.swift** — `pluginVersion = "0.3.0"`.
 - **Makefile** — `swift build -c release`, install to `~/.qntx/plugins/`.
 - **Root Makefile** — `swift-metal-plugin` target with version-gate checking `.swift` files against `Version.swift`.
 
-The scaffold does **not** compile yet — it references `Protocol_*` generated types that require running `protoc` with the swift plugin against `plugin/grpc/protocol/domain.proto`. That protobuf generation step is the first real work.
+Proto types are generated at build time via grpc-swift SPM build plugin from symlinked proto files (`plugin/grpc/protocol/*.proto`). Plugin compiles, starts, announces port, renders 128k-particle nebula on the GPU.
 
 ---
 
@@ -133,21 +135,17 @@ What is the first thing you'd want to see in this space that you currently canno
 
 grpc-swift v2 with SPM build plugin. Proto types generated at build time from `domain.proto` and `llm.proto`. Plugin compiles, starts, announces port, serves gRPC. Version 0.2.0.
 
-### Step 2: Widen the C++ aperture
+### Step 2: Widen the C++ aperture *(done)*
 
-Extend `capture_signal()` in `inference.cpp` to keep the full softmax distribution instead of discarding after top-10 extraction. Add `repeated float full_distribution = 5` to `TokenSignalProto` in `llm.proto`. The Go streaming adapter passes the full distribution through to WebSocket `llm_stream` messages.
+`capture_signal()` keeps full softmax distribution (128k floats for Llama 3.2) in `signal.full_distribution`, streamed via gRPC `StreamChat`. Stripped from WebSocket broadcast (1.3GB IndexedDB accumulation crashed the browser).
 
-Separately: at model load, project the token embedding matrix (`token_embd.weight`) to 3D via PCA. Serve the 32k × 3 float positions via `GET /api/llama-cpp/vocab-positions` (one-shot, cached).
+PCA projection of `model_->tok_embd` to 3D via Accelerate BLAS in `vocab_projection.cpp`. Accesses private header `llama-model.h`, dequantizes via `ggml_get_type_traits`. Covariance via `cblas_sgemm`, top 3 eigenvectors via power iteration + deflation. Computed once at model load, served as binary float32 at `GET /api/llama-cpp/vocab-positions`.
 
-**Done when:** a `StreamChat` gRPC response carries 32k floats per token in `signal.full_distribution`, and `/api/llama-cpp/vocab-positions` returns 32k projected 3D positions.
+### Step 3: Particle field — static frame *(done)*
 
-### Step 3: Particle field — static frame
+MSL compute kernel: probability + 3D position → particle (amber color ramp, log-scaled size, visibility threshold 1e-5). Vertex shader: orthographic MVP. Fragment shader: soft circle point sprite. Additive blending on rgba16Float, Reinhard tonemap to sRGB PNG.
 
-Write the MSL shaders: a compute shader that reads 32k probabilities + 32k × 3 positions from `MTLBuffer`s and outputs a vertex buffer (position, color, size per particle). A vertex/fragment shader that renders point sprites with soft circular falloff and additive blending. A bloom post-process pass on the framebuffer.
-
-Feed a hardcoded test distribution (one hot, uniform, bimodal) to verify rendering. No streaming yet — just prove that 32k particles render correctly at 60fps with bloom.
-
-**Done when:** `POST /render` with a test payload returns a PNG showing a luminous cloud of particles against a dark background. Bright region corresponds to high-probability tokens, rest is dark.
+Shader source embedded as Swift string, compiled at runtime (`device.makeLibrary(source:)`) — SPM does not compile `.metal` into a metallib. Tested with 128,256 particles, bimodal distribution, random positions. `POST /render` returns 800×600 PNG.
 
 ### Step 4: Live streaming
 
