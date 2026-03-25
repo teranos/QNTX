@@ -249,6 +249,35 @@ export interface LLMStreamMessage {
    * Error message if streaming failed
    */
   error?: string;
+  /**
+   * Per-token signal data
+   */
+  signal?: LLMTokenSignal | null;
+}
+
+export interface LLMTokenCandidate {
+  id: number;
+  text: string;
+  prob: number;
+}
+
+export interface LLMTokenSignal {
+  /**
+   * P(chosen) from raw distribution
+   */
+  confidence: number;
+  /**
+   * Shannon entropy in bits
+   */
+  entropy: number;
+  /**
+   * P(top1) - P(top2)
+   */
+  top_gap: number;
+  /**
+   * Top-k candidates
+   */
+  top_k?: LLMTokenCandidate[];
 }
 
 export interface ListExecutionsResponse {

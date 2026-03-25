@@ -22,4 +22,25 @@ type StreamChunk struct {
 	Content string
 	Done    bool
 	Error   error
+	Signal  *TokenSignal // Per-token signal data (nil if unavailable)
+	// Final chunk fields
+	Model            string
+	PromptTokens     int
+	CompletionTokens int
+	TotalTokens      int
+}
+
+// TokenSignal carries per-token inference signal data
+type TokenSignal struct {
+	Confidence float32
+	Entropy    float32
+	TopGap     float32
+	TopK       []TokenCandidate
+}
+
+// TokenCandidate is a candidate token from the top-k distribution
+type TokenCandidate struct {
+	ID   int32
+	Text string
+	Prob float32
 }

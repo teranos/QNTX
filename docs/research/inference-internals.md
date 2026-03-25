@@ -70,6 +70,35 @@ These compose in a chain. Order matters — penalties before temperature before 
 - **Hidden states per layer** — same, would need ggml tensor hooks
 - **Logit lens** (per-layer vocabulary projections) — requires intermediate hidden states
 
+## C++ Ecosystem
+
+The C++ ecosystem around llama.cpp is thin because llama.cpp itself absorbed most functionality. External libraries are only worth adopting where llama.cpp has genuine gaps.
+
+### Already in llama.cpp (unused by this plugin)
+
+**Custom sampler vtable (`llama_sampler_i`).** Implement `apply` and `accept` function pointers to create a sampler that sits in the chain. This is the idiomatic way to instrument the inference loop — rather than reading logits as a side effect before/after sampling, the signal computation becomes a sampler that observes the logit array as it flows through the chain.
+
+**GBNF grammar-constrained decoding (`llama_sampler_init_grammar`).** Enforce output structure — JSON, code, any BNF-expressible grammar. Already in `llama.h`.
+
+**JSON Schema to GBNF (`common/json-schema-to-grammar.h`).** Converts a JSON Schema to a GBNF grammar automatically. In llama.cpp's `common/` library.
+
+**Speculative decoding (`common/speculative.h`).** Draft model proposes tokens, main model verifies. Relevant if token tree visualization moves from "show alternatives" to "actually explore branches."
+
+**Minja template engine (`common/minja/`).** Jinja2-compatible chat template rendering. Handles ChatML, Llama, Mistral formats. The plugin currently uses `llama_model_chat_template` + `llama_chat_apply_template` which is simpler but less flexible.
+
+### External libraries worth considering
+
+**llguidance (Microsoft).** Rust library with C API for advanced constrained generation. Computes a token bitmask over the vocabulary at each step to enforce constraints. More powerful than GBNF for complex schemas. llama.cpp has initial integration. GitHub: `microsoft/llguidance`.
+
+**outlines-core (dottxt).** Rust core with C FFI. FSM-based token masking for JSON schema and regex patterns. Competes with llguidance for the same niche. GitHub: `dottxt-ai/outlines-core`.
+
+**usearch or hnswlib.** Header-only C++ approximate nearest neighbor search. Relevant if embedding similarity moves inside the plugin rather than staying in the Go layer. usearch: `unum-cloud/usearch`, hnswlib: `nmslib/hnswlib`.
+
+### Ecosystem gaps (no solution exists)
+
+- No C++ library for capturing attention weights or hidden states from llama.cpp — requires patching ggml internals
+- No standalone logit signal computation library — straightforward math on a float array, everyone writes it inline
+
 ## Visualization Ideas
 
 ### Tier 1: High feasibility, high impact
@@ -104,13 +133,13 @@ Per generation step: chosen token (~20 bytes) + top-10 probabilities (~200 bytes
 
 ## Implementation Path
 
-The natural transport is the plugin's `HandleWebSocket` endpoint (currently `UNIMPLEMENTED` in plugin.cpp). Per-token metadata streams alongside generated text.
+Transport is gRPC server streaming (`StreamChat` RPC). The Go layer adapts the gRPC stream to WebSocket `llm_stream` messages with per-token signal data.
 
-**Step 1 — Extract.** After each `llama_decode()` in the sampling loop, call `llama_get_logits_ith(ctx_, -1)`. Softmax, take top-k, compute entropy. Extend `ChatResult` to carry per-token metadata.
+**Step 1 — Extract.** *(done)* After each `llama_decode()`, `capture_signal()` reads raw logits, softmax, partial-sorts top-10, computes entropy/confidence/top-gap. `stream_chat()` calls a per-token callback with `TokenSignal`.
 
-**Step 2 — Stream.** Implement `HandleWebSocket` or extend the gRPC `LLMChatResponse` to carry per-token signal data. ~230 bytes/step is negligible.
+**Step 2 — Stream.** *(done)* gRPC `StreamChat` RPC sends `LLMChatChunk` per token with `TokenSignalProto`. Go side: `LLMServer.StreamChatClient()` → `GRPCLLMClient.ChatStreaming()` → `prompt_handlers.go` broadcasts `llm_stream` WebSocket messages.
 
-**Step 3 — Confidence heatmap.** Lowest UI effort, highest density. Each token in the output becomes a colored `<span>`. No chart library, no extra panel.
+**Step 3 — Confidence heatmap.** *(done)* Stream glyph (`stream-glyph.ts`) renders each token as a `<span>` with `background-color` mapped from confidence via `confidenceToColor()` — linear HSL interpolation, amber glow at low confidence, transparent at high. Multiplexer pattern: one WebSocket handler routes `llm_stream` messages to many glyph instances by `job_id`. Follow-ups from a stream glyph spawn a new stream glyph with live heatmap (spawn-before-fetch pattern). Token data persists to canvas state across page refresh. Shared follow-up infrastructure (`glyph-followup.ts`) between result and stream glyphs.
 
 **Step 4 — Top-K popup.** Hover/click interaction on heatmapped tokens. Shows the decision space at that position.
 
@@ -142,15 +171,16 @@ Could LLM embeddings plug into the same HDBSCAN/UMAP infra? Technically yes — 
 
 ### Infrastructure
 
-- [ ] Extract top-k logits after each `llama_decode()` in the sampling loop
-- [ ] Compute softmax, entropy, confidence, top-gap per token in C++
-- [ ] Extend `ChatResult` to carry per-token metadata
-- [ ] Implement streaming transport (WebSocket via `HandleWebSocket` or extended gRPC)
+- [x] Extract top-k logits after each `llama_decode()` in the sampling loop — `capture_signal()` in inference.cpp
+- [x] Compute softmax, entropy, confidence, top-gap per token in C++ — same function, top-10 candidates
+- [x] Extend `ChatResult` to carry per-token metadata — `TokenSignal` struct, `signals` vector
+- [x] Implement streaming transport — gRPC `StreamChat` RPC with `LLMChatChunk` + `TokenSignalProto`
+- [x] Go streaming adapter — `GRPCLLMClient.ChatStreaming()` → WebSocket `llm_stream` broadcast
 - [ ] Dump full vocabulary to frontend at model load
 
 ### Tier 1 Visualizations
 
-- [ ] Confidence heatmap — color token spans by P(chosen) or entropy
+- [x] Confidence heatmap — color token spans by P(chosen) or entropy
 - [ ] Top-K alternatives popup — hover/click a token to see candidates + probability bars
 - [ ] Entropy sparkline — rolling SVG line chart of entropy per token position
 - [ ] Runner-up ghost trail — inline muted annotation of second-place tokens
@@ -178,3 +208,7 @@ Could LLM embeddings plug into the same HDBSCAN/UMAP infra? Technically yes — 
 - [ ] Port D prototype signal computation (entropy spikes, low-confidence spans) to C++
 - [ ] Write per-generation attestations with signal attributes to ATS
 - [ ] Connect live visualizations to the same signal data that feeds attestations
+
+## Future Direction: Token-as-Glyph
+
+Each LLM token carries signal data (confidence, entropy, top-gap, top-k candidates). The stream glyph currently renders tokens as `<span>` elements with signal data stored in `data-*` attributes. The signal data structure already supports treating every token as its own glyph entity — a token-glyph carrying its full decision context as content, positioned in a text flow rather than on the canvas grid. This isn't for now: the `<span>` representation is sufficient for heatmap visualization and hover popups. But the data contract (per-token signal in `LLMStreamMessage`) is designed so that the transition from span-per-token to glyph-per-token requires no backend changes.
