@@ -101,7 +101,7 @@
         qntx-python-clippy = pkgs.rustPlatform.buildRustPackage {
           pname = "qntx-python-clippy";
           version = self.rev or "dev";
-          src = ../.;
+          src = ../../.;
 
           cargoLock = {
             lockFile = ./../../Cargo.lock;
