@@ -9,6 +9,11 @@
  * stream glyph instances by job_id.
  *
  * Persists token data to canvas state so content survives page refresh.
+ *
+ * TODO: Token hover/click popup showing signal data (entropy, top_gap, top-k candidates) — data is on each span already
+ * TODO: Copy button (result glyph has one, stream glyph doesn't)
+ * TODO: Factor entropy and top_gap into color mapping, not just confidence
+ * TODO: Window morph support (separate PR)
  */
 
 import type { Glyph } from './glyph';

@@ -139,7 +139,7 @@ Transport is gRPC server streaming (`StreamChat` RPC). The Go layer adapts the g
 
 **Step 2 — Stream.** *(done)* gRPC `StreamChat` RPC sends `LLMChatChunk` per token with `TokenSignalProto`. Go side: `LLMServer.StreamChatClient()` → `GRPCLLMClient.ChatStreaming()` → `prompt_handlers.go` broadcasts `llm_stream` WebSocket messages.
 
-**Step 3 — Confidence heatmap.** Frontend receives `llm_stream` messages, renders each token as a `<span>` with `background-color` mapped from confidence/entropy. No chart library, no extra panel.
+**Step 3 — Confidence heatmap.** *(done)* Stream glyph (`stream-glyph.ts`) renders each token as a `<span>` with `background-color` mapped from confidence via `confidenceToColor()` — linear HSL interpolation, amber glow at low confidence, transparent at high. Multiplexer pattern: one WebSocket handler routes `llm_stream` messages to many glyph instances by `job_id`. Follow-ups from a stream glyph spawn a new stream glyph with live heatmap (spawn-before-fetch pattern). Token data persists to canvas state across page refresh. Shared follow-up infrastructure (`glyph-followup.ts`) between result and stream glyphs.
 
 **Step 4 — Top-K popup.** Hover/click interaction on heatmapped tokens. Shows the decision space at that position.
 
