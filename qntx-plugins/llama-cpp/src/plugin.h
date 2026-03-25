@@ -69,7 +69,12 @@ public:
 
     std::string model_name() const { return model_name_; }
 
+    // Get vocab token positions projected to 3D via PCA.
+    // Computed once at model load, cached. Returns vocab_size × 3 floats.
+    const std::vector<float>& vocab_positions_3d();
+
 private:
+    void compute_vocab_positions();
     int prepare_prompt(const std::string& system_prompt,
                        const std::string& user_prompt,
                        ChatResult& result);
@@ -79,6 +84,7 @@ private:
     std::string model_name_;
     bool backend_initialized_ = false;
     std::mutex mutex_;
+    std::vector<float> vocab_positions_;  // cached 3D positions (n_vocab × 3)
 };
 
 // DomainPluginService implementation
