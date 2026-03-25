@@ -326,6 +326,11 @@ llama-cpp-plugin: ## Build, install, and restart llama-cpp plugin (C++ local LLM
 	@$(MAKE) -C qntx-plugins/llama-cpp install PREFIX=$(PREFIX)
 	$(call restart-plugin,llama-cpp)
 
+swift-metal-plugin: ## Build, install, and restart swift-metal plugin (Swift + Metal visualization)
+	$(call check-plugin-version,qntx-plugins/swift-metal,swift,qntx-plugins/swift-metal/Sources/SwiftMetalPlugin/Version.swift)
+	@$(MAKE) -C qntx-plugins/swift-metal install PREFIX=$(PREFIX)
+	$(call restart-plugin,swift-metal)
+
 
 rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO integration)
 	@echo "Building Rust SQLite storage library..."
