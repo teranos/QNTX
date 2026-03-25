@@ -77,6 +77,35 @@ func (s *LLMServer) Chat(ctx context.Context, req *protocol.LLMChatRequest) (*pr
 	return resp, nil
 }
 
+// StreamChatClient routes a streaming LLM request to the appropriate provider plugin.
+// Returns a client-side stream of LLMChatChunk messages (one per token).
+// Named StreamChatClient to avoid conflicting with the server-side StreamChat interface.
+func (s *LLMServer) StreamChatClient(ctx context.Context, req *protocol.LLMChatRequest) (protocol.LLMService_StreamChatClient, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if len(s.providers) == 0 {
+		return nil, errors.New("no LLM providers registered")
+	}
+
+	providerName := req.Provider
+	if providerName == "" {
+		providerName = s.defaultProvider
+	}
+
+	client, ok := s.providers[providerName]
+	if !ok {
+		return nil, errors.Newf("LLM provider %q not found (available: %v)", providerName, s.providerNames())
+	}
+
+	stream, err := client.StreamChat(ctx, req)
+	if err != nil {
+		return nil, errors.Wrapf(err, "LLM stream chat via provider %s failed", providerName)
+	}
+
+	return stream, nil
+}
+
 // providerNames returns registered provider names (must be called with lock held).
 func (s *LLMServer) providerNames() []string {
 	names := make([]string, 0, len(s.providers))

@@ -6,21 +6,25 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap/zaptest"
 	"google.golang.org/grpc"
 )
 
-// stubDomainClient implements protocol.DomainPluginServiceClient for testing.
-// Only Chat is wired; other methods panic.
-type stubDomainClient struct {
-	protocol.DomainPluginServiceClient // embed to satisfy interface
-	chatResp                           *protocol.LLMChatResponse
-	chatErr                            error
+// stubLLMClient implements protocol.LLMServiceClient for testing.
+// Only Chat is wired; StreamChat returns unimplemented.
+type stubLLMClient struct {
+	chatResp *protocol.LLMChatResponse
+	chatErr  error
 }
 
-func (s *stubDomainClient) Chat(ctx context.Context, in *protocol.LLMChatRequest, opts ...grpc.CallOption) (*protocol.LLMChatResponse, error) {
+func (s *stubLLMClient) Chat(ctx context.Context, in *protocol.LLMChatRequest, opts ...grpc.CallOption) (*protocol.LLMChatResponse, error) {
 	return s.chatResp, s.chatErr
+}
+
+func (s *stubLLMClient) StreamChat(ctx context.Context, in *protocol.LLMChatRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[protocol.LLMChatChunk], error) {
+	return nil, errors.New("StreamChat not implemented in test stub")
 }
 
 func TestLLMServer_NoProviders(t *testing.T) {
@@ -38,7 +42,7 @@ func TestLLMServer_DefaultProvider(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	srv := NewLLMServer(logger)
 
-	stub := &stubDomainClient{
+	stub := &stubLLMClient{
 		chatResp: &protocol.LLMChatResponse{
 			Content:     "world",
 			Model:       "test-model",
@@ -61,10 +65,10 @@ func TestLLMServer_ExplicitProvider(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	srv := NewLLMServer(logger)
 
-	stubA := &stubDomainClient{
+	stubA := &stubLLMClient{
 		chatResp: &protocol.LLMChatResponse{Content: "from-a"},
 	}
-	stubB := &stubDomainClient{
+	stubB := &stubLLMClient{
 		chatResp: &protocol.LLMChatResponse{Content: "from-b"},
 	}
 
@@ -91,7 +95,7 @@ func TestLLMServer_UnknownProvider(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	srv := NewLLMServer(logger)
 
-	stub := &stubDomainClient{
+	stub := &stubLLMClient{
 		chatResp: &protocol.LLMChatResponse{Content: "ok"},
 	}
 	srv.RegisterProvider("openrouter", stub)
@@ -109,10 +113,10 @@ func TestLLMServer_FirstRegisteredIsDefault(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	srv := NewLLMServer(logger)
 
-	srv.RegisterProvider("first", &stubDomainClient{
+	srv.RegisterProvider("first", &stubLLMClient{
 		chatResp: &protocol.LLMChatResponse{Content: "first"},
 	})
-	srv.RegisterProvider("second", &stubDomainClient{
+	srv.RegisterProvider("second", &stubLLMClient{
 		chatResp: &protocol.LLMChatResponse{Content: "second"},
 	})
 

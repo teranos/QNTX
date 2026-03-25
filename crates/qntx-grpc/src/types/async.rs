@@ -2,8 +2,8 @@
 // Regenerate with: make types
 // TODO: Migrate to proto generation
 // Source package: async
-// Source last modified: 2026-03-24T15:33:18+01:00
-// Source version: 8e9c4ae2
+// Source last modified: 2026-03-24T23:05:21+01:00
+// Source version: 9c711bc8
 
 //! # async module
 //!

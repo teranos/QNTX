@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	LLMService_Chat_FullMethodName = "/protocol.LLMService/Chat"
+	LLMService_Chat_FullMethodName       = "/protocol.LLMService/Chat"
+	LLMService_StreamChat_FullMethodName = "/protocol.LLMService/StreamChat"
 )
 
 // LLMServiceClient is the client API for LLMService service.
@@ -31,6 +32,7 @@ const (
 // Core routes requests to the appropriate provider.
 type LLMServiceClient interface {
 	Chat(ctx context.Context, in *LLMChatRequest, opts ...grpc.CallOption) (*LLMChatResponse, error)
+	StreamChat(ctx context.Context, in *LLMChatRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[LLMChatChunk], error)
 }
 
 type lLMServiceClient struct {
@@ -51,6 +53,25 @@ func (c *lLMServiceClient) Chat(ctx context.Context, in *LLMChatRequest, opts ..
 	return out, nil
 }
 
+func (c *lLMServiceClient) StreamChat(ctx context.Context, in *LLMChatRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[LLMChatChunk], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &LLMService_ServiceDesc.Streams[0], LLMService_StreamChat_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[LLMChatRequest, LLMChatChunk]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type LLMService_StreamChatClient = grpc.ServerStreamingClient[LLMChatChunk]
+
 // LLMServiceServer is the server API for LLMService service.
 // All implementations must embed UnimplementedLLMServiceServer
 // for forward compatibility.
@@ -60,6 +81,7 @@ func (c *lLMServiceClient) Chat(ctx context.Context, in *LLMChatRequest, opts ..
 // Core routes requests to the appropriate provider.
 type LLMServiceServer interface {
 	Chat(context.Context, *LLMChatRequest) (*LLMChatResponse, error)
+	StreamChat(*LLMChatRequest, grpc.ServerStreamingServer[LLMChatChunk]) error
 	mustEmbedUnimplementedLLMServiceServer()
 }
 
@@ -72,6 +94,9 @@ type UnimplementedLLMServiceServer struct{}
 
 func (UnimplementedLLMServiceServer) Chat(context.Context, *LLMChatRequest) (*LLMChatResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Chat not implemented")
+}
+func (UnimplementedLLMServiceServer) StreamChat(*LLMChatRequest, grpc.ServerStreamingServer[LLMChatChunk]) error {
+	return status.Error(codes.Unimplemented, "method StreamChat not implemented")
 }
 func (UnimplementedLLMServiceServer) mustEmbedUnimplementedLLMServiceServer() {}
 func (UnimplementedLLMServiceServer) testEmbeddedByValue()                    {}
@@ -112,6 +137,17 @@ func _LLMService_Chat_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _LLMService_StreamChat_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(LLMChatRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(LLMServiceServer).StreamChat(m, &grpc.GenericServerStream[LLMChatRequest, LLMChatChunk]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type LLMService_StreamChatServer = grpc.ServerStreamingServer[LLMChatChunk]
+
 // LLMService_ServiceDesc is the grpc.ServiceDesc for LLMService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -124,6 +160,12 @@ var LLMService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _LLMService_Chat_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StreamChat",
+			Handler:       _LLMService_StreamChat_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "plugin/grpc/protocol/llm.proto",
 }

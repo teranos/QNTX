@@ -1,19 +1,38 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #include <grpcpp/grpcpp.h>
 
 #include "domain.grpc.pb.h"
 #include "llm.grpc.pb.h"
 
-#define PLUGIN_VERSION "0.5.0"
+#define PLUGIN_VERSION "0.6.0"
 
 // Forward declaration
 struct llama_model;
 struct llama_context;
+
+// A candidate token and its probability from the pre-sampler logit distribution
+struct TokenCandidate {
+    int id;
+    std::string text;
+    float prob;
+};
+
+// Per-token signal captured before sampling
+struct TokenSignal {
+    int token_id;
+    std::string token_text;
+    float confidence;                      // P(chosen) from raw distribution
+    float entropy;                         // Shannon entropy in bits
+    float top_gap;                         // P(top1) - P(top2)
+    std::vector<TokenCandidate> top_k;     // top-k candidates with probabilities
+};
 
 // Inference engine wrapping llama.cpp
 class InferenceEngine {
@@ -29,6 +48,7 @@ public:
         std::string content;
         int prompt_tokens;
         int completion_tokens;
+        std::vector<TokenSignal> signals;
     };
 
     ChatResult chat(const std::string& system_prompt,
@@ -36,9 +56,22 @@ public:
                     float temperature,
                     int max_tokens);
 
+    // Callback receives token text + signal per step. Return false to abort.
+    using TokenCallback = std::function<bool(const std::string& token_text, const TokenSignal& signal)>;
+
+    // Streaming chat — calls on_token for each generated token
+    ChatResult stream_chat(const std::string& system_prompt,
+                           const std::string& user_prompt,
+                           float temperature,
+                           int max_tokens,
+                           TokenCallback on_token);
+
     std::string model_name() const { return model_name_; }
 
 private:
+    int prepare_prompt(const std::string& system_prompt,
+                       const std::string& user_prompt,
+                       ChatResult& result);
     llama_model* model_ = nullptr;
     llama_context* ctx_ = nullptr;
     std::string model_path_;
@@ -106,6 +139,10 @@ public:
     grpc::Status Chat(grpc::ServerContext* ctx,
                       const protocol::LLMChatRequest* req,
                       protocol::LLMChatResponse* resp) override;
+
+    grpc::Status StreamChat(grpc::ServerContext* ctx,
+                            const protocol::LLMChatRequest* req,
+                            grpc::ServerWriter<protocol::LLMChatChunk>* writer) override;
 
 private:
     LlamaCppPlugin* plugin_;

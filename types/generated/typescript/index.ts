@@ -64,6 +64,8 @@ export type {
   JobStagesResponse,
   JobUpdateMessage,
   LLMStreamMessage,
+  LLMTokenCandidate,
+  LLMTokenSignal,
   ListExecutionsResponse,
   ListScheduledJobsResponse,
   ParsedATSCode,
