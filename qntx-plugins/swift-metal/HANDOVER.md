@@ -109,26 +109,27 @@ Is the goal to navigate what was already computed, or to ask the model "what wou
 
 ---
 
-### Q3: Is this for understanding or for steering?
+### Q3: Where is the boundary between swift-metal and the stream glyph?
 
-Visualising model internals can serve two different purposes:
+This is a real-time system for both understanding and steering — microscope and control surface at once. The inference research document (`docs/research/inference-internals.md`) already describes this convergence: the bias glyph (#718) is steering, the confidence heatmap is understanding, the sampling chain controls are both, and they all feed from the same `TokenSignal` data path. The research document's "token-as-glyph" vision takes this further — each token becomes a glyph entity carrying its full decision context, positioned in text flow rather than on the canvas grid.
 
-- **Understanding:** See what the model is doing, build intuition, debug behaviour. The user watches. The visualization is a microscope.
-- **Steering:** Intervene in the generation process. Boost or suppress tokens, adjust temperature mid-stream, apply bias weights at specific positions. The user acts. The visualization is a control surface.
+The data flow is bidirectional: llama-cpp → swift-metal (signals for visualization) and swift-metal → llama-cpp (bias weights, sampler chain adjustments, branch selection). The research document already defines the infrastructure for both directions — `StreamChat` gRPC for signals out, the sampler vtable (`llama_sampler_i`) for intervention in.
 
-llama-cpp already has a bias glyph concept (fuzzy vocabulary search, selected tokens with bias weights). If swift-metal is a control surface, it needs to send commands back to llama-cpp during inference — not just receive signals. That changes the data flow from one-way (llama-cpp → swift-metal) to bidirectional (llama-cpp ↔ swift-metal).
+But the stream glyph (`stream-glyph.ts`) already renders confidence heatmaps, already receives `llm_stream` WebSocket messages, already persists token data to canvas state. Steps 3-5 of the research document's implementation path (confidence heatmap, top-K popup, entropy sparkline) are DOM-based visualizations that live in the stream glyph today.
+
+So what does swift-metal own vs what does the stream glyph keep? The research document's checklist has items at every level — from CSS heatmaps (stream glyph territory) to token trees (Metal territory) to sampling chain UI (could be either). If swift-metal renders the same tokens the stream glyph already renders but on the GPU, there are two competing views of the same data.
+
+Is the ◈ glyph a replacement for the stream glyph (one view to rule them all, GPU-rendered), or a companion (stream glyph shows text with heatmap coloring, ◈ glyph shows the deeper structure — trees, trajectories, sampler state — that the DOM cannot handle)?
 
 ---
 
-### Q4: One visualization or a visualization framework?
+### Q4: What makes a token "interesting"?
 
-The implementation steps below deliver one specific end-to-end vertical. But the scaffold is a plugin — it could register multiple glyph types, each rendering a different aspect of the model:
+The research document describes entropy spikes, low-confidence spans, and runner-up ghost trails as signal patterns worth surfacing. These are statistical thresholds — entropy above X bits, confidence below Y, top-gap below Z.
 
-- ◈ for the token probability tree
-- A different glyph for attention pattern heatmaps
-- Another for embedding-space trajectories
+But in a real-time system where you can both observe and steer, "interesting" might not be a static threshold. A token where the model was perfectly confident (P=0.99) might still be interesting if it's wrong. A low-entropy token might be boring if the model always picks the same filler word there.
 
-Should the first vertical be built as a standalone visualization, or should it be structured from the start as the first renderer in a framework that expects more? The difference is whether `MetalRenderer` is a monolith or a protocol that multiple visualization types implement.
+When you're watching inference happen live and considering whether to step back and take a different path — what draws your attention to a specific token? Is it the numbers (confidence, entropy), the semantics (what the token means in context), the alternatives (what else could have been there), or something else entirely? This determines what swift-metal highlights, what it dims, and what it lets you ignore.
 
 ---
 
