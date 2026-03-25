@@ -36,62 +36,57 @@ For now, Metal is the right call — the llama-cpp plugin already uses Metal acc
 
 ---
 
-## What llama-cpp captures today
+## The per-token window
 
-`capture_signal()` in `inference.cpp` runs once per token, immediately before sampling. It calls `llama_get_logits_ith(ctx, -1)` to get the raw logit array, applies softmax manually, then extracts:
+The inference loop in `stream_chat()` (`inference.cpp:278-301`) runs this sequence for every token:
 
-- **Confidence** — P(top candidate) from the softmax distribution
-- **Top-gap** — P(top1) - P(top2), the margin of decisiveness
-- **Entropy** — Shannon entropy in bits over the top-K candidates
-- **Top-10 candidates** — token ID, text (`llama_token_to_piece`), probability
+```
+llama_decode(ctx_, batch)     ← GPU forward pass (~20-100ms), fills logit buffer
+capture_signal(ctx_, vocab)   ← read logits, softmax, top-10, entropy (~0.1ms)
+llama_sampler_sample(sampler) ← sampler chain picks a token (~0.01ms)
+on_token(text, signal)        ← stream to gRPC → WebSocket → UI
+llama_decode(ctx_, next)      ← next token's forward pass begins
+```
 
-These are post-softmax observations of the **output layer only**. The sampler chain (temperature, top-p, repetition penalty) then runs as a black box — the final selected token is returned, but why alternatives were rejected is not recorded.
+Between `llama_decode` completing and `llama_sampler_sample` choosing, the full model state is available. `capture_signal` currently extracts **230 bytes** from a dataset that is **130KB+** per token. The rest is discarded.
 
-## What llama-cpp could capture but doesn't
+What exists in that window:
 
-Three tiers, ordered by what they cost on the C++ side:
+| Data | Size per token | Currently captured | Access cost |
+|------|---------------|-------------------|-------------|
+| Full probability distribution (32k+ floats after softmax) | ~128 KB | Top-10 only (200 bytes) | Zero — already computed as local var `probs`, discarded after partial sort |
+| Hidden state embedding | ~16 KB (4096 floats) | None | Zero — `llama_get_embeddings(ctx)` is a pointer dereference |
+| Sampler chain stage-by-stage transformations | ~128 KB × N stages | None | Custom `llama_sampler_i` observer between each stage |
+| Temperature sensitivity (softmax at 5 temperatures) | ~640 KB (5 × 128 KB) | None | ~0.5ms (5 extra softmax passes) |
+| Token metadata (frequency, flags per candidate) | ~40 bytes per candidate | None | Zero — `llama_token_get_score` / `get_attr` are O(1) lookups |
+| Context window fill level | 12 bytes | None | Zero — `llama_get_seq_pos(ctx, -1)` |
 
-### Tier 1: Free — data exists, just needs storage
+**The natural frame budget for visualization is the next `llama_decode` call.** While the GPU runs the forward pass for token N+1 (20-100ms), swift-metal has that time to render the full signal data from token N. At 10 tokens/sec, that's 100ms per frame — well above 60fps budget.
 
-These require small additions to `capture_signal()` and the `TokenSignal` struct. No new llama.cpp API calls, no performance impact.
+**Data throughput at full extraction:** ~130 KB/token × 10 tokens/sec = **1.3 MB/s**. Trivially streamable over gRPC. A Metal compute shader processes 32k floats in one dispatch (~0.02ms).
 
-| Signal | What it shows | C++ change |
-|--------|--------------|------------|
-| **Full logit distribution** | Probability of all 32k+ tokens, not just top-10. See the long tail — how many tokens were "almost picked." | Store the full softmax vector (already computed as a local var in `capture_signal`, currently discarded after top-10 extraction). |
-| **Sampler rejection history** | Which tokens were killed by temperature, top-p, repetition penalty, and at which stage. Why was token X not selected? | Add a custom `llama_sampler_i` that logs before/after state at each chain stage. The sampler vtable API exists for this. |
-| **Temperature sensitivity** | How much did temperature change the distribution? At temp=0.1 the top token gets 99%; at temp=2.0 it gets 5%. | Run softmax twice — once at temp=1.0 (already done), once at actual temperature. Compare P(top1) before and after. |
-| **Token metadata** | Frequency score, special/control/byte token flags per candidate. "Is the model picking a rare token?" | `llama_token_get_score(vocab, id)` and `llama_token_get_attr(vocab, id)` — O(1) lookups, already in the vocab. |
-| **Context window usage** | How full is the KV cache? Tokens used vs available. Speed degrades as context fills. | `llama_get_seq_pos(ctx, -1)` / configured `n_ctx`. Three integers per token. |
+The bottleneck is not what data exists or how fast it can be rendered. The bottleneck is that `capture_signal` was built to feed a DOM-based heatmap that only needs 230 bytes. swift-metal needs the full 130KB+ because it can actually render it.
 
-### Tier 2: Moderate — data exists in GPU memory, needs extraction
+### What requires llama.cpp patches (Tier 3 — defer)
 
-These require reading state that llama.cpp computes during `llama_decode()` but doesn't surface by default.
+`llama_decode()` itself is opaque. The forward pass through 32 transformer layers happens inside it. Per-layer predictions (logit lens), attention weights, and intermediate activations are not observable without hooking into ggml's graph execution. These require forking llama.cpp.
 
-| Signal | What it shows | C++ change |
-|--------|--------------|------------|
-| **Embeddings (hidden state)** | The model's 4096-dim internal representation at each token position. The "understanding state" — where the model is in semantic space. | `llama_get_embeddings(ctx)` returns a `float*` to the hidden state. Copy 4096 floats per token. Free compute (pointer dereference), but 2 MB storage per 512-token generation. Needs UMAP/PCA to visualise (qntx-reduce already does this). |
-| **Multi-token batching** | Decode top-3 candidates in parallel instead of just the chosen one. See what the model would say next for each branch — actual alternative continuations, not just probabilities. | `llama_batch_add()` supports multi-sequence decoding. Add 2 extra sequences per step. 3x compute cost per token, but GPU-parallel. Requires KV cache management for branch isolation. |
-
-### Tier 3: Expensive — requires llama.cpp fork
-
-These need internal access that no public API provides. They require patching ggml tensor execution or hooking into the inference graph.
-
-| Signal | What it shows | C++ change |
-|--------|--------------|------------|
-| **Per-layer logits (logit lens)** | What the model "would predict" at each transformer layer. See when the model commits to a token — does it know at layer 2 or only at layer 31? | Project each layer's hidden state through the unembedding matrix. No public API — requires custom ggml graph hooks. ~32x compute overhead (one unembedding per layer). |
-| **Attention weights** | Which prior tokens each attention head reads from when predicting the current token. The classic "what is the model looking at?" | Fully internal to ggml. Shape per token: `n_layer × n_head × seq_len` — at 32 layers, 32 heads, 2048 context: 4 GB per token position. Must downsample (top-5 attended positions per head). |
+| Signal | What it shows | Blocker |
+|--------|--------------|---------|
+| **Per-layer logits (logit lens)** | What the model "would predict" at each transformer layer. When does it commit — layer 2 or layer 31? | No public API for intermediate hidden states. ~32x compute overhead. |
+| **Attention weights** | Which prior tokens each attention head reads from. | Internal to ggml. 4 GB per token position at full resolution. Must downsample. |
 
 ---
 
 ## Open questions
 
-### Q1: Where on the depth spectrum should we start?
+### Q1: What should the first full-extraction signal look like?
 
-Tier 1 signals are free and illuminate the sampling process — why this token and not that one. Tier 2 signals (embeddings, branch exploration) reveal the model's semantic trajectory and alternative futures. Tier 3 signals (logit lens, attention) show the internal mechanics of the transformer itself.
+`capture_signal` currently discards 99.8% of the available data per token. The first swift-metal vertical needs to widen that aperture — but how far, and in what shape?
 
-The visualization architecture differs at each tier. Tier 1 data is small and per-token (heatmaps, bar charts, waterfall diagrams). Tier 2 data is high-dimensional and requires projection (scatter plots, trajectory lines, tree graphs). Tier 3 data is volumetric and layered (3D grids, attention matrices).
+The full probability distribution (32k floats) is the most obvious target: it's already computed, costs nothing to keep, and gives swift-metal a 32k-element landscape to render that the DOM never could. But embeddings (4096 floats from `llama_get_embeddings`) tell a different story — not what the model is choosing but where it is in semantic space. And sampler chain observations (distribution before/after each stage) reveal why alternatives were rejected.
 
-Should swift-metal start with Tier 1 (rich sampling visualization with the data that's nearly free to capture), or jump straight to Tier 2 (embeddings + branching, which is where the "stepping back through tokens" vision lives)?
+These aren't mutually exclusive — total per-token payload at full extraction is ~1.3 MB/s, well within budget. But what swift-metal renders first determines which extraction gets built first on the C++ side.
 
 ---
 
@@ -103,7 +98,7 @@ You mentioned stepping back through tokens and selecting different paths. This c
 - **Active branching:** Click on an alternative token at position N, and the model re-runs inference from that point forward. This is speculative decoding in reverse — "what if the model had said X instead?" Requires llama-cpp to support re-inference from a saved KV cache state via multi-token batching.
 - **Tree exploration:** Every generation produces a tree (not a sequence). All top-k candidates at every position are already known. The visualizer renders the full tree and lets you walk branches without re-inference — you see what the model *would have said* based on its probability assignments, even though only one path was actually sampled.
 
-Passive replay is pure visualization (swift-metal only). Active branching requires bidirectional communication with llama-cpp (KV cache snapshots, multi-sequence batching — Tier 2 C++ work). Tree exploration requires swift-metal to maintain and render a graph structure from existing top-k data.
+Passive replay is pure visualization (swift-metal only). Active branching requires bidirectional communication with llama-cpp (KV cache snapshots, multi-sequence batching). Tree exploration requires swift-metal to maintain and render a graph structure from existing top-k data.
 
 Is the goal to navigate what was already computed, or to ask the model "what would have happened if?"
 
