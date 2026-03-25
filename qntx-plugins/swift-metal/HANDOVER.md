@@ -80,27 +80,27 @@ The bottleneck is not what data exists or how fast it can be rendered. The bottl
 
 ## Open questions
 
-### Q1: What should the first full-extraction signal look like?
+### Q1: What should the first full-extraction signal look like? → **Full distribution as probability nebula**
 
-`capture_signal` currently discards 99.8% of the available data per token. The first swift-metal vertical needs to widen that aperture — but how far, and in what shape?
+**Resolved.** The full softmax distribution (32k floats, 128KB per token) rendered as a 3D particle nebula. See `docs/research/probability-nebula.md` for the design.
 
-The full probability distribution (32k floats) is the most obvious target: it's already computed, costs nothing to keep, and gives swift-metal a 32k-element landscape to render that the DOM never could. But embeddings (4096 floats from `llama_get_embeddings`) tell a different story — not what the model is choosing but where it is in semantic space. And sampler chain observations (distribution before/after each stage) reveal why alternatives were rejected.
+C++ work: keep the full `probs` vector in `capture_signal()` instead of discarding after top-10 extraction. Add `repeated float full_distribution = 5` to `TokenSignalProto`. Serve projected token positions (from the model's embedding matrix) via a one-shot endpoint at model load.
 
-These aren't mutually exclusive — total per-token payload at full extraction is ~1.3 MB/s, well within budget. But what swift-metal renders first determines which extraction gets built first on the C++ side.
+**Also worth exploring later:**
+- **Hidden state embeddings** (4096 floats) — semantic trajectory, where the model *is* rather than what it *sees*
+- **Sampler chain observations** — distribution before/after each sampler stage, revealing why alternatives were rejected
 
 ---
 
-### Q2: What does "stepping back" feel like?
+### Q2: What does "stepping back" feel like? → **Scrub + ghost branches, then forking**
 
-You mentioned stepping back through tokens and selecting different paths. This could mean several things in practice:
+**Resolved.** All three, in order:
 
-- **Passive replay:** Scrub a timeline slider backwards through generated tokens, seeing how the distribution evolved. Read-only, no re-inference. The data is already captured.
-- **Active branching:** Click on an alternative token at position N, and the model re-runs inference from that point forward. This is speculative decoding in reverse — "what if the model had said X instead?" Requires llama-cpp to support re-inference from a saved KV cache state via multi-token batching.
-- **Tree exploration:** Every generation produces a tree (not a sequence). All top-k candidates at every position are already known. The visualizer renders the full tree and lets you walk branches without re-inference — you see what the model *would have said* based on its probability assignments, even though only one path was actually sampled.
+**First: Timeline scrub.** Drag backwards through the generation. The nebula rewinds — the cloud re-blooms, the trail un-draws. See how the model's consideration set evolved step by step. Pure replay of captured frames, no re-inference, no C++ work.
 
-Passive replay is pure visualization (swift-metal only). Active branching requires bidirectional communication with llama-cpp (KV cache snapshots, multi-sequence batching). Tree exploration requires swift-metal to maintain and render a graph structure from existing top-k data.
+**First: Ghost branches.** At each step, the top-k candidates are already known. Draw faint ghost trails branching off the main path — where would the trail have gone if the second-place token had been chosen? Not actual continuations, just single-step alternatives shown as dim branches. Data already exists in `TokenSignal.top_k`.
 
-Is the goal to navigate what was already computed, or to ask the model "what would have happened if?"
+**Later: Active forking.** Click a bright particle that wasn't chosen at some step. The model re-infers from that point forward — a new trail branches off through a different region of vocabulary space. Two paths diverge in the nebula. Requires KV cache snapshots and multi-sequence batching on the C++ side (3x compute per branch).
 
 ---
 
@@ -121,48 +121,50 @@ What is the first thing you'd want to see in this space that you currently canno
 
 ---
 
-### Q4: What makes a token "interesting"?
+### Q4: ~~What makes a token "interesting"?~~ → **Dissolved by the nebula**
 
-The research document describes entropy spikes, low-confidence spans, and runner-up ghost trails as signal patterns worth surfacing. These are statistical thresholds — entropy above X bits, confidence below Y, top-gap below Z.
-
-But in a real-time system where you can both observe and steer, "interesting" might not be a static threshold. A token where the model was perfectly confident (P=0.99) might still be interesting if it's wrong. A low-entropy token might be boring if the model always picks the same filler word there.
-
-When you're watching inference happen live and considering whether to step back and take a different path — what draws your attention to a specific token? Is it the numbers (confidence, entropy), the semantics (what the token means in context), the alternatives (what else could have been there), or something else entirely? This determines what swift-metal highlights, what it dims, and what it lets you ignore.
+**Resolved.** The nebula doesn't highlight individual tokens — the entire field is the visualization. "Interesting" is no longer a per-token threshold. It's a property of the cloud's behavior over time: a bimodal split (the model torn between two directions), a sudden restructuring (the consideration set jumping to a new region), the cloud blooming diffuse then snapping tight. The viewer sees these moments without needing to be told they're interesting. The nebula makes them visible by being them.
 
 ---
 
-## Implementation steps — first vertical
+## Implementation steps — probability nebula
 
-These steps deliver one working visualization end-to-end: data in, Metal render, pixels on screen. They are written assuming Q1-Q4 have been answered and adjusted accordingly. **Do not start until all four questions are resolved.**
+### Step 1: Proto generation and gRPC bootstrap *(done)*
 
-### Step 1: Proto generation, gRPC bootstrap, and Nix flake
+grpc-swift v2 with SPM build plugin. Proto types generated at build time from `domain.proto` and `llm.proto`. Plugin compiles, starts, announces port, serves gRPC. Version 0.2.0.
 
-Write `flake.nix` pinning Swift toolchain, protobuf, and grpc-swift protoc plugins. Add `generate-proto.sh` that runs protoc-gen-swift and protoc-gen-grpc-swift against `domain.proto` and `llm.proto`, outputting to `Sources/SwiftMetalPlugin/Generated/`. Wire the generated types into `Plugin.swift` replacing the placeholder `Protocol_*` references. Add CI workflow mirroring llama-cpp's Nix build.
+### Step 2: Widen the C++ aperture
 
-**Files:** `flake.nix`, `flake.lock`, `generate-proto.sh`, `Sources/SwiftMetalPlugin/Generated/*.swift`, updates to `Plugin.swift` imports, `.github/workflows/swift-metal.yml`.
+Extend `capture_signal()` in `inference.cpp` to keep the full softmax distribution instead of discarding after top-10 extraction. Add `repeated float full_distribution = 5` to `TokenSignalProto` in `llm.proto`. The Go streaming adapter passes the full distribution through to WebSocket `llm_stream` messages.
 
-**Done when:** `make swift-metal-plugin` succeeds, plugin appears in QNTX UI plugin list with name "swift-metal" and version "0.1.0", health check returns "Metal device active" with the GPU name.
+Separately: at model load, project the token embedding matrix (`token_embd.weight`) to 3D via PCA. Serve the 32k × 3 float positions via `GET /api/llama-cpp/vocab-positions` (one-shot, cached).
 
-### Step 2: Metal shader for token signal visualization
+**Done when:** a `StreamChat` gRPC response carries 32k floats per token in `signal.full_distribution`, and `/api/llama-cpp/vocab-positions` returns 32k projected 3D positions.
 
-Write the MSL shader source (embedded as a Swift string constant, compiled at runtime via `MTLDevice.makeLibrary(source:)`). The shader reads from an `MTLBuffer` of token signal data — confidence, entropy, top-gap — and renders a visualization that maps these signals to color, size, and position. The exact visual form depends on Q1-Q4 answers (heatmap, tree, scatter).
+### Step 3: Particle field — static frame
 
-**Files:** `Sources/SwiftMetalPlugin/Shaders.swift` (embedded MSL source), updates to `MetalRenderer.swift` to create pipeline state, set vertex/fragment functions, allocate buffers, encode draw/dispatch commands.
+Write the MSL shaders: a compute shader that reads 32k probabilities + 32k × 3 positions from `MTLBuffer`s and outputs a vertex buffer (position, color, size per particle). A vertex/fragment shader that renders point sprites with soft circular falloff and additive blending. A bloom post-process pass on the framebuffer.
 
-**Done when:** `POST /render` with a test JSON payload returns a PNG that is not blank — the visualization is visible and data-driven. Manual test: `curl -X POST http://localhost:50200/render -d '{"tokens":[{"text":"the","confidence":0.9,"entropy":1.2},{"text":"cat","confidence":0.3,"entropy":3.1}]}' -o test.png && open test.png`.
+Feed a hardcoded test distribution (one hot, uniform, bimodal) to verify rendering. No streaming yet — just prove that 32k particles render correctly at 60fps with bloom.
 
-### Step 3: Wire the glyph into the QNTX canvas
+**Done when:** `POST /render` with a test payload returns a PNG showing a luminous cloud of particles against a dark background. Bright region corresponds to high-probability tokens, rest is dark.
 
-Update `GlyphModule.swift` so the ◈ glyph subscribes to llama-cpp's token signal stream (via the existing WebSocket infrastructure or a new endpoint) and passes signal data to `/render`. The glyph should re-render as new tokens arrive. Add the glyph to the spawn menu by confirming `RegisterGlyphs` returns the correct definition.
+### Step 4: Live streaming
 
-**Files:** `Sources/SwiftMetalPlugin/GlyphModule.swift` (JS module updates), possibly `Plugin.swift` (new HTTP endpoints for signal relay or data queries).
+swift-metal subscribes to llama-cpp's `StreamChat` gRPC stream (or receives data relayed via the Go WebSocket layer). Each token's full distribution becomes a keyframe. The compute shader lerps between keyframes at 60fps — the nebula flows rather than jumps.
 
-**Done when:** Spawning a ◈ glyph from the QNTX canvas shows a Metal-rendered visualization with real token signal data from a llama-cpp generation. The status bar shows "Rendered via Metal" with dimensions and frame timing.
+The chosen token at each step is recorded. A line strip connects chosen-token positions — the generation trail. Older segments fade via alpha decay.
 
-### Step 4: Live streaming via WebSocket
+**Done when:** running a prompt with the ◈ glyph open shows the nebula breathing in real time. Cloud contracts when confident, blooms when uncertain. Trail traces the generation path through vocabulary space.
 
-Replace the HTTP request/response cycle with WebSocket streaming. The glyph module opens a WebSocket to `/api/swift-metal/ws`. The plugin's `HandleWebSocket` implementation receives token signals from llama-cpp's `StreamChat` gRPC stream, re-renders incrementally (appending new token data without re-rendering the full frame), and pushes updated frames to the glyph. Depending on Q2 answers, this may also include backwards navigation — scrubbing or branching through previously generated tokens.
+### Step 5: Timeline scrub
 
-**Files:** `Sources/SwiftMetalPlugin/Plugin.swift` (WebSocket implementation, llama-cpp signal subscription), `Sources/SwiftMetalPlugin/MetalRenderer.swift` (incremental render support), `Sources/SwiftMetalPlugin/GlyphModule.swift` (WebSocket client in JS, navigation controls if applicable).
+Store all keyframes (full distributions) for the generation. A scrub control lets the viewer drag backwards and forwards through the sequence. The nebula rewinds — cloud re-blooms, trail un-draws. Pure replay, no re-inference.
 
-**Done when:** Running a prompt through llama-cpp with the ◈ glyph open shows the visualization updating in real time as tokens stream in. No manual refresh needed. Closing the glyph cleanly disconnects the WebSocket.
+**Done when:** after a generation completes, dragging the timeline backwards smoothly reverses the nebula animation.
+
+### Step 6: Ghost branches
+
+At each generation step, the top-k candidates are already known. For each step, draw faint trails from the chosen token's position to each runner-up's position — dim branches off the main path showing single-step alternatives. Opacity proportional to the runner-up's probability.
+
+**Done when:** the nebula shows the main bright trail with faint ghost branches at each step, visible during both live streaming and timeline scrub.
