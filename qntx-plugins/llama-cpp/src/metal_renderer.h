@@ -35,6 +35,12 @@ public:
     // The render loop interpolates between them at 60fps.
     void submit_distribution(const float* probabilities, int vocab_size);
 
+    // Store a copy of the distribution for scrub playback.
+    void store_keyframe(const float* probabilities, int vocab_size);
+
+    // Set scrub target: index >= 0 renders that keyframe, -1 resumes live.
+    void set_scrub_index(int idx);
+
     // Record the chosen token's position in the generation trail.
     void add_trail_point(int token_id);
     void clear_trail();
@@ -90,6 +96,10 @@ private:
     std::mutex dist_mutex_;
     std::chrono::steady_clock::time_point keyframe_time_;
     std::chrono::milliseconds keyframe_interval_{100};  // ~10 tok/s default
+
+    // Scrub playback — CPU-side keyframe history
+    std::vector<std::vector<float>> keyframe_history_;  // one distribution per token
+    int scrub_index_ = -1;  // -1 = live mode
 
     // Render loop
     std::thread render_thread_;

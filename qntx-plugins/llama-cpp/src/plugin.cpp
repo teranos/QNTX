@@ -315,7 +315,17 @@ export const render = async (glyph, ui) => {
 
     connect();
 
+    // Listen for nebula-scrub events from stream glyph token hover
+    function onScrub(e) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            const msg = { type: 1, data: btoa('scrub:' + e.detail.index), headers: {}, timestamp: 0 };
+            ws.send(JSON.stringify(msg));
+        }
+    }
+    document.addEventListener('nebula-scrub', onScrub);
+
     ui.onCleanup(() => {
+        document.removeEventListener('nebula-scrub', onScrub);
         ro.disconnect();
         if (ws && ws.readyState !== WebSocket.CLOSED) ws.close();
     });
@@ -341,9 +351,10 @@ grpc::Status LlamaCppPlugin::HandleWebSocket(
     grpc::ServerContext* ctx,
     grpc::ServerReaderWriter<protocol::WebSocketMessage,
                              protocol::WebSocketMessage>* stream) {
-    // Read incoming messages in a separate thread to handle CONNECT/PING/CLOSE
+    // Read incoming messages in a separate thread to handle CONNECT/PING/CLOSE/scrub
     std::atomic<bool> closed{false};
-    std::thread reader([stream, &closed]() {
+    auto* renderer = renderer_.get();
+    std::thread reader([stream, &closed, renderer]() {
         protocol::WebSocketMessage in_msg;
         while (stream->Read(&in_msg)) {
             if (in_msg.type() == protocol::WebSocketMessage::PING) {
@@ -354,8 +365,16 @@ grpc::Status LlamaCppPlugin::HandleWebSocket(
             } else if (in_msg.type() == protocol::WebSocketMessage::CLOSE) {
                 closed.store(true);
                 return;
+            } else if (in_msg.type() == protocol::WebSocketMessage::DATA) {
+                // Parse scrub commands: "scrub:N" where N is keyframe index (-1 = live)
+                const auto& data = in_msg.data();
+                if (data.size() > 6 && data.substr(0, 6) == "scrub:") {
+                    try {
+                        int idx = std::stoi(data.substr(6));
+                        renderer->set_scrub_index(idx);
+                    } catch (...) {}
+                }
             }
-            // CONNECT and DATA are acknowledged by receiving them
         }
         closed.store(true);
     });
@@ -553,9 +572,10 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
         ? req->user_prompt()
         : context + req->user_prompt();
 
-    // Clear trail for new generation
+    // Clear trail and keyframe history for new generation
     if (plugin_->renderer().is_ready()) {
         plugin_->renderer().clear_trail();
+        plugin_->renderer().set_scrub_index(-1);
     }
 
     // Stream tokens as they're generated
@@ -581,9 +601,11 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
                 signal->add_full_distribution(p);
             }
 
-            // Submit distribution for interpolated rendering + record trail
+            // Submit distribution for interpolated rendering + record trail + store keyframe
             if (plugin_->renderer().is_ready() && !sig.full_distribution.empty()) {
                 plugin_->renderer().submit_distribution(
+                    sig.full_distribution.data(), sig.full_distribution.size());
+                plugin_->renderer().store_keyframe(
                     sig.full_distribution.data(), sig.full_distribution.size());
                 plugin_->renderer().add_trail_point(sig.token_id);
             }
