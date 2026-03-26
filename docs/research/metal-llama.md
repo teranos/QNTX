@@ -156,6 +156,11 @@ Chosen token recorded per step. Line strip connects chosen-token positions — t
 
 **Done when:** running a prompt shows the nebula updating in real time.
 
+- [x] WebSocket frame push (`HandleWebSocket` + `wait_for_frame`)
+- [x] Nebula glyph (plugin-provided, conditional on Metal)
+- [ ] Keyframe interpolation at 60fps
+- [ ] Generation trail (line strip of chosen tokens)
+
 ### Step 5: Timeline scrub
 
 Store all keyframes (full distributions) for the generation. A scrub control lets the viewer drag backwards and forwards through the sequence. The nebula rewinds — cloud re-blooms, trail un-draws. Pure replay, no re-inference.
