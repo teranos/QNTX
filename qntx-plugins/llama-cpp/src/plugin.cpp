@@ -120,8 +120,8 @@ grpc::Status LlamaCppPlugin::HandleHTTP(grpc::ServerContext* ctx,
                                          protocol::HTTPResponse* resp) {
     if (req->method() == "GET" && req->path() == "/render-latest") {
         int w = 0, h = 0;
-        auto pixels = renderer_->get_latest_frame(w, h);
-        if (pixels.empty()) {
+        auto png = renderer_->get_latest_frame(w, h);
+        if (png.empty()) {
             resp->set_status_code(404);
             resp->set_body("{\"error\":\"no frame rendered yet\"}");
             auto* hdr = resp->add_headers();
@@ -130,16 +130,10 @@ grpc::Status LlamaCppPlugin::HandleHTTP(grpc::ServerContext* ctx,
             return grpc::Status::OK;
         }
         resp->set_status_code(200);
-        resp->set_body(pixels.data(), pixels.size());
+        resp->set_body(png.data(), png.size());
         auto* ct = resp->add_headers();
         ct->set_name("Content-Type");
-        ct->add_values("application/octet-stream");
-        auto* wh = resp->add_headers();
-        wh->set_name("X-Width");
-        wh->add_values(std::to_string(w));
-        auto* hh = resp->add_headers();
-        hh->set_name("X-Height");
-        hh->add_values(std::to_string(h));
+        ct->add_values("image/png");
         return grpc::Status::OK;
     }
 
@@ -176,13 +170,7 @@ grpc::Status LlamaCppPlugin::HandleHTTP(grpc::ServerContext* ctx,
         resp->set_body(pixels.data(), pixels.size());
         auto* ct = resp->add_headers();
         ct->set_name("Content-Type");
-        ct->add_values("application/octet-stream");
-        auto* wh = resp->add_headers();
-        wh->set_name("X-Width");
-        wh->add_values(std::to_string(w));
-        auto* hh = resp->add_headers();
-        hh->set_name("X-Height");
-        hh->add_values(std::to_string(h));
+        ct->add_values("image/png");
         return grpc::Status::OK;
     }
 
