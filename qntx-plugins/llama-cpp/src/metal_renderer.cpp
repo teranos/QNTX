@@ -227,8 +227,9 @@ std::vector<uint8_t> MetalRenderer::render_nebula(const float* probabilities, in
                                        MTL::ResourceStorageModeShared);
     if (!prob_buf) return {};
 
-    // Particle buffer: position(3) + color(4) + size(1) = 32 bytes
-    auto particle_buf = device_->newBuffer(n * 32, MTL::ResourceStorageModeShared);
+    // Particle struct in MSL: float3(16) + float4(16) + float(4) = 36, padded to 48 bytes
+    // float3 has 16-byte alignment in Metal, so stride is 48 not 32.
+    auto particle_buf = device_->newBuffer(n * 48, MTL::ResourceStorageModeShared);
     if (!particle_buf) { prob_buf->release(); return {}; }
 
     uint32_t vocab_u = (uint32_t)n;
@@ -366,11 +367,15 @@ std::vector<uint8_t> MetalRenderer::render_test(int width, int height) {
     return render_nebula(probs.data(), n, width, height);
 }
 
-void MetalRenderer::set_latest_frame(std::vector<uint8_t> pixels, int width, int height) {
-    std::lock_guard<std::mutex> lock(frame_mutex_);
-    latest_frame_ = std::move(pixels);
-    frame_width_ = width;
-    frame_height_ = height;
+void MetalRenderer::set_latest_frame(std::vector<uint8_t> png, int width, int height) {
+    {
+        std::lock_guard<std::mutex> lock(frame_mutex_);
+        latest_frame_ = std::move(png);
+        frame_width_ = width;
+        frame_height_ = height;
+        frame_seq_++;
+    }
+    frame_cv_.notify_all();
 }
 
 std::vector<uint8_t> MetalRenderer::get_latest_frame(int& width, int& height) {
@@ -378,4 +383,14 @@ std::vector<uint8_t> MetalRenderer::get_latest_frame(int& width, int& height) {
     width = frame_width_;
     height = frame_height_;
     return latest_frame_;
+}
+
+std::vector<uint8_t> MetalRenderer::wait_for_frame(int timeout_ms) {
+    std::unique_lock<std::mutex> lock(frame_mutex_);
+    uint64_t seen = frame_seq_;
+    if (frame_cv_.wait_for(lock, std::chrono::milliseconds(timeout_ms),
+                           [&] { return frame_seq_ > seen; })) {
+        return latest_frame_;
+    }
+    return {};
 }
