@@ -73,19 +73,21 @@ set(GENERATED_SRCS "")
 generate_proto(domain.proto)
 generate_proto(llm.proto)
 
-# Platform-specific sources: Metal renderer and BLAS-based PCA are macOS-only.
-# On Linux, stub implementations provide empty no-ops so the plugin still builds
-# and runs (inference works, visualization doesn't).
-if(APPLE)
+# Platform-specific sources: Metal renderer and BLAS-based PCA require macOS
+# with Metal-cpp headers. The Nix sandbox on macOS may not have them, so check
+# for the actual header rather than just APPLE.
+if(APPLE AND EXISTS "${CMAKE_SOURCE_DIR}/vendor/metal-cpp/Foundation/Foundation.hpp")
     set(PLATFORM_SRCS
         src/metal_renderer.cpp
         src/vocab_projection.cpp
     )
+    set(HAS_METAL TRUE)
 else()
     set(PLATFORM_SRCS
         src/metal_renderer_stub.cpp
         src/vocab_projection_stub.cpp
     )
+    set(HAS_METAL FALSE)
 endif()
 
 # Plugin binary
@@ -113,7 +115,7 @@ target_link_libraries(qntx-llama-cpp-plugin PRIVATE
     ${MUPDF_LIB}
 )
 
-if(APPLE)
+if(HAS_METAL)
     target_link_libraries(qntx-llama-cpp-plugin PRIVATE
         "-framework Accelerate"
         "-framework Metal"
