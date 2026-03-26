@@ -47,13 +47,14 @@ grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
         }
     }
 
-    // Set PCA positions on the renderer if model loaded
+    // Set PCA positions on the renderer if model loaded, start render loop
     if (engine_.is_loaded() && renderer_->is_ready()) {
         const auto& pos = engine_.vocab_positions_3d();
         if (!pos.empty()) {
             renderer_->set_vocab_positions(pos.data(), pos.size() / 3);
+            renderer_->start_render_loop(800, 600);
             std::cout << "[metal-llama] Loaded " << pos.size() / 3
-                      << " vocab positions into renderer" << std::endl;
+                      << " vocab positions into renderer, render loop started" << std::endl;
         }
     }
 
@@ -499,14 +500,11 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
         }
         std::cout << std::endl;
 
-        // Render the last token's distribution as a nebula frame
+        // Submit the last token's distribution for interpolated rendering
         const auto& last_sig = result.signals.back();
         if (plugin_->renderer().is_ready() && !last_sig.full_distribution.empty()) {
-            auto frame = plugin_->renderer().render_nebula(
-                last_sig.full_distribution.data(), last_sig.full_distribution.size(), 800, 600);
-            if (!frame.empty()) {
-                plugin_->renderer().set_latest_frame(std::move(frame), 800, 600);
-            }
+            plugin_->renderer().submit_distribution(
+                last_sig.full_distribution.data(), last_sig.full_distribution.size());
         }
     }
 
@@ -578,13 +576,10 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
                 signal->add_full_distribution(p);
             }
 
-            // Render nebula frame from this token's distribution
+            // Submit distribution for interpolated rendering
             if (plugin_->renderer().is_ready() && !sig.full_distribution.empty()) {
-                auto frame = plugin_->renderer().render_nebula(
-                    sig.full_distribution.data(), sig.full_distribution.size(), 800, 600);
-                if (!frame.empty()) {
-                    plugin_->renderer().set_latest_frame(std::move(frame), 800, 600);
-                }
+                plugin_->renderer().submit_distribution(
+                    sig.full_distribution.data(), sig.full_distribution.size());
             }
 
             return writer->Write(chunk);

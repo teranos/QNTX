@@ -65,6 +65,38 @@ kernel void particleCompute(
     particles[id] = p;
 }
 
+kernel void particleComputeLerp(
+    device const float* probA         [[buffer(0)]],
+    device const float* probB         [[buffer(1)]],
+    device const float* positions     [[buffer(2)]],
+    device Particle* particles        [[buffer(3)]],
+    constant uint& vocabSize          [[buffer(4)]],
+    constant float& t                 [[buffer(5)]],
+    uint id [[thread_position_in_grid]]
+) {
+    if (id >= vocabSize) return;
+
+    float prob = mix(probA[id], probB[id], t);
+    float3 pos = float3(positions[id * 3], positions[id * 3 + 1], positions[id * 3 + 2]);
+
+    float threshold = 1e-5;
+    float visible = step(threshold, prob);
+    float logProb = visible * saturate((log2(prob + 1e-10) + 20.0) / 20.0);
+
+    float3 lo = float3(0.15, 0.05, 0.0);
+    float3 mid = float3(0.9, 0.5, 0.05);
+    float3 hi = float3(1.0, 0.95, 0.85);
+    float3 rgb = mix(lo, mid, saturate(logProb * 2.0));
+    rgb = mix(rgb, hi, saturate(logProb * 2.0 - 1.0));
+
+    Particle p;
+    p.position = pos;
+    p.color = float4(rgb * visible, logProb * visible);
+    p.size = visible * (2.0 + logProb * 12.0);
+
+    particles[id] = p;
+}
+
 vertex VertexOut particleVertex(
     device const Particle* particles [[buffer(0)]],
     constant float4x4& mvp          [[buffer(1)]],
@@ -146,6 +178,16 @@ bool MetalRenderer::setup() {
     compute_fn->release();
     if (!compute_pipeline_) return false;
 
+    // Lerp compute pipeline
+    auto lerp_fn = library->newFunction(NS::String::string("particleComputeLerp", NS::UTF8StringEncoding));
+    if (!lerp_fn) {
+        std::cerr << "[metal-llama] particleComputeLerp not found" << std::endl;
+        return false;
+    }
+    lerp_pipeline_ = device_->newComputePipelineState(lerp_fn, &error);
+    lerp_fn->release();
+    if (!lerp_pipeline_) return false;
+
     // Render pipeline
     auto vertex_fn = library->newFunction(NS::String::string("particleVertex", NS::UTF8StringEncoding));
     auto fragment_fn = library->newFunction(NS::String::string("particleFragment", NS::UTF8StringEncoding));
@@ -178,7 +220,11 @@ bool MetalRenderer::setup() {
 }
 
 void MetalRenderer::teardown() {
+    stop_render_loop();
+    if (prob_a_) { prob_a_->release(); prob_a_ = nullptr; }
+    if (prob_b_) { prob_b_->release(); prob_b_ = nullptr; }
     if (positions_buffer_) { positions_buffer_->release(); positions_buffer_ = nullptr; }
+    if (lerp_pipeline_) { lerp_pipeline_->release(); lerp_pipeline_ = nullptr; }
     if (compute_pipeline_) { compute_pipeline_->release(); compute_pipeline_ = nullptr; }
     if (render_pipeline_) { render_pipeline_->release(); render_pipeline_ = nullptr; }
     if (queue_) { queue_->release(); queue_ = nullptr; }
@@ -393,4 +439,186 @@ std::vector<uint8_t> MetalRenderer::wait_for_frame(int timeout_ms) {
         return latest_frame_;
     }
     return {};
+}
+
+void MetalRenderer::submit_distribution(const float* probabilities, int vocab_size) {
+    if (!device_ || vocab_size != vocab_size_) return;
+
+    std::lock_guard<std::mutex> lock(dist_mutex_);
+
+    // Swap: current becomes previous
+    if (prob_b_) {
+        if (prob_a_) prob_a_->release();
+        prob_a_ = prob_b_;
+    }
+
+    // Upload new distribution as current
+    prob_b_ = device_->newBuffer(probabilities, vocab_size * sizeof(float),
+                                  MTL::ResourceStorageModeShared);
+    keyframe_time_ = std::chrono::steady_clock::now();
+
+    // If no previous distribution yet, duplicate current as previous
+    if (!prob_a_) {
+        prob_a_ = device_->newBuffer(probabilities, vocab_size * sizeof(float),
+                                      MTL::ResourceStorageModeShared);
+    }
+}
+
+std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) {
+    if (!is_ready() || !positions_buffer_ || !prob_a_ || !prob_b_) return {};
+
+    int n = vocab_size_;
+    t = std::max(0.0f, std::min(1.0f, t));
+
+    auto particle_buf = device_->newBuffer(n * 48, MTL::ResourceStorageModeShared);
+    if (!particle_buf) return {};
+
+    uint32_t vocab_u = (uint32_t)n;
+
+    auto cmd = queue_->commandBuffer();
+    if (!cmd) { particle_buf->release(); return {}; }
+
+    // --- Lerp compute pass ---
+    auto compute_enc = cmd->computeCommandEncoder();
+    {
+        std::lock_guard<std::mutex> lock(dist_mutex_);
+        compute_enc->setComputePipelineState(lerp_pipeline_);
+        compute_enc->setBuffer(prob_a_, 0, 0);
+        compute_enc->setBuffer(prob_b_, 0, 1);
+        compute_enc->setBuffer(positions_buffer_, 0, 2);
+        compute_enc->setBuffer(particle_buf, 0, 3);
+        compute_enc->setBytes(&vocab_u, sizeof(uint32_t), 4);
+        compute_enc->setBytes(&t, sizeof(float), 5);
+    }
+
+    NS::UInteger tg_size = std::min(lerp_pipeline_->maxTotalThreadsPerThreadgroup(), (NS::UInteger)256);
+    compute_enc->dispatchThreads(MTL::Size(n, 1, 1), MTL::Size(tg_size, 1, 1));
+    compute_enc->endEncoding();
+
+    // --- Render pass ---
+    auto tex_desc = MTL::TextureDescriptor::texture2DDescriptor(
+        MTL::PixelFormatRGBA16Float, width, height, false);
+    tex_desc->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
+    auto hdr_tex = device_->newTexture(tex_desc);
+    if (!hdr_tex) { particle_buf->release(); return {}; }
+
+    auto rp_desc = MTL::RenderPassDescriptor::alloc()->init();
+    rp_desc->colorAttachments()->object(0)->setTexture(hdr_tex);
+    rp_desc->colorAttachments()->object(0)->setLoadAction(MTL::LoadActionClear);
+    rp_desc->colorAttachments()->object(0)->setClearColor(MTL::ClearColor(0.02, 0.01, 0.03, 1.0));
+    rp_desc->colorAttachments()->object(0)->setStoreAction(MTL::StoreActionStore);
+
+    auto render_enc = cmd->renderCommandEncoder(rp_desc);
+    render_enc->setRenderPipelineState(render_pipeline_);
+    render_enc->setVertexBuffer(particle_buf, 0, 0);
+
+    float scale = 0.9f / extent_;
+    float aspect = (float)width / (float)height;
+    float mvp[16] = {
+        scale / aspect, 0, 0, 0,
+        0, scale, 0, 0,
+        0, 0, scale, 0,
+        -center_x_ * scale / aspect, -center_y_ * scale, 0, 1
+    };
+    render_enc->setVertexBytes(mvp, sizeof(mvp), 1);
+
+    render_enc->drawPrimitives(MTL::PrimitiveTypePoint, (NS::UInteger)0, (NS::UInteger)n);
+    render_enc->endEncoding();
+
+    cmd->commit();
+    cmd->waitUntilCompleted();
+
+    // --- Tonemap HDR → LDR PNG ---
+    int bpp_hdr = 8;
+    std::vector<uint16_t> hdr(width * height * 4);
+    hdr_tex->getBytes(hdr.data(), width * bpp_hdr,
+                      MTL::Region(0, 0, width, height), 0);
+
+    std::vector<uint8_t> ldr(width * height * 4);
+    for (int i = 0; i < width * height; i++) {
+        float r = float16to32(hdr[i * 4]);
+        float g = float16to32(hdr[i * 4 + 1]);
+        float b = float16to32(hdr[i * 4 + 2]);
+
+        float tr = powf(r / (1.0f + r), 1.0f / 2.2f);
+        float tg = powf(g / (1.0f + g), 1.0f / 2.2f);
+        float tb = powf(b / (1.0f + b), 1.0f / 2.2f);
+
+        ldr[i * 4]     = (uint8_t)fminf(fmaxf(tr * 255.0f, 0), 255);
+        ldr[i * 4 + 1] = (uint8_t)fminf(fmaxf(tg * 255.0f, 0), 255);
+        ldr[i * 4 + 2] = (uint8_t)fminf(fmaxf(tb * 255.0f, 0), 255);
+        ldr[i * 4 + 3] = 255;
+    }
+
+    auto colorspace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+    auto cg_ctx = CGBitmapContextCreate(
+        ldr.data(), width, height, 8, width * 4, colorspace,
+        kCGImageAlphaPremultipliedLast);
+
+    std::vector<uint8_t> png_data;
+    if (cg_ctx) {
+        auto image = CGBitmapContextCreateImage(cg_ctx);
+        if (image) {
+            auto mutable_data = CFDataCreateMutable(nullptr, 0);
+            auto dest = CGImageDestinationCreateWithData(mutable_data, CFSTR("public.png"), 1, nullptr);
+            if (dest) {
+                CGImageDestinationAddImage(dest, image, nullptr);
+                if (CGImageDestinationFinalize(dest)) {
+                    auto len = CFDataGetLength(mutable_data);
+                    auto ptr = CFDataGetBytePtr(mutable_data);
+                    png_data.assign(ptr, ptr + len);
+                }
+                CFRelease(dest);
+            }
+            CFRelease(mutable_data);
+            CGImageRelease(image);
+        }
+        CGContextRelease(cg_ctx);
+    }
+    CGColorSpaceRelease(colorspace);
+
+    rp_desc->release();
+    hdr_tex->release();
+    particle_buf->release();
+
+    return png_data;
+}
+
+void MetalRenderer::start_render_loop(int width, int height) {
+    if (render_running_.load()) return;
+    render_width_ = width;
+    render_height_ = height;
+    render_running_.store(true);
+
+    render_thread_ = std::thread([this]() {
+        while (render_running_.load()) {
+            // Compute lerp t based on time since last keyframe
+            float t;
+            {
+                std::lock_guard<std::mutex> lock(dist_mutex_);
+                if (!prob_a_ || !prob_b_) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(16));
+                    continue;
+                }
+                auto elapsed = std::chrono::steady_clock::now() - keyframe_time_;
+                auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
+                t = std::min(1.0f, (float)ms / (float)keyframe_interval_.count());
+            }
+
+            auto png = render_lerp(render_width_, render_height_, t);
+            if (!png.empty()) {
+                set_latest_frame(std::move(png), render_width_, render_height_);
+            }
+
+            // ~60fps
+            std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        }
+    });
+}
+
+void MetalRenderer::stop_render_loop() {
+    render_running_.store(false);
+    if (render_thread_.joinable()) {
+        render_thread_.join();
+    }
 }
