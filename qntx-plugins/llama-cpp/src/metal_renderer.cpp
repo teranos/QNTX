@@ -134,9 +134,15 @@ vertex TrailVertexOut trailVertex(
     constant float4x4& mvp       [[buffer(1)]],
     constant uint& trailCount    [[buffer(2)]],
     constant int& scrubIndex     [[buffer(3)]],
+    constant float& driftStep    [[buffer(4)]],
     uint vid [[vertex_id]]
 ) {
     float3 pos = float3(positions[vid * 3], positions[vid * 3 + 1], positions[vid * 3 + 2]);
+
+    // Drift: newest point (head) sits on the nebula, older points trail behind.
+    // headIndex is the token currently being viewed.
+    int headIndex = (scrubIndex >= 0) ? scrubIndex : int(trailCount - 1);
+    pos.x += float(int(vid) - headIndex) * driftStep;
 
     TrailVertexOut out;
     out.position = mvp * float4(pos, 1.0);
@@ -336,6 +342,11 @@ void MetalRenderer::set_vocab_positions(const float* positions, int vocab_size) 
     center_y_ = (min_y + max_y) / 2.0f;
     extent_ = std::max(max_x - min_x, max_y - min_y) / 2.0f;
     if (extent_ < 1e-6f) extent_ = 1.0f;
+
+    // Drift step: fixed offset per token so the trail unrolls in space.
+    // 0.15% of extent per token — after ~1300 tokens the trail spans
+    // one full cloud diameter. Subtle enough to stay in the viewport.
+    drift_step_ = extent_ * 0.0015f;
 }
 
 std::vector<uint8_t> MetalRenderer::render_nebula(const float* probabilities, int vocab_size,
@@ -551,12 +562,14 @@ void MetalRenderer::add_trail_point(int token_id) {
 void MetalRenderer::clear_trail() {
     std::lock_guard<std::mutex> lock(trail_mutex_);
     trail_positions_.clear();
+    drift_count_ = 0;
 }
 
 void MetalRenderer::store_keyframe(const float* probabilities, int vocab_size) {
     std::lock_guard<std::mutex> lock(dist_mutex_);
     if (keyframe_history_.size() >= 512) return;  // cap at 512 entries
     keyframe_history_.emplace_back(probabilities, probabilities + vocab_size);
+    drift_count_++;
 }
 
 void MetalRenderer::set_scrub_index(int idx) {
@@ -634,11 +647,13 @@ std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) 
             if (trail_buf) {
                 uint32_t tc = (uint32_t)trail_count;
                 int si = scrub_index_;
+                float ds = drift_step_;
                 render_enc->setRenderPipelineState(trail_pipeline_);
                 render_enc->setVertexBuffer(trail_buf, 0, 0);
                 render_enc->setVertexBytes(mvp, sizeof(mvp), 1);
                 render_enc->setVertexBytes(&tc, sizeof(uint32_t), 2);
                 render_enc->setVertexBytes(&si, sizeof(int), 3);
+                render_enc->setVertexBytes(&ds, sizeof(float), 4);
                 render_enc->drawPrimitives(MTL::PrimitiveTypeLineStrip,
                     (NS::UInteger)0, (NS::UInteger)trail_count);
                 trail_buf->release();
