@@ -120,6 +120,10 @@ private:
     std::vector<std::vector<float>> keyframe_history_;  // one distribution per token
     int scrub_index_ = -1;  // -1 = live mode
 
+    // Drift — fixed-step camera offset per token, makes time into space
+    int drift_count_ = 0;        // how many tokens have been recorded
+    float drift_step_ = 0.0f;    // world-space units per token (set after positions loaded)
+
     // Render loop
     std::thread render_thread_;
     std::atomic<bool> render_running_{false};
