@@ -105,6 +105,8 @@ if(APPLE)
         "-framework Metal"
         "-framework Foundation"
         "-framework QuartzCore"
+        "-framework CoreGraphics"
+        "-framework ImageIO"
     )
     target_compile_definitions(qntx-llama-cpp-plugin PRIVATE ACCELERATE_NEW_LAPACK)
     target_include_directories(qntx-llama-cpp-plugin PRIVATE

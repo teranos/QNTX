@@ -15,6 +15,9 @@
 #include <random>
 #include <vector>
 
+#include <CoreGraphics/CoreGraphics.h>
+#include <ImageIO/ImageIO.h>
+
 // Same MSL shader source proven in the Swift prototype.
 static const char* shader_source = R"(
 #include <metal_stdlib>
@@ -303,15 +306,39 @@ std::vector<uint8_t> MetalRenderer::render_nebula(const float* probabilities, in
     }
 
     // PNG encoding via CoreGraphics
-    // For now, return raw RGBA pixels — PNG encoding added next
-    // TODO: CGImageDestination for PNG like the Swift version
+    auto colorspace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+    auto cg_ctx = CGBitmapContextCreate(
+        ldr.data(), width, height, 8, width * 4, colorspace,
+        kCGImageAlphaPremultipliedLast);
+
+    std::vector<uint8_t> png_data;
+    if (cg_ctx) {
+        auto image = CGBitmapContextCreateImage(cg_ctx);
+        if (image) {
+            auto mutable_data = CFDataCreateMutable(nullptr, 0);
+            auto dest = CGImageDestinationCreateWithData(mutable_data, CFSTR("public.png"), 1, nullptr);
+            if (dest) {
+                CGImageDestinationAddImage(dest, image, nullptr);
+                if (CGImageDestinationFinalize(dest)) {
+                    auto len = CFDataGetLength(mutable_data);
+                    auto ptr = CFDataGetBytePtr(mutable_data);
+                    png_data.assign(ptr, ptr + len);
+                }
+                CFRelease(dest);
+            }
+            CFRelease(mutable_data);
+            CGImageRelease(image);
+        }
+        CGContextRelease(cg_ctx);
+    }
+    CGColorSpaceRelease(colorspace);
 
     rp_desc->release();
     hdr_tex->release();
     particle_buf->release();
     prob_buf->release();
 
-    return ldr;
+    return png_data;
 }
 
 std::vector<uint8_t> MetalRenderer::render_test(int width, int height) {
