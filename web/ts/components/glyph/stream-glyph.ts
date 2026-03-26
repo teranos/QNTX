@@ -94,9 +94,10 @@ export interface StreamGlyphContent {
 
 // ── Token rendering ─────────────────────────────────────────────────
 
-function renderToken(token: StreamToken): HTMLSpanElement {
+function renderToken(token: StreamToken, tokenIndex: number): HTMLSpanElement {
     const span = document.createElement('span');
     span.textContent = token.text;
+    span.dataset.tokenIndex = String(tokenIndex);
 
     if (token.signal) {
         span.style.backgroundColor = confidenceToColor(token.signal.confidence);
@@ -205,22 +206,30 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
     element.appendChild(output);
 
     // Render restored tokens
-    for (const token of tokens) {
-        output.appendChild(renderToken(token));
+    for (let i = 0; i < tokens.length; i++) {
+        output.appendChild(renderToken(tokens[i], i));
     }
 
-    // Token hover popup — event delegation on the output container
+    // Token hover popup + nebula scrub — event delegation on the output container
     const popup = createTokenPopup();
     output.addEventListener('mouseenter', (e: MouseEvent) => {
         const target = e.target as HTMLElement;
         if (target.tagName === 'SPAN' && target.dataset.confidence) {
             popup.show(target as HTMLSpanElement);
+            if (target.dataset.tokenIndex) {
+                document.dispatchEvent(new CustomEvent('nebula-scrub', {
+                    detail: { index: parseInt(target.dataset.tokenIndex, 10) },
+                }));
+            }
         }
     }, true);
     output.addEventListener('mouseleave', (e: MouseEvent) => {
         const target = e.target as HTMLElement;
         if (target.tagName === 'SPAN') {
             popup.hide();
+            document.dispatchEvent(new CustomEvent('nebula-scrub', {
+                detail: { index: -1 },
+            }));
         }
     }, true);
 
@@ -248,8 +257,9 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
             if (!msg.content) return;
 
             const token: StreamToken = { text: msg.content, signal: msg.signal };
+            const tokenIndex = tokens.length;
             tokens.push(token);
-            output.appendChild(renderToken(token));
+            output.appendChild(renderToken(token, tokenIndex));
             output.scrollTop = output.scrollHeight;
         });
     }
