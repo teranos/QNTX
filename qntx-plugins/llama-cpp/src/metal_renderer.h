@@ -1,5 +1,6 @@
 #pragma once
 
+#include <condition_variable>
 #include <cstdint>
 #include <mutex>
 #include <string>
@@ -34,13 +35,19 @@ public:
     std::vector<uint8_t> render_test(int width, int height);
 
     // Store/retrieve the latest rendered frame (thread-safe).
-    void set_latest_frame(std::vector<uint8_t> pixels, int width, int height);
+    void set_latest_frame(std::vector<uint8_t> png, int width, int height);
     std::vector<uint8_t> get_latest_frame(int& width, int& height);
+
+    // Block until a new frame is available (for WebSocket push).
+    // Returns false if timed out (no new frame within timeout_ms).
+    std::vector<uint8_t> wait_for_frame(int timeout_ms);
 
 private:
     std::mutex frame_mutex_;
+    std::condition_variable frame_cv_;
     std::vector<uint8_t> latest_frame_;
     int frame_width_ = 0, frame_height_ = 0;
+    uint64_t frame_seq_ = 0;
     MTL::Device* device_ = nullptr;
     MTL::CommandQueue* queue_ = nullptr;
     MTL::ComputePipelineState* compute_pipeline_ = nullptr;
