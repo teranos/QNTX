@@ -1,6 +1,7 @@
 #include "plugin.h"
 #include "base64.h"
 #include "log_capture.h"
+#include "metal_renderer.h"
 #include "pdf_extract.h"
 
 #include <algorithm>
@@ -9,7 +10,11 @@
 
 // --- LlamaCppPlugin (DomainPluginService) ---
 
-LlamaCppPlugin::LlamaCppPlugin() {}
+LlamaCppPlugin::LlamaCppPlugin() : renderer_(std::make_unique<MetalRenderer>()) {
+    renderer_->setup();
+}
+
+LlamaCppPlugin::~LlamaCppPlugin() = default;
 
 grpc::Status LlamaCppPlugin::Metadata(grpc::ServerContext* ctx,
                                        const protocol::Empty* req,
@@ -103,6 +108,49 @@ grpc::Status LlamaCppPlugin::RegisterGlyphs(grpc::ServerContext* ctx,
 grpc::Status LlamaCppPlugin::HandleHTTP(grpc::ServerContext* ctx,
                                          const protocol::HTTPRequest* req,
                                          protocol::HTTPResponse* resp) {
+    if (req->method() == "POST" && req->path() == "/render-test") {
+        if (!renderer_->is_ready()) {
+            resp->set_status_code(503);
+            resp->set_body("{\"error\":\"Metal not available\"}");
+            auto* h = resp->add_headers();
+            h->set_name("Content-Type");
+            h->add_values("application/json");
+            return grpc::Status::OK;
+        }
+
+        // Use real PCA positions if model is loaded
+        if (engine_.is_loaded()) {
+            const auto& pos = engine_.vocab_positions_3d();
+            if (!pos.empty()) {
+                renderer_->set_vocab_positions(pos.data(), pos.size() / 3);
+            }
+        }
+
+        int w = 800, h = 600;
+        auto pixels = renderer_->render_test(w, h);
+        if (pixels.empty()) {
+            resp->set_status_code(500);
+            resp->set_body("{\"error\":\"render failed\"}");
+            auto* hdr = resp->add_headers();
+            hdr->set_name("Content-Type");
+            hdr->add_values("application/json");
+            return grpc::Status::OK;
+        }
+
+        resp->set_status_code(200);
+        resp->set_body(pixels.data(), pixels.size());
+        auto* ct = resp->add_headers();
+        ct->set_name("Content-Type");
+        ct->add_values("application/octet-stream");
+        auto* wh = resp->add_headers();
+        wh->set_name("X-Width");
+        wh->add_values(std::to_string(w));
+        auto* hh = resp->add_headers();
+        hh->set_name("X-Height");
+        hh->add_values(std::to_string(h));
+        return grpc::Status::OK;
+    }
+
     if (req->method() == "GET" && req->path() == "/vocab-positions") {
         if (!engine_.is_loaded()) {
             resp->set_status_code(503);
