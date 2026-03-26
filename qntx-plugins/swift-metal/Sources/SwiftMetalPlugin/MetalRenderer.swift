@@ -16,6 +16,8 @@ final class MetalRenderer: @unchecked Sendable {
     // Cached buffers for vocab positions (fixed per model)
     private var positionsBuffer: MTLBuffer?
     private var vocabSize: Int = 0
+    private var positionCenter: SIMD2<Float> = .zero
+    private var positionExtent: Float = 1.0
 
     var isReady: Bool { device != nil && commandQueue != nil }
 
@@ -90,6 +92,19 @@ final class MetalRenderer: @unchecked Sendable {
             length: positions.count * MemoryLayout<Float>.size,
             options: .storageModeShared
         )
+
+        // Compute bounding box for auto-fitting MVP
+        var minX: Float = .infinity, maxX: Float = -.infinity
+        var minY: Float = .infinity, maxY: Float = -.infinity
+        for i in 0..<vocabSize {
+            let x = positions[i * 3]
+            let y = positions[i * 3 + 1]
+            minX = min(minX, x); maxX = max(maxX, x)
+            minY = min(minY, y); maxY = max(maxY, y)
+        }
+        positionCenter = SIMD2<Float>((minX + maxX) / 2, (minY + maxY) / 2)
+        positionExtent = max(maxX - minX, maxY - minY) / 2
+        if positionExtent < 1e-6 { positionExtent = 1.0 }
     }
 
     /// Render a probability distribution as a particle nebula.
@@ -178,20 +193,27 @@ final class MetalRenderer: @unchecked Sendable {
         return hdrTextureToPNG(device: device, texture: hdrTexture, width: width, height: height)
     }
 
-    /// Build a simple orthographic MVP that maps PCA coordinate space to clip space.
+    /// Build an orthographic MVP that auto-fits to position bounding box.
     private func buildMVP(width: Float, height: Float) -> simd_float4x4 {
-        // Scale positions to fit — PCA positions can have arbitrary range.
-        // Use a fixed scale that works for typical embedding projections.
-        // This will be auto-fitted later based on actual position bounds.
-        let scale: Float = 0.02
+        let scale: Float = 0.9 / positionExtent  // fit 90% of viewport
         let aspect = width / height
+        let cx = positionCenter.x
+        let cy = positionCenter.y
 
-        return simd_float4x4(
+        // Scale then translate to center
+        let s = simd_float4x4(
             SIMD4<Float>(scale / aspect, 0, 0, 0),
             SIMD4<Float>(0, scale, 0, 0),
             SIMD4<Float>(0, 0, scale, 0),
             SIMD4<Float>(0, 0, 0, 1)
         )
+        let t = simd_float4x4(
+            SIMD4<Float>(1, 0, 0, 0),
+            SIMD4<Float>(0, 1, 0, 0),
+            SIMD4<Float>(0, 0, 1, 0),
+            SIMD4<Float>(-cx, -cy, 0, 1)
+        )
+        return s * t
     }
 
     /// Convert HDR float16 texture to tonemapped LDR PNG.
