@@ -475,8 +475,8 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
         ? req->user_prompt()
         : context + req->user_prompt();
 
-    // TODO: support streaming — return partial tokens as they're sampled
-    // TODO: support multi-turn — gRPC protocol currently carries no message history
+    // TODO(STO): support multi-turn — gRPC protocol currently carries no message history
+    // TODO(SSL): log signal summary for StreamChat (currently only Chat logs it)
     auto result = engine.chat(req->system_prompt(),
                               user_prompt,
                               temperature,

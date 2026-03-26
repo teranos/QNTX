@@ -1,5 +1,21 @@
 #pragma once
 
+// TODO(GHB): Ghost branches — draw faint trails from chosen token to top-k
+//   runner-up positions at each generation step. Data exists in TokenSignal.top_k.
+// TODO(B64): WebSocket frames are base64-encoded PNG — 33% overhead. Binary
+//   WebSocket frames would eliminate this.
+// TODO(CAM): No camera control — fixed orthographic MVP auto-fitted to bounds.
+//   Interactive rotation/zoom/pan would let users explore vocabulary space.
+// TODO(KFC): Keyframe history capped at 512 (64MB). Longer generations lose
+//   early frames. No disk persistence — closing the glyph loses all history.
+// TODO(TRU): Trail positions vector is unbounded while keyframes are capped.
+// TODO(STR): GPU-accelerated steering — Metal compute shader could modify the
+//   logit buffer before sampling. Click a region of the nebula to boost tokens
+//   in that region. Infrastructure exists (writable Metal buffer, sampler reads
+//   from same memory) but no input→buffer→sampler path is wired.
+// TODO(PVH): PCA projection accesses private llama-model.h header to read
+//   tok_embd.weight. Version-fragile against llama.cpp internal changes.
+
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
