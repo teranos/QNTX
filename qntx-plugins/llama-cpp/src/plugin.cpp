@@ -45,6 +45,16 @@ grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
         }
     }
 
+    // Set PCA positions on the renderer if model loaded
+    if (engine_.is_loaded() && renderer_->is_ready()) {
+        const auto& pos = engine_.vocab_positions_3d();
+        if (!pos.empty()) {
+            renderer_->set_vocab_positions(pos.data(), pos.size() / 3);
+            std::cout << "[metal-llama] Loaded " << pos.size() / 3
+                      << " vocab positions into renderer" << std::endl;
+        }
+    }
+
     // Flush condensed log summary — replaces 1000+ lines of stderr with a few stdout lines
     auto log_it = config.find("log_level");
     std::string log_level = (log_it != config.end()) ? log_it->second : "info";
@@ -108,6 +118,31 @@ grpc::Status LlamaCppPlugin::RegisterGlyphs(grpc::ServerContext* ctx,
 grpc::Status LlamaCppPlugin::HandleHTTP(grpc::ServerContext* ctx,
                                          const protocol::HTTPRequest* req,
                                          protocol::HTTPResponse* resp) {
+    if (req->method() == "GET" && req->path() == "/render-latest") {
+        int w = 0, h = 0;
+        auto pixels = renderer_->get_latest_frame(w, h);
+        if (pixels.empty()) {
+            resp->set_status_code(404);
+            resp->set_body("{\"error\":\"no frame rendered yet\"}");
+            auto* hdr = resp->add_headers();
+            hdr->set_name("Content-Type");
+            hdr->add_values("application/json");
+            return grpc::Status::OK;
+        }
+        resp->set_status_code(200);
+        resp->set_body(pixels.data(), pixels.size());
+        auto* ct = resp->add_headers();
+        ct->set_name("Content-Type");
+        ct->add_values("application/octet-stream");
+        auto* wh = resp->add_headers();
+        wh->set_name("X-Width");
+        wh->add_values(std::to_string(w));
+        auto* hh = resp->add_headers();
+        hh->set_name("X-Height");
+        hh->add_values(std::to_string(h));
+        return grpc::Status::OK;
+    }
+
     if (req->method() == "POST" && req->path() == "/render-test") {
         if (!renderer_->is_ready()) {
             resp->set_status_code(503);
@@ -320,6 +355,16 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
                       << " H=" << s.entropy << ")";
         }
         std::cout << std::endl;
+
+        // Render the last token's distribution as a nebula frame
+        const auto& last_sig = result.signals.back();
+        if (plugin_->renderer().is_ready() && !last_sig.full_distribution.empty()) {
+            auto frame = plugin_->renderer().render_nebula(
+                last_sig.full_distribution.data(), last_sig.full_distribution.size(), 800, 600);
+            if (!frame.empty()) {
+                plugin_->renderer().set_latest_frame(std::move(frame), 800, 600);
+            }
+        }
     }
 
     return grpc::Status::OK;
@@ -388,6 +433,15 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
             }
             for (float p : sig.full_distribution) {
                 signal->add_full_distribution(p);
+            }
+
+            // Render nebula frame from this token's distribution
+            if (plugin_->renderer().is_ready() && !sig.full_distribution.empty()) {
+                auto frame = plugin_->renderer().render_nebula(
+                    sig.full_distribution.data(), sig.full_distribution.size(), 800, 600);
+                if (!frame.empty()) {
+                    plugin_->renderer().set_latest_frame(std::move(frame), 800, 600);
+                }
             }
 
             return writer->Write(chunk);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -32,7 +33,14 @@ public:
     // Render with test data for verification.
     std::vector<uint8_t> render_test(int width, int height);
 
+    // Store/retrieve the latest rendered frame (thread-safe).
+    void set_latest_frame(std::vector<uint8_t> pixels, int width, int height);
+    std::vector<uint8_t> get_latest_frame(int& width, int& height);
+
 private:
+    std::mutex frame_mutex_;
+    std::vector<uint8_t> latest_frame_;
+    int frame_width_ = 0, frame_height_ = 0;
     MTL::Device* device_ = nullptr;
     MTL::CommandQueue* queue_ = nullptr;
     MTL::ComputePipelineState* compute_pipeline_ = nullptr;

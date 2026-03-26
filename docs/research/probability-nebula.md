@@ -30,8 +30,8 @@ For token positions: at model load, read the embedding matrix via `llama_model_g
 
 **Trail:** The chosen token at each step gets recorded. A line strip connects them — the generation path. Older segments fade. The trail shows the model's journey through vocabulary space.
 
-## Transport to swift-metal
+## Data flow
 
-swift-metal subscribes to llama-cpp's `StreamChat` gRPC stream. Each `LLMChatChunk` carries the full distribution in `TokenSignalProto.full_distribution`. swift-metal's `HandleWebSocket` or a direct gRPC subscription receives chunks and feeds them to the Metal render pipeline.
+The renderer lives inside llama-cpp (Metal-cpp). The full distribution is a `float*` in the same process — `capture_signal()` produces it, the compute shader consumes it directly. No serialization, no transport.
 
-Token positions are fetched once via HTTP (`GET /api/llama-cpp/vocab-positions`) or a new gRPC RPC at the start of a generation.
+Token positions are computed once at model load via PCA of the embedding matrix (Accelerate BLAS) and cached in memory.
