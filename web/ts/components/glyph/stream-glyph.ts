@@ -11,9 +11,15 @@
  * Persists token data to canvas state so content survives page refresh.
  *
  * Token hover popup showing signal data and top-K candidates — see token-popup.ts
- * TODO: Copy button (result glyph has one, stream glyph doesn't)
- * TODO: Factor entropy and top_gap into color mapping, not just confidence
- * TODO: Window morph support (separate PR)
+ * TODO(CPY): Copy button (result glyph has one, stream glyph doesn't)
+ * TODO(ECM): Factor entropy and top_gap into color mapping, not just confidence.
+ *   Currently only confidence drives the amber heatmap. Entropy and top_gap are
+ *   captured in data-* attributes but unused in rendering.
+ * TODO(WMS): Window morph support (separate PR)
+ * TODO(SSL): Signal summary logging — StreamChat path has no post-generation
+ *   summary (Chat path logs entropy avg/max, confidence avg/min). Add equivalent.
+ * TODO(ATS): Write per-generation attestations with signal attributes to ATS
+ *   after stream completes. See inference-internals.md checklist.
  */
 
 import type { Glyph } from './glyph';
