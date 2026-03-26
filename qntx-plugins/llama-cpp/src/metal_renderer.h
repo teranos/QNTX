@@ -35,6 +35,10 @@ public:
     // The render loop interpolates between them at 60fps.
     void submit_distribution(const float* probabilities, int vocab_size);
 
+    // Record the chosen token's position in the generation trail.
+    void add_trail_point(int token_id);
+    void clear_trail();
+
     // Start/stop the background render loop (60fps interpolation).
     void start_render_loop(int width, int height);
     void stop_render_loop();
@@ -70,9 +74,15 @@ private:
     MTL::ComputePipelineState* compute_pipeline_ = nullptr;
     MTL::ComputePipelineState* lerp_pipeline_ = nullptr;
     MTL::RenderPipelineState* render_pipeline_ = nullptr;
+    MTL::RenderPipelineState* trail_pipeline_ = nullptr;
     MTL::Buffer* positions_buffer_ = nullptr;
     int vocab_size_ = 0;
     float center_x_ = 0, center_y_ = 0, extent_ = 1.0f;
+
+    // Generation trail — chosen token positions
+    std::vector<float> trail_positions_;  // flat float3 array
+    std::mutex trail_mutex_;
+    const float* vocab_positions_ptr_ = nullptr;  // borrowed pointer to cached positions
 
     // Interpolation state
     MTL::Buffer* prob_a_ = nullptr;  // previous distribution

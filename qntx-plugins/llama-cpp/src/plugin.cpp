@@ -553,6 +553,11 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
         ? req->user_prompt()
         : context + req->user_prompt();
 
+    // Clear trail for new generation
+    if (plugin_->renderer().is_ready()) {
+        plugin_->renderer().clear_trail();
+    }
+
     // Stream tokens as they're generated
     auto result = engine.stream_chat(
         req->system_prompt(), user_prompt, temperature, max_tokens,
@@ -576,10 +581,11 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
                 signal->add_full_distribution(p);
             }
 
-            // Submit distribution for interpolated rendering
+            // Submit distribution for interpolated rendering + record trail
             if (plugin_->renderer().is_ready() && !sig.full_distribution.empty()) {
                 plugin_->renderer().submit_distribution(
                     sig.full_distribution.data(), sig.full_distribution.size());
+                plugin_->renderer().add_trail_point(sig.token_id);
             }
 
             return writer->Write(chunk);
