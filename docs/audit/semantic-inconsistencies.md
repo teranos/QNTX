@@ -91,11 +91,23 @@ Same function name, different semantics. Callers importing from the wrong module
 
 Synchronous function signatures matching `localStorage` API. Implementation writes to in-memory cache synchronously, then fires async IndexedDB writes that can silently fail (errors are caught and logged/toasted, not propagated). Callers assume synchronous persistence semantics.
 
+### MEDIUM — `dispatchSearch` orchestrates three search strategies
+
+**`web/ts/system-drawer.ts:110`**
+
+Name says "dispatch search" — send a search request somewhere. Implementation runs local results synchronously, fires WASM rich search against IndexedDB, and conditionally sends a server search message for semantic enrichment. Three independent search pipelines with different latency profiles, not a single dispatch.
+
 ### LOW — `createFollowUpZone` wires full interactive form lifecycle
 
 **`web/ts/components/glyph/glyph-followup.ts:82`**
 
 Name says "create zone" (DOM factory). Implementation also wires event handlers, manages form state, coordinates submission logic, and dispatches API calls via `defaultExecute()`. It is a full interactive component constructor.
+
+### LOW — `handleParseResponse` mutates window global
+
+**`web/ts/ats-semantic-tokens-client.ts:58`**
+
+Name says "handle parse response" — process a message. Implementation also sets `window.atsParseState` (line 72), a global side effect invisible from the function signature or name.
 
 ---
 
