@@ -128,6 +128,48 @@ if(HAS_METAL)
     target_include_directories(qntx-llama-cpp-plugin PRIVATE
         ${CMAKE_SOURCE_DIR}/vendor/metal-cpp
     )
+
+    # Embed shader source as a C string literal for runtime compilation fallback.
+    # shaders.metal is the single source of truth; shaders.metal.inc is generated.
+    set(SHADER_SRC "${CMAKE_SOURCE_DIR}/src/shaders.metal")
+    set(SHADER_INC "${CMAKE_BINARY_DIR}/shaders.metal.inc")
+    add_custom_command(
+        OUTPUT ${SHADER_INC}
+        COMMAND ${CMAKE_COMMAND} -DINPUT=${SHADER_SRC} -DOUTPUT=${SHADER_INC}
+            -P ${CMAKE_SOURCE_DIR}/cmake/embed_string.cmake
+        DEPENDS ${SHADER_SRC}
+        COMMENT "Embedding shaders.metal as C string"
+    )
+    add_custom_target(shader_inc ALL DEPENDS ${SHADER_INC})
+    add_dependencies(qntx-llama-cpp-plugin shader_inc)
+    target_include_directories(qntx-llama-cpp-plugin PRIVATE ${CMAKE_BINARY_DIR})
+
+    # Optional: pre-compile metallib if Metal toolchain is available
+    execute_process(
+        COMMAND xcrun metal -v
+        RESULT_VARIABLE METAL_TOOLCHAIN_RESULT
+        OUTPUT_QUIET ERROR_QUIET
+    )
+    if(METAL_TOOLCHAIN_RESULT EQUAL 0)
+        set(SHADER_AIR "${CMAKE_BINARY_DIR}/shaders.air")
+        set(SHADER_LIB "${CMAKE_BINARY_DIR}/default.metallib")
+        add_custom_command(
+            OUTPUT ${SHADER_AIR}
+            COMMAND xcrun metal -c ${SHADER_SRC} -o ${SHADER_AIR}
+            DEPENDS ${SHADER_SRC}
+            COMMENT "Compiling shaders.metal → AIR"
+        )
+        add_custom_command(
+            OUTPUT ${SHADER_LIB}
+            COMMAND xcrun metallib ${SHADER_AIR} -o ${SHADER_LIB}
+            DEPENDS ${SHADER_AIR}
+            COMMENT "Linking shaders.air → default.metallib"
+        )
+        add_custom_target(metal_shaders ALL DEPENDS ${SHADER_LIB})
+        add_dependencies(qntx-llama-cpp-plugin metal_shaders)
+    else()
+        message(STATUS "Metal toolchain not available — shaders will compile at runtime")
+    endif()
 endif()
 
 # mupdf-third bundles freetype/zlib/etc — only present with static MuPDF installs
