@@ -89,7 +89,7 @@ Without the `rustembeddings` build tag, all endpoints return 503.
 
 Embeddings are 384-dimensional — too high to visualize directly. The `qntx-reduce` plugin projects them to 2D via UMAP for canvas visualization.
 
-See [qntx-reduce/README.md](../qntx-reduce/README.md) for setup and API details.
+See [qntx-reduce/README.md](../qntx-plugins/qntx-reduce/README.md) for setup and API details.
 
 **Flow:** `POST /api/embeddings/project` reads all embeddings, calls the reduce plugin's `/fit` endpoint, and writes `projection_x`/`projection_y` back to the embeddings table. New attestations are auto-projected via `/transform` if the model is fitted.
 

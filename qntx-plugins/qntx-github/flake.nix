@@ -24,10 +24,10 @@
         qntx-github = pkgs.buildGoModule {
           pname = "qntx-github-plugin";
           version = self.rev or "dev";
-          src = ../.; # Root of QNTX repo (needs parent code for imports)
+          src = ../../.; # Root of QNTX repo (needs parent code for imports)
 
           # Import shared vendorHash (builds from same root go.mod)
-          vendorHash = import ../nix/vendor-hash.nix;
+          vendorHash = import ../../nix/vendor-hash.nix;
 
           # Disable workspace for Nix vendoring
           preBuild = ''

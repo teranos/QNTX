@@ -2,6 +2,6 @@ go 1.24.6
 
 use (
 	.
-	./qntx-github
+	./qntx-plugins/qntx-github
 	./typegen
 )
