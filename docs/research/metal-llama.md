@@ -158,14 +158,16 @@ Chosen token recorded per step. Line strip connects chosen-token positions — t
 
 - [x] WebSocket frame push (`HandleWebSocket` + `wait_for_frame`)
 - [x] Nebula glyph (plugin-provided, conditional on Metal)
-- [ ] Keyframe interpolation at 60fps
-- [ ] Generation trail (line strip of chosen tokens)
+- [x] Keyframe interpolation at 60fps
+- [x] Generation trail (line strip of chosen tokens)
 
-### Step 5: Timeline scrub
+### Step 5: Timeline scrub *(done)*
 
-Store all keyframes (full distributions) for the generation. A scrub control lets the viewer drag backwards and forwards through the sequence. The nebula rewinds — cloud re-blooms, trail un-draws. Pure replay, no re-inference.
+Hover a token in the stream glyph to scrub the nebula to that token's distribution. The text IS the timeline — no separate scrubber UI. Stream glyph dispatches `nebula-scrub` CustomEvent with token index, nebula module sends `scrub:N` over WebSocket, C++ renders the stored keyframe. Trail shader splits at the scrub point: warm path up to the hovered token, cool blue for the future path beyond it. mouseleave resumes live mode.
 
-**Done when:** after a generation completes, dragging the timeline backwards smoothly reverses the nebula animation.
+Per-token keyframe history stored CPU-side (capped at 512 entries). Each `store_keyframe` in `StreamChat` captures the full distribution alongside `submit_distribution` and `add_trail_point`.
+
+**Done when:** ~~after a generation completes, dragging the timeline backwards smoothly reverses the nebula animation.~~ Hovering tokens scrubs the nebula and splits the trail. Works.
 
 ### Step 6: Ghost branches
 
