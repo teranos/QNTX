@@ -47,85 +47,311 @@ export function renderComponentGallery(root: HTMLElement) {
   ])
   section.appendChild(glyphBtnMatrix)
 
-  // Three mini glyphs on a mini canvas — real SDK calls
-  const canvas = document.createElement('div')
-  canvas.className = 'canvas-workspace'
-  canvas.style.position = 'relative'
-  canvas.style.height = '210px'
-  canvas.style.marginBottom = '10px'
-  canvas.style.border = '1px solid var(--border-on-dark)'
-  canvas.style.borderRadius = 'var(--border-radius)'
-  canvas.style.overflow = 'hidden'
+  // ── Focus ──
+  section.appendChild(sectionGlyph('Focus', 'Double-click a glyph to focus it. Escape to unfocus. Viewport width determines the split.'))
 
-  // ix-json: default title bar + SDK primitives
-  const ixJsonGlyph: Glyph = { id: 'demo-ix-json', title: 'ix-json', symbol: 'ix-json', x: 10, y: 10, renderContent: () => document.createElement('div') }
-  const ixJsonUI = createGlyphUI(ixJsonGlyph, 'ix-json')
-  const ixJson = ixJsonUI.glyph({
-    defaults: { x: 10, y: 10, width: 280, height: 190 },
-    titleBar: { label: 'ix-json' },
-  })
+  // Breakpoints reference
+  section.appendChild(glyphSection('Breakpoints', 'System breakpoints (tokens.css) and focus column splits', (body) => {
+    const table = document.createElement('div')
+    table.className = 'button-matrix'
+    table.style.gridTemplateColumns = '100px 100px 1fr'
 
-  const urlInput = ixJsonUI.input({ label: 'API URL', placeholder: 'https://api.example.com/data' })
-  ixJson.content.appendChild(urlInput)
-
-  const status = ixJsonUI.statusLine()
-  let demoState = 0
-  const fetchBtn = ixJsonUI.button({ label: 'Fetch', primary: true, onClick: () => {
-    if (demoState === 0) {
-      status.show('Fetching...')
-      demoState = 1
-      setTimeout(() => fetchBtn.click(), 800)
-    } else if (demoState === 1) {
-      const inp = urlInput.querySelector('input')
-      if (inp?.value) {
-        status.show('OK — 200, 1.4kb')
-        demoState = 2
-        setTimeout(() => { status.clear(); demoState = 0 }, 4000)
-      } else {
-        status.show('No URL provided', true)
-        demoState = 0
-      }
+    const headers = ['Width', 'Columns', 'System breakpoint']
+    for (const h of headers) {
+      const cell = document.createElement('div')
+      cell.className = 'button-matrix-header'
+      cell.textContent = h
+      table.appendChild(cell)
     }
-  }})
-  ixJson.content.appendChild(fetchBtn)
-  ixJson.content.appendChild(status.element)
-  canvas.appendChild(ixJson.element)
 
-  // py-glyph: Python blue title bar
-  const pyGlyphData: Glyph = { id: 'demo-py', title: 'py-glyph', symbol: 'py', x: 300, y: 10, renderContent: () => document.createElement('div') }
-  const pyUI = createGlyphUI(pyGlyphData, 'py')
-  const py = pyUI.glyph({
-    defaults: { x: 300, y: 10, width: 280, height: 190 },
-    titleBar: { label: 'py-glyph', color: '#2a5578', labelColor: '#FFD43B', actions: [runBtn()] },
-  })
-  const pyCode = document.createElement('pre')
-  pyCode.style.fontFamily = 'monospace'
-  pyCode.style.fontSize = 'var(--font-size-sm)'
-  pyCode.style.color = 'var(--text-on-dark)'
-  pyCode.style.whiteSpace = 'pre-wrap'
-  pyCode.style.wordBreak = 'break-word'
-  pyCode.textContent = 'import time\nimport secrets\n\nfoo = [\'teach\', \'meld\']\nprint(secrets.choice(foo))'
-  py.content.appendChild(pyCode)
-  canvas.appendChild(py.element)
+    const rows: [string, string, string][] = [
+      ['< 480px', '1', 'phone portrait'],
+      ['480 \u2013 719px', '2', ''],
+      ['720 \u2013 767px', '3', ''],
+      ['768 \u2013 899px', '3', 'mobile (--breakpoint-mobile)'],
+      ['900 \u2013 959px', '3', 'tablet (--breakpoint-tablet)'],
+      ['960 \u2013 1199px', '4', ''],
+      ['1200px+', '4', 'desktop (--breakpoint-desktop)'],
+    ]
 
-  // ts-glyph: TypeScript amber title bar
-  const tsGlyphData: Glyph = { id: 'demo-ts', title: 'ts-glyph', symbol: 'ts', x: 590, y: 10, renderContent: () => document.createElement('div') }
-  const tsUI = createGlyphUI(tsGlyphData, 'ts')
-  const ts = tsUI.glyph({
-    defaults: { x: 590, y: 10, width: 280, height: 190 },
-    titleBar: { label: 'ts-glyph', color: '#5c3d1a', labelColor: '#f0c878', actions: [runBtn()] },
-  })
-  const tsCode = document.createElement('pre')
-  tsCode.style.fontFamily = 'monospace'
-  tsCode.style.fontSize = 'var(--font-size-sm)'
-  tsCode.style.color = 'var(--text-on-dark)'
-  tsCode.style.whiteSpace = 'pre-wrap'
-  tsCode.style.wordBreak = 'break-word'
-  tsCode.textContent = 'const subjects = ["alice", "bob"]\nconst id = generateASUID()\nconsole.log(id)'
-  ts.content.appendChild(tsCode)
-  canvas.appendChild(ts.element)
+    for (const [width, cols, system] of rows) {
+      const wCell = document.createElement('div')
+      wCell.className = 'button-matrix-rowlabel'
+      wCell.textContent = width
+      table.appendChild(wCell)
 
-  section.appendChild(canvas)
+      const cCell = document.createElement('div')
+      cCell.className = 'button-matrix-cell'
+      cCell.textContent = cols
+      table.appendChild(cCell)
+
+      const sCell = document.createElement('div')
+      sCell.className = 'button-matrix-cell'
+      sCell.style.color = system ? 'var(--text-on-dark)' : 'var(--text-on-dark-tertiary)'
+      sCell.textContent = system || '\u2014'
+      sCell.style.justifyContent = 'flex-start'
+      table.appendChild(sCell)
+    }
+
+    body.appendChild(table)
+  }))
+
+  // Focus demo — real SDK glyphs on a focusable canvas
+  section.appendChild(glyphSection('Focus demo', 'Double-click any glyph. Escape to unfocus. Resize browser or use presets to see split change.', (body) => {
+    const canvas = document.createElement('div')
+    canvas.className = 'canvas-workspace'
+    canvas.style.position = 'relative'
+    canvas.style.height = '320px'
+    canvas.style.overflow = 'hidden'
+    canvas.tabIndex = 0
+
+    // Track focus state
+    let focusedElement: HTMLElement | null = null
+    let columnOverride: number | null = null
+
+    // Compute split column count from viewport width (or use override)
+    function getColumnCount(): number {
+      if (columnOverride) return columnOverride
+      const w = canvas.clientWidth
+      if (w >= 960) return 4
+      if (w >= 720) return 3
+      if (w >= 480) return 2
+      return 1
+    }
+
+    function focusGlyph(el: HTMLElement) {
+      // Unfocus previous
+      if (focusedElement && focusedElement !== el) {
+        focusedElement.style.transition = 'transform 0.35s ease-out, width 0.35s ease-out, height 0.35s ease-out, left 0.35s ease-out, top 0.35s ease-out'
+        focusedElement.style.transform = ''
+        focusedElement.style.width = ''
+        focusedElement.style.height = ''
+        focusedElement.style.left = focusedElement.dataset.origLeft || ''
+        focusedElement.style.top = focusedElement.dataset.origTop || ''
+        focusedElement.style.zIndex = ''
+        const prev = focusedElement
+        setTimeout(() => { prev.style.transition = '' }, 350)
+      }
+
+      // Save original position on first focus of this element
+      if (!el.dataset.origLeft) {
+        el.dataset.origLeft = el.style.left
+        el.dataset.origTop = el.style.top
+      }
+
+      const cols = getColumnCount()
+      const colWidth = canvas.clientWidth / cols
+      const colIndex = Math.floor(cols / 2) // center column
+
+      el.style.transition = 'transform 0.35s ease-out, width 0.35s ease-out, height 0.35s ease-out, left 0.35s ease-out, top 0.35s ease-out'
+      el.style.left = `${colIndex * colWidth}px`
+      el.style.top = '0px'
+      el.style.width = `${colWidth}px`
+      el.style.height = `${canvas.clientHeight}px`
+      el.style.zIndex = '10'
+      setTimeout(() => { el.style.transition = '' }, 350)
+
+      focusedElement = el
+    }
+
+    function unfocus() {
+      if (!focusedElement) return
+      focusedElement.style.transition = 'transform 0.35s ease-out, width 0.35s ease-out, height 0.35s ease-out, left 0.35s ease-out, top 0.35s ease-out'
+      focusedElement.style.width = ''
+      focusedElement.style.height = ''
+      focusedElement.style.left = focusedElement.dataset.origLeft || ''
+      focusedElement.style.top = focusedElement.dataset.origTop || ''
+      focusedElement.style.zIndex = ''
+      const prev = focusedElement
+      setTimeout(() => { prev.style.transition = '' }, 350)
+      focusedElement = null
+    }
+
+    // ix-json: default title bar + SDK primitives
+    const ixJsonGlyph: Glyph = { id: 'demo-ix-json', title: 'ix-json', symbol: 'ix-json', x: 10, y: 10, renderContent: () => document.createElement('div') }
+    const ixJsonUI = createGlyphUI(ixJsonGlyph, 'ix-json')
+    const ixJson = ixJsonUI.glyph({
+      defaults: { x: 10, y: 10, width: 280, height: 190 },
+      titleBar: { label: 'ix-json' },
+    })
+
+    const urlInput = ixJsonUI.input({ label: 'API URL', placeholder: 'https://api.example.com/data' })
+    ixJson.content.appendChild(urlInput)
+
+    const status = ixJsonUI.statusLine()
+    let demoState = 0
+    const fetchBtn = ixJsonUI.button({ label: 'Fetch', primary: true, onClick: () => {
+      if (demoState === 0) {
+        status.show('Fetching...')
+        demoState = 1
+        setTimeout(() => fetchBtn.click(), 800)
+      } else if (demoState === 1) {
+        const inp = urlInput.querySelector('input')
+        if (inp?.value) {
+          status.show('OK — 200, 1.4kb')
+          demoState = 2
+          setTimeout(() => { status.clear(); demoState = 0 }, 4000)
+        } else {
+          status.show('No URL provided', true)
+          demoState = 0
+        }
+      }
+    }})
+    ixJson.content.appendChild(fetchBtn)
+    ixJson.content.appendChild(status.element)
+    canvas.appendChild(ixJson.element)
+
+    // py-glyph: Python blue title bar
+    const pyGlyphData: Glyph = { id: 'demo-py', title: 'py-glyph', symbol: 'py', x: 300, y: 10, renderContent: () => document.createElement('div') }
+    const pyUI = createGlyphUI(pyGlyphData, 'py')
+    const py = pyUI.glyph({
+      defaults: { x: 300, y: 10, width: 280, height: 190 },
+      titleBar: { label: 'py-glyph', color: '#2a5578', labelColor: '#FFD43B', actions: [runBtn()] },
+    })
+    const pyCode = document.createElement('pre')
+    pyCode.style.fontFamily = 'monospace'
+    pyCode.style.fontSize = 'var(--font-size-sm)'
+    pyCode.style.color = 'var(--text-on-dark)'
+    pyCode.style.whiteSpace = 'pre-wrap'
+    pyCode.style.wordBreak = 'break-word'
+    pyCode.textContent = 'import time\nimport secrets\n\nfoo = [\'teach\', \'meld\']\nprint(secrets.choice(foo))'
+    py.content.appendChild(pyCode)
+    canvas.appendChild(py.element)
+
+    // ts-glyph: TypeScript amber title bar
+    const tsGlyphData: Glyph = { id: 'demo-ts', title: 'ts-glyph', symbol: 'ts', x: 590, y: 10, renderContent: () => document.createElement('div') }
+    const tsUI = createGlyphUI(tsGlyphData, 'ts')
+    const ts = tsUI.glyph({
+      defaults: { x: 590, y: 10, width: 280, height: 190 },
+      titleBar: { label: 'ts-glyph', color: '#5c3d1a', labelColor: '#f0c878', actions: [runBtn()] },
+    })
+    const tsCode = document.createElement('pre')
+    tsCode.style.fontFamily = 'monospace'
+    tsCode.style.fontSize = 'var(--font-size-sm)'
+    tsCode.style.color = 'var(--text-on-dark)'
+    tsCode.style.whiteSpace = 'pre-wrap'
+    tsCode.style.wordBreak = 'break-word'
+    tsCode.textContent = 'const subjects = ["alice", "bob"]\nconst id = generateASUID()\nconsole.log(id)'
+    ts.content.appendChild(tsCode)
+    canvas.appendChild(ts.element)
+
+    // Double-click to focus
+    canvas.addEventListener('dblclick', (e) => {
+      const target = (e.target as HTMLElement).closest('[data-glyph-id]') as HTMLElement | null
+      if (target && canvas.contains(target)) {
+        canvas.focus()
+        focusGlyph(target)
+      }
+    })
+
+    // Escape to unfocus
+    canvas.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && focusedElement) {
+        e.preventDefault()
+        unfocus()
+      }
+    })
+
+    // Click background to unfocus
+    canvas.addEventListener('click', (e) => {
+      const target = (e.target as HTMLElement).closest('[data-glyph-id]')
+      if (!target && focusedElement) unfocus()
+    })
+
+    // Viewport presets
+    const presets: [string, number, number][] = [
+      ['Phone', 375, 667],
+      ['Phone landscape', 667, 375],
+      ['Tablet', 768, 1024],
+      ['Desktop', 1100, 320],
+    ]
+
+    const controls = document.createElement('div')
+    controls.style.display = 'flex'
+    controls.style.gap = '4px'
+    controls.style.marginBottom = '6px'
+
+    let activePreset: string | null = null
+
+    for (const [label, w, h] of presets) {
+      const btn = document.createElement('button')
+      btn.className = 'qntx-btn qntx-btn-small qntx-btn-ghost'
+      const btnLabel = document.createElement('span')
+      btnLabel.className = 'qntx-btn-label'
+      btnLabel.textContent = label
+      btn.appendChild(btnLabel)
+
+      btn.addEventListener('click', () => {
+        if (activePreset === label) {
+          canvas.style.width = ''
+          canvas.style.height = '320px'
+          canvas.style.margin = ''
+          activePreset = null
+          controls.querySelectorAll('.qntx-btn').forEach(b => b.classList.remove('qntx-btn-primary'))
+        } else {
+          canvas.style.width = `${w}px`
+          canvas.style.height = `${h}px`
+          canvas.style.margin = '0 auto'
+          activePreset = label
+          controls.querySelectorAll('.qntx-btn').forEach(b => b.classList.remove('qntx-btn-primary'))
+          btn.classList.add('qntx-btn-primary')
+        }
+        if (focusedElement) unfocus()
+        updateIndicator()
+      })
+      controls.appendChild(btn)
+    }
+
+    // Separator
+    const sep = document.createElement('span')
+    sep.style.borderLeft = '1px solid var(--border-on-dark)'
+    sep.style.margin = '0 2px'
+    controls.appendChild(sep)
+
+    // Column override buttons
+    for (const n of [2, 3, 4]) {
+      const btn = document.createElement('button')
+      btn.className = 'qntx-btn qntx-btn-small qntx-btn-ghost'
+      const btnLabel = document.createElement('span')
+      btnLabel.className = 'qntx-btn-label'
+      btnLabel.textContent = `${n} col`
+      btn.appendChild(btnLabel)
+
+      btn.addEventListener('click', () => {
+        if (columnOverride === n) {
+          columnOverride = null
+          btn.classList.remove('qntx-btn-primary')
+        } else {
+          columnOverride = n
+          controls.querySelectorAll('.col-override').forEach(b => b.classList.remove('qntx-btn-primary'))
+          btn.classList.add('qntx-btn-primary')
+        }
+        if (focusedElement) unfocus()
+        updateIndicator()
+      })
+      btn.classList.add('col-override')
+      controls.appendChild(btn)
+    }
+    body.appendChild(controls)
+
+    // Column indicator
+    const indicator = document.createElement('div')
+    indicator.style.position = 'absolute'
+    indicator.style.bottom = '4px'
+    indicator.style.right = '8px'
+    indicator.style.fontSize = 'var(--font-size-xs)'
+    indicator.style.color = 'var(--text-on-dark-tertiary)'
+    function updateIndicator() {
+      indicator.textContent = `${getColumnCount()} columns @ ${canvas.clientWidth}px`
+    }
+    canvas.appendChild(indicator)
+
+    const observer = new ResizeObserver(updateIndicator)
+    observer.observe(canvas)
+    setTimeout(updateIndicator, 0)
+
+    body.appendChild(canvas)
+  }))
 
   // ── Internal Systems ──
   section.appendChild(sectionGlyph('Internal Systems', 'Used by QNTX core — not exposed to plugins'))
@@ -281,191 +507,6 @@ export function renderComponentGallery(root: HTMLElement) {
     ])
     autoHeightWrapper.style.maxWidth = '320px'
     body.appendChild(autoHeightWrapper)
-  }))
-
-  // ── Focus ──
-  section.appendChild(sectionGlyph('Focus', 'Double-click a glyph to focus it. Escape to unfocus. Viewport width determines the split.'))
-
-  section.appendChild(glyphSection('Focus demo', 'Double-click any glyph below. Resize browser to see split change.', (body) => {
-    const canvas = document.createElement('div')
-    canvas.className = 'canvas-workspace'
-    canvas.style.position = 'relative'
-    canvas.style.height = '320px'
-    canvas.style.overflow = 'hidden'
-    canvas.tabIndex = 0
-
-    // Track focus state
-    let focusedElement: HTMLElement | null = null
-
-    // Compute split column count from viewport width
-    function getColumnCount(): number {
-      const w = canvas.clientWidth
-      if (w >= 960) return 4
-      if (w >= 720) return 3
-      if (w >= 480) return 2
-      return 1
-    }
-
-    function focusGlyph(el: HTMLElement) {
-      // Unfocus previous
-      if (focusedElement && focusedElement !== el) {
-        focusedElement.style.transition = 'transform 0.35s ease-out, width 0.35s ease-out, height 0.35s ease-out, left 0.35s ease-out, top 0.35s ease-out'
-        focusedElement.style.transform = ''
-        focusedElement.style.width = ''
-        focusedElement.style.height = ''
-        focusedElement.style.left = focusedElement.dataset.origLeft || ''
-        focusedElement.style.top = focusedElement.dataset.origTop || ''
-        focusedElement.style.zIndex = ''
-        const prev = focusedElement
-        setTimeout(() => { prev.style.transition = '' }, 350)
-      }
-
-      // Save original position on first focus of this element
-      if (!el.dataset.origLeft) {
-        el.dataset.origLeft = el.style.left
-        el.dataset.origTop = el.style.top
-      }
-
-      const cols = getColumnCount()
-      const colWidth = canvas.clientWidth / cols
-      const colIndex = Math.floor(cols / 2) // center column
-
-      el.style.transition = 'transform 0.35s ease-out, width 0.35s ease-out, height 0.35s ease-out, left 0.35s ease-out, top 0.35s ease-out'
-      el.style.left = `${colIndex * colWidth}px`
-      el.style.top = '0px'
-      el.style.width = `${colWidth}px`
-      el.style.height = `${canvas.clientHeight}px`
-      el.style.zIndex = '10'
-      setTimeout(() => { el.style.transition = '' }, 350)
-
-      focusedElement = el
-    }
-
-    function unfocus() {
-      if (!focusedElement) return
-      focusedElement.style.transition = 'transform 0.35s ease-out, width 0.35s ease-out, height 0.35s ease-out, left 0.35s ease-out, top 0.35s ease-out'
-      focusedElement.style.width = ''
-      focusedElement.style.height = ''
-      focusedElement.style.left = focusedElement.dataset.origLeft || ''
-      focusedElement.style.top = focusedElement.dataset.origTop || ''
-      focusedElement.style.zIndex = ''
-      const prev = focusedElement
-      setTimeout(() => { prev.style.transition = '' }, 350)
-      focusedElement = null
-    }
-
-    // Create demo glyphs using SDK
-    const glyphConfigs = [
-      { id: 'focus-a', label: 'Glyph A', x: 10, y: 10, color: '#2a5578', labelColor: '#88ccff' },
-      { id: 'focus-b', label: 'Glyph B', x: 300, y: 10, color: '#5c3d1a', labelColor: '#f0c878' },
-      { id: 'focus-c', label: 'Glyph C', x: 590, y: 10, color: '#2a4a3a', labelColor: '#88ddaa' },
-    ]
-
-    for (const cfg of glyphConfigs) {
-      const glyphData: Glyph = { id: cfg.id, title: cfg.label, x: cfg.x, y: cfg.y, renderContent: () => document.createElement('div') }
-      const ui = createGlyphUI(glyphData, cfg.id)
-      const g = ui.glyph({
-        defaults: { x: cfg.x, y: cfg.y, width: 280, height: 190 },
-        titleBar: { label: cfg.label, color: cfg.color, labelColor: cfg.labelColor },
-      })
-
-      const content = document.createElement('pre')
-      content.style.fontFamily = 'monospace'
-      content.style.fontSize = 'var(--font-size-sm)'
-      content.style.color = 'var(--text-on-dark)'
-      content.style.padding = '8px'
-      content.textContent = `Double-click to focus ${cfg.label}\nEscape to unfocus\n\nViewport columns: resize to see`
-
-      g.content.appendChild(content)
-      canvas.appendChild(g.element)
-    }
-
-    // Double-click to focus
-    canvas.addEventListener('dblclick', (e) => {
-      const target = (e.target as HTMLElement).closest('[data-glyph-id]') as HTMLElement | null
-      if (target && canvas.contains(target)) {
-        canvas.focus()
-        focusGlyph(target)
-      }
-    })
-
-    // Escape to unfocus
-    canvas.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && focusedElement) {
-        e.preventDefault()
-        unfocus()
-      }
-    })
-
-    // Click background to unfocus
-    canvas.addEventListener('click', (e) => {
-      const target = (e.target as HTMLElement).closest('[data-glyph-id]')
-      if (!target && focusedElement) unfocus()
-    })
-
-    // Viewport presets
-    const presets: [string, number, number][] = [
-      ['Phone', 375, 667],
-      ['Phone landscape', 667, 375],
-      ['Tablet', 768, 1024],
-      ['Desktop', 1100, 320],
-    ]
-
-    const controls = document.createElement('div')
-    controls.style.display = 'flex'
-    controls.style.gap = '4px'
-    controls.style.marginBottom = '6px'
-
-    let activePreset: string | null = null
-
-    for (const [label, w, h] of presets) {
-      const btn = document.createElement('button')
-      btn.className = 'qntx-btn qntx-btn-small qntx-btn-ghost'
-      const btnLabel = document.createElement('span')
-      btnLabel.className = 'qntx-btn-label'
-      btnLabel.textContent = label
-      btn.appendChild(btnLabel)
-
-      btn.addEventListener('click', () => {
-        if (activePreset === label) {
-          // Toggle off — restore full width
-          canvas.style.width = ''
-          canvas.style.height = '320px'
-          canvas.style.margin = ''
-          activePreset = null
-          controls.querySelectorAll('.qntx-btn').forEach(b => b.classList.remove('qntx-btn-primary'))
-        } else {
-          canvas.style.width = `${w}px`
-          canvas.style.height = `${h}px`
-          canvas.style.margin = '0 auto'
-          activePreset = label
-          controls.querySelectorAll('.qntx-btn').forEach(b => b.classList.remove('qntx-btn-primary'))
-          btn.classList.add('qntx-btn-primary')
-        }
-        if (focusedElement) unfocus()
-        updateIndicator()
-      })
-      controls.appendChild(btn)
-    }
-    body.appendChild(controls)
-
-    // Column indicator
-    const indicator = document.createElement('div')
-    indicator.style.position = 'absolute'
-    indicator.style.bottom = '4px'
-    indicator.style.right = '8px'
-    indicator.style.fontSize = 'var(--font-size-xs)'
-    indicator.style.color = 'var(--text-on-dark-tertiary)'
-    function updateIndicator() {
-      indicator.textContent = `${getColumnCount()} columns @ ${canvas.clientWidth}px`
-    }
-    canvas.appendChild(indicator)
-
-    const observer = new ResizeObserver(updateIndicator)
-    observer.observe(canvas)
-    setTimeout(updateIndicator, 0)
-
-    body.appendChild(canvas)
   }))
 
   root.appendChild(section)

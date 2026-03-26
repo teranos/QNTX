@@ -4,6 +4,15 @@ Double-click a glyph to focus it. The glyph's DOM element transforms while the c
 
 Scroll direction maps to meld direction — left/right for horizontal melds, up/down for vertical. The layout reshapes continuously with scroll.
 
+## Breakpoints
+
+| Viewport width | Columns |
+|----------------|---------|
+| < 480px        | 1       |
+| 480–719px      | 2       |
+| 720–959px      | 3       |
+| 960px+         | 4       |
+
 ## Implementation
 
 ### Part 1: Foundation
