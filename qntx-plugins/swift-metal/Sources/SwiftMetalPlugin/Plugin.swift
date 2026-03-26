@@ -114,6 +114,10 @@ final class SwiftMetalPlugin: Protocol_DomainPluginService.SimpleServiceProtocol
             return await handleRender(request)
         }
 
+        if method == "POST" && path == "/set-positions" {
+            return handleSetPositions(request)
+        }
+
         if method == "GET" && path == "/status" {
             return handleStatus()
         }
@@ -192,6 +196,26 @@ final class SwiftMetalPlugin: Protocol_DomainPluginService.SimpleServiceProtocol
         contentType.name = "Content-Type"
         contentType.values = ["image/png"]
         resp.headers = [contentType]
+        return resp
+    }
+
+    private func handleSetPositions(_ request: Protocol_HTTPRequest) -> Protocol_HTTPResponse {
+        var resp = Protocol_HTTPResponse()
+        let body = request.body
+        let floatCount = body.count / MemoryLayout<Float>.size
+        guard floatCount > 0, floatCount % 3 == 0 else {
+            resp.statusCode = 400
+            resp.body = Data("{\"error\":\"body must be n*3 float32s, got \(body.count) bytes\"}".utf8)
+            resp.headers = [jsonHeader()]
+            return resp
+        }
+        let positions: [Float] = body.withUnsafeBytes { raw in
+            Array(raw.bindMemory(to: Float.self))
+        }
+        renderer.setVocabPositions(positions)
+        resp.statusCode = 200
+        resp.body = Data("{\"vocab_size\":\(floatCount / 3),\"bytes\":\(body.count)}".utf8)
+        resp.headers = [jsonHeader()]
         return resp
     }
 
