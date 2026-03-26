@@ -25,6 +25,7 @@
 #include <thread>
 #include <vector>
 
+#ifdef __APPLE__
 // Forward declarations — Metal-cpp types
 namespace MTL {
     class Device;
@@ -33,6 +34,7 @@ namespace MTL {
     class RenderPipelineState;
     class Buffer;
 }
+#endif
 
 class MetalRenderer {
 public:
@@ -83,6 +85,7 @@ public:
     std::vector<uint8_t> wait_for_frame(int timeout_ms);
 
 private:
+#ifdef __APPLE__
     // Frame output
     std::mutex frame_mutex_;
     std::condition_variable frame_cv_;
@@ -121,4 +124,5 @@ private:
     std::thread render_thread_;
     std::atomic<bool> render_running_{false};
     int render_width_ = 800, render_height_ = 600;
+#endif
 };
