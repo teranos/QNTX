@@ -120,6 +120,34 @@ fragment float4 particleFragment(
 
     return float4(in.color.rgb * alpha * in.color.a, alpha * in.color.a);
 }
+
+// --- Trail shaders ---
+
+struct TrailVertexOut {
+    float4 position [[position]];
+    float alpha;
+};
+
+vertex TrailVertexOut trailVertex(
+    device const float* positions [[buffer(0)]],
+    constant float4x4& mvp       [[buffer(1)]],
+    constant uint& trailCount    [[buffer(2)]],
+    uint vid [[vertex_id]]
+) {
+    float3 pos = float3(positions[vid * 3], positions[vid * 3 + 1], positions[vid * 3 + 2]);
+
+    TrailVertexOut out;
+    out.position = mvp * float4(pos, 1.0);
+    // Newest vertex (last) is brightest, oldest fades
+    float age = float(trailCount - 1 - vid) / max(1.0, float(trailCount - 1));
+    out.alpha = mix(1.0, 0.05, age * age);  // quadratic falloff
+    return out;
+}
+
+fragment float4 trailFragment(TrailVertexOut in [[stage_in]]) {
+    // Warm white with alpha decay, additive blending makes it glow
+    return float4(1.0, 0.85, 0.6, 1.0) * in.alpha * 0.7;
+}
 )";
 
 // IEEE 754 half → single precision
@@ -211,9 +239,35 @@ bool MetalRenderer::setup() {
     rpd->release();
     vertex_fn->release();
     fragment_fn->release();
+
+    if (!render_pipeline_) { library->release(); return false; }
+
+    // Trail render pipeline
+    auto trail_vertex_fn = library->newFunction(NS::String::string("trailVertex", NS::UTF8StringEncoding));
+    auto trail_fragment_fn = library->newFunction(NS::String::string("trailFragment", NS::UTF8StringEncoding));
+    if (!trail_vertex_fn || !trail_fragment_fn) {
+        std::cerr << "[metal-llama] trail vertex/fragment functions not found" << std::endl;
+        library->release();
+        return false;
+    }
+
+    auto trail_rpd = MTL::RenderPipelineDescriptor::alloc()->init();
+    trail_rpd->setVertexFunction(trail_vertex_fn);
+    trail_rpd->setFragmentFunction(trail_fragment_fn);
+    trail_rpd->colorAttachments()->object(0)->setPixelFormat(MTL::PixelFormatRGBA16Float);
+    trail_rpd->colorAttachments()->object(0)->setBlendingEnabled(true);
+    trail_rpd->colorAttachments()->object(0)->setSourceRGBBlendFactor(MTL::BlendFactorOne);
+    trail_rpd->colorAttachments()->object(0)->setDestinationRGBBlendFactor(MTL::BlendFactorOne);
+    trail_rpd->colorAttachments()->object(0)->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    trail_rpd->colorAttachments()->object(0)->setDestinationAlphaBlendFactor(MTL::BlendFactorOne);
+
+    trail_pipeline_ = device_->newRenderPipelineState(trail_rpd, &error);
+    trail_rpd->release();
+    trail_vertex_fn->release();
+    trail_fragment_fn->release();
     library->release();
 
-    if (!render_pipeline_) return false;
+    if (!trail_pipeline_) return false;
 
     std::cout << "[metal-llama] GPU ready: " << device_name() << std::endl;
     return true;
@@ -224,6 +278,7 @@ void MetalRenderer::teardown() {
     if (prob_a_) { prob_a_->release(); prob_a_ = nullptr; }
     if (prob_b_) { prob_b_->release(); prob_b_ = nullptr; }
     if (positions_buffer_) { positions_buffer_->release(); positions_buffer_ = nullptr; }
+    if (trail_pipeline_) { trail_pipeline_->release(); trail_pipeline_ = nullptr; }
     if (lerp_pipeline_) { lerp_pipeline_->release(); lerp_pipeline_ = nullptr; }
     if (compute_pipeline_) { compute_pipeline_->release(); compute_pipeline_ = nullptr; }
     if (render_pipeline_) { render_pipeline_->release(); render_pipeline_ = nullptr; }
@@ -247,6 +302,8 @@ void MetalRenderer::set_vocab_positions(const float* positions, int vocab_size) 
     if (positions_buffer_) positions_buffer_->release();
     positions_buffer_ = device_->newBuffer(positions, vocab_size * 3 * sizeof(float),
                                            MTL::ResourceStorageModeShared);
+    // Cache pointer for trail lookups (caller must keep data alive)
+    vocab_positions_ptr_ = positions;
 
     // Compute bounding box for auto-fit
     float min_x = INFINITY, max_x = -INFINITY;
@@ -464,6 +521,20 @@ void MetalRenderer::submit_distribution(const float* probabilities, int vocab_si
     }
 }
 
+void MetalRenderer::add_trail_point(int token_id) {
+    if (!vocab_positions_ptr_ || token_id < 0 || token_id >= vocab_size_) return;
+
+    std::lock_guard<std::mutex> lock(trail_mutex_);
+    trail_positions_.push_back(vocab_positions_ptr_[token_id * 3]);
+    trail_positions_.push_back(vocab_positions_ptr_[token_id * 3 + 1]);
+    trail_positions_.push_back(vocab_positions_ptr_[token_id * 3 + 2]);
+}
+
+void MetalRenderer::clear_trail() {
+    std::lock_guard<std::mutex> lock(trail_mutex_);
+    trail_positions_.clear();
+}
+
 std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) {
     if (!is_ready() || !positions_buffer_ || !prob_a_ || !prob_b_) return {};
 
@@ -523,6 +594,27 @@ std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) 
     render_enc->setVertexBytes(mvp, sizeof(mvp), 1);
 
     render_enc->drawPrimitives(MTL::PrimitiveTypePoint, (NS::UInteger)0, (NS::UInteger)n);
+
+    // --- Trail draw ---
+    {
+        std::lock_guard<std::mutex> lock(trail_mutex_);
+        int trail_count = trail_positions_.size() / 3;
+        if (trail_count >= 2 && trail_pipeline_) {
+            auto trail_buf = device_->newBuffer(trail_positions_.data(),
+                trail_positions_.size() * sizeof(float), MTL::ResourceStorageModeShared);
+            if (trail_buf) {
+                uint32_t tc = (uint32_t)trail_count;
+                render_enc->setRenderPipelineState(trail_pipeline_);
+                render_enc->setVertexBuffer(trail_buf, 0, 0);
+                render_enc->setVertexBytes(mvp, sizeof(mvp), 1);
+                render_enc->setVertexBytes(&tc, sizeof(uint32_t), 2);
+                render_enc->drawPrimitives(MTL::PrimitiveTypeLineStrip,
+                    (NS::UInteger)0, (NS::UInteger)trail_count);
+                trail_buf->release();
+            }
+        }
+    }
+
     render_enc->endEncoding();
 
     cmd->commit();
