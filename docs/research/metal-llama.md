@@ -169,8 +169,88 @@ Per-token keyframe history stored CPU-side (capped at 512 entries). Each `store_
 
 **Done when:** ~~after a generation completes, dragging the timeline backwards smoothly reverses the nebula animation.~~ Hovering tokens scrubs the nebula and splits the trail. Works.
 
-### Step 6: Ghost branches
+### Step 6: Ghost branches (GHB) — low priority
 
 At each generation step, the top-k candidates are already known. For each step, draw faint trails from the chosen token's position to each runner-up's position — dim branches off the main path showing single-step alternatives. Opacity proportional to the runner-up's probability.
 
-**Done when:** the nebula shows the main bright trail with faint ghost branches at each step, visible during both live streaming and timeline scrub.
+Deprioritized — zero-cost signal extraction and sampler visibility reveal more about inference than single-step visual branches. Ghost branches show where alternatives were in vocabulary space but not why they were rejected. Sampler chain observations (SCO) answer the "why" question.
+
+---
+
+## Known limitations
+
+| Code | Description | Where |
+|------|-------------|-------|
+| **B64** | WebSocket frames are base64-encoded PNG — 33% bandwidth overhead | `metal_renderer.h` |
+| **CAM** | No camera control — fixed orthographic MVP, no rotation/zoom/pan | `metal_renderer.h` |
+| **KFC** | Keyframe history capped at 512 (64MB). No disk persistence | `metal_renderer.h` |
+| **TRU** | Trail positions unbounded while keyframes are capped | `metal_renderer.h` |
+| **PVH** | PCA accesses private `llama-model.h` header — version-fragile | `vocab_projection.cpp` |
+| **SSL** | No signal summary logging for StreamChat (Chat path logs it) | `plugin.cpp` |
+
+## Zero-cost opportunities
+
+These require small C++ additions to `capture_signal()` or the sampler chain. Data already exists in the per-token window, costs nothing to extract.
+
+| Code | Signal | What it reveals | Where to add |
+|------|--------|----------------|--------------|
+| **TMD** | Token metadata (frequency, special/byte flags) | "Is the model picking a rare token?" | `capture_signal()` |
+| **CWU** | Context window usage (tokens used / available) | Speed degradation warning | `capture_signal()` |
+| **TMP** | Temperature sensitivity (softmax at 5 temps) | How much temperature reshapes the distribution | `capture_signal()` |
+| **CPX** | Cumulative perplexity (running scalar) | Fluency score for comparing prompt strategies | `capture_signal()` |
+| **SCO** | Sampler chain observations (distribution before/after each stage) | Why specific tokens were rejected | `stream_chat()` sampler chain |
+| **ECM** | Factor entropy + top_gap into stream glyph color mapping | Richer heatmap, currently confidence-only | `stream-glyph.ts` |
+
+## Moderate-cost opportunities
+
+| Code | Signal | What it reveals | Effort |
+|------|--------|----------------|--------|
+| **HSE** | Hidden state embeddings (4096 floats via `llama_get_embeddings`) | Semantic trajectory — where the model *is* | Low C++, needs UMAP/PCA |
+| **SUI** | Expose top-k/top-p/min-p/penalties in UI | Users can't control the sampler chain | Proto + C++ + Go + TS |
+| **STR** | GPU-accelerated steering — write back to logit buffer from nebula | Direct manipulation of probability landscape | Metal buffer path exists, no input wired |
+
+## High-cost opportunities
+
+| Code | Signal | What it reveals | Effort |
+|------|--------|----------------|--------|
+| **TTB** | Token tree branching (KV cache fork, generate alternatives) | "What if the model had said X instead?" | C++ KV cache management |
+| **ATS** | Write per-generation attestations with signal attributes | Persistent record of inference quality | Go storage layer |
+
+## Codes reference
+
+All codes used across the codebase (README limitations, research docs, source TODOs):
+
+| Code | Scope | Status |
+|------|-------|--------|
+| STO | Single-turn only | README limitation |
+| TAO | Text attachments only | README limitation |
+| IBP | Image-based PDFs | README limitation |
+| COF | Context overflow | README limitation |
+| NEF | No extraction feedback | README limitation |
+| SDR | Shutdown race | README limitation |
+| B64 | Base64 WebSocket overhead | Metal limitation |
+| CAM | No camera control | Metal limitation |
+| KFC | Keyframe cap 512 | Metal limitation |
+| TRU | Trail unbounded | Metal limitation |
+| PVH | Private header access | Metal limitation |
+| SSL | No StreamChat signal summary | Missing feature |
+| GHB | Ghost branches | Step 6, low priority |
+| TMD | Token metadata | Zero-cost opportunity |
+| CWU | Context window usage | Zero-cost opportunity |
+| TMP | Temperature sensitivity | Zero-cost opportunity |
+| CPX | Cumulative perplexity | Zero-cost opportunity |
+| SCO | Sampler chain observations | Zero-cost opportunity |
+| ECM | Entropy/confidence color mapping | Zero-cost opportunity |
+| HSE | Hidden state embeddings | Tier 2 opportunity |
+| SUI | Sampling UI controls | Tier 2 opportunity |
+| SCW | Sampler chain wiring | Depends on SUI |
+| STR | GPU steering | Tier 2 opportunity |
+| TTB | Token tree branching | Tier 3 opportunity |
+| ATS | Attestation storage | Tier 2 opportunity |
+| VDF | Vocabulary dump to frontend | Checklist item |
+| LTR | Logit trajectories | Checklist item |
+| BIG | Bias glyph integration | Blocked on #718 |
+| HSC | Hidden state cluster comparison | Blocked on HSE |
+| ESD | Entropy spike detection | Checklist item |
+| CPY | Copy button for stream glyph | Missing feature |
+| WMS | Window morph support | Missing feature |
