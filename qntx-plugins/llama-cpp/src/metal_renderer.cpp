@@ -338,3 +338,17 @@ std::vector<uint8_t> MetalRenderer::render_test(int width, int height) {
 
     return render_nebula(probs.data(), n, width, height);
 }
+
+void MetalRenderer::set_latest_frame(std::vector<uint8_t> pixels, int width, int height) {
+    std::lock_guard<std::mutex> lock(frame_mutex_);
+    latest_frame_ = std::move(pixels);
+    frame_width_ = width;
+    frame_height_ = height;
+}
+
+std::vector<uint8_t> MetalRenderer::get_latest_frame(int& width, int& height) {
+    std::lock_guard<std::mutex> lock(frame_mutex_);
+    width = frame_width_;
+    height = frame_height_;
+    return latest_frame_;
+}
