@@ -73,14 +73,28 @@ set(GENERATED_SRCS "")
 generate_proto(domain.proto)
 generate_proto(llm.proto)
 
+# Platform-specific sources: Metal renderer and BLAS-based PCA are macOS-only.
+# On Linux, stub implementations provide empty no-ops so the plugin still builds
+# and runs (inference works, visualization doesn't).
+if(APPLE)
+    set(PLATFORM_SRCS
+        src/metal_renderer.cpp
+        src/vocab_projection.cpp
+    )
+else()
+    set(PLATFORM_SRCS
+        src/metal_renderer_stub.cpp
+        src/vocab_projection_stub.cpp
+    )
+endif()
+
 # Plugin binary
 add_executable(qntx-llama-cpp-plugin
     src/main.cpp
     src/plugin.cpp
     src/inference.cpp
-    src/vocab_projection.cpp
-    src/metal_renderer.cpp
     src/pdf_extract.cpp
+    ${PLATFORM_SRCS}
     ${GENERATED_SRCS}
 )
 
