@@ -11,11 +11,12 @@
 #include "domain.grpc.pb.h"
 #include "llm.grpc.pb.h"
 
-#define PLUGIN_VERSION "0.7.0"
+#define PLUGIN_VERSION "0.8.0"
 
-// Forward declaration
+// Forward declarations
 struct llama_model;
 struct llama_context;
+class MetalRenderer;
 
 // A candidate token and its probability from the pre-sampler logit distribution
 struct TokenCandidate {
@@ -91,6 +92,7 @@ private:
 class LlamaCppPlugin final : public protocol::DomainPluginService::Service {
 public:
     LlamaCppPlugin();
+    ~LlamaCppPlugin();
 
     grpc::Status Metadata(grpc::ServerContext* ctx,
                           const protocol::Empty* req,
@@ -133,9 +135,11 @@ public:
                               protocol::ParseAxQueryResponse* resp) override;
 
     InferenceEngine& engine() { return engine_; }
+    MetalRenderer& renderer() { return *renderer_; }
 
 private:
     InferenceEngine engine_;
+    std::unique_ptr<MetalRenderer> renderer_;
 };
 
 // LLMService implementation
