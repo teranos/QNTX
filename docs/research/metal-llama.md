@@ -1,29 +1,22 @@
-# swift-metal plugin — handover
+# metal-llama
 
 ## What exists
 
-The scaffold in `qntx-plugins/swift-metal/` is a complete gRPC plugin skeleton in Swift that follows every QNTX plugin convention:
+Metal-cpp renderer inside `qntx-plugins/llama-cpp/`. The renderer lives in the same process as inference — the softmax distribution goes directly from C++ to a Metal compute shader with no serialization.
 
-- **Package.swift** — SPM manifest linking Metal, MetalKit, CoreGraphics, ImageIO frameworks alongside grpc-swift and swift-protobuf.
-- **Main.swift** — Entry point with CLI arg parsing (`--port`, `--version`, `--log-level`), port retry loop (64 attempts), `QNTX_PLUGIN_PORT=` announcement on stdout.
-- **Plugin.swift** — Full `DomainPluginService` implementation: `Metadata`, `Initialize`, `Shutdown`, `Health`, `ConfigSchema`, `RegisterGlyphs`, `HandleHTTP`, `HandleWebSocket` (stub), `ExecuteJob` (stub), `ParseAxQuery` (stub). HTTP routing dispatches `/viz-module.js`, `/render`, `/status`.
-- **MetalRenderer.swift** — Compute + render pipeline. `setup()` compiles MSL shaders at runtime. `setVocabPositions()` caches position buffer. `renderNebula()` dispatches compute pass (probs + positions → particles), render pass (point sprites, additive blending, HDR), tonemaps to PNG. `renderTestNebula()` generates bimodal test distribution for 128k particles.
-- **ShaderSource.swift** — MSL shader source as Swift string for runtime compilation.
-- **Shaders.metal** — Canonical MSL source (reference copy, not compiled by SPM).
-- **GlyphModule.swift** — JS glyph module (symbol ◈) with canvas element that fetches rendered PNG frames from `/api/swift-metal/render`.
-- **Version.swift** — `pluginVersion = "0.3.0"`.
-- **Makefile** — `swift build -c release`, install to `~/.qntx/plugins/`.
-- **Root Makefile** — `swift-metal-plugin` target with version-gate checking `.swift` files against `Version.swift`.
+- **`src/metal_renderer.h`** / **`src/metal_renderer.cpp`** — Metal-cpp compute + render pipeline. MSL shaders compiled at runtime. Compute pass transforms probabilities + 3D positions into particles. Render pass draws point sprites with additive blending on HDR texture, Reinhard tonemapped to RGBA.
+- **`vendor/metal-cpp/`** — Apple's header-only C++ Metal wrapper.
+- **`src/vocab_projection.cpp`** — PCA projection of token embeddings to 3D via Accelerate BLAS.
 
-Proto types are generated at build time via grpc-swift SPM build plugin from symlinked proto files (`plugin/grpc/protocol/*.proto`). Plugin compiles, starts, announces port, renders 128k-particle nebula on the GPU.
+Originally prototyped as a separate Swift plugin (`qntx-plugins/metal-llama/`, deleted). Moved into llama-cpp because the full distribution (512KB/token) doesn't need to leave the process.
 
 ---
 
 ## Vision
 
-This plugin exists to visualise what is happening inside the model as it's happening. The llama-cpp plugin already captures pre-sampler logit signals per token — confidence, entropy, top-gap, top-k candidates — and streams them over gRPC. The stream glyph renders this as a DOM-based confidence heatmap. swift-metal replaces that with GPU-accelerated rendering that can keep up with token generation speed and, critically, support stepping back through tokens and selecting different paths in possibility space.
+This plugin exists to visualise what is happening inside the model as it's happening. The llama-cpp plugin already captures pre-sampler logit signals per token — confidence, entropy, top-gap, top-k candidates — and streams them over gRPC. The stream glyph renders this as a DOM-based confidence heatmap. metal-llama replaces that with GPU-accelerated rendering that can keep up with token generation speed and, critically, support stepping back through tokens and selecting different paths in possibility space.
 
-The token stream is not just a sequence to watch — it's a tree. At each token position, the model considered alternatives. swift-metal should make that tree navigable: see where the model was confident, where it hesitated, branch into the roads not taken.
+The token stream is not just a sequence to watch — it's a tree. At each token position, the model considered alternatives. metal-llama should make that tree navigable: see where the model was confident, where it hesitated, branch into the roads not taken.
 
 **Performance is the priority.** Metal is chosen deliberately to eliminate the abstraction layers between data and pixels. This commits to the Apple ecosystem for this plugin. The same GPU running llama-cpp inference renders the visualization — zero-copy potential between inference output buffers and visualization input buffers.
 
@@ -34,7 +27,7 @@ The token stream is not just a sequence to watch — it's a tree. At each token 
 
 For now, Metal is the right call — the llama-cpp plugin already uses Metal acceleration, Tauri targets macOS, and the inference-to-visualization data path benefits from staying on the same GPU API.
 
-**Build toolchain:** Nix flake for reproducibility, matching llama-cpp and kern. protoc-gen-swift for proto generation (standard codegen, not hand-rolled — the D plugins' CTFE approach was motivated by avoiding external toolchains entirely, which isn't a concern when Nix already manages the build).
+**Build toolchain:** CMake, same as llama-cpp. Metal-cpp is header-only, linked via `-framework Metal -framework Foundation -framework QuartzCore`.
 
 ---
 
@@ -63,11 +56,11 @@ What exists in that window:
 | Token metadata (frequency, flags per candidate) | ~40 bytes per candidate | None | Zero — `llama_token_get_score` / `get_attr` are O(1) lookups |
 | Context window fill level | 12 bytes | None | Zero — `llama_get_seq_pos(ctx, -1)` |
 
-**The natural frame budget for visualization is the next `llama_decode` call.** While the GPU runs the forward pass for token N+1 (20-100ms), swift-metal has that time to render the full signal data from token N. At 10 tokens/sec, that's 100ms per frame — well above 60fps budget.
+**The natural frame budget for visualization is the next `llama_decode` call.** While the GPU runs the forward pass for token N+1 (20-100ms), metal-llama has that time to render the full signal data from token N. At 10 tokens/sec, that's 100ms per frame — well above 60fps budget.
 
 **Data throughput at full extraction:** ~130 KB/token × 10 tokens/sec = **1.3 MB/s**. Trivially streamable over gRPC. A Metal compute shader processes 32k floats in one dispatch (~0.02ms).
 
-The bottleneck is not what data exists or how fast it can be rendered. The bottleneck is that `capture_signal` was built to feed a DOM-based heatmap that only needs 230 bytes. swift-metal needs the full 130KB+ because it can actually render it.
+The bottleneck is not what data exists or how fast it can be rendered. The bottleneck is that `capture_signal` was built to feed a DOM-based heatmap that only needs 230 bytes. metal-llama needs the full 130KB+ because it can actually render it.
 
 ### What requires llama.cpp patches (Tier 3 — defer)
 
@@ -106,18 +99,18 @@ C++ work: keep the full `probs` vector in `capture_signal()` instead of discardi
 
 ---
 
-### Q3: What can swift-metal show that the DOM never could?
+### Q3: What can metal-llama show that the DOM never could?
 
-The stream glyph is text. It renders tokens as `<span>` elements with colored backgrounds — a reading experience with signal overlays. swift-metal is not a companion to this and not a replacement for it. It is a parallel system that the stream glyph's existence inspired but that operates in a space the DOM cannot enter.
+The stream glyph is text. It renders tokens as `<span>` elements with colored backgrounds — a reading experience with signal overlays. metal-llama is not a companion to this and not a replacement for it. It is a parallel system that the stream glyph's existence inspired but that operates in a space the DOM cannot enter.
 
-The stream glyph proves that per-token signal data is valuable in real time. swift-metal takes the same `TokenSignal` data path — bidirectional, llama-cpp ↔ swift-metal via `StreamChat` gRPC and the `llama_sampler_i` vtable — and renders what text-in-a-browser fundamentally cannot:
+The stream glyph proves that per-token signal data is valuable in real time. metal-llama takes the same `TokenSignal` data path — bidirectional, llama-cpp ↔ metal-llama via `StreamChat` gRPC and the `llama_sampler_i` vtable — and renders what text-in-a-browser fundamentally cannot:
 
 - **Spatial structure.** A token tree is not a list. The DOM can show a sequence of colored spans; Metal can render a branching graph where depth, angle, and thickness encode probability, and you navigate it by moving through 3D space.
 - **Continuous animation.** The softmax distribution shifting frame-by-frame as the model considers the next token — not a snapshot after the fact, but the probability mass flowing in real time at GPU framerate.
 - **Density.** 32k vocabulary entries as a probability landscape. The DOM chokes on 32k elements; a Metal compute shader processes them in one dispatch.
 - **Interaction at inference speed.** Clicking a branch in the token tree and seeing the model re-infer from that fork within the same render frame. The DOM round-trip (JS event → fetch → re-render) is too slow for this to feel like direct manipulation.
 
-The stream glyph keeps doing what it does — text with heatmap coloring, readable output, follow-up input. swift-metal exists because some things about inference are not text and never will be.
+The stream glyph keeps doing what it does — text with heatmap coloring, readable output, follow-up input. metal-llama exists because some things about inference are not text and never will be.
 
 What is the first thing you'd want to see in this space that you currently cannot? The token tree? The probability landscape? The semantic trajectory? Or something that hasn't been named yet?
 
@@ -145,15 +138,23 @@ PCA projection of `model_->tok_embd` to 3D via Accelerate BLAS in `vocab_project
 
 MSL compute kernel: probability + 3D position → particle (amber color ramp, log-scaled size, visibility threshold 1e-5). Vertex shader: orthographic MVP. Fragment shader: soft circle point sprite. Additive blending on rgba16Float, Reinhard tonemap to sRGB PNG.
 
-Shader source embedded as Swift string, compiled at runtime (`device.makeLibrary(source:)`) — SPM does not compile `.metal` into a metallib. Tested with 128,256 particles, bimodal distribution, random positions. `POST /render` returns 800×600 PNG.
+Tested with 128,256 particles, real PCA positions, bimodal test distribution. Prototyped in Swift, then ported to Metal-cpp inside llama-cpp.
+
+### metal-llama: renderer moves into llama-cpp
+
+Swift plugin was a prototype. Metal-cpp (Apple's header-only C++ wrapper) puts the renderer in the same process as inference — distribution is a `float*`, no serialization. MSL shaders unchanged.
+
+- [ ] Add Metal-cpp headers to llama-cpp
+- [ ] Port MetalRenderer to C++
+- [ ] Render per-token during `stream_chat()`
 
 ### Step 4: Live streaming
 
-swift-metal subscribes to llama-cpp's `StreamChat` gRPC stream (or receives data relayed via the Go WebSocket layer). Each token's full distribution becomes a keyframe. The compute shader lerps between keyframes at 60fps — the nebula flows rather than jumps.
+Rendered frames delivered to browser per-token. Each token's distribution is a keyframe. Compute shader lerps between keyframes at 60fps.
 
-The chosen token at each step is recorded. A line strip connects chosen-token positions — the generation trail. Older segments fade via alpha decay.
+Chosen token recorded per step. Line strip connects chosen-token positions — the generation trail. Older segments fade via alpha decay.
 
-**Done when:** running a prompt with the ◈ glyph open shows the nebula breathing in real time. Cloud contracts when confident, blooms when uncertain. Trail traces the generation path through vocabulary space.
+**Done when:** running a prompt shows the nebula updating in real time.
 
 ### Step 5: Timeline scrub
 
