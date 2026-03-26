@@ -125,6 +125,7 @@ fragment float4 particleFragment(
 
 struct TrailVertexOut {
     float4 position [[position]];
+    float3 color;
     float alpha;
 };
 
@@ -132,21 +133,38 @@ vertex TrailVertexOut trailVertex(
     device const float* positions [[buffer(0)]],
     constant float4x4& mvp       [[buffer(1)]],
     constant uint& trailCount    [[buffer(2)]],
+    constant int& scrubIndex     [[buffer(3)]],
     uint vid [[vertex_id]]
 ) {
     float3 pos = float3(positions[vid * 3], positions[vid * 3 + 1], positions[vid * 3 + 2]);
 
     TrailVertexOut out;
     out.position = mvp * float4(pos, 1.0);
-    // Newest vertex (last) is brightest, oldest fades
-    float age = float(trailCount - 1 - vid) / max(1.0, float(trailCount - 1));
-    out.alpha = mix(1.0, 0.05, age * age);  // quadratic falloff
+
+    if (scrubIndex < 0) {
+        // Live mode — newest brightest, oldest fades (warm white)
+        float age = float(trailCount - 1 - vid) / max(1.0, float(trailCount - 1));
+        out.alpha = mix(1.0, 0.05, age * age);
+        out.color = float3(1.0, 0.85, 0.6);
+    } else {
+        // Scrub mode — warm up to scrub point, cool/dim beyond
+        int si = scrubIndex;
+        if (int(vid) <= si) {
+            float age = float(si - int(vid)) / max(1.0, float(si));
+            out.alpha = mix(1.0, 0.1, age * age);
+            out.color = float3(1.0, 0.85, 0.6);  // warm
+        } else {
+            float future = float(int(vid) - si) / max(1.0, float(int(trailCount) - 1 - si));
+            out.alpha = mix(0.15, 0.03, future);
+            out.color = float3(0.4, 0.5, 0.7);   // cool blue
+        }
+    }
+
     return out;
 }
 
 fragment float4 trailFragment(TrailVertexOut in [[stage_in]]) {
-    // Warm white with alpha decay, additive blending makes it glow
-    return float4(1.0, 0.85, 0.6, 1.0) * in.alpha * 0.7;
+    return float4(in.color * in.alpha * 0.7, 1.0);
 }
 )";
 
@@ -535,6 +553,17 @@ void MetalRenderer::clear_trail() {
     trail_positions_.clear();
 }
 
+void MetalRenderer::store_keyframe(const float* probabilities, int vocab_size) {
+    std::lock_guard<std::mutex> lock(dist_mutex_);
+    if (keyframe_history_.size() >= 512) return;  // cap at 512 entries
+    keyframe_history_.emplace_back(probabilities, probabilities + vocab_size);
+}
+
+void MetalRenderer::set_scrub_index(int idx) {
+    std::lock_guard<std::mutex> lock(dist_mutex_);
+    scrub_index_ = idx;
+}
+
 std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) {
     if (!is_ready() || !positions_buffer_ || !prob_a_ || !prob_b_) return {};
 
@@ -604,10 +633,12 @@ std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) 
                 trail_positions_.size() * sizeof(float), MTL::ResourceStorageModeShared);
             if (trail_buf) {
                 uint32_t tc = (uint32_t)trail_count;
+                int si = scrub_index_;
                 render_enc->setRenderPipelineState(trail_pipeline_);
                 render_enc->setVertexBuffer(trail_buf, 0, 0);
                 render_enc->setVertexBytes(mvp, sizeof(mvp), 1);
                 render_enc->setVertexBytes(&tc, sizeof(uint32_t), 2);
+                render_enc->setVertexBytes(&si, sizeof(int), 3);
                 render_enc->drawPrimitives(MTL::PrimitiveTypeLineStrip,
                     (NS::UInteger)0, (NS::UInteger)trail_count);
                 trail_buf->release();
@@ -684,7 +715,57 @@ void MetalRenderer::start_render_loop(int width, int height) {
 
     render_thread_ = std::thread([this]() {
         while (render_running_.load()) {
-            // Compute lerp t based on time since last keyframe
+            // Check for scrub mode
+            int scrub;
+            {
+                std::lock_guard<std::mutex> lock(dist_mutex_);
+                scrub = scrub_index_;
+            }
+
+            if (scrub >= 0) {
+                // Scrub mode — upload the stored keyframe as both A and B,
+                // render via render_lerp (trail shader handles the visual split).
+                std::vector<float> kf;
+                {
+                    std::lock_guard<std::mutex> lock(dist_mutex_);
+                    if (scrub < (int)keyframe_history_.size()) {
+                        kf = keyframe_history_[scrub];
+                    }
+                }
+                if (!kf.empty() && is_ready() && positions_buffer_) {
+                    // Temporarily swap distributions to the scrub keyframe
+                    MTL::Buffer* save_a;
+                    MTL::Buffer* save_b;
+                    {
+                        std::lock_guard<std::mutex> lock(dist_mutex_);
+                        save_a = prob_a_;
+                        save_b = prob_b_;
+                        prob_a_ = device_->newBuffer(kf.data(), kf.size() * sizeof(float),
+                                                      MTL::ResourceStorageModeShared);
+                        prob_b_ = device_->newBuffer(kf.data(), kf.size() * sizeof(float),
+                                                      MTL::ResourceStorageModeShared);
+                    }
+
+                    auto png = render_lerp(render_width_, render_height_, 1.0f);
+
+                    // Restore distributions
+                    {
+                        std::lock_guard<std::mutex> lock(dist_mutex_);
+                        if (prob_a_) prob_a_->release();
+                        if (prob_b_) prob_b_->release();
+                        prob_a_ = save_a;
+                        prob_b_ = save_b;
+                    }
+
+                    if (!png.empty()) {
+                        set_latest_frame(std::move(png), render_width_, render_height_);
+                    }
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(16));
+                continue;
+            }
+
+            // Live mode — compute lerp t based on time since last keyframe
             float t;
             {
                 std::lock_guard<std::mutex> lock(dist_mutex_);
