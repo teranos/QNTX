@@ -25,10 +25,10 @@
           pname = "qntx-reduce-plugin";
           version = self.rev or "dev";
           # Include full repo root because build.rs needs ../plugin/grpc/protocol/*.proto
-          src = ./..;
+          src = ./../..;
 
           cargoLock = {
-            lockFile = ./../Cargo.lock;
+            lockFile = ./../../Cargo.lock;
           };
 
           buildInputs = with pkgs; [
