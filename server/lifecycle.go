@@ -37,6 +37,9 @@ func stateString(state ServerState) string {
 	}
 }
 
+// RENAME: startBackgroundServices — reads saved daemon state, decides what to enable, then starts services
+// Options: restoreAndStartServices | resumeBackgroundServices | initBackgroundServicesFromState
+//
 // startBackgroundServices starts all background service goroutines
 func (s *QNTXServer) startBackgroundServices() {
 	// Start daemon based on saved state

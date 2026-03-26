@@ -143,6 +143,9 @@ func UpdateLLMProvider(provider string) error {
 	return nil
 }
 
+// RENAME: UpdateEmbeddingsEnabled — validates model file exists, updates UI config, rotates backups
+// Options: ValidateAndSetEmbeddingsEnabled | SetEmbeddingsEnabledWithValidation | ApplyEmbeddingsToggle
+//
 // UpdateEmbeddingsEnabled updates the embeddings.enabled setting in UI config.
 // Rejects enabled=true if the configured path does not exist on disk.
 func UpdateEmbeddingsEnabled(enabled bool) error {

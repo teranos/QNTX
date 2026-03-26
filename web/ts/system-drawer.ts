@@ -107,6 +107,8 @@ function computeLocalResults(query: string): SearchMatch[] {
 
 // --- Search dispatch ---
 
+// RENAME: dispatchSearch — runs local results, WASM rich search, and conditional server semantic search
+// Options: executeMultiLayerSearch | searchAllSources | fanOutSearch
 function dispatchSearch(text: string): void {
     if (!text.trim()) {
         if (searchView) searchView.clear();

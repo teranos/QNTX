@@ -115,6 +115,8 @@ class ConnectivityManagerImpl implements ConnectivityManager {
         }
     }
 
+    // RENAME: reportHttpSuccess — tracks "server responded" (including 4xx/5xx), not "request succeeded"
+    // Options: reportHttpReachable | reportServerResponded | reportHttpAlive
     /**
      * Called by apiFetch on successful response (any HTTP status)
      */
@@ -163,6 +165,8 @@ class ConnectivityManagerImpl implements ConnectivityManager {
         return () => { this.authCallbacks.delete(callback); };
     }
 
+    // RENAME: reportHttpFailure — tracks "server unreachable" (network TypeError), not "request failed"
+    // Options: reportHttpUnreachable | reportNetworkFailure | reportServerUnresponsive
     /**
      * Called by apiFetch on network-level failure (fetch TypeError)
      */

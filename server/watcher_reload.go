@@ -105,6 +105,9 @@ func (c *watcherReloadCoalescer) flush() {
 	}
 }
 
+// RENAME: postReload — checks compound suppression, propagates queries, dispatches historical matches
+// Options: processCompoundWatcherSuppression | reconcileWatcherAfterReload | resolveWatcherPostReload
+//
 // postReload runs the per-watcher logic that was previously inline in handleWatcherUpsert
 // after the ReloadWatchers() call: compound suppression check, parse error broadcast,
 // and historical query dispatch.

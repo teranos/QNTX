@@ -213,6 +213,9 @@ export function preventDrag(...elements: HTMLElement[]): void {
 
 // ── makeDraggable ───────────────────────────────────────────────────
 
+// RENAME: makeDraggable — drags, multi-selects, detects meld proximity, creates compositions, persists positions
+// Options: makeGlyphInteractive | enableDragAndMeld | setupGlyphDragComposition
+
 /**
  * Make an element draggable by a handle.
  *
@@ -608,6 +611,9 @@ export function makeDraggable(
 }
 
 // ── makeResizable ───────────────────────────────────────────────────
+
+// RENAME: makeResizable — resizes AND persists final dimensions to uiState (triggers backend sync)
+// Options: makeResizableWithPersistence | enableResizeAndSync | setupGlyphResize
 
 /**
  * Make an element resizable by a handle.

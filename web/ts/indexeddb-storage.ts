@@ -116,6 +116,8 @@ export function getStorageItem(key: string): string | null {
     return cache.get(key) ?? null;
 }
 
+// RENAME: setStorageItem — sync cache write + async fire-and-forget IndexedDB persist (errors toasted, not thrown)
+// Options: cacheAndPersistItem | setItemWithAsyncPersist | writeStorageItem
 /**
  * Set an item in storage (synchronous - writes to cache, queues IndexedDB write)
  * No-op if storage not initialized yet.
@@ -139,6 +141,8 @@ export function setStorageItem(key: string, value: string): void {
     });
 }
 
+// RENAME: removeStorageItem — sync cache delete + async fire-and-forget IndexedDB delete (errors toasted, not thrown)
+// Options: uncacheAndDeleteItem | removeItemWithAsyncDelete | deleteStorageItem
 /**
  * Remove an item from storage (synchronous - removes from cache, queues IndexedDB delete)
  * No-op if storage not initialized yet.

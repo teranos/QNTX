@@ -83,6 +83,9 @@ func Reset() {
 	viperInstance = nil
 }
 
+// RENAME: initViper — binds env vars, sets defaults, merges 3 config layers, caches globally
+// Options: bootstrapConfig | loadAndMergeConfig | initConfigSystem
+//
 // initViper initializes Viper with configuration sources and defaults
 func initViper() (*viper.Viper, error) {
 	if viperInstance != nil {

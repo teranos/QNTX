@@ -58,11 +58,15 @@ impl Attestation {
             && self.contexts[0] == "_"
     }
 
+    // RENAME: has_multiple_dimensions — checks S, P, C only; ignores actors (unlike expand_cartesian)
+    // Options: has_multiple_claim_dimensions | has_multiple_spc_dimensions | is_multi_claim
     /// Returns true if this attestation has multiple subjects, predicates, or contexts
     pub fn has_multiple_dimensions(&self) -> bool {
         self.subjects.len() > 1 || self.predicates.len() > 1 || self.contexts.len() > 1
     }
 
+    // RENAME: cartesian_count — S×P×C only; expand_cartesian uses S×P×C×A — these disagree
+    // Options: claim_count_without_actors | spc_cartesian_count | cartesian_claim_dimensions
     /// Returns the total number of individual claims this attestation represents
     /// (Cartesian product of subjects × predicates × contexts)
     pub fn cartesian_count(&self) -> usize {

@@ -204,6 +204,8 @@ func (h *CanvasHandler) handleGetComposition(w http.ResponseWriter, r *http.Requ
 	h.writeJSON(w, comp)
 }
 
+// RENAME: handleUpsertComposition — upserts composition AND compiles watcher subscriptions
+// Options: upsertCompositionAndCompileSubscriptions | handleCompositionUpsertWithMeldWiring | syncComposition
 func (h *CanvasHandler) handleUpsertComposition(w http.ResponseWriter, r *http.Request) {
 	var comp glyphstorage.CanvasComposition
 	if err := json.NewDecoder(r.Body).Decode(&comp); err != nil {
@@ -228,6 +230,8 @@ func (h *CanvasHandler) handleUpsertComposition(w http.ResponseWriter, r *http.R
 	h.writeJSON(w, comp)
 }
 
+// RENAME: handleDeleteComposition — tears down watchers, cursors, and SE state before deleting
+// Options: teardownAndDeleteComposition | handleCompositionRemovalWithCleanup | removeCompositionCascade
 func (h *CanvasHandler) handleDeleteComposition(w http.ResponseWriter, r *http.Request, id string) {
 	// Re-enable downstream SE watchers that were disabled by SE→SE meld edges
 	if h.watcherEngine != nil {

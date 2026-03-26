@@ -42,6 +42,8 @@ export function getDevMode(): boolean | null {
     return devMode;
 }
 
+// RENAME: isDevMode — duplicates name in logger.ts but checks backend /api/dev (async), not browser env
+// Options: isServerDevMode | checkBackendDevMode | isDevModeFromServer
 /**
  * Check if dev mode is enabled (fetches if not cached)
  */

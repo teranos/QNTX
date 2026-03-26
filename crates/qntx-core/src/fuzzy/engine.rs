@@ -107,6 +107,8 @@ impl FuzzyEngine {
         }
     }
 
+    // RENAME: rebuild_index — replaces all vocabularies wholesale (not incremental)
+    // Options: replace_vocabularies | set_vocabularies | load_index
     /// Rebuild the index with new vocabulary.
     /// Returns (subject_count, predicate_count, context_count, actor_count, hash)
     pub fn rebuild_index(

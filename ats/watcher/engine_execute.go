@@ -14,6 +14,9 @@ import (
 	"github.com/teranos/QNTX/errors"
 )
 
+// RENAME: executeAction — executes action, enqueues retry on failure, updates edge cursors
+// Options: executeActionWithRetry | dispatchAndRecordAction | runActionAndUpdateCursors
+//
 // executeAction executes a watcher's action with the triggering attestation
 func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 	var err error

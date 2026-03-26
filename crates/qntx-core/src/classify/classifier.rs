@@ -77,6 +77,8 @@ impl SmartClassifier {
         Self { temporal, config }
     }
 
+    // RENAME: classify — classifies, aggregates counters (auto_resolved, review_required, total_analyzed), filters single-claim groups
+    // Options: analyze_conflicts | classify_and_summarize | evaluate_claim_groups
     /// Classify all claim groups and return structured results
     pub fn classify(&self, input: &ClassifyInput) -> ClassifyOutput {
         let mut conflicts = Vec::new();

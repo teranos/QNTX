@@ -50,6 +50,9 @@ type serverDependencies struct {
 	config        *appcfg.Config
 }
 
+// RENAME: NewQNTXServer — constructs server AND bootstraps ~15 subsystems (logger, daemon, plugins, watchers, sync, embeddings, ...)
+// Options: InitQNTXServer | BootstrapQNTXServer | SetupQNTXServer
+//
 // NewQNTXServer creates a new QNTX server.
 // atsStore is the pre-created attestation store (shared with the Rust SQL driver).
 // Optional initialQuery can be provided to pre-load an Ax query on connection.

@@ -68,6 +68,8 @@ export const SEG = {
     TAU: 'τ' as const,      // Tauri native integration
 } as const;
 
+// RENAME: isDevMode — duplicates name in dev-mode.ts but checks browser env (sync), not backend API
+// Options: isBrowserDevEnv | isLocalDevEnvironment | isDevEnvironment
 /**
  * Determine if we're in development mode
  * Checks multiple indicators for robustness
