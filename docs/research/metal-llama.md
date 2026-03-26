@@ -144,9 +144,9 @@ Tested with 128,256 particles, real PCA positions, bimodal test distribution. Pr
 
 Swift plugin was a prototype. Metal-cpp (Apple's header-only C++ wrapper) puts the renderer in the same process as inference — distribution is a `float*`, no serialization. MSL shaders unchanged.
 
-- [ ] Add Metal-cpp headers to llama-cpp
-- [ ] Port MetalRenderer to C++
-- [ ] Render per-token during `stream_chat()`
+- [x] Add Metal-cpp headers to llama-cpp
+- [x] Port MetalRenderer to C++
+- [x] Render per-token during `stream_chat()`
 
 ### Step 4: Live streaming
 

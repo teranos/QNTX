@@ -5,7 +5,9 @@
 #include "pdf_extract.h"
 
 #include <algorithm>
+#include <atomic>
 #include <iostream>
+#include <thread>
 #include <vector>
 
 // --- LlamaCppPlugin (DomainPluginService) ---
@@ -111,7 +113,16 @@ grpc::Status LlamaCppPlugin::ConfigSchema(grpc::ServerContext* ctx,
 grpc::Status LlamaCppPlugin::RegisterGlyphs(grpc::ServerContext* ctx,
                                               const protocol::Empty* req,
                                               protocol::GlyphDefResponse* resp) {
-    // No custom glyphs — chat goes through the prompt glyph
+    // Register nebula glyph only when Metal renderer is available
+    if (renderer_ && renderer_->is_ready()) {
+        auto* glyph = resp->add_glyphs();
+        glyph->set_symbol("✦");
+        glyph->set_title("Nebula");
+        glyph->set_label("nebula");
+        glyph->set_module_path("/nebula-module.js");
+        glyph->set_default_width(420);
+        glyph->set_default_height(420);
+    }
     return grpc::Status::OK;
 }
 
@@ -207,6 +218,119 @@ grpc::Status LlamaCppPlugin::HandleHTTP(grpc::ServerContext* ctx,
         return grpc::Status::OK;
     }
 
+    if (req->method() == "GET" && req->path() == "/nebula-module.js") {
+        static const std::string js = R"JS(
+export const render = async (glyph, ui) => {
+    const { element, content } = ui.glyph({
+        defaults: {
+            x: glyph.x ?? 200,
+            y: glyph.y ?? 200,
+            width: glyph.width ?? 420,
+            height: glyph.height ?? 420,
+        },
+        titleBar: { label: 'Nebula' },
+        resizable: { minWidth: 200, minHeight: 200 },
+        className: 'canvas-nebula-glyph',
+    });
+
+    content.style.padding = '0';
+    content.style.overflow = 'hidden';
+    content.style.backgroundColor = '#050208';
+
+    const canvas = document.createElement('canvas');
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.display = 'block';
+    content.appendChild(canvas);
+
+    const ctx2d = canvas.getContext('2d');
+
+    // Resize canvas to match container
+    function fitCanvas() {
+        const rect = content.getBoundingClientRect();
+        canvas.width = Math.round(rect.width * devicePixelRatio);
+        canvas.height = Math.round(rect.height * devicePixelRatio);
+    }
+    fitCanvas();
+    const ro = new ResizeObserver(fitCanvas);
+    ro.observe(content);
+
+    // Status indicator
+    const status = document.createElement('div');
+    status.style.position = 'absolute';
+    status.style.bottom = '4px';
+    status.style.right = '8px';
+    status.style.fontSize = '10px';
+    status.style.fontFamily = 'monospace';
+    status.style.color = 'rgba(255,255,255,0.3)';
+    status.textContent = 'connecting...';
+    content.style.position = 'relative';
+    content.appendChild(status);
+
+    let ws = null;
+    let frameCount = 0;
+
+    function connect() {
+        ws = ui.pluginWebSocket();
+
+        ws.onopen = () => {
+            status.textContent = 'connected';
+            ui.log.debug('Nebula WebSocket connected');
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                if (msg.type !== 1 || !msg.data) return;
+
+                // Decode base64 PNG and draw on canvas
+                const binary = atob(msg.data);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                const blob = new Blob([bytes], { type: 'image/png' });
+                createImageBitmap(blob).then((bmp) => {
+                    if (!ctx2d) return;
+                    ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx2d.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+                    bmp.close();
+                    frameCount++;
+                    status.textContent = frameCount + ' frames';
+                });
+            } catch (e) {
+                ui.log.error('Nebula frame error', e);
+            }
+        };
+
+        ws.onerror = () => {
+            status.textContent = 'error';
+        };
+
+        ws.onclose = () => {
+            status.textContent = 'disconnected';
+        };
+    }
+
+    connect();
+
+    ui.onCleanup(() => {
+        ro.disconnect();
+        if (ws && ws.readyState !== WebSocket.CLOSED) ws.close();
+    });
+
+    return element;
+};
+)JS";
+
+        resp->set_status_code(200);
+        resp->set_body(js);
+        auto* ct = resp->add_headers();
+        ct->set_name("Content-Type");
+        ct->add_values("application/javascript; charset=utf-8");
+        return grpc::Status::OK;
+    }
+
     resp->set_status_code(404);
     resp->set_body("not found");
     return grpc::Status::OK;
@@ -216,7 +340,38 @@ grpc::Status LlamaCppPlugin::HandleWebSocket(
     grpc::ServerContext* ctx,
     grpc::ServerReaderWriter<protocol::WebSocketMessage,
                              protocol::WebSocketMessage>* stream) {
-    return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "no websocket handlers");
+    // Read incoming messages in a separate thread to handle CONNECT/PING/CLOSE
+    std::atomic<bool> closed{false};
+    std::thread reader([stream, &closed]() {
+        protocol::WebSocketMessage in_msg;
+        while (stream->Read(&in_msg)) {
+            if (in_msg.type() == protocol::WebSocketMessage::PING) {
+                protocol::WebSocketMessage pong;
+                pong.set_type(protocol::WebSocketMessage::PONG);
+                pong.set_timestamp(in_msg.timestamp());
+                stream->Write(pong);
+            } else if (in_msg.type() == protocol::WebSocketMessage::CLOSE) {
+                closed.store(true);
+                return;
+            }
+            // CONNECT and DATA are acknowledged by receiving them
+        }
+        closed.store(true);
+    });
+
+    // Push nebula frames until client disconnects or context cancelled
+    while (!ctx->IsCancelled() && !closed.load()) {
+        auto png = renderer_->wait_for_frame(1000);
+        if (png.empty()) continue;
+
+        protocol::WebSocketMessage msg;
+        msg.set_type(protocol::WebSocketMessage::DATA);
+        msg.set_data(png.data(), png.size());
+        if (!stream->Write(msg)) break;
+    }
+
+    if (reader.joinable()) reader.join();
+    return grpc::Status::OK;
 }
 
 grpc::Status LlamaCppPlugin::ExecuteJob(grpc::ServerContext* ctx,
