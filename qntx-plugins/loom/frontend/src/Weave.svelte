@@ -1,6 +1,15 @@
 <script lang="ts">
   import { parseTurns, turnKey, fmtTime, type Turn } from './turns'
 
+  interface TokenSignal {
+    text: string
+    position: number
+    confidence: number
+    entropy: number
+    top_gap: number
+    top_k?: { text: string; prob: number }[]
+  }
+
   interface WeaveData {
     id: string
     branch: string
@@ -10,6 +19,10 @@
     word_count: number | null
     turn_count: number | null
     paths?: Record<string, string>
+    weave_source?: string | null
+    model?: string | null
+    tokens?: TokenSignal[] | null
+    prompt?: string | null
   }
 
   let {
@@ -79,6 +92,28 @@
   }
 
   const turns = parseTurns(weave)
+  // TODO(TBR): token weaves bypass turn selection — no click-to-select, no CMD+C copy.
+  // Will tie into loom branch exploration (clicking a token to explore alternative paths).
+  const isLlamaTokenWeave = weave.weave_source === 'llama-cpp' && weave.tokens != null && weave.tokens.length > 0
+
+  // TODO(TCS): hardcoded brown/amber scale. Will change with sampler chain data —
+  // different samplers produce different signal profiles needing distinct treatment.
+  function tokenBg(confidence: number): string {
+    if (confidence > 0.9) return 'transparent'
+    const opacity = (1 - confidence) * 0.35
+    return `rgba(180, 120, 60, ${opacity})`
+  }
+
+  function tokenTitle(tok: TokenSignal): string {
+    let tip = `confidence: ${tok.confidence.toFixed(3)}\nentropy: ${tok.entropy.toFixed(3)}\ntop_gap: ${tok.top_gap.toFixed(3)}`
+    if (tok.top_k && tok.top_k.length > 0) {
+      tip += '\n---'
+      for (const k of tok.top_k) {
+        tip += `\n${k.text}: ${(k.prob * 100).toFixed(1)}%`
+      }
+    }
+    return tip
+  }
 </script>
 
 <div class="dw-weave" data-ts={weave.timestamp}>
@@ -88,41 +123,63 @@
       <span class="dw-cluster">{clusterLabel}</span>
     {/if}
     <span>{fmtTime(weave.timestamp)}</span>
+    <!-- TODO(TWC): word_count is 0 for llama-cpp weaves, derive from token text or attributes.text -->
     <span>{weave.word_count}w {weave.turn_count}t</span>
   </div>
-  {#each turns as turn}
-    {@const k = turnKey(turn)}
-    <div
-      class="dw-turn"
-      class:selected={selectedTurns.has(k)}
-      class:human={turn.speaker === 'human'}
-      class:assistant={turn.speaker === 'assistant'}
-      class:tool={turn.speaker === 'tool'}
-      class:edit={turn.speaker === 'edit'}
-      class:read={turn.speaker === 'read'}
-      class:search={turn.speaker === 'search'}
-      class:write={turn.speaker === 'write'}
-      class:hook={turn.speaker === 'hook'}
-      class:marker={turn.speaker === 'session' || turn.speaker === 'compaction' || turn.speaker === 'agent' || turn.speaker === 'task'}
-      onclick={() => onToggle(turn)}
-      role="button"
-      tabindex="0"
-      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(turn) }}}
-    >
-      <span class="dw-speaker">[{turn.speaker}]</span>
-      {#if turn.speaker === 'assistant'}
-        <span class="dw-text">{@html renderText(turn.text)}</span>
-      {:else if turn.fullPath}
-        <span
-          class="dw-text dw-path"
-          title={turn.fullPath}
-          onclick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(turn.fullPath!) }}
-        >{turn.text}</span>
-      {:else}
-        <span class="dw-text">{turn.text}</span>
-      {/if}
+  {#if isLlamaTokenWeave}
+    {#if weave.prompt}
+      <div class="dw-turn human">
+        <span class="dw-speaker">[human]</span>
+        <span class="dw-text">{weave.prompt}</span>
+      </div>
+    {/if}
+    <div class="dw-turn assistant">
+      <span class="dw-speaker">[assistant]</span>
+      <!-- TODO(TDO): each token is a <span>, virtualize like stream glyph for large generations -->
+      <span class="dw-text dw-token-stream">{#each weave.tokens! as tok}<span
+          class="dw-tok"
+          style="background: {tokenBg(tok.confidence)}"
+          title={tokenTitle(tok)}
+        >{tok.text}</span>{/each}</span>
     </div>
-  {/each}
+    {#if weave.model}
+      <div class="dw-llama-meta">{weave.model}</div>
+    {/if}
+  {:else}
+    {#each turns as turn}
+      {@const k = turnKey(turn)}
+      <div
+        class="dw-turn"
+        class:selected={selectedTurns.has(k)}
+        class:human={turn.speaker === 'human'}
+        class:assistant={turn.speaker === 'assistant'}
+        class:tool={turn.speaker === 'tool'}
+        class:edit={turn.speaker === 'edit'}
+        class:read={turn.speaker === 'read'}
+        class:search={turn.speaker === 'search'}
+        class:write={turn.speaker === 'write'}
+        class:hook={turn.speaker === 'hook'}
+        class:marker={turn.speaker === 'session' || turn.speaker === 'compaction' || turn.speaker === 'agent' || turn.speaker === 'task'}
+        onclick={() => onToggle(turn)}
+        role="button"
+        tabindex="0"
+        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(turn) }}}
+      >
+        <span class="dw-speaker">[{turn.speaker}]</span>
+        {#if turn.speaker === 'assistant'}
+          <span class="dw-text">{@html renderText(turn.text)}</span>
+        {:else if turn.fullPath}
+          <span
+            class="dw-text dw-path"
+            title={turn.fullPath}
+            onclick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(turn.fullPath!) }}
+          >{turn.text}</span>
+        {:else}
+          <span class="dw-text">{turn.text}</span>
+        {/if}
+      </div>
+    {/each}
+  {/if}
 </div>
 
 <style>
@@ -248,6 +305,27 @@
     white-space: pre-wrap;
   }
   :global(.dw-code code) { color: var(--text-on-dark-secondary); }
+
+  .dw-token-stream {
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  .dw-tok {
+    border-radius: 1px;
+    cursor: default;
+  }
+  .dw-tok:hover {
+    outline: 1px solid var(--accent-on-dark);
+  }
+
+  .dw-llama-meta {
+    color: var(--text-on-dark-tertiary);
+    font-size: var(--font-size-xs);
+    padding: 1px 3px;
+    font-style: italic;
+  }
 
   :global(.dw-inline-code) {
     background: var(--bg-almost-black);

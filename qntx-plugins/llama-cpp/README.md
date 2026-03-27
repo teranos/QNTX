@@ -71,6 +71,8 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 
 - **SSL** — No signal summary for streaming. The non-streaming `Chat` path logs entropy avg/max, confidence avg/min after generation. `StreamChat` (which feeds the nebula) does not.
 
+- **ATS** — ~~Resolved.~~ Each generation writes a `["Weave"]` attestation to ATS with embedded per-token signals (confidence, entropy, top-gap, top-k) in `attributes.tokens`. One attestation per generation. Loom renders these as confidence-colored token spans.
+
 - **PVH** — Private header dependency. PCA projection in `vocab_projection.cpp` accesses `llama-model.h` (private) to read `tok_embd.weight`. Version-fragile against llama.cpp internal changes.
 
 See `docs/research/metal-llama.md` for the full code reference table including Metal visualization limitations and opportunities.
