@@ -27,7 +27,7 @@
 
           # Separate go.mod with minimal dependencies (87 lines in go.sum)
           # To update: set to `pkgs.lib.fakeHash`, run `nix build ./typegen`, copy the hash from error
-          vendorHash = "sha256-ssxQmTp1uSLvEqr8ixiUqaajgNH8JIE8DObVOgPFIq4=";
+          vendorHash = "sha256-mhUaYdOwYCFJe/+8cmiiAAUhJn9AYO0E40+aBc//EYg=";
 
           subPackages = [ "cmd/typegen" ];
         };

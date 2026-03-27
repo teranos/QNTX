@@ -64,3 +64,13 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 - **NEF** — No extraction feedback. If MuPDF returns no text from a PDF, the prompt runs without context and the user gets no indication the attachment was empty.
 
 - **SDR** — Shutdown race. Mutex recursion between gRPC teardown and llama.cpp destructor on kill. Cosmetic log noise, not a data issue.
+
+- **SUI** — Sampling controls. Only temperature is exposed. Top-k, top-p, min-p, and repetition penalty are available in llama.cpp but not wired through the proto or UI.
+
+- **SCO** — Sampler black box. The sampler chain runs as a black box — the final selected token is returned but why alternatives were rejected is not recorded. Custom `llama_sampler_i` observer vtable would reveal per-stage filtering.
+
+- **SSL** — No signal summary for streaming. The non-streaming `Chat` path logs entropy avg/max, confidence avg/min after generation. `StreamChat` (which feeds the nebula) does not.
+
+- **PVH** — Private header dependency. PCA projection in `vocab_projection.cpp` accesses `llama-model.h` (private) to read `tok_embd.weight`. Version-fragile against llama.cpp internal changes.
+
+See `docs/research/metal-llama.md` for the full code reference table including Metal visualization limitations and opportunities.

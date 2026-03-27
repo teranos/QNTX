@@ -125,17 +125,17 @@ Could LLM embeddings plug into the same HDBSCAN/UMAP infra? Technically yes — 
 
 ## Checklist
 
-- [ ] Dump full vocabulary to frontend at model load
-- [ ] Logit trajectories — multi-line chart of token probability evolution across steps
-- [ ] Token tree branching — fork from heatmap token via top-K popup, spawn new stream glyphs per alternative path
-- [ ] Cumulative perplexity — running perplexity score during generation
-- [ ] Expose top-k, top-p, min-p, repetition penalty in the UI
-- [ ] Wire sampler chain configuration through to `llama_sampler_chain_add` calls
-- [ ] Integrate with bias glyph (#718)
-- [ ] Investigate LLM embeddings via `llama_get_embeddings` for inference-specific clustering
-- [ ] Evaluate whether LLM embedding clusters differ meaningfully from MiniLM clusters
-- [ ] Port D prototype signal computation (entropy spikes, low-confidence spans) to C++
-- [ ] Write per-generation attestations with signal attributes to ATS
+- [ ] **VDF** — Dump full vocabulary to frontend at model load. Loop `llama_vocab_n_tokens`, extract text + attributes + score per token. Serve via HTTP endpoint or model metadata broadcast. Foundation for bias glyph (#718) and semantic vocab search.
+- [ ] **LTR** — Logit trajectories. Track how specific tokens' probabilities evolve across generation steps. Multi-line chart, selected token bolded at the step it was chosen. Frontend work, data already flows.
+- [ ] **TTB** — Token tree branching. Fork from heatmap token via top-K popup, spawn new stream glyphs per alternative path. Requires KV cache snapshot/restore in C++. Highest-effort item.
+- [ ] **CPX** — Cumulative perplexity. Running `exp(mean(-log(confidence)))` across all tokens. Emit as scalar per chunk. Small C++ addition.
+- [ ] **SUI** — Expose top-k, top-p, min-p, repetition penalty in the UI. Proto + C++ + Go + TS. Only temperature is wired today.
+- [ ] **SCW** — Wire sampler chain configuration through to `llama_sampler_chain_add` calls. Depends on SUI for proto fields.
+- [ ] **BIG** — Integrate with bias glyph (#718). Blocked on bias glyph implementation.
+- [ ] **HSE** — Investigate LLM embeddings via `llama_get_embeddings` for inference-specific clustering. Pointer dereference, 4096 floats per token.
+- [ ] **HSC** — Evaluate whether LLM embedding clusters differ meaningfully from MiniLM clusters. Blocked on HSE.
+- [ ] **ESD** — Port D prototype signal computation (entropy spikes, low-confidence spans) to C++. Sliding-window analysis, emit flags.
+- [ ] **ATS** — Write per-generation attestations with signal attributes to ATS. Go-only, data shape TBD (full tokens vs summary stats).
 
 ## Future Direction: Token-as-Glyph
 

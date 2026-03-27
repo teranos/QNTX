@@ -11,9 +11,15 @@
  * Persists token data to canvas state so content survives page refresh.
  *
  * Token hover popup showing signal data and top-K candidates — see token-popup.ts
- * TODO: Copy button (result glyph has one, stream glyph doesn't)
- * TODO: Factor entropy and top_gap into color mapping, not just confidence
- * TODO: Window morph support (separate PR)
+ * TODO(CPY): Copy button (result glyph has one, stream glyph doesn't)
+ * TODO(ECM): Factor entropy and top_gap into color mapping, not just confidence.
+ *   Currently only confidence drives the amber heatmap. Entropy and top_gap are
+ *   captured in data-* attributes but unused in rendering.
+ * TODO(WMS): Window morph support (separate PR)
+ * TODO(SSL): Signal summary logging — StreamChat path has no post-generation
+ *   summary (Chat path logs entropy avg/max, confidence avg/min). Add equivalent.
+ * TODO(ATS): Write per-generation attestations with signal attributes to ATS
+ *   after stream completes. See inference-internals.md checklist.
  */
 
 import type { Glyph } from './glyph';
@@ -92,11 +98,83 @@ export interface StreamGlyphContent {
     prompt?: string;
 }
 
+// ── DOM budget ──────────────────────────────────────────────────────
+
+/** Global max token spans across ALL stream glyphs. */
+const GLOBAL_DOM_BUDGET = 2500;
+
+interface StreamInstance {
+    output: HTMLElement;
+    tokens: StreamToken[];
+    visible: boolean;
+}
+
+const instances = new Set<StreamInstance>();
+
+/** Count total spans across all visible stream glyphs */
+function globalSpanCount(): number {
+    let count = 0;
+    for (const inst of instances) {
+        if (inst.visible) count += inst.output.children.length;
+    }
+    return count;
+}
+
+/** Evict oldest spans globally until under budget */
+function evictToFit(): void {
+    while (globalSpanCount() > GLOBAL_DOM_BUDGET) {
+        // Find the visible instance with the most spans
+        let largest: StreamInstance | null = null;
+        let largestCount = 0;
+        for (const inst of instances) {
+            if (inst.visible && inst.output.children.length > largestCount) {
+                largest = inst;
+                largestCount = inst.output.children.length;
+            }
+        }
+        if (!largest || largestCount === 0) break;
+        largest.output.removeChild(largest.output.children[0]);
+    }
+}
+
+/** Render spans for a stream instance (up to its share of the budget) */
+function renderSpans(inst: StreamInstance): void {
+    const output = inst.output;
+    output.textContent = '';
+    const visibleCount = [...instances].filter(i => i.visible).length;
+    const perGlyph = Math.floor(GLOBAL_DOM_BUDGET / Math.max(1, visibleCount));
+    const start = Math.max(0, inst.tokens.length - perGlyph);
+    for (let i = start; i < inst.tokens.length; i++) {
+        output.appendChild(renderToken(inst.tokens[i], i));
+    }
+}
+
+/** Shared IntersectionObserver — clears spans when off-screen, restores on-screen */
+const visibilityObserver: IntersectionObserver | null =
+    typeof IntersectionObserver !== 'undefined'
+        ? new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                const inst = [...instances].find(i => i.output === entry.target);
+                if (!inst) continue;
+
+                if (entry.isIntersecting && !inst.visible) {
+                    inst.visible = true;
+                    renderSpans(inst);
+                    evictToFit();
+                } else if (!entry.isIntersecting && inst.visible) {
+                    inst.visible = false;
+                    inst.output.textContent = '';
+                }
+            }
+        }, { threshold: 0 })
+        : null;
+
 // ── Token rendering ─────────────────────────────────────────────────
 
-function renderToken(token: StreamToken): HTMLSpanElement {
+function renderToken(token: StreamToken, tokenIndex: number): HTMLSpanElement {
     const span = document.createElement('span');
     span.textContent = token.text;
+    span.dataset.tokenIndex = String(tokenIndex);
 
     if (token.signal) {
         span.style.backgroundColor = confidenceToColor(token.signal.confidence);
@@ -111,11 +189,11 @@ function renderToken(token: StreamToken): HTMLSpanElement {
     return span;
 }
 
-/** Collect all text from token spans in the output container */
-function collectText(output: HTMLElement): string {
+/** Collect all text from the tokens array (DOM may be capped) */
+function collectText(tokens: StreamToken[]): string {
     let text = '';
-    for (const child of output.children) {
-        text += child.textContent ?? '';
+    for (const token of tokens) {
+        text += token.text;
     }
     return text;
 }
@@ -204,23 +282,35 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
     output.style.color = 'var(--text-on-dark)';
     element.appendChild(output);
 
-    // Render restored tokens
-    for (const token of tokens) {
-        output.appendChild(renderToken(token));
-    }
+    // Register this instance for global DOM budget management
+    const instance: StreamInstance = { output, tokens, visible: true };
+    instances.add(instance);
+    visibilityObserver?.observe(output);
 
-    // Token hover popup — event delegation on the output container
+    // Render restored tokens (share of global budget)
+    renderSpans(instance);
+    evictToFit();
+
+    // Token hover popup + nebula scrub — event delegation on the output container
     const popup = createTokenPopup();
     output.addEventListener('mouseenter', (e: MouseEvent) => {
         const target = e.target as HTMLElement;
         if (target.tagName === 'SPAN' && target.dataset.confidence) {
             popup.show(target as HTMLSpanElement);
+            if (target.dataset.tokenIndex) {
+                document.dispatchEvent(new CustomEvent('nebula-scrub', {
+                    detail: { index: parseInt(target.dataset.tokenIndex, 10) },
+                }));
+            }
         }
     }, true);
     output.addEventListener('mouseleave', (e: MouseEvent) => {
         const target = e.target as HTMLElement;
         if (target.tagName === 'SPAN') {
             popup.hide();
+            document.dispatchEvent(new CustomEvent('nebula-scrub', {
+                detail: { index: -1 },
+            }));
         }
     }, true);
 
@@ -248,8 +338,12 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
             if (!msg.content) return;
 
             const token: StreamToken = { text: msg.content, signal: msg.signal };
+            const tokenIndex = tokens.length;
             tokens.push(token);
-            output.appendChild(renderToken(token));
+            if (instance.visible) {
+                output.appendChild(renderToken(token, tokenIndex));
+                evictToFit();
+            }
             output.scrollTop = output.scrollHeight;
         });
     }
@@ -259,7 +353,7 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
     const followupZone = createFollowUpZone({
         element,
         glyph,
-        getSystemPrompt: () => collectText(output),
+        getSystemPrompt: () => collectText(tokens),
         getModel: () => streamModel,
         logLabel: 'StreamGlyph',
         onExecute: (request: FollowUpRequest, controls: FollowUpControls) => {
@@ -271,6 +365,8 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
     // Cleanup
     storeCleanup(element, () => {
         if (promptGlyphId) unsubscribeStream(promptGlyphId);
+        visibilityObserver?.unobserve(output);
+        instances.delete(instance);
         popup.destroy();
     });
 

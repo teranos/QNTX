@@ -73,18 +73,38 @@ set(GENERATED_SRCS "")
 generate_proto(domain.proto)
 generate_proto(llm.proto)
 
+# Platform-specific sources: Metal renderer and BLAS-based PCA require macOS
+# with Metal-cpp headers. The Nix sandbox on macOS may not have them, so check
+# for the actual header rather than just APPLE.
+if(APPLE AND EXISTS "${CMAKE_SOURCE_DIR}/vendor/metal-cpp/Foundation/Foundation.hpp")
+    set(PLATFORM_SRCS
+        src/metal_renderer.cpp
+        src/vocab_projection.cpp
+    )
+    set(HAS_METAL TRUE)
+else()
+    set(PLATFORM_SRCS
+        src/metal_renderer_stub.cpp
+        src/vocab_projection_stub.cpp
+    )
+    set(HAS_METAL FALSE)
+endif()
+
 # Plugin binary
 add_executable(qntx-llama-cpp-plugin
     src/main.cpp
     src/plugin.cpp
     src/inference.cpp
     src/pdf_extract.cpp
+    ${PLATFORM_SRCS}
     ${GENERATED_SRCS}
 )
 
 target_include_directories(qntx-llama-cpp-plugin PRIVATE
     ${PROTO_GEN_DIR}
     ${LLAMA_SOURCE_DIR}/include
+    ${LLAMA_SOURCE_DIR}/src
+    ${LLAMA_SOURCE_DIR}/ggml/include
     ${MUPDF_INCLUDE_DIR}
 )
 
@@ -94,6 +114,76 @@ target_link_libraries(qntx-llama-cpp-plugin PRIVATE
     protobuf::libprotobuf
     ${MUPDF_LIB}
 )
+
+# Embed nebula glyph JS as a C string literal — single source of truth in src/nebula-module.js
+set(NEBULA_JS_SRC "${CMAKE_SOURCE_DIR}/src/nebula-module.js")
+set(NEBULA_JS_INC "${CMAKE_BINARY_DIR}/nebula-module.js.inc")
+add_custom_command(
+    OUTPUT ${NEBULA_JS_INC}
+    COMMAND ${CMAKE_COMMAND} -DINPUT=${NEBULA_JS_SRC} -DOUTPUT=${NEBULA_JS_INC}
+        -P ${CMAKE_SOURCE_DIR}/cmake/embed_string.cmake
+    DEPENDS ${NEBULA_JS_SRC}
+    COMMENT "Embedding nebula-module.js as C string"
+)
+add_custom_target(nebula_js_inc ALL DEPENDS ${NEBULA_JS_INC})
+add_dependencies(qntx-llama-cpp-plugin nebula_js_inc)
+target_include_directories(qntx-llama-cpp-plugin PRIVATE ${CMAKE_BINARY_DIR})
+
+if(HAS_METAL)
+    target_link_libraries(qntx-llama-cpp-plugin PRIVATE
+        "-framework Accelerate"
+        "-framework Metal"
+        "-framework Foundation"
+        "-framework QuartzCore"
+        "-framework CoreGraphics"
+        "-framework ImageIO"
+    )
+    target_compile_definitions(qntx-llama-cpp-plugin PRIVATE ACCELERATE_NEW_LAPACK)
+    target_include_directories(qntx-llama-cpp-plugin PRIVATE
+        ${CMAKE_SOURCE_DIR}/vendor/metal-cpp
+    )
+
+    # Embed shader source as a C string literal for runtime compilation fallback.
+    # shaders.metal is the single source of truth; shaders.metal.inc is generated.
+    set(SHADER_SRC "${CMAKE_SOURCE_DIR}/src/shaders.metal")
+    set(SHADER_INC "${CMAKE_BINARY_DIR}/shaders.metal.inc")
+    add_custom_command(
+        OUTPUT ${SHADER_INC}
+        COMMAND ${CMAKE_COMMAND} -DINPUT=${SHADER_SRC} -DOUTPUT=${SHADER_INC}
+            -P ${CMAKE_SOURCE_DIR}/cmake/embed_string.cmake
+        DEPENDS ${SHADER_SRC}
+        COMMENT "Embedding shaders.metal as C string"
+    )
+    add_custom_target(shader_inc ALL DEPENDS ${SHADER_INC})
+    add_dependencies(qntx-llama-cpp-plugin shader_inc)
+
+    # Optional: pre-compile metallib if Metal toolchain is available
+    execute_process(
+        COMMAND xcrun metal -v
+        RESULT_VARIABLE METAL_TOOLCHAIN_RESULT
+        OUTPUT_QUIET ERROR_QUIET
+    )
+    if(METAL_TOOLCHAIN_RESULT EQUAL 0)
+        set(SHADER_AIR "${CMAKE_BINARY_DIR}/shaders.air")
+        set(SHADER_LIB "${CMAKE_BINARY_DIR}/default.metallib")
+        add_custom_command(
+            OUTPUT ${SHADER_AIR}
+            COMMAND xcrun metal -c ${SHADER_SRC} -o ${SHADER_AIR}
+            DEPENDS ${SHADER_SRC}
+            COMMENT "Compiling shaders.metal → AIR"
+        )
+        add_custom_command(
+            OUTPUT ${SHADER_LIB}
+            COMMAND xcrun metallib ${SHADER_AIR} -o ${SHADER_LIB}
+            DEPENDS ${SHADER_AIR}
+            COMMENT "Linking shaders.air → default.metallib"
+        )
+        add_custom_target(metal_shaders ALL DEPENDS ${SHADER_LIB})
+        add_dependencies(qntx-llama-cpp-plugin metal_shaders)
+    else()
+        message(STATUS "Metal toolchain not available — shaders will compile at runtime")
+    endif()
+endif()
 
 # mupdf-third bundles freetype/zlib/etc — only present with static MuPDF installs
 if(MUPDF_THIRD_LIB)

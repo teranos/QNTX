@@ -18,10 +18,10 @@
           pname = "qntx-python-plugin";
           version = self.rev or "dev";
           # Include full repo root because build.rs needs ../plugin/grpc/protocol/*.proto
-          src = ./..; # Root of QNTX repo
+          src = ./../..; # Root of QNTX repo
 
           cargoLock = {
-            lockFile = ./../Cargo.lock;
+            lockFile = ./../../Cargo.lock;
           };
 
           buildInputs = with pkgs; [
@@ -101,10 +101,10 @@
         qntx-python-clippy = pkgs.rustPlatform.buildRustPackage {
           pname = "qntx-python-clippy";
           version = self.rev or "dev";
-          src = ../.;
+          src = ../../.;
 
           cargoLock = {
-            lockFile = ./../Cargo.lock;
+            lockFile = ./../../Cargo.lock;
           };
 
           nativeBuildInputs = with pkgs; [

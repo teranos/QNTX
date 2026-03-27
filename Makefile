@@ -272,13 +272,13 @@ define check-plugin-version
 endef
 
 atproto-plugin: ## Build, install, and restart AT Protocol plugin
-	$(call check-plugin-version,qntx-atproto,go,qntx-atproto/plugin.go)
-	@$(MAKE) -C qntx-atproto install PREFIX=$(PREFIX)
+	$(call check-plugin-version,qntx-plugins/qntx-atproto,go,qntx-plugins/qntx-atproto/plugin.go)
+	@$(MAKE) -C qntx-plugins/qntx-atproto install PREFIX=$(PREFIX)
 	$(call restart-plugin,atproto)
 
 github-plugin: ## Build, install, and restart GitHub plugin
-	$(call check-plugin-version,qntx-github,go,qntx-github/plugin.go)
-	@$(MAKE) -C qntx-github install PREFIX=$(PREFIX)
+	$(call check-plugin-version,qntx-plugins/qntx-github,go,qntx-plugins/qntx-github/plugin.go)
+	@$(MAKE) -C qntx-plugins/qntx-github install PREFIX=$(PREFIX)
 	$(call restart-plugin,github)
 
 ix-json-plugin: ## Build, install, and restart ix-json plugin
@@ -301,8 +301,8 @@ faal-plugin: ## Build, install, and restart faal chaos testing D plugin
 	$(call restart-plugin,faal)
 
 openrouter-plugin: ## Build, install, and restart OpenRouter plugin
-	$(call check-plugin-version,qntx-openrouter,go,qntx-openrouter/plugin.go)
-	@$(MAKE) -C qntx-openrouter install PREFIX=$(PREFIX)
+	$(call check-plugin-version,qntx-plugins/qntx-openrouter,go,qntx-plugins/qntx-openrouter/plugin.go)
+	@$(MAKE) -C qntx-plugins/qntx-openrouter install PREFIX=$(PREFIX)
 	$(call restart-plugin,openrouter)
 
 pty-glyph-plugin: ## Build, install, and restart pty-glyph plugin
@@ -363,7 +363,7 @@ rust-embeddings: ## Build Rust embeddings library with ONNX support (for CGO int
 # REQUIRES Nix: Platform-specific Python linking issues make cargo-only builds unreliable
 rust-python: ## Build and install Rust Python plugin to ~/.qntx/plugins/
 	@echo "Building qntx-python-plugin via Nix..."
-	@nix build ./qntx-python#qntx-python-plugin
+	@nix build ./qntx-plugins/qntx-python#qntx-python-plugin
 	@mkdir -p bin $(PREFIX)/plugins
 	@rm -f bin/qntx-python-plugin $(PREFIX)/plugins/qntx-python-plugin
 	@cp -L result/bin/qntx-python-plugin bin/
@@ -376,7 +376,7 @@ rust-python: ## Build and install Rust Python plugin to ~/.qntx/plugins/
 # REQUIRES Nix: Python linking + umap-learn dependency
 rust-reduce: ## Build and install Rust Reduce plugin to ~/.qntx/plugins/
 	@echo "Building qntx-reduce-plugin via Nix..."
-	@nix build ./qntx-reduce#qntx-reduce-plugin
+	@nix build ./qntx-plugins/qntx-reduce#qntx-reduce-plugin
 	@mkdir -p bin $(PREFIX)/plugins
 	@rm -f bin/qntx-reduce-plugin $(PREFIX)/plugins/qntx-reduce-plugin
 	@cp -L result/bin/qntx-reduce-plugin bin/
