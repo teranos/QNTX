@@ -488,6 +488,57 @@ func (e *Engine) GenerateASUID(prefix, subject, predicate, context string) (stri
 	return result.Full, nil
 }
 
+// ResolvedTemporalOutput represents a resolved temporal constraint from WASM.
+// Timestamps are absolute milliseconds since epoch.
+type ResolvedTemporalOutput struct {
+	Type    string  `json:"type"`              // Since, Until, On, Between, Over
+	SinceMs *int64  `json:"since_ms,omitempty"` // For Since
+	UntilMs *int64  `json:"until_ms,omitempty"` // For Until
+	StartMs *int64  `json:"start_ms,omitempty"` // For On, Between
+	EndMs   *int64  `json:"end_ms,omitempty"`   // For On, Between
+	Value   float64 `json:"value,omitempty"`    // For Over
+	Unit    string  `json:"unit,omitempty"`     // For Over
+}
+
+// ParseResolvedOutput is the result of parse_ax_query_resolved.
+type ParseResolvedOutput struct {
+	Subjects   []string                `json:"subjects"`
+	Predicates []string                `json:"predicates"`
+	Contexts   []string                `json:"contexts"`
+	Actors     []string                `json:"actors"`
+	Temporal   *ResolvedTemporalOutput `json:"temporal,omitempty"`
+	Actions    []string                `json:"actions"`
+	Error      string                  `json:"error,omitempty"`
+}
+
+// ParseAxQueryResolved parses an AX query with temporal resolution in a single WASM call.
+// The caller provides now_ms (current time in milliseconds since epoch) so Rust can
+// resolve relative expressions like "yesterday" or "3 days ago" into absolute timestamps.
+func (e *Engine) ParseAxQueryResolved(query string, nowMs int64) (*ParseResolvedOutput, error) {
+	input, err := json.Marshal(struct {
+		Query string `json:"query"`
+		NowMs int64  `json:"now_ms"`
+	}{Query: query, NowMs: nowMs})
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal parse_ax_query_resolved input")
+	}
+
+	raw, err := e.Call("parse_ax_query_resolved", string(input))
+	if err != nil {
+		return nil, err
+	}
+
+	var output ParseResolvedOutput
+	if err := json.Unmarshal([]byte(raw), &output); err != nil {
+		return nil, errors.Wrapf(err, "unmarshal parse_ax_query_resolved result: %s", raw)
+	}
+	if output.Error != "" {
+		return nil, errors.Newf("parse_ax_query_resolved: %s", output.Error)
+	}
+
+	return &output, nil
+}
+
 // GetWASMSize returns the size of the embedded WASM module in bytes.
 func GetWASMSize() int {
 	return len(wasmBytes)

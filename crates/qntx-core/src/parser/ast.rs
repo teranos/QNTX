@@ -129,6 +129,9 @@ pub enum DurationUnit {
     Months,
     Weeks,
     Days,
+    Hours,
+    Minutes,
+    Seconds,
 }
 
 impl DurationUnit {
@@ -138,6 +141,9 @@ impl DurationUnit {
             "m" | "mo" | "mos" | "month" | "months" => Some(DurationUnit::Months),
             "w" | "wk" | "wks" | "week" | "weeks" => Some(DurationUnit::Weeks),
             "d" | "day" | "days" => Some(DurationUnit::Days),
+            "h" | "hr" | "hrs" | "hour" | "hours" => Some(DurationUnit::Hours),
+            "min" | "mins" | "minute" | "minutes" => Some(DurationUnit::Minutes),
+            "s" | "sec" | "secs" | "second" | "seconds" => Some(DurationUnit::Seconds),
             _ => None,
         }
     }
@@ -150,6 +156,9 @@ impl fmt::Display for DurationUnit {
             DurationUnit::Months => write!(f, "m"),
             DurationUnit::Weeks => write!(f, "w"),
             DurationUnit::Days => write!(f, "d"),
+            DurationUnit::Hours => write!(f, "h"),
+            DurationUnit::Minutes => write!(f, "min"),
+            DurationUnit::Seconds => write!(f, "s"),
         }
     }
 }

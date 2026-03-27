@@ -176,6 +176,80 @@ mod wazero {
         }
     }
     // ============================================================================
+    // Parser with temporal resolution
+    // ============================================================================
+
+    /// Input for parse_ax_query_resolved: query string + current time for temporal resolution.
+    #[derive(serde::Deserialize)]
+    struct ParseResolvedInput {
+        query: String,
+        now_ms: i64,
+    }
+
+    /// Output with resolved temporal constraint.
+    #[derive(serde::Serialize)]
+    struct ParseResolvedOutput {
+        subjects: Vec<String>,
+        predicates: Vec<String>,
+        contexts: Vec<String>,
+        actors: Vec<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        temporal: Option<qntx_core::temporal::ResolvedTemporal>,
+        actions: Vec<String>,
+    }
+
+    /// Parse an AX query and resolve temporal expressions into absolute timestamps.
+    ///
+    /// Input JSON: `{"query": "ALICE is author since yesterday", "now_ms": 1718452800000}`
+    ///
+    /// Output JSON includes resolved temporal with millisecond timestamps instead of raw strings.
+    #[no_mangle]
+    pub extern "C" fn parse_ax_query_resolved(ptr: u32, len: u32) -> u64 {
+        let input_str = unsafe { read_str(ptr, len) };
+
+        let input: ParseResolvedInput = match serde_json::from_str(input_str) {
+            Ok(v) => v,
+            Err(e) => return write_error(&format!("invalid JSON input: {}", e)),
+        };
+
+        match Parser::parse(&input.query) {
+            Ok(query) => {
+                // Validate "over" units (same as parse_ax_query)
+                if let Some(qntx_core::parser::TemporalClause::Over(ref dur)) = query.temporal {
+                    if dur.value.is_some() && dur.unit.is_none() {
+                        return write_error(&format!("missing unit in '{}'", dur.raw));
+                    }
+                }
+
+                // Resolve temporal clause
+                let resolved_temporal = match &query.temporal {
+                    Some(clause) => match qntx_core::temporal::resolve_clause(clause, input.now_ms)
+                    {
+                        Ok(resolved) => Some(resolved),
+                        Err(e) => return write_error(&format!("temporal resolution failed: {}", e)),
+                    },
+                    None => None,
+                };
+
+                let output = ParseResolvedOutput {
+                    subjects: query.subjects.iter().map(|s| s.to_string()).collect(),
+                    predicates: query.predicates.iter().map(|s| s.to_string()).collect(),
+                    contexts: query.contexts.iter().map(|s| s.to_string()).collect(),
+                    actors: query.actors.iter().map(|s| s.to_string()).collect(),
+                    temporal: resolved_temporal,
+                    actions: query.actions.iter().map(|s| s.to_string()).collect(),
+                };
+
+                match serde_json::to_string(&output) {
+                    Ok(json) => write_result(&json),
+                    Err(e) => write_error(&format!("serialization failed: {}", e)),
+                }
+            }
+            Err(e) => write_error(&format!("{}", e)),
+        }
+    }
+
+    // ============================================================================
     // Fuzzy matching
     // ============================================================================
 
