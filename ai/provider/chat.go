@@ -5,8 +5,9 @@ import "encoding/json"
 // ChatRequest represents a high-level request to an LLM provider.
 // This is the unified request type used by all providers (OpenRouter, local, etc.)
 type ChatRequest struct {
-	SystemPrompt string
-	UserPrompt   string
+	SystemPrompt string        // Deprecated: use Messages for multi-turn
+	UserPrompt   string        // Deprecated: use Messages for multi-turn
+	Messages     []Message     // Multi-turn conversation history; takes precedence over SystemPrompt/UserPrompt
 	Temperature  *float64      // Override default temperature
 	MaxTokens    *int          // Override default max tokens
 	Model        *string       // Override default model
