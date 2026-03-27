@@ -16,5 +16,15 @@ Multiple providers can run simultaneously. The caller specifies which backend to
 ## Protocol
 `plugin/grpc/protocol/llm.proto`
 
+## Multi-turn conversation
+
+The original `LLMChatRequest` carried `system_prompt` + `user_prompt` — two strings, single turn only. Both plugins (llama-cpp and OpenRouter) built a fresh 2-message array per request and discarded everything after the response.
+
+A `repeated ChatMessage messages` field (field 8) extends the protocol to carry full conversation history. Both plugins already send a messages array internally — llama-cpp passes it to `llama_chat_apply_template`, OpenRouter posts it to the `/v1/chat/completions` endpoint. The change is accepting a longer array, not a structural redesign.
+
+`system_prompt` and `user_prompt` are deprecated. When `messages` is populated it takes precedence; the old fields remain for backwards compatibility.
+
+Conversation state lives on the canvas — QNTX has no linear chat session. The Go prompt handler assembles the message array from the spatial arrangement of glyphs at request time. Neither plugin stores conversation state; they receive a snapshot and execute.
+
 ## Consequences
 This is the first service in `ServiceRegistry` provided by a plugin rather than by core. The routing and registration pattern must be designed with that in mind.
