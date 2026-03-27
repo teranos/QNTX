@@ -71,7 +71,7 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 
 - **SSL** — No signal summary for streaming. The non-streaming `Chat` path logs entropy avg/max, confidence avg/min after generation. `StreamChat` (which feeds the nebula) does not.
 
-- **ATS** — No attestation writes. Signal data (per-token confidence, entropy, top-gap, top-k) is streamed to the frontend and discarded. The plugin receives `ats_store_endpoint` during Initialize but ignores it. Each generation should produce a `["Weave"]` attestation and per-token `["Token"]` attestations written directly to ATS.
+- **ATS** — ~~Resolved.~~ Each generation writes a `["Weave"]` attestation to ATS with embedded per-token signals (confidence, entropy, top-gap, top-k) in `attributes.tokens`. One attestation per generation. Loom renders these as confidence-colored token spans.
 
 - **PVH** — Private header dependency. PCA projection in `vocab_projection.cpp` accesses `llama-model.h` (private) to read `tok_embd.weight`. Version-fragile against llama.cpp internal changes.
 
