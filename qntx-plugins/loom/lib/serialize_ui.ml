@@ -19,6 +19,18 @@ let extract_number (fields : Qntx_plugin_proto.Struct.Google.Protobuf.Struct.t) 
   | Some (Some (`Number_value n)) -> Some (int_of_float n)
   | _ -> None
 
+(* Convert a protobuf Value to Yojson, preserving nested structures *)
+let rec value_to_yojson (v : GValue.t option) : Yojson.Safe.t =
+  match v with
+  | Some (`String_value s) -> `String s
+  | Some (`Number_value n) -> `Float n
+  | Some (`Bool_value b) -> `Bool b
+  | Some (`Struct_value fields) ->
+    `Assoc (List.map (fun (k, v) -> (k, value_to_yojson v)) fields)
+  | Some (`List_value items) ->
+    `List (List.map (fun v -> value_to_yojson (Some v)) items)
+  | Some (`Null_value _) | Some `not_set | None -> `Null
+
 (* Extract a nested Struct as a string->string JSON object *)
 let extract_string_map (fields : Qntx_plugin_proto.Struct.Google.Protobuf.Struct.t) key =
   match List.assoc_opt key fields with
@@ -62,6 +74,17 @@ let attestation_to_json (a : Protocol.Attestation.t) =
       | Some n -> `Int n
       | None -> `Null);
     ("paths", extract_string_map fields "paths");
+    ("weave_source", match extract_string fields "weave_source" with
+      | Some s -> `String s
+      | None -> `Null);
+    ("model", match extract_string fields "model" with
+      | Some s -> `String s
+      | None -> `Null);
+    (* TODO(TPA): full token array in every response, no lazy loading or pagination *)
+    ("tokens", value_to_yojson (List.assoc_opt "tokens" fields |> Option.join));
+    ("prompt", match extract_string fields "prompt" with
+      | Some s -> `String s
+      | None -> `Null);
   ]
 
 (* Check if a weave attestation has source "graunde" *)
