@@ -80,6 +80,7 @@ let attestation_to_json (a : Protocol.Attestation.t) =
     ("model", match extract_string fields "model" with
       | Some s -> `String s
       | None -> `Null);
+    (* TODO(TPA): full token array in every response, no lazy loading or pagination *)
     ("tokens", value_to_yojson (List.assoc_opt "tokens" fields |> Option.join));
     ("prompt", match extract_string fields "prompt" with
       | Some s -> `String s

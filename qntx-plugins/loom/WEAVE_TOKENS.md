@@ -51,3 +51,15 @@ One weave per generation — no separate Token attestations.
 
 One attestation per generation avoids the 16-per-(actor, context) eviction limit.
 Token data lives inside the weave's attributes, not as separate attestations.
+
+## Limitations
+
+- **TBR** — Token branch exploration. Token weaves bypass turn-level selection, so click-to-select and CMD+C copy don't work. Will tie into loom branch exploration — clicking a low-confidence token to explore the alternative path the model didn't take.
+
+- **TDO** — Token DOM overhead. Each token is a separate `<span>` element. Will become an issue at high token counts across many weaves. Can adopt the virtualized approach used by the stream glyph in QNTX.
+
+- **TCS** — Token color scale. Hardcoded brown/amber confidence scale. Will change when sampler chain data is available — different samplers (top-k, top-p, penalties) produce different signal profiles that need distinct visual treatment.
+
+- **TWC** — Token word count. `word_count` is 0 for llama-cpp weaves. The header metadata is misleading. Should derive word count from the token text or from `attributes.text`.
+
+- **TPA** — Token payload in API. Full token arrays are included in every `/api/weaves` response. No lazy loading or pagination — large generation histories will bloat the response.

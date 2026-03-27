@@ -92,8 +92,12 @@
   }
 
   const turns = parseTurns(weave)
+  // TODO(TBR): token weaves bypass turn selection — no click-to-select, no CMD+C copy.
+  // Will tie into loom branch exploration (clicking a token to explore alternative paths).
   const isLlamaTokenWeave = weave.weave_source === 'llama-cpp' && weave.tokens != null && weave.tokens.length > 0
 
+  // TODO(TCS): hardcoded brown/amber scale. Will change with sampler chain data —
+  // different samplers produce different signal profiles needing distinct treatment.
   function tokenBg(confidence: number): string {
     if (confidence > 0.9) return 'transparent'
     const opacity = (1 - confidence) * 0.35
@@ -119,6 +123,7 @@
       <span class="dw-cluster">{clusterLabel}</span>
     {/if}
     <span>{fmtTime(weave.timestamp)}</span>
+    <!-- TODO(TWC): word_count is 0 for llama-cpp weaves, derive from token text or attributes.text -->
     <span>{weave.word_count}w {weave.turn_count}t</span>
   </div>
   {#if isLlamaTokenWeave}
@@ -130,6 +135,7 @@
     {/if}
     <div class="dw-turn assistant">
       <span class="dw-speaker">[assistant]</span>
+      <!-- TODO(TDO): each token is a <span>, virtualize like stream glyph for large generations -->
       <span class="dw-text dw-token-stream">{#each weave.tokens! as tok}<span
           class="dw-tok"
           style="background: {tokenBg(tok.confidence)}"

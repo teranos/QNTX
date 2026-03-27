@@ -135,7 +135,7 @@ Could LLM embeddings plug into the same HDBSCAN/UMAP infra? Technically yes — 
 - [ ] **HSE** — Investigate LLM embeddings via `llama_get_embeddings` for inference-specific clustering. Pointer dereference, 4096 floats per token.
 - [ ] **HSC** — Evaluate whether LLM embedding clusters differ meaningfully from MiniLM clusters. Blocked on HSE.
 - [ ] **ESD** — Port D prototype signal computation (entropy spikes, low-confidence spans) to C++. Sliding-window analysis, emit flags.
-- [ ] **ATS** — Write per-generation attestations to ATS from C++ plugin. One `["Weave"]` attestation per generation, one `["Token"]` attestation per token with signal data (confidence, entropy, top-gap, top-k). See `docs/research/loom-llama.md`.
+- [x] **ATS** — Write per-generation attestations to ATS from C++ plugin. One `["Weave"]` attestation per generation with embedded per-token signals. Loom renders as confidence-colored token spans. Done in `loom-llama-integration` branch.
 
 ## Future Direction: Token-as-Glyph
 
