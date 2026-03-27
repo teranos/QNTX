@@ -1,0 +1,256 @@
+# metal-llama
+
+## What exists
+
+Metal-cpp renderer inside `qntx-plugins/llama-cpp/`. The renderer lives in the same process as inference — the softmax distribution goes directly from C++ to a Metal compute shader with no serialization.
+
+- **`src/metal_renderer.h`** / **`src/metal_renderer.cpp`** — Metal-cpp compute + render pipeline. MSL shaders compiled at runtime. Compute pass transforms probabilities + 3D positions into particles. Render pass draws point sprites with additive blending on HDR texture, Reinhard tonemapped to RGBA.
+- **`vendor/metal-cpp/`** — Apple's header-only C++ Metal wrapper.
+- **`src/vocab_projection.cpp`** — PCA projection of token embeddings to 3D via Accelerate BLAS.
+
+Originally prototyped as a separate Swift plugin (`qntx-plugins/metal-llama/`, deleted). Moved into llama-cpp because the full distribution (512KB/token) doesn't need to leave the process.
+
+---
+
+## Vision
+
+This plugin exists to visualise what is happening inside the model as it's happening. The llama-cpp plugin already captures pre-sampler logit signals per token — confidence, entropy, top-gap, top-k candidates — and streams them over gRPC. The stream glyph renders this as a DOM-based confidence heatmap. metal-llama replaces that with GPU-accelerated rendering that can keep up with token generation speed and, critically, support stepping back through tokens and selecting different paths in possibility space.
+
+The token stream is not just a sequence to watch — it's a tree. At each token position, the model considered alternatives. metal-llama should make that tree navigable: see where the model was confident, where it hesitated, branch into the roads not taken.
+
+**Performance is the priority.** Metal is chosen deliberately to eliminate the abstraction layers between data and pixels. This commits to the Apple ecosystem for this plugin. The same GPU running llama-cpp inference renders the visualization — zero-copy potential between inference output buffers and visualization input buffers.
+
+**Platform scope:** macOS-only via Metal. If this needs to run on Windows or Linux in the future, the viable paths are:
+- **Vulkan** — closest cross-platform equivalent to Metal compute + render. MoltenVK already translates Vulkan to Metal on macOS, so a Vulkan-first approach would run everywhere but add a translation layer on the primary target. The trade-off: universal reach at the cost of the zero-copy Metal↔llama.cpp path.
+- **WebGPU (wgpu/Dawn)** — browser-native GPU API with Rust (wgpu) or C++ (Dawn) implementations. Maps to Metal on macOS, Vulkan on Linux, D3D12 on Windows. Higher abstraction than raw Metal, but the same shader language (WGSL or translated SPIR-V). Would require rewriting shaders but not the data pipeline.
+- **Rewrite in Zig + WebGPU** — Zig's comptime could generate pipeline layouts at compile time (like D's CTFE for protobuf). Cross-platform from day one, but no ecosystem precedent in QNTX yet.
+
+For now, Metal is the right call — the llama-cpp plugin already uses Metal acceleration, Tauri targets macOS, and the inference-to-visualization data path benefits from staying on the same GPU API.
+
+**Build toolchain:** CMake, same as llama-cpp. Metal-cpp is header-only, linked via `-framework Metal -framework Foundation -framework QuartzCore`.
+
+---
+
+## The per-token window
+
+The inference loop in `stream_chat()` (`inference.cpp:278-301`) runs this sequence for every token:
+
+```
+llama_decode(ctx_, batch)     ← GPU forward pass (~20-100ms), fills logit buffer
+capture_signal(ctx_, vocab)   ← read logits, softmax, top-10, entropy (~0.1ms)
+llama_sampler_sample(sampler) ← sampler chain picks a token (~0.01ms)
+on_token(text, signal)        ← stream to gRPC → WebSocket → UI
+llama_decode(ctx_, next)      ← next token's forward pass begins
+```
+
+Between `llama_decode` completing and `llama_sampler_sample` choosing, the full model state is available. `capture_signal` currently extracts **230 bytes** from a dataset that is **130KB+** per token. The rest is discarded.
+
+What exists in that window:
+
+| Data | Size per token | Currently captured | Access cost |
+|------|---------------|-------------------|-------------|
+| Full probability distribution (32k+ floats after softmax) | ~128 KB | Top-10 only (200 bytes) | Zero — already computed as local var `probs`, discarded after partial sort |
+| Hidden state embedding | ~16 KB (4096 floats) | None | Zero — `llama_get_embeddings(ctx)` is a pointer dereference |
+| Sampler chain stage-by-stage transformations | ~128 KB × N stages | None | Custom `llama_sampler_i` observer between each stage |
+| Temperature sensitivity (softmax at 5 temperatures) | ~640 KB (5 × 128 KB) | None | ~0.5ms (5 extra softmax passes) |
+| Token metadata (frequency, flags per candidate) | ~40 bytes per candidate | None | Zero — `llama_token_get_score` / `get_attr` are O(1) lookups |
+| Context window fill level | 12 bytes | None | Zero — `llama_get_seq_pos(ctx, -1)` |
+
+**The natural frame budget for visualization is the next `llama_decode` call.** While the GPU runs the forward pass for token N+1 (20-100ms), metal-llama has that time to render the full signal data from token N. At 10 tokens/sec, that's 100ms per frame — well above 60fps budget.
+
+**Data throughput at full extraction:** ~130 KB/token × 10 tokens/sec = **1.3 MB/s**. Trivially streamable over gRPC. A Metal compute shader processes 32k floats in one dispatch (~0.02ms).
+
+The bottleneck is not what data exists or how fast it can be rendered. The bottleneck is that `capture_signal` was built to feed a DOM-based heatmap that only needs 230 bytes. metal-llama needs the full 130KB+ because it can actually render it.
+
+### What requires llama.cpp patches (Tier 3 — defer)
+
+`llama_decode()` itself is opaque. The forward pass through 32 transformer layers happens inside it. Per-layer predictions (logit lens), attention weights, and intermediate activations are not observable without hooking into ggml's graph execution. These require forking llama.cpp.
+
+| Signal | What it shows | Blocker |
+|--------|--------------|---------|
+| **Per-layer logits (logit lens)** | What the model "would predict" at each transformer layer. When does it commit — layer 2 or layer 31? | No public API for intermediate hidden states. ~32x compute overhead. |
+| **Attention weights** | Which prior tokens each attention head reads from. | Internal to ggml. 4 GB per token position at full resolution. Must downsample. |
+
+---
+
+## Open questions
+
+### Q1: What should the first full-extraction signal look like? → **Full distribution as probability nebula**
+
+**Resolved.** The full softmax distribution (32k floats, 128KB per token) rendered as a 3D particle nebula. See `docs/research/probability-nebula.md` for the design.
+
+C++ work: keep the full `probs` vector in `capture_signal()` instead of discarding after top-10 extraction. Add `repeated float full_distribution = 5` to `TokenSignalProto`. Serve projected token positions (from the model's embedding matrix) via a one-shot endpoint at model load.
+
+**Also worth exploring later:**
+- **Hidden state embeddings** (4096 floats) — semantic trajectory, where the model *is* rather than what it *sees*
+- **Sampler chain observations** — distribution before/after each sampler stage, revealing why alternatives were rejected
+
+---
+
+### Q2: What does "stepping back" feel like? → **Scrub + ghost branches, then forking**
+
+**Resolved.** All three, in order:
+
+**First: Timeline scrub.** Drag backwards through the generation. The nebula rewinds — the cloud re-blooms, the trail un-draws. See how the model's consideration set evolved step by step. Pure replay of captured frames, no re-inference, no C++ work.
+
+**First: Ghost branches.** At each step, the top-k candidates are already known. Draw faint ghost trails branching off the main path — where would the trail have gone if the second-place token had been chosen? Not actual continuations, just single-step alternatives shown as dim branches. Data already exists in `TokenSignal.top_k`.
+
+**Later: Active forking.** Click a bright particle that wasn't chosen at some step. The model re-infers from that point forward — a new trail branches off through a different region of vocabulary space. Two paths diverge in the nebula. Requires KV cache snapshots and multi-sequence batching on the C++ side (3x compute per branch).
+
+---
+
+### Q3: What can metal-llama show that the DOM never could?
+
+The stream glyph is text. It renders tokens as `<span>` elements with colored backgrounds — a reading experience with signal overlays. metal-llama is not a companion to this and not a replacement for it. It is a parallel system that the stream glyph's existence inspired but that operates in a space the DOM cannot enter.
+
+The stream glyph proves that per-token signal data is valuable in real time. metal-llama takes the same `TokenSignal` data path — bidirectional, llama-cpp ↔ metal-llama via `StreamChat` gRPC and the `llama_sampler_i` vtable — and renders what text-in-a-browser fundamentally cannot:
+
+- **Spatial structure.** A token tree is not a list. The DOM can show a sequence of colored spans; Metal can render a branching graph where depth, angle, and thickness encode probability, and you navigate it by moving through 3D space.
+- **Continuous animation.** The softmax distribution shifting frame-by-frame as the model considers the next token — not a snapshot after the fact, but the probability mass flowing in real time at GPU framerate.
+- **Density.** 32k vocabulary entries as a probability landscape. The DOM chokes on 32k elements; a Metal compute shader processes them in one dispatch.
+- **Interaction at inference speed.** Clicking a branch in the token tree and seeing the model re-infer from that fork within the same render frame. The DOM round-trip (JS event → fetch → re-render) is too slow for this to feel like direct manipulation.
+
+The stream glyph keeps doing what it does — text with heatmap coloring, readable output, follow-up input. metal-llama exists because some things about inference are not text and never will be.
+
+What is the first thing you'd want to see in this space that you currently cannot? The token tree? The probability landscape? The semantic trajectory? Or something that hasn't been named yet?
+
+---
+
+### Q4: ~~What makes a token "interesting"?~~ → **Dissolved by the nebula**
+
+**Resolved.** The nebula doesn't highlight individual tokens — the entire field is the visualization. "Interesting" is no longer a per-token threshold. It's a property of the cloud's behavior over time: a bimodal split (the model torn between two directions), a sudden restructuring (the consideration set jumping to a new region), the cloud blooming diffuse then snapping tight. The viewer sees these moments without needing to be told they're interesting. The nebula makes them visible by being them.
+
+---
+
+## Implementation steps — probability nebula
+
+### Step 1: Proto generation and gRPC bootstrap *(done)*
+
+grpc-swift v2 with SPM build plugin. Proto types generated at build time from `domain.proto` and `llm.proto`. Plugin compiles, starts, announces port, serves gRPC. Version 0.2.0.
+
+### Step 2: Widen the C++ aperture *(done)*
+
+`capture_signal()` keeps full softmax distribution (128k floats for Llama 3.2) in `signal.full_distribution`, streamed via gRPC `StreamChat`. Stripped from WebSocket broadcast (1.3GB IndexedDB accumulation crashed the browser).
+
+PCA projection of `model_->tok_embd` to 3D via Accelerate BLAS in `vocab_projection.cpp`. Accesses private header `llama-model.h`, dequantizes via `ggml_get_type_traits`. Covariance via `cblas_sgemm`, top 3 eigenvectors via power iteration + deflation. Computed once at model load, served as binary float32 at `GET /api/llama-cpp/vocab-positions`.
+
+### Step 3: Particle field — static frame *(done)*
+
+MSL compute kernel: probability + 3D position → particle (amber color ramp, log-scaled size, visibility threshold 1e-5). Vertex shader: orthographic MVP. Fragment shader: soft circle point sprite. Additive blending on rgba16Float, Reinhard tonemap to sRGB PNG.
+
+Tested with 128,256 particles, real PCA positions, bimodal test distribution. Prototyped in Swift, then ported to Metal-cpp inside llama-cpp.
+
+### metal-llama: renderer moves into llama-cpp
+
+Swift plugin was a prototype. Metal-cpp (Apple's header-only C++ wrapper) puts the renderer in the same process as inference — distribution is a `float*`, no serialization. MSL shaders unchanged.
+
+- [x] Add Metal-cpp headers to llama-cpp
+- [x] Port MetalRenderer to C++
+- [x] Render per-token during `stream_chat()`
+
+### Step 4: Live streaming
+
+Rendered frames delivered to browser per-token. Each token's distribution is a keyframe. Compute shader lerps between keyframes at 60fps.
+
+Chosen token recorded per step. Line strip connects chosen-token positions — the generation trail. Older segments fade via alpha decay.
+
+**Done when:** running a prompt shows the nebula updating in real time.
+
+- [x] WebSocket frame push (`HandleWebSocket` + `wait_for_frame`)
+- [x] Nebula glyph (plugin-provided, conditional on Metal)
+- [x] Keyframe interpolation at 60fps
+- [x] Generation trail (line strip of chosen tokens)
+
+### Step 5: Timeline scrub *(done)*
+
+Hover a token in the stream glyph to scrub the nebula to that token's distribution. The text IS the timeline — no separate scrubber UI. Stream glyph dispatches `nebula-scrub` CustomEvent with token index, nebula module sends `scrub:N` over WebSocket, C++ renders the stored keyframe. Trail shader splits at the scrub point: warm path up to the hovered token, cool blue for the future path beyond it. mouseleave resumes live mode.
+
+Per-token keyframe history stored CPU-side (capped at 512 entries). Each `store_keyframe` in `StreamChat` captures the full distribution alongside `submit_distribution` and `add_trail_point`.
+
+**Done when:** ~~after a generation completes, dragging the timeline backwards smoothly reverses the nebula animation.~~ Hovering tokens scrubs the nebula and splits the trail. Works.
+
+### Step 6: Ghost branches (GHB) — low priority
+
+At each generation step, the top-k candidates are already known. For each step, draw faint trails from the chosen token's position to each runner-up's position — dim branches off the main path showing single-step alternatives. Opacity proportional to the runner-up's probability.
+
+Deprioritized — zero-cost signal extraction and sampler visibility reveal more about inference than single-step visual branches. Ghost branches show where alternatives were in vocabulary space but not why they were rejected. Sampler chain observations (SCO) answer the "why" question.
+
+---
+
+## Known limitations
+
+| Code | Description | Where |
+|------|-------------|-------|
+| **B64** | WebSocket frames are base64-encoded PNG — 33% bandwidth overhead | `metal_renderer.h` |
+| **CAM** | No camera control — fixed orthographic MVP, no rotation/zoom/pan | `metal_renderer.h` |
+| **KFC** | Keyframe history capped at 512 (64MB). No disk persistence | `metal_renderer.h` |
+| **TRU** | Trail positions unbounded while keyframes are capped | `metal_renderer.h` |
+| **PVH** | PCA accesses private `llama-model.h` header — version-fragile | `vocab_projection.cpp` |
+| **SSL** | No signal summary logging for StreamChat (Chat path logs it) | `plugin.cpp` |
+
+## Zero-cost opportunities
+
+These require small C++ additions to `capture_signal()` or the sampler chain. Data already exists in the per-token window, costs nothing to extract.
+
+| Code | Signal | What it reveals | Where to add |
+|------|--------|----------------|--------------|
+| **TMD** | Token metadata (frequency, special/byte flags) | "Is the model picking a rare token?" | `capture_signal()` |
+| **CWU** | Context window usage (tokens used / available) | Speed degradation warning | `capture_signal()` |
+| **TMP** | Temperature sensitivity (softmax at 5 temps) | How much temperature reshapes the distribution | `capture_signal()` |
+| **CPX** | Cumulative perplexity (running scalar) | Fluency score for comparing prompt strategies | `capture_signal()` |
+| **SCO** | Sampler chain observations (distribution before/after each stage) | Why specific tokens were rejected | `stream_chat()` sampler chain |
+| **ECM** | Factor entropy + top_gap into stream glyph color mapping | Richer heatmap, currently confidence-only | `stream-glyph.ts` |
+
+## Moderate-cost opportunities
+
+| Code | Signal | What it reveals | Effort |
+|------|--------|----------------|--------|
+| **HSE** | Hidden state embeddings (4096 floats via `llama_get_embeddings`) | Semantic trajectory — where the model *is* | Low C++, needs UMAP/PCA |
+| **SUI** | Expose top-k/top-p/min-p/penalties in UI | Users can't control the sampler chain | Proto + C++ + Go + TS |
+| **STR** | GPU-accelerated steering — write back to logit buffer from nebula | Direct manipulation of probability landscape | Metal buffer path exists, no input wired |
+
+## High-cost opportunities
+
+| Code | Signal | What it reveals | Effort |
+|------|--------|----------------|--------|
+| **TTB** | Token tree branching (KV cache fork, generate alternatives) | "What if the model had said X instead?" | C++ KV cache management |
+| **ATS** | Write per-generation attestations with signal attributes | Persistent record of inference quality | Go storage layer |
+
+## Codes reference
+
+All codes used across the codebase (README limitations, research docs, source TODOs):
+
+| Code | Scope | Status |
+|------|-------|--------|
+| STO | Single-turn only | README limitation |
+| TAO | Text attachments only | README limitation |
+| IBP | Image-based PDFs | README limitation |
+| COF | Context overflow | README limitation |
+| NEF | No extraction feedback | README limitation |
+| SDR | Shutdown race | README limitation |
+| B64 | Base64 WebSocket overhead | Metal limitation |
+| CAM | No camera control | Metal limitation |
+| KFC | Keyframe cap 512 | Metal limitation |
+| TRU | Trail unbounded | Metal limitation |
+| PVH | Private header access | Metal limitation |
+| SSL | No StreamChat signal summary | Missing feature |
+| GHB | Ghost branches | Step 6, low priority |
+| TMD | Token metadata | Zero-cost opportunity |
+| CWU | Context window usage | Zero-cost opportunity |
+| TMP | Temperature sensitivity | Zero-cost opportunity |
+| CPX | Cumulative perplexity | Zero-cost opportunity |
+| SCO | Sampler chain observations | Zero-cost opportunity |
+| ECM | Entropy/confidence color mapping | Zero-cost opportunity |
+| HSE | Hidden state embeddings | Tier 2 opportunity |
+| SUI | Sampling UI controls | Tier 2 opportunity |
+| SCW | Sampler chain wiring | Depends on SUI |
+| STR | GPU steering | Tier 2 opportunity |
+| TTB | Token tree branching | Tier 3 opportunity |
+| ATS | Attestation storage | Tier 2 opportunity |
+| VDF | Vocabulary dump to frontend | Checklist item |
+| LTR | Logit trajectories | Checklist item |
+| BIG | Bias glyph integration | Blocked on #718 |
+| HSC | Hidden state cluster comparison | Blocked on HSE |
+| ESD | Entropy spike detection | Checklist item |
+| CPY | Copy button for stream glyph | Missing feature |
+| WMS | Window morph support | Missing feature |

@@ -52,6 +52,7 @@ message TokenSignalProto {
   float entropy = 2;                       // Shannon entropy in bits
   float top_gap = 3;                       // P(top1) - P(top2)
   repeated TokenCandidateProto top_k = 4;  // Top-k candidates
+  repeated float full_distribution = 5;    // Full softmax distribution (vocab_size floats)
 }
 
 message TokenCandidateProto {

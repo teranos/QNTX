@@ -278,6 +278,10 @@ export interface LLMTokenSignal {
    * Top-k candidates
    */
   top_k?: LLMTokenCandidate[];
+  /**
+   * Full softmax distribution (vocab_size floats)
+   */
+  full_distribution?: number[];
 }
 
 export interface ListExecutionsResponse {

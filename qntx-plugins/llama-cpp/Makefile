@@ -14,6 +14,10 @@ install: build ## Install to ~/.qntx/plugins/
 	@mkdir -p $(PREFIX)/plugins
 	@cp $(BUILD_DIR)/qntx-llama-cpp-plugin $(PREFIX)/plugins/qntx-llama-cpp-plugin
 	@chmod +x $(PREFIX)/plugins/qntx-llama-cpp-plugin
+	@if [ -f $(BUILD_DIR)/default.metallib ]; then \
+		cp $(BUILD_DIR)/default.metallib $(PREFIX)/plugins/default.metallib; \
+		echo "✓ default.metallib → $(PREFIX)/plugins/default.metallib"; \
+	fi
 	@echo "✓ qntx-llama-cpp-plugin → $(PREFIX)/plugins/qntx-llama-cpp-plugin"
 
 clean: ## Clean build artifacts
