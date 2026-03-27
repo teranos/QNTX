@@ -20,6 +20,7 @@ kernel void particleCompute(
     device const float* positions     [[buffer(1)]],
     device Particle* particles        [[buffer(2)]],
     constant uint& vocabSize          [[buffer(3)]],
+    constant float& particleScale     [[buffer(4)]],
     uint id [[thread_position_in_grid]]
 ) {
     if (id >= vocabSize) return;
@@ -40,7 +41,7 @@ kernel void particleCompute(
     Particle p;
     p.position = pos;
     p.color = float4(rgb * visible, logProb * visible);
-    p.size = visible * (2.0 + logProb * 12.0);
+    p.size = visible * (2.0 + logProb * 12.0) * particleScale;
 
     particles[id] = p;
 }
@@ -52,6 +53,7 @@ kernel void particleComputeLerp(
     device Particle* particles        [[buffer(3)]],
     constant uint& vocabSize          [[buffer(4)]],
     constant float& t                 [[buffer(5)]],
+    constant float& particleScale     [[buffer(6)]],
     uint id [[thread_position_in_grid]]
 ) {
     if (id >= vocabSize) return;
@@ -72,7 +74,7 @@ kernel void particleComputeLerp(
     Particle p;
     p.position = pos;
     p.color = float4(rgb * visible, logProb * visible);
-    p.size = visible * (2.0 + logProb * 12.0);
+    p.size = visible * (2.0 + logProb * 12.0) * particleScale;
 
     particles[id] = p;
 }
@@ -114,14 +116,20 @@ vertex TrailVertexOut trailVertex(
     constant float4x4& mvp       [[buffer(1)]],
     constant uint& trailCount    [[buffer(2)]],
     constant int& scrubIndex     [[buffer(3)]],
-    constant float& driftStep    [[buffer(4)]],
+    constant float& orbitRadius  [[buffer(4)]],
+    constant float& angleStep    [[buffer(5)]],
     uint vid [[vertex_id]]
 ) {
     float3 pos = float3(positions[vid * 3], positions[vid * 3 + 1], positions[vid * 3 + 2]);
 
-    // Drift: newest point (head) sits on the nebula, older points trail behind.
+    // Drift: newest point (head) sits on the nebula, older points curve
+    // along a circular arc. Each token advances by angleStep radians
+    // around a circle of orbitRadius, centered below the head.
     int headIndex = (scrubIndex >= 0) ? scrubIndex : int(trailCount - 1);
-    pos.x += float(int(vid) - headIndex) * driftStep;
+    float age = float(headIndex - int(vid));
+    float theta = age * angleStep;
+    pos.x += orbitRadius * sin(theta);
+    pos.y -= orbitRadius * (1.0 - cos(theta));
 
     TrailVertexOut out;
     out.position = mvp * float4(pos, 1.0);

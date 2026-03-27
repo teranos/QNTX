@@ -10,6 +10,42 @@
 #include <thread>
 #include <vector>
 
+// BPE tokens for multi-byte scripts (Hindi, CJK, emoji) can be partial UTF-8
+// sequences. Protobuf string fields reject invalid UTF-8, so replace bad bytes
+// with U+FFFD before serializing.
+static std::string sanitize_utf8(const std::string& s) {
+    std::string out;
+    out.reserve(s.size());
+    size_t i = 0;
+    while (i < s.size()) {
+        unsigned char c = s[i];
+        int len = 0;
+        if (c < 0x80) len = 1;
+        else if ((c >> 5) == 0x06) len = 2;
+        else if ((c >> 4) == 0x0E) len = 3;
+        else if ((c >> 3) == 0x1E) len = 4;
+
+        if (len == 0 || i + len > s.size()) {
+            out += "\xEF\xBF\xBD";  // U+FFFD
+            i++;
+            continue;
+        }
+        // Validate continuation bytes
+        bool valid = true;
+        for (int j = 1; j < len; j++) {
+            if ((s[i + j] & 0xC0) != 0x80) { valid = false; break; }
+        }
+        if (valid) {
+            out.append(s, i, len);
+            i += len;
+        } else {
+            out += "\xEF\xBF\xBD";
+            i++;
+        }
+    }
+    return out;
+}
+
 // --- LlamaCppPlugin (DomainPluginService) ---
 
 LlamaCppPlugin::LlamaCppPlugin() : renderer_(std::make_unique<MetalRenderer>()) {
@@ -297,7 +333,6 @@ export const render = async (glyph, ui) => {
                     ctx2d.drawImage(bmp, 0, 0, canvas.width, canvas.height);
                     bmp.close();
                     frameCount++;
-                    status.textContent = frameCount + ' frames';
                 });
             } catch (e) {
                 ui.log.error('Nebula frame error', e);
@@ -314,6 +349,54 @@ export const render = async (glyph, ui) => {
     }
 
     connect();
+
+    // Double-click canvas to reconnect (refresh after code changes)
+    canvas.addEventListener('dblclick', () => {
+        if (ws) ws.close();
+        frameCount = 0;
+        status.textContent = 'reconnecting...';
+        setTimeout(connect, 300);
+    });
+
+    // Controls panel — toggle with right-click
+    function sendParam(key, value) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            const msg = { type: 1, data: btoa('param:' + key + ':' + value), headers: {}, timestamp: 0 };
+            ws.send(JSON.stringify(msg));
+        }
+    }
+
+    const controls = document.createElement('div');
+    controls.style.cssText = 'position:absolute;top:4px;left:4px;right:4px;display:none;' +
+        'background:rgba(0,0,0,0.8);padding:8px;border-radius:4px;font:10px monospace;color:#aaa;';
+
+    function addSlider(label, key, min, max, step, initial) {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:6px;margin:2px 0;';
+        const lbl = document.createElement('span');
+        lbl.style.cssText = 'width:80px;text-align:right;';
+        lbl.textContent = label;
+        const input = document.createElement('input');
+        input.type = 'range';
+        input.min = min; input.max = max; input.step = step; input.value = initial;
+        input.style.cssText = 'flex:1;height:12px;accent-color:#c84;';
+        const val = document.createElement('span');
+        val.style.width = '40px';
+        val.textContent = initial;
+        input.oninput = () => { val.textContent = input.value; sendParam(key, input.value); };
+        row.appendChild(lbl); row.appendChild(input); row.appendChild(val);
+        controls.appendChild(row);
+    }
+
+    addSlider('orbit period', 'orbit_period', 64, 4096, 64, 1024);
+    addSlider('orbit radius', 'orbit_radius', 0.5, 10, 0.5, 3);
+    addSlider('particle size', 'particle_scale', 0.1, 5, 0.1, 1);
+    content.appendChild(controls);
+
+    canvas.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        controls.style.display = controls.style.display === 'none' ? 'block' : 'none';
+    });
 
     // Listen for nebula-scrub events from stream glyph token hover
     function onScrub(e) {
@@ -351,17 +434,24 @@ grpc::Status LlamaCppPlugin::HandleWebSocket(
     grpc::ServerContext* ctx,
     grpc::ServerReaderWriter<protocol::WebSocketMessage,
                              protocol::WebSocketMessage>* stream) {
-    // Read incoming messages in a separate thread to handle CONNECT/PING/CLOSE/scrub
+    // gRPC ServerReaderWriter does not allow concurrent Write() calls.
+    // The reader thread queues pong responses; the main loop drains them
+    // alongside frame pushes, serializing all writes on one thread.
     std::atomic<bool> closed{false};
     auto* renderer = renderer_.get();
-    std::thread reader([stream, &closed, renderer]() {
+
+    std::mutex pong_mutex;
+    std::vector<protocol::WebSocketMessage> pong_queue;
+
+    std::thread reader([stream, &closed, renderer, &pong_mutex, &pong_queue]() {
         protocol::WebSocketMessage in_msg;
         while (stream->Read(&in_msg)) {
             if (in_msg.type() == protocol::WebSocketMessage::PING) {
                 protocol::WebSocketMessage pong;
                 pong.set_type(protocol::WebSocketMessage::PONG);
                 pong.set_timestamp(in_msg.timestamp());
-                stream->Write(pong);
+                std::lock_guard<std::mutex> lock(pong_mutex);
+                pong_queue.push_back(std::move(pong));
             } else if (in_msg.type() == protocol::WebSocketMessage::CLOSE) {
                 closed.store(true);
                 return;
@@ -373,14 +463,35 @@ grpc::Status LlamaCppPlugin::HandleWebSocket(
                         int idx = std::stoi(data.substr(6));
                         renderer->set_scrub_index(idx);
                     } catch (...) {}
+                } else if (data.size() > 6 && data.substr(0, 6) == "param:") {
+                    // param:key:value — adjust renderer parameters at runtime
+                    auto rest = data.substr(6);
+                    auto sep = rest.find(':');
+                    if (sep != std::string::npos) {
+                        try {
+                            auto key = rest.substr(0, sep);
+                            float val = std::stof(rest.substr(sep + 1));
+                            renderer->set_param(key, val);
+                        } catch (...) {}
+                    }
                 }
             }
         }
         closed.store(true);
     });
 
-    // Push nebula frames until client disconnects or context cancelled
+    // Push nebula frames and drain pong queue — all writes on this thread
     while (!ctx->IsCancelled() && !closed.load()) {
+        // Drain queued pongs
+        {
+            std::lock_guard<std::mutex> lock(pong_mutex);
+            for (auto& pong : pong_queue) {
+                if (!stream->Write(pong)) { closed.store(true); break; }
+            }
+            pong_queue.clear();
+        }
+        if (closed.load()) break;
+
         auto png = renderer_->wait_for_frame(1000);
         if (png.empty()) continue;
 
@@ -583,7 +694,7 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
         req->system_prompt(), user_prompt, temperature, max_tokens,
         [&](const std::string& token_text, const TokenSignal& sig) -> bool {
             protocol::LLMChatChunk chunk;
-            chunk.set_token(token_text);
+            chunk.set_token(sanitize_utf8(token_text));
             chunk.set_done(false);
             chunk.set_model(engine.model_name());
 
@@ -594,7 +705,7 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
             for (const auto& cand : sig.top_k) {
                 auto* tc = signal->add_top_k();
                 tc->set_id(cand.id);
-                tc->set_text(cand.text);
+                tc->set_text(sanitize_utf8(cand.text));
                 tc->set_prob(cand.prob);
             }
             for (float p : sig.full_distribution) {

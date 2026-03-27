@@ -248,6 +248,8 @@ std::vector<uint8_t> MetalRenderer::render_nebula(const float* probabilities, in
     compute_enc->setBuffer(positions_buffer_, 0, 1);
     compute_enc->setBuffer(particle_buf, 0, 2);
     compute_enc->setBytes(&vocab_u, sizeof(uint32_t), 3);
+    float ps = particle_scale_;
+    compute_enc->setBytes(&ps, sizeof(float), 4);
 
     NS::UInteger tg_size = std::min(compute_pipeline_->maxTotalThreadsPerThreadgroup(), (NS::UInteger)256);
     compute_enc->dispatchThreads(MTL::Size(n, 1, 1), MTL::Size(tg_size, 1, 1));
@@ -449,6 +451,16 @@ void MetalRenderer::set_scrub_index(int idx) {
     scrub_index_ = idx;
 }
 
+void MetalRenderer::set_param(const std::string& key, float value) {
+    if (key == "orbit_period") {
+        orbit_period_ = std::max(16, (int)value);
+    } else if (key == "orbit_radius") {
+        orbit_radius_mult_ = std::max(0.5f, value);
+    } else if (key == "particle_scale") {
+        particle_scale_ = std::max(0.1f, std::min(5.0f, value));
+    }
+}
+
 std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) {
     if (!is_ready() || !positions_buffer_ || !prob_a_ || !prob_b_) return {};
 
@@ -474,6 +486,8 @@ std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) 
         compute_enc->setBuffer(particle_buf, 0, 3);
         compute_enc->setBytes(&vocab_u, sizeof(uint32_t), 4);
         compute_enc->setBytes(&t, sizeof(float), 5);
+        float ps = particle_scale_;
+        compute_enc->setBytes(&ps, sizeof(float), 6);
     }
 
     NS::UInteger tg_size = std::min(lerp_pipeline_->maxTotalThreadsPerThreadgroup(), (NS::UInteger)256);
@@ -519,13 +533,15 @@ std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) 
             if (trail_buf) {
                 uint32_t tc = (uint32_t)trail_count;
                 int si = scrub_index_;
-                float ds = drift_step_;
+                float or_ = extent_ * orbit_radius_mult_;
+                float as = (2.0f * M_PI) / orbit_period_;  // radians per token
                 render_enc->setRenderPipelineState(trail_pipeline_);
                 render_enc->setVertexBuffer(trail_buf, 0, 0);
                 render_enc->setVertexBytes(mvp, sizeof(mvp), 1);
                 render_enc->setVertexBytes(&tc, sizeof(uint32_t), 2);
                 render_enc->setVertexBytes(&si, sizeof(int), 3);
-                render_enc->setVertexBytes(&ds, sizeof(float), 4);
+                render_enc->setVertexBytes(&or_, sizeof(float), 4);
+                render_enc->setVertexBytes(&as, sizeof(float), 5);
                 render_enc->drawPrimitives(MTL::PrimitiveTypeLineStrip,
                     (NS::UInteger)0, (NS::UInteger)trail_count);
                 trail_buf->release();
