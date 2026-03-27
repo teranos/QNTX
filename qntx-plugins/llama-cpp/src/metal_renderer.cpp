@@ -422,6 +422,13 @@ void MetalRenderer::submit_distribution(const float* probabilities, int vocab_si
         prob_a_ = device_->newBuffer(probabilities, vocab_size * sizeof(float),
                                       MTL::ResourceStorageModeShared);
     }
+
+    // Wake render loop from idle sleep
+    {
+        std::lock_guard<std::mutex> lock(render_wake_mutex_);
+        render_dirty_ = true;
+    }
+    render_wake_cv_.notify_one();
 }
 
 void MetalRenderer::add_trail_point(int token_id) {
@@ -447,8 +454,16 @@ void MetalRenderer::store_keyframe(const float* probabilities, int vocab_size) {
 }
 
 void MetalRenderer::set_scrub_index(int idx) {
-    std::lock_guard<std::mutex> lock(dist_mutex_);
-    scrub_index_ = idx;
+    {
+        std::lock_guard<std::mutex> lock(dist_mutex_);
+        scrub_index_ = idx;
+    }
+    // Wake render loop for scrub
+    {
+        std::lock_guard<std::mutex> lock(render_wake_mutex_);
+        render_dirty_ = true;
+    }
+    render_wake_cv_.notify_one();
 }
 
 void MetalRenderer::set_param(const std::string& key, float value) {
@@ -459,6 +474,12 @@ void MetalRenderer::set_param(const std::string& key, float value) {
     } else if (key == "particle_scale") {
         particle_scale_ = std::max(0.1f, std::min(5.0f, value));
     }
+    // Wake render loop to reflect the change
+    {
+        std::lock_guard<std::mutex> lock(render_wake_mutex_);
+        render_dirty_ = true;
+    }
+    render_wake_cv_.notify_one();
 }
 
 std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) {
@@ -617,6 +638,8 @@ void MetalRenderer::start_render_loop(int width, int height) {
     render_running_.store(true);
 
     render_thread_ = std::thread([this]() {
+        bool was_idle = false;
+
         while (render_running_.load()) {
             // Check for scrub mode
             int scrub;
@@ -664,7 +687,18 @@ void MetalRenderer::start_render_loop(int width, int height) {
                         set_latest_frame(std::move(png), render_width_, render_height_);
                     }
                 }
-                std::this_thread::sleep_for(std::chrono::milliseconds(16));
+                was_idle = false;
+                // Clear dirty flag — we just rendered the scrub frame
+                {
+                    std::lock_guard<std::mutex> lock(render_wake_mutex_);
+                    render_dirty_ = false;
+                }
+                // Wait for next scrub change or resume
+                {
+                    std::unique_lock<std::mutex> lock(render_wake_mutex_);
+                    render_wake_cv_.wait_for(lock, std::chrono::milliseconds(16),
+                        [this]{ return render_dirty_ || !render_running_.load(); });
+                }
                 continue;
             }
 
@@ -673,7 +707,11 @@ void MetalRenderer::start_render_loop(int width, int height) {
             {
                 std::lock_guard<std::mutex> lock(dist_mutex_);
                 if (!prob_a_ || !prob_b_) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(16));
+                    // No data yet — sleep until woken by submit_distribution
+                    std::unique_lock<std::mutex> wlock(render_wake_mutex_);
+                    render_wake_cv_.wait_for(wlock, std::chrono::milliseconds(500),
+                        [this]{ return render_dirty_ || !render_running_.load(); });
+                    render_dirty_ = false;
                     continue;
                 }
                 auto elapsed = std::chrono::steady_clock::now() - keyframe_time_;
@@ -681,12 +719,32 @@ void MetalRenderer::start_render_loop(int width, int height) {
                 t = std::min(1.0f, (float)ms / (float)keyframe_interval_.count());
             }
 
+            // If interpolation is complete (t=1) and we already rendered the final frame,
+            // sleep until new data arrives instead of burning GPU
+            if (t >= 1.0f && was_idle) {
+                std::unique_lock<std::mutex> lock(render_wake_mutex_);
+                render_wake_cv_.wait_for(lock, std::chrono::milliseconds(500),
+                    [this]{ return render_dirty_ || !render_running_.load(); });
+                if (render_dirty_) {
+                    render_dirty_ = false;
+                    was_idle = false;  // re-render with updated params
+                }
+                continue;
+            }
+
             auto png = render_lerp(render_width_, render_height_, t);
             if (!png.empty()) {
                 set_latest_frame(std::move(png), render_width_, render_height_);
             }
 
-            // ~60fps
+            was_idle = (t >= 1.0f);
+            if (was_idle) {
+                // Clear dirty so we catch the next submit_distribution
+                std::lock_guard<std::mutex> lock(render_wake_mutex_);
+                render_dirty_ = false;
+            }
+
+            // ~60fps while animating
             std::this_thread::sleep_for(std::chrono::milliseconds(16));
         }
     });
@@ -694,6 +752,7 @@ void MetalRenderer::start_render_loop(int width, int height) {
 
 void MetalRenderer::stop_render_loop() {
     render_running_.store(false);
+    render_wake_cv_.notify_one();  // unblock if sleeping
     if (render_thread_.joinable()) {
         render_thread_.join();
     }
