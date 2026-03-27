@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <iostream>
 #include <thread>
 #include <vector>
@@ -13,7 +14,7 @@
 // BPE tokens for multi-byte scripts (Hindi, CJK, emoji) can be partial UTF-8
 // sequences. Protobuf string fields reject invalid UTF-8, so replace bad bytes
 // with U+FFFD before serializing.
-static std::string sanitize_utf8(const std::string& s) {
+std::string sanitize_utf8(const std::string& s) {
     std::string out;
     out.reserve(s.size());
     size_t i = 0;
@@ -92,6 +93,11 @@ grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
             std::cout << "[metal-llama] Loaded " << pos.size() / 3
                       << " vocab positions into renderer, render loop started" << std::endl;
         }
+    }
+
+    // Configure ATS client for writing attestations
+    if (!req->ats_store_endpoint().empty()) {
+        ats_client_.configure(req->ats_store_endpoint(), req->auth_token());
     }
 
     // Flush condensed log summary — replaces 1000+ lines of stderr with a few stdout lines
@@ -479,6 +485,17 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
             plugin_->renderer().submit_distribution(
                 last_sig.full_distribution.data(), last_sig.full_distribution.size());
         }
+
+        // Write weave attestation to ATS (token signals packed in attributes)
+        auto& ats = plugin_->ats_client();
+        if (ats.is_configured()) {
+            std::string context_id = "chat:" + std::to_string(
+                std::chrono::system_clock::now().time_since_epoch().count());
+
+            ats.create_weave(engine.model_name(), req->user_prompt(),
+                             result.content, context_id, n,
+                             conf_sum / n, ent_sum / n, result.signals);
+        }
     }
 
     return grpc::Status::OK;
@@ -575,6 +592,24 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
     final_chunk.set_completion_tokens(result.completion_tokens);
     final_chunk.set_total_tokens(result.prompt_tokens + result.completion_tokens);
     writer->Write(final_chunk);
+
+    // Write weave attestation to ATS after stream completes (token signals packed in attributes)
+    auto& ats = plugin_->ats_client();
+    if (ats.is_configured() && !result.signals.empty()) {
+        int n = result.signals.size();
+        float ent_sum = 0, conf_sum = 0;
+        for (const auto& sig : result.signals) {
+            ent_sum += sig.entropy;
+            conf_sum += sig.confidence;
+        }
+
+        std::string context_id = "stream:" + std::to_string(
+            std::chrono::system_clock::now().time_since_epoch().count());
+
+        ats.create_weave(engine.model_name(), user_prompt,
+                         result.content, context_id, n,
+                         conf_sum / n, ent_sum / n, result.signals);
+    }
 
     return grpc::Status::OK;
 }
