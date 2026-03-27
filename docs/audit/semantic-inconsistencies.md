@@ -14,11 +14,11 @@ Verified against source. Sorted by severity within each language.
 
 Name says "upsert composition" — store it and return. Implementation also compiles meld edges into watcher subscriptions via `compileSubscriptions()` (line 222). The storage call is the minor part; the watcher engine orchestration is the real work.
 
-### HIGH — `handleDeleteComposition` orchestrates full watcher teardown
+### ~~HIGH~~ RESOLVED — `handleDeleteComposition` → `deleteMeldComposition`
 
-**`glyph/handlers/canvas.go:231`**
+**`glyph/handlers/canvas.go:235`**
 
-Name says "delete composition." Implementation re-enables downstream SE watchers (line 234), deletes meld-edge watchers by prefix (lines 239-247), cascade-deletes edge cursors (lines 252-255), reloads the watcher engine (line 244), *then* deletes the composition (line 258). The actual delete is the last of five operations.
+Compositions exist for meld wiring. Teardown (watchers, cursors, SE state) is inherent to what a meld composition is — not a hidden side effect. Renamed to `deleteMeldComposition`.
 
 ### HIGH — `postReload` runs compound watcher suppression and historical query dispatch
 

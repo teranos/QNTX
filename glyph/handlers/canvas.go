@@ -114,7 +114,7 @@ func (h *CanvasHandler) HandleCompositions(w http.ResponseWriter, r *http.Reques
 			h.writeError(w, errors.New("composition ID required for delete"), http.StatusBadRequest)
 			return
 		}
-		h.handleDeleteComposition(w, r, compID)
+		h.deleteMeldComposition(w, r, compID)
 	default:
 		h.writeError(w, errors.NewMethodNotAllowedError(r.Method), http.StatusMethodNotAllowed)
 	}
@@ -230,9 +230,9 @@ func (h *CanvasHandler) handleUpsertComposition(w http.ResponseWriter, r *http.R
 	h.writeJSON(w, comp)
 }
 
-// RENAME: handleDeleteComposition — tears down watchers, cursors, and SE state before deleting
-// Options: teardownAndDeleteComposition | handleCompositionRemovalWithCleanup | removeCompositionCascade
-func (h *CanvasHandler) handleDeleteComposition(w http.ResponseWriter, r *http.Request, id string) {
+// handleDeleteComposition → deleteMeldComposition: compositions exist for meld wiring;
+// teardown (watchers, cursors, SE state) is inherent to what a meld composition is.
+func (h *CanvasHandler) deleteMeldComposition(w http.ResponseWriter, r *http.Request, id string) {
 	// Re-enable downstream SE watchers that were disabled by SE→SE meld edges
 	if h.watcherEngine != nil {
 		h.reEnableDownstreamSEWatchers(r.Context(), id)
