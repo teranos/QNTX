@@ -474,6 +474,12 @@ void MetalRenderer::set_param(const std::string& key, float value) {
     } else if (key == "particle_scale") {
         particle_scale_ = std::max(0.1f, std::min(5.0f, value));
     }
+    // Wake render loop to reflect the change
+    {
+        std::lock_guard<std::mutex> lock(render_wake_mutex_);
+        render_dirty_ = true;
+    }
+    render_wake_cv_.notify_one();
 }
 
 std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) {
@@ -719,7 +725,10 @@ void MetalRenderer::start_render_loop(int width, int height) {
                 std::unique_lock<std::mutex> lock(render_wake_mutex_);
                 render_wake_cv_.wait_for(lock, std::chrono::milliseconds(500),
                     [this]{ return render_dirty_ || !render_running_.load(); });
-                render_dirty_ = false;
+                if (render_dirty_) {
+                    render_dirty_ = false;
+                    was_idle = false;  // re-render with updated params
+                }
                 continue;
             }
 
