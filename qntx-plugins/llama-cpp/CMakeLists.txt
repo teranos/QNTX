@@ -115,6 +115,20 @@ target_link_libraries(qntx-llama-cpp-plugin PRIVATE
     ${MUPDF_LIB}
 )
 
+# Embed nebula glyph JS as a C string literal — single source of truth in src/nebula-module.js
+set(NEBULA_JS_SRC "${CMAKE_SOURCE_DIR}/src/nebula-module.js")
+set(NEBULA_JS_INC "${CMAKE_BINARY_DIR}/nebula-module.js.inc")
+add_custom_command(
+    OUTPUT ${NEBULA_JS_INC}
+    COMMAND ${CMAKE_COMMAND} -DINPUT=${NEBULA_JS_SRC} -DOUTPUT=${NEBULA_JS_INC}
+        -P ${CMAKE_SOURCE_DIR}/cmake/embed_string.cmake
+    DEPENDS ${NEBULA_JS_SRC}
+    COMMENT "Embedding nebula-module.js as C string"
+)
+add_custom_target(nebula_js_inc ALL DEPENDS ${NEBULA_JS_INC})
+add_dependencies(qntx-llama-cpp-plugin nebula_js_inc)
+target_include_directories(qntx-llama-cpp-plugin PRIVATE ${CMAKE_BINARY_DIR})
+
 if(HAS_METAL)
     target_link_libraries(qntx-llama-cpp-plugin PRIVATE
         "-framework Accelerate"
@@ -142,7 +156,6 @@ if(HAS_METAL)
     )
     add_custom_target(shader_inc ALL DEPENDS ${SHADER_INC})
     add_dependencies(qntx-llama-cpp-plugin shader_inc)
-    target_include_directories(qntx-llama-cpp-plugin PRIVATE ${CMAKE_BINARY_DIR})
 
     # Optional: pre-compile metallib if Metal toolchain is available
     execute_process(
