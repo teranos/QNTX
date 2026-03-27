@@ -1,3 +1,5 @@
+//go:build cgo
+
 // Package db provides SQLite database connection utilities for QNTX.
 //
 // IMPORTANT: The primary database storage backend for QNTX is implemented in Rust
