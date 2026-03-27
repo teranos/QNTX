@@ -72,6 +72,7 @@ endfunction()
 set(GENERATED_SRCS "")
 generate_proto(domain.proto)
 generate_proto(llm.proto)
+generate_proto(atsstore.proto)
 
 # Platform-specific sources: Metal renderer and BLAS-based PCA require macOS
 # with Metal-cpp headers. The Nix sandbox on macOS may not have them, so check
@@ -96,6 +97,7 @@ add_executable(qntx-llama-cpp-plugin
     src/plugin.cpp
     src/inference.cpp
     src/pdf_extract.cpp
+    src/ats_client.cpp
     ${PLATFORM_SRCS}
     ${GENERATED_SRCS}
 )
