@@ -10,8 +10,9 @@
 
 #include "domain.grpc.pb.h"
 #include "llm.grpc.pb.h"
+#include "ats_client.h"
 
-#define PLUGIN_VERSION "0.16.2"
+#define PLUGIN_VERSION "0.17.1"
 
 // Forward declarations
 struct llama_model;
@@ -136,10 +137,12 @@ public:
 
     InferenceEngine& engine() { return engine_; }
     MetalRenderer& renderer() { return *renderer_; }
+    AtsClient& ats_client() { return ats_client_; }
 
 private:
     InferenceEngine engine_;
     std::unique_ptr<MetalRenderer> renderer_;
+    AtsClient ats_client_;
 };
 
 // LLMService implementation
