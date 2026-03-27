@@ -47,6 +47,9 @@ export const render = async (glyph, ui) => {
 
     let ws = null;
     let frameCount = 0;
+    let fpsFrames = 0;
+    let fpsLast = performance.now();
+    let fpsDisplay = 0;
 
     function connect() {
         ws = ui.pluginWebSocket();
@@ -74,6 +77,14 @@ export const render = async (glyph, ui) => {
                     ctx2d.drawImage(bmp, 0, 0, canvas.width, canvas.height);
                     bmp.close();
                     frameCount++;
+                    fpsFrames++;
+                    const now = performance.now();
+                    if (now - fpsLast >= 1000) {
+                        fpsDisplay = Math.round(fpsFrames * 1000 / (now - fpsLast));
+                        fpsFrames = 0;
+                        fpsLast = now;
+                        status.textContent = fpsDisplay + ' fps';
+                    }
                 });
             } catch (e) {
                 ui.log.error('Nebula frame error', e);
