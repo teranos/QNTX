@@ -226,7 +226,9 @@ mod wazero {
                     Some(clause) => match qntx_core::temporal::resolve_clause(clause, input.now_ms)
                     {
                         Ok(resolved) => Some(resolved),
-                        Err(e) => return write_error(&format!("temporal resolution failed: {}", e)),
+                        Err(e) => {
+                            return write_error(&format!("temporal resolution failed: {}", e))
+                        }
                     },
                     None => None,
                 };

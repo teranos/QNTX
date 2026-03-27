@@ -52,7 +52,10 @@ pub enum ResolvedTemporal {
 /// Resolve a `TemporalClause` (parser output) into a `ResolvedTemporal`.
 ///
 /// `now_ms` is the current time in milliseconds since epoch, provided by the caller.
-pub fn resolve_clause(clause: &TemporalClause<'_>, now_ms: i64) -> Result<ResolvedTemporal, String> {
+pub fn resolve_clause(
+    clause: &TemporalClause<'_>,
+    now_ms: i64,
+) -> Result<ResolvedTemporal, String> {
     match clause {
         TemporalClause::Since(expr) => {
             let ms = resolve_temporal_expr(expr, now_ms)?;
@@ -66,12 +69,18 @@ pub fn resolve_clause(clause: &TemporalClause<'_>, now_ms: i64) -> Result<Resolv
             let ms = resolve_temporal_expr(expr, now_ms)?;
             let start = start_of_day_ms(ms);
             let end = start + MS_DAY;
-            Ok(ResolvedTemporal::On { start_ms: start, end_ms: end })
+            Ok(ResolvedTemporal::On {
+                start_ms: start,
+                end_ms: end,
+            })
         }
         TemporalClause::Between(start_expr, end_expr) => {
             let start = resolve_temporal_expr(start_expr, now_ms)?;
             let end = resolve_temporal_expr(end_expr, now_ms)?;
-            Ok(ResolvedTemporal::Between { start_ms: start, end_ms: end })
+            Ok(ResolvedTemporal::Between {
+                start_ms: start,
+                end_ms: end,
+            })
         }
         TemporalClause::Over(dur) => {
             let value = dur.value.unwrap_or(0.0);
@@ -115,8 +124,7 @@ pub fn resolve_temporal_expr(expr: &str, now_ms: i64) -> Result<i64, String> {
     }
 
     // Relative future: "in 3 days", "in 2 weeks"
-    if lower.starts_with("in ") {
-        let duration_part = &lower[3..];
+    if let Some(duration_part) = lower.strip_prefix("in ") {
         if let Some(ms) = parse_relative_duration(duration_part) {
             return Ok(now_ms + ms);
         }
@@ -248,10 +256,7 @@ fn try_parse_datetime(s: &str) -> Option<i64> {
     let (date_part, time_part) = if s.contains('T') {
         let mut parts = s.splitn(2, 'T');
         (parts.next()?, parts.next()?)
-    } else if s.contains(' ') {
-        let mut parts = s.splitn(2, ' ');
-        let date = parts.next()?;
-        let time = parts.next()?;
+    } else if let Some((date, time)) = s.split_once(' ') {
         // Only treat as datetime if the part after space looks like time (HH:MM)
         if !time.contains(':') {
             return None;
@@ -361,7 +366,7 @@ fn parse_hms(s: &str) -> Option<(u32, u32, u32)> {
 
 /// Validate that a date is real (correct month lengths, leap years)
 fn validate_date(year: i32, month: u32, day: u32) -> Option<()> {
-    if month < 1 || month > 12 || day < 1 {
+    if !(1..=12).contains(&month) || day < 1 {
         return None;
     }
     let max_day = days_in_month(year, month);
@@ -425,7 +430,10 @@ fn datetime_to_ms(year: i32, month: u32, day: u32, hour: u32, minute: u32, secon
     // Days within the month (1-indexed)
     total_days += (day as i64) - 1;
 
-    total_days * MS_DAY + (hour as i64) * MS_HOUR + (minute as i64) * MS_MINUTE + (second as i64) * MS_SECOND
+    total_days * MS_DAY
+        + (hour as i64) * MS_HOUR
+        + (minute as i64) * MS_MINUTE
+        + (second as i64) * MS_SECOND
 }
 
 #[cfg(test)]
@@ -437,8 +445,14 @@ mod tests {
 
     #[test]
     fn natural_language_now() {
-        assert_eq!(resolve_temporal_expr("now", TEST_NOW_MS).unwrap(), TEST_NOW_MS);
-        assert_eq!(resolve_temporal_expr("today", TEST_NOW_MS).unwrap(), TEST_NOW_MS);
+        assert_eq!(
+            resolve_temporal_expr("now", TEST_NOW_MS).unwrap(),
+            TEST_NOW_MS
+        );
+        assert_eq!(
+            resolve_temporal_expr("today", TEST_NOW_MS).unwrap(),
+            TEST_NOW_MS
+        );
     }
 
     #[test]
@@ -652,7 +666,12 @@ mod tests {
     fn resolve_clause_since() {
         let clause = TemporalClause::Since("yesterday");
         let resolved = resolve_clause(&clause, TEST_NOW_MS).unwrap();
-        assert_eq!(resolved, ResolvedTemporal::Since { since_ms: TEST_NOW_MS - MS_DAY });
+        assert_eq!(
+            resolved,
+            ResolvedTemporal::Since {
+                since_ms: TEST_NOW_MS - MS_DAY
+            }
+        );
     }
 
     #[test]

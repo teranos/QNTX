@@ -17,6 +17,7 @@ import (
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/ats/wasm"
 )
 
 // Service provides language intelligence for ATS queries
@@ -78,8 +79,8 @@ func (s *Service) Parse(ctx context.Context, query string, verbosity int) (*Pars
 	filter, parseErr := parser.ParseAxCommandWithContext(args, verbosity, parser.ErrorContextPlain)
 
 	// Build semantic tokens with state classification
-	// We'll enhance this to track state during parsing
-	semanticTokens := s.classifyTokens(ctx, sourceTokens, filter)
+	// Primary: Rust WASM classifier. Fallback: Go state machine.
+	semanticTokens := s.classifyTokens(ctx, query, sourceTokens, filter)
 
 	// Extract diagnostics from parse errors/warnings
 	var diagnostics []Diagnostic
@@ -155,8 +156,80 @@ func (s *Service) Parse(ctx context.Context, query string, verbosity int) (*Pars
 	}, nil
 }
 
-// classifyTokens assigns semantic types to tokens based on filter result
-func (s *Service) classifyTokens(ctx context.Context, sourceTokens []parser.SourceToken, filter *types.AxFilter) []parser.SemanticToken {
+// wasmSemanticTypeMap maps Rust WASM token type indices to Go SemanticTokenType.
+// Must match the indices in qntx-core/src/semantic.rs SemanticTokenType enum.
+var wasmSemanticTypeMap = map[uint32]parser.SemanticTokenType{
+	0: parser.SemanticKeyword,
+	1: parser.SemanticSubject,
+	2: parser.SemanticPredicate,
+	3: parser.SemanticContext,
+	4: parser.SemanticActor,
+	5: parser.SemanticTemporal,
+	6: parser.SemanticSymbol,
+	7: parser.SemanticString,
+	8: parser.SemanticURL,
+	9: parser.SemanticUnknown,
+}
+
+// classifyTokens assigns semantic types to tokens.
+// Uses the Rust WASM classifier as the primary path, with Go fallback.
+func (s *Service) classifyTokens(ctx context.Context, query string, sourceTokens []parser.SourceToken, filter *types.AxFilter) []parser.SemanticToken {
+	// Try WASM classifier first
+	if tokens, err := s.classifyTokensWasm(ctx, query); err == nil {
+		return tokens
+	}
+
+	// Fallback: Go classifier
+	return s.classifyTokensGo(ctx, sourceTokens, filter)
+}
+
+// classifyTokensWasm uses the Rust WASM engine for token classification.
+func (s *Service) classifyTokensWasm(ctx context.Context, query string) ([]parser.SemanticToken, error) {
+	engine, err := wasm.GetEngine()
+	if err != nil {
+		return nil, err
+	}
+
+	wasmTokens, err := engine.ClassifySemanticTokens(query)
+	if err != nil {
+		return nil, err
+	}
+
+	tokens := make([]parser.SemanticToken, 0, len(wasmTokens))
+	for _, wt := range wasmTokens {
+		semType, ok := wasmSemanticTypeMap[wt.Type]
+		if !ok {
+			semType = parser.SemanticUnknown
+		}
+
+		endOffset := wt.Offset + wt.Length
+
+		token := parser.SemanticToken{
+			Text: wt.Text,
+			Type: semType,
+			Range: parser.Range{
+				Start: parser.Position{Line: 1, Character: wt.Offset, Offset: wt.Offset},
+				End:   parser.Position{Line: 1, Character: endOffset, Offset: endOffset},
+			},
+			IsQuoted: wt.IsQuoted,
+		}
+
+		// Add hover information from database (Layer 2 — data-dependent)
+		if semType == parser.SemanticSubject ||
+			semType == parser.SemanticPredicate ||
+			semType == parser.SemanticContext ||
+			semType == parser.SemanticActor {
+			token.Hover = s.getHoverInfo(ctx, wt.Text, semType)
+		}
+
+		tokens = append(tokens, token)
+	}
+
+	return tokens, nil
+}
+
+// classifyTokensGo is the Go-native fallback classifier.
+func (s *Service) classifyTokensGo(ctx context.Context, sourceTokens []parser.SourceToken, filter *types.AxFilter) []parser.SemanticToken {
 	semanticTokens := make([]parser.SemanticToken, 0, len(sourceTokens))
 
 	// Track state as we iterate through tokens

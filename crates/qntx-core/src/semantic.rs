@@ -97,7 +97,11 @@ pub fn classify_tokens(input: &str) -> Vec<SemanticToken> {
 }
 
 /// Classify a single token and return the (type, next_state) pair.
-fn classify_one(token: &Token<'_>, state: ClassifyState, _input: &str) -> (SemanticTokenType, ClassifyState) {
+fn classify_one(
+    token: &Token<'_>,
+    state: ClassifyState,
+    _input: &str,
+) -> (SemanticTokenType, ClassifyState) {
     // Keywords always classify as Keyword and trigger state transitions
     match token.kind {
         TokenKind::Is | TokenKind::Are => {
@@ -109,7 +113,11 @@ fn classify_one(token: &Token<'_>, state: ClassifyState, _input: &str) -> (Seman
         TokenKind::By | TokenKind::Via => {
             return (SemanticTokenType::Keyword, ClassifyState::Actors);
         }
-        TokenKind::Since | TokenKind::Until | TokenKind::On | TokenKind::Between | TokenKind::Over => {
+        TokenKind::Since
+        | TokenKind::Until
+        | TokenKind::On
+        | TokenKind::Between
+        | TokenKind::Over => {
             return (SemanticTokenType::Keyword, ClassifyState::Temporal);
         }
         TokenKind::And => {
@@ -199,17 +207,20 @@ mod tests {
     fn test_classify_full_query() {
         let tokens = classify_tokens("ALICE is author of GitHub by CHARLIE since 2024-01-01");
         let types: Vec<_> = tokens.iter().map(|t| t.token_type).collect();
-        assert_eq!(types, vec![
-            SemanticTokenType::Subject,   // ALICE
-            SemanticTokenType::Keyword,   // is
-            SemanticTokenType::Predicate, // author
-            SemanticTokenType::Keyword,   // of
-            SemanticTokenType::Context,   // GitHub
-            SemanticTokenType::Keyword,   // by
-            SemanticTokenType::Actor,     // CHARLIE
-            SemanticTokenType::Keyword,   // since
-            SemanticTokenType::Temporal,  // 2024-01-01
-        ]);
+        assert_eq!(
+            types,
+            vec![
+                SemanticTokenType::Subject,   // ALICE
+                SemanticTokenType::Keyword,   // is
+                SemanticTokenType::Predicate, // author
+                SemanticTokenType::Keyword,   // of
+                SemanticTokenType::Context,   // GitHub
+                SemanticTokenType::Keyword,   // by
+                SemanticTokenType::Actor,     // CHARLIE
+                SemanticTokenType::Keyword,   // since
+                SemanticTokenType::Temporal,  // 2024-01-01
+            ]
+        );
     }
 
     #[test]
@@ -229,13 +240,16 @@ mod tests {
     fn test_classify_temporal_between() {
         let tokens = classify_tokens("ALICE between 2024-01-01 and 2024-12-31");
         let types: Vec<_> = tokens.iter().map(|t| t.token_type).collect();
-        assert_eq!(types, vec![
-            SemanticTokenType::Subject,  // ALICE
-            SemanticTokenType::Keyword,  // between
-            SemanticTokenType::Temporal, // 2024-01-01
-            SemanticTokenType::Keyword,  // and
-            SemanticTokenType::Temporal, // 2024-12-31
-        ]);
+        assert_eq!(
+            types,
+            vec![
+                SemanticTokenType::Subject,  // ALICE
+                SemanticTokenType::Keyword,  // between
+                SemanticTokenType::Temporal, // 2024-01-01
+                SemanticTokenType::Keyword,  // and
+                SemanticTokenType::Temporal, // 2024-12-31
+            ]
+        );
     }
 
     #[test]
@@ -288,7 +302,10 @@ mod tests {
         for token in &tokens {
             // Verify each token's offset points to the right place in the input
             if !token.is_quoted {
-                assert_eq!(&input[token.offset..token.offset + token.length], token.text);
+                assert_eq!(
+                    &input[token.offset..token.offset + token.length],
+                    token.text
+                );
             }
         }
     }

@@ -539,6 +539,31 @@ func (e *Engine) ParseAxQueryResolved(query string, nowMs int64) (*ParseResolved
 	return &output, nil
 }
 
+// WasmSemanticToken matches the JSON output from Rust classify_semantic_tokens.
+type WasmSemanticToken struct {
+	Text     string `json:"text"`
+	Type     uint32 `json:"type"`
+	Offset   int    `json:"offset"`
+	Length   int    `json:"length"`
+	IsQuoted bool   `json:"is_quoted"`
+}
+
+// ClassifySemanticTokens classifies tokens in an AX query using the Rust semantic
+// classifier. Returns tokens with type indices matching the LSP SemanticTokensLegend.
+func (e *Engine) ClassifySemanticTokens(query string) ([]WasmSemanticToken, error) {
+	raw, err := e.Call("classify_semantic_tokens", query)
+	if err != nil {
+		return nil, errors.Wrapf(err, "classify_semantic_tokens for query %q", query)
+	}
+
+	var tokens []WasmSemanticToken
+	if err := json.Unmarshal([]byte(raw), &tokens); err != nil {
+		return nil, errors.Wrapf(err, "unmarshal classify_semantic_tokens result: %s", raw)
+	}
+
+	return tokens, nil
+}
+
 // GetWASMSize returns the size of the embedded WASM module in bytes.
 func GetWASMSize() int {
 	return len(wasmBytes)
