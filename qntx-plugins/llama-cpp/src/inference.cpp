@@ -166,25 +166,26 @@ bool InferenceEngine::is_loaded() const {
 // Prepare prompt: build chat template, tokenize, decode prompt into KV cache.
 // Returns prompt token count, or -1 on error (with result.content set).
 int InferenceEngine::prepare_prompt(
-    const std::string& system_prompt,
-    const std::string& user_prompt,
+    const std::vector<Message>& messages,
     ChatResult& result) {
 
-    // Build chat messages
-    std::vector<llama_chat_message> messages;
-    if (!system_prompt.empty()) {
-        messages.push_back({"system", system_prompt.c_str()});
+    // Build llama_chat_message array from our Message structs
+    std::vector<llama_chat_message> chat_msgs;
+    chat_msgs.reserve(messages.size());
+    for (const auto& m : messages) {
+        chat_msgs.push_back({m.role.c_str(), m.content.c_str()});
     }
-    messages.push_back({"user", user_prompt.c_str()});
 
     // Apply the model's own chat template
     const char* tmpl = llama_model_chat_template(model_, nullptr);
-    int alloc = 2 * (system_prompt.size() + user_prompt.size()) + 256;
+    size_t total_content = 0;
+    for (const auto& m : messages) total_content += m.content.size();
+    int alloc = 2 * total_content + 256;
     std::vector<char> buf(alloc);
-    int n_written = llama_chat_apply_template(tmpl, messages.data(), messages.size(), true, buf.data(), buf.size());
+    int n_written = llama_chat_apply_template(tmpl, chat_msgs.data(), chat_msgs.size(), true, buf.data(), buf.size());
     if (n_written > (int)buf.size()) {
         buf.resize(n_written + 1);
-        n_written = llama_chat_apply_template(tmpl, messages.data(), messages.size(), true, buf.data(), buf.size());
+        n_written = llama_chat_apply_template(tmpl, chat_msgs.data(), chat_msgs.size(), true, buf.data(), buf.size());
     }
     if (n_written < 0) {
         result.content = "error: chat template failed";
@@ -223,6 +224,19 @@ InferenceEngine::ChatResult InferenceEngine::chat(
     float temperature,
     int max_tokens) {
 
+    std::vector<Message> messages;
+    if (!system_prompt.empty()) {
+        messages.push_back({"system", system_prompt});
+    }
+    messages.push_back({"user", user_prompt});
+    return chat(messages, temperature, max_tokens);
+}
+
+InferenceEngine::ChatResult InferenceEngine::chat(
+    const std::vector<Message>& messages,
+    float temperature,
+    int max_tokens) {
+
     std::lock_guard<std::mutex> lock(mutex_);
 
     ChatResult result;
@@ -231,7 +245,7 @@ InferenceEngine::ChatResult InferenceEngine::chat(
         return result;
     }
 
-    int n_tokens = prepare_prompt(system_prompt, user_prompt, result);
+    int n_tokens = prepare_prompt(messages, result);
     if (n_tokens < 0) return result;
     result.prompt_tokens = n_tokens;
 
@@ -276,6 +290,20 @@ InferenceEngine::ChatResult InferenceEngine::stream_chat(
     int max_tokens,
     TokenCallback on_token) {
 
+    std::vector<Message> messages;
+    if (!system_prompt.empty()) {
+        messages.push_back({"system", system_prompt});
+    }
+    messages.push_back({"user", user_prompt});
+    return stream_chat(messages, temperature, max_tokens, on_token);
+}
+
+InferenceEngine::ChatResult InferenceEngine::stream_chat(
+    const std::vector<Message>& messages,
+    float temperature,
+    int max_tokens,
+    TokenCallback on_token) {
+
     std::lock_guard<std::mutex> lock(mutex_);
 
     ChatResult result;
@@ -284,7 +312,7 @@ InferenceEngine::ChatResult InferenceEngine::stream_chat(
         return result;
     }
 
-    int n_tokens = prepare_prompt(system_prompt, user_prompt, result);
+    int n_tokens = prepare_prompt(messages, result);
     if (n_tokens < 0) return result;
     result.prompt_tokens = n_tokens;
 

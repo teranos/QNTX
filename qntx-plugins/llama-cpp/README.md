@@ -53,7 +53,7 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 
 ## Limitations
 
-- **STO** — Single-turn only. Each prompt is a fresh context. The gRPC `LLMChatRequest` has no message history array. In QNTX, conversation history is spatial — result glyphs can be dragged to rearrange or splice turns — but the protocol has no way to carry that context to the plugin.
+- **STO** — Single-turn only. C++ engine accepts multi-turn message arrays via `prepare_prompt()`, but the Go prompt handler and frontend don't populate them yet. Each request still starts with a cleared KV cache — no persistent conversation state.
 
 - **TAO** — Text attachments only. PDF and plain text attachments are extracted (via MuPDF) and prepended to the prompt as context. Goal: use a multimodal GGUF model (e.g. LLaVA, Qwen2-VL) to process images and PDFs natively through llama.cpp's vision pipeline, bypassing text extraction entirely.
 

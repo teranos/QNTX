@@ -429,18 +429,35 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
         }
     }
 
-    // If we extracted context, prepend it to the user prompt so the
-    // model sees the document content before the user's question.
-    std::string user_prompt = context.empty()
-        ? req->user_prompt()
-        : context + req->user_prompt();
+    // Build message history from proto
+    std::vector<InferenceEngine::Message> messages;
+    if (req->messages_size() > 0) {
+        // Multi-turn: use messages array from proto
+        for (const auto& m : req->messages()) {
+            messages.push_back({m.role(), m.content()});
+        }
+        // Prepend attachment context to the last user message
+        if (!context.empty()) {
+            for (int i = messages.size() - 1; i >= 0; i--) {
+                if (messages[i].role == "user") {
+                    messages[i].content = context + messages[i].content;
+                    break;
+                }
+            }
+        }
+    } else {
+        // Single-turn fallback (deprecated fields)
+        std::string user_prompt = context.empty()
+            ? req->user_prompt()
+            : context + req->user_prompt();
+        if (!req->system_prompt().empty()) {
+            messages.push_back({"system", req->system_prompt()});
+        }
+        messages.push_back({"user", user_prompt});
+    }
 
-    // TODO(STO): support multi-turn — gRPC protocol currently carries no message history
     // TODO(SSL): log signal summary for StreamChat (currently only Chat logs it)
-    auto result = engine.chat(req->system_prompt(),
-                              user_prompt,
-                              temperature,
-                              max_tokens);
+    auto result = engine.chat(messages, temperature, max_tokens);
 
     resp->set_content(result.content);
     resp->set_model(engine.model_name());
@@ -492,7 +509,12 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
             std::string context_id = "chat:" + std::to_string(
                 std::chrono::system_clock::now().time_since_epoch().count());
 
-            ats.create_weave(engine.model_name(), req->user_prompt(),
+            // Extract last user message for weave attestation
+            std::string prompt_text;
+            for (auto it = messages.rbegin(); it != messages.rend(); ++it) {
+                if (it->role == "user") { prompt_text = it->content; break; }
+            }
+            ats.create_weave(engine.model_name(), prompt_text,
                              result.content, context_id, n,
                              conf_sum / n, ent_sum / n, result.signals);
         }
@@ -539,9 +561,29 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
         }
     }
 
-    std::string user_prompt = context.empty()
-        ? req->user_prompt()
-        : context + req->user_prompt();
+    // Build message history from proto
+    std::vector<InferenceEngine::Message> messages;
+    if (req->messages_size() > 0) {
+        for (const auto& m : req->messages()) {
+            messages.push_back({m.role(), m.content()});
+        }
+        if (!context.empty()) {
+            for (int i = messages.size() - 1; i >= 0; i--) {
+                if (messages[i].role == "user") {
+                    messages[i].content = context + messages[i].content;
+                    break;
+                }
+            }
+        }
+    } else {
+        std::string user_prompt = context.empty()
+            ? req->user_prompt()
+            : context + req->user_prompt();
+        if (!req->system_prompt().empty()) {
+            messages.push_back({"system", req->system_prompt()});
+        }
+        messages.push_back({"user", user_prompt});
+    }
 
     // Clear trail and keyframe history for new generation
     if (plugin_->renderer().is_ready()) {
@@ -551,7 +593,7 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
 
     // Stream tokens as they're generated
     auto result = engine.stream_chat(
-        req->system_prompt(), user_prompt, temperature, max_tokens,
+        messages, temperature, max_tokens,
         [&](const std::string& token_text, const TokenSignal& sig) -> bool {
             protocol::LLMChatChunk chunk;
             chunk.set_token(sanitize_utf8(token_text));
@@ -606,7 +648,11 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
         std::string context_id = "stream:" + std::to_string(
             std::chrono::system_clock::now().time_since_epoch().count());
 
-        ats.create_weave(engine.model_name(), user_prompt,
+        std::string prompt_text;
+        for (auto it = messages.rbegin(); it != messages.rend(); ++it) {
+            if (it->role == "user") { prompt_text = it->content; break; }
+        }
+        ats.create_weave(engine.model_name(), prompt_text,
                          result.content, context_id, n,
                          conf_sum / n, ent_sum / n, result.signals);
     }
