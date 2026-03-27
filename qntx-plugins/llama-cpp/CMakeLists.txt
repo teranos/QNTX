@@ -6,9 +6,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # llama.cpp — fetched at build time if not already vendored.
 # Same commit pinned in flake.nix for reproducibility.
+#
+# Options must be set BEFORE FetchContent_MakeAvailable / add_subdirectory
+# so llama.cpp's CMakeLists.txt sees them.
+if(APPLE)
+    set(GGML_METAL ON CACHE BOOL "Enable Metal acceleration" FORCE)
+else()
+    set(GGML_METAL OFF CACHE BOOL "Metal is macOS-only" FORCE)
+endif()
+set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
+
 include(FetchContent)
 if(EXISTS "${CMAKE_SOURCE_DIR}/vendor/llama.cpp/CMakeLists.txt")
     set(LLAMA_SOURCE_DIR "${CMAKE_SOURCE_DIR}/vendor/llama.cpp")
+    add_subdirectory(${LLAMA_SOURCE_DIR} llama.cpp)
 else()
     FetchContent_Declare(
         llama_cpp
@@ -19,16 +32,6 @@ else()
     FetchContent_MakeAvailable(llama_cpp)
     set(LLAMA_SOURCE_DIR "${llama_cpp_SOURCE_DIR}")
 endif()
-
-if(APPLE)
-    set(GGML_METAL ON CACHE BOOL "Enable Metal acceleration" FORCE)
-else()
-    set(GGML_METAL OFF CACHE BOOL "Metal is macOS-only" FORCE)
-endif()
-set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
-add_subdirectory(${LLAMA_SOURCE_DIR} llama.cpp)
 
 # MuPDF — system/nix library for PDF text extraction.
 # Install via: brew install mupdf-tools (macOS) or nix with flake.
