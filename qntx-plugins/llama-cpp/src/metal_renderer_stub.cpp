@@ -16,6 +16,7 @@ void MetalRenderer::set_vocab_positions(const float*, int) {}
 void MetalRenderer::submit_distribution(const float*, int) {}
 void MetalRenderer::store_keyframe(const float*, int) {}
 void MetalRenderer::set_scrub_index(int) {}
+void MetalRenderer::set_param(const std::string&, float) {}
 void MetalRenderer::add_trail_point(int) {}
 void MetalRenderer::clear_trail() {}
 
