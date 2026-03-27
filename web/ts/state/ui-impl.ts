@@ -119,6 +119,9 @@ export interface UIStateData {
     // Canvas pan offset and zoom scale (for canvas navigation)
     canvasPan: Record<string, { panX: number; panY: number; scale?: number }>;
 
+    // Canvas focus state (which glyph is focused, pre-focus zoom level)
+    canvasFocus: Record<string, { focusedGlyphId: string | null; preFocusScale: number }>;
+
     // Timestamp for state versioning
     lastUpdated: number;
 }
@@ -147,6 +150,7 @@ interface PersistedUIState {
     canvasGlyphs: CanvasGlyphState[];
     canvasCompositions: CompositionState[];
     canvasPan: Record<string, { panX: number; panY: number; scale?: number }>;
+    canvasFocus: Record<string, { focusedGlyphId: string | null; preFocusScale: number }>;
 }
 
 // ============================================================================
@@ -182,6 +186,7 @@ function createDefaultState(): UIStateData {
         canvasGlyphs: [],
         canvasCompositions: [],
         canvasPan: {},
+        canvasFocus: {},
         lastUpdated: Date.now(),
     };
 }
@@ -548,6 +553,21 @@ export class UIState {
         this.update('canvasPan', updated);
     }
 
+    /**
+     * Get canvas focus state for a specific canvas
+     */
+    getCanvasFocus(canvasId: string): { focusedGlyphId: string | null; preFocusScale: number } | null {
+        return this.state.canvasFocus[canvasId] ?? null;
+    }
+
+    /**
+     * Set canvas focus state for a specific canvas
+     */
+    setCanvasFocus(canvasId: string, focus: { focusedGlyphId: string | null; preFocusScale: number }): void {
+        const updated = { ...this.state.canvasFocus, [canvasId]: focus };
+        this.update('canvasFocus', updated);
+    }
+
     // ========================================================================
     // Subscription (Pub/Sub)
     // ========================================================================
@@ -659,6 +679,7 @@ export class UIState {
             canvasGlyphs: this.state.canvasGlyphs,
             canvasCompositions: this.state.canvasCompositions,
             canvasPan: this.state.canvasPan,
+            canvasFocus: this.state.canvasFocus,
             // Don't persist: panels (should start closed), budgetWarnings (session-only)
         };
     }
@@ -692,6 +713,7 @@ export class UIState {
             canvasGlyphs: persisted.canvasGlyphs ?? defaultState.canvasGlyphs,
             canvasCompositions: persisted.canvasCompositions ?? defaultState.canvasCompositions,
             canvasPan: persisted.canvasPan ?? defaultState.canvasPan,
+            canvasFocus: persisted.canvasFocus ?? defaultState.canvasFocus,
         };
     }
 

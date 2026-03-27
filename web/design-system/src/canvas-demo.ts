@@ -8,6 +8,7 @@
 import { createGlyphUI } from '../../ts/components/glyph/glyph-ui'
 import type { Glyph } from '../../ts/components/glyph/glyph'
 import { setupCanvasPan, getTransform, setZoom, resetTransform } from '../../ts/components/glyph/canvas/canvas-pan'
+import { focusGlyph as canvasFocusGlyph, unfocusGlyph, isFocused, setupCanvasFocus } from '../../ts/components/glyph/canvas/canvas-focus'
 
 /**
  * Render canvas demo into the given container.
@@ -85,8 +86,6 @@ export function renderCanvasDemo(
     contentLayer.style.width = '100%'
     contentLayer.style.height = '100%'
 
-    // Track focus state
-    let focusedElement: HTMLElement | null = null
     let columnOverride: number | null = null
 
     // Compute split column count from viewport width (or use override)
@@ -97,54 +96,6 @@ export function renderCanvasDemo(
       if (w >= 720) return 3
       if (w >= 480) return 2
       return 1
-    }
-
-    function focusGlyph(el: HTMLElement) {
-      // Unfocus previous
-      if (focusedElement && focusedElement !== el) {
-        focusedElement.style.transition = 'transform 0.35s ease-out, width 0.35s ease-out, height 0.35s ease-out, left 0.35s ease-out, top 0.35s ease-out'
-        focusedElement.style.transform = ''
-        focusedElement.style.width = ''
-        focusedElement.style.height = ''
-        focusedElement.style.left = focusedElement.dataset.origLeft || ''
-        focusedElement.style.top = focusedElement.dataset.origTop || ''
-        focusedElement.style.zIndex = ''
-        const prev = focusedElement
-        setTimeout(() => { prev.style.transition = '' }, 350)
-      }
-
-      // Save original position on first focus of this element
-      if (!el.dataset.origLeft) {
-        el.dataset.origLeft = el.style.left
-        el.dataset.origTop = el.style.top
-      }
-
-      const cols = getColumnCount()
-      const colWidth = canvas.clientWidth / cols
-      const colIndex = Math.floor(cols / 2) // center column
-
-      el.style.transition = 'transform 0.35s ease-out, width 0.35s ease-out, height 0.35s ease-out, left 0.35s ease-out, top 0.35s ease-out'
-      el.style.left = `${colIndex * colWidth}px`
-      el.style.top = '0px'
-      el.style.width = `${colWidth}px`
-      el.style.height = `${canvas.clientHeight}px`
-      el.style.zIndex = '10'
-      setTimeout(() => { el.style.transition = '' }, 350)
-
-      focusedElement = el
-    }
-
-    function unfocus() {
-      if (!focusedElement) return
-      focusedElement.style.transition = 'transform 0.35s ease-out, width 0.35s ease-out, height 0.35s ease-out, left 0.35s ease-out, top 0.35s ease-out'
-      focusedElement.style.width = ''
-      focusedElement.style.height = ''
-      focusedElement.style.left = focusedElement.dataset.origLeft || ''
-      focusedElement.style.top = focusedElement.dataset.origTop || ''
-      focusedElement.style.zIndex = ''
-      const prev = focusedElement
-      setTimeout(() => { prev.style.transition = '' }, 350)
-      focusedElement = null
     }
 
     // ix-json: default title bar + SDK primitives
@@ -220,22 +171,27 @@ export function renderCanvasDemo(
       const target = (e.target as HTMLElement).closest('[data-glyph-id]') as HTMLElement | null
       if (target && canvas.contains(target)) {
         canvas.focus()
-        focusGlyph(target)
+        canvasFocusGlyph(canvas, canvasId, target)
+        updateIndicator()
       }
     })
 
     // Escape to unfocus
     canvas.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && focusedElement) {
+      if (e.key === 'Escape' && isFocused(canvasId)) {
         e.preventDefault()
-        unfocus()
+        unfocusGlyph(canvas, canvasId)
+        updateIndicator()
       }
     })
 
     // Click background to unfocus
     canvas.addEventListener('click', (e) => {
       const target = (e.target as HTMLElement).closest('[data-glyph-id]')
-      if (!target && focusedElement) unfocus()
+      if (!target && isFocused(canvasId)) {
+        unfocusGlyph(canvas, canvasId)
+        updateIndicator()
+      }
     })
 
     // Viewport presets
@@ -276,7 +232,7 @@ export function renderCanvasDemo(
           controls.querySelectorAll('.qntx-btn').forEach(b => b.classList.remove('qntx-btn-primary'))
           btn.classList.add('qntx-btn-primary')
         }
-        if (focusedElement) unfocus()
+        if (isFocused(canvasId)) unfocusGlyph(canvas, canvasId)
         updateIndicator()
       })
       controls.appendChild(btn)
@@ -306,7 +262,7 @@ export function renderCanvasDemo(
           controls.querySelectorAll('.col-override').forEach(b => b.classList.remove('qntx-btn-primary'))
           btn.classList.add('qntx-btn-primary')
         }
-        if (focusedElement) unfocus()
+        if (isFocused(canvasId)) unfocusGlyph(canvas, canvasId)
         updateIndicator()
       })
       btn.classList.add('col-override')
@@ -369,15 +325,17 @@ export function renderCanvasDemo(
     function updateIndicator() {
       const t = getTransform(canvasId)
       const zoomPct = Math.round(t.scale * 100)
-      indicator.textContent = `${getColumnCount()} col @ ${canvas.clientWidth}px — ${zoomPct}% zoom — pan(${Math.round(t.panX)}, ${Math.round(t.panY)})`
+      const focusLabel = isFocused(canvasId) ? ' — focused' : ''
+      indicator.textContent = `${getColumnCount()} col @ ${canvas.clientWidth}px — ${zoomPct}% zoom — pan(${Math.round(t.panX)}, ${Math.round(t.panY)})${focusLabel}`
     }
     canvas.appendChild(indicator)
 
     // Add content layer to canvas, set up real pan/zoom
     canvas.appendChild(contentLayer)
 
-    // Wire up real canvas pan/zoom
+    // Wire up real canvas pan/zoom and focus
     setupCanvasPan(canvas, canvasId)
+    setupCanvasFocus(canvasId)
 
     // Update indicator on zoom/pan changes (wheel events)
     canvas.addEventListener('wheel', () => setTimeout(updateIndicator, 0), { passive: true })

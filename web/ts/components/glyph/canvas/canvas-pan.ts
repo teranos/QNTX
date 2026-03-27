@@ -349,6 +349,35 @@ export function setZoom(container: HTMLElement, canvasId: string, scale: number,
 }
 
 /**
+ * Set pan and zoom to arbitrary values, optionally animated.
+ * Does NOT persist — caller decides whether to save.
+ */
+export function setPanZoom(
+    container: HTMLElement,
+    canvasId: string,
+    panX: number,
+    panY: number,
+    scale: number,
+    animate: boolean = false,
+): void {
+    const state = getState(canvasId);
+    const contentLayer = container.querySelector('.canvas-content-layer') as HTMLElement;
+
+    if (animate && contentLayer) {
+        contentLayer.style.transition = 'transform 0.45s ease-out';
+    }
+
+    state.panX = panX;
+    state.panY = panY;
+    state.scale = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, scale));
+    applyTransform(container, canvasId);
+
+    if (animate && contentLayer) {
+        setTimeout(() => { contentLayer.style.transition = ''; }, 450);
+    }
+}
+
+/**
  * Reset transform to default (no pan, 100% zoom) with smooth animation
  * @param container Canvas container element
  * @param canvasId Canvas identifier
