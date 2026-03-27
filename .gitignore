@@ -81,4 +81,5 @@ qntx-plugins/kern/_build/
 qntx-plugins/llama-cpp/build/
 qntx-plugins/llama-cpp/.cache/
 qntx-plugins/llama-cpp/vendor/
+qntx-plugins/swift-metal/.build/
 plugin/grpc/ocaml/_build/

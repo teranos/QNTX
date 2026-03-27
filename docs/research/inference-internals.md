@@ -2,23 +2,9 @@
 
 What can we see inside a running model, and what's worth surfacing?
 
-## Context
-
-The llama-cpp plugin already loads models, tokenizes, decodes, and samples. The sampling loop (`inference.cpp:152`) generates tokens one at a time. After each `llama_decode()`, the full probability distribution over the vocabulary exists in memory — `llama_get_logits_ith(ctx, -1)` returns it. Today this data is consumed by the sampler and discarded. Everything below is about what happens if we keep it.
-
-The D prototype on `claude/review-weekend-work-lqvxU` validated three signals (entropy, confidence, top-gap) and their aggregate detections (spikes, low-confidence spans) as attestation material. That branch proxied through llama-server's HTTP API. The real implementation belongs inside the C++ sampling loop where the data is native.
+Signal extraction (entropy, confidence, top-gap), streaming transport, confidence heatmap, and top-K popup are implemented — see `qntx-plugins/llama-cpp/README.md` for architecture. Everything below is what remains unexplored.
 
 ## Untapped API Surface
-
-### Logits and Probabilities
-
-| Function | What it gives you |
-|---|---|
-| `llama_get_logits(ctx)` | Raw float array for the full batch |
-| `llama_get_logits_ith(ctx, -1)` | Logits for the last decoded position — the one you're sampling from |
-| softmax (manual) | Convert logits to probabilities — trivial loop |
-
-One call after each decode. The array is `llama_vocab_n_tokens(vocab)` wide — typically 32k-128k floats. Softmax it, sort, take top-k.
 
 ### Vocabulary Introspection
 
@@ -82,7 +68,7 @@ The C++ ecosystem around llama.cpp is thin because llama.cpp itself absorbed mos
 
 **JSON Schema to GBNF (`common/json-schema-to-grammar.h`).** Converts a JSON Schema to a GBNF grammar automatically. In llama.cpp's `common/` library.
 
-**Speculative decoding (`common/speculative.h`).** Draft model proposes tokens, main model verifies. Relevant if token tree visualization moves from "show alternatives" to "actually explore branches."
+**Speculative decoding (`common/speculative.h`).** Draft model proposes tokens, main model verifies. Not needed for token tree branching — branching forks the KV cache at a token position and generates forward with an alternative token.
 
 **Minja template engine (`common/minja/`).** Jinja2-compatible chat template rendering. Handles ChatML, Llama, Mistral formats. The plugin currently uses `llama_model_chat_template` + `llama_chat_apply_template` which is simpler but less flexible.
 
@@ -101,21 +87,11 @@ The C++ ecosystem around llama.cpp is thin because llama.cpp itself absorbed mos
 
 ## Visualization Ideas
 
-### Tier 1: High feasibility, high impact
-
-**Confidence heatmap on generated text.** Color each token `<span>` by P(chosen) or entropy. Uncertain tokens glow warm, confident tokens stay neutral. The generated text *is* the visualization — zero extra panels. CSS `background-color` per token, no chart library.
-
-**Top-K alternatives on hover.** Click or hover a token in the output to see a popup with the top-10 candidates and their probability bars. Answers: "why did the model pick this token? what else was it considering?" Horizontal bars, chosen token highlighted.
-
-**Entropy sparkline.** Small rolling SVG line chart — x-axis is token position, y-axis is entropy. Spikes correspond to moments of indecision. Sits above or beside the output text. Pairs with the heatmap: sparkline gives macro view, heatmap gives micro.
-
-**Runner-up ghost trail.** Show the second-place token as a muted annotation inline with the output: `the [a] cat [dog] sat [stood] on`. Surfaces the branching nature of autoregressive generation. Toggle on/off. Most interesting when the runner-up would have taken the sentence in a completely different direction.
-
-### Tier 2: Medium feasibility, high impact
+### Tier 2
 
 **Logit trajectories.** Track how specific tokens' probabilities evolve across generation steps. A token might start at 0.001, rise as context builds, and eventually get selected. Multi-line chart, selected token bolded at the step it was chosen. Requires storing top-100 per step (~115KB for 512 tokens).
 
-**Token tree.** Top-3 candidates at each step rendered as branches. The selected path is the trunk; alternatives ghost off as side branches. For real continuations (not just single-step alternatives) you'd need speculative decoding down each branch — multiplies compute by k x depth. Could be on-demand: "explore alternatives at this token."
+**Token tree branching.** The confidence heatmap already marks hesitation points — brown tokens are where the runner-up was close. The top-K popup shows what the alternatives were. Click a candidate to fork: the plugin generates forward from that token position with the alternative token injected. Each fork spawns a new stream glyph on the canvas, spatially rooted at the fork point. The original path is preserved — branches are additive, no undo needed. On-demand, not pre-computed: each branch is a full generation from the fork point.
 
 **Cumulative perplexity.** Single running number: exp(average negative log-likelihood). Updates with each token. Low = fluent, high = struggled. Useful for comparing prompt strategies — same question with different system prompts yields different perplexity, indicating which framing the model handles better.
 
@@ -126,26 +102,6 @@ The C++ ecosystem around llama.cpp is thin because llama.cpp itself absorbed mos
 **Logit lens.** Project intermediate hidden states through the unembedding matrix to see what the model "would have predicted" at each layer. Shows how the prediction forms layer by layer. Requires hidden state access at each transformer layer.
 
 **Activation / neuron visualization.** Per-neuron activation patterns, feature attribution. Requires full model internals. Research tool territory (TransformerLens, ecco).
-
-## Data Budget
-
-Per generation step: chosen token (~20 bytes) + top-10 probabilities (~200 bytes) + entropy (8 bytes) = **~230 bytes/step**. For 512 tokens: **~115KB total**. Trivially streamable over WebSocket.
-
-## Implementation Path
-
-Transport is gRPC server streaming (`StreamChat` RPC). The Go layer adapts the gRPC stream to WebSocket `llm_stream` messages with per-token signal data.
-
-**Step 1 — Extract.** *(done)* After each `llama_decode()`, `capture_signal()` reads raw logits, softmax, partial-sorts top-10, computes entropy/confidence/top-gap. `stream_chat()` calls a per-token callback with `TokenSignal`.
-
-**Step 2 — Stream.** *(done)* gRPC `StreamChat` RPC sends `LLMChatChunk` per token with `TokenSignalProto`. Go side: `LLMServer.StreamChatClient()` → `GRPCLLMClient.ChatStreaming()` → `prompt_handlers.go` broadcasts `llm_stream` WebSocket messages.
-
-**Step 3 — Confidence heatmap.** *(done)* Stream glyph (`stream-glyph.ts`) renders each token as a `<span>` with `background-color` mapped from confidence via `confidenceToColor()` — linear HSL interpolation, amber glow at low confidence, transparent at high. Multiplexer pattern: one WebSocket handler routes `llm_stream` messages to many glyph instances by `job_id`. Follow-ups from a stream glyph spawn a new stream glyph with live heatmap (spawn-before-fetch pattern). Token data persists to canvas state across page refresh. Shared follow-up infrastructure (`glyph-followup.ts`) between result and stream glyphs.
-
-**Step 4 — Top-K popup.** Hover/click interaction on heatmapped tokens. Shows the decision space at that position.
-
-**Step 5 — Entropy sparkline.** Macro view of the generation's certainty profile. SVG strip.
-
-**Step 6 — Attestation integration.** The D branch signals (entropy spikes, low-confidence spans) become ATS attestations. The visualizations are the live rendering of those same signals — one for the record, one for the screen.
 
 ## Open Questions
 
@@ -169,45 +125,17 @@ Could LLM embeddings plug into the same HDBSCAN/UMAP infra? Technically yes — 
 
 ## Checklist
 
-### Infrastructure
-
-- [x] Extract top-k logits after each `llama_decode()` in the sampling loop — `capture_signal()` in inference.cpp
-- [x] Compute softmax, entropy, confidence, top-gap per token in C++ — same function, top-10 candidates
-- [x] Extend `ChatResult` to carry per-token metadata — `TokenSignal` struct, `signals` vector
-- [x] Implement streaming transport — gRPC `StreamChat` RPC with `LLMChatChunk` + `TokenSignalProto`
-- [x] Go streaming adapter — `GRPCLLMClient.ChatStreaming()` → WebSocket `llm_stream` broadcast
-- [ ] Dump full vocabulary to frontend at model load
-
-### Tier 1 Visualizations
-
-- [x] Confidence heatmap — color token spans by P(chosen) or entropy
-- [ ] Top-K alternatives popup — hover/click a token to see candidates + probability bars
-- [ ] Entropy sparkline — rolling SVG line chart of entropy per token position
-- [ ] Runner-up ghost trail — inline muted annotation of second-place tokens
-
-### Tier 2 Visualizations
-
-- [ ] Logit trajectories — multi-line chart of token probability evolution across steps
-- [ ] Token tree — branching visualization of top-3 candidates per step
-- [ ] Cumulative perplexity — running perplexity score during generation
-
-### Sampling Chain
-
-- [ ] Expose top-k, top-p, min-p, repetition penalty in the UI
-- [ ] Wire sampler chain configuration through to `llama_sampler_chain_add` calls
-- [ ] Integrate with bias glyph (#718)
-
-### Embeddings (Two Lenses)
-
-- [ ] Investigate LLM embeddings via `llama_get_embeddings` for inference-specific clustering
-- [ ] Evaluate whether LLM embedding clusters differ meaningfully from MiniLM clusters
-- [ ] Determine if both can coexist in the HDBSCAN/UMAP pipeline or need separate stores
-
-### Attestation Integration
-
-- [ ] Port D prototype signal computation (entropy spikes, low-confidence spans) to C++
-- [ ] Write per-generation attestations with signal attributes to ATS
-- [ ] Connect live visualizations to the same signal data that feeds attestations
+- [ ] **VDF** — Dump full vocabulary to frontend at model load. Loop `llama_vocab_n_tokens`, extract text + attributes + score per token. Serve via HTTP endpoint or model metadata broadcast. Foundation for bias glyph (#718) and semantic vocab search.
+- [ ] **LTR** — Logit trajectories. Track how specific tokens' probabilities evolve across generation steps. Multi-line chart, selected token bolded at the step it was chosen. Frontend work, data already flows.
+- [ ] **TTB** — Token tree branching. Fork from heatmap token via top-K popup, spawn new stream glyphs per alternative path. Requires KV cache snapshot/restore in C++. Highest-effort item.
+- [ ] **CPX** — Cumulative perplexity. Running `exp(mean(-log(confidence)))` across all tokens. Emit as scalar per chunk. Small C++ addition.
+- [ ] **SUI** — Expose top-k, top-p, min-p, repetition penalty in the UI. Proto + C++ + Go + TS. Only temperature is wired today.
+- [ ] **SCW** — Wire sampler chain configuration through to `llama_sampler_chain_add` calls. Depends on SUI for proto fields.
+- [ ] **BIG** — Integrate with bias glyph (#718). Blocked on bias glyph implementation.
+- [ ] **HSE** — Investigate LLM embeddings via `llama_get_embeddings` for inference-specific clustering. Pointer dereference, 4096 floats per token.
+- [ ] **HSC** — Evaluate whether LLM embedding clusters differ meaningfully from MiniLM clusters. Blocked on HSE.
+- [ ] **ESD** — Port D prototype signal computation (entropy spikes, low-confidence spans) to C++. Sliding-window analysis, emit flags.
+- [ ] **ATS** — Write per-generation attestations with signal attributes to ATS. Go-only, data shape TBD (full tokens vs summary stats).
 
 ## Future Direction: Token-as-Glyph
 

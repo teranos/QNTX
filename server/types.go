@@ -168,10 +168,11 @@ type LLMStreamMessage struct {
 
 // LLMTokenSignal carries per-token inference signal data for visualization
 type LLMTokenSignal struct {
-	Confidence float32             `json:"confidence"`      // P(chosen) from raw distribution
-	Entropy    float32             `json:"entropy"`         // Shannon entropy in bits
-	TopGap     float32             `json:"top_gap"`         // P(top1) - P(top2)
-	TopK       []LLMTokenCandidate `json:"top_k,omitempty"` // Top-k candidates
+	Confidence       float32             `json:"confidence"`                  // P(chosen) from raw distribution
+	Entropy          float32             `json:"entropy"`                     // Shannon entropy in bits
+	TopGap           float32             `json:"top_gap"`                     // P(top1) - P(top2)
+	TopK             []LLMTokenCandidate `json:"top_k,omitempty"`             // Top-k candidates
+	FullDistribution []float32           `json:"full_distribution,omitempty"` // Full softmax distribution (vocab_size floats)
 }
 
 // LLMTokenCandidate is a candidate token from the top-k distribution

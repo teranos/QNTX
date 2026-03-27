@@ -10,10 +10,16 @@
  *
  * Persists token data to canvas state so content survives page refresh.
  *
- * TODO: Token hover/click popup showing signal data (entropy, top_gap, top-k candidates) — data is on each span already
- * TODO: Copy button (result glyph has one, stream glyph doesn't)
- * TODO: Factor entropy and top_gap into color mapping, not just confidence
- * TODO: Window morph support (separate PR)
+ * Token hover popup showing signal data and top-K candidates — see token-popup.ts
+ * TODO(CPY): Copy button (result glyph has one, stream glyph doesn't)
+ * TODO(ECM): Factor entropy and top_gap into color mapping, not just confidence.
+ *   Currently only confidence drives the amber heatmap. Entropy and top_gap are
+ *   captured in data-* attributes but unused in rendering.
+ * TODO(WMS): Window morph support (separate PR)
+ * TODO(SSL): Signal summary logging — StreamChat path has no post-generation
+ *   summary (Chat path logs entropy avg/max, confidence avg/min). Add equivalent.
+ * TODO(ATS): Write per-generation attestations with signal attributes to ATS
+ *   after stream completes. See inference-internals.md checklist.
  */
 
 import type { Glyph } from './glyph';
@@ -27,6 +33,7 @@ import { uiState } from '../../state/ui';
 import { registerHandler, unregisterHandler } from '../../websocket';
 import { apiFetch } from '../../api';
 import { createFollowUpZone, type FollowUpRequest, type FollowUpControls } from './glyph-followup';
+import { createTokenPopup } from './token-popup';
 
 // ── Multiplexer ─────────────────────────────────────────────────────
 
@@ -93,9 +100,10 @@ export interface StreamGlyphContent {
 
 // ── Token rendering ─────────────────────────────────────────────────
 
-function renderToken(token: StreamToken): HTMLSpanElement {
+function renderToken(token: StreamToken, tokenIndex: number): HTMLSpanElement {
     const span = document.createElement('span');
     span.textContent = token.text;
+    span.dataset.tokenIndex = String(tokenIndex);
 
     if (token.signal) {
         span.style.backgroundColor = confidenceToColor(token.signal.confidence);
@@ -204,9 +212,32 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
     element.appendChild(output);
 
     // Render restored tokens
-    for (const token of tokens) {
-        output.appendChild(renderToken(token));
+    for (let i = 0; i < tokens.length; i++) {
+        output.appendChild(renderToken(tokens[i], i));
     }
+
+    // Token hover popup + nebula scrub — event delegation on the output container
+    const popup = createTokenPopup();
+    output.addEventListener('mouseenter', (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'SPAN' && target.dataset.confidence) {
+            popup.show(target as HTMLSpanElement);
+            if (target.dataset.tokenIndex) {
+                document.dispatchEvent(new CustomEvent('nebula-scrub', {
+                    detail: { index: parseInt(target.dataset.tokenIndex, 10) },
+                }));
+            }
+        }
+    }, true);
+    output.addEventListener('mouseleave', (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'SPAN') {
+            popup.hide();
+            document.dispatchEvent(new CustomEvent('nebula-scrub', {
+                detail: { index: -1 },
+            }));
+        }
+    }, true);
 
     /** Persist current tokens to canvas state */
     function persistContent(): void {
@@ -232,8 +263,9 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
             if (!msg.content) return;
 
             const token: StreamToken = { text: msg.content, signal: msg.signal };
+            const tokenIndex = tokens.length;
             tokens.push(token);
-            output.appendChild(renderToken(token));
+            output.appendChild(renderToken(token, tokenIndex));
             output.scrollTop = output.scrollHeight;
         });
     }
@@ -255,6 +287,7 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
     // Cleanup
     storeCleanup(element, () => {
         if (promptGlyphId) unsubscribeStream(promptGlyphId);
+        popup.destroy();
     });
 
     return element;

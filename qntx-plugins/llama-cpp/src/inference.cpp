@@ -23,7 +23,25 @@ static void softmax(float* data, int n) {
     }
 }
 
-// Capture pre-sampler signal from raw logits at the current position
+// Capture pre-sampler signal from raw logits at the current position.
+//
+// Zero-cost signals not yet extracted (data exists in this window):
+// TODO(TMD): Token metadata — llama_token_get_score(vocab, id) and
+//   llama_token_get_attr(vocab, id) per top-k candidate. O(1) lookups.
+// TODO(CWU): Context window usage — llama_get_seq_pos(ctx, -1) / n_ctx.
+//   Three integers per token, zero compute.
+// TODO(TMP): Temperature sensitivity — softmax at 5 temperatures to show
+//   how much temperature reshapes the distribution. ~0.5ms for 5 extra passes.
+// TODO(CPX): Cumulative perplexity — exp(mean(-log(confidence))) across all
+//   tokens so far. Running scalar, negligible compute.
+//
+// Moderate-cost signals (Tier 2):
+// TODO(HSE): Hidden state embedding — llama_get_embeddings(ctx) returns 4096
+//   floats, pointer dereference. Semantic trajectory through token space.
+//
+// Sampler visibility (requires observer sampler, not a capture_signal change):
+// TODO(SCO): Sampler chain observations — custom llama_sampler_i between each
+//   sampler stage to snapshot distribution before/after. See inference-internals.md.
 static TokenSignal capture_signal(llama_context* ctx, const llama_vocab* vocab, int top_k) {
     int n_vocab = llama_vocab_n_tokens(vocab);
     float* logits = llama_get_logits_ith(ctx, -1);
@@ -62,6 +80,9 @@ static TokenSignal capture_signal(llama_context* ctx, const llama_vocab* vocab, 
         int len = llama_token_to_piece(vocab, id, buf, sizeof(buf), 0, true);
         sig.top_k[i] = {id, std::string(buf, std::max(0, len)), probs[id]};
     }
+
+    // Keep the full softmax distribution for visualization
+    sig.full_distribution = std::move(probs);
 
     return sig;
 }
@@ -268,6 +289,10 @@ InferenceEngine::ChatResult InferenceEngine::stream_chat(
     result.prompt_tokens = n_tokens;
 
     const llama_vocab* vocab = llama_model_get_vocab(model_);
+    // TODO(SCO): Insert observer samplers between stages to capture distribution
+    //   before/after each sampler. Currently the chain is a black box.
+    // TODO(SUI): Accept top_k, top_p, min_p, repetition_penalty from request.
+    //   Only temperature is wired. See inference-internals.md checklist.
     auto sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
     llama_sampler_chain_add(sampler, llama_sampler_init_temp(temperature));
     llama_sampler_chain_add(sampler, llama_sampler_init_dist(0));

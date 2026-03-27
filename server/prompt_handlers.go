@@ -776,6 +776,10 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	// TODO(ATS): After stream completes, create attestation with signal summary
+	// (mean confidence, mean entropy, token count, low-confidence spans).
+	// See inference-internals.md checklist item ATS.
+
 	// TODO: attestation subject should reflect the actual model that ran, not the
 	// requested model from frontmatter. When frontmatter says "anthropic/claude-haiku-4.5"
 	// but the request routes through llama.cpp, the attestation subject is wrong.
