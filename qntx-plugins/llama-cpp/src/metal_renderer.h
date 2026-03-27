@@ -63,6 +63,9 @@ public:
     void add_trail_point(int token_id);
     void clear_trail();
 
+    // Runtime-adjustable parameters
+    void set_param(const std::string& key, float value);
+
     // Start/stop the background render loop (60fps interpolation).
     void start_render_loop(int width, int height);
     void stop_render_loop();
@@ -123,6 +126,11 @@ private:
     // Drift — fixed-step camera offset per token, makes time into space
     int drift_count_ = 0;        // how many tokens have been recorded
     float drift_step_ = 0.0f;    // world-space units per token (set after positions loaded)
+
+    // Orbit — trail curves along a circular arc
+    int orbit_period_ = 1024;    // tokens per full 360° rotation
+    float orbit_radius_mult_ = 3.0f;  // orbit radius as multiple of extent
+    float particle_scale_ = 1.0f;     // multiplier on particle point size
 
     // Render loop
     std::thread render_thread_;
