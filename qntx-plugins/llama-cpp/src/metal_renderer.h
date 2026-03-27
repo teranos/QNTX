@@ -136,5 +136,10 @@ private:
     std::thread render_thread_;
     std::atomic<bool> render_running_{false};
     int render_width_ = 800, render_height_ = 600;
+
+    // Idle suppression — sleep when interpolation is complete and no new data
+    std::condition_variable render_wake_cv_;
+    std::mutex render_wake_mutex_;
+    bool render_dirty_ = false;  // new data arrived, need to render
 #endif
 };
