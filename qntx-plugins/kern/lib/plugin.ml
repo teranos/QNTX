@@ -25,6 +25,12 @@ let parse_query input =
   | exception Parser.Error ->
     Error "parse error"
 
+(* --- Semantic classification --- *)
+
+let classify_query input =
+  let tokens = Classify.classify_tokens input in
+  Yojson.Safe.to_string (Classify.to_json tokens)
+
 (* --- RPC Handler --- *)
 
 let handle_parse_ax_query raw =

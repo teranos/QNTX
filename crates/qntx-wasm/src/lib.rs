@@ -250,6 +250,22 @@ mod wazero {
     }
 
     // ============================================================================
+    // Semantic token classification
+    // ============================================================================
+
+    /// Classify semantic tokens in an AX query. Takes (ptr, len) pointing to a
+    /// UTF-8 query string. Returns JSON array of semantic tokens.
+    #[no_mangle]
+    pub extern "C" fn classify_semantic_tokens(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        let tokens = qntx_core::semantic::classify_tokens(input);
+        match serde_json::to_string(&tokens) {
+            Ok(json) => write_result(&json),
+            Err(e) => write_error(&format!("serialization failed: {}", e)),
+        }
+    }
+
+    // ============================================================================
     // Fuzzy matching
     // ============================================================================
 

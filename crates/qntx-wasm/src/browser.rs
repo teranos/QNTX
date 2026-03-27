@@ -95,6 +95,33 @@ pub fn parse_query(input: &str) -> String {
     }
 }
 
+/// Classify semantic tokens in an AX query string.
+/// Returns JSON array of semantic tokens with type indices matching the LSP legend.
+///
+/// Each token: `{"text":"ALICE","type":1,"offset":0,"length":5,"is_quoted":false}`
+/// Type indices: 0=keyword, 1=subject, 2=predicate, 3=context, 4=actor,
+///               5=temporal, 6=operator, 7=string, 8=url, 9=unknown
+#[wasm_bindgen]
+pub fn classify_semantic_tokens(input: &str) -> String {
+    let tokens = qntx_core::semantic::classify_tokens(input);
+    match serde_json::to_string(&tokens) {
+        Ok(json) => json,
+        Err(e) => format!(r#"{{"error":"serialization failed: {}"}}"#, e),
+    }
+}
+
+/// Encode semantic tokens into LSP delta format (array of 5-tuples).
+/// Input: AX query string. Output: JSON array of u32 values.
+#[wasm_bindgen]
+pub fn encode_semantic_tokens_lsp(input: &str) -> String {
+    let tokens = qntx_core::semantic::classify_tokens(input);
+    let encoded = qntx_core::semantic::encode_lsp_tokens(&tokens);
+    match serde_json::to_string(&encoded) {
+        Ok(json) => json,
+        Err(e) => format!(r#"{{"error":"serialization failed: {}"}}"#, e),
+    }
+}
+
 // ============================================================================
 // Storage operations
 // ============================================================================

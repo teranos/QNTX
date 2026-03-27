@@ -35,6 +35,7 @@ pub mod parser;
 pub mod similarity;
 pub mod storage;
 pub mod sync;
+pub mod semantic;
 pub mod temporal;
 
 // Re-export main types at crate root
@@ -52,4 +53,5 @@ pub use expand::{
 pub use fuzzy::{FuzzyEngine, FuzzyMatch};
 pub use parser::{AxQuery, Lexer, ParseError, Parser, TemporalClause, Token, TokenKind};
 pub use storage::{AttestationStore, MemoryStore, QueryStore, StoreError};
+pub use semantic::{classify_tokens, encode_lsp_tokens, SemanticToken, SemanticTokenType};
 pub use temporal::{resolve_clause, resolve_temporal_expr, ResolvedTemporal};
