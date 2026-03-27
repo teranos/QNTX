@@ -21,22 +21,83 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type LLMChatRequest struct {
+type ChatMessage struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SystemPrompt  string                 `protobuf:"bytes,1,opt,name=system_prompt,json=systemPrompt,proto3" json:"system_prompt,omitempty"`
-	UserPrompt    string                 `protobuf:"bytes,2,opt,name=user_prompt,json=userPrompt,proto3" json:"user_prompt,omitempty"`
-	Model         string                 `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
-	Temperature   float64                `protobuf:"fixed64,4,opt,name=temperature,proto3" json:"temperature,omitempty"`
-	MaxTokens     int32                  `protobuf:"varint,5,opt,name=max_tokens,json=maxTokens,proto3" json:"max_tokens,omitempty"`
-	Provider      string                 `protobuf:"bytes,6,opt,name=provider,proto3" json:"provider,omitempty"`
-	Attachments   []*Attachment          `protobuf:"bytes,7,rep,name=attachments,proto3" json:"attachments,omitempty"`
+	Role          string                 `protobuf:"bytes,1,opt,name=role,proto3" json:"role,omitempty"` // "system", "user", "assistant"
+	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatMessage) Reset() {
+	*x = ChatMessage{}
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatMessage) ProtoMessage() {}
+
+func (x *ChatMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatMessage.ProtoReflect.Descriptor instead.
+func (*ChatMessage) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *ChatMessage) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+func (x *ChatMessage) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+type LLMChatRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Deprecated: use messages field for new callers.
+	//
+	// Deprecated: Marked as deprecated in plugin/grpc/protocol/llm.proto.
+	SystemPrompt string `protobuf:"bytes,1,opt,name=system_prompt,json=systemPrompt,proto3" json:"system_prompt,omitempty"`
+	// Deprecated: use messages field for new callers.
+	//
+	// Deprecated: Marked as deprecated in plugin/grpc/protocol/llm.proto.
+	UserPrompt  string        `protobuf:"bytes,2,opt,name=user_prompt,json=userPrompt,proto3" json:"user_prompt,omitempty"`
+	Model       string        `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
+	Temperature float64       `protobuf:"fixed64,4,opt,name=temperature,proto3" json:"temperature,omitempty"`
+	MaxTokens   int32         `protobuf:"varint,5,opt,name=max_tokens,json=maxTokens,proto3" json:"max_tokens,omitempty"`
+	Provider    string        `protobuf:"bytes,6,opt,name=provider,proto3" json:"provider,omitempty"`
+	Attachments []*Attachment `protobuf:"bytes,7,rep,name=attachments,proto3" json:"attachments,omitempty"`
+	// Multi-turn conversation history. When populated, takes precedence
+	// over system_prompt/user_prompt which remain for single-turn callers.
+	Messages      []*ChatMessage `protobuf:"bytes,8,rep,name=messages,proto3" json:"messages,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *LLMChatRequest) Reset() {
 	*x = LLMChatRequest{}
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[0]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -48,7 +109,7 @@ func (x *LLMChatRequest) String() string {
 func (*LLMChatRequest) ProtoMessage() {}
 
 func (x *LLMChatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[0]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -61,9 +122,10 @@ func (x *LLMChatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LLMChatRequest.ProtoReflect.Descriptor instead.
 func (*LLMChatRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{0}
+	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{1}
 }
 
+// Deprecated: Marked as deprecated in plugin/grpc/protocol/llm.proto.
 func (x *LLMChatRequest) GetSystemPrompt() string {
 	if x != nil {
 		return x.SystemPrompt
@@ -71,6 +133,7 @@ func (x *LLMChatRequest) GetSystemPrompt() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in plugin/grpc/protocol/llm.proto.
 func (x *LLMChatRequest) GetUserPrompt() string {
 	if x != nil {
 		return x.UserPrompt
@@ -113,6 +176,13 @@ func (x *LLMChatRequest) GetAttachments() []*Attachment {
 	return nil
 }
 
+func (x *LLMChatRequest) GetMessages() []*ChatMessage {
+	if x != nil {
+		return x.Messages
+	}
+	return nil
+}
+
 type Attachment struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	MimeType      string                 `protobuf:"bytes,1,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
@@ -124,7 +194,7 @@ type Attachment struct {
 
 func (x *Attachment) Reset() {
 	*x = Attachment{}
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[1]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -136,7 +206,7 @@ func (x *Attachment) String() string {
 func (*Attachment) ProtoMessage() {}
 
 func (x *Attachment) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[1]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -149,7 +219,7 @@ func (x *Attachment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Attachment.ProtoReflect.Descriptor instead.
 func (*Attachment) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{1}
+	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Attachment) GetMimeType() string {
@@ -186,7 +256,7 @@ type LLMChatResponse struct {
 
 func (x *LLMChatResponse) Reset() {
 	*x = LLMChatResponse{}
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[2]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -198,7 +268,7 @@ func (x *LLMChatResponse) String() string {
 func (*LLMChatResponse) ProtoMessage() {}
 
 func (x *LLMChatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[2]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -211,7 +281,7 @@ func (x *LLMChatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LLMChatResponse.ProtoReflect.Descriptor instead.
 func (*LLMChatResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{2}
+	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *LLMChatResponse) GetContent() string {
@@ -265,7 +335,7 @@ type LLMChatChunk struct {
 
 func (x *LLMChatChunk) Reset() {
 	*x = LLMChatChunk{}
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[3]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -277,7 +347,7 @@ func (x *LLMChatChunk) String() string {
 func (*LLMChatChunk) ProtoMessage() {}
 
 func (x *LLMChatChunk) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[3]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -290,7 +360,7 @@ func (x *LLMChatChunk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LLMChatChunk.ProtoReflect.Descriptor instead.
 func (*LLMChatChunk) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{3}
+	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *LLMChatChunk) GetToken() string {
@@ -355,7 +425,7 @@ type TokenSignalProto struct {
 
 func (x *TokenSignalProto) Reset() {
 	*x = TokenSignalProto{}
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -367,7 +437,7 @@ func (x *TokenSignalProto) String() string {
 func (*TokenSignalProto) ProtoMessage() {}
 
 func (x *TokenSignalProto) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[4]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -380,7 +450,7 @@ func (x *TokenSignalProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenSignalProto.ProtoReflect.Descriptor instead.
 func (*TokenSignalProto) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{4}
+	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *TokenSignalProto) GetConfidence() float32 {
@@ -429,7 +499,7 @@ type TokenCandidateProto struct {
 
 func (x *TokenCandidateProto) Reset() {
 	*x = TokenCandidateProto{}
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -441,7 +511,7 @@ func (x *TokenCandidateProto) String() string {
 func (*TokenCandidateProto) ProtoMessage() {}
 
 func (x *TokenCandidateProto) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[5]
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -454,7 +524,7 @@ func (x *TokenCandidateProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenCandidateProto.ProtoReflect.Descriptor instead.
 func (*TokenCandidateProto) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{5}
+	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *TokenCandidateProto) GetId() int32 {
@@ -482,17 +552,21 @@ var File_plugin_grpc_protocol_llm_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_llm_proto_rawDesc = "" +
 	"\n" +
-	"\x1eplugin/grpc/protocol/llm.proto\x12\bprotocol\"\x81\x02\n" +
-	"\x0eLLMChatRequest\x12#\n" +
-	"\rsystem_prompt\x18\x01 \x01(\tR\fsystemPrompt\x12\x1f\n" +
-	"\vuser_prompt\x18\x02 \x01(\tR\n" +
+	"\x1eplugin/grpc/protocol/llm.proto\x12\bprotocol\";\n" +
+	"\vChatMessage\x12\x12\n" +
+	"\x04role\x18\x01 \x01(\tR\x04role\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent\"\xbc\x02\n" +
+	"\x0eLLMChatRequest\x12'\n" +
+	"\rsystem_prompt\x18\x01 \x01(\tB\x02\x18\x01R\fsystemPrompt\x12#\n" +
+	"\vuser_prompt\x18\x02 \x01(\tB\x02\x18\x01R\n" +
 	"userPrompt\x12\x14\n" +
 	"\x05model\x18\x03 \x01(\tR\x05model\x12 \n" +
 	"\vtemperature\x18\x04 \x01(\x01R\vtemperature\x12\x1d\n" +
 	"\n" +
 	"max_tokens\x18\x05 \x01(\x05R\tmaxTokens\x12\x1a\n" +
 	"\bprovider\x18\x06 \x01(\tR\bprovider\x126\n" +
-	"\vattachments\x18\a \x03(\v2\x14.protocol.AttachmentR\vattachments\"Y\n" +
+	"\vattachments\x18\a \x03(\v2\x14.protocol.AttachmentR\vattachments\x121\n" +
+	"\bmessages\x18\b \x03(\v2\x15.protocol.ChatMessageR\bmessages\"Y\n" +
 	"\n" +
 	"Attachment\x12\x1b\n" +
 	"\tmime_type\x18\x01 \x01(\tR\bmimeType\x12\x12\n" +
@@ -542,28 +616,30 @@ func file_plugin_grpc_protocol_llm_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_llm_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_llm_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_plugin_grpc_protocol_llm_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_plugin_grpc_protocol_llm_proto_goTypes = []any{
-	(*LLMChatRequest)(nil),      // 0: protocol.LLMChatRequest
-	(*Attachment)(nil),          // 1: protocol.Attachment
-	(*LLMChatResponse)(nil),     // 2: protocol.LLMChatResponse
-	(*LLMChatChunk)(nil),        // 3: protocol.LLMChatChunk
-	(*TokenSignalProto)(nil),    // 4: protocol.TokenSignalProto
-	(*TokenCandidateProto)(nil), // 5: protocol.TokenCandidateProto
+	(*ChatMessage)(nil),         // 0: protocol.ChatMessage
+	(*LLMChatRequest)(nil),      // 1: protocol.LLMChatRequest
+	(*Attachment)(nil),          // 2: protocol.Attachment
+	(*LLMChatResponse)(nil),     // 3: protocol.LLMChatResponse
+	(*LLMChatChunk)(nil),        // 4: protocol.LLMChatChunk
+	(*TokenSignalProto)(nil),    // 5: protocol.TokenSignalProto
+	(*TokenCandidateProto)(nil), // 6: protocol.TokenCandidateProto
 }
 var file_plugin_grpc_protocol_llm_proto_depIdxs = []int32{
-	1, // 0: protocol.LLMChatRequest.attachments:type_name -> protocol.Attachment
-	4, // 1: protocol.LLMChatChunk.signal:type_name -> protocol.TokenSignalProto
-	5, // 2: protocol.TokenSignalProto.top_k:type_name -> protocol.TokenCandidateProto
-	0, // 3: protocol.LLMService.Chat:input_type -> protocol.LLMChatRequest
-	0, // 4: protocol.LLMService.StreamChat:input_type -> protocol.LLMChatRequest
-	2, // 5: protocol.LLMService.Chat:output_type -> protocol.LLMChatResponse
-	3, // 6: protocol.LLMService.StreamChat:output_type -> protocol.LLMChatChunk
-	5, // [5:7] is the sub-list for method output_type
-	3, // [3:5] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	2, // 0: protocol.LLMChatRequest.attachments:type_name -> protocol.Attachment
+	0, // 1: protocol.LLMChatRequest.messages:type_name -> protocol.ChatMessage
+	5, // 2: protocol.LLMChatChunk.signal:type_name -> protocol.TokenSignalProto
+	6, // 3: protocol.TokenSignalProto.top_k:type_name -> protocol.TokenCandidateProto
+	1, // 4: protocol.LLMService.Chat:input_type -> protocol.LLMChatRequest
+	1, // 5: protocol.LLMService.StreamChat:input_type -> protocol.LLMChatRequest
+	3, // 6: protocol.LLMService.Chat:output_type -> protocol.LLMChatResponse
+	4, // 7: protocol.LLMService.StreamChat:output_type -> protocol.LLMChatChunk
+	6, // [6:8] is the sub-list for method output_type
+	4, // [4:6] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_llm_proto_init() }
@@ -577,7 +653,7 @@ func file_plugin_grpc_protocol_llm_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_llm_proto_rawDesc), len(file_plugin_grpc_protocol_llm_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
