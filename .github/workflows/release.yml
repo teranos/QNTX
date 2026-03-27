@@ -1,5 +1,3 @@
-# TODO: Add Tauri build jobs (Windows .msi, macOS .dmg) to ship desktop installers on tag push.
-#       Currently only the Go CLI binary is built for Windows/macOS (no desktop app).
 name: Release
 
 on:
@@ -70,6 +68,11 @@ jobs:
 
             **Windows:**
             - x64: `qntx-${{ steps.version.outputs.version }}-windows-amd64.zip`
+
+            ### Desktop App (Tauri)
+
+            **Windows:** `QNTX_${{ steps.version.outputs.version }}_x64-setup.exe` or `.msi`
+            **macOS:** `QNTX_${{ steps.version.outputs.version }}_aarch64.dmg`
 
             ### Changes
 
@@ -278,4 +281,168 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: qntx-${{ steps.version.outputs.version }}-darwin-${{ matrix.arch }}
+          path: release/*
+
+  build-tauri-windows:
+    runs-on: windows-latest
+    needs: create-release
+    if: always()
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION="test-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2"
+
+      - name: Build frontend
+        run: make web
+
+      - name: Build qntx CLI sidecar
+        run: make cli-nocgo
+
+      - name: Prepare Tauri sidecar
+        run: |
+          mkdir -p web/src-tauri/bin
+          cp bin/qntx web/src-tauri/bin/qntx-x86_64-pc-windows-msvc.exe
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: web/src-tauri
+
+      - name: Build Tauri app
+        run: cd web/src-tauri && cargo tauri build
+
+      - name: Package installer
+        run: |
+          mkdir -p release
+          cp web/src-tauri/target/release/bundle/nsis/*.exe release/ 2>/dev/null || true
+          cp web/src-tauri/target/release/bundle/msi/*.msi release/ 2>/dev/null || true
+          cd release
+          for f in *.exe *.msi; do
+            [ -f "$f" ] && sha256sum "$f" > "$f.sha256"
+          done
+
+      - name: Upload Release Asset (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: release/*
+
+      - name: Upload artifacts (testing only)
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        uses: actions/upload-artifact@v4
+        with:
+          name: qntx-desktop-${{ steps.version.outputs.version }}-windows-amd64
+          path: release/*
+
+  build-tauri-macos:
+    runs-on: macos-latest
+    needs: create-release
+    if: always()
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION="test-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2"
+
+      - name: Build frontend
+        run: make web
+
+      - name: Build qntx CLI sidecar
+        run: make cli
+
+      - name: Prepare Tauri sidecars
+        run: |
+          mkdir -p web/src-tauri/bin
+          cp bin/qntx web/src-tauri/bin/qntx-aarch64-apple-darwin
+          cp bin/qntx web/src-tauri/bin/qntx-x86_64-apple-darwin
+          chmod +x web/src-tauri/bin/qntx-*
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: web/src-tauri
+
+      - name: Build Tauri app
+        run: cd web/src-tauri && cargo tauri build
+
+      - name: Package installer
+        run: |
+          mkdir -p release
+          cp web/src-tauri/target/release/bundle/dmg/*.dmg release/ 2>/dev/null || true
+          cd release
+          for f in *.dmg; do
+            [ -f "$f" ] && shasum -a 256 "$f" > "$f.sha256"
+          done
+
+      - name: Upload Release Asset (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: release/*
+
+      - name: Upload artifacts (testing only)
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        uses: actions/upload-artifact@v4
+        with:
+          name: qntx-desktop-${{ steps.version.outputs.version }}-macos
           path: release/*
