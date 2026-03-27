@@ -98,6 +98,77 @@ export interface StreamGlyphContent {
     prompt?: string;
 }
 
+// ── DOM budget ──────────────────────────────────────────────────────
+
+/** Global max token spans across ALL stream glyphs. */
+const GLOBAL_DOM_BUDGET = 2500;
+
+interface StreamInstance {
+    output: HTMLElement;
+    tokens: StreamToken[];
+    visible: boolean;
+}
+
+const instances = new Set<StreamInstance>();
+
+/** Count total spans across all visible stream glyphs */
+function globalSpanCount(): number {
+    let count = 0;
+    for (const inst of instances) {
+        if (inst.visible) count += inst.output.children.length;
+    }
+    return count;
+}
+
+/** Evict oldest spans globally until under budget */
+function evictToFit(): void {
+    while (globalSpanCount() > GLOBAL_DOM_BUDGET) {
+        // Find the visible instance with the most spans
+        let largest: StreamInstance | null = null;
+        let largestCount = 0;
+        for (const inst of instances) {
+            if (inst.visible && inst.output.children.length > largestCount) {
+                largest = inst;
+                largestCount = inst.output.children.length;
+            }
+        }
+        if (!largest || largestCount === 0) break;
+        largest.output.removeChild(largest.output.children[0]);
+    }
+}
+
+/** Render spans for a stream instance (up to its share of the budget) */
+function renderSpans(inst: StreamInstance): void {
+    const output = inst.output;
+    output.textContent = '';
+    const visibleCount = [...instances].filter(i => i.visible).length;
+    const perGlyph = Math.floor(GLOBAL_DOM_BUDGET / Math.max(1, visibleCount));
+    const start = Math.max(0, inst.tokens.length - perGlyph);
+    for (let i = start; i < inst.tokens.length; i++) {
+        output.appendChild(renderToken(inst.tokens[i], i));
+    }
+}
+
+/** Shared IntersectionObserver — clears spans when off-screen, restores on-screen */
+const visibilityObserver: IntersectionObserver | null =
+    typeof IntersectionObserver !== 'undefined'
+        ? new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                const inst = [...instances].find(i => i.output === entry.target);
+                if (!inst) continue;
+
+                if (entry.isIntersecting && !inst.visible) {
+                    inst.visible = true;
+                    renderSpans(inst);
+                    evictToFit();
+                } else if (!entry.isIntersecting && inst.visible) {
+                    inst.visible = false;
+                    inst.output.textContent = '';
+                }
+            }
+        }, { threshold: 0 })
+        : null;
+
 // ── Token rendering ─────────────────────────────────────────────────
 
 function renderToken(token: StreamToken, tokenIndex: number): HTMLSpanElement {
@@ -118,11 +189,11 @@ function renderToken(token: StreamToken, tokenIndex: number): HTMLSpanElement {
     return span;
 }
 
-/** Collect all text from token spans in the output container */
-function collectText(output: HTMLElement): string {
+/** Collect all text from the tokens array (DOM may be capped) */
+function collectText(tokens: StreamToken[]): string {
     let text = '';
-    for (const child of output.children) {
-        text += child.textContent ?? '';
+    for (const token of tokens) {
+        text += token.text;
     }
     return text;
 }
@@ -211,10 +282,14 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
     output.style.color = 'var(--text-on-dark)';
     element.appendChild(output);
 
-    // Render restored tokens
-    for (let i = 0; i < tokens.length; i++) {
-        output.appendChild(renderToken(tokens[i], i));
-    }
+    // Register this instance for global DOM budget management
+    const instance: StreamInstance = { output, tokens, visible: true };
+    instances.add(instance);
+    visibilityObserver?.observe(output);
+
+    // Render restored tokens (share of global budget)
+    renderSpans(instance);
+    evictToFit();
 
     // Token hover popup + nebula scrub — event delegation on the output container
     const popup = createTokenPopup();
@@ -265,7 +340,10 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
             const token: StreamToken = { text: msg.content, signal: msg.signal };
             const tokenIndex = tokens.length;
             tokens.push(token);
-            output.appendChild(renderToken(token, tokenIndex));
+            if (instance.visible) {
+                output.appendChild(renderToken(token, tokenIndex));
+                evictToFit();
+            }
             output.scrollTop = output.scrollHeight;
         });
     }
@@ -275,7 +353,7 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
     const followupZone = createFollowUpZone({
         element,
         glyph,
-        getSystemPrompt: () => collectText(output),
+        getSystemPrompt: () => collectText(tokens),
         getModel: () => streamModel,
         logLabel: 'StreamGlyph',
         onExecute: (request: FollowUpRequest, controls: FollowUpControls) => {
@@ -287,6 +365,8 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
     // Cleanup
     storeCleanup(element, () => {
         if (promptGlyphId) unsubscribeStream(promptGlyphId);
+        visibilityObserver?.unobserve(output);
+        instances.delete(instance);
         popup.destroy();
     });
 
