@@ -245,6 +245,8 @@ export function initSystemDrawer(): void {
     // --- Search input in header ---
     const header = document.getElementById('system-drawer-header') as HTMLElement | null;
     if (header) {
+        // TODO: Migrate from plain <input> to a lightweight rich editor to enable inline
+        // semantic token coloring and temporal resolution badges. See ax-glyph.ts for details.
         searchInput = document.createElement('input');
         searchInput.type = 'text';
         searchInput.id = 'drawer-search-input';

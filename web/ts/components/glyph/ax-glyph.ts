@@ -76,7 +76,12 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
     element.style.minWidth = '200px';
     element.style.minHeight = '120px';
 
-    // Single-line query input (takes remaining space)
+    // TODO: Migrate from plain <input> to a lightweight rich editor (mini CodeMirror or
+    // contenteditable) to enable inline semantic token coloring, temporal resolution
+    // badges (e.g. "since yesterday" → "Mar 26"), and inlay hints. This applies to
+    // all query inputs: ax-glyph, se-glyph, and the system drawer search bar.
+    // The WASM parse_ax_query_resolved endpoint already returns resolved timestamps;
+    // the missing piece is a text surface that can render inline decorations.
     const editor = document.createElement('input');
     editor.type = 'text';
     editor.className = 'ax-query-input';

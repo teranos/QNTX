@@ -86,7 +86,8 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
     element.style.minWidth = '200px';
     element.style.minHeight = '120px';
 
-    // Query input
+    // TODO: Migrate from plain <input> to a lightweight rich editor to enable inline
+    // semantic token coloring and temporal resolution badges. See ax-glyph.ts for details.
     const editor = document.createElement('input');
     editor.type = 'text';
     editor.className = 'se-query-input';
