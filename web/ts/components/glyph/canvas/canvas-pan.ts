@@ -105,9 +105,15 @@ function saveTransformState(canvasId: string): void {
 }
 
 /**
- * Setup canvas pan handlers
+ * Optional guard — when it returns true, pan/zoom gestures are suppressed.
  */
-export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortController {
+export type PanZoomGuard = () => boolean;
+
+/**
+ * Setup canvas pan handlers
+ * @param guard Optional callback — return true to suppress pan/zoom (e.g. while focused)
+ */
+export function setupCanvasPan(container: HTMLElement, canvasId: string, guard?: PanZoomGuard): AbortController {
     const controller = new AbortController();
     const signal = controller.signal;
     const state = getState(canvasId);
@@ -129,6 +135,7 @@ export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortC
     // Always register — user may resize browser between mobile/desktop widths
     {
         container.addEventListener('wheel', (e: WheelEvent) => {
+            if (guard?.()) return;
             e.preventDefault();
 
             if (e.ctrlKey || e.metaKey) {
@@ -162,6 +169,7 @@ export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortC
 
         // Desktop: Middle mouse button drag
         container.addEventListener('mousedown', (e: MouseEvent) => {
+            if (guard?.()) return;
             // Middle button (button === 1)
             if (e.button !== 1) return;
 
@@ -202,6 +210,7 @@ export function setupCanvasPan(container: HTMLElement, canvasId: string): AbortC
 
     // Touch handlers: Always set up for mobile and responsive design mode support
     container.addEventListener('touchstart', (e: TouchEvent) => {
+        if (guard?.()) return;
         if (e.touches.length === 2) {
             // Two-finger pinch zoom
             const touch1 = e.touches[0];

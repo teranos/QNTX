@@ -166,6 +166,30 @@ export function renderCanvasDemo(
     ts.content.appendChild(tsCode)
     contentLayer.appendChild(ts.element)
 
+    // scroll-glyph: long content to test scrolling while focused
+    const scrollGlyphData: Glyph = { id: 'demo-scroll', title: 'scroll-glyph', symbol: 'scroll', x: 10, y: 220, renderContent: () => document.createElement('div') }
+    const scrollUI = createGlyphUI(scrollGlyphData, 'scroll')
+    const scroll = scrollUI.glyph({
+      defaults: { x: 10, y: 220, width: 280, height: 190 },
+      titleBar: { label: 'scroll-glyph' },
+    })
+    const scrollContent = document.createElement('div')
+    scrollContent.style.overflow = 'auto'
+    scrollContent.style.flex = '1'
+    scrollContent.style.padding = '8px'
+    scrollContent.style.fontSize = 'var(--font-size-sm)'
+    scrollContent.style.color = 'var(--text-on-dark)'
+    scrollContent.style.lineHeight = '1.6'
+    const lines: string[] = []
+    for (let i = 1; i <= 40; i++) {
+      lines.push(`Line ${i}: The quick brown fox jumps over the lazy dog.`)
+    }
+    scrollContent.textContent = lines.join('\n')
+    scrollContent.style.whiteSpace = 'pre-wrap'
+    scrollContent.style.wordBreak = 'break-word'
+    scroll.content.appendChild(scrollContent)
+    contentLayer.appendChild(scroll.element)
+
     // Double-click to focus
     canvas.addEventListener('dblclick', (e) => {
       const target = (e.target as HTMLElement).closest('[data-glyph-id]') as HTMLElement | null
@@ -334,7 +358,7 @@ export function renderCanvasDemo(
     canvas.appendChild(contentLayer)
 
     // Wire up real canvas pan/zoom and focus
-    setupCanvasPan(canvas, canvasId)
+    setupCanvasPan(canvas, canvasId, () => isFocused(canvasId))
     setupCanvasFocus(canvasId)
 
     // Update indicator on zoom/pan changes (wheel events)
