@@ -20,6 +20,19 @@
     word_count: number | null
     turn_count: number | null
     paths?: Record<string, string>
+    weave_source?: string | null
+    model?: string | null
+    tokens?: TokenSignal[] | null
+    prompt?: string | null
+  }
+
+  interface TokenSignal {
+    text: string
+    position: number
+    confidence: number
+    entropy: number
+    top_gap: number
+    top_k?: { text: string; prob: number }[]
   }
 
 
