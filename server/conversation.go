@@ -7,6 +7,7 @@ import (
 	"github.com/teranos/QNTX/ai/provider"
 	"github.com/teranos/QNTX/ats/types"
 	glyphstorage "github.com/teranos/QNTX/glyph/storage"
+	"github.com/teranos/QNTX/logger"
 )
 
 // ConversationAssembler builds a multi-turn message history from the
@@ -52,13 +53,24 @@ func (a *ConversationAssembler) AssembleMessages(ctx context.Context, glyphID st
 	}
 
 	if comp == nil {
-		// No composition — single glyph, no history
+		logger.Infow("ConversationAssembler: no composition found", "glyph_id", glyphID,
+			"total_compositions", len(compositions))
 		return nil, nil
+	}
+
+	logger.Infow("ConversationAssembler: found composition",
+		"glyph_id", glyphID, "comp_id", comp.ID, "edge_count", len(comp.Edges))
+	for i, e := range comp.Edges {
+		logger.Infow("ConversationAssembler: edge",
+			"index", i, "from", e.From, "to", e.To, "direction", e.Direction)
 	}
 
 	// Collect all glyph IDs upstream of glyphID by walking edges backwards.
 	// The target glyph is the "To" side of edges; walk "From" to find parents.
 	upstreamIDs := collectUpstream(comp, glyphID)
+
+	logger.Infow("ConversationAssembler: upstream walk",
+		"glyph_id", glyphID, "upstream_count", len(upstreamIDs), "upstream_ids", upstreamIDs)
 
 	if len(upstreamIDs) == 0 {
 		return nil, nil
@@ -74,8 +86,11 @@ func (a *ConversationAssembler) AssembleMessages(ctx context.Context, glyphID st
 		}
 		results, err := a.queryStore.ExecuteAxQuery(ctx, filter)
 		if err != nil {
+			logger.Infow("ConversationAssembler: query failed", "glyph_id", id, "error", err)
 			continue
 		}
+		logger.Infow("ConversationAssembler: attestations for glyph",
+			"glyph_id", id, "count", len(results))
 		allResults = append(allResults, results...)
 	}
 

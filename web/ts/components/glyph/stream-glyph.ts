@@ -32,6 +32,7 @@ import { autoMeldResultBelow } from './meld/meld-system';
 import { uiState } from '../../state/ui';
 import { registerHandler, unregisterHandler } from '../../websocket';
 import { apiFetch } from '../../api';
+import { canvasSyncQueue } from '../../api/canvas-sync';
 import { createFollowUpZone, type FollowUpRequest, type FollowUpControls } from './glyph-followup';
 import { createTokenPopup } from './token-popup';
 
@@ -388,12 +389,12 @@ export function getStreamTokenCount(streamElement: HTMLElement): number {
  * Execute a follow-up by spawning a stream glyph first, subscribing it,
  * then firing the API call so tokens stream in live with heatmap coloring.
  */
-function executeStreamFollowUp(
+async function executeStreamFollowUp(
     parentElement: HTMLElement,
     parentGlyph: Glyph,
     request: FollowUpRequest,
     controls: FollowUpControls,
-): void {
+): Promise<void> {
     const parentRect = parentElement.getBoundingClientRect();
     const canvas = parentElement.closest('.canvas-workspace') as HTMLElement;
     if (!canvas) {
@@ -442,6 +443,11 @@ function executeStreamFollowUp(
         );
     }
 
+    // Ensure the composition (with the new stream glyph edge) is persisted to the DB
+    // BEFORE firing the API call. The backend's ConversationAssembler traces meld edges
+    // to build multi-turn history — it needs the composition to exist in the DB.
+    await canvasSyncQueue.flush();
+
     // Fire the API call — tokens will stream in via WebSocket
     // glyph_id = streamGlyphId so backend's llm_stream job_id matches the subscription
     const body: Record<string, unknown> = {
@@ -449,6 +455,7 @@ function executeStreamFollowUp(
         system_prompt: request.systemPrompt,
         glyph_id: streamGlyphId,
     };
+    if (parentGlyphId) body.parent_glyph_id = parentGlyphId;
     if (request.model) body.model = request.model;
     if (request.provider) body.provider = request.provider;
     if (request.fileIds.length > 0) body.file_ids = request.fileIds;

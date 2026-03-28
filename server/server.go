@@ -99,7 +99,8 @@ type QNTXServer struct {
 	reloadCoalescer *watcherReloadCoalescer
 
 	// Canvas state handlers
-	canvasHandler *handlers.CanvasHandler
+	canvasHandler         *handlers.CanvasHandler
+	conversationAssembler *ConversationAssembler
 
 	// Sync: Merkle tree observer for content-addressed attestation sync
 	syncTree           syncPkg.SyncTree      // nil if WASM unavailable
