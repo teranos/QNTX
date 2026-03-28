@@ -9,6 +9,7 @@
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { apiFetch } from '../../api';
+import { canvasSyncQueue } from '../../api/canvas-sync';
 import { uiState } from '../../state/ui';
 import { Doc, Prose } from '@generated/sym.js';
 import { preventDrag } from './glyph-interaction';
@@ -39,6 +40,8 @@ export interface FollowUpRequest {
     fileIds: string[];
     /** Parent glyph ID */
     glyphId: string;
+    /** Composition edges from local state — sent to backend for conversation assembly */
+    compositionEdges?: Array<{ from: string; to: string; direction: string; position: number }>;
 }
 
 export interface FollowUpConfig {
@@ -170,6 +173,7 @@ export function createFollowUpZone(config: FollowUpConfig): HTMLElement {
                 provider,
                 fileIds,
                 glyphId: glyph.id,
+                compositionEdges: comp?.edges,
             };
 
             if (config.onExecute) {
@@ -190,13 +194,18 @@ export function createFollowUpZone(config: FollowUpConfig): HTMLElement {
 /**
  * Default execution: POST to /api/prompt/direct, spawn result glyph below.
  */
-function defaultExecute(
+async function defaultExecute(
     request: FollowUpRequest,
     controls: FollowUpControls,
     element: HTMLElement,
     glyph: Glyph,
     logLabel: string,
-): void {
+): Promise<void> {
+    // Ensure composition edges are persisted before the API call.
+    // The backend's ConversationAssembler needs the composition in the DB
+    // to trace meld edges and build multi-turn conversation history.
+    await canvasSyncQueue.flush();
+
     const body: Record<string, unknown> = {
         template: request.template,
         system_prompt: request.systemPrompt,
