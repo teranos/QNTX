@@ -422,6 +422,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		serverPort = *deps.config.Server.Port
 	}
 	canvasOpts = append(canvasOpts, handlers.WithServerPort(serverPort))
+	canvasOpts = append(canvasOpts, handlers.WithBroadcaster(server.broadcastMessage))
 	server.canvasHandler = handlers.NewCanvasHandler(canvasStore, canvasOpts...)
 	server.conversationAssembler = NewConversationAssembler(canvasStore, storage.NewSQLQueryStore(db))
 	serverLogger.Infow("Canvas state handlers initialized")

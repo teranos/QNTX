@@ -17,6 +17,7 @@ import type {
     WatcherMatchMessage,
     WatcherErrorMessage,
     GlyphFiredMessage,
+    CanvasSyncAckMessage,
     WatcherQueueStatusMessage,
 } from '../types/websocket';
 import type { RichSearchResultsMessage } from './generated/proto/plugin/grpc/protocol/server.ts';
@@ -28,6 +29,7 @@ import { log, SEG } from './logger';
 import { connectivityManager } from './connectivity';
 import { stripProtocol } from './http-utils';
 import { updateResultGlyphContent, type ExecutionResult } from './components/glyph/result-glyph';
+import { syncStateManager } from './state/sync-state';
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -261,6 +263,13 @@ const MESSAGE_HANDLERS = {
 
         // Invoke registered handler
         messageHandlers['glyph_fired']?.(data);
+    },
+
+    canvas_sync_ack: (data: CanvasSyncAckMessage) => {
+        log.debug(SEG.WS, 'Canvas sync ack:', data.op, data.entity_id);
+        syncStateManager.setState(data.entity_id, 'synced');
+
+        messageHandlers['canvas_sync_ack']?.(data);
     },
 
     watcher_error: (data: WatcherErrorMessage) => {

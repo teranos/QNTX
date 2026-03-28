@@ -257,6 +257,15 @@ type GlyphFiredMessage struct {
 	Timestamp     int64  `json:"timestamp"`        // Unix timestamp
 }
 
+// CanvasSyncAckMessage confirms a canvas write was persisted.
+// Broadcast to all connected clients so they can update sync state.
+type CanvasSyncAckMessage struct {
+	Type      string `json:"type"`      // "canvas_sync_ack"
+	EntityID  string `json:"entity_id"` // Glyph or composition ID
+	Op        string `json:"op"`        // "glyph_upsert", "glyph_delete", "composition_upsert", "composition_delete"
+	Timestamp int64  `json:"timestamp"`
+}
+
 // WatcherErrorMessage represents a watcher error (parsing failure, validation error, etc.)
 // Sent when watcher creation/update fails
 type WatcherErrorMessage struct {

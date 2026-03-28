@@ -76,6 +76,7 @@ export type MessageType =
   | 'watcher_match'
   | 'watcher_error'
   | 'glyph_fired'
+  | 'canvas_sync_ack'
   | 'watcher_queue_status'
   | 'database_stats'
   | 'sync_status'
@@ -421,6 +422,16 @@ export interface GlyphFiredMessage extends Omit<BaseMessage, 'timestamp'>, Glyph
 }
 
 /**
+ * Canvas sync ack — broadcast when a canvas write (glyph or composition) is persisted.
+ */
+export interface CanvasSyncAckMessage extends BaseMessage {
+  type: 'canvas_sync_ack';
+  entity_id: string;
+  op: 'glyph_upsert' | 'glyph_delete' | 'composition_upsert' | 'composition_delete';
+  timestamp: number;
+}
+
+/**
  * Watcher error notification - sent when a watcher encounters an error
  */
 export interface WatcherErrorMessage extends BaseMessage {
@@ -565,6 +576,7 @@ export type WebSocketMessage =
   | WatcherMatchMessage
   | WatcherErrorMessage
   | GlyphFiredMessage
+  | CanvasSyncAckMessage
   | WatcherQueueStatusMessage
   | DatabaseStatsMessage
   | SyncStatusMessage
@@ -611,6 +623,7 @@ export interface MessageHandlers {
   watcher_match?: MessageHandler<WatcherMatchMessage>;
   watcher_error?: MessageHandler<WatcherErrorMessage>;
   glyph_fired?: MessageHandler<GlyphFiredMessage>;
+  canvas_sync_ack?: MessageHandler<CanvasSyncAckMessage>;
   watcher_queue_status?: MessageHandler<WatcherQueueStatusMessage>;
   database_stats?: MessageHandler<DatabaseStatsMessage>;
   sync_status?: MessageHandler<SyncStatusMessage>;

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/watcher"
@@ -17,12 +18,16 @@ import (
 	"go.uber.org/zap"
 )
 
+// BroadcastFunc sends a message to all connected WebSocket clients.
+type BroadcastFunc func(msg interface{})
+
 // CanvasHandler handles HTTP requests for canvas state
 type CanvasHandler struct {
 	store         *glyphstorage.CanvasStore
 	watcherEngine *watcher.Engine
 	logger        *zap.SugaredLogger
 	serverPort    int // Server port for internal plugin calls
+	broadcast     BroadcastFunc
 }
 
 // NewCanvasHandler creates a new canvas handler
@@ -47,11 +52,31 @@ func WithWatcherEngine(engine *watcher.Engine, logger *zap.SugaredLogger) Canvas
 	}
 }
 
+// WithBroadcaster enables canvas sync ack broadcasts to connected clients.
+func WithBroadcaster(fn BroadcastFunc) CanvasHandlerOption {
+	return func(h *CanvasHandler) {
+		h.broadcast = fn
+	}
+}
+
 // WithServerPort sets the server port for internal plugin calls
 func WithServerPort(port int) CanvasHandlerOption {
 	return func(h *CanvasHandler) {
 		h.serverPort = port
 	}
+}
+
+// broadcastSyncAck notifies all connected clients that a canvas write was persisted.
+func (h *CanvasHandler) broadcastSyncAck(entityID, op string) {
+	if h.broadcast == nil {
+		return
+	}
+	h.broadcast(map[string]interface{}{
+		"type":      "canvas_sync_ack",
+		"entity_id": entityID,
+		"op":        op,
+		"timestamp": time.Now().Unix(),
+	})
 }
 
 // HandleGlyphs handles glyph CRUD operations
@@ -158,6 +183,7 @@ func (h *CanvasHandler) handleUpsertGlyph(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	h.broadcastSyncAck(glyph.ID, "glyph_upsert")
 	h.writeJSON(w, glyph)
 }
 
@@ -171,6 +197,7 @@ func (h *CanvasHandler) handleDeleteGlyph(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	h.broadcastSyncAck(id, "glyph_delete")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -220,6 +247,7 @@ func (h *CanvasHandler) handleUpsertComposition(w http.ResponseWriter, r *http.R
 		}
 	}
 
+	h.broadcastSyncAck(comp.ID, "composition_upsert")
 	h.writeJSON(w, comp)
 }
 
@@ -259,6 +287,7 @@ func (h *CanvasHandler) handleDeleteComposition(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	h.broadcastSyncAck(id, "composition_delete")
 	w.WriteHeader(http.StatusNoContent)
 }
 
