@@ -341,7 +341,7 @@ grpc::Status LlamaCppPlugin::HandleWebSocket(
         }
         if (closed.load()) break;
 
-        auto png = renderer_->wait_for_frame(1000);
+        auto png = renderer_->wait_for_frame(100);
         if (png.empty()) continue;
 
         protocol::WebSocketMessage msg;
