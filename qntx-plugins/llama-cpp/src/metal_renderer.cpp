@@ -52,11 +52,27 @@ MetalRenderer::~MetalRenderer() {
 }
 
 bool MetalRenderer::setup() {
+    std::cout << "[metal-llama] setup() entered" << std::endl;
+
+    // Clean up any partial state from a previous failed attempt
+    if (device_ || queue_ || compute_pipeline_ || render_pipeline_) {
+        std::cout << "[metal-llama] Cleaning up partial state from previous attempt" << std::endl;
+        teardown();
+    }
+
     device_ = MTL::CreateSystemDefaultDevice();
-    if (!device_) return false;
+    if (!device_) {
+        std::cout << "[metal-llama] MTL::CreateSystemDefaultDevice() returned null" << std::endl;
+        return false;
+    }
+    std::cout << "[metal-llama] Device acquired: " << device_->name()->utf8String() << std::endl;
 
     queue_ = device_->newCommandQueue();
-    if (!queue_) return false;
+    if (!queue_) {
+        std::cout << "[metal-llama] newCommandQueue() returned null" << std::endl;
+        return false;
+    }
+    std::cout << "[metal-llama] Command queue created" << std::endl;
 
     // Try pre-compiled metallib first, fall back to runtime compilation
     NS::Error* error = nullptr;
@@ -84,7 +100,7 @@ bool MetalRenderer::setup() {
         library = device_->newLibrary(src, nullptr, &error);
         if (!library) {
             if (error) {
-                std::cerr << "[metal-llama] Shader compilation failed: "
+                std::cout << "[metal-llama] Shader compilation failed: "
                           << error->localizedDescription()->utf8String() << std::endl;
             }
             return false;
@@ -95,7 +111,7 @@ bool MetalRenderer::setup() {
     // Compute pipeline
     auto compute_fn = library->newFunction(NS::String::string("particleCompute", NS::UTF8StringEncoding));
     if (!compute_fn) {
-        std::cerr << "[metal-llama] particleCompute not found" << std::endl;
+        std::cout << "[metal-llama] particleCompute not found" << std::endl;
         return false;
     }
     compute_pipeline_ = device_->newComputePipelineState(compute_fn, &error);
@@ -105,7 +121,7 @@ bool MetalRenderer::setup() {
     // Lerp compute pipeline
     auto lerp_fn = library->newFunction(NS::String::string("particleComputeLerp", NS::UTF8StringEncoding));
     if (!lerp_fn) {
-        std::cerr << "[metal-llama] particleComputeLerp not found" << std::endl;
+        std::cout << "[metal-llama] particleComputeLerp not found" << std::endl;
         return false;
     }
     lerp_pipeline_ = device_->newComputePipelineState(lerp_fn, &error);
@@ -116,7 +132,7 @@ bool MetalRenderer::setup() {
     auto vertex_fn = library->newFunction(NS::String::string("particleVertex", NS::UTF8StringEncoding));
     auto fragment_fn = library->newFunction(NS::String::string("particleFragment", NS::UTF8StringEncoding));
     if (!vertex_fn || !fragment_fn) {
-        std::cerr << "[metal-llama] vertex/fragment functions not found" << std::endl;
+        std::cout << "[metal-llama] vertex/fragment functions not found" << std::endl;
         return false;
     }
 
@@ -142,7 +158,7 @@ bool MetalRenderer::setup() {
     auto trail_vertex_fn = library->newFunction(NS::String::string("trailVertex", NS::UTF8StringEncoding));
     auto trail_fragment_fn = library->newFunction(NS::String::string("trailFragment", NS::UTF8StringEncoding));
     if (!trail_vertex_fn || !trail_fragment_fn) {
-        std::cerr << "[metal-llama] trail vertex/fragment functions not found" << std::endl;
+        std::cout << "[metal-llama] trail vertex/fragment functions not found" << std::endl;
         library->release();
         return false;
     }
