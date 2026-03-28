@@ -31,6 +31,7 @@ import { Window } from './components/window.ts';
 import './prose/panel.ts';
 // plugin-panel.ts is now a glyph module registered via default-glyphs.ts
 import { initDebugInterceptor } from './dev-debug-interceptor.ts';
+import { initDevSyncOverlay } from './dev-sync-overlay.ts';
 import { glyphRun } from './components/glyph/run.ts';
 import { registerDefaultGlyphs } from './default-glyphs.ts';
 import { initialize as initQntxWasm } from './qntx-wasm.ts';
@@ -145,6 +146,9 @@ async function init(): Promise<void> {
     } catch (error: unknown) {
         console.error('[Init] Failed to initialize debug interceptor:', error);
     }
+
+    // Dev-only sync state overlay on canvas glyphs
+    initDevSyncOverlay();
 
     // Initialize IndexedDB storage for UI state (canvas layouts, preferences)
     // CRITICAL: Must complete before UI state operations
