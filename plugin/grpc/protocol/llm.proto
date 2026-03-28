@@ -12,14 +12,24 @@ service LLMService {
   rpc StreamChat(LLMChatRequest) returns (stream LLMChatChunk);
 }
 
+message ChatMessage {
+  string role = 1;     // "system", "user", "assistant"
+  string content = 2;
+}
+
 message LLMChatRequest {
-  string system_prompt = 1;
-  string user_prompt = 2;
+  // Deprecated: use messages field for new callers.
+  string system_prompt = 1 [deprecated = true];
+  // Deprecated: use messages field for new callers.
+  string user_prompt = 2 [deprecated = true];
   string model = 3;
   double temperature = 4;
   int32 max_tokens = 5;
   string provider = 6;
   repeated Attachment attachments = 7;
+  // Multi-turn conversation history. When populated, takes precedence
+  // over system_prompt/user_prompt which remain for single-turn callers.
+  repeated ChatMessage messages = 8;
 }
 
 message Attachment {

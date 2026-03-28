@@ -12,7 +12,7 @@
 #include "llm.grpc.pb.h"
 #include "ats_client.h"
 
-#define PLUGIN_VERSION "0.17.3"
+#define PLUGIN_VERSION "0.18.0"
 
 // Forward declarations
 struct llama_model;
@@ -54,17 +54,34 @@ public:
         std::vector<TokenSignal> signals;
     };
 
+    // Single-turn (deprecated, wraps multi-turn)
     ChatResult chat(const std::string& system_prompt,
                     const std::string& user_prompt,
+                    float temperature,
+                    int max_tokens);
+
+    // Multi-turn: messages is a vector of {role, content} pairs
+    struct Message {
+        std::string role;    // "system", "user", "assistant"
+        std::string content;
+    };
+
+    ChatResult chat(const std::vector<Message>& messages,
                     float temperature,
                     int max_tokens);
 
     // Callback receives token text + signal per step. Return false to abort.
     using TokenCallback = std::function<bool(const std::string& token_text, const TokenSignal& signal)>;
 
-    // Streaming chat — calls on_token for each generated token
+    // Single-turn streaming (deprecated, wraps multi-turn)
     ChatResult stream_chat(const std::string& system_prompt,
                            const std::string& user_prompt,
+                           float temperature,
+                           int max_tokens,
+                           TokenCallback on_token);
+
+    // Multi-turn streaming
+    ChatResult stream_chat(const std::vector<Message>& messages,
                            float temperature,
                            int max_tokens,
                            TokenCallback on_token);
@@ -77,8 +94,7 @@ public:
 
 private:
     void compute_vocab_positions();
-    int prepare_prompt(const std::string& system_prompt,
-                       const std::string& user_prompt,
+    int prepare_prompt(const std::vector<Message>& messages,
                        ChatResult& result);
     llama_model* model_ = nullptr;
     llama_context* ctx_ = nullptr;

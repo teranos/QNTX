@@ -423,6 +423,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	}
 	canvasOpts = append(canvasOpts, handlers.WithServerPort(serverPort))
 	server.canvasHandler = handlers.NewCanvasHandler(canvasStore, canvasOpts...)
+	server.conversationAssembler = NewConversationAssembler(canvasStore, storage.NewSQLQueryStore(db))
 	serverLogger.Infow("Canvas state handlers initialized")
 
 	// Initialize embedding service for semantic search (optional)
