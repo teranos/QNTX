@@ -294,7 +294,7 @@ describe('08:29 Morden: Jenny opens QNTX and receives Parbattie\'s overnight fie
         expect(noteGlyph.content).toContain('Georgetown');
     });
 
-    // TODO(#431): Test conflict resolution for Jenny's own stale offline edits
+    // TODO: Test conflict resolution for Jenny's own stale offline edits
     // Current behavior: stale local edit silently overwrites newer work (data loss!)
     // Desired behavior: conflict UI showing both versions, let Jenny decide which to keep
     // This requires offline queue + conflict detection + merge UI
