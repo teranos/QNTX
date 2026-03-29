@@ -285,6 +285,10 @@ export interface LLMTokenSignal {
    * Full softmax distribution (vocab_size floats)
    */
   full_distribution?: number[];
+  /**
+   * Per-stage snapshots through sampler chain
+   */
+  sampler_stages?: SamplerStageSignal[];
 }
 
 export interface ListExecutionsResponse {
@@ -780,6 +784,29 @@ export interface Result {
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
+}
+
+export interface SamplerStageSignal {
+  /**
+   * Stage name: "logits", "top_k", "top_p", "temp", etc.
+   */
+  name: string;
+  /**
+   * Tokens remaining with nonzero probability
+   */
+  active_count: number;
+  /**
+   * P(top token) after this stage
+   */
+  top1_prob: number;
+  /**
+   * Shannon entropy after this stage
+   */
+  entropy: number;
+  /**
+   * Top-5 candidates after this stage
+   */
+  top_k?: LLMTokenCandidate[];
 }
 
 export interface ScheduledJobResponse {
