@@ -78,7 +78,7 @@ export function createCanvasGlyph(): Glyph {
     return {
         id: 'canvas-workspace',
         title: 'Canvas',
-        manifestationType: 'fullscreen', // Full-viewport, no chrome
+        manifestationType: 'canvas', // Full-viewport, no chrome
         layoutStrategy: 'grid',
         children: glyphs,
         onSpawnMenu: () => [Pulse, AX],
