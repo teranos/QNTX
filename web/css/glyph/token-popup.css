@@ -16,6 +16,7 @@
     pointer-events: auto;
     min-width: 200px;
     max-width: 320px;
+    opacity: 0.92;
 }
 
 .token-popup-candidates {
@@ -108,18 +109,63 @@
     margin: 0 4px;
 }
 
-/* Nested tooltip — appears on bar/marker hover inside the popup */
+/* Detail sub-popover — full stage-by-stage trace, interactive */
 .token-popup-detail {
     position: fixed;
     z-index: 100001;
     background: var(--bg-dark);
     border: 1px solid var(--border-on-dark);
-    padding: 5px 10px;
+    padding: 8px 10px;
     font-family: monospace;
     font-size: 11px;
     color: var(--text-on-dark);
-    white-space: nowrap;
-    pointer-events: none;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-    letter-spacing: 0.02em;
+    pointer-events: auto;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+    min-width: 180px;
+    max-width: 280px;
+    opacity: 0.92;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.token-popup-detail-header {
+    font-size: 12px;
+    color: #fff;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 2px;
+}
+
+.token-popup-detail-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 16px;
+}
+
+.token-popup-detail-dot {
+    width: 6px;
+    height: 6px;
+    flex-shrink: 0;
+}
+
+.token-popup-detail-name {
+    flex: 1;
+    color: var(--text-secondary);
+    font-size: 10px;
+}
+
+.token-popup-detail-prob {
+    width: 40px;
+    text-align: right;
+    flex-shrink: 0;
+    font-size: 10px;
+}
+
+.token-popup-detail-delta {
+    width: 36px;
+    text-align: right;
+    flex-shrink: 0;
+    font-size: 10px;
 }
