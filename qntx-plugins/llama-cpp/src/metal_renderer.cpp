@@ -529,10 +529,7 @@ void MetalRenderer::store_keyframe(const float* probabilities, int vocab_size) {
 }
 
 void MetalRenderer::set_scrub_index(int idx) {
-    {
-        std::lock_guard<std::mutex> lock(dist_mutex_);
-        scrub_index_ = idx;
-    }
+    scrub_index_.store(idx, std::memory_order_release);
     // Wake render loop for scrub
     {
         std::lock_guard<std::mutex> lock(render_wake_mutex_);
@@ -640,7 +637,7 @@ std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) 
         std::lock_guard<std::mutex> lock(trail_mutex_);
         int trail_count = trail_positions_.size() / 3;
         uint32_t tc = (uint32_t)trail_count;
-        int si = scrub_index_;
+        int si = scrub_index_.load(std::memory_order_relaxed);
         float or_ = extent_ * orbit_radius_mult_;
         float as = (2.0f * M_PI) / orbit_period_;
 
@@ -753,11 +750,7 @@ void MetalRenderer::start_render_loop(int width, int height) {
 
         while (render_running_.load()) {
             // Check for scrub mode
-            int scrub;
-            {
-                std::lock_guard<std::mutex> lock(dist_mutex_);
-                scrub = scrub_index_;
-            }
+            int scrub = scrub_index_.load(std::memory_order_acquire);
 
             if (scrub >= 0) {
                 // Scrub mode — upload the stored keyframe as both A and B,
@@ -814,20 +807,25 @@ void MetalRenderer::start_render_loop(int width, int height) {
             }
 
             // Live mode — compute lerp t based on time since last keyframe
-            float t;
+            bool has_data = false;
+            float t = 0;
             {
                 std::lock_guard<std::mutex> lock(dist_mutex_);
-                if (!prob_a_ || !prob_b_) {
-                    // No data yet — sleep until woken by submit_distribution
-                    std::unique_lock<std::mutex> wlock(render_wake_mutex_);
-                    render_wake_cv_.wait_for(wlock, std::chrono::milliseconds(500),
-                        [this]{ return render_dirty_ || !render_running_.load(); });
-                    render_dirty_ = false;
-                    continue;
+                if (prob_a_ && prob_b_) {
+                    auto elapsed = std::chrono::steady_clock::now() - keyframe_time_;
+                    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
+                    t = std::min(1.0f, (float)ms / (float)keyframe_interval_.count());
+                    has_data = true;
                 }
-                auto elapsed = std::chrono::steady_clock::now() - keyframe_time_;
-                auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
-                t = std::min(1.0f, (float)ms / (float)keyframe_interval_.count());
+            }
+
+            if (!has_data) {
+                // No distributions yet — sleep without holding dist_mutex_
+                std::unique_lock<std::mutex> wlock(render_wake_mutex_);
+                render_wake_cv_.wait_for(wlock, std::chrono::milliseconds(500),
+                    [this]{ return render_dirty_ || !render_running_.load(); });
+                render_dirty_ = false;
+                continue;
             }
 
             // If interpolation is complete (t=1) and we already rendered the final frame,
