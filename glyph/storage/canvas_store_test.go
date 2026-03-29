@@ -621,12 +621,15 @@ func TestCanvasStore_RemoveMinimizedWindow_NotFound(t *testing.T) {
 	}
 }
 
-func TestCanvasStore_ForeignKeyConstraints(t *testing.T) {
+// TestCanvasStore_OrphanedCompositions tests that compositions with non-existent glyphs
+// are handled gracefully. Migration 047 relaxed FK constraints on glyph IDs to support
+// eventual consistency in the sync queue — compositions may sync before their member glyphs.
+func TestCanvasStore_OrphanedCompositions(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := NewCanvasStore(db)
 	ctx := context.Background()
 
-	// Test 1: Cannot create composition with non-existent glyph IDs
+	// Compositions referencing non-existent glyphs are allowed (no FK on glyph IDs)
 	orphanedComp := &CanvasComposition{
 		ID: "comp-orphaned",
 		Edges: []*pb.CompositionEdge{
@@ -637,23 +640,22 @@ func TestCanvasStore_ForeignKeyConstraints(t *testing.T) {
 	}
 
 	err := store.UpsertComposition(ctx, orphanedComp)
-	if err == nil {
-		t.Error("Expected foreign key constraint violation when creating composition with non-existent glyphs, got nil")
+	if err != nil {
+		t.Fatalf("UpsertComposition should succeed with non-existent glyphs (relaxed FKs): %v", err)
 	}
 
-	// Test 2: Cascade delete - deleting a glyph should delete its compositions
-	glyph1 := &CanvasGlyph{
-		ID:     "glyph-1",
-		Symbol: "🜶",
-		X:      100,
-		Y:      100,
+	// Composition exists and retains its edges even without the glyphs
+	got, err := store.GetComposition(ctx, "comp-orphaned")
+	if err != nil {
+		t.Fatalf("GetComposition failed: %v", err)
 	}
-	glyph2 := &CanvasGlyph{
-		ID:     "glyph-2",
-		Symbol: "🝓",
-		X:      200,
-		Y:      200,
+	if len(got.Edges) != 1 {
+		t.Errorf("Expected 1 edge, got %d", len(got.Edges))
 	}
+
+	// Deleting glyphs does not cascade to compositions (no FK)
+	glyph1 := &CanvasGlyph{ID: "glyph-1", Symbol: "🜶", X: 100, Y: 100}
+	glyph2 := &CanvasGlyph{ID: "glyph-2", Symbol: "🝓", X: 200, Y: 200}
 
 	if err := store.UpsertGlyph(ctx, glyph1); err != nil {
 		t.Fatalf("UpsertGlyph failed: %v", err)
@@ -675,37 +677,24 @@ func TestCanvasStore_ForeignKeyConstraints(t *testing.T) {
 		t.Fatalf("UpsertComposition failed: %v", err)
 	}
 
-	// Verify composition exists
-	_, err = store.GetComposition(ctx, "comp-1")
-	if err != nil {
-		t.Fatalf("GetComposition failed: %v", err)
-	}
-
-	// Delete one glyph - composition should still exist with remaining glyph
+	// Delete both glyphs — composition and edges remain (no cascade)
 	if err := store.DeleteGlyph(ctx, "glyph-1"); err != nil {
 		t.Fatalf("DeleteGlyph failed: %v", err)
 	}
-
-	// Verify composition no longer exists (cascade delete removes edges referencing deleted glyph)
-	// Note: With edge-based structure, deleting glyph-1 removes the edge glyph-1→glyph-2
-	// This leaves the composition with no edges, making it orphaned
-	_, err = store.GetComposition(ctx, "comp-1")
-	if err == nil {
-		t.Error("Expected composition to be orphaned after cascade delete, but it still exists")
-	}
-
-	// Delete remaining glyph - composition becomes orphaned
 	if err := store.DeleteGlyph(ctx, "glyph-2"); err != nil {
 		t.Fatalf("DeleteGlyph failed: %v", err)
 	}
 
-	// Verify composition is now orphaned (GetComposition returns error)
-	_, err = store.GetComposition(ctx, "comp-1")
-	if err == nil {
-		t.Error("Expected composition to be orphaned when all glyphs deleted, but GetComposition succeeded")
+	// Composition still exists with its edges (orphaned but intact)
+	got, err = store.GetComposition(ctx, "comp-1")
+	if err != nil {
+		t.Fatalf("Composition should still exist after glyph deletion (relaxed FKs): %v", err)
+	}
+	if len(got.Edges) != 1 {
+		t.Errorf("Expected 1 edge still present, got %d", len(got.Edges))
 	}
 
-	// Verify all glyphs deleted
+	// Verify glyphs are actually deleted
 	glyphs, err := store.ListGlyphs(ctx)
 	if err != nil {
 		t.Fatalf("ListGlyphs failed: %v", err)
