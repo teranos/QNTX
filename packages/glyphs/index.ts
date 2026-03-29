@@ -64,6 +64,30 @@ export {
 // Proximity engine
 export { GlyphProximity } from './proximity';
 
+// Morph transactions — Web Animations API with commit/rollback
+export {
+    beginMinimizeMorph,
+    beginMaximizeMorph,
+    beginRestoreMorph,
+    cancelMorph,
+} from './morph-transaction';
+
+// Manifestation helpers
+export {
+    verifyGlyphAxiom,
+    prepareMorphTo,
+    calculateTrayTarget,
+    resetGlyphElement,
+} from './manifestations/morphology';
+
+export { addWindowControls, removeWindowControls } from './manifestations/title-bar-controls';
+export type { WindowControlsConfig } from './manifestations/title-bar-controls';
+
+export { stashContent, restoreContent, hasStash } from './manifestations/stash';
+
+export { renderGlyphContent } from './manifestations/render-content';
+export type { RenderContentResult } from './manifestations/render-content';
+
 // GlyphUI interface and related types (still in web/ for now, re-exported for plugin authoring)
 export type {
     GlyphUI,
