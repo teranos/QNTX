@@ -419,6 +419,7 @@ type TokenSignalProto struct {
 	TopGap           float32                `protobuf:"fixed32,3,opt,name=top_gap,json=topGap,proto3" json:"top_gap,omitempty"`                                      // P(top1) - P(top2)
 	TopK             []*TokenCandidateProto `protobuf:"bytes,4,rep,name=top_k,json=topK,proto3" json:"top_k,omitempty"`                                              // Top-k candidates
 	FullDistribution []float32              `protobuf:"fixed32,5,rep,packed,name=full_distribution,json=fullDistribution,proto3" json:"full_distribution,omitempty"` // Full softmax distribution (vocab_size floats)
+	SamplerStages    []*SamplerStageProto   `protobuf:"bytes,6,rep,name=sampler_stages,json=samplerStages,proto3" json:"sampler_stages,omitempty"`                   // Per-stage snapshots through sampler chain
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -488,6 +489,13 @@ func (x *TokenSignalProto) GetFullDistribution() []float32 {
 	return nil
 }
 
+func (x *TokenSignalProto) GetSamplerStages() []*SamplerStageProto {
+	if x != nil {
+		return x.SamplerStages
+	}
+	return nil
+}
+
 type TokenCandidateProto struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -548,6 +556,83 @@ func (x *TokenCandidateProto) GetProb() float32 {
 	return 0
 }
 
+// Snapshot of token distribution after a sampler stage
+type SamplerStageProto struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`                                   // Stage name: "logits", "top_k", "top_p", "temp", etc.
+	ActiveCount   int32                  `protobuf:"varint,2,opt,name=active_count,json=activeCount,proto3" json:"active_count,omitempty"` // Tokens remaining with nonzero probability
+	Top1Prob      float32                `protobuf:"fixed32,3,opt,name=top1_prob,json=top1Prob,proto3" json:"top1_prob,omitempty"`         // P(top token) after this stage
+	Entropy       float32                `protobuf:"fixed32,4,opt,name=entropy,proto3" json:"entropy,omitempty"`                           // Shannon entropy after this stage
+	TopK          []*TokenCandidateProto `protobuf:"bytes,5,rep,name=top_k,json=topK,proto3" json:"top_k,omitempty"`                       // Top-5 candidates after this stage
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SamplerStageProto) Reset() {
+	*x = SamplerStageProto{}
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SamplerStageProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SamplerStageProto) ProtoMessage() {}
+
+func (x *SamplerStageProto) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_llm_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SamplerStageProto.ProtoReflect.Descriptor instead.
+func (*SamplerStageProto) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_llm_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *SamplerStageProto) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SamplerStageProto) GetActiveCount() int32 {
+	if x != nil {
+		return x.ActiveCount
+	}
+	return 0
+}
+
+func (x *SamplerStageProto) GetTop1Prob() float32 {
+	if x != nil {
+		return x.Top1Prob
+	}
+	return 0
+}
+
+func (x *SamplerStageProto) GetEntropy() float32 {
+	if x != nil {
+		return x.Entropy
+	}
+	return 0
+}
+
+func (x *SamplerStageProto) GetTopK() []*TokenCandidateProto {
+	if x != nil {
+		return x.TopK
+	}
+	return nil
+}
+
 var File_plugin_grpc_protocol_llm_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_llm_proto_rawDesc = "" +
@@ -585,7 +670,7 @@ const file_plugin_grpc_protocol_llm_proto_rawDesc = "" +
 	"\rprompt_tokens\x18\x04 \x01(\x05R\fpromptTokens\x12+\n" +
 	"\x11completion_tokens\x18\x05 \x01(\x05R\x10completionTokens\x12!\n" +
 	"\ftotal_tokens\x18\x06 \x01(\x05R\vtotalTokens\x122\n" +
-	"\x06signal\x18\a \x01(\v2\x1a.protocol.TokenSignalProtoR\x06signal\"\xc6\x01\n" +
+	"\x06signal\x18\a \x01(\v2\x1a.protocol.TokenSignalProtoR\x06signal\"\x8a\x02\n" +
 	"\x10TokenSignalProto\x12\x1e\n" +
 	"\n" +
 	"confidence\x18\x01 \x01(\x02R\n" +
@@ -593,11 +678,18 @@ const file_plugin_grpc_protocol_llm_proto_rawDesc = "" +
 	"\aentropy\x18\x02 \x01(\x02R\aentropy\x12\x17\n" +
 	"\atop_gap\x18\x03 \x01(\x02R\x06topGap\x122\n" +
 	"\x05top_k\x18\x04 \x03(\v2\x1d.protocol.TokenCandidateProtoR\x04topK\x12+\n" +
-	"\x11full_distribution\x18\x05 \x03(\x02R\x10fullDistribution\"M\n" +
+	"\x11full_distribution\x18\x05 \x03(\x02R\x10fullDistribution\x12B\n" +
+	"\x0esampler_stages\x18\x06 \x03(\v2\x1b.protocol.SamplerStageProtoR\rsamplerStages\"M\n" +
 	"\x13TokenCandidateProto\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x12\n" +
 	"\x04text\x18\x02 \x01(\tR\x04text\x12\x12\n" +
-	"\x04prob\x18\x03 \x01(\x02R\x04prob2\x8b\x01\n" +
+	"\x04prob\x18\x03 \x01(\x02R\x04prob\"\xb5\x01\n" +
+	"\x11SamplerStageProto\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12!\n" +
+	"\factive_count\x18\x02 \x01(\x05R\vactiveCount\x12\x1b\n" +
+	"\ttop1_prob\x18\x03 \x01(\x02R\btop1Prob\x12\x18\n" +
+	"\aentropy\x18\x04 \x01(\x02R\aentropy\x122\n" +
+	"\x05top_k\x18\x05 \x03(\v2\x1d.protocol.TokenCandidateProtoR\x04topK2\x8b\x01\n" +
 	"\n" +
 	"LLMService\x12;\n" +
 	"\x04Chat\x12\x18.protocol.LLMChatRequest\x1a\x19.protocol.LLMChatResponse\x12@\n" +
@@ -616,7 +708,7 @@ func file_plugin_grpc_protocol_llm_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_llm_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_llm_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_plugin_grpc_protocol_llm_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_plugin_grpc_protocol_llm_proto_goTypes = []any{
 	(*ChatMessage)(nil),         // 0: protocol.ChatMessage
 	(*LLMChatRequest)(nil),      // 1: protocol.LLMChatRequest
@@ -625,21 +717,24 @@ var file_plugin_grpc_protocol_llm_proto_goTypes = []any{
 	(*LLMChatChunk)(nil),        // 4: protocol.LLMChatChunk
 	(*TokenSignalProto)(nil),    // 5: protocol.TokenSignalProto
 	(*TokenCandidateProto)(nil), // 6: protocol.TokenCandidateProto
+	(*SamplerStageProto)(nil),   // 7: protocol.SamplerStageProto
 }
 var file_plugin_grpc_protocol_llm_proto_depIdxs = []int32{
 	2, // 0: protocol.LLMChatRequest.attachments:type_name -> protocol.Attachment
 	0, // 1: protocol.LLMChatRequest.messages:type_name -> protocol.ChatMessage
 	5, // 2: protocol.LLMChatChunk.signal:type_name -> protocol.TokenSignalProto
 	6, // 3: protocol.TokenSignalProto.top_k:type_name -> protocol.TokenCandidateProto
-	1, // 4: protocol.LLMService.Chat:input_type -> protocol.LLMChatRequest
-	1, // 5: protocol.LLMService.StreamChat:input_type -> protocol.LLMChatRequest
-	3, // 6: protocol.LLMService.Chat:output_type -> protocol.LLMChatResponse
-	4, // 7: protocol.LLMService.StreamChat:output_type -> protocol.LLMChatChunk
-	6, // [6:8] is the sub-list for method output_type
-	4, // [4:6] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	7, // 4: protocol.TokenSignalProto.sampler_stages:type_name -> protocol.SamplerStageProto
+	6, // 5: protocol.SamplerStageProto.top_k:type_name -> protocol.TokenCandidateProto
+	1, // 6: protocol.LLMService.Chat:input_type -> protocol.LLMChatRequest
+	1, // 7: protocol.LLMService.StreamChat:input_type -> protocol.LLMChatRequest
+	3, // 8: protocol.LLMService.Chat:output_type -> protocol.LLMChatResponse
+	4, // 9: protocol.LLMService.StreamChat:output_type -> protocol.LLMChatChunk
+	8, // [8:10] is the sub-list for method output_type
+	6, // [6:8] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_llm_proto_init() }
@@ -653,7 +748,7 @@ func file_plugin_grpc_protocol_llm_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_llm_proto_rawDesc), len(file_plugin_grpc_protocol_llm_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
