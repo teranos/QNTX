@@ -233,7 +233,7 @@ async function startServer() {
             }
 
             // Proxy API requests to backend
-            if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/ws") || url.pathname.startsWith("/lsp")) {
+            if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/ws")) {
                 const backendUrl = `${BACKEND_URL}${url.pathname}${url.search}`;
                 try {
                     const response = await fetch(backendUrl, {

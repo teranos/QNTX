@@ -1,8 +1,8 @@
 /**
- * CodeMirror 6 Editor with LSP Integration
+ * CodeMirror 6 Editor — AX query editing with semantic highlighting
  *
- * Sunset candidate: serves the pre-canvas AX editor. Search and completions
- * moved to browser WASM (PR #566, #584). Canvas replaces this editor surface.
+ * Syntax highlighting via parse_response over main WebSocket.
+ * Completions and hover: planned for panel manifestation via browser WASM.
  */
 
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, Decoration, DecorationSet } from '@codemirror/view';
@@ -11,24 +11,11 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
 import { autocompletion, completionKeymap, closeBrackets } from '@codemirror/autocomplete';
 import { lintKeymap } from '@codemirror/lint';
-import { languageServer } from 'codemirror-languageserver';
-
-// Linter - TODO: enable once we have a proper way to import this
-// import { linter } from '@codemirror/lint';
-
-// DISABLED: LSP WebSocket transport conflicts with main WebSocket
-// import { createLSPClient } from './lsp-websocket-transport.js';
-import { validateBackendURL } from './websocket.ts';
-import { stripProtocol } from './http-utils.ts';
 import { requestParse } from './ats-semantic-tokens-client.ts';
 import type { Diagnostic, SemanticToken } from '../types/lsp';
 import { log, SEG } from './logger.ts';
 
 let editorView: EditorView | null = null;
-
-// Syntax highlighting via LSP semantic tokens
-// TODO(issue #13): codemirror-languageserver doesn't support semantic tokens yet (v1.18.1)
-// For now, we manually request them from LSP server
 
 const updateSyntaxDecorations = StateEffect.define<DecorationSet>();
 
@@ -53,7 +40,7 @@ const syntaxDecorationsField = StateField.define({
 });
 
 /**
- * Initialize CodeMirror 6 editor with LSP support
+ * Initialize CodeMirror 6 editor
  */
 export function initCodeMirrorEditor(): EditorView | null {
     const container = document.getElementById('codemirror-container');
@@ -62,24 +49,6 @@ export function initCodeMirrorEditor(): EditorView | null {
         return null;
     }
 
-    // LSP configuration (async connection, won't block page load)
-    // Use backend URL from injected global with validation
-    const rawUrl = (window as any).__BACKEND_URL__ || window.location.origin;
-    const validatedUrl = validateBackendURL(rawUrl);
-
-    if (!validatedUrl) {
-        log.error(SEG.ERROR, '[LSP] Invalid backend URL:', rawUrl);
-        log.debug(SEG.UI, '[LSP] Falling back to same-origin');
-    }
-
-    const backendUrl = validatedUrl || window.location.origin;
-    const backendHost = stripProtocol(backendUrl);
-    const protocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
-    const serverUri = `${protocol}//${backendHost}/lsp` as `ws://${string}` | `wss://${string}`;
-
-    log.debug(SEG.UI, '[LSP] Configuring connection to', serverUri);
-
-    // Create editor state with LSP extension
     const startState = EditorState.create({
         doc: '',
         extensions: [
@@ -91,19 +60,7 @@ export function initCodeMirrorEditor(): EditorView | null {
             closeBrackets(),
             autocompletion(),
             syntaxHighlighting(defaultHighlightStyle),
-            syntaxDecorationsField, // ATS semantic token highlighting (manual LSP request)
-            // linter(createAtsLinter()), // ATS parse error diagnostics - TODO: enable when linter is available
-            // LSP features: completions, hover, diagnostics (async connection)
-            // TODO(issue #9): Interactive hover with related attestations
-            // Enhance hover to show clickable related entities (subjects, contexts, predicates)
-            // Allow users to explore connections and refine queries by clicking
-            languageServer({
-                serverUri: serverUri,
-                rootUri: 'file:///',
-                documentUri: 'inmemory://ats-query',
-                languageId: 'ats',
-                workspaceFolders: null
-            }),
+            syntaxDecorationsField,
             keymap.of([
                 ...defaultKeymap,
                 ...historyKeymap,
@@ -119,13 +76,12 @@ export function initCodeMirrorEditor(): EditorView | null {
         ]
     });
 
-    // Create editor view
     editorView = new EditorView({
         state: startState,
         parent: container
     });
 
-    log.debug(SEG.UI, 'CodeMirror 6 editor initialized with LSP support');
+    log.debug(SEG.UI, 'CodeMirror editor initialized');
     return editorView;
 }
 
@@ -157,8 +113,6 @@ export function updateDiagnosticsDisplay(_diagnostics: Diagnostic[]): void {
 
 /**
  * Apply syntax highlighting from parse response tokens
- * TODO(issue #13): Request semantic tokens from LSP instead of parse_response
- * For now using old parse_response until codemirror-languageserver adds semantic token support
  */
 export function applySyntaxHighlighting(tokens: SemanticToken[]): void {
     if (!editorView || !tokens || tokens.length === 0) return;
@@ -211,12 +165,11 @@ export function setEditorContent(content: string): void {
 }
 
 /**
- * Cleanup editor and LSP client
+ * Cleanup editor
  */
 export function destroyEditor(): void {
     if (editorView) {
         editorView.destroy();
         editorView = null;
     }
-    // LSP client is managed by languageServer() extension, no manual cleanup needed
 }

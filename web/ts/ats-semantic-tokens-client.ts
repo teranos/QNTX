@@ -1,18 +1,9 @@
 /**
- * ATS Parse Client - Custom protocol support for syntax highlighting
+ * ATS Parse Client — semantic highlighting via parse_response over main WebSocket.
  *
- * Handles semantic highlighting via parse_response protocol.
- * This file manages the custom WebSocket protocol for parse requests.
- *
- * Sunset candidate: serves the pre-canvas AX editor. The Rust parser
- * (crates/qntx-core) already tokenizes AX — a WASM export for token spans
- * could replace this server-side path for canvas-native syntax highlighting.
- *
- * NOTE: Completions and hover are now handled by CodeMirror's native LSP integration.
- * The languageServer() extension connects directly to the /lsp WebSocket endpoint
- * for LSP features (completions, hover, diagnostics).
- *
- * TODO(issue #13): Accepted parse_response fallback as permanent (codemirror-languageserver won't support semantic tokens)
+ * The Rust classifier (qntx-core::semantic) now powers token classification
+ * on both server (wazero) and browser (wasm-bindgen). This client sends
+ * parse_request, receives classified tokens, and applies CodeMirror decorations.
  */
 
 import { sendMessage } from './websocket.ts';

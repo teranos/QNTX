@@ -55,24 +55,27 @@ Also fixed 3 clippy warnings in `temporal.rs` and ran `cargo fmt`.
 ## Architecture after these changes
 
 ```
-  Browser               Go Server              Rust (WASM)
-  ───────               ─────────              ───────────
-  ax-glyph.ts ──────→ lsp/service.go
-    (plain <input>)       │
-                          ├─ classifyTokensWasm ──→ classify_semantic_tokens()
-                          │    (primary)               qntx-core::semantic
-                          │
-                          └─ classifyTokensGo
-                               (fallback)
+  Browser                    Go Server              Rust (WASM)
+  ───────                    ─────────              ───────────
+  codemirror-editor.ts       client.go
+    │ parse_request ──/ws──→ handleParseRequest
+    │                            │
+    │                        lsp/service.go
+    │                            ├─ classifyTokensWasm ──→ classify_semantic_tokens()
+    │                            │    (primary)               qntx-core::semantic
+    │                            └─ classifyTokensGo (fallback)
+    │
+    ◄── parse_response ──────────┘
 
-  browser WASM ─────────────────────────────→ classify_semantic_tokens()
-    (wasm-bindgen)                               (same Rust code)
+  browser WASM ──────────────────────────────→ classify_semantic_tokens()
+    (wasm-bindgen, for canvas/panel)              (same Rust code)
 
-  Go parser ────────→ parse_ax_query_resolved ──→ Parser::parse() +
-    (dispatch_qntxwasm)  (single WASM call)       temporal::resolve_clause()
+  Go parser ─────────→ parse_ax_query_resolved ──→ Parser::parse() +
+    (dispatch_qntxwasm)  (single WASM call)        temporal::resolve_clause()
 ```
 
 Both browser and server share the same Rust classifier — single source of truth.
+GLSP WebSocket (`/lsp`) removed — no longer needed.
 
 ## Known issues / environment constraints
 
@@ -90,13 +93,33 @@ Both browser and server share the same Rust classifier — single source of trut
 - `go vet ./ats/lsp/` — clean
 - `cargo clippy -p qntx-core -p qntx-wasm` — clean
 
+### 5. Remove GLSP WebSocket layer (`latest`)
+
+The `/lsp` WebSocket endpoint served CodeMirror's `languageServer()` extension for completions and hover via the GLSP protocol. The canvas is the primary interface; CodeMirror editors will move to the panel manifestation. The GLSP layer was dead weight.
+
+**Removed:**
+- `server/lsp_handler.go` — entire GLSP protocol adapter (528 lines)
+- `server/lsp_handler_test.go` — all GLSP tests
+- `/lsp` route from `server/routing.go`
+- `/lsp` proxy from `web/dev-server.ts`
+- `/lsp` auth check from `server/auth/auth.go`
+- `/lsp` doc entry from `typegen/api/generator.go`
+- `codemirror-languageserver` npm dependency
+- `languageServer()` extension from `codemirror-editor.ts`
+
+**Kept:**
+- `ats/lsp/service.go` — still serves `parse_request` over main `/ws` WebSocket
+- `codemirror-editor.ts` — editor init, syntax decorations via parse_response
+- All other CodeMirror editors (py-glyph, ts-glyph, prose node views)
+- `tliron/glsp` in go.mod — `go mod tidy` needs network to finalize removal
+
 ## Next steps (not started)
 
 1. **Rich editor migration** — replace plain `<input>` in ax-glyph with a lightweight editor that can render inline semantic coloring. TODOs are in the code.
 
-2. **LSP Layer 2 (data-dependent)** — completions and hover. The WASM classifier already handles Layer 1; completions require access to the SymbolIndex (SQLite data), which lives in Go. Options:
-   - Keep completions in Go (current approach, works)
-   - Move SymbolIndex to Rust via `qntx-sqlite` FFI (heavier lift)
+2. **LSP Layer 2 (data-dependent)** — completions and hover for panel manifestation. The WASM classifier handles Layer 1; completions require the SymbolIndex. Options:
+   - Keep completions in Go via parse_request (current, works)
+   - Move SymbolIndex to browser WASM via `qntx-sqlite` + IndexedDB
 
 3. **kern WASM path** — `wasm_of_ocaml` would let kern run in the browser. `classify.ml` is ready; needs the WASM build infrastructure.
 

@@ -657,8 +657,7 @@ func (g *Generator) generateWebSocketDoc() string {
 	sb.WriteString("## Endpoints\n\n")
 	sb.WriteString("| Path | Purpose |\n")
 	sb.WriteString("|------|--------|\n")
-	sb.WriteString("| `/ws` | Main WebSocket (graph updates, job status, logs) |\n")
-	sb.WriteString("| `/lsp` | ATS Language Server Protocol (completions, hover) |\n")
+	sb.WriteString("| `/ws` | Main WebSocket (graph updates, job status, logs, parse) |\n")
 	sb.WriteString("\n")
 
 	sb.WriteString("## Message Types\n\n")
