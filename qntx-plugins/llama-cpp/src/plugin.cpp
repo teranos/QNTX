@@ -53,7 +53,9 @@ LlamaCppPlugin::LlamaCppPlugin() : renderer_(std::make_unique<MetalRenderer>()) 
     renderer_->setup();
 }
 
-LlamaCppPlugin::~LlamaCppPlugin() = default;
+LlamaCppPlugin::~LlamaCppPlugin() {
+    if (pca_thread_.joinable()) pca_thread_.join();
+}
 
 grpc::Status LlamaCppPlugin::Metadata(grpc::ServerContext* ctx,
                                        const protocol::Empty* req,
@@ -90,7 +92,8 @@ grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
         renderer_->setup();
     }
 
-    // Set PCA positions on the renderer if model loaded, start render loop
+    // Set PCA positions on the renderer if model loaded, start render loop.
+    // Positions load from disk cache (~1ms) or compute via PCA (~16s first run).
     if (engine_.is_loaded() && renderer_->is_ready()) {
         const auto& pos = engine_.vocab_positions_3d();
         if (!pos.empty()) {
@@ -100,6 +103,7 @@ grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
                       << " vocab positions into renderer, render loop started" << std::endl;
         }
     }
+    pca_ready_.store(true, std::memory_order_release);
 
     // Configure ATS client for writing attestations
     if (!req->ats_store_endpoint().empty()) {
@@ -120,6 +124,8 @@ grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
 grpc::Status LlamaCppPlugin::Shutdown(grpc::ServerContext* ctx,
                                        const protocol::Empty* req,
                                        protocol::Empty* resp) {
+    // Wait for background PCA to finish before unloading model
+    if (pca_thread_.joinable()) pca_thread_.join();
     engine_.unload();
     std::cout << "[llama-cpp] Shutdown complete" << std::endl;
     return grpc::Status::OK;
@@ -264,6 +270,30 @@ grpc::Status LlamaCppPlugin::HandleHTTP(grpc::ServerContext* ctx,
         auto* h2 = resp->add_headers();
         h2->set_name("X-Vocab-Size");
         h2->add_values(std::to_string(n_vocab));
+        return grpc::Status::OK;
+    }
+
+    if (req->method() == "GET" && req->path() == "/version") {
+        resp->set_status_code(200);
+        resp->set_body(PLUGIN_VERSION);
+        return grpc::Status::OK;
+    }
+
+    if (req->method() == "GET" && req->path() == "/status") {
+        std::string state;
+        if (!engine_.is_loaded()) {
+            state = "no_model";
+        } else if (!pca_ready()) {
+            state = "computing_positions";
+        } else {
+            state = "ready";
+        }
+        std::string body = "{\"state\":\"" + state + "\",\"version\":\"" + PLUGIN_VERSION + "\"}";
+        resp->set_status_code(200);
+        resp->set_body(body);
+        auto* ct = resp->add_headers();
+        ct->set_name("Content-Type");
+        ct->add_values("application/json");
         return grpc::Status::OK;
     }
 
@@ -627,6 +657,17 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
                 plugin_->renderer().store_keyframe(
                     sig.full_distribution.data(), sig.full_distribution.size());
                 plugin_->renderer().add_trail_point(sig.token_id);
+
+                // Ghost branches: feed runner-up candidates
+                if (sig.top_k.size() > 1) {
+                    std::vector<std::pair<int,float>> runners;
+                    for (size_t i = 0; i < sig.top_k.size() && runners.size() < 10; i++) {
+                        if (sig.top_k[i].id != sig.token_id) {
+                            runners.emplace_back(sig.top_k[i].id, sig.top_k[i].prob);
+                        }
+                    }
+                    plugin_->renderer().add_ghost_branches(sig.token_id, runners);
+                }
             }
 
             return writer->Write(chunk);
