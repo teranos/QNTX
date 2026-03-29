@@ -14,6 +14,7 @@ import { toast } from '../../../toast';
 import { getGlyphTypeBySymbol, getGlyphTypeByElement } from '../glyph-registry';
 import { createErrorGlyph } from '../error-glyph';
 import { createPluginPlaceholderGlyph } from '../plugin-glyph';
+import { getPluginNameBySymbol } from '../plugin-provided-glyphs';
 import { createResultGlyph, type ExecutionResult, type PromptConfig } from '../result-glyph';
 import type { SpawnResultDetail } from '../glyph-ui';
 import { uploadFile } from '../../../api/files';
@@ -281,29 +282,39 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     const entry = glyph.symbol ? getGlyphTypeBySymbol(glyph.symbol) : undefined;
     if (entry) return await entry.render(glyph);
 
-    // Unknown glyph type - check if it's a plugin glyph (has plugin_name field)
+    // Unknown glyph type - check if it's a plugin glyph
     const persistedGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
-    const pluginName = persistedGlyph?.plugin_name;
+    const pluginName = persistedGlyph?.plugin_name || (glyph.symbol ? getPluginNameBySymbol(glyph.symbol) : null);
 
     if (pluginName) {
-        // Plugin glyph unavailable (plugin disabled or disconnected)
+        // Plugin glyph unavailable (plugin not yet loaded, disabled, or disconnected)
         log.warn(SEG.GLYPH, `[Canvas] Plugin glyph unavailable: ${pluginName}`, {
             glyphId: glyph.id, symbol: glyph.symbol, pluginName
         });
         return createPluginPlaceholderGlyph(glyph, pluginName);
     }
 
-    // Unknown non-plugin glyph type → diagnostic error glyph
-    log.error(SEG.GLYPH, `[Canvas] Unsupported glyph type: ${glyph.symbol}`, {
+    // Unknown glyph type — plugin may not have loaded yet (restart, slow init, timing).
+    // Show placeholder and attempt to re-discover plugin glyphs in background.
+    log.warn(SEG.GLYPH, `[Canvas] Unknown glyph type: ${glyph.symbol}, showing placeholder with retry`, {
         glyphId: glyph.id, symbol: glyph.symbol, position: { x: glyph.x, y: glyph.y }
     });
-    return createErrorGlyph(
-        glyph.id, glyph.symbol ?? 'unknown',
-        { x: glyph.x ?? 200, y: glyph.y ?? 200 },
-        { type: 'unknown_type', message: `Glyph type '${glyph.symbol ?? 'unknown'}' not supported`,
-          details: { 'Symbol': glyph.symbol ?? 'unknown', 'Position': `(${glyph.x}, ${glyph.y})`,
-            'Cause': 'Glyph type not recognized by registry - check glyph-registry.ts' } }
-    );
+    const placeholder = createPluginPlaceholderGlyph(glyph, glyph.symbol ?? 'unknown');
+
+    // Background retry: re-fetch plugin glyph defs, if the symbol becomes
+    // available replace the placeholder with the real glyph in-place.
+    (async () => {
+        const { loadPluginGlyphs } = await import('../plugin-provided-glyphs');
+        await loadPluginGlyphs();
+        const retryEntry = glyph.symbol ? getGlyphTypeBySymbol(glyph.symbol) : undefined;
+        if (retryEntry && placeholder.parentElement) {
+            log.info(SEG.GLYPH, `[Canvas] Plugin glyph ${glyph.symbol} now available, replacing placeholder`);
+            const real = await retryEntry.render(glyph);
+            placeholder.parentElement.replaceChild(real, placeholder);
+        }
+    })();
+
+    return placeholder;
 }
 
 /**

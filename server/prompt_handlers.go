@@ -80,6 +80,7 @@ type PromptDirectRequest struct {
 	Provider            string    `json:"provider,omitempty"` // "openrouter" or "local"
 	Model               string    `json:"model,omitempty"`
 	GlyphID             string    `json:"glyph_id,omitempty"`             // Glyph that initiated execution; used as actor for the result attestation
+	ParentGlyphID       string    `json:"parent_glyph_id,omitempty"`      // Parent glyph ID for conversation history assembly (stream glyphs send their parent)
 	UpstreamAttestation *types.As `json:"upstream_attestation,omitempty"` // Triggering attestation — enables {{field}} interpolation
 	FileIDs             []string  `json:"file_ids,omitempty"`             // Attached document/image file IDs for multimodal prompts
 }
@@ -641,10 +642,45 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 	// Create AI client
 	client := s.createAIClient(resolveProvider(req.Provider), modelName, "prompt-direct")
 
+	// Build multi-turn message history from canvas meld graph when a glyph context exists.
+	// This is what makes follow-up prompts remember previous turns — the canvas IS the conversation.
+	var conversationMessages []provider.Message
+	if req.GlyphID != "" && s.conversationAssembler != nil {
+		// Use parent glyph ID for history assembly when available.
+		// Stream glyphs send their own ID as glyph_id (for WebSocket subscription matching)
+		// but the parent is the one already persisted in a composition.
+		historyGlyphID := req.GlyphID
+		if req.ParentGlyphID != "" {
+			historyGlyphID = req.ParentGlyphID
+		}
+		s.logger.Infow("Assembling conversation history",
+			"glyph_id", req.GlyphID, "history_glyph_id", historyGlyphID)
+		history, histErr := s.conversationAssembler.AssembleMessages(r.Context(), historyGlyphID)
+		if histErr != nil {
+			s.logger.Warnw("Failed to assemble conversation history, proceeding without",
+				"glyph_id", historyGlyphID, "error", histErr)
+		} else if len(history) > 0 {
+			s.logger.Infow("Assembled conversation history",
+				"glyph_id", historyGlyphID, "message_count", len(history))
+			conversationMessages = history
+		} else {
+			s.logger.Infow("No conversation history found", "glyph_id", historyGlyphID)
+		}
+	}
+
 	// Call LLM using Chat method
 	chatReq := provider.ChatRequest{
 		SystemPrompt: req.SystemPrompt,
 		UserPrompt:   promptText,
+	}
+
+	// When we have conversation history, use Messages for multi-turn instead of single-turn fields
+	if len(conversationMessages) > 0 {
+		if req.SystemPrompt != "" {
+			chatReq.Messages = append(chatReq.Messages, provider.NewTextMessage("system", req.SystemPrompt))
+		}
+		chatReq.Messages = append(chatReq.Messages, conversationMessages...)
+		chatReq.Messages = append(chatReq.Messages, provider.NewTextMessage("user", promptText))
 	}
 
 	// Set temperature if specified in frontmatter

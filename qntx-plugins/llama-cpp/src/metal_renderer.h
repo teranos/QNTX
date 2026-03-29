@@ -63,6 +63,11 @@ public:
     void add_trail_point(int token_id);
     void clear_trail();
 
+    // Record ghost branches: lines from the chosen token to runner-up positions.
+    // Call after add_trail_point for the same generation step.
+    void add_ghost_branches(int chosen_token_id,
+                            const std::vector<std::pair<int,float>>& runners);
+
     // Runtime-adjustable parameters
     void set_param(const std::string& key, float value);
 
@@ -112,6 +117,12 @@ private:
     std::mutex trail_mutex_;
     const float* vocab_positions_ptr_ = nullptr;  // borrowed pointer to cached positions
 
+    // Ghost branches — runner-up paths at each generation step
+    // Flat buffer: 5 floats per vertex [x, y, z, prob, trail_index]
+    // Vertices come in pairs (chosen->runner-up) drawn as Line primitives
+    std::vector<float> ghost_vertices_;
+    MTL::RenderPipelineState* ghost_pipeline_ = nullptr;
+
     // Interpolation state
     MTL::Buffer* prob_a_ = nullptr;  // previous distribution
     MTL::Buffer* prob_b_ = nullptr;  // current distribution
@@ -136,5 +147,10 @@ private:
     std::thread render_thread_;
     std::atomic<bool> render_running_{false};
     int render_width_ = 800, render_height_ = 600;
+
+    // Idle suppression — sleep when interpolation is complete and no new data
+    std::condition_variable render_wake_cv_;
+    std::mutex render_wake_mutex_;
+    bool render_dirty_ = false;  // new data arrived, need to render
 #endif
 };

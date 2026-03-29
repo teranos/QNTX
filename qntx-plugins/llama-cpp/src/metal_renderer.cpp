@@ -52,11 +52,27 @@ MetalRenderer::~MetalRenderer() {
 }
 
 bool MetalRenderer::setup() {
+    std::cout << "[metal-llama] setup() entered" << std::endl;
+
+    // Clean up any partial state from a previous failed attempt
+    if (device_ || queue_ || compute_pipeline_ || render_pipeline_) {
+        std::cout << "[metal-llama] Cleaning up partial state from previous attempt" << std::endl;
+        teardown();
+    }
+
     device_ = MTL::CreateSystemDefaultDevice();
-    if (!device_) return false;
+    if (!device_) {
+        std::cout << "[metal-llama] MTL::CreateSystemDefaultDevice() returned null" << std::endl;
+        return false;
+    }
+    std::cout << "[metal-llama] Device acquired: " << device_->name()->utf8String() << std::endl;
 
     queue_ = device_->newCommandQueue();
-    if (!queue_) return false;
+    if (!queue_) {
+        std::cout << "[metal-llama] newCommandQueue() returned null" << std::endl;
+        return false;
+    }
+    std::cout << "[metal-llama] Command queue created" << std::endl;
 
     // Try pre-compiled metallib first, fall back to runtime compilation
     NS::Error* error = nullptr;
@@ -84,7 +100,7 @@ bool MetalRenderer::setup() {
         library = device_->newLibrary(src, nullptr, &error);
         if (!library) {
             if (error) {
-                std::cerr << "[metal-llama] Shader compilation failed: "
+                std::cout << "[metal-llama] Shader compilation failed: "
                           << error->localizedDescription()->utf8String() << std::endl;
             }
             return false;
@@ -95,7 +111,7 @@ bool MetalRenderer::setup() {
     // Compute pipeline
     auto compute_fn = library->newFunction(NS::String::string("particleCompute", NS::UTF8StringEncoding));
     if (!compute_fn) {
-        std::cerr << "[metal-llama] particleCompute not found" << std::endl;
+        std::cout << "[metal-llama] particleCompute not found" << std::endl;
         return false;
     }
     compute_pipeline_ = device_->newComputePipelineState(compute_fn, &error);
@@ -105,7 +121,7 @@ bool MetalRenderer::setup() {
     // Lerp compute pipeline
     auto lerp_fn = library->newFunction(NS::String::string("particleComputeLerp", NS::UTF8StringEncoding));
     if (!lerp_fn) {
-        std::cerr << "[metal-llama] particleComputeLerp not found" << std::endl;
+        std::cout << "[metal-llama] particleComputeLerp not found" << std::endl;
         return false;
     }
     lerp_pipeline_ = device_->newComputePipelineState(lerp_fn, &error);
@@ -116,7 +132,7 @@ bool MetalRenderer::setup() {
     auto vertex_fn = library->newFunction(NS::String::string("particleVertex", NS::UTF8StringEncoding));
     auto fragment_fn = library->newFunction(NS::String::string("particleFragment", NS::UTF8StringEncoding));
     if (!vertex_fn || !fragment_fn) {
-        std::cerr << "[metal-llama] vertex/fragment functions not found" << std::endl;
+        std::cout << "[metal-llama] vertex/fragment functions not found" << std::endl;
         return false;
     }
 
@@ -142,7 +158,7 @@ bool MetalRenderer::setup() {
     auto trail_vertex_fn = library->newFunction(NS::String::string("trailVertex", NS::UTF8StringEncoding));
     auto trail_fragment_fn = library->newFunction(NS::String::string("trailFragment", NS::UTF8StringEncoding));
     if (!trail_vertex_fn || !trail_fragment_fn) {
-        std::cerr << "[metal-llama] trail vertex/fragment functions not found" << std::endl;
+        std::cout << "[metal-llama] trail vertex/fragment functions not found" << std::endl;
         library->release();
         return false;
     }
@@ -161,9 +177,37 @@ bool MetalRenderer::setup() {
     trail_rpd->release();
     trail_vertex_fn->release();
     trail_fragment_fn->release();
+
+    if (!trail_pipeline_) { library->release(); return false; }
+
+    // Ghost branch pipeline — runner-up paths at uncertain tokens
+    auto ghost_vertex_fn = library->newFunction(NS::String::string("ghostBranchVertex", NS::UTF8StringEncoding));
+    auto ghost_fragment_fn = library->newFunction(NS::String::string("trailFragment", NS::UTF8StringEncoding));
+    if (!ghost_vertex_fn || !ghost_fragment_fn) {
+        std::cout << "[metal-llama] ghost branch shaders not found" << std::endl;
+        if (ghost_vertex_fn) ghost_vertex_fn->release();
+        if (ghost_fragment_fn) ghost_fragment_fn->release();
+        library->release();
+        return false;
+    }
+
+    auto ghost_rpd = MTL::RenderPipelineDescriptor::alloc()->init();
+    ghost_rpd->setVertexFunction(ghost_vertex_fn);
+    ghost_rpd->setFragmentFunction(ghost_fragment_fn);
+    ghost_rpd->colorAttachments()->object(0)->setPixelFormat(MTL::PixelFormatRGBA16Float);
+    ghost_rpd->colorAttachments()->object(0)->setBlendingEnabled(true);
+    ghost_rpd->colorAttachments()->object(0)->setSourceRGBBlendFactor(MTL::BlendFactorOne);
+    ghost_rpd->colorAttachments()->object(0)->setDestinationRGBBlendFactor(MTL::BlendFactorOne);
+    ghost_rpd->colorAttachments()->object(0)->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    ghost_rpd->colorAttachments()->object(0)->setDestinationAlphaBlendFactor(MTL::BlendFactorOne);
+
+    ghost_pipeline_ = device_->newRenderPipelineState(ghost_rpd, &error);
+    ghost_rpd->release();
+    ghost_vertex_fn->release();
+    ghost_fragment_fn->release();
     library->release();
 
-    if (!trail_pipeline_) return false;
+    if (!ghost_pipeline_) return false;
 
     std::cout << "[metal-llama] GPU ready: " << device_name() << std::endl;
     return true;
@@ -171,6 +215,7 @@ bool MetalRenderer::setup() {
 
 void MetalRenderer::teardown() {
     stop_render_loop();
+    if (ghost_pipeline_) { ghost_pipeline_->release(); ghost_pipeline_ = nullptr; }
     if (prob_a_) { prob_a_->release(); prob_a_ = nullptr; }
     if (prob_b_) { prob_b_->release(); prob_b_ = nullptr; }
     if (positions_buffer_) { positions_buffer_->release(); positions_buffer_ = nullptr; }
@@ -422,6 +467,13 @@ void MetalRenderer::submit_distribution(const float* probabilities, int vocab_si
         prob_a_ = device_->newBuffer(probabilities, vocab_size * sizeof(float),
                                       MTL::ResourceStorageModeShared);
     }
+
+    // Wake render loop from idle sleep
+    {
+        std::lock_guard<std::mutex> lock(render_wake_mutex_);
+        render_dirty_ = true;
+    }
+    render_wake_cv_.notify_one();
 }
 
 void MetalRenderer::add_trail_point(int token_id) {
@@ -436,7 +488,44 @@ void MetalRenderer::add_trail_point(int token_id) {
 void MetalRenderer::clear_trail() {
     std::lock_guard<std::mutex> lock(trail_mutex_);
     trail_positions_.clear();
+    ghost_vertices_.clear();
     drift_count_ = 0;
+}
+
+void MetalRenderer::add_ghost_branches(int chosen_token_id,
+                                        const std::vector<std::pair<int,float>>& runners) {
+    if (!vocab_positions_ptr_ || chosen_token_id < 0 || chosen_token_id >= vocab_size_) return;
+
+    std::lock_guard<std::mutex> lock(trail_mutex_);
+    int trail_index = (int)(trail_positions_.size() / 3) - 1;
+    if (trail_index < 0) return;
+
+    float cx = vocab_positions_ptr_[chosen_token_id * 3];
+    float cy = vocab_positions_ptr_[chosen_token_id * 3 + 1];
+    float cz = vocab_positions_ptr_[chosen_token_id * 3 + 2];
+    float ti = (float)trail_index;
+
+    for (const auto& [runner_id, prob] : runners) {
+        if (runner_id < 0 || runner_id >= vocab_size_ || runner_id == chosen_token_id) continue;
+
+        float rx = vocab_positions_ptr_[runner_id * 3];
+        float ry = vocab_positions_ptr_[runner_id * 3 + 1];
+        float rz = vocab_positions_ptr_[runner_id * 3 + 2];
+
+        // From vertex (chosen position)
+        ghost_vertices_.push_back(cx);
+        ghost_vertices_.push_back(cy);
+        ghost_vertices_.push_back(cz);
+        ghost_vertices_.push_back(prob);
+        ghost_vertices_.push_back(ti);
+
+        // To vertex (runner-up position)
+        ghost_vertices_.push_back(rx);
+        ghost_vertices_.push_back(ry);
+        ghost_vertices_.push_back(rz);
+        ghost_vertices_.push_back(prob);
+        ghost_vertices_.push_back(ti);
+    }
 }
 
 void MetalRenderer::store_keyframe(const float* probabilities, int vocab_size) {
@@ -447,8 +536,16 @@ void MetalRenderer::store_keyframe(const float* probabilities, int vocab_size) {
 }
 
 void MetalRenderer::set_scrub_index(int idx) {
-    std::lock_guard<std::mutex> lock(dist_mutex_);
-    scrub_index_ = idx;
+    {
+        std::lock_guard<std::mutex> lock(dist_mutex_);
+        scrub_index_ = idx;
+    }
+    // Wake render loop for scrub
+    {
+        std::lock_guard<std::mutex> lock(render_wake_mutex_);
+        render_dirty_ = true;
+    }
+    render_wake_cv_.notify_one();
 }
 
 void MetalRenderer::set_param(const std::string& key, float value) {
@@ -459,6 +556,12 @@ void MetalRenderer::set_param(const std::string& key, float value) {
     } else if (key == "particle_scale") {
         particle_scale_ = std::max(0.1f, std::min(5.0f, value));
     }
+    // Wake render loop to reflect the change
+    {
+        std::lock_guard<std::mutex> lock(render_wake_mutex_);
+        render_dirty_ = true;
+    }
+    render_wake_cv_.notify_one();
 }
 
 std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) {
@@ -523,18 +626,19 @@ std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) 
 
     render_enc->drawPrimitives(MTL::PrimitiveTypePoint, (NS::UInteger)0, (NS::UInteger)n);
 
-    // --- Trail draw ---
+    // --- Trail + ghost branches draw ---
     {
         std::lock_guard<std::mutex> lock(trail_mutex_);
         int trail_count = trail_positions_.size() / 3;
+        uint32_t tc = (uint32_t)trail_count;
+        int si = scrub_index_;
+        float or_ = extent_ * orbit_radius_mult_;
+        float as = (2.0f * M_PI) / orbit_period_;
+
         if (trail_count >= 2 && trail_pipeline_) {
             auto trail_buf = device_->newBuffer(trail_positions_.data(),
                 trail_positions_.size() * sizeof(float), MTL::ResourceStorageModeShared);
             if (trail_buf) {
-                uint32_t tc = (uint32_t)trail_count;
-                int si = scrub_index_;
-                float or_ = extent_ * orbit_radius_mult_;
-                float as = (2.0f * M_PI) / orbit_period_;  // radians per token
                 render_enc->setRenderPipelineState(trail_pipeline_);
                 render_enc->setVertexBuffer(trail_buf, 0, 0);
                 render_enc->setVertexBytes(mvp, sizeof(mvp), 1);
@@ -545,6 +649,25 @@ std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) 
                 render_enc->drawPrimitives(MTL::PrimitiveTypeLineStrip,
                     (NS::UInteger)0, (NS::UInteger)trail_count);
                 trail_buf->release();
+            }
+        }
+
+        // Ghost branches — runner-up paths drawn as line pairs
+        int ghost_vertex_count = ghost_vertices_.size() / 5;
+        if (ghost_vertex_count >= 2 && ghost_pipeline_) {
+            auto ghost_buf = device_->newBuffer(ghost_vertices_.data(),
+                ghost_vertices_.size() * sizeof(float), MTL::ResourceStorageModeShared);
+            if (ghost_buf) {
+                render_enc->setRenderPipelineState(ghost_pipeline_);
+                render_enc->setVertexBuffer(ghost_buf, 0, 0);
+                render_enc->setVertexBytes(mvp, sizeof(mvp), 1);
+                render_enc->setVertexBytes(&tc, sizeof(uint32_t), 2);
+                render_enc->setVertexBytes(&si, sizeof(int), 3);
+                render_enc->setVertexBytes(&or_, sizeof(float), 4);
+                render_enc->setVertexBytes(&as, sizeof(float), 5);
+                render_enc->drawPrimitives(MTL::PrimitiveTypeLine,
+                    (NS::UInteger)0, (NS::UInteger)ghost_vertex_count);
+                ghost_buf->release();
             }
         }
     }
@@ -617,6 +740,8 @@ void MetalRenderer::start_render_loop(int width, int height) {
     render_running_.store(true);
 
     render_thread_ = std::thread([this]() {
+        bool was_idle = false;
+
         while (render_running_.load()) {
             // Check for scrub mode
             int scrub;
@@ -664,7 +789,18 @@ void MetalRenderer::start_render_loop(int width, int height) {
                         set_latest_frame(std::move(png), render_width_, render_height_);
                     }
                 }
-                std::this_thread::sleep_for(std::chrono::milliseconds(16));
+                was_idle = false;
+                // Clear dirty flag — we just rendered the scrub frame
+                {
+                    std::lock_guard<std::mutex> lock(render_wake_mutex_);
+                    render_dirty_ = false;
+                }
+                // Wait for next scrub change or resume
+                {
+                    std::unique_lock<std::mutex> lock(render_wake_mutex_);
+                    render_wake_cv_.wait_for(lock, std::chrono::milliseconds(16),
+                        [this]{ return render_dirty_ || !render_running_.load(); });
+                }
                 continue;
             }
 
@@ -673,7 +809,11 @@ void MetalRenderer::start_render_loop(int width, int height) {
             {
                 std::lock_guard<std::mutex> lock(dist_mutex_);
                 if (!prob_a_ || !prob_b_) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(16));
+                    // No data yet — sleep until woken by submit_distribution
+                    std::unique_lock<std::mutex> wlock(render_wake_mutex_);
+                    render_wake_cv_.wait_for(wlock, std::chrono::milliseconds(500),
+                        [this]{ return render_dirty_ || !render_running_.load(); });
+                    render_dirty_ = false;
                     continue;
                 }
                 auto elapsed = std::chrono::steady_clock::now() - keyframe_time_;
@@ -681,12 +821,32 @@ void MetalRenderer::start_render_loop(int width, int height) {
                 t = std::min(1.0f, (float)ms / (float)keyframe_interval_.count());
             }
 
+            // If interpolation is complete (t=1) and we already rendered the final frame,
+            // sleep until new data arrives instead of burning GPU
+            if (t >= 1.0f && was_idle) {
+                std::unique_lock<std::mutex> lock(render_wake_mutex_);
+                render_wake_cv_.wait_for(lock, std::chrono::milliseconds(500),
+                    [this]{ return render_dirty_ || !render_running_.load(); });
+                if (render_dirty_) {
+                    render_dirty_ = false;
+                    was_idle = false;  // re-render with updated params
+                }
+                continue;
+            }
+
             auto png = render_lerp(render_width_, render_height_, t);
             if (!png.empty()) {
                 set_latest_frame(std::move(png), render_width_, render_height_);
             }
 
-            // ~60fps
+            was_idle = (t >= 1.0f);
+            if (was_idle) {
+                // Clear dirty so we catch the next submit_distribution
+                std::lock_guard<std::mutex> lock(render_wake_mutex_);
+                render_dirty_ = false;
+            }
+
+            // ~60fps while animating
             std::this_thread::sleep_for(std::chrono::milliseconds(16));
         }
     });
@@ -694,6 +854,7 @@ void MetalRenderer::start_render_loop(int width, int height) {
 
 void MetalRenderer::stop_render_loop() {
     render_running_.store(false);
+    render_wake_cv_.notify_one();  // unblock if sleeping
     if (render_thread_.joinable()) {
         render_thread_.join();
     }

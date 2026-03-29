@@ -53,7 +53,9 @@ LlamaCppPlugin::LlamaCppPlugin() : renderer_(std::make_unique<MetalRenderer>()) 
     renderer_->setup();
 }
 
-LlamaCppPlugin::~LlamaCppPlugin() = default;
+LlamaCppPlugin::~LlamaCppPlugin() {
+    if (pca_thread_.joinable()) pca_thread_.join();
+}
 
 grpc::Status LlamaCppPlugin::Metadata(grpc::ServerContext* ctx,
                                        const protocol::Empty* req,
@@ -84,7 +86,14 @@ grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
         }
     }
 
-    // Set PCA positions on the renderer if model loaded, start render loop
+    // Retry renderer setup if it failed during construction (restart timing)
+    if (!renderer_->is_ready()) {
+        std::cout << "[metal-llama] Renderer not ready, retrying setup..." << std::endl;
+        renderer_->setup();
+    }
+
+    // Set PCA positions on the renderer if model loaded, start render loop.
+    // Positions load from disk cache (~1ms) or compute via PCA (~16s first run).
     if (engine_.is_loaded() && renderer_->is_ready()) {
         const auto& pos = engine_.vocab_positions_3d();
         if (!pos.empty()) {
@@ -94,6 +103,7 @@ grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
                       << " vocab positions into renderer, render loop started" << std::endl;
         }
     }
+    pca_ready_.store(true, std::memory_order_release);
 
     // Configure ATS client for writing attestations
     if (!req->ats_store_endpoint().empty()) {
@@ -114,6 +124,8 @@ grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
 grpc::Status LlamaCppPlugin::Shutdown(grpc::ServerContext* ctx,
                                        const protocol::Empty* req,
                                        protocol::Empty* resp) {
+    // Wait for background PCA to finish before unloading model
+    if (pca_thread_.joinable()) pca_thread_.join();
     engine_.unload();
     std::cout << "[llama-cpp] Shutdown complete" << std::endl;
     return grpc::Status::OK;
@@ -156,16 +168,16 @@ grpc::Status LlamaCppPlugin::ConfigSchema(grpc::ServerContext* ctx,
 grpc::Status LlamaCppPlugin::RegisterGlyphs(grpc::ServerContext* ctx,
                                               const protocol::Empty* req,
                                               protocol::GlyphDefResponse* resp) {
-    // Register nebula glyph only when Metal renderer is available
-    if (renderer_ && renderer_->is_ready()) {
-        auto* glyph = resp->add_glyphs();
-        glyph->set_symbol("✦");
-        glyph->set_title("Nebula");
-        glyph->set_label("nebula");
-        glyph->set_module_path("/nebula-module.js");
-        glyph->set_default_width(420);
-        glyph->set_default_height(420);
-    }
+    // Always announce the nebula glyph — renderer readiness is a runtime
+    // concern, not a registration concern.  The module JS and /render-latest
+    // endpoint handle renderer unavailability gracefully.
+    auto* glyph = resp->add_glyphs();
+    glyph->set_symbol("✦");
+    glyph->set_title("Nebula");
+    glyph->set_label("nebula");
+    glyph->set_module_path("/nebula-module.js");
+    glyph->set_default_width(420);
+    glyph->set_default_height(420);
     return grpc::Status::OK;
 }
 
@@ -261,6 +273,30 @@ grpc::Status LlamaCppPlugin::HandleHTTP(grpc::ServerContext* ctx,
         return grpc::Status::OK;
     }
 
+    if (req->method() == "GET" && req->path() == "/version") {
+        resp->set_status_code(200);
+        resp->set_body(PLUGIN_VERSION);
+        return grpc::Status::OK;
+    }
+
+    if (req->method() == "GET" && req->path() == "/status") {
+        std::string state;
+        if (!engine_.is_loaded()) {
+            state = "no_model";
+        } else if (!pca_ready()) {
+            state = "computing_positions";
+        } else {
+            state = "ready";
+        }
+        std::string body = "{\"state\":\"" + state + "\",\"version\":\"" + PLUGIN_VERSION + "\"}";
+        resp->set_status_code(200);
+        resp->set_body(body);
+        auto* ct = resp->add_headers();
+        ct->set_name("Content-Type");
+        ct->add_values("application/json");
+        return grpc::Status::OK;
+    }
+
     if (req->method() == "GET" && req->path() == "/nebula-module.js") {
         static const std::string js =
 #include "nebula-module.js.inc"
@@ -341,7 +377,7 @@ grpc::Status LlamaCppPlugin::HandleWebSocket(
         }
         if (closed.load()) break;
 
-        auto png = renderer_->wait_for_frame(1000);
+        auto png = renderer_->wait_for_frame(100);
         if (png.empty()) continue;
 
         protocol::WebSocketMessage msg;
@@ -429,18 +465,35 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
         }
     }
 
-    // If we extracted context, prepend it to the user prompt so the
-    // model sees the document content before the user's question.
-    std::string user_prompt = context.empty()
-        ? req->user_prompt()
-        : context + req->user_prompt();
+    // Build message history from proto
+    std::vector<InferenceEngine::Message> messages;
+    if (req->messages_size() > 0) {
+        // Multi-turn: use messages array from proto
+        for (const auto& m : req->messages()) {
+            messages.push_back({m.role(), m.content()});
+        }
+        // Prepend attachment context to the last user message
+        if (!context.empty()) {
+            for (int i = messages.size() - 1; i >= 0; i--) {
+                if (messages[i].role == "user") {
+                    messages[i].content = context + messages[i].content;
+                    break;
+                }
+            }
+        }
+    } else {
+        // Single-turn fallback (deprecated fields)
+        std::string user_prompt = context.empty()
+            ? req->user_prompt()
+            : context + req->user_prompt();
+        if (!req->system_prompt().empty()) {
+            messages.push_back({"system", req->system_prompt()});
+        }
+        messages.push_back({"user", user_prompt});
+    }
 
-    // TODO(STO): support multi-turn — gRPC protocol currently carries no message history
     // TODO(SSL): log signal summary for StreamChat (currently only Chat logs it)
-    auto result = engine.chat(req->system_prompt(),
-                              user_prompt,
-                              temperature,
-                              max_tokens);
+    auto result = engine.chat(messages, temperature, max_tokens);
 
     resp->set_content(result.content);
     resp->set_model(engine.model_name());
@@ -492,7 +545,12 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
             std::string context_id = "chat:" + std::to_string(
                 std::chrono::system_clock::now().time_since_epoch().count());
 
-            ats.create_weave(engine.model_name(), req->user_prompt(),
+            // Extract last user message for weave attestation
+            std::string prompt_text;
+            for (auto it = messages.rbegin(); it != messages.rend(); ++it) {
+                if (it->role == "user") { prompt_text = it->content; break; }
+            }
+            ats.create_weave(engine.model_name(), prompt_text,
                              result.content, context_id, n,
                              conf_sum / n, ent_sum / n, result.signals);
         }
@@ -539,9 +597,29 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
         }
     }
 
-    std::string user_prompt = context.empty()
-        ? req->user_prompt()
-        : context + req->user_prompt();
+    // Build message history from proto
+    std::vector<InferenceEngine::Message> messages;
+    if (req->messages_size() > 0) {
+        for (const auto& m : req->messages()) {
+            messages.push_back({m.role(), m.content()});
+        }
+        if (!context.empty()) {
+            for (int i = messages.size() - 1; i >= 0; i--) {
+                if (messages[i].role == "user") {
+                    messages[i].content = context + messages[i].content;
+                    break;
+                }
+            }
+        }
+    } else {
+        std::string user_prompt = context.empty()
+            ? req->user_prompt()
+            : context + req->user_prompt();
+        if (!req->system_prompt().empty()) {
+            messages.push_back({"system", req->system_prompt()});
+        }
+        messages.push_back({"user", user_prompt});
+    }
 
     // Clear trail and keyframe history for new generation
     if (plugin_->renderer().is_ready()) {
@@ -551,7 +629,7 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
 
     // Stream tokens as they're generated
     auto result = engine.stream_chat(
-        req->system_prompt(), user_prompt, temperature, max_tokens,
+        messages, temperature, max_tokens,
         [&](const std::string& token_text, const TokenSignal& sig) -> bool {
             protocol::LLMChatChunk chunk;
             chunk.set_token(sanitize_utf8(token_text));
@@ -579,6 +657,17 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
                 plugin_->renderer().store_keyframe(
                     sig.full_distribution.data(), sig.full_distribution.size());
                 plugin_->renderer().add_trail_point(sig.token_id);
+
+                // Ghost branches: feed runner-up candidates
+                if (sig.top_k.size() > 1) {
+                    std::vector<std::pair<int,float>> runners;
+                    for (size_t i = 0; i < sig.top_k.size() && runners.size() < 10; i++) {
+                        if (sig.top_k[i].id != sig.token_id) {
+                            runners.emplace_back(sig.top_k[i].id, sig.top_k[i].prob);
+                        }
+                    }
+                    plugin_->renderer().add_ghost_branches(sig.token_id, runners);
+                }
             }
 
             return writer->Write(chunk);
@@ -606,7 +695,11 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
         std::string context_id = "stream:" + std::to_string(
             std::chrono::system_clock::now().time_since_epoch().count());
 
-        ats.create_weave(engine.model_name(), user_prompt,
+        std::string prompt_text;
+        for (auto it = messages.rbegin(); it != messages.rend(); ++it) {
+            if (it->role == "user") { prompt_text = it->content; break; }
+        }
+        ats.create_weave(engine.model_name(), prompt_text,
                          result.content, context_id, n,
                          conf_sum / n, ent_sum / n, result.signals);
     }
