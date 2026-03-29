@@ -47,6 +47,9 @@ export interface ConsoleLog {
   url?: string;
 }
 
+export interface ConversationAssembler {
+}
+
 export interface CreateScheduledJobRequest {
   /**
    * ATS code to execute (e.g., "ix https://...")
@@ -423,6 +426,10 @@ export interface PromptDirectRequest {
    * Glyph that initiated execution; used as actor for the result attestation
    */
   glyph_id?: string;
+  /**
+   * Parent glyph ID for conversation history assembly (stream glyphs send their parent)
+   */
+  parent_glyph_id?: string;
   /**
    * Triggering attestation — enables {{field}} interpolation
    */

@@ -68,6 +68,16 @@ type ConsoleLog struct {
 }
 ```
 
+## ConversationAssembler {#conversationassembler}
+
+**Source**: [`server/conversation.go:17`](https://github.com/teranos/QNTX/blob/main/server/conversation.go#L17)
+
+
+```go
+type ConversationAssembler struct {
+}
+```
+
 ## CreateScheduledJobRequest {#createscheduledjobrequest}
 
 **Source**: [`server/pulse_types.go:14`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L14)
@@ -376,6 +386,7 @@ type PromptDirectRequest struct {
 	Provider string `json:"provider,omitempty"`
 	Model string `json:"model,omitempty"`
 	GlyphID string `json:"glyph_id,omitempty"`
+	ParentGlyphID string `json:"parent_glyph_id,omitempty"`
 	UpstreamAttestation *types.As `json:"upstream_attestation,omitempty"`
 	FileIDs []string `json:"file_ids,omitempty"`
 }
@@ -383,7 +394,7 @@ type PromptDirectRequest struct {
 
 ## PromptDirectResponse {#promptdirectresponse}
 
-**Source**: [`server/prompt_handlers.go:88`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L88)
+**Source**: [`server/prompt_handlers.go:89`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L89)
 
 
 ```go
@@ -416,7 +427,7 @@ type PromptExecuteRequest struct {
 
 ## PromptExecuteResponse {#promptexecuteresponse}
 
-**Source**: [`server/prompt_handlers.go:120`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L120)
+**Source**: [`server/prompt_handlers.go:121`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L121)
 
 
 ```go
@@ -463,7 +474,7 @@ type PromptPreviewResponse struct {
 
 ## PromptSaveRequest {#promptsaverequest}
 
-**Source**: [`server/prompt_handlers.go:851`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L851)
+**Source**: [`server/prompt_handlers.go:890`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L890)
 
 
 ```go
@@ -592,7 +603,7 @@ type QueryMessage struct {
 
 ## Result {#result}
 
-**Source**: [`server/prompt_handlers.go:100`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L100)
+**Source**: [`server/prompt_handlers.go:101`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L101)
 
 
 ```go

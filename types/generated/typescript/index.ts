@@ -55,6 +55,7 @@ export type {
   CompleteMessage,
   ConsoleFormatter,
   ConsoleLog,
+  ConversationAssembler,
   CreateScheduledJobRequest,
   CreationStatsObserver,
   DaemonStatusMessage,
