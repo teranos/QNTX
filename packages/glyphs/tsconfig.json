@@ -6,7 +6,8 @@
     "strict": true,
     "noEmit": true,
     "declaration": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"]
   },
-  "include": ["index.ts"]
+  "include": ["config.ts", "glyph.ts", "dataset.ts", "proximity.ts"]
 }

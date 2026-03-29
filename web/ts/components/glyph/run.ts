@@ -29,7 +29,6 @@
  */
 
 import { log, SEG } from '../../logger';
-import { stripHtml } from '../../html-utils';
 import { uiState } from '../../state/ui';
 import { GlyphProximity } from './proximity';
 import { type Glyph, getMaximizeDuration } from './glyph';
@@ -337,7 +336,6 @@ class GlyphRunImpl {
         this.proximity.updateProximity(
             this.indicatorContainer,
             this.items,
-            stripHtml,
             this.isRestoring
         );
     }
