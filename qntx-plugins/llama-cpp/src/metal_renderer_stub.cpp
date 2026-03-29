@@ -19,6 +19,7 @@ void MetalRenderer::set_scrub_index(int) {}
 void MetalRenderer::set_param(const std::string&, float) {}
 void MetalRenderer::add_trail_point(int) {}
 void MetalRenderer::clear_trail() {}
+void MetalRenderer::add_ghost_branches(int, const std::vector<std::pair<int,float>>&) {}
 
 void MetalRenderer::start_render_loop(int, int) {}
 void MetalRenderer::stop_render_loop() {}
