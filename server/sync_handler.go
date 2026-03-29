@@ -379,8 +379,12 @@ func (s *QNTXServer) syncAllPeers(ctx context.Context, st *syncTickState) {
 		}
 		syncedNames = append(syncedNames, name)
 
-		if sent > 0 || received > 0 {
-			transferred = append(transferred, fmt.Sprintf("%s ↑%d↓%d", name, sent, received))
+		if sent > 0 || received > 0 || peer.SignatureRejects > 0 {
+			detail := fmt.Sprintf("%s ↑%d↓%d", name, sent, received)
+			if peer.SignatureRejects > 0 {
+				detail += fmt.Sprintf(" ✗%d sig", peer.SignatureRejects)
+			}
+			transferred = append(transferred, detail)
 		}
 	}
 

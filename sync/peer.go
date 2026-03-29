@@ -73,8 +73,9 @@ type Peer struct {
 	RemoteName string
 
 	// Stats tracked during reconciliation
-	sent     int
-	received int
+	sent             int
+	received         int
+	SignatureRejects int // attestations rejected for invalid signature
 
 	// Populated after Reconcile if the remote peer sent budget data
 	RemoteBudget *PeerBudget
@@ -337,11 +338,14 @@ func (p *Peer) receiveAttestations(ctx context.Context) error {
 
 			// Verify signature if present — reject tampered attestations
 			if err := signing.Verify(as); err != nil {
-				p.logger.Warnw("Rejecting synced attestation with invalid signature",
-					"id", as.ID,
-					"signer_did", as.SignerDID,
-					"error", err,
-				)
+				p.SignatureRejects++
+				if p.SignatureRejects == 1 {
+					p.logger.Debugw("Signature rejection sample",
+						"id", as.ID,
+						"signer_did", as.SignerDID,
+						"error", err,
+					)
+				}
 				continue
 			}
 
