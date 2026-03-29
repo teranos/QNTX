@@ -88,6 +88,17 @@ export { stashContent, restoreContent, hasStash } from './manifestations/stash';
 export { renderGlyphContent } from './manifestations/render-content';
 export type { RenderContentResult } from './manifestations/render-content';
 
+// Window drag — standalone, no canvas dependency
+export { setupWindowDrag, teardownWindowDrag } from './window-drag';
+
+// Manifestations
+export { morphToWindow, morphFromWindow } from './manifestations/window';
+export { morphToCanvas, morphFromCanvas } from './manifestations/canvas';
+export { morphToPanel, morphFromPanel } from './manifestations/panel';
+
+// GlyphRun tray singleton
+export { glyphRun } from './run';
+
 // GlyphUI interface and related types (still in web/ for now, re-exported for plugin authoring)
 export type {
     GlyphUI,

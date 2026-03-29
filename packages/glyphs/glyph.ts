@@ -2,7 +2,7 @@
  * Glyph - The universal primitive
  *
  * A glyph is exactly ONE DOM element for its entire lifetime.
- * It can morph between different visual states (dot, proximity, window, canvas, modal, etc.)
+ * It can morph between different visual states (dot, proximity, window, canvas, panel, etc.)
  * through smooth animations, but the element identity never changes.
  *
  * All glyphs are container glyphs - they can hold child glyphs in various layout strategies.
@@ -18,8 +18,10 @@ export interface Glyph {
     renderTitleBar?: () => HTMLElement;   // Glyph-specific title bar, enhanced by manifestations with window controls
 
     // Manifestation configuration
-    manifestationType?: 'window' | 'fullscreen' | 'canvas' | 'modal' | 'panel' | 'ax';  // Default: 'window'
-    // NOTE: 'ax' renders inline on canvas for query editing
+    manifestationType?: 'window' | 'canvas' | 'panel' | 'ax';  // Default: 'window'
+    // TODO: 'ax' is currently its own manifestation type but may not need to be —
+    // it renders inline on canvas for query editing, which could be a behavior of
+    // 'canvas' or a generic 'inline' type rather than an AX-specific concept
     // TODO: Add 'programmature' manifestation type for full code editor that can minimize to tray
     initialWidth?: string;               // Initial dimensions (e.g., "800px")
     initialHeight?: string;

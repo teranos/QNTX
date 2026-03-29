@@ -18,6 +18,11 @@
     "manifestations/title-bar-controls.ts",
     "manifestations/stash.ts",
     "manifestations/morphology.ts",
-    "manifestations/render-content.ts"
+    "manifestations/render-content.ts",
+    "manifestations/window.ts",
+    "manifestations/canvas.ts",
+    "manifestations/panel.ts",
+    "window-drag.ts",
+    "run.ts"
   ]
 }
