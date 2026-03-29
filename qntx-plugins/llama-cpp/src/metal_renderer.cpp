@@ -317,15 +317,8 @@ std::vector<uint8_t> MetalRenderer::render_nebula(const float* probabilities, in
     render_enc->setRenderPipelineState(render_pipeline_);
     render_enc->setVertexBuffer(particle_buf, 0, 0);
 
-    // MVP: scale to fit + center
-    float scale = 0.9f / extent_;
-    float aspect = (float)width / (float)height;
-    float mvp[16] = {
-        scale / aspect, 0, 0, 0,
-        0, scale, 0, 0,
-        0, 0, scale, 0,
-        -center_x_ * scale / aspect, -center_y_ * scale, 0, 1
-    };
+    float mvp[16];
+    build_mvp(mvp, width, height);
     render_enc->setVertexBytes(mvp, sizeof(mvp), 1);
 
     render_enc->drawPrimitives(MTL::PrimitiveTypePoint, (NS::UInteger)0, (NS::UInteger)n);
@@ -548,6 +541,28 @@ void MetalRenderer::set_scrub_index(int idx) {
     render_wake_cv_.notify_one();
 }
 
+void MetalRenderer::apply_camera(float dx, float dy, float dz, float dyaw, float dpitch) {
+    camera_.apply(dx, dy, dz, dyaw, dpitch);
+    {
+        std::lock_guard<std::mutex> lock(render_wake_mutex_);
+        render_dirty_ = true;
+    }
+    render_wake_cv_.notify_one();
+}
+
+void MetalRenderer::reset_camera() {
+    camera_.reset();
+    {
+        std::lock_guard<std::mutex> lock(render_wake_mutex_);
+        render_dirty_ = true;
+    }
+    render_wake_cv_.notify_one();
+}
+
+void MetalRenderer::build_mvp(float* mvp, int width, int height) {
+    camera_.build_mvp(mvp, width, height, center_x_, center_y_, extent_);
+}
+
 void MetalRenderer::set_param(const std::string& key, float value) {
     if (key == "orbit_period") {
         orbit_period_ = std::max(16, (int)value);
@@ -614,14 +629,8 @@ std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) 
     render_enc->setRenderPipelineState(render_pipeline_);
     render_enc->setVertexBuffer(particle_buf, 0, 0);
 
-    float scale = 0.9f / extent_;
-    float aspect = (float)width / (float)height;
-    float mvp[16] = {
-        scale / aspect, 0, 0, 0,
-        0, scale, 0, 0,
-        0, 0, scale, 0,
-        -center_x_ * scale / aspect, -center_y_ * scale, 0, 1
-    };
+    float mvp[16];
+    build_mvp(mvp, width, height);
     render_enc->setVertexBytes(mvp, sizeof(mvp), 1);
 
     render_enc->drawPrimitives(MTL::PrimitiveTypePoint, (NS::UInteger)0, (NS::UInteger)n);
