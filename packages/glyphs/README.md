@@ -11,7 +11,7 @@ Extracting from `web/ts/components/glyph/` into this standalone package. The goa
 ### Extraction progress
 
 - [x] **Step 1: Foundation** — Config layer (`configureGlyphs()`), `Glyph` interface, dataset helpers, proximity engine. Web re-exports from package.
-- [ ] **Step 2: Morph infrastructure** — `morph-transaction.ts` (Web Animations API with commit/rollback), `morphology.ts` (axiom verification, morph lifecycle), `stash.ts` (DOM content preservation across morph cycles), `title-bar-controls.ts`, `render-content.ts`. Cut logger and stripHtml deps via config.
+- [x] **Step 2: Morph infrastructure** — `morph-transaction.ts` (Web Animations API with commit/rollback), `morphology.ts` (axiom verification, morph lifecycle), `stash.ts` (DOM content preservation across morph cycles), `title-bar-controls.ts`, `render-content.ts`. Cut logger and stripHtml deps via config.
 - [ ] **Step 3: Manifestations + tray** — `window.ts`, `canvas.ts` (fullscreen), `panel.ts` (resizable full-width), `run.ts` (the tray singleton). Extract standalone window drag (currently coupled to canvas-pan). Cut uiState dep via persistence config.
 - [ ] **Step 4: Wire QNTX** — Call `configureGlyphs()` at app startup with QNTX's logger, persistence (uiState), and stripHtml. Update remaining import sites. Verify all morph paths end-to-end.
 
