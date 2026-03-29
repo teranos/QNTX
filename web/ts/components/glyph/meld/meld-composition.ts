@@ -20,6 +20,7 @@ import { computeGridPositions } from './meldability';
 import { addComposition, removeComposition, extractGlyphIds, findCompositionByGlyph } from '../../../state/compositions';
 import { clearMeldFeedback } from './meld-feedback';
 import { getTransform } from '../canvas/canvas-pan';
+import { canvasSyncQueue } from '../../../api/canvas-sync';
 
 const UNMELD_OFFSET = 20; // px - spacing between glyphs when unmelding
 
@@ -214,13 +215,14 @@ export function performMeld(
     // Apply grid layout from edge graph
     applyColumnLayout(composition, [initiatorElement, targetElement], edges);
 
-    // Persist composition to storage
+    // Persist composition to storage and flush to backend immediately
     addComposition({
         id: compositionId,
         edges,
         x: isNaN(x) ? 0 : x,
         y: isNaN(y) ? 0 : y
     });
+    canvasSyncQueue.flush();
 
     log.info(SEG.GLYPH, '[MeldSystem] Meld complete - elements reparented and persisted', {
         compositionId,
@@ -297,6 +299,7 @@ export function extendComposition(
         x: existingComp.x,
         y: existingComp.y
     });
+    canvasSyncQueue.flush();
 
     // Rebuild grid positions for all children
     const allChildren = Array.from(
@@ -494,6 +497,7 @@ export function detachGlyph(glyphId: string, composition: HTMLElement): {
         x: storedComp.x,
         y: storedComp.y
     });
+    canvasSyncQueue.flush();
 
     // Rebuild layout for remaining elements
     const remainingElements = Array.from(
@@ -599,6 +603,7 @@ export function unmeldComposition(composition: HTMLElement): {
     if (compositionId) {
         removeComposition(compositionId);
     }
+    canvasSyncQueue.flush();
 
     // Remove composition container
     composition.remove();

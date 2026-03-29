@@ -33,16 +33,41 @@ export const render = async (glyph, ui) => {
     const ro = new ResizeObserver(fitCanvas);
     ro.observe(content);
 
-    // Status indicator
-    const status = document.createElement('div');
-    status.style.position = 'absolute';
-    status.style.bottom = '4px';
-    status.style.right = '8px';
-    status.style.fontSize = '10px';
-    status.style.fontFamily = 'monospace';
-    status.style.color = 'rgba(255,255,255,0.3)';
-    status.textContent = 'connecting...';
     content.style.position = 'relative';
+
+    // Status label (bottom-left) — shows version + PCA readiness
+    const statusLabel = document.createElement('div');
+    statusLabel.style.cssText = 'position:absolute;bottom:4px;left:8px;font:10px monospace;color:rgba(255,255,255,0.3);';
+    statusLabel.textContent = 'loading...';
+    content.appendChild(statusLabel);
+
+    let pcaReady = false;
+    function pollStatus() {
+        fetch('/api/llama-cpp/status').then(r => r.ok ? r.json() : null).then(s => {
+            if (!s) return;
+            if (s.state === 'computing_positions') {
+                statusLabel.textContent = 'v' + s.version + ' computing positions\u2026';
+                statusLabel.style.color = 'rgba(255,180,80,0.5)';
+                setTimeout(pollStatus, 500);
+            } else if (s.state === 'ready') {
+                statusLabel.textContent = 'v' + s.version;
+                statusLabel.style.color = 'rgba(255,255,255,0.2)';
+                pcaReady = true;
+            } else {
+                statusLabel.textContent = 'v' + s.version + ' no model';
+                statusLabel.style.color = 'rgba(255,255,255,0.2)';
+            }
+        }).catch(() => {
+            statusLabel.textContent = 'offline';
+            setTimeout(pollStatus, 2000);
+        });
+    }
+    pollStatus();
+
+    // Status indicator (bottom-right)
+    const status = document.createElement('div');
+    status.style.cssText = 'position:absolute;bottom:4px;right:8px;font:10px monospace;color:rgba(255,255,255,0.3);';
+    status.textContent = 'connecting...';
     content.appendChild(status);
 
     let ws = null;
