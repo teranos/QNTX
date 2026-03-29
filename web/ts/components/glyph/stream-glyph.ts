@@ -185,6 +185,9 @@ function renderToken(token: StreamToken, tokenIndex: number): HTMLSpanElement {
         if (token.signal.top_k) {
             span.dataset.topK = JSON.stringify(token.signal.top_k);
         }
+        if (token.signal.sampler_stages) {
+            span.dataset.samplerStages = JSON.stringify(token.signal.sampler_stages);
+        }
     }
 
     return span;

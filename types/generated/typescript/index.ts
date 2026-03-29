@@ -89,6 +89,7 @@ export type {
   PulseExecutionStartedMessage,
   QueryMessage,
   Result,
+  SamplerStageSignal,
   ScheduledJobResponse,
   StatsMessage,
   TaskLogsResponse,

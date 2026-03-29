@@ -1,43 +1,55 @@
 /**
- * Token popup — hover overlay showing signal data and top-K candidates.
+ * Token popup — hover overlay showing sampler stage candidate lists.
  *
- * Appears on mouseenter over a token span in stream glyph output.
- * Fixed position, viewport-constrained.
+ * Horizontal layout: stages side by side so you can scan left-to-right
+ * and see how words and probabilities change through the chain.
  */
 .token-popup {
     position: fixed;
     z-index: 100000;
     background: var(--bg-dark-hover);
     border: 1px solid var(--border-on-dark);
-    padding: 6px 8px;
+    padding: 8px 10px;
     font-family: monospace;
     font-size: var(--font-size-sm);
     color: var(--text-on-dark);
     pointer-events: none;
-    min-width: 180px;
-    max-width: 320px;
+    max-height: 80vh;
+    overflow-y: auto;
 }
 
-.token-popup-signals {
+/* Horizontal row of stage columns */
+.token-popup-stages-row {
     display: flex;
-    gap: 10px;
-    color: var(--text-secondary);
-    margin-bottom: 6px;
-    font-size: 11px;
+    gap: 12px;
+}
+
+/* Stage section — one column per sampler stage */
+.token-popup-stage-section {
+    min-width: 130px;
+}
+
+.token-popup-stage-header {
+    font-size: 10px;
+    color: hsla(30, 60%, 60%, 0.8);
+    margin-bottom: 3px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     white-space: nowrap;
 }
 
+/* Candidate list */
 .token-popup-candidates {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 1px;
 }
 
 .token-popup-candidate {
     display: flex;
     align-items: center;
-    gap: 6px;
-    height: 18px;
+    gap: 4px;
+    height: 16px;
 }
 
 .token-popup-candidate.token-popup-chosen {
@@ -49,17 +61,18 @@
 }
 
 .token-popup-token-text {
-    width: 72px;
+    width: 56px;
     overflow: hidden;
     white-space: nowrap;
     text-align: right;
     flex-shrink: 0;
-    font-size: 11px;
+    font-size: 10px;
 }
 
 .token-popup-bar-track {
     flex: 1;
-    height: 10px;
+    min-width: 40px;
+    height: 8px;
     background: rgba(255, 255, 255, 0.05);
     position: relative;
 }
@@ -74,8 +87,8 @@
 }
 
 .token-popup-prob {
-    width: 40px;
+    width: 32px;
     text-align: right;
     flex-shrink: 0;
-    font-size: 11px;
+    font-size: 10px;
 }
