@@ -59,6 +59,12 @@ const LEGEND_ITEMS = [
     { color: STAGE_COLORS.min_p, label: 'min-p / typical filtered' },
 ];
 
+interface StageTrace {
+    name: string;
+    prob: number;
+    delta: number;
+}
+
 /**
  * For each candidate in the final stage, trace back through earlier stages
  * to find the raw (first) probability. Also find which stage caused the
@@ -93,6 +99,23 @@ function traceCandidate(
     }
 
     return { rawProb, biggestStage };
+}
+
+/** Full per-stage trace for a token — used in the detail sub-popover */
+function fullTrace(tokenId: number, stages: SamplerStageSignal[]): StageTrace[] {
+    const result: StageTrace[] = [];
+    let prevProb = 0;
+
+    for (const stage of stages) {
+        if (!stage.top_k) continue;
+        const match = stage.top_k.find(c => c.id === tokenId);
+        const prob = match ? match.prob : 0;
+        const delta = stage.name === 'logits' ? 0 : prob - prevProb;
+        result.push({ name: stage.name, prob, delta });
+        prevProb = prob;
+    }
+
+    return result;
 }
 
 /**
@@ -149,30 +172,116 @@ export function createTokenPopup(): TokenPopup {
     let legendVisible = false;
     let legendEl: HTMLDivElement | null = null;
 
-    // Nested detail tooltip
+    // Nested detail sub-popover — interactive, shows full stage-by-stage trace
     const detailEl = document.createElement('div');
     detailEl.className = 'token-popup-detail';
     detailEl.style.display = 'none';
     document.body.appendChild(detailEl);
 
-    function showDetail(target: HTMLElement, text: string) {
-        detailEl.textContent = text;
-        detailEl.style.display = '';
+    let detailHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+    detailEl.addEventListener('mouseenter', () => {
+        if (detailHideTimer) { clearTimeout(detailHideTimer); detailHideTimer = null; }
+        // Keep parent popup alive while mouse is in the detail popover
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    });
+    detailEl.addEventListener('mouseleave', () => {
+        detailHideTimer = setTimeout(hideDetail, 120);
+        // Schedule parent popup hide too
+        if (!hideTimer) {
+            hideTimer = setTimeout(() => {
+                hideDetail();
+                el.style.display = 'none';
+            }, 150);
+        }
+    });
+
+    function positionDetail(target: HTMLElement) {
         const r = target.getBoundingClientRect();
+        detailEl.style.display = '';
         let left = r.right + 6;
         let top = r.top;
-        // Keep on screen
         const dw = detailEl.offsetWidth;
+        const dh = detailEl.offsetHeight;
         if (left + dw > window.innerWidth - 4) {
             left = r.left - dw - 6;
         }
         if (left < 4) left = 4;
+        if (top + dh > window.innerHeight - 4) {
+            top = window.innerHeight - dh - 4;
+        }
+        if (top < 4) top = 4;
         detailEl.style.left = `${left}px`;
         detailEl.style.top = `${top}px`;
     }
 
+    function showStageDetail(target: HTMLElement, tokenId: number, tokenText: string, stages: SamplerStageSignal[]) {
+        if (detailHideTimer) { clearTimeout(detailHideTimer); detailHideTimer = null; }
+        detailEl.innerHTML = '';
+
+        const header = document.createElement('div');
+        header.className = 'token-popup-detail-header';
+        header.textContent = escapeToken(tokenText);
+        detailEl.appendChild(header);
+
+        const traces = fullTrace(tokenId, stages);
+
+        for (const t of traces) {
+            const row = document.createElement('div');
+            row.className = 'token-popup-detail-row';
+
+            const color = t.name === 'logits'
+                ? 'rgba(255,255,255,0.3)'
+                : (STAGE_COLORS[t.name] ?? 'rgba(255,255,255,0.3)');
+            const label = t.name === 'logits'
+                ? 'raw logits'
+                : (STAGE_LABELS[t.name] ?? t.name);
+
+            // Stage color dot
+            const dot = document.createElement('span');
+            dot.className = 'token-popup-detail-dot';
+            dot.style.background = color;
+            row.appendChild(dot);
+
+            // Stage name
+            const nameEl = document.createElement('span');
+            nameEl.className = 'token-popup-detail-name';
+            nameEl.textContent = label;
+            row.appendChild(nameEl);
+
+            // Probability
+            const probEl = document.createElement('span');
+            probEl.className = 'token-popup-detail-prob';
+            probEl.textContent = `${(t.prob * 100).toFixed(1)}%`;
+            row.appendChild(probEl);
+
+            // Delta
+            if (t.name !== 'logits' && Math.abs(t.delta) > 0.001) {
+                const deltaEl = document.createElement('span');
+                deltaEl.className = 'token-popup-detail-delta';
+                const sign = t.delta > 0 ? '+' : '';
+                deltaEl.textContent = `${sign}${(t.delta * 100).toFixed(1)}`;
+                deltaEl.style.color = t.delta > 0
+                    ? 'hsla(120, 60%, 60%, 0.9)'
+                    : 'hsla(0, 60%, 60%, 0.9)';
+                row.appendChild(deltaEl);
+            }
+
+            detailEl.appendChild(row);
+        }
+
+        positionDetail(target);
+    }
+
+    function scheduleDetailHide() {
+        if (detailHideTimer) clearTimeout(detailHideTimer);
+        detailHideTimer = setTimeout(hideDetail, 120);
+    }
+
     function hideDetail() {
+        if (detailHideTimer) { clearTimeout(detailHideTimer); detailHideTimer = null; }
         detailEl.style.display = 'none';
+        detailEl.innerHTML = '';
     }
 
     function clearTimers() {
@@ -202,7 +311,9 @@ export function createTokenPopup(): TokenPopup {
     el.addEventListener('mouseleave', () => {
         clearTimers();
         hideLegend();
+        scheduleDetailHide();
         hideTimer = setTimeout(() => {
+            hideDetail();
             el.style.display = 'none';
         }, 100);
     });
@@ -269,13 +380,8 @@ export function createTokenPopup(): TokenPopup {
                     bar.className = 'token-popup-bar';
                     bar.style.width = `${finalPct.toFixed(1)}%`;
                     bar.style.background = color;
-                    const stageLabel = STAGE_LABELS[trace.biggestStage] ?? trace.biggestStage;
-                    const direction = finalPct > rawPct ? 'boosted' : 'reduced';
-                    const barDetail = rawPct > 0
-                        ? `${stageLabel} ${direction} from ${rawPct.toFixed(1)}% to ${finalPct.toFixed(1)}%`
-                        : `${finalPct.toFixed(1)}% after ${stageLabel}`;
-                    bar.addEventListener('mouseenter', () => showDetail(bar, barDetail));
-                    bar.addEventListener('mouseleave', hideDetail);
+                    bar.addEventListener('mouseenter', () => showStageDetail(bar, c.id, c.text, stages));
+                    bar.addEventListener('mouseleave', scheduleDetailHide);
                     barTrack.appendChild(bar);
 
                     // Origin marker — thin line showing raw probability
@@ -283,9 +389,8 @@ export function createTokenPopup(): TokenPopup {
                         const marker = document.createElement('div');
                         marker.className = 'token-popup-origin';
                         marker.style.left = `${rawPct.toFixed(1)}%`;
-                        const markerDetail = `started at ${rawPct.toFixed(1)}% before sampling`;
-                        marker.addEventListener('mouseenter', () => showDetail(marker, markerDetail));
-                        marker.addEventListener('mouseleave', hideDetail);
+                        marker.addEventListener('mouseenter', () => showStageDetail(marker, c.id, c.text, stages));
+                        marker.addEventListener('mouseleave', scheduleDetailHide);
                         barTrack.appendChild(marker);
                     }
                 } else {
