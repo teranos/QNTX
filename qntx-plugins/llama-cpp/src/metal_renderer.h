@@ -4,8 +4,8 @@
 //   runner-up positions at each generation step. Data exists in TokenSignal.top_k.
 // TODO(B64): WebSocket frames are base64-encoded PNG — 33% overhead. Binary
 //   WebSocket frames would eliminate this.
-// TODO(CAM): Camera is 2D pan+zoom only (orthographic). 3D rotation would
-//   let users explore the full vocabulary embedding space.
+// TODO(CAM): 3D camera (WASD + mouse) is implemented but needs testing and
+//   refinement — controls feel rough, no inertia, no collision with nebula bounds.
 // TODO(KFC): Keyframe history capped at 512 (64MB). Longer generations lose
 //   early frames. No disk persistence — closing the glyph loses all history.
 // TODO(TRU): Trail positions vector is unbounded while keyframes are capped.
@@ -143,7 +143,7 @@ private:
 
     // Scrub playback — CPU-side keyframe history
     std::vector<std::vector<float>> keyframe_history_;  // one distribution per token
-    int scrub_index_ = -1;  // -1 = live mode
+    std::atomic<int> scrub_index_{-1};  // -1 = live mode
 
     // Drift — fixed-step camera offset per token, makes time into space
     int drift_count_ = 0;        // how many tokens have been recorded

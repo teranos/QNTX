@@ -334,6 +334,8 @@ int InferenceEngine::prepare_prompt(
     const std::vector<Message>& messages,
     ChatResult& result) {
 
+    auto prep_start = std::chrono::steady_clock::now();
+
     // Build llama_chat_message array from our Message structs
     std::vector<llama_chat_message> chat_msgs;
     chat_msgs.reserve(messages.size());
@@ -372,6 +374,11 @@ int InferenceEngine::prepare_prompt(
 
     // Clear KV cache
     llama_memory_clear(llama_get_memory(ctx_), true);
+
+    auto tokenize_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - prep_start).count();
+    std::cout << "[llama-cpp] Prompt prep: " << n_tokens << " tokens, template+tokenize in "
+              << tokenize_ms << "ms" << std::endl;
 
     // Decode prompt
     auto t0 = std::chrono::steady_clock::now();
@@ -480,7 +487,12 @@ InferenceEngine::ChatResult InferenceEngine::stream_chat(
     TokenCallback on_token,
     const SamplerConfig& sampler_cfg) {
 
+    auto entry_time = std::chrono::steady_clock::now();
+    std::cout << "[llama-cpp] stream_chat: waiting for mutex..." << std::endl;
     std::lock_guard<std::mutex> lock(mutex_);
+    auto lock_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - entry_time).count();
+    std::cout << "[llama-cpp] stream_chat: mutex acquired in " << lock_ms << "ms" << std::endl;
 
     ChatResult result;
     if (!model_ || !ctx_) {
@@ -519,14 +531,18 @@ InferenceEngine::ChatResult InferenceEngine::stream_chat(
             sig.token_text = std::string(buf, n);
             output.write(buf, n);
         }
-        sig.sampler_stages = stage_snapshots;
-        result.signals.push_back(sig);
+        sig.sampler_stages = std::move(stage_snapshots);
 
-        // Stream the token to the caller
+        // Stream the token to the caller (with full distribution for renderer)
         auto t2 = std::chrono::steady_clock::now();
         if (on_token && !on_token(sig.token_text, sig)) {
             break; // Caller requested abort
         }
+
+        // Strip heavy data before accumulating — renderer already consumed it
+        sig.full_distribution.clear();
+        sig.sampler_stages.clear();
+        result.signals.push_back(std::move(sig));
         auto t3 = std::chrono::steady_clock::now();
         callback_us += std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count();
 
