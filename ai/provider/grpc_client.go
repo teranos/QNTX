@@ -140,6 +140,22 @@ func (c *GRPCLLMClient) ChatStreaming(ctx context.Context, req ChatRequest, stre
 					Prob: tc.Prob,
 				})
 			}
+			for _, stage := range chunk.Signal.SamplerStages {
+				ss := SamplerStageSignal{
+					Name:        stage.Name,
+					ActiveCount: stage.ActiveCount,
+					Top1Prob:    stage.Top1Prob,
+					Entropy:     stage.Entropy,
+				}
+				for _, tc := range stage.TopK {
+					ss.TopK = append(ss.TopK, TokenCandidate{
+						ID:   tc.Id,
+						Text: tc.Text,
+						Prob: tc.Prob,
+					})
+				}
+				sig.SamplerStages = append(sig.SamplerStages, ss)
+			}
 			sc.Signal = sig
 		}
 

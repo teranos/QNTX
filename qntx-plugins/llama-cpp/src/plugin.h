@@ -14,18 +14,41 @@
 #include "llm.grpc.pb.h"
 #include "ats_client.h"
 
-#define PLUGIN_VERSION "0.21.0"
+#define PLUGIN_VERSION "0.22.0"
 
 // Forward declarations
 struct llama_model;
 struct llama_context;
 class MetalRenderer;
 
+// Sampler chain configuration — controls which samplers are active and their params.
+// Defaults produce the same behavior as the previous temp-only chain.
+struct SamplerConfig {
+    int top_k = 0;                   // 0 = disabled
+    float top_p = 1.0f;             // 1.0 = disabled (nucleus sampling)
+    float min_p = 0.0f;             // 0.0 = disabled
+    float typical_p = 1.0f;         // 1.0 = disabled
+    int penalty_last_n = 0;         // 0 = disabled
+    float penalty_repeat = 1.0f;    // 1.0 = disabled
+    float penalty_freq = 0.0f;      // 0.0 = disabled
+    float penalty_present = 0.0f;   // 0.0 = disabled
+};
+
 // A candidate token and its probability from the pre-sampler logit distribution
 struct TokenCandidate {
     int id;
     std::string text;
     float prob;
+};
+
+// Snapshot of the token distribution at a point in the sampler chain.
+// Captured by observer samplers inserted between each stage.
+struct SamplerStageSnapshot {
+    std::string stage_name;          // e.g. "penalties", "top_k", "top_p", "temp"
+    int active_count;                // tokens remaining with nonzero probability
+    float top1_prob;                 // probability of top token after this stage
+    float entropy;                   // Shannon entropy after this stage
+    std::vector<TokenCandidate> top_k;  // top-5 candidates after this stage
 };
 
 // Per-token signal captured before sampling
@@ -37,6 +60,7 @@ struct TokenSignal {
     float top_gap;                         // P(top1) - P(top2)
     std::vector<TokenCandidate> top_k;     // top-k candidates with probabilities
     std::vector<float> full_distribution;  // Full softmax distribution (vocab_size floats)
+    std::vector<SamplerStageSnapshot> sampler_stages;  // per-stage snapshots through chain
 };
 
 // Inference engine wrapping llama.cpp
@@ -60,7 +84,8 @@ public:
     ChatResult chat(const std::string& system_prompt,
                     const std::string& user_prompt,
                     float temperature,
-                    int max_tokens);
+                    int max_tokens,
+                    const SamplerConfig& sampler_cfg = {});
 
     // Multi-turn: messages is a vector of {role, content} pairs
     struct Message {
@@ -70,7 +95,8 @@ public:
 
     ChatResult chat(const std::vector<Message>& messages,
                     float temperature,
-                    int max_tokens);
+                    int max_tokens,
+                    const SamplerConfig& sampler_cfg = {});
 
     // Callback receives token text + signal per step. Return false to abort.
     using TokenCallback = std::function<bool(const std::string& token_text, const TokenSignal& signal)>;
@@ -80,13 +106,15 @@ public:
                            const std::string& user_prompt,
                            float temperature,
                            int max_tokens,
-                           TokenCallback on_token);
+                           TokenCallback on_token,
+                           const SamplerConfig& sampler_cfg = {});
 
     // Multi-turn streaming
     ChatResult stream_chat(const std::vector<Message>& messages,
                            float temperature,
                            int max_tokens,
-                           TokenCallback on_token);
+                           TokenCallback on_token,
+                           const SamplerConfig& sampler_cfg = {});
 
     std::string model_name() const { return model_name_; }
 
@@ -166,10 +194,13 @@ public:
     // PCA readiness — set to true once background thread finishes
     bool pca_ready() const { return pca_ready_.load(std::memory_order_acquire); }
 
+    const SamplerConfig& sampler_config() const { return sampler_cfg_; }
+
 private:
     InferenceEngine engine_;
     std::unique_ptr<MetalRenderer> renderer_;
     AtsClient ats_client_;
+    SamplerConfig sampler_cfg_;
 
     // Background PCA computation thread
     std::thread pca_thread_;
