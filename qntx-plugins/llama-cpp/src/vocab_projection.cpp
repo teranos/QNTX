@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <fstream>
 #include <iostream>
 #include <random>
 #include <vector>
@@ -45,6 +46,51 @@ static void deflate(float* mat, int n, const std::vector<float>& vec) {
     float lambda = cblas_sdot(n, vec.data(), 1, mv.data(), 1);
     // mat -= lambda * vec * vec^T
     cblas_sger(CblasRowMajor, n, n, -lambda, vec.data(), 1, vec.data(), 1, mat, n);
+}
+
+// Try to load cached positions from <model_path>.vocab3d.
+// Returns true if cache was valid and loaded into vocab_positions_.
+bool InferenceEngine::load_vocab_cache() {
+    std::string cache_path = model_path_ + ".vocab3d";
+    std::ifstream f(cache_path, std::ios::binary | std::ios::ate);
+    if (!f.is_open()) return false;
+
+    auto file_size = f.tellg();
+    f.seekg(0);
+
+    // File must contain exactly n_vocab × 3 floats
+    if (!model_) return false;
+    struct ggml_tensor* tok_embd = model_->tok_embd;
+    if (!tok_embd) return false;
+    int n_vocab = tok_embd->ne[1];
+
+    size_t expected = static_cast<size_t>(n_vocab) * 3 * sizeof(float);
+    if (static_cast<size_t>(file_size) != expected) {
+        std::cout << "[llama-cpp] Cache size mismatch: " << file_size
+                  << " bytes, expected " << expected << " for n_vocab=" << n_vocab << std::endl;
+        return false;
+    }
+
+    vocab_positions_.resize(n_vocab * 3);
+    f.read(reinterpret_cast<char*>(vocab_positions_.data()), expected);
+    if (!f.good()) {
+        vocab_positions_.clear();
+        return false;
+    }
+    return true;
+}
+
+void InferenceEngine::write_vocab_cache() {
+    std::string cache_path = model_path_ + ".vocab3d";
+    std::ofstream f(cache_path, std::ios::binary | std::ios::trunc);
+    if (!f.is_open()) {
+        std::cout << "[llama-cpp] Failed to write cache: " << cache_path << std::endl;
+        return;
+    }
+    f.write(reinterpret_cast<const char*>(vocab_positions_.data()),
+            vocab_positions_.size() * sizeof(float));
+    std::cout << "[llama-cpp] Wrote vocab cache: " << cache_path
+              << " (" << vocab_positions_.size() / 3 << " positions)" << std::endl;
 }
 
 void InferenceEngine::compute_vocab_positions() {
@@ -121,11 +167,21 @@ void InferenceEngine::compute_vocab_positions() {
                 0.0f, vocab_positions_.data(), 3);
 
     std::cout << "[llama-cpp] Vocab positions computed (" << n_vocab << " × 3)" << std::endl;
+
+    write_vocab_cache();
 }
 
 const std::vector<float>& InferenceEngine::vocab_positions_3d() {
+    // No mutex_ here — this must not block inference.
+    // Only called from the background PCA thread and HTTP handlers.
+    // vocab_positions_ is written once, then read-only; pca_ready_ provides ordering.
     if (vocab_positions_.empty() && model_) {
-        compute_vocab_positions();
+        if (load_vocab_cache()) {
+            std::cout << "[llama-cpp] Loaded vocab positions from cache ("
+                      << vocab_positions_.size() / 3 << " positions)" << std::endl;
+        } else {
+            compute_vocab_positions();
+        }
     }
     return vocab_positions_;
 }
