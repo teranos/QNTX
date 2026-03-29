@@ -1,6 +1,7 @@
 #include "plugin.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <sstream>
@@ -107,8 +108,16 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
         backend_initialized_ = true;
     }
 
-    // Model parameters
+    // Model parameters — offload all layers to Metal GPU
     auto model_params = llama_model_default_params();
+    model_params.n_gpu_layers = -1;
+    model_params.progress_callback = [](float progress, void*) -> bool {
+        int pct = (int)(progress * 100);
+        if (pct % 10 == 0) {
+            std::cout << "[llama-cpp] Loading model: " << pct << "%" << std::endl;
+        }
+        return true;
+    };
     model_ = llama_model_load_from_file(model_path.c_str(), model_params);
     if (!model_) {
         std::cout << "[llama-cpp] Failed to load model from " << model_path << std::endl;
@@ -209,11 +218,17 @@ int InferenceEngine::prepare_prompt(
     llama_memory_clear(llama_get_memory(ctx_), true);
 
     // Decode prompt
+    auto t0 = std::chrono::steady_clock::now();
     llama_batch batch = llama_batch_get_one(tokens.data(), n_tokens);
     if (llama_decode(ctx_, batch) != 0) {
         result.content = "error: prompt decode failed";
         return -1;
     }
+    auto t1 = std::chrono::steady_clock::now();
+    auto prompt_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+    std::cout << "[llama-cpp] Prompt eval: " << n_tokens << " tokens in "
+              << prompt_ms << "ms (" << (prompt_ms > 0 ? (n_tokens * 1000 / prompt_ms) : 0)
+              << " tok/s)" << std::endl;
 
     return n_tokens;
 }
@@ -327,9 +342,15 @@ InferenceEngine::ChatResult InferenceEngine::stream_chat(
 
     std::ostringstream output;
     int n_generated = 0;
+    auto gen_start = std::chrono::steady_clock::now();
+    long signal_us = 0, decode_us = 0, callback_us = 0;
 
     for (int i = 0; i < max_tokens; i++) {
+        auto t0 = std::chrono::steady_clock::now();
         TokenSignal sig = capture_signal(ctx_, vocab, SIGNAL_TOP_K);
+        auto t1 = std::chrono::steady_clock::now();
+        signal_us += std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+
         llama_token new_token = llama_sampler_sample(sampler, ctx_, -1);
 
         if (llama_vocab_is_eog(vocab, new_token)) break;
@@ -344,14 +365,28 @@ InferenceEngine::ChatResult InferenceEngine::stream_chat(
         result.signals.push_back(sig);
 
         // Stream the token to the caller
+        auto t2 = std::chrono::steady_clock::now();
         if (on_token && !on_token(sig.token_text, sig)) {
             break; // Caller requested abort
         }
+        auto t3 = std::chrono::steady_clock::now();
+        callback_us += std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count();
 
+        auto t4 = std::chrono::steady_clock::now();
         llama_batch next = llama_batch_get_one(&new_token, 1);
         if (llama_decode(ctx_, next) != 0) break;
+        auto t5 = std::chrono::steady_clock::now();
+        decode_us += std::chrono::duration_cast<std::chrono::microseconds>(t5 - t4).count();
         n_generated++;
     }
+
+    auto gen_end = std::chrono::steady_clock::now();
+    auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(gen_end - gen_start).count();
+    std::cout << "[llama-cpp] Generation: " << n_generated << " tokens in "
+              << total_ms << "ms (" << (total_ms > 0 ? (n_generated * 1000 / total_ms) : 0) << " tok/s)"
+              << " | decode=" << decode_us / 1000 << "ms"
+              << " signal=" << signal_us / 1000 << "ms"
+              << " callback=" << callback_us / 1000 << "ms" << std::endl;
 
     llama_sampler_free(sampler);
     result.content = output.str();

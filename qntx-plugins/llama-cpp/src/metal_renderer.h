@@ -4,8 +4,8 @@
 //   runner-up positions at each generation step. Data exists in TokenSignal.top_k.
 // TODO(B64): WebSocket frames are base64-encoded PNG — 33% overhead. Binary
 //   WebSocket frames would eliminate this.
-// TODO(CAM): No camera control — fixed orthographic MVP auto-fitted to bounds.
-//   Interactive rotation/zoom/pan would let users explore vocabulary space.
+// TODO(CAM): Camera is 2D pan+zoom only (orthographic). 3D rotation would
+//   let users explore the full vocabulary embedding space.
 // TODO(KFC): Keyframe history capped at 512 (64MB). Longer generations lose
 //   early frames. No disk persistence — closing the glyph loses all history.
 // TODO(TRU): Trail positions vector is unbounded while keyframes are capped.
@@ -15,6 +15,8 @@
 //   from same memory) but no input→buffer→sampler path is wired.
 // TODO(PVH): PCA projection accesses private llama-model.h header to read
 //   tok_embd.weight. Version-fragile against llama.cpp internal changes.
+
+#include "camera.h"
 
 #include <atomic>
 #include <chrono>
@@ -68,6 +70,11 @@ public:
     void add_ghost_branches(int chosen_token_id,
                             const std::vector<std::pair<int,float>>& runners);
 
+    // Camera: pan (dx/dy in world units), zoom (dz multiplicative),
+    // rotation (dyaw/dpitch in radians).
+    void apply_camera(float dx, float dy, float dz, float dyaw, float dpitch);
+    void reset_camera();
+
     // Runtime-adjustable parameters
     void set_param(const std::string& key, float value);
 
@@ -111,6 +118,10 @@ private:
     MTL::Buffer* positions_buffer_ = nullptr;
     int vocab_size_ = 0;
     float center_x_ = 0, center_y_ = 0, extent_ = 1.0f;
+
+    Camera camera_;
+
+    void build_mvp(float* mvp, int width, int height);
 
     // Generation trail — chosen token positions
     std::vector<float> trail_positions_;  // flat float3 array
