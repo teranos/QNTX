@@ -34,7 +34,8 @@ import { registerHandler, unregisterHandler } from '../../websocket';
 import { apiFetch } from '../../api';
 import { canvasSyncQueue } from '../../api/canvas-sync';
 import { createFollowUpZone, type FollowUpRequest, type FollowUpControls } from './glyph-followup';
-import { createTokenPopup } from './token-popup';
+import { createTokenPopup, samplerInfluenceColor } from './token-popup';
+import type { SamplerStageSignal } from '@generated/server';
 
 // ── Multiplexer ─────────────────────────────────────────────────────
 
@@ -112,6 +113,18 @@ interface StreamInstance {
 
 const instances = new Set<StreamInstance>();
 
+/** Current coloring mode — shared across all stream glyphs */
+let colorMode: ColorMode = 'confidence';
+
+/** Toggle coloring mode and recolor all visible instances */
+export function toggleColorMode(): ColorMode {
+    colorMode = colorMode === 'confidence' ? 'sampler' : 'confidence';
+    for (const inst of instances) {
+        if (inst.visible) renderSpans(inst);
+    }
+    return colorMode;
+}
+
 /** Count total spans across all visible stream glyphs */
 function globalSpanCount(): number {
     let count = 0;
@@ -146,7 +159,7 @@ function renderSpans(inst: StreamInstance): void {
     const perGlyph = Math.floor(GLOBAL_DOM_BUDGET / Math.max(1, visibleCount));
     const start = Math.max(0, inst.tokens.length - perGlyph);
     for (let i = start; i < inst.tokens.length; i++) {
-        output.appendChild(renderToken(inst.tokens[i], i));
+        output.appendChild(renderToken(inst.tokens[i], i, colorMode));
     }
 }
 
@@ -170,20 +183,36 @@ const visibilityObserver: IntersectionObserver | null =
         }, { threshold: 0 })
         : null;
 
+// ── Coloring modes ──────────────────────────────────────────────────
+
+type ColorMode = 'confidence' | 'sampler';
+
+function tokenColor(token: StreamToken, mode: ColorMode): string {
+    if (!token.signal) return 'transparent';
+    if (mode === 'sampler' && token.signal.sampler_stages) {
+        const color = samplerInfluenceColor(token.signal.sampler_stages as SamplerStageSignal[]);
+        if (color !== 'transparent') return color;
+    }
+    return confidenceToColor(token.signal.confidence);
+}
+
 // ── Token rendering ─────────────────────────────────────────────────
 
-function renderToken(token: StreamToken, tokenIndex: number): HTMLSpanElement {
+function renderToken(token: StreamToken, tokenIndex: number, mode: ColorMode): HTMLSpanElement {
     const span = document.createElement('span');
     span.textContent = token.text;
     span.dataset.tokenIndex = String(tokenIndex);
 
     if (token.signal) {
-        span.style.backgroundColor = confidenceToColor(token.signal.confidence);
+        span.style.backgroundColor = tokenColor(token, mode);
         span.dataset.confidence = String(token.signal.confidence);
         span.dataset.entropy = String(token.signal.entropy);
         span.dataset.topGap = String(token.signal.top_gap);
         if (token.signal.top_k) {
             span.dataset.topK = JSON.stringify(token.signal.top_k);
+        }
+        if (token.signal.sampler_stages) {
+            span.dataset.samplerStages = JSON.stringify(token.signal.sampler_stages);
         }
     }
 
@@ -214,6 +243,18 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
     const tokens: StreamToken[] = [];
     let streamModel: string | undefined;
 
+    // Color mode toggle button
+    const colorBtn = document.createElement('button');
+    colorBtn.className = 'titlebar-btn';
+    colorBtn.textContent = '◐';
+    colorBtn.title = 'Toggle coloring: confidence / sampler influence';
+    colorBtn.addEventListener('click', () => {
+        const mode = toggleColorMode();
+        colorBtn.title = mode === 'confidence'
+            ? 'Coloring: confidence (click for sampler)'
+            : 'Coloring: sampler influence (click for confidence)';
+    });
+
     // Close button
     const closeBtn = document.createElement('button');
     closeBtn.className = 'titlebar-btn';
@@ -229,7 +270,7 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
         glyph,
         className: 'canvas-stream-glyph',
         defaults: { x: 200, y: 200, width: 420, height: 200 },
-        titleBar: { label: 'Stream', actions: [closeBtn] },
+        titleBar: { label: 'Stream', actions: [colorBtn, closeBtn] },
         resizable: { minWidth: 200, minHeight: 80 },
         logLabel: 'StreamGlyph',
     });
@@ -308,7 +349,7 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
     output.addEventListener('mouseleave', (e: MouseEvent) => {
         const target = e.target as HTMLElement;
         if (target.tagName === 'SPAN') {
-            popup.hide();
+            popup.scheduleHide();
             document.dispatchEvent(new CustomEvent('nebula-scrub', {
                 detail: { index: -1 },
             }));
@@ -342,7 +383,7 @@ export function createStreamGlyph(glyph: Glyph, promptGlyphId: string, promptTex
             const tokenIndex = tokens.length;
             tokens.push(token);
             if (instance.visible) {
-                output.appendChild(renderToken(token, tokenIndex));
+                output.appendChild(renderToken(token, tokenIndex, colorMode));
                 evictToFit();
             }
             output.scrollTop = output.scrollHeight;
