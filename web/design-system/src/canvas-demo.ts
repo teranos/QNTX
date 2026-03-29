@@ -2,6 +2,7 @@
  * Canvas demo — real SDK glyphs on a focusable canvas with zoom/pan.
  *
  * Dogfoods canvas-pan (real zoom/pan), GlyphUI SDK, and focus behavior.
+ * DAG structure: ix-json →right py →right ts, py →bottom result-1 →bottom result-2 →bottom result-3
  * Breakpoints table, viewport presets, column overrides, zoom controls.
  */
 
@@ -9,6 +10,7 @@ import { createGlyphUI } from '../../ts/components/glyph/glyph-ui'
 import type { Glyph } from '../../ts/components/glyph/glyph'
 import { setupCanvasPan, getTransform, setZoom, resetTransform } from '../../ts/components/glyph/canvas/canvas-pan'
 import { focusGlyph as canvasFocusGlyph, unfocusGlyph, isFocused, setupCanvasFocus } from '../../ts/components/glyph/canvas/canvas-focus'
+import type { FocusGraphProvider } from '../../ts/components/glyph/canvas/canvas-focus'
 
 /**
  * Render canvas demo into the given container.
@@ -23,7 +25,7 @@ export function renderCanvasDemo(
   elements.push(sectionGlyph('Canvas', 'Double-click a glyph to focus it. Escape to unfocus. Viewport width determines the split.'))
 
   // Breakpoints reference
-  elements.push(glyphSection('Breakpoints', 'System breakpoints (tokens.css) and focus column splits', (body) => {
+  elements.push(glyphSection('Breakpoints', 'Focus column splits — always odd, center column is the thread', (body) => {
     const table = document.createElement('div')
     table.className = 'button-matrix'
     table.style.gridTemplateColumns = '100px 100px 1fr'
@@ -38,12 +40,12 @@ export function renderCanvasDemo(
 
     const rows: [string, string, string][] = [
       ['< 480px', '1', 'phone portrait'],
-      ['480 \u2013 719px', '2', ''],
+      ['480 \u2013 719px', '1', ''],
       ['720 \u2013 767px', '3', ''],
       ['768 \u2013 899px', '3', 'mobile (--breakpoint-mobile)'],
       ['900 \u2013 959px', '3', 'tablet (--breakpoint-tablet)'],
-      ['960 \u2013 1199px', '4', ''],
-      ['1200px+', '4', 'desktop (--breakpoint-desktop)'],
+      ['960 \u2013 1199px', '5', ''],
+      ['1200px+', '5', 'desktop (--breakpoint-desktop)'],
     ]
 
     for (const [width, cols, system] of rows) {
@@ -69,12 +71,12 @@ export function renderCanvasDemo(
   }))
 
   // Canvas with real SDK glyphs, zoom/pan, focus
-  elements.push(glyphSection('Canvas demo', 'Double-click any glyph. Escape to unfocus. Scroll/pinch to zoom. Resize browser or use presets to see split change.', (body) => {
+  elements.push(glyphSection('Canvas demo', 'Double-click any glyph to enter its DAG. Escape to unfocus. Click a sibling to pivot.', (body) => {
     const canvasId = 'design-system-focus'
     const canvas = document.createElement('div')
     canvas.className = 'canvas-workspace'
     canvas.style.position = 'relative'
-    canvas.style.height = '320px'
+    canvas.style.height = '420px'
     canvas.style.overflow = 'hidden'
     canvas.tabIndex = 0
 
@@ -89,14 +91,16 @@ export function renderCanvasDemo(
     let columnOverride: number | null = null
 
     // Compute split column count from viewport width (or use override)
-    function getColumnCount(): number {
+    // Always odd: 1, 3, or 5
+    function getColumnCount(_viewportWidth?: number): number {
       if (columnOverride) return columnOverride
       const w = canvas.clientWidth
-      if (w >= 960) return 4
+      if (w >= 960) return 5
       if (w >= 720) return 3
-      if (w >= 480) return 2
       return 1
     }
+
+    // ── Demo glyphs ──
 
     // ix-json: default title bar + SDK primitives
     const ixJsonGlyph: Glyph = { id: 'demo-ix-json', title: 'ix-json', symbol: 'ix-json', x: 10, y: 10, renderContent: () => document.createElement('div') }
@@ -132,7 +136,7 @@ export function renderCanvasDemo(
     ixJson.content.appendChild(status.element)
     contentLayer.appendChild(ixJson.element)
 
-    // py-glyph: Python blue title bar
+    // py-glyph: Python blue title bar (prompt at top of vertical chain)
     const pyGlyphData: Glyph = { id: 'demo-py', title: 'py-glyph', symbol: 'py', x: 300, y: 10, renderContent: () => document.createElement('div') }
     const pyUI = createGlyphUI(pyGlyphData, 'py')
     const py = pyUI.glyph({
@@ -149,7 +153,7 @@ export function renderCanvasDemo(
     py.content.appendChild(pyCode)
     contentLayer.appendChild(py.element)
 
-    // ts-glyph: TypeScript amber title bar
+    // ts-glyph: TypeScript amber title bar (horizontal sibling of py)
     const tsGlyphData: Glyph = { id: 'demo-ts', title: 'ts-glyph', symbol: 'ts', x: 590, y: 10, renderContent: () => document.createElement('div') }
     const tsUI = createGlyphUI(tsGlyphData, 'ts')
     const ts = tsUI.glyph({
@@ -166,29 +170,105 @@ export function renderCanvasDemo(
     ts.content.appendChild(tsCode)
     contentLayer.appendChild(ts.element)
 
-    // scroll-glyph: long content to test scrolling while focused
-    const scrollGlyphData: Glyph = { id: 'demo-scroll', title: 'scroll-glyph', symbol: 'scroll', x: 10, y: 220, renderContent: () => document.createElement('div') }
-    const scrollUI = createGlyphUI(scrollGlyphData, 'scroll')
-    const scroll = scrollUI.glyph({
-      defaults: { x: 10, y: 220, width: 280, height: 190 },
-      titleBar: { label: 'scroll-glyph' },
+    // result-1: first result below py (vertical chain)
+    const r1Data: Glyph = { id: 'demo-result-1', title: 'result-1', symbol: 'result', x: 300, y: 220, renderContent: () => document.createElement('div') }
+    const r1UI = createGlyphUI(r1Data, 'result')
+    const r1 = r1UI.glyph({
+      defaults: { x: 300, y: 220, width: 280, height: 120 },
+      titleBar: { label: 'result-1' },
     })
-    const scrollContent = document.createElement('div')
-    scrollContent.style.overflow = 'auto'
-    scrollContent.style.flex = '1'
-    scrollContent.style.padding = '8px'
-    scrollContent.style.fontSize = 'var(--font-size-sm)'
-    scrollContent.style.color = 'var(--text-on-dark)'
-    scrollContent.style.lineHeight = '1.6'
-    const lines: string[] = []
-    for (let i = 1; i <= 40; i++) {
-      lines.push(`Line ${i}: The quick brown fox jumps over the lazy dog.`)
+    const r1Content = document.createElement('pre')
+    r1Content.style.fontFamily = 'monospace'
+    r1Content.style.fontSize = 'var(--font-size-sm)'
+    r1Content.style.color = 'var(--text-on-dark)'
+    r1Content.style.whiteSpace = 'pre-wrap'
+    r1Content.style.wordBreak = 'break-word'
+    r1Content.textContent = '>>> teach\nExecution time: 0.003s'
+    r1.content.appendChild(r1Content)
+    contentLayer.appendChild(r1.element)
+
+    // result-2: second result (deeper in chain)
+    const r2Data: Glyph = { id: 'demo-result-2', title: 'result-2', symbol: 'result', x: 300, y: 360, renderContent: () => document.createElement('div') }
+    const r2UI = createGlyphUI(r2Data, 'result')
+    const r2 = r2UI.glyph({
+      defaults: { x: 300, y: 360, width: 280, height: 120 },
+      titleBar: { label: 'result-2' },
+    })
+    const r2Content = document.createElement('pre')
+    r2Content.style.fontFamily = 'monospace'
+    r2Content.style.fontSize = 'var(--font-size-sm)'
+    r2Content.style.color = 'var(--text-on-dark)'
+    r2Content.style.whiteSpace = 'pre-wrap'
+    r2Content.style.wordBreak = 'break-word'
+    r2Content.textContent = '>>> meld\nExecution time: 0.001s'
+    r2.content.appendChild(r2Content)
+    contentLayer.appendChild(r2.element)
+
+    // result-3: third result (deepest)
+    const r3Data: Glyph = { id: 'demo-result-3', title: 'result-3', symbol: 'result', x: 300, y: 500, renderContent: () => document.createElement('div') }
+    const r3UI = createGlyphUI(r3Data, 'result')
+    const r3 = r3UI.glyph({
+      defaults: { x: 300, y: 500, width: 280, height: 120 },
+      titleBar: { label: 'result-3' },
+    })
+    const r3Content = document.createElement('pre')
+    r3Content.style.fontFamily = 'monospace'
+    r3Content.style.fontSize = 'var(--font-size-sm)'
+    r3Content.style.color = 'var(--text-on-dark)'
+    r3Content.style.whiteSpace = 'pre-wrap'
+    r3Content.style.wordBreak = 'break-word'
+    r3Content.textContent = '>>> teach\nExecution time: 0.002s'
+    r3.content.appendChild(r3Content)
+    contentLayer.appendChild(r3.element)
+
+    // ── DAG structure ──
+    // ix-json →right py →right ts
+    //                 py →bottom result-1 →bottom result-2 →bottom result-3
+
+    // DAG: ix-json →right py →right ts
+    //                      py →bottom result-1 →bottom result-2 →bottom result-3
+    const pyThread = ['demo-py', 'demo-result-1', 'demo-result-2', 'demo-result-3']
+
+    const focusGraphProvider: FocusGraphProvider = (glyphId) => {
+      if (pyThread.indexOf(glyphId) >= 0) {
+        // Focusing any member of py's vertical chain
+        // ix-json is LEFT of py, ts is RIGHT of py
+        return {
+          thread: pyThread,
+          focusIndex: pyThread.indexOf(glyphId),
+          leftSiblings: new Map([['demo-py', ['demo-ix-json']]]),
+          rightSiblings: new Map([['demo-py', ['demo-ts']]]),
+          siblingThreads: new Map(),
+        }
+      }
+
+      if (glyphId === 'demo-ix-json') {
+        // Pivot: ix-json becomes center, py is to the RIGHT
+        return {
+          thread: ['demo-ix-json'],
+          focusIndex: 0,
+          leftSiblings: new Map(),
+          rightSiblings: new Map([['demo-ix-json', ['demo-py', 'demo-ts']]]),
+          siblingThreads: new Map([['demo-py', pyThread]]),
+        }
+      }
+
+      if (glyphId === 'demo-ts') {
+        // Pivot: ts becomes center, py is to the LEFT
+        return {
+          thread: ['demo-ts'],
+          focusIndex: 0,
+          leftSiblings: new Map([['demo-ts', ['demo-py', 'demo-ix-json']]]),
+          rightSiblings: new Map(),
+          siblingThreads: new Map([['demo-py', pyThread]]),
+        }
+      }
+
+      // Standalone glyph
+      return { thread: [glyphId], focusIndex: 0, leftSiblings: new Map(), rightSiblings: new Map(), siblingThreads: new Map() }
     }
-    scrollContent.textContent = lines.join('\n')
-    scrollContent.style.whiteSpace = 'pre-wrap'
-    scrollContent.style.wordBreak = 'break-word'
-    scroll.content.appendChild(scrollContent)
-    contentLayer.appendChild(scroll.element)
+
+    // ── Event handlers ──
 
     // Double-click to focus
     canvas.addEventListener('dblclick', (e) => {
@@ -218,12 +298,14 @@ export function renderCanvasDemo(
       }
     })
 
+    // ── Controls ──
+
     // Viewport presets
     const presets: [string, number, number][] = [
       ['Phone', 375, 667],
       ['Phone landscape', 667, 375],
       ['Tablet', 768, 1024],
-      ['Desktop', 1100, 320],
+      ['Desktop', 1100, 420],
     ]
 
     const controls = document.createElement('div')
@@ -244,7 +326,7 @@ export function renderCanvasDemo(
       btn.addEventListener('click', () => {
         if (activePreset === label) {
           canvas.style.width = ''
-          canvas.style.height = '320px'
+          canvas.style.height = '420px'
           canvas.style.margin = ''
           activePreset = null
           controls.querySelectorAll('.qntx-btn').forEach(b => b.classList.remove('qntx-btn-primary'))
@@ -268,8 +350,8 @@ export function renderCanvasDemo(
     sep.style.margin = '0 2px'
     controls.appendChild(sep)
 
-    // Column override buttons
-    for (const n of [2, 3, 4]) {
+    // Column override buttons — always odd
+    for (const n of [3, 5]) {
       const btn = document.createElement('button')
       btn.className = 'qntx-btn qntx-btn-small qntx-btn-ghost'
       const btnLabel = document.createElement('span')
@@ -307,16 +389,13 @@ export function renderCanvasDemo(
     randomLabel.textContent = 'Random'
     randomBtn.appendChild(randomLabel)
     randomBtn.addEventListener('click', () => {
-      const scale = 0.4 + Math.random() * 2.1 // 0.4 to 2.5
+      const scale = 0.4 + Math.random() * 2.1
       const panX = -200 + Math.random() * 400
       const panY = -100 + Math.random() * 200
-      // Set zoom first (centers on origin), then manually adjust pan
       setZoom(canvas, canvasId, scale)
-      // Override pan after setZoom (which recomputes pan for zoom center)
       const t = getTransform(canvasId)
       const cl = canvas.querySelector('.canvas-content-layer') as HTMLElement
       if (cl) {
-        // Directly set pan via the content layer transform
         cl.style.transform = `translate(${panX}px, ${panY}px) scale(${t.scale})`
       }
       updateIndicator()
@@ -338,7 +417,7 @@ export function renderCanvasDemo(
 
     body.appendChild(controls)
 
-    // Zoom/pan indicator — shows current transform state
+    // Zoom/pan indicator
     const indicator = document.createElement('div')
     indicator.style.position = 'absolute'
     indicator.style.bottom = '4px'
@@ -354,14 +433,13 @@ export function renderCanvasDemo(
     }
     canvas.appendChild(indicator)
 
-    // Add content layer to canvas, set up real pan/zoom
+    // Add content layer to canvas, set up real pan/zoom and focus
     canvas.appendChild(contentLayer)
 
-    // Wire up real canvas pan/zoom and focus
     setupCanvasPan(canvas, canvasId, () => isFocused(canvasId))
-    setupCanvasFocus(canvasId)
+    setupCanvasFocus(canvasId, focusGraphProvider, getColumnCount)
 
-    // Update indicator on zoom/pan changes (wheel events)
+    // Update indicator on zoom/pan changes
     canvas.addEventListener('wheel', () => setTimeout(updateIndicator, 0), { passive: true })
     canvas.addEventListener('touchend', () => setTimeout(updateIndicator, 0))
 

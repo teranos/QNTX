@@ -1,22 +1,23 @@
 /**
- * Canvas Focus — zoom/pan to center a glyph + transform glyph to fill column.
+ * Canvas Focus — DAG-aware thread layout.
  *
- * Double-click: canvas zooms to 100% and pans to center the glyph.
- * The glyph DOM element transforms to fill its column (viewport / column count).
- * Escape: glyph transforms back, zoom restores to pre-focus level, pan stays.
+ * Double-click a glyph to enter its world. The composition DAG becomes
+ * a navigable workspace: the vertical chain (bottom edges) stacks as a
+ * thread in the center column, horizontal siblings (right edges) appear
+ * in flanking columns with their own threads.
  *
- * Focus is persisted across sessions via uiState.
+ * See docs/glyphs/manifestations/focus.md for the full vision.
  */
 
 import { log, SEG } from '../../../logger';
 import { uiState } from '../../../state/ui';
 import { getTransform, setPanZoom } from './canvas-pan';
 
-// Column breakpoints (mirrors focus.md)
+// ── Column breakpoints (mirrors focus.md) ──
+// Always odd: 1, 3, or 5. Focus column is dead center.
 const BREAKPOINTS: [number, number][] = [
-    [960, 4],
+    [960, 5],
     [720, 3],
-    [480, 2],
 ];
 
 function getColumnCount(viewportWidth: number): number {
@@ -26,17 +27,80 @@ function getColumnCount(viewportWidth: number): number {
     return 1;
 }
 
-const TRANSITION = 'left 0.45s ease-out, top 0.45s ease-out, width 0.45s ease-out, height 0.45s ease-out';
+// Center column is ~20% wider than sibling columns.
+// Given C columns total, center gets weight 1.2, each sibling gets weight 1.0.
+// Total weight = (C - 1) * 1.0 + 1.2. Each column's width = (weight / totalWeight) * viewportWidth.
+const CENTER_WEIGHT = 1.2;
+const SIBLING_WEIGHT = 1.0;
 
-interface FocusState {
-    focusedGlyphId: string | null;
-    focusedElement: HTMLElement | null;
-    preFocusScale: number;
-    // Original glyph dimensions (canvas-space) for restore
+function computeColumnWidths(viewW: number, cols: number): { centerWidth: number; siblingWidth: number; offsets: number[] } {
+    if (cols === 1) {
+        return { centerWidth: viewW, siblingWidth: 0, offsets: [0] };
+    }
+    const siblingCount = cols - 1;
+    const totalWeight = siblingCount * SIBLING_WEIGHT + CENTER_WEIGHT;
+    const siblingWidth = (SIBLING_WEIGHT / totalWeight) * viewW;
+    const centerWidth = (CENTER_WEIGHT / totalWeight) * viewW;
+    const centerCol = Math.floor(cols / 2);
+
+    const offsets: number[] = [];
+    let x = 0;
+    for (let i = 0; i < cols; i++) {
+        offsets.push(x);
+        x += i === centerCol ? centerWidth : siblingWidth;
+    }
+    return { centerWidth, siblingWidth, offsets };
+}
+
+const TRANSITION = 'left 0.45s ease-out, top 0.45s ease-out, width 0.45s ease-out, height 0.45s ease-out';
+const THREAD_GAP = 6; // px between thread members
+
+// ── Types ──
+
+/**
+ * DAG subgraph relevant to a focused glyph.
+ * The provider walks the composition and returns this structure.
+ * canvas-focus.ts doesn't know about compositions — it lays out what the provider gives it.
+ */
+export interface FocusGraph {
+    /** Vertical chain (root to leaf via bottom edges) containing the focused glyph */
+    thread: string[];
+    /** Index of the focused glyph within thread */
+    focusIndex: number;
+    /** For each glyph in the thread, siblings to the LEFT (ordered outward: closest to center first) */
+    leftSiblings: Map<string, string[]>;
+    /** For each glyph in the thread, siblings to the RIGHT (ordered outward: closest to center first) */
+    rightSiblings: Map<string, string[]>;
+    /** For each sibling, its own vertical thread (bottom-chain) */
+    siblingThreads: Map<string, string[]>;
+}
+
+/**
+ * Returns the focus-relevant DAG subgraph for a glyph.
+ * When not provided, each glyph is its own single-member thread.
+ */
+export type FocusGraphProvider = (glyphId: string) => FocusGraph;
+
+/**
+ * Returns the number of columns for the current viewport width.
+ * When not provided, uses the default breakpoint-based column count.
+ */
+export type ColumnProvider = (viewportWidth: number) => number;
+
+interface TransformedGlyph {
+    element: HTMLElement;
     origLeft: string;
     origTop: string;
     origWidth: string;
     origHeight: string;
+}
+
+interface FocusState {
+    focusedGlyphId: string | null;
+    preFocusScale: number;
+    transformed: TransformedGlyph[];
+    graphProvider: FocusGraphProvider | null;
+    columnProvider: ColumnProvider | null;
 }
 
 // Per-canvas focus state
@@ -46,20 +110,17 @@ function getState(canvasId: string): FocusState {
     if (!focusStates.has(canvasId)) {
         focusStates.set(canvasId, {
             focusedGlyphId: null,
-            focusedElement: null,
             preFocusScale: 1.0,
-            origLeft: '',
-            origTop: '',
-            origWidth: '',
-            origHeight: '',
+            transformed: [],
+            graphProvider: null,
+            columnProvider: null,
         });
     }
     return focusStates.get(canvasId)!;
 }
 
-/**
- * Load persisted focus state from uiState
- */
+// ── Persistence ──
+
 function loadFocusState(canvasId: string): void {
     if (typeof uiState.getCanvasFocus !== 'function') return;
     const saved = uiState.getCanvasFocus(canvasId);
@@ -67,13 +128,9 @@ function loadFocusState(canvasId: string): void {
         const state = getState(canvasId);
         state.focusedGlyphId = saved.focusedGlyphId;
         state.preFocusScale = saved.preFocusScale;
-        // Element ref can't be persisted — will be resolved on next focus or ignored
     }
 }
 
-/**
- * Save focus state to uiState
- */
 function saveFocusState(canvasId: string): void {
     if (typeof uiState.setCanvasFocus !== 'function') return;
     const state = getState(canvasId);
@@ -83,25 +140,84 @@ function saveFocusState(canvasId: string): void {
     });
 }
 
-/**
- * Restore a focused glyph element to its original dimensions
- */
-function restoreGlyph(state: FocusState): void {
-    const el = state.focusedElement;
-    if (!el) return;
+// ── Transform helpers ──
+
+function restoreAll(state: FocusState): void {
+    for (const t of state.transformed) {
+        t.element.style.transition = TRANSITION;
+        t.element.style.left = t.origLeft;
+        t.element.style.top = t.origTop;
+        t.element.style.width = t.origWidth;
+        t.element.style.height = t.origHeight;
+        t.element.style.zIndex = '';
+        setTimeout(() => { t.element.style.transition = ''; }, 450);
+    }
+    state.transformed = [];
+}
+
+function transformGlyph(el: HTMLElement, left: number, top: number, width: number, height?: number): TransformedGlyph {
+    const orig: TransformedGlyph = {
+        element: el,
+        origLeft: el.style.left,
+        origTop: el.style.top,
+        origWidth: el.style.width,
+        origHeight: el.style.height,
+    };
 
     el.style.transition = TRANSITION;
-    el.style.left = state.origLeft;
-    el.style.top = state.origTop;
-    el.style.width = state.origWidth;
-    el.style.height = state.origHeight;
-    el.style.zIndex = '';
-
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+    el.style.width = `${width}px`;
+    if (height !== undefined) {
+        el.style.height = `${height}px`;
+    }
+    el.style.zIndex = '10';
     setTimeout(() => { el.style.transition = ''; }, 450);
+
+    return orig;
+}
+
+// ── Layout helpers ──
+
+/**
+ * Find a glyph element by ID within the content layer.
+ */
+function findGlyphElement(contentLayer: HTMLElement, glyphId: string, focusedElement?: HTMLElement): HTMLElement | null {
+    if (focusedElement && focusedElement.dataset.glyphId === glyphId) return focusedElement;
+    return contentLayer.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
 }
 
 /**
- * Focus a glyph — zoom canvas to 100%, pan to center, transform glyph to fill column.
+ * Lay out a vertical thread: stack glyphs top-to-bottom at the given X position and column width.
+ * Each glyph keeps its natural height. Returns the total height of the stack.
+ */
+function layoutThread(
+    state: FocusState,
+    contentLayer: HTMLElement,
+    thread: string[],
+    canvasLeft: number,
+    canvasTop: number,
+    colWidth: number,
+    focusedElement?: HTMLElement,
+): number {
+    let y = canvasTop;
+    for (const memberId of thread) {
+        const el = findGlyphElement(contentLayer, memberId, focusedElement);
+        if (!el) continue;
+
+        const naturalHeight = el.offsetHeight;
+        state.transformed.push(transformGlyph(el, canvasLeft, y, colWidth));
+        y += naturalHeight + THREAD_GAP;
+    }
+    return y - canvasTop;
+}
+
+// ── Core API ──
+
+/**
+ * Focus a glyph — enter its DAG. Canvas zooms to 100%, pans to center the
+ * focused glyph. The vertical chain stacks in the center column, siblings
+ * fill flanking columns with their own threads.
  */
 export function focusGlyph(container: HTMLElement, canvasId: string, glyphElement: HTMLElement): void {
     const state = getState(canvasId);
@@ -110,74 +226,131 @@ export function focusGlyph(container: HTMLElement, canvasId: string, glyphElemen
 
     const transform = getTransform(canvasId);
 
-    // If refocusing a different glyph, restore the previous one first
-    if (state.focusedElement && state.focusedElement !== glyphElement) {
-        restoreGlyph(state);
-    }
+    // Restore any previously transformed glyphs
+    restoreAll(state);
 
-    // Save pre-focus scale only on first focus (not when refocusing)
+    // Save pre-focus scale only on first focus (not when refocusing/pivoting)
     if (!state.focusedGlyphId) {
         state.preFocusScale = transform.scale;
     }
 
-    // Save original glyph dimensions
     state.focusedGlyphId = glyphId;
-    state.focusedElement = glyphElement;
-    state.origLeft = glyphElement.style.left;
-    state.origTop = glyphElement.style.top;
-    state.origWidth = glyphElement.style.width;
-    state.origHeight = glyphElement.style.height;
 
-    // Read glyph center in canvas space (before we transform it)
-    const glyphCenterX = glyphElement.offsetLeft + glyphElement.offsetWidth / 2;
-    const glyphCenterY = glyphElement.offsetTop + glyphElement.offsetHeight / 2;
+    // Get the DAG subgraph for this glyph
+    const graph: FocusGraph = state.graphProvider
+        ? state.graphProvider(glyphId)
+        : { thread: [glyphId], focusIndex: 0, leftSiblings: new Map(), rightSiblings: new Map(), siblingThreads: new Map() };
 
-    // Canvas zoom to 100%
-    const targetScale = 1.0;
-
-    // Pan to center glyph in viewport
+    // Viewport dimensions
     const rect = container.getBoundingClientRect();
     const viewW = rect.width;
     const viewH = rect.height;
-    const targetPanX = viewW / 2 - glyphCenterX * targetScale;
-    const targetPanY = viewH / 2 - glyphCenterY * targetScale;
 
-    setPanZoom(container, canvasId, targetPanX, targetPanY, targetScale, true);
+    // Column layout — always odd (1, 3, 5)
+    const cols = state.columnProvider ? state.columnProvider(viewW) : getColumnCount(viewW);
+    const { centerWidth, siblingWidth, offsets } = computeColumnWidths(viewW, cols);
+    const centerCol = Math.floor(cols / 2);
 
-    // Transform glyph to fill its column
-    const cols = getColumnCount(viewW);
-    const colWidth = viewW / cols;
-    const colIndex = Math.floor(cols / 2); // center column
+    // Read focused glyph's current canvas-space position (before transform)
+    const glyphCenterX = glyphElement.offsetLeft + glyphElement.offsetWidth / 2;
+    const glyphCenterY = glyphElement.offsetTop + glyphElement.offsetHeight / 2;
 
-    // Glyph target position in canvas space: column position adjusted for pan
-    const padY = viewH * 0.1; // 10% padding top and bottom
-    const targetLeft = (colIndex * colWidth - targetPanX) / targetScale;
-    const targetTop = (padY - targetPanY) / targetScale;
-    const targetWidth = colWidth / targetScale;
-    const targetHeight = (viewH - padY * 2) / targetScale;
+    // The center column's canvas-space left edge: anchor from focused glyph's center
+    const centerColLeft = glyphCenterX - centerWidth / 2;
 
-    glyphElement.style.transition = TRANSITION;
-    glyphElement.style.left = `${targetLeft}px`;
-    glyphElement.style.top = `${targetTop}px`;
-    glyphElement.style.width = `${targetWidth}px`;
-    glyphElement.style.height = `${targetHeight}px`;
-    glyphElement.style.zIndex = '10';
+    // Compute canvas-space top for the thread so the focused glyph lands at viewport center.
+    // First, measure where the focused glyph sits within its thread (cumulative height above it).
+    let heightAboveFocus = 0;
+    const contentLayer = container.querySelector('.canvas-content-layer') as HTMLElement;
 
-    setTimeout(() => { glyphElement.style.transition = ''; }, 450);
+    for (let i = 0; i < graph.focusIndex; i++) {
+        const el = findGlyphElement(contentLayer, graph.thread[i], glyphElement);
+        if (el) heightAboveFocus += el.offsetHeight + THREAD_GAP;
+    }
+
+    // The focused glyph should be vertically centered in the viewport.
+    // Thread starts at: glyphCenterY - focusedGlyph.height/2 - heightAboveFocus
+    const focusedHeight = glyphElement.offsetHeight;
+    const threadTop = glyphCenterY - focusedHeight / 2 - heightAboveFocus;
+
+    // Pan so the focused glyph's center lands at viewport center
+    const targetPanX = viewW / 2 - glyphCenterX;
+    const targetPanY = viewH / 2 - glyphCenterY;
+
+    setPanZoom(container, canvasId, targetPanX, targetPanY, 1.0, true);
+
+    // Lay out center thread
+    layoutThread(state, contentLayer, graph.thread, centerColLeft, threadTop, centerWidth, glyphElement);
+
+    // Lay out sibling columns — left siblings go left of center, right siblings go right
+    if (cols > 1) {
+        const slotsPerSide = Math.floor(cols / 2); // e.g. 5 cols → 2 slots per side
+
+        for (const memberId of graph.thread) {
+            // Compute this member's Y position in the thread
+            let memberY = threadTop;
+            for (const tid of graph.thread) {
+                if (tid === memberId) break;
+                const tel = findGlyphElement(contentLayer, tid, glyphElement);
+                if (tel) memberY += tel.offsetHeight + THREAD_GAP;
+            }
+
+            // Left siblings: placed in columns left of center (closest first)
+            const leftSibs = graph.leftSiblings.get(memberId);
+            if (leftSibs) {
+                for (let i = 0; i < leftSibs.length && i < slotsPerSide; i++) {
+                    const col = centerCol - 1 - i; // closest to center first
+                    const colLeft = centerColLeft + (offsets[col] - offsets[centerCol]);
+
+                    const sibThread = graph.siblingThreads.get(leftSibs[i]);
+                    if (sibThread && sibThread.length > 0) {
+                        layoutThread(state, contentLayer, sibThread, colLeft, memberY, siblingWidth);
+                    } else {
+                        const sibEl = findGlyphElement(contentLayer, leftSibs[i]);
+                        if (sibEl) {
+                            state.transformed.push(transformGlyph(sibEl, colLeft, memberY, siblingWidth));
+                        }
+                    }
+                }
+            }
+
+            // Right siblings: placed in columns right of center (closest first)
+            const rightSibs = graph.rightSiblings.get(memberId);
+            if (rightSibs) {
+                for (let i = 0; i < rightSibs.length && i < slotsPerSide; i++) {
+                    const col = centerCol + 1 + i; // closest to center first
+                    const colLeft = centerColLeft + (offsets[col] - offsets[centerCol]);
+
+                    const sibThread = graph.siblingThreads.get(rightSibs[i]);
+                    if (sibThread && sibThread.length > 0) {
+                        layoutThread(state, contentLayer, sibThread, colLeft, memberY, siblingWidth);
+                    } else {
+                        const sibEl = findGlyphElement(contentLayer, rightSibs[i]);
+                        if (sibEl) {
+                            state.transformed.push(transformGlyph(sibEl, colLeft, memberY, siblingWidth));
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     saveFocusState(canvasId);
-    log.debug(SEG.GLYPH, '[CanvasFocus] Focus glyph', { canvasId, glyphId, cols, colWidth });
+    log.debug(SEG.GLYPH, '[CanvasFocus] Focus glyph', {
+        canvasId, glyphId, cols,
+        threadSize: graph.thread.length,
+        transformed: state.transformed.length,
+    });
 }
 
 /**
- * Unfocus — glyph transforms back, zoom restores, pan stays where you are.
+ * Unfocus — all glyphs transform back, zoom restores, pan stays where you are.
  */
 export function unfocusGlyph(container: HTMLElement, canvasId: string): void {
     const state = getState(canvasId);
     if (!state.focusedGlyphId) return;
 
-    // Restore glyph element
-    restoreGlyph(state);
+    restoreAll(state);
 
     // Restore zoom, adjust pan so viewport center stays in place
     const transform = getTransform(canvasId);
@@ -192,7 +365,6 @@ export function unfocusGlyph(container: HTMLElement, canvasId: string): void {
     const newPanY = centerY - (centerY - transform.panY) * scaleFactor;
 
     state.focusedGlyphId = null;
-    state.focusedElement = null;
     setPanZoom(container, canvasId, newPanX, newPanY, newScale, true);
     saveFocusState(canvasId);
 
@@ -214,11 +386,18 @@ export function getFocusedGlyphId(canvasId: string): string | null {
 }
 
 /**
- * Initialize focus for a canvas — loads persisted state.
+ * Initialize focus for a canvas — loads persisted state, registers providers.
  * Call after setupCanvasPan.
  */
-export function setupCanvasFocus(canvasId: string): void {
+export function setupCanvasFocus(canvasId: string, graphProvider?: FocusGraphProvider, columnProvider?: ColumnProvider): void {
     loadFocusState(canvasId);
+    const state = getState(canvasId);
+    if (graphProvider) {
+        state.graphProvider = graphProvider;
+    }
+    if (columnProvider) {
+        state.columnProvider = columnProvider;
+    }
 }
 
 /**
