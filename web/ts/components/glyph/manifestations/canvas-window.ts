@@ -6,6 +6,8 @@
  * DOM state (scroll position, textarea content, rendered markdown) is preserved.
  */
 
+// Uses QNTX logger directly — this file stays in web/ (depends on canvas-pan
+// coordinate math) so it doesn't go through configureGlyphs() injection.
 import { log, SEG } from '../../../logger';
 import {
     setCanvasOrigin,
