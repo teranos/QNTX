@@ -14,7 +14,8 @@ import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/ats
 import { AS } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from './manifestations/canvas-placed';
-import { morphCanvasPlacedToWindow, placeWindowOnCanvas, teardownWindowDrag } from './manifestations/canvas-window';
+import { morphCanvasPlacedToWindow, placeWindowOnCanvas } from './manifestations/canvas-window';
+import { teardownWindowDrag } from '@qntx/glyphs';
 import { removeWindowControls } from './manifestations/title-bar-controls';
 import { isInWindowState, setWindowState } from './dataset';
 import { preventDrag, makeDraggable, makeResizable, storeCleanup } from './glyph-interaction';
