@@ -34,7 +34,8 @@ bool AtsClient::create_weave(const std::string& model_name,
                               int token_count,
                               float mean_confidence,
                               float mean_entropy,
-                              const std::vector<TokenSignal>& signals) {
+                              const std::vector<TokenSignal>& signals,
+                              const GenerationPerf& perf) {
     if (!stub_) return false;
 
     protocol::GenerateAttestationRequest req;
@@ -57,6 +58,22 @@ bool AtsClient::create_weave(const std::string& model_name,
     (*fields)["mean_confidence"] = make_number(mean_confidence);
     (*fields)["mean_entropy"] = make_number(mean_entropy);
     (*fields)["weave_source"] = make_string("llama-cpp");
+
+    // Performance breakdown — detect regressions from attestation history
+    {
+        google::protobuf::Value perf_val;
+        auto* pf = perf_val.mutable_struct_value()->mutable_fields();
+        (*pf)["prompt_eval_ms"] = make_number(perf.prompt_eval_ms);
+        (*pf)["generation_ms"] = make_number(perf.generation_ms);
+        (*pf)["decode_ms"] = make_number(perf.decode_ms);
+        (*pf)["signal_ms"] = make_number(perf.signal_ms);
+        (*pf)["callback_ms"] = make_number(perf.callback_ms);
+        if (perf.generation_ms > 0) {
+            (*pf)["tokens_per_sec"] = make_number(
+                (double)perf.completion_tokens * 1000.0 / perf.generation_ms);
+        }
+        (*fields)["performance"] = perf_val;
+    }
 
     // Pack token signals into attributes — one weave, no eviction
     if (!signals.empty()) {

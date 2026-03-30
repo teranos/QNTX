@@ -764,6 +764,12 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 				Model:   chunk.Model,
 			}
 
+			if chunk.Done {
+				msg.PromptTokens = chunk.PromptTokens
+				msg.CompletionTokens = chunk.CompletionTokens
+				msg.TotalTokens = chunk.TotalTokens
+			}
+
 			if chunk.Signal != nil {
 				msg.Signal = &LLMTokenSignal{
 					Confidence: chunk.Signal.Confidence,
@@ -776,6 +782,22 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 						Text: tc.Text,
 						Prob: tc.Prob,
 					})
+				}
+				for _, stage := range chunk.Signal.SamplerStages {
+					ss := SamplerStageSignal{
+						Name:        stage.Name,
+						ActiveCount: stage.ActiveCount,
+						Top1Prob:    stage.Top1Prob,
+						Entropy:     stage.Entropy,
+					}
+					for _, tc := range stage.TopK {
+						ss.TopK = append(ss.TopK, LLMTokenCandidate{
+							ID:   tc.ID,
+							Text: tc.Text,
+							Prob: tc.Prob,
+						})
+					}
+					msg.Signal.SamplerStages = append(msg.Signal.SamplerStages, ss)
 				}
 			}
 

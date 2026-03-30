@@ -47,6 +47,9 @@ export interface ConsoleLog {
   url?: string;
 }
 
+export interface ConversationAssembler {
+}
+
 export interface CreateScheduledJobRequest {
   /**
    * ATS code to execute (e.g., "ix https://...")
@@ -253,6 +256,12 @@ export interface LLMStreamMessage {
    * Per-token signal data
    */
   signal?: LLMTokenSignal | null;
+  /**
+   * Usage — populated on the final (done=true) chunk only
+   */
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
 }
 
 export interface LLMTokenCandidate {
@@ -282,6 +291,10 @@ export interface LLMTokenSignal {
    * Full softmax distribution (vocab_size floats)
    */
   full_distribution?: number[];
+  /**
+   * Per-stage snapshots through sampler chain
+   */
+  sampler_stages?: SamplerStageSignal[];
 }
 
 export interface ListExecutionsResponse {
@@ -423,6 +436,10 @@ export interface PromptDirectRequest {
    * Glyph that initiated execution; used as actor for the result attestation
    */
   glyph_id?: string;
+  /**
+   * Parent glyph ID for conversation history assembly (stream glyphs send their parent)
+   */
+  parent_glyph_id?: string;
   /**
    * Triggering attestation — enables {{field}} interpolation
    */
@@ -773,6 +790,29 @@ export interface Result {
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
+}
+
+export interface SamplerStageSignal {
+  /**
+   * Stage name: "logits", "top_k", "top_p", "temp", etc.
+   */
+  name: string;
+  /**
+   * Tokens remaining with nonzero probability
+   */
+  active_count: number;
+  /**
+   * P(top token) after this stage
+   */
+  top1_prob: number;
+  /**
+   * Shannon entropy after this stage
+   */
+  entropy: number;
+  /**
+   * Top-5 candidates after this stage
+   */
+  top_k?: LLMTokenCandidate[];
 }
 
 export interface ScheduledJobResponse {

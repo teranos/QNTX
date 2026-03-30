@@ -14,7 +14,7 @@ Provides: query parsing, IndexedDB attestation CRUD, fuzzy search, classificatio
 
 ## State
 
-`uiState` (state/ui.ts) is THE singleton — pub/sub reactivity, localStorage persistence. Canvas glyph state syncs to backend via `api/canvas-sync.ts`.
+`uiState` (state/ui.ts) is THE singleton — pub/sub reactivity. Canvas glyph state syncs to backend via `api/canvas-sync.ts`.
 
 ## WebSocket
 

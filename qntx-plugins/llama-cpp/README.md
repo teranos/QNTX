@@ -53,7 +53,7 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 
 ## Limitations
 
-- **STO** — Single-turn only. C++ engine accepts multi-turn message arrays via `prepare_prompt()`, but the Go prompt handler and frontend don't populate them yet. Each request still starts with a cleared KV cache — no persistent conversation state.
+- **STO** — ~~Single-turn only.~~ Multi-turn message arrays flow through gRPC and are tokenized via `prepare_prompt()`. KV cache is still cleared per request — no persistent conversation state across requests.
 
 - **TAO** — Text attachments only. PDF and plain text attachments are extracted (via MuPDF) and prepended to the prompt as context. Goal: use a multimodal GGUF model (e.g. LLaVA, Qwen2-VL) to process images and PDFs natively through llama.cpp's vision pipeline, bypassing text extraction entirely.
 
@@ -65,14 +65,18 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 
 - **SDR** — Shutdown race. Mutex recursion between gRPC teardown and llama.cpp destructor on kill. Cosmetic log noise, not a data issue.
 
-- **SUI** — Sampling controls. Only temperature is exposed. Top-k, top-p, min-p, and repetition penalty are available in llama.cpp but not wired through the proto or UI.
+- **SUI** — ~~Only temperature.~~ `SamplerConfig` exposes top_k, top_p, min_p, typical_p, and repeat/frequency/presence penalties. These flow through gRPC and into `build_sampler_chain`. UI controls for these are not yet wired.
 
-- **SCO** — Sampler black box. The sampler chain runs as a black box — the final selected token is returned but why alternatives were rejected is not recorded. Custom `llama_sampler_i` observer vtable would reveal per-stage filtering.
+- **SCO** — ~~Sampler black box.~~ Observer samplers are inserted between each stage in the chain. Per-stage snapshots (active token count, top-1 probability, entropy, top-k candidates) are captured and streamed over gRPC in `sampler_stages`.
 
-- **SSL** — No signal summary for streaming. The non-streaming `Chat` path logs entropy avg/max, confidence avg/min after generation. `StreamChat` (which feeds the nebula) does not.
+- **SSL** — ~~No signal summary for streaming.~~ `StreamChat` now logs per-generation timing breakdown (decode/signal/callback ms) and callback sub-timings (proto/submit_dist/store_kf/trail/grpc_write). Entropy/confidence summary still only on the non-streaming path.
 
 - **ATS** — ~~Resolved.~~ Each generation writes a `["Weave"]` attestation to ATS with embedded per-token signals (confidence, entropy, top-gap, top-k) in `attributes.tokens`. One attestation per generation. Loom renders these as confidence-colored token spans.
 
 - **PVH** — Private header dependency. PCA projection in `vocab_projection.cpp` accesses `llama-model.h` (private) to read `tok_embd.weight`. Version-fragile against llama.cpp internal changes.
+
+- **CAM** — 3D camera (WASD + mouse) is implemented but needs testing and refinement — controls feel rough, no inertia, no collision with nebula bounds.
+
+- **SIG** — Signal capture overhead. `capture_signal()` runs softmax + partial sort over the full 128K vocabulary every token (~54ms/token). Actual llama.cpp decode is ~2.8ms/token — signal extraction is 20x more expensive than inference itself. This caps throughput at ~16 tok/s on M1 regardless of model speed. Moving softmax to a Metal compute shader or sampling the distribution instead of sorting it would recover most of this.
 
 See `docs/research/metal-llama.md` for the full code reference table including Metal visualization limitations and opportunities.

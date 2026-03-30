@@ -86,6 +86,33 @@ grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
         }
     }
 
+    // Parse sampler config from plugin config
+    auto parse_int = [&config](const char* key, int fallback) -> int {
+        auto it = config.find(key);
+        if (it != config.end()) { try { return std::stoi(it->second); } catch (...) {} }
+        return fallback;
+    };
+    auto parse_float = [&config](const char* key, float fallback) -> float {
+        auto it = config.find(key);
+        if (it != config.end()) { try { return std::stof(it->second); } catch (...) {} }
+        return fallback;
+    };
+    sampler_cfg_.top_k = parse_int("top_k", 0);
+    sampler_cfg_.top_p = parse_float("top_p", 1.0f);
+    sampler_cfg_.min_p = parse_float("min_p", 0.0f);
+    sampler_cfg_.typical_p = parse_float("typical_p", 1.0f);
+    sampler_cfg_.penalty_last_n = parse_int("penalty_last_n", 0);
+    sampler_cfg_.penalty_repeat = parse_float("repeat_penalty", 1.0f);
+    sampler_cfg_.penalty_freq = parse_float("freq_penalty", 0.0f);
+    sampler_cfg_.penalty_present = parse_float("presence_penalty", 0.0f);
+
+    std::cout << "[llama-cpp] Sampler config: top_k=" << sampler_cfg_.top_k
+              << " top_p=" << sampler_cfg_.top_p
+              << " min_p=" << sampler_cfg_.min_p
+              << " typical_p=" << sampler_cfg_.typical_p
+              << " penalty_last_n=" << sampler_cfg_.penalty_last_n
+              << " repeat_penalty=" << sampler_cfg_.penalty_repeat << std::endl;
+
     // Retry renderer setup if it failed during construction (restart timing)
     if (!renderer_->is_ready()) {
         std::cout << "[metal-llama] Renderer not ready, retrying setup..." << std::endl;
@@ -161,6 +188,55 @@ grpc::Status LlamaCppPlugin::ConfigSchema(grpc::ServerContext* ctx,
     ctx_field.set_min_value("512");
     ctx_field.set_max_value("32768");
     (*fields)["n_ctx"] = ctx_field;
+
+    // Sampler chain configuration
+    protocol::ConfigFieldSchema top_k_field;
+    top_k_field.set_type("number");
+    top_k_field.set_description("Top-K sampling: keep only the top K tokens (0 = disabled)");
+    top_k_field.set_default_value("0");
+    top_k_field.set_min_value("0");
+    top_k_field.set_max_value("500");
+    (*fields)["top_k"] = top_k_field;
+
+    protocol::ConfigFieldSchema top_p_field;
+    top_p_field.set_type("number");
+    top_p_field.set_description("Top-P (nucleus) sampling: cumulative probability cutoff (1.0 = disabled)");
+    top_p_field.set_default_value("1.0");
+    top_p_field.set_min_value("0.0");
+    top_p_field.set_max_value("1.0");
+    (*fields)["top_p"] = top_p_field;
+
+    protocol::ConfigFieldSchema min_p_field;
+    min_p_field.set_type("number");
+    min_p_field.set_description("Min-P sampling: drop tokens below this fraction of top token (0.0 = disabled)");
+    min_p_field.set_default_value("0.0");
+    min_p_field.set_min_value("0.0");
+    min_p_field.set_max_value("1.0");
+    (*fields)["min_p"] = min_p_field;
+
+    protocol::ConfigFieldSchema typical_p_field;
+    typical_p_field.set_type("number");
+    typical_p_field.set_description("Typical-P sampling: locally typical sampling threshold (1.0 = disabled)");
+    typical_p_field.set_default_value("1.0");
+    typical_p_field.set_min_value("0.0");
+    typical_p_field.set_max_value("1.0");
+    (*fields)["typical_p"] = typical_p_field;
+
+    protocol::ConfigFieldSchema repeat_penalty_field;
+    repeat_penalty_field.set_type("number");
+    repeat_penalty_field.set_description("Repetition penalty (1.0 = disabled)");
+    repeat_penalty_field.set_default_value("1.0");
+    repeat_penalty_field.set_min_value("0.0");
+    repeat_penalty_field.set_max_value("3.0");
+    (*fields)["repeat_penalty"] = repeat_penalty_field;
+
+    protocol::ConfigFieldSchema penalty_last_n_field;
+    penalty_last_n_field.set_type("number");
+    penalty_last_n_field.set_description("Penalty window: number of recent tokens to penalize (0 = disabled)");
+    penalty_last_n_field.set_default_value("0");
+    penalty_last_n_field.set_min_value("0");
+    penalty_last_n_field.set_max_value("2048");
+    (*fields)["penalty_last_n"] = penalty_last_n_field;
 
     return grpc::Status::OK;
 }
@@ -288,7 +364,10 @@ grpc::Status LlamaCppPlugin::HandleHTTP(grpc::ServerContext* ctx,
         } else {
             state = "ready";
         }
-        std::string body = "{\"state\":\"" + state + "\",\"version\":\"" + PLUGIN_VERSION + "\"}";
+        std::string act = activity();
+        std::string body = "{\"state\":\"" + state + "\",\"version\":\"" + PLUGIN_VERSION + "\"";
+        if (!act.empty()) body += ",\"activity\":\"" + act + "\"";
+        body += "}";
         resp->set_status_code(200);
         resp->set_body(body);
         auto* ct = resp->add_headers();
@@ -348,6 +427,25 @@ grpc::Status LlamaCppPlugin::HandleWebSocket(
                         int idx = std::stoi(data.substr(6));
                         renderer->set_scrub_index(idx);
                     } catch (...) {}
+                } else if (data == "cam:r") {
+                    renderer->reset_camera();
+                } else if (data.size() > 4 && data.substr(0, 4) == "cam:") {
+                    // cam:dx,dy,dz,dyaw,dpitch
+                    auto rest = data.substr(4);
+                    // Split on commas
+                    float vals[5] = {0, 0, 1, 0, 0};
+                    int vi = 0;
+                    size_t pos = 0;
+                    while (vi < 5 && pos < rest.size()) {
+                        auto next = rest.find(',', pos);
+                        try {
+                            vals[vi] = std::stof(rest.substr(pos, next - pos));
+                        } catch (...) {}
+                        vi++;
+                        if (next == std::string::npos) break;
+                        pos = next + 1;
+                    }
+                    renderer->apply_camera(vals[0], vals[1], vals[2], vals[3], vals[4]);
                 } else if (data.size() > 6 && data.substr(0, 6) == "param:") {
                     // param:key:value — adjust renderer parameters at runtime
                     auto rest = data.substr(6);
@@ -493,7 +591,7 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
     }
 
     // TODO(SSL): log signal summary for StreamChat (currently only Chat logs it)
-    auto result = engine.chat(messages, temperature, max_tokens);
+    auto result = engine.chat(messages, temperature, max_tokens, plugin_->sampler_config());
 
     resp->set_content(result.content);
     resp->set_model(engine.model_name());
@@ -550,9 +648,16 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
             for (auto it = messages.rbegin(); it != messages.rend(); ++it) {
                 if (it->role == "user") { prompt_text = it->content; break; }
             }
+            GenerationPerf perf;
+            perf.prompt_eval_ms = result.prompt_eval_ms;
+            perf.generation_ms = result.generation_ms;
+            perf.decode_ms = result.decode_ms;
+            perf.signal_ms = result.signal_ms;
+            perf.callback_ms = result.callback_ms;
+            perf.completion_tokens = result.completion_tokens;
             ats.create_weave(engine.model_name(), prompt_text,
                              result.content, context_id, n,
-                             conf_sum / n, ent_sum / n, result.signals);
+                             conf_sum / n, ent_sum / n, result.signals, perf);
         }
     }
 
@@ -627,10 +732,14 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
         plugin_->renderer().set_scrub_index(-1);
     }
 
+    plugin_->set_activity("evaluating prompt");
+
     // Stream tokens as they're generated
     auto result = engine.stream_chat(
         messages, temperature, max_tokens,
         [&](const std::string& token_text, const TokenSignal& sig) -> bool {
+            plugin_->set_activity("generating");
+
             protocol::LLMChatChunk chunk;
             chunk.set_token(sanitize_utf8(token_text));
             chunk.set_done(false);
@@ -646,8 +755,18 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
                 tc->set_text(sanitize_utf8(cand.text));
                 tc->set_prob(cand.prob);
             }
-            for (float p : sig.full_distribution) {
-                signal->add_full_distribution(p);
+            for (const auto& stage : sig.sampler_stages) {
+                auto* sp = signal->add_sampler_stages();
+                sp->set_name(stage.stage_name);
+                sp->set_active_count(stage.active_count);
+                sp->set_top1_prob(stage.top1_prob);
+                sp->set_entropy(stage.entropy);
+                for (const auto& cand : stage.top_k) {
+                    auto* tc = sp->add_top_k();
+                    tc->set_id(cand.id);
+                    tc->set_text(sanitize_utf8(cand.text));
+                    tc->set_prob(cand.prob);
+                }
             }
 
             // Submit distribution for interpolated rendering + record trail + store keyframe
@@ -658,7 +777,6 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
                     sig.full_distribution.data(), sig.full_distribution.size());
                 plugin_->renderer().add_trail_point(sig.token_id);
 
-                // Ghost branches: feed runner-up candidates
                 if (sig.top_k.size() > 1) {
                     std::vector<std::pair<int,float>> runners;
                     for (size_t i = 0; i < sig.top_k.size() && runners.size() < 10; i++) {
@@ -671,7 +789,8 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
             }
 
             return writer->Write(chunk);
-        });
+        },
+        plugin_->sampler_config());
 
     // Final chunk with totals
     protocol::LLMChatChunk final_chunk;
@@ -681,6 +800,7 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
     final_chunk.set_completion_tokens(result.completion_tokens);
     final_chunk.set_total_tokens(result.prompt_tokens + result.completion_tokens);
     writer->Write(final_chunk);
+    plugin_->set_activity("");
 
     // Write weave attestation to ATS after stream completes (token signals packed in attributes)
     auto& ats = plugin_->ats_client();
@@ -699,9 +819,16 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
         for (auto it = messages.rbegin(); it != messages.rend(); ++it) {
             if (it->role == "user") { prompt_text = it->content; break; }
         }
+        GenerationPerf perf;
+        perf.prompt_eval_ms = result.prompt_eval_ms;
+        perf.generation_ms = result.generation_ms;
+        perf.decode_ms = result.decode_ms;
+        perf.signal_ms = result.signal_ms;
+        perf.callback_ms = result.callback_ms;
+        perf.completion_tokens = result.completion_tokens;
         ats.create_weave(engine.model_name(), prompt_text,
                          result.content, context_id, n,
-                         conf_sum / n, ent_sum / n, result.signals);
+                         conf_sum / n, ent_sum / n, result.signals, perf);
     }
 
     return grpc::Status::OK;

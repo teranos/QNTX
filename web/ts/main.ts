@@ -32,6 +32,7 @@ import './prose/panel.ts';
 // plugin-panel.ts is now a glyph module registered via default-glyphs.ts
 import { initDebugInterceptor } from './dev-debug-interceptor.ts';
 import { glyphRun } from './components/glyph/run.ts';
+import { configureGlyphs } from '@qntx/glyphs';
 import { registerDefaultGlyphs } from './default-glyphs.ts';
 import { initialize as initQntxWasm } from './qntx-wasm.ts';
 import { initStorage } from './indexeddb-storage.ts';
@@ -240,6 +241,21 @@ async function init(): Promise<void> {
     if (window.logLoaderStep) window.logLoaderStep('Setting up editor...', false, true);
     initCodeMirrorEditor();
 
+    // Wire @qntx/glyphs with QNTX's logger, persistence, and stripHtml
+    configureGlyphs({
+        logger: log,
+        logSegment: SEG.GLYPH,
+        persistence: {
+            getMinimizedGlyphs: () => uiState.getMinimizedWindows(),
+            addMinimizedGlyph: (id) => uiState.addMinimizedWindow(id),
+            removeMinimizedGlyph: (id) => uiState.removeMinimizedWindow(id),
+        },
+        stripHtml: (html) => {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            return doc.body.textContent ?? '';
+        },
+    });
+
     // Initialize glyph run FIRST (before any glyphs are created)
     // This ensures the run is ready to receive glyphs
     glyphRun.init();
@@ -261,12 +277,12 @@ async function init(): Promise<void> {
                 const result = parsed.result ?? parsed;
                 const promptConfig = parsed.promptConfig;
                 const prompt = parsed.prompt;
-                const { renderResultContent } = await import('./components/glyph/result-glyph.ts');
+                const { renderResultContent } = await import('./components/glyph/response-glyph.ts');
                 glyphRun.add({
                     id: glyph.id,
                     title: prompt || 'Result',
                     symbol: glyph.symbol || 'result',
-                    renderContent: () => renderResultContent(result, promptConfig, prompt),
+                    renderContent: () => renderResultContent(result, parsed.tokens ?? [], promptConfig, prompt),
                     onClose: () => {
                         uiState.removeMinimizedWindow(id);
                         uiState.removeCanvasGlyph(id);
