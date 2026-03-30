@@ -85,6 +85,7 @@ let attestation_to_json (a : Protocol.Attestation.t) =
     ("prompt", match extract_string fields "prompt" with
       | Some s -> `String s
       | None -> `Null);
+    ("performance", value_to_yojson (List.assoc_opt "performance" fields |> Option.join));
   ]
 
 (* Check if a weave attestation has source "graunde" *)
