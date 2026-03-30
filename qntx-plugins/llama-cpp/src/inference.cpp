@@ -375,11 +375,6 @@ int InferenceEngine::prepare_prompt(
     // Clear KV cache
     llama_memory_clear(llama_get_memory(ctx_), true);
 
-    auto tokenize_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - prep_start).count();
-    std::cout << "[llama-cpp] Prompt prep: " << n_tokens << " tokens, template+tokenize in "
-              << tokenize_ms << "ms" << std::endl;
-
     // Decode prompt
     auto t0 = std::chrono::steady_clock::now();
     llama_batch batch = llama_batch_get_one(tokens.data(), n_tokens);
@@ -388,11 +383,7 @@ int InferenceEngine::prepare_prompt(
         return -1;
     }
     auto t1 = std::chrono::steady_clock::now();
-    auto prompt_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
-    std::cout << "[llama-cpp] Prompt eval: " << n_tokens << " tokens in "
-              << prompt_ms << "ms (" << (prompt_ms > 0 ? (n_tokens * 1000 / prompt_ms) : 0)
-              << " tok/s)" << std::endl;
-
+    result.prompt_eval_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
     return n_tokens;
 }
 
@@ -487,12 +478,7 @@ InferenceEngine::ChatResult InferenceEngine::stream_chat(
     TokenCallback on_token,
     const SamplerConfig& sampler_cfg) {
 
-    auto entry_time = std::chrono::steady_clock::now();
-    std::cout << "[llama-cpp] stream_chat: waiting for mutex..." << std::endl;
     std::lock_guard<std::mutex> lock(mutex_);
-    auto lock_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - entry_time).count();
-    std::cout << "[llama-cpp] stream_chat: mutex acquired in " << lock_ms << "ms" << std::endl;
 
     ChatResult result;
     if (!model_ || !ctx_) {
@@ -556,14 +542,16 @@ InferenceEngine::ChatResult InferenceEngine::stream_chat(
 
     auto gen_end = std::chrono::steady_clock::now();
     auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(gen_end - gen_start).count();
-    std::cout << "[llama-cpp] Generation: " << n_generated << " tokens in "
-              << total_ms << "ms (" << (total_ms > 0 ? (n_generated * 1000 / total_ms) : 0) << " tok/s)"
-              << " | decode=" << decode_us / 1000 << "ms"
-              << " signal=" << signal_us / 1000 << "ms"
-              << " callback=" << callback_us / 1000 << "ms" << std::endl;
+    std::cout << "[llama-cpp] " << n_generated << " tokens in "
+              << total_ms << "ms (" << (total_ms > 0 ? (n_generated * 1000 / total_ms) : 0)
+              << " tok/s)" << std::endl;
 
     llama_sampler_free(sampler);
     result.content = output.str();
     result.completion_tokens = n_generated;
+    result.generation_ms = total_ms;
+    result.decode_ms = decode_us / 1000;
+    result.signal_ms = signal_us / 1000;
+    result.callback_ms = callback_us / 1000;
     return result;
 }

@@ -10,6 +10,15 @@
     top_k?: { text: string; prob: number }[]
   }
 
+  interface GenerationPerf {
+    prompt_eval_ms: number
+    generation_ms: number
+    decode_ms: number
+    signal_ms: number
+    callback_ms: number
+    tokens_per_sec?: number
+  }
+
   interface WeaveData {
     id: string
     branch: string
@@ -23,6 +32,7 @@
     model?: string | null
     tokens?: TokenSignal[] | null
     prompt?: string | null
+    performance?: GenerationPerf | null
   }
 
   let {
@@ -142,8 +152,14 @@
           title={tokenTitle(tok)}
         >{tok.text}</span>{/each}</span>
     </div>
-    {#if weave.model}
-      <div class="dw-llama-meta">{weave.model}</div>
+    {#if weave.model || weave.performance}
+      <div class="dw-llama-meta">
+        {#if weave.model}{weave.model}{/if}
+        {#if weave.performance}
+          {#if weave.model} — {/if}{weave.performance.tokens_per_sec?.toFixed(1) ?? '?'} tok/s
+          <span class="dw-perf-detail" title="decode={weave.performance.decode_ms}ms signal={weave.performance.signal_ms}ms callback={weave.performance.callback_ms}ms prompt_eval={weave.performance.prompt_eval_ms}ms">({weave.performance.generation_ms}ms)</span>
+        {/if}
+      </div>
     {/if}
   {:else}
     {#each turns as turn}
@@ -325,6 +341,10 @@
     font-size: var(--font-size-xs);
     padding: 1px 3px;
     font-style: italic;
+  }
+  .dw-perf-detail {
+    cursor: help;
+    border-bottom: 1px dotted var(--text-on-dark-tertiary);
   }
 
   :global(.dw-inline-code) {
