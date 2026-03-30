@@ -15,7 +15,7 @@ import { getGlyphTypeBySymbol, getGlyphTypeByElement } from '../glyph-registry';
 import { createErrorGlyph } from '../error-glyph';
 import { createPluginPlaceholderGlyph } from '../plugin-glyph';
 import { getPluginNameBySymbol } from '../plugin-provided-glyphs';
-import { createResultGlyph, type ExecutionResult, type PromptConfig } from '../result-glyph';
+import { createResponseGlyph, type ExecutionResult, type PromptConfig } from '../response-glyph';
 import type { SpawnResultDetail } from '../glyph-ui';
 import { uploadFile } from '../../../api/files';
 import { createDocGlyph, type DocGlyphContent } from '../doc-glyph';
@@ -243,11 +243,14 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
         }
         try {
             const parsed = JSON.parse(glyph.content);
+            // Token-based content (streamed responses): let createResponseGlyph
+            // restore from saved canvas state internally — don't pass a result.
+            const hasTokens = Array.isArray(parsed.tokens) && parsed.tokens.length > 0;
             // Backwards-compatible: new format has .result, old is raw ExecutionResult
-            const result = parsed.result ?? parsed;
+            const result = hasTokens ? undefined : (parsed.result ?? parsed);
             const promptConfig: PromptConfig | undefined = parsed.promptConfig;
             const prompt: string | undefined = parsed.prompt;
-            const el = createResultGlyph(glyph, result, promptConfig, prompt);
+            const el = createResponseGlyph(glyph, result, promptConfig, prompt);
 
             // Restore follow-up error state if persisted
             if (parsed.followupError) {
@@ -450,7 +453,7 @@ export function buildCanvasWorkspace(
             renderContent: () => document.createElement('div'),
         };
 
-        const resultElement = createResultGlyph(resultGlyph, result as ExecutionResult);
+        const resultElement = createResponseGlyph(resultGlyph, result as ExecutionResult);
         contentLayer.appendChild(resultElement);
 
         const resultRect = resultElement.getBoundingClientRect();

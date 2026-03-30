@@ -277,12 +277,12 @@ async function init(): Promise<void> {
                 const result = parsed.result ?? parsed;
                 const promptConfig = parsed.promptConfig;
                 const prompt = parsed.prompt;
-                const { renderResultContent } = await import('./components/glyph/result-glyph.ts');
+                const { renderResultContent } = await import('./components/glyph/response-glyph.ts');
                 glyphRun.add({
                     id: glyph.id,
                     title: prompt || 'Result',
                     symbol: glyph.symbol || 'result',
-                    renderContent: () => renderResultContent(result, promptConfig, prompt),
+                    renderContent: () => renderResultContent(result, parsed.tokens ?? [], promptConfig, prompt),
                     onClose: () => {
                         uiState.removeMinimizedWindow(id);
                         uiState.removeCanvasGlyph(id);

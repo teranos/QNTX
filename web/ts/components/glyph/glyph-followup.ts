@@ -15,7 +15,7 @@ import { Doc, Prose } from '@generated/sym.js';
 import { preventDrag } from './glyph-interaction';
 import { autoMeldResultBelow } from './meld/meld-system';
 import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
-import { createResultGlyph, type ExecutionResult } from './result-glyph';
+import { createResponseGlyph, type ExecutionResult } from './response-glyph';
 
 /** UI controls exposed to custom onExecute callbacks */
 export interface FollowUpControls {
@@ -193,6 +193,10 @@ export function createFollowUpZone(config: FollowUpConfig): HTMLElement {
 
 /**
  * Default execution: POST to /api/prompt/direct, spawn result glyph below.
+ *
+ * TODO: Use the streaming path (like executeStreamFollowUp in response-glyph.ts)
+ * so follow-ups from py/static results also receive token signals and sampler colors.
+ * Currently wraps the full response as ExecutionResult.stdout — no streaming, no signals.
  */
 async function defaultExecute(
     request: FollowUpRequest,
@@ -290,7 +294,7 @@ export function spawnFollowUpResult(data: FollowUpResult): void {
     };
 
     const promptConfig = { model, provider };
-    const resultElement = createResultGlyph(resultGlyph, result, promptConfig, prompt);
+    const resultElement = createResponseGlyph(resultGlyph, result, promptConfig, prompt);
     canvas.appendChild(resultElement);
 
     const parentGlyphId = parentElement.dataset.glyphId;
