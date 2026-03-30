@@ -14,7 +14,7 @@
 #include "llm.grpc.pb.h"
 #include "ats_client.h"
 
-#define PLUGIN_VERSION "0.21.1"
+#define PLUGIN_VERSION "0.22.5"
 
 // Forward declarations
 struct llama_model;
@@ -187,6 +187,10 @@ public:
     MetalRenderer& renderer() { return *renderer_; }
     AtsClient& ats_client() { return ats_client_; }
 
+    // Activity status for UI feedback
+    void set_activity(const std::string& a) { std::lock_guard<std::mutex> l(activity_mu_); activity_ = a; }
+    std::string activity() { std::lock_guard<std::mutex> l(activity_mu_); return activity_; }
+
     // PCA readiness — set to true once background thread finishes
     bool pca_ready() const { return pca_ready_.load(std::memory_order_acquire); }
 
@@ -201,6 +205,10 @@ private:
     // Background PCA computation thread
     std::thread pca_thread_;
     std::atomic<bool> pca_ready_{false};
+
+    // Activity status
+    std::mutex activity_mu_;
+    std::string activity_;
 };
 
 // LLMService implementation
