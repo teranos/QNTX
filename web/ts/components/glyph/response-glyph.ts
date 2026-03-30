@@ -131,10 +131,6 @@ export function confidenceToColor(confidence: number): string {
     return `hsla(30, 100%, 50%, ${alpha.toFixed(3)})`;
 }
 
-// ── DOM budget ──────────────────────────────────────────────────────
-
-const GLOBAL_DOM_BUDGET = 2500;
-
 interface StreamInstance {
     output: HTMLElement;
     tokens: StreamToken[];
@@ -154,36 +150,10 @@ export function toggleColorMode(): ColorMode {
     return colorMode;
 }
 
-function globalSpanCount(): number {
-    let count = 0;
-    for (const inst of instances) {
-        if (inst.visible) count += inst.output.children.length;
-    }
-    return count;
-}
-
-function evictToFit(): void {
-    while (globalSpanCount() > GLOBAL_DOM_BUDGET) {
-        let largest: StreamInstance | null = null;
-        let largestCount = 0;
-        for (const inst of instances) {
-            if (inst.visible && inst.output.children.length > largestCount) {
-                largest = inst;
-                largestCount = inst.output.children.length;
-            }
-        }
-        if (!largest || largestCount === 0) break;
-        largest.output.removeChild(largest.output.children[0]);
-    }
-}
-
 function renderSpans(inst: StreamInstance): void {
     const output = inst.output;
     output.textContent = '';
-    const visibleCount = [...instances].filter(i => i.visible).length;
-    const perGlyph = Math.floor(GLOBAL_DOM_BUDGET / Math.max(1, visibleCount));
-    const start = Math.max(0, inst.tokens.length - perGlyph);
-    for (let i = start; i < inst.tokens.length; i++) {
+    for (let i = 0; i < inst.tokens.length; i++) {
         output.appendChild(renderToken(inst.tokens[i], i, colorMode));
     }
 }
@@ -197,7 +167,6 @@ const visibilityObserver: IntersectionObserver | null =
                 if (entry.isIntersecting && !inst.visible) {
                     inst.visible = true;
                     renderSpans(inst);
-                    evictToFit();
                 } else if (!entry.isIntersecting && inst.visible) {
                     inst.visible = false;
                     inst.output.textContent = '';
@@ -537,7 +506,6 @@ export function createResponseGlyph(
         instances.add(streamInstance);
         visibilityObserver?.observe(output);
         renderSpans(streamInstance);
-        evictToFit();
         if (savedStats) renderStatsLine(output, savedStats);
 
         popup = createTokenPopup();
@@ -597,7 +565,7 @@ export function createResponseGlyph(
             tokens.push(token);
             if (streamInstance!.visible) {
                 output.appendChild(renderToken(token, tokenIndex, colorMode));
-                evictToFit();
+
             }
             output.scrollTop = output.scrollHeight;
         });
