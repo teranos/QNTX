@@ -18,7 +18,7 @@ import { createTsGlyph, TS_DEFAULT_CODE } from './ts-glyph';
 import { createDocGlyph } from './doc-glyph';
 import { createSubcanvasGlyph } from './subcanvas-glyph';
 import { createAttestationGlyph } from './attestation-glyph';
-import { createStreamGlyph } from './stream-glyph';
+import { createResponseGlyph } from './response-glyph';
 
 export interface GlyphTypeEntry {
     /** Symbol identifier (e.g., AX, 'py', SO, Prose) */
@@ -51,7 +51,7 @@ const GLYPH_TYPES: GlyphTypeEntry[] = [
     { symbol: Subcanvas, className: 'canvas-subcanvas-glyph', title: 'Subcanvas',    label: 'Subcanvas', render: createSubcanvasGlyph, spawnMenuOrder: 6 },
     { symbol: Doc,      className: 'canvas-doc-glyph',     title: 'Document',        label: 'Doc',       render: createDocGlyph },
     { symbol: AS,       className: 'canvas-attestation-glyph', title: 'Attestation', label: 'AS',        render: createAttestationGlyph },
-    { symbol: 'stream', className: 'canvas-stream-glyph',      title: 'Stream',      label: 'Stream',    render: (g) => createStreamGlyph(g, '') },
+    { symbol: 'stream', className: 'canvas-stream-glyph',      title: 'Stream',      label: 'Stream',    render: (g) => createResponseGlyph(g) },
 ];
 
 const _bySymbol = new Map(GLYPH_TYPES.map(e => [e.symbol, e]));

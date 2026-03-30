@@ -23,7 +23,7 @@ import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
-import type { ExecutionResult } from './result-glyph';
+import type { ExecutionResult } from './response-glyph';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
 import { createGlyphUI } from './glyph-ui';
