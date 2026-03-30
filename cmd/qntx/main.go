@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -39,6 +41,17 @@ Examples:
   qntx ix ls               # List async jobs
   qntx db stats            # Show database statistics
   qntx server              # Start graph visualization server`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// No subcommand: try Tauri desktop app first, fall back to server
+		if tauriPath := findTauriBinary(); tauriPath != "" {
+			proc := exec.Command(tauriPath)
+			proc.Stdout = os.Stdout
+			proc.Stderr = os.Stderr
+			return proc.Run()
+		}
+		// No Tauri binary found — start the server directly
+		return commands.ServerCmd.RunE(cmd, args)
+	},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Logger is already initialized in init() with file output.
 		// Re-initializing here would overwrite the file-enabled logger
@@ -315,6 +328,35 @@ func retryScheduleSetup(plugins []plugin.DomainPlugin, logger *zap.SugaredLogger
 	}
 
 	logger.Errorw("Gave up waiting for Pulse daemon after 30 seconds")
+}
+
+// findTauriBinary looks for the QNTX Tauri desktop binary.
+// Checks: next to this binary, PATH, and platform-specific app locations.
+func findTauriBinary() string {
+	// Check next to the current executable
+	if self, err := os.Executable(); err == nil {
+		dir := filepath.Dir(self)
+		candidates := tauriCandidates(dir)
+		for _, c := range candidates {
+			if _, err := os.Stat(c); err == nil {
+				return c
+			}
+		}
+	}
+
+	// Check PATH
+	if p, err := exec.LookPath(tauriBinaryName()); err == nil {
+		return p
+	}
+
+	// Platform-specific app locations
+	for _, c := range platformTauriPaths() {
+		if _, err := os.Stat(c); err == nil {
+			return c
+		}
+	}
+
+	return ""
 }
 
 func main() {

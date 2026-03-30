@@ -2,6 +2,8 @@ package sync
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -11,8 +13,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mr-tron/base58"
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/signing"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 
 	"go.uber.org/zap"
 )
@@ -520,6 +525,96 @@ func TestWireRoundtrip(t *testing.T) {
 	}
 	if back.Attributes["color"] != "blue" {
 		t.Fatal("attributes not preserved")
+	}
+}
+
+func testSigner() *signing.Signer {
+	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
+	buf := make([]byte, 2+len(pub))
+	buf[0] = 0xed
+	buf[1] = 0x01
+	copy(buf[2:], pub)
+	did := "did:key:z" + base58.Encode(buf)
+	return signing.NewSigner(priv, did)
+}
+
+// TestSignedWireJSONRoundTrip tests the full path: sign → toWire → JSON marshal/unmarshal → fromWire → verify.
+// This is exactly the path sync takes. Protobuf v1.35+ uses protojson for MarshalJSON which
+// changes field names to camelCase and serializes int64 as strings.
+func TestSignedWireJSONRoundTrip(t *testing.T) {
+	// Create and sign attestation with weave-like attributes (same as llama-cpp plugin)
+	as := &types.As{
+		ID:         "AS-MODELAMA-WEAVE-TEST-ROUNDTRIP",
+		Subjects:   []string{"model:llama-3.2-1b"},
+		Predicates: []string{"Weave"},
+		Contexts:   []string{"test-ctx"},
+		Actors:     []string{"AS-MODELAMA-WEAVE-TEST-ROUNDTRIP"},
+		Timestamp:  time.Date(2025, 6, 1, 12, 0, 0, 0, time.UTC),
+		Source:     "llama-cpp",
+		Attributes: map[string]interface{}{
+			"prompt":          "hello world",
+			"text":            "response text",
+			"model":           "llama-3.2-1b",
+			"token_count":     float64(5),
+			"mean_confidence": float64(0.95),
+			"mean_entropy":    float64(2.3),
+			"weave_source":    "llama-cpp",
+			"source_version":  "0.18.1",
+			"tokens": []interface{}{
+				map[string]interface{}{
+					"text":       "hello",
+					"position":   float64(0),
+					"confidence": float64(0.9),
+					"entropy":    float64(1.5),
+					"top_gap":    float64(0.3),
+					"top_k": []interface{}{
+						map[string]interface{}{"text": "hello", "prob": float64(0.9)},
+						map[string]interface{}{"text": "world", "prob": float64(0.1)},
+					},
+				},
+			},
+		},
+	}
+
+	signer := testSigner()
+	if err := signer.Sign(as); err != nil {
+		t.Fatalf("Sign failed: %v", err)
+	}
+
+	signedCanonical, _ := signing.CanonicalJSON(as)
+	t.Logf("signed canonical: %s", signedCanonical)
+
+	// Convert to proto wire format (same as sendAttestations)
+	protoAtt, err := toWire(as)
+	if err != nil {
+		t.Fatalf("toWire failed: %v", err)
+	}
+
+	// JSON roundtrip through chanConn (same as WebSocket sync)
+	jsonBytes, err := json.Marshal(protoAtt)
+	if err != nil {
+		t.Fatalf("json.Marshal of proto attestation failed: %v", err)
+	}
+	t.Logf("wire JSON (first 500 chars): %.500s", string(jsonBytes))
+
+	var protoAtt2 protocol.Attestation
+	if err := json.Unmarshal(jsonBytes, &protoAtt2); err != nil {
+		t.Fatalf("json.Unmarshal of proto attestation failed: %v", err)
+	}
+
+	// Convert back to types.As (same as receiveAttestations)
+	back := fromWire(&protoAtt2)
+
+	backCanonical, _ := signing.CanonicalJSON(back)
+	t.Logf("roundtripped canonical: %s", backCanonical)
+
+	if string(signedCanonical) != string(backCanonical) {
+		t.Fatalf("canonical JSON differs after wire roundtrip:\n  signed:      %s\n  roundtripped: %s", signedCanonical, backCanonical)
+	}
+
+	// Verify signature after full wire roundtrip
+	if err := signing.Verify(back); err != nil {
+		t.Fatalf("Verify failed after wire roundtrip: %v", err)
 	}
 }
 

@@ -25,8 +25,7 @@ import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
 import { tooltip } from '../tooltip';
 import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
-import { createResultGlyph, type ExecutionResult, type ResultGlyphContent } from './result-glyph';
-import { createStreamGlyph, getStreamTokenCount, unsubscribeStream } from './stream-glyph';
+import { createResponseGlyph, getResponseTokenCount, unsubscribeStream, populateStaticContent } from './response-glyph';
 
 /**
  * Prompt glyph execution status
@@ -234,8 +233,8 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
                 finalTemplate = noteTexts.join('\n\n') + '\n\n' + template;
             }
 
-            // Spawn stream glyph below prompt before fetch starts
-            const streamElement = spawnStreamBelow(element, glyph.id, template);
+            // Spawn response glyph below prompt before fetch starts
+            const responseElement = spawnResponseBelow(element, glyph.id, template);
 
             const response = await apiFetch('/api/prompt/direct', {
                 method: 'POST',
@@ -249,10 +248,9 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
 
             if (!response.ok) {
                 const errorText = await response.text();
-                // Remove stream glyph on error
-                if (streamElement) {
+                if (responseElement) {
                     unsubscribeStream(glyph.id);
-                    streamElement.remove();
+                    responseElement.remove();
                 }
                 throw new Error(`API error: ${response.status} - ${errorText}`);
             }
@@ -268,38 +266,19 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
             });
 
             if (data.error) {
-                // Remove stream glyph on API-level error
-                if (streamElement) {
+                if (responseElement) {
                     unsubscribeStream(glyph.id);
-                    streamElement.remove();
+                    responseElement.remove();
                 }
                 return;
             }
 
-            // If stream glyph received tokens, keep it; otherwise fall back to result glyph
-            const streamTokens = streamElement ? getStreamTokenCount(streamElement) : 0;
-            if (streamTokens > 0) {
-                log.debug(SEG.GLYPH, `[Prompt] Stream glyph received ${streamTokens} tokens, keeping`);
-            } else {
-                // Non-streaming provider — remove empty stream glyph, spawn result glyph
-                if (streamElement) {
-                    unsubscribeStream(glyph.id);
-                    streamElement.remove();
-                }
-                const execResult: ExecutionResult = {
-                    success: true,
-                    stdout: data.response ?? '',
-                    stderr: '',
-                    result: null,
-                    error: null,
-                    duration_ms: elapsedMs,
-                };
-                const promptConfig = {
-                    model: data.model,
-                    provider: undefined,
-                };
-                spawnResultBelow(element, execResult, promptConfig, textarea.value.trim());
+            // If no tokens arrived (non-streaming provider), populate with response text
+            const tokenCount = responseElement ? getResponseTokenCount(responseElement) : 0;
+            if (tokenCount === 0 && data.response && responseElement) {
+                populateStaticContent(responseElement, data.response);
             }
+            log.debug(SEG.GLYPH, `[Prompt] Response complete, ${tokenCount} tokens`);
 
         } catch (error) {
             log.error(SEG.GLYPH, '[Prompt] Execution failed:', error);
@@ -361,29 +340,24 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     tooltip.attach(element);
 
     /**
-     * Spawn a result glyph directly below this prompt glyph.
-     * Composition-aware: extends existing composition or creates new meld.
+     * Spawn a response glyph below this prompt glyph in streaming mode.
+     * Returns the element, or null if canvas not found.
      */
-    function spawnResultBelow(
-        promptEl: HTMLElement,
-        result: ExecutionResult,
-        promptConfig: { model?: string; provider?: string },
-        promptText: string,
-    ): void {
+    function spawnResponseBelow(promptEl: HTMLElement, promptGlyphId: string, promptText?: string): HTMLElement | null {
         const promptRect = promptEl.getBoundingClientRect();
         const canvas = promptEl.closest('.canvas-workspace') as HTMLElement;
         if (!canvas) {
-            log.error(SEG.GLYPH, '[Prompt] Cannot spawn result glyph: no canvas-workspace ancestor');
-            return;
+            log.error(SEG.GLYPH, '[Prompt] Cannot spawn response glyph: no canvas-workspace ancestor');
+            return null;
         }
         const canvasRect = canvas.getBoundingClientRect();
 
         const rx = promptRect.left - canvasRect.left;
         const ry = promptRect.bottom - canvasRect.top;
 
-        const resultGlyphId = `result-${crypto.randomUUID()}`;
-        const resultGlyph: Glyph = {
-            id: resultGlyphId,
+        const responseGlyphId = `result-${crypto.randomUUID()}`;
+        const responseGlyph: Glyph = {
+            id: responseGlyphId,
             title: 'Result',
             symbol: 'result',
             x: rx,
@@ -392,71 +366,20 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
             renderContent: () => document.createElement('div'),
         };
 
-        const resultElement = createResultGlyph(resultGlyph, result, promptConfig, promptText);
-        canvas.appendChild(resultElement);
+        const responseElement = createResponseGlyph(responseGlyph, undefined, undefined, promptText, promptGlyphId);
+        canvas.appendChild(responseElement);
 
-        const resultRect = resultElement.getBoundingClientRect();
-        const contentPayload: ResultGlyphContent = { result, promptConfig, prompt: promptText };
         uiState.addCanvasGlyph({
-            id: resultGlyphId,
+            id: responseGlyphId,
             symbol: 'result',
             x: rx,
             y: ry,
-            width: Math.round(resultRect.width) || Math.round(promptRect.width),
-            height: Math.round(resultRect.height) || 200,
-            content: JSON.stringify(contentPayload),
-        });
-
-        // Auto-meld result below prompt glyph
-        const promptGlyphId = promptEl.dataset.glyphId;
-        if (promptGlyphId) {
-            autoMeldResultBelow(promptEl, promptGlyphId, 'prompt', 'Prompt', resultElement, resultGlyphId, 'Prompt');
-        }
-    }
-
-    /**
-     * Spawn a stream glyph directly below this prompt glyph.
-     * Returns the stream element, or null if canvas not found.
-     */
-    function spawnStreamBelow(promptEl: HTMLElement, promptGlyphId: string, promptText?: string): HTMLElement | null {
-        const promptRect = promptEl.getBoundingClientRect();
-        const canvas = promptEl.closest('.canvas-workspace') as HTMLElement;
-        if (!canvas) {
-            log.error(SEG.GLYPH, '[Prompt] Cannot spawn stream glyph: no canvas-workspace ancestor');
-            return null;
-        }
-        const canvasRect = canvas.getBoundingClientRect();
-
-        const sx = promptRect.left - canvasRect.left;
-        const sy = promptRect.bottom - canvasRect.top;
-
-        const streamGlyphId = `stream-${crypto.randomUUID()}`;
-        const streamGlyph: Glyph = {
-            id: streamGlyphId,
-            title: 'Stream',
-            symbol: 'stream',
-            x: sx,
-            y: sy,
-            width: Math.round(promptRect.width),
-            renderContent: () => document.createElement('div'),
-        };
-
-        const streamElement = createStreamGlyph(streamGlyph, promptGlyphId, promptText);
-        canvas.appendChild(streamElement);
-
-        // Register in canvas state for persistence
-        uiState.addCanvasGlyph({
-            id: streamGlyphId,
-            symbol: 'stream',
-            x: sx,
-            y: sy,
             width: Math.round(promptRect.width),
             height: 200,
         });
 
-        // Auto-meld stream below prompt glyph
-        autoMeldResultBelow(promptEl, promptGlyphId, 'prompt', 'Prompt', streamElement, streamGlyphId, 'StreamGlyph');
+        autoMeldResultBelow(promptEl, promptGlyphId, 'prompt', 'Prompt', responseElement, responseGlyphId, 'ResponseGlyph');
 
-        return streamElement;
+        return responseElement;
     }
 }

@@ -164,15 +164,21 @@ type LLMStreamMessage struct {
 	Stage   string          `json:"stage,omitempty"`   // Current stage (e.g., "extraction")
 	Error   string          `json:"error,omitempty"`   // Error message if streaming failed
 	Signal  *LLMTokenSignal `json:"signal,omitempty"`  // Per-token signal data
+
+	// Usage — populated on the final (done=true) chunk only
+	PromptTokens     int `json:"prompt_tokens,omitempty"`
+	CompletionTokens int `json:"completion_tokens,omitempty"`
+	TotalTokens      int `json:"total_tokens,omitempty"`
 }
 
 // LLMTokenSignal carries per-token inference signal data for visualization
 type LLMTokenSignal struct {
-	Confidence       float32             `json:"confidence"`                  // P(chosen) from raw distribution
-	Entropy          float32             `json:"entropy"`                     // Shannon entropy in bits
-	TopGap           float32             `json:"top_gap"`                     // P(top1) - P(top2)
-	TopK             []LLMTokenCandidate `json:"top_k,omitempty"`             // Top-k candidates
-	FullDistribution []float32           `json:"full_distribution,omitempty"` // Full softmax distribution (vocab_size floats)
+	Confidence       float32              `json:"confidence"`                  // P(chosen) from raw distribution
+	Entropy          float32              `json:"entropy"`                     // Shannon entropy in bits
+	TopGap           float32              `json:"top_gap"`                     // P(top1) - P(top2)
+	TopK             []LLMTokenCandidate  `json:"top_k,omitempty"`             // Top-k candidates
+	FullDistribution []float32            `json:"full_distribution,omitempty"` // Full softmax distribution (vocab_size floats)
+	SamplerStages    []SamplerStageSignal `json:"sampler_stages,omitempty"`    // Per-stage snapshots through sampler chain
 }
 
 // LLMTokenCandidate is a candidate token from the top-k distribution
@@ -180,6 +186,15 @@ type LLMTokenCandidate struct {
 	ID   int32   `json:"id"`
 	Text string  `json:"text"`
 	Prob float32 `json:"prob"`
+}
+
+// SamplerStageSignal is a snapshot of the token distribution after a sampler stage
+type SamplerStageSignal struct {
+	Name        string              `json:"name"`            // Stage name: "logits", "top_k", "top_p", "temp", etc.
+	ActiveCount int32               `json:"active_count"`    // Tokens remaining with nonzero probability
+	Top1Prob    float32             `json:"top1_prob"`       // P(top token) after this stage
+	Entropy     float32             `json:"entropy"`         // Shannon entropy after this stage
+	TopK        []LLMTokenCandidate `json:"top_k,omitempty"` // Top-5 candidates after this stage
 }
 
 // PulseExecutionStartedMessage represents a Pulse execution that just started

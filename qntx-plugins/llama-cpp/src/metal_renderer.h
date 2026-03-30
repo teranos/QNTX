@@ -4,8 +4,8 @@
 //   runner-up positions at each generation step. Data exists in TokenSignal.top_k.
 // TODO(B64): WebSocket frames are base64-encoded PNG — 33% overhead. Binary
 //   WebSocket frames would eliminate this.
-// TODO(CAM): No camera control — fixed orthographic MVP auto-fitted to bounds.
-//   Interactive rotation/zoom/pan would let users explore vocabulary space.
+// TODO(CAM): 3D camera (WASD + mouse) is implemented but needs testing and
+//   refinement — controls feel rough, no inertia, no collision with nebula bounds.
 // TODO(KFC): Keyframe history capped at 512 (64MB). Longer generations lose
 //   early frames. No disk persistence — closing the glyph loses all history.
 // TODO(TRU): Trail positions vector is unbounded while keyframes are capped.
@@ -15,6 +15,8 @@
 //   from same memory) but no input→buffer→sampler path is wired.
 // TODO(PVH): PCA projection accesses private llama-model.h header to read
 //   tok_embd.weight. Version-fragile against llama.cpp internal changes.
+
+#include "camera.h"
 
 #include <atomic>
 #include <chrono>
@@ -63,6 +65,16 @@ public:
     void add_trail_point(int token_id);
     void clear_trail();
 
+    // Record ghost branches: lines from the chosen token to runner-up positions.
+    // Call after add_trail_point for the same generation step.
+    void add_ghost_branches(int chosen_token_id,
+                            const std::vector<std::pair<int,float>>& runners);
+
+    // Camera: pan (dx/dy in world units), zoom (dz multiplicative),
+    // rotation (dyaw/dpitch in radians).
+    void apply_camera(float dx, float dy, float dz, float dyaw, float dpitch);
+    void reset_camera();
+
     // Runtime-adjustable parameters
     void set_param(const std::string& key, float value);
 
@@ -107,10 +119,20 @@ private:
     int vocab_size_ = 0;
     float center_x_ = 0, center_y_ = 0, extent_ = 1.0f;
 
+    Camera camera_;
+
+    void build_mvp(float* mvp, int width, int height);
+
     // Generation trail — chosen token positions
     std::vector<float> trail_positions_;  // flat float3 array
     std::mutex trail_mutex_;
     const float* vocab_positions_ptr_ = nullptr;  // borrowed pointer to cached positions
+
+    // Ghost branches — runner-up paths at each generation step
+    // Flat buffer: 5 floats per vertex [x, y, z, prob, trail_index]
+    // Vertices come in pairs (chosen->runner-up) drawn as Line primitives
+    std::vector<float> ghost_vertices_;
+    MTL::RenderPipelineState* ghost_pipeline_ = nullptr;
 
     // Interpolation state
     MTL::Buffer* prob_a_ = nullptr;  // previous distribution
@@ -121,7 +143,7 @@ private:
 
     // Scrub playback — CPU-side keyframe history
     std::vector<std::vector<float>> keyframe_history_;  // one distribution per token
-    int scrub_index_ = -1;  // -1 = live mode
+    std::atomic<int> scrub_index_{-1};  // -1 = live mode
 
     // Drift — fixed-step camera offset per token, makes time into space
     int drift_count_ = 0;        // how many tokens have been recorded
@@ -136,5 +158,10 @@ private:
     std::thread render_thread_;
     std::atomic<bool> render_running_{false};
     int render_width_ = 800, render_height_ = 600;
+
+    // Idle suppression — sleep when interpolation is complete and no new data
+    std::condition_variable render_wake_cv_;
+    std::mutex render_wake_mutex_;
+    bool render_dirty_ = false;  // new data arrived, need to render
 #endif
 };

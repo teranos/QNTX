@@ -9,12 +9,13 @@
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { apiFetch } from '../../api';
+import { canvasSyncQueue } from '../../api/canvas-sync';
 import { uiState } from '../../state/ui';
 import { Doc, Prose } from '@generated/sym.js';
 import { preventDrag } from './glyph-interaction';
 import { autoMeldResultBelow } from './meld/meld-system';
 import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
-import { createResultGlyph, type ExecutionResult } from './result-glyph';
+import { createResponseGlyph, type ExecutionResult } from './response-glyph';
 
 /** UI controls exposed to custom onExecute callbacks */
 export interface FollowUpControls {
@@ -39,6 +40,8 @@ export interface FollowUpRequest {
     fileIds: string[];
     /** Parent glyph ID */
     glyphId: string;
+    /** Composition edges from local state — sent to backend for conversation assembly */
+    compositionEdges?: Array<{ from: string; to: string; direction: string; position: number }>;
 }
 
 export interface FollowUpConfig {
@@ -170,6 +173,7 @@ export function createFollowUpZone(config: FollowUpConfig): HTMLElement {
                 provider,
                 fileIds,
                 glyphId: glyph.id,
+                compositionEdges: comp?.edges,
             };
 
             if (config.onExecute) {
@@ -189,14 +193,23 @@ export function createFollowUpZone(config: FollowUpConfig): HTMLElement {
 
 /**
  * Default execution: POST to /api/prompt/direct, spawn result glyph below.
+ *
+ * TODO: Use the streaming path (like executeStreamFollowUp in response-glyph.ts)
+ * so follow-ups from py/static results also receive token signals and sampler colors.
+ * Currently wraps the full response as ExecutionResult.stdout — no streaming, no signals.
  */
-function defaultExecute(
+async function defaultExecute(
     request: FollowUpRequest,
     controls: FollowUpControls,
     element: HTMLElement,
     glyph: Glyph,
     logLabel: string,
-): void {
+): Promise<void> {
+    // Ensure composition edges are persisted before the API call.
+    // The backend's ConversationAssembler needs the composition in the DB
+    // to trace meld edges and build multi-turn conversation history.
+    await canvasSyncQueue.flush();
+
     const body: Record<string, unknown> = {
         template: request.template,
         system_prompt: request.systemPrompt,
@@ -281,7 +294,7 @@ export function spawnFollowUpResult(data: FollowUpResult): void {
     };
 
     const promptConfig = { model, provider };
-    const resultElement = createResultGlyph(resultGlyph, result, promptConfig, prompt);
+    const resultElement = createResponseGlyph(resultGlyph, result, promptConfig, prompt);
     canvas.appendChild(resultElement);
 
     const parentGlyphId = parentElement.dataset.glyphId;

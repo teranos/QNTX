@@ -159,3 +159,36 @@ vertex TrailVertexOut trailVertex(
 fragment float4 trailFragment(TrailVertexOut in [[stage_in]]) {
     return float4(in.color * in.alpha * 0.7, 1.0);
 }
+
+// --- Ghost branches: runner-up paths at low-certainty tokens ---
+// Buffer layout: 5 floats per vertex [x, y, z, alpha, trailIndex]
+// Drawn as Line primitives (pairs of vertices: chosen->runner-up)
+
+vertex TrailVertexOut ghostBranchVertex(
+    device const float* data     [[buffer(0)]],
+    constant float4x4& mvp      [[buffer(1)]],
+    constant uint& trailCount   [[buffer(2)]],
+    constant int& scrubIndex    [[buffer(3)]],
+    constant float& orbitRadius [[buffer(4)]],
+    constant float& angleStep   [[buffer(5)]],
+    uint vid [[vertex_id]]
+) {
+    float3 pos = float3(data[vid*5], data[vid*5+1], data[vid*5+2]);
+    float prob = data[vid*5+3];
+    int trailIdx = int(data[vid*5+4]);
+
+    // Same orbit transform as the main trail
+    int headIndex = (scrubIndex >= 0) ? scrubIndex : int(trailCount - 1);
+    float age = float(headIndex - trailIdx);
+    float theta = age * angleStep;
+    pos.x += orbitRadius * sin(theta);
+    pos.y -= orbitRadius * (1.0 - cos(theta));
+
+    TrailVertexOut out;
+    out.position = mvp * float4(pos, 1.0);
+    // Cool blue-violet tint — visually distinct from warm main trail
+    out.color = float3(0.4, 0.55, 0.9);
+    // Alpha scales with probability — high-prob runners bright, low-prob fade
+    out.alpha = saturate(prob * 4.0) * 0.6;
+    return out;
+}
