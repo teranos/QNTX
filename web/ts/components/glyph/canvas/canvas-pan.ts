@@ -96,12 +96,21 @@ function loadTransformState(canvasId: string): void {
 /**
  * Save pan and zoom state to uiState
  */
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingSaveCanvasId: string | null = null;
+
 function saveTransformState(canvasId: string): void {
     // Check if uiState methods are available (may not be in test environments)
     if (typeof uiState.setCanvasPan !== 'function') return;
 
-    const state = getState(canvasId);
-    uiState.setCanvasPan(canvasId, { panX: state.panX, panY: state.panY, scale: state.scale });
+    pendingSaveCanvasId = canvasId;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+        saveTimer = null;
+        pendingSaveCanvasId = null;
+        const state = getState(canvasId);
+        uiState.setCanvasPan(canvasId, { panX: state.panX, panY: state.panY, scale: state.scale });
+    }, 200);
 }
 
 /**
@@ -400,6 +409,22 @@ export function canvasToScreen(canvasId: string, canvasX: number, canvasY: numbe
         x: canvasX * state.scale + state.panX,
         y: canvasY * state.scale + state.panY,
     };
+}
+
+/**
+ * Flush pending debounced save immediately (for testing)
+ */
+export function flushSaveState(): void {
+    if (saveTimer && pendingSaveCanvasId) {
+        clearTimeout(saveTimer);
+        const canvasId = pendingSaveCanvasId;
+        saveTimer = null;
+        pendingSaveCanvasId = null;
+        if (typeof uiState.setCanvasPan === 'function') {
+            const state = getState(canvasId);
+            uiState.setCanvasPan(canvasId, { panX: state.panX, panY: state.panY, scale: state.scale });
+        }
+    }
 }
 
 /**
