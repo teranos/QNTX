@@ -55,6 +55,12 @@ interface StreamToken {
     signal?: LLMTokenSignal | null;
 }
 
+interface GenerationStats {
+    tokenCount: number;
+    tokPerSec?: number;
+    model?: string;
+}
+
 export interface ResultGlyphContent {
     result?: ExecutionResult;
     tokens?: StreamToken[];
@@ -62,6 +68,7 @@ export interface ResultGlyphContent {
     promptConfig?: PromptConfig;
     prompt?: string;
     followupError?: string;
+    stats?: GenerationStats;
 }
 
 // ── Multiplexer ──────────────────────────────────────────────────────
@@ -93,6 +100,22 @@ export function unsubscribeStream(jobId: string): void {
         unregisterHandler('llm_stream');
         log.debug(SEG.GLYPH, '[ResponseGlyph] Unregistered llm_stream handler');
     }
+}
+
+function renderStatsLine(container: HTMLElement, stats: GenerationStats): void {
+    const el = document.createElement('div');
+    el.className = 'response-glyph-stats';
+    el.style.fontSize = '10px';
+    el.style.color = 'var(--text-muted)';
+    el.style.padding = '4px 8px 2px';
+    el.style.textAlign = 'right';
+    el.style.opacity = '0.6';
+    const parts: string[] = [];
+    if (stats.model) parts.push(stats.model);
+    parts.push(`${stats.tokenCount} tokens`);
+    if (stats.tokPerSec) parts.push(`${stats.tokPerSec.toFixed(1)} tok/s`);
+    el.textContent = parts.join(' · ');
+    container.appendChild(el);
 }
 
 // ── Confidence → Color ──────────────────────────────────────────────
@@ -289,6 +312,7 @@ export function createResponseGlyph(
     let isStreaming = !!streamJobId;
     let streamInstance: StreamInstance | null = null;
     let popup: ReturnType<typeof createTokenPopup> | null = null;
+    let savedStats: GenerationStats | undefined;
 
     // ── Header ──────────────────────────────────────────────────────
 
@@ -490,6 +514,7 @@ export function createResponseGlyph(
                 // Restore from saved token data
                 for (const token of content.tokens) tokens.push(token);
                 streamModel = content.model;
+                savedStats = content.stats;
                 if (content.prompt && !prompt) prompt = content.prompt;
                 log.debug(SEG.GLYPH, `[ResponseGlyph] Restored ${tokens.length} tokens for ${glyph.id}`);
             } else if (content.result) {
@@ -513,6 +538,7 @@ export function createResponseGlyph(
         visibilityObserver?.observe(output);
         renderSpans(streamInstance);
         evictToFit();
+        if (savedStats) renderStatsLine(output, savedStats);
 
         popup = createTokenPopup();
         setupTokenPopup(output, popup);
@@ -548,25 +574,13 @@ export function createResponseGlyph(
                 copyBtn.style.display = '';
                 toWindowBtn.style.display = '';
 
-                // Show generation stats
+                // Compute and persist generation stats
                 const tokenCount = msg.completion_tokens || tokens.length;
                 if (tokenCount > 0) {
                     const elapsedMs = streamStartMs ? performance.now() - streamStartMs : 0;
-                    const tokSec = elapsedMs > 0 ? (tokenCount / elapsedMs * 1000).toFixed(1) : null;
-
-                    const stat = document.createElement('div');
-                    stat.className = 'response-glyph-stats';
-                    stat.style.fontSize = '10px';
-                    stat.style.color = 'var(--text-muted)';
-                    stat.style.padding = '4px 8px 2px';
-                    stat.style.textAlign = 'right';
-                    stat.style.opacity = '0.6';
-                    const parts: string[] = [];
-                    if (streamModel) parts.push(streamModel);
-                    parts.push(`${tokenCount} tokens`);
-                    if (tokSec) parts.push(`${tokSec} tok/s`);
-                    stat.textContent = parts.join(' · ');
-                    output.appendChild(stat);
+                    const tokPerSec = elapsedMs > 0 ? tokenCount / elapsedMs * 1000 : undefined;
+                    savedStats = { tokenCount, tokPerSec, model: streamModel };
+                    renderStatsLine(output, savedStats);
                 }
 
                 persistContent();
@@ -627,6 +641,7 @@ export function createResponseGlyph(
             model: streamModel,
             promptConfig,
             prompt,
+            stats: savedStats,
         };
         const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
         if (existing) {
