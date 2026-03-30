@@ -55,6 +55,12 @@ interface StreamToken {
     signal?: LLMTokenSignal | null;
 }
 
+interface GenerationStats {
+    tokenCount: number;
+    tokPerSec?: number;
+    model?: string;
+}
+
 export interface ResultGlyphContent {
     result?: ExecutionResult;
     tokens?: StreamToken[];
@@ -62,6 +68,7 @@ export interface ResultGlyphContent {
     promptConfig?: PromptConfig;
     prompt?: string;
     followupError?: string;
+    stats?: GenerationStats;
 }
 
 // ── Multiplexer ──────────────────────────────────────────────────────
@@ -95,6 +102,22 @@ export function unsubscribeStream(jobId: string): void {
     }
 }
 
+function renderStatsLine(container: HTMLElement, stats: GenerationStats): void {
+    const el = document.createElement('div');
+    el.className = 'response-glyph-stats';
+    el.style.fontSize = '10px';
+    el.style.color = 'var(--text-muted)';
+    el.style.padding = '4px 8px 2px';
+    el.style.textAlign = 'right';
+    el.style.opacity = '0.6';
+    const parts: string[] = [];
+    if (stats.model) parts.push(stats.model);
+    parts.push(`${stats.tokenCount} tokens`);
+    if (stats.tokPerSec) parts.push(`${stats.tokPerSec.toFixed(1)} tok/s`);
+    el.textContent = parts.join(' · ');
+    container.appendChild(el);
+}
+
 // ── Confidence → Color ──────────────────────────────────────────────
 
 /**
@@ -107,10 +130,6 @@ export function confidenceToColor(confidence: number): string {
     if (alpha < 0.02) return 'transparent';
     return `hsla(30, 100%, 50%, ${alpha.toFixed(3)})`;
 }
-
-// ── DOM budget ──────────────────────────────────────────────────────
-
-const GLOBAL_DOM_BUDGET = 2500;
 
 interface StreamInstance {
     output: HTMLElement;
@@ -131,36 +150,10 @@ export function toggleColorMode(): ColorMode {
     return colorMode;
 }
 
-function globalSpanCount(): number {
-    let count = 0;
-    for (const inst of instances) {
-        if (inst.visible) count += inst.output.children.length;
-    }
-    return count;
-}
-
-function evictToFit(): void {
-    while (globalSpanCount() > GLOBAL_DOM_BUDGET) {
-        let largest: StreamInstance | null = null;
-        let largestCount = 0;
-        for (const inst of instances) {
-            if (inst.visible && inst.output.children.length > largestCount) {
-                largest = inst;
-                largestCount = inst.output.children.length;
-            }
-        }
-        if (!largest || largestCount === 0) break;
-        largest.output.removeChild(largest.output.children[0]);
-    }
-}
-
 function renderSpans(inst: StreamInstance): void {
     const output = inst.output;
     output.textContent = '';
-    const visibleCount = [...instances].filter(i => i.visible).length;
-    const perGlyph = Math.floor(GLOBAL_DOM_BUDGET / Math.max(1, visibleCount));
-    const start = Math.max(0, inst.tokens.length - perGlyph);
-    for (let i = start; i < inst.tokens.length; i++) {
+    for (let i = 0; i < inst.tokens.length; i++) {
         output.appendChild(renderToken(inst.tokens[i], i, colorMode));
     }
 }
@@ -174,7 +167,6 @@ const visibilityObserver: IntersectionObserver | null =
                 if (entry.isIntersecting && !inst.visible) {
                     inst.visible = true;
                     renderSpans(inst);
-                    evictToFit();
                 } else if (!entry.isIntersecting && inst.visible) {
                     inst.visible = false;
                     inst.output.textContent = '';
@@ -289,6 +281,7 @@ export function createResponseGlyph(
     let isStreaming = !!streamJobId;
     let streamInstance: StreamInstance | null = null;
     let popup: ReturnType<typeof createTokenPopup> | null = null;
+    let savedStats: GenerationStats | undefined;
 
     // ── Header ──────────────────────────────────────────────────────
 
@@ -490,6 +483,7 @@ export function createResponseGlyph(
                 // Restore from saved token data
                 for (const token of content.tokens) tokens.push(token);
                 streamModel = content.model;
+                savedStats = content.stats;
                 if (content.prompt && !prompt) prompt = content.prompt;
                 log.debug(SEG.GLYPH, `[ResponseGlyph] Restored ${tokens.length} tokens for ${glyph.id}`);
             } else if (content.result) {
@@ -512,7 +506,7 @@ export function createResponseGlyph(
         instances.add(streamInstance);
         visibilityObserver?.observe(output);
         renderSpans(streamInstance);
-        evictToFit();
+        if (savedStats) renderStatsLine(output, savedStats);
 
         popup = createTokenPopup();
         setupTokenPopup(output, popup);
@@ -536,6 +530,8 @@ export function createResponseGlyph(
             setupTokenPopup(output, popup);
         }
 
+        let streamStartMs = 0;
+
         subscribeStream(streamJobId, (msg: LLMStreamMessage) => {
             if (msg.model) streamModel = msg.model;
 
@@ -545,6 +541,16 @@ export function createResponseGlyph(
                 // Reveal copy + expand buttons
                 copyBtn.style.display = '';
                 toWindowBtn.style.display = '';
+
+                // Compute and persist generation stats
+                const tokenCount = msg.completion_tokens || tokens.length;
+                if (tokenCount > 0) {
+                    const elapsedMs = streamStartMs ? performance.now() - streamStartMs : 0;
+                    const tokPerSec = elapsedMs > 0 ? tokenCount / elapsedMs * 1000 : undefined;
+                    savedStats = { tokenCount, tokPerSec, model: streamModel };
+                    renderStatsLine(output, savedStats);
+                }
+
                 persistContent();
                 log.debug(SEG.GLYPH, `[ResponseGlyph] Stream complete for ${streamJobId}, ${tokens.length} tokens`);
                 return;
@@ -552,12 +558,14 @@ export function createResponseGlyph(
 
             if (!msg.content) return;
 
+            if (!streamStartMs) streamStartMs = performance.now();
+
             const token: StreamToken = { text: msg.content, signal: msg.signal };
             const tokenIndex = tokens.length;
             tokens.push(token);
             if (streamInstance!.visible) {
                 output.appendChild(renderToken(token, tokenIndex, colorMode));
-                evictToFit();
+
             }
             output.scrollTop = output.scrollHeight;
         });
@@ -601,6 +609,7 @@ export function createResponseGlyph(
             model: streamModel,
             promptConfig,
             prompt,
+            stats: savedStats,
         };
         const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
         if (existing) {

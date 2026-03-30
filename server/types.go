@@ -164,6 +164,11 @@ type LLMStreamMessage struct {
 	Stage   string          `json:"stage,omitempty"`   // Current stage (e.g., "extraction")
 	Error   string          `json:"error,omitempty"`   // Error message if streaming failed
 	Signal  *LLMTokenSignal `json:"signal,omitempty"`  // Per-token signal data
+
+	// Usage — populated on the final (done=true) chunk only
+	PromptTokens     int `json:"prompt_tokens,omitempty"`
+	CompletionTokens int `json:"completion_tokens,omitempty"`
+	TotalTokens      int `json:"total_tokens,omitempty"`
 }
 
 // LLMTokenSignal carries per-token inference signal data for visualization
