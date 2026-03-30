@@ -10,7 +10,7 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { createResultGlyph, type ExecutionResult } from './result-glyph';
+import { createResponseGlyph, type ExecutionResult } from './response-glyph';
 import { createErrorGlyph } from './error-glyph';
 import type { Glyph } from './glyph';
 
@@ -49,7 +49,7 @@ describe('Error Recovery Workflow - Jenny (Complex Scenarios)', () => {
         document.body.appendChild(canvas);
 
         // Jenny's result glyph renders successfully
-        const resultElement = createResultGlyph(resultGlyph, executionResult);
+        const resultElement = createResponseGlyph(resultGlyph, executionResult);
         canvas.appendChild(resultElement);
 
         // Verify execution data is attached as ResultGlyphContent JSON
