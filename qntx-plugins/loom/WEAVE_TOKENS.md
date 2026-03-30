@@ -52,7 +52,24 @@ One weave per generation — no separate Token attestations.
 One attestation per generation avoids the 16-per-(actor, context) eviction limit.
 Token data lives inside the weave's attributes, not as separate attestations.
 
+## Performance attestation
+
+llama-cpp weaves (v0.23.0+) include `attributes.performance`:
+
+| Field             | Type   | Description                           |
+|-------------------|--------|---------------------------------------|
+| `prompt_eval_ms`  | number | Prompt decode into KV cache           |
+| `generation_ms`   | number | Total generation loop                 |
+| `decode_ms`       | number | llama_decode calls only               |
+| `signal_ms`       | number | capture_signal (softmax + partial sort) |
+| `callback_ms`     | number | Token callback (proto + renderer + gRPC) |
+| `tokens_per_sec`  | number | Computed: completion_tokens * 1000 / generation_ms |
+
+Loom renders this as `{tok/s} ({generation_ms}ms)` next to the model name. Hover for the full breakdown.
+
 ## Limitations
+
+- **MWP** — Model warp placement. llama-cpp weaves use `model:X` as their attestation subject (e.g. `model:Llama 3.2 3B Instruct`). Loom treats subjects as project/column keys, so these weaves get lumped under a column called `model` — mixed in with graunde conversation weaves. Local model generations should get their own warp, grouped per model.
 
 - **TBR** — Token branch exploration. Token weaves bypass turn-level selection, so click-to-select and CMD+C copy don't work. Will tie into loom branch exploration — clicking a low-confidence token to explore the alternative path the model didn't take.
 
