@@ -561,6 +561,8 @@ InferenceEngine::ChatResult InferenceEngine::stream_chat(
               << " | decode=" << decode_us / 1000 << "ms"
               << " signal=" << signal_us / 1000 << "ms"
               << " callback=" << callback_us / 1000 << "ms" << std::endl;
+    // TODO(PAT): Attest generation timing (n_generated, total_ms, decode_us, signal_us, callback_us)
+    //            so performance regressions surface in the attestation graph.
 
     llama_sampler_free(sampler);
     result.content = output.str();
