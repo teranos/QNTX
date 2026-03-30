@@ -37,6 +37,7 @@ type TokenSignal struct {
 	TopGap           float32
 	TopK             []TokenCandidate
 	FullDistribution []float32
+	SamplerStages    []SamplerStageSignal
 }
 
 // TokenCandidate is a candidate token from the top-k distribution
@@ -44,4 +45,13 @@ type TokenCandidate struct {
 	ID   int32
 	Text string
 	Prob float32
+}
+
+// SamplerStageSignal is a snapshot of the token distribution after a sampler stage
+type SamplerStageSignal struct {
+	Name        string
+	ActiveCount int32
+	Top1Prob    float32
+	Entropy     float32
+	TopK        []TokenCandidate
 }

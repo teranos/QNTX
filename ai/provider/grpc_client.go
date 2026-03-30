@@ -2,7 +2,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"time"
 
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -98,15 +100,24 @@ func (c *GRPCLLMClient) Chat(ctx context.Context, req ChatRequest) (*ChatRespons
 func (c *GRPCLLMClient) ChatStreaming(ctx context.Context, req ChatRequest, streamChan chan<- StreamChunk) error {
 	grpcReq := c.buildGRPCRequest(req)
 
+	t0 := time.Now()
+	fmt.Printf("[grpc-llm] calling gRPC StreamChat...\n")
 	stream, err := c.router.StreamChatClient(ctx, grpcReq)
+	fmt.Printf("[grpc-llm] gRPC call returned in %dms\n", time.Since(t0).Milliseconds())
 	if err != nil {
 		return errors.Wrapf(err, "gRPC LLM stream chat via provider %s failed", c.provider)
 	}
 
 	defer close(streamChan)
 
+	tFirstRecv := time.Now()
+
 	for {
 		chunk, err := stream.Recv()
+		if tFirstRecv != (time.Time{}) {
+			fmt.Printf("[grpc-llm] first chunk received %dms after gRPC call\n", time.Since(tFirstRecv).Milliseconds())
+			tFirstRecv = time.Time{}
+		}
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				return nil
@@ -139,6 +150,22 @@ func (c *GRPCLLMClient) ChatStreaming(ctx context.Context, req ChatRequest, stre
 					Text: tc.Text,
 					Prob: tc.Prob,
 				})
+			}
+			for _, stage := range chunk.Signal.SamplerStages {
+				ss := SamplerStageSignal{
+					Name:        stage.Name,
+					ActiveCount: stage.ActiveCount,
+					Top1Prob:    stage.Top1Prob,
+					Entropy:     stage.Entropy,
+				}
+				for _, tc := range stage.TopK {
+					ss.TopK = append(ss.TopK, TokenCandidate{
+						ID:   tc.Id,
+						Text: tc.Text,
+						Prob: tc.Prob,
+					})
+				}
+				sig.SamplerStages = append(sig.SamplerStages, ss)
 			}
 			sc.Signal = sig
 		}
