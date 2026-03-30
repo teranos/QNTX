@@ -256,6 +256,12 @@ export interface LLMStreamMessage {
    * Per-token signal data
    */
   signal?: LLMTokenSignal | null;
+  /**
+   * Usage — populated on the final (done=true) chunk only
+   */
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
 }
 
 export interface LLMTokenCandidate {

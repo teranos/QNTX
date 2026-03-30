@@ -148,7 +148,7 @@ type ErrorResponse struct {
 
 ## GlyphFiredMessage {#glyphfiredmessage}
 
-**Source**: [`server/types.go:260`](https://github.com/teranos/QNTX/blob/main/server/types.go#L260)
+**Source**: [`server/types.go:265`](https://github.com/teranos/QNTX/blob/main/server/types.go#L265)
 
 
 ```go
@@ -217,12 +217,15 @@ type LLMStreamMessage struct {
 	Stage string `json:"stage,omitempty"`
 	Error string `json:"error,omitempty"`
 	Signal *LLMTokenSignal `json:"signal,omitempty"`
+	PromptTokens int `json:"prompt_tokens,omitempty"`
+	CompletionTokens int `json:"completion_tokens,omitempty"`
+	TotalTokens int `json:"total_tokens,omitempty"`
 }
 ```
 
 ## LLMTokenCandidate {#llmtokencandidate}
 
-**Source**: [`server/types.go:180`](https://github.com/teranos/QNTX/blob/main/server/types.go#L180)
+**Source**: [`server/types.go:185`](https://github.com/teranos/QNTX/blob/main/server/types.go#L185)
 
 
 ```go
@@ -235,7 +238,7 @@ type LLMTokenCandidate struct {
 
 ## LLMTokenSignal {#llmtokensignal}
 
-**Source**: [`server/types.go:170`](https://github.com/teranos/QNTX/blob/main/server/types.go#L170)
+**Source**: [`server/types.go:175`](https://github.com/teranos/QNTX/blob/main/server/types.go#L175)
 
 
 ```go
@@ -309,7 +312,7 @@ type PluginGlyphDef struct {
 
 ## PluginHealthMessage {#pluginhealthmessage}
 
-**Source**: [`server/types.go:239`](https://github.com/teranos/QNTX/blob/main/server/types.go#L239)
+**Source**: [`server/types.go:244`](https://github.com/teranos/QNTX/blob/main/server/types.go#L244)
 
 
 ```go
@@ -475,7 +478,7 @@ type PromptPreviewResponse struct {
 
 ## PromptSaveRequest {#promptsaverequest}
 
-**Source**: [`server/prompt_handlers.go:906`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L906)
+**Source**: [`server/prompt_handlers.go:912`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L912)
 
 
 ```go
@@ -505,7 +508,7 @@ type ProseEntry struct {
 
 ## PulseExecutionCompletedMessage {#pulseexecutioncompletedmessage}
 
-**Source**: [`server/types.go:217`](https://github.com/teranos/QNTX/blob/main/server/types.go#L217)
+**Source**: [`server/types.go:222`](https://github.com/teranos/QNTX/blob/main/server/types.go#L222)
 
 
 ```go
@@ -523,7 +526,7 @@ type PulseExecutionCompletedMessage struct {
 
 ## PulseExecutionFailedMessage {#pulseexecutionfailedmessage}
 
-**Source**: [`server/types.go:205`](https://github.com/teranos/QNTX/blob/main/server/types.go#L205)
+**Source**: [`server/types.go:210`](https://github.com/teranos/QNTX/blob/main/server/types.go#L210)
 
 
 ```go
@@ -541,7 +544,7 @@ type PulseExecutionFailedMessage struct {
 
 ## PulseExecutionLogStreamMessage {#pulseexecutionlogstreammessage}
 
-**Source**: [`server/types.go:229`](https://github.com/teranos/QNTX/blob/main/server/types.go#L229)
+**Source**: [`server/types.go:234`](https://github.com/teranos/QNTX/blob/main/server/types.go#L234)
 
 
 ```go
@@ -556,7 +559,7 @@ type PulseExecutionLogStreamMessage struct {
 
 ## PulseExecutionStartedMessage {#pulseexecutionstartedmessage}
 
-**Source**: [`server/types.go:196`](https://github.com/teranos/QNTX/blob/main/server/types.go#L196)
+**Source**: [`server/types.go:201`](https://github.com/teranos/QNTX/blob/main/server/types.go#L201)
 
 
 ```go
@@ -621,7 +624,7 @@ type Result struct {
 
 ## SamplerStageSignal {#samplerstagesignal}
 
-**Source**: [`server/types.go:187`](https://github.com/teranos/QNTX/blob/main/server/types.go#L187)
+**Source**: [`server/types.go:192`](https://github.com/teranos/QNTX/blob/main/server/types.go#L192)
 
 
 ```go
@@ -714,7 +717,7 @@ type UsageUpdateMessage struct {
 
 ## WatcherBroadcastStats {#watcherbroadcaststats}
 
-**Source**: [`server/types.go:282`](https://github.com/teranos/QNTX/blob/main/server/types.go#L282)
+**Source**: [`server/types.go:287`](https://github.com/teranos/QNTX/blob/main/server/types.go#L287)
 
 
 ```go
@@ -752,7 +755,7 @@ type WatcherCreateRequest struct {
 
 ## WatcherErrorMessage {#watchererrormessage}
 
-**Source**: [`server/types.go:272`](https://github.com/teranos/QNTX/blob/main/server/types.go#L272)
+**Source**: [`server/types.go:277`](https://github.com/teranos/QNTX/blob/main/server/types.go#L277)
 
 
 ```go
@@ -768,7 +771,7 @@ type WatcherErrorMessage struct {
 
 ## WatcherMatchMessage {#watchermatchmessage}
 
-**Source**: [`server/types.go:250`](https://github.com/teranos/QNTX/blob/main/server/types.go#L250)
+**Source**: [`server/types.go:255`](https://github.com/teranos/QNTX/blob/main/server/types.go#L255)
 
 
 ```go
@@ -784,7 +787,7 @@ type WatcherMatchMessage struct {
 
 ## WatcherQueueStatusMessage {#watcherqueuestatusmessage}
 
-**Source**: [`server/types.go:290`](https://github.com/teranos/QNTX/blob/main/server/types.go#L290)
+**Source**: [`server/types.go:295`](https://github.com/teranos/QNTX/blob/main/server/types.go#L295)
 
 
 ```go
