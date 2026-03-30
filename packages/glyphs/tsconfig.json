@@ -6,7 +6,23 @@
     "strict": true,
     "noEmit": true,
     "declaration": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"]
   },
-  "include": ["index.ts"]
+  "include": [
+    "config.ts",
+    "glyph.ts",
+    "dataset.ts",
+    "proximity.ts",
+    "morph-transaction.ts",
+    "manifestations/title-bar-controls.ts",
+    "manifestations/stash.ts",
+    "manifestations/morphology.ts",
+    "manifestations/render-content.ts",
+    "manifestations/window.ts",
+    "manifestations/canvas.ts",
+    "manifestations/panel.ts",
+    "window-drag.ts",
+    "run.ts"
+  ]
 }
