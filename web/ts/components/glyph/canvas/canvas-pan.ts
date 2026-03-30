@@ -96,12 +96,18 @@ function loadTransformState(canvasId: string): void {
 /**
  * Save pan and zoom state to uiState
  */
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
 function saveTransformState(canvasId: string): void {
     // Check if uiState methods are available (may not be in test environments)
     if (typeof uiState.setCanvasPan !== 'function') return;
 
-    const state = getState(canvasId);
-    uiState.setCanvasPan(canvasId, { panX: state.panX, panY: state.panY, scale: state.scale });
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+        saveTimer = null;
+        const state = getState(canvasId);
+        uiState.setCanvasPan(canvasId, { panX: state.panX, panY: state.panY, scale: state.scale });
+    }, 200);
 }
 
 /**
