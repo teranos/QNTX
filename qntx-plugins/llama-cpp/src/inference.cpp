@@ -168,20 +168,8 @@ static llama_sampler* build_sampler_chain(
     return chain;
 }
 
-// Softmax in-place over n floats, returns max for numerical stability
-static void softmax(float* data, int n) {
-    float max_val = *std::max_element(data, data + n);
-    float sum = 0.0f;
-    for (int i = 0; i < n; i++) {
-        data[i] = std::exp(data[i] - max_val);
-        sum += data[i];
-    }
-    for (int i = 0; i < n; i++) {
-        data[i] /= sum;
-    }
-}
-
 // Capture pre-sampler signal from raw logits at the current position.
+// Reuses caller-provided buffers to avoid per-token allocation of 128K-float vectors.
 //
 // Zero-cost signals not yet extracted (data exists in this window):
 // TODO(TMD): Token metadata — llama_token_get_score(vocab, id) and
@@ -199,30 +187,42 @@ static void softmax(float* data, int n) {
 //
 // Sampler visibility: implemented via observer sampler (see build_sampler_chain above).
 // Observer snapshots distribution between each stage — data flows through TokenSignal.sampler_stages.
-static TokenSignal capture_signal(llama_context* ctx, const llama_vocab* vocab, int top_k) {
+static void capture_signal(llama_context* ctx, const llama_vocab* vocab, int top_k,
+                           TokenSignal& sig,
+                           std::vector<float>& probs_buf,
+                           std::vector<int>& indices_buf) {
     int n_vocab = llama_vocab_n_tokens(vocab);
     float* logits = llama_get_logits_ith(ctx, -1);
 
-    // Copy logits — we need to softmax without mutating the originals
-    // that the sampler will read
-    std::vector<float> probs(logits, logits + n_vocab);
-    softmax(probs.data(), n_vocab);
+    // Reuse probs buffer — avoid 512KB allocation per token
+    probs_buf.resize(n_vocab);
+    std::copy(logits, logits + n_vocab, probs_buf.begin());
 
-    // Build index array, partial sort for top-k
-    std::vector<int> indices(n_vocab);
-    for (int i = 0; i < n_vocab; i++) indices[i] = i;
+    // Softmax in-place
+    float max_val = *std::max_element(probs_buf.begin(), probs_buf.end());
+    float sum = 0.0f;
+    for (int i = 0; i < n_vocab; i++) {
+        probs_buf[i] = std::exp(probs_buf[i] - max_val);
+        sum += probs_buf[i];
+    }
+    for (int i = 0; i < n_vocab; i++) {
+        probs_buf[i] /= sum;
+    }
+
+    // Reuse indices buffer — avoid 512KB allocation per token
+    indices_buf.resize(n_vocab);
+    for (int i = 0; i < n_vocab; i++) indices_buf[i] = i;
     int k = std::min(top_k, n_vocab);
-    std::partial_sort(indices.begin(), indices.begin() + k, indices.end(),
-                      [&probs](int a, int b) { return probs[a] > probs[b]; });
+    std::partial_sort(indices_buf.begin(), indices_buf.begin() + k, indices_buf.end(),
+                      [&probs_buf](int a, int b) { return probs_buf[a] > probs_buf[b]; });
 
-    TokenSignal sig;
-    sig.confidence = probs[indices[0]];
-    sig.top_gap = (k >= 2) ? probs[indices[0]] - probs[indices[1]] : sig.confidence;
+    sig.confidence = probs_buf[indices_buf[0]];
+    sig.top_gap = (k >= 2) ? probs_buf[indices_buf[0]] - probs_buf[indices_buf[1]] : sig.confidence;
 
     // Shannon entropy over top-k
     float h = 0.0f;
     for (int i = 0; i < k; i++) {
-        float p = probs[indices[i]];
+        float p = probs_buf[indices_buf[i]];
         if (p > 0.0f) {
             h -= p * std::log2(p);
         }
@@ -232,16 +232,15 @@ static TokenSignal capture_signal(llama_context* ctx, const llama_vocab* vocab, 
     // Top-k candidates
     sig.top_k.resize(k);
     for (int i = 0; i < k; i++) {
-        int id = indices[i];
+        int id = indices_buf[i];
         char buf[256];
         int len = llama_token_to_piece(vocab, id, buf, sizeof(buf), 0, true);
-        sig.top_k[i] = {id, std::string(buf, std::max(0, len)), probs[id]};
+        sig.top_k[i] = {id, std::string(buf, std::max(0, len)), probs_buf[id]};
     }
 
-    // Keep the full softmax distribution for visualization
-    sig.full_distribution = std::move(probs);
-
-    return sig;
+    // Move distribution to signal for renderer — no copy, just pointer swap
+    sig.full_distribution = std::move(probs_buf);
+    // Restore probs_buf to valid state (moved-from) — next call will resize it
 }
 
 InferenceEngine::InferenceEngine() {}
@@ -424,11 +423,17 @@ InferenceEngine::ChatResult InferenceEngine::chat(
     std::vector<SamplerStageSnapshot> stage_snapshots;
     auto sampler = build_sampler_chain(temperature, sampler_cfg, vocab, &stage_snapshots);
 
+    // Reusable buffers for capture_signal — allocated once, reused across tokens
+    std::vector<float> probs_buf;
+    std::vector<int> indices_buf;
+
     std::ostringstream output;
     int n_generated = 0;
 
     for (int i = 0; i < max_tokens; i++) {
-        TokenSignal sig = capture_signal(ctx_, vocab, SIGNAL_TOP_K);
+        TokenSignal sig;
+        capture_signal(ctx_, vocab, SIGNAL_TOP_K, sig, probs_buf, indices_buf);
+
         stage_snapshots.clear();
         llama_token new_token = llama_sampler_sample(sampler, ctx_, -1);
 
@@ -442,6 +447,9 @@ InferenceEngine::ChatResult InferenceEngine::chat(
             output.write(buf, n);
         }
         sig.sampler_stages = stage_snapshots;
+
+        // Don't accumulate full_distribution — 512KB per token adds up fast
+        sig.full_distribution.clear();
         result.signals.push_back(std::move(sig));
 
         llama_batch next = llama_batch_get_one(&new_token, 1);
@@ -494,6 +502,10 @@ InferenceEngine::ChatResult InferenceEngine::stream_chat(
     std::vector<SamplerStageSnapshot> stage_snapshots;
     auto sampler = build_sampler_chain(temperature, sampler_cfg, vocab, &stage_snapshots);
 
+    // Reusable buffers for capture_signal — allocated once, reused across tokens
+    std::vector<float> probs_buf;
+    std::vector<int> indices_buf;
+
     std::ostringstream output;
     int n_generated = 0;
     auto gen_start = std::chrono::steady_clock::now();
@@ -501,7 +513,8 @@ InferenceEngine::ChatResult InferenceEngine::stream_chat(
 
     for (int i = 0; i < max_tokens; i++) {
         auto t0 = std::chrono::steady_clock::now();
-        TokenSignal sig = capture_signal(ctx_, vocab, SIGNAL_TOP_K);
+        TokenSignal sig;
+        capture_signal(ctx_, vocab, SIGNAL_TOP_K, sig, probs_buf, indices_buf);
         auto t1 = std::chrono::steady_clock::now();
         signal_us += std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
 
