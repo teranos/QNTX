@@ -764,6 +764,12 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 				Model:   chunk.Model,
 			}
 
+			if chunk.Done {
+				msg.PromptTokens = chunk.PromptTokens
+				msg.CompletionTokens = chunk.CompletionTokens
+				msg.TotalTokens = chunk.TotalTokens
+			}
+
 			if chunk.Signal != nil {
 				msg.Signal = &LLMTokenSignal{
 					Confidence: chunk.Signal.Confidence,

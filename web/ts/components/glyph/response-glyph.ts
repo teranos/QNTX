@@ -536,6 +536,8 @@ export function createResponseGlyph(
             setupTokenPopup(output, popup);
         }
 
+        let streamStartMs = 0;
+
         subscribeStream(streamJobId, (msg: LLMStreamMessage) => {
             if (msg.model) streamModel = msg.model;
 
@@ -545,12 +547,36 @@ export function createResponseGlyph(
                 // Reveal copy + expand buttons
                 copyBtn.style.display = '';
                 toWindowBtn.style.display = '';
+
+                // Show generation stats
+                const tokenCount = msg.completion_tokens || tokens.length;
+                if (tokenCount > 0) {
+                    const elapsedMs = streamStartMs ? performance.now() - streamStartMs : 0;
+                    const tokSec = elapsedMs > 0 ? (tokenCount / elapsedMs * 1000).toFixed(1) : null;
+
+                    const stat = document.createElement('div');
+                    stat.className = 'response-glyph-stats';
+                    stat.style.fontSize = '10px';
+                    stat.style.color = 'var(--text-muted)';
+                    stat.style.padding = '4px 8px 2px';
+                    stat.style.textAlign = 'right';
+                    stat.style.opacity = '0.6';
+                    const parts: string[] = [];
+                    if (streamModel) parts.push(streamModel);
+                    parts.push(`${tokenCount} tokens`);
+                    if (tokSec) parts.push(`${tokSec} tok/s`);
+                    stat.textContent = parts.join(' · ');
+                    output.appendChild(stat);
+                }
+
                 persistContent();
                 log.debug(SEG.GLYPH, `[ResponseGlyph] Stream complete for ${streamJobId}, ${tokens.length} tokens`);
                 return;
             }
 
             if (!msg.content) return;
+
+            if (!streamStartMs) streamStartMs = performance.now();
 
             const token: StreamToken = { text: msg.content, signal: msg.signal };
             const tokenIndex = tokens.length;
