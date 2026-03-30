@@ -69,6 +69,9 @@ int main(int argc, char* argv[]) {
         grpc::ServerBuilder builder;
         builder.AddListeningPort(server_address, grpc::InsecureServerCredentials(), &bound_port);
         builder.SetMaxReceiveMessageSize(64 * 1024 * 1024); // 64 MB — PDF attachments via data URI
+        // Allow keepalive pings from Go client (default minimum is 5min)
+        builder.AddChannelArgument(GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS, 1);
+        builder.AddChannelArgument(GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS, 10000);
         builder.RegisterService(plugin_service.get());
         builder.RegisterService(llm_service.get());
 

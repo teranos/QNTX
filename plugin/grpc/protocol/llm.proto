@@ -63,10 +63,20 @@ message TokenSignalProto {
   float top_gap = 3;                       // P(top1) - P(top2)
   repeated TokenCandidateProto top_k = 4;  // Top-k candidates
   repeated float full_distribution = 5;    // Full softmax distribution (vocab_size floats)
+  repeated SamplerStageProto sampler_stages = 6;  // Per-stage snapshots through sampler chain
 }
 
 message TokenCandidateProto {
   int32 id = 1;
   string text = 2;
   float prob = 3;
+}
+
+// Snapshot of token distribution after a sampler stage
+message SamplerStageProto {
+  string name = 1;                         // Stage name: "logits", "top_k", "top_p", "temp", etc.
+  int32 active_count = 2;                  // Tokens remaining with nonzero probability
+  float top1_prob = 3;                     // P(top token) after this stage
+  float entropy = 4;                       // Shannon entropy after this stage
+  repeated TokenCandidateProto top_k = 5;  // Top-5 candidates after this stage
 }
