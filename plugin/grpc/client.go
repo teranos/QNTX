@@ -17,6 +17,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -64,6 +65,11 @@ func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDo
 			grpc.MaxCallRecvMsgSize(maxMsgSize),
 			grpc.MaxCallSendMsgSize(maxMsgSize),
 		),
+		grpc.WithKeepaliveParams(keepalive.ClientParameters{
+			Time:                30 * time.Second, // ping every 30s if idle
+			Timeout:             10 * time.Second, // wait 10s for pong before closing
+			PermitWithoutStream: true,             // ping even with no active RPCs
+		}),
 	)
 	if err != nil {
 		wrappedErr := errors.Wrapf(err, "failed to connect to plugin at %s", addr)
