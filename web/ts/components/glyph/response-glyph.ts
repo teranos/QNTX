@@ -142,6 +142,8 @@ const instances = new Set<StreamInstance>();
 type ColorMode = 'confidence' | 'sampler';
 let colorMode: ColorMode = 'sampler';
 
+// RENAME: toggleColorMode — toggles AND re-renders ALL visible stream instances
+// Options: toggleColorModeAndRerender | switchColorMode | cycleColorMode
 export function toggleColorMode(): ColorMode {
     colorMode = colorMode === 'confidence' ? 'sampler' : 'confidence';
     for (const inst of instances) {

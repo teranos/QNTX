@@ -161,6 +161,8 @@ export function samplerInfluenceColor(stages: SamplerStageSignal[]): string {
     return `hsla(${hue}, 70%, 50%, ${alpha.toFixed(3)})`;
 }
 
+// RENAME: createTokenPopup — creates popup, detail sub-popover, legend, manages 3 hide timers, positions everything
+// Options: createTokenPopupManager | createTokenInspector | initTokenPopup
 export function createTokenPopup(): TokenPopup {
     const el = document.createElement('div');
     el.className = 'token-popup';

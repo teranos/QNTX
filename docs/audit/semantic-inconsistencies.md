@@ -150,6 +150,24 @@ Checks subjects, predicates, and contexts but not actors. Same gap as `cartesian
 
 `size()` returns sum of all leaves across all groups. `group_count()` returns number of groups. `size` is ambiguous — `leaf_count` or `total_attestations` would be clearer.
 
+### MEDIUM — `toggleColorMode` re-renders all visible stream instances
+
+**`web/ts/components/glyph/response-glyph.ts:145`**
+
+Name says "toggle color mode" — flip a flag and return. Implementation also iterates all visible `StreamInstance`s and re-renders their token spans. A toggle with a global repaint side effect.
+
+### MEDIUM — `createTokenPopup` is a stateful component manager
+
+**`web/ts/components/glyph/token-popup.ts:164`**
+
+Name says "create token popup" — factory. Implementation creates the popup element, a detail sub-popover, a legend overlay, manages 3 independent hide timers (`hideTimer`, `legendTimer`, `detailHideTimer`), handles positioning, and wires mouseenter/mouseleave across all three elements. This is a component lifecycle manager returned as a closure bag.
+
+### MEDIUM — `createMorphAnimation` enforces exclusivity and transaction semantics
+
+**`packages/glyphs/morph-transaction.ts:19`**
+
+Name says "create morph animation" — make an animation. Implementation cancels any existing animation on the element (exclusivity), wraps the animation in a Promise, implements commit (forward-fill styles on finish) and rollback (cancel handler), and cleans up event listeners. This is transaction coordination, not animation creation.
+
 ---
 
 ## Patterns

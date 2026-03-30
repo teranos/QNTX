@@ -12,6 +12,8 @@ import { getLogger, getLogSegment } from './config';
 // Track active animations to ensure exclusivity per element
 const activeAnimations = new WeakMap<HTMLElement, Animation>();
 
+// RENAME: createMorphAnimation — enforces exclusivity (cancels prior), wraps in Promise, commits or rolls back
+// Options: beginMorphTransaction | executeMorphTransition | runExclusiveMorph
 /**
  * Core animation transaction helper
  * Handles exclusivity, promise wrapping, and event listener cleanup
