@@ -98,6 +98,12 @@ export function morphToWindow(
         addWindowControls(titleBar, {
             onMinimize: () => morphFromWindow(glyphElement, glyph, verifyElement, onMinimize),
             onClose: glyph.onClose ? () => {
+                teardownWindowDrag(glyphElement);
+                const observer = (glyphElement as any).__resizeObserver as ResizeObserver | undefined;
+                if (observer) {
+                    observer.disconnect();
+                    delete (glyphElement as any).__resizeObserver;
+                }
                 onRemove(glyph.id);
                 glyphElement.remove();
                 try {
