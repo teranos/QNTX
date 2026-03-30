@@ -25,7 +25,7 @@ import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
 import { tooltip } from '../tooltip';
 import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
-import { createResponseGlyph, getResponseTokenCount, unsubscribeStream, populateStaticContent, type ExecutionResult, type ResultGlyphContent } from './response-glyph';
+import { createResponseGlyph, getResponseTokenCount, unsubscribeStream, populateStaticContent } from './response-glyph';
 
 /**
  * Prompt glyph execution status
