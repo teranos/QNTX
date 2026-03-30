@@ -1,6 +1,6 @@
 # @qntx/glyphs
 
-A glyph is exactly one DOM element for its entire lifetime. It morphs between visual states — dot, proximity-expanded, window, panel, fullscreen — through smooth animations, but the element identity never changes.
+A glyph is exactly one DOM element for its entire lifetime. It morphs between visual states — dot, proximity-expanded, window, panel, canvas — through smooth animations, but the element identity never changes.
 
 This package is the glyph runtime: the tray, proximity engine, morph transactions, and manifestations. It has zero framework dependencies — pure DOM, Web Animations API, and dependency injection for host-specific concerns.
 
@@ -8,12 +8,25 @@ This package is the glyph runtime: the tray, proximity engine, morph transaction
 
 Extracting from `web/ts/components/glyph/` into this standalone package. The goal is a reusable runtime that any frontend can consume — QNTX is the first host, not the only one.
 
-### Extraction progress
+### Extraction complete
 
-- [x] **Step 1: Foundation** — Config layer (`configureGlyphs()`), `Glyph` interface, dataset helpers, proximity engine. Web re-exports from package.
-- [x] **Step 2: Morph infrastructure** — `morph-transaction.ts` (Web Animations API with commit/rollback), `morphology.ts` (axiom verification, morph lifecycle), `stash.ts` (DOM content preservation across morph cycles), `title-bar-controls.ts`, `render-content.ts`. Cut logger and stripHtml deps via config.
-- [ ] **Step 3: Manifestations + tray** — `window.ts`, `canvas.ts` (fullscreen), `panel.ts` (resizable full-width), `run.ts` (the tray singleton). Extract standalone window drag (currently coupled to canvas-pan). Cut uiState dep via persistence config.
-- [ ] **Step 4: Wire QNTX** — Call `configureGlyphs()` at app startup with QNTX's logger, persistence (uiState), and stripHtml. Update remaining import sites. Verify all morph paths end-to-end.
+- [x] **Step 1: Foundation** — Config layer (`configureGlyphs()`), `Glyph` interface, dataset helpers, proximity engine
+- [x] **Step 2: Morph infrastructure** — morph-transaction, morphology, stash, title-bar-controls, render-content
+- [x] **Step 3: Manifestations + tray** — window, canvas, panel, run.ts (tray), standalone window drag
+- [x] **Step 4: Wire QNTX** — `configureGlyphs()` at startup with logger, persistence, stripHtml
+
+### Follow-up
+
+- `REXP` — Eliminate re-exports: move imports in web/ to point directly at `@qntx/glyphs`
+- `TEST` — Move tests to live with the package code, not in web/
+- `EXAM` — Canonical examples: minimal host app consuming the package
+- `DSGN` — Design system integration: make sure the broader design system uses this
+- `DOCS` — Better documentation
+- `CICD` — Package gets its own CI
+- `CONF` — `configureGlyphs()` contract: clarify what's host-specific vs package defaults as more consumers appear
+- `AXMT` — Resolve `'ax'` manifestation type tension: inline-on-canvas may be generic, not AX-specific
+- `BROW` — DOM environment assumptions: `document`, `DOMParser`, Web Animations API are all assumed globals
+- `STRP` — Proximity engine's stripHtml coupling: callers should strip before passing items, not the package
 
 ## Configuration
 
@@ -44,7 +57,7 @@ glyph.ts           — Glyph interface + animation/manifestation constants
 dataset.ts         — Type-safe DOM dataset attribute helpers
 proximity.ts       — Pointer-distance morphing (8px dot → 220px expanded)
 morph-transaction.ts  — Web Animations API with exclusivity + commit/rollback
-manifestations/    — window, canvas (fullscreen), panel morph implementations
+manifestations/    — window, canvas, panel morph implementations
 run.ts             — GlyphRun tray singleton
 ```
 
