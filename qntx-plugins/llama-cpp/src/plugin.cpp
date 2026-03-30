@@ -132,6 +132,14 @@ grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
     }
     pca_ready_.store(true, std::memory_order_release);
 
+    // Precompute HYP positions in the background (after PCA, non-blocking).
+    // Loads from .vocab3d.hyp cache (~1ms) or computes via RSGD (~30-60s first run).
+    if (engine_.is_loaded()) {
+        engine_.vocab_positions_hyp();
+        std::cout << "[metal-llama] HYP positions ready ("
+                  << engine_.vocab_positions_hyp().size() / 3 << " tokens)" << std::endl;
+    }
+
     // Configure ATS client for writing attestations
     if (!req->ats_store_endpoint().empty()) {
         ats_client_.configure(req->ats_store_endpoint(), req->auth_token());
@@ -289,9 +297,9 @@ grpc::Status LlamaCppPlugin::HandleHTTP(grpc::ServerContext* ctx,
             return grpc::Status::OK;
         }
 
-        // Use real PCA positions if model is loaded
+        // Use active projection positions if model is loaded
         if (engine_.is_loaded()) {
-            const auto& pos = engine_.vocab_positions_3d();
+            const auto& pos = engine_.active_positions();
             if (!pos.empty()) {
                 renderer_->set_vocab_positions(pos.data(), pos.size() / 3);
             }
@@ -365,11 +373,40 @@ grpc::Status LlamaCppPlugin::HandleHTTP(grpc::ServerContext* ctx,
             state = "ready";
         }
         std::string act = activity();
+        std::string proj = (engine_.projection_mode() == InferenceEngine::ProjectionMode::HYP) ? "hyp" : "pca";
         std::string body = "{\"state\":\"" + state + "\",\"version\":\"" + PLUGIN_VERSION + "\"";
+        body += ",\"projection\":\"" + proj + "\"";
         if (!act.empty()) body += ",\"activity\":\"" + act + "\"";
         body += "}";
         resp->set_status_code(200);
         resp->set_body(body);
+        auto* ct = resp->add_headers();
+        ct->set_name("Content-Type");
+        ct->add_values("application/json");
+        return grpc::Status::OK;
+    }
+
+    // Switch nebula projection mode: POST /projection {"mode":"hyp"} or {"mode":"pca"}
+    if (req->method() == "POST" && req->path() == "/projection") {
+        std::string body = req->body();
+        bool want_hyp = body.find("\"hyp\"") != std::string::npos;
+        auto mode = want_hyp ? InferenceEngine::ProjectionMode::HYP
+                             : InferenceEngine::ProjectionMode::PCA;
+
+        engine_.set_projection_mode(mode);
+        const auto& pos = engine_.active_positions();
+
+        if (!pos.empty() && renderer_->is_ready()) {
+            renderer_->set_vocab_positions(pos.data(), pos.size() / 3);
+            renderer_->clear_trail();
+            std::cout << "[llama-cpp] Switched to " << (want_hyp ? "HYP" : "PCA")
+                      << " projection (" << pos.size() / 3 << " positions)" << std::endl;
+        }
+
+        std::string mode_str = want_hyp ? "hyp" : "pca";
+        resp->set_status_code(200);
+        resp->set_body("{\"mode\":\"" + mode_str + "\",\"positions\":" +
+                       std::to_string(pos.size() / 3) + "}");
         auto* ct = resp->add_headers();
         ct->set_name("Content-Type");
         ct->add_values("application/json");

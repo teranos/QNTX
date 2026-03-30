@@ -51,6 +51,11 @@ export const render = async (glyph, ui) => {
                 setTimeout(pollStatus, 500);
             } else if (s.state === 'ready') {
                 pcaReady = true;
+                if (s.projection && s.projection !== currentProjection) {
+                    currentProjection = s.projection;
+                    projBtn.textContent = s.projection.toUpperCase();
+                    projBtn.style.color = s.projection === 'hyp' ? '#8cf' : '#c84';
+                }
                 if (s.activity) {
                     statusLabel.textContent = s.activity;
                     statusLabel.style.color = 'rgba(255,180,80,0.5)';
@@ -176,6 +181,35 @@ export const render = async (glyph, ui) => {
     addSlider('orbit period', 'orbit_period', 64, 4096, 64, 1024);
     addSlider('orbit radius', 'orbit_radius', 0.5, 10, 0.5, 3);
     addSlider('particle size', 'particle_scale', 0.1, 5, 0.1, 1);
+
+    // Projection mode toggle: PCA ↔ HYP (Poincaré ball)
+    let currentProjection = 'pca';
+    const projRow = document.createElement('div');
+    projRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin:6px 0 2px;';
+    const projLabel = document.createElement('span');
+    projLabel.style.cssText = 'width:80px;text-align:right;';
+    projLabel.textContent = 'projection';
+    const projBtn = document.createElement('button');
+    projBtn.style.cssText = 'flex:1;height:22px;background:#222;border:1px solid #444;color:#c84;' +
+        'font:10px monospace;cursor:pointer;border-radius:3px;';
+    projBtn.textContent = 'PCA';
+    projBtn.onclick = () => {
+        const next = currentProjection === 'pca' ? 'hyp' : 'pca';
+        fetch('/api/llama-cpp/projection', {
+            method: 'POST',
+            body: JSON.stringify({ mode: next }),
+        }).then(r => r.ok ? r.json() : null).then(data => {
+            if (data) {
+                currentProjection = data.mode;
+                projBtn.textContent = data.mode.toUpperCase();
+                projBtn.style.color = data.mode === 'hyp' ? '#8cf' : '#c84';
+            }
+        });
+    };
+    projRow.appendChild(projLabel);
+    projRow.appendChild(projBtn);
+    controls.appendChild(projRow);
+
     content.appendChild(controls);
 
     canvas.addEventListener('contextmenu', (e) => {
@@ -222,7 +256,7 @@ export const render = async (glyph, ui) => {
         camLoopId = requestAnimationFrame(camLoop);
     }
 
-    const camKeys = new Set(['w','a','s','d','arrowleft','arrowright','arrowup','arrowdown','escape']);
+    const camKeys = new Set(['w','a','s','d','arrowleft','arrowright','arrowup','arrowdown','escape','p']);
 
     function onDocKeyDown(e) {
         if (!nebulaHovered) return;
@@ -232,6 +266,11 @@ export const render = async (glyph, ui) => {
                 const msg = { type: 1, data: btoa('cam:r'), headers: {}, timestamp: 0 };
                 ws.send(JSON.stringify(msg));
             }
+            return;
+        }
+        if (k === 'p') {
+            e.preventDefault();
+            projBtn.onclick();
             return;
         }
         if (!camKeys.has(k)) return;

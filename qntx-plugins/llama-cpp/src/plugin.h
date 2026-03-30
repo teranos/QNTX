@@ -14,7 +14,7 @@
 #include "llm.grpc.pb.h"
 #include "ats_client.h"
 
-#define PLUGIN_VERSION "0.22.7"
+#define PLUGIN_VERSION "0.23.0"
 
 // Forward declarations
 struct llama_model;
@@ -122,10 +122,25 @@ public:
     // Computed once at model load, cached. Returns vocab_size × 3 floats.
     const std::vector<float>& vocab_positions_3d();
 
+    // Get vocab positions in Poincaré ball (hyperbolic embedding).
+    // Computed after PCA, cached as .vocab3d.hyp. Returns vocab_size × 3 floats
+    // inside the unit ball.
+    const std::vector<float>& vocab_positions_hyp();
+
+    enum class ProjectionMode { PCA, HYP };
+
+    // Get positions for the active projection mode.
+    const std::vector<float>& active_positions();
+    void set_projection_mode(ProjectionMode mode);
+    ProjectionMode projection_mode() const { return projection_mode_; }
+
 private:
     void compute_vocab_positions();
+    void compute_hyperbolic_positions();
     bool load_vocab_cache();
     void write_vocab_cache();
+    bool load_hyp_cache();
+    void write_hyp_cache();
     int prepare_prompt(const std::vector<Message>& messages,
                        ChatResult& result);
     llama_model* model_ = nullptr;
@@ -134,7 +149,9 @@ private:
     std::string model_name_;
     bool backend_initialized_ = false;
     std::mutex mutex_;
-    std::vector<float> vocab_positions_;  // cached 3D positions (n_vocab × 3)
+    std::vector<float> vocab_positions_;      // PCA 3D positions (n_vocab × 3)
+    std::vector<float> vocab_positions_hyp_;  // Poincaré ball positions (n_vocab × 3)
+    ProjectionMode projection_mode_ = ProjectionMode::PCA;
 };
 
 // DomainPluginService implementation
