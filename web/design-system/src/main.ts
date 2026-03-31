@@ -11,6 +11,7 @@
 
 import { parseTokens, renderToken, type TokenGroup } from './tokens'
 import { renderComponentGallery } from './components'
+import { renderGlyphSpecimens } from './glyphs'
 
 // --- Render ---
 
@@ -43,6 +44,9 @@ function render(groups: TokenGroup[]) {
 
   // Component galleries — simpler first, then more complex
   renderComponentGallery(root)
+
+  // Glyph package specimens — live demos of @qntx/glyphs
+  renderGlyphSpecimens(root)
 }
 
 // --- Styles ---

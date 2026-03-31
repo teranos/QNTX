@@ -37,6 +37,10 @@ const windowSource = resolve(import.meta.dir, '../css/window.css')
 await copyFile(windowSource, join(outDir, 'window.css'))
 const canvasPlacedSource = resolve(import.meta.dir, '../css/glyph/states/canvas-placed.css')
 await copyFile(canvasPlacedSource, join(outDir, 'canvas-placed.css'))
+const dotSource = resolve(import.meta.dir, '../css/glyph/states/dot.css')
+await copyFile(dotSource, join(outDir, 'dot.css'))
+const morphSource = resolve(import.meta.dir, '../css/glyph/transitions/morph.css')
+await copyFile(morphSource, join(outDir, 'morph.css'))
 
 // Copy index.html, rewrite script src
 const html = await Bun.file(join(import.meta.dir, 'index.html')).text()
