@@ -5,11 +5,12 @@
  * that influenced it most) and a thin origin line where it started.
  */
 
-/* Hover: faint yellow outline on token spans */
+/* Hover: faint yellow outline on token spans (no dimming — dim only on click-lock) */
 .result-glyph-output span[data-confidence]:hover {
     outline: 1px solid rgba(255, 220, 100, 0.35);
     cursor: pointer;
 }
+
 .token-popup {
     position: fixed;
     z-index: 100000;

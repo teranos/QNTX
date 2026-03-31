@@ -10,7 +10,7 @@
  *
  * Token hover popup showing sampler stage data — see token-popup.ts
  * TODO(ECM): Factor entropy and top_gap into color mapping, not just confidence.
- * TODO(DIM/#749): Dim intersecting token labels when a token is selected, popover on select only.
+ * DIM(#749): Token labels dim based on nebula brightness behind them when a token is selected.
  * TODO(CLR/#750): Use embedding dimensions (PCA 4-6) to drive particle hue — semantic color.
  */
 
@@ -541,6 +541,7 @@ export function createResponseGlyph(
                     lastNebulaBitmap = bmp;
                     nebulaCtx.clearRect(0, 0, nebulaCanvas.width, nebulaCanvas.height);
                     nebulaCtx.drawImage(bmp, 0, 0, nebulaCanvas.width, nebulaCanvas.height);
+                    if (nebulaScrub) applyDim();
                     nebulaFpsFrames++;
                     const now = performance.now();
                     if (now - nebulaFpsLast >= 1000) {
@@ -556,6 +557,71 @@ export function createResponseGlyph(
 
         nebulaWs.onerror = () => { if (nebulaLive) nebulaStatus.textContent = 'error'; };
         nebulaWs.onclose = () => { if (nebulaLive) nebulaStatus.textContent = ''; };
+    }
+
+    // Dim token spans based on nebula brightness behind them (#749)
+    function applyDim(): void {
+        if (!nebulaCtx || !nebulaScrub || !selectedSpan) return;
+        const canvasRect = nebulaCanvas.getBoundingClientRect();
+        const imgData = nebulaCtx.getImageData(0, 0, nebulaCanvas.width, nebulaCanvas.height);
+        const pixels = imgData.data;
+        const scaleX = nebulaCanvas.width / canvasRect.width;
+        const scaleY = nebulaCanvas.height / canvasRect.height;
+
+        const w = nebulaCanvas.width;
+        const h = nebulaCanvas.height;
+
+        function sampleBrightness(px: number, py: number): number {
+            const x = Math.round(px);
+            const y = Math.round(py);
+            if (x < 0 || y < 0 || x >= w || y >= h) return 0;
+            const idx = (y * w + x) * 4;
+            return (pixels[idx] + pixels[idx + 1] + pixels[idx + 2]) / (3 * 255);
+        }
+
+        const spans = output.querySelectorAll('span[data-confidence]');
+        for (const span of spans) {
+            const rect = (span as HTMLElement).getBoundingClientRect();
+            const l = (rect.left - canvasRect.left) * scaleX;
+            const r = (rect.right - canvasRect.left) * scaleX;
+            const t = (rect.top - canvasRect.top) * scaleY;
+            const b = (rect.bottom - canvasRect.top) * scaleY;
+            const mx = (l + r) / 2;
+            const my = (t + b) / 2;
+
+            // Sample 9 points: center, edges, corners — take max brightness
+            const brightness = Math.max(
+                sampleBrightness(mx, my),
+                sampleBrightness(l, my), sampleBrightness(r, my),
+                sampleBrightness(mx, t), sampleBrightness(mx, b),
+                sampleBrightness(l, t), sampleBrightness(r, t),
+                sampleBrightness(l, b), sampleBrightness(r, b),
+            );
+            const base = (span === selectedSpan) ? 1.0 : 0.8;
+            (span as HTMLElement).dataset.dimOpacity = String(Math.max(0.08, base - brightness * 1.4));
+        }
+
+        // Smooth lone bright spans: if both neighbors are 20%+ dimmer, pull to their average
+        const allSpans = Array.from(spans) as HTMLElement[];
+        for (let i = 1; i < allSpans.length - 1; i++) {
+            const self = parseFloat(allSpans[i].dataset.dimOpacity || '1');
+            const prev = parseFloat(allSpans[i - 1].dataset.dimOpacity || '1');
+            const next = parseFloat(allSpans[i + 1].dataset.dimOpacity || '1');
+            if (self - prev > 0.2 && self - next > 0.2) {
+                allSpans[i].dataset.dimOpacity = String((prev + next) / 2);
+            }
+        }
+
+        for (const span of allSpans) {
+            span.style.opacity = span.dataset.dimOpacity || '';
+        }
+    }
+
+    function clearDim(): void {
+        const spans = output.querySelectorAll('span[data-confidence]');
+        for (const span of spans) {
+            (span as HTMLElement).style.opacity = '';
+        }
     }
 
     // Store last frame as base64 PNG for persistence across refresh
@@ -600,6 +666,7 @@ export function createResponseGlyph(
 
     // WASD + arrow camera controls — active only when a token is selected
     let nebulaNavActive = false;
+    let selectedSpan: HTMLElement | null = null; // tracks locked token for dim calculation
     const camStep = 0.02;
     const camRotStep = 0.03;
     const keyMap: Record<string, string> = {
@@ -684,7 +751,7 @@ export function createResponseGlyph(
         }
 
         popup = createTokenPopup();
-        setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked) => { nebulaNavActive = locked; });
+        setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; });
     } else if (result) {
         // Static mode — render output text
         renderOutput(output, result);
@@ -702,7 +769,7 @@ export function createResponseGlyph(
             visibilityObserver?.observe(output);
 
             popup = createTokenPopup();
-            setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked) => { nebulaNavActive = locked; });
+            setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; });
         }
 
         // Show nebula and connect to Metal renderer — live frame drawing
@@ -821,7 +888,7 @@ function setupTokenPopup(
     output: HTMLElement,
     popup: ReturnType<typeof createTokenPopup>,
     onScrub?: (index: number) => void,
-    onLockChange?: (locked: boolean) => void,
+    onLockChange?: (locked: boolean, span: HTMLElement | null) => void,
 ): void {
     let lockedSpan: HTMLSpanElement | null = null;
 
@@ -835,8 +902,9 @@ function setupTokenPopup(
             lockedSpan.style.outline = '';
             lockedSpan.style.boxShadow = '';
             lockedSpan = null;
+            clearDim();
             scrubTo(-1);
-            if (onLockChange) onLockChange(false);
+            if (onLockChange) onLockChange(false, null);
         }
     }
 
@@ -846,13 +914,13 @@ function setupTokenPopup(
             lockedSpan.style.boxShadow = '';
         }
         lockedSpan = span;
-        lockedSpan.style.outline = '1px solid rgba(204, 85, 0, 0.65)';
-        lockedSpan.style.boxShadow = '0 0 8px rgba(204, 85, 0, 0.5)';
+        lockedSpan.style.outline = '1px solid rgba(255, 140, 30, 0.45)';
+        lockedSpan.style.boxShadow = '0 0 6px rgba(255, 140, 30, 0.3)';
         popup.show(span);
         if (span.dataset.tokenIndex) {
             scrubTo(parseInt(span.dataset.tokenIndex, 10));
         }
-        if (onLockChange) onLockChange(true);
+        if (onLockChange) onLockChange(true, span);
     }
 
     // Click to lock selection — click again or click outside to unlock
