@@ -14,15 +14,43 @@
 
 import { log, SEG } from '../../../logger';
 import type { Glyph } from '../glyph';
-import type { CompositionEdge } from '../../../state/ui';
-import type { EdgeDirection } from './meldability';
-import { computeGridPositions } from './meldability';
-import { addComposition, removeComposition, extractGlyphIds, findCompositionByGlyph } from '../../../state/compositions';
+import type { CompositionEdge, EdgeDirection } from '@qntx/glyphs';
+import { computeGridPositions, extractGlyphIds, isConnectedGraph } from '@qntx/glyphs';
+import { addComposition, removeComposition, findCompositionByGlyph } from '../../../state/compositions';
 import { clearMeldFeedback } from './meld-feedback';
 import { getTransform } from '../canvas/canvas-pan';
 import { canvasSyncQueue } from '../../../api/canvas-sync';
+import { uiState } from '../../../state/ui';
 
 const UNMELD_OFFSET = 20; // px - spacing between glyphs when unmelding
+const UNMELD_DURATION_MS = 200; // animation duration for unmeld slide
+
+/**
+ * Animate an element from one position to another using Web Animations API.
+ * Sets final position in style so the value persists after animation completes.
+ */
+function animatePosition(
+    el: HTMLElement,
+    fromX: number, fromY: number,
+    toX: number, toY: number
+): void {
+    // Set final position immediately (animation is visual overlay)
+    el.style.left = `${toX}px`;
+    el.style.top = `${toY}px`;
+
+    // Animate from old position to new
+    const dx = fromX - toX;
+    const dy = fromY - toY;
+    if (dx === 0 && dy === 0) return;
+
+    el.animate([
+        { transform: `translate(${dx}px, ${dy}px)` },
+        { transform: 'translate(0, 0)' },
+    ], {
+        duration: UNMELD_DURATION_MS,
+        easing: 'ease-out',
+    });
+}
 
 /**
  * Apply absolute positioning layout to a composition based on its edge graph.
@@ -375,38 +403,6 @@ export function reconstructMeld(
 }
 
 /**
- * Check if remaining node IDs form a connected graph when treating edges as undirected.
- * Used by detachGlyph to decide between partial detach and full unmeld.
- */
-function isConnectedGraph(edges: CompositionEdge[]): boolean {
-    const ids = new Set<string>();
-    const adjacency = new Map<string, Set<string>>();
-    for (const edge of edges) {
-        ids.add(edge.from);
-        ids.add(edge.to);
-        if (!adjacency.has(edge.from)) adjacency.set(edge.from, new Set());
-        if (!adjacency.has(edge.to)) adjacency.set(edge.to, new Set());
-        adjacency.get(edge.from)!.add(edge.to);
-        adjacency.get(edge.to)!.add(edge.from);
-    }
-    if (ids.size === 0) return false;
-
-    const start = ids.values().next().value!;
-    const visited = new Set<string>([start]);
-    const queue = [start];
-    while (queue.length > 0) {
-        const current = queue.shift()!;
-        for (const neighbor of adjacency.get(current) || []) {
-            if (!visited.has(neighbor)) {
-                visited.add(neighbor);
-                queue.push(neighbor);
-            }
-        }
-    }
-    return visited.size === ids.size;
-}
-
-/**
  * Detach a single glyph from a composition, keeping the rest melded if possible.
  *
  * - If only 2 glyphs: delegates to unmeldComposition (can't have 1-glyph composition)
@@ -475,17 +471,44 @@ export function detachGlyph(glyphId: string, composition: HTMLElement): {
         return null;
     }
 
-    // Position the detached element near the composition
+    // Position the detached element based on where it sat inside the composition
     const compLeft = parseInt(composition.style.left || '0', 10) || 0;
     const compTop = parseInt(composition.style.top || '0', 10) || 0;
+    const innerLeft = parseFloat(detachedEl.style.left) || 0;
+    const innerTop = parseFloat(detachedEl.style.top) || 0;
+
+    // Target: slide out from its composition position + offset away from remaining glyphs
+    const targetX = compLeft + innerLeft + UNMELD_OFFSET;
+    const targetY = compTop + innerTop - UNMELD_OFFSET - 40;
+
+    // Start at the glyph's current visual position (composition origin + inner offset)
+    const startX = compLeft + innerLeft;
+    const startY = compTop + innerTop;
+
     detachedEl.style.position = 'absolute';
-    detachedEl.style.left = `${compLeft + UNMELD_OFFSET}px`;
-    detachedEl.style.top = `${compTop - UNMELD_OFFSET - 40}px`;
+    detachedEl.style.left = `${startX}px`;
+    detachedEl.style.top = `${startY}px`;
     detachedEl.style.gridRow = '';
     detachedEl.style.gridColumn = '';
 
     // Reparent to canvas
     canvas.insertBefore(detachedEl, composition);
+
+    // Animate slide to target position
+    animatePosition(detachedEl, startX, startY, targetX, targetY);
+
+    // Persist detached glyph's new position
+    const detachedSymbol = detachedEl.dataset.glyphSymbol || '';
+    if (detachedSymbol) {
+        const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+        uiState.addCanvasGlyph({
+            ...existing,
+            id: glyphId,
+            symbol: detachedSymbol,
+            x: targetX,
+            y: targetY,
+        });
+    }
 
     // Update storage: remove old composition, add new with remaining edges
     const newId = `melded-${remainingEdges[0].from}-${remainingEdges[0].to}`;
@@ -571,31 +594,44 @@ export function unmeldComposition(composition: HTMLElement): {
     const left = isNaN(compLeft) ? 0 : compLeft;
     const top = isNaN(compTop) ? 0 : compTop;
 
-    // TODO(#448): binary heuristic — mixed-direction compositions spread into a flat row
-    const firstChildId = glyphElements[0].getAttribute('data-glyph-id') || '';
-    const storedComp = findCompositionByGlyph(firstChildId);
-    const isVertical = storedComp?.edges.some(e => e.direction === 'bottom' || e.direction === 'top')
-        && !storedComp?.edges.some(e => e.direction === 'right');
+    // Use each glyph's inner position within the composition to compute canvas position.
+    // Glyphs slide out from their composition position to a spread-out arrangement.
+    glyphElements.forEach((element, i) => {
+        const innerLeft = parseFloat(element.style.left) || 0;
+        const innerTop = parseFloat(element.style.top) || 0;
 
-    // TODO(#450): animate the separation instead of instant repositioning
-    let currentX = left;
-    let currentY = top;
-    glyphElements.forEach((element) => {
+        // Start: glyph's actual visual position (composition origin + inner offset)
+        const startX = left + innerLeft;
+        const startY = top + innerTop;
+
+        // Target: spread out with offset so they don't stack on top of each other
+        const targetX = startX + i * UNMELD_OFFSET;
+        const targetY = startY + i * UNMELD_OFFSET;
+
         element.style.position = 'absolute';
-        element.style.left = `${currentX}px`;
-        element.style.top = `${currentY}px`;
+        element.style.left = `${startX}px`;
+        element.style.top = `${startY}px`;
         element.style.gridRow = '';
         element.style.gridColumn = '';
 
         // Reparent back to canvas
         canvas.insertBefore(element, composition);
 
-        // Accumulate position for next glyph along the original axis
-        const rect = element.getBoundingClientRect();
-        if (isVertical) {
-            currentY += rect.height + UNMELD_OFFSET;
-        } else {
-            currentX += rect.width + UNMELD_OFFSET;
+        // Animate slide to spread-out position
+        animatePosition(element, startX, startY, targetX, targetY);
+
+        // Persist new position so it survives refresh
+        const glyphId = element.getAttribute('data-glyph-id') || element.dataset.glyphId || '';
+        const symbol = element.dataset.glyphSymbol || '';
+        if (glyphId && symbol) {
+            const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+            uiState.addCanvasGlyph({
+                ...existing,
+                id: glyphId,
+                symbol,
+                x: targetX,
+                y: targetY,
+            });
         }
     });
 

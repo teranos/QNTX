@@ -23,6 +23,8 @@
     "manifestations/canvas.ts",
     "manifestations/panel.ts",
     "window-drag.ts",
-    "run.ts"
+    "run.ts",
+    "composition.ts",
+    "edge-graph.ts"
   ]
 }

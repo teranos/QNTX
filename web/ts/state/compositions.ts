@@ -6,46 +6,13 @@
  * to keep composition-specific logic separate.
  */
 
-import { uiState, type CompositionState, type CompositionEdge } from './ui';
+import { uiState, type CompositionState } from './ui';
 import { log, SEG } from '../logger';
 import { upsertComposition as apiUpsertComposition, deleteComposition as apiDeleteComposition } from '../api/canvas';
 
-/**
- * Build edges from a linear chain of glyph IDs
- * Creates consecutive edges connecting glyphs in order
- */
-export function buildEdgesFromChain(
-    glyphIds: string[],
-    direction: 'right' | 'top' | 'bottom' = 'right'
-): CompositionEdge[] {
-    if (glyphIds.length < 2) {
-        return [];
-    }
-
-    const edges: CompositionEdge[] = [];
-    for (let i = 0; i < glyphIds.length - 1; i++) {
-        edges.push({
-            from: glyphIds[i],
-            to: glyphIds[i + 1],
-            direction,
-            position: i
-        });
-    }
-    return edges;
-}
-
-/**
- * Extract all unique glyph IDs from edges
- * Returns deduplicated array of glyph IDs
- */
-export function extractGlyphIds(edges: CompositionEdge[]): string[] {
-    const ids = new Set<string>();
-    for (const edge of edges) {
-        ids.add(edge.from);
-        ids.add(edge.to);
-    }
-    return Array.from(ids);
-}
+// Pure functions — canonical in @qntx/glyphs, re-exported here
+export { buildEdgesFromChain, extractGlyphIds } from '@qntx/glyphs';
+import { extractGlyphIds } from '@qntx/glyphs';
 
 /**
  * Add a new composition to storage

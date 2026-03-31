@@ -19,9 +19,9 @@ Extracting from `web/ts/components/glyph/` into this standalone package. The goa
 
 The package currently has morph, tray, and manifestations. The next series moves the canvas interaction layer — placement, drag, resize, meld, compositions — into the package so any host can have a fully interactive glyph canvas.
 
-- [ ] `CTYPE` — Composition types: `CompositionEdge`, `CompositionState` as package-native types
-- [ ] `EWALK` — Generic edge walker: takes edges + glyph ID, walks the DAG, returns focus/navigation graph
-- [ ] `GRDLP` — Grid layout from edges: `computeGridPositions` and layout application, pure geometry
+- [x] `CTYPE` — Composition types: `CompositionEdge`, `CompositionState` as package-native types
+- [x] `EWALK` — Generic edge walker: takes edges + glyph ID, walks the DAG, returns focus/navigation graph
+- [x] `GRDLP` — Grid layout from edges: `computeGridPositions` and layout application, pure geometry
 - [ ] `CPLCD` — Canvas-placed: `canvasPlaced()` factory, `applyCanvasGlyphLayout`, positioning logic
 - [ ] `DRAGR` — Canvas drag/resize: `makeDraggable`, `makeResizable`, z-index stacking
 - [ ] `MELDT` — Meld detection: proximity-based meld triggering during drag
@@ -63,18 +63,6 @@ configureGlyphs({
 ```
 
 Without configuration, safe defaults apply: no-op logger, no-op persistence, DOMParser-based HTML stripping.
-
-## Architecture
-
-```
-config.ts          — Dependency injection (logger, persistence, stripHtml)
-glyph.ts           — Glyph interface + animation/manifestation constants
-dataset.ts         — Type-safe DOM dataset attribute helpers
-proximity.ts       — Pointer-distance morphing (8px dot → 220px expanded)
-morph-transaction.ts  — Web Animations API with exclusivity + commit/rollback
-manifestations/    — window, canvas, panel morph implementations
-run.ts             — GlyphRun tray singleton
-```
 
 ## The one law
 

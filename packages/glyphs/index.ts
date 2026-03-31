@@ -99,6 +99,19 @@ export { morphToPanel, morphFromPanel } from './manifestations/panel';
 // GlyphRun tray singleton
 export { glyphRun } from './run';
 
+// Composition types — canonical, package-owned (CTYPE)
+export type { CompositionEdge, CompositionState, EdgeDirection } from './composition';
+export { buildEdgesFromChain, extractGlyphIds } from './composition';
+
+// Edge graph — pure DAG traversal and layout (EWALK + GRDLP)
+export {
+    getRootGlyphIds,
+    getLeafGlyphIds,
+    isPortFree,
+    isConnectedGraph,
+    computeGridPositions,
+} from './edge-graph';
+
 // GlyphUI interface and related types (still in web/ for now, re-exported for plugin authoring)
 export type {
     GlyphUI,

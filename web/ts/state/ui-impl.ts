@@ -21,7 +21,8 @@
  */
 
 import type { PanelState } from '../../types/core';
-import type { CanvasGlyph, CompositionEdge, Composition } from '../generated/proto/glyph/proto/canvas';
+import type { CompositionState } from '@qntx/glyphs';
+import type { CanvasGlyph } from '../generated/proto/glyph/proto/canvas';
 import { getItem, setItem, removeItem } from './storage';
 import { log, SEG } from '../logger';
 import { upsertCanvasGlyph as apiUpsertGlyph, deleteCanvasGlyph as apiDeleteGlyph, addMinimizedWindow as apiAddMinimized, deleteMinimizedWindow as apiDeleteMinimized } from '../api/canvas';
@@ -61,23 +62,10 @@ export interface GraphSessionState {
 }
 
 /**
- * Melded composition state (for persistence)
- * Tracks spatial composition of glyphs that have been melded together
- *
- * Uses edge-based DAG structure to support multi-directional melding.
- * Edges define directed relationships between glyphs (right, top, bottom).
- * See ADR-009 for rationale.
- *
- * Example: [ax|py|prompt] = two edges:
- *   { from: 'ax-1', to: 'py-1', direction: 'right', position: 0 }
- *   { from: 'py-1', to: 'prompt-1', direction: 'right', position: 1 }
- *
- * CompositionEdge and Composition types are imported from proto (ADR-007).
+ * Composition types — canonical, owned by @qntx/glyphs.
+ * Re-exported here for backward compatibility with web/ consumers.
  */
-export type { CompositionEdge };
-export type CompositionState =
-    Pick<Composition, 'id' | 'edges' | 'x' | 'y'>
-    & Partial<Omit<Composition, 'id' | 'edges' | 'x' | 'y'>>;
+export type { CompositionEdge, CompositionState } from '@qntx/glyphs';
 
 /**
  * Canvas glyph state (for persistence)
