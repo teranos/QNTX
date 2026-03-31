@@ -1,11 +1,12 @@
 #pragma once
 
-// TODO(GHB): Ghost branches — draw faint trails from chosen token to top-k
-//   runner-up positions at each generation step. Data exists in TokenSignal.top_k.
+// TODO(#751): Ghost trail triangulation — connect high-scoring runner-ups with
+//   filled triangles to create visible "decision surfaces."
 // TODO(B64): WebSocket frames are base64-encoded PNG — 33% overhead. Binary
 //   WebSocket frames would eliminate this.
-// TODO(CAM): 3D camera (WASD + mouse) is implemented but needs testing and
-//   refinement — controls feel rough, no inertia, no collision with nebula bounds.
+// TODO(#748): Camera is orthographic external observer — needs rework to
+//   first-person perspective (fly through the particle field). Requires 3D camera
+//   position, perspective projection, and WASD movement relative to facing direction.
 // TODO(KFC): Keyframe history capped at 512 (64MB). Longer generations lose
 //   early frames. No disk persistence — closing the glyph loses all history.
 // TODO(TRU): Trail positions vector is unbounded while keyframes are capped.
