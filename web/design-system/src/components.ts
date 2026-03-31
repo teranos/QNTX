@@ -11,7 +11,7 @@
  */
 
 import { createGlyphUI } from '../../ts/components/glyph/glyph-ui'
-import type { Glyph } from '../../ts/components/glyph/glyph'
+import type { Glyph } from '@qntx/glyphs'
 
 interface ButtonSpec {
   label: string
