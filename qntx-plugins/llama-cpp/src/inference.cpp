@@ -20,6 +20,8 @@ struct ObserverCtx {
     std::string stage_name;                      // name of the preceding sampler stage
     std::vector<SamplerStageSnapshot>* snapshots; // output: append here
     const llama_vocab* vocab;                    // for token_to_piece
+    std::vector<float> probs;                    // reusable softmax buffer
+    std::vector<size_t> indices;                 // reusable sort buffer
 };
 
 static const char* observer_name(const struct llama_sampler* smpl) {
@@ -37,8 +39,9 @@ static void observer_apply(struct llama_sampler* smpl, llama_token_data_array* c
     float top1_prob = 0.0f;
 
     // Normalize if not already (samplers may leave raw logits)
-    // We compute softmax on a copy to avoid mutating the chain
-    std::vector<float> probs(cur_p->size);
+    // Reuse buffer from ObserverCtx to avoid 512KB allocation per observer per token
+    auto& probs = ctx->probs;
+    probs.resize(cur_p->size);
     float max_val = -1e30f;
     for (size_t i = 0; i < cur_p->size; i++) {
         if (cur_p->data[i].logit > max_val) max_val = cur_p->data[i].logit;
@@ -65,8 +68,9 @@ static void observer_apply(struct llama_sampler* smpl, llama_token_data_array* c
         }
     }
 
-    // Top-k candidates
-    std::vector<size_t> indices(cur_p->size);
+    // Top-k candidates — reuse indices buffer
+    auto& indices = ctx->indices;
+    indices.resize(cur_p->size);
     for (size_t i = 0; i < cur_p->size; i++) indices[i] = i;
     int k = std::min(STAGE_TOP_K, (int)cur_p->size);
     std::partial_sort(indices.begin(), indices.begin() + k, indices.end(),
@@ -171,6 +175,11 @@ static llama_sampler* build_sampler_chain(
 // Capture pre-sampler signal from raw logits at the current position.
 // Reuses caller-provided buffers to avoid per-token allocation of 128K-float vectors.
 //
+// SIG: signal extraction adds ~3ms/token (softmax 1-2ms, sort 0.1ms, rest 1ms).
+// The 55-62ms/token reported in signal_ms is dominated by llama_get_logits_ith(),
+// which calls ctx->synchronize() — waiting for Metal to finish the decode. That's
+// the actual LLM inference time, not signal overhead. Nothing to optimize here.
+//
 // Zero-cost signals not yet extracted (data exists in this window):
 // TODO(TMD): Token metadata — llama_token_get_score(vocab, id) and
 //   llama_token_get_attr(vocab, id) per top-k candidate. O(1) lookups.
@@ -198,7 +207,7 @@ static void capture_signal(llama_context* ctx, const llama_vocab* vocab, int top
     probs_buf.resize(n_vocab);
     std::copy(logits, logits + n_vocab, probs_buf.begin());
 
-    // Softmax in-place
+    // Softmax in-place (~1-2ms on 128K vocab, negligible vs the ~55ms GPU sync above)
     float max_val = *std::max_element(probs_buf.begin(), probs_buf.end());
     float sum = 0.0f;
     for (int i = 0; i < n_vocab; i++) {
@@ -240,7 +249,6 @@ static void capture_signal(llama_context* ctx, const llama_vocab* vocab, int top
 
     // Move distribution to signal for renderer — no copy, just pointer swap
     sig.full_distribution = std::move(probs_buf);
-    // Restore probs_buf to valid state (moved-from) — next call will resize it
 }
 
 InferenceEngine::InferenceEngine() {}
@@ -558,7 +566,6 @@ InferenceEngine::ChatResult InferenceEngine::stream_chat(
     std::cout << "[llama-cpp] " << n_generated << " tokens in "
               << total_ms << "ms (" << (total_ms > 0 ? (n_generated * 1000 / total_ms) : 0)
               << " tok/s)" << std::endl;
-
     llama_sampler_free(sampler);
     result.content = output.str();
     result.completion_tokens = n_generated;
