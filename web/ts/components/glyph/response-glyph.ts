@@ -10,8 +10,6 @@
  *
  * Token hover popup showing sampler stage data — see token-popup.ts
  * TODO(ECM): Factor entropy and top_gap into color mapping, not just confidence.
- * TODO(SSL): Signal summary logging for StreamChat path.
- * TODO(ATS): Write per-generation attestations after stream completes.
  * TODO(DIM/#749): Dim intersecting token labels when a token is selected, popover on select only.
  * TODO(CLR/#750): Use embedding dimensions (PCA 4-6) to drive particle hue — semantic color.
  */
