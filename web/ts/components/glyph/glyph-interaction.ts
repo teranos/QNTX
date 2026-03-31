@@ -441,14 +441,11 @@ export function makeDraggable(
         currentMeldTarget = null;
 
         // Save positions for all dragged glyphs
-        const canvas = element.parentElement;
-        const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
-
         // Check if we're dragging a melded composition
         if (isMeldedComposition(element)) {
-            const elementRect = element.getBoundingClientRect();
-            const x = Math.round(elementRect.left - canvasRect.left);
-            const y = Math.round(elementRect.top - canvasRect.top);
+            // Read position from style (content-layer space) — not bounding rect (screen space)
+            const x = Math.round(parseFloat(element.style.left) || 0);
+            const y = Math.round(parseFloat(element.style.top) || 0);
 
             // Get composition data from DOM
             const compositionId = element.getAttribute('data-glyph-id') || '';
@@ -475,9 +472,9 @@ export function makeDraggable(
         } else if (isMultiDrag) {
             // Save positions for all selected glyphs
             for (const { element: el, glyph: g } of multiDragElements) {
-                const rect = el.getBoundingClientRect();
-                const x = Math.round(rect.left - canvasRect.left);
-                const y = Math.round(rect.top - canvasRect.top);
+                // Read position from style (content-layer space) — not bounding rect (screen space)
+                const x = Math.round(parseFloat(el.style.left) || 0);
+                const y = Math.round(parseFloat(el.style.top) || 0);
                 g.x = x;
                 g.y = y;
 
@@ -498,10 +495,9 @@ export function makeDraggable(
             multiDragElements = [];
             isMultiDrag = false;
         } else {
-            // Single glyph position save
-            const elementRect = element.getBoundingClientRect();
-            const x = Math.round(elementRect.left - canvasRect.left);
-            const y = Math.round(elementRect.top - canvasRect.top);
+            // Single glyph position save — read from style (content-layer space)
+            const x = Math.round(parseFloat(element.style.left) || 0);
+            const y = Math.round(parseFloat(element.style.top) || 0);
             glyph.x = x;
             glyph.y = y;
 
