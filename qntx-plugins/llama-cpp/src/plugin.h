@@ -14,7 +14,7 @@
 #include "llm.grpc.pb.h"
 #include "ats_client.h"
 
-#define PLUGIN_VERSION "0.23.0"
+#define PLUGIN_VERSION "0.25.0"
 
 // Forward declarations
 struct llama_model;
@@ -78,6 +78,13 @@ public:
         int prompt_tokens;
         int completion_tokens;
         std::vector<TokenSignal> signals;
+
+        // Performance breakdown (milliseconds)
+        long prompt_eval_ms = 0;   // prompt decode into KV cache
+        long generation_ms = 0;    // total generation loop
+        long decode_ms = 0;        // llama_decode calls only
+        long signal_ms = 0;        // capture_signal: ~55ms GPU sync + ~3ms actual work
+        long callback_ms = 0;      // token callback (proto + renderer + grpc)
     };
 
     // Single-turn (deprecated, wraps multi-turn)
@@ -87,12 +94,15 @@ public:
                     int max_tokens,
                     const SamplerConfig& sampler_cfg = {});
 
-    // Multi-turn: messages is a vector of {role, content} pairs
+    // Multi-turn without streaming (deprecated — use stream_chat)
+    // No timing instrumentation, no per-token callback, no renderer integration.
+    // Performance fields in ChatResult will be zero.
     struct Message {
         std::string role;    // "system", "user", "assistant"
         std::string content;
     };
 
+    [[deprecated("use stream_chat — non-streaming path has no timing or renderer integration")]]
     ChatResult chat(const std::vector<Message>& messages,
                     float temperature,
                     int max_tokens,

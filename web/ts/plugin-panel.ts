@@ -13,7 +13,7 @@
  */
 
 import { apiFetch } from './api.ts';
-import { toast } from './toast';
+
 import { escapeHtml } from './html-utils.ts';
 import { log, SEG } from './logger';
 import { handleError } from './error-handler.ts';
@@ -87,6 +87,7 @@ let plugins: PluginInfo[] = [];
 let expandedPlugin: string | null = null;
 let configState: ConfigFormState | null = null;
 let serverHealth: ServerHealth | null = null;
+let lastRefreshed: Date | null = null;
 
 // The content element provided by renderContent()
 let contentElement: HTMLElement | null = null;
@@ -127,6 +128,7 @@ async function fetchPlugins(): Promise<void> {
         }
 
         plugins = data.plugins;
+        lastRefreshed = new Date();
         log.debug(SEG.UI, 'Successfully loaded', plugins.length, 'plugins');
     } catch (error: unknown) {
         handleError(error, 'Failed to fetch plugins', { context: SEG.UI, silent: true });
@@ -178,6 +180,7 @@ function render(): void {
                 <div class="plugin-summary-stats">
                     <span class="plugin-count">${plugins.length} plugin${plugins.length !== 1 ? 's' : ''} installed</span>
                     <span class="plugin-health-summary">${getHealthSummary()}</span>
+                    ${lastRefreshed ? `<span class="plugin-last-refreshed plugin-mono">${formatTime(lastRefreshed)}</span>` : ''}
                 </div>
                 ${serverBuildTime ? `
                     <div class="plugin-server-info">
@@ -185,7 +188,7 @@ function render(): void {
                         <span class="plugin-server-value plugin-mono">${serverBuildTime}</span>
                     </div>
                 ` : ''}
-                <button class="plugin-refresh-btn has-tooltip" data-tooltip="Refresh">&#8635; Refresh</button>
+
             </div>
             <div class="plugin-list">
                 ${plugins.map(plugin => renderPlugin(plugin)).join('')}
@@ -214,13 +217,6 @@ function attachEventDelegation(): void {
     // Click delegation — attached once, works with dynamic content via .closest()
     contentElement.addEventListener('click', async (e: Event) => {
         const target = e.target as HTMLElement;
-
-        // Refresh button
-        if (target.closest('.plugin-refresh-btn')) {
-            await fetchPlugins();
-            render();
-            return;
-        }
 
         // Save config button
         if (target.closest('.plugin-config-save-btn')) {
@@ -357,6 +353,13 @@ function getHealthSummary(): string {
         return '<span class="plugin-health-good">All healthy</span>';
     }
     return `<span class="plugin-health-warning">${unhealthy} unhealthy</span>`;
+}
+
+function formatTime(date: Date): string {
+    const hh = String(date.getHours()).padStart(2, '0');
+    const mm = String(date.getMinutes()).padStart(2, '0');
+    const ss = String(date.getSeconds()).padStart(2, '0');
+    return `${hh}:${mm}:${ss}`;
 }
 
 export function formatBuildTime(buildTime?: string): string | null {
@@ -846,8 +849,6 @@ async function savePluginConfig(): Promise<void> {
             return;
         }
 
-        toast.success('Plugin configuration updated successfully');
-
         expandedPlugin = null;
         configState = null;
         await fetchPlugins();
@@ -976,6 +977,22 @@ export function createPluginGlyph(): Glyph {
 
             // Attach delegated listeners once — they survive innerHTML replacements
             attachEventDelegation();
+
+            // Live-update when health polling detects a change
+            const onHealthChange = () => {
+                fetchPlugins().then(() => render());
+            };
+            document.addEventListener('plugin-health-change', onHealthChange);
+
+            // Auto-refresh every 10s while the panel is open
+            const refreshInterval = setInterval(() => {
+                if (!contentElement?.isConnected) {
+                    clearInterval(refreshInterval);
+                    document.removeEventListener('plugin-health-change', onHealthChange);
+                    return;
+                }
+                fetchPlugins().then(() => render());
+            }, 10_000);
 
             // Show loading, then fetch data
             content.innerHTML = '<div class="glyph-loading">Loading plugins...</div>';

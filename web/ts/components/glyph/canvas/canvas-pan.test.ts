@@ -13,7 +13,8 @@ import {
     resetTransform,
     screenToCanvas,
     canvasToScreen,
-    resetCanvasState
+    resetCanvasState,
+    flushSaveState
 } from './canvas-pan';
 import { makeDraggable, makeResizable } from '../glyph-interaction';
 import type { Glyph } from '../glyph';
@@ -162,6 +163,8 @@ describe('Canvas Pan', () => {
         // Pan should move opposite to scroll direction
         expect(contentLayer.style.transform).toBe('translate(-10px, -20px) scale(1)');
 
+        // Flush debounced save before checking persisted state
+        flushSaveState();
         // State should be persisted (skip check if method not available in CI)
         if (typeof uiState.getCanvasPan === 'function') {
             const saved = uiState.getCanvasPan('test-canvas');
@@ -204,6 +207,8 @@ describe('Canvas Pan', () => {
         const transform = getTransform('test-canvas');
         expect(transform.scale).toBeGreaterThan(1.0);
 
+        // Flush debounced save before checking persisted state
+        flushSaveState();
         // State should be persisted (skip check if method not available in CI)
         if (typeof uiState.getCanvasPan === 'function') {
             const saved = uiState.getCanvasPan('test-canvas');
@@ -256,6 +261,8 @@ describe('Canvas Pan', () => {
         const touchEnd = createTouchEvent('touchend', 150, 130);
         container.dispatchEvent(touchEnd);
 
+        // Flush debounced save before checking persisted state
+        flushSaveState();
         // State should be persisted (skip check if method not available in CI)
         if (typeof uiState.getCanvasPan === 'function') {
             const saved = uiState.getCanvasPan('test-canvas');
@@ -342,6 +349,8 @@ describe('Canvas Pan', () => {
         expect(transform.panX).toBe(initialPanX * 2);
         expect(transform.panY).toBe(initialPanY * 2);
 
+        // Flush debounced save before checking persisted state
+        flushSaveState();
         // State should be persisted (skip check if method not available in CI)
         if (typeof uiState.getCanvasPan === 'function') {
             const saved = uiState.getCanvasPan('test-canvas');
@@ -477,6 +486,8 @@ describe('Canvas Pan', () => {
         const touchEnd = createPinchEvent('touchend', 300, 300, 500, 300);
         container.dispatchEvent(touchEnd);
 
+        // Flush debounced save before checking persisted state
+        flushSaveState();
         // State should be persisted (skip check if method not available in CI)
         if (typeof uiState.getCanvasPan === 'function') {
             const saved = uiState.getCanvasPan('test-canvas');

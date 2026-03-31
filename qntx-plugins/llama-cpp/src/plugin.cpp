@@ -685,9 +685,16 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
             for (auto it = messages.rbegin(); it != messages.rend(); ++it) {
                 if (it->role == "user") { prompt_text = it->content; break; }
             }
+            GenerationPerf perf;
+            perf.prompt_eval_ms = result.prompt_eval_ms;
+            perf.generation_ms = result.generation_ms;
+            perf.decode_ms = result.decode_ms;
+            perf.signal_ms = result.signal_ms;
+            perf.callback_ms = result.callback_ms;
+            perf.completion_tokens = result.completion_tokens;
             ats.create_weave(engine.model_name(), prompt_text,
                              result.content, context_id, n,
-                             conf_sum / n, ent_sum / n, result.signals);
+                             conf_sum / n, ent_sum / n, result.signals, perf);
         }
     }
 
@@ -697,9 +704,6 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
 grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
                                              const protocol::LLMChatRequest* req,
                                              grpc::ServerWriter<protocol::LLMChatChunk>* writer) {
-    auto sc_start = std::chrono::steady_clock::now();
-    std::cout << "[llama-cpp] StreamChat: entered" << std::endl;
-
     auto& engine = plugin_->engine();
 
     if (!engine.is_loaded()) {
@@ -735,11 +739,6 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
         }
     }
 
-    auto sc_attachments = std::chrono::steady_clock::now();
-    auto att_ms = std::chrono::duration_cast<std::chrono::milliseconds>(sc_attachments - sc_start).count();
-    std::cout << "[llama-cpp] StreamChat: attachments extracted in " << att_ms << "ms ("
-              << req->attachments_size() << " attachments)" << std::endl;
-
     // Build message history from proto
     std::vector<InferenceEngine::Message> messages;
     if (req->messages_size() > 0) {
@@ -764,40 +763,19 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
         messages.push_back({"user", user_prompt});
     }
 
-    auto sc_messages = std::chrono::steady_clock::now();
-    auto msg_ms = std::chrono::duration_cast<std::chrono::milliseconds>(sc_messages - sc_attachments).count();
-    std::cout << "[llama-cpp] StreamChat: messages built in " << msg_ms << "ms ("
-              << messages.size() << " messages)" << std::endl;
-
     // Clear trail and keyframe history for new generation
     if (plugin_->renderer().is_ready()) {
-        auto ct0 = std::chrono::steady_clock::now();
         plugin_->renderer().clear_trail();
-        auto ct1 = std::chrono::steady_clock::now();
         plugin_->renderer().set_scrub_index(-1);
-        auto ct2 = std::chrono::steady_clock::now();
-        std::cout << "[llama-cpp] StreamChat: clear_trail="
-                  << std::chrono::duration_cast<std::chrono::milliseconds>(ct1 - ct0).count()
-                  << "ms set_scrub_index="
-                  << std::chrono::duration_cast<std::chrono::milliseconds>(ct2 - ct1).count()
-                  << "ms" << std::endl;
     }
-
-    auto sc_clear = std::chrono::steady_clock::now();
-    auto clear_ms = std::chrono::duration_cast<std::chrono::milliseconds>(sc_clear - sc_messages).count();
-    std::cout << "[llama-cpp] StreamChat: renderer section total " << clear_ms << "ms, calling stream_chat..." << std::endl;
 
     plugin_->set_activity("evaluating prompt");
 
     // Stream tokens as they're generated
-    long cb_proto_us = 0, cb_submit_us = 0, cb_keyframe_us = 0, cb_trail_us = 0, cb_write_us = 0;
-    int cb_count = 0;
     auto result = engine.stream_chat(
         messages, temperature, max_tokens,
         [&](const std::string& token_text, const TokenSignal& sig) -> bool {
             plugin_->set_activity("generating");
-
-            auto cb0 = std::chrono::steady_clock::now();
 
             protocol::LLMChatChunk chunk;
             chunk.set_token(sanitize_utf8(token_text));
@@ -828,21 +806,12 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
                 }
             }
 
-            auto cb1 = std::chrono::steady_clock::now();
-            cb_proto_us += std::chrono::duration_cast<std::chrono::microseconds>(cb1 - cb0).count();
-
             // Submit distribution for interpolated rendering + record trail + store keyframe
             if (plugin_->renderer().is_ready() && !sig.full_distribution.empty()) {
                 plugin_->renderer().submit_distribution(
                     sig.full_distribution.data(), sig.full_distribution.size());
-                auto cb2 = std::chrono::steady_clock::now();
-                cb_submit_us += std::chrono::duration_cast<std::chrono::microseconds>(cb2 - cb1).count();
-
                 plugin_->renderer().store_keyframe(
                     sig.full_distribution.data(), sig.full_distribution.size());
-                auto cb3 = std::chrono::steady_clock::now();
-                cb_keyframe_us += std::chrono::duration_cast<std::chrono::microseconds>(cb3 - cb2).count();
-
                 plugin_->renderer().add_trail_point(sig.token_id);
 
                 if (sig.top_k.size() > 1) {
@@ -854,27 +823,11 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
                     }
                     plugin_->renderer().add_ghost_branches(sig.token_id, runners);
                 }
-                auto cb4 = std::chrono::steady_clock::now();
-                cb_trail_us += std::chrono::duration_cast<std::chrono::microseconds>(cb4 - cb3).count();
             }
 
-            auto cb5 = std::chrono::steady_clock::now();
-            bool ok = writer->Write(chunk);
-            auto cb6 = std::chrono::steady_clock::now();
-            cb_write_us += std::chrono::duration_cast<std::chrono::microseconds>(cb6 - cb5).count();
-
-            cb_count++;
-            return ok;
+            return writer->Write(chunk);
         },
         plugin_->sampler_config());
-
-    // Callback breakdown
-    std::cout << "[llama-cpp] Callback breakdown (" << cb_count << " tokens):"
-              << " proto=" << cb_proto_us / 1000 << "ms"
-              << " submit_dist=" << cb_submit_us / 1000 << "ms"
-              << " store_kf=" << cb_keyframe_us / 1000 << "ms"
-              << " trail=" << cb_trail_us / 1000 << "ms"
-              << " grpc_write=" << cb_write_us / 1000 << "ms" << std::endl;
 
     // Final chunk with totals
     protocol::LLMChatChunk final_chunk;
@@ -903,9 +856,16 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
         for (auto it = messages.rbegin(); it != messages.rend(); ++it) {
             if (it->role == "user") { prompt_text = it->content; break; }
         }
+        GenerationPerf perf;
+        perf.prompt_eval_ms = result.prompt_eval_ms;
+        perf.generation_ms = result.generation_ms;
+        perf.decode_ms = result.decode_ms;
+        perf.signal_ms = result.signal_ms;
+        perf.callback_ms = result.callback_ms;
+        perf.completion_tokens = result.completion_tokens;
         ats.create_weave(engine.model_name(), prompt_text,
                          result.content, context_id, n,
-                         conf_sum / n, ent_sum / n, result.signals);
+                         conf_sum / n, ent_sum / n, result.signals, perf);
     }
 
     return grpc::Status::OK;

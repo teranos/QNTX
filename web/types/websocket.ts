@@ -122,12 +122,10 @@ export interface JobUpdateMessage extends Omit<GeneratedJobUpdateMessage, 'type'
  */
 export interface LLMStreamMessage extends Omit<GeneratedLLMStreamMessage, 'type'> {
   type: 'llm_stream';
-  // Additional frontend-only fields for usage tracking
-  usage?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-  };
+  // Usage — populated on the final (done=true) chunk only
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
 }
 
 /**
