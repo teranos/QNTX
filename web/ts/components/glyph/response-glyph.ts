@@ -681,11 +681,17 @@ export function createResponseGlyph(
         q: `cam:0,0,0.9,0,0`,
         e: `cam:0,0,1.1,0,0`,
         r: 'cam:r',
-        Escape: 'cam:r',
     };
+    let unlockFn: (() => void) | null = null;
+
     function onNebulaKey(e: KeyboardEvent): void {
-        if (!nebulaNavActive) return;
         if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
+        if (e.key === 'Escape' && unlockFn) {
+            e.preventDefault();
+            unlockFn();
+            return;
+        }
+        if (!nebulaNavActive) return;
         const cmd = keyMap[e.key];
         if (cmd) {
             e.preventDefault();
@@ -751,7 +757,7 @@ export function createResponseGlyph(
         }
 
         popup = createTokenPopup();
-        setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; });
+        unlockFn = setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; if (!locked) clearDim(); });
     } else if (result) {
         // Static mode — render output text
         renderOutput(output, result);
@@ -769,7 +775,7 @@ export function createResponseGlyph(
             visibilityObserver?.observe(output);
 
             popup = createTokenPopup();
-            setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; });
+            unlockFn = setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; if (!locked) clearDim(); });
         }
 
         // Show nebula and connect to Metal renderer — live frame drawing
@@ -889,7 +895,7 @@ function setupTokenPopup(
     popup: ReturnType<typeof createTokenPopup>,
     onScrub?: (index: number) => void,
     onLockChange?: (locked: boolean, span: HTMLElement | null) => void,
-): void {
+): () => void {
     let lockedSpan: HTMLSpanElement | null = null;
 
     function scrubTo(idx: number): void {
@@ -902,7 +908,6 @@ function setupTokenPopup(
             lockedSpan.style.outline = '';
             lockedSpan.style.boxShadow = '';
             lockedSpan = null;
-            clearDim();
             scrubTo(-1);
             if (onLockChange) onLockChange(false, null);
         }
@@ -957,6 +962,8 @@ function setupTokenPopup(
             scrubTo(-1);
         }
     }, true);
+
+    return unlock;
 }
 
 // ── Public helpers ──────────────────────────────────────────────────
