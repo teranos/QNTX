@@ -12,6 +12,8 @@
  * TODO(ECM): Factor entropy and top_gap into color mapping, not just confidence.
  * TODO(SSL): Signal summary logging for StreamChat path.
  * TODO(ATS): Write per-generation attestations after stream completes.
+ * TODO(DIM/#749): Dim intersecting token labels when a token is selected, popover on select only.
+ * TODO(CLR/#750): Use embedding dimensions (PCA 4-6) to drive particle hue — semantic color.
  */
 
 import type { Glyph } from './glyph';
@@ -20,7 +22,7 @@ import type { LLMTokenSignal, SamplerStageSignal } from '@generated/server';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { unmeldComposition } from './meld/meld-composition';
-import { makeDraggable, storeCleanup } from './glyph-interaction';
+import { makeDraggable, storeCleanup, preventDrag } from './glyph-interaction';
 import { morphCanvasPlacedToWindow, placeWindowOnCanvas } from './manifestations/canvas-window';
 import { isInWindowState } from './dataset';
 import { glyphRun } from './run';
@@ -479,6 +481,7 @@ export function createResponseGlyph(
     output.style.overflowWrap = 'break-word';
     output.style.backgroundColor = 'transparent';
     output.style.color = 'var(--text-on-dark)';
+    preventDrag(output); // token clicks must not trigger composition drag
     element.appendChild(output);
 
     // ── Nebula canvas ──────────────────────────────────────────────
@@ -510,6 +513,7 @@ export function createResponseGlyph(
     let nebulaFpsFrames = 0;
     let nebulaFpsLast = performance.now();
     let nebulaLive = false; // true during active streaming — frames are drawn
+    let nebulaScrub = false; // true while scrubbing a completed response — frames drawn
 
     function connectNebula(): void {
         const base = getBackendUrl().replace(/^http/, 'ws');
@@ -521,7 +525,7 @@ export function createResponseGlyph(
         };
 
         nebulaWs.onmessage = (event: MessageEvent) => {
-            if (!nebulaLive) return; // scrub-only reconnect — don't draw frames
+            if (!nebulaLive && !nebulaScrub) return; // no active stream or scrub — ignore
             try {
                 const msg = JSON.parse(event.data);
                 if (msg.type !== 1 || !msg.data) return;
@@ -560,7 +564,12 @@ export function createResponseGlyph(
     let lastNebulaBase64: string | null = null;
 
     function sendNebulaMessage(data: string): void {
-        // Lazy reconnect — if WebSocket is closed (post-stream), reconnect for scrub only
+        // Track scrub state — enable frame drawing during scrub on completed glyphs
+        if (data.indexOf('scrub:') === 0) {
+            nebulaScrub = data !== 'scrub:-1';
+        }
+
+        // Lazy reconnect — if WebSocket is closed (post-stream), reconnect
         if (!nebulaWs || nebulaWs.readyState === WebSocket.CLOSED || nebulaWs.readyState === WebSocket.CLOSING) {
             connectNebula();
             const pending = data;
@@ -590,6 +599,35 @@ export function createResponseGlyph(
     element.insertBefore(nebulaCanvas, element.firstChild);
     element.appendChild(nebulaStatus);
     nebulaRo.observe(element);
+
+    // WASD + arrow camera controls — active only when a token is selected
+    let nebulaNavActive = false;
+    const camStep = 0.02;
+    const camRotStep = 0.03;
+    const keyMap: Record<string, string> = {
+        w: `cam:0,${camStep},1,0,0`,
+        s: `cam:0,${-camStep},1,0,0`,
+        a: `cam:${-camStep},0,1,0,0`,
+        d: `cam:${camStep},0,1,0,0`,
+        ArrowUp: `cam:0,0,1,0,${-camRotStep}`,
+        ArrowDown: `cam:0,0,1,0,${camRotStep}`,
+        ArrowLeft: `cam:0,0,1,${-camRotStep},0`,
+        ArrowRight: `cam:0,0,1,${camRotStep},0`,
+        q: `cam:0,0,0.9,0,0`,
+        e: `cam:0,0,1.1,0,0`,
+        r: 'cam:r',
+        Escape: 'cam:r',
+    };
+    function onNebulaKey(e: KeyboardEvent): void {
+        if (!nebulaNavActive) return;
+        if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
+        const cmd = keyMap[e.key];
+        if (cmd) {
+            e.preventDefault();
+            sendNebulaMessage(cmd);
+        }
+    }
+    document.addEventListener('keydown', onNebulaKey);
 
     // ── Restore saved content ───────────────────────────────────────
 
@@ -648,7 +686,7 @@ export function createResponseGlyph(
         }
 
         popup = createTokenPopup();
-        setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx));
+        setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked) => { nebulaNavActive = locked; });
     } else if (result) {
         // Static mode — render output text
         renderOutput(output, result);
@@ -666,7 +704,7 @@ export function createResponseGlyph(
             visibilityObserver?.observe(output);
 
             popup = createTokenPopup();
-            setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx));
+            setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked) => { nebulaNavActive = locked; });
         }
 
         // Show nebula and connect to Metal renderer — live frame drawing
@@ -748,6 +786,7 @@ export function createResponseGlyph(
         popup?.destroy();
         closeNebula();
         nebulaRo.disconnect();
+        document.removeEventListener('keydown', onNebulaKey);
         if (lastNebulaBitmap) { lastNebulaBitmap.close(); lastNebulaBitmap = null; }
     });
 
@@ -784,6 +823,7 @@ function setupTokenPopup(
     output: HTMLElement,
     popup: ReturnType<typeof createTokenPopup>,
     onScrub?: (index: number) => void,
+    onLockChange?: (locked: boolean) => void,
 ): void {
     let lockedSpan: HTMLSpanElement | null = null;
 
@@ -792,33 +832,43 @@ function setupTokenPopup(
         document.dispatchEvent(new CustomEvent('nebula-scrub', { detail: { index: idx } }));
     }
 
+    function unlock(): void {
+        if (lockedSpan) {
+            lockedSpan.style.outline = '';
+            lockedSpan.style.boxShadow = '';
+            lockedSpan = null;
+            scrubTo(-1);
+            if (onLockChange) onLockChange(false);
+        }
+    }
+
+    function lockToken(span: HTMLSpanElement): void {
+        if (lockedSpan) {
+            lockedSpan.style.outline = '';
+            lockedSpan.style.boxShadow = '';
+        }
+        lockedSpan = span;
+        lockedSpan.style.outline = '1px solid rgba(204, 85, 0, 0.65)';
+        lockedSpan.style.boxShadow = '0 0 8px rgba(204, 85, 0, 0.5)';
+        popup.show(span);
+        if (span.dataset.tokenIndex) {
+            scrubTo(parseInt(span.dataset.tokenIndex, 10));
+        }
+        if (onLockChange) onLockChange(true);
+    }
+
     // Click to lock selection — click again or click outside to unlock
     output.addEventListener('click', (e: MouseEvent) => {
         const target = e.target as HTMLElement;
         if (target.tagName === 'SPAN' && target.dataset.confidence) {
             const span = target as HTMLSpanElement;
             if (lockedSpan === span) {
-                // Click same token — unlock
-                lockedSpan.style.outline = '';
-                lockedSpan = null;
-                scrubTo(-1);
+                unlock();
             } else {
-                // Lock new token
-                if (lockedSpan) lockedSpan.style.outline = '';
-                lockedSpan = span;
-                lockedSpan.style.outline = '1px solid rgba(255, 180, 80, 0.7)';
-                popup.show(span);
-                if (span.dataset.tokenIndex) {
-                    scrubTo(parseInt(span.dataset.tokenIndex, 10));
-                }
+                lockToken(span);
             }
         } else if (!target.closest('.token-popup')) {
-            // Click outside tokens — unlock
-            if (lockedSpan) {
-                lockedSpan.style.outline = '';
-                lockedSpan = null;
-                scrubTo(-1);
-            }
+            unlock();
         }
     });
 
