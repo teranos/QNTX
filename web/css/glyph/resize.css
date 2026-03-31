@@ -13,6 +13,7 @@
     cursor: nwse-resize;
     background-color: var(--bg-tertiary);
     border-top-left-radius: 4px;
+    z-index: 2;
 }
 
 /* Smaller variant for note glyphs (sits over folded corner) */

@@ -27,7 +27,7 @@ import { glyphRun } from './run';
 import { autoMeldResultBelow } from './meld/meld-system';
 import { uiState } from '../../state/ui';
 import { registerHandler, unregisterHandler } from '../../websocket';
-import { apiFetch } from '../../api';
+import { apiFetch, getBackendUrl } from '../../api';
 import { canvasSyncQueue } from '../../api/canvas-sync';
 import { createFollowUpZone, type FollowUpRequest, type FollowUpControls } from './glyph-followup';
 import { createTokenPopup, samplerInfluenceColor } from './token-popup';
@@ -61,6 +61,9 @@ interface GenerationStats {
     model?: string;
 }
 
+// Last nebula frame stored as base64 PNG for persistence across refresh
+type NebulaFrame = string; // base64-encoded PNG data (without data: prefix)
+
 export interface ResultGlyphContent {
     result?: ExecutionResult;
     tokens?: StreamToken[];
@@ -69,6 +72,7 @@ export interface ResultGlyphContent {
     prompt?: string;
     followupError?: string;
     stats?: GenerationStats;
+    nebulaFrame?: NebulaFrame;
 }
 
 // ── Multiplexer ──────────────────────────────────────────────────────
@@ -453,25 +457,139 @@ export function createResponseGlyph(
         logLabel: 'ResponseGlyph',
     });
     element.style.minHeight = '80px';
-    element.style.backgroundColor = 'transparent';
+    element.style.backgroundColor = '#050208';
     element.style.borderRadius = '0 0 2px 2px';
     element.style.border = '1px solid var(--border-on-dark)';
     element.style.borderTop = 'none';
     element.style.zIndex = '1';
+    header.style.position = 'relative';
+    header.style.zIndex = '1';
     element.appendChild(header);
 
     // ── Output container ────────────────────────────────────────────
 
     const output = document.createElement('div');
     output.className = 'result-glyph-output glyph-content-area';
+    output.style.position = 'relative';
+    output.style.zIndex = '1';
     output.style.fontFamily = 'monospace';
     output.style.fontSize = '12px';
     output.style.whiteSpace = 'pre-wrap';
     output.style.wordBreak = 'break-word';
     output.style.overflowWrap = 'break-word';
-    output.style.backgroundColor = 'rgba(10, 10, 10, 0.85)';
+    output.style.backgroundColor = 'transparent';
     output.style.color = 'var(--text-on-dark)';
     element.appendChild(output);
+
+    // ── Nebula canvas ──────────────────────────────────────────────
+    // Small inline particle view from the Metal renderer. Connects to
+    // the llama-cpp plugin's WebSocket frame stream during generation.
+
+    // Nebula renders behind the text as the glyph's background
+    const nebulaCanvas = document.createElement('canvas');
+    nebulaCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;display:none;';
+    const nebulaCtx = nebulaCanvas.getContext('2d');
+
+    const nebulaStatus = document.createElement('div');
+    nebulaStatus.style.cssText = 'position:absolute;bottom:2px;right:6px;font:9px monospace;color:rgba(255,255,255,0.25);z-index:1;';
+
+    let lastNebulaBitmap: ImageBitmap | null = null;
+
+    // Resize canvas to match element pixel density, redraw last frame
+    function fitNebulaCanvas(): void {
+        const rect = element.getBoundingClientRect();
+        nebulaCanvas.width = Math.round(rect.width * devicePixelRatio);
+        nebulaCanvas.height = Math.round(rect.height * devicePixelRatio);
+        if (lastNebulaBitmap && nebulaCtx) {
+            nebulaCtx.drawImage(lastNebulaBitmap, 0, 0, nebulaCanvas.width, nebulaCanvas.height);
+        }
+    }
+    const nebulaRo = new ResizeObserver(fitNebulaCanvas);
+
+    let nebulaWs: WebSocket | null = null;
+    let nebulaFpsFrames = 0;
+    let nebulaFpsLast = performance.now();
+    let nebulaLive = false; // true during active streaming — frames are drawn
+
+    function connectNebula(): void {
+        const base = getBackendUrl().replace(/^http/, 'ws');
+        nebulaWs = new WebSocket(`${base}/ws/llama-cpp`);
+
+        nebulaWs.onopen = () => {
+            if (nebulaLive) nebulaStatus.textContent = 'connected';
+            log.debug(SEG.GLYPH, '[ResponseGlyph] Nebula WebSocket connected');
+        };
+
+        nebulaWs.onmessage = (event: MessageEvent) => {
+            if (!nebulaLive) return; // scrub-only reconnect — don't draw frames
+            try {
+                const msg = JSON.parse(event.data);
+                if (msg.type !== 1 || !msg.data) return;
+
+                const binary = atob(msg.data);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                const blob = new Blob([bytes], { type: 'image/png' });
+                lastNebulaBase64 = msg.data; // store raw base64 for persistence
+                createImageBitmap(blob).then((bmp) => {
+                    if (!nebulaCtx) return;
+                    if (lastNebulaBitmap) lastNebulaBitmap.close();
+                    lastNebulaBitmap = bmp;
+                    nebulaCtx.clearRect(0, 0, nebulaCanvas.width, nebulaCanvas.height);
+                    nebulaCtx.drawImage(bmp, 0, 0, nebulaCanvas.width, nebulaCanvas.height);
+                    nebulaFpsFrames++;
+                    const now = performance.now();
+                    if (now - nebulaFpsLast >= 1000) {
+                        nebulaStatus.textContent = Math.round(nebulaFpsFrames * 1000 / (now - nebulaFpsLast)) + ' fps';
+                        nebulaFpsFrames = 0;
+                        nebulaFpsLast = now;
+                    }
+                });
+            } catch (e) {
+                log.error(SEG.GLYPH, '[ResponseGlyph] Nebula frame error', e);
+            }
+        };
+
+        nebulaWs.onerror = () => { if (nebulaLive) nebulaStatus.textContent = 'error'; };
+        nebulaWs.onclose = () => { if (nebulaLive) nebulaStatus.textContent = ''; };
+    }
+
+    // Store last frame as base64 PNG for persistence across refresh
+    let lastNebulaBase64: string | null = null;
+
+    function sendNebulaMessage(data: string): void {
+        // Lazy reconnect — if WebSocket is closed (post-stream), reconnect for scrub only
+        if (!nebulaWs || nebulaWs.readyState === WebSocket.CLOSED || nebulaWs.readyState === WebSocket.CLOSING) {
+            connectNebula();
+            const pending = data;
+            const origOnOpen = nebulaWs!.onopen;
+            nebulaWs!.onopen = (ev) => {
+                if (origOnOpen) (origOnOpen as (ev: Event) => void)(ev);
+                const msg = { type: 1, data: btoa(pending), headers: {}, timestamp: 0 };
+                nebulaWs!.send(JSON.stringify(msg));
+            };
+            return;
+        }
+        if (nebulaWs.readyState === WebSocket.OPEN) {
+            const msg = { type: 1, data: btoa(data), headers: {}, timestamp: 0 };
+            nebulaWs.send(JSON.stringify(msg));
+        }
+    }
+
+    function closeNebula(): void {
+        nebulaLive = false;
+        if (nebulaWs && nebulaWs.readyState !== WebSocket.CLOSED) {
+            nebulaWs.close();
+        }
+        nebulaWs = null;
+    }
+
+    element.style.position = 'relative';
+    element.insertBefore(nebulaCanvas, element.firstChild);
+    element.appendChild(nebulaStatus);
+    nebulaRo.observe(element);
 
     // ── Restore saved content ───────────────────────────────────────
 
@@ -508,8 +626,29 @@ export function createResponseGlyph(
         renderSpans(streamInstance);
         if (savedStats) renderStatsLine(output, savedStats);
 
+        // Show nebula — restore last frame from persisted base64 if available
+        nebulaCanvas.style.display = '';
+        fitNebulaCanvas();
+        if (saved?.content) {
+            try {
+                const restored = JSON.parse(saved.content) as ResultGlyphContent;
+                if (restored.nebulaFrame) {
+                    lastNebulaBase64 = restored.nebulaFrame;
+                    const bin = atob(restored.nebulaFrame);
+                    const arr = new Uint8Array(bin.length);
+                    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+                    createImageBitmap(new Blob([arr], { type: 'image/png' })).then((bmp) => {
+                        if (!nebulaCtx) return;
+                        lastNebulaBitmap = bmp;
+                        nebulaCtx.clearRect(0, 0, nebulaCanvas.width, nebulaCanvas.height);
+                        nebulaCtx.drawImage(bmp, 0, 0, nebulaCanvas.width, nebulaCanvas.height);
+                    });
+                }
+            } catch { /* already logged above */ }
+        }
+
         popup = createTokenPopup();
-        setupTokenPopup(output, popup);
+        setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx));
     } else if (result) {
         // Static mode — render output text
         renderOutput(output, result);
@@ -527,8 +666,14 @@ export function createResponseGlyph(
             visibilityObserver?.observe(output);
 
             popup = createTokenPopup();
-            setupTokenPopup(output, popup);
+            setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx));
         }
+
+        // Show nebula and connect to Metal renderer — live frame drawing
+        nebulaCanvas.style.display = '';
+        fitNebulaCanvas();
+        nebulaLive = true;
+        connectNebula();
 
         let streamStartMs = 0;
 
@@ -550,6 +695,9 @@ export function createResponseGlyph(
                     savedStats = { tokenCount, tokPerSec, model: streamModel };
                     renderStatsLine(output, savedStats);
                 }
+
+                // Disconnect from Metal renderer — keep last frame as static image
+                closeNebula();
 
                 persistContent();
                 log.debug(SEG.GLYPH, `[ResponseGlyph] Stream complete for ${streamJobId}, ${tokens.length} tokens`);
@@ -598,6 +746,9 @@ export function createResponseGlyph(
             instances.delete(streamInstance);
         }
         popup?.destroy();
+        closeNebula();
+        nebulaRo.disconnect();
+        if (lastNebulaBitmap) { lastNebulaBitmap.close(); lastNebulaBitmap = null; }
     });
 
     // ── Persist helpers ─────────────────────────────────────────────
@@ -610,6 +761,7 @@ export function createResponseGlyph(
             promptConfig,
             prompt,
             stats: savedStats,
+            nebulaFrame: lastNebulaBase64 ?? undefined,
         };
         const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
         if (existing) {
@@ -628,25 +780,65 @@ export function createResponseGlyph(
 
 // ── Token popup wiring ──────────────────────────────────────────────
 
-function setupTokenPopup(output: HTMLElement, popup: ReturnType<typeof createTokenPopup>): void {
+function setupTokenPopup(
+    output: HTMLElement,
+    popup: ReturnType<typeof createTokenPopup>,
+    onScrub?: (index: number) => void,
+): void {
+    let lockedSpan: HTMLSpanElement | null = null;
+
+    function scrubTo(idx: number): void {
+        if (onScrub) onScrub(idx);
+        document.dispatchEvent(new CustomEvent('nebula-scrub', { detail: { index: idx } }));
+    }
+
+    // Click to lock selection — click again or click outside to unlock
+    output.addEventListener('click', (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'SPAN' && target.dataset.confidence) {
+            const span = target as HTMLSpanElement;
+            if (lockedSpan === span) {
+                // Click same token — unlock
+                lockedSpan.style.outline = '';
+                lockedSpan = null;
+                scrubTo(-1);
+            } else {
+                // Lock new token
+                if (lockedSpan) lockedSpan.style.outline = '';
+                lockedSpan = span;
+                lockedSpan.style.outline = '1px solid rgba(255, 180, 80, 0.7)';
+                popup.show(span);
+                if (span.dataset.tokenIndex) {
+                    scrubTo(parseInt(span.dataset.tokenIndex, 10));
+                }
+            }
+        } else if (!target.closest('.token-popup')) {
+            // Click outside tokens — unlock
+            if (lockedSpan) {
+                lockedSpan.style.outline = '';
+                lockedSpan = null;
+                scrubTo(-1);
+            }
+        }
+    });
+
+    // Hover — only scrub if no token is locked
     output.addEventListener('mouseenter', (e: MouseEvent) => {
+        if (lockedSpan) return;
         const target = e.target as HTMLElement;
         if (target.tagName === 'SPAN' && target.dataset.confidence) {
             popup.show(target as HTMLSpanElement);
             if (target.dataset.tokenIndex) {
-                document.dispatchEvent(new CustomEvent('nebula-scrub', {
-                    detail: { index: parseInt(target.dataset.tokenIndex, 10) },
-                }));
+                scrubTo(parseInt(target.dataset.tokenIndex, 10));
             }
         }
     }, true);
     output.addEventListener('mouseleave', (e: MouseEvent) => {
+        if (lockedSpan) return;
         const target = e.target as HTMLElement;
         if (target.tagName === 'SPAN') {
             popup.scheduleHide();
-            document.dispatchEvent(new CustomEvent('nebula-scrub', {
-                detail: { index: -1 },
-            }));
+            scrubTo(-1);
         }
     }, true);
 }

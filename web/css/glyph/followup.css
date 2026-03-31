@@ -8,6 +8,8 @@
  * Also includes error state styling for result glyphs.
  */
 .result-followup-zone {
+    position: relative;
+    z-index: 1;
     flex-shrink: 0;
     box-sizing: border-box;
     height: 0;
