@@ -14,7 +14,7 @@
 #include "llm.grpc.pb.h"
 #include "ats_client.h"
 
-#define PLUGIN_VERSION "0.23.1"
+#define PLUGIN_VERSION "0.24.2"
 
 // Forward declarations
 struct llama_model;
@@ -83,7 +83,7 @@ public:
         long prompt_eval_ms = 0;   // prompt decode into KV cache
         long generation_ms = 0;    // total generation loop
         long decode_ms = 0;        // llama_decode calls only
-        long signal_ms = 0;        // capture_signal (softmax + sort)
+        long signal_ms = 0;        // capture_signal: ~55ms GPU sync + ~3ms actual work
         long callback_ms = 0;      // token callback (proto + renderer + grpc)
     };
 
