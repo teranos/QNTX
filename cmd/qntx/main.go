@@ -265,6 +265,13 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 		// Retry when server becomes available
 		go retryScheduleSetup(loadedPlugins, pluginLogger)
 	}
+
+	// Start health polling — detect plugin crashes and restart automatically
+	if defaultServer != nil && defaultServer.GetServices() != nil {
+		manager.StartHealthPolling(registry, defaultServer.GetServices(), func(event grpc.HealthEvent) {
+			defaultServer.BroadcastPluginHealth(event.Name, event.Healthy, event.State, event.Message)
+		})
+	}
 }
 
 // retryScheduleSetup waits for Pulse daemon to be ready, then sets up plugin schedules

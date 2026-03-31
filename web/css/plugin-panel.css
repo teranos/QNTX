@@ -124,19 +124,6 @@
     color: #9ca3af;
 }
 
-.plugin-refresh-btn {
-    font-size: var(--font-size-sm);
-    background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    color: var(--text-on-dark);
-    border-radius: 4px;
-    padding: 4px 12px;
-    cursor: pointer;
-}
-
-.plugin-refresh-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
-}
 
 /* Plugin list */
 .plugin-list {
