@@ -41,6 +41,8 @@ export {
     MAX_VIEWPORT_WIDTH_RATIO,
     MIN_WINDOW_HEIGHT,
     MIN_WINDOW_WIDTH,
+    DEFAULT_GLYPH_COLOR,
+    DEFAULT_GLYPH_TEXT_COLOR,
 } from './glyph';
 export type { Glyph } from './glyph';
 
