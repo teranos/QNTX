@@ -205,9 +205,10 @@ bool MetalRenderer::setup() {
     ghost_rpd->release();
     ghost_vertex_fn->release();
     ghost_fragment_fn->release();
-    library->release();
 
-    if (!ghost_pipeline_) return false;
+    if (!ghost_pipeline_) { library->release(); return false; }
+
+    library->release();
 
     std::cout << "[metal-llama] GPU ready: " << device_name() << std::endl;
     return true;

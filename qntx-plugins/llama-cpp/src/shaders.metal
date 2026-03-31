@@ -164,6 +164,8 @@ fragment float4 trailFragment(TrailVertexOut in [[stage_in]]) {
 // Buffer layout: 5 floats per vertex [x, y, z, alpha, trailIndex]
 // Drawn as Line primitives (pairs of vertices: chosen->runner-up)
 
+// --- Ghost branches ---
+
 vertex TrailVertexOut ghostBranchVertex(
     device const float* data     [[buffer(0)]],
     constant float4x4& mvp      [[buffer(1)]],

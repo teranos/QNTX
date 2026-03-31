@@ -77,6 +77,6 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 
 - **CAM** — 3D camera (WASD + mouse) is implemented but needs testing and refinement — controls feel rough, no inertia, no collision with nebula bounds.
 
-- **SIG** — Signal capture overhead. `capture_signal()` runs softmax + partial sort over the full 128K vocabulary every token (~54ms/token). Actual llama.cpp decode is ~2.8ms/token — signal extraction is 20x more expensive than inference itself. This caps throughput at ~16 tok/s on M1 regardless of model speed. Moving softmax to a Metal compute shader or sampling the distribution instead of sorting it would recover most of this.
+- **SIG** — ~~Signal capture overhead.~~ Resolved. Profiling showed the ~55ms/token attributed to signal extraction was actually `ctx->synchronize()` inside `llama_get_logits_ith()` (llama-context.cpp:3079) — waiting for Metal to finish the decode. Signal extraction itself (softmax + partial sort + top-k) adds ~3ms/token. CPU softmax is 1-2ms after the sync completes. This is llama.cpp's Metal decode pipeline — not optimizable from our side.
 
 See `docs/research/metal-llama.md` for the full code reference table including Metal visualization limitations and opportunities.
