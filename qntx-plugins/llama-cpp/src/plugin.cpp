@@ -244,16 +244,8 @@ grpc::Status LlamaCppPlugin::ConfigSchema(grpc::ServerContext* ctx,
 grpc::Status LlamaCppPlugin::RegisterGlyphs(grpc::ServerContext* ctx,
                                               const protocol::Empty* req,
                                               protocol::GlyphDefResponse* resp) {
-    // Always announce the nebula glyph — renderer readiness is a runtime
-    // concern, not a registration concern.  The module JS and /render-latest
-    // endpoint handle renderer unavailability gracefully.
-    auto* glyph = resp->add_glyphs();
-    glyph->set_symbol("✦");
-    glyph->set_title("Nebula");
-    glyph->set_label("nebula");
-    glyph->set_module_path("/nebula-module.js");
-    glyph->set_default_width(420);
-    glyph->set_default_height(420);
+    // Nebula view is now part of the response glyph — no separate glyph needed.
+    // The response glyph connects directly to this plugin's WebSocket for frames.
     return grpc::Status::OK;
 }
 
