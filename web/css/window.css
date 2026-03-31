@@ -272,6 +272,7 @@
     flex: 1;
     overflow: auto;
     padding: 8px;
+    background: transparent;
 }
 
 /* GlyphUI form primitives — dark-mode first */

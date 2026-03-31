@@ -17,7 +17,7 @@
  */
 
 import { getLogger, getLogSegment } from '../config';
-import type { Glyph } from '../glyph';
+import { type Glyph, DEFAULT_GLYPH_COLOR, DEFAULT_GLYPH_TEXT_COLOR } from '../glyph';
 import { addWindowControls } from './title-bar-controls';
 import { stashContent } from './stash';
 import { renderGlyphContent } from './render-content';
@@ -194,6 +194,8 @@ export function morphToPanel(
         glyphElement.style.width = `${panelWidth}px`;
         glyphElement.style.height = `${panelHeight}px`;
         glyphElement.style.zIndex = PANEL_Z_INDEX;
+        glyphElement.style.backgroundColor = glyph.color ?? DEFAULT_GLYPH_COLOR;
+        glyphElement.style.color = glyph.textColor ?? DEFAULT_GLYPH_TEXT_COLOR;
 
         // Restore stashed content or render fresh (shared with window.ts)
         const { titleBar } = renderGlyphContent(glyphElement, glyph, 'Panel');

@@ -7,7 +7,7 @@
  */
 
 import { getLogger, getLogSegment } from '../config';
-import type { Glyph } from '../glyph';
+import { type Glyph, DEFAULT_GLYPH_COLOR, DEFAULT_GLYPH_TEXT_COLOR } from '../glyph';
 import { beginMaximizeMorph, beginMinimizeMorph } from '../morph-transaction';
 import { getMaximizeDuration, getMinimizeDuration } from '../glyph';
 import { prepareMorphTo, calculateTrayTarget, resetGlyphElement } from './morphology';
@@ -48,7 +48,9 @@ export function morphToCanvas(
         glyphElement.style.width = '100vw';
         glyphElement.style.height = '100vh';
         glyphElement.style.borderRadius = '0'; // No rounded corners
-        glyphElement.style.backgroundColor = 'var(--bg-primary)';
+        glyphElement.style.backgroundColor = glyph.color ?? DEFAULT_GLYPH_COLOR;
+        glyphElement.style.backdropFilter = 'blur(2px)';
+        glyphElement.style.color = glyph.textColor ?? DEFAULT_GLYPH_TEXT_COLOR;
         glyphElement.style.boxShadow = 'none'; // No shadow
         glyphElement.style.padding = '0'; // No padding
         glyphElement.style.opacity = '1';

@@ -14,10 +14,8 @@
     position: fixed;
     left: 0;
     width: 100vw;
-    background-color: rgba(58, 59, 58, 0.92);
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
-    color: var(--text-on-dark);
     display: flex;
     flex-direction: column;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
