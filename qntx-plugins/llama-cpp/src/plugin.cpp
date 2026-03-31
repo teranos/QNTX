@@ -569,7 +569,6 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
         messages.push_back({"user", user_prompt});
     }
 
-    // TODO(SSL): log signal summary for StreamChat (currently only Chat logs it)
     auto result = engine.chat(messages, temperature, max_tokens, plugin_->sampler_config());
 
     resp->set_content(result.content);

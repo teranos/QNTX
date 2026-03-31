@@ -75,7 +75,7 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 
 - **PVH** — Private header dependency. PCA projection in `vocab_projection.cpp` accesses `llama-model.h` (private) to read `tok_embd.weight`. Version-fragile against llama.cpp internal changes.
 
-- **CAM** — 3D camera (WASD + mouse) is implemented but needs testing and refinement — controls feel rough, no inertia, no collision with nebula bounds.
+- **CAM** — Camera is an orthographic external observer. Needs rework to first-person perspective — fly through the particle field with 3D position, perspective projection, and WASD movement relative to facing direction (#748).
 
 - **SIG** — ~~Signal capture overhead.~~ Resolved. Profiling showed the ~55ms/token attributed to signal extraction was actually `ctx->synchronize()` inside `llama_get_logits_ith()` (llama-context.cpp:3079) — waiting for Metal to finish the decode. Signal extraction itself (softmax + partial sort + top-k) adds ~3ms/token. CPU softmax is 1-2ms after the sync completes. This is llama.cpp's Metal decode pipeline — not optimizable from our side.
 
