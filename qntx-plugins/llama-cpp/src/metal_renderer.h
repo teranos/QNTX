@@ -163,5 +163,6 @@ private:
     std::condition_variable render_wake_cv_;
     std::mutex render_wake_mutex_;
     bool render_dirty_ = false;  // new data arrived, need to render
+
 #endif
 };
