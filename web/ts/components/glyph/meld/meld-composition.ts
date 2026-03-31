@@ -14,10 +14,9 @@
 
 import { log, SEG } from '../../../logger';
 import type { Glyph } from '../glyph';
-import type { CompositionEdge } from '../../../state/ui';
-import type { EdgeDirection } from './meldability';
-import { computeGridPositions } from './meldability';
-import { addComposition, removeComposition, extractGlyphIds, findCompositionByGlyph } from '../../../state/compositions';
+import type { CompositionEdge, EdgeDirection } from '@qntx/glyphs';
+import { computeGridPositions, extractGlyphIds, isConnectedGraph } from '@qntx/glyphs';
+import { addComposition, removeComposition, findCompositionByGlyph } from '../../../state/compositions';
 import { clearMeldFeedback } from './meld-feedback';
 import { getTransform } from '../canvas/canvas-pan';
 import { canvasSyncQueue } from '../../../api/canvas-sync';
@@ -372,38 +371,6 @@ export function reconstructMeld(
     });
 
     return composition;
-}
-
-/**
- * Check if remaining node IDs form a connected graph when treating edges as undirected.
- * Used by detachGlyph to decide between partial detach and full unmeld.
- */
-function isConnectedGraph(edges: CompositionEdge[]): boolean {
-    const ids = new Set<string>();
-    const adjacency = new Map<string, Set<string>>();
-    for (const edge of edges) {
-        ids.add(edge.from);
-        ids.add(edge.to);
-        if (!adjacency.has(edge.from)) adjacency.set(edge.from, new Set());
-        if (!adjacency.has(edge.to)) adjacency.set(edge.to, new Set());
-        adjacency.get(edge.from)!.add(edge.to);
-        adjacency.get(edge.to)!.add(edge.from);
-    }
-    if (ids.size === 0) return false;
-
-    const start = ids.values().next().value!;
-    const visited = new Set<string>([start]);
-    const queue = [start];
-    while (queue.length > 0) {
-        const current = queue.shift()!;
-        for (const neighbor of adjacency.get(current) || []) {
-            if (!visited.has(neighbor)) {
-                visited.add(neighbor);
-                queue.push(neighbor);
-            }
-        }
-    }
-    return visited.size === ids.size;
 }
 
 /**
