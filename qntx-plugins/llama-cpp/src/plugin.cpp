@@ -368,19 +368,6 @@ grpc::Status LlamaCppPlugin::HandleHTTP(grpc::ServerContext* ctx,
         return grpc::Status::OK;
     }
 
-    if (req->method() == "GET" && req->path() == "/nebula-module.js") {
-        static const std::string js =
-#include "nebula-module.js.inc"
-        ;
-
-        resp->set_status_code(200);
-        resp->set_body(js);
-        auto* ct = resp->add_headers();
-        ct->set_name("Content-Type");
-        ct->add_values("application/javascript; charset=utf-8");
-        return grpc::Status::OK;
-    }
-
     resp->set_status_code(404);
     resp->set_body("not found");
     return grpc::Status::OK;

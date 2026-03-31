@@ -48,10 +48,10 @@ static void deflate(float* mat, int n, const std::vector<float>& vec) {
     cblas_sger(CblasRowMajor, n, n, -lambda, vec.data(), 1, vec.data(), 1, mat, n);
 }
 
-// Try to load cached positions from <model_path>.vocab3d.
+// Try to load cached positions from <model_path>.poincare3d.
 // Returns true if cache was valid and loaded into vocab_positions_.
 bool InferenceEngine::load_vocab_cache() {
-    std::string cache_path = model_path_ + ".vocab3d";
+    std::string cache_path = model_path_ + ".poincare3d";
     std::ifstream f(cache_path, std::ios::binary | std::ios::ate);
     if (!f.is_open()) return false;
 
@@ -81,7 +81,7 @@ bool InferenceEngine::load_vocab_cache() {
 }
 
 void InferenceEngine::write_vocab_cache() {
-    std::string cache_path = model_path_ + ".vocab3d";
+    std::string cache_path = model_path_ + ".poincare3d";
     std::ofstream f(cache_path, std::ios::binary | std::ios::trunc);
     if (!f.is_open()) {
         std::cout << "[llama-cpp] Failed to write cache: " << cache_path << std::endl;
@@ -159,14 +159,55 @@ void InferenceEngine::compute_vocab_positions() {
         proj[j * 3 + 2] = pcs[2][j];
     }
 
-    // positions = X * proj  (n_vocab × 3)
+    // positions = X * proj  (n_vocab × 3)  — Euclidean PCA coordinates
     vocab_positions_.resize(n_vocab * 3);
     cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
                 n_vocab, 3, d,
                 1.0f, X.data(), d, proj.data(), 3,
                 0.0f, vocab_positions_.data(), 3);
 
-    std::cout << "[llama-cpp] Vocab positions computed (" << n_vocab << " × 3)" << std::endl;
+    // --- Poincaré ball projection ---
+    // Map PCA coordinates into the Poincaré ball via the exponential map at
+    // the origin: exp_0(v) = tanh(||v|| / 2) * v / ||v||
+    //
+    // This gives the embedding hyperbolic geometry: common tokens cluster at
+    // the center, rare/specialized tokens spread toward the boundary. Distance
+    // grows exponentially near the edge, revealing fine structure among outliers.
+    //
+    // We scale so the median token lands at ~0.6 radius, leaving room for
+    // outliers to differentiate near the boundary without bunching at the edge.
+
+    // Compute norms of PCA projections
+    std::vector<float> norms(n_vocab);
+    for (int i = 0; i < n_vocab; i++) {
+        float x = vocab_positions_[i*3];
+        float y = vocab_positions_[i*3+1];
+        float z = vocab_positions_[i*3+2];
+        norms[i] = sqrtf(x*x + y*y + z*z);
+    }
+
+    // Find median norm for scaling
+    std::vector<float> sorted_norms = norms;
+    std::sort(sorted_norms.begin(), sorted_norms.end());
+    float median_norm = sorted_norms[n_vocab / 2];
+    if (median_norm < 1e-8f) median_norm = 1.0f;
+
+    // Scale so median maps to radius 0.6: tanh(alpha * median / 2) = 0.6
+    // alpha = 2 * atanh(0.6) / median ≈ 1.386 / median
+    float alpha = 2.0f * atanhf(0.6f) / median_norm;
+
+    for (int i = 0; i < n_vocab; i++) {
+        float norm = norms[i];
+        if (norm < 1e-8f) continue;
+        float r = tanhf(alpha * norm / 2.0f);  // radius in Poincaré ball [0, 1)
+        float scale = r / norm;
+        vocab_positions_[i*3]   *= scale;
+        vocab_positions_[i*3+1] *= scale;
+        vocab_positions_[i*3+2] *= scale;
+    }
+
+    std::cout << "[llama-cpp] Poincaré ball projection: median_norm=" << median_norm
+              << " alpha=" << alpha << " (" << n_vocab << " tokens)" << std::endl;
 
     write_vocab_cache();
 }
