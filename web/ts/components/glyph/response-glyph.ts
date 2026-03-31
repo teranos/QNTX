@@ -604,7 +604,6 @@ export function createResponseGlyph(
     let nebulaNavActive = false;
     const camStep = 0.02;
     const camRotStep = 0.03;
-    const camZoomStep = 0.1;
     const keyMap: Record<string, string> = {
         w: `cam:0,${camStep},1,0,0`,
         s: `cam:0,${-camStep},1,0,0`,
