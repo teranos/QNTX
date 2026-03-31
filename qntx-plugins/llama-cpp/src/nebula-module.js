@@ -35,6 +35,9 @@ export const render = async (glyph, ui) => {
 
     content.style.position = 'relative';
 
+    // Projection mode state — initialized before status polling references it
+    let currentProjection = 'pca';
+
     // Status label (bottom-left) — shows version + PCA readiness
     const statusLabel = document.createElement('div');
     statusLabel.style.cssText = 'position:absolute;bottom:4px;left:8px;font:10px monospace;color:rgba(255,255,255,0.3);';
@@ -53,8 +56,10 @@ export const render = async (glyph, ui) => {
                 pcaReady = true;
                 if (s.projection && s.projection !== currentProjection) {
                     currentProjection = s.projection;
-                    projBtn.textContent = s.projection.toUpperCase();
-                    projBtn.style.color = s.projection === 'hyp' ? '#8cf' : '#c84';
+                    if (typeof projBtn !== 'undefined') {
+                        projBtn.textContent = s.projection.toUpperCase();
+                        projBtn.style.color = s.projection === 'hyp' ? '#8cf' : '#c84';
+                    }
                 }
                 if (s.activity) {
                     statusLabel.textContent = s.activity;
@@ -183,7 +188,6 @@ export const render = async (glyph, ui) => {
     addSlider('particle size', 'particle_scale', 0.1, 5, 0.1, 1);
 
     // Projection mode toggle: PCA ↔ HYP (Poincaré ball)
-    let currentProjection = 'pca';
     const projRow = document.createElement('div');
     projRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin:6px 0 2px;';
     const projLabel = document.createElement('span');
