@@ -15,7 +15,22 @@ Extracting from `web/ts/components/glyph/` into this standalone package. The goa
 - [x] **Step 3: Manifestations + tray** — window, canvas, panel, run.ts (tray), standalone window drag
 - [x] **Step 4: Wire QNTX** — `configureGlyphs()` at startup with logger, persistence, stripHtml
 
-### Follow-up
+### Interaction extraction
+
+The package currently has morph, tray, and manifestations. The next series moves the canvas interaction layer — placement, drag, resize, meld, compositions — into the package so any host can have a fully interactive glyph canvas.
+
+- [ ] `CTYPE` — Composition types: `CompositionEdge`, `CompositionState` as package-native types
+- [ ] `EWALK` — Generic edge walker: takes edges + glyph ID, walks the DAG, returns focus/navigation graph
+- [ ] `GRDLP` — Grid layout from edges: `computeGridPositions` and layout application, pure geometry
+- [ ] `CPLCD` — Canvas-placed: `canvasPlaced()` factory, `applyCanvasGlyphLayout`, positioning logic
+- [ ] `DRAGR` — Canvas drag/resize: `makeDraggable`, `makeResizable`, z-index stacking
+- [ ] `MELDT` — Meld detection: proximity-based meld triggering during drag
+- [ ] `MELDF` — Meld feedback: visual indicators (glow, snap) during meld approach
+- [ ] `MELDX` — Meld execution: `performMeld`, `extendComposition`, `unmeldComposition`, `detachGlyph`
+- [ ] `GLYUI` — `createGlyphUI` + SDK primitives (glyph, input, button, statusLine) into package
+- [ ] `DSDMO` — Design system demo: mini-canvas with real drag-to-meld, compositions from edge data
+
+### Cleanup
 
 - `REXP` — Eliminate re-exports: move imports in web/ to point directly at `@qntx/glyphs`
 - `TEST` — Move tests to live with the package code, not in web/
