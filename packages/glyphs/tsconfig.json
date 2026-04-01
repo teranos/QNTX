@@ -26,6 +26,7 @@
     "run.ts",
     "composition.ts",
     "edge-graph.ts",
-    "glyph-ui.ts"
+    "glyph-ui.ts",
+    "manifestations/focus.ts"
   ]
 }
