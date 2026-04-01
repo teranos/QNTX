@@ -47,7 +47,14 @@ export interface Glyph {
 
     // Glyph content: source code, markdown, template, or JSON result
     content?: string;
+
+    // Visual identity — every manifestation (dot, window, panel) reads these
+    color?: string;      // Background color (default: DEFAULT_GLYPH_COLOR)
+    textColor?: string;  // Text color (default: 'rgb(255,255,255)')
 }
+
+export const DEFAULT_GLYPH_COLOR = 'rgba(35, 35, 38, 0.92)';
+export const DEFAULT_GLYPH_TEXT_COLOR = 'rgb(255,255,255)';
 
 // Function to check if user prefers reduced motion
 function getPrefersReducedMotion(): boolean {

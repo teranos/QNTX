@@ -15,7 +15,7 @@
     align-items: center;
     gap: 8px;
     padding: 0 8px;
-    background-color: rgba(41, 43, 43, 0.90);
+    background-color: transparent;
     border-bottom: 1px solid var(--border);
     border-radius: 4px 4px 0 0;
     height: 32px;

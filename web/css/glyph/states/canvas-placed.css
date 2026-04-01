@@ -11,7 +11,7 @@
     position: absolute;
     display: flex;
     flex-direction: column;
-    background-color: var(--bg-secondary);
+    background-color: transparent;
     outline: calc(1px / var(--canvas-scale, 1)) solid rgba(220, 222, 221, var(--glyph-border-opacity, 0.4));
     border-radius: 4px;
     overflow: hidden;

@@ -145,7 +145,6 @@ export function morphCanvasPlacedToWindow(
         element.style.height = `${targetH}px`;
         element.style.borderRadius = WINDOW_BORDER_RADIUS;
         element.style.boxShadow = WINDOW_BOX_SHADOW;
-        element.style.backgroundColor = 'var(--bg-almost-black)';
         element.style.display = 'flex';
         element.style.flexDirection = 'column';
         element.style.overflow = 'hidden';

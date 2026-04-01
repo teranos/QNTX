@@ -9,7 +9,7 @@
  */
 
 import { getLogger, getLogSegment } from '../config';
-import type { Glyph } from '../glyph';
+import { type Glyph, DEFAULT_GLYPH_COLOR, DEFAULT_GLYPH_TEXT_COLOR } from '../glyph';
 import { addWindowControls } from './title-bar-controls';
 import { stashContent } from './stash';
 import { renderGlyphContent } from './render-content';
@@ -80,11 +80,12 @@ export function morphToWindow(
         glyphElement.style.width = `${windowWidth}px`;
         glyphElement.style.height = `${windowHeight}px`;
         glyphElement.style.borderRadius = WINDOW_BORDER_RADIUS;
-        glyphElement.style.backgroundColor = 'var(--bg-almost-black)';
+        glyphElement.style.backgroundColor = glyph.color ?? DEFAULT_GLYPH_COLOR;
+        glyphElement.style.backdropFilter = 'blur(2px)';
         glyphElement.style.boxShadow = WINDOW_BOX_SHADOW;
         glyphElement.style.padding = '0';
         glyphElement.style.opacity = '1';
-        glyphElement.style.color = 'var(--text-on-dark)';
+        glyphElement.style.color = glyph.textColor ?? DEFAULT_GLYPH_TEXT_COLOR;
 
         // Set up window as flex container
         glyphElement.style.display = 'flex';
