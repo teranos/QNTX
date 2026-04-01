@@ -49,7 +49,7 @@ export interface Glyph {
     content?: string;
 
     // Visual identity — every manifestation (dot, window, panel) reads these
-    color?: string;      // Background color (default: 'rgb(26,26,26)')
+    color?: string;      // Background color (default: DEFAULT_GLYPH_COLOR)
     textColor?: string;  // Text color (default: 'rgb(255,255,255)')
 }
 
