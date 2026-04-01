@@ -473,6 +473,103 @@ describe('Touch Browse', () => {
     });
 });
 
+describe('Tray Identity', () => {
+    if (!USE_JSDOM) {
+        test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
+        return;
+    }
+
+    beforeEach(() => {
+        document.body.innerHTML = '';
+        (glyphRun as any).element = null;
+        (glyphRun as any).indicatorContainer = null;
+        (glyphRun as any).items.clear();
+        (glyphRun as any).glyphElements.clear();
+        (glyphRun as any).deferredItems = [];
+    });
+
+    test('Tim clicks a tray item and gets that item, not a different one', () => {
+        glyphRun.init();
+
+        const glyphA: Glyph = { id: 'glyph-a', title: 'Alpha', renderContent: () => document.createElement('div') };
+        const glyphB: Glyph = { id: 'glyph-b', title: 'Beta', renderContent: () => document.createElement('div') };
+        const glyphC: Glyph = { id: 'glyph-c', title: 'Gamma', renderContent: () => document.createElement('div') };
+
+        glyphRun.add(glyphA);
+        glyphRun.add(glyphB);
+        glyphRun.add(glyphC);
+
+        const dots = document.querySelectorAll('.glyph-run-glyph') as NodeListOf<HTMLElement>;
+        expect(dots.length).toBe(3);
+
+        // Each dot's identity matches its glyph — DOM order matches registration order
+        expect(dots[0].dataset.glyphId).toBe('glyph-a');
+        expect(dots[1].dataset.glyphId).toBe('glyph-b');
+        expect(dots[2].dataset.glyphId).toBe('glyph-c');
+
+        // The items map has the correct glyph for each ID
+        const items = (glyphRun as any).items as Map<string, Glyph>;
+        expect(items.get('glyph-a')!.title).toBe('Alpha');
+        expect(items.get('glyph-b')!.title).toBe('Beta');
+        expect(items.get('glyph-c')!.title).toBe('Gamma');
+
+        // Click the second dot — isRestoring flag proves morphGlyph was called for this element
+        dots[1].click();
+        expect((glyphRun as any).isRestoring).toBe(true);
+    });
+
+    test('Tim adds glyphs out of order via adopt — tray labels still match', () => {
+        glyphRun.init();
+
+        const glyphA: Glyph = { id: 'glyph-a', title: 'Alpha', renderContent: () => document.createElement('div') };
+        const glyphB: Glyph = { id: 'glyph-b', title: 'Beta', renderContent: () => document.createElement('div') };
+
+        glyphRun.add(glyphA);
+
+        // Adopt an existing element (simulates canvas-placed glyph minimized to tray)
+        const adoptedEl = document.createElement('div');
+        glyphRun.adopt(adoptedEl, glyphB);
+
+        // Both dots exist
+        const dots = document.querySelectorAll('.glyph-run-glyph') as NodeListOf<HTMLElement>;
+        expect(dots.length).toBe(2);
+
+        // Each dot's data-glyph-id matches its item
+        expect(dots[0].dataset.glyphId).toBe('glyph-a');
+        expect(dots[1].dataset.glyphId).toBe('glyph-b');
+    });
+
+    test('Tim: system glyph is not overwritten by persistence restore', () => {
+        glyphRun.init();
+
+        let systemRenderCalled = false;
+        const systemGlyph: Glyph = {
+            id: 'llm-provider',
+            title: 'LLM Provider',
+            renderContent: () => { systemRenderCalled = true; return document.createElement('div'); },
+        };
+
+        // System glyph registers first
+        glyphRun.add(systemGlyph);
+
+        // Persistence restore tries to add a glyph with the same ID
+        const imposterGlyph: Glyph = {
+            id: 'llm-provider',
+            title: 'Result',
+            renderContent: () => document.createElement('div'),
+        };
+        glyphRun.add(imposterGlyph);
+
+        // Only one element exists
+        const dots = document.querySelectorAll('[data-glyph-id="llm-provider"]');
+        expect(dots.length).toBe(1);
+
+        // The stored item is the system glyph, not the imposter
+        const storedItem = (glyphRun as any).items.get('llm-provider');
+        expect(storedItem.title).toBe('LLM Provider');
+    });
+});
+
 describe('Glyph State Transitions', () => {
     if (!USE_JSDOM) {
         test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
