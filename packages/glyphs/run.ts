@@ -30,7 +30,7 @@
 
 import { getLogger, getLogSegment, getPersistence } from './config';
 import { GlyphProximity } from './proximity';
-import { type Glyph, getMaximizeDuration } from './glyph';
+import { type Glyph, getMaximizeDuration, DEFAULT_GLYPH_COLOR } from './glyph';
 import { isInWindowState, setGlyphId } from './dataset';
 import { morphToWindow } from './manifestations/window';
 import { morphToCanvas } from './manifestations/canvas';
@@ -82,6 +82,7 @@ class GlyphRunImpl {
         // CREATE THE ELEMENT - ONCE AND ONLY ONCE
         const glyph = document.createElement('div');
         glyph.className = 'glyph-run-glyph';
+        glyph.style.backgroundColor = item.color ?? DEFAULT_GLYPH_COLOR;
         setGlyphId(glyph, item.id);
 
         // Track this element
@@ -436,6 +437,7 @@ class GlyphRunImpl {
 
         // Ensure tray-dot state
         element.className = 'glyph-run-glyph';
+        element.style.backgroundColor = item.color ?? DEFAULT_GLYPH_COLOR;
         setGlyphId(element, item.id);
 
         // Attach click handler

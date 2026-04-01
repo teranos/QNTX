@@ -139,6 +139,9 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
     runButton.className = 'titlebar-btn';
     runButton.title = 'Run JavaScript code';
 
+    // Orange tint — local-only glyph (ts-glyph always runs in-browser)
+    if (!glyph.color) glyph.color = 'rgba(61, 45, 20, 0.92)';
+
     const ui = createGlyphUI(glyph, 'ts');
     const { element, content } = ui.glyph({
         defaults: { x: 200, y: 200, width: 400, height: calculatedHeight },
@@ -149,10 +152,7 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
     element.style.minWidth = '200px';
     element.style.minHeight = '120px';
     element.style.zIndex = '1';
-
-    // Orange = local-only glyph (ts-glyph always runs in-browser)
     element.dataset.localActive = 'true';
-    element.style.backgroundColor = 'rgba(61, 45, 20, 0.92)';
 
 
     // Execute JavaScript on click

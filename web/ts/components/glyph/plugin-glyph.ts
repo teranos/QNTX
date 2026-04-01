@@ -210,8 +210,6 @@ export function createPluginPlaceholderGlyph(
         logLabel: 'PluginPlaceholder',
     });
 
-    // Muted styling (not alarming red)
-    element.style.backgroundColor = 'rgba(30, 30, 35, 0.92)';
     element.style.border = '1px solid var(--border)';
     element.style.pointerEvents = 'auto'; // Allow dragging
 
