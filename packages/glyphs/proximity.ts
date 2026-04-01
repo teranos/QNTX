@@ -154,7 +154,6 @@ export class GlyphProximity {
             const baselineBoost = maxProximityRaw > this.BASELINE_BOOST_TRIGGER ? this.BASELINE_BOOST_AMOUNT : 0;
 
             glyphs.forEach((glyph) => {
-                // Look up item by the element's own ID — not by array index
                 const glyphId = glyph.dataset.glyphId ?? '';
                 const item = items.get(glyphId);
 

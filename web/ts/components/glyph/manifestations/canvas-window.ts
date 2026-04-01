@@ -271,7 +271,7 @@ function minimizeCanvasWindowToTray(
     // 2. Tear down window drag
     teardownWindowDrag(element);
 
-    // 3. Find tray target position (specific dot, not tray center)
+    // 3. Find tray target position
     const trayTarget = calculateTrayTarget(element.dataset.glyphId);
 
     // 4. Animate toward tray

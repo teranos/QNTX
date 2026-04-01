@@ -73,7 +73,6 @@ export function calculateTrayTarget(glyphId?: string): { x: number; y: number } 
         return { x: window.innerWidth - 50, y: window.innerHeight / 2 };
     }
 
-    // Target the specific dot if it exists in the tray
     if (glyphId) {
         const dot = trayElement.querySelector(`[data-glyph-id="${glyphId}"]`);
         if (dot) {
@@ -85,7 +84,6 @@ export function calculateTrayTarget(glyphId?: string): { x: number; y: number } 
         }
     }
 
-    // Target the end of the tray (below last dot)
     const indicators = trayElement.querySelector('.glyph-run-indicators');
     const lastDot = indicators?.lastElementChild;
     if (lastDot) {
