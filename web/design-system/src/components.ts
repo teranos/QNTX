@@ -12,6 +12,7 @@
 
 import { createGlyphUI } from '../../ts/components/glyph/glyph-ui'
 import type { Glyph } from '@qntx/glyphs'
+import { renderCanvasDemo } from './canvas-demo'
 
 interface ButtonSpec {
   label: string
@@ -126,6 +127,11 @@ export function renderComponentGallery(root: HTMLElement) {
   canvas.appendChild(ts.element)
 
   section.appendChild(canvas)
+
+  // ── Canvas (focus manifestation) ──
+  for (const el of renderCanvasDemo(sectionGlyph, glyphSection)) {
+    section.appendChild(el)
+  }
 
   // ── Internal Systems ──
   section.appendChild(sectionGlyph('Internal Systems', 'Used by QNTX core — not exposed to plugins'))
