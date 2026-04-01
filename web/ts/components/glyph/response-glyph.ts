@@ -682,16 +682,16 @@ export function createResponseGlyph(
     const camStep = 0.02;
     const camRotStep = 0.03;
     const bindings: {key: string; display: string; cmd: string; label: string}[] = [
-        { key: 'w',          display: 'W',  cmd: `cam:0,${camStep},1,0,0`,       label: 'forward' },
-        { key: 's',          display: 'S',  cmd: `cam:0,${-camStep},1,0,0`,      label: 'backward' },
-        { key: 'a',          display: 'A',  cmd: `cam:${-camStep},0,1,0,0`,      label: 'strafe left' },
-        { key: 'd',          display: 'D',  cmd: `cam:${camStep},0,1,0,0`,       label: 'strafe right' },
-        { key: 'ArrowUp',    display: '\u2191', cmd: `cam:0,0,1,0,${-camRotStep}`,   label: 'look up' },
-        { key: 'ArrowDown',  display: '\u2193', cmd: `cam:0,0,1,0,${camRotStep}`,    label: 'look down' },
-        { key: 'ArrowLeft',  display: '\u2190', cmd: `cam:0,0,1,${-camRotStep},0`,   label: 'look left' },
-        { key: 'ArrowRight', display: '\u2192', cmd: `cam:0,0,1,${camRotStep},0`,    label: 'look right' },
-        { key: 'q',          display: 'Q',  cmd: `cam:0,0,0.9,0,0`,              label: 'ascend' },
-        { key: 'e',          display: 'E',  cmd: `cam:0,0,1.1,0,0`,              label: 'descend' },
+        { key: 'w',          display: 'W',  cmd: `cam:0,0,${1 - camStep},0,0`,   label: 'forward' },
+        { key: 's',          display: 'S',  cmd: `cam:0,0,${1 + camStep},0,0`,   label: 'backward' },
+        { key: 'a',          display: 'A',  cmd: `cam:${camStep},0,1,0,0`,       label: 'strafe left' },
+        { key: 'd',          display: 'D',  cmd: `cam:${-camStep},0,1,0,0`,      label: 'strafe right' },
+        { key: 'ArrowUp',    display: '\u2191', cmd: `cam:0,0,1,0,${camRotStep}`,    label: 'look up' },
+        { key: 'ArrowDown',  display: '\u2193', cmd: `cam:0,0,1,0,${-camRotStep}`,   label: 'look down' },
+        { key: 'ArrowLeft',  display: '\u2190', cmd: `cam:0,0,1,${camRotStep},0`,    label: 'look left' },
+        { key: 'ArrowRight', display: '\u2192', cmd: `cam:0,0,1,${-camRotStep},0`,   label: 'look right' },
+        { key: 'q',          display: 'Q',  cmd: `cam:0,${camStep},1,0,0`,       label: 'ascend' },
+        { key: 'e',          display: 'E',  cmd: `cam:0,${-camStep},1,0,0`,      label: 'descend' },
         { key: 'r',          display: 'R',  cmd: 'cam:r',                        label: 'reset camera' },
     ];
     const keyMap: Record<string, string> = {};
