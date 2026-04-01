@@ -22,7 +22,7 @@ The package currently has morph, tray, and manifestations. The next series moves
 - [x] `CTYPE` — Composition types: `CompositionEdge`, `CompositionState` as package-native types
 - [x] `EWALK` — Generic edge walker: takes edges + glyph ID, walks the DAG, returns focus/navigation graph
 - [x] `GRDLP` — Grid layout from edges: `computeGridPositions` and layout application, pure geometry
-- [ ] `TYPS` — Extract pure type definitions (`GlyphUI`, `RenderFn`, `GlyphDef`, etc.) from web/ into package — no logic, just interfaces
+- [x] `TYPS` — Extract pure type definitions (`GlyphUI`, `RenderFn`, `GlyphDef`, etc.) from web/ into package — no logic, just interfaces
 - [ ] `JSRP` — First JSR publish: `jsr.json`, self-contained package, `@qntx/glyphs` on jsr.io
 - [ ] `CPLCD` — Canvas-placed: `canvasPlaced()` factory, `applyCanvasGlyphLayout`, positioning logic
 - [ ] `DRAGR` — Canvas drag/resize: `makeDraggable`, `makeResizable`, z-index stacking
@@ -65,6 +65,10 @@ configureGlyphs({
 ```
 
 Without configuration, safe defaults apply: no-op logger, no-op persistence, DOMParser-based HTML stripping.
+
+## Publishing
+
+Published to [JSR](https://jsr.io/@qntx/glyphs) via GitHub Actions. To release: bump `version` in `jsr.json` and merge to main. The workflow runs on any change to `packages/glyphs/` but JSR skips versions that already exist.
 
 ## The one law
 

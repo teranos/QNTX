@@ -2,6 +2,5 @@
   "name": "@qntx/glyphs",
   "version": "0.1.0",
   "description": "Glyph runtime — tray, proximity engine, morph transactions, manifestations",
-  "types": "index.ts",
-  "private": true
+  "types": "index.ts"
 }
