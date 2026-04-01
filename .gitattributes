@@ -3,3 +3,6 @@ web/site/** linguist-generated=true
 
 # Generated Rust types - collapse in GitHub PR diffs
 types/generated/rust/** linguist-generated=true
+
+# Generated WASM glue
+web/wasm/qntx_wasm.js linguist-generated=true
