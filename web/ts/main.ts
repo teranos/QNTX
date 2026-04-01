@@ -260,13 +260,20 @@ async function init(): Promise<void> {
     // This ensures the run is ready to receive glyphs
     glyphRun.init();
 
-    // Restore minimized glyphs to the tray from persisted state.
-    // Glyph data stays in canvas state (not removed on minimize) so we can
-    // reconstruct tray entries from content on page load.
+    // Register default system glyphs FIRST — they define their own renderContent.
+    // Must happen before persistence restore so system glyph IDs are already
+    // claimed and won't be overwritten by the generic result-glyph reconstruction.
+    registerDefaultGlyphs();
+
+    // Restore minimized result glyphs to the tray from persisted state.
+    // System glyphs (already registered above) are skipped by glyphRun.add's
+    // duplicate check. Only result glyphs need reconstruction from stored content.
     const minimizedIds = uiState.getMinimizedWindows();
     if (minimizedIds.length > 0) {
         const canvasGlyphs = uiState.getCanvasGlyphs();
         for (const id of minimizedIds) {
+            if (glyphRun.has(id)) continue; // System glyph — already registered
+
             const glyph = canvasGlyphs.find(g => g.id === id);
             if (!glyph || !glyph.content) {
                 log.warn(SEG.GLYPH, `[Init] Minimized glyph ${id} has no stored content, skipping tray restore`);
@@ -295,9 +302,6 @@ async function init(): Promise<void> {
             }
         }
     }
-
-    // Register default system glyphs
-    registerDefaultGlyphs();
 
     // Load plugin glyphs (blocking — canvas needs plugin types registered before restoring glyphs)
     try {

@@ -267,25 +267,29 @@ class GlyphRunImpl {
         const glyphs = Array.from(
             this.indicatorContainer.querySelectorAll('.glyph-run-glyph')
         ) as HTMLElement[];
-        const itemsArray = Array.from(this.items.values());
 
         let bestProximity = 0;
-        let bestIndex = -1;
+        let bestElement: HTMLElement | null = null;
 
-        glyphs.forEach((glyph, index) => {
+        glyphs.forEach((glyph) => {
             const { proximityRaw } = this.proximity.calculateProximity(glyph);
             if (proximityRaw > bestProximity) {
                 bestProximity = proximityRaw;
-                bestIndex = index;
+                bestElement = glyph;
             }
         });
 
         // Require meaningful proximity — don't open if thumb was far from any glyph
-        if (bestIndex < 0 || bestProximity < 0.3 || bestIndex >= itemsArray.length) {
+        if (!bestElement || bestProximity < 0.3) {
             return null;
         }
 
-        return { element: glyphs[bestIndex], item: itemsArray[bestIndex] };
+        // Look up item by the element's own ID
+        const glyphId = (bestElement as HTMLElement).dataset.glyphId ?? '';
+        const item = this.items.get(glyphId);
+        if (!item) return null;
+
+        return { element: bestElement, item };
     }
 
     /**
