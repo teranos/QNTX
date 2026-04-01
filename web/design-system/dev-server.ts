@@ -54,6 +54,14 @@ watch(join(import.meta.dir, '../css/tokens.css'), () => {
   buildTimeout = setTimeout(build, 300)
 })
 
+// Watch packages/glyphs for focus manifestation changes
+watch(join(import.meta.dir, '../../packages/glyphs'), { recursive: true }, (_event, filename) => {
+  if (!filename) return
+  console.log(`Changed (glyphs pkg): ${filename}`)
+  if (buildTimeout) clearTimeout(buildTimeout)
+  buildTimeout = setTimeout(build, 300)
+})
+
 await build()
 
 const server = Bun.serve({
