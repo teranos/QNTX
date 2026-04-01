@@ -8,6 +8,8 @@
  * Defaults are safe no-ops so the package works standalone.
  */
 
+import type { CompositionState } from './composition';
+
 export interface GlyphLogger {
     debug(segment: string, message: string): void;
     info(segment: string, message: string): void;
@@ -24,11 +26,37 @@ export interface GlyphPersistence {
     removeMinimizedGlyph(id: string): void;
 }
 
+/** Glyph position and dimensions on a canvas. */
+export interface CanvasGlyphData {
+    id: string;
+    symbol: string;
+    x: number;
+    y: number;
+    width?: number;
+    height?: number;
+    content?: string;
+    canvas_id?: string;
+}
+
+/** Host-provided canvas state — persistence, transform, selection, sync. */
+export interface CanvasHost {
+    saveCanvasGlyph(glyph: CanvasGlyphData): void;
+    getCanvasGlyphs(canvasId?: string): CanvasGlyphData[];
+    getTransform(canvasId: string): { panX: number; panY: number; scale: number };
+    getSelectedGlyphIds(canvasId: string): string[];
+    isGlyphSelected(canvasId: string, glyphId: string): boolean;
+    saveComposition(composition: CompositionState): void;
+    removeComposition(id: string): void;
+    findCompositionByGlyph(glyphId: string): CompositionState | null;
+    flushSync(): void;
+}
+
 export interface GlyphConfig {
     logger?: GlyphLogger;
     logSegment?: string;
     persistence?: GlyphPersistence;
     stripHtml?: (html: string) => string;
+    canvas?: CanvasHost;
 }
 
 // Default no-op logger
@@ -46,6 +74,19 @@ const noopPersistence: GlyphPersistence = {
     removeMinimizedGlyph() {},
 };
 
+// Default no-op canvas host
+const noopCanvasHost: CanvasHost = {
+    saveCanvasGlyph() {},
+    getCanvasGlyphs: () => [],
+    getTransform: () => ({ panX: 0, panY: 0, scale: 1 }),
+    getSelectedGlyphIds: () => [],
+    isGlyphSelected: () => false,
+    saveComposition() {},
+    removeComposition() {},
+    findCompositionByGlyph: () => null,
+    flushSync() {},
+};
+
 // Default stripHtml using DOMParser (works in any browser)
 function defaultStripHtml(html: string): string {
     const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -58,6 +99,7 @@ let config = {
     logSegment: 'GLYPH',
     persistence: noopPersistence,
     stripHtml: defaultStripHtml,
+    canvas: noopCanvasHost,
 };
 
 /**
@@ -69,6 +111,7 @@ export function configureGlyphs(opts: GlyphConfig): void {
     if (opts.logSegment) config.logSegment = opts.logSegment;
     if (opts.persistence) config.persistence = opts.persistence;
     if (opts.stripHtml) config.stripHtml = opts.stripHtml;
+    if (opts.canvas) config.canvas = opts.canvas;
 }
 
 /** Get the active logger */
@@ -84,6 +127,11 @@ export function getLogSegment(): string {
 /** Get the active persistence layer */
 export function getPersistence(): GlyphPersistence {
     return config.persistence;
+}
+
+/** Get the active canvas host */
+export function getCanvasHost(): CanvasHost {
+    return config.canvas;
 }
 
 /** Strip HTML tags from a string */

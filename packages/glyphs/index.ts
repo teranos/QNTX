@@ -14,8 +14,8 @@
  */
 
 // Configuration / dependency injection
-export { configureGlyphs, stripHtml, getLogger, getLogSegment, getPersistence } from './config';
-export type { GlyphConfig, GlyphLogger, GlyphPersistence } from './config';
+export { configureGlyphs, stripHtml, getLogger, getLogSegment, getPersistence, getCanvasHost } from './config';
+export type { GlyphConfig, GlyphLogger, GlyphPersistence, CanvasGlyphData, CanvasHost } from './config';
 
 // Glyph primitive — interface + constants
 export {
