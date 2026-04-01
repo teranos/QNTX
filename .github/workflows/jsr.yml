@@ -1,0 +1,19 @@
+name: Publish @qntx/glyphs to JSR
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/glyphs/**'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: npx jsr publish
+        working-directory: packages/glyphs
