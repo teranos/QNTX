@@ -101,14 +101,8 @@ function findBestAnchorInComposition(
 
 // ── Options ─────────────────────────────────────────────────────────
 
-export interface MakeDraggableOptions {
-    /** When true the drag is cancelled if the mousedown target is a <button>. */
-    ignoreButtons?: boolean;
-    /** Label used in log messages, e.g. "PyGlyph". */
-    logLabel?: string;
-    /** The prompt glyph object (if this is a prompt being made draggable) */
-    promptGlyph?: Glyph;
-}
+import type { MakeDraggableOptions } from '@qntx/glyphs';
+export type { MakeDraggableOptions } from '@qntx/glyphs';
 
 export interface MakeResizableOptions {
     /** Label used in log messages, e.g. "PyGlyph". */

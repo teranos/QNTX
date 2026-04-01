@@ -677,4 +677,4 @@ class GlyphRunImpl {
 }
 
 // Singleton instance
-export const glyphRun = new GlyphRunImpl();
+export const glyphRun: GlyphRunImpl = new GlyphRunImpl();

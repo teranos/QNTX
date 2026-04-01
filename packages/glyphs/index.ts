@@ -114,7 +114,7 @@ export {
     computeGridPositions,
 } from './edge-graph';
 
-// GlyphUI interface and related types (still in web/ for now, re-exported for plugin authoring)
+// GlyphUI interface and related types
 export type {
     GlyphUI,
     GlyphModule,
@@ -124,4 +124,5 @@ export type {
     FetchOpts,
     MeldEvent,
     SpawnResultDetail,
-} from '../../web/ts/components/glyph/glyph-ui';
+    MakeDraggableOptions,
+} from './glyph-ui';
