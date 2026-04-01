@@ -27,7 +27,7 @@ import {
     WINDOW_BOX_SHADOW,
 } from '../glyph';
 import { addWindowControls, removeWindowControls } from './title-bar-controls';
-import { setupWindowDrag, teardownWindowDrag } from '@qntx/glyphs';
+import { setupWindowDrag, teardownWindowDrag, calculateTrayTarget } from '@qntx/glyphs';
 import { stashContent } from './stash';
 
 // ── Default window dimensions ────────────────────────────────────────
@@ -272,17 +272,10 @@ function minimizeCanvasWindowToTray(
     teardownWindowDrag(element);
 
     // 3. Find tray target position
-    const tray = document.querySelector('.glyph-run');
-    let targetX = window.innerWidth - 50;
-    let targetY = window.innerHeight / 2;
-    if (tray) {
-        const trayRect = tray.getBoundingClientRect();
-        targetX = trayRect.right - 20;
-        targetY = trayRect.top + trayRect.height / 2;
-    }
+    const trayTarget = calculateTrayTarget(element.dataset.glyphId);
 
     // 4. Animate toward tray
-    beginMinimizeMorph(element, windowRect, { x: targetX, y: targetY }, getMinimizeDuration())
+    beginMinimizeMorph(element, windowRect, trayTarget, getMinimizeDuration())
         .then(() => {
             // 5. Stash content, clear state, pass element through
             stashContent(element);

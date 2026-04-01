@@ -267,25 +267,28 @@ class GlyphRunImpl {
         const glyphs = Array.from(
             this.indicatorContainer.querySelectorAll('.glyph-run-glyph')
         ) as HTMLElement[];
-        const itemsArray = Array.from(this.items.values());
 
         let bestProximity = 0;
-        let bestIndex = -1;
+        let bestElement: HTMLElement | null = null;
 
-        glyphs.forEach((glyph, index) => {
+        glyphs.forEach((glyph) => {
             const { proximityRaw } = this.proximity.calculateProximity(glyph);
             if (proximityRaw > bestProximity) {
                 bestProximity = proximityRaw;
-                bestIndex = index;
+                bestElement = glyph;
             }
         });
 
         // Require meaningful proximity — don't open if thumb was far from any glyph
-        if (bestIndex < 0 || bestProximity < 0.3 || bestIndex >= itemsArray.length) {
+        if (!bestElement || bestProximity < 0.3) {
             return null;
         }
 
-        return { element: glyphs[bestIndex], item: itemsArray[bestIndex] };
+        const glyphId = (bestElement as HTMLElement).dataset.glyphId ?? '';
+        const item = this.items.get(glyphId);
+        if (!item) return null;
+
+        return { element: bestElement, item };
     }
 
     /**
@@ -521,10 +524,36 @@ class GlyphRunImpl {
     }
 
     /**
-     * Get the tray element position for minimize animation target
+     * Get the target position for minimize animation.
+     * If glyphId is provided, returns that dot's position.
+     * Falls back to the last dot, then the tray center.
      */
-    public getTargetPosition(): { x: number; y: number } | null {
+    public getTargetPosition(glyphId?: string): { x: number; y: number } | null {
         if (!this.element) return null;
+
+        if (glyphId) {
+            const dot = this.glyphElements.get(glyphId);
+            if (dot) {
+                const dotRect = dot.getBoundingClientRect();
+                return {
+                    x: dotRect.left + dotRect.width / 2,
+                    y: dotRect.top + dotRect.height / 2,
+                };
+            }
+        }
+
+        if (this.indicatorContainer) {
+            const lastDot = this.indicatorContainer.lastElementChild as HTMLElement | null;
+            if (lastDot) {
+                const lastRect = lastDot.getBoundingClientRect();
+                return {
+                    x: lastRect.left + lastRect.width / 2,
+                    y: lastRect.bottom + 6,
+                };
+            }
+        }
+
+        // Last resort: tray center
         const rect = this.element.getBoundingClientRect();
         return {
             x: rect.left + rect.width / 2,
