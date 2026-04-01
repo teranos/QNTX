@@ -132,7 +132,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
                 element.style.backgroundColor = 'var(--glyph-status-error-bg)';
                 break;
             default:
-                element.style.backgroundColor = 'var(--bg-secondary)';
+                element.style.backgroundColor = glyph.color ?? '';
         }
 
         if (status.state !== 'idle' && status.message) {

@@ -11,7 +11,7 @@
  *   titleBar?.appendChild(extraButton);    // optional: extend the title bar
  */
 
-import type { Glyph } from '../glyph';
+import { type Glyph, DEFAULT_GLYPH_COLOR, DEFAULT_GLYPH_TEXT_COLOR } from '@qntx/glyphs';
 import {
     applyCanvasGlyphLayout,
     makeDraggable,
@@ -62,6 +62,9 @@ export function canvasPlaced(config: CanvasPlacedConfig): CanvasPlacedResult {
     element.className = `${className} canvas-glyph`;
     element.dataset.glyphId = glyph.id;
     if (glyph.symbol) element.dataset.glyphSymbol = glyph.symbol;
+    element.style.backgroundColor = glyph.color ?? DEFAULT_GLYPH_COLOR;
+    element.style.color = glyph.textColor ?? DEFAULT_GLYPH_TEXT_COLOR;
+    element.style.backdropFilter = 'blur(2px)';
 
     // Layout
     applyCanvasGlyphLayout(element, {

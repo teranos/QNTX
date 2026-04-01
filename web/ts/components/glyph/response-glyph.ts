@@ -457,7 +457,6 @@ export function createResponseGlyph(
         logLabel: 'ResponseGlyph',
     });
     element.style.minHeight = '80px';
-    element.style.backgroundColor = '#050208';
     element.style.borderRadius = '0 0 2px 2px';
     element.style.border = '1px solid var(--border-on-dark)';
     element.style.borderTop = 'none';

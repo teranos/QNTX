@@ -9,7 +9,7 @@
     width: 10px;
     height: 10px;
     border-radius: 0;
-    background: var(--bg-gray);
+    background: transparent;
     border: 1px solid var(--border-on-dark);
     color: var(--text-on-dark);
     font-family: var(--font-mono);
@@ -25,7 +25,7 @@
 }
 
 .glyph-run-glyph:hover {
-    background: color-mix(in srgb, var(--bg-gray) 90%, white 10%);
+    filter: brightness(1.2);
 }
 
 /* Tablet: larger dots for touch browse */

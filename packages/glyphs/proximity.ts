@@ -13,7 +13,7 @@
  * The element persists through: dot → proximity → window → dot
  */
 
-import type { Glyph } from './glyph';
+import { type Glyph, DEFAULT_GLYPH_COLOR } from './glyph';
 import { hasProximityText, setProximityText } from './dataset';
 import { stripHtml } from './config';
 
@@ -196,28 +196,17 @@ export class GlyphProximity {
                 // Interpolate border radius (starts at max, goes to 0 for full item)
                 const borderRadius = this.DOT_BORDER_RADIUS_MAX * (1 - proximity);
 
-                // Interpolate colors using RGB interpolation
-                // Start: --bg-gray (#999 = rgb(153,153,153))
-                // End: --bg-almost-black (#1a1a1a = rgb(26,26,26))
-                const startR = 153, startG = 153, startB = 153;
-                const endR = 26, endG = 26, endB = 26;
-                let r = Math.round(startR + (endR - startR) * proximity);
-                let g = Math.round(startG + (endG - startG) * proximity);
-                let b = Math.round(startB + (endB - startB) * proximity);
-
-                // Brighten on hover (10% lighter)
-                const isHovered = glyph.matches(':hover');
-                if (isHovered) {
-                    r = Math.min(255, Math.round(r + (255 - r) * 0.1));
-                    g = Math.min(255, Math.round(g + (255 - g) * 0.1));
-                    b = Math.min(255, Math.round(b + (255 - b) * 0.1));
-                }
+                // Use the glyph's own color
+                const item = index < itemsArray.length ? itemsArray[index] : undefined;
+                const color = item?.color ?? DEFAULT_GLYPH_COLOR;
 
                 // Apply morphing styles
                 glyph.style.width = `${width}px`;
                 glyph.style.height = `${height}px`;
                 glyph.style.borderRadius = `${borderRadius}px`;
-                glyph.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+                glyph.style.backgroundColor = color;
+                glyph.style.backdropFilter = 'blur(2px)';
+                glyph.style.filter = glyph.matches(':hover') ? 'brightness(1.2)' : '';
 
                 // Show title text when proximity exceeds threshold
                 if (proximity > this.TEXT_FADE_THRESHOLD && index < itemsArray.length) {
