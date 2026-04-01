@@ -673,7 +673,6 @@ export function createResponseGlyph(
     element.style.position = 'relative';
     element.insertBefore(nebulaCanvas, element.firstChild);
     element.appendChild(nebulaStatus);
-    element.appendChild(helpOverlay);
     nebulaRo.observe(element);
 
     // Camera controls — active only when a token is selected.
@@ -728,6 +727,7 @@ export function createResponseGlyph(
         helpLine.appendChild(document.createTextNode(' toggle this help'));
         helpOverlay.appendChild(helpLine);
     }
+    element.appendChild(helpOverlay);
 
     let unlockFn: (() => void) | null = null;
 
