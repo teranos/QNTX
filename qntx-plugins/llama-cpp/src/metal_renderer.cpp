@@ -219,6 +219,7 @@ void MetalRenderer::teardown() {
     if (ghost_pipeline_) { ghost_pipeline_->release(); ghost_pipeline_ = nullptr; }
     if (prob_a_) { prob_a_->release(); prob_a_ = nullptr; }
     if (prob_b_) { prob_b_->release(); prob_b_ = nullptr; }
+    if (colors_buffer_) { colors_buffer_->release(); colors_buffer_ = nullptr; }
     if (positions_buffer_) { positions_buffer_->release(); positions_buffer_ = nullptr; }
     if (trail_pipeline_) { trail_pipeline_->release(); trail_pipeline_ = nullptr; }
     if (lerp_pipeline_) { lerp_pipeline_->release(); lerp_pipeline_ = nullptr; }
@@ -237,22 +238,41 @@ std::string MetalRenderer::device_name() const {
     return device_->name()->utf8String();
 }
 
-void MetalRenderer::set_vocab_positions(const float* positions, int vocab_size) {
+void MetalRenderer::set_vocab_positions(const float* data, int vocab_size) {
     if (!device_) return;
 
     vocab_size_ = vocab_size;
+
+    // Input is interleaved: 6 floats per token (3 pos + 3 color).
+    // Deinterleave into separate GPU buffers.
+    std::vector<float> pos(vocab_size * 3);
+    std::vector<float> col(vocab_size * 3);
+    for (int i = 0; i < vocab_size; i++) {
+        pos[i*3]   = data[i*6];
+        pos[i*3+1] = data[i*6+1];
+        pos[i*3+2] = data[i*6+2];
+        col[i*3]   = data[i*6+3];
+        col[i*3+1] = data[i*6+4];
+        col[i*3+2] = data[i*6+5];
+    }
+
     if (positions_buffer_) positions_buffer_->release();
-    positions_buffer_ = device_->newBuffer(positions, vocab_size * 3 * sizeof(float),
+    positions_buffer_ = device_->newBuffer(pos.data(), vocab_size * 3 * sizeof(float),
                                            MTL::ResourceStorageModeShared);
+
+    if (colors_buffer_) colors_buffer_->release();
+    colors_buffer_ = device_->newBuffer(col.data(), vocab_size * 3 * sizeof(float),
+                                         MTL::ResourceStorageModeShared);
+
     // Cache pointer for trail lookups (caller must keep data alive)
-    vocab_positions_ptr_ = positions;
+    vocab_positions_ptr_ = data;
 
     // Compute bounding box for auto-fit
     float min_x = INFINITY, max_x = -INFINITY;
     float min_y = INFINITY, max_y = -INFINITY;
     for (int i = 0; i < vocab_size; i++) {
-        float x = positions[i * 3];
-        float y = positions[i * 3 + 1];
+        float x = pos[i * 3];
+        float y = pos[i * 3 + 1];
         if (x < min_x) min_x = x; if (x > max_x) max_x = x;
         if (y < min_y) min_y = y; if (y > max_y) max_y = y;
     }
@@ -261,9 +281,6 @@ void MetalRenderer::set_vocab_positions(const float* positions, int vocab_size) 
     extent_ = std::max(max_x - min_x, max_y - min_y) / 2.0f;
     if (extent_ < 1e-6f) extent_ = 1.0f;
 
-    // Drift step: fixed offset per token so the trail unrolls in space.
-    // 0.15% of extent per token — after ~1300 tokens the trail spans
-    // one full cloud diameter. Subtle enough to stay in the viewport.
     drift_step_ = extent_ * 0.0015f;
 }
 
@@ -296,6 +313,7 @@ std::vector<uint8_t> MetalRenderer::render_nebula(const float* probabilities, in
     compute_enc->setBytes(&vocab_u, sizeof(uint32_t), 3);
     float ps = particle_scale_;
     compute_enc->setBytes(&ps, sizeof(float), 4);
+    compute_enc->setBuffer(colors_buffer_, 0, 5);
 
     NS::UInteger tg_size = std::min(compute_pipeline_->maxTotalThreadsPerThreadgroup(), (NS::UInteger)256);
     compute_enc->dispatchThreads(MTL::Size(n, 1, 1), MTL::Size(tg_size, 1, 1));
@@ -474,9 +492,9 @@ void MetalRenderer::add_trail_point(int token_id) {
     if (!vocab_positions_ptr_ || token_id < 0 || token_id >= vocab_size_) return;
 
     std::lock_guard<std::mutex> lock(trail_mutex_);
-    trail_positions_.push_back(vocab_positions_ptr_[token_id * 3]);
-    trail_positions_.push_back(vocab_positions_ptr_[token_id * 3 + 1]);
-    trail_positions_.push_back(vocab_positions_ptr_[token_id * 3 + 2]);
+    trail_positions_.push_back(vocab_positions_ptr_[token_id * 6]);
+    trail_positions_.push_back(vocab_positions_ptr_[token_id * 6 + 1]);
+    trail_positions_.push_back(vocab_positions_ptr_[token_id * 6 + 2]);
 }
 
 void MetalRenderer::clear_trail() {
@@ -494,17 +512,17 @@ void MetalRenderer::add_ghost_branches(int chosen_token_id,
     int trail_index = (int)(trail_positions_.size() / 3) - 1;
     if (trail_index < 0) return;
 
-    float cx = vocab_positions_ptr_[chosen_token_id * 3];
-    float cy = vocab_positions_ptr_[chosen_token_id * 3 + 1];
-    float cz = vocab_positions_ptr_[chosen_token_id * 3 + 2];
+    float cx = vocab_positions_ptr_[chosen_token_id * 6];
+    float cy = vocab_positions_ptr_[chosen_token_id * 6 + 1];
+    float cz = vocab_positions_ptr_[chosen_token_id * 6 + 2];
     float ti = (float)trail_index;
 
     for (const auto& [runner_id, prob] : runners) {
         if (runner_id < 0 || runner_id >= vocab_size_ || runner_id == chosen_token_id) continue;
 
-        float rx = vocab_positions_ptr_[runner_id * 3];
-        float ry = vocab_positions_ptr_[runner_id * 3 + 1];
-        float rz = vocab_positions_ptr_[runner_id * 3 + 2];
+        float rx = vocab_positions_ptr_[runner_id * 6];
+        float ry = vocab_positions_ptr_[runner_id * 6 + 1];
+        float rz = vocab_positions_ptr_[runner_id * 6 + 2];
 
         // From vertex (chosen position)
         ghost_vertices_.push_back(cx);
@@ -604,6 +622,11 @@ std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) 
         compute_enc->setBytes(&t, sizeof(float), 5);
         float ps = particle_scale_;
         compute_enc->setBytes(&ps, sizeof(float), 6);
+        compute_enc->setBuffer(colors_buffer_, 0, 7);
+        float zero_off[3] = {0, 0, 0};
+        compute_enc->setBytes(zero_off, sizeof(float) * 3, 8);
+        float full_fade = 1.0f;
+        compute_enc->setBytes(&full_fade, sizeof(float), 9);
     }
 
     NS::UInteger tg_size = std::min(lerp_pipeline_->maxTotalThreadsPerThreadgroup(), (NS::UInteger)256);
@@ -754,42 +777,213 @@ void MetalRenderer::start_render_loop(int width, int height) {
             int scrub = scrub_index_.load(std::memory_order_acquire);
 
             if (scrub >= 0) {
-                // Scrub mode — upload the stored keyframe as both A and B,
-                // render via render_lerp (trail shader handles the visual split).
-                std::vector<float> kf;
+                // Multi-cloud scrub: render every keyframe's cloud at its orbit
+                // position, fading with distance from the selected keyframe.
+                int kf_count = 0;
                 {
                     std::lock_guard<std::mutex> lock(dist_mutex_);
-                    if (scrub < (int)keyframe_history_.size()) {
-                        kf = keyframe_history_[scrub];
-                    }
+                    kf_count = (int)keyframe_history_.size();
                 }
-                if (!kf.empty() && is_ready() && positions_buffer_) {
-                    // Temporarily swap distributions to the scrub keyframe
-                    MTL::Buffer* save_a;
-                    MTL::Buffer* save_b;
-                    {
-                        std::lock_guard<std::mutex> lock(dist_mutex_);
-                        save_a = prob_a_;
-                        save_b = prob_b_;
-                        prob_a_ = device_->newBuffer(kf.data(), kf.size() * sizeof(float),
-                                                      MTL::ResourceStorageModeShared);
-                        prob_b_ = device_->newBuffer(kf.data(), kf.size() * sizeof(float),
-                                                      MTL::ResourceStorageModeShared);
-                    }
 
-                    auto png = render_lerp(render_width_, render_height_, 1.0f);
+                if (kf_count > 0 && is_ready() && positions_buffer_ && colors_buffer_) {
+                    int w = render_width_, h = render_height_;
+                    int n = vocab_size_;
+                    float or_ = extent_ * orbit_radius_mult_;
+                    float as = (2.0f * M_PI) / orbit_period_;
 
-                    // Restore distributions
-                    {
-                        std::lock_guard<std::mutex> lock(dist_mutex_);
-                        if (prob_a_) prob_a_->release();
-                        if (prob_b_) prob_b_->release();
-                        prob_a_ = save_a;
-                        prob_b_ = save_b;
-                    }
+                    // HDR render target — shared across all keyframe passes
+                    auto tex_desc = MTL::TextureDescriptor::texture2DDescriptor(
+                        MTL::PixelFormatRGBA16Float, w, h, false);
+                    tex_desc->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
+                    auto hdr_tex = device_->newTexture(tex_desc);
 
-                    if (!png.empty()) {
-                        set_latest_frame(std::move(png), render_width_, render_height_);
+                    if (hdr_tex) {
+                        bool first_pass = true;
+
+                        for (int ki = 0; ki < kf_count; ki++) {
+                            // Distance-based fade: selected = 1.0, fades with distance
+                            int dist = std::abs(ki - scrub);
+                            float fade = expf(-0.0375f * (float)dist);
+                            if (fade < 0.02f) continue;  // skip near-invisible clouds
+
+                            std::vector<float> kf;
+                            {
+                                std::lock_guard<std::mutex> lock(dist_mutex_);
+                                if (ki < (int)keyframe_history_.size())
+                                    kf = keyframe_history_[ki];
+                            }
+                            if (kf.empty()) continue;
+
+                            // Orbit offset for this keyframe
+                            float age = (float)(scrub - ki);
+                            float theta = age * as;
+                            float off[3] = {
+                                or_ * sinf(theta),
+                                -or_ * (1.0f - cosf(theta)),
+                                0.0f
+                            };
+
+                            auto prob_buf = device_->newBuffer(kf.data(), kf.size() * sizeof(float),
+                                                                MTL::ResourceStorageModeShared);
+                            auto particle_buf = device_->newBuffer(n * 48, MTL::ResourceStorageModeShared);
+                            if (!prob_buf || !particle_buf) {
+                                if (prob_buf) prob_buf->release();
+                                if (particle_buf) particle_buf->release();
+                                continue;
+                            }
+
+                            uint32_t vocab_u = (uint32_t)n;
+                            float ps = particle_scale_;
+
+                            auto cmd = queue_->commandBuffer();
+                            if (!cmd) { prob_buf->release(); particle_buf->release(); continue; }
+
+                            // Compute pass — generate particles with orbit offset and fade
+                            auto compute_enc = cmd->computeCommandEncoder();
+                            compute_enc->setComputePipelineState(lerp_pipeline_);
+                            compute_enc->setBuffer(prob_buf, 0, 0);   // probA
+                            compute_enc->setBuffer(prob_buf, 0, 1);   // probB (same — no lerp)
+                            compute_enc->setBuffer(positions_buffer_, 0, 2);
+                            compute_enc->setBuffer(particle_buf, 0, 3);
+                            compute_enc->setBytes(&vocab_u, sizeof(uint32_t), 4);
+                            float t_one = 1.0f;
+                            compute_enc->setBytes(&t_one, sizeof(float), 5);
+                            compute_enc->setBytes(&ps, sizeof(float), 6);
+                            compute_enc->setBuffer(colors_buffer_, 0, 7);
+                            compute_enc->setBytes(off, sizeof(float) * 3, 8);
+                            compute_enc->setBytes(&fade, sizeof(float), 9);
+
+                            NS::UInteger tg = std::min(lerp_pipeline_->maxTotalThreadsPerThreadgroup(), (NS::UInteger)256);
+                            compute_enc->dispatchThreads(MTL::Size(n, 1, 1), MTL::Size(tg, 1, 1));
+                            compute_enc->endEncoding();
+
+                            // Render pass — additive into shared HDR texture
+                            auto rp_desc = MTL::RenderPassDescriptor::alloc()->init();
+                            rp_desc->colorAttachments()->object(0)->setTexture(hdr_tex);
+                            if (first_pass) {
+                                rp_desc->colorAttachments()->object(0)->setLoadAction(MTL::LoadActionClear);
+                                rp_desc->colorAttachments()->object(0)->setClearColor(MTL::ClearColor(0.02, 0.01, 0.03, 1.0));
+                                first_pass = false;
+                            } else {
+                                rp_desc->colorAttachments()->object(0)->setLoadAction(MTL::LoadActionLoad);
+                            }
+                            rp_desc->colorAttachments()->object(0)->setStoreAction(MTL::StoreActionStore);
+
+                            auto render_enc = cmd->renderCommandEncoder(rp_desc);
+                            render_enc->setRenderPipelineState(render_pipeline_);
+                            render_enc->setVertexBuffer(particle_buf, 0, 0);
+
+                            float mvp[16];
+                            build_mvp(mvp, w, h);
+                            render_enc->setVertexBytes(mvp, sizeof(mvp), 1);
+
+                            render_enc->drawPrimitives(MTL::PrimitiveTypePoint, (NS::UInteger)0, (NS::UInteger)n);
+
+                            // Draw trail + ghost branches on last pass
+                            if (ki == kf_count - 1 || ki == scrub) {
+                                std::lock_guard<std::mutex> lock(trail_mutex_);
+                                int trail_count = trail_positions_.size() / 3;
+                                uint32_t tc = (uint32_t)trail_count;
+                                int si = scrub;
+                                float or_t = or_;
+                                float as_t = as;
+
+                                if (trail_count >= 2 && trail_pipeline_) {
+                                    auto trail_buf = device_->newBuffer(trail_positions_.data(),
+                                        trail_positions_.size() * sizeof(float), MTL::ResourceStorageModeShared);
+                                    if (trail_buf) {
+                                        render_enc->setRenderPipelineState(trail_pipeline_);
+                                        render_enc->setVertexBuffer(trail_buf, 0, 0);
+                                        render_enc->setVertexBytes(mvp, sizeof(mvp), 1);
+                                        render_enc->setVertexBytes(&tc, sizeof(uint32_t), 2);
+                                        render_enc->setVertexBytes(&si, sizeof(int), 3);
+                                        render_enc->setVertexBytes(&or_t, sizeof(float), 4);
+                                        render_enc->setVertexBytes(&as_t, sizeof(float), 5);
+                                        render_enc->drawPrimitives(MTL::PrimitiveTypeLineStrip,
+                                            (NS::UInteger)0, (NS::UInteger)trail_count);
+                                        trail_buf->release();
+                                    }
+                                }
+
+                                int ghost_vertex_count = ghost_vertices_.size() / 5;
+                                if (ghost_vertex_count >= 2 && ghost_pipeline_) {
+                                    auto ghost_buf = device_->newBuffer(ghost_vertices_.data(),
+                                        ghost_vertices_.size() * sizeof(float), MTL::ResourceStorageModeShared);
+                                    if (ghost_buf) {
+                                        render_enc->setRenderPipelineState(ghost_pipeline_);
+                                        render_enc->setVertexBuffer(ghost_buf, 0, 0);
+                                        render_enc->setVertexBytes(mvp, sizeof(mvp), 1);
+                                        render_enc->setVertexBytes(&tc, sizeof(uint32_t), 2);
+                                        render_enc->setVertexBytes(&si, sizeof(int), 3);
+                                        render_enc->setVertexBytes(&or_t, sizeof(float), 4);
+                                        render_enc->setVertexBytes(&as_t, sizeof(float), 5);
+                                        render_enc->drawPrimitives(MTL::PrimitiveTypeLine,
+                                            (NS::UInteger)0, (NS::UInteger)ghost_vertex_count);
+                                        ghost_buf->release();
+                                    }
+                                }
+                            }
+
+                            render_enc->endEncoding();
+                            cmd->commit();
+                            cmd->waitUntilCompleted();
+
+                            rp_desc->release();
+                            prob_buf->release();
+                            particle_buf->release();
+                        }
+
+                        // Tonemap HDR → LDR PNG
+                        int bpp_hdr = 8;
+                        std::vector<uint16_t> hdr(w * h * 4);
+                        hdr_tex->getBytes(hdr.data(), w * bpp_hdr,
+                                          MTL::Region(0, 0, w, h), 0);
+
+                        std::vector<uint8_t> ldr(w * h * 4);
+                        for (int i = 0; i < w * h; i++) {
+                            float r = float16to32(hdr[i * 4]);
+                            float g = float16to32(hdr[i * 4 + 1]);
+                            float b = float16to32(hdr[i * 4 + 2]);
+                            float tr = powf(r / (1.0f + r), 1.0f / 2.2f);
+                            float tg = powf(g / (1.0f + g), 1.0f / 2.2f);
+                            float tb = powf(b / (1.0f + b), 1.0f / 2.2f);
+                            ldr[i * 4]     = (uint8_t)fminf(fmaxf(tr * 255.0f, 0), 255);
+                            ldr[i * 4 + 1] = (uint8_t)fminf(fmaxf(tg * 255.0f, 0), 255);
+                            ldr[i * 4 + 2] = (uint8_t)fminf(fmaxf(tb * 255.0f, 0), 255);
+                            ldr[i * 4 + 3] = 255;
+                        }
+
+                        auto colorspace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+                        auto cg_ctx = CGBitmapContextCreate(
+                            ldr.data(), w, h, 8, w * 4, colorspace,
+                            kCGImageAlphaPremultipliedLast);
+
+                        std::vector<uint8_t> png_data;
+                        if (cg_ctx) {
+                            auto image = CGBitmapContextCreateImage(cg_ctx);
+                            if (image) {
+                                auto mutable_data = CFDataCreateMutable(nullptr, 0);
+                                auto dest = CGImageDestinationCreateWithData(mutable_data, CFSTR("public.png"), 1, nullptr);
+                                if (dest) {
+                                    CGImageDestinationAddImage(dest, image, nullptr);
+                                    if (CGImageDestinationFinalize(dest)) {
+                                        auto len = CFDataGetLength(mutable_data);
+                                        auto ptr = CFDataGetBytePtr(mutable_data);
+                                        png_data.assign(ptr, ptr + len);
+                                    }
+                                    CFRelease(dest);
+                                }
+                                CFRelease(mutable_data);
+                                CGImageRelease(image);
+                            }
+                            CGContextRelease(cg_ctx);
+                        }
+                        CGColorSpaceRelease(colorspace);
+                        hdr_tex->release();
+
+                        if (!png_data.empty()) {
+                            set_latest_frame(std::move(png_data), w, h);
+                        }
                     }
                 }
                 was_idle = false;

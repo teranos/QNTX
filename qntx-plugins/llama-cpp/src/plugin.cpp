@@ -124,10 +124,10 @@ grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
     if (engine_.is_loaded() && renderer_->is_ready()) {
         const auto& pos = engine_.vocab_positions_3d();
         if (!pos.empty()) {
-            renderer_->set_vocab_positions(pos.data(), pos.size() / 3);
+            renderer_->set_vocab_positions(pos.data(), pos.size() / 6);
             renderer_->start_render_loop(800, 600);
-            std::cout << "[metal-llama] Loaded " << pos.size() / 3
-                      << " vocab positions into renderer, render loop started" << std::endl;
+            std::cout << "[metal-llama] Loaded " << pos.size() / 6
+                      << " vocab positions+colors into renderer, render loop started" << std::endl;
         }
     }
     pca_ready_.store(true, std::memory_order_release);
@@ -285,7 +285,7 @@ grpc::Status LlamaCppPlugin::HandleHTTP(grpc::ServerContext* ctx,
         if (engine_.is_loaded()) {
             const auto& pos = engine_.vocab_positions_3d();
             if (!pos.empty()) {
-                renderer_->set_vocab_positions(pos.data(), pos.size() / 3);
+                renderer_->set_vocab_positions(pos.data(), pos.size() / 6);
             }
         }
 

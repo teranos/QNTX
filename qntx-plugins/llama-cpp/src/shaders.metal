@@ -21,22 +21,21 @@ kernel void particleCompute(
     device Particle* particles        [[buffer(2)]],
     constant uint& vocabSize          [[buffer(3)]],
     constant float& particleScale     [[buffer(4)]],
+    device const float* colors        [[buffer(5)]],
     uint id [[thread_position_in_grid]]
 ) {
     if (id >= vocabSize) return;
 
     float prob = probabilities[id];
     float3 pos = float3(positions[id * 3], positions[id * 3 + 1], positions[id * 3 + 2]);
+    float3 baseColor = float3(colors[id * 3], colors[id * 3 + 1], colors[id * 3 + 2]);
 
     float threshold = 1e-5;
     float visible = step(threshold, prob);
     float logProb = visible * saturate((log2(prob + 1e-10) + 20.0) / 20.0);
 
-    float3 lo = float3(0.15, 0.05, 0.0);
-    float3 mid = float3(0.9, 0.5, 0.05);
-    float3 hi = float3(1.0, 0.95, 0.85);
-    float3 rgb = mix(lo, mid, saturate(logProb * 2.0));
-    rgb = mix(rgb, hi, saturate(logProb * 2.0 - 1.0));
+    // Base color from PCA 4-6, boosted for visibility. Probability drives brightness.
+    float3 rgb = baseColor * (0.4 + logProb * 1.6);
 
     Particle p;
     p.position = pos;
@@ -54,27 +53,29 @@ kernel void particleComputeLerp(
     constant uint& vocabSize          [[buffer(4)]],
     constant float& t                 [[buffer(5)]],
     constant float& particleScale     [[buffer(6)]],
+    device const float* colors        [[buffer(7)]],
+    constant float3& posOffset        [[buffer(8)]],
+    constant float& fadeMul           [[buffer(9)]],
     uint id [[thread_position_in_grid]]
 ) {
     if (id >= vocabSize) return;
 
     float prob = mix(probA[id], probB[id], t);
     float3 pos = float3(positions[id * 3], positions[id * 3 + 1], positions[id * 3 + 2]);
+    pos += posOffset;
+    float3 baseColor = float3(colors[id * 3], colors[id * 3 + 1], colors[id * 3 + 2]);
 
     float threshold = 1e-5;
     float visible = step(threshold, prob);
     float logProb = visible * saturate((log2(prob + 1e-10) + 20.0) / 20.0);
 
-    float3 lo = float3(0.15, 0.05, 0.0);
-    float3 mid = float3(0.9, 0.5, 0.05);
-    float3 hi = float3(1.0, 0.95, 0.85);
-    float3 rgb = mix(lo, mid, saturate(logProb * 2.0));
-    rgb = mix(rgb, hi, saturate(logProb * 2.0 - 1.0));
+    // Base color from PCA 4-6, boosted for visibility. Probability drives brightness.
+    float3 rgb = baseColor * (0.4 + logProb * 1.6);
 
     Particle p;
     p.position = pos;
-    p.color = float4(rgb * visible, logProb * visible);
-    p.size = visible * (2.0 + logProb * 12.0) * particleScale;
+    p.color = float4(rgb * visible * fadeMul, logProb * visible * fadeMul);
+    p.size = visible * (2.0 + logProb * 12.0) * particleScale * fadeMul;
 
     particles[id] = p;
 }
