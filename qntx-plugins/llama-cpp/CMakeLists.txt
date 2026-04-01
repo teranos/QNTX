@@ -23,13 +23,19 @@ include(FetchContent)
 
 # GLM — header-only math library for camera/projection math.
 # GLM_FORCE_DEPTH_ZERO_TO_ONE matches Metal's [0,1] depth range.
-FetchContent_Declare(
-    glm
-    GIT_REPOSITORY https://github.com/g-truc/glm.git
-    GIT_TAG        1.0.1
-    GIT_SHALLOW    TRUE
-)
-FetchContent_MakeAvailable(glm)
+# Vendored in Nix builds (no git available); FetchContent for local dev.
+if(EXISTS "${CMAKE_SOURCE_DIR}/vendor/glm/glm/glm.hpp")
+    set(GLM_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/vendor/glm")
+else()
+    FetchContent_Declare(
+        glm
+        GIT_REPOSITORY https://github.com/g-truc/glm.git
+        GIT_TAG        1.0.1
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(glm)
+    set(GLM_INCLUDE_DIR "${glm_SOURCE_DIR}")
+endif()
 
 if(EXISTS "${CMAKE_SOURCE_DIR}/vendor/llama.cpp/CMakeLists.txt")
     set(LLAMA_SOURCE_DIR "${CMAKE_SOURCE_DIR}/vendor/llama.cpp")
@@ -123,7 +129,7 @@ target_include_directories(qntx-llama-cpp-plugin PRIVATE
     ${LLAMA_SOURCE_DIR}/src
     ${LLAMA_SOURCE_DIR}/ggml/include
     ${MUPDF_INCLUDE_DIR}
-    ${glm_SOURCE_DIR}
+    ${GLM_INCLUDE_DIR}
 )
 target_compile_definitions(qntx-llama-cpp-plugin PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
