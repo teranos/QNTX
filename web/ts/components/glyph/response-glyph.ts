@@ -9,7 +9,7 @@
  * Replaces the former stream-glyph.ts and result-glyph.ts.
  *
  * Token hover popup showing sampler stage data — see token-popup.ts
- * TODO(ECM): Factor entropy and top_gap into color mapping, not just confidence.
+ * ECM: Entropy drives hue (orange→purple), confidence drives alpha. Data-driven.
  * DIM(#749): Token labels dim based on nebula brightness behind them when a token is selected.
  * TODO(CLR/#750): Use embedding dimensions (PCA 4-6) to drive particle hue — semantic color.
  */
@@ -122,18 +122,25 @@ function renderStatsLine(container: HTMLElement, stats: GenerationStats): void {
     container.appendChild(el);
 }
 
-// ── Confidence → Color ──────────────────────────────────────────────
+// ── Signal → Color ──────────────────────────────────────────────────
 
 /**
- * Map confidence (0–1) to a CSS background-color.
- * High confidence (>0.9): transparent. Low (<0.4): amber glow.
+ * Map confidence + entropy to a CSS background-color.
+ * Alpha: confidence drives visibility (low confidence = more opaque).
+ * Hue: entropy drives color (low entropy = orange "close race",
+ *       high entropy = purple "lost in noise").
  */
-export function confidenceToColor(confidence: number): string {
+export function signalToColor(confidence: number, entropy: number): string {
     const c = Math.max(0, Math.min(1, confidence));
     const alpha = Math.min(0.55, (1 - c) * 0.65);
     if (alpha < 0.02) return 'transparent';
-    return `hsla(30, 100%, 50%, ${alpha.toFixed(3)})`;
+    // Below P50 (1.67): orange. Above: shift toward red→magenta.
+    // Entropy 3.0+ reaches full magenta — the "lost in noise" tokens.
+    const ent = Math.max(0, Math.min(1, (entropy - 1.67) / 1.5));
+    const hue = 30 - ent * 110;
+    return `hsla(${hue.toFixed(0)}, 100%, 50%, ${alpha.toFixed(3)})`;
 }
+
 
 interface StreamInstance {
     output: HTMLElement;
@@ -143,11 +150,12 @@ interface StreamInstance {
 
 const instances = new Set<StreamInstance>();
 
-type ColorMode = 'confidence' | 'sampler';
-let colorMode: ColorMode = 'sampler';
+type ColorMode = 'confidence' | 'sampler' | 'none';
+let colorMode: ColorMode = 'confidence';
 
 export function toggleColorMode(): ColorMode {
-    colorMode = colorMode === 'confidence' ? 'sampler' : 'confidence';
+    const cycle: ColorMode[] = ['confidence', 'sampler', 'none'];
+    colorMode = cycle[(cycle.indexOf(colorMode) + 1) % cycle.length];
     for (const inst of instances) {
         if (inst.visible) renderSpans(inst);
     }
@@ -182,12 +190,12 @@ const visibilityObserver: IntersectionObserver | null =
 // ── Token rendering ─────────────────────────────────────────────────
 
 function tokenColor(token: StreamToken, mode: ColorMode): string {
-    if (!token.signal) return 'transparent';
+    if (!token.signal || mode === 'none') return 'transparent';
     if (mode === 'sampler' && token.signal.sampler_stages) {
         const color = samplerInfluenceColor(token.signal.sampler_stages as SamplerStageSignal[]);
         if (color !== 'transparent') return color;
     }
-    return confidenceToColor(token.signal.confidence);
+    return signalToColor(token.signal.confidence, token.signal.entropy);
 }
 
 function renderToken(token: StreamToken, tokenIndex: number, mode: ColorMode): HTMLSpanElement {
@@ -320,13 +328,16 @@ export function createResponseGlyph(
     }
 
     // Color toggle — visible when tokens are present
-    const colorBtn = headerBtn('◐', 'Toggle coloring: confidence / sampler influence');
+    const colorBtn = headerBtn('◐', 'Coloring: signal');
     colorBtn.style.display = 'none';
     colorBtn.addEventListener('click', () => {
         const mode = toggleColorMode();
-        colorBtn.title = mode === 'confidence'
-            ? 'Coloring: confidence (click for sampler)'
-            : 'Coloring: sampler influence (click for confidence)';
+        const labels: Record<ColorMode, string> = {
+            confidence: 'Coloring: signal',
+            sampler: 'Coloring: sampler influence',
+            none: 'Coloring: off',
+        };
+        colorBtn.title = labels[mode];
     });
     buttonContainer.appendChild(colorBtn);
 
