@@ -23,7 +23,7 @@ The package currently has morph, tray, and manifestations. The next series moves
 - [x] `EWALK` — Generic edge walker: takes edges + glyph ID, walks the DAG, returns focus/navigation graph
 - [x] `GRDLP` — Grid layout from edges: `computeGridPositions` and layout application, pure geometry
 - [x] `TYPS` — Extract pure type definitions (`GlyphUI`, `RenderFn`, `GlyphDef`, etc.) from web/ into package — no logic, just interfaces
-- [ ] `JSRP` — First JSR publish: `jsr.json`, self-contained package, `@qntx/glyphs` on jsr.io
+- [x] `JSRP` — First JSR publish: `jsr.json`, self-contained package, `@qntx/glyphs` on jsr.io
 - [ ] `CPLCD` — Canvas-placed: `canvasPlaced()` factory, `applyCanvasGlyphLayout`, positioning logic
 - [ ] `DRAGR` — Canvas drag/resize: `makeDraggable`, `makeResizable`, z-index stacking
 - [ ] `MELDT` — Meld detection: proximity-based meld triggering during drag
