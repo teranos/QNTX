@@ -14,9 +14,13 @@ import { MAX_VIEWPORT_HEIGHT_RATIO } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
-import { storeCleanup } from './glyph-interaction';
+import { storeCleanup, preventDrag } from './glyph-interaction';
 import { tooltip } from '../tooltip';
 import { canvasPlaced } from './manifestations/canvas-placed';
+import { morphCanvasPlacedToWindow, placeWindowOnCanvas } from './manifestations/canvas-window';
+import { isInWindowState } from './dataset';
+import { glyphRun } from './run';
+import { Prose } from '@generated/sym.js';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { history, undo, redo } from 'prosemirror-history';
@@ -24,6 +28,28 @@ import { keymap } from 'prosemirror-keymap';
 import { baseKeymap } from 'prosemirror-commands';
 import { noteSchema } from '../../prose/note-schema.ts';
 import { noteMarkdownParser, noteMarkdownSerializer } from '../../prose/note-markdown.ts';
+
+// Tear edge clip-path — computed once, reused on restore
+const tearClipPath = (() => {
+    const points: string[] = ['0% 0.5%'];
+    for (let i = 1; i < 100; i++) {
+        const ty = 0.3 + Math.sin(i * 0.5) * 0.15 + (Math.sin(i * 1.3) * 0.1);
+        points.push(`${i}% ${ty}%`);
+    }
+    points.push('100% 0.5%');
+    return `polygon(${points.join(', ')}, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0% 100%)`;
+})();
+
+function applyPostItStyle(element: HTMLElement, glyph: Glyph): void {
+    element.style.backgroundColor = glyph.color ?? '#f5edb8';
+    element.style.color = glyph.textColor ?? '#2a2a2a';
+    element.style.backdropFilter = 'blur(2px)';
+    element.style.border = '1px solid #d4c59a';
+    element.style.borderRadius = '2px';
+    element.style.boxShadow = '2px 2px 8px rgba(0, 0, 0, 0.15)';
+    element.style.cursor = 'move';
+    element.style.clipPath = tearClipPath;
+}
 
 /**
  * Create a note glyph element and populate it
@@ -56,6 +82,10 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
     // Reset inline styles (important when repopulating after conversion)
     element.style.cssText = '';
 
+    // Post-it identity — survives all manifestation transitions
+    if (!glyph.color) glyph.color = '#f5edb8';
+    if (!glyph.textColor) glyph.textColor = '#2a2a2a';
+
     canvasPlaced({
         element,
         glyph,
@@ -66,25 +96,116 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
         logLabel: 'NoteGlyph',
     });
 
-    // Post-it note styling: light beige/yellow background with torn top edge
-    element.style.backgroundColor = '#f5edb8';
-    element.style.border = '1px solid #d4c59a';
-    element.style.borderRadius = '2px';
-    element.style.boxShadow = '2px 2px 8px rgba(0, 0, 0, 0.15)';
-    element.style.cursor = 'move';
+    applyPostItStyle(element, glyph);
 
-    // Torn edge pattern using clip-path (percentage-based, scales with width)
-    // Only tear the top edge, keep sides and bottom straight (except corner cutout)
-    // Subtle tear effect - small amplitude for natural look
-    const tearPoints: string[] = ['0% 0.5%'];
-    for (let i = 1; i < 100; i++) {
-        const ty = 0.3 + Math.sin(i * 0.5) * 0.15 + (Math.sin(i * 1.3) * 0.1);
-        tearPoints.push(`${i}% ${ty}%`);
-    }
-    tearPoints.push('100% 0.5%');
+    // Fold-mark title bar — looks like a crease in the paper, buttons appear on hover
+    const foldBar = document.createElement('div');
+    foldBar.className = 'glyph-title-bar note-fold-bar';
+    foldBar.style.height = '24px';
+    foldBar.style.minHeight = '24px';
+    foldBar.style.padding = '0 4px';
+    foldBar.style.background = 'transparent';
+    foldBar.style.borderBottom = '1px dashed #d4c59a';
+    foldBar.style.borderRadius = '0';
+    foldBar.style.cursor = 'move';
+    foldBar.style.display = 'flex';
+    foldBar.style.alignItems = 'center';
+    foldBar.style.justifyContent = 'flex-end';
+    foldBar.style.gap = '2px';
 
-    // Complete the shape: straight right side, corner cutout at bottom, straight left side
-    element.style.clipPath = `polygon(${tearPoints.join(', ')}, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0% 100%)`;
+    // Expand button — morph to window
+    const expandBtn = document.createElement('button');
+    expandBtn.textContent = '\u2B06'; // ⬆
+    expandBtn.title = 'Expand to window';
+    expandBtn.style.cssText = 'width:20px;height:18px;font-size:11px;padding:0;background:transparent;border:none;color:#8a7a5a;cursor:pointer;opacity:0;transition:opacity 0.15s ease;display:flex;align-items:center;justify-content:center;';
+    preventDrag(expandBtn);
+
+    // Close button
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '\u00D7'; // ×
+    closeBtn.title = 'Close';
+    closeBtn.style.cssText = 'width:16px;height:12px;font-size:11px;padding:0;background:transparent;border:none;color:#8a7a5a;cursor:pointer;opacity:0;transition:opacity 0.15s ease;display:flex;align-items:center;justify-content:center;';
+    preventDrag(closeBtn);
+
+    // Show all buttons on hover — including standard window controls added by morphCanvasPlacedToWindow
+    foldBar.addEventListener('mouseenter', () => {
+        expandBtn.style.opacity = '1';
+        closeBtn.style.opacity = '1';
+        const windowControls = foldBar.querySelector('.glyph-window-controls') as HTMLElement | null;
+        if (windowControls) windowControls.style.opacity = '1';
+    });
+    foldBar.addEventListener('mouseleave', () => {
+        expandBtn.style.opacity = '0';
+        closeBtn.style.opacity = '0';
+        const windowControls = foldBar.querySelector('.glyph-window-controls') as HTMLElement | null;
+        if (windowControls) windowControls.style.opacity = '0';
+    });
+
+    // Expand handler
+    expandBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (isInWindowState(element)) {
+            placeWindowOnCanvas(element, {
+                onRestoreComplete: () => {
+                    applyPostItStyle(element, glyph);
+                    expandBtn.textContent = '\u2B06';
+                    expandBtn.title = 'Expand to window';
+                },
+            });
+            return;
+        }
+
+        const canvas = element.closest('.canvas-workspace') as HTMLElement | null;
+        const canvasId = (canvas?.closest('[data-canvas-id]') as HTMLElement | null)?.dataset?.canvasId ?? 'canvas-workspace';
+        const title = `${Prose} Note`;
+
+        morphCanvasPlacedToWindow(element, {
+            title,
+            canvasId,
+            onClose: () => {
+                element.remove();
+                uiState.removeCanvasGlyph(glyph.id);
+                log.debug(SEG.GLYPH, `[NoteGlyph] Closed from window ${glyph.id}`);
+            },
+            onMinimize: (el: HTMLElement) => {
+                glyphRun.adopt(el, {
+                    id: glyph.id,
+                    title: `${Prose} Note`,
+                    symbol: Prose,
+                    color: glyph.color,
+                    textColor: glyph.textColor,
+                    renderContent: () => {
+                        const content = document.createElement('div');
+                        content.textContent = 'Note (minimized)';
+                        return content;
+                    },
+                    onClose: () => {
+                        log.debug(SEG.GLYPH, `[NoteGlyph] Closed from tray ${glyph.id}`);
+                    },
+                });
+            },
+            onRestoreComplete: () => {
+                expandBtn.textContent = '\u2B06';
+                expandBtn.title = 'Expand to window';
+            },
+        });
+
+        // Hide standard window controls — fold-bar reveals them on hover
+        const windowControls = foldBar.querySelector('.glyph-window-controls') as HTMLElement | null;
+        if (windowControls) windowControls.style.opacity = '0';
+    });
+
+    // Close handler
+    closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        element.remove();
+        uiState.removeCanvasGlyph(glyph.id);
+        log.debug(SEG.GLYPH, `[NoteGlyph] Closed ${glyph.id}`);
+    });
+
+    foldBar.appendChild(expandBtn);
+    foldBar.appendChild(closeBtn);
+    element.appendChild(foldBar);
 
     // Editor container
     const editorContainer = document.createElement('div');
