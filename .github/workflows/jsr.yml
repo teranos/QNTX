@@ -14,6 +14,6 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: npx jsr publish
         working-directory: packages/glyphs
