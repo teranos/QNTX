@@ -25,6 +25,7 @@
     "window-drag.ts",
     "run.ts",
     "composition.ts",
-    "edge-graph.ts"
+    "edge-graph.ts",
+    "glyph-ui.ts"
   ]
 }
