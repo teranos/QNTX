@@ -203,4 +203,11 @@ if(MUPDF_THIRD_LIB)
     target_link_libraries(qntx-llama-cpp-plugin PRIVATE ${MUPDF_THIRD_LIB})
 endif()
 
+# Camera math tests — pure C++, no gRPC/llama deps
+enable_testing()
+add_executable(camera_test tests/camera_test.cpp)
+target_include_directories(camera_test PRIVATE ${GLM_INCLUDE_DIR})
+target_compile_definitions(camera_test PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
+add_test(NAME camera_test COMMAND camera_test)
+
 install(TARGETS qntx-llama-cpp-plugin DESTINATION bin)

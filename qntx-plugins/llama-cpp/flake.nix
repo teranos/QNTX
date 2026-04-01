@@ -27,7 +27,7 @@
           owner = "g-truc";
           repo = "glm";
           rev = "1.0.1";
-          hash = "sha256-GWmYmDITRGhMfEFT0AEfWqPC6ggeHCR0JJl1VEIDPiM=";
+          hash = "sha256-GnGyzNRpzuguc3yYbEFtYLvG+KiCtRAktiN+NvbOICE=";
         };
 
         llama-cpp-plugin = pkgs.stdenv.mkDerivation {
@@ -60,6 +60,11 @@
             "-DCMAKE_BUILD_TYPE=Release"
             "-DPROTO_DIR=${protoSrc}"
           ];
+
+          doCheck = true;
+          checkPhase = ''
+            ctest --output-on-failure
+          '';
         };
       in
       {
