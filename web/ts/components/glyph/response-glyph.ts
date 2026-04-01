@@ -130,12 +130,13 @@ function renderStatsLine(container: HTMLElement, stats: GenerationStats): void {
  * Hue: entropy drives color (low entropy = orange "close race",
  *       high entropy = purple "lost in noise").
  */
-export function signalToColor(confidence: number, entropy: number): string {
+function signalToColor(confidence: number, entropy: number): string {
     const c = Math.max(0, Math.min(1, confidence));
     const alpha = Math.min(0.55, (1 - c) * 0.65);
     if (alpha < 0.02) return 'transparent';
-    // Below P50 (1.67): orange. Above: shift toward red→magenta.
-    // Entropy 3.0+ reaches full magenta — the "lost in noise" tokens.
+    // Calibrated from 13K tokens (ATS attestations, April 2026).
+    // P50 entropy = 1.67, range 1.5 covers up to ~3.2 bits.
+    // May need recalibration for different models or prompt styles.
     const ent = Math.max(0, Math.min(1, (entropy - 1.67) / 1.5));
     const hue = 30 - ent * 110;
     return `hsla(${hue.toFixed(0)}, 100%, 50%, ${alpha.toFixed(3)})`;
