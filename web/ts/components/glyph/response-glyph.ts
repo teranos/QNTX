@@ -141,10 +141,6 @@ export function signalToColor(confidence: number, entropy: number): string {
     return `hsla(${hue.toFixed(0)}, 100%, 50%, ${alpha.toFixed(3)})`;
 }
 
-/** @deprecated Use signalToColor — kept for external callers */
-export function confidenceToColor(confidence: number): string {
-    return signalToColor(confidence, 0);
-}
 
 interface StreamInstance {
     output: HTMLElement;
