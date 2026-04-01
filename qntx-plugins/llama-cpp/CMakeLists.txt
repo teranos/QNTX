@@ -20,6 +20,17 @@ set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
 
 include(FetchContent)
+
+# GLM — header-only math library for camera/projection math.
+# GLM_FORCE_DEPTH_ZERO_TO_ONE matches Metal's [0,1] depth range.
+FetchContent_Declare(
+    glm
+    GIT_REPOSITORY https://github.com/g-truc/glm.git
+    GIT_TAG        1.0.1
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(glm)
+
 if(EXISTS "${CMAKE_SOURCE_DIR}/vendor/llama.cpp/CMakeLists.txt")
     set(LLAMA_SOURCE_DIR "${CMAKE_SOURCE_DIR}/vendor/llama.cpp")
     add_subdirectory(${LLAMA_SOURCE_DIR} llama.cpp)
@@ -112,7 +123,9 @@ target_include_directories(qntx-llama-cpp-plugin PRIVATE
     ${LLAMA_SOURCE_DIR}/src
     ${LLAMA_SOURCE_DIR}/ggml/include
     ${MUPDF_INCLUDE_DIR}
+    ${glm_SOURCE_DIR}
 )
+target_compile_definitions(qntx-llama-cpp-plugin PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
 target_link_libraries(qntx-llama-cpp-plugin PRIVATE
     llama

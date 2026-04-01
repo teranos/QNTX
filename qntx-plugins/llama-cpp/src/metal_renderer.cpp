@@ -282,6 +282,9 @@ void MetalRenderer::set_vocab_positions(const float* data, int vocab_size) {
     if (extent_ < 1e-6f) extent_ = 1.0f;
 
     drift_step_ = extent_ * 0.0015f;
+
+    // Position camera to see the cloud
+    camera_.reset(center_x_, center_y_, extent_);
 }
 
 std::vector<uint8_t> MetalRenderer::render_nebula(const float* probabilities, int vocab_size,
@@ -567,7 +570,7 @@ void MetalRenderer::apply_camera(float dx, float dy, float dz, float dyaw, float
 }
 
 void MetalRenderer::reset_camera() {
-    camera_.reset();
+    camera_.reset(center_x_, center_y_, extent_);
     {
         std::lock_guard<std::mutex> lock(render_wake_mutex_);
         render_dirty_ = true;
@@ -586,6 +589,11 @@ void MetalRenderer::set_param(const std::string& key, float value) {
         orbit_radius_mult_ = std::max(0.5f, value);
     } else if (key == "particle_scale") {
         particle_scale_ = std::max(0.1f, std::min(5.0f, value));
+    } else if (key == "projection") {
+        camera_.mode = (value < 0.5f)
+            ? Camera::Mode::Perspective
+            : Camera::Mode::Orthographic;
+        camera_.reset(center_x_, center_y_, extent_);
     }
     // Wake render loop to reflect the change
     {
@@ -771,8 +779,15 @@ void MetalRenderer::start_render_loop(int width, int height) {
 
     render_thread_ = std::thread([this]() {
         bool was_idle = false;
+        auto last_time = std::chrono::steady_clock::now();
 
         while (render_running_.load()) {
+            // Tick camera interpolation
+            auto now = std::chrono::steady_clock::now();
+            float dt = std::chrono::duration<float>(now - last_time).count();
+            last_time = now;
+            camera_.update(dt);
+
             // Check for scrub mode
             int scrub = scrub_index_.load(std::memory_order_acquire);
 

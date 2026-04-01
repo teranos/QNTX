@@ -694,6 +694,7 @@ export function createResponseGlyph(
         r: 'cam:r',
     };
     let unlockFn: (() => void) | null = null;
+    let perspectiveMode = true;
 
     function onNebulaKey(e: KeyboardEvent): void {
         if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
@@ -703,6 +704,12 @@ export function createResponseGlyph(
             return;
         }
         if (!nebulaNavActive) return;
+        if (e.key === 'p') {
+            e.preventDefault();
+            perspectiveMode = !perspectiveMode;
+            sendNebulaMessage(`param:projection:${perspectiveMode ? 0 : 1}`);
+            return;
+        }
         const cmd = keyMap[e.key];
         if (cmd) {
             e.preventDefault();
