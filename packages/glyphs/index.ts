@@ -112,7 +112,26 @@ export {
     isPortFree,
     isConnectedGraph,
     computeGridPositions,
+    buildFocusGraph,
 } from './edge-graph';
+
+// Focus manifestation — DAG-aware thread layout
+export {
+    focusGlyph,
+    unfocusGlyph,
+    isFocused,
+    getFocusedGlyphId,
+    setupCanvasFocus,
+    resetFocusState,
+} from './manifestations/focus';
+export type {
+    FocusGraph,
+    FocusGraphProvider,
+    ColumnProvider,
+    FocusDeps,
+    FocusPanControl,
+    FocusPersistence,
+} from './manifestations/focus';
 
 // GlyphUI interface and related types
 export type {
