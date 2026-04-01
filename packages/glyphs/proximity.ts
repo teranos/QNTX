@@ -142,7 +142,6 @@ export class GlyphProximity {
             if (!indicatorContainer || isRestoring) return;
 
             const glyphs = Array.from(indicatorContainer.querySelectorAll('.glyph-run-glyph')) as HTMLElement[];
-            const itemsArray = Array.from(items.values());
 
             // First pass: check if any glyph is highly proximate (gives baseline boost to all)
             let maxProximityRaw = 0;
@@ -154,7 +153,10 @@ export class GlyphProximity {
             // Calculate baseline boost when any glyph is nearly fully expanded
             const baselineBoost = maxProximityRaw > this.BASELINE_BOOST_TRIGGER ? this.BASELINE_BOOST_AMOUNT : 0;
 
-            glyphs.forEach((glyph, index) => {
+            glyphs.forEach((glyph) => {
+                const glyphId = glyph.dataset.glyphId ?? '';
+                const item = items.get(glyphId);
+
                 const { proximityRaw, isVerticalApproach } = this.calculateProximity(glyph);
 
                 // Apply different easing based on approach direction
@@ -197,7 +199,6 @@ export class GlyphProximity {
                 const borderRadius = this.DOT_BORDER_RADIUS_MAX * (1 - proximity);
 
                 // Use the glyph's own color
-                const item = index < itemsArray.length ? itemsArray[index] : undefined;
                 const color = item?.color ?? DEFAULT_GLYPH_COLOR;
 
                 // Apply morphing styles
@@ -209,8 +210,7 @@ export class GlyphProximity {
                 glyph.style.filter = glyph.matches(':hover') ? 'brightness(1.2)' : '';
 
                 // Show title text when proximity exceeds threshold
-                if (proximity > this.TEXT_FADE_THRESHOLD && index < itemsArray.length) {
-                    const item = itemsArray[index];
+                if (proximity > this.TEXT_FADE_THRESHOLD && item) {
                     const title = stripHtml(item.title);
 
                     // Add text content if not already present

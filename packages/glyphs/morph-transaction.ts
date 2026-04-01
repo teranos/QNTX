@@ -79,7 +79,9 @@ export function beginMinimizeMorph(
     toPosition: { x: number; y: number },
     duration: number
 ): Promise<void> {
-    // Define the morph keyframes
+    const computedStyle = window.getComputedStyle(element);
+    const bgColor = computedStyle.backgroundColor;
+
     const keyframes: Keyframe[] = [
         // From: Window state
         {
@@ -88,7 +90,7 @@ export function beginMinimizeMorph(
             width: `${fromRect.width}px`,
             height: `${fromRect.height}px`,
             borderRadius: '8px',
-            backgroundColor: 'var(--bg-primary)',
+            backgroundColor: bgColor,
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
             opacity: '1'
         },
@@ -99,7 +101,7 @@ export function beginMinimizeMorph(
             width: '8px',
             height: '8px',
             borderRadius: '2px',
-            backgroundColor: 'var(--bg-gray)',
+            backgroundColor: bgColor,
             boxShadow: 'none',
             opacity: '1'
         }
@@ -121,7 +123,8 @@ export function beginMaximizeMorph(
     // Capture current computed styles (may be proximity-expanded)
     const computedStyle = window.getComputedStyle(element);
 
-    // Define the morph keyframes
+    const bgColor = computedStyle.backgroundColor;
+
     const keyframes: Keyframe[] = [
         // From: Dot/proximity-expanded state
         {
@@ -130,7 +133,7 @@ export function beginMaximizeMorph(
             width: `${fromRect.width}px`,
             height: `${fromRect.height}px`,
             borderRadius: computedStyle.borderRadius,
-            backgroundColor: computedStyle.backgroundColor,
+            backgroundColor: bgColor,
             boxShadow: 'none',
             opacity: computedStyle.opacity
         },
@@ -141,7 +144,7 @@ export function beginMaximizeMorph(
             width: `${toPosition.width}px`,
             height: `${toPosition.height}px`,
             borderRadius: '8px',
-            backgroundColor: 'var(--bg-primary)',
+            backgroundColor: bgColor,
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
             opacity: '1'
         }
@@ -161,6 +164,9 @@ export function beginRestoreMorph(
     toRect: { x: number; y: number; width: number; height: number },
     duration: number
 ): Promise<void> {
+    const computedStyle = window.getComputedStyle(element);
+    const bgColor = computedStyle.backgroundColor;
+
     const keyframes: Keyframe[] = [
         // From: Fullscreen state
         {
@@ -169,7 +175,7 @@ export function beginRestoreMorph(
             width: `${fromRect.width}px`,
             height: `${fromRect.height}px`,
             borderRadius: '0',
-            backgroundColor: 'var(--bg-primary)',
+            backgroundColor: bgColor,
             boxShadow: 'none',
             opacity: '1'
         },
@@ -180,7 +186,7 @@ export function beginRestoreMorph(
             width: `${toRect.width}px`,
             height: `${toRect.height}px`,
             borderRadius: '8px',
-            backgroundColor: 'var(--bg-secondary)',
+            backgroundColor: bgColor,
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
             opacity: '1'
         }

@@ -64,20 +64,40 @@ export function prepareMorphTo(
 
 /**
  * Calculate the target position for minimizing to the glyph tray.
- * Returns the right edge of the tray, centered vertically.
+ * If glyphId is provided, targets that dot's position.
+ * Otherwise targets the end of the tray (where new dots append).
  */
-export function calculateTrayTarget(): { x: number; y: number } {
+export function calculateTrayTarget(glyphId?: string): { x: number; y: number } {
     const trayElement = document.querySelector('.glyph-run');
-    if (trayElement) {
-        const trayRect = trayElement.getBoundingClientRect();
+    if (!trayElement) {
+        return { x: window.innerWidth - 50, y: window.innerHeight / 2 };
+    }
+
+    if (glyphId) {
+        const dot = trayElement.querySelector(`[data-glyph-id="${glyphId}"]`);
+        if (dot) {
+            const dotRect = dot.getBoundingClientRect();
+            return {
+                x: dotRect.left + dotRect.width / 2,
+                y: dotRect.top + dotRect.height / 2,
+            };
+        }
+    }
+
+    const indicators = trayElement.querySelector('.glyph-run-indicators');
+    const lastDot = indicators?.lastElementChild;
+    if (lastDot) {
+        const lastRect = lastDot.getBoundingClientRect();
         return {
-            x: trayRect.right - 20,
-            y: trayRect.top + trayRect.height / 2,
+            x: lastRect.left + lastRect.width / 2,
+            y: lastRect.bottom + 6,
         };
     }
+
+    const trayRect = trayElement.getBoundingClientRect();
     return {
-        x: window.innerWidth - 50,
-        y: window.innerHeight / 2,
+        x: trayRect.right - 20,
+        y: trayRect.top + trayRect.height / 2,
     };
 }
 

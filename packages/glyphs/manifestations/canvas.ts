@@ -125,7 +125,7 @@ export function morphFromCanvas(
     canvasElement.innerHTML = '';
     canvasElement.textContent = '';
 
-    const trayTarget = calculateTrayTarget();
+    const trayTarget = calculateTrayTarget(glyph.id);
 
     beginMinimizeMorph(canvasElement, currentRect, trayTarget, getMinimizeDuration())
         .then(() => {

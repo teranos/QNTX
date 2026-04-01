@@ -280,7 +280,7 @@ export function morphFromPanel(
     // Stash content (strips window controls, preserves glyph identity off-DOM)
     stashContent(panelElement);
 
-    const trayTarget = calculateTrayTarget();
+    const trayTarget = calculateTrayTarget(glyph.id);
 
     beginMinimizeMorph(panelElement, currentRect, trayTarget, getMinimizeDuration())
         .then(() => {
