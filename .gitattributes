@@ -4,5 +4,6 @@ web/site/** linguist-generated=true
 # Generated Rust types - collapse in GitHub PR diffs
 types/generated/rust/** linguist-generated=true
 
-# Generated WASM glue
+# Generated WASM glue and bundled plugin modules
 web/wasm/qntx_wasm.js linguist-generated=true
+qntx-plugins/pty-glyph/web/pty-glyph-module.js linguist-generated=true
