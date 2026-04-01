@@ -525,10 +525,38 @@ class GlyphRunImpl {
     }
 
     /**
-     * Get the tray element position for minimize animation target
+     * Get the target position for minimize animation.
+     * If glyphId is provided, returns that dot's position.
+     * Falls back to the last dot, then the tray center.
      */
-    public getTargetPosition(): { x: number; y: number } | null {
+    public getTargetPosition(glyphId?: string): { x: number; y: number } | null {
         if (!this.element) return null;
+
+        // Try to find the specific dot for this glyph
+        if (glyphId) {
+            const dot = this.glyphElements.get(glyphId);
+            if (dot) {
+                const dotRect = dot.getBoundingClientRect();
+                return {
+                    x: dotRect.left + dotRect.width / 2,
+                    y: dotRect.top + dotRect.height / 2,
+                };
+            }
+        }
+
+        // Fall back to last dot in tray (where new glyphs append)
+        if (this.indicatorContainer) {
+            const lastDot = this.indicatorContainer.lastElementChild as HTMLElement | null;
+            if (lastDot) {
+                const lastRect = lastDot.getBoundingClientRect();
+                return {
+                    x: lastRect.left + lastRect.width / 2,
+                    y: lastRect.bottom + 6,
+                };
+            }
+        }
+
+        // Last resort: tray center
         const rect = this.element.getBoundingClientRect();
         return {
             x: rect.left + rect.width / 2,
