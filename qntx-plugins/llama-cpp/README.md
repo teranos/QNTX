@@ -75,7 +75,11 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 
 - **PVH** — Private header dependency. PCA projection in `vocab_projection.cpp` accesses `llama-model.h` (private) to read `tok_embd.weight`. Version-fragile against llama.cpp internal changes.
 
-- **CAM** — Camera is an orthographic external observer. Needs rework to first-person perspective — fly through the particle field with 3D position, perspective projection, and WASD movement relative to facing direction (#748).
+- **CAM** — ~~Orthographic external observer.~~ First-person perspective camera with GLM. WASD moves relative to facing direction, arrows rotate, QE ascend/descend. Smooth interpolation for future token tracking. Data-driven key bindings with `?` help overlay (#748).
+
+- **PIK** — No token identification on hover. Mouse over a particle and nothing happens — you can't tell which token it represents. Needs a GPU pick buffer (render token IDs to an offscreen R32Uint texture, read back pixel under cursor) and a WebSocket round-trip to resolve token ID to text.
+
+- **NAV** — No keyboard navigation in logit space. Should be able to step through generation steps (`,`/`.`) and cycle through top-k candidates at each step (`[`/`]`), with the camera flying smoothly to the focused particle. Requires target tracking in the camera and a focus_token concept in the renderer.
 
 - **SIG** — ~~Signal capture overhead.~~ Resolved. Profiling showed the ~55ms/token attributed to signal extraction was actually `ctx->synchronize()` inside `llama_get_logits_ith()` (llama-context.cpp:3079) — waiting for Metal to finish the decode. Signal extraction itself (softmax + partial sort + top-k) adds ~3ms/token. CPU softmax is 1-2ms after the sync completes. This is llama.cpp's Metal decode pipeline — not optimizable from our side.
 
