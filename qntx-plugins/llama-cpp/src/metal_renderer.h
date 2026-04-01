@@ -117,6 +117,7 @@ private:
     MTL::RenderPipelineState* render_pipeline_ = nullptr;
     MTL::RenderPipelineState* trail_pipeline_ = nullptr;
     MTL::Buffer* positions_buffer_ = nullptr;
+    MTL::Buffer* colors_buffer_ = nullptr;  // per-token RGB from PCA 4-6
     int vocab_size_ = 0;
     float center_x_ = 0, center_y_ = 0, extent_ = 1.0f;
 

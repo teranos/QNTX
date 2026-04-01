@@ -14,7 +14,7 @@
 #include "llm.grpc.pb.h"
 #include "ats_client.h"
 
-#define PLUGIN_VERSION "0.26.0"
+#define PLUGIN_VERSION "0.27.0"
 
 // Forward declarations
 struct llama_model;
@@ -128,8 +128,9 @@ public:
 
     std::string model_name() const { return model_name_; }
 
-    // Get vocab token positions projected to 3D via PCA.
-    // Computed once at model load, cached. Returns vocab_size × 3 floats.
+    // Get vocab token positions (3D) and colors (RGB) via PCA.
+    // Computed once at model load, cached. Returns vocab_size × 6 floats
+    // (3 Poincaré position + 3 normalized color from PCA components 4-6).
     const std::vector<float>& vocab_positions_3d();
 
 private:
@@ -144,7 +145,7 @@ private:
     std::string model_name_;
     bool backend_initialized_ = false;
     std::mutex mutex_;
-    std::vector<float> vocab_positions_;  // cached 3D positions (n_vocab × 3)
+    std::vector<float> vocab_positions_;  // cached positions+colors (n_vocab × 6: 3 pos + 3 color)
 };
 
 // DomainPluginService implementation
