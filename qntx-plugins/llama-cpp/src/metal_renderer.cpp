@@ -589,11 +589,6 @@ void MetalRenderer::set_param(const std::string& key, float value) {
         orbit_radius_mult_ = std::max(0.5f, value);
     } else if (key == "particle_scale") {
         particle_scale_ = std::max(0.1f, std::min(5.0f, value));
-    } else if (key == "projection") {
-        camera_.mode = (value < 0.5f)
-            ? Camera::Mode::Perspective
-            : Camera::Mode::Orthographic;
-        camera_.reset(center_x_, center_y_, extent_);
     }
     // Wake render loop to reflect the change
     {
