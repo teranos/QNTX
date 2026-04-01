@@ -48,30 +48,29 @@ static void deflate(float* mat, int n, const std::vector<float>& vec) {
     cblas_sger(CblasRowMajor, n, n, -lambda, vec.data(), 1, vec.data(), 1, mat, n);
 }
 
-// Try to load cached positions from <model_path>.poincare3d.
-// Returns true if cache was valid and loaded into vocab_positions_.
+// Load cached positions+colors from <model_path>.poincare6d.
+// Layout: n_vocab × 6 floats (3 position + 3 color).
 bool InferenceEngine::load_vocab_cache() {
-    std::string cache_path = model_path_ + ".poincare3d";
+    std::string cache_path = model_path_ + ".poincare6d";
     std::ifstream f(cache_path, std::ios::binary | std::ios::ate);
     if (!f.is_open()) return false;
 
     auto file_size = f.tellg();
     f.seekg(0);
 
-    // File must contain exactly n_vocab × 3 floats
     if (!model_) return false;
     struct ggml_tensor* tok_embd = model_->tok_embd;
     if (!tok_embd) return false;
     int n_vocab = tok_embd->ne[1];
 
-    size_t expected = static_cast<size_t>(n_vocab) * 3 * sizeof(float);
+    size_t expected = static_cast<size_t>(n_vocab) * 6 * sizeof(float);
     if (static_cast<size_t>(file_size) != expected) {
         std::cout << "[llama-cpp] Cache size mismatch: " << file_size
                   << " bytes, expected " << expected << " for n_vocab=" << n_vocab << std::endl;
         return false;
     }
 
-    vocab_positions_.resize(n_vocab * 3);
+    vocab_positions_.resize(n_vocab * 6);
     f.read(reinterpret_cast<char*>(vocab_positions_.data()), expected);
     if (!f.good()) {
         vocab_positions_.clear();
@@ -81,7 +80,7 @@ bool InferenceEngine::load_vocab_cache() {
 }
 
 void InferenceEngine::write_vocab_cache() {
-    std::string cache_path = model_path_ + ".poincare3d";
+    std::string cache_path = model_path_ + ".poincare6d";
     std::ofstream f(cache_path, std::ios::binary | std::ios::trunc);
     if (!f.is_open()) {
         std::cout << "[llama-cpp] Failed to write cache: " << cache_path << std::endl;
@@ -90,7 +89,7 @@ void InferenceEngine::write_vocab_cache() {
     f.write(reinterpret_cast<const char*>(vocab_positions_.data()),
             vocab_positions_.size() * sizeof(float));
     std::cout << "[llama-cpp] Wrote vocab cache: " << cache_path
-              << " (" << vocab_positions_.size() / 3 << " positions)" << std::endl;
+              << " (" << vocab_positions_.size() / 6 << " tokens)" << std::endl;
 }
 
 void InferenceEngine::compute_vocab_positions() {
@@ -143,70 +142,72 @@ void InferenceEngine::compute_vocab_positions() {
                 inv_n, X.data(), d, X.data(), d,
                 0.0f, cov.data(), d);
 
-    // Top 3 principal components via power iteration + deflation
-    std::vector<std::vector<float>> pcs(3);
-    for (int pc = 0; pc < 3; pc++) {
+    // Top 6 principal components via power iteration + deflation.
+    // PC 0-2: position (Poincaré ball). PC 3-5: color (normalized RGB).
+    std::vector<std::vector<float>> pcs(6);
+    for (int pc = 0; pc < 6; pc++) {
         power_iteration(cov.data(), d, pcs[pc]);
         deflate(cov.data(), d, pcs[pc]);
     }
 
-    // Project: positions = X * [pc0 | pc1 | pc2]
-    // Build projection matrix (n_embd × 3)
-    std::vector<float> proj(d * 3);
+    // Project: all6 = X * [pc0 | pc1 | pc2 | pc3 | pc4 | pc5]  (n_vocab × 6)
+    std::vector<float> proj(d * 6);
     for (int j = 0; j < d; j++) {
-        proj[j * 3 + 0] = pcs[0][j];
-        proj[j * 3 + 1] = pcs[1][j];
-        proj[j * 3 + 2] = pcs[2][j];
+        for (int pc = 0; pc < 6; pc++)
+            proj[j * 6 + pc] = pcs[pc][j];
     }
 
-    // positions = X * proj  (n_vocab × 3)  — Euclidean PCA coordinates
-    vocab_positions_.resize(n_vocab * 3);
+    std::vector<float> all6(n_vocab * 6);
     cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-                n_vocab, 3, d,
-                1.0f, X.data(), d, proj.data(), 3,
-                0.0f, vocab_positions_.data(), 3);
+                n_vocab, 6, d,
+                1.0f, X.data(), d, proj.data(), 6,
+                0.0f, all6.data(), 6);
 
-    // --- Poincaré ball projection ---
-    // Map PCA coordinates into the Poincaré ball via the exponential map at
-    // the origin: exp_0(v) = tanh(||v|| / 2) * v / ||v||
-    //
-    // This gives the embedding hyperbolic geometry: common tokens cluster at
-    // the center, rare/specialized tokens spread toward the boundary. Distance
-    // grows exponentially near the edge, revealing fine structure among outliers.
-    //
-    // We scale so the median token lands at ~0.6 radius, leaving room for
-    // outliers to differentiate near the boundary without bunching at the edge.
-
-    // Compute norms of PCA projections
+    // --- Poincaré ball projection on position components (0-2) ---
+    // exp_0(v) = tanh(α||v||/2) * v/||v||
+    // Scale so median token lands at ~0.6 radius.
     std::vector<float> norms(n_vocab);
     for (int i = 0; i < n_vocab; i++) {
-        float x = vocab_positions_[i*3];
-        float y = vocab_positions_[i*3+1];
-        float z = vocab_positions_[i*3+2];
+        float x = all6[i*6], y = all6[i*6+1], z = all6[i*6+2];
         norms[i] = sqrtf(x*x + y*y + z*z);
     }
 
-    // Find median norm for scaling
     std::vector<float> sorted_norms = norms;
     std::sort(sorted_norms.begin(), sorted_norms.end());
     float median_norm = sorted_norms[n_vocab / 2];
     if (median_norm < 1e-8f) median_norm = 1.0f;
-
-    // Scale so median maps to radius 0.6: tanh(alpha * median / 2) = 0.6
-    // alpha = 2 * atanh(0.6) / median ≈ 1.386 / median
     float alpha = 2.0f * atanhf(0.6f) / median_norm;
 
     for (int i = 0; i < n_vocab; i++) {
         float norm = norms[i];
         if (norm < 1e-8f) continue;
-        float r = tanhf(alpha * norm / 2.0f);  // radius in Poincaré ball [0, 1)
+        float r = tanhf(alpha * norm / 2.0f);
         float scale = r / norm;
-        vocab_positions_[i*3]   *= scale;
-        vocab_positions_[i*3+1] *= scale;
-        vocab_positions_[i*3+2] *= scale;
+        all6[i*6]   *= scale;
+        all6[i*6+1] *= scale;
+        all6[i*6+2] *= scale;
     }
 
-    std::cout << "[llama-cpp] Poincaré ball projection: median_norm=" << median_norm
+    // --- Normalize color components (3-5) to [0, 1] ---
+    // Find min/max per color dimension, map linearly.
+    for (int c = 3; c < 6; c++) {
+        float lo = INFINITY, hi = -INFINITY;
+        for (int i = 0; i < n_vocab; i++) {
+            float v = all6[i*6 + c];
+            if (v < lo) lo = v;
+            if (v > hi) hi = v;
+        }
+        float range = hi - lo;
+        if (range < 1e-8f) range = 1.0f;
+        for (int i = 0; i < n_vocab; i++) {
+            all6[i*6 + c] = (all6[i*6 + c] - lo) / range;
+        }
+    }
+
+    // Store interleaved: 6 floats per token (3 pos + 3 color)
+    vocab_positions_ = std::move(all6);
+
+    std::cout << "[llama-cpp] Poincaré ball + semantic color: median_norm=" << median_norm
               << " alpha=" << alpha << " (" << n_vocab << " tokens)" << std::endl;
 
     write_vocab_cache();
@@ -216,10 +217,11 @@ const std::vector<float>& InferenceEngine::vocab_positions_3d() {
     // No mutex_ here — this must not block inference.
     // Only called from the background PCA thread and HTTP handlers.
     // vocab_positions_ is written once, then read-only; pca_ready_ provides ordering.
+    // Returns n_vocab × 6 floats (3 position + 3 color) despite the name.
     if (vocab_positions_.empty() && model_) {
         if (load_vocab_cache()) {
-            std::cout << "[llama-cpp] Loaded vocab positions from cache ("
-                      << vocab_positions_.size() / 3 << " positions)" << std::endl;
+            std::cout << "[llama-cpp] Loaded vocab data from cache ("
+                      << vocab_positions_.size() / 6 << " tokens)" << std::endl;
         } else {
             compute_vocab_positions();
         }
