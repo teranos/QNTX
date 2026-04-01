@@ -81,6 +81,8 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 
 - **NAV** — No keyboard navigation in logit space. Should be able to step through generation steps (`,`/`.`) and cycle through top-k candidates at each step (`[`/`]`), with the camera flying smoothly to the focused particle. Requires target tracking in the camera and a focus_token concept in the renderer.
 
+- **RDR** — No generation redirect. Click an alternative token in 3D to branch the generation: rewind the KV cache to that step, replace the chosen token, continue generation from there. Old path becomes a ghost branch, text updates live. Requires storing prompt/generated token sequences, partial KV cache replay, and a bidirectional WebSocket protocol for redirect commands and streamed results. Depends on PIK and NAV.
+
 - **SIG** — ~~Signal capture overhead.~~ Resolved. Profiling showed the ~55ms/token attributed to signal extraction was actually `ctx->synchronize()` inside `llama_get_logits_ith()` (llama-context.cpp:3079) — waiting for Metal to finish the decode. Signal extraction itself (softmax + partial sort + top-k) adds ~3ms/token. CPU softmax is 1-2ms after the sync completes. This is llama.cpp's Metal decode pipeline — not optimizable from our side.
 
 See `docs/research/metal-llama.md` for the full code reference table including Metal visualization limitations and opportunities.
