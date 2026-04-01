@@ -284,7 +284,6 @@ class GlyphRunImpl {
             return null;
         }
 
-        // Look up item by the element's own ID
         const glyphId = (bestElement as HTMLElement).dataset.glyphId ?? '';
         const item = this.items.get(glyphId);
         if (!item) return null;
@@ -532,7 +531,6 @@ class GlyphRunImpl {
     public getTargetPosition(glyphId?: string): { x: number; y: number } | null {
         if (!this.element) return null;
 
-        // Try to find the specific dot for this glyph
         if (glyphId) {
             const dot = this.glyphElements.get(glyphId);
             if (dot) {
@@ -544,7 +542,6 @@ class GlyphRunImpl {
             }
         }
 
-        // Fall back to last dot in tray (where new glyphs append)
         if (this.indicatorContainer) {
             const lastDot = this.indicatorContainer.lastElementChild as HTMLElement | null;
             if (lastDot) {

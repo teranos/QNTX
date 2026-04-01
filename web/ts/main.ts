@@ -260,19 +260,14 @@ async function init(): Promise<void> {
     // This ensures the run is ready to receive glyphs
     glyphRun.init();
 
-    // Register default system glyphs FIRST — they define their own renderContent.
-    // Must happen before persistence restore so system glyph IDs are already
-    // claimed and won't be overwritten by the generic result-glyph reconstruction.
     registerDefaultGlyphs();
 
-    // Restore minimized result glyphs to the tray from persisted state.
-    // System glyphs (already registered above) are skipped by glyphRun.add's
-    // duplicate check. Only result glyphs need reconstruction from stored content.
+    // Restore minimized glyphs from persisted state
     const minimizedIds = uiState.getMinimizedWindows();
     if (minimizedIds.length > 0) {
         const canvasGlyphs = uiState.getCanvasGlyphs();
         for (const id of minimizedIds) {
-            if (glyphRun.has(id)) continue; // System glyph — already registered
+            if (glyphRun.has(id)) continue;
 
             const glyph = canvasGlyphs.find(g => g.id === id);
             if (!glyph || !glyph.content) {
