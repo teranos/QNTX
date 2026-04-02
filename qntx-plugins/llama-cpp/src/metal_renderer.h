@@ -89,6 +89,13 @@ public:
     // Returns token_id >= 0 if ready, -1 otherwise. Resets after read.
     int consume_pick_result();
 
+    // Set the hover label text (called from plugin when pick fires).
+    // Cleared automatically when mouse moves.
+    void set_hover_label(const std::string& text);
+
+    // Read probability of a token from the current distribution.
+    float token_probability(int token_id);
+
     // Render a text label into the current HDR texture at pixel coords.
     // Uses CoreText for rasterization, composited as a textured quad.
     void render_label(MTL::RenderCommandEncoder* enc, const std::string& text,
@@ -176,6 +183,10 @@ private:
     // Mouse idle timer for debounced pick response
     std::chrono::steady_clock::time_point mouse_last_move_;
     bool pick_sent_ = false;  // true after sending picked: for current idle
+
+    // Hover label — set by plugin when pick fires, cleared on mouse move
+    std::string hover_label_;
+    std::mutex hover_label_mutex_;
 
     void ensure_pick_textures(int width, int height);
 

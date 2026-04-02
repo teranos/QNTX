@@ -259,32 +259,29 @@ vertex HighlightVertexOut highlightVertex(
 fragment float4 highlightFragment(
     HighlightVertexOut in [[stage_in]]
 ) {
-    // Hollow square: only draw the border (2px-equivalent in UV space)
+    // Hollow square: only draw the border
     float border = 0.08;
     float2 uv = in.uv;
     bool onEdge = uv.x < border || uv.x > (1.0 - border) ||
                   uv.y < border || uv.y > (1.0 - border);
     if (!onEdge) discard_fragment();
 
-    return float4(0.0, 1.0, 1.0, 0.9);  // cyan
+    return float4(0.6, 0.9, 0.9, 0.35);  // dim cyan
 }
 
-// --- Cursor: crosshair with semi-transparent fill ---
+// --- Cursor: square with semi-transparent fill ---
 
 fragment float4 cursorFragment(
     HighlightVertexOut in [[stage_in]]
 ) {
     float2 uv = in.uv;
-    // Semi-transparent fill
-    float4 fill = float4(0.0, 1.0, 1.0, 0.08);
+    // Semi-transparent white fill
+    float4 fill = float4(0.9, 0.9, 0.9, 0.06);
     // Border — thicker than highlight (visible at small sizes)
     float border = 0.15;
     bool onEdge = uv.x < border || uv.x > (1.0 - border) ||
                   uv.y < border || uv.y > (1.0 - border);
-    // Crosshair lines through center
-    float cross = 0.06;
-    bool onCross = (abs(uv.x - 0.5) < cross) || (abs(uv.y - 0.5) < cross);
-    if (onEdge || onCross) return float4(0.0, 1.0, 1.0, 0.7);
+    if (onEdge) return float4(0.85, 0.9, 0.92, 0.35);  // dim white
     return fill;
 }
 

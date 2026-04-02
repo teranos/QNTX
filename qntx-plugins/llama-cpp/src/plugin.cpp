@@ -469,11 +469,17 @@ grpc::Status LlamaCppPlugin::HandleWebSocket(
         // Check for debounced pick result (400ms idle)
         int pick_id = renderer_->consume_pick_result();
         if (pick_id >= 0) {
-            std::string pick_resp = "picked:" + std::to_string(pick_id) + "," + engine_.token_text(pick_id);
+            auto token_text = engine_.token_text(pick_id);
+
+            // Send to JS for span highlighting
+            std::string pick_resp = "picked:" + std::to_string(pick_id) + "," + token_text;
             protocol::WebSocketMessage pick_msg;
             pick_msg.set_type(protocol::WebSocketMessage::DATA);
             pick_msg.set_data(pick_resp);
             if (!stream->Write(pick_msg)) break;
+
+            // Set Metal-rendered label
+            renderer_->set_hover_label(token_text);
         }
 
         auto png = renderer_->wait_for_frame(100);

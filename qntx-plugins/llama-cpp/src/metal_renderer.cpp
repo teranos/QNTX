@@ -820,7 +820,7 @@ std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) 
             glm::vec4 clip = mvp_mat * glm::vec4(hpx, hpy, hpz, 1.0f);
 
             if (clip.w > 0) {
-                float half_size[2] = { 16.0f / (float)width, 16.0f / (float)height };
+                float half_size[2] = { 19.0f / (float)width, 19.0f / (float)height };
                 float clip_arr[4] = { clip.x, clip.y, clip.z, clip.w };
 
                 render_enc->setRenderPipelineState(highlight_pipeline_);
@@ -848,6 +848,20 @@ std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) 
             render_enc->setVertexBytes(cursor_clip, sizeof(cursor_clip), 0);
             render_enc->setVertexBytes(cursor_size, sizeof(cursor_size), 1);
             render_enc->drawPrimitives(MTL::PrimitiveTypeTriangle, (NS::UInteger)0, (NS::UInteger)6);
+        }
+
+        // Hover label — rendered at offset from cursor after 400ms idle
+        {
+            std::lock_guard<std::mutex> lock(hover_label_mutex_);
+            if (!hover_label_.empty()) {
+                // Position label to the right of the cursor, slightly above
+                float label_x = (float)mx + 20.0f;
+                float label_y = (float)my - 10.0f;
+                // Clamp to keep label on screen
+                if (label_x + 200 > width) label_x = (float)mx - 220.0f;
+                if (label_y < 0) label_y = (float)my + 20.0f;
+                render_label(render_enc, hover_label_, label_x, label_y, width, height);
+            }
         }
     }
 
@@ -1133,7 +1147,7 @@ void MetalRenderer::start_render_loop(int width, int height) {
                                         float hpz = ((float*)positions_buffer_->contents())[picked_scrub * 3 + 2];
                                         glm::vec4 clip = mvp_mat * glm::vec4(hpx, hpy, hpz, 1.0f);
                                         if (clip.w > 0) {
-                                            float hs[2] = { 16.0f / (float)w, 16.0f / (float)h };
+                                            float hs[2] = { 19.0f / (float)w, 19.0f / (float)h };
                                             float ca[4] = { clip.x, clip.y, clip.z, clip.w };
                                             render_enc->setRenderPipelineState(highlight_pipeline_);
                                             render_enc->setVertexBytes(ca, sizeof(ca), 0);
@@ -1157,6 +1171,18 @@ void MetalRenderer::start_render_loop(int width, int height) {
                                         render_enc->setVertexBytes(cc, sizeof(cc), 0);
                                         render_enc->setVertexBytes(cs, sizeof(cs), 1);
                                         render_enc->drawPrimitives(MTL::PrimitiveTypeTriangle, (NS::UInteger)0, (NS::UInteger)6);
+                                    }
+
+                                    // Hover label in scrub mode
+                                    {
+                                        std::lock_guard<std::mutex> llock(hover_label_mutex_);
+                                        if (!hover_label_.empty()) {
+                                            float lx = (float)smx + 20.0f;
+                                            float ly = (float)smy - 10.0f;
+                                            if (lx + 200 > w) lx = (float)smx - 220.0f;
+                                            if (ly < 0) ly = (float)smy + 20.0f;
+                                            render_label(render_enc, hover_label_, lx, ly, w, h);
+                                        }
                                     }
                                 }
                             }
@@ -1407,10 +1433,33 @@ int MetalRenderer::consume_pick_result() {
     return ht;
 }
 
+float MetalRenderer::token_probability(int token_id) {
+    std::lock_guard<std::mutex> lock(dist_mutex_);
+    if (!prob_b_ || token_id < 0 || token_id >= vocab_size_) return 0.0f;
+    auto* probs = (float*)prob_b_->contents();
+    return probs[token_id];
+}
+
+void MetalRenderer::set_hover_label(const std::string& text) {
+    std::lock_guard<std::mutex> lock(hover_label_mutex_);
+    hover_label_ = text;
+    // Wake render loop to draw label
+    {
+        std::lock_guard<std::mutex> wlock(render_wake_mutex_);
+        render_dirty_ = true;
+    }
+    render_wake_cv_.notify_one();
+}
+
 void MetalRenderer::set_mouse(int px, int py) {
     // px/py are normalized 0..1000 from JS — map to render texture pixels
     int rx = (px >= 0) ? (px * render_width_ / 1000) : -1;
     int ry = (py >= 0) ? (py * render_height_ / 1000) : -1;
+    // Clear hover label when mouse moves
+    {
+        std::lock_guard<std::mutex> lock(hover_label_mutex_);
+        hover_label_.clear();
+    }
     mouse_x_.store(rx, std::memory_order_release);
     mouse_y_.store(ry, std::memory_order_release);
     mouse_last_move_ = std::chrono::steady_clock::now();
@@ -1458,12 +1507,12 @@ void MetalRenderer::render_label(MTL::RenderCommandEncoder* enc, const std::stri
         return;
     }
 
-    // Background
-    CGContextSetRGBFillColor(cg_ctx, 0.0, 0.0, 0.0, 0.75);
+    // Semi-transparent background
+    CGContextSetRGBFillColor(cg_ctx, 0.05, 0.05, 0.1, 0.5);
     CGContextFillRect(cg_ctx, CGRectMake(0, 0, tex_w, tex_h));
 
-    // Text in cyan
-    CGContextSetRGBFillColor(cg_ctx, 0.0, 1.0, 1.0, 1.0);
+    // Text in soft white
+    CGContextSetRGBFillColor(cg_ctx, 0.9, 0.95, 0.95, 0.9);
     CGContextSetTextPosition(cg_ctx, 4, descent + 3);
     CTLineDraw(line, cg_ctx);
 
