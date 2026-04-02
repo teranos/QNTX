@@ -22,6 +22,14 @@
           hash = "sha256-ZX5eaeNZYZIzJyEV3k0Dpcr6L84ccm4YRI++pY9hlJU=";
         };
 
+        # GLM — header-only math library for camera/projection
+        glm-src = pkgs.fetchFromGitHub {
+          owner = "g-truc";
+          repo = "glm";
+          rev = "1.0.1";
+          hash = "sha256-GnGyzNRpzuguc3yYbEFtYLvG+KiCtRAktiN+NvbOICE=";
+        };
+
         llama-cpp-plugin = pkgs.stdenv.mkDerivation {
           pname = "qntx-llama-cpp-plugin";
           version = self.rev or "dev";
@@ -30,6 +38,7 @@
           postUnpack = ''
             mkdir -p $sourceRoot/vendor
             cp -r ${llama-cpp-src} $sourceRoot/vendor/llama.cpp
+            cp -r ${glm-src} $sourceRoot/vendor/glm
           '';
 
           nativeBuildInputs = with pkgs; [
@@ -51,6 +60,11 @@
             "-DCMAKE_BUILD_TYPE=Release"
             "-DPROTO_DIR=${protoSrc}"
           ];
+
+          doCheck = true;
+          checkPhase = ''
+            ctest --output-on-failure
+          '';
         };
       in
       {
