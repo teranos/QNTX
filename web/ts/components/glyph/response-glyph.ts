@@ -675,24 +675,60 @@ export function createResponseGlyph(
     element.appendChild(nebulaStatus);
     nebulaRo.observe(element);
 
-    // WASD + arrow camera controls — active only when a token is selected
+    // Camera controls — active only when a token is selected.
+    // Single source of truth: key, command, and label defined together.
     let nebulaNavActive = false;
     let selectedSpan: HTMLElement | null = null; // tracks locked token for dim calculation
     const camStep = 0.02;
     const camRotStep = 0.03;
-    const keyMap: Record<string, string> = {
-        w: `cam:0,${camStep},1,0,0`,
-        s: `cam:0,${-camStep},1,0,0`,
-        a: `cam:${-camStep},0,1,0,0`,
-        d: `cam:${camStep},0,1,0,0`,
-        ArrowUp: `cam:0,0,1,0,${-camRotStep}`,
-        ArrowDown: `cam:0,0,1,0,${camRotStep}`,
-        ArrowLeft: `cam:0,0,1,${-camRotStep},0`,
-        ArrowRight: `cam:0,0,1,${camRotStep},0`,
-        q: `cam:0,0,0.9,0,0`,
-        e: `cam:0,0,1.1,0,0`,
-        r: 'cam:r',
-    };
+    const bindings: {key: string; display: string; cmd: string; label: string}[] = [
+        { key: 'w',          display: 'W',  cmd: `cam:0,0,${1 - camStep},0,0`,   label: 'forward' },
+        { key: 's',          display: 'S',  cmd: `cam:0,0,${1 + camStep},0,0`,   label: 'backward' },
+        { key: 'a',          display: 'A',  cmd: `cam:${camStep},0,1,0,0`,       label: 'strafe left' },
+        { key: 'd',          display: 'D',  cmd: `cam:${-camStep},0,1,0,0`,      label: 'strafe right' },
+        { key: 'ArrowUp',    display: '\u2191', cmd: `cam:0,0,1,0,${camRotStep}`,    label: 'look up' },
+        { key: 'ArrowDown',  display: '\u2193', cmd: `cam:0,0,1,0,${-camRotStep}`,   label: 'look down' },
+        { key: 'ArrowLeft',  display: '\u2190', cmd: `cam:0,0,1,${camRotStep},0`,    label: 'look left' },
+        { key: 'ArrowRight', display: '\u2192', cmd: `cam:0,0,1,${-camRotStep},0`,   label: 'look right' },
+        { key: 'q',          display: 'Q',  cmd: `cam:0,${camStep},1,0,0`,       label: 'ascend' },
+        { key: 'e',          display: 'E',  cmd: `cam:0,${-camStep},1,0,0`,      label: 'descend' },
+        { key: 'r',          display: 'R',  cmd: 'cam:r',                        label: 'reset camera' },
+    ];
+    const keyMap: Record<string, string> = {};
+    for (const b of bindings) keyMap[b.key] = b.cmd;
+
+    // Help overlay — toggled with ? key, reads from bindings
+    const helpOverlay = document.createElement('div');
+    helpOverlay.style.cssText = 'position:absolute;bottom:4px;left:6px;font:10px monospace;color:rgba(255,255,255,0.5);z-index:2;line-height:1.6;display:none;background:rgba(0,0,0,0.5);padding:4px 8px;border-radius:3px;';
+    let helpVisible = false;
+    function buildHelp(): void {
+        helpOverlay.textContent = '';
+        for (const b of bindings) {
+            const line = document.createElement('div');
+            const keyEl = document.createElement('span');
+            keyEl.style.cssText = 'display:inline-block;min-width:18px;color:rgba(255,255,255,0.7);';
+            keyEl.textContent = b.display;
+            line.appendChild(keyEl);
+            line.appendChild(document.createTextNode(' ' + b.label));
+            helpOverlay.appendChild(line);
+        }
+        const escLine = document.createElement('div');
+        const escKey = document.createElement('span');
+        escKey.style.cssText = 'display:inline-block;min-width:18px;color:rgba(255,255,255,0.7);';
+        escKey.textContent = 'Esc';
+        escLine.appendChild(escKey);
+        escLine.appendChild(document.createTextNode(' exit navigation'));
+        helpOverlay.appendChild(escLine);
+        const helpLine = document.createElement('div');
+        const helpKey = document.createElement('span');
+        helpKey.style.cssText = 'display:inline-block;min-width:18px;color:rgba(255,255,255,0.7);';
+        helpKey.textContent = '?';
+        helpLine.appendChild(helpKey);
+        helpLine.appendChild(document.createTextNode(' toggle this help'));
+        helpOverlay.appendChild(helpLine);
+    }
+    element.appendChild(helpOverlay);
+
     let unlockFn: (() => void) | null = null;
 
     function onNebulaKey(e: KeyboardEvent): void {
@@ -703,6 +739,13 @@ export function createResponseGlyph(
             return;
         }
         if (!nebulaNavActive) return;
+        if (e.key === '?') {
+            e.preventDefault();
+            helpVisible = !helpVisible;
+            if (helpVisible) { buildHelp(); helpOverlay.style.display = ''; }
+            else helpOverlay.style.display = 'none';
+            return;
+        }
         const cmd = keyMap[e.key];
         if (cmd) {
             e.preventDefault();

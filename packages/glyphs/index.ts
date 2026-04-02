@@ -133,6 +133,10 @@ export type {
     FocusPersistence,
 } from './manifestations/focus';
 
+// Touch browse
+export { setupTouchBrowse, findPeakedGlyph } from './touch-browse';
+export type { TouchBrowseHost } from './touch-browse';
+
 // GlyphUI interface and related types
 export type {
     GlyphUI,
