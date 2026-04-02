@@ -20,6 +20,23 @@ set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
 
 include(FetchContent)
+
+# GLM — header-only math library for camera/projection math.
+# GLM_FORCE_DEPTH_ZERO_TO_ONE matches Metal's [0,1] depth range.
+# Vendored in Nix builds (no git available); FetchContent for local dev.
+if(EXISTS "${CMAKE_SOURCE_DIR}/vendor/glm/glm/glm.hpp")
+    set(GLM_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/vendor/glm")
+else()
+    FetchContent_Declare(
+        glm
+        GIT_REPOSITORY https://github.com/g-truc/glm.git
+        GIT_TAG        1.0.1
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(glm)
+    set(GLM_INCLUDE_DIR "${glm_SOURCE_DIR}")
+endif()
+
 if(EXISTS "${CMAKE_SOURCE_DIR}/vendor/llama.cpp/CMakeLists.txt")
     set(LLAMA_SOURCE_DIR "${CMAKE_SOURCE_DIR}/vendor/llama.cpp")
     add_subdirectory(${LLAMA_SOURCE_DIR} llama.cpp)
@@ -112,7 +129,9 @@ target_include_directories(qntx-llama-cpp-plugin PRIVATE
     ${LLAMA_SOURCE_DIR}/src
     ${LLAMA_SOURCE_DIR}/ggml/include
     ${MUPDF_INCLUDE_DIR}
+    ${GLM_INCLUDE_DIR}
 )
+target_compile_definitions(qntx-llama-cpp-plugin PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
 target_link_libraries(qntx-llama-cpp-plugin PRIVATE
     llama
@@ -183,5 +202,12 @@ endif()
 if(MUPDF_THIRD_LIB)
     target_link_libraries(qntx-llama-cpp-plugin PRIVATE ${MUPDF_THIRD_LIB})
 endif()
+
+# Camera math tests — pure C++, no gRPC/llama deps
+enable_testing()
+add_executable(camera_test tests/camera_test.cpp)
+target_include_directories(camera_test PRIVATE ${GLM_INCLUDE_DIR})
+target_compile_definitions(camera_test PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
+add_test(NAME camera_test COMMAND camera_test)
 
 install(TARGETS qntx-llama-cpp-plugin DESTINATION bin)

@@ -4,9 +4,6 @@
 //   filled triangles to create visible "decision surfaces."
 // TODO(B64): WebSocket frames are base64-encoded PNG — 33% overhead. Binary
 //   WebSocket frames would eliminate this.
-// TODO(#748): Camera is orthographic external observer — needs rework to
-//   first-person perspective (fly through the particle field). Requires 3D camera
-//   position, perspective projection, and WASD movement relative to facing direction.
 // TODO(KFC): Keyframe history capped at 512 (64MB). Longer generations lose
 //   early frames. No disk persistence — closing the glyph loses all history.
 // TODO(TRU): Trail positions vector is unbounded while keyframes are capped.
