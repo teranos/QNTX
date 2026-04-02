@@ -41,6 +41,7 @@ mock.module('../../state/ui', () => ({ uiState }));
 
 // Import after JSDOM + mock setup
 const { glyphRun } = await import('./run.ts');
+const { findPeakedGlyph } = await import('@qntx/glyphs');
 
 describe('Glyph Single Element Axiom', () => {
     if (!USE_JSDOM) {
@@ -424,7 +425,7 @@ describe('Touch Browse', () => {
         // Set pointer far from everything
         proximity.setPointerPosition(-9999, -9999);
 
-        const peaked = (glyphRun as any).findPeakedGlyph();
+        const peaked = findPeakedGlyph(glyphRun as any);
         expect(peaked).toBeNull();
     });
 
@@ -445,7 +446,7 @@ describe('Touch Browse', () => {
         // Place pointer right on top of the second glyph (y=224 is center of 218-230)
         proximity.setPointerPosition(355, 224);
 
-        const peaked = (glyphRun as any).findPeakedGlyph();
+        const peaked = findPeakedGlyph(glyphRun as any);
         expect(peaked).not.toBeNull();
         expect(peaked.item.id).toBe('touch-glyph-1');
     });
