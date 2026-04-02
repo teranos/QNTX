@@ -32,7 +32,9 @@ namespace MTL {
     class CommandQueue;
     class ComputePipelineState;
     class RenderPipelineState;
+    class RenderCommandEncoder;
     class Buffer;
+    class Texture;
 }
 #endif
 
@@ -72,6 +74,25 @@ public:
     // rotation (dyaw/dpitch in radians).
     void apply_camera(float dx, float dy, float dz, float dyaw, float dpitch);
     void reset_camera();
+
+    // Pick: read token ID at pixel coordinates. Returns -1 if no particle.
+    int pick_at(int px, int py);
+
+    // Mouse position for GPU-side cursor rendering. -1,-1 = no cursor.
+    void set_mouse(int px, int py);
+
+    // Set/clear the highlighted (hovered) token for visual feedback.
+    void set_hovered_token(int token_id);
+    int hovered_token() const;
+
+    // Check if mouse has been idle for 400ms and a pick result is ready.
+    // Returns token_id >= 0 if ready, -1 otherwise. Resets after read.
+    int consume_pick_result();
+
+    // Render a text label into the current HDR texture at pixel coords.
+    // Uses CoreText for rasterization, composited as a textured quad.
+    void render_label(MTL::RenderCommandEncoder* enc, const std::string& text,
+                      float screen_x, float screen_y, int width, int height);
 
     // Runtime-adjustable parameters
     void set_param(const std::string& key, float value);
@@ -132,6 +153,31 @@ private:
     // Vertices come in pairs (chosen->runner-up) drawn as Line primitives
     std::vector<float> ghost_vertices_;
     MTL::RenderPipelineState* ghost_pipeline_ = nullptr;
+
+    // Pick buffer — R32Uint texture for hover identification
+    MTL::RenderPipelineState* pick_pipeline_ = nullptr;
+    MTL::Texture* pick_texture_ = nullptr;
+    MTL::Texture* pick_depth_ = nullptr;
+    int pick_width_ = 0, pick_height_ = 0;
+    std::mutex pick_mutex_;
+
+    // Mouse position in render-texture pixels (-1 = no cursor)
+    std::atomic<int> mouse_x_{-1}, mouse_y_{-1};
+
+    // Highlight — square around hovered particle
+    MTL::RenderPipelineState* highlight_pipeline_ = nullptr;
+    // Cursor — persistent crosshair with semi-transparent fill
+    MTL::RenderPipelineState* cursor_pipeline_ = nullptr;
+    std::atomic<int> hovered_token_{-1};
+
+    // Label rendering — textured quad pipeline
+    MTL::RenderPipelineState* label_pipeline_ = nullptr;
+
+    // Mouse idle timer for debounced pick response
+    std::chrono::steady_clock::time_point mouse_last_move_;
+    bool pick_sent_ = false;  // true after sending picked: for current idle
+
+    void ensure_pick_textures(int width, int height);
 
     // Interpolation state
     MTL::Buffer* prob_a_ = nullptr;  // previous distribution

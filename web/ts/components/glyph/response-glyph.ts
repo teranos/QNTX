@@ -539,10 +539,17 @@ export function createResponseGlyph(
                 const msg = JSON.parse(event.data);
                 if (msg.type !== 1 || !msg.data) return;
 
-                const binary = atob(msg.data);
-                const bytes = new Uint8Array(binary.length);
-                for (let i = 0; i < binary.length; i++) {
-                    bytes[i] = binary.charCodeAt(i);
+                const decoded = atob(msg.data);
+
+                // Pick response: picked:tokenId,tokenText
+                if (decoded.indexOf('picked:') === 0) {
+                    handlePickResponse(decoded.substring(7));
+                    return;
+                }
+
+                const bytes = new Uint8Array(decoded.length);
+                for (let i = 0; i < decoded.length; i++) {
+                    bytes[i] = decoded.charCodeAt(i);
                 }
                 const blob = new Blob([bytes], { type: 'image/png' });
                 lastNebulaBase64 = msg.data; // store raw base64 for persistence
@@ -754,6 +761,62 @@ export function createResponseGlyph(
     }
     document.addEventListener('keydown', onNebulaKey);
 
+    // ── Pick hover — GPU-side cursor + highlight, JS only for span outline ──
+    // Mouse position sent on every move; C++ renders cursor square + label
+    // into the Metal frame. After 0.4s idle, C++ sends picked:id,text for
+    // the span highlight in the response text.
+
+    let pickedSpanHighlight: HTMLElement | null = null;
+
+    function handlePickResponse(data: string): void {
+        const comma = data.indexOf(',');
+        if (comma < 0) return;
+        const tokenId = parseInt(data.substring(0, comma), 10);
+        const tokenText = data.substring(comma + 1);
+
+        if (pickedSpanHighlight) {
+            pickedSpanHighlight.style.outline = '';
+            pickedSpanHighlight = null;
+        }
+
+        if (tokenId < 0 || !tokenText) return;
+
+        // Highlight matching span in the response text
+        const spans = output.querySelectorAll('span[data-token-index]');
+        for (const span of spans) {
+            const el = span as HTMLElement;
+            if (el.textContent === tokenText) {
+                el.style.outline = '1px solid cyan';
+                pickedSpanHighlight = el;
+                break;
+            }
+        }
+    }
+
+    function clearPick(): void {
+        if (pickedSpanHighlight) {
+            pickedSpanHighlight.style.outline = '';
+            pickedSpanHighlight = null;
+        }
+        sendNebulaMessage('mouse:-1,-1');
+    }
+
+    function onPickMouseMove(e: MouseEvent): void {
+        if (!nebulaNavActive) return;
+        // Send normalized coordinates (0..1000) — C++ maps to render texture size
+        const rect = element.getBoundingClientRect();
+        const nx = Math.round((e.clientX - rect.left) / rect.width * 1000);
+        const ny = Math.round((e.clientY - rect.top) / rect.height * 1000);
+        sendNebulaMessage('mouse:' + nx + ',' + ny);
+    }
+
+    function onPickMouseLeave(): void {
+        clearPick();
+    }
+
+    element.addEventListener('mousemove', onPickMouseMove);
+    element.addEventListener('mouseleave', onPickMouseLeave);
+
     // ── Restore saved content ───────────────────────────────────────
 
     const saved = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
@@ -811,7 +874,7 @@ export function createResponseGlyph(
         }
 
         popup = createTokenPopup();
-        unlockFn = setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; if (!locked) clearDim(); });
+        unlockFn = setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; element.style.cursor = locked ? 'none' : ''; if (!locked) { clearDim(); sendNebulaMessage('mouse:-1,-1'); } });
     } else if (result) {
         // Static mode — render output text
         renderOutput(output, result);
@@ -829,7 +892,7 @@ export function createResponseGlyph(
             visibilityObserver?.observe(output);
 
             popup = createTokenPopup();
-            unlockFn = setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; if (!locked) clearDim(); });
+            unlockFn = setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; element.style.cursor = locked ? 'none' : ''; if (!locked) { clearDim(); sendNebulaMessage('mouse:-1,-1'); } });
         }
 
         // Show nebula and connect to Metal renderer — live frame drawing
@@ -912,6 +975,9 @@ export function createResponseGlyph(
         closeNebula();
         nebulaRo.disconnect();
         document.removeEventListener('keydown', onNebulaKey);
+        element.removeEventListener('mousemove', onPickMouseMove);
+        element.removeEventListener('mouseleave', onPickMouseLeave);
+        clearPick();
         if (lastNebulaBitmap) { lastNebulaBitmap.close(); lastNebulaBitmap = null; }
     });
 
