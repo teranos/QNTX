@@ -335,6 +335,22 @@ bool InferenceEngine::is_loaded() const {
     return model_ != nullptr && ctx_ != nullptr;
 }
 
+int InferenceEngine::vocab_size() const {
+    if (!model_) return 0;
+    const auto* vocab = llama_model_get_vocab(model_);
+    return vocab ? llama_vocab_n_tokens(vocab) : 0;
+}
+
+std::string InferenceEngine::token_text(int token_id) const {
+    if (!model_ || token_id < 0) return "";
+    const auto* vocab = llama_model_get_vocab(model_);
+    if (!vocab) return "";
+    char buf[256];
+    int len = llama_token_to_piece(vocab, token_id, buf, sizeof(buf), 0, true);
+    if (len < 0) return "";
+    return std::string(buf, len);
+}
+
 // Prepare prompt: build chat template, tokenize, decode prompt into KV cache.
 // Returns prompt token count, or -1 on error (with result.content set).
 int InferenceEngine::prepare_prompt(

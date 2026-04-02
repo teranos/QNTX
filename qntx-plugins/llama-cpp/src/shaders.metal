@@ -195,3 +195,133 @@ vertex TrailVertexOut ghostBranchVertex(
     out.alpha = saturate(prob * 4.0) * 0.6;
     return out;
 }
+
+// --- Pick buffer: render token IDs to R32Uint for hover identification ---
+
+struct PickVertexOut {
+    float4 position [[position]];
+    float pointSize [[point_size]];
+    uint tokenId [[flat]];
+};
+
+vertex PickVertexOut pickVertex(
+    device const Particle* particles [[buffer(0)]],
+    constant float4x4& mvp          [[buffer(1)]],
+    uint vid [[vertex_id]]
+) {
+    Particle p = particles[vid];
+
+    PickVertexOut out;
+    out.position = mvp * float4(p.position, 1.0);
+    // Minimum 8px hitbox so small/distant particles are still pickable
+    out.pointSize = max(p.size, 8.0);
+    out.tokenId = vid;
+    return out;
+}
+
+fragment uint pickFragment(
+    PickVertexOut in [[stage_in]],
+    float2 pointCoord [[point_coord]]
+) {
+    // Circular cutout — but use the inflated radius for picking
+    float dist = length(pointCoord - float2(0.5));
+    if (dist > 0.5) discard_fragment();
+
+    return in.tokenId;
+}
+
+// --- Highlight: square outline around a picked particle ---
+
+struct HighlightVertexOut {
+    float4 position [[position]];
+    float2 uv;
+};
+
+vertex HighlightVertexOut highlightVertex(
+    constant float4& clipCenter [[buffer(0)]],  // clip-space position of picked particle
+    constant float2& halfSize   [[buffer(1)]],  // half-size in NDC
+    uint vid [[vertex_id]]
+) {
+    // Quad: 6 vertices (2 triangles), CCW
+    float2 corners[6] = {
+        float2(-1, -1), float2(1, -1), float2(1, 1),
+        float2(-1, -1), float2(1, 1), float2(-1, 1)
+    };
+    float2 c = corners[vid];
+
+    HighlightVertexOut out;
+    float2 ndc = clipCenter.xy / clipCenter.w;
+    out.position = float4(ndc + c * halfSize, clipCenter.z / clipCenter.w, 1.0);
+    out.uv = c * 0.5 + 0.5;  // 0..1
+    return out;
+}
+
+fragment float4 highlightFragment(
+    HighlightVertexOut in [[stage_in]]
+) {
+    // Hollow square: only draw the border (2px-equivalent in UV space)
+    float border = 0.08;
+    float2 uv = in.uv;
+    bool onEdge = uv.x < border || uv.x > (1.0 - border) ||
+                  uv.y < border || uv.y > (1.0 - border);
+    if (!onEdge) discard_fragment();
+
+    return float4(0.0, 1.0, 1.0, 0.9);  // cyan
+}
+
+// --- Cursor: crosshair with semi-transparent fill ---
+
+fragment float4 cursorFragment(
+    HighlightVertexOut in [[stage_in]]
+) {
+    float2 uv = in.uv;
+    // Semi-transparent fill
+    float4 fill = float4(0.0, 1.0, 1.0, 0.08);
+    // Border — thicker than highlight (visible at small sizes)
+    float border = 0.15;
+    bool onEdge = uv.x < border || uv.x > (1.0 - border) ||
+                  uv.y < border || uv.y > (1.0 - border);
+    // Crosshair lines through center
+    float cross = 0.06;
+    bool onCross = (abs(uv.x - 0.5) < cross) || (abs(uv.y - 0.5) < cross);
+    if (onEdge || onCross) return float4(0.0, 1.0, 1.0, 0.7);
+    return fill;
+}
+
+// --- Label: textured quad for CoreText-rendered text ---
+
+struct LabelVertexOut {
+    float4 position [[position]];
+    float2 uv;
+};
+
+vertex LabelVertexOut labelVertex(
+    constant float4& rect [[buffer(0)]],  // x, y, w, h in pixels
+    constant float2& viewport [[buffer(1)]],  // viewport width, height
+    uint vid [[vertex_id]]
+) {
+    float2 corners[6] = {
+        float2(0, 0), float2(1, 0), float2(1, 1),
+        float2(0, 0), float2(1, 1), float2(0, 1)
+    };
+    float2 c = corners[vid];
+
+    // Pixel coords to NDC
+    float2 pos = float2(rect.x + c.x * rect.z, rect.y + c.y * rect.w);
+    float2 ndc = pos / viewport * 2.0 - 1.0;
+    ndc.y = -ndc.y;  // flip Y
+
+    LabelVertexOut out;
+    out.position = float4(ndc, 0.0, 1.0);
+    out.uv = float2(c.x, c.y);
+    return out;
+}
+
+fragment float4 labelFragment(
+    LabelVertexOut in [[stage_in]],
+    texture2d<float> tex [[texture(0)]]
+) {
+    constexpr sampler s(filter::linear);
+    float4 t = tex.sample(s, in.uv);
+    return t;
+}
