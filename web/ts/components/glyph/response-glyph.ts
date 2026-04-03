@@ -579,6 +579,7 @@ export function createResponseGlyph(
 
     // Dim token spans based on nebula brightness behind them (#749)
     function applyDim(): void {
+        if (nebulaExamine) { applyExamineDim(); return; }
         if (!nebulaCtx || !nebulaScrub || !selectedSpan) return;
         const canvasRect = nebulaCanvas.getBoundingClientRect();
         const imgData = nebulaCtx.getImageData(0, 0, nebulaCanvas.width, nebulaCanvas.height);
@@ -635,7 +636,46 @@ export function createResponseGlyph(
         }
     }
 
+    // Examine dim: selected token full opacity, its sentence visible, rest fades out
+    function applyExamineDim(): void {
+        if (!selectedSpan) return;
+        const spans = Array.from(output.querySelectorAll('span[data-confidence]')) as HTMLElement[];
+        const selectedIdx = spans.indexOf(selectedSpan);
+        if (selectedIdx < 0) return;
+
+        // Find sentence boundaries by scanning for sentence-ending punctuation
+        let sentStart = 0;
+        let sentEnd = spans.length - 1;
+        for (let i = selectedIdx - 1; i >= 0; i--) {
+            const text = spans[i].textContent || '';
+            if (text.indexOf('.') >= 0 || text.indexOf('!') >= 0 || text.indexOf('?') >= 0 || text.indexOf('\n') >= 0) {
+                sentStart = i + 1;
+                break;
+            }
+        }
+        for (let i = selectedIdx; i < spans.length; i++) {
+            const text = spans[i].textContent || '';
+            if (text.indexOf('.') >= 0 || text.indexOf('!') >= 0 || text.indexOf('?') >= 0 || text.indexOf('\n') >= 0) {
+                sentEnd = i;
+                break;
+            }
+        }
+
+        for (let i = 0; i < spans.length; i++) {
+            if (i === selectedIdx) {
+                spans[i].style.opacity = '1';
+            } else if (i >= sentStart && i <= sentEnd) {
+                spans[i].style.opacity = '0.6';
+            } else if (Math.abs(i - selectedIdx) <= 5) {
+                spans[i].style.opacity = '0.25';
+            } else {
+                spans[i].style.opacity = '0.04';
+            }
+        }
+    }
+
     function clearDim(): void {
+        nebulaExamine = false;
         const spans = output.querySelectorAll('span[data-confidence]');
         for (const span of spans) {
             (span as HTMLElement).style.opacity = '';
@@ -685,6 +725,7 @@ export function createResponseGlyph(
     // Camera controls — active only when a token is selected.
     // Single source of truth: key, command, and label defined together.
     let nebulaNavActive = false;
+    let nebulaExamine = false;  // red mode — single keyframe isolation
     let selectedSpan: HTMLElement | null = null; // tracks locked token for dim calculation
     const camStep = 0.02;
     const camRotStep = 0.03;
@@ -874,7 +915,7 @@ export function createResponseGlyph(
         }
 
         popup = createTokenPopup();
-        unlockFn = setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; element.style.cursor = locked ? 'none' : ''; if (!locked) { clearDim(); sendNebulaMessage('mouse:-1,-1'); } }, (focused) => sendNebulaMessage('examine:' + (focused ? '1' : '0')));
+        unlockFn = setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; element.style.cursor = locked ? 'none' : ''; if (!locked) { clearDim(); sendNebulaMessage('mouse:-1,-1'); } }, (focused) => { nebulaExamine = focused; sendNebulaMessage('examine:' + (focused ? '1' : '0')); if (focused) applyExamineDim(); else applyDim(); });
     } else if (result) {
         // Static mode — render output text
         renderOutput(output, result);
@@ -892,7 +933,7 @@ export function createResponseGlyph(
             visibilityObserver?.observe(output);
 
             popup = createTokenPopup();
-            unlockFn = setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; element.style.cursor = locked ? 'none' : ''; if (!locked) { clearDim(); sendNebulaMessage('mouse:-1,-1'); } }, (focused) => sendNebulaMessage('examine:' + (focused ? '1' : '0')));
+            unlockFn = setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; element.style.cursor = locked ? 'none' : ''; if (!locked) { clearDim(); sendNebulaMessage('mouse:-1,-1'); } }, (focused) => { nebulaExamine = focused; sendNebulaMessage('examine:' + (focused ? '1' : '0')); if (focused) applyExamineDim(); else applyDim(); });
         }
 
         // Show nebula and connect to Metal renderer — live frame drawing
