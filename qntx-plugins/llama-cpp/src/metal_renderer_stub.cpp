@@ -30,6 +30,8 @@ int MetalRenderer::consume_pick_result() { return -1; }
 void MetalRenderer::set_hover_label(const std::string&) {}
 float MetalRenderer::token_probability(int) { return 0.0f; }
 void MetalRenderer::set_token_examine(bool) {}
+int MetalRenderer::step_candidate(int) { return -1; }
+void MetalRenderer::select_candidate(int) {}
 
 void MetalRenderer::start_render_loop(int, int) {}
 void MetalRenderer::stop_render_loop() {}

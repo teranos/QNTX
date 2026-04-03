@@ -116,6 +116,15 @@ public:
     // Read probability of a token from the current distribution.
     float token_probability(int token_id);
 
+    // Step through visible tokens by probability rank.
+    // dir=+1 moves to next lower prob, dir=-1 to next higher.
+    // Returns token_id of the newly selected candidate, or -1 if at boundary.
+    // Only meaningful in examine mode. Nudges camera if candidate is off-screen.
+    int step_candidate(int dir);
+
+    // Jump selection to a specific token (e.g. from pick). Updates rank.
+    void select_candidate(int token_id);
+
     // Runtime-adjustable parameters
     void set_param(const std::string& key, float value);
 
@@ -218,6 +227,13 @@ private:
     std::vector<std::vector<float>> keyframe_history_;  // one distribution per token
     std::atomic<int> scrub_index_{-1};  // -1 = live mode
     std::atomic<bool> token_examine_{false};  // true = isolate single keyframe
+
+    // Rank navigation — sorted candidate index for ,/. stepping
+    std::vector<int> ranked_tokens_;   // token IDs sorted by prob descending
+    int candidate_rank_ = -1;         // current position in ranked_tokens_ (-1 = none)
+    bool ranked_dirty_ = true;        // rebuild sorted index on next step
+    void rebuild_ranked_index();
+    void nudge_camera_to_token(int token_id);
 
     // Drift — fixed-step camera offset per token, makes time into space
     int drift_count_ = 0;        // how many tokens have been recorded
