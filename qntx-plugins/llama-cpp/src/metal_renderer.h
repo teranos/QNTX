@@ -99,11 +99,6 @@ public:
     // Read probability of a token from the current distribution.
     float token_probability(int token_id);
 
-    // Render a text label into the current HDR texture at pixel coords.
-    // Uses CoreText for rasterization, composited as a textured quad.
-    void render_label(MTL::RenderCommandEncoder* enc, const std::string& text,
-                      float screen_x, float screen_y, int width, int height);
-
     // Runtime-adjustable parameters
     void set_param(const std::string& key, float value);
 
@@ -182,6 +177,8 @@ private:
 
     // Label rendering — textured quad pipeline
     MTL::RenderPipelineState* label_pipeline_ = nullptr;
+    void render_label(MTL::RenderCommandEncoder* enc, const std::string& text,
+                      float screen_x, float screen_y, int width, int height);
 
     // Mouse idle timer for debounced pick response
     std::chrono::steady_clock::time_point mouse_last_move_;
