@@ -657,6 +657,10 @@ void MetalRenderer::set_scrub_index(int idx) {
         if (pick_depth_) { pick_depth_->release(); pick_depth_ = nullptr; }
     }
     hovered_token_.store(-1, std::memory_order_release);
+    // In examine mode, animate camera to the new distribution's center
+    if (token_examine_.load(std::memory_order_acquire) && idx >= 0) {
+        camera_.fly_to(glm::vec3(center_x_, center_y_, 0.0f));
+    }
     // Wake render loop for scrub
     {
         std::lock_guard<std::mutex> lock(render_wake_mutex_);
@@ -668,8 +672,8 @@ void MetalRenderer::set_scrub_index(int idx) {
 void MetalRenderer::set_token_examine(bool focused) {
     bool was_focused = token_examine_.exchange(focused, std::memory_order_release);
     if (focused && !was_focused) {
-        // Auto-center camera on the single keyframe cloud
-        camera_.reset();
+        // Fly camera to distribution center instead of snapping
+        camera_.fly_to(glm::vec3(center_x_, center_y_, 0.0f));
     }
     // Invalidate pick texture so stale picks from previous mode don't linger
     {
@@ -1328,7 +1332,7 @@ void MetalRenderer::start_render_loop(int width, int height) {
                 // Stay awake at 60fps while mouse is active for cursor rendering
                 {
                     bool mouse_active = mouse_x_.load(std::memory_order_acquire) >= 0;
-                    if (!mouse_active) {
+                    if (!mouse_active && !camera_.tracking) {
                         std::unique_lock<std::mutex> lock(render_wake_mutex_);
                         render_wake_cv_.wait_for(lock, std::chrono::milliseconds(500),
                             [this]{ return render_dirty_ || !render_running_.load(); });
@@ -1385,7 +1389,7 @@ void MetalRenderer::start_render_loop(int width, int height) {
                 set_latest_frame(std::move(png), render_width_, render_height_);
             }
 
-            was_idle = (t >= 1.0f) && mouse_x_.load(std::memory_order_acquire) < 0;
+            was_idle = (t >= 1.0f) && mouse_x_.load(std::memory_order_acquire) < 0 && !camera_.tracking;
             if (was_idle) {
                 // Clear dirty so we catch the next submit_distribution
                 std::lock_guard<std::mutex> lock(render_wake_mutex_);

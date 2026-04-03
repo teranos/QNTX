@@ -74,6 +74,13 @@ struct Camera {
         yaw = yaw + (target_yaw - yaw) * t;
         pitch = pitch + (target_pitch - pitch) * t;
         pitch = std::clamp(pitch, -1.5f, 1.5f);
+
+        // Clear tracking when close enough to target
+        if (tracking) {
+            float dist = glm::length(position - target_position);
+            float angle = fabsf(yaw - target_yaw) + fabsf(pitch - target_pitch);
+            if (dist < 0.001f && angle < 0.001f) tracking = false;
+        }
     }
 
     // Apply input deltas from WebSocket cam: messages.
