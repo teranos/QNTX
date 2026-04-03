@@ -149,6 +149,7 @@ if(HAS_METAL)
         "-framework Foundation"
         "-framework QuartzCore"
         "-framework CoreGraphics"
+        "-framework CoreText"
         "-framework ImageIO"
     )
     target_compile_definitions(qntx-llama-cpp-plugin PRIVATE ACCELERATE_NEW_LAPACK)

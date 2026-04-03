@@ -22,6 +22,14 @@ void MetalRenderer::clear_trail() {}
 void MetalRenderer::add_ghost_branches(int, const std::vector<std::pair<int,float>>&) {}
 void MetalRenderer::apply_camera(float, float, float, float, float) {}
 void MetalRenderer::reset_camera() {}
+int MetalRenderer::pick_at(int, int) { return -1; }
+void MetalRenderer::set_mouse(int, int) {}
+void MetalRenderer::set_hovered_token(int) {}
+int MetalRenderer::hovered_token() const { return -1; }
+int MetalRenderer::consume_pick_result() { return -1; }
+void MetalRenderer::set_hover_label(const std::string&) {}
+float MetalRenderer::token_probability(int) { return 0.0f; }
+void MetalRenderer::set_token_examine(bool) {}
 
 void MetalRenderer::start_render_loop(int, int) {}
 void MetalRenderer::stop_render_loop() {}

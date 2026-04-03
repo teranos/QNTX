@@ -382,11 +382,12 @@ grpc::Status LlamaCppPlugin::HandleWebSocket(
     // alongside frame pushes, serializing all writes on one thread.
     std::atomic<bool> closed{false};
     auto* renderer = renderer_.get();
+    auto* engine = &engine_;
 
     std::mutex pong_mutex;
     std::vector<protocol::WebSocketMessage> pong_queue;
 
-    std::thread reader([stream, &closed, renderer, &pong_mutex, &pong_queue]() {
+    std::thread reader([stream, &closed, renderer, engine, &pong_mutex, &pong_queue]() {
         protocol::WebSocketMessage in_msg;
         while (stream->Read(&in_msg)) {
             if (in_msg.type() == protocol::WebSocketMessage::PING) {
@@ -436,6 +437,19 @@ grpc::Status LlamaCppPlugin::HandleWebSocket(
                             renderer->set_param(key, val);
                         } catch (...) {}
                     }
+                } else if (data.size() > 6 && data.substr(0, 6) == "mouse:") {
+                    // mouse:x,y — update cursor position for GPU pick
+                    auto rest = data.substr(6);
+                    auto comma = rest.find(',');
+                    if (comma != std::string::npos) {
+                        try {
+                            int mx = std::stoi(rest.substr(0, comma));
+                            int my = std::stoi(rest.substr(comma + 1));
+                            renderer->set_mouse(mx, my);
+                        } catch (...) {}
+                    }
+                } else if (data.size() > 8 && data.substr(0, 8) == "examine:") {
+                    renderer->set_token_examine(data.substr(8) == "1");
                 }
             }
         }
@@ -453,6 +467,22 @@ grpc::Status LlamaCppPlugin::HandleWebSocket(
             pong_queue.clear();
         }
         if (closed.load()) break;
+
+        // Check for debounced pick result (400ms idle)
+        int pick_id = renderer_->consume_pick_result();
+        if (pick_id >= 0) {
+            auto token_text = engine_.token_text(pick_id);
+
+            // Send to JS for span highlighting
+            std::string pick_resp = "picked:" + std::to_string(pick_id) + "," + token_text;
+            protocol::WebSocketMessage pick_msg;
+            pick_msg.set_type(protocol::WebSocketMessage::DATA);
+            pick_msg.set_data(pick_resp);
+            if (!stream->Write(pick_msg)) break;
+
+            // Set Metal-rendered label
+            renderer_->set_hover_label(token_text);
+        }
 
         auto png = renderer_->wait_for_frame(100);
         if (png.empty()) continue;
