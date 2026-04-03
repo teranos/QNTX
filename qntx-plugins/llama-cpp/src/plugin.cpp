@@ -450,6 +450,25 @@ grpc::Status LlamaCppPlugin::HandleWebSocket(
                     }
                 } else if (data.size() > 8 && data.substr(0, 8) == "examine:") {
                     renderer->set_token_examine(data.substr(8) == "1");
+                } else if (data.size() > 4 && data.substr(0, 4) == "nav:") {
+                    auto cmd = data.substr(4);
+                    int dir = 0;
+                    if (cmd == ".") dir = 1;
+                    else if (cmd == ",") dir = -1;
+                    if (dir != 0) {
+                        int token_id = renderer->step_candidate(dir);
+                        if (token_id >= 0) {
+                            auto text = engine->token_text(token_id);
+                            renderer->set_hover_label(text);
+                            // Queue picked response for JS span highlight
+                            std::string pick_resp = "picked:" + std::to_string(token_id) + "," + text;
+                            protocol::WebSocketMessage pick_msg;
+                            pick_msg.set_type(protocol::WebSocketMessage::DATA);
+                            pick_msg.set_data(pick_resp);
+                            std::lock_guard<std::mutex> lock(pong_mutex);
+                            pong_queue.push_back(pick_msg);
+                        }
+                    }
                 }
             }
         }
@@ -742,7 +761,9 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
 
     plugin_->set_activity("evaluating prompt");
 
-    // Stream tokens as they're generated
+    // Pre-flight: check if prompt will exceed context window.
+    // stream_chat's prepare_prompt will truncate and set result.warning,
+    // but we send the warning chunk after we know.
     auto result = engine.stream_chat(
         messages, temperature, max_tokens,
         [&](const std::string& token_text, const TokenSignal& sig) -> bool {
@@ -799,6 +820,15 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
             return writer->Write(chunk);
         },
         plugin_->sampler_config());
+
+    // Send truncation warning as a visible token so the UI shows it
+    if (!result.warning.empty()) {
+        protocol::LLMChatChunk warn_chunk;
+        warn_chunk.set_token("\n\n⚠ " + result.warning);
+        warn_chunk.set_done(false);
+        warn_chunk.set_model(engine.model_name());
+        writer->Write(warn_chunk);
+    }
 
     // Final chunk with totals
     protocol::LLMChatChunk final_chunk;

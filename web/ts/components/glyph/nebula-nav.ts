@@ -52,6 +52,8 @@ export function createNebulaNav(config: NebulaNavConfig): NebulaNavHandle {
         { key: 'r',          display: 'R',  cmd: 'cam:r',                        label: 'reset camera' },
         { key: '[',          display: '[',  cmd: '',                             label: 'prev token' },
         { key: ']',          display: ']',  cmd: '',                             label: 'next token' },
+        { key: ',',          display: ',',  cmd: '',                             label: 'prev candidate' },
+        { key: '.',          display: '.',  cmd: '',                             label: 'next candidate' },
     ];
     const keyMap: Record<string, string> = {};
     for (const b of bindings) keyMap[b.key] = b.cmd;
@@ -103,6 +105,11 @@ export function createNebulaNav(config: NebulaNavConfig): NebulaNavHandle {
         if (e.key === '[' || e.key === ']') {
             e.preventDefault();
             if (tokenNav) tokenNav.navigate(e.key === '[' ? -1 : 1);
+            return;
+        }
+        if ((e.key === ',' || e.key === '.') && examine) {
+            e.preventDefault();
+            sendMessage('nav:' + e.key);
             return;
         }
         if (e.key === '?') {

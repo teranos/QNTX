@@ -395,6 +395,19 @@ int InferenceEngine::prepare_prompt(
     }
     tokens.resize(n_tokens);
 
+    // Check against context window — reserve 25% for generation
+    int ctx_size = llama_n_ctx(ctx_);
+    int max_prompt = ctx_size * 3 / 4;
+    if (n_tokens > max_prompt) {
+        int original = n_tokens;
+        n_tokens = max_prompt;
+        tokens.resize(n_tokens);
+        result.warning = "Prompt truncated from " + std::to_string(original)
+            + " to " + std::to_string(n_tokens) + " tokens (context window: "
+            + std::to_string(ctx_size) + ")";
+        std::cerr << "[llama-cpp] WARNING: " << result.warning << std::endl;
+    }
+
     // Clear KV cache
     llama_memory_clear(llama_get_memory(ctx_), true);
 
