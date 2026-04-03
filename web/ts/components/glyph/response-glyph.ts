@@ -874,7 +874,7 @@ export function createResponseGlyph(
         }
 
         popup = createTokenPopup();
-        unlockFn = setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; element.style.cursor = locked ? 'none' : ''; if (!locked) { clearDim(); sendNebulaMessage('mouse:-1,-1'); } });
+        unlockFn = setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; element.style.cursor = locked ? 'none' : ''; if (!locked) { clearDim(); sendNebulaMessage('mouse:-1,-1'); } }, (focused) => sendNebulaMessage('examine:' + (focused ? '1' : '0')));
     } else if (result) {
         // Static mode — render output text
         renderOutput(output, result);
@@ -892,7 +892,7 @@ export function createResponseGlyph(
             visibilityObserver?.observe(output);
 
             popup = createTokenPopup();
-            unlockFn = setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; element.style.cursor = locked ? 'none' : ''; if (!locked) { clearDim(); sendNebulaMessage('mouse:-1,-1'); } });
+            unlockFn = setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; element.style.cursor = locked ? 'none' : ''; if (!locked) { clearDim(); sendNebulaMessage('mouse:-1,-1'); } }, (focused) => sendNebulaMessage('examine:' + (focused ? '1' : '0')));
         }
 
         // Show nebula and connect to Metal renderer — live frame drawing
@@ -1015,8 +1015,10 @@ function setupTokenPopup(
     popup: ReturnType<typeof createTokenPopup>,
     onScrub?: (index: number) => void,
     onLockChange?: (locked: boolean, span: HTMLElement | null) => void,
+    onExamineChange?: (focused: boolean) => void,
 ): () => void {
     let lockedSpan: HTMLSpanElement | null = null;
+    let focused = false;  // red = focus mode (single keyframe isolation)
 
     function scrubTo(idx: number): void {
         if (onScrub) onScrub(idx);
@@ -1024,6 +1026,10 @@ function setupTokenPopup(
     }
 
     function unlock(): void {
+        if (focused) {
+            focused = false;
+            if (onExamineChange) onExamineChange(false);
+        }
         if (lockedSpan) {
             lockedSpan.style.outline = '';
             lockedSpan.style.boxShadow = '';
@@ -1038,9 +1044,11 @@ function setupTokenPopup(
             lockedSpan.style.outline = '';
             lockedSpan.style.boxShadow = '';
         }
+        focused = false;
+        if (onExamineChange) onExamineChange(false);
         lockedSpan = span;
-        lockedSpan.style.outline = '1px solid rgba(255, 140, 30, 0.45)';
-        lockedSpan.style.boxShadow = '0 0 6px rgba(255, 140, 30, 0.3)';
+        lockedSpan.style.outline = '1px solid rgba(255, 160, 40, 0.8)';
+        lockedSpan.style.boxShadow = 'none';
         popup.show(span);
         if (span.dataset.tokenIndex) {
             scrubTo(parseInt(span.dataset.tokenIndex, 10));
@@ -1048,13 +1056,25 @@ function setupTokenPopup(
         if (onLockChange) onLockChange(true, span);
     }
 
-    // Click to lock selection — click again or click outside to unlock
+    function examineToken(): void {
+        if (!lockedSpan) return;
+        focused = true;
+        lockedSpan.style.outline = '1px solid rgba(240, 50, 50, 0.85)';
+        lockedSpan.style.boxShadow = 'none';
+        if (onExamineChange) onExamineChange(true);
+    }
+
+    // Click: span → lock (orange). Same span again → focus (red). Again → unlock.
     output.addEventListener('click', (e: MouseEvent) => {
         const target = e.target as HTMLElement;
         if (target.tagName === 'SPAN' && target.dataset.confidence) {
             const span = target as HTMLSpanElement;
             if (lockedSpan === span) {
-                unlock();
+                if (focused) {
+                    unlock();
+                } else {
+                    examineToken();
+                }
             } else {
                 lockToken(span);
             }

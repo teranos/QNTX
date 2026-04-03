@@ -158,7 +158,9 @@ vertex TrailVertexOut trailVertex(
 }
 
 fragment float4 trailFragment(TrailVertexOut in [[stage_in]]) {
-    return float4(in.color * in.alpha * 0.7, 1.0);
+    // Bright warm trail — stands out from ghost branches
+    float3 glow = in.color * in.alpha * 1.2;
+    return float4(glow, 1.0);
 }
 
 // --- Ghost branches: runner-up paths at low-certainty tokens ---
@@ -190,10 +192,15 @@ vertex TrailVertexOut ghostBranchVertex(
     TrailVertexOut out;
     out.position = mvp * float4(pos, 1.0);
     // Cool blue-violet tint — visually distinct from warm main trail
-    out.color = float3(0.4, 0.55, 0.9);
-    // Alpha scales with probability — high-prob runners bright, low-prob fade
-    out.alpha = saturate(prob * 4.0) * 0.6;
+    out.color = float3(0.3, 0.4, 0.7);
+    // Alpha scales with probability — high-prob runners visible, low-prob fade
+    out.alpha = saturate(prob * 3.0) * 0.3;
     return out;
+}
+
+fragment float4 ghostFragment(TrailVertexOut in [[stage_in]]) {
+    // Dim ghost lines — clearly subordinate to the main trail
+    return float4(in.color * in.alpha * 0.5, in.alpha * 0.4);
 }
 
 // --- Pick buffer: render token IDs to R32Uint for hover identification ---
@@ -213,8 +220,8 @@ vertex PickVertexOut pickVertex(
 
     PickVertexOut out;
     out.position = mvp * float4(p.position, 1.0);
-    // Minimum 8px hitbox so small/distant particles are still pickable
-    out.pointSize = max(p.size, 8.0);
+    // Inflate visible particles for easier picking, but skip invisible ones
+    out.pointSize = (p.size > 0.1) ? max(p.size, 8.0) : 0.0;
     out.tokenId = vid;
     return out;
 }

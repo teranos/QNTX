@@ -183,7 +183,7 @@ bool MetalRenderer::setup() {
 
     // Ghost branch pipeline — runner-up paths at uncertain tokens
     auto ghost_vertex_fn = library->newFunction(NS::String::string("ghostBranchVertex", NS::UTF8StringEncoding));
-    auto ghost_fragment_fn = library->newFunction(NS::String::string("trailFragment", NS::UTF8StringEncoding));
+    auto ghost_fragment_fn = library->newFunction(NS::String::string("ghostFragment", NS::UTF8StringEncoding));
     if (!ghost_vertex_fn || !ghost_fragment_fn) {
         std::cout << "[metal-llama] ghost branch shaders not found" << std::endl;
         if (ghost_vertex_fn) ghost_vertex_fn->release();
@@ -650,7 +650,34 @@ void MetalRenderer::store_keyframe(const float* probabilities, int vocab_size) {
 
 void MetalRenderer::set_scrub_index(int idx) {
     scrub_index_.store(idx, std::memory_order_release);
+    // Invalidate pick texture — new keyframe, new distribution
+    {
+        std::lock_guard<std::mutex> plock(pick_mutex_);
+        if (pick_texture_) { pick_texture_->release(); pick_texture_ = nullptr; }
+        if (pick_depth_) { pick_depth_->release(); pick_depth_ = nullptr; }
+    }
+    hovered_token_.store(-1, std::memory_order_release);
     // Wake render loop for scrub
+    {
+        std::lock_guard<std::mutex> lock(render_wake_mutex_);
+        render_dirty_ = true;
+    }
+    render_wake_cv_.notify_one();
+}
+
+void MetalRenderer::set_token_examine(bool focused) {
+    bool was_focused = token_examine_.exchange(focused, std::memory_order_release);
+    if (focused && !was_focused) {
+        // Auto-center camera on the single keyframe cloud
+        camera_.reset();
+    }
+    // Invalidate pick texture so stale picks from previous mode don't linger
+    {
+        std::lock_guard<std::mutex> plock(pick_mutex_);
+        if (pick_texture_) { pick_texture_->release(); pick_texture_ = nullptr; }
+        if (pick_depth_) { pick_depth_->release(); pick_depth_ = nullptr; }
+    }
+    hovered_token_.store(-1, std::memory_order_release);
     {
         std::lock_guard<std::mutex> lock(render_wake_mutex_);
         render_dirty_ = true;
@@ -984,8 +1011,11 @@ void MetalRenderer::start_render_loop(int width, int height) {
             int scrub = scrub_index_.load(std::memory_order_acquire);
 
             if (scrub >= 0) {
+                bool examining = token_examine_.load(std::memory_order_acquire);
+
                 // Multi-cloud scrub: render every keyframe's cloud at its orbit
                 // position, fading with distance from the selected keyframe.
+                // In examine mode: single keyframe, no orbit, no fade.
                 int kf_count = 0;
                 {
                     std::lock_guard<std::mutex> lock(dist_mutex_);
@@ -1007,10 +1037,14 @@ void MetalRenderer::start_render_loop(int width, int height) {
                     if (hdr_tex) {
                         bool first_pass = true;
 
-                        for (int ki = 0; ki < kf_count; ki++) {
+                        // In examine mode, only render the selected keyframe
+                        int ki_start = examining ? scrub : 0;
+                        int ki_end = examining ? scrub + 1 : kf_count;
+
+                        for (int ki = ki_start; ki < ki_end; ki++) {
                             // Distance-based fade: selected = 1.0, fades with distance
                             int dist = std::abs(ki - scrub);
-                            float fade = expf(-0.0375f * (float)dist);
+                            float fade = examining ? 1.0f : expf(-0.0375f * (float)dist);
                             if (fade < 0.02f) continue;  // skip near-invisible clouds
 
                             std::vector<float> kf;
@@ -1021,14 +1055,14 @@ void MetalRenderer::start_render_loop(int width, int height) {
                             }
                             if (kf.empty()) continue;
 
-                            // Orbit offset for this keyframe
-                            float age = (float)(scrub - ki);
-                            float theta = age * as;
-                            float off[3] = {
-                                or_ * sinf(theta),
-                                -or_ * (1.0f - cosf(theta)),
-                                0.0f
-                            };
+                            // Orbit offset — zero in examine mode
+                            float off[3] = {0, 0, 0};
+                            if (!examining) {
+                                float age = (float)(scrub - ki);
+                                float theta = age * as;
+                                off[0] = or_ * sinf(theta);
+                                off[1] = -or_ * (1.0f - cosf(theta));
+                            }
 
                             auto prob_buf = device_->newBuffer(kf.data(), kf.size() * sizeof(float),
                                                                 MTL::ResourceStorageModeShared);
@@ -1086,8 +1120,8 @@ void MetalRenderer::start_render_loop(int width, int height) {
 
                             render_enc->drawPrimitives(MTL::PrimitiveTypePoint, (NS::UInteger)0, (NS::UInteger)n);
 
-                            // Draw trail + ghost branches on last pass
-                            if (ki == kf_count - 1 || ki == scrub) {
+                            // Draw trail + ghost branches on last pass (skip in examine mode)
+                            if (!examining && (ki == kf_count - 1 || ki == scrub)) {
                                 std::lock_guard<std::mutex> lock(trail_mutex_);
                                 int trail_count = trail_positions_.size() / 3;
                                 uint32_t tc = (uint32_t)trail_count;
@@ -1131,8 +1165,8 @@ void MetalRenderer::start_render_loop(int width, int height) {
                                 }
                             }
 
-                            // Mouse-driven cursor + highlight in scrub mode
-                            if (ki == scrub) {
+                            // Mouse-driven cursor + highlight — only in examine mode
+                            if (ki == scrub && examining) {
                                 int smx = mouse_x_.load(std::memory_order_acquire);
                                 int smy = mouse_y_.load(std::memory_order_acquire);
                                 if (smx >= 0 && smy >= 0) {
@@ -1189,8 +1223,8 @@ void MetalRenderer::start_render_loop(int width, int height) {
 
                             render_enc->endEncoding();
 
-                            // Pick pass for the selected keyframe
-                            if (ki == scrub && pick_pipeline_) {
+                            // Pick pass — only in examine mode
+                            if (ki == scrub && examining && pick_pipeline_) {
                                 std::lock_guard<std::mutex> plock(pick_mutex_);
                                 ensure_pick_textures(w, h);
                                 if (pick_texture_ && pick_depth_) {
