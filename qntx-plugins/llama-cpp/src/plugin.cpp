@@ -448,6 +448,8 @@ grpc::Status LlamaCppPlugin::HandleWebSocket(
                             renderer->set_mouse(mx, my);
                         } catch (...) {}
                     }
+                } else if (data.size() > 8 && data.substr(0, 8) == "examine:") {
+                    renderer->set_token_examine(data.substr(8) == "1");
                 }
             }
         }

@@ -61,6 +61,9 @@ public:
     // Set scrub target: index >= 0 renders that keyframe, -1 resumes live.
     void set_scrub_index(int idx);
 
+    // Examine mode: isolate single keyframe (no orbit, no trail, no fade).
+    void set_token_examine(bool examine);
+
     // Record the chosen token's position in the generation trail.
     void add_trail_point(int token_id);
     void clear_trail();
@@ -200,6 +203,7 @@ private:
     // Scrub playback — CPU-side keyframe history
     std::vector<std::vector<float>> keyframe_history_;  // one distribution per token
     std::atomic<int> scrub_index_{-1};  // -1 = live mode
+    std::atomic<bool> token_examine_{false};  // true = isolate single keyframe
 
     // Drift — fixed-step camera offset per token, makes time into space
     int drift_count_ = 0;        // how many tokens have been recorded
