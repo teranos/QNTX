@@ -9,10 +9,21 @@
 // TODO(TRU): Trail positions vector is unbounded while keyframes are capped.
 // TODO(WSPT): WebSocket message parsing in plugin.cpp (mouse:, examine:, cam:,
 //   scrub:) is string prefix matching with no tests. Extract and unit-test.
+// TODO(KFNV): Keyframe navigation — [/] keys step between tokens in the
+//   generation sequence. Camera animates to the new distribution's center
+//   (subsumes CSNP). Works in both orange (scrub) and red (examine) modes.
+//   JS finds adjacent token span, triggers scrubTo(). C++ animates camera.
+// TODO(RNAV): Rank navigation — ,/. keys step through visible tokens sorted
+//   by probability (descending). Sorted index rebuilt on keyframe change.
+//   Pick (click) jumps to arbitrary rank. Camera nudges only when the
+//   selected candidate is off-screen (pull to 10% from edge, don't center).
+// TODO(CLST): Cluster navigation — 'c' toggles cluster mode overlay using
+//   HDBSCAN on visible token positions. ,/. shifts meaning: step between
+//   clusters (camera centers), press 'c' again to enter cluster (,/. steps
+//   within). Escape backs out. Flat ,/. rank nav always available outside
+//   c-mode. Builds on RNAV's sorted candidate index.
 // TODO(DCUR): Cursor is a fixed-size screen-space quad — doesn't scale with
 //   distance to the particle. Closer particles should get a larger cursor.
-// TODO(CSNP): Examine mode camera reset is abrupt. Animate the transition to
-//   center on the single keyframe's cloud instead of snapping.
 // TODO(STR): GPU-accelerated steering — Metal compute shader could modify the
 //   logit buffer before sampling. Click a region of the nebula to boost tokens
 //   in that region. Infrastructure exists (writable Metal buffer, sampler reads
