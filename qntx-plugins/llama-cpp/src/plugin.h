@@ -14,7 +14,7 @@
 #include "llm.grpc.pb.h"
 #include "ats_client.h"
 
-#define PLUGIN_VERSION "0.28.2"
+#define PLUGIN_VERSION "0.31.1"
 
 // Forward declarations
 struct llama_model;
@@ -127,6 +127,8 @@ public:
                            const SamplerConfig& sampler_cfg = {});
 
     std::string model_name() const { return model_name_; }
+    int vocab_size() const;
+    std::string token_text(int token_id) const;
 
     // Get vocab token positions (3D) and colors (RGB) via PCA.
     // Computed once at model load, cached. Returns vocab_size × 6 floats

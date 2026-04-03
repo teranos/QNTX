@@ -32,7 +32,9 @@ namespace MTL {
     class CommandQueue;
     class ComputePipelineState;
     class RenderPipelineState;
+    class RenderCommandEncoder;
     class Buffer;
+    class Texture;
 }
 #endif
 
@@ -59,6 +61,9 @@ public:
     // Set scrub target: index >= 0 renders that keyframe, -1 resumes live.
     void set_scrub_index(int idx);
 
+    // Examine mode: isolate single keyframe (no orbit, no trail, no fade).
+    void set_token_examine(bool examine);
+
     // Record the chosen token's position in the generation trail.
     void add_trail_point(int token_id);
     void clear_trail();
@@ -72,6 +77,27 @@ public:
     // rotation (dyaw/dpitch in radians).
     void apply_camera(float dx, float dy, float dz, float dyaw, float dpitch);
     void reset_camera();
+
+    // Pick: read token ID at pixel coordinates. Returns -1 if no particle.
+    int pick_at(int px, int py);
+
+    // Mouse position for GPU-side cursor rendering. -1,-1 = no cursor.
+    void set_mouse(int px, int py);
+
+    // Set/clear the highlighted (hovered) token for visual feedback.
+    void set_hovered_token(int token_id);
+    int hovered_token() const;
+
+    // Check if mouse has been idle for 400ms and a pick result is ready.
+    // Returns token_id >= 0 if ready, -1 otherwise. Resets after read.
+    int consume_pick_result();
+
+    // Set the hover label text (called from plugin when pick fires).
+    // Cleared automatically when mouse moves.
+    void set_hover_label(const std::string& text);
+
+    // Read probability of a token from the current distribution.
+    float token_probability(int token_id);
 
     // Runtime-adjustable parameters
     void set_param(const std::string& key, float value);
@@ -133,6 +159,37 @@ private:
     std::vector<float> ghost_vertices_;
     MTL::RenderPipelineState* ghost_pipeline_ = nullptr;
 
+    // Pick buffer — R32Uint texture for hover identification
+    MTL::RenderPipelineState* pick_pipeline_ = nullptr;
+    MTL::Texture* pick_texture_ = nullptr;
+    MTL::Texture* pick_depth_ = nullptr;
+    int pick_width_ = 0, pick_height_ = 0;
+    std::mutex pick_mutex_;
+
+    // Mouse position in render-texture pixels (-1 = no cursor)
+    std::atomic<int> mouse_x_{-1}, mouse_y_{-1};
+
+    // Highlight — square around hovered particle
+    MTL::RenderPipelineState* highlight_pipeline_ = nullptr;
+    // Cursor — persistent crosshair with semi-transparent fill
+    MTL::RenderPipelineState* cursor_pipeline_ = nullptr;
+    std::atomic<int> hovered_token_{-1};
+
+    // Label rendering — textured quad pipeline
+    MTL::RenderPipelineState* label_pipeline_ = nullptr;
+    void render_label(MTL::RenderCommandEncoder* enc, const std::string& text,
+                      float screen_x, float screen_y, int width, int height);
+
+    // Mouse idle timer for debounced pick response
+    std::chrono::steady_clock::time_point mouse_last_move_;
+    bool pick_sent_ = false;  // true after sending picked: for current idle
+
+    // Hover label — set by plugin when pick fires, cleared on mouse move
+    std::string hover_label_;
+    std::mutex hover_label_mutex_;
+
+    void ensure_pick_textures(int width, int height);
+
     // Interpolation state
     MTL::Buffer* prob_a_ = nullptr;  // previous distribution
     MTL::Buffer* prob_b_ = nullptr;  // current distribution
@@ -143,6 +200,7 @@ private:
     // Scrub playback — CPU-side keyframe history
     std::vector<std::vector<float>> keyframe_history_;  // one distribution per token
     std::atomic<int> scrub_index_{-1};  // -1 = live mode
+    std::atomic<bool> token_examine_{false};  // true = isolate single keyframe
 
     // Drift — fixed-step camera offset per token, makes time into space
     int drift_count_ = 0;        // how many tokens have been recorded

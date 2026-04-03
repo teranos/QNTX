@@ -539,10 +539,17 @@ export function createResponseGlyph(
                 const msg = JSON.parse(event.data);
                 if (msg.type !== 1 || !msg.data) return;
 
-                const binary = atob(msg.data);
-                const bytes = new Uint8Array(binary.length);
-                for (let i = 0; i < binary.length; i++) {
-                    bytes[i] = binary.charCodeAt(i);
+                const decoded = atob(msg.data);
+
+                // Pick response: picked:tokenId,tokenText
+                if (decoded.indexOf('picked:') === 0) {
+                    handlePickResponse(decoded.substring(7));
+                    return;
+                }
+
+                const bytes = new Uint8Array(decoded.length);
+                for (let i = 0; i < decoded.length; i++) {
+                    bytes[i] = decoded.charCodeAt(i);
                 }
                 const blob = new Blob([bytes], { type: 'image/png' });
                 lastNebulaBase64 = msg.data; // store raw base64 for persistence
@@ -572,6 +579,7 @@ export function createResponseGlyph(
 
     // Dim token spans based on nebula brightness behind them (#749)
     function applyDim(): void {
+        if (nebulaExamine) { applyExamineDim(); return; }
         if (!nebulaCtx || !nebulaScrub || !selectedSpan) return;
         const canvasRect = nebulaCanvas.getBoundingClientRect();
         const imgData = nebulaCtx.getImageData(0, 0, nebulaCanvas.width, nebulaCanvas.height);
@@ -628,7 +636,46 @@ export function createResponseGlyph(
         }
     }
 
+    // Examine dim: selected token full opacity, its sentence visible, rest fades out
+    function applyExamineDim(): void {
+        if (!selectedSpan) return;
+        const spans = Array.from(output.querySelectorAll('span[data-confidence]')) as HTMLElement[];
+        const selectedIdx = spans.indexOf(selectedSpan);
+        if (selectedIdx < 0) return;
+
+        // Find sentence boundaries by scanning for sentence-ending punctuation
+        let sentStart = 0;
+        let sentEnd = spans.length - 1;
+        for (let i = selectedIdx - 1; i >= 0; i--) {
+            const text = spans[i].textContent || '';
+            if (text.indexOf('.') >= 0 || text.indexOf('!') >= 0 || text.indexOf('?') >= 0 || text.indexOf('\n') >= 0) {
+                sentStart = i + 1;
+                break;
+            }
+        }
+        for (let i = selectedIdx; i < spans.length; i++) {
+            const text = spans[i].textContent || '';
+            if (text.indexOf('.') >= 0 || text.indexOf('!') >= 0 || text.indexOf('?') >= 0 || text.indexOf('\n') >= 0) {
+                sentEnd = i;
+                break;
+            }
+        }
+
+        for (let i = 0; i < spans.length; i++) {
+            if (i === selectedIdx) {
+                spans[i].style.opacity = '1';
+            } else if (i >= sentStart && i <= sentEnd) {
+                spans[i].style.opacity = '0.6';
+            } else if (Math.abs(i - selectedIdx) <= 5) {
+                spans[i].style.opacity = '0.25';
+            } else {
+                spans[i].style.opacity = '0.04';
+            }
+        }
+    }
+
     function clearDim(): void {
+        nebulaExamine = false;
         const spans = output.querySelectorAll('span[data-confidence]');
         for (const span of spans) {
             (span as HTMLElement).style.opacity = '';
@@ -678,6 +725,7 @@ export function createResponseGlyph(
     // Camera controls — active only when a token is selected.
     // Single source of truth: key, command, and label defined together.
     let nebulaNavActive = false;
+    let nebulaExamine = false;  // red mode — single keyframe isolation
     let selectedSpan: HTMLElement | null = null; // tracks locked token for dim calculation
     const camStep = 0.02;
     const camRotStep = 0.03;
@@ -754,6 +802,62 @@ export function createResponseGlyph(
     }
     document.addEventListener('keydown', onNebulaKey);
 
+    // ── Pick hover — GPU-side cursor + highlight, JS only for span outline ──
+    // Mouse position sent on every move; C++ renders cursor square + label
+    // into the Metal frame. After 0.4s idle, C++ sends picked:id,text for
+    // the span highlight in the response text.
+
+    let pickedSpanHighlight: HTMLElement | null = null;
+
+    function handlePickResponse(data: string): void {
+        const comma = data.indexOf(',');
+        if (comma < 0) return;
+        const tokenId = parseInt(data.substring(0, comma), 10);
+        const tokenText = data.substring(comma + 1);
+
+        if (pickedSpanHighlight) {
+            pickedSpanHighlight.style.outline = '';
+            pickedSpanHighlight = null;
+        }
+
+        if (tokenId < 0 || !tokenText) return;
+
+        // Highlight matching span in the response text
+        const spans = output.querySelectorAll('span[data-token-index]');
+        for (const span of spans) {
+            const el = span as HTMLElement;
+            if (el.textContent === tokenText) {
+                el.style.outline = '1px solid cyan';
+                pickedSpanHighlight = el;
+                break;
+            }
+        }
+    }
+
+    function clearPick(): void {
+        if (pickedSpanHighlight) {
+            pickedSpanHighlight.style.outline = '';
+            pickedSpanHighlight = null;
+        }
+        sendNebulaMessage('mouse:-1,-1');
+    }
+
+    function onPickMouseMove(e: MouseEvent): void {
+        if (!nebulaNavActive) return;
+        // Send normalized coordinates (0..1000) — C++ maps to render texture size
+        const rect = element.getBoundingClientRect();
+        const nx = Math.round((e.clientX - rect.left) / rect.width * 1000);
+        const ny = Math.round((e.clientY - rect.top) / rect.height * 1000);
+        sendNebulaMessage('mouse:' + nx + ',' + ny);
+    }
+
+    function onPickMouseLeave(): void {
+        clearPick();
+    }
+
+    element.addEventListener('mousemove', onPickMouseMove);
+    element.addEventListener('mouseleave', onPickMouseLeave);
+
     // ── Restore saved content ───────────────────────────────────────
 
     const saved = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
@@ -811,7 +915,7 @@ export function createResponseGlyph(
         }
 
         popup = createTokenPopup();
-        unlockFn = setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; if (!locked) clearDim(); });
+        unlockFn = setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; element.style.cursor = locked ? 'none' : ''; if (!locked) { clearDim(); sendNebulaMessage('mouse:-1,-1'); } }, (focused) => { nebulaExamine = focused; sendNebulaMessage('examine:' + (focused ? '1' : '0')); if (focused) applyExamineDim(); else applyDim(); });
     } else if (result) {
         // Static mode — render output text
         renderOutput(output, result);
@@ -829,7 +933,7 @@ export function createResponseGlyph(
             visibilityObserver?.observe(output);
 
             popup = createTokenPopup();
-            unlockFn = setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; if (!locked) clearDim(); });
+            unlockFn = setupTokenPopup(output, popup, (idx) => sendNebulaMessage('scrub:' + idx), (locked, span) => { nebulaNavActive = locked; selectedSpan = span; element.style.cursor = locked ? 'none' : ''; if (!locked) { clearDim(); sendNebulaMessage('mouse:-1,-1'); } }, (focused) => { nebulaExamine = focused; sendNebulaMessage('examine:' + (focused ? '1' : '0')); if (focused) applyExamineDim(); else applyDim(); });
         }
 
         // Show nebula and connect to Metal renderer — live frame drawing
@@ -912,6 +1016,9 @@ export function createResponseGlyph(
         closeNebula();
         nebulaRo.disconnect();
         document.removeEventListener('keydown', onNebulaKey);
+        element.removeEventListener('mousemove', onPickMouseMove);
+        element.removeEventListener('mouseleave', onPickMouseLeave);
+        clearPick();
         if (lastNebulaBitmap) { lastNebulaBitmap.close(); lastNebulaBitmap = null; }
     });
 
@@ -949,8 +1056,10 @@ function setupTokenPopup(
     popup: ReturnType<typeof createTokenPopup>,
     onScrub?: (index: number) => void,
     onLockChange?: (locked: boolean, span: HTMLElement | null) => void,
+    onExamineChange?: (focused: boolean) => void,
 ): () => void {
     let lockedSpan: HTMLSpanElement | null = null;
+    let focused = false;  // red = focus mode (single keyframe isolation)
 
     function scrubTo(idx: number): void {
         if (onScrub) onScrub(idx);
@@ -958,6 +1067,10 @@ function setupTokenPopup(
     }
 
     function unlock(): void {
+        if (focused) {
+            focused = false;
+            if (onExamineChange) onExamineChange(false);
+        }
         if (lockedSpan) {
             lockedSpan.style.outline = '';
             lockedSpan.style.boxShadow = '';
@@ -972,9 +1085,11 @@ function setupTokenPopup(
             lockedSpan.style.outline = '';
             lockedSpan.style.boxShadow = '';
         }
+        focused = false;
+        if (onExamineChange) onExamineChange(false);
         lockedSpan = span;
-        lockedSpan.style.outline = '1px solid rgba(255, 140, 30, 0.45)';
-        lockedSpan.style.boxShadow = '0 0 6px rgba(255, 140, 30, 0.3)';
+        lockedSpan.style.outline = '1px solid rgba(255, 160, 40, 0.8)';
+        lockedSpan.style.boxShadow = 'none';
         popup.show(span);
         if (span.dataset.tokenIndex) {
             scrubTo(parseInt(span.dataset.tokenIndex, 10));
@@ -982,13 +1097,25 @@ function setupTokenPopup(
         if (onLockChange) onLockChange(true, span);
     }
 
-    // Click to lock selection — click again or click outside to unlock
+    function examineToken(): void {
+        if (!lockedSpan) return;
+        focused = true;
+        lockedSpan.style.outline = '1px solid rgba(240, 50, 50, 0.85)';
+        lockedSpan.style.boxShadow = 'none';
+        if (onExamineChange) onExamineChange(true);
+    }
+
+    // Click: span → lock (orange). Same span again → focus (red). Again → unlock.
     output.addEventListener('click', (e: MouseEvent) => {
         const target = e.target as HTMLElement;
         if (target.tagName === 'SPAN' && target.dataset.confidence) {
             const span = target as HTMLSpanElement;
             if (lockedSpan === span) {
-                unlock();
+                if (focused) {
+                    unlock();
+                } else {
+                    examineToken();
+                }
             } else {
                 lockToken(span);
             }

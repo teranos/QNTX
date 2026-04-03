@@ -16,6 +16,7 @@
 #include <vector>
 
 #include <CoreGraphics/CoreGraphics.h>
+#include <CoreText/CoreText.h>
 #include <ImageIO/ImageIO.h>
 
 // Shader source — read from src/shaders.metal at compile time.
@@ -182,7 +183,7 @@ bool MetalRenderer::setup() {
 
     // Ghost branch pipeline — runner-up paths at uncertain tokens
     auto ghost_vertex_fn = library->newFunction(NS::String::string("ghostBranchVertex", NS::UTF8StringEncoding));
-    auto ghost_fragment_fn = library->newFunction(NS::String::string("trailFragment", NS::UTF8StringEncoding));
+    auto ghost_fragment_fn = library->newFunction(NS::String::string("ghostFragment", NS::UTF8StringEncoding));
     if (!ghost_vertex_fn || !ghost_fragment_fn) {
         std::cout << "[metal-llama] ghost branch shaders not found" << std::endl;
         if (ghost_vertex_fn) ghost_vertex_fn->release();
@@ -208,6 +209,98 @@ bool MetalRenderer::setup() {
 
     if (!ghost_pipeline_) { library->release(); return false; }
 
+    // Pick pipeline — renders token IDs to R32Uint for hover identification
+    auto pick_vertex_fn = library->newFunction(NS::String::string("pickVertex", NS::UTF8StringEncoding));
+    auto pick_fragment_fn = library->newFunction(NS::String::string("pickFragment", NS::UTF8StringEncoding));
+    if (!pick_vertex_fn || !pick_fragment_fn) {
+        std::cout << "[metal-llama] pick shaders not found" << std::endl;
+        if (pick_vertex_fn) pick_vertex_fn->release();
+        if (pick_fragment_fn) pick_fragment_fn->release();
+        library->release();
+        return false;
+    }
+
+    auto pick_rpd = MTL::RenderPipelineDescriptor::alloc()->init();
+    pick_rpd->setVertexFunction(pick_vertex_fn);
+    pick_rpd->setFragmentFunction(pick_fragment_fn);
+    pick_rpd->colorAttachments()->object(0)->setPixelFormat(MTL::PixelFormatR32Uint);
+    pick_rpd->colorAttachments()->object(0)->setBlendingEnabled(false);
+    pick_rpd->setDepthAttachmentPixelFormat(MTL::PixelFormatDepth32Float);
+
+    pick_pipeline_ = device_->newRenderPipelineState(pick_rpd, &error);
+    pick_rpd->release();
+    pick_vertex_fn->release();
+    pick_fragment_fn->release();
+
+    if (!pick_pipeline_) { library->release(); return false; }
+
+    // Highlight pipeline — cyan square around hovered particle
+    auto hl_vertex_fn = library->newFunction(NS::String::string("highlightVertex", NS::UTF8StringEncoding));
+    auto hl_fragment_fn = library->newFunction(NS::String::string("highlightFragment", NS::UTF8StringEncoding));
+    if (!hl_vertex_fn || !hl_fragment_fn) {
+        std::cout << "[metal-llama] highlight shaders not found" << std::endl;
+        if (hl_vertex_fn) hl_vertex_fn->release();
+        if (hl_fragment_fn) hl_fragment_fn->release();
+        library->release();
+        return false;
+    }
+
+    auto hl_rpd = MTL::RenderPipelineDescriptor::alloc()->init();
+    hl_rpd->setVertexFunction(hl_vertex_fn);
+    hl_rpd->setFragmentFunction(hl_fragment_fn);
+    hl_rpd->colorAttachments()->object(0)->setPixelFormat(MTL::PixelFormatRGBA16Float);
+    hl_rpd->colorAttachments()->object(0)->setBlendingEnabled(true);
+    hl_rpd->colorAttachments()->object(0)->setSourceRGBBlendFactor(MTL::BlendFactorSourceAlpha);
+    hl_rpd->colorAttachments()->object(0)->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    hl_rpd->colorAttachments()->object(0)->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    hl_rpd->colorAttachments()->object(0)->setDestinationAlphaBlendFactor(MTL::BlendFactorOne);
+
+    highlight_pipeline_ = device_->newRenderPipelineState(hl_rpd, &error);
+    hl_rpd->release();
+    hl_vertex_fn->release();
+    hl_fragment_fn->release();
+
+    if (!highlight_pipeline_) { library->release(); return false; }
+
+    // Cursor pipeline — same vertex shader as highlight, cursor fragment with crosshair + fill
+    auto cursor_fragment_fn = library->newFunction(NS::String::string("cursorFragment", NS::UTF8StringEncoding));
+    if (cursor_fragment_fn) {
+        auto cursor_vertex_fn = library->newFunction(NS::String::string("highlightVertex", NS::UTF8StringEncoding));
+        auto cur_rpd = MTL::RenderPipelineDescriptor::alloc()->init();
+        cur_rpd->setVertexFunction(cursor_vertex_fn);
+        cur_rpd->setFragmentFunction(cursor_fragment_fn);
+        cur_rpd->colorAttachments()->object(0)->setPixelFormat(MTL::PixelFormatRGBA16Float);
+        cur_rpd->colorAttachments()->object(0)->setBlendingEnabled(true);
+        cur_rpd->colorAttachments()->object(0)->setSourceRGBBlendFactor(MTL::BlendFactorSourceAlpha);
+        cur_rpd->colorAttachments()->object(0)->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+        cur_rpd->colorAttachments()->object(0)->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+        cur_rpd->colorAttachments()->object(0)->setDestinationAlphaBlendFactor(MTL::BlendFactorOne);
+        cursor_pipeline_ = device_->newRenderPipelineState(cur_rpd, &error);
+        cur_rpd->release();
+        cursor_vertex_fn->release();
+        cursor_fragment_fn->release();
+    }
+
+    // Label pipeline — textured quad for CoreText-rendered text
+    auto label_vertex_fn = library->newFunction(NS::String::string("labelVertex", NS::UTF8StringEncoding));
+    auto label_fragment_fn = library->newFunction(NS::String::string("labelFragment", NS::UTF8StringEncoding));
+    if (label_vertex_fn && label_fragment_fn) {
+        auto label_rpd = MTL::RenderPipelineDescriptor::alloc()->init();
+        label_rpd->setVertexFunction(label_vertex_fn);
+        label_rpd->setFragmentFunction(label_fragment_fn);
+        label_rpd->colorAttachments()->object(0)->setPixelFormat(MTL::PixelFormatRGBA16Float);
+        label_rpd->colorAttachments()->object(0)->setBlendingEnabled(true);
+        label_rpd->colorAttachments()->object(0)->setSourceRGBBlendFactor(MTL::BlendFactorSourceAlpha);
+        label_rpd->colorAttachments()->object(0)->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+        label_rpd->colorAttachments()->object(0)->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+        label_rpd->colorAttachments()->object(0)->setDestinationAlphaBlendFactor(MTL::BlendFactorOne);
+        label_pipeline_ = device_->newRenderPipelineState(label_rpd, &error);
+        label_rpd->release();
+    }
+    if (label_vertex_fn) label_vertex_fn->release();
+    if (label_fragment_fn) label_fragment_fn->release();
+    // Label pipeline is optional — don't fail if it's missing
+
     library->release();
 
     std::cout << "[metal-llama] GPU ready: " << device_name() << std::endl;
@@ -216,6 +309,11 @@ bool MetalRenderer::setup() {
 
 void MetalRenderer::teardown() {
     stop_render_loop();
+    if (label_pipeline_) { label_pipeline_->release(); label_pipeline_ = nullptr; }
+    if (highlight_pipeline_) { highlight_pipeline_->release(); highlight_pipeline_ = nullptr; }
+    if (pick_pipeline_) { pick_pipeline_->release(); pick_pipeline_ = nullptr; }
+    if (pick_depth_) { pick_depth_->release(); pick_depth_ = nullptr; }
+    if (pick_texture_) { pick_texture_->release(); pick_texture_ = nullptr; }
     if (ghost_pipeline_) { ghost_pipeline_->release(); ghost_pipeline_ = nullptr; }
     if (prob_a_) { prob_a_->release(); prob_a_ = nullptr; }
     if (prob_b_) { prob_b_->release(); prob_b_ = nullptr; }
@@ -552,7 +650,34 @@ void MetalRenderer::store_keyframe(const float* probabilities, int vocab_size) {
 
 void MetalRenderer::set_scrub_index(int idx) {
     scrub_index_.store(idx, std::memory_order_release);
+    // Invalidate pick texture — new keyframe, new distribution
+    {
+        std::lock_guard<std::mutex> plock(pick_mutex_);
+        if (pick_texture_) { pick_texture_->release(); pick_texture_ = nullptr; }
+        if (pick_depth_) { pick_depth_->release(); pick_depth_ = nullptr; }
+    }
+    hovered_token_.store(-1, std::memory_order_release);
     // Wake render loop for scrub
+    {
+        std::lock_guard<std::mutex> lock(render_wake_mutex_);
+        render_dirty_ = true;
+    }
+    render_wake_cv_.notify_one();
+}
+
+void MetalRenderer::set_token_examine(bool focused) {
+    bool was_focused = token_examine_.exchange(focused, std::memory_order_release);
+    if (focused && !was_focused) {
+        // Auto-center camera on the single keyframe cloud
+        camera_.reset();
+    }
+    // Invalidate pick texture so stale picks from previous mode don't linger
+    {
+        std::lock_guard<std::mutex> plock(pick_mutex_);
+        if (pick_texture_) { pick_texture_->release(); pick_texture_ = nullptr; }
+        if (pick_depth_) { pick_depth_->release(); pick_depth_ = nullptr; }
+    }
+    hovered_token_.store(-1, std::memory_order_release);
     {
         std::lock_guard<std::mutex> lock(render_wake_mutex_);
         render_dirty_ = true;
@@ -705,7 +830,106 @@ std::vector<uint8_t> MetalRenderer::render_lerp(int width, int height, float t) 
         }
     }
 
+    // --- Mouse-driven cursor + highlight ---
+    int mx = mouse_x_.load(std::memory_order_acquire);
+    int my = mouse_y_.load(std::memory_order_acquire);
+    if (mx >= 0 && my >= 0) {
+        // Read token under cursor from pick buffer
+        int picked = pick_at(mx, my);
+        hovered_token_.store(picked, std::memory_order_release);
+
+        if (picked >= 0 && picked < n && highlight_pipeline_) {
+            glm::mat4 mvp_mat;
+            std::memcpy(&mvp_mat[0][0], mvp, 16 * sizeof(float));
+            float hpx = ((float*)positions_buffer_->contents())[picked * 3];
+            float hpy = ((float*)positions_buffer_->contents())[picked * 3 + 1];
+            float hpz = ((float*)positions_buffer_->contents())[picked * 3 + 2];
+            glm::vec4 clip = mvp_mat * glm::vec4(hpx, hpy, hpz, 1.0f);
+
+            if (clip.w > 0) {
+                float half_size[2] = { 19.0f / (float)width, 19.0f / (float)height };
+                float clip_arr[4] = { clip.x, clip.y, clip.z, clip.w };
+
+                render_enc->setRenderPipelineState(highlight_pipeline_);
+                render_enc->setVertexBytes(clip_arr, sizeof(clip_arr), 0);
+                render_enc->setVertexBytes(half_size, sizeof(half_size), 1);
+                render_enc->drawPrimitives(MTL::PrimitiveTypeTriangle, (NS::UInteger)0, (NS::UInteger)6);
+            }
+        }
+
+        // Persistent cursor — crosshair with semi-transparent fill, scales with particle
+        if (cursor_pipeline_) {
+            float cursor_ndc_x = ((float)mx / (float)width) * 2.0f - 1.0f;
+            float cursor_ndc_y = -(((float)my / (float)height) * 2.0f - 1.0f);
+            float cursor_px = 12.0f;
+            if (picked >= 0 && picked < n) {
+                auto* particles = (float*)particle_buf->contents();
+                // Particle struct: float3(16B) + float4(16B) + float(4B) = 48B stride = 12 floats
+                float psize = particles[picked * 12 + 8];
+                cursor_px = fmaxf(12.0f, psize * 1.2f);
+            }
+            float cursor_size[2] = { cursor_px / (float)width, cursor_px / (float)height };
+            float cursor_clip[4] = { cursor_ndc_x, cursor_ndc_y, 0.0f, 1.0f };
+
+            render_enc->setRenderPipelineState(cursor_pipeline_);
+            render_enc->setVertexBytes(cursor_clip, sizeof(cursor_clip), 0);
+            render_enc->setVertexBytes(cursor_size, sizeof(cursor_size), 1);
+            render_enc->drawPrimitives(MTL::PrimitiveTypeTriangle, (NS::UInteger)0, (NS::UInteger)6);
+        }
+
+        // Hover label — rendered at offset from cursor after 400ms idle
+        {
+            std::lock_guard<std::mutex> lock(hover_label_mutex_);
+            if (!hover_label_.empty()) {
+                // Position label to the right of the cursor, slightly above
+                float label_x = (float)mx + 20.0f;
+                float label_y = (float)my - 10.0f;
+                // Clamp to keep label on screen
+                if (label_x + 200 > width) label_x = (float)mx - 220.0f;
+                if (label_y < 0) label_y = (float)my + 20.0f;
+                render_label(render_enc, hover_label_, label_x, label_y, width, height);
+            }
+        }
+    }
+
     render_enc->endEncoding();
+
+    // --- Pick pass: render token IDs to R32Uint with depth test ---
+    if (pick_pipeline_) {
+        std::lock_guard<std::mutex> lock(pick_mutex_);
+        ensure_pick_textures(width, height);
+
+        if (pick_texture_ && pick_depth_) {
+            auto pick_rp = MTL::RenderPassDescriptor::alloc()->init();
+            pick_rp->colorAttachments()->object(0)->setTexture(pick_texture_);
+            pick_rp->colorAttachments()->object(0)->setLoadAction(MTL::LoadActionClear);
+            // Clear to 0xFFFFFFFF (no token)
+            pick_rp->colorAttachments()->object(0)->setClearColor(MTL::ClearColor(4294967295.0, 0, 0, 0));
+            pick_rp->colorAttachments()->object(0)->setStoreAction(MTL::StoreActionStore);
+            pick_rp->depthAttachment()->setTexture(pick_depth_);
+            pick_rp->depthAttachment()->setLoadAction(MTL::LoadActionClear);
+            pick_rp->depthAttachment()->setClearDepth(1.0);
+            pick_rp->depthAttachment()->setStoreAction(MTL::StoreActionDontCare);
+
+            auto pick_enc = cmd->renderCommandEncoder(pick_rp);
+            pick_enc->setRenderPipelineState(pick_pipeline_);
+            pick_enc->setVertexBuffer(particle_buf, 0, 0);
+            pick_enc->setVertexBytes(mvp, sizeof(mvp), 1);
+
+            // Depth state: less-equal, write enabled
+            auto depth_desc = MTL::DepthStencilDescriptor::alloc()->init();
+            depth_desc->setDepthCompareFunction(MTL::CompareFunctionLessEqual);
+            depth_desc->setDepthWriteEnabled(true);
+            auto depth_state = device_->newDepthStencilState(depth_desc);
+            depth_desc->release();
+            pick_enc->setDepthStencilState(depth_state);
+
+            pick_enc->drawPrimitives(MTL::PrimitiveTypePoint, (NS::UInteger)0, (NS::UInteger)n);
+            pick_enc->endEncoding();
+            depth_state->release();
+            pick_rp->release();
+        }
+    }
 
     cmd->commit();
     cmd->waitUntilCompleted();
@@ -787,8 +1011,11 @@ void MetalRenderer::start_render_loop(int width, int height) {
             int scrub = scrub_index_.load(std::memory_order_acquire);
 
             if (scrub >= 0) {
+                bool examining = token_examine_.load(std::memory_order_acquire);
+
                 // Multi-cloud scrub: render every keyframe's cloud at its orbit
                 // position, fading with distance from the selected keyframe.
+                // In examine mode: single keyframe, no orbit, no fade.
                 int kf_count = 0;
                 {
                     std::lock_guard<std::mutex> lock(dist_mutex_);
@@ -810,10 +1037,14 @@ void MetalRenderer::start_render_loop(int width, int height) {
                     if (hdr_tex) {
                         bool first_pass = true;
 
-                        for (int ki = 0; ki < kf_count; ki++) {
+                        // In examine mode, only render the selected keyframe
+                        int ki_start = examining ? scrub : 0;
+                        int ki_end = examining ? scrub + 1 : kf_count;
+
+                        for (int ki = ki_start; ki < ki_end; ki++) {
                             // Distance-based fade: selected = 1.0, fades with distance
                             int dist = std::abs(ki - scrub);
-                            float fade = expf(-0.0375f * (float)dist);
+                            float fade = examining ? 1.0f : expf(-0.0375f * (float)dist);
                             if (fade < 0.02f) continue;  // skip near-invisible clouds
 
                             std::vector<float> kf;
@@ -824,14 +1055,14 @@ void MetalRenderer::start_render_loop(int width, int height) {
                             }
                             if (kf.empty()) continue;
 
-                            // Orbit offset for this keyframe
-                            float age = (float)(scrub - ki);
-                            float theta = age * as;
-                            float off[3] = {
-                                or_ * sinf(theta),
-                                -or_ * (1.0f - cosf(theta)),
-                                0.0f
-                            };
+                            // Orbit offset — zero in examine mode
+                            float off[3] = {0, 0, 0};
+                            if (!examining) {
+                                float age = (float)(scrub - ki);
+                                float theta = age * as;
+                                off[0] = or_ * sinf(theta);
+                                off[1] = -or_ * (1.0f - cosf(theta));
+                            }
 
                             auto prob_buf = device_->newBuffer(kf.data(), kf.size() * sizeof(float),
                                                                 MTL::ResourceStorageModeShared);
@@ -889,8 +1120,8 @@ void MetalRenderer::start_render_loop(int width, int height) {
 
                             render_enc->drawPrimitives(MTL::PrimitiveTypePoint, (NS::UInteger)0, (NS::UInteger)n);
 
-                            // Draw trail + ghost branches on last pass
-                            if (ki == kf_count - 1 || ki == scrub) {
+                            // Draw trail + ghost branches on last pass (skip in examine mode)
+                            if (!examining && (ki == kf_count - 1 || ki == scrub)) {
                                 std::lock_guard<std::mutex> lock(trail_mutex_);
                                 int trail_count = trail_positions_.size() / 3;
                                 uint32_t tc = (uint32_t)trail_count;
@@ -934,7 +1165,98 @@ void MetalRenderer::start_render_loop(int width, int height) {
                                 }
                             }
 
+                            // Mouse-driven cursor + highlight — only in examine mode
+                            if (ki == scrub && examining) {
+                                int smx = mouse_x_.load(std::memory_order_acquire);
+                                int smy = mouse_y_.load(std::memory_order_acquire);
+                                if (smx >= 0 && smy >= 0) {
+                                    int picked_scrub = pick_at(smx, smy);
+                                    hovered_token_.store(picked_scrub, std::memory_order_release);
+
+                                    if (picked_scrub >= 0 && picked_scrub < n && highlight_pipeline_) {
+                                        glm::mat4 mvp_mat;
+                                        std::memcpy(&mvp_mat[0][0], mvp, 16 * sizeof(float));
+                                        float hpx = ((float*)positions_buffer_->contents())[picked_scrub * 3];
+                                        float hpy = ((float*)positions_buffer_->contents())[picked_scrub * 3 + 1];
+                                        float hpz = ((float*)positions_buffer_->contents())[picked_scrub * 3 + 2];
+                                        glm::vec4 clip = mvp_mat * glm::vec4(hpx, hpy, hpz, 1.0f);
+                                        if (clip.w > 0) {
+                                            float hs[2] = { 19.0f / (float)w, 19.0f / (float)h };
+                                            float ca[4] = { clip.x, clip.y, clip.z, clip.w };
+                                            render_enc->setRenderPipelineState(highlight_pipeline_);
+                                            render_enc->setVertexBytes(ca, sizeof(ca), 0);
+                                            render_enc->setVertexBytes(hs, sizeof(hs), 1);
+                                            render_enc->drawPrimitives(MTL::PrimitiveTypeTriangle, (NS::UInteger)0, (NS::UInteger)6);
+                                        }
+                                    }
+
+                                    // Persistent cursor — crosshair, scales with particle
+                                    if (cursor_pipeline_) {
+                                        float cnx = ((float)smx / (float)w) * 2.0f - 1.0f;
+                                        float cny = -(((float)smy / (float)h) * 2.0f - 1.0f);
+                                        float cpx = 12.0f;
+                                        if (picked_scrub >= 0 && picked_scrub < n) {
+                                            auto* sp = (float*)particle_buf->contents();
+                                            cpx = fmaxf(12.0f, sp[picked_scrub * 12 + 8] * 1.2f);
+                                        }
+                                        float cs[2] = { cpx / (float)w, cpx / (float)h };
+                                        float cc[4] = { cnx, cny, 0.0f, 1.0f };
+                                        render_enc->setRenderPipelineState(cursor_pipeline_);
+                                        render_enc->setVertexBytes(cc, sizeof(cc), 0);
+                                        render_enc->setVertexBytes(cs, sizeof(cs), 1);
+                                        render_enc->drawPrimitives(MTL::PrimitiveTypeTriangle, (NS::UInteger)0, (NS::UInteger)6);
+                                    }
+
+                                    // Hover label in scrub mode
+                                    {
+                                        std::lock_guard<std::mutex> llock(hover_label_mutex_);
+                                        if (!hover_label_.empty()) {
+                                            float lx = (float)smx + 20.0f;
+                                            float ly = (float)smy - 10.0f;
+                                            if (lx + 200 > w) lx = (float)smx - 220.0f;
+                                            if (ly < 0) ly = (float)smy + 20.0f;
+                                            render_label(render_enc, hover_label_, lx, ly, w, h);
+                                        }
+                                    }
+                                }
+                            }
+
                             render_enc->endEncoding();
+
+                            // Pick pass — only in examine mode
+                            if (ki == scrub && examining && pick_pipeline_) {
+                                std::lock_guard<std::mutex> plock(pick_mutex_);
+                                ensure_pick_textures(w, h);
+                                if (pick_texture_ && pick_depth_) {
+                                    auto pick_rp = MTL::RenderPassDescriptor::alloc()->init();
+                                    pick_rp->colorAttachments()->object(0)->setTexture(pick_texture_);
+                                    pick_rp->colorAttachments()->object(0)->setLoadAction(MTL::LoadActionClear);
+                                    pick_rp->colorAttachments()->object(0)->setClearColor(MTL::ClearColor(4294967295.0, 0, 0, 0));
+                                    pick_rp->colorAttachments()->object(0)->setStoreAction(MTL::StoreActionStore);
+                                    pick_rp->depthAttachment()->setTexture(pick_depth_);
+                                    pick_rp->depthAttachment()->setLoadAction(MTL::LoadActionClear);
+                                    pick_rp->depthAttachment()->setClearDepth(1.0);
+                                    pick_rp->depthAttachment()->setStoreAction(MTL::StoreActionDontCare);
+
+                                    auto pick_enc = cmd->renderCommandEncoder(pick_rp);
+                                    pick_enc->setRenderPipelineState(pick_pipeline_);
+                                    pick_enc->setVertexBuffer(particle_buf, 0, 0);
+                                    pick_enc->setVertexBytes(mvp, sizeof(mvp), 1);
+
+                                    auto depth_desc = MTL::DepthStencilDescriptor::alloc()->init();
+                                    depth_desc->setDepthCompareFunction(MTL::CompareFunctionLessEqual);
+                                    depth_desc->setDepthWriteEnabled(true);
+                                    auto depth_state = device_->newDepthStencilState(depth_desc);
+                                    depth_desc->release();
+                                    pick_enc->setDepthStencilState(depth_state);
+
+                                    pick_enc->drawPrimitives(MTL::PrimitiveTypePoint, (NS::UInteger)0, (NS::UInteger)n);
+                                    pick_enc->endEncoding();
+                                    depth_state->release();
+                                    pick_rp->release();
+                                }
+                            }
+
                             cmd->commit();
                             cmd->waitUntilCompleted();
 
@@ -1002,11 +1324,17 @@ void MetalRenderer::start_render_loop(int width, int height) {
                     std::lock_guard<std::mutex> lock(render_wake_mutex_);
                     render_dirty_ = false;
                 }
-                // Wait for next scrub change or resume
+                // Wait for next scrub change, mouse move, or resume
+                // Stay awake at 60fps while mouse is active for cursor rendering
                 {
-                    std::unique_lock<std::mutex> lock(render_wake_mutex_);
-                    render_wake_cv_.wait_for(lock, std::chrono::milliseconds(16),
-                        [this]{ return render_dirty_ || !render_running_.load(); });
+                    bool mouse_active = mouse_x_.load(std::memory_order_acquire) >= 0;
+                    if (!mouse_active) {
+                        std::unique_lock<std::mutex> lock(render_wake_mutex_);
+                        render_wake_cv_.wait_for(lock, std::chrono::milliseconds(500),
+                            [this]{ return render_dirty_ || !render_running_.load(); });
+                    } else {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(16));
+                    }
                 }
                 continue;
             }
@@ -1036,14 +1364,20 @@ void MetalRenderer::start_render_loop(int width, int height) {
             // If interpolation is complete (t=1) and we already rendered the final frame,
             // sleep until new data arrives instead of burning GPU
             if (t >= 1.0f && was_idle) {
-                std::unique_lock<std::mutex> lock(render_wake_mutex_);
-                render_wake_cv_.wait_for(lock, std::chrono::milliseconds(500),
-                    [this]{ return render_dirty_ || !render_running_.load(); });
-                if (render_dirty_) {
-                    render_dirty_ = false;
-                    was_idle = false;  // re-render with updated params
+                // Stay awake while mouse is active — cursor needs continuous rendering
+                bool mouse_active = mouse_x_.load(std::memory_order_acquire) >= 0;
+                if (mouse_active) {
+                    was_idle = false;
+                } else {
+                    std::unique_lock<std::mutex> lock(render_wake_mutex_);
+                    render_wake_cv_.wait_for(lock, std::chrono::milliseconds(500),
+                        [this]{ return render_dirty_ || !render_running_.load(); });
+                    if (render_dirty_) {
+                        render_dirty_ = false;
+                        was_idle = false;
+                    }
+                    continue;
                 }
-                continue;
             }
 
             auto png = render_lerp(render_width_, render_height_, t);
@@ -1051,7 +1385,7 @@ void MetalRenderer::start_render_loop(int width, int height) {
                 set_latest_frame(std::move(png), render_width_, render_height_);
             }
 
-            was_idle = (t >= 1.0f);
+            was_idle = (t >= 1.0f) && mouse_x_.load(std::memory_order_acquire) < 0;
             if (was_idle) {
                 // Clear dirty so we catch the next submit_distribution
                 std::lock_guard<std::mutex> lock(render_wake_mutex_);
@@ -1070,4 +1404,178 @@ void MetalRenderer::stop_render_loop() {
     if (render_thread_.joinable()) {
         render_thread_.join();
     }
+}
+
+void MetalRenderer::ensure_pick_textures(int width, int height) {
+    if (pick_texture_ && pick_width_ == width && pick_height_ == height) return;
+
+    if (pick_texture_) pick_texture_->release();
+    if (pick_depth_) pick_depth_->release();
+
+    auto td = MTL::TextureDescriptor::texture2DDescriptor(
+        MTL::PixelFormatR32Uint, width, height, false);
+    td->setUsage(MTL::TextureUsageRenderTarget);
+    td->setStorageMode(MTL::StorageModeShared);
+    pick_texture_ = device_->newTexture(td);
+
+    auto dd = MTL::TextureDescriptor::texture2DDescriptor(
+        MTL::PixelFormatDepth32Float, width, height, false);
+    dd->setUsage(MTL::TextureUsageRenderTarget);
+    dd->setStorageMode(MTL::StorageModePrivate);
+    pick_depth_ = device_->newTexture(dd);
+
+    pick_width_ = width;
+    pick_height_ = height;
+}
+
+int MetalRenderer::pick_at(int px, int py) {
+    std::lock_guard<std::mutex> lock(pick_mutex_);
+    if (!pick_texture_ || px < 0 || py < 0 || px >= pick_width_ || py >= pick_height_) return -1;
+
+    uint32_t val = 0xFFFFFFFF;
+    pick_texture_->getBytes(&val, sizeof(uint32_t), MTL::Region(px, py, 1, 1), 0);
+    if (val == 0xFFFFFFFF || val >= (uint32_t)vocab_size_) return -1;
+    return (int)val;
+}
+
+void MetalRenderer::set_hovered_token(int token_id) {
+    hovered_token_.store(token_id, std::memory_order_release);
+    // Wake render loop to draw highlight
+    {
+        std::lock_guard<std::mutex> lock(render_wake_mutex_);
+        render_dirty_ = true;
+    }
+    render_wake_cv_.notify_one();
+}
+
+int MetalRenderer::hovered_token() const {
+    return hovered_token_.load(std::memory_order_acquire);
+}
+
+int MetalRenderer::consume_pick_result() {
+    if (pick_sent_) return -1;
+    int mx = mouse_x_.load(std::memory_order_acquire);
+    if (mx < 0) return -1;
+
+    auto elapsed = std::chrono::steady_clock::now() - mouse_last_move_;
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() < 400) return -1;
+
+    int ht = hovered_token_.load(std::memory_order_acquire);
+    if (ht < 0) return -1;
+
+    pick_sent_ = true;
+    return ht;
+}
+
+float MetalRenderer::token_probability(int token_id) {
+    std::lock_guard<std::mutex> lock(dist_mutex_);
+    if (!prob_b_ || token_id < 0 || token_id >= vocab_size_) return 0.0f;
+    auto* probs = (float*)prob_b_->contents();
+    return probs[token_id];
+}
+
+void MetalRenderer::set_hover_label(const std::string& text) {
+    std::lock_guard<std::mutex> lock(hover_label_mutex_);
+    hover_label_ = text;
+    // Wake render loop to draw label
+    {
+        std::lock_guard<std::mutex> wlock(render_wake_mutex_);
+        render_dirty_ = true;
+    }
+    render_wake_cv_.notify_one();
+}
+
+void MetalRenderer::set_mouse(int px, int py) {
+    // px/py are normalized 0..1000 from JS — map to render texture pixels
+    int rx = (px >= 0) ? (px * render_width_ / 1000) : -1;
+    int ry = (py >= 0) ? (py * render_height_ / 1000) : -1;
+    // Clear hover label when mouse moves
+    {
+        std::lock_guard<std::mutex> lock(hover_label_mutex_);
+        hover_label_.clear();
+    }
+    mouse_x_.store(rx, std::memory_order_release);
+    mouse_y_.store(ry, std::memory_order_release);
+    mouse_last_move_ = std::chrono::steady_clock::now();
+    pick_sent_ = false;
+    // Wake render loop
+    {
+        std::lock_guard<std::mutex> lock(render_wake_mutex_);
+        render_dirty_ = true;
+    }
+    render_wake_cv_.notify_one();
+}
+
+void MetalRenderer::render_label(MTL::RenderCommandEncoder* enc, const std::string& text,
+                                  float screen_x, float screen_y, int width, int height) {
+    if (!label_pipeline_ || text.empty()) return;
+
+    // Render text to a bitmap using CoreText
+    float font_size = 11.0f;
+    auto font = CTFontCreateWithName(CFSTR("Menlo"), font_size, nullptr);
+    if (!font) return;
+
+    CFStringRef cf_text = CFStringCreateWithCString(nullptr, text.c_str(), kCFStringEncodingUTF8);
+    if (!cf_text) { CFRelease(font); return; }
+
+    CFStringRef keys[] = { kCTFontAttributeName, kCTForegroundColorFromContextAttributeName };
+    CFTypeRef vals[] = { font, kCFBooleanTrue };
+    auto attrs = CFDictionaryCreate(nullptr, (const void**)keys, (const void**)vals, 2,
+                                     &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    auto attr_str = CFAttributedStringCreate(nullptr, cf_text, attrs);
+    auto line = CTLineCreateWithAttributedString(attr_str);
+
+    CGFloat ascent, descent, leading;
+    double line_width = CTLineGetTypographicBounds(line, &ascent, &descent, &leading);
+
+    int tex_w = (int)ceil(line_width) + 8;  // padding
+    int tex_h = (int)ceil(ascent + descent) + 6;
+
+    // Draw to RGBA bitmap
+    auto colorspace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+    auto cg_ctx = CGBitmapContextCreate(nullptr, tex_w, tex_h, 8, tex_w * 4, colorspace,
+                                         kCGImageAlphaPremultipliedLast);
+    if (!cg_ctx) {
+        CFRelease(line); CFRelease(attr_str); CFRelease(attrs);
+        CFRelease(cf_text); CFRelease(font); CGColorSpaceRelease(colorspace);
+        return;
+    }
+
+    // Semi-transparent background
+    CGContextSetRGBFillColor(cg_ctx, 0.05, 0.05, 0.1, 0.5);
+    CGContextFillRect(cg_ctx, CGRectMake(0, 0, tex_w, tex_h));
+
+    // Text in soft white
+    CGContextSetRGBFillColor(cg_ctx, 0.9, 0.95, 0.95, 0.9);
+    CGContextSetTextPosition(cg_ctx, 4, descent + 3);
+    CTLineDraw(line, cg_ctx);
+
+    auto* pixels = (uint8_t*)CGBitmapContextGetData(cg_ctx);
+
+    // Upload to Metal texture
+    auto td = MTL::TextureDescriptor::texture2DDescriptor(
+        MTL::PixelFormatRGBA8Unorm, tex_w, tex_h, false);
+    td->setUsage(MTL::TextureUsageShaderRead);
+    td->setStorageMode(MTL::StorageModeShared);
+    auto label_tex = device_->newTexture(td);
+    label_tex->replaceRegion(MTL::Region(0, 0, tex_w, tex_h), 0, pixels, tex_w * 4);
+
+    // Draw textured quad
+    float rect_data[4] = { screen_x, screen_y, (float)tex_w, (float)tex_h };
+    float viewport[2] = { (float)width, (float)height };
+
+    enc->setRenderPipelineState(label_pipeline_);
+    enc->setVertexBytes(rect_data, sizeof(rect_data), 0);
+    enc->setVertexBytes(viewport, sizeof(viewport), 1);
+    enc->setFragmentTexture(label_tex, 0);
+    enc->drawPrimitives(MTL::PrimitiveTypeTriangle, (NS::UInteger)0, (NS::UInteger)6);
+
+    label_tex->release();
+    CGContextRelease(cg_ctx);
+    CGColorSpaceRelease(colorspace);
+    CFRelease(line);
+    CFRelease(attr_str);
+    CFRelease(attrs);
+    CFRelease(cf_text);
+    CFRelease(font);
 }
