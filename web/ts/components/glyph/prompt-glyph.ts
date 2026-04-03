@@ -106,6 +106,14 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     const { save, cancel: cancelAutoSave } = createAutoSave(glyph.id, () => textarea.value, 'Prompt Glyph');
     textarea.addEventListener('input', () => save());
 
+    // Cmd/Ctrl+Enter to execute prompt
+    textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            playBtn.click();
+        }
+    });
+
     preventDrag(textarea);
 
     // Status display

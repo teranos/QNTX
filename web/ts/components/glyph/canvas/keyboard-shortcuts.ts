@@ -2,13 +2,14 @@
  * Canvas Keyboard Shortcuts
  *
  * Handles keyboard interactions for canvas operations:
- * - ESC: deselect all glyphs
+ * - h/j/k/l: directional glyph selection (left/down/up/right)
+ * - ENTER: focus the follow-up textarea of the selected glyph
+ * - ESC: deselect all glyphs (or blur follow-up textarea)
  * - DELETE/BACKSPACE: remove selected glyphs
  * - U: unmeld selected composition
  * - 0: reset zoom/pan to origin
- * - 1: fit all glyphs in view (TODO)
  *
- * Shortcuts are scoped to the focused canvas container
+ * Shortcuts listen on document (no focus/click required)
  * Uses AbortController for automatic cleanup when container is removed
  */
 
@@ -20,6 +21,8 @@ import { isInputFocused } from '../../../keyboard';
  */
 export type HasSelectionCallback = () => boolean;
 
+export type Direction = 'left' | 'down' | 'up' | 'right';
+
 /**
  * Setup keyboard shortcuts for canvas container
  * Uses AbortController for automatic cleanup - signal will abort when container is removed
@@ -30,12 +33,30 @@ export function setupKeyboardShortcuts(
     onDeselect: () => void,
     onDelete: () => void,
     onUnmeld: () => void,
-    onResetView: () => void
+    onResetView: () => void,
+    onNavigate: (direction: Direction) => void,
+    onEnterGlyph: () => void
 ): AbortController {
     const controller = new AbortController();
 
     const handleKeydown = (e: KeyboardEvent) => {
         if (isInputFocused(e.target)) return;
+
+        // h/j/k/l — directional glyph navigation
+        const dirMap: Record<string, Direction> = { h: 'left', j: 'down', k: 'up', l: 'right' };
+        const dir = dirMap[e.key];
+        if (dir) {
+            e.preventDefault();
+            onNavigate(dir);
+            return;
+        }
+
+        // ENTER — focus the selected glyph's follow-up textarea
+        if (e.key === 'Enter' && hasSelection()) {
+            e.preventDefault();
+            onEnterGlyph();
+            return;
+        }
 
         // ESC to deselect
         if (e.key === 'Escape') {
@@ -75,17 +96,9 @@ export function setupKeyboardShortcuts(
             log.debug(SEG.GLYPH, '[Canvas] U pressed - unmelding selected composition');
             return;
         }
-
-        // TODO: 1 to fit all glyphs in view
-        // Calculate bounding box of all canvas glyphs and zoom/pan to show everything
-        // if (e.key === '1' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
-        //     e.preventDefault();
-        //     onFitToView();
-        //     return;
-        // }
     };
 
-    container.addEventListener('keydown', handleKeydown, { signal: controller.signal });
+    document.addEventListener('keydown', handleKeydown, { signal: controller.signal });
 
     return controller;
 }
