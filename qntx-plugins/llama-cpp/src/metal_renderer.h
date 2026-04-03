@@ -7,6 +7,12 @@
 // TODO(KFC): Keyframe history capped at 512 (64MB). Longer generations lose
 //   early frames. No disk persistence — closing the glyph loses all history.
 // TODO(TRU): Trail positions vector is unbounded while keyframes are capped.
+// TODO(WSPT): WebSocket message parsing in plugin.cpp (mouse:, examine:, cam:,
+//   scrub:) is string prefix matching with no tests. Extract and unit-test.
+// TODO(DCUR): Cursor is a fixed-size screen-space quad — doesn't scale with
+//   distance to the particle. Closer particles should get a larger cursor.
+// TODO(CSNP): Examine mode camera reset is abrupt. Animate the transition to
+//   center on the single keyframe's cloud instead of snapping.
 // TODO(STR): GPU-accelerated steering — Metal compute shader could modify the
 //   logit buffer before sampling. Click a region of the nebula to boost tokens
 //   in that region. Infrastructure exists (writable Metal buffer, sampler reads
