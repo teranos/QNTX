@@ -14,7 +14,7 @@
 #include "llm.grpc.pb.h"
 #include "ats_client.h"
 
-#define PLUGIN_VERSION "0.31.1"
+#define PLUGIN_VERSION "0.32.3"
 
 // Forward declarations
 struct llama_model;
@@ -78,6 +78,7 @@ public:
         int prompt_tokens;
         int completion_tokens;
         std::vector<TokenSignal> signals;
+        std::string warning;  // non-empty if prompt was truncated to fit n_ctx
 
         // Performance breakdown (milliseconds)
         long prompt_eval_ms = 0;   // prompt decode into KV cache

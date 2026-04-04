@@ -386,6 +386,47 @@ export function resetTransform(container: HTMLElement, canvasId: string): void {
 }
 
 /**
+ * Pan the canvas so a glyph element is visible.
+ * If the glyph center is already within the viewport, no movement occurs.
+ * Otherwise, smoothly pans to bring the glyph center into the viewport center.
+ */
+export function panToGlyph(container: HTMLElement, canvasId: string, glyphEl: HTMLElement): void {
+    const state = getState(canvasId);
+    const vw = container.clientWidth;
+    const vh = container.clientHeight;
+
+    // Glyph position in canvas coords (from CSS left/top)
+    const gx = glyphEl.offsetLeft + glyphEl.offsetWidth / 2;
+    const gy = glyphEl.offsetTop + glyphEl.offsetHeight / 2;
+
+    // Glyph center in screen coords
+    const screenX = gx * state.scale + state.panX;
+    const screenY = gy * state.scale + state.panY;
+
+    // Margin: consider visible if within 10% inset of viewport
+    const mx = vw * 0.1;
+    const my = vh * 0.1;
+    if (screenX >= mx && screenX <= vw - mx && screenY >= my && screenY <= vh - my) {
+        return; // already visible
+    }
+
+    // Pan so glyph center maps to viewport center
+    const contentLayer = container.querySelector('.canvas-content-layer') as HTMLElement;
+    if (contentLayer) {
+        contentLayer.style.transition = 'transform 0.35s ease-out';
+    }
+
+    state.panX = vw / 2 - gx * state.scale;
+    state.panY = vh / 2 - gy * state.scale;
+    applyTransform(container, canvasId);
+    saveTransformState(canvasId);
+
+    if (contentLayer) {
+        setTimeout(() => { contentLayer.style.transition = ''; }, 350);
+    }
+}
+
+/**
  * Convert screen coordinates to canvas coordinates
  * Takes a screen point and returns the corresponding canvas point accounting for pan and zoom
  */

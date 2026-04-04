@@ -359,41 +359,107 @@ int InferenceEngine::prepare_prompt(
 
     auto prep_start = std::chrono::steady_clock::now();
 
-    // Build llama_chat_message array from our Message structs
-    std::vector<llama_chat_message> chat_msgs;
-    chat_msgs.reserve(messages.size());
-    for (const auto& m : messages) {
-        chat_msgs.push_back({m.role.c_str(), m.content.c_str()});
-    }
-
-    // Apply the model's own chat template
-    const char* tmpl = llama_model_chat_template(model_, nullptr);
-    size_t total_content = 0;
-    for (const auto& m : messages) total_content += m.content.size();
-    int alloc = 2 * total_content + 256;
-    std::vector<char> buf(alloc);
-    int n_written = llama_chat_apply_template(tmpl, chat_msgs.data(), chat_msgs.size(), true, buf.data(), buf.size());
-    if (n_written > (int)buf.size()) {
-        buf.resize(n_written + 1);
-        n_written = llama_chat_apply_template(tmpl, chat_msgs.data(), chat_msgs.size(), true, buf.data(), buf.size());
-    }
-    if (n_written < 0) {
-        result.content = "error: chat template failed";
-        return -1;
-    }
-    std::string prompt(buf.data(), n_written);
-
-    // Tokenize
     const llama_vocab* vocab = llama_model_get_vocab(model_);
-    int n_prompt_max = prompt.size() + 32;
-    std::vector<llama_token> tokens(n_prompt_max);
-    int n_tokens = llama_tokenize(vocab, prompt.c_str(), prompt.size(),
-                                   tokens.data(), n_prompt_max, true, true);
+    const char* tmpl = llama_model_chat_template(model_, nullptr);
+    int ctx_size = llama_n_ctx(ctx_);
+    int max_prompt = ctx_size * 3 / 4;
+
+    // Helper: apply chat template + tokenize a message set
+    auto template_and_tokenize = [&](const std::vector<Message>& msgs,
+                                      std::vector<llama_token>& out) -> int {
+        std::vector<llama_chat_message> chat_msgs;
+        chat_msgs.reserve(msgs.size());
+        for (const auto& m : msgs) {
+            chat_msgs.push_back({m.role.c_str(), m.content.c_str()});
+        }
+        size_t total = 0;
+        for (const auto& m : msgs) total += m.content.size();
+        int alloc = 2 * total + 256;
+        std::vector<char> buf(alloc);
+        int n = llama_chat_apply_template(tmpl, chat_msgs.data(), chat_msgs.size(),
+                                          true, buf.data(), buf.size());
+        if (n > (int)buf.size()) {
+            buf.resize(n + 1);
+            n = llama_chat_apply_template(tmpl, chat_msgs.data(), chat_msgs.size(),
+                                          true, buf.data(), buf.size());
+        }
+        if (n < 0) return -1;
+        std::string prompt(buf.data(), n);
+        int tok_max = prompt.size() + 32;
+        out.resize(tok_max);
+        int nt = llama_tokenize(vocab, prompt.c_str(), prompt.size(),
+                                out.data(), tok_max, true, true);
+        if (nt < 0) return -1;
+        out.resize(nt);
+        return nt;
+    };
+
+    // Try full message set first
+    std::vector<llama_token> tokens;
+    int n_tokens = template_and_tokenize(messages, tokens);
     if (n_tokens < 0) {
         result.content = "error: tokenization failed";
         return -1;
     }
-    tokens.resize(n_tokens);
+
+    // If over budget, truncate at message level to preserve the user's question.
+    // PDF/attachment context is prepended to the user message, so trimming from
+    // the beginning of the user content removes document text first.
+    if (n_tokens > max_prompt) {
+        int original = n_tokens;
+
+        // Build minimal set: system (if any) + last user message
+        std::vector<Message> reduced;
+        for (const auto& m : messages) {
+            if (m.role == "system") { reduced.push_back(m); break; }
+        }
+        int last_user = -1;
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            if (messages[i].role == "user") { last_user = i; break; }
+        }
+        if (last_user < 0) {
+            result.content = "error: no user message found";
+            return -1;
+        }
+        reduced.push_back(messages[last_user]);
+
+        n_tokens = template_and_tokenize(reduced, tokens);
+        if (n_tokens < 0) {
+            result.content = "error: tokenization failed";
+            return -1;
+        }
+
+        // If still too large, trim user message content from the beginning
+        // (document context lives there, the actual question is at the end)
+        if (n_tokens > max_prompt) {
+            int excess = n_tokens - max_prompt;
+            // ~5 chars per token, overshoot slightly to avoid a second pass
+            int chars_to_cut = excess * 5;
+            auto& content = reduced.back().content;
+            if (chars_to_cut < (int)content.size()) {
+                content = "… " + content.substr(chars_to_cut);
+            } else {
+                // Even the user message alone is too large — keep the tail
+                int keep = (int)content.size() / 2;
+                content = "… " + content.substr(content.size() - keep);
+            }
+            n_tokens = template_and_tokenize(reduced, tokens);
+            if (n_tokens < 0) {
+                result.content = "error: tokenization failed after truncation";
+                return -1;
+            }
+            // Safety: hard-cap if estimate was off
+            if (n_tokens > max_prompt) {
+                n_tokens = max_prompt;
+                tokens.resize(n_tokens);
+            }
+        }
+
+        result.warning = "Prompt truncated from " + std::to_string(original)
+            + " to " + std::to_string(n_tokens) + " tokens (context window: "
+            + std::to_string(ctx_size) + ")";
+        std::cerr << "[llama-cpp] WARNING: " << result.warning << std::endl;
+    }
 
     // Clear KV cache
     llama_memory_clear(llama_get_memory(ctx_), true);
