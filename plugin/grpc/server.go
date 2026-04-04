@@ -491,6 +491,12 @@ func (s *PluginServer) ExecuteJob(ctx context.Context, req *protocol.ExecuteJobR
 
 // llmPluginServer implements protocol.LLMServiceServer by wrapping a plugin.LLMProvider.
 // Registered as a separate gRPC service on the same server, only for provider plugins.
+//
+// TODO(STRM): StreamChat falls through to UnimplementedLLMServiceServer (returns
+// Unimplemented). Go-based LLM providers (openrouter) only implement Chat, so
+// streaming prompts fail. Fix: implement StreamChat here by calling Chat and
+// sending the full response as a single done chunk, or add StreamChat to
+// the LLMProvider interface for true streaming (OpenRouter SSE support exists).
 type llmPluginServer struct {
 	protocol.UnimplementedLLMServiceServer
 	provider plugin.LLMProvider

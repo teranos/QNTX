@@ -41,6 +41,8 @@ export function setupKeyboardShortcuts(
 
     const handleKeydown = (e: KeyboardEvent) => {
         if (isInputFocused(e.target)) return;
+        // Only fire for the active (connected, topmost) workspace
+        if (!_container.isConnected) return;
 
         // h/j/k/l — directional glyph navigation
         const dirMap: Record<string, Direction> = { h: 'left', j: 'down', k: 'up', l: 'right' };

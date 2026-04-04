@@ -201,8 +201,11 @@ private:
     MTL::RenderPipelineState* cursor_pipeline_ = nullptr;
     std::atomic<int> hovered_token_{-1};
 
-    // Label rendering — textured quad pipeline
+    // Label rendering — textured quad pipeline (texture cached per text string)
     MTL::RenderPipelineState* label_pipeline_ = nullptr;
+    MTL::Texture* label_cache_tex_ = nullptr;
+    std::string label_cache_text_;
+    int label_cache_w_ = 0, label_cache_h_ = 0;
     void render_label(MTL::RenderCommandEncoder* enc, const std::string& text,
                       float screen_x, float screen_y, int width, int height);
 

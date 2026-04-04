@@ -210,74 +210,77 @@ void MetalRenderer::render_label(MTL::RenderCommandEncoder* enc, const std::stri
                                   float screen_x, float screen_y, int width, int height) {
     if (!label_pipeline_ || text.empty()) return;
 
-    // Render text to a bitmap using CoreText
-    float font_size = 11.0f;
-    auto font = CTFontCreateWithName(CFSTR("Menlo"), font_size, nullptr);
-    if (!font) return;
+    // Cache: only rasterize when text changes
+    if (text != label_cache_text_ || !label_cache_tex_) {
+        if (label_cache_tex_) { label_cache_tex_->release(); label_cache_tex_ = nullptr; }
 
-    CFStringRef cf_text = CFStringCreateWithCString(nullptr, text.c_str(), kCFStringEncodingUTF8);
-    if (!cf_text) { CFRelease(font); return; }
+        float font_size = 11.0f;
+        auto font = CTFontCreateWithName(CFSTR("Menlo"), font_size, nullptr);
+        if (!font) return;
 
-    CFStringRef keys[] = { kCTFontAttributeName, kCTForegroundColorFromContextAttributeName };
-    CFTypeRef vals[] = { font, kCFBooleanTrue };
-    auto attrs = CFDictionaryCreate(nullptr, (const void**)keys, (const void**)vals, 2,
-                                     &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-    auto attr_str = CFAttributedStringCreate(nullptr, cf_text, attrs);
-    auto line = CTLineCreateWithAttributedString(attr_str);
+        CFStringRef cf_text = CFStringCreateWithCString(nullptr, text.c_str(), kCFStringEncodingUTF8);
+        if (!cf_text) { CFRelease(font); return; }
 
-    CGFloat ascent, descent, leading;
-    double line_width = CTLineGetTypographicBounds(line, &ascent, &descent, &leading);
+        CFStringRef keys[] = { kCTFontAttributeName, kCTForegroundColorFromContextAttributeName };
+        CFTypeRef vals[] = { font, kCFBooleanTrue };
+        auto attrs = CFDictionaryCreate(nullptr, (const void**)keys, (const void**)vals, 2,
+                                         &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        auto attr_str = CFAttributedStringCreate(nullptr, cf_text, attrs);
+        auto line = CTLineCreateWithAttributedString(attr_str);
 
-    int tex_w = (int)ceil(line_width) + 8;  // padding
-    int tex_h = (int)ceil(ascent + descent) + 6;
+        CGFloat ascent, descent, leading;
+        double line_width = CTLineGetTypographicBounds(line, &ascent, &descent, &leading);
 
-    // Draw to RGBA bitmap
-    auto colorspace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
-    auto cg_ctx = CGBitmapContextCreate(nullptr, tex_w, tex_h, 8, tex_w * 4, colorspace,
-                                         kCGImageAlphaPremultipliedLast);
-    if (!cg_ctx) {
-        CFRelease(line); CFRelease(attr_str); CFRelease(attrs);
-        CFRelease(cf_text); CFRelease(font); CGColorSpaceRelease(colorspace);
-        return;
+        int tex_w = (int)ceil(line_width) + 8;
+        int tex_h = (int)ceil(ascent + descent) + 6;
+
+        auto colorspace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+        auto cg_ctx = CGBitmapContextCreate(nullptr, tex_w, tex_h, 8, tex_w * 4, colorspace,
+                                             kCGImageAlphaPremultipliedLast);
+        if (!cg_ctx) {
+            CFRelease(line); CFRelease(attr_str); CFRelease(attrs);
+            CFRelease(cf_text); CFRelease(font); CGColorSpaceRelease(colorspace);
+            return;
+        }
+
+        CGContextSetRGBFillColor(cg_ctx, 0.05, 0.05, 0.1, 0.5);
+        CGContextFillRect(cg_ctx, CGRectMake(0, 0, tex_w, tex_h));
+
+        CGContextSetRGBFillColor(cg_ctx, 0.9, 0.95, 0.95, 0.9);
+        CGContextSetTextPosition(cg_ctx, 4, descent + 3);
+        CTLineDraw(line, cg_ctx);
+
+        auto* pixels = (uint8_t*)CGBitmapContextGetData(cg_ctx);
+
+        auto td = MTL::TextureDescriptor::texture2DDescriptor(
+            MTL::PixelFormatRGBA8Unorm, tex_w, tex_h, false);
+        td->setUsage(MTL::TextureUsageShaderRead);
+        td->setStorageMode(MTL::StorageModeShared);
+        label_cache_tex_ = device_->newTexture(td);
+        label_cache_tex_->replaceRegion(MTL::Region(0, 0, tex_w, tex_h), 0, pixels, tex_w * 4);
+
+        label_cache_text_ = text;
+        label_cache_w_ = tex_w;
+        label_cache_h_ = tex_h;
+
+        CGContextRelease(cg_ctx);
+        CGColorSpaceRelease(colorspace);
+        CFRelease(line);
+        CFRelease(attr_str);
+        CFRelease(attrs);
+        CFRelease(cf_text);
+        CFRelease(font);
     }
 
-    // Semi-transparent background
-    CGContextSetRGBFillColor(cg_ctx, 0.05, 0.05, 0.1, 0.5);
-    CGContextFillRect(cg_ctx, CGRectMake(0, 0, tex_w, tex_h));
-
-    // Text in soft white
-    CGContextSetRGBFillColor(cg_ctx, 0.9, 0.95, 0.95, 0.9);
-    CGContextSetTextPosition(cg_ctx, 4, descent + 3);
-    CTLineDraw(line, cg_ctx);
-
-    auto* pixels = (uint8_t*)CGBitmapContextGetData(cg_ctx);
-
-    // Upload to Metal texture
-    auto td = MTL::TextureDescriptor::texture2DDescriptor(
-        MTL::PixelFormatRGBA8Unorm, tex_w, tex_h, false);
-    td->setUsage(MTL::TextureUsageShaderRead);
-    td->setStorageMode(MTL::StorageModeShared);
-    auto label_tex = device_->newTexture(td);
-    label_tex->replaceRegion(MTL::Region(0, 0, tex_w, tex_h), 0, pixels, tex_w * 4);
-
-    // Draw textured quad
-    float rect_data[4] = { screen_x, screen_y, (float)tex_w, (float)tex_h };
+    // Draw cached texture as textured quad
+    float rect_data[4] = { screen_x, screen_y, (float)label_cache_w_, (float)label_cache_h_ };
     float viewport[2] = { (float)width, (float)height };
 
     enc->setRenderPipelineState(label_pipeline_);
     enc->setVertexBytes(rect_data, sizeof(rect_data), 0);
     enc->setVertexBytes(viewport, sizeof(viewport), 1);
-    enc->setFragmentTexture(label_tex, 0);
+    enc->setFragmentTexture(label_cache_tex_, 0);
     enc->drawPrimitives(MTL::PrimitiveTypeTriangle, (NS::UInteger)0, (NS::UInteger)6);
-
-    label_tex->release();
-    CGContextRelease(cg_ctx);
-    CGColorSpaceRelease(colorspace);
-    CFRelease(line);
-    CFRelease(attr_str);
-    CFRelease(attrs);
-    CFRelease(cf_text);
-    CFRelease(font);
 }
 
 #endif // __APPLE__
