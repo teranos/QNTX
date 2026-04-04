@@ -50,9 +50,7 @@ declare global {
     }
 }
 
-// TIMING: Track when main.js module starts executing
-const navStart = performance.timeOrigin || Date.now();
-console.log('[TIMING] main.js module start:', Date.now() - navStart, 'ms');
+const _t0 = performance.now();
 if (window.logLoaderStep) window.logLoaderStep('Loading core modules...');
 
 if (window.logLoaderStep) window.logLoaderStep('Core modules loaded');
@@ -110,8 +108,7 @@ function handleVersion(data: VersionMessage): void {
 // Initialize the application
 // WebSocket connects immediately — storage, WASM, and canvas sync run in parallel.
 async function init(): Promise<void> {
-    // TIMING: Track when init() is called
-    console.log('[TIMING] init() called:', Date.now() - navStart, 'ms');
+    console.log('[TIMING] init() called:', (performance.now() - _t0).toFixed(0), 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Initializing application...');
 
     // Status indicators must exist before WebSocket connects — the WS open handler
@@ -120,7 +117,6 @@ async function init(): Promise<void> {
 
     // Connect WebSocket FIRST — this is the critical transport and must not wait
     // on storage, WASM, or canvas sync which can take seconds (or 30s on timeout).
-    console.log('[TIMING] Calling connectWebSocket():', Date.now() - navStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Connecting to server...');
 
     const handlers: MessageHandlers = {
@@ -159,63 +155,56 @@ async function init(): Promise<void> {
 
     // Load persisted UI state from IndexedDB (must happen after initStorage())
     uiState.loadPersistedState();
+    console.log('[TIMING] storage ready, state loaded:', (performance.now() - _t0).toFixed(0), 'ms');
 
-    // Run WASM init and canvas state sync in parallel — neither depends on the other,
-    // and both depend only on IndexedDB storage being ready (which it is at this point).
-    if (window.logLoaderStep) window.logLoaderStep('Initializing WASM + syncing canvas...', false, true);
-    await Promise.all([
-        // WASM module init
-        initQntxWasm(),
+    // WASM and canvas sync run in the background — neither is needed before the
+    // canvas opens.  WASM powers search/attestation (user-initiated); canvas sync
+    // reconciles with the backend (local IndexedDB state is already loaded above).
+    initQntxWasm().catch(err => log.error(SEG.WASM, '[Init] WASM init failed:', err));
 
-        // Canvas state sync (with timeout — never block init for more than 3s)
-        (async () => {
-            const { loadCanvasState, mergeCanvasState, upsertCanvasGlyph, upsertComposition, addMinimizedWindow } = await import('./api/canvas.ts');
+    (async () => {
+        const { loadCanvasState, mergeCanvasState, upsertCanvasGlyph, upsertComposition, addMinimizedWindow } = await import('./api/canvas.ts');
 
-            // Merge backend state into local (skip if offline or slow)
-            let backendReachable = false;
-            try {
-                const backendState = await Promise.race([
-                    loadCanvasState(),
-                    new Promise<never>((_, reject) =>
-                        setTimeout(() => reject(new Error('canvas state fetch timed out after 3s')), 3000)
-                    ),
-                ]);
-                backendReachable = true;
-                const local = {
-                    glyphs: uiState.getCanvasGlyphs(),
-                    compositions: uiState.getCanvasCompositions(),
-                    minimizedWindows: uiState.getMinimizedWindows(),
-                };
-                const merged = mergeCanvasState(local, backendState);
+        let backendReachable = false;
+        try {
+            const backendState = await Promise.race([
+                loadCanvasState(),
+                new Promise<never>((_, reject) =>
+                    setTimeout(() => reject(new Error('canvas state fetch timed out after 3s')), 3000)
+                ),
+            ]);
+            backendReachable = true;
+            const local = {
+                glyphs: uiState.getCanvasGlyphs(),
+                compositions: uiState.getCanvasCompositions(),
+                minimizedWindows: uiState.getMinimizedWindows(),
+            };
+            const merged = mergeCanvasState(local, backendState);
 
-                if (merged.mergedGlyphs > 0) uiState.setCanvasGlyphs(merged.glyphs);
-                if (merged.mergedComps > 0) uiState.setCanvasCompositions(merged.compositions);
-                if (merged.mergedMinimized > 0) uiState.setMinimizedWindows(merged.minimizedWindows);
+            if (merged.mergedGlyphs > 0) uiState.setCanvasGlyphs(merged.glyphs);
+            if (merged.mergedComps > 0) uiState.setCanvasCompositions(merged.compositions);
+            if (merged.mergedMinimized > 0) uiState.setMinimizedWindows(merged.minimizedWindows);
 
-                if (merged.mergedGlyphs > 0 || merged.mergedComps > 0 || merged.mergedMinimized > 0) {
-                    log.info(SEG.GLYPH, `[Init] Merged ${merged.mergedGlyphs} glyphs, ${merged.mergedComps} compositions, ${merged.mergedMinimized} minimized windows from backend`);
-                }
-            } catch (error: unknown) {
-                log.warn(SEG.GLYPH, '[Init] Failed to load canvas state from backend, continuing with local state:', error);
+            if (merged.mergedGlyphs > 0 || merged.mergedComps > 0 || merged.mergedMinimized > 0) {
+                log.info(SEG.GLYPH, `[Init] Merged ${merged.mergedGlyphs} glyphs, ${merged.mergedComps} compositions, ${merged.mergedMinimized} minimized windows from backend`);
             }
+        } catch (error: unknown) {
+            log.warn(SEG.GLYPH, '[Init] Failed to load canvas state from backend, continuing with local state:', error);
+        }
 
-            // Only enqueue local state when backend was unreachable — local may be ahead.
-            // When backend responded, merge already reconciled; re-enqueuing would just
-            // create phantom "pending" entries for items the server already has.
-            if (!backendReachable) {
-                const localGlyphs = uiState.getCanvasGlyphs();
-                const localCompositions = uiState.getCanvasCompositions();
-                const localMinimized = uiState.getMinimizedWindows();
-                for (const glyph of localGlyphs) upsertCanvasGlyph(glyph);
-                for (const comp of localCompositions) upsertComposition(comp);
-                for (const id of localMinimized) addMinimizedWindow(id);
+        if (!backendReachable) {
+            const localGlyphs = uiState.getCanvasGlyphs();
+            const localCompositions = uiState.getCanvasCompositions();
+            const localMinimized = uiState.getMinimizedWindows();
+            for (const glyph of localGlyphs) upsertCanvasGlyph(glyph);
+            for (const comp of localCompositions) upsertComposition(comp);
+            for (const id of localMinimized) addMinimizedWindow(id);
 
-                if (localGlyphs.length > 0 || localCompositions.length > 0 || localMinimized.length > 0) {
-                    log.info(SEG.GLYPH, `[Init] Backend unreachable, enqueued ${localGlyphs.length} glyphs, ${localCompositions.length} compositions, ${localMinimized.length} minimized windows for sync`);
-                }
+            if (localGlyphs.length > 0 || localCompositions.length > 0 || localMinimized.length > 0) {
+                log.info(SEG.GLYPH, `[Init] Backend unreachable, enqueued ${localGlyphs.length} glyphs, ${localCompositions.length} compositions, ${localMinimized.length} minimized windows for sync`);
             }
-        })(),
-    ]);
+        }
+    })().catch(err => log.warn(SEG.GLYPH, '[Init] Canvas sync failed:', err));
 
     // Restore previous session if exists
     const graphSession = uiState.getGraphSession();
@@ -255,6 +244,7 @@ async function init(): Promise<void> {
             return doc.body.textContent ?? '';
         },
     });
+
 
     // Initialize glyph run FIRST (before any glyphs are created)
     // This ensures the run is ready to receive glyphs
@@ -298,16 +288,17 @@ async function init(): Promise<void> {
         }
     }
 
-    // Load plugin glyphs (blocking — canvas needs plugin types registered before restoring glyphs)
-    try {
-        const { loadPluginGlyphs } = await import('./components/glyph/plugin-provided-glyphs.ts');
-        await loadPluginGlyphs();
-    } catch (err) {
-        log.warn(SEG.UI, '[Init] Failed to load plugin glyphs:', err);
-    }
 
-    // Canvas is the primary workspace — open it immediately
+    // Canvas is the primary workspace — open it immediately.
+    // Plugin glyphs load in background; unknown types show placeholders that
+    // auto-replace when the plugin becomes available (see renderGlyph retry).
+    console.log('[TIMING] canvas opening:', (performance.now() - _t0).toFixed(0), 'ms');
     glyphRun.openGlyph('canvas-workspace');
+
+    // Load plugin glyphs in background — non-blocking
+    import('./components/glyph/plugin-provided-glyphs.ts')
+        .then(({ loadPluginGlyphs }) => loadPluginGlyphs())
+        .catch(err => log.warn(SEG.UI, '[Init] Failed to load plugin glyphs:', err));
 
     if (window.logLoaderStep) window.logLoaderStep('Setting up file upload...');
     initQueryFileDrop();

@@ -656,15 +656,13 @@ export function buildCanvasWorkspace(
         if (idx !== -1) glyphs.splice(idx, 1);
     }) as EventListener);
 
-    // Render existing glyphs asynchronously (to support py glyphs)
+    // Render existing glyphs in parallel then append in original order
     (async () => {
         // Step 1: Render all individual glyphs (skip minimized — they live in the tray)
         const minimizedIds = new Set(uiState.getMinimizedWindows());
-        for (const glyph of glyphs) {
-            if (minimizedIds.has(glyph.id)) continue;
-            const glyphElement = await renderGlyph(glyph);
-            contentLayer.appendChild(glyphElement);
-        }
+        const visible = glyphs.filter(g => !minimizedIds.has(g.id));
+        const rendered = await Promise.all(visible.map(g => renderGlyph(g)));
+        for (const el of rendered) contentLayer.appendChild(el);
 
         // Step 2: Restore melded compositions after all glyphs are rendered
         const savedCompositions = getAllCompositions();
