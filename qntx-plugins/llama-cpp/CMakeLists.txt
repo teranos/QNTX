@@ -101,6 +101,7 @@ generate_proto(atsstore.proto)
 if(APPLE AND EXISTS "${CMAKE_SOURCE_DIR}/vendor/metal-cpp/Foundation/Foundation.hpp")
     set(PLATFORM_SRCS
         src/metal_renderer.cpp
+        src/metal_pick.cpp
         src/vocab_projection.cpp
     )
     set(HAS_METAL TRUE)

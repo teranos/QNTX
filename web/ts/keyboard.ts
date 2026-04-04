@@ -15,6 +15,12 @@ export function isInputFocused(target: EventTarget | null): boolean {
 /** Register global keyboard shortcuts */
 export function initGlobalKeyboard(): void {
     document.addEventListener('keydown', (e: KeyboardEvent) => {
+        // Suppress Tab — QNTX uses hjkl for navigation, Tab's browser focus cycling is unwanted
+        if (e.key === 'Tab' && !isInputFocused(e.target)) {
+            e.preventDefault();
+            return;
+        }
+
         // Cmd+, on Mac, Ctrl+, on Windows/Linux — toggle config panel
         if ((e.metaKey || e.ctrlKey) && e.key === ',') {
             e.preventDefault();

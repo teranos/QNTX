@@ -9,10 +9,21 @@
 // TODO(TRU): Trail positions vector is unbounded while keyframes are capped.
 // TODO(WSPT): WebSocket message parsing in plugin.cpp (mouse:, examine:, cam:,
 //   scrub:) is string prefix matching with no tests. Extract and unit-test.
+// TODO(KFNV): Keyframe navigation — [/] keys step between tokens in the
+//   generation sequence. Camera animates to the new distribution's center
+//   (subsumes CSNP). Works in both orange (scrub) and red (examine) modes.
+//   JS finds adjacent token span, triggers scrubTo(). C++ animates camera.
+// TODO(RNAV): Rank navigation — ,/. keys step through visible tokens sorted
+//   by probability (descending). Sorted index rebuilt on keyframe change.
+//   Pick (click) jumps to arbitrary rank. Camera nudges only when the
+//   selected candidate is off-screen (pull to 10% from edge, don't center).
+// TODO(CLST): Cluster navigation — 'c' toggles cluster mode overlay using
+//   HDBSCAN on visible token positions. ,/. shifts meaning: step between
+//   clusters (camera centers), press 'c' again to enter cluster (,/. steps
+//   within). Escape backs out. Flat ,/. rank nav always available outside
+//   c-mode. Builds on RNAV's sorted candidate index.
 // TODO(DCUR): Cursor is a fixed-size screen-space quad — doesn't scale with
 //   distance to the particle. Closer particles should get a larger cursor.
-// TODO(CSNP): Examine mode camera reset is abrupt. Animate the transition to
-//   center on the single keyframe's cloud instead of snapping.
 // TODO(STR): GPU-accelerated steering — Metal compute shader could modify the
 //   logit buffer before sampling. Click a region of the nebula to boost tokens
 //   in that region. Infrastructure exists (writable Metal buffer, sampler reads
@@ -105,6 +116,15 @@ public:
     // Read probability of a token from the current distribution.
     float token_probability(int token_id);
 
+    // Step through visible tokens by probability rank.
+    // dir=+1 moves to next lower prob, dir=-1 to next higher.
+    // Returns token_id of the newly selected candidate, or -1 if at boundary.
+    // Only meaningful in examine mode. Nudges camera if candidate is off-screen.
+    int step_candidate(int dir);
+
+    // Jump selection to a specific token (e.g. from pick). Updates rank.
+    void select_candidate(int token_id);
+
     // Runtime-adjustable parameters
     void set_param(const std::string& key, float value);
 
@@ -181,8 +201,11 @@ private:
     MTL::RenderPipelineState* cursor_pipeline_ = nullptr;
     std::atomic<int> hovered_token_{-1};
 
-    // Label rendering — textured quad pipeline
+    // Label rendering — textured quad pipeline (texture cached per text string)
     MTL::RenderPipelineState* label_pipeline_ = nullptr;
+    MTL::Texture* label_cache_tex_ = nullptr;
+    std::string label_cache_text_;
+    int label_cache_w_ = 0, label_cache_h_ = 0;
     void render_label(MTL::RenderCommandEncoder* enc, const std::string& text,
                       float screen_x, float screen_y, int width, int height);
 
@@ -207,6 +230,13 @@ private:
     std::vector<std::vector<float>> keyframe_history_;  // one distribution per token
     std::atomic<int> scrub_index_{-1};  // -1 = live mode
     std::atomic<bool> token_examine_{false};  // true = isolate single keyframe
+
+    // Rank navigation — sorted candidate index for ,/. stepping
+    std::vector<int> ranked_tokens_;   // token IDs sorted by prob descending
+    int candidate_rank_ = -1;         // current position in ranked_tokens_ (-1 = none)
+    bool ranked_dirty_ = true;        // rebuild sorted index on next step
+    void rebuild_ranked_index();
+    void nudge_camera_to_token(int token_id);
 
     // Drift — fixed-step camera offset per token, makes time into space
     int drift_count_ = 0;        // how many tokens have been recorded

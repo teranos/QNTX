@@ -27,7 +27,7 @@ import { showActionBar, hideActionBar } from './action-bar';
 import { showSpawnMenu } from './spawn-menu';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
 import { setupRectangleSelection, didRectangleSelectionJustComplete } from './rectangle-selection';
-import { setupCanvasPan, resetTransform } from './canvas-pan';
+import { setupCanvasPan, resetTransform, panToGlyph, screenToCanvas } from './canvas-pan';
 import { getAllCompositions, removeComposition, extractGlyphIds } from '../../../state/compositions';
 import { convertNoteToPrompt, convertResultToNote } from '../conversions';
 import {
@@ -509,14 +509,134 @@ export function buildCanvasWorkspace(
         }
     }, true);
 
-    // Setup keyboard shortcuts (ESC, DELETE, U, 0 for reset view)
+    // Drill-in state: when inside a melded composition, hjkl navigates children only
+    let drilledComposition: HTMLElement | null = null;
+
+    function getNavigationCandidates(): HTMLElement[] {
+        if (drilledComposition) {
+            // Inside a composition — only direct glyph children, skip error glyphs
+            return ([...drilledComposition.querySelectorAll(':scope > [data-glyph-id]')] as HTMLElement[])
+                .filter(el => !el.classList.contains('canvas-error-glyph'));
+        }
+        // Top level — compositions as units + standalone glyphs
+        const all = [...container.querySelectorAll('[data-glyph-id]')] as HTMLElement[];
+        return all.filter(el => {
+            if (!el.dataset.glyphId || el.dataset.glyphId === 'canvas-workspace') return false;
+            // Skip error glyphs
+            if (el.classList.contains('canvas-error-glyph')) return false;
+            // Skip glyphs that are inside a composition (the composition itself is the nav target)
+            const parentComp = el.parentElement?.closest('.melded-composition');
+            if (parentComp && parentComp !== el) return false;
+            return true;
+        });
+    }
+
+    function navigateDirection(direction: 'left' | 'down' | 'up' | 'right'): void {
+        const selected = getSelectedGlyphIds(canvasId);
+
+        // Auto-drill: if selected glyph is inside a composition we haven't drilled into, do it now
+        if (!drilledComposition && selected.length > 0) {
+            const selEl = container.querySelector(`[data-glyph-id="${selected[0]}"]`) as HTMLElement | null;
+            if (selEl) {
+                const parentComp = selEl.parentElement?.closest('.melded-composition') as HTMLElement | null;
+                if (parentComp && parentComp !== selEl) {
+                    drilledComposition = parentComp;
+                }
+            }
+        }
+
+        const candidates = getNavigationCandidates();
+        if (candidates.length === 0) return;
+
+        // Reference point: selected glyph center, or viewport center
+        let cx: number, cy: number;
+        if (selected.length > 0) {
+            const currentEl = candidates.find(el => el.dataset.glyphId === selected[0]);
+            if (!currentEl) return;
+            cx = currentEl.offsetLeft + currentEl.offsetWidth / 2;
+            cy = currentEl.offsetTop + currentEl.offsetHeight / 2;
+        } else {
+            const viewCenter = screenToCanvas(canvasId, container.clientWidth / 2, container.clientHeight / 2);
+            cx = viewCenter.x;
+            cy = viewCenter.y;
+        }
+
+        const currentId = selected.length > 0 ? selected[0] : null;
+        let best: HTMLElement | null = null;
+        let bestDist = Infinity;
+        for (const el of candidates) {
+            if (el.dataset.glyphId === currentId) continue;
+            const ex = el.offsetLeft + el.offsetWidth / 2;
+            const ey = el.offsetTop + el.offsetHeight / 2;
+            const dx = ex - cx;
+            const dy = ey - cy;
+
+            let valid = false;
+            if (direction === 'right' && dx > 0) valid = true;
+            else if (direction === 'left' && dx < 0) valid = true;
+            else if (direction === 'down' && dy > 0) valid = true;
+            else if (direction === 'up' && dy < 0) valid = true;
+            if (!valid) continue;
+
+            const dist = dx * dx + dy * dy;
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = el;
+            }
+        }
+        if (best) {
+            selectGlyph(canvasId, best.dataset.glyphId!, container, false);
+            panToGlyph(container, canvasId, best);
+        }
+    }
+
+    // Setup keyboard shortcuts (hjkl nav, Enter drill-in, ESC drill-out, DELETE, U, 0)
     void setupKeyboardShortcuts(
         container,
         () => hasSelection(canvasId),
-        () => deselectAll(canvasId, container),
+        () => {
+            // ESC: if drilled into a composition, pop out and select the composition
+            if (drilledComposition) {
+                const compId = drilledComposition.dataset.glyphId;
+                drilledComposition = null;
+                if (compId) {
+                    selectGlyph(canvasId, compId, container, false);
+                } else {
+                    deselectAll(canvasId, container);
+                }
+                return;
+            }
+            deselectAll(canvasId, container);
+        },
         () => deleteSelectedGlyphs(canvasId, container),
         () => unmeldFromSelection(canvasId, container),
-        () => resetTransform(container, canvasId)
+        () => resetTransform(container, canvasId),
+        navigateDirection,
+        () => {
+            // Enter: if selected element is a composition, drill into it.
+            // Otherwise, focus textarea.
+            const selected = getSelectedGlyphIds(canvasId);
+            if (selected.length !== 1) return;
+            const el = container.querySelector(`[data-glyph-id="${selected[0]}"]`) as HTMLElement | null;
+            if (!el) return;
+
+            if (el.classList.contains('melded-composition') && !drilledComposition) {
+                // Drill into composition — select first child
+                drilledComposition = el;
+                const firstChild = el.querySelector(':scope > [data-glyph-id]') as HTMLElement | null;
+                if (firstChild && firstChild.dataset.glyphId) {
+                    selectGlyph(canvasId, firstChild.dataset.glyphId, container, false);
+                }
+                log.debug(SEG.GLYPH, '[Canvas] Drilled into composition', { id: selected[0] });
+                return;
+            }
+
+            // Focus textarea
+            const textarea = el.querySelector('textarea') as HTMLTextAreaElement | null;
+            if (textarea) {
+                textarea.focus();
+            }
+        }
     );
 
     // Setup canvas pan (two-finger scroll on desktop, single finger drag on mobile)
