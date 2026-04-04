@@ -613,7 +613,6 @@ export function createResponseGlyph(
         nebulaWs = null;
     }
 
-    element.style.position = 'relative';
     element.insertBefore(nebulaCanvas, element.firstChild);
     element.appendChild(nebulaStatus);
     nebulaRo.observe(element);
