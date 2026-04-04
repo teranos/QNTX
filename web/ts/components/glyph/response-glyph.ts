@@ -825,7 +825,7 @@ function setupTokenPopup(
     onScrub?: (index: number) => void,
     onLockChange?: (locked: boolean, span: HTMLElement | null) => void,
     onExamineChange?: (focused: boolean) => void,
-): () => void {
+): { unlock: () => void; navigate: (dir: number) => void } {
     let lockedSpan: HTMLSpanElement | null = null;
     let focused = false;  // red = focus mode (single keyframe isolation)
 

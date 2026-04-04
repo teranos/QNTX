@@ -28,7 +28,7 @@ export type Direction = 'left' | 'down' | 'up' | 'right';
  * Uses AbortController for automatic cleanup - signal will abort when container is removed
  */
 export function setupKeyboardShortcuts(
-    container: HTMLElement,
+    _container: HTMLElement,
     hasSelection: HasSelectionCallback,
     onDeselect: () => void,
     onDelete: () => void,
