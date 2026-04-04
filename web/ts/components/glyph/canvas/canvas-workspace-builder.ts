@@ -490,7 +490,7 @@ export function buildCanvasWorkspace(
         if (target.closest('[data-prevent-drag]')) return;
 
         // Focus container to enable keyboard shortcuts
-        container.focus();
+        container.focus({ preventScroll: true });
 
         // Walk up from click target to find a glyph element (must be inside this workspace)
         const glyphEl = target.closest('[data-glyph-id]') as HTMLElement | null;
