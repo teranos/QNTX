@@ -450,7 +450,8 @@ func (c *ExternalDomainProxy) RegisterWebSocket() (map[string]plugin.WebSocketHa
 		keepaliveCfg = *c.keepaliveConfig
 	}
 	pluginLogger := c.logger.With("plugin", c.metadata.Name)
-	keepaliveHandler := NewKeepaliveHandler(keepaliveCfg, pluginLogger)
+	pluginLabel := fmt.Sprintf("%s v%s", c.metadata.Name, c.metadata.Version)
+	keepaliveHandler := NewKeepaliveHandler(keepaliveCfg, pluginLogger, pluginLabel)
 
 	// Use configured WebSocket security or default
 	wsCfg := DefaultWebSocketConfig()
@@ -474,7 +475,8 @@ func (c *ExternalDomainProxy) RegisterWebSocketWithConfig(config KeepaliveConfig
 	handlers := make(map[string]plugin.WebSocketHandler)
 
 	pluginLogger := c.logger.With("plugin", c.metadata.Name)
-	keepaliveHandler := NewKeepaliveHandler(config, pluginLogger)
+	pluginLabel := fmt.Sprintf("%s v%s", c.metadata.Name, c.metadata.Version)
+	keepaliveHandler := NewKeepaliveHandler(config, pluginLogger, pluginLabel)
 
 	handlers[fmt.Sprintf("/ws/%s", c.metadata.Name)] = &wsProxyHandler{
 		client:    c,
