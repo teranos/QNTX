@@ -245,7 +245,7 @@ func TestKeepaliveHandler_StartStop(t *testing.T) {
 		PongTimeout:  100 * time.Millisecond,
 	}
 
-	handler := NewKeepaliveHandler(config, logger)
+	handler := NewKeepaliveHandler(config, logger, "test")
 
 	var pingCount int32
 	sendPing := func(timestamp int64) error {
@@ -278,7 +278,7 @@ func TestKeepaliveHandler_DisabledDoesNotStart(t *testing.T) {
 		PingInterval: 10 * time.Millisecond,
 	}
 
-	handler := NewKeepaliveHandler(config, logger)
+	handler := NewKeepaliveHandler(config, logger, "test")
 
 	var pingCount int32
 	sendPing := func(timestamp int64) error {
@@ -299,7 +299,7 @@ func TestKeepaliveHandler_DisabledDoesNotStart(t *testing.T) {
 
 func TestKeepaliveHandler_HandlePing(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	handler := NewKeepaliveHandler(DefaultKeepaliveConfig(), logger)
+	handler := NewKeepaliveHandler(DefaultKeepaliveConfig(), logger, "test")
 
 	timestamp := time.Now().UnixNano()
 	pingMsg := &protocol.WebSocketMessage{
@@ -317,7 +317,7 @@ func TestKeepaliveHandler_HandlePing(t *testing.T) {
 func TestKeepaliveHandler_HandlePong(t *testing.T) {
 	skipIfShort(t)
 	logger := zaptest.NewLogger(t).Sugar()
-	handler := NewKeepaliveHandler(DefaultKeepaliveConfig(), logger)
+	handler := NewKeepaliveHandler(DefaultKeepaliveConfig(), logger, "test")
 
 	// Send a pong with timestamp from 100ms ago
 	sentTime := time.Now().Add(-100 * time.Millisecond)
@@ -339,7 +339,7 @@ func TestKeepaliveHandler_HandlePong(t *testing.T) {
 
 func TestKeepaliveHandler_HandlePongWithoutTimestamp(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	handler := NewKeepaliveHandler(DefaultKeepaliveConfig(), logger)
+	handler := NewKeepaliveHandler(DefaultKeepaliveConfig(), logger, "test")
 
 	pongMsg := &protocol.WebSocketMessage{
 		Type:      protocol.WebSocketMessage_PONG,
@@ -356,7 +356,7 @@ func TestKeepaliveHandler_HandlePongWithoutTimestamp(t *testing.T) {
 
 func TestKeepaliveHandler_HandleMessage(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	handler := NewKeepaliveHandler(DefaultKeepaliveConfig(), logger)
+	handler := NewKeepaliveHandler(DefaultKeepaliveConfig(), logger, "test")
 
 	tests := []struct {
 		name        string
@@ -441,7 +441,7 @@ func TestKeepaliveHandler_CheckTimeout(t *testing.T) {
 		PongTimeout: 50 * time.Millisecond,
 	}
 
-	handler := NewKeepaliveHandler(config, logger)
+	handler := NewKeepaliveHandler(config, logger, "test")
 
 	// Initially not timed out
 	assert.False(t, handler.CheckTimeout())
@@ -468,7 +468,7 @@ func TestKeepaliveHandler_ConnectWithRetry_Success(t *testing.T) {
 		ReconnectBaseWait: 10 * time.Millisecond,
 	}
 
-	handler := NewKeepaliveHandler(config, logger)
+	handler := NewKeepaliveHandler(config, logger, "test")
 
 	var attempts int32
 	connect := func() error {
@@ -490,7 +490,7 @@ func TestKeepaliveHandler_ConnectWithRetry_SuccessAfterFailures(t *testing.T) {
 		ReconnectBaseWait: 5 * time.Millisecond,
 	}
 
-	handler := NewKeepaliveHandler(config, logger)
+	handler := NewKeepaliveHandler(config, logger, "test")
 
 	var attempts int32
 	connect := func() error {
@@ -514,7 +514,7 @@ func TestKeepaliveHandler_ConnectWithRetry_AllFail(t *testing.T) {
 		ReconnectBaseWait: 5 * time.Millisecond,
 	}
 
-	handler := NewKeepaliveHandler(config, logger)
+	handler := NewKeepaliveHandler(config, logger, "test")
 
 	var attempts int32
 	connect := func() error {
@@ -536,7 +536,7 @@ func TestKeepaliveHandler_ConnectWithRetry_ContextCanceled(t *testing.T) {
 		ReconnectBaseWait: 100 * time.Millisecond,
 	}
 
-	handler := NewKeepaliveHandler(config, logger)
+	handler := NewKeepaliveHandler(config, logger, "test")
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -565,7 +565,7 @@ func TestKeepaliveHandler_MultipleStartStopCycles(t *testing.T) {
 		PingInterval: 20 * time.Millisecond,
 	}
 
-	handler := NewKeepaliveHandler(config, logger)
+	handler := NewKeepaliveHandler(config, logger, "test")
 
 	sendPing := func(timestamp int64) error {
 		return nil
@@ -592,7 +592,7 @@ func TestKeepaliveHandler_DoubleStartIgnored(t *testing.T) {
 		PingInterval: 50 * time.Millisecond,
 	}
 
-	handler := NewKeepaliveHandler(config, logger)
+	handler := NewKeepaliveHandler(config, logger, "test")
 
 	var pingCount int32
 	sendPing := func(timestamp int64) error {
@@ -617,7 +617,7 @@ func TestKeepaliveHandler_DoubleStartIgnored(t *testing.T) {
 
 func TestKeepaliveHandler_DoubleStopSafe(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	handler := NewKeepaliveHandler(DefaultKeepaliveConfig(), logger)
+	handler := NewKeepaliveHandler(DefaultKeepaliveConfig(), logger, "test")
 
 	sendPing := func(timestamp int64) error {
 		return nil
@@ -643,7 +643,7 @@ func TestKeepaliveHandler_Integration_PingPongFlow(t *testing.T) {
 		PongTimeout:  100 * time.Millisecond,
 	}
 
-	handler := NewKeepaliveHandler(config, logger)
+	handler := NewKeepaliveHandler(config, logger, "test")
 
 	// Channel to receive pings
 	pingCh := make(chan int64, 10)
