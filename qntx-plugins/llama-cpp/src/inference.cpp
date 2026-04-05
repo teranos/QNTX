@@ -1,4 +1,4 @@
-#include "plugin.h"
+#include "inference_internal.h"
 
 #include <algorithm>
 #include <chrono>
@@ -7,9 +7,6 @@
 #include <sstream>
 #include <vector>
 
-#include "llama.h"
-
-static constexpr int SIGNAL_TOP_K = 10;
 static constexpr int STAGE_TOP_K = 5;  // top-k candidates stored per stage snapshot
 
 // --- Observer sampler ---
@@ -117,7 +114,7 @@ static llama_sampler* make_observer(const std::string& stage_name,
 // Build the full sampler chain with observers between each stage.
 // Returns the chain sampler. Caller must llama_sampler_free() it.
 // `snapshots` is cleared and will be populated per-token (clear before each sample call).
-static llama_sampler* build_sampler_chain(
+llama_sampler* build_sampler_chain(
     float temperature,
     const SamplerConfig& cfg,
     const llama_vocab* vocab,
@@ -196,7 +193,7 @@ static llama_sampler* build_sampler_chain(
 //
 // Sampler visibility: implemented via observer sampler (see build_sampler_chain above).
 // Observer snapshots distribution between each stage — data flows through TokenSignal.sampler_stages.
-static void capture_signal(llama_context* ctx, const llama_vocab* vocab, int top_k,
+void capture_signal(llama_context* ctx, const llama_vocab* vocab, int top_k,
                            TokenSignal& sig,
                            std::vector<float>& probs_buf,
                            std::vector<int>& indices_buf) {
@@ -317,10 +314,14 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
 
     std::cout << "[llama-cpp] Model loaded: " << model_name_
               << " (ctx=" << n_ctx << ")" << std::endl;
+
+    init_vision(model_path);
+
     return true;
 }
 
 void InferenceEngine::unload() {
+    cleanup_vision();
     if (ctx_) {
         llama_free(ctx_);
         ctx_ = nullptr;
@@ -657,3 +658,4 @@ InferenceEngine::ChatResult InferenceEngine::stream_chat(
     result.callback_ms = callback_us / 1000;
     return result;
 }
+
