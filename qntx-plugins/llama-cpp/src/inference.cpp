@@ -3,13 +3,9 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <dirent.h>
 #include <iostream>
 #include <sstream>
 #include <vector>
-
-#include "mtmd.h"
-#include "mtmd-helper.h"
 
 static constexpr int STAGE_TOP_K = 5;  // top-k candidates stored per stage snapshot
 
@@ -319,58 +315,13 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
     std::cout << "[llama-cpp] Model loaded: " << model_name_
               << " (ctx=" << n_ctx << ")" << std::endl;
 
-    // Auto-detect mmproj in the same directory as the model file.
-    // Looks for mmproj-*.gguf, then tries loading from the model file itself.
-    auto mparams = mtmd_context_params_default();
-    mparams.use_gpu = true;
-    mparams.print_timings = true;
-    mparams.warmup = true;
-
-    std::string mmproj_path;
-    auto slash = model_path.find_last_of('/');
-    if (slash != std::string::npos) {
-        std::string dir = model_path.substr(0, slash + 1);
-        // Scan directory for mmproj-*.gguf
-        DIR* d = opendir(dir.c_str());
-        if (d) {
-            struct dirent* entry;
-            while ((entry = readdir(d)) != nullptr) {
-                std::string name(entry->d_name);
-                if (name.find("mmproj") == 0 && name.find(".gguf") != std::string::npos) {
-                    mmproj_path = dir + name;
-                    break;
-                }
-            }
-            closedir(d);
-        }
-    }
-
-    if (!mmproj_path.empty()) {
-        mtmd_ctx_ = mtmd_init_from_file(mmproj_path.c_str(), model_, mparams);
-    } else {
-        // Try the model file itself — works if vision tensors are bundled
-        mtmd_ctx_ = mtmd_init_from_file(model_path.c_str(), model_, mparams);
-    }
-
-    if (mtmd_ctx_ && mtmd_support_vision(mtmd_ctx_)) {
-        std::cout << "[llama-cpp] Vision support: yes"
-                  << (mmproj_path.empty() ? " (bundled)" : " (" + mmproj_path + ")")
-                  << std::endl;
-    } else {
-        if (mtmd_ctx_) {
-            mtmd_free(mtmd_ctx_);
-            mtmd_ctx_ = nullptr;
-        }
-    }
+    init_vision(model_path);
 
     return true;
 }
 
 void InferenceEngine::unload() {
-    if (mtmd_ctx_) {
-        mtmd_free(mtmd_ctx_);
-        mtmd_ctx_ = nullptr;
-    }
+    cleanup_vision();
     if (ctx_) {
         llama_free(ctx_);
         ctx_ = nullptr;

@@ -121,6 +121,7 @@ add_executable(qntx-llama-cpp-plugin
     src/plugin.cpp
     src/inference.cpp
     src/vision.cpp
+    src/llm_service.cpp
     src/pdf_extract.cpp
     src/ats_client.cpp
     ${PLATFORM_SRCS}
