@@ -1,4 +1,4 @@
-.PHONY: build install clean
+.PHONY: install clean
 
 PREFIX ?= $(HOME)/.qntx
 BUILD_DIR = build
@@ -12,14 +12,11 @@ define restart-plugin
 		|| echo "  ⊘ QNTX not running — restart make dev to pick up new binary"
 endef
 
-build: ## Build qntx-llama-cpp-plugin
+install: ## Build, install, and restart llama-cpp plugin
 	@echo "Building qntx-llama-cpp-plugin..."
 	@mkdir -p $(BUILD_DIR)
 	@cd $(BUILD_DIR) && cmake .. -DCMAKE_BUILD_TYPE=Release
 	@cd $(BUILD_DIR) && cmake --build . --parallel 5
-	@echo "✓ $(BUILD_DIR)/qntx-llama-cpp-plugin"
-
-install: build ## Build, install, and restart llama-cpp plugin
 	@mkdir -p $(PREFIX)/plugins
 	@cp $(BUILD_DIR)/qntx-llama-cpp-plugin $(PREFIX)/plugins/qntx-llama-cpp-plugin
 	@chmod +x $(PREFIX)/plugins/qntx-llama-cpp-plugin
