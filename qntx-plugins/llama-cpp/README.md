@@ -57,7 +57,7 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 
 - **STO** — ~~Single-turn only.~~ Multi-turn message arrays flow through gRPC and are tokenized via `prepare_prompt()`. KV cache is still cleared per request — no persistent conversation state across requests.
 
-- **TAO** — Text attachments only. Vision support via mtmd (llama.cpp multimodal) is coded but **untested**. Requires a separate mmproj GGUF (not bundled by ollama). Set `mmproj_path` in config. Image attachments (`image/*` MIME) would route through the clip encoder; PDF and text attachments still use MuPDF text extraction. Not verified end-to-end.
+- **TAO** — ~~Text attachments only.~~ Vision support via mtmd (llama.cpp multimodal). Auto-detects `mmproj-*.gguf` in the model directory — no config needed. Image attachments (`image/*` MIME) route through the CLIP encoder via `stream_chat_vision()`; PDF and text attachments still use MuPDF text extraction. Verified with Qwen2.5-VL 3B.
 
 - **IBP** — Image-based PDFs. MuPDF extracts text objects from the PDF structure. PDFs where text is baked into images (scanned documents, designed flyers) return empty. OCR (e.g. Tesseract) would be needed for those.
 
