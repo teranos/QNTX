@@ -2,7 +2,7 @@
  * Nebula navigation — keyboard camera controls, pick hover, dim logic,
  * and token stepping for the Metal particle renderer.
  *
- * Extracted from response-glyph.ts to keep the glyph factory focused on
+ * Extracted from result-glyph.ts to keep the glyph factory focused on
  * lifecycle and DOM concerns.
  */
 

@@ -8,7 +8,7 @@
  */
 
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
-import type { Glyph } from './glyph';
+import type { Glyph } from '@qntx/glyphs';
 import { AX } from '@generated/sym.js';
 
 // Mock ResizeObserver

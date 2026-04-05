@@ -17,7 +17,7 @@ import {
     flushSaveState
 } from './canvas-pan';
 import { makeDraggable, makeResizable } from '../glyph-interaction';
-import type { Glyph } from '../glyph';
+import type { Glyph } from '@qntx/glyphs';
 import { uiState } from '../../../state/ui';
 
 // Helper to create wheel event in test environment

@@ -7,7 +7,7 @@
  */
 
 import { describe, test, expect, mock } from 'bun:test';
-import type { Glyph } from './glyph';
+import type { Glyph } from '@qntx/glyphs';
 import type { SpawnResultDetail } from './glyph-ui';
 
 // Only run under JSDOM (CI) — CustomEvent dispatch requires consistent DOM

@@ -14,7 +14,7 @@
  * TODO: Migrate to GlyphUI SDK (like py-glyph and ts-glyph).
  */
 
-import type { Glyph } from './glyph';
+import type { Glyph } from '@qntx/glyphs';
 import { SO, Doc, Prose } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { apiFetch } from '../../api';
@@ -25,7 +25,7 @@ import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
 import { tooltip } from '../tooltip';
 import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
-import { createResponseGlyph, getResponseTokenCount, unsubscribeStream, populateStaticContent } from './response-glyph';
+import { createResultGlyph, getResponseTokenCount, unsubscribeStream, populateStaticContent } from './result-glyph';
 
 /**
  * Prompt glyph execution status
@@ -212,6 +212,8 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
 
         try {
             // Collect attachments from melded glyphs
+            // TODO [TS-4]: Extract shared collectMeldedAttachments(glyphId) — identical
+            // block in glyph-followup.ts. Part of the same execute→spawn pipeline as TS-5.
             const fileIds: string[] = [];
             const noteTexts: string[] = [];
             const comp = findCompositionByGlyph(glyph.id);
@@ -348,8 +350,11 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     tooltip.attach(element);
 
     /**
-     * Spawn a response glyph below this prompt glyph in streaming mode.
+     * Spawn a result glyph below this prompt glyph in streaming mode.
      * Returns the element, or null if canvas not found.
+     *
+     * TODO [TS-5]: Extract shared spawnResultBelow — this pattern is repeated
+     * in glyph-followup.ts and canvas-workspace-builder.ts.
      */
     function spawnResponseBelow(promptEl: HTMLElement, promptGlyphId: string, promptText?: string): HTMLElement | null {
         const promptRect = promptEl.getBoundingClientRect();
@@ -374,7 +379,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
             renderContent: () => document.createElement('div'),
         };
 
-        const responseElement = createResponseGlyph(responseGlyph, undefined, undefined, promptText, promptGlyphId);
+        const responseElement = createResultGlyph(responseGlyph, undefined, undefined, promptText, promptGlyphId);
         canvas.appendChild(responseElement);
 
         uiState.addCanvasGlyph({
@@ -386,7 +391,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
             height: 200,
         });
 
-        autoMeldResultBelow(promptEl, promptGlyphId, 'prompt', 'Prompt', responseElement, responseGlyphId, 'ResponseGlyph');
+        autoMeldResultBelow(promptEl, promptGlyphId, 'prompt', 'Prompt', responseElement, responseGlyphId, 'ResultGlyph');
 
         return responseElement;
     }

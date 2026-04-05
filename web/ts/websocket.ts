@@ -27,7 +27,7 @@ import { handleWatcherQueueStatus } from './websocket-handlers/watcher-queue-sta
 import { log, SEG } from './logger';
 import { connectivityManager } from './connectivity';
 import { stripProtocol } from './http-utils';
-import { updateResultGlyphContent, type ExecutionResult } from './components/glyph/response-glyph';
+import { updateResultGlyphContent, type ExecutionResult } from './components/glyph/result-glyph';
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;

@@ -7,7 +7,7 @@
  * rectangle selection, glyph restoration, and composition restoration.
  */
 
-import type { Glyph } from '../glyph';
+import type { Glyph } from '@qntx/glyphs';
 import { Doc } from '@generated/sym.js';
 import { log, SEG } from '../../../logger';
 import { toast } from '../../../toast';
@@ -15,12 +15,12 @@ import { getGlyphTypeBySymbol, getGlyphTypeByElement } from '../glyph-registry';
 import { createErrorGlyph } from '../error-glyph';
 import { createPluginPlaceholderGlyph } from '../plugin-glyph';
 import { getPluginNameBySymbol } from '../plugin-provided-glyphs';
-import { createResponseGlyph, type ExecutionResult, type PromptConfig } from '../response-glyph';
+import { createResultGlyph, type ExecutionResult, type PromptConfig } from '../result-glyph';
 import type { SpawnResultDetail } from '../glyph-ui';
 import { uploadFile } from '../../../api/files';
 import { createDocGlyph, type DocGlyphContent } from '../doc-glyph';
 import { uiState } from '../../../state/ui';
-import { getMinimizeDuration } from '../glyph';
+import { getMinimizeDuration } from '@qntx/glyphs';
 import { unmeldComposition, reconstructMeld, detachGlyph, autoMeldResultBelow } from '../meld/meld-system';
 import { makeDraggable } from '../glyph-interaction';
 import { showActionBar, hideActionBar } from './action-bar';
@@ -243,14 +243,14 @@ export async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
         }
         try {
             const parsed = JSON.parse(glyph.content);
-            // Token-based content (streamed responses): let createResponseGlyph
+            // Token-based content (streamed responses): let createResultGlyph
             // restore from saved canvas state internally — don't pass a result.
             const hasTokens = Array.isArray(parsed.tokens) && parsed.tokens.length > 0;
             // Backwards-compatible: new format has .result, old is raw ExecutionResult
             const result = hasTokens ? undefined : (parsed.result ?? parsed);
             const promptConfig: PromptConfig | undefined = parsed.promptConfig;
             const prompt: string | undefined = parsed.prompt;
-            const el = createResponseGlyph(glyph, result, promptConfig, prompt);
+            const el = createResultGlyph(glyph, result, promptConfig, prompt);
 
             // Restore follow-up error state if persisted
             if (parsed.followupError) {
@@ -430,6 +430,8 @@ export function buildCanvasWorkspace(
     });
 
     // SDK spawn-result: glyphs fire this event via ui.spawnResult(), canvas handles the rest
+    // TODO [TS-5]: Extract shared spawnResultBelow — this pattern is repeated
+    // in prompt-glyph.ts and glyph-followup.ts.
     container.addEventListener('glyph:spawn-result', ((e: CustomEvent<SpawnResultDetail>) => {
         const { glyphId, name, result } = e.detail;
         const parentElement = (e.target as HTMLElement).closest('[data-glyph-id]') as HTMLElement | null;
@@ -453,7 +455,7 @@ export function buildCanvasWorkspace(
             renderContent: () => document.createElement('div'),
         };
 
-        const resultElement = createResponseGlyph(resultGlyph, result as ExecutionResult);
+        const resultElement = createResultGlyph(resultGlyph, result as ExecutionResult);
         contentLayer.appendChild(resultElement);
 
         const resultRect = resultElement.getBoundingClientRect();

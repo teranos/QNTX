@@ -40,7 +40,7 @@ const { uiState } = createMockUiState();
 mock.module('../../state/ui', () => ({ uiState }));
 
 // Import after JSDOM + mock setup
-const { glyphRun } = await import('./run.ts');
+const { glyphRun } = await import('@qntx/glyphs');
 const { findPeakedGlyph } = await import('@qntx/glyphs');
 
 describe('Glyph Single Element Axiom', () => {
