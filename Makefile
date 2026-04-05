@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin rust-sqlite rust-embeddings wasm rust-python rust-reduce
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin rust-sqlite rust-embeddings wasm rust-python rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -189,18 +189,6 @@ clean: ## Clean build artifacts
 	@rm -rf web/node_modules
 	@rm -rf plugins/qntx-fuzzy/target
 
-install: cli ## Install QNTX binary to ~/.qntx/bin (override with PREFIX=/custom/path)
-	@echo "Installing qntx to $(PREFIX)/bin..."
-	@mkdir -p $(PREFIX)/bin
-	@cp bin/qntx $(PREFIX)/bin/qntx
-	@chmod +x $(PREFIX)/bin/qntx
-	@echo "✓ qntx installed to $(PREFIX)/bin/qntx"
-	@if ! echo $$PATH | grep -q "$(PREFIX)/bin"; then \
-		echo ""; \
-		echo "⚠️  $(PREFIX)/bin is not in your PATH"; \
-		echo "Add this to your shell config:"; \
-		echo "  export PATH=\"$(PREFIX)/bin:\$$PATH\""; \
-	fi
 
 desktop-prepare: cli web ## Prepare desktop app (icons + sidecar binary)
 	# TODO: Add proper Nix package for Tauri desktop app (rustPlatform.buildRustPackage)
