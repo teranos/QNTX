@@ -14,11 +14,12 @@
 #include "llm.grpc.pb.h"
 #include "ats_client.h"
 
-#define PLUGIN_VERSION "0.32.3"
+#define PLUGIN_VERSION "0.34.3"
 
 // Forward declarations
 struct llama_model;
 struct llama_context;
+struct mtmd_context;
 class MetalRenderer;
 
 // Sampler chain configuration — controls which samplers are active and their params.
@@ -72,6 +73,7 @@ public:
     bool load_model(const std::string& model_path, int n_ctx = 2048);
     void unload();
     bool is_loaded() const;
+    bool has_vision() const { return mtmd_ctx_ != nullptr; }
 
     struct ChatResult {
         std::string content;
@@ -127,6 +129,26 @@ public:
                            TokenCallback on_token,
                            const SamplerConfig& sampler_cfg = {});
 
+    // Image data for vision: raw bytes (decoded PNG/JPG)
+    struct ImageAttachment {
+        std::vector<uint8_t> data;
+    };
+
+    // Multi-turn streaming with image attachments (vision)
+    ChatResult stream_chat_vision(const std::vector<Message>& messages,
+                                   const std::vector<ImageAttachment>& images,
+                                   float temperature,
+                                   int max_tokens,
+                                   TokenCallback on_token,
+                                   const SamplerConfig& sampler_cfg = {});
+
+    // Non-streaming vision variant
+    ChatResult chat_vision(const std::vector<Message>& messages,
+                           const std::vector<ImageAttachment>& images,
+                           float temperature,
+                           int max_tokens,
+                           const SamplerConfig& sampler_cfg = {});
+
     std::string model_name() const { return model_name_; }
     int vocab_size() const;
     std::string token_text(int token_id) const;
@@ -142,8 +164,14 @@ private:
     void write_vocab_cache();
     int prepare_prompt(const std::vector<Message>& messages,
                        ChatResult& result);
+    void init_vision(const std::string& model_path);
+    void cleanup_vision();
+    int prepare_prompt_vision(const std::vector<Message>& messages,
+                              const std::vector<ImageAttachment>& images,
+                              ChatResult& result);
     llama_model* model_ = nullptr;
     llama_context* ctx_ = nullptr;
+    mtmd_context* mtmd_ctx_ = nullptr;
     std::string model_path_;
     std::string model_name_;
     bool backend_initialized_ = false;

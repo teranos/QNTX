@@ -18,6 +18,8 @@ endif()
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_COMMON ON CACHE BOOL "Build common lib (needed for mtmd)" FORCE)
+set(LLAMA_BUILD_TOOLS ON CACHE BOOL "Build tools including mtmd" FORCE)
 
 include(FetchContent)
 
@@ -118,6 +120,8 @@ add_executable(qntx-llama-cpp-plugin
     src/main.cpp
     src/plugin.cpp
     src/inference.cpp
+    src/vision.cpp
+    src/llm_service.cpp
     src/pdf_extract.cpp
     src/ats_client.cpp
     ${PLATFORM_SRCS}
@@ -129,6 +133,8 @@ target_include_directories(qntx-llama-cpp-plugin PRIVATE
     ${LLAMA_SOURCE_DIR}/include
     ${LLAMA_SOURCE_DIR}/src
     ${LLAMA_SOURCE_DIR}/ggml/include
+    ${LLAMA_SOURCE_DIR}/common
+    ${LLAMA_SOURCE_DIR}/tools/mtmd
     ${MUPDF_INCLUDE_DIR}
     ${GLM_INCLUDE_DIR}
 )
@@ -136,6 +142,7 @@ target_compile_definitions(qntx-llama-cpp-plugin PRIVATE GLM_FORCE_DEPTH_ZERO_TO
 
 target_link_libraries(qntx-llama-cpp-plugin PRIVATE
     llama
+    mtmd
     gRPC::grpc++
     protobuf::libprotobuf
     ${MUPDF_LIB}

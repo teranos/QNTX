@@ -53,9 +53,11 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 
 ## Limitations
 
+**Strikethrough = verified.** A limitation is only struck through after end-to-end testing confirms the fix works. Code that compiles but hasn't been tested against real input is not done — it stays open.
+
 - **STO** — ~~Single-turn only.~~ Multi-turn message arrays flow through gRPC and are tokenized via `prepare_prompt()`. KV cache is still cleared per request — no persistent conversation state across requests.
 
-- **TAO** — Text attachments only. PDF and plain text attachments are extracted (via MuPDF) and prepended to the prompt as context. Goal: use a multimodal GGUF model (e.g. LLaVA, Qwen2-VL) to process images and PDFs natively through llama.cpp's vision pipeline, bypassing text extraction entirely.
+- **TAO** — ~~Text attachments only.~~ Vision support via mtmd (llama.cpp multimodal). Auto-detects `mmproj-*.gguf` in the model directory — no config needed. Image attachments (`image/*` MIME) route through the CLIP encoder via `stream_chat_vision()`; PDF and text attachments still use MuPDF text extraction. Verified with Qwen2.5-VL 3B.
 
 - **IBP** — Image-based PDFs. MuPDF extracts text objects from the PDF structure. PDFs where text is baked into images (scanned documents, designed flyers) return empty. OCR (e.g. Tesseract) would be needed for those.
 
