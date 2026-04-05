@@ -549,41 +549,56 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
     float temperature = req->temperature() > 0 ? req->temperature() : 0.7;
     int max_tokens = req->max_tokens() > 0 ? req->max_tokens() : 512;
 
-    // Extract text from attachments and prepend as context.
-    //
-    // The Go core sends file attachments as data URIs:
-    //   data:application/pdf;base64,JVBERi0xLjQg...
-    //
-    // We parse the URI with string methods (find/substr), decode the
-    // base64 payload, then extract text depending on the MIME type.
-    // PDF goes through MuPDF; plain text is used directly.
+    // Process attachments: separate images (for vision) from documents (text extraction).
     std::string context;
+    std::vector<InferenceEngine::ImageAttachment> image_attachments;
+
     for (const auto& att : req->attachments()) {
-        const auto& uri = att.data();
-        if (uri.empty()) continue;
+        const auto& data = att.data();
+        const auto& mime = att.mime_type();
+        if (data.empty()) continue;
 
-        // Data URI format: "data:<mime>;base64,<payload>"
-        // Find the comma that separates header from payload.
-        auto comma = uri.find(',');
+        // Check if this is an image attachment
+        bool is_image = false;
+        std::string payload;
+
+        if (mime.find("image") != std::string::npos) {
+            // Direct image: mime_type is "image/png" etc, data is raw base64
+            is_image = true;
+            // Data might be a data URI or raw base64
+            auto comma = data.find(',');
+            payload = (comma != std::string::npos) ? data.substr(comma + 1) : data;
+        } else if (data.find("data:image") == 0) {
+            // Data URI with image mime
+            is_image = true;
+            auto comma = data.find(',');
+            if (comma != std::string::npos) payload = data.substr(comma + 1);
+        }
+
+        if (is_image) {
+            if (!engine.has_vision()) {
+                return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION,
+                    "image attachment received but model has no vision support");
+            }
+            auto bytes = base64_decode(payload);
+            image_attachments.push_back({std::move(bytes)});
+            continue;
+        }
+
+        // Text/document extraction (existing path)
+        auto comma = data.find(',');
         if (comma == std::string::npos) continue;
-
-        // The header is everything before the comma: "data:application/pdf;base64"
-        // We check for known MIME types using find() — no regex needed.
-        auto header = uri.substr(0, comma);
-        auto payload = uri.substr(comma + 1);
+        auto header = data.substr(0, comma);
+        auto doc_payload = data.substr(comma + 1);
 
         if (header.find("application/pdf") != std::string::npos) {
-            // base64_decode returns vector<uint8_t> — contiguous memory,
-            // so .data() gives us the raw byte pointer MuPDF needs.
-            auto bytes = base64_decode(payload);
+            auto bytes = base64_decode(doc_payload);
             auto text = extract_pdf_text(bytes.data(), bytes.size());
             if (!text.empty()) {
                 context += "[Document: " + att.filename() + "]\n" + text + "\n\n";
             }
         } else if (header.find("text/plain") != std::string::npos) {
-            auto bytes = base64_decode(payload);
-            // std::string constructor from iterators — works because
-            // uint8_t is just unsigned char, which char can hold.
+            auto bytes = base64_decode(doc_payload);
             std::string text(bytes.begin(), bytes.end());
             if (!text.empty()) {
                 context += "[Document: " + att.filename() + "]\n" + text + "\n\n";
@@ -594,11 +609,9 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
     // Build message history from proto
     std::vector<InferenceEngine::Message> messages;
     if (req->messages_size() > 0) {
-        // Multi-turn: use messages array from proto
         for (const auto& m : req->messages()) {
             messages.push_back({m.role(), m.content()});
         }
-        // Prepend attachment context to the last user message
         if (!context.empty()) {
             for (int i = messages.size() - 1; i >= 0; i--) {
                 if (messages[i].role == "user") {
@@ -608,7 +621,6 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
             }
         }
     } else {
-        // Single-turn fallback (deprecated fields)
         std::string user_prompt = context.empty()
             ? req->user_prompt()
             : context + req->user_prompt();
@@ -618,7 +630,14 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
         messages.push_back({"user", user_prompt});
     }
 
-    auto result = engine.chat(messages, temperature, max_tokens, plugin_->sampler_config());
+    // Route to vision or text path
+    InferenceEngine::ChatResult result;
+    if (!image_attachments.empty()) {
+        result = engine.chat_vision(messages, image_attachments,
+                                     temperature, max_tokens, plugin_->sampler_config());
+    } else {
+        result = engine.chat(messages, temperature, max_tokens, plugin_->sampler_config());
+    }
 
     resp->set_content(result.content);
     resp->set_model(engine.model_name());
@@ -704,24 +723,51 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
     float temperature = req->temperature() > 0 ? req->temperature() : 0.7;
     int max_tokens = req->max_tokens() > 0 ? req->max_tokens() : 512;
 
-    // Extract attachment context (same as Chat)
+    // Process attachments: separate images (for vision) from documents (text extraction)
     std::string context;
+    std::vector<InferenceEngine::ImageAttachment> image_attachments;
+
     for (const auto& att : req->attachments()) {
-        const auto& uri = att.data();
-        if (uri.empty()) continue;
-        auto comma = uri.find(',');
+        const auto& data = att.data();
+        const auto& mime = att.mime_type();
+        if (data.empty()) continue;
+
+        bool is_image = false;
+        std::string payload;
+
+        if (mime.find("image") != std::string::npos) {
+            is_image = true;
+            auto comma = data.find(',');
+            payload = (comma != std::string::npos) ? data.substr(comma + 1) : data;
+        } else if (data.find("data:image") == 0) {
+            is_image = true;
+            auto comma = data.find(',');
+            if (comma != std::string::npos) payload = data.substr(comma + 1);
+        }
+
+        if (is_image) {
+            if (!engine.has_vision()) {
+                return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION,
+                    "image attachment received but model has no vision support");
+            }
+            auto bytes = base64_decode(payload);
+            image_attachments.push_back({std::move(bytes)});
+            continue;
+        }
+
+        auto comma = data.find(',');
         if (comma == std::string::npos) continue;
-        auto header = uri.substr(0, comma);
-        auto payload = uri.substr(comma + 1);
+        auto header = data.substr(0, comma);
+        auto doc_payload = data.substr(comma + 1);
 
         if (header.find("application/pdf") != std::string::npos) {
-            auto bytes = base64_decode(payload);
+            auto bytes = base64_decode(doc_payload);
             auto text = extract_pdf_text(bytes.data(), bytes.size());
             if (!text.empty()) {
                 context += "[Document: " + att.filename() + "]\n" + text + "\n\n";
             }
         } else if (header.find("text/plain") != std::string::npos) {
-            auto bytes = base64_decode(payload);
+            auto bytes = base64_decode(doc_payload);
             std::string text(bytes.begin(), bytes.end());
             if (!text.empty()) {
                 context += "[Document: " + att.filename() + "]\n" + text + "\n\n";
@@ -761,12 +807,8 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
 
     plugin_->set_activity("evaluating prompt");
 
-    // Pre-flight: check if prompt will exceed context window.
-    // stream_chat's prepare_prompt will truncate and set result.warning,
-    // but we send the warning chunk after we know.
-    auto result = engine.stream_chat(
-        messages, temperature, max_tokens,
-        [&](const std::string& token_text, const TokenSignal& sig) -> bool {
+    // Route to vision or text streaming path
+    auto token_callback = [&](const std::string& token_text, const TokenSignal& sig) -> bool {
             plugin_->set_activity("generating");
 
             protocol::LLMChatChunk chunk;
@@ -818,8 +860,18 @@ grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
             }
 
             return writer->Write(chunk);
-        },
-        plugin_->sampler_config());
+    };
+
+    InferenceEngine::ChatResult result;
+    if (!image_attachments.empty()) {
+        result = engine.stream_chat_vision(
+            messages, image_attachments, temperature, max_tokens,
+            token_callback, plugin_->sampler_config());
+    } else {
+        result = engine.stream_chat(
+            messages, temperature, max_tokens,
+            token_callback, plugin_->sampler_config());
+    }
 
     // Send truncation warning as a visible token so the UI shows it
     if (!result.warning.empty()) {
