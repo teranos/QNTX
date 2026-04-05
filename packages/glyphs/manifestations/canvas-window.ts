@@ -4,11 +4,11 @@
  * Unlike the tray→window path (manifestations/window.ts) which clears the element
  * and rebuilds via renderContent(), this path wraps/unwraps existing children so
  * DOM state (scroll position, textarea content, rendered markdown) is preserved.
+ *
+ * Canvas coordinate transforms are injected via configureGlyphs({ canvas }).
  */
 
-// Uses QNTX logger directly — this file stays in web/ (depends on canvas-pan
-// coordinate math) so it doesn't go through configureGlyphs() injection.
-import { log, SEG } from '../../../logger';
+import { getLogger, getLogSegment, getCanvasBridge } from '../config';
 import {
     setCanvasOrigin,
     getCanvasOrigin,
@@ -19,7 +19,6 @@ import {
     setLastPosition,
 } from '../dataset';
 import { beginMaximizeMorph, beginMinimizeMorph, beginRestoreMorph } from '../morph-transaction';
-import { canvasToScreen, screenToCanvas, getTransform } from '../canvas/canvas-pan';
 import {
     getMaximizeDuration,
     getMinimizeDuration,
@@ -27,7 +26,8 @@ import {
     WINDOW_BOX_SHADOW,
 } from '../glyph';
 import { addWindowControls, removeWindowControls } from './title-bar-controls';
-import { setupWindowDrag, teardownWindowDrag, calculateTrayTarget } from '@qntx/glyphs';
+import { setupWindowDrag, teardownWindowDrag } from '../window-drag';
+import { calculateTrayTarget } from './morphology';
 import { stashContent } from './stash';
 
 // ── Default window dimensions ────────────────────────────────────────
@@ -37,6 +37,14 @@ const DEFAULT_HEIGHT = 420;
 
 // Key for storing original canvas parent on the element
 const CANVAS_PARENT_KEY = '__canvasParent';
+
+// Inline styles applied during window state that must be cleared on restore.
+// Clearing only these preserves glyph-specific styles (border, minHeight, zIndex, etc.).
+const WINDOW_STYLE_PROPS: (keyof CSSStyleDeclaration)[] = [
+    'position', 'left', 'top', 'width', 'height',
+    'zIndex', 'borderRadius', 'boxShadow',
+    'display', 'flexDirection', 'overflow',
+];
 
 // ── Public API ───────────────────────────────────────────────────────
 
@@ -60,6 +68,8 @@ export function morphCanvasPlacedToWindow(
 ): void {
     if (isInWindowState(element)) return;
 
+    const log = getLogger();
+    const seg = getLogSegment();
     const { title, canvasId, onClose } = config;
 
     // 1. Save canvas-local position for morph-back
@@ -78,7 +88,7 @@ export function morphCanvasPlacedToWindow(
     // 3. Detect existing glyph title bar (belongs to the glyph, not the manifestation)
     const existingTitleBar = element.querySelector(':scope > .glyph-title-bar') as HTMLElement | null;
 
-    // 5. Wrap non-title-bar children into a scrollable content div
+    // 4. Wrap non-title-bar children into a scrollable content div
     const contentDiv = document.createElement('div');
     contentDiv.className = 'canvas-window-content glyph-content-area';
     contentDiv.style.padding = '0';
@@ -88,7 +98,7 @@ export function morphCanvasPlacedToWindow(
         contentDiv.appendChild(child);
     }
 
-    // 6. Reuse existing title bar or create a generic one
+    // 5. Reuse existing title bar or create a generic one
     let titleBar: HTMLElement;
     if (existingTitleBar) {
         titleBar = existingTitleBar;
@@ -102,7 +112,7 @@ export function morphCanvasPlacedToWindow(
         titleBar.appendChild(titleText);
     }
 
-    // 7. Add window controls (minimize/close) to the title bar
+    // 6. Add window controls (minimize/close) to the title bar
     addWindowControls(titleBar, {
         onMinimize: config.onMinimize
             ? () => minimizeCanvasWindowToTray(element, config)
@@ -110,28 +120,28 @@ export function morphCanvasPlacedToWindow(
         onClose,
     });
 
-    // 8. Assemble: title bar + content
+    // 7. Assemble: title bar + content
     element.appendChild(titleBar);
     element.appendChild(contentDiv);
 
-    // 7. Save original parent, detach from canvas, reparent to body as fixed
+    // 8. Save original parent, detach from canvas, reparent to body as fixed
     (element as any)[CANVAS_PARENT_KEY] = originalParent;
     element.remove();
     element.style.position = 'fixed';
     element.style.zIndex = '1000';
     document.body.appendChild(element);
 
-    // 8. Mark window state
+    // 9. Mark window state
     setWindowState(element, true);
 
-    // 9. Calculate target window rect
+    // 10. Calculate target window rect
     const remembered = getLastPosition(element);
     const targetW = DEFAULT_WIDTH;
     const targetH = DEFAULT_HEIGHT;
     const targetX = remembered?.x ?? Math.round((window.innerWidth - targetW) / 2);
     const targetY = remembered?.y ?? Math.round((window.innerHeight - targetH) / 2);
 
-    // 10. Animate
+    // 11. Animate
     beginMaximizeMorph(
         element,
         fromRect,
@@ -156,10 +166,30 @@ export function morphCanvasPlacedToWindow(
         // Set up window dragging
         setupWindowDrag(element, titleBar);
 
-        log.debug(SEG.GLYPH, `[CanvasWindow] Morphed to window at ${targetX},${targetY}`);
+        log.debug(seg, `[CanvasWindow] Morphed to window at ${targetX},${targetY}`);
     }).catch(err => {
-        log.warn(SEG.GLYPH, `[CanvasWindow] Maximize animation failed:`, err);
+        log.warn(seg, `[CanvasWindow] Maximize animation failed: ${err}`);
     });
+}
+
+/** Shared unwrap logic: remove content div wrapper and window controls from title bar. */
+function unwrapWindowContent(element: HTMLElement): void {
+    const contentDiv = element.querySelector('.canvas-window-content');
+    const titleBar = element.querySelector('.glyph-title-bar');
+
+    if (titleBar) {
+        if ((titleBar as HTMLElement).dataset.windowCreated) {
+            titleBar.remove(); // Manifestation-created: remove entirely
+        } else {
+            removeWindowControls(titleBar as HTMLElement); // Glyph-owned: just strip controls
+        }
+    }
+    if (contentDiv) {
+        while (contentDiv.firstChild) {
+            element.appendChild(contentDiv.firstChild);
+        }
+        contentDiv.remove();
+    }
 }
 
 /**
@@ -172,6 +202,9 @@ export function morphWindowToCanvasPlaced(
 ): void {
     if (!isInWindowState(element)) return;
 
+    const log = getLogger();
+    const seg = getLogSegment();
+    const bridge = getCanvasBridge();
     const { onRestoreComplete } = config;
 
     // 1. Remember window position for next expand
@@ -184,7 +217,7 @@ export function morphWindowToCanvasPlaced(
     // 3. Read canvas origin, convert to current screen coords
     const origin = getCanvasOrigin(element);
     if (!origin) {
-        log.warn(SEG.GLYPH, `[CanvasWindow] No canvas origin stored, aborting restore`);
+        log.warn(seg, `[CanvasWindow] No canvas origin stored, aborting restore`);
         return;
     }
 
@@ -192,8 +225,10 @@ export function morphWindowToCanvasPlaced(
     // not the viewport. Add the container's viewport offset for the fixed-position animation.
     const canvasContainer = document.querySelector(`[data-canvas-id="${origin.canvasId}"]`) as HTMLElement | null;
     const canvasRect = canvasContainer?.getBoundingClientRect() ?? { left: 0, top: 0 };
-    const screenPos = canvasToScreen(origin.canvasId, origin.x, origin.y);
-    const scale = getTransform(origin.canvasId).scale;
+    const screenPos = bridge
+        ? bridge.toScreen(origin.canvasId, origin.x, origin.y)
+        : { x: origin.x, y: origin.y };
+    const scale = bridge ? bridge.getScale(origin.canvasId) : 1;
     const toRect = {
         x: screenPos.x + canvasRect.left,
         y: screenPos.y + canvasRect.top,
@@ -204,31 +239,18 @@ export function morphWindowToCanvasPlaced(
     // 4. Animate back to canvas rect
     beginRestoreMorph(element, windowRect, toRect, getMinimizeDuration())
         .then(() => {
-            // 5. Unwrap: move children out of content div, strip window controls from title bar
-            const contentDiv = element.querySelector('.canvas-window-content');
-            const titleBar = element.querySelector('.glyph-title-bar');
-
-            if (titleBar) {
-                if ((titleBar as HTMLElement).dataset.windowCreated) {
-                    titleBar.remove(); // Manifestation-created: remove entirely
-                } else {
-                    removeWindowControls(titleBar as HTMLElement); // Glyph-owned: just strip controls
-                }
-            }
-            if (contentDiv) {
-                while (contentDiv.firstChild) {
-                    element.appendChild(contentDiv.firstChild);
-                }
-                contentDiv.remove();
-            }
+            // 5. Unwrap window content
+            unwrapWindowContent(element);
 
             // 6. Clear state
             setWindowState(element, false);
             clearCanvasOrigin(element);
 
-            // 7. Remove from body, clear inline styles
+            // 7. Remove from body, clear window-specific inline styles
             element.remove();
-            element.style.cssText = '';
+            for (const prop of WINDOW_STYLE_PROPS) {
+                (element.style as any)[prop] = '';
+            }
 
             // 8. Restore canvas layout from origin
             element.style.position = 'absolute';
@@ -247,10 +269,10 @@ export function morphWindowToCanvasPlaced(
             // 10. Notify caller (drag/resize handlers persist through morph)
             onRestoreComplete(element);
 
-            log.debug(SEG.GLYPH, `[CanvasWindow] Restored to canvas at ${origin.x},${origin.y}`);
+            log.debug(seg, `[CanvasWindow] Restored to canvas at ${origin.x},${origin.y}`);
         })
         .catch(err => {
-            log.warn(SEG.GLYPH, `[CanvasWindow] Restore animation failed:`, err);
+            log.warn(seg, `[CanvasWindow] Restore animation failed: ${err}`);
         });
 }
 
@@ -263,6 +285,9 @@ function minimizeCanvasWindowToTray(
     config: CanvasWindowConfig,
 ): void {
     if (!isInWindowState(element)) return;
+
+    const log = getLogger();
+    const seg = getLogSegment();
 
     // 1. Remember window position for next expand
     const windowRect = element.getBoundingClientRect();
@@ -287,10 +312,10 @@ function minimizeCanvasWindowToTray(
             // 6. Pass element to caller for tray adoption (same element, no new creation)
             config.onMinimize!(element);
 
-            log.debug(SEG.GLYPH, `[CanvasWindow] Minimized to tray`);
+            log.debug(seg, `[CanvasWindow] Minimized to tray`);
         })
         .catch(err => {
-            log.warn(SEG.GLYPH, `[CanvasWindow] Minimize to tray animation failed:`, err);
+            log.warn(seg, `[CanvasWindow] Minimize to tray animation failed: ${err}`);
         });
 }
 
@@ -304,19 +329,22 @@ export function placeWindowOnCanvas(
 ): void {
     if (!isInWindowState(element)) return;
 
+    const log = getLogger();
+    const seg = getLogSegment();
+    const bridge = getCanvasBridge();
     const { onRestoreComplete } = config;
 
     // 1. Find the visible canvas
     const canvasEl = document.querySelector('.canvas-workspace') as HTMLElement | null;
     if (!canvasEl) {
-        log.warn(SEG.GLYPH, `[CanvasWindow] No canvas workspace found, aborting place`);
+        log.warn(seg, `[CanvasWindow] No canvas workspace found, aborting place`);
         return;
     }
     const canvasId = canvasEl.dataset.canvasId ?? 'canvas-workspace';
     const canvasRect = canvasEl.getBoundingClientRect();
     const contentLayer = canvasEl.querySelector('.canvas-content-layer') as HTMLElement | null;
     if (!contentLayer) {
-        log.warn(SEG.GLYPH, `[CanvasWindow] No content layer in canvas ${canvasId}`);
+        log.warn(seg, `[CanvasWindow] No content layer in canvas ${canvasId}`);
         return;
     }
 
@@ -330,7 +358,9 @@ export function placeWindowOnCanvas(
     // 4. Convert window position to canvas-local coordinates
     const relX = windowRect.left - canvasRect.left;
     const relY = windowRect.top - canvasRect.top;
-    const canvasPos = screenToCanvas(canvasId, relX, relY);
+    const canvasPos = bridge
+        ? bridge.fromScreen(canvasId, relX, relY)
+        : { x: relX, y: relY };
 
     // 5. Glyph dimensions (from stored origin or default)
     const origin = getCanvasOrigin(element);
@@ -338,7 +368,7 @@ export function placeWindowOnCanvas(
     const glyphH = origin?.height ?? 250;
 
     // 6. Animation target: same screen position, glyph size scaled by canvas zoom
-    const scale = getTransform(canvasId).scale;
+    const scale = bridge ? bridge.getScale(canvasId) : 1;
     const toRect = {
         x: windowRect.left,
         y: windowRect.top,
@@ -349,30 +379,18 @@ export function placeWindowOnCanvas(
     // 7. Animate
     beginRestoreMorph(element, windowRect, toRect, getMinimizeDuration())
         .then(() => {
-            // 8. Unwrap content div, strip window controls from title bar
-            const contentDiv = element.querySelector('.canvas-window-content');
-            const titleBar = element.querySelector('.glyph-title-bar');
-            if (titleBar) {
-                if ((titleBar as HTMLElement).dataset.windowCreated) {
-                    titleBar.remove(); // Manifestation-created: remove entirely
-                } else {
-                    removeWindowControls(titleBar as HTMLElement); // Glyph-owned: just strip controls
-                }
-            }
-            if (contentDiv) {
-                while (contentDiv.firstChild) {
-                    element.appendChild(contentDiv.firstChild);
-                }
-                contentDiv.remove();
-            }
+            // 8. Unwrap window content
+            unwrapWindowContent(element);
 
             // 9. Clear state
             setWindowState(element, false);
             clearCanvasOrigin(element);
 
-            // 10. Remove from body, clear inline styles
+            // 10. Remove from body, clear window-specific inline styles
             element.remove();
-            element.style.cssText = '';
+            for (const prop of WINDOW_STYLE_PROPS) {
+                (element.style as any)[prop] = '';
+            }
 
             // 11. Place at computed canvas-local position
             element.style.position = 'absolute';
@@ -387,12 +405,9 @@ export function placeWindowOnCanvas(
             // 13. Notify caller
             onRestoreComplete(element);
 
-            log.debug(SEG.GLYPH, `[CanvasWindow] Placed on canvas ${canvasId} at ${Math.round(canvasPos.x)},${Math.round(canvasPos.y)}`);
+            log.debug(seg, `[CanvasWindow] Placed on canvas ${canvasId} at ${Math.round(canvasPos.x)},${Math.round(canvasPos.y)}`);
         })
         .catch(err => {
-            log.warn(SEG.GLYPH, `[CanvasWindow] Place on canvas animation failed:`, err);
+            log.warn(seg, `[CanvasWindow] Place on canvas animation failed: ${err}`);
         });
 }
-
-// Re-export window drag from @qntx/glyphs for consumers that import from this file
-export { setupWindowDrag, teardownWindowDrag } from '@qntx/glyphs';

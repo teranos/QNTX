@@ -9,8 +9,8 @@
 import { apiFetch } from '../../api';
 import { connectivityManager } from '../../connectivity';
 import { log, SEG } from '../../logger';
-import { glyphRun } from './run';
-import type { Glyph } from './glyph';
+import { glyphRun } from '@qntx/glyphs';
+import type { Glyph } from '@qntx/glyphs';
 
 const AUTH_GLYPH_ID = 'auth';
 

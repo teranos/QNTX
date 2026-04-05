@@ -19,7 +19,7 @@
  * This demonstrates the fractal principle: all glyphs are containers.
  */
 
-import type { Glyph } from '../glyph';
+import type { Glyph } from '@qntx/glyphs';
 import { Pulse, AX } from '@generated/sym.js';
 import { log, SEG } from '../../../logger';
 import { getGlyphTypeBySymbol } from '../glyph-registry';

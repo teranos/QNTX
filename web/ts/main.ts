@@ -31,8 +31,9 @@ import { Window } from './components/window.ts';
 import './prose/panel.ts';
 // plugin-panel.ts is now a glyph module registered via default-glyphs.ts
 import { initDebugInterceptor } from './dev-debug-interceptor.ts';
-import { glyphRun } from './components/glyph/run.ts';
+import { glyphRun } from '@qntx/glyphs';
 import { configureGlyphs } from '@qntx/glyphs';
+import { canvasToScreen, screenToCanvas, getTransform } from './components/glyph/canvas/canvas-pan.ts';
 import { registerDefaultGlyphs } from './default-glyphs.ts';
 import { initialize as initQntxWasm } from './qntx-wasm.ts';
 import { initStorage } from './indexeddb-storage.ts';
@@ -230,7 +231,7 @@ async function init(): Promise<void> {
     if (window.logLoaderStep) window.logLoaderStep('Setting up editor...', false, true);
     initCodeMirrorEditor();
 
-    // Wire @qntx/glyphs with QNTX's logger, persistence, and stripHtml
+    // Wire @qntx/glyphs with QNTX's logger, persistence, canvas bridge, and stripHtml
     configureGlyphs({
         logger: log,
         logSegment: SEG.GLYPH,
@@ -239,6 +240,12 @@ async function init(): Promise<void> {
             addMinimizedGlyph: (id) => uiState.addMinimizedWindow(id),
             removeMinimizedGlyph: (id) => uiState.removeMinimizedWindow(id),
         },
+        canvas: {
+            toScreen: canvasToScreen,
+            fromScreen: screenToCanvas,
+            getScale: (canvasId) => getTransform(canvasId).scale,
+        },
+        removeCanvasGlyph: (glyphId) => uiState.removeCanvasGlyph(glyphId),
         stripHtml: (html) => {
             const doc = new DOMParser().parseFromString(html, 'text/html');
             return doc.body.textContent ?? '';
@@ -269,7 +276,7 @@ async function init(): Promise<void> {
                 const result = parsed.result ?? parsed;
                 const promptConfig = parsed.promptConfig;
                 const prompt = parsed.prompt;
-                const { renderResultContent } = await import('./components/glyph/response-glyph.ts');
+                const { renderResultContent } = await import('./components/glyph/result-glyph.ts');
                 glyphRun.add({
                     id: glyph.id,
                     title: prompt || 'Result',

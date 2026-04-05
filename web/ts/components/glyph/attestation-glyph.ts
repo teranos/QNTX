@@ -9,20 +9,16 @@
  * revealed via hover pill at bottom center of title bar.
  */
 
-import type { Glyph } from './glyph';
+import type { Glyph } from '@qntx/glyphs';
+import { wireExpandToWindow, teardownWindowDrag, removeWindowControls, isInWindowState, setWindowState, glyphRun } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { AS } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from './manifestations/canvas-placed';
-import { morphCanvasPlacedToWindow, placeWindowOnCanvas } from './manifestations/canvas-window';
-import { teardownWindowDrag } from '@qntx/glyphs';
-import { removeWindowControls } from './manifestations/title-bar-controls';
-import { isInWindowState, setWindowState } from './dataset';
 import { preventDrag, makeDraggable, makeResizable, storeCleanup } from './glyph-interaction';
 import { screenToCanvas } from './canvas/canvas-pan';
 import { uiState } from '../../state/ui';
 import { getGlyphTypeBySymbol } from './glyph-registry';
-import { glyphRun } from './run';
 
 // Muted azure — desaturated toward gray
 const AZURE = '#adbcc1';
@@ -228,48 +224,14 @@ export function createAttestationGlyph(glyph: Glyph): HTMLElement {
         ? `${attestation.subjects?.join(', ') || '?'} is ${attestation.predicates?.join(', ') || '?'}`
         : 'Attestation';
 
-    expandBtn.addEventListener('click', () => {
-        if (isInWindowState(element)) {
-            placeWindowOnCanvas(element, {
-                onRestoreComplete: () => {
-                    expandBtn.textContent = '\u2B06'; // ⬆
-                    expandBtn.title = 'Expand to window';
-                    log.debug(SEG.GLYPH, `[AsGlyph] Placed on canvas ${glyph.id}`);
-                },
-            });
-            return;
-        }
-
-        const canvas = element.closest('.canvas-workspace') as HTMLElement | null;
-        const canvasId = (canvas?.closest('[data-canvas-id]') as HTMLElement | null)?.dataset?.canvasId ?? 'canvas-workspace';
-
-        morphCanvasPlacedToWindow(element, {
-            title,
-            canvasId,
-            onClose: () => {
-                element.remove();
-                uiState.removeCanvasGlyph(glyph.id);
-                log.debug(SEG.GLYPH, `[AsGlyph] Closed from window ${glyph.id}`);
-            },
-            onMinimize: (el: HTMLElement) => {
-                glyphRun.adopt(el, {
-                    id: glyph.id,
-                    title,
-                    symbol: AS,
-                    renderContent: () => buildAttestationContent(attestation, attrs),
-                    onClose: () => {
-                        log.debug(SEG.GLYPH, `[AsGlyph] Closed from tray ${glyph.id}`);
-                    },
-                });
-                log.debug(SEG.GLYPH, `[AsGlyph] Minimized to tray ${glyph.id}`);
-            },
-            onRestoreComplete: () => {
-                log.debug(SEG.GLYPH, `[AsGlyph] Restored to canvas ${glyph.id}`);
-            },
-        });
-
-        expandBtn.textContent = '\u2B07'; // ⬇
-        expandBtn.title = 'Place on canvas';
+    wireExpandToWindow({
+        element,
+        expandBtn,
+        glyphId: glyph.id,
+        title,
+        symbol: AS,
+        renderContent: () => buildAttestationContent(attestation, attrs),
+        logLabel: 'AsGlyph',
     });
 
     log.debug(SEG.GLYPH, `[AsGlyph] Created attestation glyph ${glyph.id} (attrs: ${hasContent})`);
@@ -589,51 +551,15 @@ function placeAttestationWindowOnCanvas(
     placeBtn.replaceWith(newBtn);
     preventDrag(newBtn);
 
-    newBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (isInWindowState(element)) {
-            placeWindowOnCanvas(element, {
-                onRestoreComplete: () => {
-                    newBtn.textContent = '\u2B06'; // ⬆
-                    newBtn.title = 'Expand to window';
-                    log.debug(SEG.GLYPH, `[AsGlyph] Placed on canvas ${glyphId}`);
-                },
-            });
-            return;
-        }
-
-        const canvas = element.closest('.canvas-workspace') as HTMLElement | null;
-        const cId = (canvas?.closest('[data-canvas-id]') as HTMLElement | null)?.dataset?.canvasId ?? 'canvas-workspace';
-
-        morphCanvasPlacedToWindow(element, {
-            title,
-            canvasId: cId,
-            onClose: () => {
-                element.remove();
-                uiState.removeCanvasGlyph(glyphId);
-                log.debug(SEG.GLYPH, `[AsGlyph] Closed from window ${glyphId}`);
-            },
-            onMinimize: (el: HTMLElement) => {
-                glyphRun.adopt(el, {
-                    id: glyphId,
-                    title,
-                    symbol: AS,
-                    renderContent: () => buildAttestationContent(attestation, attrs),
-                    onClose: () => {
-                        log.debug(SEG.GLYPH, `[AsGlyph] Closed from tray ${glyphId}`);
-                    },
-                });
-                log.debug(SEG.GLYPH, `[AsGlyph] Minimized to tray ${glyphId}`);
-            },
-            onRestoreComplete: () => {
-                newBtn.textContent = '\u2B07'; // ⬇
-                newBtn.title = 'Place on canvas';
-                log.debug(SEG.GLYPH, `[AsGlyph] Restored to window ${glyphId}`);
-            },
-        });
-
-        newBtn.textContent = '\u2B07'; // ⬇
-        newBtn.title = 'Place on canvas';
+    wireExpandToWindow({
+        element,
+        expandBtn: newBtn,
+        glyphId,
+        title,
+        symbol: AS,
+        renderContent: () => buildAttestationContent(attestation, attrs),
+        logLabel: 'AsGlyph',
+        stopPropagation: true,
     });
 
     log.debug(SEG.GLYPH, `[AsGlyph] Placed ${glyphId} on canvas at (${Math.round(canvasPos.x)}, ${Math.round(canvasPos.y)})`);

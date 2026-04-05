@@ -14,16 +14,14 @@
  * TODO(CLR/#750): Use embedding dimensions (PCA 4-6) to drive particle hue — semantic color.
  */
 
-import type { Glyph } from './glyph';
+import type { Glyph } from '@qntx/glyphs';
 import type { LLMStreamMessage } from '../../../types/websocket';
 import type { LLMTokenSignal, SamplerStageSignal } from '@generated/server';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { unmeldComposition } from './meld/meld-composition';
 import { makeDraggable, storeCleanup, preventDrag } from './glyph-interaction';
-import { morphCanvasPlacedToWindow, placeWindowOnCanvas } from './manifestations/canvas-window';
-import { isInWindowState } from './dataset';
-import { glyphRun } from './run';
+import { wireExpandToWindow } from '@qntx/glyphs';
 import { autoMeldResultBelow } from './meld/meld-system';
 import { uiState } from '../../state/ui';
 import { registerHandler, unregisterHandler } from '../../websocket';
@@ -87,14 +85,14 @@ function dispatch(msg: LLMStreamMessage): void {
     if (cb) {
         cb(msg);
     } else {
-        log.debug(SEG.GLYPH, `[ResponseGlyph] No subscriber for job_id ${msg.job_id}`);
+        log.debug(SEG.GLYPH, `[ResultGlyph] No subscriber for job_id ${msg.job_id}`);
     }
 }
 
 export function subscribeStream(jobId: string, callback: StreamCallback): void {
     if (subscribers.size === 0) {
         registerHandler('llm_stream', dispatch);
-        log.debug(SEG.GLYPH, '[ResponseGlyph] Registered llm_stream handler');
+        log.debug(SEG.GLYPH, '[ResultGlyph] Registered llm_stream handler');
     }
     subscribers.set(jobId, callback);
 }
@@ -103,13 +101,13 @@ export function unsubscribeStream(jobId: string): void {
     subscribers.delete(jobId);
     if (subscribers.size === 0) {
         unregisterHandler('llm_stream');
-        log.debug(SEG.GLYPH, '[ResponseGlyph] Unregistered llm_stream handler');
+        log.debug(SEG.GLYPH, '[ResultGlyph] Unregistered llm_stream handler');
     }
 }
 
 function renderStatsLine(container: HTMLElement, stats: GenerationStats): void {
     const el = document.createElement('div');
-    el.className = 'response-glyph-stats';
+    el.className = 'result-glyph-stats';
     el.style.fontSize = '10px';
     el.style.color = 'var(--text-muted)';
     el.style.padding = '4px 8px 2px';
@@ -283,7 +281,7 @@ function renderOutput(container: HTMLElement, result: ExecutionResult): void {
  * @param prompt - Prompt text for header display
  * @param streamJobId - WebSocket job ID to subscribe to (enables streaming mode)
  */
-export function createResponseGlyph(
+export function createResultGlyph(
     glyph: Glyph,
     result?: ExecutionResult,
     promptConfig?: PromptConfig,
@@ -361,62 +359,9 @@ export function createResponseGlyph(
     });
     buttonContainer.appendChild(copyBtn);
 
-    // Expand to window — hidden during streaming
+    // Expand to window — hidden during streaming (wired after element is created below)
     const toWindowBtn = headerBtn('⬆', 'Expand to window');
     if (isStreaming) toWindowBtn.style.display = 'none';
-    toWindowBtn.addEventListener('click', () => {
-        if (isInWindowState(element)) {
-            placeWindowOnCanvas(element, {
-                onRestoreComplete: (el) => {
-                    const contentStr = uiState.getCanvasGlyphs().find(g => g.id === glyph.id)?.content;
-                    uiState.addCanvasGlyph({
-                        id: glyph.id,
-                        symbol: 'result',
-                        x: parseInt(el.style.left),
-                        y: parseInt(el.style.top),
-                        width: parseInt(el.style.width),
-                        height: parseInt(el.style.height),
-                        content: contentStr,
-                    });
-                    toWindowBtn.textContent = '⬆';
-                    toWindowBtn.title = 'Expand to window';
-                    log.debug(SEG.GLYPH, `[ResponseGlyph] Placed on canvas ${glyph.id}`);
-                },
-            });
-        } else {
-            const canvas = element.closest('.canvas-workspace') as HTMLElement | null;
-            const canvasId = (canvas?.closest('[data-canvas-id]') as HTMLElement | null)?.dataset?.canvasId ?? 'canvas-workspace';
-
-            morphCanvasPlacedToWindow(element, {
-                title: prompt || 'Result',
-                canvasId,
-                onClose: () => {
-                    element.remove();
-                    uiState.removeCanvasGlyph(glyph.id);
-                    log.debug(SEG.GLYPH, `[ResponseGlyph] Closed from window ${glyph.id}`);
-                },
-                onMinimize: (el: HTMLElement) => {
-                    glyphRun.adopt(el, {
-                        id: glyph.id,
-                        title: prompt || 'Result',
-                        symbol: 'result',
-                        renderContent: () => renderResultContent(result ?? null, tokens, promptConfig, prompt),
-                        renderTitleBar: () => buildResultTitleBar(result ?? null, tokens, prompt),
-                        onClose: () => {
-                            log.debug(SEG.GLYPH, `[ResponseGlyph] Closed from tray ${glyph.id}`);
-                        },
-                    });
-                    log.debug(SEG.GLYPH, `[ResponseGlyph] Minimized to tray ${glyph.id}`);
-                },
-                onRestoreComplete: () => {
-                    log.debug(SEG.GLYPH, `[ResponseGlyph] Restored to canvas ${glyph.id}`);
-                },
-            });
-
-            toWindowBtn.textContent = '↩';
-            toWindowBtn.title = 'Return to canvas';
-        }
-    });
     buttonContainer.appendChild(toWindowBtn);
 
     // Close — always visible, composition-aware
@@ -442,13 +387,13 @@ export function createResponseGlyph(
                         });
                     }
                 }
-                log.debug(SEG.GLYPH, `[ResponseGlyph] Unmelded composition before closing ${glyph.id}`);
+                log.debug(SEG.GLYPH, `[ResultGlyph] Unmelded composition before closing ${glyph.id}`);
             }
         }
 
         element.remove();
         uiState.removeCanvasGlyph(glyph.id);
-        log.debug(SEG.GLYPH, `[ResponseGlyph] Closed ${glyph.id}`);
+        log.debug(SEG.GLYPH, `[ResultGlyph] Closed ${glyph.id}`);
     });
     buttonContainer.appendChild(closeBtn);
 
@@ -467,7 +412,7 @@ export function createResponseGlyph(
         dragHandle: header,
         draggableOptions: { ignoreButtons: true },
         resizable: { minWidth: 200, minHeight: 80 },
-        logLabel: 'ResponseGlyph',
+        logLabel: 'ResultGlyph',
     });
     element.style.minHeight = '80px';
     element.style.borderRadius = '0 0 2px 2px';
@@ -477,6 +422,30 @@ export function createResponseGlyph(
     header.style.position = 'relative';
     header.style.zIndex = '1';
     element.appendChild(header);
+
+    // Wire expand-to-window (deferred until element exists)
+    wireExpandToWindow({
+        element,
+        expandBtn: toWindowBtn,
+        glyphId: glyph.id,
+        title: prompt || 'Result',
+        symbol: 'result',
+        renderContent: () => renderResultContent(result ?? null, tokens, promptConfig, prompt),
+        logLabel: 'ResultGlyph',
+        adoptExtras: { renderTitleBar: () => buildResultTitleBar(result ?? null, tokens, prompt) },
+        onRestoreToCanvas: (el) => {
+            const contentStr = uiState.getCanvasGlyphs().find(g => g.id === glyph.id)?.content;
+            uiState.addCanvasGlyph({
+                id: glyph.id,
+                symbol: 'result',
+                x: parseInt(el.style.left),
+                y: parseInt(el.style.top),
+                width: parseInt(el.style.width),
+                height: parseInt(el.style.height),
+                content: contentStr,
+            });
+        },
+    });
 
     // ── Output container ────────────────────────────────────────────
 
@@ -531,7 +500,7 @@ export function createResponseGlyph(
 
         nebulaWs.onopen = () => {
             if (nebulaLive) nebulaStatus.textContent = 'connected';
-            log.debug(SEG.GLYPH, '[ResponseGlyph] Nebula WebSocket connected');
+            log.debug(SEG.GLYPH, '[ResultGlyph] Nebula WebSocket connected');
         };
 
         nebulaWs.onmessage = (event: MessageEvent) => {
@@ -570,7 +539,7 @@ export function createResponseGlyph(
                     }
                 });
             } catch (e) {
-                log.error(SEG.GLYPH, '[ResponseGlyph] Nebula frame error', e);
+                log.error(SEG.GLYPH, '[ResultGlyph] Nebula frame error', e);
             }
         };
 
@@ -638,7 +607,7 @@ export function createResponseGlyph(
                 streamModel = content.model;
                 savedStats = content.stats;
                 if (content.prompt && !prompt) prompt = content.prompt;
-                log.debug(SEG.GLYPH, `[ResponseGlyph] Restored ${tokens.length} tokens for ${glyph.id}`);
+                log.debug(SEG.GLYPH, `[ResultGlyph] Restored ${tokens.length} tokens for ${glyph.id}`);
             } else if (content.result) {
                 // Restore from saved execution result
                 result = content.result;
@@ -646,7 +615,7 @@ export function createResponseGlyph(
                 if (content.prompt && !prompt) prompt = content.prompt;
             }
         } catch (e) {
-            log.error(SEG.GLYPH, `[ResponseGlyph] Failed to parse saved content for ${glyph.id}:`, e);
+            log.error(SEG.GLYPH, `[ResultGlyph] Failed to parse saved content for ${glyph.id}:`, e);
         }
     }
 
@@ -737,7 +706,7 @@ export function createResponseGlyph(
                 closeNebula();
 
                 persistContent();
-                log.debug(SEG.GLYPH, `[ResponseGlyph] Stream complete for ${streamJobId}, ${tokens.length} tokens`);
+                log.debug(SEG.GLYPH, `[ResultGlyph] Stream complete for ${streamJobId}, ${tokens.length} tokens`);
                 return;
             }
 
@@ -765,7 +734,7 @@ export function createResponseGlyph(
         getSystemPrompt: () => hasTokens ? collectText(tokens) : (result?.stdout ?? ''),
         getModel: () => streamModel ?? promptConfig?.model,
         getProvider: () => promptConfig?.provider,
-        logLabel: 'ResponseGlyph',
+        logLabel: 'ResultGlyph',
         onExecute: hasTokens
             ? (request: FollowUpRequest, controls: FollowUpControls) => {
                 executeStreamFollowUp(element, glyph, request, controls);
@@ -1109,14 +1078,14 @@ async function executeStreamFollowUp(
         renderContent: () => document.createElement('div'),
     };
 
-    const responseElement = createResponseGlyph(responseGlyph, undefined, undefined, request.text, responseGlyphId);
+    const responseElement = createResultGlyph(responseGlyph, undefined, undefined, request.text, responseGlyphId);
     canvas.appendChild(responseElement);
 
     const parentGlyphId = parentElement.dataset.glyphId;
     if (parentGlyphId) {
         autoMeldResultBelow(
             parentElement, parentGlyphId, 'result',
-            'ResponseGlyph', responseElement, responseGlyphId, 'ResponseFollowUp',
+            'ResultGlyph', responseElement, responseGlyphId, 'ResponseFollowUp',
         );
     }
 
@@ -1163,7 +1132,7 @@ async function executeStreamFollowUp(
                 populateStaticContent(responseElement, data.response);
             }
 
-            log.debug(SEG.GLYPH, `[ResponseGlyph] Follow-up complete, ${tokenCount} streamed tokens`);
+            log.debug(SEG.GLYPH, `[ResultGlyph] Follow-up complete, ${tokenCount} streamed tokens`);
         })
         .catch((err) => {
             unsubscribeStream(request.glyphId);
@@ -1172,7 +1141,7 @@ async function executeStreamFollowUp(
 
             const errMsg = err instanceof Error ? err.message : String(err);
             controls.error(`Failed: ${errMsg}`);
-            log.error(SEG.GLYPH, `[ResponseGlyph] Follow-up failed for ${parentGlyph.id}: ${errMsg}`);
+            log.error(SEG.GLYPH, `[ResultGlyph] Follow-up failed for ${parentGlyph.id}: ${errMsg}`);
         });
 }
 
