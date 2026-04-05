@@ -164,6 +164,8 @@ private:
     void write_vocab_cache();
     int prepare_prompt(const std::vector<Message>& messages,
                        ChatResult& result);
+    void init_vision(const std::string& model_path);
+    void cleanup_vision();
     int prepare_prompt_vision(const std::vector<Message>& messages,
                               const std::vector<ImageAttachment>& images,
                               ChatResult& result);

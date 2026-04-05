@@ -1,11 +1,63 @@
 #include "inference_internal.h"
 
 #include <chrono>
+#include <dirent.h>
 #include <iostream>
 #include <sstream>
 
 #include "mtmd.h"
 #include "mtmd-helper.h"
+
+// Auto-detect mmproj in the same directory as the model file.
+// Tries mmproj-*.gguf first, then the model file itself (bundled tensors).
+void InferenceEngine::init_vision(const std::string& model_path) {
+    auto mparams = mtmd_context_params_default();
+    mparams.use_gpu = true;
+    mparams.print_timings = true;
+    mparams.warmup = true;
+
+    std::string mmproj_path;
+    auto slash = model_path.find_last_of('/');
+    if (slash != std::string::npos) {
+        std::string dir = model_path.substr(0, slash + 1);
+        DIR* d = opendir(dir.c_str());
+        if (d) {
+            struct dirent* entry;
+            while ((entry = readdir(d)) != nullptr) {
+                std::string name(entry->d_name);
+                if (name.find("mmproj") == 0 && name.find(".gguf") != std::string::npos) {
+                    mmproj_path = dir + name;
+                    break;
+                }
+            }
+            closedir(d);
+        }
+    }
+
+    if (!mmproj_path.empty()) {
+        mtmd_ctx_ = mtmd_init_from_file(mmproj_path.c_str(), model_, mparams);
+    } else {
+        mtmd_ctx_ = mtmd_init_from_file(model_path.c_str(), model_, mparams);
+    }
+
+    if (mtmd_ctx_ && mtmd_support_vision(mtmd_ctx_)) {
+        std::cout << "[llama-cpp] Vision support: yes"
+                  << (mmproj_path.empty() ? " (bundled)" : " (" + mmproj_path + ")")
+                  << std::endl;
+    } else {
+        if (mtmd_ctx_) {
+            mtmd_free(mtmd_ctx_);
+            mtmd_ctx_ = nullptr;
+        }
+    }
+}
+
+void InferenceEngine::cleanup_vision() {
+    if (mtmd_ctx_) {
+        mtmd_free(mtmd_ctx_);
+        mtmd_ctx_ = nullptr;
+    }
+}
 
 // Prepare prompt with vision: tokenize text + images through mtmd, decode into KV cache.
 // Returns total token count (text + image tokens), or -1 on error.
