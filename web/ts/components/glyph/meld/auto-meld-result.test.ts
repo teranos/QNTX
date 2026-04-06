@@ -10,7 +10,7 @@
 import { describe, test, expect } from 'bun:test';
 import { autoMeldResultBelow } from './auto-meld-result';
 import { performMeld } from './meld-composition';
-import type { Glyph } from '../glyph';
+import type { Glyph } from '@qntx/glyphs';
 import { uiState } from '../../../state/ui';
 
 describe('Auto-Meld Result Below - Tim (Happy Path)', () => {

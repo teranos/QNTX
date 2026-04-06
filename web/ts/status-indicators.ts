@@ -12,7 +12,7 @@ import type { DaemonStatusMessage } from '../types/websocket';
 import { DB } from '@generated/sym.js';
 import { connectivityManager, type ConnectivityState } from './connectivity';
 import { spawnAuthGlyph } from './components/glyph/auth-glyph';
-import { glyphRun } from './components/glyph/run.ts';
+import { glyphRun } from '@qntx/glyphs';
 
 interface StatusIndicator {
     id: string;

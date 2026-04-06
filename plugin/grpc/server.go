@@ -491,6 +491,8 @@ func (s *PluginServer) ExecuteJob(ctx context.Context, req *protocol.ExecuteJobR
 
 // llmPluginServer implements protocol.LLMServiceServer by wrapping a plugin.LLMProvider.
 // Registered as a separate gRPC service on the same server, only for provider plugins.
+// StreamChat falls through to UnimplementedLLMServiceServer — Go-based providers
+// (openrouter) only implement Chat. Streaming is handled by LLMServer in llm_server.go.
 type llmPluginServer struct {
 	protocol.UnimplementedLLMServiceServer
 	provider plugin.LLMProvider

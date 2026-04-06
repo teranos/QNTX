@@ -10,9 +10,9 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { createResponseGlyph, type ExecutionResult } from './response-glyph';
+import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { createErrorGlyph } from './error-glyph';
-import type { Glyph } from './glyph';
+import type { Glyph } from '@qntx/glyphs';
 
 // Mock ResizeObserver
 globalThis.ResizeObserver = class ResizeObserver {
@@ -49,7 +49,7 @@ describe('Error Recovery Workflow - Jenny (Complex Scenarios)', () => {
         document.body.appendChild(canvas);
 
         // Jenny's result glyph renders successfully
-        const resultElement = createResponseGlyph(resultGlyph, executionResult);
+        const resultElement = createResultGlyph(resultGlyph, executionResult);
         canvas.appendChild(resultElement);
 
         // Verify execution data is attached as ResultGlyphContent JSON

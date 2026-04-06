@@ -8,7 +8,7 @@
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { createSubcanvasGlyph } from './subcanvas-glyph';
 import { buildCanvasWorkspace } from './canvas/canvas-workspace-builder';
-import type { Glyph } from './glyph';
+import type { Glyph } from '@qntx/glyphs';
 
 // Mock animate for morph transitions
 (window as any).Element.prototype.animate = function() {

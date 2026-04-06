@@ -5,9 +5,9 @@
  * Glyph types and their spawn configuration come from glyph-registry.ts.
  */
 
-import type { Glyph } from '../glyph';
+import type { Glyph } from '@qntx/glyphs';
 import { log, SEG } from '../../../logger';
-import { getMinimizeDuration } from '../glyph';
+import { getMinimizeDuration } from '@qntx/glyphs';
 import { uiState } from '../../../state/ui';
 import { getTransform } from './canvas-pan';
 import {

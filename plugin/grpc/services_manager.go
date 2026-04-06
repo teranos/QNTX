@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"net"
 
+	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -33,14 +34,16 @@ type ServicesManager struct {
 	fileServiceServer *grpc.Server
 	llmServer         *grpc.Server
 	llmRouter         *LLMServer // Exposed for provider registration after plugin init
+	llmConfig         am.LLMConfig
 	endpoints         ServiceEndpoints
 	logger            *zap.SugaredLogger
 }
 
 // NewServicesManager creates a new services manager
-func NewServicesManager(logger *zap.SugaredLogger) *ServicesManager {
+func NewServicesManager(llmCfg am.LLMConfig, logger *zap.SugaredLogger) *ServicesManager {
 	return &ServicesManager{
-		logger: logger,
+		llmConfig: llmCfg,
+		logger:    logger,
 	}
 }
 
@@ -253,7 +256,7 @@ func (m *ServicesManager) startLLMService(ctx context.Context) (string, error) {
 		return "", errors.Wrap(err, "failed to listen")
 	}
 
-	m.llmRouter = NewLLMServer(m.logger)
+	m.llmRouter = NewLLMServer(m.llmConfig, m.logger)
 	m.llmServer = grpc.NewServer()
 	protocol.RegisterLLMServiceServer(m.llmServer, m.llmRouter)
 

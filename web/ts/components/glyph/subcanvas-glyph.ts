@@ -12,7 +12,7 @@
  * its inner workspace becomes the shared context for the melded neighbours.
  */
 
-import type { Glyph } from './glyph';
+import type { Glyph } from '@qntx/glyphs';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { morphCanvasPlacedToFullscreen } from './manifestations/canvas-expanded';

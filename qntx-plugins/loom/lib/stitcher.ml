@@ -283,8 +283,6 @@ let stitch_turn ~branch ~context ~predicate ~label ~text ~paths:turn_path ?(time
         { branch; context = old_context; buffered_words = 0; emitted = Some block;
           turn_count = num_turns; paths = old_paths; timestamp = old_ts }
       | None ->
-        Printf.printf "[loom] Buffered %d words for branch %s (%d total)\n%!"
-          (word_count turn) branch (word_count turn);
         { branch; context; buffered_words = word_count turn; emitted = None;
           turn_count = 0; paths = []; timestamp }
     ) else (
@@ -313,8 +311,6 @@ let stitch_turn ~branch ~context ~predicate ~label ~text ~paths:turn_path ?(time
           turn_count = num_turns; paths = entry.paths; timestamp = entry.timestamp }
       ) else (
         Hashtbl.replace buffers key entry;
-        Printf.printf "[loom] Buffered %d words for branch %s (%d total)\n%!"
-          (word_count turn) branch total_words;
         { branch; context = entry.context; buffered_words = total_words; emitted = None;
           turn_count = 0; paths = []; timestamp = 0 }
       )

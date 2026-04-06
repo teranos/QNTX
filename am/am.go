@@ -6,6 +6,7 @@ type Config struct {
 	Server        ServerConfig     `mapstructure:"server"`
 	Auth          AuthConfig       `mapstructure:"auth"`
 	Pulse         PulseConfig      `mapstructure:"pulse"`
+	LLM           LLMConfig        `mapstructure:"llm"`
 	Code          CodeConfig       `mapstructure:"code"`
 	Ax            AxConfig         `mapstructure:"ax"`
 	Plugin        PluginConfig     `mapstructure:"plugin"`
@@ -13,6 +14,13 @@ type Config struct {
 	Watcher       WatcherConfig    `mapstructure:"watcher"`
 	Sync          SyncConfig       `mapstructure:"sync"`
 	GraundeDBPath string           `mapstructure:"graunde_db_path"` // Path to Graunde's database for deferred news delivery
+}
+
+// LLMConfig configures LLM request queuing and rate limiting at the core routing layer.
+type LLMConfig struct {
+	MaxConcurrent     int `mapstructure:"max_concurrent"`       // Max simultaneous provider calls (default: 1)
+	MaxCallsPerMinute int `mapstructure:"max_calls_per_minute"` // Rate limit across all callers (default: 60)
+	MaxQueueDepth     int `mapstructure:"max_queue_depth"`      // Max waiting requests before rejection (default: 25)
 }
 
 // WatcherConfig configures the watcher engine

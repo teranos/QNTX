@@ -9,17 +9,15 @@
  * Visual style: Light beige/yellow background with dark text (post-it aesthetic)
  */
 
-import type { Glyph } from './glyph';
-import { MAX_VIEWPORT_HEIGHT_RATIO } from './glyph';
+import type { Glyph } from '@qntx/glyphs';
+import { MAX_VIEWPORT_HEIGHT_RATIO } from '@qntx/glyphs';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
 import { storeCleanup, preventDrag } from './glyph-interaction';
 import { tooltip } from '../tooltip';
 import { canvasPlaced } from './manifestations/canvas-placed';
-import { morphCanvasPlacedToWindow, placeWindowOnCanvas } from './manifestations/canvas-window';
-import { isInWindowState } from './dataset';
-import { glyphRun } from './run';
+import { wireExpandToWindow } from '@qntx/glyphs';
 import { Prose } from '@generated/sym.js';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
@@ -142,57 +140,22 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
     });
 
     // Expand handler
-    expandBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (isInWindowState(element)) {
-            placeWindowOnCanvas(element, {
-                onRestoreComplete: () => {
-                    applyPostItStyle(element, glyph);
-                    expandBtn.textContent = '\u2B06';
-                    expandBtn.title = 'Expand to window';
-                },
-            });
-            return;
-        }
-
-        const canvas = element.closest('.canvas-workspace') as HTMLElement | null;
-        const canvasId = (canvas?.closest('[data-canvas-id]') as HTMLElement | null)?.dataset?.canvasId ?? 'canvas-workspace';
-        const title = `${Prose} Note`;
-
-        morphCanvasPlacedToWindow(element, {
-            title,
-            canvasId,
-            onClose: () => {
-                element.remove();
-                uiState.removeCanvasGlyph(glyph.id);
-                log.debug(SEG.GLYPH, `[NoteGlyph] Closed from window ${glyph.id}`);
-            },
-            onMinimize: (el: HTMLElement) => {
-                glyphRun.adopt(el, {
-                    id: glyph.id,
-                    title: `${Prose} Note`,
-                    symbol: Prose,
-                    color: glyph.color,
-                    textColor: glyph.textColor,
-                    renderContent: () => {
-                        const content = document.createElement('div');
-                        content.textContent = 'Note (minimized)';
-                        return content;
-                    },
-                    onClose: () => {
-                        log.debug(SEG.GLYPH, `[NoteGlyph] Closed from tray ${glyph.id}`);
-                    },
-                });
-            },
-            onRestoreComplete: () => {
-                expandBtn.textContent = '\u2B06';
-                expandBtn.title = 'Expand to window';
-            },
-        });
-
-        // Hide standard window controls — fold-bar reveals them on hover
-        const windowControls = foldBar.querySelector('.glyph-window-controls') as HTMLElement | null;
-        if (windowControls) windowControls.style.opacity = '0';
+    wireExpandToWindow({
+        element,
+        expandBtn,
+        glyphId: glyph.id,
+        title: `${Prose} Note`,
+        symbol: Prose,
+        color: glyph.color,
+        textColor: glyph.textColor,
+        renderContent: () => {
+            const content = document.createElement('div');
+            content.textContent = 'Note (minimized)';
+            return content;
+        },
+        logLabel: 'NoteGlyph',
+        onRestoreToCanvas: () => applyPostItStyle(element, glyph),
+        stopPropagation: true,
     });
 
     // Close handler

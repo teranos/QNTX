@@ -6,7 +6,7 @@
  */
 
 import { log, SEG } from '../../../logger';
-import type { Glyph } from '../glyph';
+import type { Glyph } from '@qntx/glyphs';
 import { performMeld, extendComposition } from './meld-composition';
 import { makeDraggable } from '../glyph-interaction';
 

@@ -19,7 +19,7 @@ import { log, SEG } from './logger';
 import { handleError } from './error-handler.ts';
 import { buttonPlaceholder, hydrateButtons, registerButton, type HydrateConfig } from './components/button';
 import { tooltip } from './components/tooltip.ts';
-import type { Glyph } from './components/glyph/glyph';
+import type { Glyph } from '@qntx/glyphs';
 
 interface PluginInfo {
     name: string;

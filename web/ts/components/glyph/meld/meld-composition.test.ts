@@ -12,7 +12,7 @@
 import { describe, test, expect } from 'bun:test';
 import { performMeld, unmeldComposition, isMeldedComposition, reconstructMeld, extendComposition, detachGlyph } from './meld-composition';
 import { MELD_THRESHOLD } from './meld-detect';
-import type { Glyph } from '../glyph';
+import type { Glyph } from '@qntx/glyphs';
 import { uiState } from '../../../state/ui';
 
 /** Get direct glyph children of a composition (no column wrappers with absolute positioning) */
