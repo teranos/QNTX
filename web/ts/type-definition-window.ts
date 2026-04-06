@@ -9,7 +9,7 @@ import { apiFetch } from './api.js';
 import { log, SEG } from './logger.ts';
 import { escapeHtml } from './html-utils.js';
 import { glyphRun } from '@qntx/glyphs';
-import type { Glyph } from './components/glyph/glyph.ts';
+import type { Glyph } from '@qntx/glyphs';
 
 const GLYPH_ID = 'type-definition';
 

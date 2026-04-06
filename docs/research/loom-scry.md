@@ -1,4 +1,4 @@
-# Loom x llama-cpp: Token Confidence in the Timeline
+# Loom x Scry: Token Confidence in the Timeline
 
 How LLM inference signal data (confidence, entropy, top-gap, top-k) could flow into loom's stitching system and timeline UI.
 
@@ -27,7 +27,7 @@ Key point: loom's unit of data is the **turn** (a single speaker utterance withi
 
 ## 2. How Stream Results Work Today
 
-The llama-cpp plugin streams tokens over WebSocket as `LLMStreamMessage` (`server/types.go`). Each message carries:
+The scry plugin streams tokens over WebSocket as `LLMStreamMessage` (`server/types.go`). Each message carries:
 - `content`: the token text
 - `signal`: optional `LLMTokenSignal` with `confidence` (P(chosen)), `entropy` (Shannon entropy in bits), `top_gap` (P(top1) - P(top2)), `top_k` (candidate tokens with probabilities)
 
@@ -43,7 +43,7 @@ The inference-internals checklist (`docs/research/inference-internals.md`) inclu
 
 ### 3A. Generation as weave source: a new predicate
 
-Today loom consumes attestations with predicates like UserPromptSubmit, Stop, PreToolUse. A generation from llama-cpp produces two levels of attestation: the generation as a weave, each token as an individual attestation within it.
+Today loom consumes attestations with predicates like UserPromptSubmit, Stop, PreToolUse. A generation from scry produces two levels of attestation: the generation as a weave, each token as an individual attestation within it.
 
 **Two attestation levels.** The generation is a weave. Each token is an attestation within it.
 
@@ -59,7 +59,7 @@ Today loom consumes attestations with predicates like UserPromptSubmit, Stop, Pr
     "token_count": 247,
     "mean_confidence": 0.83,
     "mean_entropy": 1.42,
-    "weave_source": "llama-cpp"
+    "weave_source": "scry"
   }
 }
 ```
@@ -86,7 +86,7 @@ Today loom consumes attestations with predicates like UserPromptSubmit, Stop, Pr
 
 The weave uses the same `["Weave"]` predicate loom already queries — no new code path needed. The tokens are individual attestations linked to the weave by shared context. Loom renders the weave in the timeline; token attestations provide the signal data for confidence coloring and hover popups within it. A single prompt + generation already feels like an entire weave given the amount of output it produces — no stitcher chunking needed.
 
-**How loom consumes it.** No new code path needed. The weave attestation uses the standard `["Weave"]` predicate with `weave_source: "llama-cpp"`. Loom's existing ATS query for `["Weave"]` picks it up automatically. Token attestations (`["Token"]` predicate) are fetched on demand when the frontend renders a generation weave — query by shared context to get the per-token signal data.
+**How loom consumes it.** No new code path needed. The weave attestation uses the standard `["Weave"]` predicate with `weave_source: "scry"`. Loom's existing ATS query for `["Weave"]` picks it up automatically. Token attestations (`["Token"]` predicate) are fetched on demand when the frontend renders a generation weave — query by shared context to get the per-token signal data.
 
 ### 3B. Each generation as a weave, each token as an attestation
 

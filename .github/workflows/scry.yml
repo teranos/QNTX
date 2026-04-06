@@ -1,16 +1,16 @@
-name: llama-cpp
+name: scry
 
 on:
   pull_request:
     paths:
-      - 'qntx-plugins/llama-cpp/**'
+      - 'qntx-plugins/scry/**'
       - 'plugin/grpc/protocol/domain.proto'
       - 'plugin/grpc/protocol/llm.proto'
-      - '.github/workflows/llama-cpp.yml'
+      - '.github/workflows/scry.yml'
   push:
     branches: [main]
     paths:
-      - 'qntx-plugins/llama-cpp/**'
+      - 'qntx-plugins/scry/**'
       - 'plugin/grpc/protocol/domain.proto'
       - 'plugin/grpc/protocol/llm.proto'
 
@@ -38,11 +38,11 @@ jobs:
           name: qntx
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
-      - name: Build llama-cpp plugin
-        run: nix build ./qntx-plugins/llama-cpp --show-trace
+      - name: Build scry plugin
+        run: nix build ./qntx-plugins/scry --show-trace
 
       - name: Verify binary
-        run: ./result/bin/qntx-llama-cpp-plugin --version
+        run: ./result/bin/qntx-scry-plugin --version
 
       - name: Push to Cachix
-        run: nix build ./qntx-plugins/llama-cpp --print-out-paths --no-link | cachix push qntx
+        run: nix build ./qntx-plugins/scry --print-out-paths --no-link | cachix push qntx

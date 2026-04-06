@@ -53,27 +53,27 @@ MetalRenderer::~MetalRenderer() {
 }
 
 bool MetalRenderer::setup() {
-    std::cout << "[metal-llama] setup() entered" << std::endl;
+    std::cout << "[metal-scry] setup() entered" << std::endl;
 
     // Clean up any partial state from a previous failed attempt
     if (device_ || queue_ || compute_pipeline_ || render_pipeline_) {
-        std::cout << "[metal-llama] Cleaning up partial state from previous attempt" << std::endl;
+        std::cout << "[metal-scry] Cleaning up partial state from previous attempt" << std::endl;
         teardown();
     }
 
     device_ = MTL::CreateSystemDefaultDevice();
     if (!device_) {
-        std::cout << "[metal-llama] MTL::CreateSystemDefaultDevice() returned null" << std::endl;
+        std::cout << "[metal-scry] MTL::CreateSystemDefaultDevice() returned null" << std::endl;
         return false;
     }
-    std::cout << "[metal-llama] Device acquired: " << device_->name()->utf8String() << std::endl;
+    std::cout << "[metal-scry] Device acquired: " << device_->name()->utf8String() << std::endl;
 
     queue_ = device_->newCommandQueue();
     if (!queue_) {
-        std::cout << "[metal-llama] newCommandQueue() returned null" << std::endl;
+        std::cout << "[metal-scry] newCommandQueue() returned null" << std::endl;
         return false;
     }
-    std::cout << "[metal-llama] Command queue created" << std::endl;
+    std::cout << "[metal-scry] Command queue created" << std::endl;
 
     // Try pre-compiled metallib first, fall back to runtime compilation
     NS::Error* error = nullptr;
@@ -90,7 +90,7 @@ bool MetalRenderer::setup() {
             NS::String::string(lib_path.c_str(), NS::UTF8StringEncoding));
         library = device_->newLibrary(lib_url, &error);
         if (library) {
-            std::cout << "[metal-llama] Loaded pre-compiled " << lib_path << std::endl;
+            std::cout << "[metal-scry] Loaded pre-compiled " << lib_path << std::endl;
         }
     }
 
@@ -101,18 +101,18 @@ bool MetalRenderer::setup() {
         library = device_->newLibrary(src, nullptr, &error);
         if (!library) {
             if (error) {
-                std::cout << "[metal-llama] Shader compilation failed: "
+                std::cout << "[metal-scry] Shader compilation failed: "
                           << error->localizedDescription()->utf8String() << std::endl;
             }
             return false;
         }
-        std::cout << "[metal-llama] Compiled shaders from source" << std::endl;
+        std::cout << "[metal-scry] Compiled shaders from source" << std::endl;
     }
 
     // Compute pipeline
     auto compute_fn = library->newFunction(NS::String::string("particleCompute", NS::UTF8StringEncoding));
     if (!compute_fn) {
-        std::cout << "[metal-llama] particleCompute not found" << std::endl;
+        std::cout << "[metal-scry] particleCompute not found" << std::endl;
         return false;
     }
     compute_pipeline_ = device_->newComputePipelineState(compute_fn, &error);
@@ -122,7 +122,7 @@ bool MetalRenderer::setup() {
     // Lerp compute pipeline
     auto lerp_fn = library->newFunction(NS::String::string("particleComputeLerp", NS::UTF8StringEncoding));
     if (!lerp_fn) {
-        std::cout << "[metal-llama] particleComputeLerp not found" << std::endl;
+        std::cout << "[metal-scry] particleComputeLerp not found" << std::endl;
         return false;
     }
     lerp_pipeline_ = device_->newComputePipelineState(lerp_fn, &error);
@@ -133,7 +133,7 @@ bool MetalRenderer::setup() {
     auto vertex_fn = library->newFunction(NS::String::string("particleVertex", NS::UTF8StringEncoding));
     auto fragment_fn = library->newFunction(NS::String::string("particleFragment", NS::UTF8StringEncoding));
     if (!vertex_fn || !fragment_fn) {
-        std::cout << "[metal-llama] vertex/fragment functions not found" << std::endl;
+        std::cout << "[metal-scry] vertex/fragment functions not found" << std::endl;
         return false;
     }
 
@@ -159,7 +159,7 @@ bool MetalRenderer::setup() {
     auto trail_vertex_fn = library->newFunction(NS::String::string("trailVertex", NS::UTF8StringEncoding));
     auto trail_fragment_fn = library->newFunction(NS::String::string("trailFragment", NS::UTF8StringEncoding));
     if (!trail_vertex_fn || !trail_fragment_fn) {
-        std::cout << "[metal-llama] trail vertex/fragment functions not found" << std::endl;
+        std::cout << "[metal-scry] trail vertex/fragment functions not found" << std::endl;
         library->release();
         return false;
     }
@@ -185,7 +185,7 @@ bool MetalRenderer::setup() {
     auto ghost_vertex_fn = library->newFunction(NS::String::string("ghostBranchVertex", NS::UTF8StringEncoding));
     auto ghost_fragment_fn = library->newFunction(NS::String::string("ghostFragment", NS::UTF8StringEncoding));
     if (!ghost_vertex_fn || !ghost_fragment_fn) {
-        std::cout << "[metal-llama] ghost branch shaders not found" << std::endl;
+        std::cout << "[metal-scry] ghost branch shaders not found" << std::endl;
         if (ghost_vertex_fn) ghost_vertex_fn->release();
         if (ghost_fragment_fn) ghost_fragment_fn->release();
         library->release();
@@ -213,7 +213,7 @@ bool MetalRenderer::setup() {
     auto pick_vertex_fn = library->newFunction(NS::String::string("pickVertex", NS::UTF8StringEncoding));
     auto pick_fragment_fn = library->newFunction(NS::String::string("pickFragment", NS::UTF8StringEncoding));
     if (!pick_vertex_fn || !pick_fragment_fn) {
-        std::cout << "[metal-llama] pick shaders not found" << std::endl;
+        std::cout << "[metal-scry] pick shaders not found" << std::endl;
         if (pick_vertex_fn) pick_vertex_fn->release();
         if (pick_fragment_fn) pick_fragment_fn->release();
         library->release();
@@ -238,7 +238,7 @@ bool MetalRenderer::setup() {
     auto hl_vertex_fn = library->newFunction(NS::String::string("highlightVertex", NS::UTF8StringEncoding));
     auto hl_fragment_fn = library->newFunction(NS::String::string("highlightFragment", NS::UTF8StringEncoding));
     if (!hl_vertex_fn || !hl_fragment_fn) {
-        std::cout << "[metal-llama] highlight shaders not found" << std::endl;
+        std::cout << "[metal-scry] highlight shaders not found" << std::endl;
         if (hl_vertex_fn) hl_vertex_fn->release();
         if (hl_fragment_fn) hl_fragment_fn->release();
         library->release();
@@ -303,7 +303,7 @@ bool MetalRenderer::setup() {
 
     library->release();
 
-    std::cout << "[metal-llama] GPU ready: " << device_name() << std::endl;
+    std::cout << "[metal-scry] GPU ready: " << device_name() << std::endl;
     return true;
 }
 

@@ -5,7 +5,6 @@ import (
 )
 
 // AIClient interface for LLM inference providers.
-// All providers are gRPC plugins (openrouter, llama-cpp, etc.)
 type AIClient interface {
 	Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error)
 }

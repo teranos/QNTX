@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(qntx-llama-cpp VERSION 0.1.0 LANGUAGES CXX C)
+project(qntx-scry VERSION 0.1.0 LANGUAGES CXX C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 17)
@@ -116,7 +116,7 @@ else()
 endif()
 
 # Plugin binary
-add_executable(qntx-llama-cpp-plugin
+add_executable(qntx-scry-plugin
     src/main.cpp
     src/plugin.cpp
     src/inference.cpp
@@ -128,7 +128,7 @@ add_executable(qntx-llama-cpp-plugin
     ${GENERATED_SRCS}
 )
 
-target_include_directories(qntx-llama-cpp-plugin PRIVATE
+target_include_directories(qntx-scry-plugin PRIVATE
     ${PROTO_GEN_DIR}
     ${LLAMA_SOURCE_DIR}/include
     ${LLAMA_SOURCE_DIR}/src
@@ -138,9 +138,9 @@ target_include_directories(qntx-llama-cpp-plugin PRIVATE
     ${MUPDF_INCLUDE_DIR}
     ${GLM_INCLUDE_DIR}
 )
-target_compile_definitions(qntx-llama-cpp-plugin PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
+target_compile_definitions(qntx-scry-plugin PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
-target_link_libraries(qntx-llama-cpp-plugin PRIVATE
+target_link_libraries(qntx-scry-plugin PRIVATE
     llama
     mtmd
     gRPC::grpc++
@@ -148,10 +148,10 @@ target_link_libraries(qntx-llama-cpp-plugin PRIVATE
     ${MUPDF_LIB}
 )
 
-target_include_directories(qntx-llama-cpp-plugin PRIVATE ${CMAKE_BINARY_DIR})
+target_include_directories(qntx-scry-plugin PRIVATE ${CMAKE_BINARY_DIR})
 
 if(HAS_METAL)
-    target_link_libraries(qntx-llama-cpp-plugin PRIVATE
+    target_link_libraries(qntx-scry-plugin PRIVATE
         "-framework Accelerate"
         "-framework Metal"
         "-framework Foundation"
@@ -160,8 +160,8 @@ if(HAS_METAL)
         "-framework CoreText"
         "-framework ImageIO"
     )
-    target_compile_definitions(qntx-llama-cpp-plugin PRIVATE ACCELERATE_NEW_LAPACK)
-    target_include_directories(qntx-llama-cpp-plugin PRIVATE
+    target_compile_definitions(qntx-scry-plugin PRIVATE ACCELERATE_NEW_LAPACK)
+    target_include_directories(qntx-scry-plugin PRIVATE
         ${CMAKE_SOURCE_DIR}/vendor/metal-cpp
     )
 
@@ -177,7 +177,7 @@ if(HAS_METAL)
         COMMENT "Embedding shaders.metal as C string"
     )
     add_custom_target(shader_inc ALL DEPENDS ${SHADER_INC})
-    add_dependencies(qntx-llama-cpp-plugin shader_inc)
+    add_dependencies(qntx-scry-plugin shader_inc)
 
     # Optional: pre-compile metallib if Metal toolchain is available
     execute_process(
@@ -201,7 +201,7 @@ if(HAS_METAL)
             COMMENT "Linking shaders.air → default.metallib"
         )
         add_custom_target(metal_shaders ALL DEPENDS ${SHADER_LIB})
-        add_dependencies(qntx-llama-cpp-plugin metal_shaders)
+        add_dependencies(qntx-scry-plugin metal_shaders)
     else()
         message(STATUS "Metal toolchain not available — shaders will compile at runtime")
     endif()
@@ -209,7 +209,7 @@ endif()
 
 # mupdf-third bundles freetype/zlib/etc — only present with static MuPDF installs
 if(MUPDF_THIRD_LIB)
-    target_link_libraries(qntx-llama-cpp-plugin PRIVATE ${MUPDF_THIRD_LIB})
+    target_link_libraries(qntx-scry-plugin PRIVATE ${MUPDF_THIRD_LIB})
 endif()
 
 # Camera math tests — pure C++, no gRPC/llama deps
@@ -219,4 +219,4 @@ target_include_directories(camera_test PRIVATE ${GLM_INCLUDE_DIR})
 target_compile_definitions(camera_test PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
 add_test(NAME camera_test COMMAND camera_test)
 
-install(TARGETS qntx-llama-cpp-plugin DESTINATION bin)
+install(TARGETS qntx-scry-plugin DESTINATION bin)

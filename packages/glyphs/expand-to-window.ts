@@ -12,7 +12,6 @@ import { getGlyphRun } from './run';
 import type { Glyph } from './glyph';
 import {
     morphCanvasPlacedToWindow,
-    morphWindowToCanvasPlaced,
     placeWindowOnCanvas,
 } from './manifestations/canvas-window';
 

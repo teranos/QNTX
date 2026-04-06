@@ -65,7 +65,7 @@ bool InferenceEngine::load_vocab_cache() {
 
     size_t expected = static_cast<size_t>(n_vocab) * 6 * sizeof(float);
     if (static_cast<size_t>(file_size) != expected) {
-        std::cout << "[llama-cpp] Cache size mismatch: " << file_size
+        std::cout << "[scry] Cache size mismatch: " << file_size
                   << " bytes, expected " << expected << " for n_vocab=" << n_vocab << std::endl;
         return false;
     }
@@ -83,12 +83,12 @@ void InferenceEngine::write_vocab_cache() {
     std::string cache_path = model_path_ + ".poincare6d";
     std::ofstream f(cache_path, std::ios::binary | std::ios::trunc);
     if (!f.is_open()) {
-        std::cout << "[llama-cpp] Failed to write cache: " << cache_path << std::endl;
+        std::cout << "[scry] Failed to write cache: " << cache_path << std::endl;
         return;
     }
     f.write(reinterpret_cast<const char*>(vocab_positions_.data()),
             vocab_positions_.size() * sizeof(float));
-    std::cout << "[llama-cpp] Wrote vocab cache: " << cache_path
+    std::cout << "[scry] Wrote vocab cache: " << cache_path
               << " (" << vocab_positions_.size() / 6 << " tokens)" << std::endl;
 }
 
@@ -97,13 +97,13 @@ void InferenceEngine::compute_vocab_positions() {
 
     struct ggml_tensor* tok_embd = model_->tok_embd;
     if (!tok_embd) {
-        std::cout << "[llama-cpp] tok_embd tensor not found" << std::endl;
+        std::cout << "[scry] tok_embd tensor not found" << std::endl;
         return;
     }
 
     int n_vocab = tok_embd->ne[1];
     int n_embd = tok_embd->ne[0];
-    std::cout << "[llama-cpp] Computing vocab positions: " << n_vocab
+    std::cout << "[scry] Computing vocab positions: " << n_vocab
               << " tokens × " << n_embd << " dims" << std::endl;
 
     // Dequantize the embedding matrix to a contiguous f32 buffer (n_vocab × n_embd)
@@ -207,7 +207,7 @@ void InferenceEngine::compute_vocab_positions() {
     // Store interleaved: 6 floats per token (3 pos + 3 color)
     vocab_positions_ = std::move(all6);
 
-    std::cout << "[llama-cpp] Poincaré ball + semantic color: median_norm=" << median_norm
+    std::cout << "[scry] Poincaré ball + semantic color: median_norm=" << median_norm
               << " alpha=" << alpha << " (" << n_vocab << " tokens)" << std::endl;
 
     write_vocab_cache();
@@ -220,7 +220,7 @@ const std::vector<float>& InferenceEngine::vocab_positions_3d() {
     // Returns n_vocab × 6 floats (3 position + 3 color) despite the name.
     if (vocab_positions_.empty() && model_) {
         if (load_vocab_cache()) {
-            std::cout << "[llama-cpp] Loaded vocab data from cache ("
+            std::cout << "[scry] Loaded vocab data from cache ("
                       << vocab_positions_.size() / 6 << " tokens)" << std::endl;
         } else {
             compute_vocab_positions();

@@ -1,5 +1,5 @@
 {
-  description = "QNTX llama-cpp plugin — local LLM inference via llama.cpp";
+  description = "QNTX scry plugin — local LLM inference via llama.cpp";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -30,8 +30,8 @@
           hash = "sha256-GnGyzNRpzuguc3yYbEFtYLvG+KiCtRAktiN+NvbOICE=";
         };
 
-        llama-cpp-plugin = pkgs.stdenv.mkDerivation {
-          pname = "qntx-llama-cpp-plugin";
+        scry-plugin = pkgs.stdenv.mkDerivation {
+          pname = "qntx-scry-plugin";
           version = self.rev or "dev";
           src = ./.;
 
@@ -69,13 +69,13 @@
       in
       {
         packages = {
-          default = llama-cpp-plugin;
-          llama-cpp-plugin = llama-cpp-plugin;
+          default = scry-plugin;
+          scry-plugin = scry-plugin;
         };
 
         apps.default = {
           type = "app";
-          program = "${llama-cpp-plugin}/bin/qntx-llama-cpp-plugin";
+          program = "${scry-plugin}/bin/qntx-scry-plugin";
         };
       });
 }

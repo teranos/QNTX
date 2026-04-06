@@ -11,8 +11,7 @@ import (
 )
 
 // GRPCLLMClient adapts the gRPC LLMService to the AIClient interface.
-// This allows gRPC LLM plugins (like llama-cpp) to be used anywhere
-// a local or cloud AIClient is expected.
+// GRPCLLMClient adapts the gRPC LLMService to the AIClient interface.
 type GRPCLLMClient struct {
 	router   GRPCLLMRouter
 	provider string

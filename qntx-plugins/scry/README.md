@@ -1,4 +1,4 @@
-# qntx-llama-cpp-plugin
+# qntx-scry-plugin
 
 Local LLM inference via llama.cpp with Metal acceleration. C++ because llama.cpp is C++ — direct sampler chain access for custom logit processors (#715), live visualization of logits/attention during generation (#716), and branching on alternative token paths (#717).
 
@@ -8,9 +8,9 @@ In `am.toml`:
 
 ```toml
 [Plugin]
-enabled = ["llama-cpp"]
+enabled = ["scry"]
 
-[llama-cpp]
+[scry]
 model_path = "/path/to/model.gguf"
 n_ctx = "2048"
 log_level = "info"  # error | warn | info | debug
@@ -89,4 +89,4 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 
 - **SIG** — ~~Signal capture overhead.~~ Resolved. Profiling showed the ~55ms/token attributed to signal extraction was actually `ctx->synchronize()` inside `llama_get_logits_ith()` (llama-context.cpp:3079) — waiting for Metal to finish the decode. Signal extraction itself (softmax + partial sort + top-k) adds ~3ms/token. CPU softmax is 1-2ms after the sync completes. This is llama.cpp's Metal decode pipeline — not optimizable from our side.
 
-See `docs/research/metal-llama.md` for the full code reference table including Metal visualization limitations and opportunities.
+See `docs/research/metal-scry.md` for the full code reference table including Metal visualization limitations and opportunities.

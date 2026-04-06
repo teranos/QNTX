@@ -14,7 +14,7 @@
 #include "llm.grpc.pb.h"
 #include "ats_client.h"
 
-#define PLUGIN_VERSION "0.34.3"
+#define PLUGIN_VERSION "0.35.0"
 
 // Forward declarations
 struct llama_model;
@@ -180,10 +180,10 @@ private:
 };
 
 // DomainPluginService implementation
-class LlamaCppPlugin final : public protocol::DomainPluginService::Service {
+class ScryPlugin final : public protocol::DomainPluginService::Service {
 public:
-    LlamaCppPlugin();
-    ~LlamaCppPlugin();
+    ScryPlugin();
+    ~ScryPlugin();
 
     grpc::Status Metadata(grpc::ServerContext* ctx,
                           const protocol::Empty* req,
@@ -254,9 +254,9 @@ private:
 };
 
 // LLMService implementation
-class LlamaCppLLMService final : public protocol::LLMService::Service {
+class ScryLLMService final : public protocol::LLMService::Service {
 public:
-    explicit LlamaCppLLMService(LlamaCppPlugin* plugin);
+    explicit ScryLLMService(ScryPlugin* plugin);
 
     grpc::Status Chat(grpc::ServerContext* ctx,
                       const protocol::LLMChatRequest* req,
@@ -267,5 +267,5 @@ public:
                             grpc::ServerWriter<protocol::LLMChatChunk>* writer) override;
 
 private:
-    LlamaCppPlugin* plugin_;
+    ScryPlugin* plugin_;
 };
