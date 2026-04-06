@@ -10,6 +10,8 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/budget"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // LLMServer is the core-side gRPC server that routes LLM requests to provider plugins.
@@ -150,16 +152,18 @@ func (s *LLMServer) resolveProvider(name string) (protocol.LLMServiceClient, str
 }
 
 // gate checks rate limit then acquires a concurrency slot (priority-ordered).
+// Returns gRPC RESOURCE_EXHAUSTED for rate limit and queue-full rejections
+// so callers can distinguish "retry later" from "provider error".
 func (s *LLMServer) gate(ctx context.Context, priority int32) error {
 	if err := s.limiter.Wait(ctx); err != nil {
-		return errors.Wrap(err, "LLM rate limit")
+		return status.Errorf(codes.ResourceExhausted, "LLM rate limit: %v", err)
 	}
 	active, queued := s.queue.Stats()
 	if queued > 0 {
 		s.logger.Infow("LLM request queued", "priority", priority, "active", active, "queued", queued)
 	}
 	if err := s.queue.Acquire(ctx, priority); err != nil {
-		return errors.Wrap(err, "LLM queue")
+		return status.Errorf(codes.ResourceExhausted, "LLM queue: %v", err)
 	}
 	return nil
 }
