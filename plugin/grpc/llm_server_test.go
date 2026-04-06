@@ -6,11 +6,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 	"google.golang.org/grpc"
 )
+
+func newTestLLMServer(logger *zap.SugaredLogger) *LLMServer {
+	return NewLLMServer(am.LLMConfig{MaxConcurrent: 2, MaxCallsPerMinute: 1000}, logger)
+}
 
 // stubLLMClient implements protocol.LLMServiceClient for testing.
 // Only Chat is wired; StreamChat returns unimplemented.
@@ -29,7 +35,7 @@ func (s *stubLLMClient) StreamChat(ctx context.Context, in *protocol.LLMChatRequ
 
 func TestLLMServer_NoProviders(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	srv := NewLLMServer(logger)
+	srv := newTestLLMServer(logger)
 
 	_, err := srv.Chat(context.Background(), &protocol.LLMChatRequest{
 		UserPrompt: "hello",
@@ -40,7 +46,7 @@ func TestLLMServer_NoProviders(t *testing.T) {
 
 func TestLLMServer_DefaultProvider(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	srv := NewLLMServer(logger)
+	srv := newTestLLMServer(logger)
 
 	stub := &stubLLMClient{
 		chatResp: &protocol.LLMChatResponse{
@@ -63,7 +69,7 @@ func TestLLMServer_DefaultProvider(t *testing.T) {
 
 func TestLLMServer_ExplicitProvider(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	srv := NewLLMServer(logger)
+	srv := newTestLLMServer(logger)
 
 	stubA := &stubLLMClient{
 		chatResp: &protocol.LLMChatResponse{Content: "from-a"},
@@ -93,7 +99,7 @@ func TestLLMServer_ExplicitProvider(t *testing.T) {
 
 func TestLLMServer_UnknownProvider(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	srv := NewLLMServer(logger)
+	srv := newTestLLMServer(logger)
 
 	stub := &stubLLMClient{
 		chatResp: &protocol.LLMChatResponse{Content: "ok"},
@@ -111,7 +117,7 @@ func TestLLMServer_UnknownProvider(t *testing.T) {
 
 func TestLLMServer_FirstRegisteredIsDefault(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	srv := NewLLMServer(logger)
+	srv := newTestLLMServer(logger)
 
 	srv.RegisterProvider("first", &stubLLMClient{
 		chatResp: &protocol.LLMChatResponse{Content: "first"},
