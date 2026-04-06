@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"io"
 	"sync"
 
 	"github.com/teranos/QNTX/errors"
@@ -52,21 +53,9 @@ func (s *LLMServer) HasProvider(name string) bool {
 
 // Chat routes an LLM chat request to the appropriate provider plugin.
 func (s *LLMServer) Chat(ctx context.Context, req *protocol.LLMChatRequest) (*protocol.LLMChatResponse, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	if len(s.providers) == 0 {
-		return nil, errors.New("no LLM providers registered")
-	}
-
-	providerName := req.Provider
-	if providerName == "" {
-		providerName = s.defaultProvider
-	}
-
-	client, ok := s.providers[providerName]
-	if !ok {
-		return nil, errors.Newf("LLM provider %q not found (available: %v)", providerName, s.providerNames())
+	client, providerName, err := s.resolveProvider(req.Provider)
+	if err != nil {
+		return nil, err
 	}
 
 	resp, err := client.Chat(ctx, req)
@@ -77,25 +66,36 @@ func (s *LLMServer) Chat(ctx context.Context, req *protocol.LLMChatRequest) (*pr
 	return resp, nil
 }
 
+// StreamChat implements protocol.LLMServiceServer — routes a streaming LLM request
+// to the provider plugin and forwards chunks back to the calling plugin.
+func (s *LLMServer) StreamChat(req *protocol.LLMChatRequest, srv protocol.LLMService_StreamChatServer) error {
+	clientStream, err := s.StreamChatClient(srv.Context(), req)
+	if err != nil {
+		return err
+	}
+	for {
+		chunk, err := clientStream.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if err := srv.Send(chunk); err != nil {
+			return err
+		}
+	}
+}
+
 // StreamChatClient routes a streaming LLM request to the appropriate provider plugin.
 // Returns a client-side stream of LLMChatChunk messages (one per token).
-// Named StreamChatClient to avoid conflicting with the server-side StreamChat interface.
+// Named StreamChatClient to avoid conflicting with the server-side StreamChat method.
 func (s *LLMServer) StreamChatClient(ctx context.Context, req *protocol.LLMChatRequest) (protocol.LLMService_StreamChatClient, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	if len(s.providers) == 0 {
-		return nil, errors.New("no LLM providers registered")
-	}
-
-	providerName := req.Provider
-	if providerName == "" {
-		providerName = s.defaultProvider
-	}
-
-	client, ok := s.providers[providerName]
-	if !ok {
-		return nil, errors.Newf("LLM provider %q not found (available: %v)", providerName, s.providerNames())
+	// Look up provider under lock, then release before streaming —
+	// inference can run for seconds and must not block provider registration.
+	client, providerName, err := s.resolveProvider(req.Provider)
+	if err != nil {
+		return nil, err
 	}
 
 	stream, err := client.StreamChat(ctx, req)
@@ -104,6 +104,27 @@ func (s *LLMServer) StreamChatClient(ctx context.Context, req *protocol.LLMChatR
 	}
 
 	return stream, nil
+}
+
+// resolveProvider returns the LLM client for the given provider name (or default).
+func (s *LLMServer) resolveProvider(name string) (protocol.LLMServiceClient, string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if len(s.providers) == 0 {
+		return nil, "", errors.New("no LLM providers registered")
+	}
+
+	if name == "" {
+		name = s.defaultProvider
+	}
+
+	client, ok := s.providers[name]
+	if !ok {
+		return nil, "", errors.Newf("LLM provider %q not found (available: %v)", name, s.providerNames())
+	}
+
+	return client, name, nil
 }
 
 // providerNames returns registered provider names (must be called with lock held).
