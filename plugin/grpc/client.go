@@ -243,6 +243,11 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		llmEndpoint = ep
 		c.logger.Debugw("Extracted LLM endpoint from config", "endpoint", ep)
 	}
+	embeddingEndpoint := ""
+	if ep := pluginConfig.GetString("_embedding_endpoint"); ep != "" {
+		embeddingEndpoint = ep
+		c.logger.Debugw("Extracted Embedding endpoint from config", "endpoint", ep)
+	}
 	if token := pluginConfig.GetString("_auth_token"); token != "" {
 		authToken = token
 	}
@@ -253,6 +258,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		ScheduleEndpoint:    scheduleEndpoint,
 		FileServiceEndpoint: fileServiceEndpoint,
 		LlmEndpoint:         llmEndpoint,
+		EmbeddingEndpoint:   embeddingEndpoint,
 		AuthToken:           authToken,
 		Config:              config,
 	}
@@ -264,6 +270,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		"schedule_endpoint", scheduleEndpoint,
 		"file_service_endpoint", fileServiceEndpoint,
 		"llm_endpoint", llmEndpoint,
+		"embedding_endpoint", embeddingEndpoint,
 	)
 
 	resp, err := c.client.Initialize(ctx, req)

@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// EmbeddingService provides text-to-vector embedding operations for plugins
+service EmbeddingService {
+  // Embed generates a vector embedding for a single text
+  rpc Embed(EmbedRequest) returns (EmbedResponse);
+
+  // BatchEmbed generates vector embeddings for multiple texts
+  rpc BatchEmbed(BatchEmbedRequest) returns (BatchEmbedResponse);
+}
+
+message EmbedRequest {
+  string auth_token = 1;
+  string text = 2;
+}
+
+message EmbedResponse {
+  repeated float vector = 1;
+  int32 dimensions = 2;
+  string model = 3;
+  int32 tokens = 4;
+}
+
+message BatchEmbedRequest {
+  string auth_token = 1;
+  repeated string texts = 2;
+}
+
+message BatchEmbedResponse {
+  repeated EmbeddingVector results = 1;
+  int32 dimensions = 2;
+  string model = 3;
+  int32 total_tokens = 4;
+}
+
+message EmbeddingVector {
+  repeated float vector = 1;
+  int32 tokens = 2;
+}

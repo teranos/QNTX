@@ -23,6 +23,7 @@ type ServiceEndpoints struct {
 	ScheduleAddress    string
 	FileServiceAddress string
 	LLMAddress         string
+	EmbeddingAddress   string
 	AuthToken          string
 }
 
@@ -35,6 +36,8 @@ type ServicesManager struct {
 	llmServer         *grpc.Server
 	llmRouter         *LLMServer // Exposed for provider registration after plugin init
 	llmConfig         am.LLMConfig
+	embeddingServer   *grpc.Server
+	embeddingRouter   *EmbeddingServer // Exposed for late backend registration
 	endpoints         ServiceEndpoints
 	logger            *zap.SugaredLogger
 }
@@ -105,12 +108,20 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 		llmAddr = ""
 	}
 
+	// Start Embedding service (starts empty, backend registers after embedding engine init)
+	embeddingAddr, err := m.startEmbeddingService(ctx, authToken)
+	if err != nil {
+		m.logger.Warnw("Failed to start Embedding service, plugins will not have embedding access", "error", err)
+		embeddingAddr = ""
+	}
+
 	m.endpoints = ServiceEndpoints{
 		ATSStoreAddress:    atsStoreAddr,
 		QueueAddress:       queueAddr,
 		ScheduleAddress:    scheduleAddr,
 		FileServiceAddress: fileServiceAddr,
 		LLMAddress:         llmAddr,
+		EmbeddingAddress:   embeddingAddr,
 		AuthToken:          authToken,
 	}
 
@@ -278,10 +289,46 @@ func (m *ServicesManager) startLLMService(ctx context.Context) (string, error) {
 	return addr, nil
 }
 
+// startEmbeddingService starts the Embedding gRPC service.
+// The server starts empty — the backend registers after the embedding engine initializes.
+func (m *ServicesManager) startEmbeddingService(ctx context.Context, authToken string) (string, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to listen")
+	}
+
+	m.embeddingRouter = NewEmbeddingServer(authToken, m.logger)
+	m.embeddingServer = grpc.NewServer()
+	protocol.RegisterEmbeddingServiceServer(m.embeddingServer, m.embeddingRouter)
+
+	go func() {
+		<-ctx.Done()
+		m.logger.Debug("Context cancelled, stopping Embedding service")
+		m.embeddingServer.GracefulStop()
+	}()
+
+	go func() {
+		if err := m.embeddingServer.Serve(listener); err != nil {
+			m.logger.Errorw("Embedding service error", "error", err)
+		}
+	}()
+
+	addr := listener.Addr().String()
+	m.logger.Infow("Embedding service started", "address", addr)
+
+	return addr, nil
+}
+
 // GetLLMRouter returns the LLM router for provider registration.
 // Returns nil if the LLM service is not running.
 func (m *ServicesManager) GetLLMRouter() *LLMServer {
 	return m.llmRouter
+}
+
+// GetEmbeddingRouter returns the embedding router for backend registration.
+// Returns nil if the embedding service is not running.
+func (m *ServicesManager) GetEmbeddingRouter() *EmbeddingServer {
+	return m.embeddingRouter
 }
 
 // Shutdown gracefully stops all service servers
@@ -306,6 +353,10 @@ func (m *ServicesManager) Shutdown() {
 
 	if m.llmServer != nil {
 		m.llmServer.GracefulStop()
+	}
+
+	if m.embeddingServer != nil {
+		m.embeddingServer.GracefulStop()
 	}
 
 	m.logger.Info("Plugin services stopped")

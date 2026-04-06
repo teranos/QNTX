@@ -137,6 +137,7 @@ ParseAxQuery parses an Ax query string and returns the AST as JSON. Used by kern
 | schedule_endpoint | string | schedule_endpoint: gRPC endpoint for ScheduleService Provides: Runtime schedule creation, pause, resume, delete |
 | file_service_endpoint | string | file_service_endpoint: gRPC endpoint for FileService Provides: Read stored files (for multimodal attachments) |
 | llm_endpoint | string | llm_endpoint: gRPC endpoint for LLMService Provides: Provider-agnostic LLM chat (routed through core to provider plugins) |
+| embedding_endpoint | string | embedding_endpoint: gRPC endpoint for EmbeddingService Provides: Text-to-vector embedding generation |
 
 ### HTTPRequest
 
