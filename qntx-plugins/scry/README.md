@@ -77,6 +77,8 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 
 - **ATS** — ~~Resolved.~~ Each generation writes a `["Weave"]` attestation to ATS with embedded per-token signals (confidence, entropy, top-gap, top-k) in `attributes.tokens`. One attestation per generation. Loom renders these as confidence-colored token spans.
 
+- **CWEV** — Weave creation belongs in QNTX core, not scry. Core's `LLMServer` sees all LLM traffic — weaves should be created at the routing layer so every provider (scry, openrouter, future) gets observability for free. Scry should only do inference.
+
 - **PVH** — Private header dependency. PCA projection in `vocab_projection.cpp` accesses `llama-model.h` (private) to read `tok_embd.weight`. Version-fragile against llama.cpp internal changes.
 
 - **CAM** — ~~Orthographic external observer.~~ First-person perspective camera with GLM. WASD moves relative to facing direction, arrows rotate, QE ascend/descend. Smooth interpolation for future token tracking. Data-driven key bindings with `?` help overlay (#748).
