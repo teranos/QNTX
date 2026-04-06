@@ -4,21 +4,25 @@ import (
 	"container/heap"
 	"context"
 	"sync"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // llmQueue is a priority-aware concurrency limiter.
 // Lower priority value = higher priority (0 = interactive, 10 = background).
 // Callers block until a slot opens, served in priority order.
 type llmQueue struct {
-	mu       sync.Mutex
-	active   int
-	maxSlots int
-	waiters  waiterHeap
+	mu         sync.Mutex
+	active     int
+	maxSlots   int
+	maxWaiters int
+	waiters    waiterHeap
 }
 
-func newLLMQueue(maxSlots int) *llmQueue {
+func newLLMQueue(maxSlots int, maxWaiters int) *llmQueue {
 	return &llmQueue{
-		maxSlots: maxSlots,
+		maxSlots:   maxSlots,
+		maxWaiters: maxWaiters,
 	}
 }
 
@@ -31,6 +35,12 @@ func (q *llmQueue) Acquire(ctx context.Context, priority int32) error {
 		q.active++
 		q.mu.Unlock()
 		return nil
+	}
+
+	// Reject if queue is full.
+	if q.maxWaiters > 0 && q.waiters.Len() >= q.maxWaiters {
+		q.mu.Unlock()
+		return errors.Newf("LLM queue full (%d waiting, %d active)", q.waiters.Len(), q.active)
 	}
 
 	// No slot available — wait in priority order.

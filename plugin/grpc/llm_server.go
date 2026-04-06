@@ -35,7 +35,7 @@ type LLMServer struct {
 func NewLLMServer(cfg am.LLMConfig, logger *zap.SugaredLogger) *LLMServer {
 	return &LLMServer{
 		providers: make(map[string]protocol.LLMServiceClient),
-		queue:     newLLMQueue(cfg.MaxConcurrent),
+		queue:     newLLMQueue(cfg.MaxConcurrent, cfg.MaxQueueDepth),
 		limiter:   budget.NewLimiter(cfg.MaxCallsPerMinute),
 		logger:    logger,
 	}
