@@ -39,7 +39,7 @@ int main(int argc, char* argv[]) {
         } else if (arg == "--log-level" && i + 1 < argc) {
             log_level = argv[++i];
         } else if (arg == "--version") {
-            std::cout << "qntx-llama-cpp " << PLUGIN_VERSION << std::endl;
+            std::cout << "qntx-scry " << PLUGIN_VERSION << std::endl;
             return 0;
         } else if (arg == "--help") {
             print_usage(argv[0]);
@@ -55,8 +55,8 @@ int main(int argc, char* argv[]) {
     std::signal(SIGTERM, signal_handler);
 
     // Create plugin service
-    auto plugin_service = std::make_unique<LlamaCppPlugin>();
-    auto llm_service = std::make_unique<LlamaCppLLMService>(plugin_service.get());
+    auto plugin_service = std::make_unique<ScryPlugin>();
+    auto llm_service = std::make_unique<ScryLLMService>(plugin_service.get());
 
     // Try to bind to port, retry up to 64 times
     std::string server_address;

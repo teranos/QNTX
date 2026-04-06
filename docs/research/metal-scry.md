@@ -1,33 +1,33 @@
-# metal-llama
+# metal-scry
 
 ## What exists
 
-Metal-cpp renderer inside `qntx-plugins/llama-cpp/`. The renderer lives in the same process as inference — the softmax distribution goes directly from C++ to a Metal compute shader with no serialization.
+Metal-cpp renderer inside `qntx-plugins/scry/`. The renderer lives in the same process as inference — the softmax distribution goes directly from C++ to a Metal compute shader with no serialization.
 
 - **`src/metal_renderer.h`** / **`src/metal_renderer.cpp`** — Metal-cpp compute + render pipeline. MSL shaders compiled at runtime. Compute pass transforms probabilities + 3D positions into particles. Render pass draws point sprites with additive blending on HDR texture, Reinhard tonemapped to RGBA.
 - **`vendor/metal-cpp/`** — Apple's header-only C++ Metal wrapper.
 - **`src/vocab_projection.cpp`** — PCA projection of token embeddings to 3D via Accelerate BLAS.
 
-Originally prototyped as a separate Swift plugin (`qntx-plugins/metal-llama/`, deleted). Moved into llama-cpp because the full distribution (512KB/token) doesn't need to leave the process.
+Originally prototyped as a separate Swift plugin (`qntx-plugins/metal-scry/`, deleted). Moved into scry because the full distribution (512KB/token) doesn't need to leave the process.
 
 ---
 
 ## Vision
 
-This plugin exists to visualise what is happening inside the model as it's happening. The llama-cpp plugin already captures pre-sampler logit signals per token — confidence, entropy, top-gap, top-k candidates — and streams them over gRPC. The stream glyph renders this as a DOM-based confidence heatmap. metal-llama replaces that with GPU-accelerated rendering that can keep up with token generation speed and, critically, support stepping back through tokens and selecting different paths in possibility space.
+This plugin exists to visualise what is happening inside the model as it's happening. The scry plugin already captures pre-sampler logit signals per token — confidence, entropy, top-gap, top-k candidates — and streams them over gRPC. The stream glyph renders this as a DOM-based confidence heatmap. metal-scry replaces that with GPU-accelerated rendering that can keep up with token generation speed and, critically, support stepping back through tokens and selecting different paths in possibility space.
 
-The token stream is not just a sequence to watch — it's a tree. At each token position, the model considered alternatives. metal-llama should make that tree navigable: see where the model was confident, where it hesitated, branch into the roads not taken.
+The token stream is not just a sequence to watch — it's a tree. At each token position, the model considered alternatives. metal-scry should make that tree navigable: see where the model was confident, where it hesitated, branch into the roads not taken.
 
-**Performance is the priority.** Metal is chosen deliberately to eliminate the abstraction layers between data and pixels. This commits to the Apple ecosystem for this plugin. The same GPU running llama-cpp inference renders the visualization — zero-copy potential between inference output buffers and visualization input buffers.
+**Performance is the priority.** Metal is chosen deliberately to eliminate the abstraction layers between data and pixels. This commits to the Apple ecosystem for this plugin. The same GPU running scry inference renders the visualization — zero-copy potential between inference output buffers and visualization input buffers.
 
 **Platform scope:** macOS-only via Metal. If this needs to run on Windows or Linux in the future, the viable paths are:
 - **Vulkan** — closest cross-platform equivalent to Metal compute + render. MoltenVK already translates Vulkan to Metal on macOS, so a Vulkan-first approach would run everywhere but add a translation layer on the primary target. The trade-off: universal reach at the cost of the zero-copy Metal↔llama.cpp path.
 - **WebGPU (wgpu/Dawn)** — browser-native GPU API with Rust (wgpu) or C++ (Dawn) implementations. Maps to Metal on macOS, Vulkan on Linux, D3D12 on Windows. Higher abstraction than raw Metal, but the same shader language (WGSL or translated SPIR-V). Would require rewriting shaders but not the data pipeline.
 - **Rewrite in Zig + WebGPU** — Zig's comptime could generate pipeline layouts at compile time (like D's CTFE for protobuf). Cross-platform from day one, but no ecosystem precedent in QNTX yet.
 
-For now, Metal is the right call — the llama-cpp plugin already uses Metal acceleration, Tauri targets macOS, and the inference-to-visualization data path benefits from staying on the same GPU API.
+For now, Metal is the right call — the scry plugin already uses Metal acceleration, Tauri targets macOS, and the inference-to-visualization data path benefits from staying on the same GPU API.
 
-**Build toolchain:** CMake, same as llama-cpp. Metal-cpp is header-only, linked via `-framework Metal -framework Foundation -framework QuartzCore`.
+**Build toolchain:** CMake, same as scry. Metal-cpp is header-only, linked via `-framework Metal -framework Foundation -framework QuartzCore`.
 
 ---
 
@@ -56,11 +56,11 @@ What exists in that window:
 | Token metadata (frequency, flags per candidate) | ~40 bytes per candidate | None | Zero — `llama_token_get_score` / `get_attr` are O(1) lookups |
 | Context window fill level | 12 bytes | None | Zero — `llama_get_seq_pos(ctx, -1)` |
 
-**The natural frame budget for visualization is the next `llama_decode` call.** While the GPU runs the forward pass for token N+1 (20-100ms), metal-llama has that time to render the full signal data from token N. At 10 tokens/sec, that's 100ms per frame — well above 60fps budget.
+**The natural frame budget for visualization is the next `llama_decode` call.** While the GPU runs the forward pass for token N+1 (20-100ms), metal-scry has that time to render the full signal data from token N. At 10 tokens/sec, that's 100ms per frame — well above 60fps budget.
 
 **Data throughput at full extraction:** ~130 KB/token × 10 tokens/sec = **1.3 MB/s**. Trivially streamable over gRPC. A Metal compute shader processes 32k floats in one dispatch (~0.02ms).
 
-The bottleneck is not what data exists or how fast it can be rendered. The bottleneck is that `capture_signal` was built to feed a DOM-based heatmap that only needs 230 bytes. metal-llama needs the full 130KB+ because it can actually render it.
+The bottleneck is not what data exists or how fast it can be rendered. The bottleneck is that `capture_signal` was built to feed a DOM-based heatmap that only needs 230 bytes. metal-scry needs the full 130KB+ because it can actually render it.
 
 ### What requires llama.cpp patches (Tier 3 — defer)
 
@@ -99,18 +99,18 @@ C++ work: keep the full `probs` vector in `capture_signal()` instead of discardi
 
 ---
 
-### Q3: What can metal-llama show that the DOM never could?
+### Q3: What can metal-scry show that the DOM never could?
 
-The stream glyph is text. It renders tokens as `<span>` elements with colored backgrounds — a reading experience with signal overlays. metal-llama is not a companion to this and not a replacement for it. It is a parallel system that the stream glyph's existence inspired but that operates in a space the DOM cannot enter.
+The stream glyph is text. It renders tokens as `<span>` elements with colored backgrounds — a reading experience with signal overlays. metal-scry is not a companion to this and not a replacement for it. It is a parallel system that the stream glyph's existence inspired but that operates in a space the DOM cannot enter.
 
-The stream glyph proves that per-token signal data is valuable in real time. metal-llama takes the same `TokenSignal` data path — bidirectional, llama-cpp ↔ metal-llama via `StreamChat` gRPC and the `llama_sampler_i` vtable — and renders what text-in-a-browser fundamentally cannot:
+The stream glyph proves that per-token signal data is valuable in real time. metal-scry takes the same `TokenSignal` data path — bidirectional, scry ↔ metal-scry via `StreamChat` gRPC and the `llama_sampler_i` vtable — and renders what text-in-a-browser fundamentally cannot:
 
 - **Spatial structure.** A token tree is not a list. The DOM can show a sequence of colored spans; Metal can render a branching graph where depth, angle, and thickness encode probability, and you navigate it by moving through 3D space.
 - **Continuous animation.** The softmax distribution shifting frame-by-frame as the model considers the next token — not a snapshot after the fact, but the probability mass flowing in real time at GPU framerate.
 - **Density.** 32k vocabulary entries as a probability landscape. The DOM chokes on 32k elements; a Metal compute shader processes them in one dispatch.
 - **Interaction at inference speed.** Clicking a branch in the token tree and seeing the model re-infer from that fork within the same render frame. The DOM round-trip (JS event → fetch → re-render) is too slow for this to feel like direct manipulation.
 
-The stream glyph keeps doing what it does — text with heatmap coloring, readable output, follow-up input. metal-llama exists because some things about inference are not text and never will be.
+The stream glyph keeps doing what it does — text with heatmap coloring, readable output, follow-up input. metal-scry exists because some things about inference are not text and never will be.
 
 What is the first thing you'd want to see in this space that you currently cannot? The token tree? The probability landscape? The semantic trajectory? Or something that hasn't been named yet?
 
@@ -132,19 +132,19 @@ grpc-swift v2 with SPM build plugin. Proto types generated at build time from `d
 
 `capture_signal()` keeps full softmax distribution (128k floats for Llama 3.2) in `signal.full_distribution`, streamed via gRPC `StreamChat`. Stripped from WebSocket broadcast (1.3GB IndexedDB accumulation crashed the browser).
 
-PCA projection of `model_->tok_embd` to 3D via Accelerate BLAS in `vocab_projection.cpp`. Accesses private header `llama-model.h`, dequantizes via `ggml_get_type_traits`. Covariance via `cblas_sgemm`, top 3 eigenvectors via power iteration + deflation. Computed once at model load, served as binary float32 at `GET /api/llama-cpp/vocab-positions`.
+PCA projection of `model_->tok_embd` to 3D via Accelerate BLAS in `vocab_projection.cpp`. Accesses private header `llama-model.h`, dequantizes via `ggml_get_type_traits`. Covariance via `cblas_sgemm`, top 3 eigenvectors via power iteration + deflation. Computed once at model load, served as binary float32 at `GET /api/scry/vocab-positions`.
 
 ### Step 3: Particle field — static frame *(done)*
 
 MSL compute kernel: probability + 3D position → particle (amber color ramp, log-scaled size, visibility threshold 1e-5). Vertex shader: orthographic MVP. Fragment shader: soft circle point sprite. Additive blending on rgba16Float, Reinhard tonemap to sRGB PNG.
 
-Tested with 128,256 particles, real PCA positions, bimodal test distribution. Prototyped in Swift, then ported to Metal-cpp inside llama-cpp.
+Tested with 128,256 particles, real PCA positions, bimodal test distribution. Prototyped in Swift, then ported to Metal-cpp inside scry.
 
-### metal-llama: renderer moves into llama-cpp
+### metal-scry: renderer moves into scry
 
 Swift plugin was a prototype. Metal-cpp (Apple's header-only C++ wrapper) puts the renderer in the same process as inference — distribution is a `float*`, no serialization. MSL shaders unchanged.
 
-- [x] Add Metal-cpp headers to llama-cpp
+- [x] Add Metal-cpp headers to scry
 - [x] Port MetalRenderer to C++
 - [x] Render per-token during `stream_chat()`
 

@@ -6,5 +6,5 @@ type ProviderType string
 
 const (
 	ProviderTypeOpenRouter ProviderType = "openrouter" // OpenRouter cloud service (gateway to multiple models)
-	ProviderTypeLlamaCpp   ProviderType = "llama-cpp"  // llama.cpp local inference via gRPC plugin
+	ProviderTypeScry       ProviderType = "scry"       // Scry — local inference via llama.cpp gRPC plugin
 )

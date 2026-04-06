@@ -24,7 +24,7 @@ void AtsClient::configure(const std::string& endpoint, const std::string& auth_t
     auth_token_ = auth_token;
     auto channel = grpc::CreateChannel(endpoint, grpc::InsecureChannelCredentials());
     stub_ = protocol::ATSStoreService::NewStub(channel);
-    std::cout << "[llama-cpp] ATS client configured: " << endpoint << std::endl;
+    std::cout << "[scry] ATS client configured: " << endpoint << std::endl;
 }
 
 bool AtsClient::create_weave(const std::string& model_name,
@@ -45,8 +45,8 @@ bool AtsClient::create_weave(const std::string& model_name,
     cmd->add_subjects("model:" + model_name);
     cmd->add_predicates("Weave");
     cmd->add_contexts(context_id);
-    cmd->add_actors("llama-cpp");
-    cmd->set_source("llama-cpp");
+    cmd->add_actors("scry");
+    cmd->set_source("scry");
     cmd->set_source_version(PLUGIN_VERSION);
 
     auto* attrs = cmd->mutable_attributes();
@@ -57,7 +57,7 @@ bool AtsClient::create_weave(const std::string& model_name,
     (*fields)["token_count"] = make_number(token_count);
     (*fields)["mean_confidence"] = make_number(mean_confidence);
     (*fields)["mean_entropy"] = make_number(mean_entropy);
-    (*fields)["weave_source"] = make_string("llama-cpp");
+    (*fields)["weave_source"] = make_string("scry");
 
     // Performance breakdown — detect regressions from attestation history
     {
@@ -112,15 +112,15 @@ bool AtsClient::create_weave(const std::string& model_name,
     auto status = stub_->GenerateAndCreateAttestation(&ctx, req, &resp);
 
     if (!status.ok()) {
-        std::cerr << "[llama-cpp] ATS weave write failed: " << status.error_message() << std::endl;
+        std::cerr << "[scry] ATS weave write failed: " << status.error_message() << std::endl;
         return false;
     }
     if (!resp.success()) {
-        std::cerr << "[llama-cpp] ATS weave rejected: " << resp.error() << std::endl;
+        std::cerr << "[scry] ATS weave rejected: " << resp.error() << std::endl;
         return false;
     }
 
-    std::cout << "[llama-cpp] Weave attestation created: " << resp.attestation().id()
+    std::cout << "[scry] Weave attestation created: " << resp.attestation().id()
               << " (" << signals.size() << " tokens embedded)" << std::endl;
     return true;
 }

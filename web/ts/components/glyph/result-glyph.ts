@@ -465,7 +465,6 @@ export function createResultGlyph(
 
     // ── Nebula canvas ──────────────────────────────────────────────
     // Small inline particle view from the Metal renderer. Connects to
-    // the llama-cpp plugin's WebSocket frame stream during generation.
 
     // Nebula renders behind the text as the glyph's background
     const nebulaCanvas = document.createElement('canvas');
@@ -496,7 +495,7 @@ export function createResultGlyph(
 
     function connectNebula(): void {
         const base = getBackendUrl().replace(/^http/, 'ws');
-        nebulaWs = new WebSocket(`${base}/ws/llama-cpp`);
+        nebulaWs = new WebSocket(`${base}/ws/scry`);
 
         nebulaWs.onopen = () => {
             if (nebulaLive) nebulaStatus.textContent = 'connected';

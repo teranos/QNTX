@@ -11,12 +11,12 @@
 // Defined in plugin.cpp
 std::string sanitize_utf8(const std::string& s);
 
-// --- LlamaCppLLMService ---
+// --- ScryLLMService ---
 
-LlamaCppLLMService::LlamaCppLLMService(LlamaCppPlugin* plugin)
+ScryLLMService::ScryLLMService(ScryPlugin* plugin)
     : plugin_(plugin) {}
 
-grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
+grpc::Status ScryLLMService::Chat(grpc::ServerContext* ctx,
                                        const protocol::LLMChatRequest* req,
                                        protocol::LLMChatResponse* resp) {
     auto& engine = plugin_->engine();
@@ -135,7 +135,7 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
             if (sig.confidence < conf_min) conf_min = sig.confidence;
         }
         int n = result.signals.size();
-        std::cout << "[llama-cpp] signals: " << n << " tokens"
+        std::cout << "[scry] signals: " << n << " tokens"
                   << " | entropy avg=" << (ent_sum / n)
                   << " max=" << ent_max
                   << " | confidence avg=" << (conf_sum / n)
@@ -148,7 +148,7 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
                           [&result](size_t a, size_t b) {
                               return result.signals[a].confidence < result.signals[b].confidence;
                           });
-        std::cout << "[llama-cpp] least confident:";
+        std::cout << "[scry] least confident:";
         for (int i = 0; i < std::min(3, n); i++) {
             const auto& s = result.signals[idx[i]];
             std::cout << " \"" << s.token_text << "\"(p=" << s.confidence
@@ -190,7 +190,7 @@ grpc::Status LlamaCppLLMService::Chat(grpc::ServerContext* ctx,
     return grpc::Status::OK;
 }
 
-grpc::Status LlamaCppLLMService::StreamChat(grpc::ServerContext* ctx,
+grpc::Status ScryLLMService::StreamChat(grpc::ServerContext* ctx,
                                              const protocol::LLMChatRequest* req,
                                              grpc::ServerWriter<protocol::LLMChatChunk>* writer) {
     auto& engine = plugin_->engine();

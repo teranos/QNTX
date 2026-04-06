@@ -47,20 +47,20 @@ std::string sanitize_utf8(const std::string& s) {
     return out;
 }
 
-// --- LlamaCppPlugin (DomainPluginService) ---
+// --- ScryPlugin (DomainPluginService) ---
 
-LlamaCppPlugin::LlamaCppPlugin() : renderer_(std::make_unique<MetalRenderer>()) {
+ScryPlugin::ScryPlugin() : renderer_(std::make_unique<MetalRenderer>()) {
     renderer_->setup();
 }
 
-LlamaCppPlugin::~LlamaCppPlugin() {
+ScryPlugin::~ScryPlugin() {
     if (pca_thread_.joinable()) pca_thread_.join();
 }
 
-grpc::Status LlamaCppPlugin::Metadata(grpc::ServerContext* ctx,
+grpc::Status ScryPlugin::Metadata(grpc::ServerContext* ctx,
                                        const protocol::Empty* req,
                                        protocol::MetadataResponse* resp) {
-    resp->set_name("llama-cpp");
+    resp->set_name("scry");
     resp->set_version(PLUGIN_VERSION);
     resp->set_description("Local LLM inference via llama.cpp with Metal acceleration");
     resp->set_author("teranos");
@@ -68,7 +68,7 @@ grpc::Status LlamaCppPlugin::Metadata(grpc::ServerContext* ctx,
     return grpc::Status::OK;
 }
 
-grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
+grpc::Status ScryPlugin::Initialize(grpc::ServerContext* ctx,
                                          const protocol::InitializeRequest* req,
                                          protocol::InitializeResponse* resp) {
     // Load model from config — gather all params first, load once
@@ -82,7 +82,7 @@ grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
             if (n_ctx <= 0) n_ctx = 2048;
         }
         if (!engine_.load_model(it->second, n_ctx)) {
-            std::cout << "[llama-cpp] Failed to load model: " << it->second << std::endl;
+            std::cout << "[scry] Failed to load model: " << it->second << std::endl;
         }
     }
 
@@ -106,7 +106,7 @@ grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
     sampler_cfg_.penalty_freq = parse_float("freq_penalty", 0.0f);
     sampler_cfg_.penalty_present = parse_float("presence_penalty", 0.0f);
 
-    std::cout << "[llama-cpp] Sampler config: top_k=" << sampler_cfg_.top_k
+    std::cout << "[scry] Sampler config: top_k=" << sampler_cfg_.top_k
               << " top_p=" << sampler_cfg_.top_p
               << " min_p=" << sampler_cfg_.min_p
               << " typical_p=" << sampler_cfg_.typical_p
@@ -115,7 +115,7 @@ grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
 
     // Retry renderer setup if it failed during construction (restart timing)
     if (!renderer_->is_ready()) {
-        std::cout << "[metal-llama] Renderer not ready, retrying setup..." << std::endl;
+        std::cout << "[metal-scry] Renderer not ready, retrying setup..." << std::endl;
         renderer_->setup();
     }
 
@@ -126,7 +126,7 @@ grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
         if (!pos.empty()) {
             renderer_->set_vocab_positions(pos.data(), pos.size() / 6);
             renderer_->start_render_loop(800, 600);
-            std::cout << "[metal-llama] Loaded " << pos.size() / 6
+            std::cout << "[metal-scry] Loaded " << pos.size() / 6
                       << " vocab positions+colors into renderer, render loop started" << std::endl;
         }
     }
@@ -148,17 +148,17 @@ grpc::Status LlamaCppPlugin::Initialize(grpc::ServerContext* ctx,
     return grpc::Status::OK;
 }
 
-grpc::Status LlamaCppPlugin::Shutdown(grpc::ServerContext* ctx,
+grpc::Status ScryPlugin::Shutdown(grpc::ServerContext* ctx,
                                        const protocol::Empty* req,
                                        protocol::Empty* resp) {
     // Wait for background PCA to finish before unloading model
     if (pca_thread_.joinable()) pca_thread_.join();
     engine_.unload();
-    std::cout << "[llama-cpp] Shutdown complete" << std::endl;
+    std::cout << "[scry] Shutdown complete" << std::endl;
     return grpc::Status::OK;
 }
 
-grpc::Status LlamaCppPlugin::Health(grpc::ServerContext* ctx,
+grpc::Status ScryPlugin::Health(grpc::ServerContext* ctx,
                                      const protocol::Empty* req,
                                      protocol::HealthResponse* resp) {
     resp->set_healthy(true);
@@ -170,7 +170,7 @@ grpc::Status LlamaCppPlugin::Health(grpc::ServerContext* ctx,
     return grpc::Status::OK;
 }
 
-grpc::Status LlamaCppPlugin::ConfigSchema(grpc::ServerContext* ctx,
+grpc::Status ScryPlugin::ConfigSchema(grpc::ServerContext* ctx,
                                            const protocol::Empty* req,
                                            protocol::ConfigSchemaResponse* resp) {
     auto* fields = resp->mutable_fields();
@@ -241,7 +241,7 @@ grpc::Status LlamaCppPlugin::ConfigSchema(grpc::ServerContext* ctx,
     return grpc::Status::OK;
 }
 
-grpc::Status LlamaCppPlugin::RegisterGlyphs(grpc::ServerContext* ctx,
+grpc::Status ScryPlugin::RegisterGlyphs(grpc::ServerContext* ctx,
                                               const protocol::Empty* req,
                                               protocol::GlyphDefResponse* resp) {
     // Nebula view is now part of the response glyph — no separate glyph needed.
@@ -249,7 +249,7 @@ grpc::Status LlamaCppPlugin::RegisterGlyphs(grpc::ServerContext* ctx,
     return grpc::Status::OK;
 }
 
-grpc::Status LlamaCppPlugin::HandleHTTP(grpc::ServerContext* ctx,
+grpc::Status ScryPlugin::HandleHTTP(grpc::ServerContext* ctx,
                                          const protocol::HTTPRequest* req,
                                          protocol::HTTPResponse* resp) {
     if (req->method() == "GET" && req->path() == "/render-latest") {
@@ -373,7 +373,7 @@ grpc::Status LlamaCppPlugin::HandleHTTP(grpc::ServerContext* ctx,
     return grpc::Status::OK;
 }
 
-grpc::Status LlamaCppPlugin::HandleWebSocket(
+grpc::Status ScryPlugin::HandleWebSocket(
     grpc::ServerContext* ctx,
     grpc::ServerReaderWriter<protocol::WebSocketMessage,
                              protocol::WebSocketMessage>* stream) {
@@ -516,18 +516,18 @@ grpc::Status LlamaCppPlugin::HandleWebSocket(
     return grpc::Status::OK;
 }
 
-grpc::Status LlamaCppPlugin::ExecuteJob(grpc::ServerContext* ctx,
+grpc::Status ScryPlugin::ExecuteJob(grpc::ServerContext* ctx,
                                          const protocol::ExecuteJobRequest* req,
                                          protocol::ExecuteJobResponse* resp) {
     resp->set_success(false);
-    resp->set_error("llama-cpp does not handle async jobs");
+    resp->set_error("scry does not handle async jobs");
     return grpc::Status::OK;
 }
 
-grpc::Status LlamaCppPlugin::ParseAxQuery(grpc::ServerContext* ctx,
+grpc::Status ScryPlugin::ParseAxQuery(grpc::ServerContext* ctx,
                                            const protocol::ParseAxQueryRequest* req,
                                            protocol::ParseAxQueryResponse* resp) {
-    resp->set_error("llama-cpp does not parse Ax queries");
+    resp->set_error("scry does not parse Ax queries");
     return grpc::Status::OK;
 }
 
