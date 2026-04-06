@@ -71,6 +71,10 @@ PATCH /api/config
 {"updates": {"embeddings.enabled": true, "embeddings.path": "/path/to/model.onnx"}}
 ```
 
+## Plugin gRPC Service
+
+Plugins access embeddings via the `EmbeddingService` gRPC endpoint passed in `InitializeRequest.embedding_endpoint`. The service exposes `Embed` (single text) and `BatchEmbed` (multiple texts), both returning 384-dim L2-normalized float vectors. See `plugin/grpc/protocol/embedding.proto` for the full message definitions.
+
 ## API Endpoints
 
 | Method | Path | Description |

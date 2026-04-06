@@ -295,6 +295,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 				"schedule", endpoints.ScheduleAddress,
 				"file_service", endpoints.FileServiceAddress,
 				"llm", endpoints.LLMAddress,
+				"embedding", endpoints.EmbeddingAddress,
 			)
 		}
 
@@ -435,6 +436,13 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	server.setupEmbeddingReclusterSchedule(deps.config)
 	server.setupEmbeddingReprojectSchedule(deps.config)
 	server.setupClusterLabelSchedule(deps.config)
+
+	// Wire embedding service into gRPC for plugin access
+	if server.embeddingService != nil && server.servicesManager != nil {
+		if router := server.servicesManager.GetEmbeddingRouter(); router != nil {
+			router.SetService(server.embeddingService)
+		}
+	}
 
 	// Wire embedding service into watcher engine now that it's available
 	// (watcher engine starts before embeddings — reconnect and reload)
@@ -756,6 +764,8 @@ func (c *pluginConfigWithEndpoints) GetString(key string) string {
 			return c.endpoints.FileServiceAddress
 		case "_llm_endpoint":
 			return c.endpoints.LLMAddress
+		case "_embedding_endpoint":
+			return c.endpoints.EmbeddingAddress
 		case "_auth_token":
 			return c.endpoints.AuthToken
 		}
@@ -789,6 +799,8 @@ func (c *pluginConfigWithEndpoints) Get(key string) interface{} {
 			return c.endpoints.FileServiceAddress
 		case "_llm_endpoint":
 			return c.endpoints.LLMAddress
+		case "_embedding_endpoint":
+			return c.endpoints.EmbeddingAddress
 		case "_auth_token":
 			return c.endpoints.AuthToken
 		}

@@ -223,9 +223,12 @@ type InitializeRequest struct {
 	FileServiceEndpoint string `protobuf:"bytes,6,opt,name=file_service_endpoint,json=fileServiceEndpoint,proto3" json:"file_service_endpoint,omitempty"`
 	// llm_endpoint: gRPC endpoint for LLMService
 	// Provides: Provider-agnostic LLM chat (routed through core to provider plugins)
-	LlmEndpoint   string `protobuf:"bytes,7,opt,name=llm_endpoint,json=llmEndpoint,proto3" json:"llm_endpoint,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	LlmEndpoint string `protobuf:"bytes,7,opt,name=llm_endpoint,json=llmEndpoint,proto3" json:"llm_endpoint,omitempty"`
+	// embedding_endpoint: gRPC endpoint for EmbeddingService
+	// Provides: Text-to-vector embedding generation
+	EmbeddingEndpoint string `protobuf:"bytes,8,opt,name=embedding_endpoint,json=embeddingEndpoint,proto3" json:"embedding_endpoint,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *InitializeRequest) Reset() {
@@ -303,6 +306,13 @@ func (x *InitializeRequest) GetFileServiceEndpoint() string {
 func (x *InitializeRequest) GetLlmEndpoint() string {
 	if x != nil {
 		return x.LlmEndpoint
+	}
+	return ""
+}
+
+func (x *InitializeRequest) GetEmbeddingEndpoint() string {
+	if x != nil {
+		return x.EmbeddingEndpoint
 	}
 	return ""
 }
@@ -1432,7 +1442,7 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\fqntx_version\x18\x03 \x01(\tR\vqntxVersion\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x16\n" +
 	"\x06author\x18\x05 \x01(\tR\x06author\x12\x18\n" +
-	"\alicense\x18\x06 \x01(\tR\alicense\"\x87\x03\n" +
+	"\alicense\x18\x06 \x01(\tR\alicense\"\xb6\x03\n" +
 	"\x11InitializeRequest\x12,\n" +
 	"\x12ats_store_endpoint\x18\x01 \x01(\tR\x10atsStoreEndpoint\x12%\n" +
 	"\x0equeue_endpoint\x18\x02 \x01(\tR\rqueueEndpoint\x12\x1d\n" +
@@ -1441,7 +1451,8 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x06config\x18\x04 \x03(\v2'.protocol.InitializeRequest.ConfigEntryR\x06config\x12+\n" +
 	"\x11schedule_endpoint\x18\x05 \x01(\tR\x10scheduleEndpoint\x122\n" +
 	"\x15file_service_endpoint\x18\x06 \x01(\tR\x13fileServiceEndpoint\x12!\n" +
-	"\fllm_endpoint\x18\a \x01(\tR\vllmEndpoint\x1a9\n" +
+	"\fllm_endpoint\x18\a \x01(\tR\vllmEndpoint\x12-\n" +
+	"\x12embedding_endpoint\x18\b \x01(\tR\x11embeddingEndpoint\x1a9\n" +
 	"\vConfigEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"}\n" +

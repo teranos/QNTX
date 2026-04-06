@@ -86,6 +86,10 @@ message InitializeRequest {
   // llm_endpoint: gRPC endpoint for LLMService
   // Provides: Provider-agnostic LLM chat (routed through core to provider plugins)
   string llm_endpoint = 7;
+
+  // embedding_endpoint: gRPC endpoint for EmbeddingService
+  // Provides: Text-to-vector embedding generation
+  string embedding_endpoint = 8;
 }
 
 message HTTPRequest {
