@@ -33,6 +33,11 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("pulse.monthly_budget_usd", 15.0)  // Default $15/month limit
 	v.SetDefault("pulse.cost_per_score_usd", 0.002) // Default $0.002 per operation
 
+	// LLM routing defaults (queuing at core, not provider)
+	v.SetDefault("llm.max_concurrent", 1)        // scry is single-threaded
+	v.SetDefault("llm.max_calls_per_minute", 60) // sliding window rate limit
+	v.SetDefault("llm.max_queue_depth", 20)      // reject excess requests
+
 	// Auth defaults (disabled by default — zero auth code runs when disabled)
 	v.SetDefault("auth.enabled", false)
 	v.SetDefault("auth.session_expiry_hours", 24)

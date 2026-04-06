@@ -34,7 +34,7 @@ The package currently has morph, tray, and manifestations. The next series moves
 
 ### Cleanup
 
-- `REXP` — Eliminate re-exports: move imports in web/ to point directly at `@qntx/glyphs`
+- [x] `REXP` — Eliminate re-exports: move imports in web/ to point directly at `@qntx/glyphs`
 - `TEST` — Move tests to live with the package code, not in web/
 - `EXAM` — Canonical examples: minimal host app consuming the package
 - `DSGN` — Design system integration: make sure the broader design system uses this
@@ -47,24 +47,7 @@ The package currently has morph, tray, and manifestations. The next series moves
 
 ## Configuration
 
-Host apps wire in their implementations at startup:
-
-```ts
-import { configureGlyphs } from '@qntx/glyphs';
-
-configureGlyphs({
-    logger: myLogger,
-    logSegment: 'GLYPH',
-    persistence: {
-        getMinimizedGlyphs: () => state.minimizedGlyphs,
-        addMinimizedGlyph: (id) => state.addMinimized(id),
-        removeMinimizedGlyph: (id) => state.removeMinimized(id),
-    },
-    stripHtml: myStripHtml,
-});
-```
-
-Without configuration, safe defaults apply: no-op logger, no-op persistence, DOMParser-based HTML stripping.
+Host apps call `configureGlyphs()` at startup to inject logger, persistence, canvas coordinate bridge, and cleanup callbacks. See `web/ts/main.ts` for the canonical wiring. Without configuration, safe defaults apply: no-op logger, no-op persistence, identity coordinate transforms.
 
 ## Publishing
 

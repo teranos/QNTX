@@ -30,6 +30,9 @@ message LLMChatRequest {
   // Multi-turn conversation history. When populated, takes precedence
   // over system_prompt/user_prompt which remain for single-turn callers.
   repeated ChatMessage messages = 8;
+  // Queuing priority. Lower value = higher priority.
+  // 0 = interactive (user-initiated), 10 = background (generators, batch).
+  int32 priority = 9;
 }
 
 message Attachment {

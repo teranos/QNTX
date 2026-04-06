@@ -8,7 +8,7 @@
  * No global singleton — supports multiple simultaneous workspaces.
  */
 
-import { getMinimizeDuration } from '../glyph';
+import { getMinimizeDuration } from '@qntx/glyphs';
 
 import { Prose } from '@generated/sym.js';
 

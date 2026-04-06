@@ -194,9 +194,10 @@ func (m *KeepaliveMetrics) GetLastPongTime() time.Time {
 
 // KeepaliveHandler manages the keepalive mechanism for a WebSocket connection
 type KeepaliveHandler struct {
-	config  KeepaliveConfig
-	metrics *KeepaliveMetrics
-	logger  *zap.SugaredLogger
+	config     KeepaliveConfig
+	metrics    *KeepaliveMetrics
+	logger     *zap.SugaredLogger
+	pluginName string
 
 	// mu protects state changes
 	mu sync.Mutex
@@ -212,12 +213,13 @@ type KeepaliveHandler struct {
 }
 
 // NewKeepaliveHandler creates a new KeepaliveHandler with the given configuration
-func NewKeepaliveHandler(config KeepaliveConfig, logger *zap.SugaredLogger) *KeepaliveHandler {
+func NewKeepaliveHandler(config KeepaliveConfig, logger *zap.SugaredLogger, pluginName string) *KeepaliveHandler {
 	return &KeepaliveHandler{
-		config:   config,
-		metrics:  NewKeepaliveMetrics(),
-		logger:   logger,
-		lastPong: time.Now(),
+		config:     config,
+		metrics:    NewKeepaliveMetrics(),
+		logger:     logger,
+		pluginName: pluginName,
+		lastPong:   time.Now(),
 	}
 }
 
@@ -328,7 +330,7 @@ func (h *KeepaliveHandler) keepaliveLoop(ctx context.Context, sendPing func(time
 		case <-ticker.C:
 			// Check for pong timeout
 			if h.CheckTimeout() {
-				h.logger.Warn("WebSocket pong timeout, connection may be stale")
+				h.logger.Warnf("[%s] WebSocket pong timeout — not responding to keepalive", h.pluginName)
 				// Continue sending pings in case the connection recovers
 			}
 

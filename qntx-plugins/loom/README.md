@@ -74,7 +74,7 @@ Svelte 5 app with extracted components. No bundler dependencies beyond Bun and s
 - Cluster distribution per project in drawer header
 - Pointer-driven time-synchronized scrolling across columns
 - Minimal markdown rendering for assistant turns (code blocks, bold, inline code)
-- Token-aware rendering for llama-cpp weaves: per-token confidence coloring (brown/amber tint scaling with uncertainty), hover tooltips showing confidence, entropy, top_gap, and top-k candidates with probabilities
+- Token-aware rendering for scry weaves: per-token confidence coloring (brown/amber tint scaling with uncertainty), hover tooltips showing confidence, entropy, top_gap, and top-k candidates with probabilities
 - Click-to-copy weave attestation ID
 - Turn selection with CMD+C copy
 - Session browser with JSONL import from project headers

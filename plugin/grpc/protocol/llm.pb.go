@@ -90,7 +90,10 @@ type LLMChatRequest struct {
 	Attachments []*Attachment `protobuf:"bytes,7,rep,name=attachments,proto3" json:"attachments,omitempty"`
 	// Multi-turn conversation history. When populated, takes precedence
 	// over system_prompt/user_prompt which remain for single-turn callers.
-	Messages      []*ChatMessage `protobuf:"bytes,8,rep,name=messages,proto3" json:"messages,omitempty"`
+	Messages []*ChatMessage `protobuf:"bytes,8,rep,name=messages,proto3" json:"messages,omitempty"`
+	// Queuing priority. Lower value = higher priority.
+	// 0 = interactive (user-initiated), 10 = background (generators, batch).
+	Priority      int32 `protobuf:"varint,9,opt,name=priority,proto3" json:"priority,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -181,6 +184,13 @@ func (x *LLMChatRequest) GetMessages() []*ChatMessage {
 		return x.Messages
 	}
 	return nil
+}
+
+func (x *LLMChatRequest) GetPriority() int32 {
+	if x != nil {
+		return x.Priority
+	}
+	return 0
 }
 
 type Attachment struct {
@@ -640,7 +650,7 @@ const file_plugin_grpc_protocol_llm_proto_rawDesc = "" +
 	"\x1eplugin/grpc/protocol/llm.proto\x12\bprotocol\";\n" +
 	"\vChatMessage\x12\x12\n" +
 	"\x04role\x18\x01 \x01(\tR\x04role\x12\x18\n" +
-	"\acontent\x18\x02 \x01(\tR\acontent\"\xbc\x02\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent\"\xd8\x02\n" +
 	"\x0eLLMChatRequest\x12'\n" +
 	"\rsystem_prompt\x18\x01 \x01(\tB\x02\x18\x01R\fsystemPrompt\x12#\n" +
 	"\vuser_prompt\x18\x02 \x01(\tB\x02\x18\x01R\n" +
@@ -651,7 +661,8 @@ const file_plugin_grpc_protocol_llm_proto_rawDesc = "" +
 	"max_tokens\x18\x05 \x01(\x05R\tmaxTokens\x12\x1a\n" +
 	"\bprovider\x18\x06 \x01(\tR\bprovider\x126\n" +
 	"\vattachments\x18\a \x03(\v2\x14.protocol.AttachmentR\vattachments\x121\n" +
-	"\bmessages\x18\b \x03(\v2\x15.protocol.ChatMessageR\bmessages\"Y\n" +
+	"\bmessages\x18\b \x03(\v2\x15.protocol.ChatMessageR\bmessages\x12\x1a\n" +
+	"\bpriority\x18\t \x01(\x05R\bpriority\"Y\n" +
 	"\n" +
 	"Attachment\x12\x1b\n" +
 	"\tmime_type\x18\x01 \x01(\tR\bmimeType\x12\x12\n" +

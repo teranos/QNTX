@@ -10,7 +10,7 @@
  * global window.* pollution, and gives plugins type-safe access to QNTX primitives.
  */
 
-import type { Glyph } from './glyph';
+import type { Glyph } from '@qntx/glyphs';
 import type { PluginGlyphDef } from './plugin-provided-glyphs';
 import type { GlyphModule } from './glyph-ui';
 import { createGlyphUI } from './glyph-ui';
@@ -18,10 +18,7 @@ import { loadPluginCSS } from './plugin-provided-glyphs';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { preventDrag } from './glyph-interaction';
-import { morphCanvasPlacedToWindow, placeWindowOnCanvas } from './manifestations/canvas-window';
-import { isInWindowState } from './dataset';
-import { glyphRun } from './run';
-import { uiState } from '../../state/ui';
+import { wireExpandToWindow } from '@qntx/glyphs';
 
 // Cache imported modules — one import per module_url
 const moduleCache = new Map<string, Promise<GlyphModule>>();
@@ -102,45 +99,15 @@ export function wrapInCanvasPlaced(glyph: Glyph, rendered: HTMLElement, opts: Wr
     });
     element.appendChild(rendered);
 
-    function restoreCanvasUI() {
-        expandBtn.textContent = '\u2B06'; // ⬆
-        expandBtn.title = 'Expand to window';
-    }
-
-    expandBtn.addEventListener('click', () => {
-        if (isInWindowState(element)) {
-            // In window mode: place back on canvas
-            placeWindowOnCanvas(element, {
-                onRestoreComplete: restoreCanvasUI,
-            });
-            return;
-        }
-
-        // On canvas: morph to window
-        const canvas = element.closest('.canvas-workspace') as HTMLElement | null;
-        const canvasId = (canvas?.closest('[data-canvas-id]') as HTMLElement | null)?.dataset?.canvasId ?? 'canvas-workspace';
-
-        morphCanvasPlacedToWindow(element, {
-            title,
-            canvasId,
-            onClose: () => {
-                element.remove();
-                uiState.removeCanvasGlyph(glyph.id);
-            },
-            onMinimize: (el: HTMLElement) => {
-                glyphRun.adopt(el, {
-                    id: glyph.id,
-                    title,
-                    symbol: opts.symbol || glyph.symbol || '',
-                    renderContent: () => rendered,
-                    manifestationType: 'window',
-                });
-            },
-            onRestoreComplete: restoreCanvasUI,
-        });
-
-        expandBtn.textContent = '\u2B07'; // ⬇
-        expandBtn.title = 'Place on canvas';
+    wireExpandToWindow({
+        element,
+        expandBtn,
+        glyphId: glyph.id,
+        title,
+        symbol: opts.symbol || glyph.symbol || '',
+        renderContent: () => rendered,
+        logLabel: `Plugin:${opts.plugin}`,
+        adoptExtras: { manifestationType: 'window' as const },
     });
 
     log.debug(SEG.GLYPH, `[GlyphModule] Wrapped ${opts.plugin} glyph ${glyph.id} in canvasPlaced`);

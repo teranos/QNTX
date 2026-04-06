@@ -6,7 +6,7 @@
  * or delegates to a custom onExecute (stream glyph).
  */
 
-import type { Glyph } from './glyph';
+import type { Glyph } from '@qntx/glyphs';
 import { log, SEG } from '../../logger';
 import { apiFetch } from '../../api';
 import { canvasSyncQueue } from '../../api/canvas-sync';
@@ -15,7 +15,7 @@ import { Doc, Prose } from '@generated/sym.js';
 import { preventDrag } from './glyph-interaction';
 import { autoMeldResultBelow } from './meld/meld-system';
 import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
-import { createResponseGlyph, type ExecutionResult } from './response-glyph';
+import { createResultGlyph, type ExecutionResult } from './result-glyph';
 
 /** UI controls exposed to custom onExecute callbacks */
 export interface FollowUpControls {
@@ -134,6 +134,8 @@ export function createFollowUpZone(config: FollowUpConfig): HTMLElement {
             followupStatus.textContent = 'Running…';
 
             // Collect attachments from melded glyphs
+            // TODO [TS-4]: Extract shared collectMeldedAttachments(glyphId) — identical
+            // block in prompt-glyph.ts. Part of the same execute→spawn pipeline as TS-5.
             const fileIds: string[] = [];
             const noteTexts: string[] = [];
             const comp = findCompositionByGlyph(glyph.id);
@@ -194,7 +196,7 @@ export function createFollowUpZone(config: FollowUpConfig): HTMLElement {
 /**
  * Default execution: POST to /api/prompt/direct, spawn result glyph below.
  *
- * TODO: Use the streaming path (like executeStreamFollowUp in response-glyph.ts)
+ * TODO: Use the streaming path (like executeStreamFollowUp in result-glyph.ts)
  * so follow-ups from py/static results also receive token signals and sampler colors.
  * Currently wraps the full response as ExecutionResult.stdout — no streaming, no signals.
  */
@@ -267,6 +269,9 @@ async function defaultExecute(
 
 /**
  * Spawn a result glyph below the parent.
+ *
+ * TODO [TS-5]: Extract shared spawnResultBelow — this pattern is repeated
+ * in prompt-glyph.ts and canvas-workspace-builder.ts.
  */
 export function spawnFollowUpResult(data: FollowUpResult): void {
     const { parentElement, parentGlyph, result, model, provider, prompt, logLabel } = data;
@@ -294,7 +299,7 @@ export function spawnFollowUpResult(data: FollowUpResult): void {
     };
 
     const promptConfig = { model, provider };
-    const resultElement = createResponseGlyph(resultGlyph, result, promptConfig, prompt);
+    const resultElement = createResultGlyph(resultGlyph, result, promptConfig, prompt);
     canvas.appendChild(resultElement);
 
     const parentGlyphId = parentElement.dataset.glyphId;

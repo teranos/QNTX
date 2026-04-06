@@ -104,7 +104,7 @@
   const turns = parseTurns(weave)
   // TODO(TBR): token weaves bypass turn selection — no click-to-select, no CMD+C copy.
   // Will tie into loom branch exploration (clicking a token to explore alternative paths).
-  const isLlamaTokenWeave = weave.weave_source === 'llama-cpp' && weave.tokens != null && weave.tokens.length > 0
+  const isTokenWeave = (weave.weave_source === 'scry' || weave.weave_source === 'llama-cpp') && weave.tokens != null && weave.tokens.length > 0
 
   // TODO(TCS): hardcoded brown/amber scale. Will change with sampler chain data —
   // different samplers produce different signal profiles needing distinct treatment.
@@ -133,10 +133,10 @@
       <span class="dw-cluster">{clusterLabel}</span>
     {/if}
     <span>{fmtTime(weave.timestamp)}</span>
-    <!-- TODO(TWC): word_count is 0 for llama-cpp weaves, derive from token text or attributes.text -->
+    <!-- TODO(TWC): word_count is 0 for scry weaves, derive from token text or attributes.text -->
     <span>{weave.word_count}w {weave.turn_count}t</span>
   </div>
-  {#if isLlamaTokenWeave}
+  {#if isTokenWeave}
     {#if weave.prompt}
       <div class="dw-turn human">
         <span class="dw-speaker">[human]</span>

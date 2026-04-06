@@ -11,8 +11,7 @@ import (
 )
 
 // GRPCLLMClient adapts the gRPC LLMService to the AIClient interface.
-// This allows gRPC LLM plugins (like llama-cpp) to be used anywhere
-// a local or cloud AIClient is expected.
+// GRPCLLMClient adapts the gRPC LLMService to the AIClient interface.
 type GRPCLLMClient struct {
 	router   GRPCLLMRouter
 	provider string
@@ -22,7 +21,7 @@ type GRPCLLMClient struct {
 // Satisfied by grpc.LLMServer.
 type GRPCLLMRouter interface {
 	Chat(ctx context.Context, req *protocol.LLMChatRequest) (*protocol.LLMChatResponse, error)
-	StreamChatClient(ctx context.Context, req *protocol.LLMChatRequest) (protocol.LLMService_StreamChatClient, error)
+	StreamChatClient(ctx context.Context, req *protocol.LLMChatRequest) (protocol.LLMService_StreamChatClient, func(), error)
 }
 
 // NewGRPCLLMClient creates an AIClient that routes through the gRPC LLM service.
@@ -102,12 +101,13 @@ func (c *GRPCLLMClient) ChatStreaming(ctx context.Context, req ChatRequest, stre
 
 	t0 := time.Now()
 	fmt.Printf("[grpc-llm] calling gRPC StreamChat...\n")
-	stream, err := c.router.StreamChatClient(ctx, grpcReq)
+	stream, release, err := c.router.StreamChatClient(ctx, grpcReq)
 	fmt.Printf("[grpc-llm] gRPC call returned in %dms\n", time.Since(t0).Milliseconds())
 	if err != nil {
 		return errors.Wrapf(err, "gRPC LLM stream chat via provider %s failed", c.provider)
 	}
 
+	defer release()
 	defer close(streamChan)
 
 	tFirstRecv := time.Now()

@@ -8,8 +8,8 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { createResponseGlyph, type ExecutionResult } from './response-glyph';
-import type { Glyph } from './glyph';
+import { createResultGlyph, type ExecutionResult } from './result-glyph';
+import type { Glyph } from '@qntx/glyphs';
 
 // Mock ResizeObserver for tests
 globalThis.ResizeObserver = class ResizeObserver {
@@ -41,7 +41,7 @@ describe('Result Glyph Drag Persistence - Tim (Happy Path)', () => {
             renderContent: () => document.createElement('div')
         };
 
-        const element = createResponseGlyph(glyph, result);
+        const element = createResultGlyph(glyph, result);
         container.appendChild(element);
 
         // Result glyph is created
@@ -77,7 +77,7 @@ describe('Result Glyph Drag Persistence - Tim (Happy Path)', () => {
             renderContent: () => document.createElement('div')
         };
 
-        const element = createResponseGlyph(glyph, result);
+        const element = createResultGlyph(glyph, result);
         container.appendChild(element);
 
         // Output is visible
@@ -113,7 +113,7 @@ describe('Result Glyph Drag Persistence - Tim (Happy Path)', () => {
             renderContent: () => document.createElement('div')
         };
 
-        const element = createResponseGlyph(glyph, result);
+        const element = createResultGlyph(glyph, result);
         container.appendChild(element);
 
         // Error content is present
@@ -148,7 +148,7 @@ describe('Result Glyph Drag Persistence - Spike (Edge Cases)', () => {
             renderContent: () => document.createElement('div')
         };
 
-        const element = createResponseGlyph(glyph, result);
+        const element = createResultGlyph(glyph, result);
         container.appendChild(element);
 
         // Result glyph handles large output

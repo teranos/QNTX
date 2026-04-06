@@ -3,10 +3,9 @@
  *
  * Replaces ai-provider-window.ts (Window component → glyph system).
  * Tray glyph: dot in GlyphRun, morphs to window on click.
- * Provider selection: OpenRouter (cloud) and llama.cpp (local Metal).
  */
 
-import type { Glyph } from './components/glyph/glyph';
+import type { Glyph } from '@qntx/glyphs';
 import { BY } from '@generated/sym.js';
 import { log, SEG } from './logger';
 import { apiFetch } from './api';
@@ -72,15 +71,15 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
 
     // Create provider buttons
     const openrouterBtn = makeProviderButton('OpenRouter', 'Cloud API');
-    const llamaCppBtn = makeProviderButton('llama.cpp', 'Local Metal');
+    const scryBtn = makeProviderButton('Scry', 'Local Metal');
     btnGroup.appendChild(openrouterBtn);
-    btnGroup.appendChild(llamaCppBtn);
+    btnGroup.appendChild(scryBtn);
 
     // --- Behavior ---
 
-    function updateProviderUI(provider: 'openrouter' | 'llama-cpp'): void {
+    function updateProviderUI(provider: 'openrouter' | 'scry'): void {
         openrouterBtn.classList.toggle('active', provider === 'openrouter');
-        llamaCppBtn.classList.toggle('active', provider === 'llama-cpp');
+        scryBtn.classList.toggle('active', provider === 'scry');
         openrouterConfig.style.display = provider === 'openrouter' ? '' : 'none';
     }
 
@@ -116,14 +115,14 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
         }
     });
 
-    llamaCppBtn.addEventListener('click', async () => {
-        log.debug(SEG.ACTOR, 'Switching to llama.cpp');
-        updateProviderUI('llama-cpp');
+    scryBtn.addEventListener('click', async () => {
+        log.debug(SEG.ACTOR, 'Switching to Scry');
+        updateProviderUI('scry');
         try {
-            await updateConfig({ 'llm.provider': 'llama-cpp' });
-            showStatus('Using llama.cpp (local Metal)', 'success');
+            await updateConfig({ 'llm.provider': 'scry' });
+            showStatus('Using Scry (local Metal)', 'success');
         } catch (error: unknown) {
-            handleError(error, 'Failed to switch to llama.cpp', { context: SEG.ACTOR, silent: true });
+            handleError(error, 'Failed to switch to Scry', { context: SEG.ACTOR, silent: true });
             showStatus('Failed to update config', 'error');
         }
     });
@@ -160,8 +159,8 @@ async function setupLlmProviderContent(content: HTMLElement): Promise<void> {
             const providerSetting = settings.find(s => s.key === 'llm.provider');
             const configuredProvider = providerSetting?.value as string;
 
-            if (configuredProvider === 'llama-cpp') {
-                updateProviderUI('llama-cpp');
+            if (configuredProvider === 'scry') {
+                updateProviderUI('scry');
             } else {
                 updateProviderUI('openrouter');
             }
