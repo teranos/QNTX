@@ -28,5 +28,19 @@ Conversation state lives on the canvas — QNTX has no linear chat session. `Con
 
 The frontend must `await canvasSyncQueue.flush()` before firing the API call — the assembler reads composition edges from the DB, and the canvas sync pipeline is async. Without the flush, the composition created by `extendComposition` may not be persisted yet when the backend queries it.
 
+## Queuing (PULS)
+
+Direct gRPC has no queuing. Providers like scry are single-threaded — when multiple plugins fire LLM calls concurrently, requests queue inside the provider and later ones exceed their gRPC deadline.
+
+`LLMServer` becomes the queuing point. A concurrency semaphore limits how many calls reach the provider simultaneously. Callers that don't get a slot block until one opens, ordered by priority — interactive prompts (user-initiated) before background work (generators, batch matching). A priority field on `LLMChatRequest` lets the caller declare intent. Rate limiting and budget tracking reuse Pulse's existing `budget.Limiter` and `budget.Tracker`.
+
+This keeps the streaming gRPC path intact — no async/sync bridge needed. The caller still holds the `StreamChat` connection; it just waits longer when the provider is busy instead of deadlining.
+
+Future (Option B): plugins enqueue background LLM work as Pulse jobs instead of calling `StreamChat` directly. The Pulse worker executes the job, including LLM calls through the controlled `LLMServer` path. Interactive prompts stay direct.
+
+## Observability (planned — CWEV)
+
+Weave creation belongs in core, not in individual providers. Core sees all LLM traffic; providers only do inference.
+
 ## Consequences
 This is the first service in `ServiceRegistry` provided by a plugin rather than by core. The routing and registration pattern must be designed with that in mind.

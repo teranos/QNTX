@@ -5,27 +5,38 @@ import (
 	"io"
 	"sync"
 
+	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/pulse/budget"
 	"go.uber.org/zap"
 )
 
 // LLMServer is the core-side gRPC server that routes LLM requests to provider plugins.
 // It implements protocol.LLMServiceServer and holds LLMServiceClient connections
 // to provider plugins that registered a separate LLMService on their gRPC server.
+//
+// Queuing: a priority-aware concurrency semaphore limits how many calls reach
+// the provider simultaneously. Callers that don't get a slot block until one
+// opens, served in priority order (lower value = higher priority).
+// Rate limiting reuses Pulse's budget.Limiter (sliding window, calls/minute).
 type LLMServer struct {
 	protocol.UnimplementedLLMServiceServer
 
 	mu              sync.RWMutex
 	providers       map[string]protocol.LLMServiceClient // provider name → client
 	defaultProvider string
+	queue           *llmQueue
+	limiter         *budget.Limiter
 	logger          *zap.SugaredLogger
 }
 
 // NewLLMServer creates a new LLM routing server. Starts empty — providers register after init.
-func NewLLMServer(logger *zap.SugaredLogger) *LLMServer {
+func NewLLMServer(cfg am.LLMConfig, logger *zap.SugaredLogger) *LLMServer {
 	return &LLMServer{
 		providers: make(map[string]protocol.LLMServiceClient),
+		queue:     newLLMQueue(cfg.MaxConcurrent),
+		limiter:   budget.NewLimiter(cfg.MaxCallsPerMinute),
 		logger:    logger,
 	}
 }
@@ -58,6 +69,11 @@ func (s *LLMServer) Chat(ctx context.Context, req *protocol.LLMChatRequest) (*pr
 		return nil, err
 	}
 
+	if err := s.gate(ctx, req.GetPriority()); err != nil {
+		return nil, err
+	}
+	defer s.queue.Release()
+
 	resp, err := client.Chat(ctx, req)
 	if err != nil {
 		return nil, errors.Wrapf(err, "LLM chat via provider %s failed", providerName)
@@ -69,10 +85,11 @@ func (s *LLMServer) Chat(ctx context.Context, req *protocol.LLMChatRequest) (*pr
 // StreamChat implements protocol.LLMServiceServer — routes a streaming LLM request
 // to the provider plugin and forwards chunks back to the calling plugin.
 func (s *LLMServer) StreamChat(req *protocol.LLMChatRequest, srv protocol.LLMService_StreamChatServer) error {
-	clientStream, err := s.StreamChatClient(srv.Context(), req)
+	clientStream, release, err := s.StreamChatClient(srv.Context(), req)
 	if err != nil {
 		return err
 	}
+	defer release()
 	for {
 		chunk, err := clientStream.Recv()
 		if err == io.EOF {
@@ -88,22 +105,27 @@ func (s *LLMServer) StreamChat(req *protocol.LLMChatRequest, srv protocol.LLMSer
 }
 
 // StreamChatClient routes a streaming LLM request to the appropriate provider plugin.
-// Returns a client-side stream of LLMChatChunk messages (one per token).
-// Named StreamChatClient to avoid conflicting with the server-side StreamChat method.
-func (s *LLMServer) StreamChatClient(ctx context.Context, req *protocol.LLMChatRequest) (protocol.LLMService_StreamChatClient, error) {
+// Returns a client-side stream and a release function. The caller MUST call release
+// when the stream is fully consumed to return the concurrency slot.
+func (s *LLMServer) StreamChatClient(ctx context.Context, req *protocol.LLMChatRequest) (protocol.LLMService_StreamChatClient, func(), error) {
 	// Look up provider under lock, then release before streaming —
 	// inference can run for seconds and must not block provider registration.
 	client, providerName, err := s.resolveProvider(req.Provider)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+
+	if err := s.gate(ctx, req.GetPriority()); err != nil {
+		return nil, nil, err
 	}
 
 	stream, err := client.StreamChat(ctx, req)
 	if err != nil {
-		return nil, errors.Wrapf(err, "LLM stream chat via provider %s failed", providerName)
+		s.queue.Release()
+		return nil, nil, errors.Wrapf(err, "LLM stream chat via provider %s failed", providerName)
 	}
 
-	return stream, nil
+	return stream, s.queue.Release, nil
 }
 
 // resolveProvider returns the LLM client for the given provider name (or default).
@@ -125,6 +147,21 @@ func (s *LLMServer) resolveProvider(name string) (protocol.LLMServiceClient, str
 	}
 
 	return client, name, nil
+}
+
+// gate checks rate limit then acquires a concurrency slot (priority-ordered).
+func (s *LLMServer) gate(ctx context.Context, priority int32) error {
+	if err := s.limiter.Wait(ctx); err != nil {
+		return errors.Wrap(err, "LLM rate limit")
+	}
+	active, queued := s.queue.Stats()
+	if queued > 0 {
+		s.logger.Infow("LLM request queued", "priority", priority, "active", active, "queued", queued)
+	}
+	if err := s.queue.Acquire(ctx, priority); err != nil {
+		return errors.Wrap(err, "LLM queue")
+	}
+	return nil
 }
 
 // providerNames returns registered provider names (must be called with lock held).
