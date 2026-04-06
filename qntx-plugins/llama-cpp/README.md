@@ -59,6 +59,8 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 
 - **TAO** — ~~Text attachments only.~~ Vision support via mtmd (llama.cpp multimodal). Auto-detects `mmproj-*.gguf` in the model directory — no config needed. Image attachments (`image/*` MIME) route through the CLIP encoder via `stream_chat_vision()`; PDF and text attachments still use MuPDF text extraction. Verified with Qwen2.5-VL 3B.
 
+- **NDOC** — PDF only. DOCX, RTF, and other formats not supported. MuPDF doesn't handle Word files — needs a converter (LibreOffice headless or pandoc) to PDF first.
+
 - **IBP** — Image-based PDFs. MuPDF extracts text objects from the PDF structure. PDFs where text is baked into images (scanned documents, designed flyers) return empty. OCR (e.g. Tesseract) would be needed for those.
 
 - **COF** — Context overflow. Extracted PDF text is prepended to the prompt. A large document can exceed the context window (default 2048 tokens) and get silently truncated by llama.cpp. No warning is given.
