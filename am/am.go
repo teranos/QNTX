@@ -12,8 +12,17 @@ type Config struct {
 	Plugin        PluginConfig     `mapstructure:"plugin"`
 	Embeddings    EmbeddingsConfig `mapstructure:"embeddings"`
 	Watcher       WatcherConfig    `mapstructure:"watcher"`
-	Sync          SyncConfig       `mapstructure:"sync"`
-	GraundeDBPath string           `mapstructure:"graunde_db_path"` // Path to Graunde's database for deferred news delivery
+	Sync          SyncConfig         `mapstructure:"sync"`
+	Meilisearch   MeilisearchConfig  `mapstructure:"meilisearch"`
+	GraundeDBPath string             `mapstructure:"graunde_db_path"` // Path to Graunde's database for deferred news delivery
+}
+
+// MeilisearchConfig configures the Meilisearch full-text search integration.
+// Meilisearch runs as an external process; this configures the client connection.
+type MeilisearchConfig struct {
+	Enabled bool   `mapstructure:"enabled"` // Enable Meilisearch integration (default: false)
+	URL     string `mapstructure:"url"`     // Meilisearch HTTP URL (default: "http://localhost:7700")
+	APIKey  string `mapstructure:"api_key"` // Meilisearch API key (required when enabled)
 }
 
 // LLMConfig configures LLM request queuing and rate limiting at the core routing layer.

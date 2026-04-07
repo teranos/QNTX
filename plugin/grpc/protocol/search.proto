@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// SearchService provides full-text search over attestations for gRPC plugins.
+// Backed by Meilisearch when enabled; returns UNAVAILABLE when disabled.
+service SearchService {
+  // Search performs a full-text search over indexed attestations.
+  rpc Search(SearchRequest) returns (SearchResponse);
+
+  // Reindex triggers a full reindex of all attestations.
+  rpc Reindex(ReindexRequest) returns (ReindexResponse);
+
+  // Stats returns index statistics (document count, indexing status).
+  rpc Stats(SearchStatsRequest) returns (SearchStatsResponse);
+}
+
+message SearchRequest {
+  string auth_token = 1;
+  string query = 2;                    // Full-text search query
+  repeated string subjects = 3;        // Filter by subjects
+  repeated string predicates = 4;      // Filter by predicates
+  repeated string contexts = 5;        // Filter by contexts
+  repeated string actors = 6;          // Filter by actors
+  string source = 7;                   // Filter by source (e.g., "cli", "python")
+  optional int64 time_start = 8;       // Unix ms lower bound
+  optional int64 time_end = 9;         // Unix ms upper bound
+  int32 limit = 10;                    // Max results (default 20)
+  int32 offset = 11;                   // Pagination offset
+}
+
+message SearchResponse {
+  bool success = 1;
+  string error = 2;
+  string query = 3;
+  repeated SearchHit hits = 4;
+  int64 total_hits = 5;
+  int64 processing_time_ms = 6;
+}
+
+message SearchHit {
+  string attestation_id = 1;           // Attestation ID (ASID)
+  double score = 2;                    // Meilisearch ranking score
+}
+
+message ReindexRequest {
+  string auth_token = 1;
+}
+
+message ReindexResponse {
+  bool success = 1;
+  string error = 2;
+  int32 documents_indexed = 3;
+}
+
+message SearchStatsRequest {
+  string auth_token = 1;
+}
+
+message SearchStatsResponse {
+  bool success = 1;
+  string error = 2;
+  int64 number_of_documents = 3;
+  bool is_indexing = 4;
+}

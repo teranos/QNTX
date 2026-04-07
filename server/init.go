@@ -26,6 +26,7 @@ import (
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/QNTX/search"
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/nodedid"
 	"github.com/teranos/QNTX/server/wslogs"
@@ -230,6 +231,24 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 
 	// Configure log transport to route sends through broadcast worker (thread-safe)
 	wsTransport.SetSendFunc(server.sendLogBatch)
+
+	// Initialize Meilisearch full-text search (if enabled in config)
+	if deps.config.Meilisearch.Enabled {
+		meili, err := search.New(deps.config.Meilisearch.URL, deps.config.Meilisearch.APIKey, serverLogger)
+		if err != nil {
+			serverLogger.Warnw("Meilisearch initialization failed, full-text search unavailable",
+				"url", deps.config.Meilisearch.URL,
+				"error", err,
+			)
+		} else {
+			server.meiliSearch = meili
+			// Register as storage observer for real-time indexing
+			storage.RegisterObserver(meili)
+			serverLogger.Infow("Meilisearch full-text search enabled",
+				"url", deps.config.Meilisearch.URL,
+			)
+		}
+	}
 
 	// Initialize WebAuthn auth gate (if enabled in config)
 	if deps.config.Auth.Enabled {

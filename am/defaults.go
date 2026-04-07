@@ -87,6 +87,10 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("embeddings.cluster_label_max_tokens", 2000)
 	v.SetDefault("embeddings.cluster_label_model", "") // empty = system default
 
+	// Meilisearch (full-text search) defaults
+	v.SetDefault("meilisearch.enabled", false)                     // Disabled by default — requires external Meilisearch process
+	v.SetDefault("meilisearch.url", "http://localhost:7700")       // Standard Meilisearch port
+
 	// Watcher defaults
 	v.SetDefault("watcher.max_fires_per_second", 3)
 
@@ -157,6 +161,8 @@ func BindSensitiveEnvVars(v *viper.Viper) {
 	// Server bind address (e.g., "0.0.0.0" for all interfaces — requires auth.enabled)
 	v.BindEnv("server.bind_address", "QNTX_BIND_ADDRESS")
 
+	// Meilisearch API key
+	v.BindEnv("meilisearch.api_key", "QNTX_MEILISEARCH_API_KEY")
 }
 
 // IsLoopbackAddress returns true if the address is a loopback address (127.0.0.1, ::1, localhost)

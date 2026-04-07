@@ -23,6 +23,7 @@ import (
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/search"
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/auth"
@@ -107,6 +108,9 @@ type QNTXServer struct {
 	syncObserver       *syncPkg.TreeObserver // nil if WASM unavailable
 	syncPeerStatus     sync.Map              // map[string]string — peer name → "ok", "unreachable", or "self"
 	syncPeerRemoteName sync.Map              // map[string]string — peer name → advertised name from hello
+
+	// Meilisearch full-text search (optional, requires meilisearch.enabled = true)
+	meiliSearch *search.Service
 
 	// Embedding service for semantic search (optional, requires rustembeddings build tag)
 	embeddingService interface {

@@ -50,9 +50,8 @@ type Document struct {
 
 // SearchResult is a single search hit returned to callers.
 type SearchResult struct {
-	AttestationID string                 `json:"attestation_id"`
-	Score         float64                `json:"score,omitempty"` // Meilisearch ranking score (when showRankingScore enabled)
-	Formatted     map[string]interface{} `json:"formatted,omitempty"`
+	AttestationID string  `json:"attestation_id"`
+	Score         float64 `json:"score,omitempty"` // Meilisearch ranking score (when showRankingScore enabled)
 }
 
 // SearchResponse wraps search results with metadata.
@@ -198,18 +197,19 @@ func (s *Service) Search(query string, filters SearchFilters) (*SearchResponse, 
 
 	hits := make([]SearchResult, 0, len(resp.Hits))
 	for _, hit := range resp.Hits {
-		hitMap, ok := hit.(map[string]interface{})
-		if !ok {
-			continue
-		}
 		result := SearchResult{}
-		if id, ok := hitMap["id"].(string); ok {
-			result.AttestationID = id
+		if raw, ok := hit["id"]; ok {
+			var id string
+			if json.Unmarshal(raw, &id) == nil {
+				result.AttestationID = id
+			}
 		}
-		if score, ok := hitMap["_rankingScore"].(float64); ok {
-			result.Score = score
+		if raw, ok := hit["_rankingScore"]; ok {
+			var score float64
+			if json.Unmarshal(raw, &score) == nil {
+				result.Score = score
+			}
 		}
-		result.Formatted = hitMap
 		hits = append(hits, result)
 	}
 
@@ -231,7 +231,8 @@ func (s *Service) Index(as *types.As) error {
 	s.mu.RUnlock()
 
 	doc := attestationToDocument(as)
-	_, err := s.index.AddDocuments([]Document{doc}, "id")
+	pk := "id"
+	_, err := s.index.AddDocuments([]Document{doc}, &meilisearch.DocumentOptions{PrimaryKey: &pk})
 	if err != nil {
 		return errors.Wrapf(err, "failed to index attestation %s", as.ID)
 	}
@@ -249,7 +250,7 @@ func (s *Service) Reindex(store ats.AttestationStore) (int, error) {
 	s.mu.RUnlock()
 
 	// Delete all documents first
-	taskInfo, err := s.index.DeleteAllDocuments()
+	taskInfo, err := s.index.DeleteAllDocuments(nil)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to clear index")
 	}
@@ -285,7 +286,8 @@ func (s *Service) Reindex(store ats.AttestationStore) (int, error) {
 			docs[j] = attestationToDocument(a)
 		}
 
-		_, err := s.index.AddDocuments(docs, "id")
+		pk := "id"
+		_, err := s.index.AddDocuments(docs, &meilisearch.DocumentOptions{PrimaryKey: &pk})
 		if err != nil {
 			return total, errors.Wrapf(err, "failed to index batch at offset %d", i)
 		}

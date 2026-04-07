@@ -90,6 +90,10 @@ message InitializeRequest {
   // embedding_endpoint: gRPC endpoint for EmbeddingService
   // Provides: Text-to-vector embedding generation
   string embedding_endpoint = 8;
+
+  // search_endpoint: gRPC endpoint for SearchService
+  // Provides: Full-text search over attestations (Meilisearch)
+  string search_endpoint = 9;
 }
 
 message HTTPRequest {
