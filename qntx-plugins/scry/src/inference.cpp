@@ -287,6 +287,7 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
     // Context parameters
     auto ctx_params = llama_context_default_params();
     ctx_params.n_ctx = n_ctx;
+    ctx_params.n_batch = n_ctx;
     ctx_ = llama_init_from_model(model_, ctx_params);
     if (!ctx_) {
         std::cout << "[scry] Failed to create context for " << model_path << std::endl;
