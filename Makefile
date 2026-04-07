@@ -135,6 +135,10 @@ test-jsdom: ## Run web UI tests including JSDOM DOM tests
 	@cd web && USE_JSDOM=1 bun test
 
 test: ## Run all tests (Go + TypeScript)
+	@if [ ! -f "ats/wasm/qntx_core.wasm" ]; then \
+		echo "⚠ ats/wasm/qntx_core.wasm not found — run 'make wasm' first (requires Rust toolchain)"; \
+		exit 1; \
+	fi
 	@go test -tags "rustsqlite,qntxwasm" -short ./...
 	@if [ ! -d "web/node_modules" ]; then \
 		cd web && bun install; \
