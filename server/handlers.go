@@ -421,6 +421,19 @@ func (s *QNTXServer) HandleHealth(w http.ResponseWriter, r *http.Request) {
 		"owner":      "SBVH",
 	}
 
+	// Meilisearch status (only present when enabled)
+	if s.meiliSearch != nil {
+		meiliHealth := map[string]interface{}{
+			"healthy": s.meiliSearch.Healthy(),
+		}
+		if stats, err := s.meiliSearch.Stats(); err == nil {
+			for k, v := range stats {
+				meiliHealth[k] = v
+			}
+		}
+		health["meilisearch"] = meiliHealth
+	}
+
 	writeJSON(w, http.StatusOK, health)
 }
 

@@ -309,6 +309,11 @@ func (s *Service) OnAttestationCreated(as *types.As) {
 	}
 }
 
+// Healthy returns whether Meilisearch is reachable.
+func (s *Service) Healthy() bool {
+	return s.client.IsHealthy()
+}
+
 // Stats returns index statistics.
 func (s *Service) Stats() (map[string]interface{}, error) {
 	s.mu.RLock()

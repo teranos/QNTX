@@ -244,6 +244,15 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 			server.meiliSearch = meili
 			// Register as storage observer for real-time indexing
 			storage.RegisterObserver(meili)
+			// Async reindex to backfill attestations created before Meilisearch was enabled
+			go func() {
+				count, err := meili.Reindex(atsStore)
+				if err != nil {
+					serverLogger.Warnw("Meilisearch initial reindex failed", "error", err)
+				} else if count > 0 {
+					serverLogger.Infow("Meilisearch initial reindex complete", "documents", count)
+				}
+			}()
 			serverLogger.Infow("Meilisearch full-text search enabled",
 				"url", deps.config.Meilisearch.URL,
 			)
@@ -460,6 +469,13 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	if server.embeddingService != nil && server.servicesManager != nil {
 		if router := server.servicesManager.GetEmbeddingRouter(); router != nil {
 			router.SetService(server.embeddingService)
+		}
+	}
+
+	// Wire search service into gRPC for plugin access
+	if server.meiliSearch != nil && server.servicesManager != nil {
+		if router := server.servicesManager.GetSearchRouter(); router != nil {
+			router.SetService(server.meiliSearch, server.atsStore)
 		}
 	}
 
@@ -785,6 +801,8 @@ func (c *pluginConfigWithEndpoints) GetString(key string) string {
 			return c.endpoints.LLMAddress
 		case "_embedding_endpoint":
 			return c.endpoints.EmbeddingAddress
+		case "_search_endpoint":
+			return c.endpoints.SearchAddress
 		case "_auth_token":
 			return c.endpoints.AuthToken
 		}
@@ -820,6 +838,8 @@ func (c *pluginConfigWithEndpoints) Get(key string) interface{} {
 			return c.endpoints.LLMAddress
 		case "_embedding_endpoint":
 			return c.endpoints.EmbeddingAddress
+		case "_search_endpoint":
+			return c.endpoints.SearchAddress
 		case "_auth_token":
 			return c.endpoints.AuthToken
 		}

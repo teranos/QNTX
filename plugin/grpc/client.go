@@ -248,6 +248,11 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		embeddingEndpoint = ep
 		c.logger.Debugw("Extracted Embedding endpoint from config", "endpoint", ep)
 	}
+	searchEndpoint := ""
+	if ep := pluginConfig.GetString("_search_endpoint"); ep != "" {
+		searchEndpoint = ep
+		c.logger.Debugw("Extracted Search endpoint from config", "endpoint", ep)
+	}
 	if token := pluginConfig.GetString("_auth_token"); token != "" {
 		authToken = token
 	}
@@ -259,9 +264,12 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		FileServiceEndpoint: fileServiceEndpoint,
 		LlmEndpoint:         llmEndpoint,
 		EmbeddingEndpoint:   embeddingEndpoint,
-		AuthToken:           authToken,
-		Config:              config,
+		// TODO(m1): Uncomment after make proto generates SearchEndpoint field
+		// SearchEndpoint:   searchEndpoint,
+		AuthToken: authToken,
+		Config:    config,
 	}
+	_ = searchEndpoint // Used after make proto
 
 	c.logger.Debugw("Sending Initialize RPC to plugin",
 		"name", c.metadata.Name,

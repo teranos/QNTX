@@ -19,8 +19,10 @@ Or via environment variable: `QNTX_MEILISEARCH_API_KEY=your-master-key`
 ## How it works
 
 - Every attestation write triggers immediate Meilisearch indexing via the `AttestationObserver` pattern (zero lag)
+- On startup, async reindex backfills any attestations created before Meilisearch was enabled
 - Documents are denormalized: subjects/predicates/contexts/actors space-joined for FTS, attributes flattened
 - Search supports filters (source, actors, time range) combined with full-text queries
+- `/health` reports Meilisearch status (healthy, document count, indexing state)
 
 ## HTTP API
 
@@ -32,16 +34,17 @@ Or via environment variable: `QNTX_MEILISEARCH_API_KEY=your-master-key`
 
 Plugins can search via the `SearchService` gRPC endpoint (passed as `search_endpoint` in `InitializeRequest`).
 
+The `SearchServer` struct and `SetService` are wired into `ServicesManager`. The gRPC listener starts after `make proto` generates the protocol types.
+
 ## TODO
 
-- [ ] **m1**: Run `make proto` to generate Go code from `search.proto`, then remove `//go:build meilisearch` tag from `plugin/grpc/search_server.go`
-- [ ] **m3**: Wire SearchService into `ServicesManager.Start()` and pass `search_endpoint` to plugins via `InitializeRequest`
-- [ ] **m4**: Initial reindex on startup (async) to backfill attestations created before Meilisearch was enabled
-- [ ] **m5**: Retry buffer or health degradation when Meilisearch is unreachable
-- [ ] **m6**: Expose Meilisearch status in `/health` response
-- [ ] **m7**: Search glyph (frontend) — search box with faceted results on the canvas
-- [ ] **m8**: WebSocket `"meilisearch_search"` message type for search-as-you-type
-- [ ] **m9**: Route existing `"rich_search"` WebSocket messages through Meilisearch
-- [ ] **m10**: Auto-manage Meilisearch binary (download + lifecycle)
+- [ ] **m1**: Run `make proto` to generate Go code from `search.proto`, then:
+  - Remove `//go:build meilisearch` tag from `plugin/grpc/search_server_grpc.go`
+  - Embed `protocol.UnimplementedSearchServiceServer` in `SearchServer`
+  - Uncomment `SearchEndpoint` in `client.go` `InitializeRequest`
+  - Add `startSearchService()` to `ServicesManager.Start()`
+- [ ] **m7**: Search glyph (frontend) — search box with faceted results on the canvas. Use the glyph module pattern (`render(glyph, ui)`) with debounced input hitting `GET /api/search/meilisearch`. Faceted sidebar showing source/actor/context breakdowns. Results as attestation cards that can meld into other glyphs.
+- [ ] **m8**: WebSocket `"meilisearch_search"` message type for search-as-you-type. Same contract as existing `"rich_search"` but backed by Meilisearch. Enables keystroke-level latency without HTTP round-trips.
+- [ ] **m9**: Route existing `"rich_search"` WebSocket messages through Meilisearch. This is the actual replacement — same frontend contract, different backend. Keep WASM fuzzy engine for Ax predicate matching only. Retire `rich_search.go` and `rich_search_qntx.go` (~900 LOC).
 - [ ] **m11**: Unit tests for document conversion, filter building; integration tests with live Meilisearch
 - [ ] **m12**: Update `crates/qntx-grpc/build.rs` to compile `search.proto` for Rust plugins

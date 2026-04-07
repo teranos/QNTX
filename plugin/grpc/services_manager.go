@@ -24,6 +24,7 @@ type ServiceEndpoints struct {
 	FileServiceAddress string
 	LLMAddress         string
 	EmbeddingAddress   string
+	SearchAddress      string
 	AuthToken          string
 }
 
@@ -38,6 +39,8 @@ type ServicesManager struct {
 	llmConfig         am.LLMConfig
 	embeddingServer   *grpc.Server
 	embeddingRouter   *EmbeddingServer // Exposed for late backend registration
+	searchServer      *grpc.Server
+	searchRouter      *SearchServer // Exposed for late backend registration
 	endpoints         ServiceEndpoints
 	logger            *zap.SugaredLogger
 }
@@ -114,6 +117,11 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 		m.logger.Warnw("Failed to start Embedding service, plugins will not have embedding access", "error", err)
 		embeddingAddr = ""
 	}
+
+	// Create search server (starts empty, backend registered after Meilisearch init)
+	// Note: gRPC listener deferred until make proto generates SearchServiceServer.
+	// For now, just create the router so SetService can be called.
+	m.searchRouter = NewSearchServer(authToken, m.logger)
 
 	m.endpoints = ServiceEndpoints{
 		ATSStoreAddress:    atsStoreAddr,
@@ -331,6 +339,12 @@ func (m *ServicesManager) GetEmbeddingRouter() *EmbeddingServer {
 	return m.embeddingRouter
 }
 
+// GetSearchRouter returns the search router for backend registration.
+// Returns nil if the search service is not running.
+func (m *ServicesManager) GetSearchRouter() *SearchServer {
+	return m.searchRouter
+}
+
 // Shutdown gracefully stops all service servers
 func (m *ServicesManager) Shutdown() {
 	m.logger.Info("Shutting down plugin services")
@@ -357,6 +371,10 @@ func (m *ServicesManager) Shutdown() {
 
 	if m.embeddingServer != nil {
 		m.embeddingServer.GracefulStop()
+	}
+
+	if m.searchServer != nil {
+		m.searchServer.GracefulStop()
 	}
 
 	m.logger.Info("Plugin services stopped")
