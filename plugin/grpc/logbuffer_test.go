@@ -190,7 +190,6 @@ func TestPluginLogger_WritesToLogBuffer(t *testing.T) {
 	buf := NewLogBuffer(10)
 	logger := &pluginLogger{
 		logger:    zap.NewNop().Sugar(),
-		name:      "test-plugin",
 		level:     "info",
 		logBuffer: buf,
 	}
@@ -210,7 +209,6 @@ func TestPluginLogger_JSONLevelExtraction(t *testing.T) {
 	buf := NewLogBuffer(10)
 	logger := &pluginLogger{
 		logger:    zap.NewNop().Sugar(),
-		name:      "test-plugin",
 		level:     "info",
 		logBuffer: buf,
 	}
@@ -226,7 +224,6 @@ func TestPluginLogger_StderrSource(t *testing.T) {
 	buf := NewLogBuffer(10)
 	logger := &pluginLogger{
 		logger:    zap.NewNop().Sugar(),
-		name:      "test-plugin",
 		level:     "error", // stderr logger has level "error"
 		logBuffer: buf,
 	}

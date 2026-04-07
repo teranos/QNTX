@@ -144,7 +144,7 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	manager, err := grpc.LoadPluginsFromConfig(ctx, cfg, pluginLogger)
+	manager, err := grpc.LoadPluginsFromConfig(ctx, cfg, pluginLogger, logger.Logger)
 	if err != nil {
 		pluginLogger.Errorw("Failed to load plugins from configuration", "error", err)
 		return
