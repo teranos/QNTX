@@ -90,6 +90,7 @@ type PluginManager struct {
 	plugins           map[string]*managedPlugin
 	failedPlugins     map[string]string // plugin name → error message for plugins that failed to load
 	logger            *zap.SugaredLogger
+	rootLogger        *zap.SugaredLogger // un-named root logger for creating per-plugin named loggers
 	basePort          int
 	nextPort          int             // Track the next port to allocate
 	portMu            sync.Mutex      // Separate mutex for port allocation
@@ -117,12 +118,15 @@ const (
 )
 
 // NewPluginManager creates a new plugin manager.
-func NewPluginManager(logger *zap.SugaredLogger, typescriptRuntime string) *PluginManager {
+// The logger is used for manager-level messages; rootLogger is used to create
+// per-plugin named loggers so each plugin's output shows its own name.
+func NewPluginManager(logger *zap.SugaredLogger, rootLogger *zap.SugaredLogger, typescriptRuntime string) *PluginManager {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &PluginManager{
 		plugins:           make(map[string]*managedPlugin),
 		failedPlugins:     make(map[string]string),
 		logger:            logger,
+		rootLogger:        rootLogger,
 		basePort:          DefaultPluginBasePort,
 		nextPort:          DefaultPluginBasePort,
 		typescriptRuntime: typescriptRuntime,
@@ -343,13 +347,12 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		return errors.WithHint(err, "verify the correct plugin binary is installed or update the plugin name in config")
 	}
 
-	// Update logger names with version information
-	nameWithVersion := fmt.Sprintf("%s v%s", meta.Name, meta.Version)
+	// Add version to plugin loggers now that metadata is available
 	if stdoutLogger != nil {
-		stdoutLogger.updateName(nameWithVersion)
+		stdoutLogger.setVersion(meta.Name, meta.Version)
 	}
 	if stderrLogger != nil {
-		stderrLogger.updateName(nameWithVersion)
+		stderrLogger.setVersion(meta.Name, meta.Version)
 	}
 
 	// Register — lock only for the final state write
@@ -487,17 +490,17 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	// Create shared log buffer for live streaming
 	logBuf := NewLogBuffer(200)
 
-	// Capture output for debugging and port discovery
+	// Capture output for debugging and port discovery.
+	// Each plugin gets its own named logger so the zap name shows "scry" not "plugin-loader".
+	pLogger := m.rootLogger.Named(config.Name)
 	stdoutLogger := &pluginLogger{
-		logger:    m.logger,
-		name:      config.Name,
+		logger:    pLogger,
 		level:     "info",
 		portChan:  portChan,
 		logBuffer: logBuf,
 	}
 	stderrLogger := &pluginLogger{
-		logger:    m.logger,
-		name:      config.Name,
+		logger:    pLogger,
 		level:     "error",
 		logBuffer: logBuf,
 		// Don't pass portChan to stderr - port announcement should be on stdout
@@ -809,26 +812,19 @@ func (m *PluginManager) Shutdown(ctx context.Context) error {
 // pluginLogger logs plugin output and captures port announcements.
 type pluginLogger struct {
 	logger    *zap.SugaredLogger
-	name      string
+	prefix    string // e.g. "[scry v0.35.0] " — set after metadata arrives
 	level     string
 	buf       strings.Builder
-	portChan  chan int     // Optional channel to send discovered port
-	logBuffer *LogBuffer   // Optional ring buffer for log streaming
-	mu        sync.RWMutex // Protects name field for dynamic updates
+	portChan  chan int    // Optional channel to send discovered port
+	logBuffer *LogBuffer // Optional ring buffer for log streaming
+	mu        sync.Mutex // Protects prefix field for dynamic updates
 }
 
-// updateName safely updates the logger's name with version info
-func (l *pluginLogger) updateName(newName string) {
+// setVersion sets the log line prefix to [name vX.Y.Z]
+func (l *pluginLogger) setVersion(name, version string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.name = newName
-}
-
-// getName safely retrieves the current name
-func (l *pluginLogger) getName() string {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-	return l.name
+	l.prefix = fmt.Sprintf("[%s v%s] ", name, version)
 }
 
 func (l *pluginLogger) Write(p []byte) (n int, err error) {
@@ -880,20 +876,23 @@ func (l *pluginLogger) Write(p []byte) (n int, err error) {
 				})
 			}
 
-			// Log at the actual level from JSON, or fallback to configured level for non-JSON
-			name := l.getName()
+			// Log with plugin identity from logger name, version from prefix
+			l.mu.Lock()
+			lg := l.logger
+			pfx := l.prefix
+			l.mu.Unlock()
+			msg := pfx + line
 			switch actualLevel {
 			case "debug":
-				l.logger.Debugf("[%s] %s", name, line)
+				lg.Debug(msg)
 			case "info":
-				l.logger.Infof("[%s] %s", name, line)
+				lg.Info(msg)
 			case "warn":
-				l.logger.Warnf("[%s] %s", name, line)
+				lg.Warn(msg)
 			case "error":
-				l.logger.Errorf("[%s stderr] %s", name, line)
+				lg.Error(msg)
 			default:
-				// Unknown level or non-JSON
-				l.logger.Warnf("[%s UNKNOWN] %s", name, line)
+				lg.Warn(msg)
 			}
 		}
 	}
