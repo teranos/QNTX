@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/errors"
@@ -37,7 +38,7 @@ type LLMServer struct {
 func NewLLMServer(cfg am.LLMConfig, logger *zap.SugaredLogger) *LLMServer {
 	return &LLMServer{
 		providers: make(map[string]protocol.LLMServiceClient),
-		queue:     newLLMQueue(cfg.MaxConcurrent, cfg.MaxQueueDepth),
+		queue:     newLLMQueue(cfg.MaxConcurrent, cfg.MaxQueueDepth, time.Duration(cfg.CooldownSeconds)*time.Second),
 		limiter:   budget.NewLimiter(cfg.MaxCallsPerMinute),
 		logger:    logger,
 	}
