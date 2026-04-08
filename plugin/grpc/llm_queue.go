@@ -46,6 +46,17 @@ func (q *llmQueue) Acquire(ctx context.Context, priority int32) error {
 		return errors.Newf("LLM queue full (%d waiting, %d active)", q.waiters.Len(), q.active)
 	}
 
+	// Progressive backpressure: as queue fills, reject lower-priority requests.
+	// At depth 10 reject priority >= 10 (background), at 15 reject >= 9, etc.
+	depth := q.waiters.Len()
+	if depth >= 10 {
+		cutoff := int32(12 - depth/5)
+		if priority >= cutoff {
+			q.mu.Unlock()
+			return errors.Newf("LLM backpressure: priority %d rejected (queue depth %d, cutoff %d)", priority, depth, cutoff)
+		}
+	}
+
 	// No slot available — wait in priority order.
 	w := &waiter{
 		priority: priority,
