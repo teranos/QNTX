@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"context"
 	"sync"
+	"time"
 
 	"github.com/teranos/QNTX/errors"
 )
@@ -16,13 +17,15 @@ type llmQueue struct {
 	active     int
 	maxSlots   int
 	maxWaiters int
+	cooldown   time.Duration // pause after each request before waking next waiter
 	waiters    waiterHeap
 }
 
-func newLLMQueue(maxSlots int, maxWaiters int) *llmQueue {
+func newLLMQueue(maxSlots int, maxWaiters int, cooldown time.Duration) *llmQueue {
 	return &llmQueue{
 		maxSlots:   maxSlots,
 		maxWaiters: maxWaiters,
+		cooldown:   cooldown,
 	}
 }
 
@@ -74,8 +77,14 @@ func (q *llmQueue) Acquire(ctx context.Context, priority int32) error {
 	}
 }
 
-// Release returns a concurrency slot. Wakes the highest-priority waiter if any.
+// Release returns a concurrency slot. If there are waiters, pauses for the
+// cooldown duration before waking the next one — gives the system breathing room
+// between back-to-back inference runs.
 func (q *llmQueue) Release() {
+	if q.cooldown > 0 {
+		time.Sleep(q.cooldown)
+	}
+
 	q.mu.Lock()
 	defer q.mu.Unlock()
 

@@ -37,6 +37,7 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("llm.max_concurrent", 1)        // scry is single-threaded
 	v.SetDefault("llm.max_calls_per_minute", 60) // sliding window rate limit
 	v.SetDefault("llm.max_queue_depth", 20)      // reject excess requests
+	v.SetDefault("llm.cooldown_seconds", 3)      // breathing room between inference runs
 
 	// Auth defaults (disabled by default — zero auth code runs when disabled)
 	v.SetDefault("auth.enabled", false)
