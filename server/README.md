@@ -13,3 +13,5 @@ SOmetimes it really does feel like the only way is by writing another integratio
 I took avery heavily tdd approach in many of the packages, so when refactoring i think its important to keep that in mind.
 
 there is this thing called typegen that generates the api documentation, you can find it in docs/api/ 
+
+- PROSE: The prose question, currently I am writinganother plugin called Voor, prose was meant to be a visual way in QNTX to craft the perfect prompt, and use different strats for finding out what works best. Voor seems to be taking over this role and is supposed to do it much better, Loom seems likely to be the UI for Voor looking forward. but that leaved the question of what we do with this functionality in QNTX, im starting to feel like it should just be taken out actually, deprecate Prose, also in the UI, it uses a prosemirror edit, and I can't get it to work for me in a way that its going to replace the way i promptright now, there is a lot about Prose and the built-in documentation, that just isnt pulling its weight.
