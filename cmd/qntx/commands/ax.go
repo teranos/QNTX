@@ -18,6 +18,10 @@ var (
 	axFormat string
 )
 
+// DEPRECATED: ax will move to an HTTP API endpoint. CLI query requires qntxwasm
+// build tag which couples the CLI to the WASM module. HTTP query through the
+// running server avoids this dependency.
+//
 // AxCmd represents the ax command
 var AxCmd = &cobra.Command{
 	Use:   "ax [QUERY]",
