@@ -433,6 +433,11 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	if server.embeddingStats != nil {
 		ticker.SetEmbeddingStats(server.embeddingStats)
 	}
+	if server.servicesManager != nil {
+		if llmRouter := server.servicesManager.GetLLMRouter(); llmRouter != nil {
+			ticker.SetWeaveStats(llmRouter)
+		}
+	}
 	server.setupEmbeddingReclusterSchedule(deps.config)
 	server.setupEmbeddingReprojectSchedule(deps.config)
 	server.setupClusterLabelSchedule(deps.config)
