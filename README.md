@@ -5,7 +5,7 @@
 
 **QNTX: Continuous Intelligence**
 
-A new paradigm where systems continuously evolve their understanding through verifiable attestations.
+Systems continuously evolve their understanding through verifiable attestations.
 
 ```
 Data → Graph → Knowledge → Intelligence → Action
