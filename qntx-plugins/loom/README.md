@@ -65,6 +65,9 @@ Bash `[tool]` turns are filtered by a command whitelist (git, gh, make). All oth
 
 Svelte 5 app with extracted components. No bundler dependencies beyond Bun and svelte.
 
+TODO:
+- RESEARCH usage of Glyphs package in Loom: https://jsr.io/@qntx/glyphs/versions
+
 ### What it does
 
 - Vertical chronology, horizontal projects (grouped by branch prefix before `:`)
