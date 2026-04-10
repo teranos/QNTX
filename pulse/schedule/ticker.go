@@ -51,6 +51,11 @@ type EmbeddingStats interface {
 	DrainEmbeddingCounts() (embedded int, clusterCounts []string, noise int)
 }
 
+// WeaveStats drains accumulated LLM weave attestation counts.
+type WeaveStats interface {
+	DrainWeaveCounts() int
+}
+
 // BackupProvider performs hot database backups.
 type BackupProvider interface {
 	Backup(destPath string) error
@@ -76,6 +81,7 @@ type Ticker struct {
 	evictionStats   EvictionStats
 	creationStats   CreationStats
 	embeddingStats  EmbeddingStats
+	weaveStats      WeaveStats
 	backupProvider  BackupProvider
 	backupDBPath    string        // source db path, used to derive backup destination
 	backupInterval  time.Duration // how often to backup (0 = disabled)
@@ -130,6 +136,11 @@ func (t *Ticker) SetCreationStats(cs CreationStats) {
 // SetEmbeddingStats injects an embedding counter for periodic summary logging.
 func (t *Ticker) SetEmbeddingStats(es EmbeddingStats) {
 	t.embeddingStats = es
+}
+
+// SetWeaveStats injects an LLM weave counter for periodic summary logging.
+func (t *Ticker) SetWeaveStats(ws WeaveStats) {
+	t.weaveStats = ws
 }
 
 // SetBackupProvider configures periodic database backups via the ticker.
@@ -285,7 +296,12 @@ func (t *Ticker) logActivitySummary() {
 		embedded, clusterCounts, noise = t.embeddingStats.DrainEmbeddingCounts()
 	}
 
-	if created == 0 && evictionEvents == 0 && embedded == 0 {
+	var weaves int
+	if t.weaveStats != nil {
+		weaves = t.weaveStats.DrainWeaveCounts()
+	}
+
+	if created == 0 && evictionEvents == 0 && embedded == 0 && weaves == 0 {
 		return
 	}
 
@@ -295,6 +311,9 @@ func (t *Ticker) logActivitySummary() {
 	}
 	if evictionEvents > 0 {
 		parts = append(parts, fmt.Sprintf("evicted %d", evicted))
+	}
+	if weaves > 0 {
+		parts = append(parts, fmt.Sprintf("weaves %d", weaves))
 	}
 	if embedded > 0 {
 		embPart := fmt.Sprintf("embedded %d", embedded)
