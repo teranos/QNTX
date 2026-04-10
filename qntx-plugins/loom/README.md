@@ -1,5 +1,7 @@
 # qntx-loom
 
+TODO: This README needs restructuring. Not everything is relevant, I think a lot of implementation details slipped in. Splitting off LIMITATIONS.md is a good idea for example
+
 Receives conversation events from [Graunde](https://github.com/teranos/graunde) over UDP and stitches them into embedding-sized text blocks (weaves). Serves a timeline explorer frontend for browsing conversation history across projects and sessions.
 
 **UDP port: 19470** — Graunde sends attestation JSON datagrams here. Fire-and-forget, no response.
