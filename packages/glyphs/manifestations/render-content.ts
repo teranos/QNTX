@@ -58,10 +58,12 @@ export function renderGlyphContent(
         // Add content area with error boundary
         try {
             const content = glyph.renderContent();
-            content.classList.add('glyph-content-area');
-            content.style.padding = `${CANVAS_GLYPH_CONTENT_PADDING}px`;
-            element.appendChild(content);
-            contentElement = content;
+            const contentArea = document.createElement('div');
+            contentArea.classList.add('glyph-content-area');
+            contentArea.style.padding = `${CANVAS_GLYPH_CONTENT_PADDING}px`;
+            contentArea.appendChild(content);
+            element.appendChild(contentArea);
+            contentElement = contentArea;
         } catch (error) {
             log.error(seg, `[${logLabel} ${glyph.id}] Error rendering content: ${error instanceof Error ? error.message : String(error)}`);
             const errorContent = document.createElement('div');
