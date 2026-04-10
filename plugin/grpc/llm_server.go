@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/teranos/QNTX/am"
@@ -36,6 +37,7 @@ type LLMServer struct {
 	queue           *llmQueue
 	limiter         *budget.Limiter
 	store           ats.AttestationStore // nil = weave creation disabled
+	weaveCount      atomic.Int64         // accumulated weave count, drained by ticker
 	logger          *zap.SugaredLogger
 }
 
@@ -211,6 +213,11 @@ func (s *LLMServer) gate(ctx context.Context, priority int32) error {
 	return nil
 }
 
+// DrainWeaveCounts atomically reads and resets the accumulated weave counter.
+func (s *LLMServer) DrainWeaveCounts() int {
+	return int(s.weaveCount.Swap(0))
+}
+
 // providerNames returns registered provider names (must be called with lock held).
 func (s *LLMServer) providerNames() []string {
 	names := make([]string, 0, len(s.providers))
@@ -290,7 +297,7 @@ func (s *LLMServer) createWeave(ctx context.Context, req *protocol.LLMChatReques
 		if _, err := s.store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
 			s.logger.Warnw("Failed to create weave attestation", "provider", provider, "model", model, "error", err)
 		} else {
-			s.logger.Infow("Weave attestation created", "provider", provider, "model", model, "tokens", totalTokens)
+			s.weaveCount.Add(1)
 		}
 	}()
 }
