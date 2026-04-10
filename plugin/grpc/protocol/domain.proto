@@ -192,15 +192,14 @@ message InitializeResponse {
   // Watchers this plugin wants registered on its behalf.
   // Core creates watchers with action_type=plugin_execute targeting this plugin.
   // On match, core calls ExecuteJob with the matching attestation as payload.
-  // Watcher ID is scoped to the plugin: "{plugin_name}-{watcher_id}".
   repeated WatcherRegistration watchers = 4;
 }
 
 // WatcherRegistration declares a watcher a plugin wants core to manage.
-// Core creates/updates the watcher during Initialize and routes matches
+// Core creates/updates the watcher on Initialize and routes matches
 // to the plugin via ExecuteJob.
 message WatcherRegistration {
-  string id = 1;                    // Watcher ID (scoped: "{plugin}-{id}")
+  string id = 1;                    // Watcher ID (scoped to plugin: "{plugin}-{id}")
   string handler_name = 2;          // ExecuteJob handler to invoke on match
   repeated string subjects = 3;     // Structural filter: subjects
   repeated string predicates = 4;   // Structural filter: predicates
