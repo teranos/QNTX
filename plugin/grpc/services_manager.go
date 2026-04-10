@@ -102,7 +102,7 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 	}
 
 	// Start LLM service (starts empty, providers register after plugin init)
-	llmAddr, err := m.startLLMService(ctx)
+	llmAddr, err := m.startLLMService(ctx, store)
 	if err != nil {
 		m.logger.Warnw("Failed to start LLM service, plugins will not have LLM access", "error", err)
 		llmAddr = ""
@@ -261,13 +261,13 @@ func (m *ServicesManager) startFileService(ctx context.Context, filesDir string,
 
 // startLLMService starts the LLM routing gRPC service.
 // The server starts empty — providers register after their own initialization completes.
-func (m *ServicesManager) startLLMService(ctx context.Context) (string, error) {
+func (m *ServicesManager) startLLMService(ctx context.Context, store ats.AttestationStore) (string, error) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return "", errors.Wrap(err, "failed to listen")
 	}
 
-	m.llmRouter = NewLLMServer(m.llmConfig, m.logger)
+	m.llmRouter = NewLLMServer(m.llmConfig, store, m.logger)
 	m.llmServer = grpc.NewServer()
 	protocol.RegisterLLMServiceServer(m.llmServer, m.llmRouter)
 
