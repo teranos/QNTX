@@ -114,6 +114,7 @@ ticker_interval_seconds = 1
 
 # ════════════════════════════════════════════════════════════════
 # Code Configuration (GitHub & LSP Integration)
+# DEPRECATED: planning for removal of these two integrations
 # ════════════════════════════════════════════════════════════════
 
 [code.github]
@@ -130,16 +131,6 @@ ticker_interval_seconds = 1
 # Enable gopls integration
 # Default: true
 enabled = true
-
-# ════════════════════════════════════════════════════════════════
-# Ax Configuration (Attestation Query System)
-# ════════════════════════════════════════════════════════════════
-
-[ax]
-# Default actor for attestation queries
-# Used when no actor is explicitly specified
-# Default: "ax@user"
-default_actor = "ax@user"
 
 # ════════════════════════════════════════════════════════════════
 # Sync Configuration (Peer-to-Peer Attestation Sync)
