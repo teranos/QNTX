@@ -23,6 +23,8 @@ The developer always uses `make dev` to start the development environment. `make
 
 **KNOW** the developer is always running the latest version of QNTX. It is **FORBIDDEN** to discuss or question whether the developer has run the latest version. If there is an issue, it is in the code, not with running the latest binary (`make dev` solves this) or configuration (QNTX works without configuration).
 
+**Log files append across restarts.** The current run is at the bottom, not the top. Always read the tail first.
+
 ## Testing
 
 **The AI agent MUST execute `make test` before claiming completion of any work. The cost is ~17 seconds.**
