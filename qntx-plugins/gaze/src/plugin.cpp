@@ -56,16 +56,45 @@ grpc::Status GazePlugin::Initialize(grpc::ServerContext* ctx,
                                      const protocol::InitializeRequest* req,
                                      protocol::InitializeResponse* resp) {
     auto config = req->config();
-    auto it = config.find("model_path");
-    if (it != config.end() && !it->second.empty()) {
-        int n_ctx = 2048;
-        auto ctx_it = config.find("n_ctx");
-        if (ctx_it != config.end()) {
-            try { n_ctx = std::stoi(ctx_it->second); } catch (...) {}
-            if (n_ctx <= 0) n_ctx = 2048;
+
+    int n_ctx = 2048;
+    auto ctx_it = config.find("n_ctx");
+    if (ctx_it != config.end()) {
+        try { n_ctx = std::stoi(ctx_it->second); } catch (...) {}
+        if (n_ctx <= 0) n_ctx = 2048;
+    }
+
+    // Collect model paths: "models" JSON array or legacy "model_path" single entry
+    std::vector<std::string> model_paths;
+    auto models_it = config.find("models");
+    if (models_it != config.end() && !models_it->second.empty()) {
+        // Core serializes TOML arrays as JSON: ["/path/a.gguf","/path/b.gguf"]
+        const std::string& json = models_it->second;
+        // Minimal JSON array parser — extract quoted strings
+        size_t pos = 0;
+        while ((pos = json.find('"', pos)) != std::string::npos) {
+            size_t start = pos + 1;
+            size_t end = json.find('"', start);
+            if (end == std::string::npos) break;
+            std::string path = json.substr(start, end - start);
+            if (!path.empty()) model_paths.push_back(path);
+            pos = end + 1;
         }
-        if (!engine_.load_model(it->second, n_ctx)) {
-            std::cout << "[gaze] Failed to load model: " << it->second << std::endl;
+    }
+    if (model_paths.empty()) {
+        auto it = config.find("model_path");
+        if (it != config.end() && !it->second.empty()) {
+            model_paths.push_back(it->second);
+        }
+    }
+
+    for (const auto& path : model_paths) {
+        auto engine = std::make_unique<InferenceEngine>();
+        if (engine->load_model(path, n_ctx)) {
+            std::string name = engine->model_name();
+            engines_[name] = std::move(engine);
+        } else {
+            std::cout << "[gaze] Failed to load model: " << path << std::endl;
         }
     }
 
@@ -109,19 +138,46 @@ grpc::Status GazePlugin::Initialize(grpc::ServerContext* ctx,
 grpc::Status GazePlugin::Shutdown(grpc::ServerContext* ctx,
                                    const protocol::Empty* req,
                                    protocol::Empty* resp) {
-    engine_.unload();
+    engines_.clear();
     std::cout << "[gaze] Shutdown complete" << std::endl;
     return grpc::Status::OK;
+}
+
+InferenceEngine* GazePlugin::get_engine(const std::string& model_name) {
+    auto it = engines_.find(model_name);
+    if (it != engines_.end()) return it->second.get();
+    return nullptr;
+}
+
+InferenceEngine* GazePlugin::default_engine() {
+    if (engines_.empty()) return nullptr;
+    return engines_.begin()->second.get();
+}
+
+std::vector<std::string> GazePlugin::model_names() const {
+    std::vector<std::string> names;
+    names.reserve(engines_.size());
+    for (const auto& [name, _] : engines_) {
+        names.push_back(name);
+    }
+    return names;
 }
 
 grpc::Status GazePlugin::Health(grpc::ServerContext* ctx,
                                  const protocol::Empty* req,
                                  protocol::HealthResponse* resp) {
     resp->set_healthy(true);
-    if (engine_.is_loaded()) {
-        resp->set_message("model loaded: " + engine_.model_name());
+    if (engines_.empty()) {
+        resp->set_message("no models loaded");
     } else {
-        resp->set_message("no model loaded");
+        std::string msg = std::to_string(engines_.size()) + " model(s): ";
+        bool first = true;
+        for (const auto& [name, _] : engines_) {
+            if (!first) msg += ", ";
+            msg += name;
+            first = false;
+        }
+        resp->set_message(msg);
     }
     return grpc::Status::OK;
 }
@@ -212,9 +268,10 @@ grpc::Status GazePlugin::HandleHTTP(grpc::ServerContext* ctx,
     }
 
     if (req->method() == "GET" && req->path() == "/status") {
-        std::string state = engine_.is_loaded() ? "ready" : "no_model";
+        std::string state = engines_.empty() ? "no_model" : "ready";
         std::string act = activity();
         std::string body = "{\"state\":\"" + state + "\",\"version\":\"" + PLUGIN_VERSION + "\"";
+        body += ",\"models\":" + std::to_string(engines_.size());
         if (!act.empty()) body += ",\"activity\":\"" + act + "\"";
         body += "}";
         resp->set_status_code(200);

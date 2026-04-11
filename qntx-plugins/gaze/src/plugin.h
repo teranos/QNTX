@@ -1,7 +1,7 @@
 #pragma once
 
-#include <atomic>
 #include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -12,7 +12,7 @@
 #include "domain.grpc.pb.h"
 #include "llm.grpc.pb.h"
 
-#define PLUGIN_VERSION "0.1.0"
+#define PLUGIN_VERSION "0.2.0"
 
 // Forward declarations
 struct llama_model;
@@ -101,7 +101,6 @@ private:
     mtmd_context* mtmd_ctx_ = nullptr;
     std::string model_path_;
     std::string model_name_;
-    bool backend_initialized_ = false;
     std::mutex mutex_;
 };
 
@@ -148,7 +147,14 @@ public:
                               const protocol::ParseAxQueryRequest* req,
                               protocol::ParseAxQueryResponse* resp) override;
 
-    InferenceEngine& engine() { return engine_; }
+    // Get engine by model name. Returns nullptr if not found.
+    InferenceEngine* get_engine(const std::string& model_name);
+
+    // Get the first (or only) engine. Returns nullptr if none loaded.
+    InferenceEngine* default_engine();
+
+    // List all advertised model names.
+    std::vector<std::string> model_names() const;
 
     // Activity status for UI feedback
     void set_activity(const std::string& a) { std::lock_guard<std::mutex> l(activity_mu_); activity_ = a; }
@@ -157,7 +163,7 @@ public:
     const SamplerConfig& sampler_config() const { return sampler_cfg_; }
 
 private:
-    InferenceEngine engine_;
+    std::map<std::string, std::unique_ptr<InferenceEngine>> engines_;
     SamplerConfig sampler_cfg_;
 
     // Activity status

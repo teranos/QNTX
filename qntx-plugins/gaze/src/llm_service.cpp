@@ -104,11 +104,20 @@ static std::vector<InferenceEngine::Message> build_messages(
 grpc::Status GazeLLMService::Chat(grpc::ServerContext* ctx,
                                    const protocol::LLMChatRequest* req,
                                    protocol::LLMChatResponse* resp) {
-    auto& engine = plugin_->engine();
+    InferenceEngine* engine = nullptr;
+    if (!req->model().empty()) {
+        engine = plugin_->get_engine(req->model());
+        if (!engine) {
+            return grpc::Status(grpc::StatusCode::NOT_FOUND,
+                "model not found: " + req->model());
+        }
+    } else {
+        engine = plugin_->default_engine();
+    }
 
-    if (!engine.is_loaded()) {
+    if (!engine || !engine->is_loaded()) {
         return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION,
-                            "no model loaded — set model_path in plugin config");
+                            "no model loaded — set models in plugin config");
     }
 
     float temperature = req->temperature() > 0 ? req->temperature() : 0.7;
@@ -117,7 +126,7 @@ grpc::Status GazeLLMService::Chat(grpc::ServerContext* ctx,
     std::string context;
     std::vector<InferenceEngine::ImageAttachment> image_attachments;
     grpc::Status att_err;
-    parse_attachments(*req, engine, context, image_attachments, att_err);
+    parse_attachments(*req, *engine, context, image_attachments, att_err);
     if (!att_err.ok()) return att_err;
 
     auto messages = build_messages(*req, context);
@@ -131,17 +140,17 @@ grpc::Status GazeLLMService::Chat(grpc::ServerContext* ctx,
 
     InferenceEngine::ChatResult result;
     if (!image_attachments.empty()) {
-        result = engine.stream_chat_vision(
+        result = engine->stream_chat_vision(
             messages, image_attachments, temperature, max_tokens,
             collect, plugin_->sampler_config());
     } else {
-        result = engine.stream_chat(
+        result = engine->stream_chat(
             messages, temperature, max_tokens,
             collect, plugin_->sampler_config());
     }
 
     resp->set_content(result.content);
-    resp->set_model(engine.model_name());
+    resp->set_model(engine->model_name());
     resp->set_prompt_tokens(result.prompt_tokens);
     resp->set_completion_tokens(result.completion_tokens);
     resp->set_total_tokens(result.prompt_tokens + result.completion_tokens);
@@ -152,11 +161,20 @@ grpc::Status GazeLLMService::Chat(grpc::ServerContext* ctx,
 grpc::Status GazeLLMService::StreamChat(grpc::ServerContext* ctx,
                                          const protocol::LLMChatRequest* req,
                                          grpc::ServerWriter<protocol::LLMChatChunk>* writer) {
-    auto& engine = plugin_->engine();
+    InferenceEngine* engine = nullptr;
+    if (!req->model().empty()) {
+        engine = plugin_->get_engine(req->model());
+        if (!engine) {
+            return grpc::Status(grpc::StatusCode::NOT_FOUND,
+                "model not found: " + req->model());
+        }
+    } else {
+        engine = plugin_->default_engine();
+    }
 
-    if (!engine.is_loaded()) {
+    if (!engine || !engine->is_loaded()) {
         return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION,
-                            "no model loaded — set model_path in plugin config");
+                            "no model loaded — set models in plugin config");
     }
 
     float temperature = req->temperature() > 0 ? req->temperature() : 0.7;
@@ -165,7 +183,7 @@ grpc::Status GazeLLMService::StreamChat(grpc::ServerContext* ctx,
     std::string context;
     std::vector<InferenceEngine::ImageAttachment> image_attachments;
     grpc::Status att_err;
-    parse_attachments(*req, engine, context, image_attachments, att_err);
+    parse_attachments(*req, *engine, context, image_attachments, att_err);
     if (!att_err.ok()) return att_err;
 
     auto messages = build_messages(*req, context);
@@ -178,18 +196,18 @@ grpc::Status GazeLLMService::StreamChat(grpc::ServerContext* ctx,
         protocol::LLMChatChunk chunk;
         chunk.set_token(sanitize_utf8(token_text));
         chunk.set_done(false);
-        chunk.set_model(engine.model_name());
+        chunk.set_model(engine->model_name());
 
         return writer->Write(chunk);
     };
 
     InferenceEngine::ChatResult result;
     if (!image_attachments.empty()) {
-        result = engine.stream_chat_vision(
+        result = engine->stream_chat_vision(
             messages, image_attachments, temperature, max_tokens,
             token_callback, plugin_->sampler_config());
     } else {
-        result = engine.stream_chat(
+        result = engine->stream_chat(
             messages, temperature, max_tokens,
             token_callback, plugin_->sampler_config());
     }
@@ -199,14 +217,14 @@ grpc::Status GazeLLMService::StreamChat(grpc::ServerContext* ctx,
         protocol::LLMChatChunk warn_chunk;
         warn_chunk.set_token("\n\n⚠ " + result.warning);
         warn_chunk.set_done(false);
-        warn_chunk.set_model(engine.model_name());
+        warn_chunk.set_model(engine->model_name());
         writer->Write(warn_chunk);
     }
 
     // Final chunk with totals
     protocol::LLMChatChunk final_chunk;
     final_chunk.set_done(true);
-    final_chunk.set_model(engine.model_name());
+    final_chunk.set_model(engine->model_name());
     final_chunk.set_prompt_tokens(result.prompt_tokens);
     final_chunk.set_completion_tokens(result.completion_tokens);
     final_chunk.set_total_tokens(result.prompt_tokens + result.completion_tokens);
