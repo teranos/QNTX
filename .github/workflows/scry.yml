@@ -6,6 +6,7 @@ on:
       - 'qntx-plugins/scry/**'
       - 'plugin/grpc/protocol/domain.proto'
       - 'plugin/grpc/protocol/llm.proto'
+      - 'plugin/grpc/protocol/proto.cmake'
       - '.github/workflows/scry.yml'
   push:
     branches: [main]
@@ -13,6 +14,7 @@ on:
       - 'qntx-plugins/scry/**'
       - 'plugin/grpc/protocol/domain.proto'
       - 'plugin/grpc/protocol/llm.proto'
+      - 'plugin/grpc/protocol/proto.cmake'
 
 jobs:
   build:

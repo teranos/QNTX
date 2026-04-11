@@ -1,6 +1,7 @@
 # Shared C++ proto generation for all plugins.
 # Usage:
-#   include(${CMAKE_SOURCE_DIR}/../../plugin/grpc/protocol/proto.cmake)
+#   set(PROTO_DIR "${CMAKE_SOURCE_DIR}/../../plugin/grpc/protocol")  # or -DPROTO_DIR=
+#   include(${PROTO_DIR}/proto.cmake)
 #   generate_proto(domain.proto)
 #   generate_proto(llm.proto)
 #   # then add ${GENERATED_SRCS} to your target and ${PROTO_GEN_DIR} to includes

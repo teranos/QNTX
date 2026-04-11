@@ -64,8 +64,11 @@ find_package(protobuf CONFIG REQUIRED)
 find_package(gRPC CONFIG REQUIRED)
 
 # Proto generation — shared function from proto.cmake
+if(NOT DEFINED PROTO_DIR)
+    set(PROTO_DIR "${CMAKE_SOURCE_DIR}/../../plugin/grpc/protocol")
+endif()
 set(GENERATED_SRCS "")
-include(${CMAKE_SOURCE_DIR}/../../plugin/grpc/protocol/proto.cmake)
+include(${PROTO_DIR}/proto.cmake)
 generate_proto(domain.proto)
 generate_proto(llm.proto)
 generate_proto(atsstore.proto)
