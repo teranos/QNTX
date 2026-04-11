@@ -79,6 +79,13 @@ Extended `domain.proto`:
 - Added `GetDaemon()` for registry access
 - Handlers properly registered with Pulse
 
+### Phase 5: Reactive Watchers (PR #770) ✅
+- Plugins declare `WatcherRegistration` in `InitializeResponse`
+- Core creates watchers during `doInitialize`, idempotent via `CreateOrReplace`
+- Matching attestations routed to plugin via existing `ExecuteJob` RPC
+- Phases 1-4: "do this job" — Phase 5: "tell me when this happens"
+- UI visibility tracked in #771
+
 ## Consequences
 
 ### Positive
