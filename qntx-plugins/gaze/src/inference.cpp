@@ -40,24 +40,26 @@ llama_sampler* build_sampler_chain(float temperature, const SamplerConfig& cfg) 
     return chain;
 }
 
+static bool g_backend_initialized = false;
+
+static void ensure_backend() {
+    if (!g_backend_initialized) {
+        llama_backend_init();
+        g_backend_initialized = true;
+    }
+}
+
 InferenceEngine::InferenceEngine() {}
 
 InferenceEngine::~InferenceEngine() {
     unload();
-    if (backend_initialized_) {
-        llama_backend_free();
-    }
 }
 
 bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     unload();
-
-    if (!backend_initialized_) {
-        llama_backend_init();
-        backend_initialized_ = true;
-    }
+    ensure_backend();
 
     auto model_params = llama_model_default_params();
     model_params.n_gpu_layers = -1;

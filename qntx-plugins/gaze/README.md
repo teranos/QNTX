@@ -11,34 +11,36 @@ In `am.toml`:
 enabled = ["gaze"]
 
 [gaze]
-model_path = "/path/to/model.gguf"
-n_ctx = "2048"
+n_ctx = "8192"
 log_level = "info"  # error | warn | info | debug
+
+# Drop GGUF files here. Gaze reads the model name from GGUF metadata
+# (general.name) and advertises each under that name.
+# Callers address models by name. Gaze does not choose.
+models = [
+  "/path/to/qwen-3b-Q4_K_M.gguf",
+  "/path/to/classifier-Q8.gguf",
+]
+
+# Single model shorthand (legacy, equivalent to models with one entry)
+# model_path = "/path/to/model.gguf"
 ```
 
-## What gaze does
+## Contract
 
-- Loads a GGUF model via llama.cpp with full Metal GPU offload
-- Serves `Chat` and `StreamChat` gRPC methods as an LLM provider
-- Processes PDF attachments (MuPDF text extraction) and image attachments (CLIP vision via mtmd)
-- Configurable sampler chain: top_k, top_p, min_p, typical_p, repeat/frequency/presence penalties
-- Prompt truncation with warning when context window is exceeded
-
-## What gaze does NOT do
-
-- No signal extraction (no `TokenSignal`, no `capture_signal`, no observer samplers)
-- No nebula visualization (no Metal renderer, no PCA projection, no WebSocket frame streaming)
-- No ATS attestation writing (weave creation is handled by core's LLM routing layer)
+- **Gaze loads, gaze serves.** Every GGUF in `models` is loaded at startup and held in memory. Each gets its own llama.cpp context and mutex.
+- **Callers choose.** The `model` field in the gRPC request must match an advertised name. Gaze does not pick models — that's voor's job.
+- **Names come from the model.** `general.name` GGUF metadata is the advertised name. Falls back to filename minus `.gguf` if metadata is missing.
+- **Sampler config is global.** Applies to all models. Override per-request if needed.
+- **RAM is the limit.** Each model holds its weights + KV cache in memory. A 3B Q4 is ~2GB. Plan accordingly.
 
 ## Difference from scry
 
-Scry is the research/development inference tool — it instruments every token with signal data (confidence, entropy, top-k candidates, sampler stage snapshots) and renders a 3D nebula visualization of the token probability space.
-
-Gaze is the production inference runner — same llama.cpp engine, same model loading, same sampler chain, but without the ~55ms/token GPU sync for signal extraction and without the rendering overhead. Tokens stream directly from the sampler to gRPC.
+Scry instruments every token with signal data and renders a 3D nebula. Gaze is the production path — same llama.cpp engine, no instrumentation overhead. Tokens stream directly from the sampler to gRPC.
 
 ## Limitations
 
-- **SINF** — Single-threaded inference. One llama.cpp context, one KV cache — requests are serial. Core's `LLMServer` queues at `max_concurrent=1`.
+- **SINF** — Serial inference per model. Each model has its own context and mutex — different models run concurrently, but two requests to the same model still queue. True parallel inference on one model needs multiple contexts sharing weights.
 - **NDOC** — PDF only. DOCX, RTF, and other formats not supported.
 - **IBP** — Image-based PDFs return empty text. OCR not supported.
 - **UIG** — UI still references scry. The LLM provider glyph (`llm-provider-glyph.ts`) hardcodes scry as the local provider option. Needs a gaze option or a generic "local" toggle that discovers whichever local LLM plugin is running.

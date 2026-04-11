@@ -682,6 +682,11 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		chatReq.Messages = append(chatReq.Messages, provider.NewTextMessage("user", promptText))
 	}
 
+	// Set model if specified in request or frontmatter
+	if modelName != "" {
+		chatReq.Model = &modelName
+	}
+
 	// Set temperature if specified in frontmatter
 	if doc.Metadata.Temperature != nil {
 		chatReq.Temperature = doc.Metadata.Temperature
