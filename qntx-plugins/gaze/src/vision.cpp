@@ -2,11 +2,50 @@
 
 #include <chrono>
 #include <dirent.h>
+#include <fstream>
 #include <iostream>
 #include <sstream>
+#include <unistd.h>
 
 #include "mtmd.h"
 #include "mtmd-helper.h"
+
+// Redirect stderr to a temp file, call fn(), restore stderr, return captured output.
+// Uses a file instead of a pipe to avoid deadlock when output exceeds pipe buffer.
+static std::string capture_stderr(std::function<void()> fn) {
+    char tmpl[] = "/tmp/gaze-clip-XXXXXX";
+    int tmpfd = mkstemp(tmpl);
+    if (tmpfd < 0) {
+        fn();
+        return "";
+    }
+
+    fflush(stderr);
+    int saved = dup(STDERR_FILENO);
+    dup2(tmpfd, STDERR_FILENO);
+    close(tmpfd);
+
+    fn();
+
+    fflush(stderr);
+    dup2(saved, STDERR_FILENO);
+    close(saved);
+
+    std::ifstream f(tmpl);
+    std::string captured((std::istreambuf_iterator<char>(f)),
+                          std::istreambuf_iterator<char>());
+    f.close();
+    unlink(tmpl);
+    return captured;
+}
+
+static int count_lines(const std::string& s) {
+    int n = 0;
+    for (char c : s) {
+        if (c == '\n') n++;
+    }
+    return n;
+}
 
 void InferenceEngine::init_vision(const std::string& model_path) {
     auto mparams = mtmd_context_params_default();
@@ -47,12 +86,19 @@ void InferenceEngine::init_vision(const std::string& model_path) {
         return;
     }
 
-    mtmd_ctx_ = mtmd_init_from_file(mmproj_path.c_str(), model_, mparams);
+    // mtmd_init_from_file dumps clip_model_loader tensor info directly to stderr,
+    // bypassing llama_log_set. Capture and condense into a single summary line.
+    std::string clip_stderr = capture_stderr([&]() {
+        mtmd_ctx_ = mtmd_init_from_file(mmproj_path.c_str(), model_, mparams);
+    });
 
     if (mtmd_ctx_ && mtmd_support_vision(mtmd_ctx_)) {
-        std::cout << "[gaze] Vision support: yes"
-                  << (mmproj_path.empty() ? " (bundled)" : " (" + mmproj_path + ")")
-                  << std::endl;
+        int n_lines = count_lines(clip_stderr);
+        std::cout << "[gaze] Vision: yes (" + mmproj_path + ")";
+        if (n_lines > 0) {
+            std::cout << ", " << n_lines << " clip loader lines condensed";
+        }
+        std::cout << std::endl;
     } else {
         if (mtmd_ctx_) {
             mtmd_free(mtmd_ctx_);
