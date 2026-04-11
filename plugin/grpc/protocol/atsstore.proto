@@ -8,7 +8,7 @@ option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
 // ATSStoreService provides attestation storage operations for gRPC plugins
 service ATSStoreService {
-  // CreateAttestation creates a new attestation
+  // Deprecated: use GenerateAndCreateAttestation. Client-provided IDs cause collisions.
   rpc CreateAttestation(CreateAttestationRequest) returns (CreateAttestationResponse);
 
   // AttestationExists checks if an attestation exists by ID
