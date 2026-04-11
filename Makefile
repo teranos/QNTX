@@ -227,7 +227,7 @@ desktop-build: desktop-prepare ## Build production desktop app (requires: cargo 
 		cp web/src-tauri/bin/qntx-$$TARGET target/release/bundle/macos/QNTX.app/Contents/MacOS/
 	@echo "✓ Desktop app built in target/release/bundle/"
 
-proto: ## Generate Go code from protobuf definitions (via Nix)
+proto: ## Generate all proto bindings (Go, TypeScript, OCaml)
 	@nix run .#generate-proto
 
 proto-rust: ## Rust proto types are now generated automatically at build time

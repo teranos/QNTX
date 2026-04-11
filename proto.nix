@@ -99,6 +99,28 @@
     '');
   };
 
+  generate-proto-ocaml = {
+    type = "app";
+    program = toString (pkgs.writeShellScript "generate-proto-ocaml" ''
+      set -e
+      echo "Generating OCaml proto code..."
+
+      PROTOC_GEN_OCAML="$HOME/.opam/5.2.1/bin/protoc-gen-ocaml"
+      if ! [ -x "$PROTOC_GEN_OCAML" ]; then
+        echo "⚠ protoc-gen-ocaml not found at $PROTOC_GEN_OCAML — skipping OCaml proto generation"
+        exit 0
+      fi
+
+      ${pkgs.protobuf}/bin/protoc \
+        --plugin=protoc-gen-ocaml="$PROTOC_GEN_OCAML" \
+        --ocaml_out=plugin/grpc/ocaml/proto/ \
+        plugin/grpc/protocol/domain.proto \
+        plugin/grpc/protocol/atsstore.proto
+
+      echo "✓ OCaml proto files generated in plugin/grpc/ocaml/proto/"
+    '');
+  };
+
   generate-proto = {
     type = "app";
     program = toString (pkgs.writeShellScript "generate-proto" ''
@@ -110,6 +132,9 @@
 
       # Run TypeScript generation
       nix run .#generate-proto-typescript
+
+      # Run OCaml generation
+      nix run .#generate-proto-ocaml
 
       echo "✓ All proto files generated"
     '');
