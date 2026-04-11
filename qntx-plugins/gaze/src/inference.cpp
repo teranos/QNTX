@@ -76,9 +76,13 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
         return false;
     }
 
+    // Use model's native context length, capped by config n_ctx
+    int model_ctx = llama_model_n_ctx_train(model_);
+    int effective_ctx = (model_ctx > 0 && model_ctx < n_ctx) ? model_ctx : n_ctx;
+
     auto ctx_params = llama_context_default_params();
-    ctx_params.n_ctx = n_ctx;
-    ctx_params.n_batch = n_ctx;
+    ctx_params.n_ctx = effective_ctx;
+    ctx_params.n_batch = effective_ctx;
     ctx_ = llama_init_from_model(model_, ctx_params);
     if (!ctx_) {
         std::cout << "[gaze] Failed to create context for " << model_path << std::endl;
@@ -103,7 +107,8 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
     }
 
     std::cout << "[gaze] Model loaded: " << model_name_
-              << " (ctx=" << n_ctx << ")" << std::endl;
+              << " (ctx=" << effective_ctx
+              << ", native=" << model_ctx << ", cap=" << n_ctx << ")" << std::endl;
 
     init_vision(model_path);
 
