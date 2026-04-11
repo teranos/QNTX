@@ -672,6 +672,8 @@ func (e *Engine) drainOnce() {
 			execErr = e.executeWebhook(watcher, &as)
 		case storage.ActionTypeGlyphExecute:
 			execErr = e.executeGlyph(watcher, &as)
+		case storage.ActionTypePluginExecute:
+			execErr = e.executePlugin(watcher, &as)
 		case storage.ActionTypeSemanticMatch:
 			e.queueStore.Complete(entry.ID)
 			continue

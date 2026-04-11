@@ -188,6 +188,24 @@ message InitializeResponse {
   // llm_provider indicates this plugin implements LLMProvider (Chat RPC).
   // Core registers it as an LLM backend in the service mesh.
   bool llm_provider = 3;
+
+  // Watchers this plugin wants registered on its behalf.
+  // Core creates watchers with action_type=plugin_execute targeting this plugin.
+  // On match, core calls ExecuteJob with the matching attestation as payload.
+  repeated WatcherRegistration watchers = 4;
+}
+
+// WatcherRegistration declares a watcher a plugin wants core to manage.
+// Core creates/updates the watcher on Initialize and routes matches
+// to the plugin via ExecuteJob.
+message WatcherRegistration {
+  string id = 1;                    // Watcher ID (scoped to plugin: "{plugin}-{id}")
+  string handler_name = 2;          // ExecuteJob handler to invoke on match
+  repeated string subjects = 3;     // Structural filter: subjects
+  repeated string predicates = 4;   // Structural filter: predicates
+  repeated string contexts = 5;     // Structural filter: contexts
+  repeated string actors = 6;       // Structural filter: actors
+  int32 max_fires_per_second = 7;   // Rate limit (0 = no action, structural only)
 }
 
 // ExecuteJobRequest is sent to plugins to execute an async job

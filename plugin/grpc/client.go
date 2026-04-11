@@ -40,6 +40,9 @@ type ExternalDomainProxy struct {
 	// llmProvider indicates this plugin implements LLMProvider (populated during Initialize)
 	llmProvider bool
 
+	// Watchers this plugin wants registered (populated during Initialize)
+	watchers []*protocol.WatcherRegistration
+
 	// WebSocket configuration (set via SetWebSocketConfig)
 	keepaliveConfig *KeepaliveConfig
 	wsConfig        *WebSocketConfig
@@ -146,6 +149,11 @@ func (c *ExternalDomainProxy) Client() protocol.DomainPluginServiceClient {
 // IsLLMProvider returns true if this plugin declared LLM provider capability during Initialize.
 func (c *ExternalDomainProxy) IsLLMProvider() bool {
 	return c.llmProvider
+}
+
+// GetWatchers returns the watcher registrations this plugin announced during Initialize.
+func (c *ExternalDomainProxy) GetWatchers() []*protocol.WatcherRegistration {
+	return c.watchers
 }
 
 // LLMServiceClient returns an LLMServiceClient using this plugin's existing gRPC connection.
@@ -288,10 +296,22 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	// Store LLM provider capability
 	c.llmProvider = resp.GetLlmProvider()
 
+	// Store and create watcher registrations
+	c.watchers = resp.GetWatchers()
+	if len(c.watchers) > 0 {
+		if err := SetupPluginWatchers(services.Database(), c.metadata.Name, c.watchers, c.logger); err != nil {
+			c.logger.Errorw("Failed to setup plugin watchers",
+				"plugin", c.metadata.Name,
+				"error", err,
+			)
+		}
+	}
+
 	c.logger.Infow("Plugin initialized",
 		"name", c.metadata.Name,
 		"handlers", len(c.handlerNames),
 		"schedules", len(c.schedules),
+		"watchers", len(c.watchers),
 		"llm_provider", c.llmProvider,
 	)
 	return nil

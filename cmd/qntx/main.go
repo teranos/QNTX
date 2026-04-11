@@ -204,6 +204,11 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 			pluginLogger.Infow("Successfully initialized all plugins")
 		}
 
+		// Reload watcher engine — plugins may have registered watchers during Initialize
+		if err := defaultServer.ReloadWatchers(); err != nil {
+			pluginLogger.Errorw("Failed to reload watchers after plugin init", "error", err)
+		}
+
 		// Phase 4: Register plugin async handlers with Pulse
 		// Now that plugins are initialized, they've announced their handlers in InitializeResponse
 		// Register these handlers with Pulse's worker pool registry
@@ -258,12 +263,12 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 		} else {
 			pluginLogger.Warnw("Cannot register handlers - Pulse daemon not available, will retry")
 			// Retry schedule setup after Pulse starts
-			go retryScheduleSetup(loadedPlugins, pluginLogger)
+			go retryPluginSetup(loadedPlugins, registry, pluginLogger)
 		}
 	} else {
 		pluginLogger.Warnw("Cannot initialize plugins - server or services not available yet, will retry")
 		// Retry when server becomes available
-		go retryScheduleSetup(loadedPlugins, pluginLogger)
+		go retryPluginSetup(loadedPlugins, registry, pluginLogger)
 	}
 
 	// Start health polling — detect plugin crashes and restart automatically
@@ -275,8 +280,8 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 }
 
 // retryScheduleSetup waits for Pulse daemon to be ready, then sets up plugin schedules
-func retryScheduleSetup(plugins []plugin.DomainPlugin, logger *zap.SugaredLogger) {
-	// Wait for server and Pulse daemon to be ready
+func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Registry, logger *zap.SugaredLogger) {
+	// Wait for server, services, and Pulse daemon to all be ready
 	for i := 0; i < 30; i++ {
 		time.Sleep(1 * time.Second)
 
@@ -285,13 +290,23 @@ func retryScheduleSetup(plugins []plugin.DomainPlugin, logger *zap.SugaredLogger
 			continue
 		}
 
+		services := defaultServer.GetServices()
+		if services == nil {
+			continue
+		}
+
 		daemon := defaultServer.GetDaemon()
 		if daemon == nil {
 			continue
 		}
 
-		// Daemon is ready, register handlers and set up schedules
-		logger.Infow("Pulse daemon ready, registering handlers and setting up schedules")
+		// Everything ready — Initialize plugins first
+		logger.Infow("Server ready, initializing plugins")
+		if err := pluginRegistry.InitializeAll(context.Background(), services); err != nil {
+			logger.Errorw("Failed to initialize plugins", "error", err)
+		}
+
+		// Now register handlers and schedules (Initialize has populated them)
 		handlerRegistry := daemon.Registry()
 		db := defaultServer.GetDB()
 
@@ -301,7 +316,6 @@ func retryScheduleSetup(plugins []plugin.DomainPlugin, logger *zap.SugaredLogger
 				continue
 			}
 
-			// Register handlers first
 			handlerNames := externalPlugin.GetHandlerNames()
 			for _, handlerName := range handlerNames {
 				logger.Infow("Registering plugin async handler",
@@ -312,29 +326,40 @@ func retryScheduleSetup(plugins []plugin.DomainPlugin, logger *zap.SugaredLogger
 				handlerRegistry.Register(proxyHandler)
 			}
 
-			// Then set up schedules
 			schedules := externalPlugin.GetSchedules()
 			if len(schedules) > 0 {
-				logger.Infow("Setting up schedules for plugin",
-					"plugin", p.Metadata().Name,
-					"count", len(schedules),
-				)
 				if err := grpc.SetupPluginSchedules(db, p.Metadata().Name, schedules, logger); err != nil {
 					logger.Errorw("Failed to setup plugin schedules",
 						"plugin", p.Metadata().Name,
 						"error", err,
 					)
-				} else {
-					logger.Infow("Successfully set up schedules",
-						"plugin", p.Metadata().Name,
-					)
 				}
 			}
 		}
+
+		// Register LLM providers
+		if sm := defaultServer.GetServicesManager(); sm != nil {
+			if llmRouter := sm.GetLLMRouter(); llmRouter != nil {
+				for _, p := range plugins {
+					proxy, ok := p.(*grpc.ExternalDomainProxy)
+					if !ok || !proxy.IsLLMProvider() {
+						continue
+					}
+					llmRouter.RegisterProvider(p.Metadata().Name, proxy.LLMServiceClient())
+				}
+			}
+		}
+
+		// Reload watcher engine — plugins registered watchers during Initialize
+		if err := defaultServer.ReloadWatchers(); err != nil {
+			logger.Errorw("Failed to reload watchers after plugin init", "error", err)
+		}
+
+		logger.Infow("Plugin setup complete")
 		return
 	}
 
-	logger.Errorw("Gave up waiting for Pulse daemon after 30 seconds")
+	logger.Errorw("Gave up waiting for server after 30 seconds")
 }
 
 // findTauriBinary looks for the QNTX Tauri desktop binary.

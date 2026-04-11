@@ -356,6 +356,14 @@ func (s *QNTXServer) GetServicesManager() *grpcplugin.ServicesManager {
 	return s.servicesManager
 }
 
+// ReloadWatchers reloads the watcher engine's in-memory map from the database.
+func (s *QNTXServer) ReloadWatchers() error {
+	if s.watcherEngine == nil {
+		return nil
+	}
+	return s.watcherEngine.ReloadWatchers()
+}
+
 // getAttestationByID retrieves a single attestation through the attestation store (Rust FFI).
 // Falls back to Go's *sql.DB if the store doesn't support direct get.
 func (s *QNTXServer) getAttestationByID(id string) (*types.As, error) {
