@@ -18,12 +18,22 @@ void InferenceEngine::init_vision(const std::string& model_path) {
     auto slash = model_path.find_last_of('/');
     if (slash != std::string::npos) {
         std::string dir = model_path.substr(0, slash + 1);
+        // Extract model base name for matching (e.g. "Qwen2.5-VL-3B-Instruct" from filename)
+        std::string filename = model_path.substr(slash + 1);
+        auto dot = filename.find_last_of('.');
+        std::string base = (dot != std::string::npos) ? filename.substr(0, dot) : filename;
+        // Strip quantization suffix (e.g. "-Q4_K_M") for looser matching
+        auto dash_q = base.find("-Q");
+        std::string model_stem = (dash_q != std::string::npos) ? base.substr(0, dash_q) : base;
+
         DIR* d = opendir(dir.c_str());
         if (d) {
             struct dirent* entry;
             while ((entry = readdir(d)) != nullptr) {
                 std::string name(entry->d_name);
-                if (name.find("mmproj") == 0 && name.find(".gguf") != std::string::npos) {
+                if (name.find("mmproj") != 0 || name.find(".gguf") == std::string::npos) continue;
+                // Only match mmproj files that contain this model's stem
+                if (name.find(model_stem) != std::string::npos) {
                     mmproj_path = dir + name;
                     break;
                 }
@@ -32,11 +42,12 @@ void InferenceEngine::init_vision(const std::string& model_path) {
         }
     }
 
-    if (!mmproj_path.empty()) {
-        mtmd_ctx_ = mtmd_init_from_file(mmproj_path.c_str(), model_, mparams);
-    } else {
-        mtmd_ctx_ = mtmd_init_from_file(model_path.c_str(), model_, mparams);
+    if (mmproj_path.empty()) {
+        // No matching mmproj found — model has no vision support
+        return;
     }
+
+    mtmd_ctx_ = mtmd_init_from_file(mmproj_path.c_str(), model_, mparams);
 
     if (mtmd_ctx_ && mtmd_support_vision(mtmd_ctx_)) {
         std::cout << "[gaze] Vision support: yes"
