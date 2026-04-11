@@ -139,4 +139,23 @@
       echo "✓ All proto files generated"
     '');
   };
+
+  # TODO: generate-proto-cpp
+  # All 5 C++ plugins (gaze, scry, werf, spindle, ipluk) duplicate an identical
+  # generate_proto() CMake function that runs protoc at build time. Instead,
+  # pre-generate C++ proto files into plugin/grpc/protocol/cpp/ like the other
+  # languages, then rewire each plugin's CMakeLists.txt to include them directly.
+  # This removes find_package(protobuf/gRPC) as a build-time dependency from plugins.
+  #
+  # After adding generate-proto-cpp, update:
+  #   - qntx-plugins/gaze/CMakeLists.txt
+  #   - qntx-plugins/scry/CMakeLists.txt
+  #   - ctp/werf/CMakeLists.txt
+  #   - ctp/spindle/CMakeLists.txt
+  #   - ctp/ipluk/CMakeLists.txt
+  #
+  # Related: libstelt — shared C++ library for plugin infrastructure.
+  # All 5 plugins duplicate base64, pdf_extract, LLMClient, ATSClient, and
+  # main() boilerplate. libstelt extracts these into a single linkable library.
+  # Plugins link against libstelt and only implement domain logic.
 }
