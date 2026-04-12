@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin scry-plugin rust-sqlite rust-embeddings wasm rust-python rust-reduce
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin scry-plugin meili-plugin rust-sqlite rust-embeddings wasm rust-python rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -314,6 +314,11 @@ scry-plugin: ## Build, install, and restart scry plugin (C++ local LLM)
 	$(call check-plugin-version,qntx-plugins/scry,h,qntx-plugins/scry/src/plugin.h)
 	@$(MAKE) -C qntx-plugins/scry install PREFIX=$(PREFIX)
 	$(call restart-plugin,scry)
+
+meili-plugin: ## Build, install, and restart meili plugin (Rust MeiliSearch)
+	$(call check-plugin-version,qntx-plugins/qntx-meili,rs,qntx-plugins/qntx-meili/Cargo.toml)
+	@$(MAKE) -C qntx-plugins/qntx-meili install PREFIX=$(PREFIX)
+	$(call restart-plugin,meili)
 
 
 rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO integration)
