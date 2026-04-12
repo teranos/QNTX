@@ -31,7 +31,7 @@ const (
 //
 // ATSStoreService provides attestation storage operations for gRPC plugins
 type ATSStoreServiceClient interface {
-	// CreateAttestation creates a new attestation
+	// Deprecated: use GenerateAndCreateAttestation. Client-provided IDs cause collisions.
 	CreateAttestation(ctx context.Context, in *CreateAttestationRequest, opts ...grpc.CallOption) (*CreateAttestationResponse, error)
 	// AttestationExists checks if an attestation exists by ID
 	AttestationExists(ctx context.Context, in *AttestationExistsRequest, opts ...grpc.CallOption) (*AttestationExistsResponse, error)
@@ -95,7 +95,7 @@ func (c *aTSStoreServiceClient) GetAttestations(ctx context.Context, in *GetAtte
 //
 // ATSStoreService provides attestation storage operations for gRPC plugins
 type ATSStoreServiceServer interface {
-	// CreateAttestation creates a new attestation
+	// Deprecated: use GenerateAndCreateAttestation. Client-provided IDs cause collisions.
 	CreateAttestation(context.Context, *CreateAttestationRequest) (*CreateAttestationResponse, error)
 	// AttestationExists checks if an attestation exists by ID
 	AttestationExists(context.Context, *AttestationExistsRequest) (*AttestationExistsResponse, error)
