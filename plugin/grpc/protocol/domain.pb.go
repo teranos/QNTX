@@ -227,8 +227,11 @@ type InitializeRequest struct {
 	// embedding_endpoint: gRPC endpoint for EmbeddingService
 	// Provides: Text-to-vector embedding generation
 	EmbeddingEndpoint string `protobuf:"bytes,8,opt,name=embedding_endpoint,json=embeddingEndpoint,proto3" json:"embedding_endpoint,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// vector_search_endpoint: gRPC endpoint for VectorSearchService
+	// Provides: Nearest-neighbor search over dense vector indexes (ADR-016)
+	VectorSearchEndpoint string `protobuf:"bytes,9,opt,name=vector_search_endpoint,json=vectorSearchEndpoint,proto3" json:"vector_search_endpoint,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *InitializeRequest) Reset() {
@@ -313,6 +316,13 @@ func (x *InitializeRequest) GetLlmEndpoint() string {
 func (x *InitializeRequest) GetEmbeddingEndpoint() string {
 	if x != nil {
 		return x.EmbeddingEndpoint
+	}
+	return ""
+}
+
+func (x *InitializeRequest) GetVectorSearchEndpoint() string {
+	if x != nil {
+		return x.VectorSearchEndpoint
 	}
 	return ""
 }
@@ -873,9 +883,12 @@ type InitializeResponse struct {
 	// Watchers this plugin wants registered on its behalf.
 	// Core creates watchers with action_type=plugin_execute targeting this plugin.
 	// On match, core calls ExecuteJob with the matching attestation as payload.
-	Watchers      []*WatcherRegistration `protobuf:"bytes,4,rep,name=watchers,proto3" json:"watchers,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Watchers []*WatcherRegistration `protobuf:"bytes,4,rep,name=watchers,proto3" json:"watchers,omitempty"`
+	// vector_search_provider indicates this plugin implements VectorSearchService (ADR-016).
+	// Core registers it as a vector search backend in the service mesh.
+	VectorSearchProvider bool `protobuf:"varint,5,opt,name=vector_search_provider,json=vectorSearchProvider,proto3" json:"vector_search_provider,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *InitializeResponse) Reset() {
@@ -934,6 +947,13 @@ func (x *InitializeResponse) GetWatchers() []*WatcherRegistration {
 		return x.Watchers
 	}
 	return nil
+}
+
+func (x *InitializeResponse) GetVectorSearchProvider() bool {
+	if x != nil {
+		return x.VectorSearchProvider
+	}
+	return false
 }
 
 // WatcherRegistration declares a watcher a plugin wants core to manage.
@@ -1548,7 +1568,7 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\fqntx_version\x18\x03 \x01(\tR\vqntxVersion\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x16\n" +
 	"\x06author\x18\x05 \x01(\tR\x06author\x12\x18\n" +
-	"\alicense\x18\x06 \x01(\tR\alicense\"\xb6\x03\n" +
+	"\alicense\x18\x06 \x01(\tR\alicense\"\xec\x03\n" +
 	"\x11InitializeRequest\x12,\n" +
 	"\x12ats_store_endpoint\x18\x01 \x01(\tR\x10atsStoreEndpoint\x12%\n" +
 	"\x0equeue_endpoint\x18\x02 \x01(\tR\rqueueEndpoint\x12\x1d\n" +
@@ -1558,7 +1578,8 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x11schedule_endpoint\x18\x05 \x01(\tR\x10scheduleEndpoint\x122\n" +
 	"\x15file_service_endpoint\x18\x06 \x01(\tR\x13fileServiceEndpoint\x12!\n" +
 	"\fllm_endpoint\x18\a \x01(\tR\vllmEndpoint\x12-\n" +
-	"\x12embedding_endpoint\x18\b \x01(\tR\x11embeddingEndpoint\x1a9\n" +
+	"\x12embedding_endpoint\x18\b \x01(\tR\x11embeddingEndpoint\x124\n" +
+	"\x16vector_search_endpoint\x18\t \x01(\tR\x14vectorSearchEndpoint\x1a9\n" +
 	"\vConfigEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"}\n" +
@@ -1617,12 +1638,13 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x10interval_seconds\x18\x02 \x01(\x05R\x0fintervalSeconds\x12,\n" +
 	"\x12enabled_by_default\x18\x03 \x01(\bR\x10enabledByDefault\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x19\n" +
-	"\bats_code\x18\x05 \x01(\tR\aatsCode\"\xcd\x01\n" +
+	"\bats_code\x18\x05 \x01(\tR\aatsCode\"\x83\x02\n" +
 	"\x12InitializeResponse\x12#\n" +
 	"\rhandler_names\x18\x01 \x03(\tR\fhandlerNames\x124\n" +
 	"\tschedules\x18\x02 \x03(\v2\x16.protocol.ScheduleInfoR\tschedules\x12!\n" +
 	"\fllm_provider\x18\x03 \x01(\bR\vllmProvider\x129\n" +
-	"\bwatchers\x18\x04 \x03(\v2\x1d.protocol.WatcherRegistrationR\bwatchers\"\xe9\x01\n" +
+	"\bwatchers\x18\x04 \x03(\v2\x1d.protocol.WatcherRegistrationR\bwatchers\x124\n" +
+	"\x16vector_search_provider\x18\x05 \x01(\bR\x14vectorSearchProvider\"\xe9\x01\n" +
 	"\x13WatcherRegistration\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fhandler_name\x18\x02 \x01(\tR\vhandlerName\x12\x1a\n" +

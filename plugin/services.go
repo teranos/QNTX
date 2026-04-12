@@ -86,6 +86,65 @@ type LLMResponse struct {
 	TotalTokens      int
 }
 
+// VectorSearchService provides nearest-neighbor search over dense vector indexes (ADR-016).
+// Core routes requests to the provider plugin (e.g. faiss).
+type VectorSearchService interface {
+	// Search finds the nearest neighbors to a query vector in a named index.
+	Search(ctx context.Context, req VectorSearchRequest) (*VectorSearchResponse, error)
+
+	// AddVectors inserts vectors into a named index.
+	AddVectors(ctx context.Context, req AddVectorsRequest) (*AddVectorsResponse, error)
+
+	// CreateIndex creates a new named vector index.
+	CreateIndex(ctx context.Context, req CreateIndexRequest) (*CreateIndexResponse, error)
+}
+
+// VectorSearchRequest is a request to search a vector index.
+type VectorSearchRequest struct {
+	Index       string
+	QueryVector []float32
+	TopK        int
+}
+
+// VectorSearchResponse contains search results.
+type VectorSearchResponse struct {
+	Results []VectorSearchHit
+}
+
+// VectorSearchHit is a single search result.
+type VectorSearchHit struct {
+	ID       string
+	Distance float32
+}
+
+// AddVectorsRequest is a request to add vectors to an index.
+type AddVectorsRequest struct {
+	Index   string
+	Vectors []VectorEntry
+}
+
+// VectorEntry is a single vector with its identifier.
+type VectorEntry struct {
+	ID     string
+	Vector []float32
+}
+
+// AddVectorsResponse is the result of adding vectors.
+type AddVectorsResponse struct {
+	Added int
+}
+
+// CreateIndexRequest is a request to create a new vector index.
+type CreateIndexRequest struct {
+	Name       string
+	Dimensions int
+}
+
+// CreateIndexResponse is the result of creating an index.
+type CreateIndexResponse struct {
+	Name string
+}
+
 // ServiceRegistry provides access to QNTX core services for domain plugins.
 // Plugins use this registry to look up services they need.
 type ServiceRegistry interface {
@@ -113,6 +172,10 @@ type ServiceRegistry interface {
 	// LLM returns the LLM service for provider-agnostic chat completions.
 	// Returns nil if no LLM provider is available.
 	LLM() LLMService
+
+	// VectorSearch returns the vector search service for nearest-neighbor queries (ADR-016).
+	// Returns nil if no vector search provider is available.
+	VectorSearch() VectorSearchService
 }
 
 // Config provides access to plugin configuration
@@ -215,5 +278,10 @@ func (r *DefaultServiceRegistry) FileService() FileService {
 
 // LLM returns nil for in-process plugins (LLM is a gRPC-only service).
 func (r *DefaultServiceRegistry) LLM() LLMService {
+	return nil
+}
+
+// VectorSearch returns nil for in-process plugins (VectorSearch is a gRPC-only service).
+func (r *DefaultServiceRegistry) VectorSearch() VectorSearchService {
 	return nil
 }

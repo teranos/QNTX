@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// VectorSearchService provides nearest-neighbor search over dense vector indexes.
+// Backed by a FAISS provider plugin (ADR-016).
+service VectorSearchService {
+  // Search finds the nearest neighbors to a query vector in a named index.
+  rpc Search(VectorSearchRequest) returns (VectorSearchResponse);
+
+  // AddVectors inserts vectors into a named index.
+  rpc AddVectors(AddVectorsRequest) returns (AddVectorsResponse);
+
+  // CreateIndex creates a new named vector index.
+  rpc CreateIndex(CreateIndexRequest) returns (CreateIndexResponse);
+}
+
+message VectorSearchRequest {
+  string auth_token = 1;
+  string index = 2;                 // which index to search
+  repeated float query_vector = 3;  // query vector
+  int32 top_k = 4;
+}
+
+message VectorSearchResponse {
+  repeated VectorSearchHit results = 1;
+}
+
+message VectorSearchHit {
+  string id = 1;        // identifier of the matched item
+  float distance = 2;   // distance from query vector
+}
+
+message AddVectorsRequest {
+  string auth_token = 1;
+  string index = 2;                    // target index
+  repeated VectorEntry vectors = 3;    // vectors to add
+}
+
+message VectorEntry {
+  string id = 1;                // identifier for this vector
+  repeated float vector = 2;   // the vector data
+}
+
+message AddVectorsResponse {
+  int32 added = 1;   // number of vectors successfully added
+}
+
+message CreateIndexRequest {
+  string auth_token = 1;
+  string name = 2;          // index name
+  int32 dimensions = 3;     // vector dimensionality
+}
+
+message CreateIndexResponse {
+  string name = 1;   // confirmed index name
+}

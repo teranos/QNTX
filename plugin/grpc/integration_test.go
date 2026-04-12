@@ -604,6 +604,10 @@ func (r *testServiceRegistry) LLM() pluginpkg.LLMService {
 	return nil
 }
 
+func (r *testServiceRegistry) VectorSearch() pluginpkg.VectorSearchService {
+	return nil
+}
+
 // testConfig implements pluginpkg.Config for integration testing
 type testConfig struct {
 	config map[string]string
