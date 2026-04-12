@@ -178,6 +178,18 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 	s.initOnce.Do(func() {
 		// Create a remote service registry with service endpoints
 		// Pass the context for proper cancellation propagation in gRPC calls
+		// Inject service endpoints into config for direct plugin access
+		pluginConfig := make(map[string]string, len(req.Config)+2)
+		for k, v := range req.Config {
+			pluginConfig[k] = v
+		}
+		if req.EmbeddingEndpoint != "" {
+			pluginConfig["_embedding_endpoint"] = req.EmbeddingEndpoint
+		}
+		if req.AuthToken != "" {
+			pluginConfig["_auth_token"] = req.AuthToken
+		}
+
 		s.services = NewRemoteServiceRegistry(
 			ctx,
 			req.AtsStoreEndpoint,
@@ -185,8 +197,9 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 			req.ScheduleEndpoint,
 			req.FileServiceEndpoint,
 			req.LlmEndpoint,
+			req.VectorSearchEndpoint,
 			req.AuthToken,
-			req.Config,
+			pluginConfig,
 			s.logger,
 			s.plugin, // Pass plugin reference for metadata lookup
 		)

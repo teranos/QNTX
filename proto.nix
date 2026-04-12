@@ -20,7 +20,8 @@
         plugin/grpc/protocol/server.proto \
         plugin/grpc/protocol/fileservice.proto \
         plugin/grpc/protocol/llm.proto \
-        plugin/grpc/protocol/embedding.proto
+        plugin/grpc/protocol/embedding.proto \
+        plugin/grpc/protocol/vectorsearch.proto
 
       echo "✓ Plugin proto files generated in plugin/grpc/protocol/"
 
