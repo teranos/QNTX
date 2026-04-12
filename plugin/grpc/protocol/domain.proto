@@ -98,6 +98,10 @@ message InitializeRequest {
   // ground_endpoint: gRPC endpoint for GroundService
   // Provides: Write attestations to Ground's deferred news database
   string ground_endpoint = 10;
+
+  // search_endpoint: gRPC endpoint for SearchService
+  // Provides: Full-text search over indexed documents (routed through core to provider plugin)
+  string search_endpoint = 11;
 }
 
 message HTTPRequest {
@@ -205,6 +209,10 @@ message InitializeResponse {
   // vector_search_provider indicates this plugin implements VectorSearchService (ADR-016).
   // Core registers it as a vector search backend in the service mesh.
   bool vector_search_provider = 5;
+
+  // search_provider indicates this plugin implements SearchProvider (Search RPCs).
+  // Core registers it as the search backend in the service mesh.
+  bool search_provider = 6;
 }
 
 // WatcherRegistration declares a watcher a plugin wants core to manage.

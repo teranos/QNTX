@@ -198,6 +198,7 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 			req.FileServiceEndpoint,
 			req.LlmEndpoint,
 			req.VectorSearchEndpoint,
+			req.SearchEndpoint,
 			req.AuthToken,
 			pluginConfig,
 			s.logger,

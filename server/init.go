@@ -296,6 +296,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 				"file_service", endpoints.FileServiceAddress,
 				"llm", endpoints.LLMAddress,
 				"embedding", endpoints.EmbeddingAddress,
+				"search", endpoints.SearchAddress,
 			)
 		}
 
@@ -363,16 +364,20 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 				serverLogger.Infow("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
 			}
 
-			// Register LLM providers with the core LLM router
+			// Register LLM and Search providers with core routers
 			if server.servicesManager != nil {
 				llmRouter := server.servicesManager.GetLLMRouter()
-				if llmRouter != nil {
-					for _, p := range plugins {
-						proxy, ok := p.(*grpcplugin.ExternalDomainProxy)
-						if !ok || !proxy.IsLLMProvider() {
-							continue
-						}
+				searchRouter := server.servicesManager.GetSearchRouter()
+				for _, p := range plugins {
+					proxy, ok := p.(*grpcplugin.ExternalDomainProxy)
+					if !ok {
+						continue
+					}
+					if proxy.IsLLMProvider() && llmRouter != nil {
 						llmRouter.RegisterProvider(p.Metadata().Name, proxy.LLMServiceClient())
+					}
+					if proxy.IsSearchProvider() && searchRouter != nil {
+						searchRouter.RegisterProvider(p.Metadata().Name, proxy.SearchServiceClient())
 					}
 				}
 			}
@@ -790,6 +795,8 @@ func (c *pluginConfigWithEndpoints) GetString(key string) string {
 			return c.endpoints.VectorSearchAddress
 		case "_ground_endpoint":
 			return c.endpoints.GroundAddress
+		case "_search_endpoint":
+			return c.endpoints.SearchAddress
 		case "_auth_token":
 			return c.endpoints.AuthToken
 		}
@@ -829,6 +836,8 @@ func (c *pluginConfigWithEndpoints) Get(key string) interface{} {
 			return c.endpoints.VectorSearchAddress
 		case "_ground_endpoint":
 			return c.endpoints.GroundAddress
+		case "_search_endpoint":
+			return c.endpoints.SearchAddress
 		case "_auth_token":
 			return c.endpoints.AuthToken
 		}

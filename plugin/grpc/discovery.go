@@ -755,20 +755,26 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		}
 	}
 
-	// Re-register LLM provider if applicable
+	// Re-register service providers if applicable
 	m.mu.RLock()
 	p, exists := m.plugins[name]
 	m.mu.RUnlock()
 	if !exists || m.servicesManager == nil {
+		m.logger.Infof("Plugin '%s' restarted successfully", name)
 		return
 	}
 	proxy := p.client
-	if !proxy.IsLLMProvider() {
-		return
+	if proxy.IsLLMProvider() {
+		if llmRouter := m.servicesManager.GetLLMRouter(); llmRouter != nil {
+			llmRouter.RegisterProvider(name, proxy.LLMServiceClient())
+			m.logger.Infof("Re-registered LLM provider '%s' after restart", name)
+		}
 	}
-	if llmRouter := m.servicesManager.GetLLMRouter(); llmRouter != nil {
-		llmRouter.RegisterProvider(name, proxy.LLMServiceClient())
-		m.logger.Infof("Re-registered LLM provider '%s' after restart", name)
+	if proxy.IsSearchProvider() {
+		if searchRouter := m.servicesManager.GetSearchRouter(); searchRouter != nil {
+			searchRouter.RegisterProvider(name, proxy.SearchServiceClient())
+			m.logger.Infof("Re-registered search provider '%s' after restart", name)
+		}
 	}
 
 	m.logger.Infof("Plugin '%s' restarted successfully", name)
