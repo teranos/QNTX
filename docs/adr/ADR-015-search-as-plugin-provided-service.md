@@ -15,7 +15,7 @@ MeiliSearch is a proven full-text search engine with typo tolerance, faceted fil
 
 Add SearchService as a plugin-provided gRPC service. A new plugin — `qntx-meili` (Rust) — owns the MeiliSearch instance and registers as the search backend. Core routes search calls to the provider. Consumers call `SearchService.Search` without knowing or caring about the underlying engine.
 
-`qntx-meili` is a dedicated search provider plugin, separate from any domain plugin. Domain plugins are consumers of SearchService, not providers.
+`qntx-meili` is a dedicated search provider plugin, separate from any domain plugin. Domain plugins are consumers of SearchService, not providers. `qntx-meili` lives in `qntx-plugins/qntx-meili/` in this repository.
 
 This is the second plugin-provided service on `ServiceRegistry`, after LLMService.
 
