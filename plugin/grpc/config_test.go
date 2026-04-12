@@ -247,6 +247,7 @@ func TestRemoteServiceRegistryConfig(t *testing.T) {
 			"", // file service
 			"", // llm
 			"", // vector search
+			"", // search
 			"test-token",
 			configMap,
 			nil, // logger

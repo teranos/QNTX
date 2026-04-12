@@ -111,6 +111,7 @@ func (m *mockServiceRegistry) Schedule() pluginpkg.ScheduleService         { ret
 func (m *mockServiceRegistry) FileService() pluginpkg.FileService          { return nil }
 func (m *mockServiceRegistry) LLM() pluginpkg.LLMService                   { return nil }
 func (m *mockServiceRegistry) VectorSearch() pluginpkg.VectorSearchService { return nil }
+func (m *mockServiceRegistry) Search() pluginpkg.SearchService             { return nil }
 
 type mockConfig struct{}
 
