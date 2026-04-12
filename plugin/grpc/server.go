@@ -129,6 +129,13 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 		s.logger.Infow("Registered LLMService on plugin server", "plugin", s.plugin.Metadata().Name)
 	}
 
+	// If plugin implements SearchProvider, register SearchService on the same server
+	if provider, ok := s.plugin.(plugin.SearchProvider); ok {
+		searchSrv := &searchPluginServer{provider: provider}
+		protocol.RegisterSearchServiceServer(grpcServer, searchSrv)
+		s.logger.Infow("Registered SearchService on plugin server", "plugin", s.plugin.Metadata().Name)
+	}
+
 	s.logger.Infow("Starting gRPC plugin server", "address", actualAddr, "port", actualPort)
 
 	// Handle graceful shutdown
@@ -243,11 +250,13 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 	}
 
 	_, isLLMProvider := s.plugin.(plugin.LLMProvider)
+	_, isSearchProvider := s.plugin.(plugin.SearchProvider)
 
 	return &protocol.InitializeResponse{
-		HandlerNames: handlerNames,
-		Schedules:    schedules,
-		LlmProvider:  isLLMProvider,
+		HandlerNames:   handlerNames,
+		Schedules:      schedules,
+		LlmProvider:    isLLMProvider,
+		SearchProvider: isSearchProvider,
 	}, nil
 }
 
@@ -542,5 +551,66 @@ func (s *llmPluginServer) Chat(ctx context.Context, req *protocol.LLMChatRequest
 		PromptTokens:     int32(resp.PromptTokens),
 		CompletionTokens: int32(resp.CompletionTokens),
 		TotalTokens:      int32(resp.TotalTokens),
+	}, nil
+}
+
+// searchPluginServer implements protocol.SearchServiceServer by wrapping a plugin.SearchProvider.
+type searchPluginServer struct {
+	protocol.UnimplementedSearchServiceServer
+	provider plugin.SearchProvider
+}
+
+func (s *searchPluginServer) Search(ctx context.Context, req *protocol.SearchRequest) (*protocol.SearchResponse, error) {
+	resp, err := s.provider.Search(ctx, plugin.SearchRequest{
+		Query:   req.Query,
+		Index:   req.Index,
+		TopK:    int(req.TopK),
+		Filters: req.Filters,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	hits := make([]*protocol.SearchHit, len(resp.Hits))
+	for i, h := range resp.Hits {
+		hits[i] = &protocol.SearchHit{
+			Id:       h.ID,
+			Score:    h.Score,
+			Document: h.Document,
+		}
+	}
+
+	return &protocol.SearchResponse{
+		Hits:         hits,
+		Total:        int32(resp.Total),
+		ProcessingMs: int32(resp.ProcessingMs),
+	}, nil
+}
+
+func (s *searchPluginServer) IndexDocuments(ctx context.Context, req *protocol.IndexDocumentsRequest) (*protocol.IndexDocumentsResponse, error) {
+	resp, err := s.provider.IndexDocuments(ctx, plugin.IndexDocumentsRequest{
+		Index:     req.Index,
+		Documents: req.Documents,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &protocol.IndexDocumentsResponse{
+		Accepted: int32(resp.Accepted),
+	}, nil
+}
+
+func (s *searchPluginServer) DeleteDocuments(ctx context.Context, req *protocol.DeleteDocumentsRequest) (*protocol.DeleteDocumentsResponse, error) {
+	resp, err := s.provider.DeleteDocuments(ctx, plugin.DeleteDocumentsRequest{
+		Index: req.Index,
+		IDs:   req.Ids,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &protocol.DeleteDocumentsResponse{
+		Deleted: int32(resp.Deleted),
 	}, nil
 }
