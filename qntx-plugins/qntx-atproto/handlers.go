@@ -40,6 +40,9 @@ func (p *Plugin) registerHTTPHandlers(mux *http.ServeMux) error {
 	// Timeline sync (for Pulse scheduling or manual triggering)
 	mux.HandleFunc("POST /sync-timeline", p.handleSyncTimeline)
 
+	// Semantic search over timeline posts
+	mux.HandleFunc("GET /search-timeline", p.handleSearchTimeline)
+
 	// AT Protocol feed glyph
 	mux.HandleFunc("GET /feed-glyph", p.handleFeedGlyph)
 	mux.HandleFunc("GET /feed-glyph.css", p.handleFeedGlyphCSS)
