@@ -26,13 +26,15 @@ This is the second plugin-provided service on `ServiceRegistry`, after LLMServic
 ```protobuf
 service SearchService {
   rpc Search(SearchRequest) returns (SearchResponse);
+  rpc IndexDocuments(IndexDocumentsRequest) returns (IndexDocumentsResponse);
+  rpc DeleteDocuments(DeleteDocumentsRequest) returns (DeleteDocumentsResponse);
 }
 
 message SearchRequest {
   string query = 1;           // search query text
   string index = 2;           // which index to search
   int32 top_k = 3;            // max results to return
-  map<string, string> filters = 4;  // facet filters
+  bytes filters = 4;          // filter expression as JSON — interpreted by the provider
 }
 
 message SearchResponse {
@@ -44,9 +46,31 @@ message SearchResponse {
 message SearchHit {
   string id = 1;
   float score = 2;
-  map<string, string> fields = 3;   // document fields
+  bytes document = 3;         // indexed content as JSON
+}
+
+message IndexDocumentsRequest {
+  string index = 1;           // index name (created implicitly if needed)
+  repeated bytes documents = 2; // documents as JSON — schema is qntx-meili's concern
+}
+
+message IndexDocumentsResponse {
+  int32 accepted = 1;         // number of documents accepted for indexing
+}
+
+message DeleteDocumentsRequest {
+  string index = 1;
+  repeated string ids = 2;    // document IDs to remove
+}
+
+message DeleteDocumentsResponse {
+  int32 deleted = 1;
 }
 ```
+
+## Responsibility boundary
+
+Domain plugins decide *what* gets indexed and *when* — they push JSON documents and search by query. `qntx-meili` decides *how* — index creation, schema detection, field configuration, async task management, and all MeiliSearch-specific mechanics. The proto is engine-agnostic: documents in, results out.
 
 ## Consumers
 
@@ -62,11 +86,17 @@ Fuzzy-ax is string-level approximation over attestation fields. SearchService re
 
 Same pattern as LLMService: `SearchServer` in core holds a reference to the provider backend. Provider plugins register via `SetService`. Callers go through `services.Search()` on `ServiceRegistry`.
 
-No queuing needed initially — MeiliSearch handles concurrent reads natively. If write contention becomes an issue (index updates during search), the provider handles it internally.
+## Startup ordering
+
+If a plugin calls `services.Search()` before `qntx-meili` has initialized, the call fails. The plugin should fail its own initialization and be restarted until SearchService is available.
+
+## Meili Panel Glyph
+
+`qntx-meili` registers a panel glyph for index management visibility. Shows indexes, document counts, indexing status. Without this, the search infrastructure is a black box.
 
 ## Consequences
 
 - `qntx-meili` is a standalone Rust plugin — search infrastructure lives in its own process
 - Domain plugins stay decoupled from search internals — no MeiliSearch client dependencies
 - Fuzzy-ax has a concrete replacement path
-- Index management (creation, schema, updates) is `qntx-meili`'s responsibility, not core's
+- Index management is `qntx-meili`'s concern — domain plugins push documents, the provider handles the rest
