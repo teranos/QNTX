@@ -1,26 +1,23 @@
 #pragma once
 
-#include <atomic>
 #include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include <grpcpp/grpcpp.h>
 
 #include "domain.grpc.pb.h"
 #include "llm.grpc.pb.h"
-#include "ats_client.h"
 
-#define PLUGIN_VERSION "0.36.1"
+#define PLUGIN_VERSION "0.2.1"
 
 // Forward declarations
 struct llama_model;
 struct llama_context;
 struct mtmd_context;
-class MetalRenderer;
 
 // Sampler chain configuration — controls which samplers are active and their params.
 // Defaults produce the same behavior as the previous temp-only chain.
@@ -33,35 +30,6 @@ struct SamplerConfig {
     float penalty_repeat = 1.0f;    // 1.0 = disabled
     float penalty_freq = 0.0f;      // 0.0 = disabled
     float penalty_present = 0.0f;   // 0.0 = disabled
-};
-
-// A candidate token and its probability from the pre-sampler logit distribution
-struct TokenCandidate {
-    int id;
-    std::string text;
-    float prob;
-};
-
-// Snapshot of the token distribution at a point in the sampler chain.
-// Captured by observer samplers inserted between each stage.
-struct SamplerStageSnapshot {
-    std::string stage_name;          // e.g. "penalties", "top_k", "top_p", "temp"
-    int active_count;                // tokens remaining with nonzero probability
-    float top1_prob;                 // probability of top token after this stage
-    float entropy;                   // Shannon entropy after this stage
-    std::vector<TokenCandidate> top_k;  // top-5 candidates after this stage
-};
-
-// Per-token signal captured before sampling
-struct TokenSignal {
-    int token_id;
-    std::string token_text;
-    float confidence;                      // P(chosen) from raw distribution
-    float entropy;                         // Shannon entropy in bits
-    float top_gap;                         // P(top1) - P(top2)
-    std::vector<TokenCandidate> top_k;     // top-k candidates with probabilities
-    std::vector<float> full_distribution;  // Full softmax distribution (vocab_size floats)
-    std::vector<SamplerStageSnapshot> sampler_stages;  // per-stage snapshots through chain
 };
 
 // Inference engine wrapping llama.cpp
@@ -79,48 +47,22 @@ public:
         std::string content;
         int prompt_tokens;
         int completion_tokens;
-        std::vector<TokenSignal> signals;
         std::string warning;  // non-empty if prompt was truncated to fit n_ctx
 
         // Performance breakdown (milliseconds)
-        long prompt_eval_ms = 0;   // prompt decode into KV cache
-        long generation_ms = 0;    // total generation loop
-        long decode_ms = 0;        // llama_decode calls only
-        long signal_ms = 0;        // capture_signal: ~55ms GPU sync + ~3ms actual work
-        long callback_ms = 0;      // token callback (proto + renderer + grpc)
+        long prompt_eval_ms = 0;
+        long generation_ms = 0;
+        long decode_ms = 0;
+        long callback_ms = 0;
     };
 
-    // Single-turn (deprecated, wraps multi-turn)
-    ChatResult chat(const std::string& system_prompt,
-                    const std::string& user_prompt,
-                    float temperature,
-                    int max_tokens,
-                    const SamplerConfig& sampler_cfg = {});
-
-    // Multi-turn without streaming (deprecated — use stream_chat)
-    // No timing instrumentation, no per-token callback, no renderer integration.
-    // Performance fields in ChatResult will be zero.
     struct Message {
         std::string role;    // "system", "user", "assistant"
         std::string content;
     };
 
-    [[deprecated("use stream_chat — non-streaming path has no timing or renderer integration")]]
-    ChatResult chat(const std::vector<Message>& messages,
-                    float temperature,
-                    int max_tokens,
-                    const SamplerConfig& sampler_cfg = {});
-
-    // Callback receives token text + signal per step. Return false to abort.
-    using TokenCallback = std::function<bool(const std::string& token_text, const TokenSignal& signal)>;
-
-    // Single-turn streaming (deprecated, wraps multi-turn)
-    ChatResult stream_chat(const std::string& system_prompt,
-                           const std::string& user_prompt,
-                           float temperature,
-                           int max_tokens,
-                           TokenCallback on_token,
-                           const SamplerConfig& sampler_cfg = {});
+    // Callback receives token text per step. Return false to abort.
+    using TokenCallback = std::function<bool(const std::string& token_text)>;
 
     // Multi-turn streaming
     ChatResult stream_chat(const std::vector<Message>& messages,
@@ -142,26 +84,11 @@ public:
                                    TokenCallback on_token,
                                    const SamplerConfig& sampler_cfg = {});
 
-    // Non-streaming vision variant
-    ChatResult chat_vision(const std::vector<Message>& messages,
-                           const std::vector<ImageAttachment>& images,
-                           float temperature,
-                           int max_tokens,
-                           const SamplerConfig& sampler_cfg = {});
-
     std::string model_name() const { return model_name_; }
     int vocab_size() const;
     std::string token_text(int token_id) const;
 
-    // Get vocab token positions (3D) and colors (RGB) via PCA.
-    // Computed once at model load, cached. Returns vocab_size × 6 floats
-    // (3 Poincaré position + 3 normalized color from PCA components 4-6).
-    const std::vector<float>& vocab_positions_3d();
-
 private:
-    void compute_vocab_positions();
-    bool load_vocab_cache();
-    void write_vocab_cache();
     int prepare_prompt(const std::vector<Message>& messages,
                        ChatResult& result);
     void init_vision(const std::string& model_path);
@@ -174,17 +101,12 @@ private:
     mtmd_context* mtmd_ctx_ = nullptr;
     std::string model_path_;
     std::string model_name_;
-    bool backend_initialized_ = false;
     std::mutex mutex_;
-    std::vector<float> vocab_positions_;  // cached positions+colors (n_vocab × 6: 3 pos + 3 color)
 };
 
 // DomainPluginService implementation
-class ScryPlugin final : public protocol::DomainPluginService::Service {
+class GazePlugin final : public protocol::DomainPluginService::Service {
 public:
-    ScryPlugin();
-    ~ScryPlugin();
-
     grpc::Status Metadata(grpc::ServerContext* ctx,
                           const protocol::Empty* req,
                           protocol::MetadataResponse* resp) override;
@@ -225,28 +147,24 @@ public:
                               const protocol::ParseAxQueryRequest* req,
                               protocol::ParseAxQueryResponse* resp) override;
 
-    InferenceEngine& engine() { return engine_; }
-    MetalRenderer& renderer() { return *renderer_; }
-    AtsClient& ats_client() { return ats_client_; }
+    // Get engine by model name. Returns nullptr if not found.
+    InferenceEngine* get_engine(const std::string& model_name);
+
+    // Get the first (or only) engine. Returns nullptr if none loaded.
+    InferenceEngine* default_engine();
+
+    // List all advertised model names.
+    std::vector<std::string> model_names() const;
 
     // Activity status for UI feedback
     void set_activity(const std::string& a) { std::lock_guard<std::mutex> l(activity_mu_); activity_ = a; }
     std::string activity() { std::lock_guard<std::mutex> l(activity_mu_); return activity_; }
 
-    // PCA readiness — set to true once background thread finishes
-    bool pca_ready() const { return pca_ready_.load(std::memory_order_acquire); }
-
     const SamplerConfig& sampler_config() const { return sampler_cfg_; }
 
 private:
-    InferenceEngine engine_;
-    std::unique_ptr<MetalRenderer> renderer_;
-    AtsClient ats_client_;
+    std::map<std::string, std::unique_ptr<InferenceEngine>> engines_;
     SamplerConfig sampler_cfg_;
-
-    // Background PCA computation thread
-    std::thread pca_thread_;
-    std::atomic<bool> pca_ready_{false};
 
     // Activity status
     std::mutex activity_mu_;
@@ -254,9 +172,9 @@ private:
 };
 
 // LLMService implementation
-class ScryLLMService final : public protocol::LLMService::Service {
+class GazeLLMService final : public protocol::LLMService::Service {
 public:
-    explicit ScryLLMService(ScryPlugin* plugin);
+    explicit GazeLLMService(GazePlugin* plugin);
 
     grpc::Status Chat(grpc::ServerContext* ctx,
                       const protocol::LLMChatRequest* req,
@@ -267,5 +185,5 @@ public:
                             grpc::ServerWriter<protocol::LLMChatChunk>* writer) override;
 
 private:
-    ScryPlugin* plugin_;
+    GazePlugin* plugin_;
 };

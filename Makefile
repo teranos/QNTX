@@ -39,6 +39,7 @@ dev: web cli ## Build frontend and CLI, then start development servers (backend 
 	TOML_FRONTEND_PORT=$$(grep -E '^frontend_port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
 	BACKEND_PORT=$${BACKEND_PORT:-$${TOML_BACKEND_PORT:-877}}; \
 	FRONTEND_PORT=$${FRONTEND_PORT:-$${TOML_FRONTEND_PORT:-8820}}; \
+	: > tmp/qntx-$$BACKEND_PORT.log 2>/dev/null || true; \
 	echo "🚀 Starting development environment..."; \
 	echo "  Backend:  http://localhost:$$BACKEND_PORT"; \
 	echo "  Frontend: http://localhost:$$FRONTEND_PORT (with live reload)"; \
@@ -227,7 +228,7 @@ desktop-build: desktop-prepare ## Build production desktop app (requires: cargo 
 		cp web/src-tauri/bin/qntx-$$TARGET target/release/bundle/macos/QNTX.app/Contents/MacOS/
 	@echo "✓ Desktop app built in target/release/bundle/"
 
-proto: ## Generate Go code from protobuf definitions (via Nix)
+proto: ## Generate all proto bindings (Go, TypeScript, OCaml)
 	@nix run .#generate-proto
 
 proto-rust: ## Rust proto types are now generated automatically at build time

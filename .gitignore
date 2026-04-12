@@ -84,3 +84,4 @@ qntx-plugins/scry/vendor/
 qntx-plugins/scry/compile_commands.json
 qntx-plugins/qntx-scry-plugin
 plugin/grpc/ocaml/_build/
+ctp/Voor/_build/

@@ -4,11 +4,16 @@ import (
 	"context"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/teranos/QNTX/errors"
 	"go.uber.org/zap"
 )
+
+// pluginInitTimeout is the maximum time a plugin's Initialize call may take
+// before it is cancelled and marked as failed.
+const pluginInitTimeout = 60 * time.Second
 
 // Registry manages all domain plugins
 type Registry struct {
@@ -139,12 +144,15 @@ func (r *Registry) InitializeAll(ctx context.Context, services ServiceRegistry) 
 
 	var failedPlugins []string
 	for _, name := range names {
-		if err := plugins[name].Initialize(ctx, services); err != nil {
+		initCtx, cancel := context.WithTimeout(ctx, pluginInitTimeout)
+		err := plugins[name].Initialize(initCtx, services)
+		cancel()
+		if err != nil {
 			r.logger.Errorf("Failed to initialize plugin '%s': %v", name, err)
 			failedPlugins = append(failedPlugins, name)
-			// Mark as failed but continue with other plugins
 			r.mu.Lock()
 			r.states[name] = StateFailed
+			r.errors[name] = err.Error()
 			r.mu.Unlock()
 			continue
 		}

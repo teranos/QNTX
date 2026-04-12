@@ -99,6 +99,28 @@
     '');
   };
 
+  generate-proto-ocaml = {
+    type = "app";
+    program = toString (pkgs.writeShellScript "generate-proto-ocaml" ''
+      set -e
+      echo "Generating OCaml proto code..."
+
+      PROTOC_GEN_OCAML="$HOME/.opam/5.2.1/bin/protoc-gen-ocaml"
+      if ! [ -x "$PROTOC_GEN_OCAML" ]; then
+        echo "⚠ protoc-gen-ocaml not found at $PROTOC_GEN_OCAML — skipping OCaml proto generation"
+        exit 0
+      fi
+
+      ${pkgs.protobuf}/bin/protoc \
+        --plugin=protoc-gen-ocaml="$PROTOC_GEN_OCAML" \
+        --ocaml_out=plugin/grpc/ocaml/proto/ \
+        plugin/grpc/protocol/domain.proto \
+        plugin/grpc/protocol/atsstore.proto
+
+      echo "✓ OCaml proto files generated in plugin/grpc/ocaml/proto/"
+    '');
+  };
+
   generate-proto = {
     type = "app";
     program = toString (pkgs.writeShellScript "generate-proto" ''
@@ -111,7 +133,22 @@
       # Run TypeScript generation
       nix run .#generate-proto-typescript
 
+      # Run OCaml generation
+      nix run .#generate-proto-ocaml
+
+      # C++ protos are generated at build time via shared proto.cmake
+      # (protoc version must match the linked protobuf library)
+
       echo "✓ All proto files generated"
     '');
   };
+
+  # C++ proto generation is handled by plugin/grpc/protocol/proto.cmake (shared
+  # cmake include) because protoc version must match the linked protobuf library.
+  # Go, TypeScript, and OCaml don't have this constraint.
+
+  # TODO: libstelt — shared C++ library for plugin infrastructure.
+  # All 5 plugins duplicate base64, pdf_extract, LLMClient, ATSClient, and
+  # main() boilerplate. libstelt extracts these into a single linkable library.
+  # Plugins link against libstelt and only implement domain logic.
 }
