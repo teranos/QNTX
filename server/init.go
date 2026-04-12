@@ -376,6 +376,21 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 					}
 				}
 			}
+
+			// Register VectorSearch providers with the core VectorSearch router
+			if server.servicesManager != nil {
+				vsRouter := server.servicesManager.GetVectorSearchRouter()
+				if vsRouter != nil {
+					for _, p := range plugins {
+						proxy, ok := p.(*grpcplugin.ExternalDomainProxy)
+						if !ok || !proxy.IsVectorSearchProvider() {
+							continue
+						}
+						vsRouter.SetService(proxy.VectorSearchServiceClient())
+						serverLogger.Infow("Registered VectorSearch provider", "plugin", p.Metadata().Name)
+					}
+				}
+			}
 		}
 	}
 
@@ -771,6 +786,8 @@ func (c *pluginConfigWithEndpoints) GetString(key string) string {
 			return c.endpoints.LLMAddress
 		case "_embedding_endpoint":
 			return c.endpoints.EmbeddingAddress
+		case "_vector_search_endpoint":
+			return c.endpoints.VectorSearchAddress
 		case "_auth_token":
 			return c.endpoints.AuthToken
 		}
@@ -806,6 +823,8 @@ func (c *pluginConfigWithEndpoints) Get(key string) interface{} {
 			return c.endpoints.LLMAddress
 		case "_embedding_endpoint":
 			return c.endpoints.EmbeddingAddress
+		case "_vector_search_endpoint":
+			return c.endpoints.VectorSearchAddress
 		case "_auth_token":
 			return c.endpoints.AuthToken
 		}

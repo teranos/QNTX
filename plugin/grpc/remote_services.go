@@ -18,21 +18,23 @@ import (
 // gRPC plugins receive this registry with endpoints to connect back to QNTX.
 // Services are accessed via gRPC clients that connect to the endpoints.
 type RemoteServiceRegistry struct {
-	ctx                 context.Context // Parent context for cancellation
-	atsStoreEndpoint    string
-	queueEndpoint       string
-	scheduleEndpoint    string
-	fileServiceEndpoint string
-	llmEndpoint         string
-	authToken           string
-	config              map[string]string
-	logger              *zap.SugaredLogger
-	atsStoreClient      ats.AttestationStore   // Lazy-initialized gRPC client
-	queueClient         plugin.QueueService    // Lazy-initialized gRPC client
-	scheduleClient      plugin.ScheduleService // Lazy-initialized gRPC client
-	fileServiceClient   plugin.FileService     // Lazy-initialized gRPC client
-	llmClient           plugin.LLMService      // Lazy-initialized gRPC client
-	pluginRef           plugin.DomainPlugin    // Reference to plugin for metadata lookup
+	ctx                  context.Context // Parent context for cancellation
+	atsStoreEndpoint     string
+	queueEndpoint        string
+	scheduleEndpoint     string
+	fileServiceEndpoint  string
+	llmEndpoint          string
+	vectorSearchEndpoint string
+	authToken            string
+	config               map[string]string
+	logger               *zap.SugaredLogger
+	atsStoreClient       ats.AttestationStore       // Lazy-initialized gRPC client
+	queueClient          plugin.QueueService        // Lazy-initialized gRPC client
+	scheduleClient       plugin.ScheduleService     // Lazy-initialized gRPC client
+	fileServiceClient    plugin.FileService         // Lazy-initialized gRPC client
+	llmClient            plugin.LLMService          // Lazy-initialized gRPC client
+	vectorSearchClient   plugin.VectorSearchService // Lazy-initialized gRPC client
+	pluginRef            plugin.DomainPlugin        // Reference to plugin for metadata lookup
 }
 
 // NewRemoteServiceRegistry creates a new remote service registry.
@@ -46,22 +48,24 @@ func NewRemoteServiceRegistry(
 	scheduleEndpoint string,
 	fileServiceEndpoint string,
 	llmEndpoint string,
+	vectorSearchEndpoint string,
 	authToken string,
 	config map[string]string,
 	logger *zap.SugaredLogger,
 	pluginRef plugin.DomainPlugin,
 ) *RemoteServiceRegistry {
 	return &RemoteServiceRegistry{
-		ctx:                 context.Background(),
-		atsStoreEndpoint:    atsStoreEndpoint,
-		queueEndpoint:       queueEndpoint,
-		scheduleEndpoint:    scheduleEndpoint,
-		fileServiceEndpoint: fileServiceEndpoint,
-		llmEndpoint:         llmEndpoint,
-		authToken:           authToken,
-		config:              config,
-		logger:              logger,
-		pluginRef:           pluginRef,
+		ctx:                  context.Background(),
+		atsStoreEndpoint:     atsStoreEndpoint,
+		queueEndpoint:        queueEndpoint,
+		scheduleEndpoint:     scheduleEndpoint,
+		fileServiceEndpoint:  fileServiceEndpoint,
+		llmEndpoint:          llmEndpoint,
+		vectorSearchEndpoint: vectorSearchEndpoint,
+		authToken:            authToken,
+		config:               config,
+		logger:               logger,
+		pluginRef:            pluginRef,
 	}
 }
 
@@ -161,6 +165,20 @@ func (r *RemoteServiceRegistry) LLM() plugin.LLMService {
 		r.llmClient = client
 	}
 	return r.llmClient
+}
+
+// VectorSearch returns a gRPC client for vector search operations.
+// The client is lazy-initialized on first access.
+func (r *RemoteServiceRegistry) VectorSearch() plugin.VectorSearchService {
+	if r.vectorSearchClient == nil && r.vectorSearchEndpoint != "" {
+		client, err := NewRemoteVectorSearch(r.ctx, r.vectorSearchEndpoint, r.authToken, r.logger)
+		if err != nil {
+			r.logger.Errorw("Failed to create VectorSearch client", "error", err)
+			return nil
+		}
+		r.vectorSearchClient = client
+	}
+	return r.vectorSearchClient
 }
 
 // remoteConfig provides configuration for remote plugins using viper for parsing.

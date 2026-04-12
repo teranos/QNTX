@@ -90,6 +90,10 @@ message InitializeRequest {
   // embedding_endpoint: gRPC endpoint for EmbeddingService
   // Provides: Text-to-vector embedding generation
   string embedding_endpoint = 8;
+
+  // vector_search_endpoint: gRPC endpoint for VectorSearchService
+  // Provides: Nearest-neighbor search over dense vector indexes (ADR-016)
+  string vector_search_endpoint = 9;
 }
 
 message HTTPRequest {
@@ -193,6 +197,10 @@ message InitializeResponse {
   // Core creates watchers with action_type=plugin_execute targeting this plugin.
   // On match, core calls ExecuteJob with the matching attestation as payload.
   repeated WatcherRegistration watchers = 4;
+
+  // vector_search_provider indicates this plugin implements VectorSearchService (ADR-016).
+  // Core registers it as a vector search backend in the service mesh.
+  bool vector_search_provider = 5;
 }
 
 // WatcherRegistration declares a watcher a plugin wants core to manage.
