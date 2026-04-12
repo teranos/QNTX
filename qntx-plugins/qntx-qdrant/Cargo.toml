@@ -1,0 +1,42 @@
+[package]
+name = "qntx-qdrant-plugin"
+version = "0.1.0"
+edition.workspace = true
+description = "QNTX plugin providing SearchService (ADR-015) and VectorSearchService (ADR-016) backed by a plugin-managed Qdrant instance (ADR-017)"
+license.workspace = true
+authors = ["QNTX Contributors"]
+
+[[bin]]
+name = "qntx-qdrant-plugin"
+path = "src/main.rs"
+
+[dependencies]
+# QNTX gRPC infrastructure (proto + plugin server scaffolding)
+qntx-grpc = { path = "../../crates/qntx-grpc", features = ["plugin"] }
+
+# gRPC and async
+tonic.workspace = true
+prost.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+
+# Qdrant client — talks to the Qdrant instance this plugin supervises.
+# The qdrant server binary is provided by the plugin's nix flake; this
+# plugin never assumes a user-installed Qdrant.
+# TODO: pin to the version that matches the bundled qdrant binary.
+qdrant-client = "1.14"
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Utilities
+thiserror.workspace = true
+parking_lot.workspace = true

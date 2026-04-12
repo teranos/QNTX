@@ -11,6 +11,7 @@ members = [
     "crates/qntx-wasm",
     "qntx-plugins/pty-glyph",
     "qntx-plugins/qntx-python",
+    "qntx-plugins/qntx-qdrant",
     "qntx-plugins/qntx-reduce",
     "web/src-tauri",
 ]

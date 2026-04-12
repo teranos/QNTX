@@ -12,6 +12,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         proto_dir.join("queue.proto"),
         proto_dir.join("server.proto"),
         proto_dir.join("llm.proto"),
+        proto_dir.join("search.proto"),
+        proto_dir.join("vectorsearch.proto"),
     ];
 
     let mut config = prost_build::Config::new();

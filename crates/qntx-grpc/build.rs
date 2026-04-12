@@ -12,6 +12,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             proto_dir.join("domain.proto"),
             proto_dir.join("atsstore.proto"),
             proto_dir.join("queue.proto"),
+            proto_dir.join("search.proto"),
+            proto_dir.join("vectorsearch.proto"),
         ];
 
         // Check that proto files exist
