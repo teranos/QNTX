@@ -1,21 +1,20 @@
 //! Entry point for the qntx-qdrant plugin.
 //!
-//! Boots the managed Qdrant instance first, then starts the gRPC server that
-//! exposes three services on one port:
+//! Opens the in-process Qdrant engine, then serves three gRPC services on
+//! one port:
 //!
 //!   * DomainPluginService  — plugin-host contract
 //!   * SearchService        — ADR-015
 //!   * VectorSearchService  — ADR-016
 //!
-//! If Qdrant fails to come up, the plugin exits non-zero rather than serving
-//! degraded RPCs. "Entire thing plugin-managed" (ADR-017) only has teeth if
-//! the plugin refuses to run when it can't manage the engine.
+//! Engine lifetime == plugin process lifetime. No child process, no
+//! supervisor, no external binary.
 
 use clap::Parser;
 use qntx_qdrant_plugin::proto::domain_plugin_service_server::DomainPluginServiceServer;
 use qntx_qdrant_plugin::proto::search_service_server::SearchServiceServer;
 use qntx_qdrant_plugin::proto::vector_search_service_server::VectorSearchServiceServer;
-use qntx_qdrant_plugin::qdrant::{Mode, Supervisor};
+use qntx_qdrant_plugin::qdrant::Engine;
 use qntx_qdrant_plugin::search::SearchServiceImpl;
 use qntx_qdrant_plugin::vector::VectorSearchServiceImpl;
 use qntx_qdrant_plugin::QdrantPluginService;
@@ -24,7 +23,7 @@ use tokio::net::TcpListener;
 use tokio::signal;
 use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::Server;
-use tracing::{error, info, warn, Level};
+use tracing::{info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 
 #[derive(Parser, Debug)]
@@ -32,11 +31,11 @@ use tracing_subscriber::FmtSubscriber;
 #[command(about = "QNTX Qdrant plugin (ADR-017): SearchService + VectorSearchService")]
 #[command(version)]
 struct Args {
-    /// gRPC server port for the plugin's own listener (not Qdrant's).
+    /// gRPC server port for the plugin's listener.
     #[arg(short, long, default_value = "9002")]
     port: u16,
 
-    /// Full address override for the plugin's listener.
+    /// Full address override.
     #[arg(short, long)]
     address: Option<String>,
 
@@ -83,36 +82,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("qntx-qdrant plugin {}", env!("CARGO_PKG_VERSION"));
 
-    // 1) Bring up the plugin-managed Qdrant instance before binding the
-    //    gRPC port. A plugin that can't manage its engine has nothing useful
-    //    to say, so we fail fast instead of serving Unavailable forever.
-    let supervisor = Supervisor::prepare(Mode::ChildProcess).map_err(box_err)?;
-    if let Err(e) = supervisor.start().await {
-        error!("managed qdrant failed to start: {}", e);
-        return Err(box_err(e));
-    }
-    info!(
-        addr = %supervisor.endpoint().addr,
-        data_dir = %supervisor.endpoint().data_dir.display(),
-        "managed qdrant ready",
-    );
+    // 1) Open the in-process engine.
+    let engine = Engine::open().map_err(box_err)?;
+    info!(state_dir = %engine.state_dir().display(), "engine ready");
 
-    // 2) Bind the plugin's own gRPC port (the one the plugin host talks to).
+    // 2) Bind the plugin's gRPC port.
     let listener = bind_plugin_listener(&args).await?;
     let local_addr = listener.local_addr()?;
     println!("QNTX_PLUGIN_PORT={}", local_addr.port());
 
-    // 3) Build services and serve. All three share the same supervisor,
-    //    so all gRPC calls route to the single managed Qdrant.
-    let plugin_svc = QdrantPluginService::new(supervisor.clone());
-    let search_svc = SearchServiceImpl::new(supervisor.clone());
-    let vector_svc = VectorSearchServiceImpl::new(supervisor.clone());
+    // 3) Build services — all three share the same `Engine`.
+    let plugin_svc = QdrantPluginService::new(engine.clone());
+    let search_svc = SearchServiceImpl::new(engine.clone());
+    let vector_svc = VectorSearchServiceImpl::new(engine.clone());
 
     info!("starting gRPC server on {}", local_addr);
     let incoming = TcpListenerStream::new(listener);
 
-    let shutdown_supervisor = supervisor.clone();
-    let serve_result = Server::builder()
+    Server::builder()
         .add_service(
             DomainPluginServiceServer::new(plugin_svc)
                 .max_decoding_message_size(100 * 1024 * 1024)
@@ -121,12 +108,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_service(SearchServiceServer::new(search_svc))
         .add_service(VectorSearchServiceServer::new(vector_svc))
         .serve_with_incoming_shutdown(incoming, shutdown_signal())
-        .await;
+        .await?;
 
-    // Always tear Qdrant down, even if the gRPC server errored.
-    shutdown_supervisor.shutdown().await;
-
-    serve_result?;
     info!("qntx-qdrant shutdown complete");
     Ok(())
 }

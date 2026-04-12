@@ -1,50 +1,43 @@
 # qntx-qdrant
 
-Single plugin providing both **SearchService** (ADR-015) and **VectorSearchService** (ADR-016), backed by a Qdrant instance that the plugin manages end-to-end (ADR-017).
+Single plugin providing both **SearchService** (ADR-015) and **VectorSearchService** (ADR-016). Qdrant's engine is linked directly into the plugin as a Rust library — there is no Qdrant binary, no child process, no sidecar (ADR-017).
 
-## Plugin-managed contract
+## Engine: in-process
 
-The whole point of picking Qdrant over separate MeiliSearch + FAISS plugins is that one engine covers both jobs. The only way that payoff is real is if the plugin is a drop-in: no Qdrant install, no sidecar daemon, no user-touched storage.
+The plugin depends on Qdrant's `segment` crate via a pinned git revision of `qdrant/qdrant`. `Segment` is Qdrant's on-disk unit of storage: HNSW vector index + payload index + WAL, all in one. One `Segment` per named index is sufficient for a single-node plugin; upstream Qdrant's collection / shard / replica layers aren't linked because they aren't needed.
 
-This plugin owns:
-
-- **the binary** — supplied by the plugin's nix flake via `QNTX_QDRANT_BINARY`; the plugin refuses to fall back to `PATH`.
-- **the data directory** — under plugin state (`QNTX_QDRANT_STATE` or a per-user cache default); not a user-chosen path.
-- **the listen port** — ephemeral loopback, rolled on each startup; Qdrant is not reachable from outside the plugin process.
-- **the lifecycle** — `Supervisor::start` blocks until Qdrant is ready; `shutdown` tears it down before the plugin exits. If Qdrant can't start, the plugin exits non-zero instead of serving degraded RPCs.
-
-To a QNTX deployment, Qdrant does not exist as a separate thing to operate.
+The `Engine` type in `src/qdrant.rs` is a plain Rust value: a map from index name to open `Segment`. It lives for the duration of the plugin process and shuts down with it.
 
 ## Services on one port
 
-The plugin's gRPC listener serves three services:
+The plugin's gRPC listener serves three services that share one `Engine`:
 
 | Service               | Source         | Status in this scaffold |
 |-----------------------|----------------|-------------------------|
-| DomainPluginService   | `src/service.rs` | metadata / init / shutdown / health wired; panel glyph deferred |
-| SearchService         | `src/search.rs`  | signatures only — Qdrant mapping is a follow-up |
-| VectorSearchService   | `src/vector.rs`  | signatures only — Qdrant mapping is a follow-up |
+| DomainPluginService   | `src/service.rs` | metadata / init / shutdown / health wired |
+| SearchService         | `src/search.rs`  | signatures only — keyword/BM25 mapping deferred |
+| VectorSearchService   | `src/vector.rs`  | `CreateIndex` wired to `build_segment`; `Search` and `AddVectors` stubbed |
 
-Both search services share the same `Supervisor`, so both route to the single managed Qdrant. That shared backend is what lets hybrid (BM25 + dense) ranking stay inside the engine.
-
-## Supervision modes
-
-`src/qdrant.rs` exposes `Mode::ChildProcess` (the default, spawns the bundled binary) and `Mode::Embedded` (deferred — Qdrant does not expose a stable library surface today). The service layer is written against `Supervisor` so the two modes are interchangeable.
+Because both search services share the same `Engine`, hybrid (dense + sparse) ranking can stay inside the engine.
 
 ## Status
 
-This is a scaffold. What is in place:
+What works today:
 
-- workspace registration (`Cargo.toml`)
-- `search.proto` and `vectorsearch.proto` wired through `qntx-proto` and `qntx-grpc` builds
-- plugin binary that brings up managed Qdrant, then serves all three gRPC services
-- `Supervisor` with child-process lifecycle, ephemeral loopback port, managed data dir
+- `cargo build -p qntx-qdrant-plugin` produces a single binary with Qdrant's engine statically linked
+- `Engine::open` resolves a plugin-owned state directory (`QNTX_QDRANT_STATE` env, or a per-user cache fallback), creates it if missing, and holds segments behind `Arc<RwLock<Segment>>`
+- `VectorSearchService::CreateIndex` actually builds a Qdrant segment (`segment_constructor::build_segment`) with a `Distance::Cosine`, in-RAM mmap `VectorStorageType`, in-RAM payload storage — constructed on a blocking thread, registered on the engine
 
-What is not yet done:
+Still to do:
 
-- `SearchService` / `VectorSearchService` method bodies (return `Unimplemented`)
-- Readiness probe via `qdrant_client::health_check` (currently a TCP-connect probe)
+- `SearchService` method bodies (need keyword/payload-text strategy agreed)
+- `VectorSearchService::Search` and `AddVectors` (segment point upsert / `SegmentEntry::search` wiring)
+- Persistence across restarts — currently `Engine::open` doesn't walk the state dir and re-open existing segments
 - Panel glyph for the Qdrant tray
-- `InitializeResponse` provider flags (`search_provider`, `vector_search_provider`) — field numbers need coordinating with in-flight branches `search-service` and `vector-search-service` before this plugin can register as the backend via the core service mesh
-- Nix flake to supply the `qdrant` binary (plugin expects `QNTX_QDRANT_BINARY`)
-- `qdrant-client` crate version pin aligned with the bundled binary
+- `InitializeResponse` provider flags — field numbers collide between the in-flight `search-service` and `vector-search-service` branches; coordinate before enabling
+
+## Why linked, not supervised
+
+The goal of ADR-017 is to make Qdrant disappear into the plugin. Spawning a child process or asking the user to install Qdrant would defeat that. Linking the `segment` crate is the concrete expression of "plugin managed" — the engine is a library call, not a daemon.
+
+Top-level `Collection` / `ChannelService` / sharding / replica primitives from upstream Qdrant are intentionally not linked: they assume a cluster runtime (peer IDs, shard transfers, consensus) that doesn't exist here.

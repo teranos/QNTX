@@ -1,31 +1,25 @@
 //! SearchService impl (ADR-015).
 //!
-//! Maps the engine-agnostic proto to Qdrant operations:
-//!   * `Search`           → Qdrant full-text / sparse-vector search with
-//!                          `SearchRequest.filters` as payload filter
-//!   * `IndexDocuments`   → upsert JSON docs as points with payload
-//!   * `DeleteDocuments`  → delete points by id
-//!
-//! This module intentionally returns `Unimplemented` until the Qdrant
-//! collection layout is decided (collection-per-index, payload-schema
-//! inference rules, tokenizer config). Those decisions belong in a follow-up;
-//! the service skeleton is what this change establishes.
+//! Single `Segment` per index isn't the natural fit for full-text search —
+//! Qdrant's keyword/BM25 story rides on payload text indexes and sparse
+//! vectors, which this plugin can wire up but hasn't yet. Stubbed until the
+//! index layout is decided.
 
 use crate::proto::{
     search_service_server::SearchService, DeleteDocumentsRequest, DeleteDocumentsResponse,
     IndexDocumentsRequest, IndexDocumentsResponse, SearchRequest, SearchResponse,
 };
-use crate::qdrant::Supervisor;
+use crate::qdrant::Engine;
 use tonic::{Request, Response, Status};
 
 pub struct SearchServiceImpl {
     #[allow(dead_code)] // wired in a follow-up
-    supervisor: Supervisor,
+    engine: Engine,
 }
 
 impl SearchServiceImpl {
-    pub fn new(supervisor: Supervisor) -> Self {
-        Self { supervisor }
+    pub fn new(engine: Engine) -> Self {
+        Self { engine }
     }
 }
 
@@ -35,12 +29,8 @@ impl SearchService for SearchServiceImpl {
         &self,
         _request: Request<SearchRequest>,
     ) -> Result<Response<SearchResponse>, Status> {
-        // TODO: translate SearchRequest → qdrant search with payload filter.
-        // SearchRequest.filters (JSON bytes) maps to a Qdrant Filter via
-        // a small deserializer — the mapping is small but deliberate, so
-        // it lives in a follow-up change rather than a stub.
         Err(Status::unimplemented(
-            "search: qdrant mapping not wired yet (scaffold)",
+            "search: text-over-payload / sparse-vector mapping not wired yet",
         ))
     }
 
@@ -48,11 +38,8 @@ impl SearchService for SearchServiceImpl {
         &self,
         _request: Request<IndexDocumentsRequest>,
     ) -> Result<Response<IndexDocumentsResponse>, Status> {
-        // TODO: upsert documents as points in the named collection.
-        // Collection is created implicitly on first use; payload schema is
-        // inferred from the first batch (same contract as ADR-015).
         Err(Status::unimplemented(
-            "index_documents: qdrant mapping not wired yet (scaffold)",
+            "index_documents: payload-schema inference not wired yet",
         ))
     }
 
@@ -61,7 +48,7 @@ impl SearchService for SearchServiceImpl {
         _request: Request<DeleteDocumentsRequest>,
     ) -> Result<Response<DeleteDocumentsResponse>, Status> {
         Err(Status::unimplemented(
-            "delete_documents: qdrant mapping not wired yet (scaffold)",
+            "delete_documents: not wired yet",
         ))
     }
 }

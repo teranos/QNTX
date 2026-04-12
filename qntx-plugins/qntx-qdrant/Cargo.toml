@@ -2,7 +2,7 @@
 name = "qntx-qdrant-plugin"
 version = "0.1.0"
 edition.workspace = true
-description = "QNTX plugin providing SearchService (ADR-015) and VectorSearchService (ADR-016) backed by a plugin-managed Qdrant instance (ADR-017)"
+description = "QNTX plugin providing SearchService (ADR-015) and VectorSearchService (ADR-016) with Qdrant's engine linked in-process (ADR-017)"
 license.workspace = true
 authors = ["QNTX Contributors"]
 
@@ -14,17 +14,20 @@ path = "src/main.rs"
 # QNTX gRPC infrastructure (proto + plugin server scaffolding)
 qntx-grpc = { path = "../../crates/qntx-grpc", features = ["plugin"] }
 
+# Qdrant's segment crate — the on-disk index (HNSW + payload) that powers
+# a Qdrant collection, used directly in-process. The whole engine runs inside
+# this plugin; there is no Qdrant binary and no external process.
+#
+# Pinned to a commit on qdrant/qdrant. The `segment` crate exposes
+# `build_simple_segment` and friends as top-level `pub fn` — that's the
+# documented embedding surface.
+segment = { git = "https://github.com/qdrant/qdrant.git", rev = "eabee371fda447974a94d29fbaa675a6a596cc7b", package = "segment", default-features = false }
+
 # gRPC and async
 tonic.workspace = true
 prost.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
-
-# Qdrant client — talks to the Qdrant instance this plugin supervises.
-# The qdrant server binary is provided by the plugin's nix flake; this
-# plugin never assumes a user-installed Qdrant.
-# TODO: pin to the version that matches the bundled qdrant binary.
-qdrant-client = "1.14"
 
 # Serialization
 serde.workspace = true
