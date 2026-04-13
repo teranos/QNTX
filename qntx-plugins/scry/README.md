@@ -81,18 +81,24 @@ Like ax and se glyphs but with an added bias dimension. Two columns: left is a f
 
 - **SINF** — Single-threaded inference. One llama.cpp context, one KV cache — requests are serial. No continuous batching or parallel decoding. Core's `LLMServer` queues at `max_concurrent=1`.
 
-- **CWEV** — Weave creation belongs in QNTX core, not scry. Core's `LLMServer` sees all LLM traffic — weaves should be created at the routing layer so every provider (scry, openrouter, future) gets observability for free. Scry should only do inference.
+- **CWEV** — ~~Weave creation belongs in QNTX core, not scry.~~ Moved. `LLMServer.createWeave()` in `plugin/grpc/llm_server.go` accumulates stream chunks (text, model, token signals) and writes a single `["Weave"]` attestation when the stream ends — every provider gets observability for free. Weave count is drained into the Pulse ticker summary via `DrainWeaveCounts()`.
 
 - **PVH** — Private header dependency. PCA projection in `vocab_projection.cpp` accesses `llama-model.h` (private) to read `tok_embd.weight`. Version-fragile against llama.cpp internal changes.
 
 - **CAM** — ~~Orthographic external observer.~~ First-person perspective camera with GLM. WASD moves relative to facing direction, arrows rotate, QE ascend/descend. Smooth interpolation for future token tracking. Data-driven key bindings with `?` help overlay (#748).
 
-- **PIK** — No token identification on hover. Mouse over a particle and nothing happens — you can't tell which token it represents. Needs a GPU pick buffer (render token IDs to an offscreen R32Uint texture, read back pixel under cursor) and a WebSocket round-trip to resolve token ID to text.
+- **PIK** — ~~No token identification on hover.~~ `metal_pick.cpp` renders token IDs into an R32Uint offscreen texture (`ensure_pick_textures`), reads back the pixel under the cursor (`pick_at`), and dispatches via the WebSocket `mouse:` protocol with a 400 ms hover debounce (`consume_pick_result`). Hover label is rasterized via CoreText and cached per-text (`render_label`).
 
-- **NAV** — No keyboard navigation in logit space. Should be able to step through generation steps (`,`/`.`) and cycle through top-k candidates at each step (`[`/`]`), with the camera flying smoothly to the focused particle. Requires target tracking in the camera and a focus_token concept in the renderer.
+- **NAV** — ~~No keyboard navigation in logit space.~~ `step_candidate(dir)` walks a probability-sorted index built by `rebuild_ranked_index()`; `select_candidate()` + `hovered_token_` carry the focus-token concept. `nudge_camera_to_token()` flies the camera only when the focused token leaves the 80% viewport. Keyframe stepping is tracked separately as KFNV.
 
-- **RDR** — No generation redirect. Click an alternative token in 3D to branch the generation: rewind the KV cache to that step, replace the chosen token, continue generation from there. Old path becomes a ghost branch, text updates live. Requires storing prompt/generated token sequences, partial KV cache replay, and a bidirectional WebSocket protocol for redirect commands and streamed results. Depends on PIK and NAV.
+- **RDR** — No generation redirect. Click an alternative token in 3D to branch the generation: rewind the KV cache to that step, replace the chosen token, continue generation from there. Old path becomes a ghost branch, text updates live. Requires storing prompt/generated token sequences, partial KV cache replay, and a bidirectional WebSocket protocol for redirect commands and streamed results. PIK and NAV dependencies resolved — unblocked. Ghost branches today are visualization-only (`add_ghost_branches` in `metal_renderer.cpp`), no KV rewind path yet.
 
 - **SIG** — ~~Signal capture overhead.~~ Resolved. Profiling showed the ~55ms/token attributed to signal extraction was actually `ctx->synchronize()` inside `llama_get_logits_ith()` (llama-context.cpp:3079) — waiting for Metal to finish the decode. Signal extraction itself (softmax + partial sort + top-k) adds ~3ms/token. CPU softmax is 1-2ms after the sync completes. This is llama.cpp's Metal decode pipeline — not optimizable from our side.
+
+- **WSPT** — WebSocket message parsing in `plugin.cpp` uses string-prefix matching (`mouse:`, `examine:`, `cam:`, `scrub:`) with no tests. Extract and unit-test.
+
+- **DCUR** — Hover cursor is a fixed-size screen-space quad — doesn't scale with distance to the particle. Closer particles should get a larger cursor.
+
+- **CSNP** — Camera snap on keyframe change. Subsumed by KFNV: `[`/`]` stepping through tokens in the generation sequence will animate the camera to the new distribution's center, in both scrub (orange) and examine (red) modes.
 
 See `docs/research/metal-scry.md` for the full code reference table including Metal visualization limitations and opportunities.
