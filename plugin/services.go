@@ -145,6 +145,63 @@ type CreateIndexResponse struct {
 	Name string
 }
 
+// SearchService provides full-text search over indexed documents.
+// Core routes requests to the search provider plugin (qntx-meili).
+type SearchService interface {
+	// Search queries an index and returns ranked results.
+	Search(ctx context.Context, req SearchRequest) (*SearchResponse, error)
+
+	// IndexDocuments pushes documents into an index.
+	IndexDocuments(ctx context.Context, req IndexDocumentsRequest) (*IndexDocumentsResponse, error)
+
+	// DeleteDocuments removes documents from an index by ID.
+	DeleteDocuments(ctx context.Context, req DeleteDocumentsRequest) (*DeleteDocumentsResponse, error)
+}
+
+// SearchRequest is a search query against an index.
+type SearchRequest struct {
+	Query   string
+	Index   string
+	TopK    int
+	Filters []byte // filter expression as JSON — interpreted by the provider
+}
+
+// SearchResponse contains ranked search results.
+type SearchResponse struct {
+	Hits         []SearchHit
+	Total        int
+	ProcessingMs int
+}
+
+// SearchHit is a single search result.
+type SearchHit struct {
+	ID       string
+	Score    float32
+	Document []byte // indexed content as JSON
+}
+
+// IndexDocumentsRequest pushes documents into an index.
+type IndexDocumentsRequest struct {
+	Index     string
+	Documents [][]byte // documents as JSON
+}
+
+// IndexDocumentsResponse reports how many documents were accepted.
+type IndexDocumentsResponse struct {
+	Accepted int
+}
+
+// DeleteDocumentsRequest removes documents from an index.
+type DeleteDocumentsRequest struct {
+	Index string
+	IDs   []string
+}
+
+// DeleteDocumentsResponse reports how many documents were deleted.
+type DeleteDocumentsResponse struct {
+	Deleted int
+}
+
 // ServiceRegistry provides access to QNTX core services for domain plugins.
 // Plugins use this registry to look up services they need.
 type ServiceRegistry interface {
@@ -176,6 +233,10 @@ type ServiceRegistry interface {
 	// VectorSearch returns the vector search service for nearest-neighbor queries (ADR-016).
 	// Returns nil if no vector search provider is available.
 	VectorSearch() VectorSearchService
+
+	// Search returns the full-text search service.
+	// Returns nil if no search provider is available.
+	Search() SearchService
 }
 
 // Config provides access to plugin configuration
@@ -283,5 +344,10 @@ func (r *DefaultServiceRegistry) LLM() LLMService {
 
 // VectorSearch returns nil for in-process plugins (VectorSearch is a gRPC-only service).
 func (r *DefaultServiceRegistry) VectorSearch() VectorSearchService {
+	return nil
+}
+
+// Search returns nil for in-process plugins (Search is a gRPC-only service).
+func (r *DefaultServiceRegistry) Search() SearchService {
 	return nil
 }

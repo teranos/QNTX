@@ -233,6 +233,9 @@ type InitializeRequest struct {
 	// ground_endpoint: gRPC endpoint for GroundService
 	// Provides: Write attestations to Ground's deferred news database
 	GroundEndpoint string `protobuf:"bytes,10,opt,name=ground_endpoint,json=groundEndpoint,proto3" json:"ground_endpoint,omitempty"`
+	// search_endpoint: gRPC endpoint for SearchService
+	// Provides: Full-text search over indexed documents (routed through core to provider plugin)
+	SearchEndpoint string `protobuf:"bytes,11,opt,name=search_endpoint,json=searchEndpoint,proto3" json:"search_endpoint,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -333,6 +336,13 @@ func (x *InitializeRequest) GetVectorSearchEndpoint() string {
 func (x *InitializeRequest) GetGroundEndpoint() string {
 	if x != nil {
 		return x.GroundEndpoint
+	}
+	return ""
+}
+
+func (x *InitializeRequest) GetSearchEndpoint() string {
+	if x != nil {
+		return x.SearchEndpoint
 	}
 	return ""
 }
@@ -897,8 +907,11 @@ type InitializeResponse struct {
 	// vector_search_provider indicates this plugin implements VectorSearchService (ADR-016).
 	// Core registers it as a vector search backend in the service mesh.
 	VectorSearchProvider bool `protobuf:"varint,5,opt,name=vector_search_provider,json=vectorSearchProvider,proto3" json:"vector_search_provider,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// search_provider indicates this plugin implements SearchProvider (Search RPCs).
+	// Core registers it as the search backend in the service mesh.
+	SearchProvider bool `protobuf:"varint,6,opt,name=search_provider,json=searchProvider,proto3" json:"search_provider,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *InitializeResponse) Reset() {
@@ -962,6 +975,13 @@ func (x *InitializeResponse) GetWatchers() []*WatcherRegistration {
 func (x *InitializeResponse) GetVectorSearchProvider() bool {
 	if x != nil {
 		return x.VectorSearchProvider
+	}
+	return false
+}
+
+func (x *InitializeResponse) GetSearchProvider() bool {
+	if x != nil {
+		return x.SearchProvider
 	}
 	return false
 }
@@ -1578,7 +1598,7 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\fqntx_version\x18\x03 \x01(\tR\vqntxVersion\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x16\n" +
 	"\x06author\x18\x05 \x01(\tR\x06author\x12\x18\n" +
-	"\alicense\x18\x06 \x01(\tR\alicense\"\x95\x04\n" +
+	"\alicense\x18\x06 \x01(\tR\alicense\"\xbe\x04\n" +
 	"\x11InitializeRequest\x12,\n" +
 	"\x12ats_store_endpoint\x18\x01 \x01(\tR\x10atsStoreEndpoint\x12%\n" +
 	"\x0equeue_endpoint\x18\x02 \x01(\tR\rqueueEndpoint\x12\x1d\n" +
@@ -1591,7 +1611,8 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x12embedding_endpoint\x18\b \x01(\tR\x11embeddingEndpoint\x124\n" +
 	"\x16vector_search_endpoint\x18\t \x01(\tR\x14vectorSearchEndpoint\x12'\n" +
 	"\x0fground_endpoint\x18\n" +
-	" \x01(\tR\x0egroundEndpoint\x1a9\n" +
+	" \x01(\tR\x0egroundEndpoint\x12'\n" +
+	"\x0fsearch_endpoint\x18\v \x01(\tR\x0esearchEndpoint\x1a9\n" +
 	"\vConfigEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"}\n" +
@@ -1650,13 +1671,14 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x10interval_seconds\x18\x02 \x01(\x05R\x0fintervalSeconds\x12,\n" +
 	"\x12enabled_by_default\x18\x03 \x01(\bR\x10enabledByDefault\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x19\n" +
-	"\bats_code\x18\x05 \x01(\tR\aatsCode\"\x83\x02\n" +
+	"\bats_code\x18\x05 \x01(\tR\aatsCode\"\xac\x02\n" +
 	"\x12InitializeResponse\x12#\n" +
 	"\rhandler_names\x18\x01 \x03(\tR\fhandlerNames\x124\n" +
 	"\tschedules\x18\x02 \x03(\v2\x16.protocol.ScheduleInfoR\tschedules\x12!\n" +
 	"\fllm_provider\x18\x03 \x01(\bR\vllmProvider\x129\n" +
 	"\bwatchers\x18\x04 \x03(\v2\x1d.protocol.WatcherRegistrationR\bwatchers\x124\n" +
-	"\x16vector_search_provider\x18\x05 \x01(\bR\x14vectorSearchProvider\"\xe9\x01\n" +
+	"\x16vector_search_provider\x18\x05 \x01(\bR\x14vectorSearchProvider\x12'\n" +
+	"\x0fsearch_provider\x18\x06 \x01(\bR\x0esearchProvider\"\xe9\x01\n" +
 	"\x13WatcherRegistration\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fhandler_name\x18\x02 \x01(\tR\vhandlerName\x12\x1a\n" +

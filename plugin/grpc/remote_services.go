@@ -25,6 +25,7 @@ type RemoteServiceRegistry struct {
 	fileServiceEndpoint  string
 	llmEndpoint          string
 	vectorSearchEndpoint string
+	searchEndpoint       string
 	authToken            string
 	config               map[string]string
 	logger               *zap.SugaredLogger
@@ -34,6 +35,7 @@ type RemoteServiceRegistry struct {
 	fileServiceClient    plugin.FileService         // Lazy-initialized gRPC client
 	llmClient            plugin.LLMService          // Lazy-initialized gRPC client
 	vectorSearchClient   plugin.VectorSearchService // Lazy-initialized gRPC client
+	searchClient         plugin.SearchService       // Lazy-initialized gRPC client
 	pluginRef            plugin.DomainPlugin        // Reference to plugin for metadata lookup
 }
 
@@ -49,6 +51,7 @@ func NewRemoteServiceRegistry(
 	fileServiceEndpoint string,
 	llmEndpoint string,
 	vectorSearchEndpoint string,
+	searchEndpoint string,
 	authToken string,
 	config map[string]string,
 	logger *zap.SugaredLogger,
@@ -62,6 +65,7 @@ func NewRemoteServiceRegistry(
 		fileServiceEndpoint:  fileServiceEndpoint,
 		llmEndpoint:          llmEndpoint,
 		vectorSearchEndpoint: vectorSearchEndpoint,
+		searchEndpoint:       searchEndpoint,
 		authToken:            authToken,
 		config:               config,
 		logger:               logger,
@@ -179,6 +183,20 @@ func (r *RemoteServiceRegistry) VectorSearch() plugin.VectorSearchService {
 		r.vectorSearchClient = client
 	}
 	return r.vectorSearchClient
+}
+
+// Search returns a gRPC client for Search operations.
+// The client is lazy-initialized on first access.
+func (r *RemoteServiceRegistry) Search() plugin.SearchService {
+	if r.searchClient == nil && r.searchEndpoint != "" {
+		client, err := NewRemoteSearch(r.ctx, r.searchEndpoint, r.logger)
+		if err != nil {
+			r.logger.Errorw("Failed to create Search client", "error", err)
+			return nil
+		}
+		r.searchClient = client
+	}
+	return r.searchClient
 }
 
 // remoteConfig provides configuration for remote plugins using viper for parsing.

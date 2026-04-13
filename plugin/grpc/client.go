@@ -43,6 +43,9 @@ type ExternalDomainProxy struct {
 	// vectorSearchProvider indicates this plugin implements VectorSearchService (populated during Initialize)
 	vectorSearchProvider bool
 
+	// searchProvider indicates this plugin implements SearchProvider (populated during Initialize)
+	searchProvider bool
+
 	// Watchers this plugin wants registered (populated during Initialize)
 	watchers []*protocol.WatcherRegistration
 
@@ -176,6 +179,17 @@ func (c *ExternalDomainProxy) VectorSearchServiceClient() protocol.VectorSearchS
 	return protocol.NewVectorSearchServiceClient(c.conn)
 }
 
+// IsSearchProvider returns true if this plugin declared search provider capability during Initialize.
+func (c *ExternalDomainProxy) IsSearchProvider() bool {
+	return c.searchProvider
+}
+
+// SearchServiceClient returns a SearchServiceClient using this plugin's existing gRPC connection.
+// Only meaningful when IsSearchProvider() is true.
+func (c *ExternalDomainProxy) SearchServiceClient() protocol.SearchServiceClient {
+	return protocol.NewSearchServiceClient(c.conn)
+}
+
 // Initialize initializes the remote plugin. Idempotent — safe to call from multiple code paths.
 func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
 	c.initOnce.Do(func() {
@@ -280,6 +294,11 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		groundEndpoint = ep
 		c.logger.Debugw("Extracted Ground endpoint from config", "endpoint", ep)
 	}
+	searchEndpoint := ""
+	if ep := pluginConfig.GetString("_search_endpoint"); ep != "" {
+		searchEndpoint = ep
+		c.logger.Debugw("Extracted Search endpoint from config", "endpoint", ep)
+	}
 	if token := pluginConfig.GetString("_auth_token"); token != "" {
 		authToken = token
 	}
@@ -293,6 +312,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		EmbeddingEndpoint:    embeddingEndpoint,
 		VectorSearchEndpoint: vectorSearchEndpoint,
 		GroundEndpoint:       groundEndpoint,
+		SearchEndpoint:       searchEndpoint,
 		AuthToken:            authToken,
 		Config:               config,
 	}
@@ -307,6 +327,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		"embedding_endpoint", embeddingEndpoint,
 		"vector_search_endpoint", vectorSearchEndpoint,
 		"ground_endpoint", groundEndpoint,
+		"search_endpoint", searchEndpoint,
 	)
 
 	resp, err := c.client.Initialize(ctx, req)
@@ -327,6 +348,9 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	// Store VectorSearch provider capability
 	c.vectorSearchProvider = resp.GetVectorSearchProvider()
 
+	// Store search provider capability
+	c.searchProvider = resp.GetSearchProvider()
+
 	// Store and create watcher registrations
 	c.watchers = resp.GetWatchers()
 	if len(c.watchers) > 0 {
@@ -345,6 +369,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		"watchers", len(c.watchers),
 		"llm_provider", c.llmProvider,
 		"vector_search_provider", c.vectorSearchProvider,
+		"search_provider", c.searchProvider,
 	)
 	return nil
 }
