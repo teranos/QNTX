@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -197,11 +198,51 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 	defaultServer := server.GetDefaultServer()
 
 	if defaultServer != nil && defaultServer.GetServices() != nil {
-		pluginLogger.Infow("Initializing loaded plugins with services", "count", len(loadedPlugins))
-		if err := registry.InitializeAll(context.Background(), defaultServer.GetServices()); err != nil {
-			pluginLogger.Errorw("Failed to initialize plugins", "error", err)
-		} else {
-			pluginLogger.Infow("Successfully initialized all plugins")
+		services := defaultServer.GetServices()
+		sm := defaultServer.GetServicesManager()
+
+		// Initialize each plugin individually, registering provider services
+		// (LLM, VectorSearch) immediately after each init. This ensures provider
+		// plugins like faiss make their services available before consumer plugins
+		// like werf attempt to connect. No hardcoded ordering — alphabetical
+		// sort is sufficient (faiss < werf).
+		sorted := sortPluginsByName(loadedPlugins)
+		pluginLogger.Infow("Initializing plugins", "count", len(sorted))
+		for _, p := range sorted {
+			meta := p.Metadata()
+			initCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			if err := p.Initialize(initCtx, services); err != nil {
+				pluginLogger.Errorw("Failed to initialize plugin",
+					"plugin", meta.Name, "version", meta.Version, "error", err)
+				registry.MarkFailed(meta.Name, err.Error())
+				cancel()
+				continue
+			}
+			cancel()
+			registry.MarkReady(meta.Name)
+			pluginLogger.Infow("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
+
+			// Provider services register immediately — before the next plugin inits
+			if proxy, ok := p.(*grpc.ExternalDomainProxy); ok && sm != nil {
+				if proxy.IsLLMProvider() {
+					if llmRouter := sm.GetLLMRouter(); llmRouter != nil {
+						llmRouter.RegisterProvider(meta.Name, proxy.LLMServiceClient())
+						pluginLogger.Infow("Registered LLM provider", "plugin", meta.Name)
+					}
+				}
+				if proxy.IsVectorSearchProvider() {
+					if vsRouter := sm.GetVectorSearchRouter(); vsRouter != nil {
+						vsRouter.SetService(proxy.VectorSearchServiceClient())
+						pluginLogger.Infow("Registered VectorSearch provider", "plugin", meta.Name)
+					}
+				}
+				if proxy.IsSearchProvider() {
+					if searchRouter := sm.GetSearchRouter(); searchRouter != nil {
+						searchRouter.RegisterProvider(meta.Name, proxy.SearchServiceClient())
+						pluginLogger.Infow("Registered Search provider", "plugin", meta.Name)
+					}
+				}
+			}
 		}
 
 		// Reload watcher engine — plugins may have registered watchers during Initialize
@@ -209,65 +250,40 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 			pluginLogger.Errorw("Failed to reload watchers after plugin init", "error", err)
 		}
 
-		// Phase 4: Register plugin async handlers with Pulse
-		// Now that plugins are initialized, they've announced their handlers in InitializeResponse
-		// Register these handlers with Pulse's worker pool registry
+		// Register plugin async handlers with Pulse
 		daemon := defaultServer.GetDaemon()
 		if daemon != nil {
 			handlerRegistry := daemon.Registry()
 			db := defaultServer.GetDB()
-			pluginLogger.Infow("Registering plugin async handlers with Pulse")
 
 			for _, p := range loadedPlugins {
-				// Only ExternalDomainProxy supports async handlers (not built-in plugins)
 				externalPlugin, ok := p.(*grpc.ExternalDomainProxy)
 				if !ok {
-					continue // Skip built-in plugins
+					continue
 				}
 
-				handlerNames := externalPlugin.GetHandlerNames()
-				for _, handlerName := range handlerNames {
+				for _, handlerName := range externalPlugin.GetHandlerNames() {
 					pluginLogger.Infow("Registering plugin async handler",
-						"plugin", p.Metadata().Name,
-						"handler", handlerName,
-					)
+						"plugin", p.Metadata().Name, "handler", handlerName)
 					proxyHandler := grpc.NewPluginProxyHandler(handlerName, externalPlugin, db, pluginLogger)
 					handlerRegistry.Register(proxyHandler)
 				}
 
-				// Setup plugin-announced schedules
 				schedules := externalPlugin.GetSchedules()
 				if len(schedules) > 0 {
 					if err := grpc.SetupPluginSchedules(db, p.Metadata().Name, schedules, pluginLogger); err != nil {
 						pluginLogger.Errorw("Failed to setup plugin schedules",
-							"plugin", p.Metadata().Name,
-							"error", err,
-						)
+							"plugin", p.Metadata().Name, "error", err)
 					}
 				}
 			}
 			pluginLogger.Infow("Plugin async handler registration complete")
-
-			// Register LLM providers with the core LLM router
-			if sm := defaultServer.GetServicesManager(); sm != nil {
-				if llmRouter := sm.GetLLMRouter(); llmRouter != nil {
-					for _, p := range loadedPlugins {
-						proxy, ok := p.(*grpc.ExternalDomainProxy)
-						if !ok || !proxy.IsLLMProvider() {
-							continue
-						}
-						llmRouter.RegisterProvider(p.Metadata().Name, proxy.LLMServiceClient())
-					}
-				}
-			}
 		} else {
 			pluginLogger.Warnw("Cannot register handlers - Pulse daemon not available, will retry")
-			// Retry schedule setup after Pulse starts
 			go retryPluginSetup(loadedPlugins, registry, pluginLogger)
 		}
 	} else {
 		pluginLogger.Warnw("Cannot initialize plugins - server or services not available yet, will retry")
-		// Retry when server becomes available
 		go retryPluginSetup(loadedPlugins, registry, pluginLogger)
 	}
 
@@ -279,9 +295,21 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 	}
 }
 
-// retryScheduleSetup waits for Pulse daemon to be ready, then sets up plugin schedules
+// sortPluginsByName returns plugins sorted alphabetically by name.
+// This gives deterministic init order without hardcoding dependencies —
+// provider plugins (faiss, openrouter) naturally init before consumers (werf).
+func sortPluginsByName(plugins []plugin.DomainPlugin) []plugin.DomainPlugin {
+	sorted := make([]plugin.DomainPlugin, len(plugins))
+	copy(sorted, plugins)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Metadata().Name < sorted[j].Metadata().Name
+	})
+	return sorted
+}
+
+// retryPluginSetup waits for server infrastructure to be ready, then initializes plugins.
+// Same inline init+register pattern as the primary path — no separate passes.
 func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Registry, logger *zap.SugaredLogger) {
-	// Wait for server, services, and Pulse daemon to all be ready
 	for i := 0; i < 30; i++ {
 		time.Sleep(1 * time.Second)
 
@@ -300,57 +328,70 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 			continue
 		}
 
-		// Everything ready — Initialize plugins first
-		logger.Infow("Server ready, initializing plugins")
-		if err := pluginRegistry.InitializeAll(context.Background(), services); err != nil {
-			logger.Errorw("Failed to initialize plugins", "error", err)
+		sm := defaultServer.GetServicesManager()
+
+		// Init each plugin, register providers inline
+		sorted := sortPluginsByName(plugins)
+		logger.Infow("Server ready, initializing plugins", "count", len(sorted))
+		for _, p := range sorted {
+			meta := p.Metadata()
+			initCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			if err := p.Initialize(initCtx, services); err != nil {
+				logger.Errorw("Failed to initialize plugin",
+					"plugin", meta.Name, "version", meta.Version, "error", err)
+				pluginRegistry.MarkFailed(meta.Name, err.Error())
+				cancel()
+				continue
+			}
+			cancel()
+			pluginRegistry.MarkReady(meta.Name)
+			logger.Infow("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
+
+			if proxy, ok := p.(*grpc.ExternalDomainProxy); ok && sm != nil {
+				if proxy.IsLLMProvider() {
+					if llmRouter := sm.GetLLMRouter(); llmRouter != nil {
+						llmRouter.RegisterProvider(meta.Name, proxy.LLMServiceClient())
+						logger.Infow("Registered LLM provider", "plugin", meta.Name)
+					}
+				}
+				if proxy.IsVectorSearchProvider() {
+					if vsRouter := sm.GetVectorSearchRouter(); vsRouter != nil {
+						vsRouter.SetService(proxy.VectorSearchServiceClient())
+						logger.Infow("Registered VectorSearch provider", "plugin", meta.Name)
+					}
+				}
+				if proxy.IsSearchProvider() {
+					if searchRouter := sm.GetSearchRouter(); searchRouter != nil {
+						searchRouter.RegisterProvider(meta.Name, proxy.SearchServiceClient())
+						logger.Infow("Registered Search provider", "plugin", meta.Name)
+					}
+				}
+			}
 		}
 
-		// Now register handlers and schedules (Initialize has populated them)
+		// Register async handlers with Pulse
 		handlerRegistry := daemon.Registry()
 		db := defaultServer.GetDB()
-
 		for _, p := range plugins {
 			externalPlugin, ok := p.(*grpc.ExternalDomainProxy)
 			if !ok {
 				continue
 			}
-
-			handlerNames := externalPlugin.GetHandlerNames()
-			for _, handlerName := range handlerNames {
+			for _, handlerName := range externalPlugin.GetHandlerNames() {
 				logger.Infow("Registering plugin async handler",
-					"plugin", p.Metadata().Name,
-					"handler", handlerName,
-				)
+					"plugin", p.Metadata().Name, "handler", handlerName)
 				proxyHandler := grpc.NewPluginProxyHandler(handlerName, externalPlugin, db, logger)
 				handlerRegistry.Register(proxyHandler)
 			}
-
 			schedules := externalPlugin.GetSchedules()
 			if len(schedules) > 0 {
 				if err := grpc.SetupPluginSchedules(db, p.Metadata().Name, schedules, logger); err != nil {
 					logger.Errorw("Failed to setup plugin schedules",
-						"plugin", p.Metadata().Name,
-						"error", err,
-					)
+						"plugin", p.Metadata().Name, "error", err)
 				}
 			}
 		}
 
-		// Register LLM providers
-		if sm := defaultServer.GetServicesManager(); sm != nil {
-			if llmRouter := sm.GetLLMRouter(); llmRouter != nil {
-				for _, p := range plugins {
-					proxy, ok := p.(*grpc.ExternalDomainProxy)
-					if !ok || !proxy.IsLLMProvider() {
-						continue
-					}
-					llmRouter.RegisterProvider(p.Metadata().Name, proxy.LLMServiceClient())
-				}
-			}
-		}
-
-		// Reload watcher engine — plugins registered watchers during Initialize
 		if err := defaultServer.ReloadWatchers(); err != nil {
 			logger.Errorw("Failed to reload watchers after plugin init", "error", err)
 		}
