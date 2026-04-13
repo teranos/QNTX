@@ -18,28 +18,31 @@ import (
 
 // ServiceEndpoints holds the addresses of running service servers
 type ServiceEndpoints struct {
-	ATSStoreAddress    string
-	QueueAddress       string
-	ScheduleAddress    string
-	FileServiceAddress string
-	LLMAddress         string
-	EmbeddingAddress   string
-	AuthToken          string
+	ATSStoreAddress     string
+	QueueAddress        string
+	ScheduleAddress     string
+	FileServiceAddress  string
+	LLMAddress          string
+	EmbeddingAddress    string
+	VectorSearchAddress string
+	AuthToken           string
 }
 
 // ServicesManager manages gRPC service servers for plugin callbacks
 type ServicesManager struct {
-	atsStoreServer    *grpc.Server
-	queueServer       *grpc.Server
-	scheduleServer    *grpc.Server
-	fileServiceServer *grpc.Server
-	llmServer         *grpc.Server
-	llmRouter         *LLMServer // Exposed for provider registration after plugin init
-	llmConfig         am.LLMConfig
-	embeddingServer   *grpc.Server
-	embeddingRouter   *EmbeddingServer // Exposed for late backend registration
-	endpoints         ServiceEndpoints
-	logger            *zap.SugaredLogger
+	atsStoreServer     *grpc.Server
+	queueServer        *grpc.Server
+	scheduleServer     *grpc.Server
+	fileServiceServer  *grpc.Server
+	llmServer          *grpc.Server
+	llmRouter          *LLMServer // Exposed for provider registration after plugin init
+	llmConfig          am.LLMConfig
+	embeddingServer    *grpc.Server
+	embeddingRouter    *EmbeddingServer // Exposed for late backend registration
+	vectorSearchServer *grpc.Server
+	vectorSearchRouter *VectorSearchServer // Exposed for provider registration after plugin init
+	endpoints          ServiceEndpoints
+	logger             *zap.SugaredLogger
 }
 
 // NewServicesManager creates a new services manager
@@ -115,14 +118,22 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 		embeddingAddr = ""
 	}
 
+	// Start VectorSearch service (starts empty, provider registers after plugin init)
+	vectorSearchAddr, err := m.startVectorSearchService(ctx, authToken)
+	if err != nil {
+		m.logger.Warnw("Failed to start VectorSearch service, plugins will not have vector search access", "error", err)
+		vectorSearchAddr = ""
+	}
+
 	m.endpoints = ServiceEndpoints{
-		ATSStoreAddress:    atsStoreAddr,
-		QueueAddress:       queueAddr,
-		ScheduleAddress:    scheduleAddr,
-		FileServiceAddress: fileServiceAddr,
-		LLMAddress:         llmAddr,
-		EmbeddingAddress:   embeddingAddr,
-		AuthToken:          authToken,
+		ATSStoreAddress:     atsStoreAddr,
+		QueueAddress:        queueAddr,
+		ScheduleAddress:     scheduleAddr,
+		FileServiceAddress:  fileServiceAddr,
+		LLMAddress:          llmAddr,
+		EmbeddingAddress:    embeddingAddr,
+		VectorSearchAddress: vectorSearchAddr,
+		AuthToken:           authToken,
 	}
 
 	return &m.endpoints, nil
@@ -319,6 +330,36 @@ func (m *ServicesManager) startEmbeddingService(ctx context.Context, authToken s
 	return addr, nil
 }
 
+// startVectorSearchService starts the VectorSearch routing gRPC service.
+// The server starts empty — the provider registers after its own initialization completes.
+func (m *ServicesManager) startVectorSearchService(ctx context.Context, authToken string) (string, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to listen")
+	}
+
+	m.vectorSearchRouter = NewVectorSearchServer(authToken, m.logger)
+	m.vectorSearchServer = grpc.NewServer()
+	protocol.RegisterVectorSearchServiceServer(m.vectorSearchServer, m.vectorSearchRouter)
+
+	go func() {
+		<-ctx.Done()
+		m.logger.Debug("Context cancelled, stopping VectorSearch service")
+		m.vectorSearchServer.GracefulStop()
+	}()
+
+	go func() {
+		if err := m.vectorSearchServer.Serve(listener); err != nil {
+			m.logger.Errorw("VectorSearch service error", "error", err)
+		}
+	}()
+
+	addr := listener.Addr().String()
+	m.logger.Infow("VectorSearch service started", "address", addr)
+
+	return addr, nil
+}
+
 // GetLLMRouter returns the LLM router for provider registration.
 // Returns nil if the LLM service is not running.
 func (m *ServicesManager) GetLLMRouter() *LLMServer {
@@ -329,6 +370,12 @@ func (m *ServicesManager) GetLLMRouter() *LLMServer {
 // Returns nil if the embedding service is not running.
 func (m *ServicesManager) GetEmbeddingRouter() *EmbeddingServer {
 	return m.embeddingRouter
+}
+
+// GetVectorSearchRouter returns the vector search router for provider registration.
+// Returns nil if the vector search service is not running.
+func (m *ServicesManager) GetVectorSearchRouter() *VectorSearchServer {
+	return m.vectorSearchRouter
 }
 
 // Shutdown gracefully stops all service servers
@@ -357,6 +404,10 @@ func (m *ServicesManager) Shutdown() {
 
 	if m.embeddingServer != nil {
 		m.embeddingServer.GracefulStop()
+	}
+
+	if m.vectorSearchServer != nil {
+		m.vectorSearchServer.GracefulStop()
 	}
 
 	m.logger.Info("Plugin services stopped")

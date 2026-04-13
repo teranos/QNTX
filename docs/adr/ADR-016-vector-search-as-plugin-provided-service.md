@@ -62,6 +62,10 @@ Same pattern as LLMService and SearchService: `VectorSearchServer` in core holds
 
 FAISS index creation, rebuilding, and persistence are `qntx-faiss`'s responsibility. Consumers only search. How indexes are populated — whether `qntx-faiss` subscribes to embedding events, receives explicit index-build requests, or manages its own ingestion — is an implementation detail of the plugin.
 
+## Future: EmbeddingService on ServiceRegistry
+
+EmbeddingService is currently accessed by plugins via `_embedding_endpoint` in config — plugins create their own gRPC client (same pattern as Werf). This works. A future improvement would be to expose `Embedding()` on `ServiceRegistry` for convenience, following the same lazy-init pattern as `VectorSearch()` and `LLM()`. Not a blocker — just less boilerplate for consumer plugins.
+
 ## Consequences
 
 - `qntx-faiss` is a standalone C++ plugin — vector search infrastructure lives in its own process

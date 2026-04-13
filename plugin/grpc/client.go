@@ -40,6 +40,9 @@ type ExternalDomainProxy struct {
 	// llmProvider indicates this plugin implements LLMProvider (populated during Initialize)
 	llmProvider bool
 
+	// vectorSearchProvider indicates this plugin implements VectorSearchService (populated during Initialize)
+	vectorSearchProvider bool
+
 	// Watchers this plugin wants registered (populated during Initialize)
 	watchers []*protocol.WatcherRegistration
 
@@ -162,6 +165,17 @@ func (c *ExternalDomainProxy) LLMServiceClient() protocol.LLMServiceClient {
 	return protocol.NewLLMServiceClient(c.conn)
 }
 
+// IsVectorSearchProvider returns true if this plugin declared VectorSearch provider capability during Initialize.
+func (c *ExternalDomainProxy) IsVectorSearchProvider() bool {
+	return c.vectorSearchProvider
+}
+
+// VectorSearchServiceClient returns a VectorSearchServiceClient using this plugin's existing gRPC connection.
+// Only meaningful when IsVectorSearchProvider() is true.
+func (c *ExternalDomainProxy) VectorSearchServiceClient() protocol.VectorSearchServiceClient {
+	return protocol.NewVectorSearchServiceClient(c.conn)
+}
+
 // Initialize initializes the remote plugin. Idempotent — safe to call from multiple code paths.
 func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
 	c.initOnce.Do(func() {
@@ -256,19 +270,25 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		embeddingEndpoint = ep
 		c.logger.Debugw("Extracted Embedding endpoint from config", "endpoint", ep)
 	}
+	vectorSearchEndpoint := ""
+	if ep := pluginConfig.GetString("_vector_search_endpoint"); ep != "" {
+		vectorSearchEndpoint = ep
+		c.logger.Debugw("Extracted VectorSearch endpoint from config", "endpoint", ep)
+	}
 	if token := pluginConfig.GetString("_auth_token"); token != "" {
 		authToken = token
 	}
 
 	req := &protocol.InitializeRequest{
-		AtsStoreEndpoint:    atsStoreEndpoint,
-		QueueEndpoint:       queueEndpoint,
-		ScheduleEndpoint:    scheduleEndpoint,
-		FileServiceEndpoint: fileServiceEndpoint,
-		LlmEndpoint:         llmEndpoint,
-		EmbeddingEndpoint:   embeddingEndpoint,
-		AuthToken:           authToken,
-		Config:              config,
+		AtsStoreEndpoint:     atsStoreEndpoint,
+		QueueEndpoint:        queueEndpoint,
+		ScheduleEndpoint:     scheduleEndpoint,
+		FileServiceEndpoint:  fileServiceEndpoint,
+		LlmEndpoint:          llmEndpoint,
+		EmbeddingEndpoint:    embeddingEndpoint,
+		VectorSearchEndpoint: vectorSearchEndpoint,
+		AuthToken:            authToken,
+		Config:               config,
 	}
 
 	c.logger.Debugw("Sending Initialize RPC to plugin",
@@ -279,6 +299,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		"file_service_endpoint", fileServiceEndpoint,
 		"llm_endpoint", llmEndpoint,
 		"embedding_endpoint", embeddingEndpoint,
+		"vector_search_endpoint", vectorSearchEndpoint,
 	)
 
 	resp, err := c.client.Initialize(ctx, req)
@@ -295,6 +316,9 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 
 	// Store LLM provider capability
 	c.llmProvider = resp.GetLlmProvider()
+
+	// Store VectorSearch provider capability
+	c.vectorSearchProvider = resp.GetVectorSearchProvider()
 
 	// Store and create watcher registrations
 	c.watchers = resp.GetWatchers()
@@ -313,6 +337,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		"schedules", len(c.schedules),
 		"watchers", len(c.watchers),
 		"llm_provider", c.llmProvider,
+		"vector_search_provider", c.vectorSearchProvider,
 	)
 	return nil
 }
