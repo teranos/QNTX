@@ -275,6 +275,11 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		vectorSearchEndpoint = ep
 		c.logger.Debugw("Extracted VectorSearch endpoint from config", "endpoint", ep)
 	}
+	groundEndpoint := ""
+	if ep := pluginConfig.GetString("_ground_endpoint"); ep != "" {
+		groundEndpoint = ep
+		c.logger.Debugw("Extracted Ground endpoint from config", "endpoint", ep)
+	}
 	if token := pluginConfig.GetString("_auth_token"); token != "" {
 		authToken = token
 	}
@@ -287,6 +292,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		LlmEndpoint:          llmEndpoint,
 		EmbeddingEndpoint:    embeddingEndpoint,
 		VectorSearchEndpoint: vectorSearchEndpoint,
+		GroundEndpoint:       groundEndpoint,
 		AuthToken:            authToken,
 		Config:               config,
 	}
@@ -300,6 +306,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		"llm_endpoint", llmEndpoint,
 		"embedding_endpoint", embeddingEndpoint,
 		"vector_search_endpoint", vectorSearchEndpoint,
+		"ground_endpoint", groundEndpoint,
 	)
 
 	resp, err := c.client.Initialize(ctx, req)

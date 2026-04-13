@@ -230,8 +230,11 @@ type InitializeRequest struct {
 	// vector_search_endpoint: gRPC endpoint for VectorSearchService
 	// Provides: Nearest-neighbor search over dense vector indexes (ADR-016)
 	VectorSearchEndpoint string `protobuf:"bytes,9,opt,name=vector_search_endpoint,json=vectorSearchEndpoint,proto3" json:"vector_search_endpoint,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// ground_endpoint: gRPC endpoint for GroundService
+	// Provides: Write attestations to Ground's deferred news database
+	GroundEndpoint string `protobuf:"bytes,10,opt,name=ground_endpoint,json=groundEndpoint,proto3" json:"ground_endpoint,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *InitializeRequest) Reset() {
@@ -323,6 +326,13 @@ func (x *InitializeRequest) GetEmbeddingEndpoint() string {
 func (x *InitializeRequest) GetVectorSearchEndpoint() string {
 	if x != nil {
 		return x.VectorSearchEndpoint
+	}
+	return ""
+}
+
+func (x *InitializeRequest) GetGroundEndpoint() string {
+	if x != nil {
+		return x.GroundEndpoint
 	}
 	return ""
 }
@@ -1568,7 +1578,7 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\fqntx_version\x18\x03 \x01(\tR\vqntxVersion\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x16\n" +
 	"\x06author\x18\x05 \x01(\tR\x06author\x12\x18\n" +
-	"\alicense\x18\x06 \x01(\tR\alicense\"\xec\x03\n" +
+	"\alicense\x18\x06 \x01(\tR\alicense\"\x95\x04\n" +
 	"\x11InitializeRequest\x12,\n" +
 	"\x12ats_store_endpoint\x18\x01 \x01(\tR\x10atsStoreEndpoint\x12%\n" +
 	"\x0equeue_endpoint\x18\x02 \x01(\tR\rqueueEndpoint\x12\x1d\n" +
@@ -1579,7 +1589,9 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x15file_service_endpoint\x18\x06 \x01(\tR\x13fileServiceEndpoint\x12!\n" +
 	"\fllm_endpoint\x18\a \x01(\tR\vllmEndpoint\x12-\n" +
 	"\x12embedding_endpoint\x18\b \x01(\tR\x11embeddingEndpoint\x124\n" +
-	"\x16vector_search_endpoint\x18\t \x01(\tR\x14vectorSearchEndpoint\x1a9\n" +
+	"\x16vector_search_endpoint\x18\t \x01(\tR\x14vectorSearchEndpoint\x12'\n" +
+	"\x0fground_endpoint\x18\n" +
+	" \x01(\tR\x0egroundEndpoint\x1a9\n" +
 	"\vConfigEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"}\n" +

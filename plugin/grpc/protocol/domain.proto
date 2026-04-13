@@ -94,6 +94,10 @@ message InitializeRequest {
   // vector_search_endpoint: gRPC endpoint for VectorSearchService
   // Provides: Nearest-neighbor search over dense vector indexes (ADR-016)
   string vector_search_endpoint = 9;
+
+  // ground_endpoint: gRPC endpoint for GroundService
+  // Provides: Write attestations to Ground's deferred news database
+  string ground_endpoint = 10;
 }
 
 message HTTPRequest {

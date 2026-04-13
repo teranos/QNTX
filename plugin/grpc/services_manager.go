@@ -25,6 +25,7 @@ type ServiceEndpoints struct {
 	LLMAddress          string
 	EmbeddingAddress    string
 	VectorSearchAddress string
+	GroundAddress       string
 	AuthToken           string
 }
 
@@ -41,6 +42,8 @@ type ServicesManager struct {
 	embeddingRouter    *EmbeddingServer // Exposed for late backend registration
 	vectorSearchServer *grpc.Server
 	vectorSearchRouter *VectorSearchServer // Exposed for provider registration after plugin init
+	groundServer       *grpc.Server
+	groundDBPath       string
 	endpoints          ServiceEndpoints
 	logger             *zap.SugaredLogger
 }
@@ -55,7 +58,9 @@ func NewServicesManager(llmCfg am.LLMConfig, logger *zap.SugaredLogger) *Service
 
 // Start starts the gRPC service servers with dynamic port allocation.
 // filesDir is the path to stored files (for the FileService).
-func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore, queue *async.Queue, scheduleStore *schedule.Store, filesDir string) (*ServiceEndpoints, error) {
+// groundDBPath is the path to Ground's SQLite database (empty = Ground service disabled).
+func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore, queue *async.Queue, scheduleStore *schedule.Store, filesDir string, groundDBPath string) (*ServiceEndpoints, error) {
+	m.groundDBPath = groundDBPath
 	// Generate authentication token
 	authToken, err := generateAuthToken()
 	if err != nil {
@@ -125,6 +130,17 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 		vectorSearchAddr = ""
 	}
 
+	// Start Ground service (only if ground_db_path is configured)
+	groundAddr := ""
+	if groundDBPath != "" {
+		var groundErr error
+		groundAddr, groundErr = m.startGroundService(ctx, groundDBPath, authToken)
+		if groundErr != nil {
+			m.logger.Warnw("Failed to start Ground service, plugins will not have Ground access", "error", groundErr)
+			groundAddr = ""
+		}
+	}
+
 	m.endpoints = ServiceEndpoints{
 		ATSStoreAddress:     atsStoreAddr,
 		QueueAddress:        queueAddr,
@@ -133,6 +149,7 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 		LLMAddress:          llmAddr,
 		EmbeddingAddress:    embeddingAddr,
 		VectorSearchAddress: vectorSearchAddr,
+		GroundAddress:       groundAddr,
 		AuthToken:           authToken,
 	}
 
@@ -360,6 +377,35 @@ func (m *ServicesManager) startVectorSearchService(ctx context.Context, authToke
 	return addr, nil
 }
 
+// startGroundService starts the Ground gRPC service
+func (m *ServicesManager) startGroundService(ctx context.Context, dbPath string, authToken string) (string, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to listen")
+	}
+
+	m.groundServer = grpc.NewServer()
+	groundServer := NewGroundServer(dbPath, authToken, m.logger)
+	protocol.RegisterGroundServiceServer(m.groundServer, groundServer)
+
+	go func() {
+		<-ctx.Done()
+		m.logger.Debug("Context cancelled, stopping Ground service")
+		m.groundServer.GracefulStop()
+	}()
+
+	go func() {
+		if err := m.groundServer.Serve(listener); err != nil {
+			m.logger.Errorw("Ground service error", "error", err)
+		}
+	}()
+
+	addr := listener.Addr().String()
+	m.logger.Infow("Ground service started", "address", addr)
+
+	return addr, nil
+}
+
 // GetLLMRouter returns the LLM router for provider registration.
 // Returns nil if the LLM service is not running.
 func (m *ServicesManager) GetLLMRouter() *LLMServer {
@@ -408,6 +454,10 @@ func (m *ServicesManager) Shutdown() {
 
 	if m.vectorSearchServer != nil {
 		m.vectorSearchServer.GracefulStop()
+	}
+
+	if m.groundServer != nil {
+		m.groundServer.GracefulStop()
 	}
 
 	m.logger.Info("Plugin services stopped")

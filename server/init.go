@@ -284,7 +284,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		// These services allow plugins to call back to QNTX core
 		servicesManager := grpcplugin.NewServicesManager(deps.config.LLM, serverLogger)
 		filesDir := filepath.Join(filepath.Dir(dbPath), "files")
-		endpoints, err := servicesManager.Start(ctx, atsStore, queue, scheduleStore, filesDir)
+		endpoints, err := servicesManager.Start(ctx, atsStore, queue, scheduleStore, filesDir, deps.config.GroundDBPath)
 		if err != nil {
 			serverLogger.Warnw("Failed to start plugin services, plugins will not have service access", "error", err)
 			endpoints = nil
@@ -788,6 +788,8 @@ func (c *pluginConfigWithEndpoints) GetString(key string) string {
 			return c.endpoints.EmbeddingAddress
 		case "_vector_search_endpoint":
 			return c.endpoints.VectorSearchAddress
+		case "_ground_endpoint":
+			return c.endpoints.GroundAddress
 		case "_auth_token":
 			return c.endpoints.AuthToken
 		}
@@ -825,6 +827,8 @@ func (c *pluginConfigWithEndpoints) Get(key string) interface{} {
 			return c.endpoints.EmbeddingAddress
 		case "_vector_search_endpoint":
 			return c.endpoints.VectorSearchAddress
+		case "_ground_endpoint":
+			return c.endpoints.GroundAddress
 		case "_auth_token":
 			return c.endpoints.AuthToken
 		}
