@@ -10,17 +10,17 @@ import (
 	"go.uber.org/zap"
 )
 
-// writeToGraundeDB inserts an attestation directly into Graunde's database.
-// This bridges the gap between QNTX's per-clone database and Graunde's
-// standalone database at ~/.local/share/graunde/graunde.db.
-func writeToGraundeDB(dbPath string, as *types.As, logger *zap.SugaredLogger) {
+// writeToGround inserts an attestation directly into Ground's database.
+// This bridges the gap between QNTX's per-clone database and Ground's
+// standalone database at ~/.local/share/ground/ground.db.
+func writeToGround(dbPath string, as *types.As, logger *zap.SugaredLogger) {
 	if dbPath == "" {
 		return
 	}
 
 	db, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_busy_timeout=5000")
 	if err != nil {
-		logger.Warnw("Failed to open Graunde db", "path", dbPath, "error", err)
+		logger.Warnw("Failed to open Ground db", "path", dbPath, "error", err)
 		return
 	}
 	defer db.Close()
@@ -44,10 +44,10 @@ func writeToGraundeDB(dbPath string, as *types.As, logger *zap.SugaredLogger) {
 		as.CreatedAt.UTC().Format("2006-01-02 15:04:05"),
 	)
 	if err != nil {
-		logger.Warnw("Failed to write deferred news to Graunde db",
-			"path", dbPath, "asid", as.ID, "error", errors.Wrap(err, "graunde db insert failed"))
+		logger.Warnw("Failed to write to Ground db",
+			"path", dbPath, "asid", as.ID, "error", errors.Wrap(err, "ground db insert failed"))
 		return
 	}
 
-	logger.Infow("Wrote deferred news to Graunde db", "path", dbPath, "asid", as.ID)
+	logger.Infow("Wrote deferred news to Ground db", "path", dbPath, "asid", as.ID)
 }

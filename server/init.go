@@ -443,7 +443,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	serverLogger.Infow("Canvas state handlers initialized")
 
 	// Initialize embedding service for semantic search (optional)
-	server.graundeDBPath = deps.config.GraundeDBPath
+	server.groundDBPath = deps.config.GroundDBPath
 	server.SetupEmbeddingService()
 	if server.embeddingStats != nil {
 		ticker.SetEmbeddingStats(server.embeddingStats)

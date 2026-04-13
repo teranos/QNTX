@@ -3,7 +3,7 @@
  * Scans ~/.claude/projects/ for .jsonl session files, cross-references with
  * ATS weaves and WeaveComplete attestations to determine each session's state:
  *   - unweaved: JSONL on disk, no weaves in ATS
- *   - partial: weaves exist (from Graunde UDP), no WeaveComplete attestation
+ *   - partial: weaves exist (from Ground UDP), no WeaveComplete attestation
  *   - complete: WeaveComplete attestation exists, fully imported
  *   - stale: WeaveComplete exists but JSONL grew since import *)
 

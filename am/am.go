@@ -2,18 +2,18 @@ package am
 
 // Config represents the core QNTX configuration
 type Config struct {
-	Database      DatabaseConfig   `mapstructure:"database"`
-	Server        ServerConfig     `mapstructure:"server"`
-	Auth          AuthConfig       `mapstructure:"auth"`
-	Pulse         PulseConfig      `mapstructure:"pulse"`
-	LLM           LLMConfig        `mapstructure:"llm"`
-	Code          CodeConfig       `mapstructure:"code"`
-	Ax            AxConfig         `mapstructure:"ax"`
-	Plugin        PluginConfig     `mapstructure:"plugin"`
-	Embeddings    EmbeddingsConfig `mapstructure:"embeddings"`
-	Watcher       WatcherConfig    `mapstructure:"watcher"`
-	Sync          SyncConfig       `mapstructure:"sync"`
-	GraundeDBPath string           `mapstructure:"graunde_db_path"` // Path to Graunde's database for deferred news delivery
+	Database     DatabaseConfig   `mapstructure:"database"`
+	Server       ServerConfig     `mapstructure:"server"`
+	Auth         AuthConfig       `mapstructure:"auth"`
+	Pulse        PulseConfig      `mapstructure:"pulse"`
+	LLM          LLMConfig        `mapstructure:"llm"`
+	Code         CodeConfig       `mapstructure:"code"`
+	Ax           AxConfig         `mapstructure:"ax"`
+	Plugin       PluginConfig     `mapstructure:"plugin"`
+	Embeddings   EmbeddingsConfig `mapstructure:"embeddings"`
+	Watcher      WatcherConfig    `mapstructure:"watcher"`
+	Sync         SyncConfig       `mapstructure:"sync"`
+	GroundDBPath string           `mapstructure:"ground_db_path"` // Path to Ground's database for deferred news delivery
 }
 
 // LLMConfig configures LLM request queuing and rate limiting at the core routing layer.
