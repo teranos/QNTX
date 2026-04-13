@@ -10,9 +10,9 @@
 
 # Path to Ground's database for deferred news delivery.
 # When set, QNTX writes cluster lifecycle and Pulse news directly
-# to Graunde's db so it can deliver them on session Stop.
+# to Ground's db so it can deliver them on session Stop.
 # Default: "" (disabled)
-# graunde_db_path = "/Users/you/.local/share/ground/ground.db"
+# ground_db_path = "/Users/you/.local/share/ground/ground.db"
 
 # ════════════════════════════════════════════════════════════════
 # Database Configuration

@@ -39,7 +39,7 @@ let extract_tool_use_blocks content =
 (* --- Tool use → turn mapping --- *)
 
 (* Map a tool_use block to (label, display_text, paths) using
- * the same logic as the Graunde path (file_tail, weave_worthy_command). *)
+ * the same logic as the Ground path (file_tail, weave_worthy_command). *)
 let tool_to_turn name input =
   match name with
   | "Read" ->

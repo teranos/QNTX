@@ -220,7 +220,7 @@ func RunHDBSCANClustering(
 	clusterMatchThreshold float64,
 	atsStore ats.AttestationStore,
 	projectCtx string,
-	graundeDBPath string,
+	groundDBPath string,
 	logger *zap.SugaredLogger,
 ) (*EmbeddingClusterResult, error) {
 	startTime := time.Now()
@@ -390,7 +390,7 @@ func RunHDBSCANClustering(
 			}
 			emitClusterLifecycleAttestation(atsStore, ev, memberCounts[ev.ClusterID], runID, projectCtx, logger)
 		}
-		emitClusterDeferredNews(store, atsStore, matchResult.events, memberCounts, swept, runID, projectCtx, graundeDBPath, logger)
+		emitClusterDeferredNews(store, atsStore, matchResult.events, memberCounts, swept, runID, projectCtx, groundDBPath, logger)
 	}
 
 	summary, err := store.GetClusterSummary()
@@ -424,7 +424,7 @@ type ReclusterHandler struct {
 	invalidator           func()
 	minClusterSize        int
 	clusterMatchThreshold float64
-	graundeDBPath         string
+	groundDBPath          string
 	logger                *zap.SugaredLogger
 }
 
@@ -433,10 +433,10 @@ func (h *ReclusterHandler) Name() string { return ReclusterHandlerName }
 func (h *ReclusterHandler) Execute(ctx context.Context, job *async.Job) error {
 	h.writeLog(job.ID, "clustering", "info", "Starting HDBSCAN re-clustering", fmt.Sprintf(`{"min_cluster_size":%d}`, h.minClusterSize))
 
-	result, err := RunHDBSCANClustering(h.store, h.svc, h.invalidator, h.minClusterSize, h.clusterMatchThreshold, h.atsStore, h.projectCtx, h.graundeDBPath, h.logger)
+	result, err := RunHDBSCANClustering(h.store, h.svc, h.invalidator, h.minClusterSize, h.clusterMatchThreshold, h.atsStore, h.projectCtx, h.groundDBPath, h.logger)
 	if err != nil {
 		h.writeLog(job.ID, "clustering", "error", fmt.Sprintf("Clustering failed: %s", err), "")
-		emitPulseDeferredNews(h.db, h.atsStore, h.projectCtx, h.graundeDBPath, h.logger)
+		emitPulseDeferredNews(h.db, h.atsStore, h.projectCtx, h.groundDBPath, h.logger)
 		return err
 	}
 
@@ -446,7 +446,7 @@ func (h *ReclusterHandler) Execute(ctx context.Context, job *async.Job) error {
 		fmt.Sprintf(`{"n_points":%d,"n_clusters":%d,"n_noise":%d,"time_ms":%.0f}`,
 			result.Summary.NTotal, result.Summary.NClusters, result.Summary.NNoise, result.TimeMS))
 
-	emitPulseDeferredNews(h.db, h.atsStore, h.projectCtx, h.graundeDBPath, h.logger)
+	emitPulseDeferredNews(h.db, h.atsStore, h.projectCtx, h.groundDBPath, h.logger)
 	return nil
 }
 
@@ -512,8 +512,8 @@ func emitClusterLifecycleAttestation(atsStore ats.AttestationStore, ev storage.C
 // deferred:cluster-update attestation. Returns empty string if all news has been
 // delivered or no prior news exists.
 //
-// Delivery acks are written by Graunde into Graunde's DB, so we check there.
-func getUndeliveredDetail(atsStore ats.AttestationStore, projectCtx string, graundeDBPath string) string {
+// Delivery acks are written by Ground into Ground's DB, so we check there.
+func getUndeliveredDetail(atsStore ats.AttestationStore, projectCtx string, groundDBPath string) string {
 	// Find the latest deferred:cluster-update in QNTX's store
 	deferred, err := atsStore.GetAttestations(ats.AttestationFilter{
 		Predicates: []string{"deferred:cluster-update"},
@@ -524,9 +524,9 @@ func getUndeliveredDetail(atsStore ats.AttestationStore, projectCtx string, grau
 		return ""
 	}
 
-	// Check Graunde's DB for delivery ack
-	if graundeDBPath != "" {
-		db, err := sql.Open("sqlite3", graundeDBPath+"?_journal_mode=WAL&_busy_timeout=5000&mode=ro")
+	// Check Ground's DB for delivery ack
+	if groundDBPath != "" {
+		db, err := sql.Open("sqlite3", groundDBPath+"?_journal_mode=WAL&_busy_timeout=5000&mode=ro")
 		if err == nil {
 			defer db.Close()
 			var ackTS string
@@ -548,9 +548,9 @@ func getUndeliveredDetail(atsStore ats.AttestationStore, projectCtx string, grau
 	return ""
 }
 
-// emitClusterDeferredNews writes a deferred message attestation for Graunde to pick up
+// emitClusterDeferredNews writes a deferred message attestation for Ground to pick up
 // on Stop. If there's undelivered news from a previous run, accumulates by prepending it.
-func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.AttestationStore, events []storage.ClusterEvent, memberCounts map[int]int, staleSwept int, runID string, projectCtx string, graundeDBPath string, logger *zap.SugaredLogger) {
+func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.AttestationStore, events []storage.ClusterEvent, memberCounts map[int]int, staleSwept int, runID string, projectCtx string, groundDBPath string, logger *zap.SugaredLogger) {
 	type birthInfo struct {
 		clusterID int
 		nMembers  int
@@ -621,7 +621,7 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 	}
 
 	// Accumulate: if there's undelivered news from a previous run, prepend it
-	if prior := getUndeliveredDetail(atsStore, projectCtx, graundeDBPath); prior != "" {
+	if prior := getUndeliveredDetail(atsStore, projectCtx, groundDBPath); prior != "" {
 		detail = prior + " " + detail
 		logger.Infow("Accumulating with undelivered prior news")
 	}
@@ -653,17 +653,17 @@ func emitClusterDeferredNews(embStore *storage.EmbeddingStore, atsStore ats.Atte
 		logger.Warnw("Failed to create cluster deferred news",
 			"asid", asid, "error", err)
 	} else {
-		logger.Infow("Deferred cluster news for Graunde",
+		logger.Infow("Deferred cluster news for Ground",
 			"asid", asid, "births", len(births), "deaths", len(deaths))
 	}
 
-	writeToGraundeDB(graundeDBPath, as, logger)
+	writeToGround(groundDBPath, as, logger)
 }
 
 // emitPulseDeferredNews queries recent Pulse execution stats and writes a deferred
-// news attestation for Graunde. Emitted after every recluster run (success or failure)
+// news attestation for Ground. Emitted after every recluster run (success or failure)
 // as the recluster heartbeat is the natural place for periodic Pulse health reporting.
-func emitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx string, graundeDBPath string, logger *zap.SugaredLogger) {
+func emitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx string, groundDBPath string, logger *zap.SugaredLogger) {
 	if atsStore == nil {
 		return
 	}
@@ -747,11 +747,11 @@ func emitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx
 		logger.Warnw("Failed to create Pulse deferred news",
 			"asid", asid, "error", err)
 	} else {
-		logger.Infow("Deferred Pulse news for Graunde",
+		logger.Infow("Deferred Pulse news for Ground",
 			"asid", asid, "completed", completed, "failed", failed)
 	}
 
-	writeToGraundeDB(graundeDBPath, as, logger)
+	writeToGround(groundDBPath, as, logger)
 }
 
 // setupEmbeddingReclusterSchedule registers the recluster handler and auto-creates
@@ -773,7 +773,7 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 		invalidator:           s.embeddingClusterInvalidator,
 		minClusterSize:        cfg.Embeddings.MinClusterSize,
 		clusterMatchThreshold: cfg.Embeddings.ClusterMatchThreshold,
-		graundeDBPath:         cfg.GraundeDBPath,
+		groundDBPath:          cfg.GroundDBPath,
 		logger:                s.logger.Named("recluster"),
 	}
 	if handler.minClusterSize <= 0 {
