@@ -86,28 +86,28 @@ TODO:
 
 ### Frontend limitations
 
-- **No virtualization**: every weave and turn is in the DOM. Will not scale to thousands of weaves.
-- **No memoization**: `computeWarpItems()` and `parseTurns()` recompute on every render.
-- **No live updates**: data fetched once on load. New weaves require manual refresh.
-- **Cluster data is stale**: fetched once, never refreshed.
-- **No search**: cannot find weaves by content, branch, or time range.
-- **No URL routing**: no deep links to specific weaves or scroll positions. State lost on refresh.
-- **No client-side persistence**: column order, expanded/collapsed state, scroll positions, favorites, and UI preferences are lost on refresh. Column positions jump after import because the sort key changes when a project transitions from empty to woven. IndexedDB is the key next step — it unblocks favorites, stable column order, collapsible columns, frozen columns, and scroll position recall.
-- **Warp click math is fragile**: translateY/content fraction mapping breaks if CSS layout changes.
-- **Raw text parsing**: `[speaker]` prefix parsing with string methods is fragile if text contains those patterns literally. A structured format from the API would be better.
+- **NVIR** — No virtualization. Every weave and turn is in the DOM. Will not scale to thousands of weaves.
+- **NMEM** — No memoization. `computeWarpItems()` and `parseTurns()` recompute on every render.
+- **NLIV** — No live updates. Data fetched once on load. New weaves require manual refresh.
+- **CLSS** — Cluster data is stale. Fetched once, never refreshed.
+- **NSCH** — No search. Cannot find weaves by content, branch, or time range.
+- **NURL** — No URL routing. No deep links to specific weaves or scroll positions. State lost on refresh.
+- **NCSP** — No client-side persistence. Column order, expanded/collapsed state, scroll positions, favorites, and UI preferences are lost on refresh. Column positions jump after import because the sort key changes when a project transitions from empty to woven. IndexedDB is the key next step — it unblocks FAVE, stable column order, CPC, FRZC, and scroll position recall.
+- **WCMF** — Warp click math is fragile. translateY/content fraction mapping breaks if CSS layout changes.
+- **RTP** — Raw text parsing. `[speaker]` prefix parsing with string methods is fragile if text contains those patterns literally. A structured format from the API would be better (see UST).
 
 ### Missing features (frontend)
 
-- **Interactive cluster chips**: cluster distribution shows in the drawer but clicking a chip does nothing yet. Should filter/highlight weaves belonging to that cluster, scroll to them, or cross-highlight across columns.
-- **Collapsible project columns**: minimize a project to a thin vertical strip showing just the project name (rotated). Click to restore. Keeps the column present but out of the way.
-- **Favorite weaves**: bookmark and return to specific weaves. Requires IndexedDB for persistence.
-- Diffs: show code changes that happened during the conversation.
-- Git moments: commits and merges as distinct timeline events.
-- Freeze columns: toggle time-sync per column, pin a view in place.
-- Images: screenshots as part of weave data, rendered inline.
-- Branch click navigation: clicking a branch name should scroll to its weaves.
-- Cluster legend: surface cluster labels, make cluster intelligence actionable.
-- Share components with QNTX/web: import actual UI components rather than reimplementing.
+- **ICC** — Interactive cluster chips. Cluster distribution shows in the drawer but clicking a chip does nothing yet. Should filter/highlight weaves belonging to that cluster, scroll to them, or cross-highlight across columns.
+- **CPC** — Collapsible project columns. Minimize a project to a thin vertical strip showing just the project name (rotated). Click to restore. Keeps the column present but out of the way.
+- **FAVE** — Favorite weaves. Bookmark and return to specific weaves. Requires IndexedDB for persistence (NCSP).
+- **FDIF** — Frontend diffs. Show code changes that happened during the conversation. Gated on UDIF.
+- **GITM** — Git moments. Commits and merges as distinct timeline events. Gated on UGIT.
+- **FRZC** — Freeze columns. Toggle time-sync per column, pin a view in place.
+- **IMG** — Images inline. Screenshots as part of weave data, rendered inline. Gated on UIMG.
+- **BCN** — Branch click navigation. Clicking a branch name should scroll to its weaves.
+- **CLGD** — Cluster legend. Surface cluster labels, make cluster intelligence actionable.
+- **SCMP** — Share components with QNTX/web. Import actual UI components rather than reimplementing.
 
 ## HTTP API (OCaml)
 
@@ -115,25 +115,25 @@ Serves JSON over HTTP/2 on port 5178. Read endpoints query ATS for `["Weave"]` a
 
 ### HTTP API limitations
 
-- **No caching**: queries ATS on every HTTP request. No in-memory cache.
-- **No pagination**: no cursor or offset support. All weaves returned at once.
-- **No HTTP filtering**: cannot filter by context, timestamp, actor, or text content via HTTP API.
-- **No authentication**: HTTP endpoints are open (CORS: `*`). No per-request token validation.
-- **No configuration schema**: `ConfigSchema` returns empty.
-- **Silent error handling**: ATS connection errors logged to stderr only, not propagated. Initialize decode errors silently ignored.
-- **No connection timeout**: synchronous socket connect to ATS with no timeout.
-- **Hardcoded predicate**: can only query `["Weave"]` attestations.
-- **Data loss on extraction**: `int_of_float` truncates number values. Missing subjects/contexts default to empty string with no error signal.
+- **NCAC** — No caching. Queries ATS on every HTTP request. No in-memory cache.
+- **NPAG** — No pagination. No cursor or offset support. All weaves returned at once.
+- **NFLT** — No HTTP filtering. Cannot filter by context, timestamp, actor, or text content via HTTP API.
+- **NAUT** — No authentication. HTTP endpoints are open (CORS: `*`). No per-request token validation.
+- **NCFG** — No configuration schema. `ConfigSchema` returns empty.
+- **SEH** — Silent error handling. ATS connection errors logged to stderr only, not propagated. Initialize decode errors silently ignored.
+- **NCTO** — No connection timeout. Synchronous socket connect to ATS with no timeout.
+- **HCP** — Hardcoded predicate. Can only query `["Weave"]` attestations.
+- **DLE** — Data loss on extraction. `int_of_float` truncates number values. Missing subjects/contexts default to empty string with no error signal.
 
 ## Upstream gaps (graunde)
 
 Loom as consumer reveals what the upstream producers don't capture yet:
 
-- **Diffs**: code changes during a session are not recorded.
-- **Git events**: commits, merges, branch operations are not weave events.
-- **Images/screenshots**: not part of the weave data model.
-- **Directory identity**: graunde's project tracking (which directory a session belongs to) has had drift issues, now resolved but still fragile.
-- **Structured turns**: weave text is a flat string with `[speaker]` prefixes. A structured format (array of typed turns) would eliminate parsing fragility.
+- **UDIF** — Diffs. Code changes during a session are not recorded. Blocks FDIF.
+- **UGIT** — Git events. Commits, merges, branch operations are not weave events. Blocks GITM.
+- **UIMG** — Images/screenshots. Not part of the weave data model. Blocks IMG.
+- **UDID** — Directory identity. Graunde's project tracking (which directory a session belongs to) has had drift issues, now resolved but still fragile.
+- **UST** — Structured turns. Weave text is a flat string with `[speaker]` prefixes. A structured format (array of typed turns) would eliminate RTP fragility.
 
 ## JSONL Import (historical weaving)
 
