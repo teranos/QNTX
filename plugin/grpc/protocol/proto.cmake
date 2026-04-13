@@ -22,10 +22,14 @@ function(generate_proto PROTO_FILE)
     set(GRPC_SRC "${PROTO_GEN_DIR}/${PROTO_NAME}.grpc.pb.cc")
     set(GRPC_HDR "${PROTO_GEN_DIR}/${PROTO_NAME}.grpc.pb.h")
 
+    # PROTO_DIR for bare imports, PROTO_DIR/../../.. for qualified imports
+    # (e.g. ground.proto imports "plugin/grpc/protocol/atsstore.proto")
+    get_filename_component(PROTO_ROOT "${PROTO_DIR}/../../.." ABSOLUTE)
     add_custom_command(
         OUTPUT ${PROTO_SRC} ${PROTO_HDR} ${GRPC_SRC} ${GRPC_HDR}
         COMMAND protobuf::protoc
             --proto_path=${PROTO_DIR}
+            --proto_path=${PROTO_ROOT}
             --cpp_out=${PROTO_GEN_DIR}
             --grpc_out=${PROTO_GEN_DIR}
             --plugin=protoc-gen-grpc=$<TARGET_FILE:gRPC::grpc_cpp_plugin>
