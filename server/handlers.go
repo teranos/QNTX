@@ -864,6 +864,8 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 			writeError(w, http.StatusServiceUnavailable, "Plugin manager not available")
 			return
 		}
+		// Re-read config from disk so the restarted plugin gets fresh values
+		appcfg.Reset()
 		err = pm.RestartPlugin(ctx, name, s.pluginRegistry, s.services)
 		if err != nil {
 			s.logger.Warnw("Failed to restart plugin", "plugin", name, "error", err)

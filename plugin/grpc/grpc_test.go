@@ -111,6 +111,7 @@ func (m *mockServiceRegistry) Schedule() pluginpkg.ScheduleService         { ret
 func (m *mockServiceRegistry) FileService() pluginpkg.FileService          { return nil }
 func (m *mockServiceRegistry) LLM() pluginpkg.LLMService                   { return nil }
 func (m *mockServiceRegistry) VectorSearch() pluginpkg.VectorSearchService { return nil }
+func (m *mockServiceRegistry) Search() pluginpkg.SearchService             { return nil }
 
 type mockConfig struct{}
 
@@ -469,7 +470,7 @@ func TestExternalDomainProxy_ImplementsDomainPlugin(t *testing.T) {
 
 func TestRemoteServiceRegistry_Database(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", nil, logger, nil)
+	registry := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", nil, logger, nil)
 
 	// Should return nil and log warning
 	db := registry.Database()
@@ -478,7 +479,7 @@ func TestRemoteServiceRegistry_Database(t *testing.T) {
 
 func TestRemoteServiceRegistry_ATSStore(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", nil, logger, nil)
+	registry := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", nil, logger, nil)
 
 	// Should return nil and log warning
 	store := registry.ATSStore()
@@ -487,7 +488,7 @@ func TestRemoteServiceRegistry_ATSStore(t *testing.T) {
 
 func TestRemoteServiceRegistry_Queue(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", nil, logger, nil)
+	registry := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", nil, logger, nil)
 
 	// Should return nil and log warning
 	queue := registry.Queue()
@@ -496,7 +497,7 @@ func TestRemoteServiceRegistry_Queue(t *testing.T) {
 
 func TestRemoteServiceRegistry_Logger(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", nil, logger, nil)
+	registry := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", nil, logger, nil)
 
 	pluginLogger := registry.Logger("test")
 	assert.NotNil(t, pluginLogger)
@@ -509,7 +510,7 @@ func TestRemoteServiceRegistry_Config(t *testing.T) {
 		"enabled": "true",
 		"count":   "42",
 	}
-	registry := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", config, logger, nil)
+	registry := NewRemoteServiceRegistry(context.Background(), "", "", "", "", "", "", "", "", config, logger, nil)
 
 	cfg := registry.Config("test")
 	assert.Equal(t, "value1", cfg.GetString("key1"))

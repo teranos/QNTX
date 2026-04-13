@@ -26,6 +26,7 @@ type ServiceEndpoints struct {
 	EmbeddingAddress    string
 	VectorSearchAddress string
 	GroundAddress       string
+	SearchAddress       string
 	AuthToken           string
 }
 
@@ -44,6 +45,8 @@ type ServicesManager struct {
 	vectorSearchRouter *VectorSearchServer // Exposed for provider registration after plugin init
 	groundServer       *grpc.Server
 	groundDBPath       string
+	searchServer       *grpc.Server
+	searchRouter       *SearchServer // Exposed for provider registration after plugin init
 	endpoints          ServiceEndpoints
 	logger             *zap.SugaredLogger
 }
@@ -141,6 +144,13 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 		}
 	}
 
+	// Start Search service (starts empty, provider registers after plugin init)
+	searchAddr, err := m.startSearchService(ctx)
+	if err != nil {
+		m.logger.Warnw("Failed to start Search service, plugins will not have search access", "error", err)
+		searchAddr = ""
+	}
+
 	m.endpoints = ServiceEndpoints{
 		ATSStoreAddress:     atsStoreAddr,
 		QueueAddress:        queueAddr,
@@ -150,6 +160,7 @@ func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore,
 		EmbeddingAddress:    embeddingAddr,
 		VectorSearchAddress: vectorSearchAddr,
 		GroundAddress:       groundAddr,
+		SearchAddress:       searchAddr,
 		AuthToken:           authToken,
 	}
 
@@ -406,6 +417,42 @@ func (m *ServicesManager) startGroundService(ctx context.Context, dbPath string,
 	return addr, nil
 }
 
+// startSearchService starts the Search routing gRPC service.
+// The server starts empty — the provider registers after its own initialization completes.
+func (m *ServicesManager) startSearchService(ctx context.Context) (string, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to listen")
+	}
+
+	m.searchRouter = NewSearchServer(m.logger)
+	m.searchServer = grpc.NewServer()
+	protocol.RegisterSearchServiceServer(m.searchServer, m.searchRouter)
+
+	go func() {
+		<-ctx.Done()
+		m.logger.Debug("Context cancelled, stopping Search service")
+		m.searchServer.GracefulStop()
+	}()
+
+	go func() {
+		if err := m.searchServer.Serve(listener); err != nil {
+			m.logger.Errorw("Search service error", "error", err)
+		}
+	}()
+
+	addr := listener.Addr().String()
+	m.logger.Infow("Search service started", "address", addr)
+
+	return addr, nil
+}
+
+// GetSearchRouter returns the search router for provider registration.
+// Returns nil if the search service is not running.
+func (m *ServicesManager) GetSearchRouter() *SearchServer {
+	return m.searchRouter
+}
+
 // GetLLMRouter returns the LLM router for provider registration.
 // Returns nil if the LLM service is not running.
 func (m *ServicesManager) GetLLMRouter() *LLMServer {
@@ -458,6 +505,10 @@ func (m *ServicesManager) Shutdown() {
 
 	if m.groundServer != nil {
 		m.groundServer.GracefulStop()
+	}
+
+	if m.searchServer != nil {
+		m.searchServer.GracefulStop()
 	}
 
 	m.logger.Info("Plugin services stopped")

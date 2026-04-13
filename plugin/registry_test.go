@@ -655,6 +655,7 @@ func (m *mockServiceRegistry) Schedule() ScheduleService         { return nil }
 func (m *mockServiceRegistry) FileService() FileService          { return nil }
 func (m *mockServiceRegistry) LLM() LLMService                   { return nil }
 func (m *mockServiceRegistry) VectorSearch() VectorSearchService { return nil }
+func (m *mockServiceRegistry) Search() SearchService             { return nil }
 
 // Verify mockServiceRegistry implements ServiceRegistry
 var _ ServiceRegistry = (*mockServiceRegistry)(nil)
