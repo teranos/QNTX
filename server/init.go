@@ -308,13 +308,6 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 
 		services := plugin.NewServiceRegistry(db, serverLogger, atsStore, configProvider, queue)
 
-		if err := pluginRegistry.InitializeAll(ctx, services); err != nil {
-			serverLogger.Errorw("Failed to initialize domain plugins", "error", err)
-			// Continue anyway - plugins are optional
-		} else {
-			serverLogger.Infow("Domain plugins initialized", "count", len(pluginRegistry.List()))
-		}
-
 		// Store services manager and registry for shutdown and reinitialization
 		server.servicesManager = servicesManager
 		server.services = services
@@ -341,61 +334,6 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 			errMsg, _ := pluginRegistry.GetError(name)
 			serverLogger.Infow("Plugin state at server startup",
 				"plugin", name, "state", state, "error", errMsg)
-		}
-	}
-
-	if server.pluginManager != nil && server.services != nil {
-		plugins := server.pluginManager.GetAllPlugins()
-		serverLogger.Infow("Plugin manager has plugins", "count", len(plugins))
-		if len(plugins) > 0 {
-			serverLogger.Infow("Initializing plugins eagerly", "count", len(plugins))
-
-			// Initialize each plugin with the service registry
-			for _, p := range plugins {
-				meta := p.Metadata()
-				if err := p.Initialize(ctx, server.services); err != nil {
-					serverLogger.Errorw("Failed to initialize plugin",
-						"plugin", meta.Name,
-						"version", meta.Version,
-						"error", err)
-					continue
-				}
-
-				serverLogger.Infow("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
-			}
-
-			// Register LLM and Search providers with core routers
-			if server.servicesManager != nil {
-				llmRouter := server.servicesManager.GetLLMRouter()
-				searchRouter := server.servicesManager.GetSearchRouter()
-				for _, p := range plugins {
-					proxy, ok := p.(*grpcplugin.ExternalDomainProxy)
-					if !ok {
-						continue
-					}
-					if proxy.IsLLMProvider() && llmRouter != nil {
-						llmRouter.RegisterProvider(p.Metadata().Name, proxy.LLMServiceClient())
-					}
-					if proxy.IsSearchProvider() && searchRouter != nil {
-						searchRouter.RegisterProvider(p.Metadata().Name, proxy.SearchServiceClient())
-					}
-				}
-			}
-
-			// Register VectorSearch providers with the core VectorSearch router
-			if server.servicesManager != nil {
-				vsRouter := server.servicesManager.GetVectorSearchRouter()
-				if vsRouter != nil {
-					for _, p := range plugins {
-						proxy, ok := p.(*grpcplugin.ExternalDomainProxy)
-						if !ok || !proxy.IsVectorSearchProvider() {
-							continue
-						}
-						vsRouter.SetService(proxy.VectorSearchServiceClient())
-						serverLogger.Infow("Registered VectorSearch provider", "plugin", p.Metadata().Name)
-					}
-				}
-			}
 		}
 	}
 
