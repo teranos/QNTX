@@ -608,6 +608,10 @@ func (r *testServiceRegistry) VectorSearch() pluginpkg.VectorSearchService {
 	return nil
 }
 
+func (r *testServiceRegistry) Search() pluginpkg.SearchService {
+	return nil
+}
+
 // testConfig implements pluginpkg.Config for integration testing
 type testConfig struct {
 	config map[string]string
