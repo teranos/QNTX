@@ -49,17 +49,18 @@ impl DomainPluginService for QdrantPluginService {
     ) -> Result<Response<InitializeResponse>, Status> {
         info!("initializing qntx-qdrant plugin");
 
-        // TODO (merge coordination): once branches `search-service` and
-        // `vector-search-service` land, set provider flags on
-        // InitializeResponse so core registers this plugin as the backend
-        // for both services. Field numbers need reconciling across the two
-        // branches before those markers exist on main.
+        // vector_search_provider: true — core registers this plugin as the
+        // VectorSearchService backend (ADR-016 landed on main via PR #774).
+        //
+        // search_provider (ADR-015) is still on the search-service branch;
+        // add it here once that merges. Same plugin, both flags.
 
         Ok(Response::new(InitializeResponse {
             handler_names: vec![],
             schedules: vec![],
             watchers: vec![],
             llm_provider: false,
+            vector_search_provider: true,
         }))
     }
 
