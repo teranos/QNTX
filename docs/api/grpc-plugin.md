@@ -138,6 +138,9 @@ ParseAxQuery parses an Ax query string and returns the AST as JSON. Used by kern
 | file_service_endpoint | string | file_service_endpoint: gRPC endpoint for FileService Provides: Read stored files (for multimodal attachments) |
 | llm_endpoint | string | llm_endpoint: gRPC endpoint for LLMService Provides: Provider-agnostic LLM chat (routed through core to provider plugins) |
 | embedding_endpoint | string | embedding_endpoint: gRPC endpoint for EmbeddingService Provides: Text-to-vector embedding generation |
+| vector_search_endpoint | string | vector_search_endpoint: gRPC endpoint for VectorSearchService Provides: Nearest-neighbor search over dense vector indexes (ADR-016) |
+| ground_endpoint | string | ground_endpoint: gRPC endpoint for GroundService Provides: Write attestations to Ground's deferred news database |
+| search_endpoint | string | search_endpoint: gRPC endpoint for SearchService Provides: Full-text search over indexed documents (routed through core to provider plugin) |
 
 ### HTTPRequest
 
@@ -215,6 +218,23 @@ InitializeResponse is returned by Initialize RPC
 | handler_names | string | Handler names this plugin can execute Examples: ["python.script", "python.webhook", "ixgest.git"] Empty list means plugin provides no async handlers (backward compatible) |
 | schedules | ScheduleInfo | Schedules this plugin wants QNTX to create QNTX will auto-create schedule.Job entries for these |
 | llm_provider | bool | llm_provider indicates this plugin implements LLMProvider (Chat RPC). Core registers it as an LLM backend in the service mesh. |
+| watchers | WatcherRegistration | Watchers this plugin wants registered on its behalf. Core creates watchers with action_type=plugin_execute targeting this plugin. On match, core calls ExecuteJob with the matching attestation as payload. |
+| vector_search_provider | bool | vector_search_provider indicates this plugin implements VectorSearchService (ADR-016). Core registers it as a vector search backend in the service mesh. |
+| search_provider | bool | search_provider indicates this plugin implements SearchProvider (Search RPCs). Core registers it as the search backend in the service mesh. |
+
+### WatcherRegistration
+
+WatcherRegistration declares a watcher a plugin wants core to manage. Core creates/updates the watcher on Initialize and routes matches to the plugin via ExecuteJob.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | string | - |
+| handler_name | string | - |
+| subjects | string | - |
+| predicates | string | - |
+| contexts | string | - |
+| actors | string | - |
+| max_fires_per_second | int32 | - |
 
 ### ExecuteJobRequest
 

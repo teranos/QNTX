@@ -478,7 +478,7 @@ type PromptPreviewResponse struct {
 
 ## PromptSaveRequest {#promptsaverequest}
 
-**Source**: [`server/prompt_handlers.go:911`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L911)
+**Source**: [`server/prompt_handlers.go:916`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L916)
 
 
 ```go
