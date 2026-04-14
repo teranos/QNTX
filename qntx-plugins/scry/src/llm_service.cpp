@@ -265,6 +265,24 @@ grpc::Status ScryLLMService::StreamChat(grpc::ServerContext* ctx,
         plugin_->renderer().set_scrub_index(-1);
     }
 
+    // Initialize root branch in fork tree
+    {
+        std::lock_guard<std::mutex> flock(plugin_->fork_mutex());
+        auto& tree = plugin_->fork_tree();
+        tree.branches.clear();
+        ForkBranch root;
+        root.id = 0;
+        root.parent_id = -1;
+        root.fork_position = 0;
+        root.seq_id = 0;
+        root.fork_token = 0;
+        root.orbit_phase = 0.0f;
+        root.active = true;
+        tree.branches.push_back(root);
+        tree.active_branch = 0;
+        tree.next_seq_id = 1;
+    }
+
     plugin_->set_activity("evaluating prompt");
 
     // Route to vision or text streaming path
@@ -305,8 +323,8 @@ grpc::Status ScryLLMService::StreamChat(grpc::ServerContext* ctx,
                 plugin_->renderer().submit_distribution(
                     sig.full_distribution.data(), sig.full_distribution.size());
                 plugin_->renderer().store_keyframe(
-                    sig.full_distribution.data(), sig.full_distribution.size());
-                plugin_->renderer().add_trail_point(sig.token_id);
+                    sig.full_distribution.data(), sig.full_distribution.size(), 0);
+                plugin_->renderer().add_trail_point(sig.token_id, 0);
 
                 if (sig.top_k.size() > 1) {
                     std::vector<std::pair<int,float>> runners;
@@ -316,6 +334,15 @@ grpc::Status ScryLLMService::StreamChat(grpc::ServerContext* ctx,
                         }
                     }
                     plugin_->renderer().add_ghost_branches(sig.token_id, runners);
+                }
+            }
+
+            // Record token in root branch of fork tree
+            {
+                std::lock_guard<std::mutex> flock(plugin_->fork_mutex());
+                auto& tree = plugin_->fork_tree();
+                if (!tree.branches.empty()) {
+                    tree.branches[0].tokens.push_back((int32_t)sig.token_id);
                 }
             }
 
@@ -331,6 +358,12 @@ grpc::Status ScryLLMService::StreamChat(grpc::ServerContext* ctx,
         result = engine.stream_chat(
             messages, temperature, max_tokens,
             token_callback, plugin_->sampler_config());
+    }
+
+    // Record prompt token count for fork position calculation
+    {
+        std::lock_guard<std::mutex> flock(plugin_->fork_mutex());
+        plugin_->fork_tree().prompt_token_count = result.prompt_tokens;
     }
 
     // Send truncation warning as a visible token so the UI shows it

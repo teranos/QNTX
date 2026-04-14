@@ -558,6 +558,124 @@ InferenceEngine::ChatResult InferenceEngine::chat(
     return result;
 }
 
+InferenceEngine::ChatResult InferenceEngine::fork_and_generate(
+    int32_t parent_seq, int fork_pos_absolute,
+    int32_t fork_token, int32_t new_seq,
+    float temperature, int max_tokens,
+    TokenCallback on_token, const SamplerConfig& sampler_cfg) {
+
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    ChatResult result;
+    if (!model_ || !ctx_) {
+        result.content = "error: no model loaded";
+        return result;
+    }
+
+    auto mem = llama_get_memory(ctx_);
+
+    // Copy parent KV cache [0, fork_pos_absolute) to new sequence
+    llama_memory_seq_cp(mem, parent_seq, new_seq, 0, fork_pos_absolute);
+
+    // Decode the fork token on the new sequence at the fork position
+    auto batch = llama_batch_init(1, 0, 1);
+    batch.n_tokens = 1;
+    batch.token[0] = fork_token;
+    batch.pos[0] = fork_pos_absolute;
+    batch.n_seq_id[0] = 1;
+    batch.seq_id[0][0] = new_seq;
+    batch.logits[0] = 1;  // need logits for next prediction
+
+    if (llama_decode(ctx_, batch) != 0) {
+        llama_batch_free(batch);
+        result.content = "error: fork token decode failed";
+        return result;
+    }
+    llama_batch_free(batch);
+
+    result.prompt_tokens = fork_pos_absolute;
+
+    const llama_vocab* vocab = llama_model_get_vocab(model_);
+    std::vector<SamplerStageSnapshot> stage_snapshots;
+    auto sampler = build_sampler_chain(temperature, sampler_cfg, vocab, &stage_snapshots);
+
+    std::vector<float> probs_buf;
+    std::vector<int> indices_buf;
+
+    std::ostringstream output;
+    int n_generated = 0;
+    auto gen_start = std::chrono::steady_clock::now();
+    long signal_us = 0, decode_us = 0, callback_us = 0;
+
+    // First iteration: capture signal from the fork token decode, then generate
+    llama_token current_token = fork_token;
+
+    for (int i = 0; i < max_tokens; i++) {
+        auto t0 = std::chrono::steady_clock::now();
+        TokenSignal sig;
+        capture_signal(ctx_, vocab, SIGNAL_TOP_K, sig, probs_buf, indices_buf);
+        auto t1 = std::chrono::steady_clock::now();
+        signal_us += std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+
+        stage_snapshots.clear();
+        llama_token new_token = llama_sampler_sample(sampler, ctx_, -1);
+
+        if (llama_vocab_is_eog(vocab, new_token)) break;
+
+        char buf[256];
+        int n = llama_token_to_piece(vocab, new_token, buf, sizeof(buf), 0, true);
+        sig.token_id = new_token;
+        if (n > 0) {
+            sig.token_text = std::string(buf, n);
+            output.write(buf, n);
+        }
+        sig.sampler_stages = std::move(stage_snapshots);
+
+        auto t2 = std::chrono::steady_clock::now();
+        if (on_token && !on_token(sig.token_text, sig)) {
+            break;
+        }
+
+        sig.full_distribution.clear();
+        sig.sampler_stages.clear();
+        result.signals.push_back(std::move(sig));
+        auto t3 = std::chrono::steady_clock::now();
+        callback_us += std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count();
+
+        // Decode next token on the fork sequence
+        auto t4 = std::chrono::steady_clock::now();
+        auto next_batch = llama_batch_init(1, 0, 1);
+        next_batch.n_tokens = 1;
+        next_batch.token[0] = new_token;
+        next_batch.pos[0] = fork_pos_absolute + 1 + i;
+        next_batch.n_seq_id[0] = 1;
+        next_batch.seq_id[0][0] = new_seq;
+        next_batch.logits[0] = 1;
+
+        int decode_status = llama_decode(ctx_, next_batch);
+        llama_batch_free(next_batch);
+        if (decode_status != 0) break;
+
+        auto t5 = std::chrono::steady_clock::now();
+        decode_us += std::chrono::duration_cast<std::chrono::microseconds>(t5 - t4).count();
+        n_generated++;
+    }
+
+    auto gen_end = std::chrono::steady_clock::now();
+    auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(gen_end - gen_start).count();
+    std::cout << "[scry] fork: " << n_generated << " tokens in "
+              << total_ms << "ms on seq " << new_seq << std::endl;
+
+    llama_sampler_free(sampler);
+    result.content = output.str();
+    result.completion_tokens = n_generated;
+    result.generation_ms = total_ms;
+    result.decode_ms = decode_us / 1000;
+    result.signal_ms = signal_us / 1000;
+    result.callback_ms = callback_us / 1000;
+    return result;
+}
+
 InferenceEngine::ChatResult InferenceEngine::stream_chat(
     const std::string& system_prompt,
     const std::string& user_prompt,

@@ -54,6 +54,7 @@ export function createNebulaNav(config: NebulaNavConfig): NebulaNavHandle {
         { key: ']',          display: ']',  cmd: '',                             label: 'next token' },
         { key: ',',          display: ',',  cmd: '',                             label: 'prev candidate' },
         { key: '.',          display: '.',  cmd: '',                             label: 'next candidate' },
+        { key: 'f',          display: 'F',  cmd: '',                             label: 'fork from candidate' },
     ];
     const keyMap: Record<string, string> = {};
     for (const b of bindings) keyMap[b.key] = b.cmd;
@@ -112,6 +113,15 @@ export function createNebulaNav(config: NebulaNavConfig): NebulaNavHandle {
             sendMessage('nav:' + e.key);
             return;
         }
+        if (e.key === 'f' && examine) {
+            e.preventDefault();
+            // Fork from the currently hovered/selected candidate
+            const hoveredId = element.dataset.hoveredTokenId;
+            if (hoveredId) {
+                sendMessage('fork:' + hoveredId);
+            }
+            return;
+        }
         if (e.key === '?') {
             e.preventDefault();
             helpVisible = !helpVisible;
@@ -136,6 +146,13 @@ export function createNebulaNav(config: NebulaNavConfig): NebulaNavHandle {
         if (comma < 0) return;
         const tokenId = parseInt(data.substring(0, comma), 10);
         const tokenText = data.substring(comma + 1);
+
+        // Store hovered token ID for fork key binding
+        if (tokenId >= 0) {
+            element.dataset.hoveredTokenId = String(tokenId);
+        } else {
+            delete element.dataset.hoveredTokenId;
+        }
 
         if (pickedSpanHighlight) {
             pickedSpanHighlight.style.outline = '';
