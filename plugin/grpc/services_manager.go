@@ -196,7 +196,7 @@ func (m *ServicesManager) startATSStoreService(ctx context.Context, store ats.At
 	}()
 
 	addr := listener.Addr().String()
-	m.logger.Infow("ATSStore service started", "address", addr)
+	m.logger.Debugw("ATSStore service started", "address", addr)
 
 	return addr, nil
 }
@@ -230,7 +230,7 @@ func (m *ServicesManager) startQueueService(ctx context.Context, queue *async.Qu
 	}()
 
 	addr := listener.Addr().String()
-	m.logger.Infow("Queue service started", "address", addr)
+	m.logger.Debugw("Queue service started", "address", addr)
 
 	return addr, nil
 }
@@ -264,7 +264,7 @@ func (m *ServicesManager) startScheduleService(ctx context.Context, store *sched
 	}()
 
 	addr := listener.Addr().String()
-	m.logger.Infow("Schedule service started", "address", addr)
+	m.logger.Debugw("Schedule service started", "address", addr)
 
 	return addr, nil
 }
@@ -293,7 +293,7 @@ func (m *ServicesManager) startFileService(ctx context.Context, filesDir string,
 	}()
 
 	addr := listener.Addr().String()
-	m.logger.Infow("File service started", "address", addr)
+	m.logger.Debugw("File service started", "address", addr)
 
 	return addr, nil
 }
@@ -323,7 +323,7 @@ func (m *ServicesManager) startLLMService(ctx context.Context, store ats.Attesta
 	}()
 
 	addr := listener.Addr().String()
-	m.logger.Infow("LLM service started", "address", addr)
+	m.logger.Debugw("LLM service started", "address", addr)
 
 	return addr, nil
 }
@@ -353,7 +353,7 @@ func (m *ServicesManager) startEmbeddingService(ctx context.Context, authToken s
 	}()
 
 	addr := listener.Addr().String()
-	m.logger.Infow("Embedding service started", "address", addr)
+	m.logger.Debugw("Embedding service started", "address", addr)
 
 	return addr, nil
 }
@@ -383,7 +383,7 @@ func (m *ServicesManager) startVectorSearchService(ctx context.Context, authToke
 	}()
 
 	addr := listener.Addr().String()
-	m.logger.Infow("VectorSearch service started", "address", addr)
+	m.logger.Debugw("VectorSearch service started", "address", addr)
 
 	return addr, nil
 }
@@ -412,7 +412,7 @@ func (m *ServicesManager) startGroundService(ctx context.Context, dbPath string,
 	}()
 
 	addr := listener.Addr().String()
-	m.logger.Infow("Ground service started", "address", addr)
+	m.logger.Debugw("Ground service started", "address", addr)
 
 	return addr, nil
 }
@@ -442,7 +442,7 @@ func (m *ServicesManager) startSearchService(ctx context.Context) (string, error
 	}()
 
 	addr := listener.Addr().String()
-	m.logger.Infow("Search service started", "address", addr)
+	m.logger.Debugw("Search service started", "address", addr)
 
 	return addr, nil
 }

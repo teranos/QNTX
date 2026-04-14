@@ -68,7 +68,7 @@ func (r *Registry) Unregister(name string) {
 	delete(r.plugins, name)
 	r.states[name] = StateRestarting
 	delete(r.errors, name)
-	r.logger.Infof("Unregistered plugin '%s' for restart", name)
+	r.logger.Debugf("Unregistered plugin '%s' for restart", name)
 }
 
 // Get retrieves a domain plugin by name
