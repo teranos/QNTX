@@ -68,6 +68,7 @@ impl DomainPluginService for ReducePluginService {
                 "reduce.pca".to_string(),
             ],
             schedules: vec![],
+            ..Default::default()
         }))
     }
 
