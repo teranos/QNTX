@@ -11,6 +11,7 @@ use tracing::{info, warn};
 pub struct MeiliSearchService {
     client: RwLock<Option<Client>>,
     url: RwLock<String>,
+    index_count: RwLock<usize>,
 }
 
 impl MeiliSearchService {
@@ -18,6 +19,7 @@ impl MeiliSearchService {
         Self {
             client: RwLock::new(None),
             url: RwLock::new(String::new()),
+            index_count: RwLock::new(0),
         }
     }
 
@@ -38,11 +40,9 @@ impl MeiliSearchService {
         // Validate connectivity and auth by listing indexes (requires valid key)
         match client.list_all_indexes().await {
             Ok(indexes) => {
-                info!(
-                    "MeiliSearch connected at {} ({} indexes)",
-                    url,
-                    indexes.results.len()
-                );
+                let count = indexes.results.len();
+                info!("MeiliSearch connected at {} ({} indexes)", url, count);
+                *self.index_count.write() = count;
                 *self.client.write() = Some(client);
                 Ok(())
             }
@@ -59,6 +59,14 @@ impl MeiliSearchService {
 
     pub fn has_client(&self) -> bool {
         self.client.read().is_some()
+    }
+
+    pub fn get_url(&self) -> String {
+        self.url.read().clone()
+    }
+
+    pub fn get_index_count(&self) -> usize {
+        *self.index_count.read()
     }
 
     #[allow(clippy::result_large_err)] // Status is the standard tonic error type
