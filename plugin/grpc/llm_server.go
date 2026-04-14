@@ -63,7 +63,7 @@ func (s *LLMServer) RegisterProvider(name string, client protocol.LLMServiceClie
 	if s.defaultProvider == "" {
 		s.defaultProvider = name
 	}
-	s.logger.Infow("LLM provider registered", "provider", name, "is_default", s.defaultProvider == name)
+	s.logger.Debugw("LLM provider registered", "provider", name, "is_default", s.defaultProvider == name)
 }
 
 // HasProvider returns true if the named provider is registered.

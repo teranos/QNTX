@@ -550,7 +550,7 @@ func (s *QNTXServer) initWatcherEngine() error {
 		return errors.Wrap(err, "failed to start watcher engine")
 	}
 
-	s.logger.Info("Watcher engine initialized")
+	s.logger.Debug("Watcher engine initialized")
 	return nil
 }
 

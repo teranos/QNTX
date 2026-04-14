@@ -128,7 +128,7 @@ func initializePluginRegistry() {
 	for _, pluginName := range cfg.Plugin.Enabled {
 		registry.PreRegister(pluginName)
 	}
-	pluginLogger.Infof("Pre-registered %d plugins, loading in background", len(cfg.Plugin.Enabled))
+	pluginLogger.Debugf("Pre-registered %d plugins, loading in background", len(cfg.Plugin.Enabled))
 
 	// Load plugins asynchronously in background
 	go loadPluginsAsync(cfg, pluginLogger, registry)
@@ -156,21 +156,29 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 
 	// Register loaded plugins with registry
 	loadedPlugins := manager.GetAllPlugins()
-	pluginLogger.Infof("Registering %d loaded plugins with registry", len(loadedPlugins))
+	acc := manager.Accumulator()
+	pluginLogger.Debugf("Registering %d loaded plugins with registry", len(loadedPlugins))
 	registeredNames := make(map[string]bool)
 	for i, p := range loadedPlugins {
 		meta := p.Metadata()
-		pluginLogger.Infof("[%d/%d] Attempting to register '%s' plugin", i+1, len(loadedPlugins), meta.Name)
+		pluginLogger.Debugf("[%d/%d] Attempting to register '%s' plugin", i+1, len(loadedPlugins), meta.Name)
+		if acc != nil {
+			acc.SetLoading(meta.Name, meta.Version)
+		}
 		if err := registry.Register(p); err != nil {
 			pluginLogger.Errorf("Failed to register '%s' plugin v%s: %s (skipping)",
 				meta.Name, meta.Version, err.Error())
 			registry.MarkFailed(meta.Name, err.Error())
+			if acc != nil {
+				acc.SetFailed(meta.Name, err.Error())
+				acc.Emit(meta.Name, grpc.BannerBoot)
+			}
 			continue
 		}
 		// Mark plugin as running since gRPC connection is already established
 		registry.MarkReady(meta.Name)
 		registeredNames[meta.Name] = true
-		pluginLogger.Infof("Registered '%s' plugin v%s - %s",
+		pluginLogger.Debugf("Registered '%s' plugin v%s - %s",
 			meta.Name, meta.Version, meta.Description)
 	}
 
@@ -189,7 +197,7 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 		}
 	}
 
-	pluginLogger.Info("Plugin loading complete")
+	pluginLogger.Debug("Plugin loading complete")
 
 	// CRITICAL: Initialize all loaded plugins now that they're registered
 	// This must happen HERE (not in server/init.go) because plugins load asynchronously
@@ -207,7 +215,7 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 		// like werf attempt to connect. No hardcoded ordering — alphabetical
 		// sort is sufficient (faiss < werf).
 		sorted := sortPluginsByName(loadedPlugins)
-		pluginLogger.Infow("Initializing plugins", "count", len(sorted))
+		pluginLogger.Debugw("Initializing plugins", "count", len(sorted))
 		for _, p := range sorted {
 			meta := p.Metadata()
 			initCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -215,33 +223,47 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 				pluginLogger.Errorw("Failed to initialize plugin",
 					"plugin", meta.Name, "version", meta.Version, "error", err)
 				registry.MarkFailed(meta.Name, err.Error())
+				if acc != nil {
+					acc.SetFailed(meta.Name, err.Error())
+					acc.Emit(meta.Name, grpc.BannerBoot)
+				}
 				cancel()
 				continue
 			}
 			cancel()
 			registry.MarkReady(meta.Name)
-			pluginLogger.Infow("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
+			pluginLogger.Debugw("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
+
+			// Collect provider roles for banner
+			var roles []string
 
 			// Provider services register immediately — before the next plugin inits
 			if proxy, ok := p.(*grpc.ExternalDomainProxy); ok && sm != nil {
 				if proxy.IsLLMProvider() {
+					roles = append(roles, "llm-provider")
 					if llmRouter := sm.GetLLMRouter(); llmRouter != nil {
 						llmRouter.RegisterProvider(meta.Name, proxy.LLMServiceClient())
-						pluginLogger.Infow("Registered LLM provider", "plugin", meta.Name)
+						pluginLogger.Debugw("Registered LLM provider", "plugin", meta.Name)
 					}
 				}
 				if proxy.IsVectorSearchProvider() {
+					roles = append(roles, "vector-search-provider")
 					if vsRouter := sm.GetVectorSearchRouter(); vsRouter != nil {
 						vsRouter.SetService(proxy.VectorSearchServiceClient())
-						pluginLogger.Infow("Registered VectorSearch provider", "plugin", meta.Name)
+						pluginLogger.Debugw("Registered VectorSearch provider", "plugin", meta.Name)
 					}
 				}
 				if proxy.IsSearchProvider() {
+					roles = append(roles, "search-provider")
 					if searchRouter := sm.GetSearchRouter(); searchRouter != nil {
 						searchRouter.RegisterProvider(meta.Name, proxy.SearchServiceClient())
-						pluginLogger.Infow("Registered Search provider", "plugin", meta.Name)
+						pluginLogger.Debugw("Registered Search provider", "plugin", meta.Name)
 					}
 				}
+			}
+
+			if acc != nil {
+				acc.SetRoles(meta.Name, roles)
 			}
 		}
 
@@ -250,7 +272,7 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 			pluginLogger.Errorw("Failed to reload watchers after plugin init", "error", err)
 		}
 
-		// Register plugin async handlers with Pulse
+		// Register plugin async handlers with Pulse and emit banners
 		daemon := defaultServer.GetDaemon()
 		if daemon != nil {
 			handlerRegistry := daemon.Registry()
@@ -262,29 +284,47 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 					continue
 				}
 
+				meta := p.Metadata()
 				for _, handlerName := range externalPlugin.GetHandlerNames() {
-					pluginLogger.Infow("Registering plugin async handler",
-						"plugin", p.Metadata().Name, "handler", handlerName)
+					pluginLogger.Debugw("Registering plugin async handler",
+						"plugin", meta.Name, "handler", handlerName)
 					proxyHandler := grpc.NewPluginProxyHandler(handlerName, externalPlugin, db, pluginLogger)
 					handlerRegistry.Register(proxyHandler)
 				}
 
 				schedules := externalPlugin.GetSchedules()
 				if len(schedules) > 0 {
-					if err := grpc.SetupPluginSchedules(db, p.Metadata().Name, schedules, pluginLogger); err != nil {
+					if err := grpc.SetupPluginSchedules(db, meta.Name, schedules, pluginLogger); err != nil {
 						pluginLogger.Errorw("Failed to setup plugin schedules",
-							"plugin", p.Metadata().Name, "error", err)
+							"plugin", meta.Name, "error", err)
 					}
 				}
+
+				// Accumulate handler/schedule/watcher counts and emit banner
+				if acc != nil {
+					acc.SetHandlers(meta.Name, externalPlugin.GetHandlerNames(), len(schedules), len(externalPlugin.GetWatchers()))
+					// Call Health for status enrichment
+					healthCtx, hCancel := context.WithTimeout(context.Background(), 5*time.Second)
+					health := externalPlugin.Health(healthCtx)
+					hCancel()
+					details := make(map[string]string)
+					for k, v := range health.Details {
+						if s, ok := v.(string); ok {
+							details[k] = s
+						}
+					}
+					acc.SetHealth(meta.Name, health.Healthy, health.Message, details)
+					acc.Emit(meta.Name, grpc.BannerBoot)
+				}
 			}
-			pluginLogger.Infow("Plugin async handler registration complete")
+			pluginLogger.Debugw("Plugin async handler registration complete")
 		} else {
 			pluginLogger.Warnw("Cannot register handlers - Pulse daemon not available, will retry")
-			go retryPluginSetup(loadedPlugins, registry, pluginLogger)
+			go retryPluginSetup(loadedPlugins, registry, pluginLogger, acc)
 		}
 	} else {
-		pluginLogger.Warnw("Cannot initialize plugins - server or services not available yet, will retry")
-		go retryPluginSetup(loadedPlugins, registry, pluginLogger)
+		pluginLogger.Debugw("Cannot initialize plugins - server or services not available yet, will retry")
+		go retryPluginSetup(loadedPlugins, registry, pluginLogger, acc)
 	}
 
 	// Start health polling — detect plugin crashes and restart automatically
@@ -309,7 +349,7 @@ func sortPluginsByName(plugins []plugin.DomainPlugin) []plugin.DomainPlugin {
 
 // retryPluginSetup waits for server infrastructure to be ready, then initializes plugins.
 // Same inline init+register pattern as the primary path — no separate passes.
-func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Registry, logger *zap.SugaredLogger) {
+func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Registry, logger *zap.SugaredLogger, acc *grpc.PluginAccumulator) {
 	for i := 0; i < 30; i++ {
 		time.Sleep(1 * time.Second)
 
@@ -332,40 +372,54 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 
 		// Init each plugin, register providers inline
 		sorted := sortPluginsByName(plugins)
-		logger.Infow("Server ready, initializing plugins", "count", len(sorted))
+		logger.Debugw("Server ready, initializing plugins", "count", len(sorted))
 		for _, p := range sorted {
 			meta := p.Metadata()
+			if acc != nil {
+				acc.SetLoading(meta.Name, meta.Version)
+			}
 			initCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			if err := p.Initialize(initCtx, services); err != nil {
 				logger.Errorw("Failed to initialize plugin",
 					"plugin", meta.Name, "version", meta.Version, "error", err)
 				pluginRegistry.MarkFailed(meta.Name, err.Error())
+				if acc != nil {
+					acc.SetFailed(meta.Name, err.Error())
+					acc.Emit(meta.Name, grpc.BannerBoot)
+				}
 				cancel()
 				continue
 			}
 			cancel()
 			pluginRegistry.MarkReady(meta.Name)
-			logger.Infow("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
+			logger.Debugw("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
 
+			var roles []string
 			if proxy, ok := p.(*grpc.ExternalDomainProxy); ok && sm != nil {
 				if proxy.IsLLMProvider() {
+					roles = append(roles, "llm-provider")
 					if llmRouter := sm.GetLLMRouter(); llmRouter != nil {
 						llmRouter.RegisterProvider(meta.Name, proxy.LLMServiceClient())
-						logger.Infow("Registered LLM provider", "plugin", meta.Name)
+						logger.Debugw("Registered LLM provider", "plugin", meta.Name)
 					}
 				}
 				if proxy.IsVectorSearchProvider() {
+					roles = append(roles, "vector-search-provider")
 					if vsRouter := sm.GetVectorSearchRouter(); vsRouter != nil {
 						vsRouter.SetService(proxy.VectorSearchServiceClient())
-						logger.Infow("Registered VectorSearch provider", "plugin", meta.Name)
+						logger.Debugw("Registered VectorSearch provider", "plugin", meta.Name)
 					}
 				}
 				if proxy.IsSearchProvider() {
+					roles = append(roles, "search-provider")
 					if searchRouter := sm.GetSearchRouter(); searchRouter != nil {
 						searchRouter.RegisterProvider(meta.Name, proxy.SearchServiceClient())
-						logger.Infow("Registered Search provider", "plugin", meta.Name)
+						logger.Debugw("Registered Search provider", "plugin", meta.Name)
 					}
 				}
+			}
+			if acc != nil {
+				acc.SetRoles(meta.Name, roles)
 			}
 		}
 
@@ -377,18 +431,35 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 			if !ok {
 				continue
 			}
+			meta := p.Metadata()
 			for _, handlerName := range externalPlugin.GetHandlerNames() {
-				logger.Infow("Registering plugin async handler",
-					"plugin", p.Metadata().Name, "handler", handlerName)
+				logger.Debugw("Registering plugin async handler",
+					"plugin", meta.Name, "handler", handlerName)
 				proxyHandler := grpc.NewPluginProxyHandler(handlerName, externalPlugin, db, logger)
 				handlerRegistry.Register(proxyHandler)
 			}
 			schedules := externalPlugin.GetSchedules()
 			if len(schedules) > 0 {
-				if err := grpc.SetupPluginSchedules(db, p.Metadata().Name, schedules, logger); err != nil {
+				if err := grpc.SetupPluginSchedules(db, meta.Name, schedules, logger); err != nil {
 					logger.Errorw("Failed to setup plugin schedules",
-						"plugin", p.Metadata().Name, "error", err)
+						"plugin", meta.Name, "error", err)
 				}
+			}
+
+			// Accumulate and emit banner
+			if acc != nil {
+				acc.SetHandlers(meta.Name, externalPlugin.GetHandlerNames(), len(schedules), len(externalPlugin.GetWatchers()))
+				healthCtx, hCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				health := externalPlugin.Health(healthCtx)
+				hCancel()
+				details := make(map[string]string)
+				for k, v := range health.Details {
+					if s, ok := v.(string); ok {
+						details[k] = s
+					}
+				}
+				acc.SetHealth(meta.Name, health.Healthy, health.Message, details)
+				acc.Emit(meta.Name, grpc.BannerBoot)
 			}
 		}
 
@@ -396,7 +467,7 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 			logger.Errorw("Failed to reload watchers after plugin init", "error", err)
 		}
 
-		logger.Infow("Plugin setup complete")
+		logger.Debugw("Plugin setup complete")
 		return
 	}
 

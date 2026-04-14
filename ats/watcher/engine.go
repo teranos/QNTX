@@ -146,7 +146,7 @@ func (e *Engine) Start() error {
 	e.wg.Add(1)
 	go e.drainLoop()
 
-	e.logger.Infow("Watcher engine started", "watchers_loaded", len(e.watchers))
+	e.logger.Debugw("Watcher engine started", "watchers_loaded", len(e.watchers))
 	return nil
 }
 

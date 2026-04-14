@@ -51,9 +51,9 @@ func (s *QNTXServer) startBackgroundServices() {
 			s.daemon.Start()
 			if s.ticker != nil {
 				s.ticker.Start()
-				logger.AddPulseSymbol(s.logger).Infow("Pulse ticker started (from saved state)")
+				logger.AddPulseSymbol(s.logger).Debugw("Pulse ticker started (from saved state)")
 			}
-			s.logger.Infow("Daemon started (from saved state)", "workers", s.daemon.Workers())
+			s.logger.Debugw("Daemon started (from saved state)", "workers", s.daemon.Workers())
 		} else {
 			s.logger.Infow("Daemon not started (disabled in saved state)")
 		}

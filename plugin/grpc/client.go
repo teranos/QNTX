@@ -111,7 +111,7 @@ func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDo
 		License:     metaResp.License,
 	}
 
-	logger.Infof("Connected to '%s' plugin gRPC server v%s at %s (requires QNTX %s)",
+	logger.Debugf("Connected to '%s' plugin gRPC server v%s at %s (requires QNTX %s)",
 		proxy.metadata.Name, proxy.metadata.Version, addr, proxy.metadata.QNTXVersion)
 
 	return proxy, nil
@@ -362,7 +362,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		}
 	}
 
-	c.logger.Infow("Plugin initialized",
+	c.logger.Debugw("Plugin initialized",
 		"name", c.metadata.Name,
 		"handlers", len(c.handlerNames),
 		"schedules", len(c.schedules),

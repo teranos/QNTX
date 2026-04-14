@@ -98,6 +98,7 @@ type PluginManager struct {
 	shutdownCtx       context.Context // cancelled on Shutdown to stop retry goroutines
 	shutdownCancel    context.CancelFunc
 	servicesManager   *ServicesManager // for re-registering LLM providers after restart
+	accumulator       *PluginAccumulator
 }
 
 // managedPlugin tracks a running plugin.
@@ -158,6 +159,11 @@ func GetDefaultPluginManager() *PluginManager {
 // SetServicesManager sets the services manager for LLM provider re-registration after restart.
 func (m *PluginManager) SetServicesManager(sm *ServicesManager) {
 	m.servicesManager = sm
+}
+
+// Accumulator returns the plugin banner accumulator.
+func (m *PluginManager) Accumulator() *PluginAccumulator {
+	return m.accumulator
 }
 
 // LoadPlugins loads and connects to plugins from configuration.
@@ -224,7 +230,12 @@ func (m *PluginManager) retryPluginForever(ctx context.Context, config PluginCon
 				m.registerRestarted(ctx, config.Name, registry, services)
 			}
 
-			m.logger.Infof("Plugin '%s' loaded successfully on restart cycle %d", config.Name, cycle)
+			// Emit recovered banner
+			if m.accumulator != nil {
+				m.accumulator.Emit(config.Name, BannerRecovered)
+			}
+
+			m.logger.Debugf("Plugin '%s' loaded successfully on restart cycle %d", config.Name, cycle)
 			return
 		}
 
@@ -267,7 +278,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 
 	if config.Address != "" {
 		addr = config.Address
-		m.logger.Infow("Connecting to existing plugin", "name", config.Name, "address", addr)
+		m.logger.Debugw("Connecting to existing plugin", "name", config.Name, "address", addr)
 	} else if config.Binary != "" && config.AutoStart {
 		port = m.allocatePort()
 		addr = fmt.Sprintf("127.0.0.1:%d", port)
@@ -283,10 +294,10 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		if actualPort != 0 && actualPort != port {
 			port = actualPort
 			addr = fmt.Sprintf("127.0.0.1:%d", port)
-			m.logger.Infow("Plugin bound to different port", "name", config.Name, "actual_port", actualPort)
+			m.logger.Debugw("Plugin bound to different port", "name", config.Name, "actual_port", actualPort)
 		}
 
-		m.logger.Infof("Started '%s' plugin process (pid=%d, port=%d, addr=%s)",
+		m.logger.Debugf("Started '%s' plugin process (pid=%d, port=%d, addr=%s)",
 			config.Name, process.Pid, port, addr)
 
 		if err := m.waitForPlugin(ctx, config.Name, addr, 5*time.Second); err != nil {
@@ -368,7 +379,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 	}
 	m.mu.Unlock()
 
-	m.logger.Infof("Plugin '%s' v%s loaded and ready - %s",
+	m.logger.Debugf("Plugin '%s' v%s loaded and ready - %s",
 		config.Name, meta.Version, meta.Description)
 
 	return nil
@@ -501,7 +512,7 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	}
 	stderrLogger := &pluginLogger{
 		logger:    pLogger,
-		level:     "error",
+		level:     "debug",
 		logBuffer: logBuf,
 		// Don't pass portChan to stderr - port announcement should be on stdout
 	}
@@ -520,7 +531,7 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	select {
 	case discoveredPort := <-portChan:
 		actualPort = discoveredPort
-		m.logger.Infow("Discovered plugin port from stdout",
+		m.logger.Debugw("Discovered plugin port from stdout",
 			"name", config.Name,
 			"requested_port", port,
 			"actual_port", actualPort)
@@ -590,18 +601,20 @@ func (m *PluginManager) waitForPlugin(ctx context.Context, expectedName string, 
 
 		// gRPC service is ready, but is it the right plugin?
 		if metaResp.Name == expectedName {
-			m.logger.Infow("Plugin ready",
+			m.logger.Debugw("Plugin ready",
 				"plugin", expectedName, "addr", addr,
 				"attempts", attempt, "elapsed_ms", time.Since(start).Milliseconds(),
 			)
 			return nil
 		}
 
-		// Wrong plugin at this address (likely from another QNTX instance)
-		m.logger.Warnw("Wrong plugin at address",
-			"expected", expectedName, "found", metaResp.Name,
-			"addr", addr, "attempt", attempt,
-		)
+		// Wrong plugin at this address — log once, not every retry
+		if attempt == 1 {
+			m.logger.Warnw("Wrong plugin at address",
+				"expected", expectedName, "found", metaResp.Name,
+				"addr", addr,
+			)
+		}
 		time.Sleep(100 * time.Millisecond)
 	}
 
@@ -668,7 +681,7 @@ func (m *PluginManager) ConfigureWebSocket(keepalive KeepaliveConfig, wsConfig W
 	for _, p := range m.plugins {
 		p.client.SetWebSocketConfig(keepalive, wsConfig)
 	}
-	m.logger.Infow("WebSocket configuration applied to plugins",
+	m.logger.Debugw("WebSocket configuration applied to plugins",
 		"keepalive_enabled", keepalive.Enabled,
 		"ping_interval", keepalive.PingInterval,
 		"allowed_origins_count", len(wsConfig.AllowedOrigins),
@@ -694,7 +707,7 @@ func (m *PluginManager) ReinitializePlugin(ctx context.Context, pluginName strin
 		return errors.WithHintf(wrappedErr, "check plugin logs and verify configuration is valid")
 	}
 
-	m.logger.Infof("Successfully reinitialized plugin '%s' with updated configuration", pluginName)
+	m.logger.Debugf("Successfully reinitialized plugin '%s' with updated configuration", pluginName)
 	return nil
 }
 
@@ -722,7 +735,7 @@ func (m *PluginManager) RestartPlugin(ctx context.Context, name string, registry
 	// Unregister from registry so Register doesn't hit "already registered"
 	registry.Unregister(name)
 
-	m.logger.Infof("Killed plugin '%s', relaunching from %s", name, config.Binary)
+	m.logger.Debugf("Killed plugin '%s', relaunching from %s", name, config.Binary)
 
 	// Relaunch — if it fails, retry forever in background
 	if err := m.loadPlugin(ctx, config); err != nil {
@@ -736,6 +749,7 @@ func (m *PluginManager) RestartPlugin(ctx context.Context, name string, registry
 	}
 
 	m.registerRestarted(ctx, name, registry, services)
+	// Accumulator is populated by registerRestarted — callers emit with the appropriate reason
 	return nil
 }
 
@@ -760,24 +774,45 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 	p, exists := m.plugins[name]
 	m.mu.RUnlock()
 	if !exists || m.servicesManager == nil {
-		m.logger.Infof("Plugin '%s' restarted successfully", name)
+		m.logger.Debugf("Plugin '%s' restarted successfully", name)
 		return
 	}
 	proxy := p.client
+	var roles []string
 	if proxy.IsLLMProvider() {
+		roles = append(roles, "llm-provider")
 		if llmRouter := m.servicesManager.GetLLMRouter(); llmRouter != nil {
 			llmRouter.RegisterProvider(name, proxy.LLMServiceClient())
-			m.logger.Infof("Re-registered LLM provider '%s' after restart", name)
+			m.logger.Debugf("Re-registered LLM provider '%s' after restart", name)
 		}
 	}
 	if proxy.IsSearchProvider() {
+		roles = append(roles, "search-provider")
 		if searchRouter := m.servicesManager.GetSearchRouter(); searchRouter != nil {
 			searchRouter.RegisterProvider(name, proxy.SearchServiceClient())
-			m.logger.Infof("Re-registered search provider '%s' after restart", name)
+			m.logger.Debugf("Re-registered search provider '%s' after restart", name)
 		}
 	}
 
-	m.logger.Infof("Plugin '%s' restarted successfully", name)
+	m.logger.Debugf("Plugin '%s' restarted successfully", name)
+
+	// Emit banner for restarted plugin
+	if m.accumulator != nil {
+		meta := proxy.Metadata()
+		m.accumulator.SetLoading(name, meta.Version)
+		m.accumulator.SetRoles(name, roles)
+		m.accumulator.SetHandlers(name, proxy.GetHandlerNames(), len(proxy.GetSchedules()), len(proxy.GetWatchers()))
+		healthCtx, hCancel := context.WithTimeout(ctx, 5*time.Second)
+		health := proxy.Health(healthCtx)
+		hCancel()
+		details := make(map[string]string)
+		for k, v := range health.Details {
+			if s, ok := v.(string); ok {
+				details[k] = s
+			}
+		}
+		m.accumulator.SetHealth(name, health.Healthy, health.Message, details)
+	}
 }
 
 // Shutdown stops all managed plugins and retry goroutines.
