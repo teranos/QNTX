@@ -12,7 +12,7 @@
 #include "domain.grpc.pb.h"
 #include "llm.grpc.pb.h"
 
-#define PLUGIN_VERSION "0.2.1"
+#define PLUGIN_VERSION "0.3.1"
 
 // Forward declarations
 struct llama_model;
@@ -85,6 +85,10 @@ public:
                                    const SamplerConfig& sampler_cfg = {});
 
     std::string model_name() const { return model_name_; }
+    std::string model_desc() const;       // e.g. "llama 7B Q4_K_M"
+    uint64_t model_size_bytes() const;    // file size in bytes
+    uint64_t model_n_params() const;      // parameter count
+    int context_length() const;           // effective n_ctx
     int vocab_size() const;
     std::string token_text(int token_id) const;
 
@@ -101,6 +105,7 @@ private:
     mtmd_context* mtmd_ctx_ = nullptr;
     std::string model_path_;
     std::string model_name_;
+    int effective_ctx_ = 0;
     std::mutex mutex_;
 };
 
