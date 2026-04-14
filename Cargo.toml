@@ -49,3 +49,12 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Utilities
 parking_lot = "0.12"
+
+# WASM size optimization: applies only to qntx-wasm (cdylib for the browser).
+# opt-level="s" optimizes for size, strip=true removes symbols.
+# Other crates keep the default release profile.
+# NOTE: lto is not overridable per-package in cargo, so the previous lto=true
+# setting in crates/qntx-wasm/Cargo.toml was silently ignored anyway.
+[profile.release.package.qntx-wasm]
+opt-level = "s"
+strip = true
