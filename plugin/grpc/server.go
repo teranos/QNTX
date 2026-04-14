@@ -197,20 +197,19 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 			pluginConfig["_auth_token"] = req.AuthToken
 		}
 
-		s.services = NewRemoteServiceRegistry(
-			ctx,
-			req.AtsStoreEndpoint,
-			req.QueueEndpoint,
-			req.ScheduleEndpoint,
-			req.FileServiceEndpoint,
-			req.LlmEndpoint,
-			req.VectorSearchEndpoint,
-			req.SearchEndpoint,
-			req.AuthToken,
-			pluginConfig,
-			s.logger,
-			s.plugin, // Pass plugin reference for metadata lookup
-		)
+		s.services = NewRemoteServiceRegistry(RemoteServiceRegistryConfig{
+			ATSStoreEndpoint:     req.AtsStoreEndpoint,
+			QueueEndpoint:        req.QueueEndpoint,
+			ScheduleEndpoint:     req.ScheduleEndpoint,
+			FileServiceEndpoint:  req.FileServiceEndpoint,
+			LLMEndpoint:          req.LlmEndpoint,
+			VectorSearchEndpoint: req.VectorSearchEndpoint,
+			SearchEndpoint:       req.SearchEndpoint,
+			AuthToken:            req.AuthToken,
+			Config:               pluginConfig,
+			Logger:               s.logger,
+			PluginRef:            s.plugin, // for metadata lookup
+		})
 
 		// Initialize the plugin
 		if err := s.plugin.Initialize(ctx, s.services); err != nil {

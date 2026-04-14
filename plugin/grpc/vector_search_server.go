@@ -7,20 +7,28 @@ import (
 
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
-// VectorSearchServer implements the VectorSearchService gRPC server.
-// Starts with no backend — SetService must be called once the provider
-// plugin initializes (same lazy pattern as EmbeddingServer).
+// VectorSearchServer is the core-side gRPC server that routes vector search
+// requests to the provider plugin (e.g. qntx-faiss). It implements
+// protocol.VectorSearchServiceServer and holds a VectorSearchServiceClient
+// connection to the provider plugin.
+//
+// Starts empty — the provider registers after init, same pattern as
+// LLMServer and SearchServer.
 type VectorSearchServer struct {
 	protocol.UnimplementedVectorSearchServiceServer
 	mu        sync.RWMutex
-	service   protocol.VectorSearchServiceClient
+	provider  protocol.VectorSearchServiceClient
+	name      string // provider name for logging
 	authToken string
 	logger    *zap.SugaredLogger
 }
 
-// NewVectorSearchServer creates a new vector search gRPC server.
+// NewVectorSearchServer creates a new vector search routing server.
+// Starts empty — provider registers after init.
 func NewVectorSearchServer(authToken string, logger *zap.SugaredLogger) *VectorSearchServer {
 	return &VectorSearchServer{
 		authToken: authToken,
@@ -28,19 +36,20 @@ func NewVectorSearchServer(authToken string, logger *zap.SugaredLogger) *VectorS
 	}
 }
 
-// SetService registers the vector search backend after provider initialization.
-func (s *VectorSearchServer) SetService(client protocol.VectorSearchServiceClient) {
+// RegisterProvider sets the vector search provider plugin's client connection.
+func (s *VectorSearchServer) RegisterProvider(name string, client protocol.VectorSearchServiceClient) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.service = client
-	s.logger.Infow("VectorSearch gRPC service backend registered")
+	s.provider = client
+	s.name = name
+	s.logger.Debugw("VectorSearch provider registered", "provider", name)
 }
 
-// HasProvider returns true if a vector search backend is registered.
+// HasProvider returns true if a vector search provider is registered.
 func (s *VectorSearchServer) HasProvider() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.service != nil
+	return s.provider != nil
 }
 
 // Search finds the nearest neighbors to a query vector in a named index.
@@ -49,12 +58,9 @@ func (s *VectorSearchServer) Search(ctx context.Context, req *protocol.VectorSea
 		return nil, err
 	}
 
-	s.mu.RLock()
-	svc := s.service
-	s.mu.RUnlock()
-
-	if svc == nil {
-		return nil, fmt.Errorf("vector search service not initialized")
+	client, _, err := s.getProvider()
+	if err != nil {
+		return nil, err
 	}
 
 	if req.Index == "" {
@@ -64,7 +70,7 @@ func (s *VectorSearchServer) Search(ctx context.Context, req *protocol.VectorSea
 		return nil, fmt.Errorf("query vector cannot be empty")
 	}
 
-	return svc.Search(ctx, req)
+	return client.Search(ctx, req)
 }
 
 // AddVectors inserts vectors into a named index.
@@ -73,12 +79,9 @@ func (s *VectorSearchServer) AddVectors(ctx context.Context, req *protocol.AddVe
 		return nil, err
 	}
 
-	s.mu.RLock()
-	svc := s.service
-	s.mu.RUnlock()
-
-	if svc == nil {
-		return nil, fmt.Errorf("vector search service not initialized")
+	client, _, err := s.getProvider()
+	if err != nil {
+		return nil, err
 	}
 
 	if req.Index == "" {
@@ -88,7 +91,7 @@ func (s *VectorSearchServer) AddVectors(ctx context.Context, req *protocol.AddVe
 		return nil, fmt.Errorf("no vectors provided")
 	}
 
-	return svc.AddVectors(ctx, req)
+	return client.AddVectors(ctx, req)
 }
 
 // CreateIndex creates a new named vector index.
@@ -97,12 +100,9 @@ func (s *VectorSearchServer) CreateIndex(ctx context.Context, req *protocol.Crea
 		return nil, err
 	}
 
-	s.mu.RLock()
-	svc := s.service
-	s.mu.RUnlock()
-
-	if svc == nil {
-		return nil, fmt.Errorf("vector search service not initialized")
+	client, _, err := s.getProvider()
+	if err != nil {
+		return nil, err
 	}
 
 	if req.Name == "" {
@@ -112,5 +112,17 @@ func (s *VectorSearchServer) CreateIndex(ctx context.Context, req *protocol.Crea
 		return nil, fmt.Errorf("dimensions must be positive, got %d", req.Dimensions)
 	}
 
-	return svc.CreateIndex(ctx, req)
+	return client.CreateIndex(ctx, req)
+}
+
+// getProvider returns the vector search client or an error if none is registered.
+func (s *VectorSearchServer) getProvider() (protocol.VectorSearchServiceClient, string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.provider == nil {
+		return nil, "", status.Error(codes.Unavailable, "no vector search provider registered")
+	}
+
+	return s.provider, s.name, nil
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/teranos/QNTX/pulse/schedule"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // RemoteSchedule is a gRPC client wrapper for schedule.Store.
@@ -23,17 +22,13 @@ type RemoteSchedule struct {
 
 // NewRemoteSchedule creates a gRPC client connection to the Schedule service.
 func NewRemoteSchedule(ctx context.Context, endpoint string, authToken string, logger *zap.SugaredLogger) (*RemoteSchedule, error) {
-	conn, err := grpc.NewClient(endpoint,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
+	conn, err := dialPluginEndpoint(endpoint, "ScheduleService")
 	if err != nil {
 		return nil, err
 	}
 
-	client := protocol.NewScheduleServiceClient(conn)
-
 	return &RemoteSchedule{
-		client:    client,
+		client:    protocol.NewScheduleServiceClient(conn),
 		conn:      conn,
 		authToken: authToken,
 		logger:    logger,

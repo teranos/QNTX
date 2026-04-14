@@ -8,7 +8,6 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // RemoteSearch is a gRPC client wrapper for the SearchService.
@@ -21,17 +20,13 @@ type RemoteSearch struct {
 
 // NewRemoteSearch creates a gRPC client connection to the core SearchService.
 func NewRemoteSearch(ctx context.Context, endpoint string, logger *zap.SugaredLogger) (*RemoteSearch, error) {
-	conn, err := grpc.NewClient(endpoint,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
+	conn, err := dialPluginEndpoint(endpoint, "SearchService")
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to connect to search service at %s", endpoint)
+		return nil, err
 	}
 
-	client := protocol.NewSearchServiceClient(conn)
-
 	return &RemoteSearch{
-		client: client,
+		client: protocol.NewSearchServiceClient(conn),
 		conn:   conn,
 		logger: logger,
 	}, nil

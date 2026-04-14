@@ -39,37 +39,41 @@ type RemoteServiceRegistry struct {
 	pluginRef            plugin.DomainPlugin        // Reference to plugin for metadata lookup
 }
 
+// RemoteServiceRegistryConfig configures a RemoteServiceRegistry.
+// Named fields keep the signature stable as new services are added — a new
+// endpoint is one field, not another positional argument at every call site.
+type RemoteServiceRegistryConfig struct {
+	ATSStoreEndpoint     string
+	QueueEndpoint        string
+	ScheduleEndpoint     string
+	FileServiceEndpoint  string
+	LLMEndpoint          string
+	VectorSearchEndpoint string
+	SearchEndpoint       string
+	AuthToken            string
+	Config               map[string]string
+	Logger               *zap.SugaredLogger
+	PluginRef            plugin.DomainPlugin
+}
+
 // NewRemoteServiceRegistry creates a new remote service registry.
 // Uses background context for gRPC clients — the caller's context (typically
 // the Initialize RPC) is short-lived and cancelled when the RPC returns,
 // but ATSStore/Queue clients must outlive initialization.
-func NewRemoteServiceRegistry(
-	ctx context.Context,
-	atsStoreEndpoint string,
-	queueEndpoint string,
-	scheduleEndpoint string,
-	fileServiceEndpoint string,
-	llmEndpoint string,
-	vectorSearchEndpoint string,
-	searchEndpoint string,
-	authToken string,
-	config map[string]string,
-	logger *zap.SugaredLogger,
-	pluginRef plugin.DomainPlugin,
-) *RemoteServiceRegistry {
+func NewRemoteServiceRegistry(cfg RemoteServiceRegistryConfig) *RemoteServiceRegistry {
 	return &RemoteServiceRegistry{
 		ctx:                  context.Background(),
-		atsStoreEndpoint:     atsStoreEndpoint,
-		queueEndpoint:        queueEndpoint,
-		scheduleEndpoint:     scheduleEndpoint,
-		fileServiceEndpoint:  fileServiceEndpoint,
-		llmEndpoint:          llmEndpoint,
-		vectorSearchEndpoint: vectorSearchEndpoint,
-		searchEndpoint:       searchEndpoint,
-		authToken:            authToken,
-		config:               config,
-		logger:               logger,
-		pluginRef:            pluginRef,
+		atsStoreEndpoint:     cfg.ATSStoreEndpoint,
+		queueEndpoint:        cfg.QueueEndpoint,
+		scheduleEndpoint:     cfg.ScheduleEndpoint,
+		fileServiceEndpoint:  cfg.FileServiceEndpoint,
+		llmEndpoint:          cfg.LLMEndpoint,
+		vectorSearchEndpoint: cfg.VectorSearchEndpoint,
+		searchEndpoint:       cfg.SearchEndpoint,
+		authToken:            cfg.AuthToken,
+		config:               cfg.Config,
+		logger:               cfg.Logger,
+		pluginRef:            cfg.PluginRef,
 	}
 }
 

@@ -1,7 +1,6 @@
 package grpc
 
 import (
-	"context"
 	"sort"
 	"testing"
 
@@ -239,20 +238,13 @@ func TestRemoteServiceRegistryConfig(t *testing.T) {
 			"port":     "3000",
 		}
 
-		registry := NewRemoteServiceRegistry(
-			context.Background(),
-			"localhost:50051",
-			"localhost:50052",
-			"localhost:50053",
-			"", // file service
-			"", // llm
-			"", // vector search
-			"", // search
-			"test-token",
-			configMap,
-			nil, // logger
-			nil, // plugin
-		)
+		registry := NewRemoteServiceRegistry(RemoteServiceRegistryConfig{
+			ATSStoreEndpoint: "localhost:50051",
+			QueueEndpoint:    "localhost:50052",
+			ScheduleEndpoint: "localhost:50053",
+			AuthToken:        "test-token",
+			Config:           configMap,
+		})
 
 		config := registry.Config("test-domain")
 		require.NotNil(t, config)

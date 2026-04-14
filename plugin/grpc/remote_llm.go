@@ -8,7 +8,6 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // RemoteLLM is a gRPC client wrapper for the LLM service.
@@ -21,17 +20,13 @@ type RemoteLLM struct {
 
 // NewRemoteLLM creates a gRPC client connection to the core LLM service.
 func NewRemoteLLM(ctx context.Context, endpoint string, logger *zap.SugaredLogger) (*RemoteLLM, error) {
-	conn, err := grpc.NewClient(endpoint,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
+	conn, err := dialPluginEndpoint(endpoint, "LLMService")
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to connect to LLM service at %s", endpoint)
+		return nil, err
 	}
 
-	client := protocol.NewLLMServiceClient(conn)
-
 	return &RemoteLLM{
-		client: client,
+		client: protocol.NewLLMServiceClient(conn),
 		conn:   conn,
 		logger: logger,
 	}, nil

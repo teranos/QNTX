@@ -249,7 +249,7 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 				if proxy.IsVectorSearchProvider() {
 					roles = append(roles, "vector-search-provider")
 					if vsRouter := sm.GetVectorSearchRouter(); vsRouter != nil {
-						vsRouter.SetService(proxy.VectorSearchServiceClient())
+						vsRouter.RegisterProvider(meta.Name, proxy.VectorSearchServiceClient())
 						pluginLogger.Debugw("Registered VectorSearch provider", "plugin", meta.Name)
 					}
 				}
@@ -406,7 +406,7 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 				if proxy.IsVectorSearchProvider() {
 					roles = append(roles, "vector-search-provider")
 					if vsRouter := sm.GetVectorSearchRouter(); vsRouter != nil {
-						vsRouter.SetService(proxy.VectorSearchServiceClient())
+						vsRouter.RegisterProvider(meta.Name, proxy.VectorSearchServiceClient())
 						logger.Debugw("Registered VectorSearch provider", "plugin", meta.Name)
 					}
 				}

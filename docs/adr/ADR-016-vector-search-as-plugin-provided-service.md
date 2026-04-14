@@ -56,7 +56,7 @@ A plugin may use all three. A workflow might embed text via EmbeddingService, fi
 
 ## Routing
 
-Same pattern as LLMService and SearchService: `VectorSearchServer` in core holds a reference to the provider backend. Provider plugins register via `SetService`. Callers go through `services.VectorSearch()` on `ServiceRegistry`.
+Same pattern as LLMService and SearchService: `VectorSearchServer` in core holds a reference to the provider backend. Provider plugins register via `RegisterProvider(name, client)`. Callers go through `services.VectorSearch()` on `ServiceRegistry`.
 
 ## Index management
 

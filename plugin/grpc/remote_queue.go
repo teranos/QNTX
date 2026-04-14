@@ -8,7 +8,6 @@ import (
 	"github.com/teranos/QNTX/pulse/async"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // RemoteQueue is a gRPC client wrapper for async.Queue.
@@ -24,17 +23,13 @@ type RemoteQueue struct {
 // NewRemoteQueue creates a gRPC client connection to the Queue service.
 // The provided context is used for all gRPC operations and enables cancellation.
 func NewRemoteQueue(ctx context.Context, endpoint string, authToken string, logger *zap.SugaredLogger) (*RemoteQueue, error) {
-	conn, err := grpc.NewClient(endpoint,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
+	conn, err := dialPluginEndpoint(endpoint, "QueueService")
 	if err != nil {
 		return nil, err
 	}
 
-	client := protocol.NewQueueServiceClient(conn)
-
 	return &RemoteQueue{
-		client:    client,
+		client:    protocol.NewQueueServiceClient(conn),
 		conn:      conn,
 		authToken: authToken,
 		logger:    logger,

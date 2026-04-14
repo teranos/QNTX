@@ -7,7 +7,6 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // RemoteFileService is a gRPC client wrapper for the FileService.
@@ -23,18 +22,15 @@ type RemoteFileService struct {
 // NewRemoteFileService creates a gRPC client connection to the FileService.
 // Sets a 100MB max receive message size to handle files up to 50MB (base64 ~67MB).
 func NewRemoteFileService(ctx context.Context, endpoint string, authToken string, logger *zap.SugaredLogger) (*RemoteFileService, error) {
-	conn, err := grpc.NewClient(endpoint,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	conn, err := dialPluginEndpoint(endpoint, "FileService",
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(100<<20)),
 	)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to connect to FileService gRPC endpoint")
+		return nil, err
 	}
 
-	client := protocol.NewFileServiceClient(conn)
-
 	return &RemoteFileService{
-		client:    client,
+		client:    protocol.NewFileServiceClient(conn),
 		conn:      conn,
 		authToken: authToken,
 		logger:    logger,
