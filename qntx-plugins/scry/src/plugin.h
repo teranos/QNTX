@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -14,13 +15,39 @@
 #include "llm.grpc.pb.h"
 #include "ats_client.h"
 
-#define PLUGIN_VERSION "0.36.1"
+#define PLUGIN_VERSION "0.37.0"
 
 // Forward declarations
 struct llama_model;
 struct llama_context;
 struct mtmd_context;
 class MetalRenderer;
+
+// A branch in the fork tree — each branch owns its own trail/ghost/keyframe data.
+// Uses int32_t directly to avoid redefinition conflicts with llama.h typedefs.
+// Root branch (id=0) is populated after initial StreamChat completes.
+// Fork branches copy parent state up to the fork point, then diverge.
+struct ForkBranch {
+    int id;                          // 0 = root
+    int parent_id;                   // -1 for root
+    int fork_position;               // index in parent's generated sequence where fork starts
+    int32_t seq_id;                  // llama.cpp KV cache sequence (llama_seq_id)
+    int32_t fork_token;              // the alternative token that starts this branch (llama_token)
+
+    std::vector<int32_t> tokens;     // generated token IDs
+    std::vector<float> trail_positions;
+    std::vector<float> ghost_vertices;
+    std::vector<std::vector<float>> keyframes;
+    float orbit_phase;               // radians, parent_phase + π/2 per fork depth
+    bool active;
+};
+
+struct ForkTree {
+    std::vector<ForkBranch> branches;
+    int active_branch = 0;
+    int next_seq_id = 1;  // root uses seq_id 0
+    int prompt_token_count = 0;  // tokens in prompt (shared prefix for all branches)
+};
 
 // Sampler chain configuration — controls which samplers are active and their params.
 // Defaults produce the same behavior as the previous temp-only chain.
@@ -149,6 +176,14 @@ public:
                            int max_tokens,
                            const SamplerConfig& sampler_cfg = {});
 
+    // Fork: copy parent KV cache up to fork_pos, decode fork_token on new_seq,
+    // then continue generation. Skips prepare_prompt (reuses existing KV cache).
+    ChatResult fork_and_generate(
+        int32_t parent_seq, int fork_pos_absolute,
+        int32_t fork_token, int32_t new_seq,
+        float temperature, int max_tokens,
+        TokenCallback on_token, const SamplerConfig& cfg);
+
     std::string model_name() const { return model_name_; }
     int vocab_size() const;
     std::string token_text(int token_id) const;
@@ -229,6 +264,10 @@ public:
     MetalRenderer& renderer() { return *renderer_; }
     AtsClient& ats_client() { return ats_client_; }
 
+    // Fork tree — tracks branching state across generations
+    ForkTree& fork_tree() { return fork_tree_; }
+    std::mutex& fork_mutex() { return fork_mu_; }
+
     // Activity status for UI feedback
     void set_activity(const std::string& a) { std::lock_guard<std::mutex> l(activity_mu_); activity_ = a; }
     std::string activity() { std::lock_guard<std::mutex> l(activity_mu_); return activity_; }
@@ -243,6 +282,10 @@ private:
     std::unique_ptr<MetalRenderer> renderer_;
     AtsClient ats_client_;
     SamplerConfig sampler_cfg_;
+
+    // Fork tree state
+    ForkTree fork_tree_;
+    std::mutex fork_mu_;
 
     // Background PCA computation thread
     std::thread pca_thread_;

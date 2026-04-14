@@ -72,9 +72,6 @@ public:
     // The render loop interpolates between them at 60fps.
     void submit_distribution(const float* probabilities, int vocab_size);
 
-    // Store a copy of the distribution for scrub playback.
-    void store_keyframe(const float* probabilities, int vocab_size);
-
     // Set scrub target: index >= 0 renders that keyframe, -1 resumes live.
     void set_scrub_index(int idx);
 
@@ -82,13 +79,23 @@ public:
     void set_token_examine(bool examine);
 
     // Record the chosen token's position in the generation trail.
-    void add_trail_point(int token_id);
+    // branch_id selects which fork branch to append to (-1 or 0 = root/default).
+    void add_trail_point(int token_id, int branch_id = 0);
     void clear_trail();
 
     // Record ghost branches: lines from the chosen token to runner-up positions.
     // Call after add_trail_point for the same generation step.
     void add_ghost_branches(int chosen_token_id,
-                            const std::vector<std::pair<int,float>>& runners);
+                            const std::vector<std::pair<int,float>>& runners,
+                            int branch_id = 0);
+
+    // Store keyframe for a specific branch.
+    void store_keyframe(const float* probabilities, int vocab_size, int branch_id);
+
+    // Fork branch management
+    int add_fork_branch(int parent_branch_id, int fork_position);
+    int branch_count() const;
+    void set_active_branch(int branch_id);
 
     // Camera: pan (dx/dy in world units), zoom (dz multiplicative),
     // rotation (dyaw/dpitch in radians).
@@ -174,15 +181,26 @@ private:
 
     void build_mvp(float* mvp, int width, int height);
 
-    // Generation trail — chosen token positions
-    std::vector<float> trail_positions_;  // flat float3 array
+    // Per-branch rendering data for fork tree visualization
+    struct BranchRenderData {
+        std::vector<float> trail_positions;   // flat float3 array
+        std::vector<float> ghost_vertices;    // 5 floats per vertex [x,y,z,prob,trail_index]
+        std::vector<std::vector<float>> keyframes;
+        float orbit_phase = 0.0f;            // radians offset for orbit
+        bool active = true;                   // active = warm trail, inactive = ghost-like
+    };
+    std::vector<BranchRenderData> branches_;  // index 0 = root, initialized in setup()
+    int active_branch_ = 0;
+
+    // Generation trail — chosen token positions (root branch, for backward compat)
+    std::vector<float> trail_positions_;  // flat float3 array (mirrors branches_[0].trail_positions)
     std::mutex trail_mutex_;
     const float* vocab_positions_ptr_ = nullptr;  // borrowed pointer to cached positions
 
     // Ghost branches — runner-up paths at each generation step
     // Flat buffer: 5 floats per vertex [x, y, z, prob, trail_index]
     // Vertices come in pairs (chosen->runner-up) drawn as Line primitives
-    std::vector<float> ghost_vertices_;
+    std::vector<float> ghost_vertices_;  // mirrors branches_[0].ghost_vertices
     MTL::RenderPipelineState* ghost_pipeline_ = nullptr;
 
     // Pick buffer — R32Uint texture for hover identification
@@ -226,7 +244,7 @@ private:
     std::chrono::steady_clock::time_point keyframe_time_;
     std::chrono::milliseconds keyframe_interval_{100};  // ~10 tok/s default
 
-    // Scrub playback — CPU-side keyframe history
+    // Scrub playback — CPU-side keyframe history (active branch's keyframes)
     std::vector<std::vector<float>> keyframe_history_;  // one distribution per token
     std::atomic<int> scrub_index_{-1};  // -1 = live mode
     std::atomic<bool> token_examine_{false};  // true = isolate single keyframe
