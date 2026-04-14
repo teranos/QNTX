@@ -19,19 +19,24 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	GroundService_WriteToGround_FullMethodName = "/protocol.GroundService/WriteToGround"
+	GroundService_WriteToGround_FullMethodName   = "/protocol.GroundService/WriteToGround"
+	GroundService_ReadUndelivered_FullMethodName = "/protocol.GroundService/ReadUndelivered"
 )
 
 // GroundServiceClient is the client API for GroundService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// GroundService provides write access to Ground's deferred news database.
+// GroundService provides access to Ground's deferred news database.
 // Plugins call this to surface attestations in Claude Code sessions via Ground.
 type GroundServiceClient interface {
 	// WriteToGround inserts an attestation into Ground's SQLite database.
 	// Ground delivers these as deferred news on session Stop.
 	WriteToGround(ctx context.Context, in *WriteToGroundRequest, opts ...grpc.CallOption) (*WriteToGroundResponse, error)
+	// ReadUndelivered returns the detail text from the most recent undelivered
+	// deferred message for a given predicate name and project context.
+	// Used by plugins to accumulate news across writes.
+	ReadUndelivered(ctx context.Context, in *ReadUndeliveredRequest, opts ...grpc.CallOption) (*ReadUndeliveredResponse, error)
 }
 
 type groundServiceClient struct {
@@ -52,16 +57,30 @@ func (c *groundServiceClient) WriteToGround(ctx context.Context, in *WriteToGrou
 	return out, nil
 }
 
+func (c *groundServiceClient) ReadUndelivered(ctx context.Context, in *ReadUndeliveredRequest, opts ...grpc.CallOption) (*ReadUndeliveredResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReadUndeliveredResponse)
+	err := c.cc.Invoke(ctx, GroundService_ReadUndelivered_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GroundServiceServer is the server API for GroundService service.
 // All implementations must embed UnimplementedGroundServiceServer
 // for forward compatibility.
 //
-// GroundService provides write access to Ground's deferred news database.
+// GroundService provides access to Ground's deferred news database.
 // Plugins call this to surface attestations in Claude Code sessions via Ground.
 type GroundServiceServer interface {
 	// WriteToGround inserts an attestation into Ground's SQLite database.
 	// Ground delivers these as deferred news on session Stop.
 	WriteToGround(context.Context, *WriteToGroundRequest) (*WriteToGroundResponse, error)
+	// ReadUndelivered returns the detail text from the most recent undelivered
+	// deferred message for a given predicate name and project context.
+	// Used by plugins to accumulate news across writes.
+	ReadUndelivered(context.Context, *ReadUndeliveredRequest) (*ReadUndeliveredResponse, error)
 	mustEmbedUnimplementedGroundServiceServer()
 }
 
@@ -74,6 +93,9 @@ type UnimplementedGroundServiceServer struct{}
 
 func (UnimplementedGroundServiceServer) WriteToGround(context.Context, *WriteToGroundRequest) (*WriteToGroundResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method WriteToGround not implemented")
+}
+func (UnimplementedGroundServiceServer) ReadUndelivered(context.Context, *ReadUndeliveredRequest) (*ReadUndeliveredResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReadUndelivered not implemented")
 }
 func (UnimplementedGroundServiceServer) mustEmbedUnimplementedGroundServiceServer() {}
 func (UnimplementedGroundServiceServer) testEmbeddedByValue()                       {}
@@ -114,6 +136,24 @@ func _GroundService_WriteToGround_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GroundService_ReadUndelivered_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadUndeliveredRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GroundServiceServer).ReadUndelivered(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GroundService_ReadUndelivered_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GroundServiceServer).ReadUndelivered(ctx, req.(*ReadUndeliveredRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // GroundService_ServiceDesc is the grpc.ServiceDesc for GroundService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -124,6 +164,10 @@ var GroundService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "WriteToGround",
 			Handler:    _GroundService_WriteToGround_Handler,
+		},
+		{
+			MethodName: "ReadUndelivered",
+			Handler:    _GroundService_ReadUndelivered_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
