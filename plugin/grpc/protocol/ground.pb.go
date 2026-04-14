@@ -166,6 +166,118 @@ func (x *WriteToGroundResponse) GetError() string {
 	return ""
 }
 
+type ReadUndeliveredRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AuthToken      string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
+	PredicateName  string                 `protobuf:"bytes,2,opt,name=predicate_name,json=predicateName,proto3" json:"predicate_name,omitempty"`    // e.g. "telegram-message" → looks for deferred:telegram-message
+	ProjectContext string                 `protobuf:"bytes,3,opt,name=project_context,json=projectContext,proto3" json:"project_context,omitempty"` // e.g. "project:SBVH"
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ReadUndeliveredRequest) Reset() {
+	*x = ReadUndeliveredRequest{}
+	mi := &file_plugin_grpc_protocol_ground_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadUndeliveredRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadUndeliveredRequest) ProtoMessage() {}
+
+func (x *ReadUndeliveredRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_ground_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadUndeliveredRequest.ProtoReflect.Descriptor instead.
+func (*ReadUndeliveredRequest) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_ground_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ReadUndeliveredRequest) GetAuthToken() string {
+	if x != nil {
+		return x.AuthToken
+	}
+	return ""
+}
+
+func (x *ReadUndeliveredRequest) GetPredicateName() string {
+	if x != nil {
+		return x.PredicateName
+	}
+	return ""
+}
+
+func (x *ReadUndeliveredRequest) GetProjectContext() string {
+	if x != nil {
+		return x.ProjectContext
+	}
+	return ""
+}
+
+type ReadUndeliveredResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Detail        string                 `protobuf:"bytes,1,opt,name=detail,proto3" json:"detail,omitempty"` // accumulated detail text, empty if nothing pending or already delivered
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReadUndeliveredResponse) Reset() {
+	*x = ReadUndeliveredResponse{}
+	mi := &file_plugin_grpc_protocol_ground_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadUndeliveredResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadUndeliveredResponse) ProtoMessage() {}
+
+func (x *ReadUndeliveredResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_ground_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadUndeliveredResponse.ProtoReflect.Descriptor instead.
+func (*ReadUndeliveredResponse) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_ground_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ReadUndeliveredResponse) GetDetail() string {
+	if x != nil {
+		return x.Detail
+	}
+	return ""
+}
+
+func (x *ReadUndeliveredResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
 var File_plugin_grpc_protocol_ground_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_ground_proto_rawDesc = "" +
@@ -186,9 +298,18 @@ const file_plugin_grpc_protocol_ground_proto_rawDesc = "" +
 	"\x06source\x18\a \x01(\tR\x06source\"G\n" +
 	"\x15WriteToGroundResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error2a\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"\x87\x01\n" +
+	"\x16ReadUndeliveredRequest\x12\x1d\n" +
+	"\n" +
+	"auth_token\x18\x01 \x01(\tR\tauthToken\x12%\n" +
+	"\x0epredicate_name\x18\x02 \x01(\tR\rpredicateName\x12'\n" +
+	"\x0fproject_context\x18\x03 \x01(\tR\x0eprojectContext\"G\n" +
+	"\x17ReadUndeliveredResponse\x12\x16\n" +
+	"\x06detail\x18\x01 \x01(\tR\x06detail\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error2\xb9\x01\n" +
 	"\rGroundService\x12P\n" +
-	"\rWriteToGround\x12\x1e.protocol.WriteToGroundRequest\x1a\x1f.protocol.WriteToGroundResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
+	"\rWriteToGround\x12\x1e.protocol.WriteToGroundRequest\x1a\x1f.protocol.WriteToGroundResponse\x12V\n" +
+	"\x0fReadUndelivered\x12 .protocol.ReadUndeliveredRequest\x1a!.protocol.ReadUndeliveredResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
 var (
 	file_plugin_grpc_protocol_ground_proto_rawDescOnce sync.Once
@@ -202,18 +323,22 @@ func file_plugin_grpc_protocol_ground_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_ground_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_ground_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_plugin_grpc_protocol_ground_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_plugin_grpc_protocol_ground_proto_goTypes = []any{
-	(*WriteToGroundRequest)(nil),  // 0: protocol.WriteToGroundRequest
-	(*WriteToGroundResponse)(nil), // 1: protocol.WriteToGroundResponse
-	(*structpb.Struct)(nil),       // 2: google.protobuf.Struct
+	(*WriteToGroundRequest)(nil),    // 0: protocol.WriteToGroundRequest
+	(*WriteToGroundResponse)(nil),   // 1: protocol.WriteToGroundResponse
+	(*ReadUndeliveredRequest)(nil),  // 2: protocol.ReadUndeliveredRequest
+	(*ReadUndeliveredResponse)(nil), // 3: protocol.ReadUndeliveredResponse
+	(*structpb.Struct)(nil),         // 4: google.protobuf.Struct
 }
 var file_plugin_grpc_protocol_ground_proto_depIdxs = []int32{
-	2, // 0: protocol.WriteToGroundRequest.attributes:type_name -> google.protobuf.Struct
+	4, // 0: protocol.WriteToGroundRequest.attributes:type_name -> google.protobuf.Struct
 	0, // 1: protocol.GroundService.WriteToGround:input_type -> protocol.WriteToGroundRequest
-	1, // 2: protocol.GroundService.WriteToGround:output_type -> protocol.WriteToGroundResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
+	2, // 2: protocol.GroundService.ReadUndelivered:input_type -> protocol.ReadUndeliveredRequest
+	1, // 3: protocol.GroundService.WriteToGround:output_type -> protocol.WriteToGroundResponse
+	3, // 4: protocol.GroundService.ReadUndelivered:output_type -> protocol.ReadUndeliveredResponse
+	3, // [3:5] is the sub-list for method output_type
+	1, // [1:3] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
 	1, // [1:1] is the sub-list for extension extendee
 	0, // [0:1] is the sub-list for field type_name
@@ -230,7 +355,7 @@ func file_plugin_grpc_protocol_ground_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_ground_proto_rawDesc), len(file_plugin_grpc_protocol_ground_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
