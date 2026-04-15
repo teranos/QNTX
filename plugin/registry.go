@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -181,15 +182,25 @@ func (r *Registry) ShutdownAll(ctx context.Context) error {
 	}
 	sort.Sort(sort.Reverse(sort.StringSlice(names)))
 
-	var errs []error
+	var realErrs []string
+	var alreadyDead []string
 	for _, name := range names {
 		if err := plugins[name].Shutdown(ctx); err != nil {
-			errs = append(errs, errors.Wrapf(err, "failed to shutdown domain plugin %s", name))
+			errMsg := err.Error()
+			if strings.Contains(errMsg, "connection refused") || strings.Contains(errMsg, "Unavailable") {
+				alreadyDead = append(alreadyDead, name)
+			} else {
+				realErrs = append(realErrs, name+": "+errMsg)
+			}
 		}
 	}
 
-	if len(errs) > 0 {
-		return errors.Newf("shutdown errors: %v", errs)
+	if len(alreadyDead) > 0 {
+		r.logger.Debugf("Plugins already stopped: %v", alreadyDead)
+	}
+
+	if len(realErrs) > 0 {
+		return errors.Newf("shutdown errors: %v", realErrs)
 	}
 
 	return nil
