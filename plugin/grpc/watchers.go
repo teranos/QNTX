@@ -17,11 +17,8 @@ import (
 // SetupPluginWatchers creates or replaces watchers announced by a plugin.
 // Called during plugin initialization to register plugin-declared watchers.
 // Uses CreateOrReplace for idempotency — safe across plugin restarts.
+// Prunes stale watchers that the plugin no longer declares.
 func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protocol.WatcherRegistration, logger *zap.SugaredLogger) error {
-	if len(registrations) == 0 {
-		return nil
-	}
-
 	logger.Infow("Setting up plugin watchers",
 		"plugin", pluginName,
 		"count", len(registrations),
@@ -30,6 +27,42 @@ func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protoco
 	ws := storage.NewWatcherStore(db)
 	ctx := context.Background()
 
+	// Build set of watcher IDs the plugin currently declares
+	declaredIDs := make(map[string]bool, len(registrations))
+	for _, reg := range registrations {
+		declaredIDs[fmt.Sprintf("%s-%s", pluginName, reg.Id)] = true
+	}
+
+	// Prune watchers with this plugin's prefix that are no longer declared
+	prefix := pluginName + "-"
+	existing, err := ws.List(ctx, false)
+	if err != nil {
+		return errors.Wrapf(err, "failed to list watchers for pruning plugin %s", pluginName)
+	}
+	for _, w := range existing {
+		if w.ActionType != storage.ActionTypePluginExecute {
+			continue
+		}
+		if len(w.ID) <= len(prefix) || w.ID[:len(prefix)] != prefix {
+			continue
+		}
+		if declaredIDs[w.ID] {
+			continue
+		}
+		// Stale watcher — plugin no longer declares it
+		if err := ws.Delete(ctx, w.ID); err != nil {
+			logger.Warnw("Failed to prune stale plugin watcher",
+				"plugin", pluginName,
+				"watcher_id", w.ID,
+				"error", err)
+		} else {
+			logger.Infow("Pruned stale plugin watcher",
+				"plugin", pluginName,
+				"watcher_id", w.ID)
+		}
+	}
+
+	// Register current watchers
 	for _, reg := range registrations {
 		watcherID := fmt.Sprintf("%s-%s", pluginName, reg.Id)
 
