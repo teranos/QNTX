@@ -17,6 +17,7 @@ import (
 	"github.com/teranos/QNTX/errors"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/pulse/async"
 )
 
 // WatcherCreateRequest represents a request to create a new watcher
@@ -550,8 +551,103 @@ func (s *QNTXServer) initWatcherEngine() error {
 		return errors.Wrap(err, "failed to start watcher engine")
 	}
 
+	// Start dilation loop: adjusts watcher firing rates based on system memory pressure
+	go s.runDilationLoop()
+
 	s.logger.Debug("Watcher engine initialized")
 	return nil
+}
+
+// dilationLevels are the possible dilation values, ordered high to low for display.
+var dilationLevels = []float64{2.0, 1.5, 1.25, 1.0, 0.75, 0.5, 0.25, 0.1, 0.0}
+
+// runDilationLoop samples system pressure every 10s and adjusts watcher firing rates.
+// Logging schedule: first at ~2min (after plugins load), then every 30min.
+// Each log shows a distribution of dilation values over the window.
+func (s *QNTXServer) runDilationLoop() {
+	const (
+		sampleInterval = 10 * time.Second
+		earlyLogAfter  = 3 * time.Minute
+		steadyLogEvery = 30 * time.Minute
+		barWidth       = 20
+	)
+
+	ticker := time.NewTicker(sampleInterval)
+	defer ticker.Stop()
+
+	var (
+		dist       = make(map[float64]int)
+		lastLogged = time.Now()
+		earlyDone  bool
+	)
+
+	resetDist := func() {
+		for k := range dist {
+			delete(dist, k)
+		}
+		lastLogged = time.Now()
+	}
+
+	formatDist := func(d, memPct, cpuPct float64, tag string) string {
+		total := 0
+		for _, n := range dist {
+			total += n
+		}
+		if total == 0 {
+			total = 1
+		}
+
+		var b strings.Builder
+		b.WriteString(fmt.Sprintf("Dilation %s  now=%.2f  mem=%.1f%%  cpu=%.1f%%\n", tag, d, memPct, cpuPct))
+		for _, level := range dilationLevels {
+			n := dist[level]
+			pct := float64(n) / float64(total) * 100
+			filled := int(pct / 100 * barWidth)
+			if n > 0 && filled == 0 {
+				filled = 1
+			}
+			bar := strings.Repeat("\u2593", filled) + strings.Repeat("\u2591", barWidth-filled)
+			b.WriteString(fmt.Sprintf("  %4.2f  %s  %2.0f%%\n", level, bar, pct))
+		}
+		return b.String()
+	}
+
+	logDilation := func(d, memPct, cpuPct float64, tag string) {
+		s.logger.Infof("\n%s", formatDist(d, memPct, cpuPct, tag))
+		resetDist()
+	}
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-ticker.C:
+			if s.watcherEngine == nil {
+				continue
+			}
+
+			d := async.CalculateDilation()
+			memPct, cpuPct := async.GetPressure()
+			prev := s.watcherEngine.Dilation()
+			if d != prev {
+				s.watcherEngine.SetDilation(d)
+			}
+
+			dist[d]++
+			elapsed := time.Since(lastLogged)
+
+			if !earlyDone && elapsed >= earlyLogAfter {
+				logDilation(d, memPct, cpuPct, "early")
+				earlyDone = true
+				continue
+			}
+
+			// Steady state: every 30 minutes
+			if elapsed >= steadyLogEvery {
+				logDilation(d, memPct, cpuPct, "steady")
+			}
+		}
+	}
 }
 
 // watcherEmbeddingAdapter adapts the server's embedding service (which returns
