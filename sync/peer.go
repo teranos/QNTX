@@ -216,7 +216,7 @@ func (p *Peer) Reconcile(ctx context.Context) (sent, received int, err error) {
 	// Cap the number of groups we'll fulfill to prevent unbounded work
 	requested := needMsg.Need
 	if len(requested) > maxGroupsPerSync {
-		p.logger.Warnw("Peer requested more groups than allowed, truncating",
+		p.logger.Debugw("Peer requested more groups than allowed, truncating",
 			"requested", len(requested),
 			"max", maxGroupsPerSync,
 		)
