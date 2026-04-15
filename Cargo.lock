@@ -3929,7 +3929,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-meili"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "clap",
  "meilisearch-sdk",
@@ -3987,7 +3987,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-python-plugin"
-version = "0.5.7"
+version = "0.5.8"
 dependencies = [
  "clap",
  "parking_lot",
