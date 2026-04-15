@@ -99,6 +99,7 @@ type PluginManager struct {
 	shutdownCancel    context.CancelFunc
 	servicesManager   *ServicesManager // for re-registering LLM providers after restart
 	accumulator       *PluginAccumulator
+	onWatchersSetup   func() // called after plugin watchers are written to DB
 }
 
 // managedPlugin tracks a running plugin.
@@ -159,6 +160,12 @@ func GetDefaultPluginManager() *PluginManager {
 // SetServicesManager sets the services manager for LLM provider re-registration after restart.
 func (m *PluginManager) SetServicesManager(sm *ServicesManager) {
 	m.servicesManager = sm
+}
+
+// SetOnWatchersSetup sets a callback invoked after plugin watchers are written to DB.
+// The server uses this to reload the watcher engine's in-memory map.
+func (m *PluginManager) SetOnWatchersSetup(fn func()) {
+	m.onWatchersSetup = fn
 }
 
 // Accumulator returns the plugin banner accumulator.
@@ -364,6 +371,11 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 	}
 	if stderrLogger != nil {
 		stderrLogger.setVersion(meta.Name, meta.Version)
+	}
+
+	// Wire watcher reload callback so engine picks up plugin-declared watchers
+	if m.onWatchersSetup != nil {
+		client.OnWatchersSetup = m.onWatchersSetup
 	}
 
 	// Register — lock only for the final state write
@@ -856,7 +868,7 @@ type pluginLogger struct {
 	prefix    string // e.g. "[scry v0.35.0] " — set after metadata arrives
 	level     string
 	buf       strings.Builder
-	portChan  chan int    // Optional channel to send discovered port
+	portChan  chan int   // Optional channel to send discovered port
 	logBuffer *LogBuffer // Optional ring buffer for log streaming
 	mu        sync.Mutex // Protects prefix field for dynamic updates
 }
