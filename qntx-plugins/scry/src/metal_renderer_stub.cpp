@@ -14,12 +14,15 @@ std::string MetalRenderer::device_name() const { return "none (no Metal)"; }
 
 void MetalRenderer::set_vocab_positions(const float*, int) {}
 void MetalRenderer::submit_distribution(const float*, int) {}
-void MetalRenderer::store_keyframe(const float*, int) {}
+void MetalRenderer::store_keyframe(const float*, int, int) {}
 void MetalRenderer::set_scrub_index(int) {}
 void MetalRenderer::set_param(const std::string&, float) {}
-void MetalRenderer::add_trail_point(int) {}
+void MetalRenderer::add_trail_point(int, int) {}
 void MetalRenderer::clear_trail() {}
-void MetalRenderer::add_ghost_branches(int, const std::vector<std::pair<int,float>>&) {}
+void MetalRenderer::add_ghost_branches(int, const std::vector<std::pair<int,float>>&, int) {}
+int MetalRenderer::add_fork_branch(int, int) { return 0; }
+int MetalRenderer::branch_count() const { return 0; }
+void MetalRenderer::set_active_branch(int) {}
 void MetalRenderer::apply_camera(float, float, float, float, float) {}
 void MetalRenderer::reset_camera() {}
 int MetalRenderer::pick_at(int, int) { return -1; }

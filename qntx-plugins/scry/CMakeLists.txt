@@ -73,12 +73,27 @@ generate_proto(domain.proto)
 generate_proto(llm.proto)
 generate_proto(atsstore.proto)
 
+# metal-cpp — Apple's header-only C++ wrapper for Metal.
+# Vendored in Nix builds; FetchContent for local dev.
+if(APPLE)
+    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/vendor/metal-cpp/Foundation/Foundation.hpp")
+        FetchContent_Declare(
+            metal_cpp
+            GIT_REPOSITORY https://github.com/bkaradzic/metal-cpp.git
+            GIT_TAG        metal-cpp_macOS15_iOS18
+            GIT_SHALLOW    TRUE
+            SOURCE_DIR     "${CMAKE_SOURCE_DIR}/vendor/metal-cpp"
+        )
+        FetchContent_Populate(metal_cpp)
+    endif()
+endif()
+
 # Platform-specific sources: Metal renderer and BLAS-based PCA require macOS
-# with Metal-cpp headers. The Nix sandbox on macOS may not have them, so check
-# for the actual header rather than just APPLE.
+# with Metal-cpp headers.
 if(APPLE AND EXISTS "${CMAKE_SOURCE_DIR}/vendor/metal-cpp/Foundation/Foundation.hpp")
     set(PLATFORM_SRCS
         src/metal_renderer.cpp
+        src/metal_render_pass.cpp
         src/metal_pick.cpp
         src/vocab_projection.cpp
     )
@@ -194,5 +209,49 @@ add_executable(camera_test tests/camera_test.cpp)
 target_include_directories(camera_test PRIVATE ${GLM_INCLUDE_DIR})
 target_compile_definitions(camera_test PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
 add_test(NAME camera_test COMMAND camera_test)
+
+# Fork integration test — requires a real model (set SCRY_TEST_MODEL env var)
+add_executable(fork_test
+    tests/fork_test.cpp
+    src/inference.cpp
+    src/vision.cpp
+    src/pdf_extract.cpp
+    ${GENERATED_SRCS}
+)
+target_include_directories(fork_test PRIVATE
+    ${PROTO_GEN_DIR}
+    ${LLAMA_SOURCE_DIR}/include
+    ${LLAMA_SOURCE_DIR}/src
+    ${LLAMA_SOURCE_DIR}/ggml/include
+    ${LLAMA_SOURCE_DIR}/common
+    ${LLAMA_SOURCE_DIR}/tools/mtmd
+    ${MUPDF_INCLUDE_DIR}
+    ${GLM_INCLUDE_DIR}
+)
+target_compile_definitions(fork_test PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
+target_link_libraries(fork_test PRIVATE
+    llama
+    mtmd
+    gRPC::grpc++
+    protobuf::libprotobuf
+    ${MUPDF_LIB}
+)
+if(MUPDF_THIRD_LIB)
+    target_link_libraries(fork_test PRIVATE ${MUPDF_THIRD_LIB})
+endif()
+if(HAS_METAL)
+    target_link_libraries(fork_test PRIVATE
+        "-framework Accelerate"
+        "-framework Metal"
+        "-framework Foundation"
+        "-framework QuartzCore"
+        "-framework CoreGraphics"
+        "-framework CoreText"
+        "-framework ImageIO"
+    )
+    target_compile_definitions(fork_test PRIVATE ACCELERATE_NEW_LAPACK)
+    target_include_directories(fork_test PRIVATE ${CMAKE_SOURCE_DIR}/vendor/metal-cpp)
+    target_include_directories(fork_test PRIVATE ${CMAKE_BINARY_DIR})
+endif()
 
 install(TARGETS qntx-scry-plugin DESTINATION bin)

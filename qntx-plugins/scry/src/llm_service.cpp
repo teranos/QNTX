@@ -270,6 +270,7 @@ grpc::Status ScryLLMService::StreamChat(grpc::ServerContext* ctx,
         std::lock_guard<std::mutex> flock(plugin_->fork_mutex());
         auto& tree = plugin_->fork_tree();
         tree.branches.clear();
+        tree.prompt_token_count = 0;
         ForkBranch root;
         root.id = 0;
         root.parent_id = -1;

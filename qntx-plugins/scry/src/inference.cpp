@@ -291,6 +291,7 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
     auto ctx_params = llama_context_default_params();
     ctx_params.n_ctx = n_ctx;
     ctx_params.n_batch = n_ctx;
+    ctx_params.n_seq_max = 8;  // support fork branching (multiple KV cache sequences)
     ctx_ = llama_init_from_model(model_, ctx_params);
     if (!ctx_) {
         std::cout << "[scry] Failed to create context for " << model_path << std::endl;
@@ -566,7 +567,19 @@ InferenceEngine::ChatResult InferenceEngine::fork_and_generate(
 
     std::lock_guard<std::mutex> lock(mutex_);
 
+    std::cout << "[scry] fork_and_generate: parent_seq=" << parent_seq
+              << " fork_pos=" << fork_pos_absolute
+              << " fork_token=" << fork_token
+              << " new_seq=" << new_seq
+              << " max_tokens=" << max_tokens << std::endl;
+
+    // Hard safety cap
+    if (max_tokens > 1024) max_tokens = 1024;
+
     ChatResult result;
+    result.prompt_tokens = 0;
+    result.completion_tokens = 0;
+
     if (!model_ || !ctx_) {
         result.content = "error: no model loaded";
         return result;
@@ -574,8 +587,22 @@ InferenceEngine::ChatResult InferenceEngine::fork_and_generate(
 
     auto mem = llama_get_memory(ctx_);
 
-    // Copy parent KV cache [0, fork_pos_absolute) to new sequence
-    llama_memory_seq_cp(mem, parent_seq, new_seq, 0, fork_pos_absolute);
+    // Check parent sequence state before fork
+    auto parent_min = llama_memory_seq_pos_min(mem, parent_seq);
+    auto parent_max = llama_memory_seq_pos_max(mem, parent_seq);
+    std::cout << "[scry] fork: parent seq " << parent_seq
+              << " pos range [" << parent_min << "," << parent_max << "]"
+              << " fork_pos=" << fork_pos_absolute << std::endl;
+
+    // Copy full parent KV to new sequence (partial copy not supported by llama.cpp)
+    // then trim the new sequence past the fork point
+    llama_memory_seq_cp(mem, parent_seq, new_seq, 0, -1);
+    llama_memory_seq_rm(mem, new_seq, fork_pos_absolute, -1);
+
+    auto new_min = llama_memory_seq_pos_min(mem, new_seq);
+    auto new_max = llama_memory_seq_pos_max(mem, new_seq);
+    std::cout << "[scry] fork: new seq " << new_seq
+              << " pos range [" << new_min << "," << new_max << "]" << std::endl;
 
     // Decode the fork token on the new sequence at the fork position
     auto batch = llama_batch_init(1, 0, 1);
@@ -586,12 +613,16 @@ InferenceEngine::ChatResult InferenceEngine::fork_and_generate(
     batch.seq_id[0][0] = new_seq;
     batch.logits[0] = 1;  // need logits for next prediction
 
-    if (llama_decode(ctx_, batch) != 0) {
-        llama_batch_free(batch);
+    int decode_rc = llama_decode(ctx_, batch);
+    llama_batch_free(batch);
+    if (decode_rc != 0) {
+        std::cout << "[scry] fork: decode failed (rc=" << decode_rc
+                  << " fork_pos=" << fork_pos_absolute
+                  << " token=" << fork_token
+                  << " n_ctx=" << llama_n_ctx(ctx_) << ")" << std::endl;
         result.content = "error: fork token decode failed";
         return result;
     }
-    llama_batch_free(batch);
 
     result.prompt_tokens = fork_pos_absolute;
 

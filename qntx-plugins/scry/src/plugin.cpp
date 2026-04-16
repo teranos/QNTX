@@ -386,9 +386,10 @@ grpc::Status ScryPlugin::HandleWebSocket(
 
     std::mutex pong_mutex;
     std::vector<protocol::WebSocketMessage> pong_queue;
+    std::thread fork_thread;  // tracked so we can join before locals are destroyed
 
     auto* plugin = this;
-    std::thread reader([stream, &closed, renderer, engine, plugin, &pong_mutex, &pong_queue]() {
+    std::thread reader([stream, &closed, renderer, engine, plugin, &pong_mutex, &pong_queue, &fork_thread]() {
         protocol::WebSocketMessage in_msg;
         while (stream->Read(&in_msg)) {
             if (in_msg.type() == protocol::WebSocketMessage::PING) {
@@ -477,50 +478,59 @@ grpc::Status ScryPlugin::HandleWebSocket(
                     try {
                         int fork_token_id = std::stoi(data.substr(5));
 
-                        // Detach fork generation to avoid blocking the WS reader
-                        std::thread([plugin, renderer, engine, fork_token_id,
+                        // Join any previous fork thread before starting a new one
+                        if (fork_thread.joinable()) fork_thread.join();
+
+                        // Fork generation on separate thread (joined before HandleWebSocket returns)
+                        fork_thread = std::thread([plugin, renderer, engine, fork_token_id,
                                      &pong_mutex, &pong_queue, &closed]() {
-                            std::lock_guard<std::mutex> flock(plugin->fork_mutex());
-                            auto& tree = plugin->fork_tree();
+                            int branch_id = -1;
+                            int render_branch_id = 0;
+                            int parent_seq = 0;
+                            int new_seq = 0;
+                            int fork_pos_absolute = 0;
 
-                            // Determine fork position from scrub index
-                            int fork_pos = renderer->branch_count() > 0
-                                ? (int)(renderer->token_probability(fork_token_id) >= 0 ? 0 : 0)
-                                : 0;
-                            // The scrub index tells us where in the sequence to fork
-                            // We need it from the renderer's scrub state
-                            // For now, use the active branch's token count as fork position
-                            int active_id = tree.active_branch;
-                            if (active_id >= 0 && active_id < (int)tree.branches.size()) {
-                                fork_pos = tree.branches[active_id].tokens.size();
+                            // Lock fork tree only for setup, release before generation
+                            {
+                                std::lock_guard<std::mutex> flock(plugin->fork_mutex());
+                                auto& tree = plugin->fork_tree();
+
+                                // Use scrub index as fork position (where user is looking)
+                                int scrub = renderer->scrub_index();
+                                int active_id = tree.active_branch;
+                                int fork_pos = 0;
+                                int max_pos = (active_id >= 0 && active_id < (int)tree.branches.size())
+                                    ? (int)tree.branches[active_id].tokens.size() : 0;
+                                if (scrub >= 0 && scrub <= max_pos) {
+                                    fork_pos = scrub;
+                                } else if (max_pos > 0) {
+                                    fork_pos = max_pos;
+                                }
+
+                                new_seq = tree.next_seq_id++;
+                                parent_seq = (active_id >= 0 && active_id < (int)tree.branches.size())
+                                    ? tree.branches[active_id].seq_id : 0;
+
+                                // Create renderer branch (copies parent trail up to fork point)
+                                render_branch_id = renderer->add_fork_branch(active_id, fork_pos);
+                                renderer->set_active_branch(render_branch_id);
+
+                                // Create data model branch
+                                ForkBranch branch;
+                                branch.id = (int)tree.branches.size();
+                                branch.parent_id = active_id;
+                                branch.fork_position = fork_pos;
+                                branch.seq_id = new_seq;
+                                branch.fork_token = fork_token_id;
+                                branch.orbit_phase = (active_id >= 0 && active_id < (int)tree.branches.size())
+                                    ? tree.branches[active_id].orbit_phase + (float)M_PI / 2.0f : (float)M_PI / 2.0f;
+                                branch.active = true;
+                                tree.branches.push_back(branch);
+
+                                branch_id = branch.id;
+                                tree.active_branch = branch_id;
+                                fork_pos_absolute = tree.prompt_token_count + fork_pos;
                             }
-
-                            // Allocate new sequence and branch
-                            int new_seq = tree.next_seq_id++;
-                            int parent_seq = (active_id >= 0 && active_id < (int)tree.branches.size())
-                                ? tree.branches[active_id].seq_id : 0;
-
-                            // Create renderer branch (copies parent trail up to fork point)
-                            int render_branch_id = renderer->add_fork_branch(active_id, fork_pos);
-                            renderer->set_active_branch(render_branch_id);
-
-                            // Create data model branch
-                            ForkBranch branch;
-                            branch.id = (int)tree.branches.size();
-                            branch.parent_id = active_id;
-                            branch.fork_position = fork_pos;
-                            branch.seq_id = new_seq;
-                            branch.fork_token = fork_token_id;
-                            branch.orbit_phase = (active_id >= 0 && active_id < (int)tree.branches.size())
-                                ? tree.branches[active_id].orbit_phase + (float)M_PI / 2.0f : (float)M_PI / 2.0f;
-                            branch.active = true;
-                            tree.branches.push_back(branch);
-
-                            int branch_id = branch.id;
-                            tree.active_branch = branch_id;
-
-                            // Absolute position = prompt tokens + fork position
-                            int fork_pos_absolute = tree.prompt_token_count + fork_pos;
 
                             // Send forked: response
                             {
@@ -534,7 +544,7 @@ grpc::Status ScryPlugin::HandleWebSocket(
 
                             plugin->set_activity("forking (branch " + std::to_string(branch_id) + ")");
 
-                            // Generate on the fork
+                            // Generate on the fork — no fork_mutex held during generation
                             auto result = engine->fork_and_generate(
                                 parent_seq, fork_pos_absolute,
                                 fork_token_id, new_seq,
@@ -567,12 +577,14 @@ grpc::Status ScryPlugin::HandleWebSocket(
                                     protocol::WebSocketMessage msg;
                                     msg.set_type(protocol::WebSocketMessage::DATA);
                                     msg.set_data(tok_resp);
-                                    std::lock_guard<std::mutex> lock(pong_mutex);
-                                    pong_queue.push_back(msg);
+                                    {
+                                        std::lock_guard<std::mutex> lock(pong_mutex);
+                                        pong_queue.push_back(msg);
+                                    }
 
                                     // Record token in branch
                                     {
-                                        std::lock_guard<std::mutex> flock2(plugin->fork_mutex());
+                                        std::lock_guard<std::mutex> flock(plugin->fork_mutex());
                                         auto& b = plugin->fork_tree().branches[branch_id];
                                         b.tokens.push_back((int32_t)sig.token_id);
                                     }
@@ -596,8 +608,11 @@ grpc::Status ScryPlugin::HandleWebSocket(
                                 std::lock_guard<std::mutex> lock(pong_mutex);
                                 pong_queue.push_back(msg);
                             }
-                        }).detach();
-                    } catch (...) {}
+                        });
+                    } catch (const std::exception& e) {
+                        std::cerr << "[scry] fork: invalid message '"
+                                  << data << "': " << e.what() << std::endl;
+                    }
                 }
             }
         }
@@ -642,6 +657,7 @@ grpc::Status ScryPlugin::HandleWebSocket(
     }
 
     if (reader.joinable()) reader.join();
+    if (fork_thread.joinable()) fork_thread.join();
     return grpc::Status::OK;
 }
 
