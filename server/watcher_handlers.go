@@ -523,6 +523,16 @@ func (s *QNTXServer) initWatcherEngine() error {
 	s.watcherEngine = watcher.NewEngine(s.db, reader, apiBaseURL, s.logger)
 	s.reloadCoalescer = newWatcherReloadCoalescer(s, 50*time.Millisecond)
 
+	// Tell the watcher engine which glyph types can execute.
+	// "prompt" and "se" are always available (built-in); "py" requires the "python" plugin.
+	glyphTypes := []string{"prompt", "se"}
+	for _, p := range am.GetStringSlice("plugin.enabled") {
+		if p == "python" {
+			glyphTypes = append(glyphTypes, "py")
+		}
+	}
+	s.watcherEngine.SetAvailableGlyphTypes(glyphTypes)
+
 	// Set broadcast callback for live results
 	s.watcherEngine.SetBroadcastCallback(s.broadcastWatcherMatch)
 

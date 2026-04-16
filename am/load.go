@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/BurntSushi/toml"
 	"github.com/spf13/viper"
@@ -15,10 +16,13 @@ import (
 
 var globalConfig *Config
 var viperInstance *viper.Viper
+var viperOnce sync.Once
+var viperInitErr error
 
 // ConfigSources tracks where each setting came from during loading
 // Exported for use by introspection
 var ConfigSources = make(map[string]SourceInfo)
+var configSourcesMu sync.RWMutex
 
 // Load reads the QNTX core configuration using Viper
 func Load() (*Config, error) {
@@ -81,34 +85,38 @@ func LoadFromFile(configPath string) (*Config, error) {
 func Reset() {
 	globalConfig = nil
 	viperInstance = nil
+	viperOnce = sync.Once{}
+	viperInitErr = nil
+	configSourcesMu.Lock()
+	ConfigSources = make(map[string]SourceInfo)
+	configSourcesMu.Unlock()
 }
 
 // initViper initializes Viper with configuration sources and defaults
 func initViper() (*viper.Viper, error) {
-	if viperInstance != nil {
-		return viperInstance, nil
-	}
+	viperOnce.Do(func() {
+		v := viper.New()
 
-	v := viper.New()
+		// Set up environment variable binding
+		v.SetEnvPrefix("QNTX")
+		v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+		v.AutomaticEnv()
 
-	// Set up environment variable binding
-	v.SetEnvPrefix("QNTX")
-	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	v.AutomaticEnv()
+		// Bind specific sensitive configuration values to environment variables
+		BindSensitiveEnvVars(v)
 
-	// Bind specific sensitive configuration values to environment variables
-	BindSensitiveEnvVars(v)
+		// Set defaults first
+		SetDefaults(v)
 
-	// Set defaults first
-	SetDefaults(v)
+		// Manually merge configs in precedence order: system -> user -> project -> env vars
+		if err := mergeConfigFiles(v); err != nil {
+			viperInitErr = err
+			return
+		}
 
-	// Manually merge configs in precedence order: system -> user -> project -> env vars
-	if err := mergeConfigFiles(v); err != nil {
-		return nil, err
-	}
-
-	viperInstance = v
-	return v, nil
+		viperInstance = v
+	})
+	return viperInstance, viperInitErr
 }
 
 // findProjectConfig searches for config.toml or am.toml by walking up the directory tree
@@ -148,10 +156,12 @@ func findProjectConfig() string {
 
 // trackSource records where a configuration key came from
 func trackSource(key string, source ConfigSource, path string) {
+	configSourcesMu.Lock()
 	ConfigSources[key] = SourceInfo{
 		Source: source,
 		Path:   path,
 	}
+	configSourcesMu.Unlock()
 }
 
 // TrackNestedSources recursively tracks sources for nested configuration
@@ -241,7 +251,13 @@ func mergeConfigFiles(v *viper.Viper) error {
 
 	// Track environment variable overrides
 	// Check each setting to see if it was overridden by an env var
+	configSourcesMu.RLock()
+	keys := make([]string, 0, len(ConfigSources))
 	for key := range ConfigSources {
+		keys = append(keys, key)
+	}
+	configSourcesMu.RUnlock()
+	for _, key := range keys {
 		envKey := "QNTX_" + strings.ToUpper(strings.ReplaceAll(key, ".", "_"))
 		if envValue := os.Getenv(envKey); envValue != "" {
 			// This setting was overridden by environment
