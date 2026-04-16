@@ -22,6 +22,12 @@ func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.Suga
 	manager := NewPluginManager(logger, rootLogger, cfg.Plugin.Runtime.TypeScriptRuntime)
 	manager.accumulator = NewPluginAccumulator(logger)
 
+	// Set up PID file for stale process cleanup, keyed by server port
+	// so multiple QNTX instances on the same machine don't interfere.
+	if home, err := os.UserHomeDir(); err == nil {
+		manager.SetPidFile(filepath.Join(home, ".qntx"), am.GetServerPort())
+	}
+
 	// If no plugins enabled, return empty manager
 	if len(cfg.Plugin.Enabled) == 0 {
 		logger.Infow("No plugins enabled in configuration")

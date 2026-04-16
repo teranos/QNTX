@@ -569,7 +569,12 @@ func (s *QNTXServer) runDilationLoop() {
 		sampleInterval = 10 * time.Second
 		earlyLogAfter  = 3 * time.Minute
 		steadyLogEvery = 30 * time.Minute
-		barWidth       = 20
+		maxBarWidth    = 8
+
+		colorGreen  = "\033[32m"
+		colorYellow = "\033[33m"
+		colorRed    = "\033[31m"
+		colorReset  = "\033[0m"
 	)
 
 	ticker := time.NewTicker(sampleInterval)
@@ -588,6 +593,17 @@ func (s *QNTXServer) runDilationLoop() {
 		lastLogged = time.Now()
 	}
 
+	dilationColor := func(level float64) string {
+		switch {
+		case level >= 1.5:
+			return colorGreen
+		case level >= 0.75:
+			return colorYellow
+		default:
+			return colorRed
+		}
+	}
+
 	formatDist := func(d, memPct, cpuPct float64, tag string) string {
 		total := 0
 		for _, n := range dist {
@@ -598,16 +614,25 @@ func (s *QNTXServer) runDilationLoop() {
 		}
 
 		var b strings.Builder
-		b.WriteString(fmt.Sprintf("Dilation %s  now=%.2f  mem=%.1f%%  cpu=%.1f%%\n", tag, d, memPct, cpuPct))
+		b.WriteString(fmt.Sprintf("Dilation %s  now=%.2f  mem=%.1f%%  cpu=%.1f%%\n  ", tag, d, memPct, cpuPct))
+		first := true
 		for _, level := range dilationLevels {
 			n := dist[level]
+			if n == 0 {
+				continue
+			}
 			pct := float64(n) / float64(total) * 100
-			filled := int(pct / 100 * barWidth)
-			if n > 0 && filled == 0 {
+			filled := int(pct / 100 * maxBarWidth)
+			if filled == 0 {
 				filled = 1
 			}
-			bar := strings.Repeat("\u2593", filled) + strings.Repeat("\u2591", barWidth-filled)
-			b.WriteString(fmt.Sprintf("  %4.2f  %s  %2.0f%%\n", level, bar, pct))
+			if !first {
+				b.WriteString("  ")
+			}
+			bar := strings.Repeat("\u2593", filled)
+			color := dilationColor(level)
+			b.WriteString(fmt.Sprintf("%.2f %s%s%s %0.0f%%", level, color, bar, colorReset, pct))
+			first = false
 		}
 		return b.String()
 	}
