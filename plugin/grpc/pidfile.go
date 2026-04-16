@@ -70,7 +70,9 @@ func (p *pidFile) Add(pid int) {
 		return
 	}
 	defer f.Close()
-	f.WriteString(strconv.Itoa(pid) + "\n")
+	if _, err := f.WriteString(strconv.Itoa(pid) + "\n"); err != nil {
+		p.logger.Warnw("Failed to write PID to file", "pid", pid, "path", p.path, "error", err)
+	}
 }
 
 // Remove deletes the PID file (called on clean shutdown).

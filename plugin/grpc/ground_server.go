@@ -159,7 +159,14 @@ func (s *GroundServer) ReadUndelivered(ctx context.Context, req *protocol.ReadUn
 		}, nil
 	}
 
-	detail, _ := parsed["detail"].(string)
+	var detail string
+	if v, ok := parsed["detail"]; ok {
+		if s, ok := v.(string); ok {
+			detail = s
+		} else {
+			detail = fmt.Sprintf("%v", v)
+		}
+	}
 	return &protocol.ReadUndeliveredResponse{Detail: detail}, nil
 }
 
@@ -171,11 +178,26 @@ func writeToGroundDB(dbPath string, as *types.As) error {
 	}
 	defer db.Close()
 
-	subjects, _ := json.Marshal(as.Subjects)
-	predicates, _ := json.Marshal(as.Predicates)
-	contexts, _ := json.Marshal(as.Contexts)
-	actors, _ := json.Marshal(as.Actors)
-	attributes, _ := json.Marshal(as.Attributes)
+	subjects, err := json.Marshal(as.Subjects)
+	if err != nil {
+		return errors.Wrapf(err, "ground db: failed to marshal subjects for %s", as.ID)
+	}
+	predicates, err := json.Marshal(as.Predicates)
+	if err != nil {
+		return errors.Wrapf(err, "ground db: failed to marshal predicates for %s", as.ID)
+	}
+	contexts, err := json.Marshal(as.Contexts)
+	if err != nil {
+		return errors.Wrapf(err, "ground db: failed to marshal contexts for %s", as.ID)
+	}
+	actors, err := json.Marshal(as.Actors)
+	if err != nil {
+		return errors.Wrapf(err, "ground db: failed to marshal actors for %s", as.ID)
+	}
+	attributes, err := json.Marshal(as.Attributes)
+	if err != nil {
+		return errors.Wrapf(err, "ground db: failed to marshal attributes for %s", as.ID)
+	}
 
 	_, err = db.Exec(`INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
