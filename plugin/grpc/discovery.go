@@ -99,6 +99,8 @@ type PluginManager struct {
 	shutdownCancel    context.CancelFunc
 	servicesManager   *ServicesManager // for re-registering LLM providers after restart
 	accumulator       *PluginAccumulator
+	onWatchersSetup   func() // called after plugin watchers are written to DB
+	pidFile           *pidFile
 }
 
 // managedPlugin tracks a running plugin.
@@ -156,9 +158,22 @@ func GetDefaultPluginManager() *PluginManager {
 	return defaultPluginManager
 }
 
+// SetPidFile configures PID file tracking for plugin process cleanup.
+// Must be called before LoadPlugins.
+func (m *PluginManager) SetPidFile(dir string, serverPort int) {
+	name := fmt.Sprintf("plugins-%d.pid", serverPort)
+	m.pidFile = newPidFile(filepath.Join(dir, name), m.logger)
+}
+
 // SetServicesManager sets the services manager for LLM provider re-registration after restart.
 func (m *PluginManager) SetServicesManager(sm *ServicesManager) {
 	m.servicesManager = sm
+}
+
+// SetOnWatchersSetup sets a callback invoked after plugin watchers are written to DB.
+// The server uses this to reload the watcher engine's in-memory map.
+func (m *PluginManager) SetOnWatchersSetup(fn func()) {
+	m.onWatchersSetup = fn
 }
 
 // Accumulator returns the plugin banner accumulator.
@@ -170,6 +185,11 @@ func (m *PluginManager) Accumulator() *PluginAccumulator {
 // Enabled plugins are retried forever — enabled means the operator is certain
 // this plugin must run. Disabled plugins are skipped entirely.
 func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig) error {
+	// Kill plugin processes orphaned by a previous run
+	if m.pidFile != nil {
+		m.pidFile.CleanStale()
+	}
+
 	for _, config := range configs {
 		if !config.Enabled {
 			m.logger.Infow("Skipping disabled plugin", "name", config.Name)
@@ -300,6 +320,10 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		m.logger.Debugf("Started '%s' plugin process (pid=%d, port=%d, addr=%s)",
 			config.Name, process.Pid, port, addr)
 
+		if m.pidFile != nil {
+			m.pidFile.Add(process.Pid)
+		}
+
 		if err := m.waitForPlugin(ctx, config.Name, addr, 5*time.Second); err != nil {
 			process.Kill()
 			return errors.Wrapf(err, "plugin %s failed to start (binary=%s, addr=%s, pid=%d)",
@@ -364,6 +388,11 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 	}
 	if stderrLogger != nil {
 		stderrLogger.setVersion(meta.Name, meta.Version)
+	}
+
+	// Wire watcher reload callback so engine picks up plugin-declared watchers
+	if m.onWatchersSetup != nil {
+		client.OnWatchersSetup = m.onWatchersSetup
 	}
 
 	// Register — lock only for the final state write
@@ -481,13 +510,10 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 		cmd = exec.Command(binary, args...)
 	}
 
-	// NOTE: Using exec.Command instead of exec.CommandContext intentionally.
-	// This prevents plugins from being killed when parent context is cancelled (e.g., during
-	// graceful shutdown), allowing proper plugin shutdown via gRPC Shutdown() call.
-	//
-	// TRADEOFF: If QNTX crashes or is killed (SIGKILL), plugin processes become orphans.
-	// TODO: Consider implementing process group management or pidfile tracking for cleanup
-	// of orphaned plugins on next QNTX startup.
+	// Using exec.Command instead of exec.CommandContext intentionally.
+	// Plugins are not killed on context cancellation — graceful shutdown sends
+	// gRPC Shutdown() first. Orphans from crashes are cleaned up on next startup
+	// via pidfile tracking (see pidfile.go).
 
 	// Set environment
 	cmd.Env = os.Environ()
@@ -844,6 +870,11 @@ func (m *PluginManager) Shutdown(ctx context.Context) error {
 
 	m.plugins = make(map[string]*managedPlugin)
 
+	// Clean shutdown — remove PID file so next startup doesn't kill anything
+	if m.pidFile != nil {
+		m.pidFile.Remove()
+	}
+
 	if len(errs) > 0 {
 		return errors.Newf("shutdown errors: %v", errs)
 	}
@@ -856,7 +887,7 @@ type pluginLogger struct {
 	prefix    string // e.g. "[scry v0.35.0] " — set after metadata arrives
 	level     string
 	buf       strings.Builder
-	portChan  chan int    // Optional channel to send discovered port
+	portChan  chan int   // Optional channel to send discovered port
 	logBuffer *LogBuffer // Optional ring buffer for log streaming
 	mu        sync.Mutex // Protects prefix field for dynamic updates
 }

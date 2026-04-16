@@ -209,6 +209,15 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 		services := defaultServer.GetServices()
 		sm := defaultServer.GetServicesManager()
 
+		// Wire watcher reload so plugin-declared watchers are loaded into the engine
+		if pm := grpc.GetDefaultPluginManager(); pm != nil {
+			pm.SetOnWatchersSetup(func() {
+				if err := defaultServer.ReloadWatchers(); err != nil {
+					pluginLogger.Warnw("Failed to reload watchers after plugin setup", "error", err)
+				}
+			})
+		}
+
 		// Initialize each plugin individually, registering provider services
 		// (LLM, VectorSearch) immediately after each init. This ensures provider
 		// plugins like faiss make their services available before consumer plugins

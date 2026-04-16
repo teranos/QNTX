@@ -187,34 +187,24 @@ func (s *QNTXServer) Stop() error {
 
 	// Stop daemon FIRST before stopping server goroutines
 	if s.daemon != nil {
-		s.logger.Infow("Stopping daemon workers")
 		s.daemon.Stop()
-		s.logger.Infow("Daemon stopped")
 	}
 
 	// Stop watcher engine — drain loop stops, in-flight entries re-queued for next startup
 	if s.watcherEngine != nil {
-		s.logger.Infow("Stopping watcher engine")
 		s.watcherEngine.Stop()
-		s.logger.Infow("Watcher engine stopped")
 	}
 
-	// Shutdown plugins before closing clients
+	// Shutdown plugins and gRPC services
 	if s.pluginRegistry != nil {
-		s.logger.Infow("Shutting down domain plugins")
 		if err := s.pluginRegistry.ShutdownAll(s.ctx); err != nil {
 			s.logger.Warnw("Plugin shutdown errors", "error", err)
-		} else {
-			s.logger.Infow("Domain plugins shut down")
 		}
 	}
-
-	// Shutdown gRPC services for plugins (Issue #138)
 	if s.servicesManager != nil {
-		s.logger.Infow("Shutting down plugin services")
 		s.servicesManager.Shutdown()
-		s.logger.Infow("Plugin services shut down")
 	}
+	s.logger.Debugw("Plugins shut down")
 
 	// Gracefully shut down the HTTP server — stops accepting new connections
 	// while allowing in-flight requests to complete.

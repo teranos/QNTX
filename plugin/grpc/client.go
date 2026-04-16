@@ -53,6 +53,10 @@ type ExternalDomainProxy struct {
 	keepaliveConfig *KeepaliveConfig
 	wsConfig        *WebSocketConfig
 
+	// Callback invoked after plugin watchers are written to DB.
+	// Allows the server to reload the watcher engine's in-memory map.
+	OnWatchersSetup func()
+
 	// Initialize idempotency — multiple code paths may call Initialize
 	// (server/init.go eager init + async goroutine in main.go)
 	initOnce sync.Once
@@ -359,6 +363,8 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 				"plugin", c.metadata.Name,
 				"error", err,
 			)
+		} else if c.OnWatchersSetup != nil {
+			c.OnWatchersSetup()
 		}
 	}
 
