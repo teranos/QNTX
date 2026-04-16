@@ -30,6 +30,14 @@
           hash = "sha256-GnGyzNRpzuguc3yYbEFtYLvG+KiCtRAktiN+NvbOICE=";
         };
 
+        # metal-cpp — Apple's header-only C++ wrapper for Metal/Foundation/QuartzCore
+        metal-cpp-src = pkgs.fetchFromGitHub {
+          owner = "bkaradzic";
+          repo = "metal-cpp";
+          rev = "3d8da919aadee9556ecf1f8f317ef5a57777206a";
+          hash = "sha256-LsV6Rt+WdqmJ+Fyrk14FLyF8wrUgNgZQvNG9/FWj3+k=";
+        };
+
         scry-plugin = pkgs.stdenv.mkDerivation {
           pname = "qntx-scry-plugin";
           version = self.rev or "dev";
@@ -39,6 +47,7 @@
             mkdir -p $sourceRoot/vendor
             cp -r ${llama-cpp-src} $sourceRoot/vendor/llama.cpp
             cp -r ${glm-src} $sourceRoot/vendor/glm
+            cp -r ${metal-cpp-src} $sourceRoot/vendor/metal-cpp
           '';
 
           nativeBuildInputs = with pkgs; [
