@@ -99,7 +99,8 @@ type PluginManager struct {
 	shutdownCancel    context.CancelFunc
 	servicesManager   *ServicesManager // for re-registering LLM providers after restart
 	accumulator       *PluginAccumulator
-	onWatchersSetup   func() // called after plugin watchers are written to DB
+	onWatchersSetup   func()            // called after plugin watchers are written to DB
+	onPluginRestarted func(name string) // called after auto-restart succeeds (clear HTTP mux state)
 	pidFile           *pidFile
 }
 
@@ -176,6 +177,12 @@ func (m *PluginManager) SetOnWatchersSetup(fn func()) {
 	m.onWatchersSetup = fn
 }
 
+// SetOnPluginRestarted sets a callback invoked after a plugin auto-restart succeeds.
+// The server uses this to clear stale HTTP mux state (sync.Once + cached ServeMux).
+func (m *PluginManager) SetOnPluginRestarted(fn func(name string)) {
+	m.onPluginRestarted = fn
+}
+
 // Accumulator returns the plugin banner accumulator.
 func (m *PluginManager) Accumulator() *PluginAccumulator {
 	return m.accumulator
@@ -248,6 +255,11 @@ func (m *PluginManager) retryPluginForever(ctx context.Context, config PluginCon
 
 			if registry != nil {
 				m.registerRestarted(ctx, config.Name, registry, services)
+			}
+
+			// Clear stale HTTP mux state so next request re-initializes
+			if m.onPluginRestarted != nil {
+				m.onPluginRestarted(config.Name)
 			}
 
 			// Emit recovered banner
