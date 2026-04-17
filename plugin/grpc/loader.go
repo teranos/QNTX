@@ -20,6 +20,13 @@ import (
 // It discovers plugin binaries from configured paths and loads enabled plugins.
 func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.SugaredLogger, rootLogger *zap.SugaredLogger) (*PluginManager, error) {
 	manager := NewPluginManager(logger, rootLogger, cfg.Plugin.Runtime.TypeScriptRuntime)
+	manager.accumulator = NewPluginAccumulator(logger)
+
+	// Set up PID file for stale process cleanup, keyed by server port
+	// so multiple QNTX instances on the same machine don't interfere.
+	if home, err := os.UserHomeDir(); err == nil {
+		manager.SetPidFile(filepath.Join(home, ".qntx"), am.GetServerPort())
+	}
 
 	// If no plugins enabled, return empty manager
 	if len(cfg.Plugin.Enabled) == 0 {
@@ -44,7 +51,7 @@ func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.Suga
 	var pluginConfigs []PluginConfig
 	var failedPlugins []string
 	for _, pluginName := range pluginNames {
-		logger.Infof("Searching for '%s' plugin binary in %d paths", pluginName, len(cfg.Plugin.Paths))
+		logger.Debugf("Searching for '%s' plugin binary in %d paths", pluginName, len(cfg.Plugin.Paths))
 
 		pluginConfig, err := discoverPlugin(pluginName, cfg.Plugin.Paths, logger)
 		if err != nil {
@@ -56,7 +63,7 @@ func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.Suga
 			manager.mu.Unlock()
 			continue
 		}
-		logger.Infof("Will load '%s' plugin from binary: %s", pluginName, pluginConfig.Binary)
+		logger.Debugf("Will load '%s' plugin from binary: %s", pluginName, pluginConfig.Binary)
 		pluginConfigs = append(pluginConfigs, pluginConfig)
 	}
 
@@ -92,7 +99,7 @@ func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.Suga
 			"failed", failedPlugins,
 		)
 	} else if len(pluginConfigs) > 0 {
-		logger.Infow("Plugin discovery complete",
+		logger.Debugw("Plugin discovery complete",
 			"enabled", len(cfg.Plugin.Enabled),
 			"loaded", len(pluginConfigs),
 		)
@@ -142,7 +149,7 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 								// TypeScript plugin directory - look for plugin.ts
 								pluginTsPath := filepath.Join(candidate, "plugin.ts")
 								if _, err := os.Stat(pluginTsPath); err == nil {
-									logger.Infof("Found '%s' TypeScript plugin: %s", name, pluginTsPath)
+									logger.Debugf("Found '%s' TypeScript plugin: %s", name, pluginTsPath)
 									return PluginConfig{
 										Name:      name,
 										Enabled:   true,
@@ -162,7 +169,7 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 				if fileInfo.Mode()&0111 == 0 {
 					// Not executable - check if it's a .ts file (TypeScript plugin)
 					if strings.HasSuffix(candidate, ".ts") {
-						logger.Infof("Found '%s' TypeScript plugin: %s", name, candidate)
+						logger.Debugf("Found '%s' TypeScript plugin: %s", name, candidate)
 						return PluginConfig{
 							Name:      name,
 							Enabled:   true,
@@ -178,7 +185,7 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 					continue
 				}
 
-				logger.Infof("Found '%s' plugin binary: %s", name, candidate)
+				logger.Debugf("Found '%s' plugin binary: %s", name, candidate)
 
 				return PluginConfig{
 					Name:      name,

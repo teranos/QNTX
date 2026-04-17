@@ -99,14 +99,22 @@ impl DomainPluginService for MeiliPluginService {
 
     async fn health(&self, _request: Request<Empty>) -> Result<Response<HealthResponse>, Status> {
         let has_client = self.search.has_client();
+        let url = self.search.get_url();
+        let mut details = std::collections::HashMap::new();
+
+        if has_client {
+            details.insert("backend".into(), format!("MeiliSearch at {}", url));
+            details.insert("indexes".into(), self.search.get_index_count().to_string());
+        }
+
         Ok(Response::new(HealthResponse {
             healthy: has_client,
             message: if has_client {
-                String::new()
+                format!("MeiliSearch at {}", url)
             } else {
-                "MeiliSearch client not connected".to_string()
+                format!("MeiliSearch at {} not accessible", url)
             },
-            details: Default::default(),
+            details,
         }))
     }
 

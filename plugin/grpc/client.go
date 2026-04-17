@@ -53,6 +53,10 @@ type ExternalDomainProxy struct {
 	keepaliveConfig *KeepaliveConfig
 	wsConfig        *WebSocketConfig
 
+	// Callback invoked after plugin watchers are written to DB.
+	// Allows the server to reload the watcher engine's in-memory map.
+	OnWatchersSetup func()
+
 	// Initialize idempotency — multiple code paths may call Initialize
 	// (server/init.go eager init + async goroutine in main.go)
 	initOnce sync.Once
@@ -111,7 +115,7 @@ func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDo
 		License:     metaResp.License,
 	}
 
-	logger.Infof("Connected to '%s' plugin gRPC server v%s at %s (requires QNTX %s)",
+	logger.Debugf("Connected to '%s' plugin gRPC server v%s at %s (requires QNTX %s)",
 		proxy.metadata.Name, proxy.metadata.Version, addr, proxy.metadata.QNTXVersion)
 
 	return proxy, nil
@@ -359,10 +363,12 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 				"plugin", c.metadata.Name,
 				"error", err,
 			)
+		} else if c.OnWatchersSetup != nil {
+			c.OnWatchersSetup()
 		}
 	}
 
-	c.logger.Infow("Plugin initialized",
+	c.logger.Debugw("Plugin initialized",
 		"name", c.metadata.Name,
 		"handlers", len(c.handlerNames),
 		"schedules", len(c.schedules),

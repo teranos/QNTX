@@ -36,9 +36,9 @@ func New(db *sql.DB, logger *zap.SugaredLogger) (*Handler, error) {
 		if err := s.save(id); err != nil {
 			return nil, err
 		}
-		logger.Infow("Generated node DID", "did", id.did)
+		logger.Debugw("Generated node DID", "did", id.did)
 	} else {
-		logger.Infow("Loaded node DID", "did", id.did)
+		logger.Debugw("Loaded node DID", "did", id.did)
 	}
 
 	doc, err := buildDIDDocument(id.did, id.publicKey)

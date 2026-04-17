@@ -63,7 +63,7 @@ func (s *LLMServer) RegisterProvider(name string, client protocol.LLMServiceClie
 	if s.defaultProvider == "" {
 		s.defaultProvider = name
 	}
-	s.logger.Infow("LLM provider registered", "provider", name, "is_default", s.defaultProvider == name)
+	s.logger.Debugw("LLM provider registered", "provider", name, "is_default", s.defaultProvider == name)
 }
 
 // HasProvider returns true if the named provider is registered.
@@ -240,10 +240,10 @@ func (s *LLMServer) createWeave(ctx context.Context, req *protocol.LLMChatReques
 	}
 
 	attrs := map[string]interface{}{
-		"prompt":      prompt,
-		"text":        responseText,
-		"model":       model,
-		"token_count": totalTokens,
+		"prompt":       prompt,
+		"text":         responseText,
+		"model":        model,
+		"token_count":  totalTokens,
 		"weave_source": provider,
 	}
 

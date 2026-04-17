@@ -118,12 +118,7 @@ grpc::Status GazePlugin::Initialize(grpc::ServerContext* ctx,
     sampler_cfg_.penalty_freq = parse_float("freq_penalty", 0.0f);
     sampler_cfg_.penalty_present = parse_float("presence_penalty", 0.0f);
 
-    std::cout << "[gaze] Sampler config: top_k=" << sampler_cfg_.top_k
-              << " top_p=" << sampler_cfg_.top_p
-              << " min_p=" << sampler_cfg_.min_p
-              << " typical_p=" << sampler_cfg_.typical_p
-              << " penalty_last_n=" << sampler_cfg_.penalty_last_n
-              << " repeat_penalty=" << sampler_cfg_.penalty_repeat << std::endl;
+    // Sampler config details are available via ConfigSchema RPC
 
     // Flush condensed log summary
     auto log_it = config.find("log_level");
@@ -139,7 +134,6 @@ grpc::Status GazePlugin::Shutdown(grpc::ServerContext* ctx,
                                    const protocol::Empty* req,
                                    protocol::Empty* resp) {
     engines_.clear();
-    std::cout << "[gaze] Shutdown complete" << std::endl;
     return grpc::Status::OK;
 }
 
@@ -166,19 +160,84 @@ std::vector<std::string> GazePlugin::model_names() const {
 grpc::Status GazePlugin::Health(grpc::ServerContext* ctx,
                                  const protocol::Empty* req,
                                  protocol::HealthResponse* resp) {
-    resp->set_healthy(true);
+    auto* details = resp->mutable_details();
+
     if (engines_.empty()) {
+        resp->set_healthy(true);
         resp->set_message("no models loaded");
-    } else {
-        std::string msg = std::to_string(engines_.size()) + " model(s): ";
-        bool first = true;
-        for (const auto& [name, _] : engines_) {
-            if (!first) msg += ", ";
-            msg += name;
-            first = false;
-        }
-        resp->set_message(msg);
+        return grpc::Status::OK;
     }
+
+    resp->set_healthy(true);
+
+    // Build model list and populate details from first/each engine
+    std::string models_str;
+    bool first = true;
+    for (const auto& [name, engine] : engines_) {
+        if (!first) models_str += ", ";
+        models_str += name;
+        first = false;
+
+        // Per-model details (prefixed if multiple models)
+        std::string prefix = (engines_.size() > 1) ? name + "." : "";
+
+        std::string desc = engine->model_desc();
+        if (!desc.empty()) {
+            (*details)[prefix + "backend"] = desc;
+        }
+
+        (*details)[prefix + "context"] = std::to_string(engine->context_length());
+
+        if (engine->has_vision()) {
+            (*details)[prefix + "vision"] = "true";
+        }
+
+        uint64_t size = engine->model_size_bytes();
+        if (size > 0) {
+            // Human-readable size
+            if (size >= 1024ULL * 1024 * 1024) {
+                char buf[32];
+                snprintf(buf, sizeof(buf), "%.1f GiB", size / (1024.0 * 1024.0 * 1024.0));
+                (*details)[prefix + "size"] = buf;
+            } else {
+                char buf[32];
+                snprintf(buf, sizeof(buf), "%.0f MiB", size / (1024.0 * 1024.0));
+                (*details)[prefix + "size"] = buf;
+            }
+        }
+
+        uint64_t params = engine->model_n_params();
+        if (params > 0) {
+            char buf[32];
+            if (params >= 1000000000ULL) {
+                snprintf(buf, sizeof(buf), "%.1fB", params / 1e9);
+            } else {
+                snprintf(buf, sizeof(buf), "%.0fM", params / 1e6);
+            }
+            (*details)[prefix + "params"] = buf;
+        }
+    }
+
+    // Hardware details from llama.cpp log capture
+    auto& logs = LogCapture::instance();
+    std::string device = logs.device_name();
+    if (!device.empty()) {
+        std::string accel = "Metal, " + device;
+        std::string family = logs.gpu_family();
+        if (!family.empty()) accel += " (" + family + ")";
+        int vram = logs.vram_free_mib();
+        if (vram > 0) accel += ", " + std::to_string(vram) + " MiB free";
+        (*details)["accelerator"] = accel;
+    } else {
+        (*details)["accelerator"] = "Metal";
+    }
+
+    std::string quant = logs.quant_type();
+    if (!quant.empty()) {
+        (*details)["quantization"] = quant;
+    }
+
+    resp->set_message(std::to_string(engines_.size()) + " model(s): " + models_str);
     return grpc::Status::OK;
 }
 
