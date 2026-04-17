@@ -87,6 +87,10 @@ type Engine struct {
 	parseErrors     map[string]error     // Stores parse errors for watchers that failed to load
 	queryEmbeddings map[string][]float32 // Pre-computed query embeddings for semantic watchers (watcherID → embedding)
 
+	// Dilation: multiplier on watcher firing rates based on system load.
+	// 1.0 = normal, >1.0 = faster (low load), <1.0 = slower (high load), 0.0 = halted.
+	dilation float64
+
 	// Persistent execution queue (replaces in-memory retry)
 	queueStore *QueueStore
 
@@ -126,6 +130,7 @@ func NewEngine(db *sql.DB, reader AttestationReader, apiBaseURL string, logger *
 		rateLimiters:    make(map[string]*rate.Limiter),
 		parseErrors:     make(map[string]error),
 		queryEmbeddings: make(map[string][]float32),
+		dilation:        1.0,
 		queueStore:      NewQueueStore(db),
 		ctx:             ctx,
 		cancel:          cancel,
@@ -140,6 +145,37 @@ func (e *Engine) SetAvailableGlyphTypes(types []string) {
 	for _, t := range types {
 		e.availableGlyphTypes[t] = true
 	}
+}
+
+// SetDilation adjusts watcher firing rates based on system load.
+// Values: 0.0 = halted, 0.5 = half speed, 1.0 = normal, 2.0 = double speed.
+// Rescales all rate limiters relative to each watcher's configured MaxFiresPerSecond.
+func (e *Engine) SetDilation(d float64) {
+	if d < 0 {
+		d = 0
+	}
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	e.dilation = d
+
+	for id, w := range e.watchers {
+		limiter := e.rateLimiters[id]
+		if limiter == nil {
+			continue
+		}
+		base := float64(w.MaxFiresPerSecond)
+		limiter.SetLimit(rate.Limit(base * d))
+	}
+
+}
+
+// Dilation returns the current dilation factor.
+func (e *Engine) Dilation() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.dilation
 }
 
 // Start loads watchers from DB and starts the drain loop
@@ -160,7 +196,7 @@ func (e *Engine) Start() error {
 	e.wg.Add(1)
 	go e.drainLoop()
 
-	e.logger.Infow("Watcher engine started", "watchers_loaded", len(e.watchers))
+	e.logger.Debugw("Watcher engine started", "watchers_loaded", len(e.watchers))
 	return nil
 }
 
@@ -281,7 +317,7 @@ func (e *Engine) loadWatchers() error {
 
 		e.watchers[w.ID] = w
 		// If MaxFiresPerSecond is 0, rate is 0 — no fires allowed (QNTX LAW: zero means zero)
-		e.rateLimiters[w.ID] = rate.NewLimiter(rate.Limit(float64(w.MaxFiresPerSecond)), 1)
+		e.rateLimiters[w.ID] = rate.NewLimiter(rate.Limit(float64(w.MaxFiresPerSecond)*e.dilation), 1)
 	}
 
 	// Suppress standalone SE watchers that are targets of compound SE→SE melds.

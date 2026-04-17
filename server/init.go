@@ -289,7 +289,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 			serverLogger.Warnw("Failed to start plugin services, plugins will not have service access", "error", err)
 			endpoints = nil
 		} else {
-			serverLogger.Infow("Plugin services started",
+			serverLogger.Debugw("Plugin services started",
 				"ats_store", endpoints.ATSStoreAddress,
 				"queue", endpoints.QueueAddress,
 				"schedule", endpoints.ScheduleAddress,
@@ -323,7 +323,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	// Initialize gRPC plugins (if any are loaded)
 	// IMPORTANT: This must happen during server startup, not lazily on first HTTP request,
 	// so that plugins can register type definitions before graph queries are executed.
-	serverLogger.Infow("Plugin manager check", "plugin_manager_is_nil", server.pluginManager == nil, "services_is_nil", server.services == nil)
+	serverLogger.Debugw("Plugin manager check", "plugin_manager_is_nil", server.pluginManager == nil, "services_is_nil", server.services == nil)
 
 	// Log plugin registry state — plugins load asynchronously, so the manager
 	// is typically nil here. This captures the registry state in the structured
@@ -332,7 +332,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		states := pluginRegistry.GetAllStates()
 		for name, state := range states {
 			errMsg, _ := pluginRegistry.GetError(name)
-			serverLogger.Infow("Plugin state at server startup",
+			serverLogger.Debugw("Plugin state at server startup",
 				"plugin", name, "state", state, "error", errMsg)
 		}
 	}
@@ -383,7 +383,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	canvasOpts = append(canvasOpts, handlers.WithServerPort(serverPort))
 	server.canvasHandler = handlers.NewCanvasHandler(canvasStore, canvasOpts...)
 	server.conversationAssembler = NewConversationAssembler(canvasStore, storage.NewSQLQueryStore(db))
-	serverLogger.Infow("Canvas state handlers initialized")
+	serverLogger.Debugw("Canvas state handlers initialized")
 
 	// Initialize embedding service for semantic search (optional)
 	server.groundDBPath = deps.config.GroundDBPath
@@ -474,7 +474,7 @@ func setupSync(server *QNTXServer, db *sql.DB, logger *zap.SugaredLogger) {
 	// reflects the full dataset (not just attestations created after startup).
 	go backfillSyncTree(server.atsStore, tree, observer, logger)
 
-	logger.Infow("Sync observer registered, backfill started")
+	logger.Debugw("Sync observer registered, backfill started")
 }
 
 // backfillSyncTree walks all existing attestations and inserts them into the
@@ -589,7 +589,7 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 	// Get the config file path from Viper
 	configPath := appcfg.GetViper().ConfigFileUsed()
 	if configPath == "" {
-		serverLogger.Infow("No config file found, using defaults (config watching disabled)")
+		serverLogger.Debugw("No config file found, using defaults (config watching disabled)")
 		return
 	}
 

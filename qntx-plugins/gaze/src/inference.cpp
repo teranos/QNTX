@@ -63,16 +63,7 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
 
     auto model_params = llama_model_default_params();
     model_params.n_gpu_layers = -1;
-    static int last_pct = -1;
-    last_pct = -1;
-    model_params.progress_callback = [](float progress, void*) -> bool {
-        int pct = (int)(progress * 100) / 10 * 10; // round to nearest 10
-        if (pct != last_pct) {
-            last_pct = pct;
-            std::cout << "[gaze] Loading model: " << pct << "%" << std::endl;
-        }
-        return true;
-    };
+    model_params.progress_callback = [](float, void*) -> bool { return true; };
     model_ = llama_model_load_from_file(model_path.c_str(), model_params);
     if (!model_) {
         std::cout << "[gaze] Failed to load model from " << model_path << std::endl;
@@ -95,6 +86,7 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
     }
 
     model_path_ = model_path;
+    effective_ctx_ = effective_ctx;
 
     char name_buf[256];
     int n = llama_model_meta_val_str(model_, "general.name", name_buf, sizeof(name_buf));
@@ -109,9 +101,7 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
         }
     }
 
-    std::cout << "[gaze] Model loaded: " << model_name_
-              << " (ctx=" << effective_ctx
-              << ", native=" << model_ctx << ", cap=" << n_ctx << ")" << std::endl;
+    // Model details are reported via Health RPC details map
 
     init_vision(model_path);
 
@@ -148,6 +138,28 @@ std::string InferenceEngine::token_text(int token_id) const {
     int len = llama_token_to_piece(vocab, token_id, buf, sizeof(buf), 0, true);
     if (len < 0) return "";
     return std::string(buf, len);
+}
+
+std::string InferenceEngine::model_desc() const {
+    if (!model_) return "";
+    char buf[256];
+    int n = llama_model_desc(model_, buf, sizeof(buf));
+    if (n > 0) return std::string(buf, n);
+    return "";
+}
+
+uint64_t InferenceEngine::model_size_bytes() const {
+    if (!model_) return 0;
+    return llama_model_size(model_);
+}
+
+uint64_t InferenceEngine::model_n_params() const {
+    if (!model_) return 0;
+    return llama_model_n_params(model_);
+}
+
+int InferenceEngine::context_length() const {
+    return effective_ctx_;
 }
 
 int InferenceEngine::prepare_prompt(

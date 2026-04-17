@@ -23,6 +23,8 @@ var (
 	// fileOutputAdded is set by AddFileOutput. Once true, Initialize() panics
 	// to prevent accidentally replacing the file-enabled logger with a console-only one.
 	fileOutputAdded bool
+	// fileWriter is the raw file writer, set by AddFileOutput.
+	fileWriter *os.File
 )
 
 func init() {
@@ -186,8 +188,19 @@ func AddFileOutput(logPath string) error {
 	combined := zapcore.NewTee(Logger.Desugar().Core(), fileCore)
 	Logger = zap.New(combined).Sugar()
 	fileOutputAdded = true
+	fileWriter = file
 
 	return nil
+}
+
+// WriteRaw writes pre-formatted content to the logger's outputs without
+// any encoding (no timestamp prefix, no level, no logger name).
+// Colored version goes to stdout, ANSI-stripped version goes to the log file.
+func WriteRaw(colored, plain string) {
+	os.Stdout.WriteString(colored)
+	if fileWriter != nil {
+		fileWriter.WriteString(plain)
+	}
 }
 
 // Cleanup flushes any buffered log entries.

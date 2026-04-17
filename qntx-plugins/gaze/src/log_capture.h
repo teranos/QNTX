@@ -81,6 +81,12 @@ public:
         }
     }
 
+    // Accessors for Health enrichment
+    std::string device_name() const { std::lock_guard<std::mutex> l(mutex_); return device_name_; }
+    std::string gpu_family() const { std::lock_guard<std::mutex> l(mutex_); return gpu_family_; }
+    int vram_free_mib() const { std::lock_guard<std::mutex> l(mutex_); return vram_free_mib_; }
+    std::string quant_type() const { std::lock_guard<std::mutex> l(mutex_); return quant_type_; }
+
 private:
     LogCapture() = default;
 
@@ -231,7 +237,7 @@ private:
         return s.substr(start, end - start + 1);
     }
 
-    std::mutex mutex_;
+    mutable std::mutex mutex_;
     std::string line_buf_;
 
     // Extracted values

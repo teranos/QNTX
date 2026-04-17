@@ -39,7 +39,7 @@ func (s *SearchServer) RegisterProvider(name string, client protocol.SearchServi
 
 	s.provider = client
 	s.name = name
-	s.logger.Infow("Search provider registered", "provider", name)
+	s.logger.Debugw("Search provider registered", "provider", name)
 }
 
 // HasProvider returns true if a search provider is registered.
