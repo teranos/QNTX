@@ -673,16 +673,12 @@ func (e *Engine) drainOnce() {
 			continue
 		}
 
-		// Paused entries wait for their plugin to become available
-		if entry.Reason == "paused" {
-			if required := actionRequiresPlugin(watcher); required != "" && e.pluginExecutor != nil {
-				if !e.pluginExecutor.IsPluginLoaded(required) {
-					// Still unavailable — push back 60s
-					e.queueStore.Requeue(entry.ID, time.Now().Add(60*time.Second))
-					continue
-				}
+		// If the action depends on a plugin that isn't loaded, defer execution
+		if required := actionRequiresPlugin(watcher); required != "" && e.pluginExecutor != nil {
+			if !e.pluginExecutor.IsPluginLoaded(required) {
+				e.queueStore.Requeue(entry.ID, time.Now().Add(60*time.Second))
+				continue
 			}
-			// Plugin is back — fall through to execution
 		}
 
 		// For rate-limited entries, use Reserve/Cancel to peek at when the next token is available
