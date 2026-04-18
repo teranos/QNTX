@@ -42,6 +42,7 @@ type EmbeddingSearcher interface {
 // Optional — nil when no plugin manager is available.
 type PluginExecutor interface {
 	ExecutePluginJob(ctx context.Context, pluginName string, handlerName string, payload []byte) ([]byte, error)
+	IsPluginLoaded(pluginName string) bool
 }
 
 // AttestationReader provides read access to attestations through Rust's single connection.
@@ -698,6 +699,14 @@ func (e *Engine) drainOnce() {
 		if !exists || !watcher.Enabled {
 			e.queueStore.Complete(entry.ID)
 			continue
+		}
+
+		// If the action depends on a plugin that isn't loaded, defer execution
+		if required := actionRequiresPlugin(watcher); required != "" && e.pluginExecutor != nil {
+			if !e.pluginExecutor.IsPluginLoaded(required) {
+				e.queueStore.Requeue(entry.ID, time.Now().Add(60*time.Second))
+				continue
+			}
 		}
 
 		// For rate-limited entries, use Reserve/Cancel to peek at when the next token is available

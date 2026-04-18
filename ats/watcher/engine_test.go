@@ -744,6 +744,10 @@ func (f pluginExecutorFunc) ExecutePluginJob(ctx context.Context, pluginName, ha
 	return f(ctx, pluginName, handlerName, payload)
 }
 
+func (f pluginExecutorFunc) IsPluginLoaded(pluginName string) bool {
+	return true
+}
+
 func TestEngine_ExecutePlugin(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
