@@ -74,7 +74,8 @@ public:
 
     // Set scrub target: index >= 0 renders that keyframe, -1 resumes live.
     void set_scrub_index(int idx);
-    int scrub_index() const { return scrub_index_.load(std::memory_order_acquire); }
+    int scrub_index() const;
+
 
     // Examine mode: isolate single keyframe (no orbit, no trail, no fade).
     void set_token_examine(bool examine);
