@@ -27,6 +27,10 @@
     "composition.ts",
     "edge-graph.ts",
     "glyph-ui.ts",
-    "touch-browse.ts"
+    "touch-browse.ts",
+    "meld/meldability.ts",
+    "meld/meld-detect.ts",
+    "meld/meld-feedback.ts",
+    "meld/meld-composition.ts"
   ]
 }

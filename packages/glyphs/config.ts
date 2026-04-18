@@ -11,10 +11,10 @@
 import type { CompositionState } from './composition';
 
 export interface GlyphLogger {
-    debug(segment: string, message: string): void;
-    info(segment: string, message: string): void;
-    warn(segment: string, message: string): void;
-    error(segment: string, message: string): void;
+    debug(segment: string, message: string, metadata?: Record<string, unknown>): void;
+    info(segment: string, message: string, metadata?: Record<string, unknown>): void;
+    warn(segment: string, message: string, metadata?: Record<string, unknown>): void;
+    error(segment: string, message: string, metadata?: Record<string, unknown>): void;
 }
 
 export interface GlyphPersistence {

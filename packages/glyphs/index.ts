@@ -118,6 +118,38 @@ export {
 export { setupTouchBrowse, findPeakedGlyph } from './touch-browse';
 export type { TouchBrowseHost } from './touch-browse';
 
+// Meld system
+export {
+    canInitiateMeld,
+    canReceiveMeld,
+    findMeldTarget,
+    checkDirectionalProximity,
+    PROXIMITY_THRESHOLD,
+    MELD_THRESHOLD,
+} from './meld/meld-detect';
+export { applyMeldFeedback, clearMeldFeedback } from './meld/meld-feedback';
+export {
+    performMeld,
+    extendComposition,
+    reconstructMeld,
+    isMeldedComposition,
+    unmeldComposition,
+    detachGlyph,
+} from './meld/meld-composition';
+export {
+    MELDABILITY,
+    getInitiatorClasses,
+    getTargetClasses,
+    getCompatibleTargets,
+    getCompatibleDirections,
+    areClassesCompatible,
+    getCompositionGlyphIds,
+    getGlyphClass,
+    getMeldOptions,
+    selectPreferredMeldOption,
+} from './meld/meldability';
+export type { PortRule, MeldOption } from './meld/meldability';
+
 // GlyphUI interface and related types
 export type {
     GlyphUI,
