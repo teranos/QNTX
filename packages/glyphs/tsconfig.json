@@ -31,6 +31,9 @@
     "meld/meldability.ts",
     "meld/meld-detect.ts",
     "meld/meld-feedback.ts",
-    "meld/meld-composition.ts"
+    "meld/meld-composition.ts",
+    "canvas-drag.ts",
+    "manifestations/canvas-window.ts",
+    "expand-to-window.ts"
   ]
 }
