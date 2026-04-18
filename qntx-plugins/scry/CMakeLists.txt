@@ -111,6 +111,7 @@ add_executable(qntx-scry-plugin
     src/main.cpp
     src/plugin.cpp
     src/inference.cpp
+    src/inference_fork.cpp
     src/vision.cpp
     src/llm_service.cpp
     src/pdf_extract.cpp
@@ -214,6 +215,7 @@ add_test(NAME camera_test COMMAND camera_test)
 add_executable(fork_test
     tests/fork_test.cpp
     src/inference.cpp
+    src/inference_fork.cpp
     src/vision.cpp
     src/pdf_extract.cpp
     ${GENERATED_SRCS}
