@@ -284,17 +284,19 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		// These services allow plugins to call back to QNTX core
 		servicesManager := grpcplugin.NewServicesManager(deps.config.LLM, serverLogger)
 		filesDir := filepath.Join(filepath.Dir(dbPath), "files")
-		endpoints, err := servicesManager.Start(ctx, atsStore, queue, scheduleStore, filesDir)
+		endpoints, err := servicesManager.Start(ctx, atsStore, queue, scheduleStore, filesDir, deps.config.GroundDBPath)
 		if err != nil {
 			serverLogger.Warnw("Failed to start plugin services, plugins will not have service access", "error", err)
 			endpoints = nil
 		} else {
-			serverLogger.Infow("Plugin services started",
+			serverLogger.Debugw("Plugin services started",
 				"ats_store", endpoints.ATSStoreAddress,
 				"queue", endpoints.QueueAddress,
 				"schedule", endpoints.ScheduleAddress,
 				"file_service", endpoints.FileServiceAddress,
 				"llm", endpoints.LLMAddress,
+				"embedding", endpoints.EmbeddingAddress,
+				"search", endpoints.SearchAddress,
 			)
 		}
 
@@ -305,13 +307,6 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		}
 
 		services := plugin.NewServiceRegistry(db, serverLogger, atsStore, configProvider, queue)
-
-		if err := pluginRegistry.InitializeAll(ctx, services); err != nil {
-			serverLogger.Errorw("Failed to initialize domain plugins", "error", err)
-			// Continue anyway - plugins are optional
-		} else {
-			serverLogger.Infow("Domain plugins initialized", "count", len(pluginRegistry.List()))
-		}
 
 		// Store services manager and registry for shutdown and reinitialization
 		server.servicesManager = servicesManager
@@ -328,7 +323,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	// Initialize gRPC plugins (if any are loaded)
 	// IMPORTANT: This must happen during server startup, not lazily on first HTTP request,
 	// so that plugins can register type definitions before graph queries are executed.
-	serverLogger.Infow("Plugin manager check", "plugin_manager_is_nil", server.pluginManager == nil, "services_is_nil", server.services == nil)
+	serverLogger.Debugw("Plugin manager check", "plugin_manager_is_nil", server.pluginManager == nil, "services_is_nil", server.services == nil)
 
 	// Log plugin registry state — plugins load asynchronously, so the manager
 	// is typically nil here. This captures the registry state in the structured
@@ -337,44 +332,8 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		states := pluginRegistry.GetAllStates()
 		for name, state := range states {
 			errMsg, _ := pluginRegistry.GetError(name)
-			serverLogger.Infow("Plugin state at server startup",
+			serverLogger.Debugw("Plugin state at server startup",
 				"plugin", name, "state", state, "error", errMsg)
-		}
-	}
-
-	if server.pluginManager != nil && server.services != nil {
-		plugins := server.pluginManager.GetAllPlugins()
-		serverLogger.Infow("Plugin manager has plugins", "count", len(plugins))
-		if len(plugins) > 0 {
-			serverLogger.Infow("Initializing plugins eagerly", "count", len(plugins))
-
-			// Initialize each plugin with the service registry
-			for _, p := range plugins {
-				meta := p.Metadata()
-				if err := p.Initialize(ctx, server.services); err != nil {
-					serverLogger.Errorw("Failed to initialize plugin",
-						"plugin", meta.Name,
-						"version", meta.Version,
-						"error", err)
-					continue
-				}
-
-				serverLogger.Infow("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
-			}
-
-			// Register LLM providers with the core LLM router
-			if server.servicesManager != nil {
-				llmRouter := server.servicesManager.GetLLMRouter()
-				if llmRouter != nil {
-					for _, p := range plugins {
-						proxy, ok := p.(*grpcplugin.ExternalDomainProxy)
-						if !ok || !proxy.IsLLMProvider() {
-							continue
-						}
-						llmRouter.RegisterProvider(p.Metadata().Name, proxy.LLMServiceClient())
-					}
-				}
-			}
 		}
 	}
 
@@ -424,17 +383,29 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	canvasOpts = append(canvasOpts, handlers.WithServerPort(serverPort))
 	server.canvasHandler = handlers.NewCanvasHandler(canvasStore, canvasOpts...)
 	server.conversationAssembler = NewConversationAssembler(canvasStore, storage.NewSQLQueryStore(db))
-	serverLogger.Infow("Canvas state handlers initialized")
+	serverLogger.Debugw("Canvas state handlers initialized")
 
 	// Initialize embedding service for semantic search (optional)
-	server.graundeDBPath = deps.config.GraundeDBPath
+	server.groundDBPath = deps.config.GroundDBPath
 	server.SetupEmbeddingService()
 	if server.embeddingStats != nil {
 		ticker.SetEmbeddingStats(server.embeddingStats)
 	}
+	if server.servicesManager != nil {
+		if llmRouter := server.servicesManager.GetLLMRouter(); llmRouter != nil {
+			ticker.SetWeaveStats(llmRouter)
+		}
+	}
 	server.setupEmbeddingReclusterSchedule(deps.config)
 	server.setupEmbeddingReprojectSchedule(deps.config)
 	server.setupClusterLabelSchedule(deps.config)
+
+	// Wire embedding service into gRPC for plugin access
+	if server.embeddingService != nil && server.servicesManager != nil {
+		if router := server.servicesManager.GetEmbeddingRouter(); router != nil {
+			router.SetService(server.embeddingService)
+		}
+	}
 
 	// Wire embedding service into watcher engine now that it's available
 	// (watcher engine starts before embeddings — reconnect and reload)
@@ -503,7 +474,7 @@ func setupSync(server *QNTXServer, db *sql.DB, logger *zap.SugaredLogger) {
 	// reflects the full dataset (not just attestations created after startup).
 	go backfillSyncTree(server.atsStore, tree, observer, logger)
 
-	logger.Infow("Sync observer registered, backfill started")
+	logger.Debugw("Sync observer registered, backfill started")
 }
 
 // backfillSyncTree walks all existing attestations and inserts them into the
@@ -618,7 +589,7 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 	// Get the config file path from Viper
 	configPath := appcfg.GetViper().ConfigFileUsed()
 	if configPath == "" {
-		serverLogger.Infow("No config file found, using defaults (config watching disabled)")
+		serverLogger.Debugw("No config file found, using defaults (config watching disabled)")
 		return
 	}
 
@@ -756,6 +727,14 @@ func (c *pluginConfigWithEndpoints) GetString(key string) string {
 			return c.endpoints.FileServiceAddress
 		case "_llm_endpoint":
 			return c.endpoints.LLMAddress
+		case "_embedding_endpoint":
+			return c.endpoints.EmbeddingAddress
+		case "_vector_search_endpoint":
+			return c.endpoints.VectorSearchAddress
+		case "_ground_endpoint":
+			return c.endpoints.GroundAddress
+		case "_search_endpoint":
+			return c.endpoints.SearchAddress
 		case "_auth_token":
 			return c.endpoints.AuthToken
 		}
@@ -789,6 +768,14 @@ func (c *pluginConfigWithEndpoints) Get(key string) interface{} {
 			return c.endpoints.FileServiceAddress
 		case "_llm_endpoint":
 			return c.endpoints.LLMAddress
+		case "_embedding_endpoint":
+			return c.endpoints.EmbeddingAddress
+		case "_vector_search_endpoint":
+			return c.endpoints.VectorSearchAddress
+		case "_ground_endpoint":
+			return c.endpoints.GroundAddress
+		case "_search_endpoint":
+			return c.endpoints.SearchAddress
 		case "_auth_token":
 			return c.endpoints.AuthToken
 		}

@@ -24,6 +24,7 @@ import (
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/plugin"
+	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/wslogs"
@@ -864,17 +865,37 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 			writeError(w, http.StatusServiceUnavailable, "Plugin manager not available")
 			return
 		}
+		// Snapshot config before reset for diff detection
+		if acc := pm.Accumulator(); acc != nil {
+			if v := appcfg.GetViper(); v != nil {
+				acc.SnapshotConfig(name, v.GetStringMapString(name))
+			}
+		}
+		// Re-read config from disk so the restarted plugin gets fresh values
+		appcfg.Reset()
 		err = pm.RestartPlugin(ctx, name, s.pluginRegistry, s.services)
 		if err != nil {
 			s.logger.Warnw("Failed to restart plugin", "plugin", name, "error", err)
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+		// Emit restart/reconfigured banner
+		if acc := pm.Accumulator(); acc != nil {
+			reason := plugingrpc.BannerRestart
+			if v := appcfg.GetViper(); v != nil {
+				diffs := acc.ComputeConfigDiff(name, v.GetStringMapString(name))
+				if len(diffs) > 0 {
+					reason = plugingrpc.BannerReconfigured
+					acc.SetConfigDiff(name, diffs)
+				}
+			}
+			acc.Emit(name, reason)
+		}
 		// Invalidate cached HTTP mux and sync.Once so next request
 		// re-initializes with the new gRPC connection
 		s.pluginMuxes.Delete(name)
 		s.pluginMuxInit.Delete(name)
-		s.logger.Infow("Plugin restarted", "plugin", name)
+		s.logger.Debugw("Plugin restarted", "plugin", name)
 		s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin restarted")
 
 	default:

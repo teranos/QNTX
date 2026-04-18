@@ -71,6 +71,10 @@ PATCH /api/config
 {"updates": {"embeddings.enabled": true, "embeddings.path": "/path/to/model.onnx"}}
 ```
 
+## Plugin gRPC Service
+
+Plugins access embeddings via the `EmbeddingService` gRPC endpoint passed in `InitializeRequest.embedding_endpoint`. The service exposes `Embed` (single text) and `BatchEmbed` (multiple texts), both returning 384-dim L2-normalized float vectors. See `plugin/grpc/protocol/embedding.proto` for the full message definitions.
+
 ## API Endpoints
 
 | Method | Path | Description |
@@ -115,7 +119,7 @@ When HDBSCAN re-clustering runs (manually or via Pulse schedule), the system emi
 - Actor: `qntx@embeddings`, Source: `cluster-lifecycle`
 - Attributes: `run_id`, `n_members`
 
-**Deferred news** — a summary for Graunde to deliver on the next session Stop:
+**Deferred news** — a summary for Ground to deliver on the next session Stop:
 - Subject: `embeddings`, Predicate: `deferred:cluster-update`
 - Context: `project:<parent>/<repo>` (project-scoped, not session-scoped)
 - Attributes: `event`, `detail` (rich text summary with sample texts), `after` (unix timestamp)
@@ -124,11 +128,11 @@ When HDBSCAN re-clustering runs (manually or via Pulse schedule), the system emi
 - Subject: `pulse`, Predicate: `deferred:pulse-summary`
 - Same project context and delivery mechanism
 
-### Graunde delivery protocol
+### Ground delivery protocol
 
-Graunde reads `deferred:*` attestations and delivers the `detail` field. After delivery, it writes a `delivered:<name>` attestation with the same project context as an ack.
+Ground reads `deferred:*` attestations and delivers the `detail` field. After delivery, it writes a `delivered:<name>` attestation with the same project context as an ack.
 
-**Ack-aware accumulation:** Before emitting new deferred news, QNTX checks for a `delivered:cluster-update` ack from Graunde. If the previous news hasn't been delivered yet, the new events are prepended to the existing detail — so Graunde delivers the full accumulated summary spanning all runs since last delivery.
+**Ack-aware accumulation:** Before emitting new deferred news, QNTX checks for a `delivered:cluster-update` ack from Ground. If the previous news hasn't been delivered yet, the new events are prepended to the existing detail — so Ground delivers the full accumulated summary spanning all runs since last delivery.
 
 ## Open Work
 

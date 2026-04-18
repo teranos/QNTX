@@ -1,5 +1,7 @@
 # sym - QNTX Symbol System
 
+- TODO: Review, I havent touched this for more than 3 months, that means its very stable? i think this stuff is still permeating throughout QNTX, so very important indeed. but the UI has been going ham on creating many more symbols, in a way the sym are becoming the glyph you could say? Or more like a subset.
+
 Canonical symbols for QNTX SEG operations and system markers.
 
 ## Why Symbols?

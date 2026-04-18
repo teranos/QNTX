@@ -5,7 +5,7 @@
 (* https://github.com/andersfugmann/ocaml-protoc-plugin *)
 (********************************************************)
 (*
-  Source: domain.proto
+  Source: plugin/grpc/protocol/domain.proto
   Syntax: proto3
   Parameters:
     debug=false
@@ -150,8 +150,48 @@ Provides: Read stored files (for multimodal attachments)</p>
 %}
       *)
 
+      llm_endpoint:string;
+      (**
+{%html:
+<p>llm_endpoint: gRPC endpoint for LLMService
+Provides: Provider-agnostic LLM chat (routed through core to provider plugins)</p>
+%}
+      *)
+
+      embedding_endpoint:string;
+      (**
+{%html:
+<p>embedding_endpoint: gRPC endpoint for EmbeddingService
+Provides: Text-to-vector embedding generation</p>
+%}
+      *)
+
+      vector_search_endpoint:string;
+      (**
+{%html:
+<p>vector_search_endpoint: gRPC endpoint for VectorSearchService
+Provides: Nearest-neighbor search over dense vector indexes (ADR-016)</p>
+%}
+      *)
+
+      ground_endpoint:string;
+      (**
+{%html:
+<p>ground_endpoint: gRPC endpoint for GroundService
+Provides: Write attestations to Ground's deferred news database</p>
+%}
+      *)
+
+      search_endpoint:string;
+      (**
+{%html:
+<p>search_endpoint: gRPC endpoint for SearchService
+Provides: Full-text search over indexed documents (routed through core to provider plugin)</p>
+%}
+      *)
+
     }
-    val make: ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> unit -> t
+    val make: ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> ?llm_endpoint:string -> ?embedding_endpoint:string -> ?vector_search_endpoint:string -> ?ground_endpoint:string -> ?search_endpoint:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -170,7 +210,7 @@ Provides: Read stored files (for multimodal attachments)</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> unit -> t
+    type make_t = ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> ?llm_endpoint:string -> ?embedding_endpoint:string -> ?vector_search_endpoint:string -> ?ground_endpoint:string -> ?search_endpoint:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -619,8 +659,41 @@ QNTX will auto-create schedule.Job entries for these</p>
 %}
       *)
 
+      llm_provider:bool;
+      (**
+{%html:
+<p>llm_provider indicates this plugin implements LLMProvider (Chat RPC).
+Core registers it as an LLM backend in the service mesh.</p>
+%}
+      *)
+
+      watchers:WatcherRegistration.t list;
+      (**
+{%html:
+<p>Watchers this plugin wants registered on its behalf.
+Core creates watchers with action_type=plugin_execute targeting this plugin.
+On match, core calls ExecuteJob with the matching attestation as payload.</p>
+%}
+      *)
+
+      vector_search_provider:bool;
+      (**
+{%html:
+<p>vector_search_provider indicates this plugin implements VectorSearchService (ADR-016).
+Core registers it as a vector search backend in the service mesh.</p>
+%}
+      *)
+
+      search_provider:bool;
+      (**
+{%html:
+<p>search_provider indicates this plugin implements SearchProvider (Search RPCs).
+Core registers it as the search backend in the service mesh.</p>
+%}
+      *)
+
     }
-    val make: ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> unit -> t
+    val make: ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -639,7 +712,94 @@ QNTX will auto-create schedule.Job entries for these</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> unit -> t
+    type make_t = ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+
+  (**
+{%html:
+<p>WatcherRegistration declares a watcher a plugin wants core to manage.
+Core creates/updates the watcher on Initialize and routes matches
+to the plugin via ExecuteJob.</p>
+%}
+  *)
+  and WatcherRegistration : sig
+    type t = {
+      id:string;
+      (**
+{%html:
+<p>Watcher ID (scoped to plugin: &quot;{plugin}-{id}&quot;)</p>
+%}
+      *)
+
+      handler_name:string;
+      (**
+{%html:
+<p>ExecuteJob handler to invoke on match</p>
+%}
+      *)
+
+      subjects:string list;
+      (**
+{%html:
+<p>Structural filter: subjects</p>
+%}
+      *)
+
+      predicates:string list;
+      (**
+{%html:
+<p>Structural filter: predicates</p>
+%}
+      *)
+
+      contexts:string list;
+      (**
+{%html:
+<p>Structural filter: contexts</p>
+%}
+      *)
+
+      actors:string list;
+      (**
+{%html:
+<p>Structural filter: actors</p>
+%}
+      *)
+
+      max_fires_per_second:int;
+      (**
+{%html:
+<p>Rate limit (0 = no action, structural only)</p>
+%}
+      *)
+
+    }
+    val make: ?id:string -> ?handler_name:string -> ?subjects:string list -> ?predicates:string list -> ?contexts:string list -> ?actors:string list -> ?max_fires_per_second:int -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?id:string -> ?handler_name:string -> ?subjects:string list -> ?predicates:string list -> ?contexts:string list -> ?actors:string list -> ?max_fires_per_second:int -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -1367,8 +1527,48 @@ Provides: Read stored files (for multimodal attachments)</p>
 %}
       *)
 
+      llm_endpoint:string;
+      (**
+{%html:
+<p>llm_endpoint: gRPC endpoint for LLMService
+Provides: Provider-agnostic LLM chat (routed through core to provider plugins)</p>
+%}
+      *)
+
+      embedding_endpoint:string;
+      (**
+{%html:
+<p>embedding_endpoint: gRPC endpoint for EmbeddingService
+Provides: Text-to-vector embedding generation</p>
+%}
+      *)
+
+      vector_search_endpoint:string;
+      (**
+{%html:
+<p>vector_search_endpoint: gRPC endpoint for VectorSearchService
+Provides: Nearest-neighbor search over dense vector indexes (ADR-016)</p>
+%}
+      *)
+
+      ground_endpoint:string;
+      (**
+{%html:
+<p>ground_endpoint: gRPC endpoint for GroundService
+Provides: Write attestations to Ground's deferred news database</p>
+%}
+      *)
+
+      search_endpoint:string;
+      (**
+{%html:
+<p>search_endpoint: gRPC endpoint for SearchService
+Provides: Full-text search over indexed documents (routed through core to provider plugin)</p>
+%}
+      *)
+
     }
-    val make: ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> unit -> t
+    val make: ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> ?llm_endpoint:string -> ?embedding_endpoint:string -> ?vector_search_endpoint:string -> ?ground_endpoint:string -> ?search_endpoint:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -1387,7 +1587,7 @@ Provides: Read stored files (for multimodal attachments)</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> unit -> t
+    type make_t = ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> ?llm_endpoint:string -> ?embedding_endpoint:string -> ?vector_search_endpoint:string -> ?ground_endpoint:string -> ?search_endpoint:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -1403,9 +1603,14 @@ Provides: Read stored files (for multimodal attachments)</p>
       config:(string * string) list;
       schedule_endpoint:string;
       file_service_endpoint:string;
+      llm_endpoint:string;
+      embedding_endpoint:string;
+      vector_search_endpoint:string;
+      ground_endpoint:string;
+      search_endpoint:string;
     }
-    type make_t = ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> unit -> t
-    let make ?(ats_store_endpoint = {||}) ?(queue_endpoint = {||}) ?(auth_token = {||}) ?(config = []) ?(schedule_endpoint = {||}) ?(file_service_endpoint = {||}) () = { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint }
+    type make_t = ?ats_store_endpoint:string -> ?queue_endpoint:string -> ?auth_token:string -> ?config:(string * string) list -> ?schedule_endpoint:string -> ?file_service_endpoint:string -> ?llm_endpoint:string -> ?embedding_endpoint:string -> ?vector_search_endpoint:string -> ?ground_endpoint:string -> ?search_endpoint:string -> unit -> t
+    let make ?(ats_store_endpoint = {||}) ?(queue_endpoint = {||}) ?(auth_token = {||}) ?(config = []) ?(schedule_endpoint = {||}) ?(file_service_endpoint = {||}) ?(llm_endpoint = {||}) ?(embedding_endpoint = {||}) ?(vector_search_endpoint = {||}) ?(ground_endpoint = {||}) ?(search_endpoint = {||}) () = { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint; llm_endpoint; embedding_endpoint; vector_search_endpoint; ground_endpoint; search_endpoint }
     let merge =
     let merge_ats_store_endpoint = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "ats_store_endpoint", "atsStoreEndpoint"), string, ({||})) ) in
     let merge_queue_endpoint = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "queue_endpoint", "queueEndpoint"), string, ({||})) ) in
@@ -1413,6 +1618,11 @@ Provides: Read stored files (for multimodal attachments)</p>
     let merge_config = Runtime'.Merge.merge Runtime'.Spec.( map ((4, "config", "config"), (string, basic ((2, "value", "value"), string, ({||})))) ) in
     let merge_schedule_endpoint = Runtime'.Merge.merge Runtime'.Spec.( basic ((5, "schedule_endpoint", "scheduleEndpoint"), string, ({||})) ) in
     let merge_file_service_endpoint = Runtime'.Merge.merge Runtime'.Spec.( basic ((6, "file_service_endpoint", "fileServiceEndpoint"), string, ({||})) ) in
+    let merge_llm_endpoint = Runtime'.Merge.merge Runtime'.Spec.( basic ((7, "llm_endpoint", "llmEndpoint"), string, ({||})) ) in
+    let merge_embedding_endpoint = Runtime'.Merge.merge Runtime'.Spec.( basic ((8, "embedding_endpoint", "embeddingEndpoint"), string, ({||})) ) in
+    let merge_vector_search_endpoint = Runtime'.Merge.merge Runtime'.Spec.( basic ((9, "vector_search_endpoint", "vectorSearchEndpoint"), string, ({||})) ) in
+    let merge_ground_endpoint = Runtime'.Merge.merge Runtime'.Spec.( basic ((10, "ground_endpoint", "groundEndpoint"), string, ({||})) ) in
+    let merge_search_endpoint = Runtime'.Merge.merge Runtime'.Spec.( basic ((11, "search_endpoint", "searchEndpoint"), string, ({||})) ) in
     fun t1 t2 -> {
     	ats_store_endpoint = (merge_ats_store_endpoint t1.ats_store_endpoint t2.ats_store_endpoint);
     	queue_endpoint = (merge_queue_endpoint t1.queue_endpoint t2.queue_endpoint);
@@ -1420,22 +1630,27 @@ Provides: Read stored files (for multimodal attachments)</p>
     	config = (merge_config t1.config t2.config);
     	schedule_endpoint = (merge_schedule_endpoint t1.schedule_endpoint t2.schedule_endpoint);
     	file_service_endpoint = (merge_file_service_endpoint t1.file_service_endpoint t2.file_service_endpoint);
+    	llm_endpoint = (merge_llm_endpoint t1.llm_endpoint t2.llm_endpoint);
+    	embedding_endpoint = (merge_embedding_endpoint t1.embedding_endpoint t2.embedding_endpoint);
+    	vector_search_endpoint = (merge_vector_search_endpoint t1.vector_search_endpoint t2.vector_search_endpoint);
+    	ground_endpoint = (merge_ground_endpoint t1.ground_endpoint t2.ground_endpoint);
+    	search_endpoint = (merge_search_endpoint t1.search_endpoint t2.search_endpoint);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "ats_store_endpoint", "atsStoreEndpoint"), string, ({||})) ^:: basic ((2, "queue_endpoint", "queueEndpoint"), string, ({||})) ^:: basic ((3, "auth_token", "authToken"), string, ({||})) ^:: map ((4, "config", "config"), (string, basic ((2, "value", "value"), string, ({||})))) ^:: basic ((5, "schedule_endpoint", "scheduleEndpoint"), string, ({||})) ^:: basic ((6, "file_service_endpoint", "fileServiceEndpoint"), string, ({||})) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "ats_store_endpoint", "atsStoreEndpoint"), string, ({||})) ^:: basic ((2, "queue_endpoint", "queueEndpoint"), string, ({||})) ^:: basic ((3, "auth_token", "authToken"), string, ({||})) ^:: map ((4, "config", "config"), (string, basic ((2, "value", "value"), string, ({||})))) ^:: basic ((5, "schedule_endpoint", "scheduleEndpoint"), string, ({||})) ^:: basic ((6, "file_service_endpoint", "fileServiceEndpoint"), string, ({||})) ^:: basic ((7, "llm_endpoint", "llmEndpoint"), string, ({||})) ^:: basic ((8, "embedding_endpoint", "embeddingEndpoint"), string, ({||})) ^:: basic ((9, "vector_search_endpoint", "vectorSearchEndpoint"), string, ({||})) ^:: basic ((10, "ground_endpoint", "groundEndpoint"), string, ({||})) ^:: basic ((11, "search_endpoint", "searchEndpoint"), string, ({||})) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint } -> serialize writer ats_store_endpoint queue_endpoint auth_token config schedule_endpoint file_service_endpoint
+      fun writer { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint; llm_endpoint; embedding_endpoint; vector_search_endpoint; ground_endpoint; search_endpoint } -> serialize writer ats_store_endpoint queue_endpoint auth_token config schedule_endpoint file_service_endpoint llm_endpoint embedding_endpoint vector_search_endpoint ground_endpoint search_endpoint
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor ats_store_endpoint queue_endpoint auth_token config schedule_endpoint file_service_endpoint = { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint } in
+      let constructor ats_store_endpoint queue_endpoint auth_token config schedule_endpoint file_service_endpoint llm_endpoint embedding_endpoint vector_search_endpoint ground_endpoint search_endpoint = { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint; llm_endpoint; embedding_endpoint; vector_search_endpoint; ground_endpoint; search_endpoint } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint } -> serialize ats_store_endpoint queue_endpoint auth_token config schedule_endpoint file_service_endpoint
+      fun { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint; llm_endpoint; embedding_endpoint; vector_search_endpoint; ground_endpoint; search_endpoint } -> serialize ats_store_endpoint queue_endpoint auth_token config schedule_endpoint file_service_endpoint llm_endpoint embedding_endpoint vector_search_endpoint ground_endpoint search_endpoint
     let from_json_exn =
-      let constructor ats_store_endpoint queue_endpoint auth_token config schedule_endpoint file_service_endpoint = { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint } in
+      let constructor ats_store_endpoint queue_endpoint auth_token config schedule_endpoint file_service_endpoint llm_endpoint embedding_endpoint vector_search_endpoint ground_endpoint search_endpoint = { ats_store_endpoint; queue_endpoint; auth_token; config; schedule_endpoint; file_service_endpoint; llm_endpoint; embedding_endpoint; vector_search_endpoint; ground_endpoint; search_endpoint } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
@@ -2264,8 +2479,41 @@ QNTX will auto-create schedule.Job entries for these</p>
 %}
       *)
 
+      llm_provider:bool;
+      (**
+{%html:
+<p>llm_provider indicates this plugin implements LLMProvider (Chat RPC).
+Core registers it as an LLM backend in the service mesh.</p>
+%}
+      *)
+
+      watchers:WatcherRegistration.t list;
+      (**
+{%html:
+<p>Watchers this plugin wants registered on its behalf.
+Core creates watchers with action_type=plugin_execute targeting this plugin.
+On match, core calls ExecuteJob with the matching attestation as payload.</p>
+%}
+      *)
+
+      vector_search_provider:bool;
+      (**
+{%html:
+<p>vector_search_provider indicates this plugin implements VectorSearchService (ADR-016).
+Core registers it as a vector search backend in the service mesh.</p>
+%}
+      *)
+
+      search_provider:bool;
+      (**
+{%html:
+<p>search_provider indicates this plugin implements SearchProvider (Search RPCs).
+Core registers it as the search backend in the service mesh.</p>
+%}
+      *)
+
     }
-    val make: ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> unit -> t
+    val make: ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -2284,7 +2532,7 @@ QNTX will auto-create schedule.Job entries for these</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> unit -> t
+    type make_t = ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -2296,31 +2544,170 @@ QNTX will auto-create schedule.Job entries for these</p>
     type t = {
       handler_names:string list;
       schedules:ScheduleInfo.t list;
+      llm_provider:bool;
+      watchers:WatcherRegistration.t list;
+      vector_search_provider:bool;
+      search_provider:bool;
     }
-    type make_t = ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> unit -> t
-    let make ?(handler_names = []) ?(schedules = []) () = { handler_names; schedules }
+    type make_t = ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> unit -> t
+    let make ?(handler_names = []) ?(schedules = []) ?(llm_provider = false) ?(watchers = []) ?(vector_search_provider = false) ?(search_provider = false) () = { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider }
     let merge =
     let merge_handler_names = Runtime'.Merge.merge Runtime'.Spec.( repeated ((1, "handler_names", "handlerNames"), string, not_packed) ) in
     let merge_schedules = Runtime'.Merge.merge Runtime'.Spec.( repeated ((2, "schedules", "schedules"), (message (module ScheduleInfo)), not_packed) ) in
+    let merge_llm_provider = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "llm_provider", "llmProvider"), bool, (false)) ) in
+    let merge_watchers = Runtime'.Merge.merge Runtime'.Spec.( repeated ((4, "watchers", "watchers"), (message (module WatcherRegistration)), not_packed) ) in
+    let merge_vector_search_provider = Runtime'.Merge.merge Runtime'.Spec.( basic ((5, "vector_search_provider", "vectorSearchProvider"), bool, (false)) ) in
+    let merge_search_provider = Runtime'.Merge.merge Runtime'.Spec.( basic ((6, "search_provider", "searchProvider"), bool, (false)) ) in
     fun t1 t2 -> {
     	handler_names = (merge_handler_names t1.handler_names t2.handler_names);
     	schedules = (merge_schedules t1.schedules t2.schedules);
+    	llm_provider = (merge_llm_provider t1.llm_provider t2.llm_provider);
+    	watchers = (merge_watchers t1.watchers t2.watchers);
+    	vector_search_provider = (merge_vector_search_provider t1.vector_search_provider t2.vector_search_provider);
+    	search_provider = (merge_search_provider t1.search_provider t2.search_provider);
      }
-    let spec () = Runtime'.Spec.( repeated ((1, "handler_names", "handlerNames"), string, not_packed) ^:: repeated ((2, "schedules", "schedules"), (message (module ScheduleInfo)), not_packed) ^:: nil )
+    let spec () = Runtime'.Spec.( repeated ((1, "handler_names", "handlerNames"), string, not_packed) ^:: repeated ((2, "schedules", "schedules"), (message (module ScheduleInfo)), not_packed) ^:: basic ((3, "llm_provider", "llmProvider"), bool, (false)) ^:: repeated ((4, "watchers", "watchers"), (message (module WatcherRegistration)), not_packed) ^:: basic ((5, "vector_search_provider", "vectorSearchProvider"), bool, (false)) ^:: basic ((6, "search_provider", "searchProvider"), bool, (false)) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { handler_names; schedules } -> serialize writer handler_names schedules
+      fun writer { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider } -> serialize writer handler_names schedules llm_provider watchers vector_search_provider search_provider
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor handler_names schedules = { handler_names; schedules } in
+      let constructor handler_names schedules llm_provider watchers vector_search_provider search_provider = { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { handler_names; schedules } -> serialize handler_names schedules
+      fun { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider } -> serialize handler_names schedules llm_provider watchers vector_search_provider search_provider
     let from_json_exn =
-      let constructor handler_names schedules = { handler_names; schedules } in
+      let constructor handler_names schedules llm_provider watchers vector_search_provider search_provider = { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and WatcherRegistration : sig
+    type t = {
+      id:string;
+      (**
+{%html:
+<p>Watcher ID (scoped to plugin: &quot;{plugin}-{id}&quot;)</p>
+%}
+      *)
+
+      handler_name:string;
+      (**
+{%html:
+<p>ExecuteJob handler to invoke on match</p>
+%}
+      *)
+
+      subjects:string list;
+      (**
+{%html:
+<p>Structural filter: subjects</p>
+%}
+      *)
+
+      predicates:string list;
+      (**
+{%html:
+<p>Structural filter: predicates</p>
+%}
+      *)
+
+      contexts:string list;
+      (**
+{%html:
+<p>Structural filter: contexts</p>
+%}
+      *)
+
+      actors:string list;
+      (**
+{%html:
+<p>Structural filter: actors</p>
+%}
+      *)
+
+      max_fires_per_second:int;
+      (**
+{%html:
+<p>Rate limit (0 = no action, structural only)</p>
+%}
+      *)
+
+    }
+    val make: ?id:string -> ?handler_name:string -> ?subjects:string list -> ?predicates:string list -> ?contexts:string list -> ?actors:string list -> ?max_fires_per_second:int -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?id:string -> ?handler_name:string -> ?subjects:string list -> ?predicates:string list -> ?contexts:string list -> ?actors:string list -> ?max_fires_per_second:int -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = WatcherRegistration
+    let name () = ".protocol.WatcherRegistration"
+    type t = {
+      id:string;
+      handler_name:string;
+      subjects:string list;
+      predicates:string list;
+      contexts:string list;
+      actors:string list;
+      max_fires_per_second:int;
+    }
+    type make_t = ?id:string -> ?handler_name:string -> ?subjects:string list -> ?predicates:string list -> ?contexts:string list -> ?actors:string list -> ?max_fires_per_second:int -> unit -> t
+    let make ?(id = {||}) ?(handler_name = {||}) ?(subjects = []) ?(predicates = []) ?(contexts = []) ?(actors = []) ?(max_fires_per_second = 0) () = { id; handler_name; subjects; predicates; contexts; actors; max_fires_per_second }
+    let merge =
+    let merge_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ) in
+    let merge_handler_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "handler_name", "handlerName"), string, ({||})) ) in
+    let merge_subjects = Runtime'.Merge.merge Runtime'.Spec.( repeated ((3, "subjects", "subjects"), string, not_packed) ) in
+    let merge_predicates = Runtime'.Merge.merge Runtime'.Spec.( repeated ((4, "predicates", "predicates"), string, not_packed) ) in
+    let merge_contexts = Runtime'.Merge.merge Runtime'.Spec.( repeated ((5, "contexts", "contexts"), string, not_packed) ) in
+    let merge_actors = Runtime'.Merge.merge Runtime'.Spec.( repeated ((6, "actors", "actors"), string, not_packed) ) in
+    let merge_max_fires_per_second = Runtime'.Merge.merge Runtime'.Spec.( basic ((7, "max_fires_per_second", "maxFiresPerSecond"), int32_int, (0)) ) in
+    fun t1 t2 -> {
+    	id = (merge_id t1.id t2.id);
+    	handler_name = (merge_handler_name t1.handler_name t2.handler_name);
+    	subjects = (merge_subjects t1.subjects t2.subjects);
+    	predicates = (merge_predicates t1.predicates t2.predicates);
+    	contexts = (merge_contexts t1.contexts t2.contexts);
+    	actors = (merge_actors t1.actors t2.actors);
+    	max_fires_per_second = (merge_max_fires_per_second t1.max_fires_per_second t2.max_fires_per_second);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ^:: basic ((2, "handler_name", "handlerName"), string, ({||})) ^:: repeated ((3, "subjects", "subjects"), string, not_packed) ^:: repeated ((4, "predicates", "predicates"), string, not_packed) ^:: repeated ((5, "contexts", "contexts"), string, not_packed) ^:: repeated ((6, "actors", "actors"), string, not_packed) ^:: basic ((7, "max_fires_per_second", "maxFiresPerSecond"), int32_int, (0)) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { id; handler_name; subjects; predicates; contexts; actors; max_fires_per_second } -> serialize writer id handler_name subjects predicates contexts actors max_fires_per_second
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor id handler_name subjects predicates contexts actors max_fires_per_second = { id; handler_name; subjects; predicates; contexts; actors; max_fires_per_second } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { id; handler_name; subjects; predicates; contexts; actors; max_fires_per_second } -> serialize id handler_name subjects predicates contexts actors max_fires_per_second
+    let from_json_exn =
+      let constructor id handler_name subjects predicates contexts actors max_fires_per_second = { id; handler_name; subjects; predicates; contexts; actors; max_fires_per_second } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end

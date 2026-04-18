@@ -168,7 +168,7 @@ func (s *QNTXServer) startJobUpdateBroadcaster() {
 		}
 	}()
 
-	s.logger.Infow("Job update broadcaster started")
+	s.logger.Debugw("Job update broadcaster started")
 }
 
 // handlePulseExecutionUpdate updates pulse_execution records and broadcasts Pulse-specific events
@@ -333,7 +333,7 @@ func (s *QNTXServer) startDaemonStatusBroadcaster() {
 		}
 	}()
 
-	s.logger.Infow("Adaptive daemon status broadcaster started")
+	s.logger.Debugw("Adaptive daemon status broadcaster started")
 }
 
 // broadcastJobUpdate sends a job update to all connected clients
@@ -572,12 +572,12 @@ func (s *QNTXServer) startDaemon() error {
 	s.daemon.Start()
 	if s.ticker != nil {
 		s.ticker.Start()
-		logger.AddPulseSymbol(s.logger).Infow("Pulse ticker started")
+		logger.AddPulseSymbol(s.logger).Debugw("Pulse ticker started")
 	}
 	if err := s.setDaemonState(true); err != nil {
 		s.logger.Warnw("Failed to persist daemon state", "error", err)
 	}
-	s.logger.Infow("Daemon started", "workers", s.daemon.Workers())
+	s.logger.Debugw("Daemon started", "workers", s.daemon.Workers())
 	s.broadcastDaemonStatus()
 	return nil
 }
@@ -704,7 +704,7 @@ func (s *QNTXServer) BroadcastPluginHealth(name string, healthy bool, state, mes
 	}
 
 	s.broadcastMessage(msg)
-	s.logger.Infow("Broadcasted plugin health update",
+	s.logger.Debugw("Broadcasted plugin health update",
 		"plugin", name,
 		"healthy", healthy,
 		"state", state,

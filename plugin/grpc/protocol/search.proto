@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// SearchService provides full-text search over indexed documents.
+// Provider plugin (qntx-meili) registers as the backend.
+// Core routes calls to the provider.
+service SearchService {
+  rpc Search(SearchRequest) returns (SearchResponse);
+  rpc IndexDocuments(IndexDocumentsRequest) returns (IndexDocumentsResponse);
+  rpc DeleteDocuments(DeleteDocumentsRequest) returns (DeleteDocumentsResponse);
+}
+
+message SearchRequest {
+  string query = 1;
+  string index = 2;
+  int32 top_k = 3;
+  bytes filters = 4;          // filter expression as JSON — interpreted by the provider
+}
+
+message SearchResponse {
+  repeated SearchHit hits = 1;
+  int32 total = 2;
+  int32 processing_ms = 3;
+}
+
+message SearchHit {
+  string id = 1;
+  float score = 2;
+  bytes document = 3;         // indexed content as JSON
+}
+
+message IndexDocumentsRequest {
+  string index = 1;
+  repeated bytes documents = 2; // documents as JSON
+}
+
+message IndexDocumentsResponse {
+  int32 accepted = 1;
+}
+
+message DeleteDocumentsRequest {
+  string index = 1;
+  repeated string ids = 2;
+}
+
+message DeleteDocumentsResponse {
+  int32 deleted = 1;
+}

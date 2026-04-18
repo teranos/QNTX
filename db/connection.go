@@ -26,7 +26,7 @@ import (
 
 func init() {
 	// Initialize sqlite-vec extension for vector similarity search.
-	// Still needed for test helpers and graunde_bridge.go (separate DB files).
+	// Still needed for test helpers and ground_bridge.go (separate DB files).
 	sqlite_vec.Auto()
 }
 

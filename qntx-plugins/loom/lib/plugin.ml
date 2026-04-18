@@ -46,7 +46,7 @@ let handle_execute_job raw =
                ~word_count:(Stitcher.word_count block)
                ~turn_count:result.turn_count
                ~paths:result.paths
-               ~weave_source:"graunde"
+               ~weave_source:"ground"
                ()
              in
              (match ats_result with
@@ -96,7 +96,7 @@ let flush_and_persist () =
         ~word_count:(Stitcher.word_count block)
         ~turn_count:result.turn_count
         ~paths:result.paths
-        ~weave_source:"graunde"
+        ~weave_source:"ground"
         ()
       in
       (match ats_result with

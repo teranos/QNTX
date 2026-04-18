@@ -163,28 +163,8 @@ grpc::Status ScryLLMService::Chat(grpc::ServerContext* ctx,
                 last_sig.full_distribution.data(), last_sig.full_distribution.size());
         }
 
-        // Write weave attestation to ATS (token signals packed in attributes)
-        auto& ats = plugin_->ats_client();
-        if (ats.is_configured()) {
-            std::string context_id = "chat:" + std::to_string(
-                std::chrono::system_clock::now().time_since_epoch().count());
-
-            // Extract last user message for weave attestation
-            std::string prompt_text;
-            for (auto it = messages.rbegin(); it != messages.rend(); ++it) {
-                if (it->role == "user") { prompt_text = it->content; break; }
-            }
-            GenerationPerf perf;
-            perf.prompt_eval_ms = result.prompt_eval_ms;
-            perf.generation_ms = result.generation_ms;
-            perf.decode_ms = result.decode_ms;
-            perf.signal_ms = result.signal_ms;
-            perf.callback_ms = result.callback_ms;
-            perf.completion_tokens = result.completion_tokens;
-            ats.create_weave(engine.model_name(), prompt_text,
-                             result.content, context_id, n,
-                             conf_sum / n, ent_sum / n, result.signals, perf);
-        }
+        // Weave attestation creation moved to core LLMServer routing layer (CWEV).
+        // All providers get observability for free — scry no longer writes weaves directly.
     }
 
     return grpc::Status::OK;
@@ -372,34 +352,8 @@ grpc::Status ScryLLMService::StreamChat(grpc::ServerContext* ctx,
     writer->Write(final_chunk);
     plugin_->set_activity("");
 
-    // Write weave attestation to ATS after stream completes (token signals packed in attributes)
-    auto& ats = plugin_->ats_client();
-    if (ats.is_configured() && !result.signals.empty()) {
-        int n = result.signals.size();
-        float ent_sum = 0, conf_sum = 0;
-        for (const auto& sig : result.signals) {
-            ent_sum += sig.entropy;
-            conf_sum += sig.confidence;
-        }
-
-        std::string context_id = "stream:" + std::to_string(
-            std::chrono::system_clock::now().time_since_epoch().count());
-
-        std::string prompt_text;
-        for (auto it = messages.rbegin(); it != messages.rend(); ++it) {
-            if (it->role == "user") { prompt_text = it->content; break; }
-        }
-        GenerationPerf perf;
-        perf.prompt_eval_ms = result.prompt_eval_ms;
-        perf.generation_ms = result.generation_ms;
-        perf.decode_ms = result.decode_ms;
-        perf.signal_ms = result.signal_ms;
-        perf.callback_ms = result.callback_ms;
-        perf.completion_tokens = result.completion_tokens;
-        ats.create_weave(engine.model_name(), prompt_text,
-                         result.content, context_id, n,
-                         conf_sum / n, ent_sum / n, result.signals, perf);
-    }
+    // Weave attestation creation moved to core LLMServer routing layer (CWEV).
+    // All providers get observability for free — scry no longer writes weaves directly.
 
     return grpc::Status::OK;
 }
