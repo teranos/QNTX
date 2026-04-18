@@ -14,8 +14,8 @@
  */
 
 // Configuration / dependency injection
-export { configureGlyphs, stripHtml, getLogger, getLogSegment, getPersistence, getCanvasHost } from './config';
-export type { GlyphConfig, GlyphLogger, GlyphPersistence, CanvasGlyphData, CanvasHost } from './config';
+export { configureGlyphs, stripHtml, getLogger, getLogSegment, getPersistence, getCanvasHost, getCanvasBridge, removeCanvasGlyph } from './config';
+export type { GlyphConfig, GlyphLogger, GlyphPersistence, CanvasGlyphData, CanvasHost, CanvasCoordinateBridge } from './config';
 
 // Glyph primitive — interface + constants
 export {
@@ -89,6 +89,18 @@ export { stashContent, restoreContent, hasStash } from './manifestations/stash';
 
 export { renderGlyphContent } from './manifestations/render-content';
 export type { RenderContentResult } from './manifestations/render-content';
+
+// Canvas-window manifestation — canvas ↔ window morphing
+export {
+    morphCanvasPlacedToWindow,
+    morphWindowToCanvasPlaced,
+    placeWindowOnCanvas,
+} from './manifestations/canvas-window';
+export type { CanvasWindowConfig } from './manifestations/canvas-window';
+
+// Expand-to-window — unified lifecycle wiring
+export { wireExpandToWindow } from './expand-to-window';
+export type { ExpandToWindowConfig } from './expand-to-window';
 
 // Window drag — standalone, no canvas dependency
 export { setupWindowDrag, teardownWindowDrag } from './window-drag';

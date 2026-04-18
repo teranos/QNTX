@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package protocol;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// GroundService provides access to Ground's deferred news database.
+// Plugins call this to surface attestations in Claude Code sessions via Ground.
+service GroundService {
+  // WriteToGround inserts an attestation into Ground's SQLite database.
+  // Ground delivers these as deferred news on session Stop.
+  rpc WriteToGround(WriteToGroundRequest) returns (WriteToGroundResponse);
+
+  // ReadUndelivered returns the detail text from the most recent undelivered
+  // deferred message for a given predicate name and project context.
+  // Used by plugins to accumulate news across writes.
+  rpc ReadUndelivered(ReadUndeliveredRequest) returns (ReadUndeliveredResponse);
+}
+
+message WriteToGroundRequest {
+  string auth_token = 1;
+  repeated string subjects = 2;
+  repeated string predicates = 3;
+  repeated string contexts = 4;
+  repeated string actors = 5;
+  google.protobuf.Struct attributes = 6;
+  string source = 7;
+}
+
+message WriteToGroundResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message ReadUndeliveredRequest {
+  string auth_token = 1;
+  string predicate_name = 2;  // e.g. "telegram-message" → looks for deferred:telegram-message
+  string project_context = 3; // e.g. "project:SBVH"
+}
+
+message ReadUndeliveredResponse {
+  string detail = 1;  // accumulated detail text, empty if nothing pending or already delivered
+  string error = 2;
+}

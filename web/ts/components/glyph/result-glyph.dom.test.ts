@@ -4,8 +4,8 @@
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { createResponseGlyph, type ExecutionResult } from './response-glyph';
-import type { Glyph } from './glyph';
+import { createResultGlyph, type ExecutionResult } from './result-glyph';
+import type { Glyph } from '@qntx/glyphs';
 import { performMeld } from './meld/meld-composition';
 import { uiState } from '../../state/ui';
 
@@ -45,18 +45,18 @@ describe('ResultGlyph', () => {
 
     describe('rendering', () => {
         test('creates element with result and base glyph classes', () => {
-            const element = createResponseGlyph(glyph, result);
+            const element = createResultGlyph(glyph, result);
             expect(element.classList.contains('canvas-result-glyph')).toBe(true);
             expect(element.classList.contains('canvas-glyph')).toBe(true);
         });
 
         test('sets data-glyph-id attribute', () => {
-            const element = createResponseGlyph(glyph, result);
+            const element = createResultGlyph(glyph, result);
             expect(element.dataset.glyphId).toBe('result-test-123');
         });
 
         test('has header with copy button', () => {
-            const element = createResponseGlyph(glyph, result);
+            const element = createResultGlyph(glyph, result);
             const header = element.querySelector('.result-glyph-header');
             expect(header).not.toBeNull();
             const copyBtn = element.querySelector('button[title="Copy to clipboard"]');
@@ -64,13 +64,13 @@ describe('ResultGlyph', () => {
         });
 
         test('has close button', () => {
-            const element = createResponseGlyph(glyph, result);
+            const element = createResultGlyph(glyph, result);
             const closeBtn = element.querySelector('button[title="Close"]');
             expect(closeBtn).not.toBeNull();
         });
 
         test('has to-window button', () => {
-            const element = createResponseGlyph(glyph, result);
+            const element = createResultGlyph(glyph, result);
             const toWindowBtn = element.querySelector('button[title="Expand to window"]');
             expect(toWindowBtn).not.toBeNull();
         });
@@ -78,7 +78,7 @@ describe('ResultGlyph', () => {
 
     describe('output rendering', () => {
         test('displays stdout text', () => {
-            const element = createResponseGlyph(glyph, result);
+            const element = createResultGlyph(glyph, result);
             const outputContainer = element.querySelector('.result-glyph-output');
             expect(outputContainer).not.toBeNull();
             expect(outputContainer?.textContent).toContain('Hello from Python');
@@ -86,14 +86,14 @@ describe('ResultGlyph', () => {
 
         test('displays stderr text', () => {
             result.stderr = 'Warning: something happened';
-            const element = createResponseGlyph(glyph, result);
+            const element = createResultGlyph(glyph, result);
             const outputContainer = element.querySelector('.result-glyph-output');
             expect(outputContainer?.textContent).toContain('Warning: something happened');
         });
 
         test('displays error message', () => {
             result.error = 'RuntimeError: test error';
-            const element = createResponseGlyph(glyph, result);
+            const element = createResultGlyph(glyph, result);
             const outputContainer = element.querySelector('.result-glyph-output');
             expect(outputContainer?.textContent).toContain('Error: RuntimeError');
         });
@@ -102,7 +102,7 @@ describe('ResultGlyph', () => {
             result.stdout = '';
             result.stderr = '';
             result.error = null;
-            const element = createResponseGlyph(glyph, result);
+            const element = createResultGlyph(glyph, result);
             const outputContainer = element.querySelector('.result-glyph-output');
             expect(outputContainer?.textContent).toBe('(no output)');
         });
@@ -113,7 +113,7 @@ describe('ResultGlyph', () => {
             const container = document.createElement('div');
             document.body.appendChild(container);
 
-            const element = createResponseGlyph(glyph, result);
+            const element = createResultGlyph(glyph, result);
             container.appendChild(element);
 
             const closeBtn = element.querySelector('button[title="Close"]') as HTMLElement;
@@ -145,7 +145,7 @@ describe('ResultGlyph', () => {
             };
 
             // Create result glyph
-            const resultElement = createResponseGlyph(glyph, result);
+            const resultElement = createResultGlyph(glyph, result);
             canvas.appendChild(resultElement);
 
             // Meld them together (py on top, result below)

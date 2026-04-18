@@ -59,7 +59,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 			wildcardPattern := "/api/" + name + "/{path...}"
 			http.HandleFunc(wildcardPattern, pluginHandler)
 
-			s.logger.Infow("Registered HTTP routes", "plugin", name,
+			s.logger.Debugw("Registered HTTP routes", "plugin", name,
 				"exact", exactPattern,
 				"wildcard", wildcardPattern)
 		}
@@ -73,7 +73,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 		for _, name := range s.pluginRegistry.ListEnabled() {
 			pattern := "/ws/" + name
 			http.HandleFunc(pattern, wsHandler)
-			s.logger.Infow("Registered WebSocket route", "plugin", name, "path", pattern)
+			s.logger.Debugw("Registered WebSocket route", "plugin", name, "path", pattern)
 		}
 	}
 

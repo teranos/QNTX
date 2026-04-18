@@ -78,9 +78,10 @@ web/css/ctp2.css
 **/*ctp2*_test.go
 test_fuzzy
 qntx-plugins/kern/_build/
-qntx-plugins/llama-cpp/build/
-qntx-plugins/llama-cpp/.cache/
-qntx-plugins/llama-cpp/vendor/
-qntx-plugins/llama-cpp/compile_commands.json
-qntx-plugins/qntx-llama-cpp-plugin
+qntx-plugins/scry/build/
+qntx-plugins/scry/.cache/
+qntx-plugins/scry/vendor/
+qntx-plugins/scry/compile_commands.json
+qntx-plugins/qntx-scry-plugin
 plugin/grpc/ocaml/_build/
+ctp/Voor/_build/

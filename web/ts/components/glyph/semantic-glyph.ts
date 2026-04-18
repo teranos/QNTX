@@ -8,7 +8,7 @@
  * No local WASM query — semantic matching requires server-side embeddings.
  */
 
-import type { Glyph } from './glyph';
+import type { Glyph } from '@qntx/glyphs';
 import { SE } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { preventDrag, storeCleanup, cleanupResizeObserver } from './glyph-interaction';
@@ -24,7 +24,7 @@ import { connectivityManager } from '../../connectivity';
 import {
     CANVAS_GLYPH_TITLE_BAR_HEIGHT,
     MAX_VIEWPORT_HEIGHT_RATIO
-} from './glyph';
+} from '@qntx/glyphs';
 import {
     createColorStateSetter,
     appendEmptyState,

@@ -19,9 +19,11 @@
 
 ## Development Workflow
 
-The developer always uses `make dev` to start the development environment with hot-reloading for both backend (port 877) and frontend (port 8820). `make dev` builds the Go backend and runs the hot-reloading TypeScript frontend dev server.
+Hot-reloading TypeScript frontend dev server. Restart `make dev` to pick up QNTX backend changes. Ports are configured in `am.toml`.
 
-**KNOW** the developer is always running the latest version of QNTX. It is **FORBIDDEN** to discuss or question whether the developer has run the latest version. If there is an issue, it is in the code, not with running the latest binary (`make dev` solves this) or configuration (QNTX works without configuration).
+**KNOW** the developer is always running the latest version of QNTX. It is **FORBIDDEN** to discuss or question whether the developer has run the latest version. If there is an issue, it is in the code, not with running the latest binary or configuration.
+
+**Log files append across restarts.** The current run is at the bottom, not the top. Always read the tail first.
 
 ## Testing
 

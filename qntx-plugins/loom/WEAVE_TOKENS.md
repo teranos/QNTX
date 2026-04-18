@@ -1,13 +1,13 @@
-# Weave Token Structure (llama-cpp)
+# Weave Token Structure (scry)
 
-Weaves from `llama-cpp` embed per-token signal data in `attributes.tokens`.
-Standard loom weaves (from graunde) do not have this field.
+Weaves from `scry` embed per-token signal data in `attributes.tokens`.
+Standard loom weaves (from ground) do not have this field.
 
-## Identifying llama-cpp weaves
+## Identifying scry weaves
 
 - `predicate: ["Weave"]` (same as all weaves)
-- `attributes.weave_source: "llama-cpp"`
-- `actors: ["llama-cpp"]`
+- `attributes.weave_source: "scry"`
+- `actors: ["scry"]`
 
 ## Top-level attributes
 
@@ -19,7 +19,7 @@ Standard loom weaves (from graunde) do not have this field.
 | `token_count`      | number | Total tokens generated             |
 | `mean_confidence`  | number | Mean P(chosen) across all tokens   |
 | `mean_entropy`     | number | Mean Shannon entropy (bits)        |
-| `weave_source`     | string | Always `"llama-cpp"`               |
+| `weave_source`     | string | Always `"scry"`               |
 | `tokens`           | list   | Per-token signal array (see below) |
 
 ## Token signal structure
@@ -44,7 +44,7 @@ Each entry in `attributes.tokens`:
 
 ## Context linking
 
-All llama-cpp weaves use a context like `stream:<epoch_ns>` or `chat:<epoch_ns>`.
+All scry weaves use a context like `stream:<epoch_ns>` or `chat:<epoch_ns>`.
 One weave per generation — no separate Token attestations.
 
 ## Bounded storage
@@ -54,7 +54,7 @@ Token data lives inside the weave's attributes, not as separate attestations.
 
 ## Performance attestation
 
-llama-cpp weaves (v0.23.0+) include `attributes.performance`:
+scry weaves (v0.23.0+) include `attributes.performance`:
 
 | Field             | Type   | Description                           |
 |-------------------|--------|---------------------------------------|
@@ -69,7 +69,7 @@ Loom renders this as `{tok/s} ({generation_ms}ms)` next to the model name. Hover
 
 ## Limitations
 
-- **MWP** — Model warp placement. llama-cpp weaves use `model:X` as their attestation subject (e.g. `model:Llama 3.2 3B Instruct`). Loom treats subjects as project/column keys, so these weaves get lumped under a column called `model` — mixed in with graunde conversation weaves. Local model generations should get their own warp, grouped per model.
+- **MWP** — Model warp placement. scry weaves use `model:X` as their attestation subject (e.g. `model:Llama 3.2 3B Instruct`). Loom treats subjects as project/column keys, so these weaves get lumped under a column called `model` — mixed in with ground conversation weaves. Local model generations should get their own warp, grouped per model.
 
 - **TBR** — Token branch exploration. Token weaves bypass turn-level selection, so click-to-select and CMD+C copy don't work. Will tie into loom branch exploration — clicking a low-confidence token to explore the alternative path the model didn't take.
 
@@ -77,6 +77,6 @@ Loom renders this as `{tok/s} ({generation_ms}ms)` next to the model name. Hover
 
 - **TCS** — Token color scale. Hardcoded brown/amber confidence scale. Will change when sampler chain data is available — different samplers (top-k, top-p, penalties) produce different signal profiles that need distinct visual treatment.
 
-- **TWC** — Token word count. `word_count` is 0 for llama-cpp weaves. The header metadata is misleading. Should derive word count from the token text or from `attributes.text`.
+- **TWC** — Token word count. `word_count` is 0 for scry weaves. The header metadata is misleading. Should derive word count from the token text or from `attributes.text`.
 
 - **TPA** — Token payload in API. Full token arrays are included in every `/api/weaves` response. No lazy loading or pagination — large generation histories will bloat the response.

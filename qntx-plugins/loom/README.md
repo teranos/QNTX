@@ -1,15 +1,17 @@
 # qntx-loom
 
-Receives conversation events from [Graunde](https://github.com/teranos/graunde) over UDP and stitches them into embedding-sized text blocks (weaves). Serves a timeline explorer frontend for browsing conversation history across projects and sessions.
+TODO: This README needs restructuring. Not everything is relevant, I think a lot of implementation details slipped in. Splitting off LIMITATIONS.md is a good idea for example
 
-**UDP port: 19470** — Graunde sends attestation JSON datagrams here. Fire-and-forget, no response.
+Receives conversation events from [Ground](https://github.com/teranos/ground) over UDP and stitches them into embedding-sized text blocks (weaves). Serves a timeline explorer frontend for browsing conversation history across projects and sessions.
+
+**UDP port: 19470** — Ground sends attestation JSON datagrams here. Fire-and-forget, no response.
 
 ## Architecture
 
 ```
 QNTX Server
   ├── gRPC plugin protocol → loom (OCaml, HTTP/2)
-  │                            ├── UDP listener (port 19470) — receives events from Graunde
+  │                            ├── UDP listener (port 19470) — receives events from Ground
   │                            ├── Stitcher — chunks turns into weaves, writes to ATS
   │                            ├── HTTP API (port 5178)
   │                            │     ├── GET /api/weaves — all weaves grouped by branch
@@ -39,7 +41,7 @@ Every datagram is a JSON attestation:
 }
 ```
 
-Graunde sends these on every hook event via `attestEvent` → `sendToLoom`. Corrective stop hooks additionally send `Hook` predicates via `notifyLoomHook`.
+Ground sends these on every hook event via `attestEvent` → `sendToLoom`. Corrective stop hooks additionally send `Hook` predicates via `notifyLoomHook`.
 
 ## Turn types
 
@@ -65,6 +67,9 @@ Bash `[tool]` turns are filtered by a command whitelist (git, gh, make). All oth
 
 Svelte 5 app with extracted components. No bundler dependencies beyond Bun and svelte.
 
+TODO:
+- RESEARCH usage of Glyphs package in Loom: https://jsr.io/@qntx/glyphs/versions
+
 ### What it does
 
 - Vertical chronology, horizontal projects (grouped by branch prefix before `:`)
@@ -74,7 +79,7 @@ Svelte 5 app with extracted components. No bundler dependencies beyond Bun and s
 - Cluster distribution per project in drawer header
 - Pointer-driven time-synchronized scrolling across columns
 - Minimal markdown rendering for assistant turns (code blocks, bold, inline code)
-- Token-aware rendering for llama-cpp weaves: per-token confidence coloring (brown/amber tint scaling with uncertainty), hover tooltips showing confidence, entropy, top_gap, and top-k candidates with probabilities
+- Token-aware rendering for scry weaves: per-token confidence coloring (brown/amber tint scaling with uncertainty), hover tooltips showing confidence, entropy, top_gap, and top-k candidates with probabilities
 - Click-to-copy weave attestation ID
 - Turn selection with CMD+C copy
 - Session browser with JSONL import from project headers
@@ -120,19 +125,19 @@ Serves JSON over HTTP/2 on port 5178. Read endpoints query ATS for `["Weave"]` a
 - **Hardcoded predicate**: can only query `["Weave"]` attestations.
 - **Data loss on extraction**: `int_of_float` truncates number values. Missing subjects/contexts default to empty string with no error signal.
 
-## Upstream gaps (graunde)
+## Upstream gaps (ground)
 
 Loom as consumer reveals what the upstream producers don't capture yet:
 
 - **Diffs**: code changes during a session are not recorded.
 - **Git events**: commits, merges, branch operations are not weave events.
 - **Images/screenshots**: not part of the weave data model.
-- **Directory identity**: graunde's project tracking (which directory a session belongs to) has had drift issues, now resolved but still fragile.
+- **Directory identity**: ground's project tracking (which directory a session belongs to) has had drift issues, now resolved but still fragile.
 - **Structured turns**: weave text is a flat string with `[speaker]` prefixes. A structured format (array of typed turns) would eliminate parsing fragility.
 
 ## JSONL Import (historical weaving)
 
-Weaves historical conversations — sessions that predate Graunde/Loom, or completing sessions where UDP delivery was partial. Imports the full JSONL file each time (not incremental).
+Weaves historical conversations — sessions that predate Ground/Loom, or completing sessions where UDP delivery was partial. Imports the full JSONL file each time (not incremental).
 
 One JSONL file = one session. Claude Code writes all turns to `~/.claude/projects/{project-slug}/{session-uuid}.jsonl`. The format is Claude Code native (not attestation format): `type: "user"` / `"assistant"` / `"progress"`, with `message`, `gitBranch`, `sessionId`, `cwd`, `timestamp`.
 
@@ -141,7 +146,7 @@ One JSONL file = one session. Claude Code writes all turns to `~/.claude/project
 Each session has one of four states, derivable from ATS + filesystem:
 
 1. **Unweaved** — JSONL on disk, no weaves in ATS for this session
-2. **Partial** — weaves exist (from Graunde UDP), no `WeaveComplete` attestation, potentially incomplete
+2. **Partial** — weaves exist (from Ground UDP), no `WeaveComplete` attestation, potentially incomplete
 3. **Complete** — `WeaveComplete` attestation exists, JSONL was fully imported at that point
 4. **Stale** — `WeaveComplete` exists but JSONL has grown since import (file size > recorded size), new unweaved content at the tail
 
@@ -149,7 +154,7 @@ Completeness tracked via `WeaveComplete` attestation written by loom after impor
 
 ### Weave source precedence
 
-Weaves carry a `weave_source` attribute: `"graunde"` (live UDP) or `"jsonl"` (JSONL import). When a `WeaveComplete` exists for a session, JSONL weaves take precedence — graunde weaves for that session are suppressed in the read path. No attestations are deleted.
+Weaves carry a `weave_source` attribute: `"ground"` (live UDP) or `"jsonl"` (JSONL import). When a `WeaveComplete` exists for a session, JSONL weaves take precedence — ground weaves for that session are suppressed in the read path. No attestations are deleted.
 
 ### Import flow
 

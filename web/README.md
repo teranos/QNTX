@@ -1,5 +1,7 @@
 # QNTX Web UI
 
+- REWORK: This file is in heavy need of an update. It's not like this README is completely useless, but it's pretty close for how things are structured now and how things evolved. what needs to happen is that we move almost all of the information aboutglyphs to the glyphs package, and link to it. this file just needs a  readover and update in order to make it more accurate.
+
 Web interface for QNTX built on the [Glyph](../docs/vision/glyphs.md) primitive - a universal UI element that morphs between states while maintaining identity.
 
 ## Glyph System

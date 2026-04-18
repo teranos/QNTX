@@ -140,7 +140,6 @@ func resolveProvider(explicit string) string {
 // prompt handler. Buffers the response to extract token usage for core-side tracking.
 // Returns true if forwarded, false if the provider is local or unknown.
 func (s *QNTXServer) forwardToProviderPlugin(w http.ResponseWriter, r *http.Request, providerName string, body any, endpoint string) bool {
-	// gRPC LLM providers (e.g. llama-cpp) are handled by createAIClient, not HTTP forwarding.
 	if router := s.servicesManager.GetLLMRouter(); router != nil && router.HasProvider(providerName) {
 		return false
 	}
@@ -681,6 +680,11 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		}
 		chatReq.Messages = append(chatReq.Messages, conversationMessages...)
 		chatReq.Messages = append(chatReq.Messages, provider.NewTextMessage("user", promptText))
+	}
+
+	// Set model if specified in request or frontmatter
+	if modelName != "" {
+		chatReq.Model = &modelName
 	}
 
 	// Set temperature if specified in frontmatter

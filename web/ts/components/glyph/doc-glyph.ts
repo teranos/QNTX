@@ -13,7 +13,7 @@
  * dependency and page navigation/zoom logic.
  */
 
-import type { Glyph } from './glyph';
+import type { Glyph } from '@qntx/glyphs';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { canvasPlaced } from './manifestations/canvas-placed';

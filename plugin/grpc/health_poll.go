@@ -112,7 +112,7 @@ func (m *PluginManager) StartHealthPolling(registry *plugin.Registry, services p
 		ticker := time.NewTicker(healthPollInterval)
 		defer ticker.Stop()
 
-		m.logger.Infow("Health polling started",
+		m.logger.Debugw("Health polling started",
 			"interval", healthPollInterval,
 			"failures_before_restart", consecutiveFailuresBeforeRestart,
 		)
@@ -203,6 +203,10 @@ func (m *PluginManager) pollAllPlugins(registry *plugin.Registry, services plugi
 				if err := m.RestartPlugin(m.shutdownCtx, pluginName, registry, services); err != nil {
 					m.logger.Errorf("Failed to restart plugin '%s': %v", pluginName, err)
 					return
+				}
+				// Emit recovered banner (RestartPlugin already populated the accumulator)
+				if m.accumulator != nil {
+					m.accumulator.Emit(pluginName, BannerRecovered)
 				}
 				// Notify UI that plugin recovered
 				if onEvent != nil {

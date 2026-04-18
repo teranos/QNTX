@@ -13,7 +13,7 @@
  */
 
 import { log, SEG } from '../../../logger';
-import type { Glyph } from '../glyph';
+import type { Glyph } from '@qntx/glyphs';
 import type { CompositionEdge, EdgeDirection } from '@qntx/glyphs';
 import { computeGridPositions, extractGlyphIds, isConnectedGraph } from '@qntx/glyphs';
 import { addComposition, removeComposition, findCompositionByGlyph } from '../../../state/compositions';

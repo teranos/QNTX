@@ -38,8 +38,7 @@ const { uiState, glyphs: mockCanvasGlyphs } = createMockUiState();
 mock.module('../../state/ui', () => ({ uiState }));
 
 // Import after mocks
-const { morphCanvasPlacedToWindow } = await import('./manifestations/canvas-window');
-const { setWindowState, isInWindowState, getCanvasOrigin, getLastPosition } = await import('./dataset');
+const { morphCanvasPlacedToWindow, setWindowState, isInWindowState, getCanvasOrigin, getLastPosition } = await import('@qntx/glyphs');
 const { resetCanvasState } = await import('./canvas/canvas-pan');
 
 /** Mock getBoundingClientRect on an element */

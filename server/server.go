@@ -121,7 +121,7 @@ type QNTXServer struct {
 	embeddingStore              *storage.EmbeddingStore
 	embeddingClusterInvalidator func()                  // called after re-cluster to invalidate centroid cache
 	embeddingStats              schedule.EmbeddingStats // drained by ticker for periodic summary
-	graundeDBPath               string
+	groundDBPath                string
 }
 
 // handleClientRegister handles a new client connection
@@ -354,6 +354,14 @@ func (s *QNTXServer) GetDB() *sql.DB {
 // GetServicesManager returns the gRPC services manager for plugin service access
 func (s *QNTXServer) GetServicesManager() *grpcplugin.ServicesManager {
 	return s.servicesManager
+}
+
+// ReloadWatchers reloads the watcher engine's in-memory map from the database.
+func (s *QNTXServer) ReloadWatchers() error {
+	if s.watcherEngine == nil {
+		return nil
+	}
+	return s.watcherEngine.ReloadWatchers()
 }
 
 // getAttestationByID retrieves a single attestation through the attestation store (Rust FFI).

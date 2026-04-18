@@ -32,7 +32,7 @@ For token positions: at model load, read the embedding matrix via `llama_model_g
 
 ## Data flow
 
-The renderer lives inside llama-cpp (Metal-cpp). The full distribution is a `float*` in the same process — `capture_signal()` produces it, the compute shader consumes it directly. No serialization, no transport.
+The renderer lives inside scry (Metal-cpp). The full distribution is a `float*` in the same process — `capture_signal()` produces it, the compute shader consumes it directly. No serialization, no transport.
 
 Token positions are computed once at model load via PCA of the embedding matrix (Accelerate BLAS) and cached in memory.
 

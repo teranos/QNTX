@@ -2,6 +2,8 @@
 
 See [docs/embeddings.md](https://github.com/teranos/QNTX/blob/main/docs/embeddings.md) for architecture, API reference, and open work.
 
+- INTERNAL: I dont think ats/ is the correct place for this code?
+
 ## Model Files
 
 The ONNX model files are not in git (~86MB). To obtain them:

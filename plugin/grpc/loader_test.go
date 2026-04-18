@@ -23,7 +23,7 @@ func TestLoadPluginsFromConfig_NoDuplicates(t *testing.T) {
 		},
 	}
 
-	manager, err := LoadPluginsFromConfig(ctx, cfg, logger)
+	manager, err := LoadPluginsFromConfig(ctx, cfg, logger, logger)
 	assert.NoError(t, err, "Loading should not error even if plugins not found")
 
 	// Verify no plugins loaded (binaries don't exist)
@@ -56,7 +56,7 @@ func TestLoadPluginsFromConfig_UniquePlugins(t *testing.T) {
 		},
 	}
 
-	manager, err := LoadPluginsFromConfig(ctx, cfg, logger)
+	manager, err := LoadPluginsFromConfig(ctx, cfg, logger, logger)
 	assert.NoError(t, err)
 
 	plugins := manager.GetAllPlugins()
@@ -70,7 +70,7 @@ func TestLoadPluginsFromConfig_UniquePlugins(t *testing.T) {
 // return duplicates even if the internal map somehow had duplicates
 func TestGetAllPlugins_ReturnsUniqueInstances(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	manager := NewPluginManager(logger, "")
+	manager := NewPluginManager(logger, logger, "")
 
 	// GetAllPlugins should return unique instances
 	plugins := manager.GetAllPlugins()

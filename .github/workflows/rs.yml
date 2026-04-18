@@ -11,6 +11,7 @@ on:
       - 'crates/qntx-sqlite/Cargo.toml'
       - 'crates/qntx-wasm/Cargo.toml'
       - 'qntx-plugins/qntx-python/Cargo.toml'
+      - 'qntx-plugins/qntx-meili/Cargo.toml'
       - '.github/workflows/rs.yml'
   push:
     branches:
@@ -22,6 +23,7 @@ on:
       - 'crates/qntx/Cargo.toml'
       - 'crates/qntx-wasm/Cargo.toml'
       - 'qntx-plugins/qntx-python/Cargo.toml'
+      - 'qntx-plugins/qntx-meili/Cargo.toml'
   workflow_dispatch:
 
 jobs:
@@ -133,6 +135,39 @@ jobs:
 
       - name: Verify binary works
         run: ./result/bin/qntx-python-plugin --version
+
+  qntx-meili:
+    name: MeiliSearch Plugin
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v26
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: qntx
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          skipPush: true
+
+      - name: Check formatting
+        run: nix develop ./qntx-plugins/qntx-meili --command cargo fmt --check -p qntx-meili
+
+      - name: Clippy (via Nix)
+        run: nix flake check ./qntx-plugins/qntx-meili --print-build-logs
+
+      - name: Build via Nix
+        run: nix build ./qntx-plugins/qntx-meili --print-build-logs
+
+      - name: Verify binary works
+        run: ./result/bin/qntx-meili --version
 
   # Legacy cargo-based checks (disabled - Python linking issues)
   # Kept for reference until Nix-based checks are stable

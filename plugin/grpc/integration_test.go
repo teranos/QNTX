@@ -16,6 +16,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	pluginpkg "github.com/teranos/QNTX/plugin"
@@ -46,7 +47,7 @@ func TestCriticalPath_PluginLifecycle(t *testing.T) {
 	defer cleanup()
 
 	// 2. Create plugin manager
-	manager := NewPluginManager(logger, "")
+	manager := NewPluginManager(logger, logger, "")
 
 	// 3. Load plugin from address
 	configs := []PluginConfig{
@@ -101,7 +102,7 @@ func TestCriticalPath_MultiPluginCoordination(t *testing.T) {
 	defer cleanup3()
 
 	// Load all plugins
-	manager := NewPluginManager(logger, "")
+	manager := NewPluginManager(logger, logger, "")
 	configs := []PluginConfig{
 		{Name: "plugin1", Enabled: true, Address: addr1},
 		{Name: "plugin2", Enabled: true, Address: addr2},
@@ -418,7 +419,7 @@ func TestCrash_PartialFailure(t *testing.T) {
 	addr2, cleanup2 := startTestServer(t, plugin2)
 	defer cleanup2()
 
-	manager := NewPluginManager(logger, "")
+	manager := NewPluginManager(logger, logger, "")
 	configs := []PluginConfig{
 		{Name: "plugin1", Enabled: true, Address: addr1},
 		{Name: "plugin2", Enabled: true, Address: addr2},
@@ -455,7 +456,7 @@ func TestCrash_GracefulDegradation(t *testing.T) {
 	}
 
 	logger := zaptest.NewLogger(t).Sugar()
-	manager := NewPluginManager(logger, "")
+	manager := NewPluginManager(logger, logger, "")
 
 	// Try to load plugin that doesn't exist
 	configs := []PluginConfig{
@@ -603,6 +604,14 @@ func (r *testServiceRegistry) LLM() pluginpkg.LLMService {
 	return nil
 }
 
+func (r *testServiceRegistry) VectorSearch() pluginpkg.VectorSearchService {
+	return nil
+}
+
+func (r *testServiceRegistry) Search() pluginpkg.SearchService {
+	return nil
+}
+
 // testConfig implements pluginpkg.Config for integration testing
 type testConfig struct {
 	config map[string]string
@@ -660,8 +669,8 @@ func TestServiceIntegration_BookCollectorAttestations(t *testing.T) {
 	queue := async.NewQueue(db)
 
 	// 3. Start gRPC services for plugin callbacks
-	servicesManager := NewServicesManager(logger)
-	endpoints, err := servicesManager.Start(ctx, store, queue, nil, t.TempDir())
+	servicesManager := NewServicesManager(am.LLMConfig{MaxConcurrent: 1, MaxCallsPerMinute: 60}, logger)
+	endpoints, err := servicesManager.Start(ctx, store, queue, nil, t.TempDir(), t.TempDir())
 	require.NoError(t, err)
 	defer servicesManager.Shutdown()
 

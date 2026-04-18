@@ -11,7 +11,7 @@
  * ts-glyph is a power-user tool, not a public-facing sandbox.
  */
 
-import type { Glyph } from './glyph';
+import type { Glyph } from '@qntx/glyphs';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
