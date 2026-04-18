@@ -255,8 +255,6 @@ func (c *Client) routeMessage(msg *QueryMessage) {
 		c.handleRichSearch(msg.Query)
 	case "get_database_stats":
 		c.handleGetDatabaseStats()
-	case "get_sync_status":
-		c.handleGetSyncStatus()
 	case "watcher_upsert":
 		c.handleWatcherUpsert(*msg)
 	case "ping":
@@ -918,46 +916,6 @@ func (c *Client) handleGetDatabaseStats() {
 		"total_attestations", totalAttestations,
 		"client_id", c.id,
 	)
-}
-
-// handleGetSyncStatus sends the current Merkle tree state to the client
-func (c *Client) handleGetSyncStatus() {
-	if c.server.syncTree == nil {
-		c.sendJSON(map[string]interface{}{
-			"type":      "sync_status",
-			"available": false,
-			"reason":    "WASM engine not loaded",
-		})
-		return
-	}
-
-	root, err := c.server.syncTree.Root()
-	if err != nil {
-		c.sendJSON(map[string]interface{}{
-			"type":      "sync_status",
-			"available": true,
-			"error":     fmt.Sprintf("Failed to read tree root: %v", err),
-		})
-		return
-	}
-
-	groups, err := c.server.syncTree.GroupHashes()
-	if err != nil {
-		c.sendJSON(map[string]interface{}{
-			"type":      "sync_status",
-			"available": true,
-			"error":     fmt.Sprintf("Failed to read group hashes: %v", err),
-		})
-		return
-	}
-
-	c.sendJSON(map[string]interface{}{
-		"type":      "sync_status",
-		"available": true,
-		"root":      root,
-		"groups":    len(groups),
-		"peers":     c.server.buildPeerList(),
-	})
 }
 
 // richSearchResponse is the typed WS response for rich_search_results.

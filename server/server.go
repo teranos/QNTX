@@ -28,7 +28,6 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	"github.com/teranos/QNTX/server/nodedid"
 	"github.com/teranos/QNTX/server/wslogs"
-	syncPkg "github.com/teranos/QNTX/sync"
 	"go.uber.org/zap"
 )
 
@@ -101,12 +100,6 @@ type QNTXServer struct {
 	// Canvas state handlers
 	canvasHandler         *handlers.CanvasHandler
 	conversationAssembler *ConversationAssembler
-
-	// Sync: Merkle tree observer for content-addressed attestation sync
-	syncTree           syncPkg.SyncTree      // nil if WASM unavailable
-	syncObserver       *syncPkg.TreeObserver // nil if WASM unavailable
-	syncPeerStatus     sync.Map              // map[string]string — peer name → "ok", "unreachable", or "self"
-	syncPeerRemoteName sync.Map              // map[string]string — peer name → advertised name from hello
 
 	// Embedding service for semantic search (optional, requires rustembeddings build tag)
 	embeddingService interface {
