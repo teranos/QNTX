@@ -43,6 +43,7 @@
     "node_modules",
     "ts/vendor",
     "**/*.test.ts",
+    "../packages/**/*.test.ts",
     "ctpm1/**/*"
   ]
 }
