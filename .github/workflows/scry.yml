@@ -41,7 +41,7 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: Build scry plugin
-        run: nix build ./qntx-plugins/scry --show-trace 2>&1 || { nix log $(nix path-info --derivation ./qntx-plugins/scry 2>/dev/null || echo /dev/null) 2>/dev/null | tail -100; exit 1; }
+        run: nix build ./qntx-plugins/scry --show-trace
 
       - name: Verify binary
         run: ./result/bin/qntx-scry-plugin --version
