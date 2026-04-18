@@ -596,6 +596,10 @@ void MetalRenderer::set_active_branch(int branch_id) {
     }
 }
 
+int MetalRenderer::scrub_index() const {
+    return scrub_index_.load(std::memory_order_acquire);
+}
+
 void MetalRenderer::set_scrub_index(int idx) {
     scrub_index_.store(idx, std::memory_order_release);
     ranked_dirty_ = true;
