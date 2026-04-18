@@ -14,8 +14,36 @@ import (
 	"github.com/teranos/QNTX/errors"
 )
 
+// actionRequiresPlugin returns the plugin name this action depends on, or empty if none.
+func actionRequiresPlugin(watcher *storage.Watcher) string {
+	switch watcher.ActionType {
+	case storage.ActionTypePython:
+		return "python"
+	case storage.ActionTypeGlyphExecute:
+		var action GlyphExecuteAction
+		if err := json.Unmarshal([]byte(watcher.ActionData), &action); err == nil && action.TargetGlyphType == "py" {
+			return "python"
+		}
+	case storage.ActionTypePluginExecute:
+		var action PluginExecuteAction
+		if err := json.Unmarshal([]byte(watcher.ActionData), &action); err == nil {
+			return action.PluginName
+		}
+	}
+	return ""
+}
+
 // executeAction executes a watcher's action with the triggering attestation
 func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
+	// If the action depends on a plugin that isn't loaded, queue it for later.
+	// It will be picked up by drainLoop when the plugin is re-enabled.
+	if required := actionRequiresPlugin(watcher); required != "" && e.pluginExecutor != nil {
+		if !e.pluginExecutor.IsPluginLoaded(required) {
+			e.enqueueAttestation(watcher.ID, as, "paused", 1, "plugin "+required+" not loaded")
+			return
+		}
+	}
+
 	var err error
 
 	switch watcher.ActionType {

@@ -770,3 +770,12 @@ func (a *watcherPluginAdapter) ExecutePluginJob(ctx context.Context, pluginName 
 
 	return resp.Result, nil
 }
+
+func (a *watcherPluginAdapter) IsPluginLoaded(pluginName string) bool {
+	pm := a.server.getPluginManager()
+	if pm == nil {
+		return false
+	}
+	_, ok := pm.GetPlugin(pluginName)
+	return ok
+}
