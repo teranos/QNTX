@@ -524,8 +524,11 @@ func (s *QNTXServer) initWatcherEngine() error {
 	s.watcherEngine = watcher.NewEngine(s.db, reader, apiBaseURL, s.logger)
 	s.reloadCoalescer = newWatcherReloadCoalescer(s, 50*time.Millisecond)
 
-	// Tell the watcher engine which glyph types can execute.
-	// "prompt" and "se" are always available (built-in); "py" requires the "python" plugin.
+	// TODO(#780): This is a boot-time snapshot of which glyph types can execute.
+	// It doesn't update when plugins start/stop at runtime. The engine should
+	// query plugin availability at execution time instead (IsPluginLoaded
+	// partially covers this, making this list redundant).
+	// Magic strings: "prompt" and "se" are built-in, "py" maps to the "python" plugin.
 	glyphTypes := []string{"prompt", "se"}
 	for _, p := range am.GetStringSlice("plugin.enabled") {
 		if p == "python" {
