@@ -39,7 +39,7 @@ import { toggleConfig } from './config-panel.js';
 import { togglePulsePanel } from './pulse-panel.js';
 import { toggleProsePanel } from './prose/panel.js';
 import { togglePythonEditor } from './python/panel.js';
-import { glyphRun } from './components/glyph/run.ts';
+import { glyphRun } from '@qntx/glyphs';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
 type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'db';

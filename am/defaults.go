@@ -33,6 +33,12 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("pulse.monthly_budget_usd", 15.0)  // Default $15/month limit
 	v.SetDefault("pulse.cost_per_score_usd", 0.002) // Default $0.002 per operation
 
+	// LLM routing defaults (queuing at core, not provider)
+	v.SetDefault("llm.max_concurrent", 1)        // scry is single-threaded
+	v.SetDefault("llm.max_calls_per_minute", 60) // sliding window rate limit
+	v.SetDefault("llm.max_queue_depth", 20)      // reject excess requests
+	v.SetDefault("llm.cooldown_seconds", 3)      // breathing room between inference runs
+
 	// Auth defaults (disabled by default — zero auth code runs when disabled)
 	v.SetDefault("auth.enabled", false)
 	v.SetDefault("auth.session_expiry_hours", 24)
@@ -96,10 +102,28 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("plugin.websocket.keepalive.enabled", true)
 	// ping_interval_secs, pong_timeout_secs, reconnect_attempts are optional: nil = defaults (30, 60, 3) in plugin/grpc/websocket_keepalive.go
 
+	// Ground database auto-detection — Ground always stores at ~/.local/share/ground/ground.db
+	if groundDB := findGroundDB(); groundDB != "" {
+		v.SetDefault("ground_db_path", groundDB)
+	}
+
 	// Runtime defaults - auto-detect QNTX root or use env var
 	if tsRuntime := findTypeScriptRuntime(); tsRuntime != "" {
 		v.SetDefault("plugin.runtime.typescript_runtime", tsRuntime)
 	}
+}
+
+// findGroundDB locates Ground's database at ~/.local/share/ground/ground.db
+func findGroundDB() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	dbPath := filepath.Join(home, ".local", "share", "ground", "ground.db")
+	if _, err := os.Stat(dbPath); err == nil {
+		return dbPath
+	}
+	return ""
 }
 
 // findTypeScriptRuntime locates the TypeScript runtime (main.ts)

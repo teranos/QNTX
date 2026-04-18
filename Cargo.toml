@@ -12,6 +12,7 @@ members = [
     "qntx-plugins/pty-glyph",
     "qntx-plugins/qntx-python",
     "qntx-plugins/qntx-reduce",
+    "qntx-plugins/qntx-meili",
     "web/src-tauri",
 ]
 exclude = [

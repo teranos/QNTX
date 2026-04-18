@@ -14,7 +14,7 @@ import { createPluginGlyph } from './plugin-glyph';
 import { createPluginGlyphFromModule, wrapInCanvasPlaced } from './glyph-module-loader';
 import { apiFetch } from '../../api';
 import { log, SEG } from '../../logger';
-import type { Glyph } from './glyph';
+import type { Glyph } from '@qntx/glyphs';
 import type { GlyphDef, GlyphModule } from './glyph-ui';
 import { createGlyphUI } from './glyph-ui';
 

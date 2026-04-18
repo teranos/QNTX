@@ -51,7 +51,7 @@
  * symbols into true glyphs.
  */
 
-import { glyphRun } from './components/glyph/run';
+import { glyphRun } from '@qntx/glyphs';
 import { createCanvasGlyph } from './components/glyph/canvas/canvas-glyph';
 import { createChartGlyph } from './components/glyph/chart-glyph';
 import { createEmbeddingsGlyph } from './embeddings-glyph';

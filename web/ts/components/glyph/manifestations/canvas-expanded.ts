@@ -14,10 +14,8 @@
  */
 
 import { log, SEG } from '../../../logger';
-import type { Glyph } from '../glyph';
-import { getMaximizeDuration, getMinimizeDuration } from '../glyph';
-import { setWindowState, setCanvasOrigin, getCanvasOrigin, clearCanvasOrigin } from '../dataset';
-import { beginMaximizeMorph, beginRestoreMorph } from '../morph-transaction';
+import type { Glyph } from '@qntx/glyphs';
+import { getMaximizeDuration, getMinimizeDuration, setWindowState, setCanvasOrigin, getCanvasOrigin, clearCanvasOrigin, beginMaximizeMorph, beginRestoreMorph } from '@qntx/glyphs';
 import { canvasToScreen, getTransform } from '../canvas/canvas-pan';
 import { buildCanvasWorkspace } from '../canvas/canvas-workspace-builder';
 import { uiState } from '../../../state/ui';

@@ -1,11 +1,11 @@
-(* UDP listener — receives attestation payloads from Graunde
+(* UDP listener — receives attestation payloads from Ground
  *
- * Graunde fires a UDP datagram on every hook event (UserPromptSubmit, Stop, etc.)
+ * Ground fires a UDP datagram on every hook event (UserPromptSubmit, Stop, etc.)
  * to avoid adding latency to the Claude Code hook chain. Fire-and-forget from
- * Graunde's side — if loom isn't running, the packet drops silently.
+ * Ground's side — if loom isn't running, the packet drops silently.
  *
  * This is the primary data ingestion path for loom. The gRPC ExecuteJob path
- * via QNTX's watcher system is the "proper" alternative, but requires Graunde
+ * via QNTX's watcher system is the "proper" alternative, but requires Ground
  * to talk to QNTX over the network — which it currently doesn't do. *)
 
 let udp_port = 19470
@@ -42,7 +42,7 @@ let start () =
             ~word_count:(Stitcher.word_count block)
             ~turn_count:result.turn_count
             ~paths:result.paths
-            ~weave_source:"graunde"
+            ~weave_source:"ground"
             ()
           in
           (match ats_result with

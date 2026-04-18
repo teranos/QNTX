@@ -6,10 +6,10 @@
  * across py-glyph and result-glyph.
  */
 
-import type { Glyph } from './glyph';
+import type { Glyph } from '@qntx/glyphs';
+import { isInWindowState } from '@qntx/glyphs';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { isInWindowState } from './dataset';
 import {
     canInitiateMeld,
     canReceiveMeld,

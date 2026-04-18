@@ -51,12 +51,24 @@ export interface CanvasHost {
     flushSync(): void;
 }
 
+/** Coordinate transforms between canvas-local and screen-space. */
+export interface CanvasCoordinateBridge {
+    toScreen(canvasId: string, x: number, y: number): { x: number; y: number };
+    fromScreen(canvasId: string, x: number, y: number): { x: number; y: number };
+    getScale(canvasId: string): number;
+}
+
 export interface GlyphConfig {
     logger?: GlyphLogger;
     logSegment?: string;
     persistence?: GlyphPersistence;
     stripHtml?: (html: string) => string;
-    canvas?: CanvasHost;
+    /** Canvas coordinate transforms — required for canvas-window morphs. */
+    canvas?: CanvasCoordinateBridge;
+    /** Canvas host — persistence, transform, selection, composition CRUD. */
+    canvasHost?: CanvasHost;
+    /** Called when a glyph is removed from the canvas (close/minimize). */
+    removeCanvasGlyph?: (glyphId: string) => void;
 }
 
 // Default no-op logger
@@ -94,12 +106,22 @@ function defaultStripHtml(html: string): string {
 }
 
 // Active configuration — starts with defaults
-let config = {
+let config: {
+    logger: GlyphLogger;
+    logSegment: string;
+    persistence: GlyphPersistence;
+    stripHtml: (html: string) => string;
+    canvas: CanvasCoordinateBridge | null;
+    canvasHost: CanvasHost;
+    removeCanvasGlyph: ((glyphId: string) => void) | null;
+} = {
     logger: noopLogger,
     logSegment: 'GLYPH',
     persistence: noopPersistence,
     stripHtml: defaultStripHtml,
-    canvas: noopCanvasHost,
+    canvas: null,
+    canvasHost: noopCanvasHost,
+    removeCanvasGlyph: null,
 };
 
 /**
@@ -112,6 +134,8 @@ export function configureGlyphs(opts: GlyphConfig): void {
     if (opts.persistence) config.persistence = opts.persistence;
     if (opts.stripHtml) config.stripHtml = opts.stripHtml;
     if (opts.canvas) config.canvas = opts.canvas;
+    if (opts.canvasHost) config.canvasHost = opts.canvasHost;
+    if (opts.removeCanvasGlyph) config.removeCanvasGlyph = opts.removeCanvasGlyph;
 }
 
 /** Get the active logger */
@@ -131,10 +155,20 @@ export function getPersistence(): GlyphPersistence {
 
 /** Get the active canvas host */
 export function getCanvasHost(): CanvasHost {
-    return config.canvas;
+    return config.canvasHost;
 }
 
 /** Strip HTML tags from a string */
 export function stripHtml(html: string): string {
     return config.stripHtml(html);
+}
+
+/** Get the canvas coordinate bridge (null if not configured). */
+export function getCanvasBridge(): CanvasCoordinateBridge | null {
+    return config.canvas;
+}
+
+/** Remove a glyph from canvas state. No-op if not configured. */
+export function removeCanvasGlyph(glyphId: string): void {
+    config.removeCanvasGlyph?.(glyphId);
 }

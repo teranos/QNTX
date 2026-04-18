@@ -1,0 +1,50 @@
+name: scry
+
+on:
+  pull_request:
+    paths:
+      - 'qntx-plugins/scry/**'
+      - 'plugin/grpc/protocol/domain.proto'
+      - 'plugin/grpc/protocol/llm.proto'
+      - 'plugin/grpc/protocol/proto.cmake'
+      - '.github/workflows/scry.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'qntx-plugins/scry/**'
+      - 'plugin/grpc/protocol/domain.proto'
+      - 'plugin/grpc/protocol/llm.proto'
+      - 'plugin/grpc/protocol/proto.cmake'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: qntx
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Build scry plugin
+        run: nix build ./qntx-plugins/scry --show-trace
+
+      - name: Verify binary
+        run: ./result/bin/qntx-scry-plugin --version
+
+      - name: Push to Cachix
+        run: nix build ./qntx-plugins/scry --print-out-paths --no-link | cachix push qntx

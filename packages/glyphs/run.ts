@@ -556,3 +556,8 @@ class GlyphRunImpl {
 
 // Singleton instance
 export const glyphRun: GlyphRunImpl = new GlyphRunImpl();
+
+/** Getter — safe to call from code that imports via the barrel without const init ordering issues. */
+export function getGlyphRun(): GlyphRunImpl {
+    return glyphRun;
+}

@@ -2,7 +2,7 @@
 
 What can we see inside a running model, and what's worth surfacing?
 
-Signal extraction (entropy, confidence, top-gap), streaming transport, confidence heatmap, and top-K popup are implemented — see `qntx-plugins/llama-cpp/README.md` for architecture. Everything below is what remains unexplored.
+Signal extraction (entropy, confidence, top-gap), streaming transport, confidence heatmap, and top-K popup are implemented — see `qntx-plugins/scry/README.md` for architecture. Everything below is what remains unexplored.
 
 ## Untapped API Surface
 

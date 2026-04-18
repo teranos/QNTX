@@ -648,12 +648,14 @@ func (m *mockServiceRegistry) Database() *sql.DB { return m.db }
 func (m *mockServiceRegistry) Logger(domain string) *zap.SugaredLogger {
 	return zap.NewNop().Sugar()
 }
-func (m *mockServiceRegistry) Config(domain string) Config    { return &mockConfig{} }
-func (m *mockServiceRegistry) ATSStore() ats.AttestationStore { return m.store }
-func (m *mockServiceRegistry) Queue() QueueService            { return m.queue }
-func (m *mockServiceRegistry) Schedule() ScheduleService      { return nil }
-func (m *mockServiceRegistry) FileService() FileService       { return nil }
-func (m *mockServiceRegistry) LLM() LLMService                { return nil }
+func (m *mockServiceRegistry) Config(domain string) Config       { return &mockConfig{} }
+func (m *mockServiceRegistry) ATSStore() ats.AttestationStore    { return m.store }
+func (m *mockServiceRegistry) Queue() QueueService               { return m.queue }
+func (m *mockServiceRegistry) Schedule() ScheduleService         { return nil }
+func (m *mockServiceRegistry) FileService() FileService          { return nil }
+func (m *mockServiceRegistry) LLM() LLMService                   { return nil }
+func (m *mockServiceRegistry) VectorSearch() VectorSearchService { return nil }
+func (m *mockServiceRegistry) Search() SearchService             { return nil }
 
 // Verify mockServiceRegistry implements ServiceRegistry
 var _ ServiceRegistry = (*mockServiceRegistry)(nil)

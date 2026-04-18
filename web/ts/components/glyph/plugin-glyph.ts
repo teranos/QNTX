@@ -5,7 +5,7 @@
  * Handles retry logic for 503 (plugin unavailable) and error states.
  */
 
-import type { Glyph } from './glyph';
+import type { Glyph } from '@qntx/glyphs';
 import type { PluginGlyphDef } from './plugin-provided-glyphs';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { loadPluginCSS } from './plugin-provided-glyphs';

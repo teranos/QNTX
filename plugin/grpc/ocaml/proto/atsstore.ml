@@ -5,7 +5,7 @@
 (* https://github.com/andersfugmann/ocaml-protoc-plugin *)
 (********************************************************)
 (*
-  Source: atsstore.proto
+  Source: plugin/grpc/protocol/atsstore.proto
   Syntax: proto3
   Parameters:
     debug=false
