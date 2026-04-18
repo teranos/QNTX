@@ -27,6 +27,7 @@
     "composition.ts",
     "edge-graph.ts",
     "glyph-ui.ts",
+    "manifestations/focus.ts",
     "touch-browse.ts"
   ]
 }

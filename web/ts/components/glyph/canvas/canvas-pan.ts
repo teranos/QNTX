@@ -331,6 +331,37 @@ export function getTransform(canvasId: string): { panX: number; panY: number; sc
 }
 
 /**
+ * Set pan and zoom programmatically — used by focus manifestation to position
+ * the viewport (enter focus, scroll thread, exit focus).
+ */
+export function setPanZoom(
+    container: HTMLElement,
+    canvasId: string,
+    panX: number,
+    panY: number,
+    scale: number,
+    animate?: boolean,
+): void {
+    const state = getState(canvasId);
+    const contentLayer = container.querySelector('.canvas-content-layer') as HTMLElement;
+
+    if (animate && contentLayer) {
+        contentLayer.style.transition = 'transform 0.45s ease-out';
+    }
+
+    state.panX = panX;
+    state.panY = panY;
+    state.scale = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, scale));
+
+    applyTransform(container, canvasId);
+    saveTransformState(canvasId);
+
+    if (animate && contentLayer) {
+        setTimeout(() => { contentLayer.style.transition = ''; }, 450);
+    }
+}
+
+/**
  * Set zoom level programmatically
  * @param container Canvas container element
  * @param canvasId Canvas identifier
