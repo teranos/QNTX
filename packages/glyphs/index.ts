@@ -162,6 +162,18 @@ export {
 } from './meld/meldability';
 export type { PortRule, MeldOption } from './meld/meldability';
 
+// Canvas drag/resize interaction (DRAGR)
+export {
+    makeDraggable,
+    makeResizable,
+    applyCanvasGlyphLayout,
+    preventDrag,
+    storeCleanup,
+    runCleanup,
+    cleanupResizeObserver,
+} from './canvas-drag';
+export type { MakeResizableOptions, CanvasGlyphLayoutOptions } from './canvas-drag';
+
 // GlyphUI interface and related types
 export type {
     GlyphUI,
