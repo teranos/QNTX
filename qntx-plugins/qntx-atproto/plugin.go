@@ -32,9 +32,10 @@ import (
 type Plugin struct {
 	plugin.Base
 
-	mu     sync.RWMutex
-	client *xrpc.Client // Protected by mu
-	did    string       // Protected by mu
+	mu        sync.RWMutex
+	client    *xrpc.Client     // Protected by mu
+	did       string           // Protected by mu
+	embedding *embeddingClient // Protected by mu
 
 	// Stored for re-authentication when refresh token also expires
 	pdsHost     string
@@ -47,7 +48,7 @@ func NewPlugin() *Plugin {
 	return &Plugin{
 		Base: plugin.NewBase(plugin.Metadata{
 			Name:        "atproto",
-			Version:     "0.3.3",
+			Version:     "0.4.0",
 			QNTXVersion: ">= 0.1.0",
 			Description: "AT Protocol integration (Bluesky) with auto-scheduled timeline sync",
 			Author:      "QNTX Team",
@@ -109,6 +110,11 @@ func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry
 		}
 	}
 
+	// Initialize vector search (embedding + faiss)
+	if err := p.initVectorSearch(ctx); err != nil {
+		logger.Warnw("Vector search initialization failed, semantic search disabled", "error", err)
+	}
+
 	logger.Info("AT Protocol domain plugin initialized")
 	return nil
 }
@@ -118,6 +124,10 @@ func (p *Plugin) Shutdown(ctx context.Context) error {
 	p.mu.Lock()
 	p.client = nil
 	p.did = ""
+	if p.embedding != nil {
+		p.embedding.close()
+		p.embedding = nil
+	}
 	p.mu.Unlock()
 
 	return p.Base.Shutdown(ctx)

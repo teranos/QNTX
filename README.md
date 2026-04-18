@@ -5,7 +5,7 @@
 
 **QNTX: Continuous Intelligence**
 
-A new paradigm where systems continuously evolve their understanding through verifiable attestations.
+Systems continuously evolve their understanding through verifiable attestations.
 
 ```
 Data → Graph → Knowledge → Intelligence → Action
@@ -16,18 +16,6 @@ Data → Graph → Knowledge → Intelligence → Action
 ## What is QNTX?
 
 QNTX provides a **domain-agnostic foundation** for building knowledge systems. At its core is the **[Attestation Type System (ATS)](ats/README.md)** - a way to track who said what, when, and in what context. For architecture and philosophy, see [Understanding QNTX](docs/understanding-qntx.md). For the full architectural overview, see [Architecture (arc42)](docs/arc42.md).
-
-### Quick Example
-```bash
-# Record an attestation
-qntx as USER-123 is member of TEAM-ENGINEERING
-
-# Query attestations
-qntx ax member of TEAM-ENGINEERING
-
-# Continuous updates via Pulse
-qntx pulse start  # Keeps your data current automatically
-```
 
 ## Installation
 
@@ -43,8 +31,9 @@ QNTX uses semantic symbols as a namespace system. See [GLOSSARY.md](docs/GLOSSAR
 
 ## Testing
 
-Run the full test suite:
-
 ```bash
+# first make wasm
+make wasm
+# go and typescript, fast tests during development.
 make test
 ```

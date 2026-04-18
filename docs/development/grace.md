@@ -13,6 +13,7 @@ _(Formerly codename: GRACE - Graceful Async Cancellation Engine)_
 ### ❀ Closing (Graceful Shutdown)
 - **Context propagation**: Application → Worker Pool → Jobs → Handlers
 - **Plugin shutdown**: Plugins receive shutdown signal via gRPC, complete in-flight work
+- **Plugin PID tracking**: Each instance writes plugin PIDs to `~/.qntx/plugins-{port}.pid`; on dirty shutdown (crash, double Ctrl+C) the next startup kills orphans before launching new plugins ([plugin/grpc/pidfile.go](https://github.com/teranos/QNTX/blob/main/plugin/grpc/pidfile.go))
 - **Task-level atomicity**: Jobs complete current task before checkpointing
 - **Signal handling**: Application catches signals, triggers shutdown
 - **Worker timeout**: 20 seconds for clean checkpoint and exit (configurable via `WorkerPoolConfig.WorkerStopTimeout`)

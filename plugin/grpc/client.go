@@ -40,9 +40,22 @@ type ExternalDomainProxy struct {
 	// llmProvider indicates this plugin implements LLMProvider (populated during Initialize)
 	llmProvider bool
 
+	// vectorSearchProvider indicates this plugin implements VectorSearchService (populated during Initialize)
+	vectorSearchProvider bool
+
+	// searchProvider indicates this plugin implements SearchProvider (populated during Initialize)
+	searchProvider bool
+
+	// Watchers this plugin wants registered (populated during Initialize)
+	watchers []*protocol.WatcherRegistration
+
 	// WebSocket configuration (set via SetWebSocketConfig)
 	keepaliveConfig *KeepaliveConfig
 	wsConfig        *WebSocketConfig
+
+	// Callback invoked after plugin watchers are written to DB.
+	// Allows the server to reload the watcher engine's in-memory map.
+	OnWatchersSetup func()
 
 	// Initialize idempotency — multiple code paths may call Initialize
 	// (server/init.go eager init + async goroutine in main.go)
@@ -102,7 +115,7 @@ func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDo
 		License:     metaResp.License,
 	}
 
-	logger.Infof("Connected to '%s' plugin gRPC server v%s at %s (requires QNTX %s)",
+	logger.Debugf("Connected to '%s' plugin gRPC server v%s at %s (requires QNTX %s)",
 		proxy.metadata.Name, proxy.metadata.Version, addr, proxy.metadata.QNTXVersion)
 
 	return proxy, nil
@@ -148,10 +161,37 @@ func (c *ExternalDomainProxy) IsLLMProvider() bool {
 	return c.llmProvider
 }
 
+// GetWatchers returns the watcher registrations this plugin announced during Initialize.
+func (c *ExternalDomainProxy) GetWatchers() []*protocol.WatcherRegistration {
+	return c.watchers
+}
+
 // LLMServiceClient returns an LLMServiceClient using this plugin's existing gRPC connection.
 // Only meaningful when IsLLMProvider() is true.
 func (c *ExternalDomainProxy) LLMServiceClient() protocol.LLMServiceClient {
 	return protocol.NewLLMServiceClient(c.conn)
+}
+
+// IsVectorSearchProvider returns true if this plugin declared VectorSearch provider capability during Initialize.
+func (c *ExternalDomainProxy) IsVectorSearchProvider() bool {
+	return c.vectorSearchProvider
+}
+
+// VectorSearchServiceClient returns a VectorSearchServiceClient using this plugin's existing gRPC connection.
+// Only meaningful when IsVectorSearchProvider() is true.
+func (c *ExternalDomainProxy) VectorSearchServiceClient() protocol.VectorSearchServiceClient {
+	return protocol.NewVectorSearchServiceClient(c.conn)
+}
+
+// IsSearchProvider returns true if this plugin declared search provider capability during Initialize.
+func (c *ExternalDomainProxy) IsSearchProvider() bool {
+	return c.searchProvider
+}
+
+// SearchServiceClient returns a SearchServiceClient using this plugin's existing gRPC connection.
+// Only meaningful when IsSearchProvider() is true.
+func (c *ExternalDomainProxy) SearchServiceClient() protocol.SearchServiceClient {
+	return protocol.NewSearchServiceClient(c.conn)
 }
 
 // Initialize initializes the remote plugin. Idempotent — safe to call from multiple code paths.
@@ -243,18 +283,42 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		llmEndpoint = ep
 		c.logger.Debugw("Extracted LLM endpoint from config", "endpoint", ep)
 	}
+	embeddingEndpoint := ""
+	if ep := pluginConfig.GetString("_embedding_endpoint"); ep != "" {
+		embeddingEndpoint = ep
+		c.logger.Debugw("Extracted Embedding endpoint from config", "endpoint", ep)
+	}
+	vectorSearchEndpoint := ""
+	if ep := pluginConfig.GetString("_vector_search_endpoint"); ep != "" {
+		vectorSearchEndpoint = ep
+		c.logger.Debugw("Extracted VectorSearch endpoint from config", "endpoint", ep)
+	}
+	groundEndpoint := ""
+	if ep := pluginConfig.GetString("_ground_endpoint"); ep != "" {
+		groundEndpoint = ep
+		c.logger.Debugw("Extracted Ground endpoint from config", "endpoint", ep)
+	}
+	searchEndpoint := ""
+	if ep := pluginConfig.GetString("_search_endpoint"); ep != "" {
+		searchEndpoint = ep
+		c.logger.Debugw("Extracted Search endpoint from config", "endpoint", ep)
+	}
 	if token := pluginConfig.GetString("_auth_token"); token != "" {
 		authToken = token
 	}
 
 	req := &protocol.InitializeRequest{
-		AtsStoreEndpoint:    atsStoreEndpoint,
-		QueueEndpoint:       queueEndpoint,
-		ScheduleEndpoint:    scheduleEndpoint,
-		FileServiceEndpoint: fileServiceEndpoint,
-		LlmEndpoint:         llmEndpoint,
-		AuthToken:           authToken,
-		Config:              config,
+		AtsStoreEndpoint:     atsStoreEndpoint,
+		QueueEndpoint:        queueEndpoint,
+		ScheduleEndpoint:     scheduleEndpoint,
+		FileServiceEndpoint:  fileServiceEndpoint,
+		LlmEndpoint:          llmEndpoint,
+		EmbeddingEndpoint:    embeddingEndpoint,
+		VectorSearchEndpoint: vectorSearchEndpoint,
+		GroundEndpoint:       groundEndpoint,
+		SearchEndpoint:       searchEndpoint,
+		AuthToken:            authToken,
+		Config:               config,
 	}
 
 	c.logger.Debugw("Sending Initialize RPC to plugin",
@@ -264,6 +328,10 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		"schedule_endpoint", scheduleEndpoint,
 		"file_service_endpoint", fileServiceEndpoint,
 		"llm_endpoint", llmEndpoint,
+		"embedding_endpoint", embeddingEndpoint,
+		"vector_search_endpoint", vectorSearchEndpoint,
+		"ground_endpoint", groundEndpoint,
+		"search_endpoint", searchEndpoint,
 	)
 
 	resp, err := c.client.Initialize(ctx, req)
@@ -281,11 +349,33 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	// Store LLM provider capability
 	c.llmProvider = resp.GetLlmProvider()
 
-	c.logger.Infow("Plugin initialized",
+	// Store VectorSearch provider capability
+	c.vectorSearchProvider = resp.GetVectorSearchProvider()
+
+	// Store search provider capability
+	c.searchProvider = resp.GetSearchProvider()
+
+	// Store and create watcher registrations
+	c.watchers = resp.GetWatchers()
+	if len(c.watchers) > 0 {
+		if err := SetupPluginWatchers(services.Database(), c.metadata.Name, c.watchers, c.logger); err != nil {
+			c.logger.Errorw("Failed to setup plugin watchers",
+				"plugin", c.metadata.Name,
+				"error", err,
+			)
+		} else if c.OnWatchersSetup != nil {
+			c.OnWatchersSetup()
+		}
+	}
+
+	c.logger.Debugw("Plugin initialized",
 		"name", c.metadata.Name,
 		"handlers", len(c.handlerNames),
 		"schedules", len(c.schedules),
+		"watchers", len(c.watchers),
 		"llm_provider", c.llmProvider,
+		"vector_search_provider", c.vectorSearchProvider,
+		"search_provider", c.searchProvider,
 	)
 	return nil
 }

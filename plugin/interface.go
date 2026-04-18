@@ -163,6 +163,22 @@ type LLMProvider interface {
 	Chat(ctx context.Context, req LLMRequest) (*LLMResponse, error)
 }
 
+// SearchProvider is an optional interface for plugins that provide search services.
+// Plugins implementing this interface register as the search backend in the core
+// service mesh. Other plugins can then call services.Search() to query indexes.
+type SearchProvider interface {
+	DomainPlugin
+
+	// Search queries an index and returns ranked results.
+	Search(ctx context.Context, req SearchRequest) (*SearchResponse, error)
+
+	// IndexDocuments pushes documents into an index.
+	IndexDocuments(ctx context.Context, req IndexDocumentsRequest) (*IndexDocumentsResponse, error)
+
+	// DeleteDocuments removes documents from an index by ID.
+	DeleteDocuments(ctx context.Context, req DeleteDocumentsRequest) (*DeleteDocumentsResponse, error)
+}
+
 // GlyphDef defines a custom glyph type provided by a plugin.
 type GlyphDef struct {
 	// Symbol is the glyph identifier (e.g., "⚗" for a chemistry plugin).

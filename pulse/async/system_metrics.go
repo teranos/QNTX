@@ -75,6 +75,85 @@ func (wp *WorkerPool) GetSystemMetrics() SystemMetrics {
 	}
 }
 
+// getCPUPercent is implemented in platform-specific files alongside getMemoryStats.
+
+// CalculateDilation returns a watcher firing rate multiplier based on system load.
+// CPU-dominant weighting: pressure = (5*cpu + 1*mem) / 6
+// Memory is mostly static (loaded models), CPU reflects active work.
+//
+//	pressure < 50%  → 2.0   (idle machine, speed up)
+//	50-60%          → 1.5   (light load)
+//	60-75%          → 1.25  (moderate)
+//	75-80%          → 1.0   (normal)
+//	80-85%          → 0.75  (elevated)
+//	85-88%          → 0.5   (heavy)
+//	88-92%          → 0.25  (severe)
+//	92-95%          → 0.1   (critical, near-halt)
+//	>95%            → 0.0   (halted)
+func CalculateDilation() float64 {
+	mem := getMemoryPressure()
+	cpu := getCPUPressure()
+
+	// If one signal is unavailable, use the other alone
+	if mem < 0 && cpu < 0 {
+		return 1.0
+	}
+	if mem < 0 {
+		mem = 0
+	}
+	if cpu < 0 {
+		cpu = 0
+	}
+
+	// CPU matters 5x more than memory
+	pressure := (5*cpu + mem) / 6
+
+	switch {
+	case pressure > 95:
+		return 0.0
+	case pressure > 92:
+		return 0.1
+	case pressure > 88:
+		return 0.25
+	case pressure > 85:
+		return 0.5
+	case pressure > 80:
+		return 0.75
+	case pressure > 75:
+		return 1.0
+	case pressure > 60:
+		return 1.25
+	case pressure > 50:
+		return 1.5
+	default:
+		return 2.0
+	}
+}
+
+// GetPressure returns current memory and CPU utilization percentages (0-100).
+// Returns -1 for either value if it could not be read.
+func GetPressure() (memPct, cpuPct float64) {
+	return getMemoryPressure(), getCPUPressure()
+}
+
+// getMemoryPressure returns memory utilization as 0-100, or -1 on error.
+func getMemoryPressure() float64 {
+	total, available, err := getMemoryStats()
+	if err != nil || total == 0 {
+		return -1
+	}
+	return float64(total-available) / float64(total) * 100
+}
+
+// getCPUPressure returns CPU utilization as 0-100, or -1 on error.
+func getCPUPressure() float64 {
+	pct, err := getCPUPercent()
+	if err != nil {
+		return -1
+	}
+	return pct
+}
+
 // checkMemoryPressure validates worker count against available memory
 // Returns warning message if worker count may be too high, empty string if OK
 func (wp *WorkerPool) checkMemoryPressure() string {

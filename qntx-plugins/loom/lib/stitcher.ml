@@ -4,7 +4,7 @@
  * context, label, text) and handles buffering, chunking, and emission.
  *
  * Format-specific parsers call stitch_turn:
- *   - stitch: parses Graunde attestation JSON (UDP listener path)
+ *   - stitch: parses Ground attestation JSON (UDP listener path)
  *   - jsonl_reader: parses Claude Code JSONL (historical import path)
  *)
 
@@ -180,7 +180,7 @@ let extract_text json predicate =
           (match List.assoc_opt "last_assistant_message" attrs with
            | Some (`String text) -> Some text
            | _ -> None)
-        | "PreToolUse" | "GraundedPreToolUse" ->
+        | "PreToolUse" | "GroundedPreToolUse" ->
           (* Tool use handled separately via extract_tool_use for label routing *)
           (match extract_tool_use attrs with
            | Some (_, text, _) -> Some text
@@ -231,7 +231,7 @@ type stitch_result = {
 }
 
 (* stitch_turn — format-agnostic entry point.
- * Accepts pre-parsed turn data from any format parser (Graunde attestation,
+ * Accepts pre-parsed turn data from any format parser (Ground attestation,
  * Claude Code JSONL, etc.) and handles buffering, chunking, and emission.
  *
  * predicate: controls boundary behavior ("SessionStart" flushes and restarts,
@@ -318,9 +318,9 @@ let stitch_turn ~branch ~context ~predicate ~label ~text ~paths:turn_path ?(time
   in
   branch_flush @ [current_result]
 
-(* --- Graunde attestation parser --- *)
+(* --- Ground attestation parser --- *)
 
-(* stitch — parses a Graunde attestation JSON payload and feeds stitch_turn.
+(* stitch — parses a Ground attestation JSON payload and feeds stitch_turn.
  * This is the entry point for the UDP listener (live weaving path). *)
 let stitch payload =
   let json =
@@ -344,7 +344,7 @@ let stitch payload =
     | Some text ->
       (* Extract tool use info once for label and path *)
       let tool_info = match predicate with
-        | "PreToolUse" | "GraundedPreToolUse" ->
+        | "PreToolUse" | "GroundedPreToolUse" ->
           (match json with
            | `Assoc fields ->
              (match List.assoc_opt "attributes" fields with
@@ -356,7 +356,7 @@ let stitch payload =
       let label = match predicate with
         | "UserPromptSubmit" -> "human"
         | "Stop" -> "assistant"
-        | "PreToolUse" | "GraundedPreToolUse" ->
+        | "PreToolUse" | "GroundedPreToolUse" ->
           (match tool_info with Some (lbl, _, _) -> lbl | None -> "tool")
         | "SessionStart" | "SessionEnd" -> "session"
         | "PreCompact" -> "compaction"

@@ -271,9 +271,12 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
     // Model parameters — offload all layers to Metal GPU
     auto model_params = llama_model_default_params();
     model_params.n_gpu_layers = -1;
+    static int last_pct = -1;
+    last_pct = -1;
     model_params.progress_callback = [](float progress, void*) -> bool {
-        int pct = (int)(progress * 100);
-        if (pct % 10 == 0) {
+        int pct = (int)(progress * 100) / 10 * 10; // round to nearest 10
+        if (pct != last_pct) {
+            last_pct = pct;
             std::cout << "[scry] Loading model: " << pct << "%" << std::endl;
         }
         return true;
@@ -287,6 +290,7 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
     // Context parameters
     auto ctx_params = llama_context_default_params();
     ctx_params.n_ctx = n_ctx;
+    ctx_params.n_batch = n_ctx;
     ctx_ = llama_init_from_model(model_, ctx_params);
     if (!ctx_) {
         std::cout << "[scry] Failed to create context for " << model_path << std::endl;

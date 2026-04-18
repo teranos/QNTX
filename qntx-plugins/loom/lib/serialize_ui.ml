@@ -88,10 +88,10 @@ let attestation_to_json (a : Protocol.Attestation.t) =
     ("performance", value_to_yojson (List.assoc_opt "performance" fields |> Option.join));
   ]
 
-(* Check if a weave attestation has source "graunde" *)
-let is_graunde_weave (a : Protocol.Attestation.t) =
+(* Check if a weave attestation has source "ground" *)
+let is_ground_weave (a : Protocol.Attestation.t) =
   match a.attributes with
-  | Some fields -> extract_string fields "weave_source" = Some "graunde"
+  | Some fields -> extract_string fields "weave_source" = Some "ground"
   | None -> false
 
 (* Get the session context from a weave attestation *)
@@ -100,12 +100,12 @@ let weave_context (a : Protocol.Attestation.t) =
   | c :: _ -> c
   | [] -> ""
 
-(* Filter out graunde weaves for sessions that have been imported via JSONL.
+(* Filter out ground weaves for sessions that have been imported via JSONL.
  * When a WeaveComplete exists for a session, JSONL weaves are the authoritative
- * source — graunde weaves for that session are suppressed. *)
+ * source — ground weaves for that session are suppressed. *)
 let filter_superseded ~completed_contexts attestations =
   List.filter (fun a ->
-    not (is_graunde_weave a && Hashtbl.mem completed_contexts (weave_context a))
+    not (is_ground_weave a && Hashtbl.mem completed_contexts (weave_context a))
   ) attestations
 
 (* Convert a list of attestations into a JSON response *)

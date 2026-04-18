@@ -90,6 +90,7 @@ type PluginManager struct {
 	plugins           map[string]*managedPlugin
 	failedPlugins     map[string]string // plugin name → error message for plugins that failed to load
 	logger            *zap.SugaredLogger
+	rootLogger        *zap.SugaredLogger // un-named root logger for creating per-plugin named loggers
 	basePort          int
 	nextPort          int             // Track the next port to allocate
 	portMu            sync.Mutex      // Separate mutex for port allocation
@@ -97,6 +98,10 @@ type PluginManager struct {
 	shutdownCtx       context.Context // cancelled on Shutdown to stop retry goroutines
 	shutdownCancel    context.CancelFunc
 	servicesManager   *ServicesManager // for re-registering LLM providers after restart
+	accumulator       *PluginAccumulator
+	onWatchersSetup   func()            // called after plugin watchers are written to DB
+	onPluginRestarted func(name string) // called after auto-restart succeeds (clear HTTP mux state)
+	pidFile           *pidFile
 }
 
 // managedPlugin tracks a running plugin.
@@ -117,12 +122,15 @@ const (
 )
 
 // NewPluginManager creates a new plugin manager.
-func NewPluginManager(logger *zap.SugaredLogger, typescriptRuntime string) *PluginManager {
+// The logger is used for manager-level messages; rootLogger is used to create
+// per-plugin named loggers so each plugin's output shows its own name.
+func NewPluginManager(logger *zap.SugaredLogger, rootLogger *zap.SugaredLogger, typescriptRuntime string) *PluginManager {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &PluginManager{
 		plugins:           make(map[string]*managedPlugin),
 		failedPlugins:     make(map[string]string),
 		logger:            logger,
+		rootLogger:        rootLogger,
 		basePort:          DefaultPluginBasePort,
 		nextPort:          DefaultPluginBasePort,
 		typescriptRuntime: typescriptRuntime,
@@ -151,15 +159,44 @@ func GetDefaultPluginManager() *PluginManager {
 	return defaultPluginManager
 }
 
+// SetPidFile configures PID file tracking for plugin process cleanup.
+// Must be called before LoadPlugins.
+func (m *PluginManager) SetPidFile(dir string, serverPort int) {
+	name := fmt.Sprintf("plugins-%d.pid", serverPort)
+	m.pidFile = newPidFile(filepath.Join(dir, name), m.logger)
+}
+
 // SetServicesManager sets the services manager for LLM provider re-registration after restart.
 func (m *PluginManager) SetServicesManager(sm *ServicesManager) {
 	m.servicesManager = sm
+}
+
+// SetOnWatchersSetup sets a callback invoked after plugin watchers are written to DB.
+// The server uses this to reload the watcher engine's in-memory map.
+func (m *PluginManager) SetOnWatchersSetup(fn func()) {
+	m.onWatchersSetup = fn
+}
+
+// SetOnPluginRestarted sets a callback invoked after a plugin auto-restart succeeds.
+// The server uses this to clear stale HTTP mux state (sync.Once + cached ServeMux).
+func (m *PluginManager) SetOnPluginRestarted(fn func(name string)) {
+	m.onPluginRestarted = fn
+}
+
+// Accumulator returns the plugin banner accumulator.
+func (m *PluginManager) Accumulator() *PluginAccumulator {
+	return m.accumulator
 }
 
 // LoadPlugins loads and connects to plugins from configuration.
 // Enabled plugins are retried forever — enabled means the operator is certain
 // this plugin must run. Disabled plugins are skipped entirely.
 func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig) error {
+	// Kill plugin processes orphaned by a previous run
+	if m.pidFile != nil {
+		m.pidFile.CleanStale()
+	}
+
 	for _, config := range configs {
 		if !config.Enabled {
 			m.logger.Infow("Skipping disabled plugin", "name", config.Name)
@@ -220,7 +257,17 @@ func (m *PluginManager) retryPluginForever(ctx context.Context, config PluginCon
 				m.registerRestarted(ctx, config.Name, registry, services)
 			}
 
-			m.logger.Infof("Plugin '%s' loaded successfully on restart cycle %d", config.Name, cycle)
+			// Clear stale HTTP mux state so next request re-initializes
+			if m.onPluginRestarted != nil {
+				m.onPluginRestarted(config.Name)
+			}
+
+			// Emit recovered banner
+			if m.accumulator != nil {
+				m.accumulator.Emit(config.Name, BannerRecovered)
+			}
+
+			m.logger.Debugf("Plugin '%s' loaded successfully on restart cycle %d", config.Name, cycle)
 			return
 		}
 
@@ -263,7 +310,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 
 	if config.Address != "" {
 		addr = config.Address
-		m.logger.Infow("Connecting to existing plugin", "name", config.Name, "address", addr)
+		m.logger.Debugw("Connecting to existing plugin", "name", config.Name, "address", addr)
 	} else if config.Binary != "" && config.AutoStart {
 		port = m.allocatePort()
 		addr = fmt.Sprintf("127.0.0.1:%d", port)
@@ -279,11 +326,15 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		if actualPort != 0 && actualPort != port {
 			port = actualPort
 			addr = fmt.Sprintf("127.0.0.1:%d", port)
-			m.logger.Infow("Plugin bound to different port", "name", config.Name, "actual_port", actualPort)
+			m.logger.Debugw("Plugin bound to different port", "name", config.Name, "actual_port", actualPort)
 		}
 
-		m.logger.Infof("Started '%s' plugin process (pid=%d, port=%d, addr=%s)",
+		m.logger.Debugf("Started '%s' plugin process (pid=%d, port=%d, addr=%s)",
 			config.Name, process.Pid, port, addr)
+
+		if m.pidFile != nil {
+			m.pidFile.Add(process.Pid)
+		}
 
 		if err := m.waitForPlugin(ctx, config.Name, addr, 5*time.Second); err != nil {
 			process.Kill()
@@ -343,13 +394,17 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		return errors.WithHint(err, "verify the correct plugin binary is installed or update the plugin name in config")
 	}
 
-	// Update logger names with version information
-	nameWithVersion := fmt.Sprintf("%s v%s", meta.Name, meta.Version)
+	// Add version to plugin loggers now that metadata is available
 	if stdoutLogger != nil {
-		stdoutLogger.updateName(nameWithVersion)
+		stdoutLogger.setVersion(meta.Name, meta.Version)
 	}
 	if stderrLogger != nil {
-		stderrLogger.updateName(nameWithVersion)
+		stderrLogger.setVersion(meta.Name, meta.Version)
+	}
+
+	// Wire watcher reload callback so engine picks up plugin-declared watchers
+	if m.onWatchersSetup != nil {
+		client.OnWatchersSetup = m.onWatchersSetup
 	}
 
 	// Register — lock only for the final state write
@@ -365,7 +420,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 	}
 	m.mu.Unlock()
 
-	m.logger.Infof("Plugin '%s' v%s loaded and ready - %s",
+	m.logger.Debugf("Plugin '%s' v%s loaded and ready - %s",
 		config.Name, meta.Version, meta.Description)
 
 	return nil
@@ -467,13 +522,10 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 		cmd = exec.Command(binary, args...)
 	}
 
-	// NOTE: Using exec.Command instead of exec.CommandContext intentionally.
-	// This prevents plugins from being killed when parent context is cancelled (e.g., during
-	// graceful shutdown), allowing proper plugin shutdown via gRPC Shutdown() call.
-	//
-	// TRADEOFF: If QNTX crashes or is killed (SIGKILL), plugin processes become orphans.
-	// TODO: Consider implementing process group management or pidfile tracking for cleanup
-	// of orphaned plugins on next QNTX startup.
+	// Using exec.Command instead of exec.CommandContext intentionally.
+	// Plugins are not killed on context cancellation — graceful shutdown sends
+	// gRPC Shutdown() first. Orphans from crashes are cleaned up on next startup
+	// via pidfile tracking (see pidfile.go).
 
 	// Set environment
 	cmd.Env = os.Environ()
@@ -487,18 +539,18 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	// Create shared log buffer for live streaming
 	logBuf := NewLogBuffer(200)
 
-	// Capture output for debugging and port discovery
+	// Capture output for debugging and port discovery.
+	// Each plugin gets its own named logger so the zap name shows "scry" not "plugin-loader".
+	pLogger := m.rootLogger.Named(config.Name)
 	stdoutLogger := &pluginLogger{
-		logger:    m.logger,
-		name:      config.Name,
+		logger:    pLogger,
 		level:     "info",
 		portChan:  portChan,
 		logBuffer: logBuf,
 	}
 	stderrLogger := &pluginLogger{
-		logger:    m.logger,
-		name:      config.Name,
-		level:     "error",
+		logger:    pLogger,
+		level:     "debug",
 		logBuffer: logBuf,
 		// Don't pass portChan to stderr - port announcement should be on stdout
 	}
@@ -517,7 +569,7 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	select {
 	case discoveredPort := <-portChan:
 		actualPort = discoveredPort
-		m.logger.Infow("Discovered plugin port from stdout",
+		m.logger.Debugw("Discovered plugin port from stdout",
 			"name", config.Name,
 			"requested_port", port,
 			"actual_port", actualPort)
@@ -587,18 +639,20 @@ func (m *PluginManager) waitForPlugin(ctx context.Context, expectedName string, 
 
 		// gRPC service is ready, but is it the right plugin?
 		if metaResp.Name == expectedName {
-			m.logger.Infow("Plugin ready",
+			m.logger.Debugw("Plugin ready",
 				"plugin", expectedName, "addr", addr,
 				"attempts", attempt, "elapsed_ms", time.Since(start).Milliseconds(),
 			)
 			return nil
 		}
 
-		// Wrong plugin at this address (likely from another QNTX instance)
-		m.logger.Warnw("Wrong plugin at address",
-			"expected", expectedName, "found", metaResp.Name,
-			"addr", addr, "attempt", attempt,
-		)
+		// Wrong plugin at this address — log once, not every retry
+		if attempt == 1 {
+			m.logger.Warnw("Wrong plugin at address",
+				"expected", expectedName, "found", metaResp.Name,
+				"addr", addr,
+			)
+		}
 		time.Sleep(100 * time.Millisecond)
 	}
 
@@ -665,7 +719,7 @@ func (m *PluginManager) ConfigureWebSocket(keepalive KeepaliveConfig, wsConfig W
 	for _, p := range m.plugins {
 		p.client.SetWebSocketConfig(keepalive, wsConfig)
 	}
-	m.logger.Infow("WebSocket configuration applied to plugins",
+	m.logger.Debugw("WebSocket configuration applied to plugins",
 		"keepalive_enabled", keepalive.Enabled,
 		"ping_interval", keepalive.PingInterval,
 		"allowed_origins_count", len(wsConfig.AllowedOrigins),
@@ -691,7 +745,7 @@ func (m *PluginManager) ReinitializePlugin(ctx context.Context, pluginName strin
 		return errors.WithHintf(wrappedErr, "check plugin logs and verify configuration is valid")
 	}
 
-	m.logger.Infof("Successfully reinitialized plugin '%s' with updated configuration", pluginName)
+	m.logger.Debugf("Successfully reinitialized plugin '%s' with updated configuration", pluginName)
 	return nil
 }
 
@@ -719,7 +773,7 @@ func (m *PluginManager) RestartPlugin(ctx context.Context, name string, registry
 	// Unregister from registry so Register doesn't hit "already registered"
 	registry.Unregister(name)
 
-	m.logger.Infof("Killed plugin '%s', relaunching from %s", name, config.Binary)
+	m.logger.Debugf("Killed plugin '%s', relaunching from %s", name, config.Binary)
 
 	// Relaunch — if it fails, retry forever in background
 	if err := m.loadPlugin(ctx, config); err != nil {
@@ -733,6 +787,7 @@ func (m *PluginManager) RestartPlugin(ctx context.Context, name string, registry
 	}
 
 	m.registerRestarted(ctx, name, registry, services)
+	// Accumulator is populated by registerRestarted — callers emit with the appropriate reason
 	return nil
 }
 
@@ -752,23 +807,50 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		}
 	}
 
-	// Re-register LLM provider if applicable
+	// Re-register service providers if applicable
 	m.mu.RLock()
 	p, exists := m.plugins[name]
 	m.mu.RUnlock()
 	if !exists || m.servicesManager == nil {
+		m.logger.Debugf("Plugin '%s' restarted successfully", name)
 		return
 	}
 	proxy := p.client
-	if !proxy.IsLLMProvider() {
-		return
+	var roles []string
+	if proxy.IsLLMProvider() {
+		roles = append(roles, "llm-provider")
+		if llmRouter := m.servicesManager.GetLLMRouter(); llmRouter != nil {
+			llmRouter.RegisterProvider(name, proxy.LLMServiceClient())
+			m.logger.Debugf("Re-registered LLM provider '%s' after restart", name)
+		}
 	}
-	if llmRouter := m.servicesManager.GetLLMRouter(); llmRouter != nil {
-		llmRouter.RegisterProvider(name, proxy.LLMServiceClient())
-		m.logger.Infof("Re-registered LLM provider '%s' after restart", name)
+	if proxy.IsSearchProvider() {
+		roles = append(roles, "search-provider")
+		if searchRouter := m.servicesManager.GetSearchRouter(); searchRouter != nil {
+			searchRouter.RegisterProvider(name, proxy.SearchServiceClient())
+			m.logger.Debugf("Re-registered search provider '%s' after restart", name)
+		}
 	}
 
-	m.logger.Infof("Plugin '%s' restarted successfully", name)
+	m.logger.Debugf("Plugin '%s' restarted successfully", name)
+
+	// Emit banner for restarted plugin
+	if m.accumulator != nil {
+		meta := proxy.Metadata()
+		m.accumulator.SetLoading(name, meta.Version)
+		m.accumulator.SetRoles(name, roles)
+		m.accumulator.SetHandlers(name, proxy.GetHandlerNames(), len(proxy.GetSchedules()), len(proxy.GetWatchers()))
+		healthCtx, hCancel := context.WithTimeout(ctx, 5*time.Second)
+		health := proxy.Health(healthCtx)
+		hCancel()
+		details := make(map[string]string)
+		for k, v := range health.Details {
+			if s, ok := v.(string); ok {
+				details[k] = s
+			}
+		}
+		m.accumulator.SetHealth(name, health.Healthy, health.Message, details)
+	}
 }
 
 // Shutdown stops all managed plugins and retry goroutines.
@@ -800,6 +882,11 @@ func (m *PluginManager) Shutdown(ctx context.Context) error {
 
 	m.plugins = make(map[string]*managedPlugin)
 
+	// Clean shutdown — remove PID file so next startup doesn't kill anything
+	if m.pidFile != nil {
+		m.pidFile.Remove()
+	}
+
 	if len(errs) > 0 {
 		return errors.Newf("shutdown errors: %v", errs)
 	}
@@ -809,26 +896,19 @@ func (m *PluginManager) Shutdown(ctx context.Context) error {
 // pluginLogger logs plugin output and captures port announcements.
 type pluginLogger struct {
 	logger    *zap.SugaredLogger
-	name      string
+	prefix    string // e.g. "[scry v0.35.0] " — set after metadata arrives
 	level     string
 	buf       strings.Builder
-	portChan  chan int     // Optional channel to send discovered port
-	logBuffer *LogBuffer   // Optional ring buffer for log streaming
-	mu        sync.RWMutex // Protects name field for dynamic updates
+	portChan  chan int   // Optional channel to send discovered port
+	logBuffer *LogBuffer // Optional ring buffer for log streaming
+	mu        sync.Mutex // Protects prefix field for dynamic updates
 }
 
-// updateName safely updates the logger's name with version info
-func (l *pluginLogger) updateName(newName string) {
+// setVersion sets the log line prefix to [name vX.Y.Z]
+func (l *pluginLogger) setVersion(name, version string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.name = newName
-}
-
-// getName safely retrieves the current name
-func (l *pluginLogger) getName() string {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-	return l.name
+	l.prefix = fmt.Sprintf("[%s v%s] ", name, version)
 }
 
 func (l *pluginLogger) Write(p []byte) (n int, err error) {
@@ -880,20 +960,23 @@ func (l *pluginLogger) Write(p []byte) (n int, err error) {
 				})
 			}
 
-			// Log at the actual level from JSON, or fallback to configured level for non-JSON
-			name := l.getName()
+			// Log with plugin identity from logger name, version from prefix
+			l.mu.Lock()
+			lg := l.logger
+			pfx := l.prefix
+			l.mu.Unlock()
+			msg := pfx + line
 			switch actualLevel {
 			case "debug":
-				l.logger.Debugf("[%s] %s", name, line)
+				lg.Debug(msg)
 			case "info":
-				l.logger.Infof("[%s] %s", name, line)
+				lg.Info(msg)
 			case "warn":
-				l.logger.Warnf("[%s] %s", name, line)
+				lg.Warn(msg)
 			case "error":
-				l.logger.Errorf("[%s stderr] %s", name, line)
+				lg.Error(msg)
 			default:
-				// Unknown level or non-JSON
-				l.logger.Warnf("[%s UNKNOWN] %s", name, line)
+				lg.Warn(msg)
 			}
 		}
 	}

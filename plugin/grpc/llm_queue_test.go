@@ -11,7 +11,7 @@ import (
 )
 
 func TestLLMQueue_ImmediateAcquire(t *testing.T) {
-	q := newLLMQueue(2, 0)
+	q := newLLMQueue(2, 0, 0)
 
 	require.NoError(t, q.Acquire(context.Background(), 0))
 	require.NoError(t, q.Acquire(context.Background(), 0))
@@ -29,7 +29,7 @@ func TestLLMQueue_ImmediateAcquire(t *testing.T) {
 }
 
 func TestLLMQueue_BlocksWhenFull(t *testing.T) {
-	q := newLLMQueue(1, 0)
+	q := newLLMQueue(1, 0, 0)
 
 	require.NoError(t, q.Acquire(context.Background(), 0))
 
@@ -42,7 +42,7 @@ func TestLLMQueue_BlocksWhenFull(t *testing.T) {
 }
 
 func TestLLMQueue_PriorityOrdering(t *testing.T) {
-	q := newLLMQueue(1, 0)
+	q := newLLMQueue(1, 0, 0)
 
 	// Fill the single slot
 	require.NoError(t, q.Acquire(context.Background(), 0))
@@ -92,7 +92,7 @@ func TestLLMQueue_PriorityOrdering(t *testing.T) {
 }
 
 func TestLLMQueue_ContextCancelWhileWaiting(t *testing.T) {
-	q := newLLMQueue(1, 0)
+	q := newLLMQueue(1, 0, 0)
 	require.NoError(t, q.Acquire(context.Background(), 0))
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -122,7 +122,7 @@ func TestLLMQueue_ContextCancelWhileWaiting(t *testing.T) {
 }
 
 func TestLLMQueue_RejectsWhenQueueFull(t *testing.T) {
-	q := newLLMQueue(1, 2) // 1 active slot, max 2 waiters
+	q := newLLMQueue(1, 2, 0) // 1 active slot, max 2 waiters
 
 	// Fill the active slot
 	require.NoError(t, q.Acquire(context.Background(), 0))

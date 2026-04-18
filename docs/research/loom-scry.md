@@ -8,7 +8,7 @@ Loom is an OCaml plugin that receives conversation events and chunks them into "
 
 **Data ingestion.** Two paths:
 
-- **UDP listener** (`lib/udp_listener.ml`, port 19470): Graunde sends a JSON attestation datagram on every Claude Code hook event (UserPromptSubmit, Stop, PreToolUse, SessionStart/End, etc.). Fire-and-forget. This is the primary live path.
+- **UDP listener** (`lib/udp_listener.ml`, port 19470): Ground sends a JSON attestation datagram on every Claude Code hook event (UserPromptSubmit, Stop, PreToolUse, SessionStart/End, etc.). Fire-and-forget. This is the primary live path.
 - **JSONL import** (`lib/http_api.ml`, POST /api/import): Reads historical Claude Code session files (`~/.claude/projects/{slug}/{uuid}.jsonl`) and feeds them through the same stitcher.
 
 **Stitching** (`lib/stitcher.ml`). The stitcher buffers incoming turns per branch+session key. Each turn gets a `[speaker]` prefix label (human, assistant, tool, edit, read, etc.) and is appended to a buffer. When the buffer exceeds `max_chunk_words` (150 words), or a session boundary occurs (SessionStart/SessionEnd), the buffer is flushed as a weave. Branch changes also trigger a flush. The emitted block is a flat string of `[speaker] text` entries joined by `\n\n`.
@@ -17,7 +17,7 @@ Loom is an OCaml plugin that receives conversation events and chunks them into "
 - `subjects`: the branch name
 - `predicates`: `["Weave"]`
 - `contexts`: the session context
-- `attributes`: text, word_count, turn_count, paths (file tail -> full path mapping), weave_source ("graunde" or "jsonl")
+- `attributes`: text, word_count, turn_count, paths (file tail -> full path mapping), weave_source ("ground" or "jsonl")
 
 **HTTP API** (`lib/http_api.ml`, port 5178). Read-only JSON endpoints: GET /api/weaves returns all weaves grouped by branch, GET /api/weaves/branch returns weaves for a single branch, GET /api/sessions lists discoverable session files with import state.
 

@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+// TODO: Check if anything in this file is actually getting used.
+
 // LLMInfo contains information about the detected LLM environment
 type LLMInfo struct {
 	IsLLM    bool

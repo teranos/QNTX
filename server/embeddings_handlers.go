@@ -613,7 +613,7 @@ func (s *QNTXServer) SetupEmbeddingService() {
 
 	// Check if embeddings are enabled in config
 	if !appcfg.GetBool("embeddings.enabled") {
-		s.logger.Infow("Embeddings service disabled in config (embeddings.enabled=false)")
+		s.logger.Debugw("Embeddings service disabled in config (embeddings.enabled=false)")
 		return
 	}
 
