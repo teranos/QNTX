@@ -2,7 +2,7 @@
 
 A glyph is exactly one DOM element for its entire lifetime. It morphs between visual states — dot, proximity-expanded, window, panel, canvas — through smooth animations, but the element identity never changes.
 
-This package is the glyph runtime: the tray, proximity engine, morph transactions, and manifestations. It has zero framework dependencies — pure DOM, Web Animations API, and dependency injection for host-specific concerns.
+This package is the glyph runtime: tray, proximity engine, morph transactions, manifestations, and the canvas interaction layer (drag, resize, meld). It has zero framework dependencies — pure DOM, Web Animations API, and dependency injection via `configureGlyphs()` and `CanvasHost` for host-specific concerns.
 
 ## Status
 
@@ -17,7 +17,7 @@ Extracting from `web/ts/components/glyph/` into this standalone package. The goa
 
 ### Interaction extraction
 
-The package currently has morph, tray, and manifestations. The next series moves the canvas interaction layer — placement, drag, resize, meld, compositions — into the package so any host can have a fully interactive glyph canvas.
+Drag, resize, and the full meld pipeline are in the package. Hosts implement `CanvasHost` to bridge persistence, selection, and composition state. Remaining steps:
 
 - [x] `CTYPE` — Composition types: `CompositionEdge`, `CompositionState` as package-native types
 - [x] `EWALK` — Generic edge walker: takes edges + glyph ID, walks the DAG, returns focus/navigation graph
@@ -47,7 +47,7 @@ The package currently has morph, tray, and manifestations. The next series moves
 
 ## Configuration
 
-Host apps call `configureGlyphs()` at startup to inject logger, persistence, canvas coordinate bridge, and cleanup callbacks. See `web/ts/main.ts` for the canonical wiring. Without configuration, safe defaults apply: no-op logger, no-op persistence, identity coordinate transforms.
+Host apps call `configureGlyphs()` at startup to inject logger, persistence, canvas coordinate bridge, `CanvasHost`, and cleanup callbacks. `CanvasHost` bridges canvas interaction (drag, resize, meld) to host-specific state — persistence, selection, composition CRUD, and sync. See `web/ts/main.ts` for the canonical wiring. Without configuration, safe defaults apply: no-op logger, no-op persistence, no-op canvas host, identity coordinate transforms.
 
 ## Publishing
 
