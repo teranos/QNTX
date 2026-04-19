@@ -6,7 +6,7 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { findMeldTarget, PROXIMITY_THRESHOLD } from './meld-detect';
+import { findMeldTarget, PROXIMITY_THRESHOLD } from '@qntx/glyphs';
 import { uiState } from '../../../state/ui';
 
 /** Helper: mock getBoundingClientRect on an element */

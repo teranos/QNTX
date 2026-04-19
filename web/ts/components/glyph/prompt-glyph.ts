@@ -20,7 +20,7 @@ import { log, SEG } from '../../logger';
 import { apiFetch } from '../../api';
 import { preventDrag, storeCleanup } from '@qntx/glyphs';
 import { canvasPlaced } from './manifestations/canvas-placed';
-import { autoMeldResultBelow } from './meld/meld-system';
+import { autoMeldResultBelow } from './meld/auto-meld-result';
 import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
 import { tooltip } from '../tooltip';

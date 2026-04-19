@@ -15,8 +15,8 @@ import {
     getMeldOptions,
     selectPreferredMeldOption,
     computeGridPositions,
-    type EdgeDirection
-} from './meldability';
+} from '@qntx/glyphs';
+import type { EdgeDirection } from '@qntx/glyphs';
 
 describe('Port-aware MELDABILITY registry', () => {
     describe('areClassesCompatible', () => {
