@@ -6,7 +6,7 @@
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import type { Glyph } from '@qntx/glyphs';
-import { performMeld } from './meld/meld-composition';
+import { performMeld } from '@qntx/glyphs';
 import { uiState } from '../../state/ui';
 
 // Only run these tests when USE_JSDOM=1 (CI environment)

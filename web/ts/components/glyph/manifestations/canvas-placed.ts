@@ -18,8 +18,8 @@ import {
     makeResizable,
     preventDrag,
     storeCleanup,
-    type MakeDraggableOptions,
-} from '../glyph-interaction';
+} from '@qntx/glyphs';
+import type { MakeDraggableOptions } from '@qntx/glyphs';
 
 // ── Config ──────────────────────────────────────────────────────────
 

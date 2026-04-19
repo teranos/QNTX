@@ -12,8 +12,8 @@ import { apiFetch } from '../../api';
 import { canvasSyncQueue } from '../../api/canvas-sync';
 import { uiState } from '../../state/ui';
 import { Doc, Prose } from '@generated/sym.js';
-import { preventDrag } from './glyph-interaction';
-import { autoMeldResultBelow } from './meld/meld-system';
+import { preventDrag } from '@qntx/glyphs';
+import { autoMeldResultBelow } from './meld/auto-meld-result';
 import { findCompositionByGlyph, extractGlyphIds } from '../../state/compositions';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 

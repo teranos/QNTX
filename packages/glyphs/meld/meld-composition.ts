@@ -12,15 +12,12 @@
  * CSS grid's row-height coupling and flexbox's inability to express row offsets.
  */
 
-import { log, SEG } from '../../../logger';
-import type { Glyph } from '@qntx/glyphs';
-import type { CompositionEdge, EdgeDirection } from '@qntx/glyphs';
-import { computeGridPositions, extractGlyphIds, isConnectedGraph } from '@qntx/glyphs';
-import { addComposition, removeComposition, findCompositionByGlyph } from '../../../state/compositions';
+import { getLogger, getLogSegment, getCanvasHost } from '../config';
+import type { Glyph } from '../glyph';
+import type { CompositionEdge, EdgeDirection } from '../composition';
+import { computeGridPositions, isConnectedGraph } from '../edge-graph';
+import { extractGlyphIds } from '../composition';
 import { clearMeldFeedback } from './meld-feedback';
-import { getTransform } from '../canvas/canvas-pan';
-import { canvasSyncQueue } from '../../../api/canvas-sync';
-import { uiState } from '../../../state/ui';
 
 const UNMELD_OFFSET = 20; // px - spacing between glyphs when unmelding
 const UNMELD_DURATION_MS = 200; // animation duration for unmeld slide
@@ -65,6 +62,8 @@ function applyColumnLayout(
     elements: HTMLElement[],
     edges: CompositionEdge[]
 ): void {
+    const log = getLogger();
+    const seg = getLogSegment();
     const positions = computeGridPositions(edges);
 
     // Remove existing column wrappers (migration from flexbox), moving children back
@@ -90,7 +89,7 @@ function applyColumnLayout(
         const id = el.getAttribute('data-glyph-id') || '';
         const pos = positions.get(id);
         if (!pos) {
-            log.warn(SEG.GLYPH, `[MeldSystem] No grid position computed for glyph ${id}`);
+            log.warn(seg, `[MeldSystem] No grid position computed for glyph ${id}`);
             continue;
         }
         if (!rows.has(pos.row)) rows.set(pos.row, new Map());
@@ -122,7 +121,7 @@ function applyColumnLayout(
     // Divide by scale to get unscaled dimensions.
     const canvasEl = composition.closest('.canvas-workspace');
     const canvasId = canvasEl?.getAttribute('data-canvas-id') || 'canvas-workspace';
-    const { scale } = getTransform(canvasId);
+    const { scale } = getCanvasHost().getTransform(canvasId);
 
     const colWidths = new Map<number, number>();
     const rowHeights = new Map<number, number>();
@@ -184,7 +183,11 @@ export function performMeld(
         throw new Error(`Cannot meld: no canvas parent for initiator ${initiatorGlyph.id}`);
     }
 
-    log.info(SEG.GLYPH, '[MeldSystem] Performing meld - reparenting elements', { direction });
+    const log = getLogger();
+    const seg = getLogSegment();
+    const canvasHost = getCanvasHost();
+
+    log.info(seg, '[MeldSystem] Performing meld - reparenting elements', { direction });
 
     // Generate composition ID
     const compositionId = `melded-${initiatorGlyph.id}-${targetGlyph.id}`;
@@ -213,7 +216,7 @@ export function performMeld(
     const y = parseInt(initiatorElement.style.top || '0', 10);
 
     if (isNaN(x) || isNaN(y)) {
-        log.warn(SEG.GLYPH, '[MeldSystem] Invalid position during meld', {
+        log.warn(seg, '[MeldSystem] Invalid position during meld', {
             rawLeft: initiatorElement.style.left,
             rawTop: initiatorElement.style.top,
             parsedX: x,
@@ -244,15 +247,15 @@ export function performMeld(
     applyColumnLayout(composition, [initiatorElement, targetElement], edges);
 
     // Persist composition to storage and flush to backend immediately
-    addComposition({
+    canvasHost.saveComposition({
         id: compositionId,
         edges,
         x: isNaN(x) ? 0 : x,
         y: isNaN(y) ? 0 : y
     });
-    canvasSyncQueue.flush();
+    canvasHost.flushSync();
 
-    log.info(SEG.GLYPH, '[MeldSystem] Meld complete - elements reparented and persisted', {
+    log.info(seg, '[MeldSystem] Meld complete - elements reparented and persisted', {
         compositionId,
         edges: edges.length,
         glyphs: extractGlyphIds(edges)
@@ -275,8 +278,12 @@ export function extendComposition(
     direction: EdgeDirection,
     incomingRole: 'from' | 'to'
 ): HTMLElement {
+    const log = getLogger();
+    const seg = getLogSegment();
+    const canvasHost = getCanvasHost();
+
     // Look up existing composition state
-    const existingComp = findCompositionByGlyph(anchorGlyphId);
+    const existingComp = canvasHost.findCompositionByGlyph(anchorGlyphId);
     if (!existingComp) {
         throw new Error(`Cannot extend composition: no composition found for glyph ${anchorGlyphId}`);
     }
@@ -291,7 +298,7 @@ export function extendComposition(
     // Regenerate composition ID from the new edge
     const newId = `melded-${newEdge.from}-${newEdge.to}`;
 
-    log.info(SEG.GLYPH, '[MeldSystem] Extending composition', {
+    log.info(seg, '[MeldSystem] Extending composition', {
         oldId,
         newId,
         anchor: anchorGlyphId,
@@ -320,14 +327,14 @@ export function extendComposition(
 
     // Update storage: remove old, add new with all edges
     const allEdges = [...existingComp.edges, newEdge];
-    removeComposition(oldId);
-    addComposition({
+    canvasHost.removeComposition(oldId);
+    canvasHost.saveComposition({
         id: newId,
         edges: allEdges,
         x: existingComp.x,
         y: existingComp.y
     });
-    canvasSyncQueue.flush();
+    canvasHost.flushSync();
 
     // Rebuild grid positions for all children
     const allChildren = Array.from(
@@ -335,7 +342,7 @@ export function extendComposition(
     ) as HTMLElement[];
     applyColumnLayout(compositionElement, allChildren, allEdges);
 
-    log.info(SEG.GLYPH, '[MeldSystem] Composition extended', {
+    log.info(seg, '[MeldSystem] Composition extended', {
         newId,
         edges: allEdges.length,
         glyphs: extractGlyphIds(allEdges)
@@ -364,7 +371,10 @@ export function reconstructMeld(
         throw new Error(`Cannot reconstruct meld: no canvas parent for composition ${compositionId}`);
     }
 
-    log.info(SEG.GLYPH, '[MeldSystem] Reconstructing meld from storage', {
+    const log = getLogger();
+    const seg = getLogSegment();
+
+    log.info(seg, '[MeldSystem] Reconstructing meld from storage', {
         glyphCount: glyphElements.length,
         edgeCount: edges.length
     });
@@ -394,7 +404,7 @@ export function reconstructMeld(
     // Apply grid layout from edge graph
     applyColumnLayout(composition, glyphElements, edges);
 
-    log.info(SEG.GLYPH, '[MeldSystem] Meld reconstructed', {
+    log.info(seg, '[MeldSystem] Meld reconstructed', {
         compositionId,
         glyphCount: glyphElements.length
     });
@@ -415,21 +425,25 @@ export function detachGlyph(glyphId: string, composition: HTMLElement): {
     detachedElement: HTMLElement;
     remainingComposition: HTMLElement | null;
 } | null {
+    const log = getLogger();
+    const seg = getLogSegment();
+    const canvasHost = getCanvasHost();
+
     if (!isMeldedComposition(composition)) {
-        log.warn(SEG.GLYPH, '[MeldSystem] detachGlyph: not a melded composition');
+        log.warn(seg, '[MeldSystem] detachGlyph: not a melded composition');
         return null;
     }
 
     const canvas = composition.parentElement;
     if (!canvas) {
-        log.error(SEG.GLYPH, '[MeldSystem] detachGlyph: composition has no parent canvas');
+        log.error(seg, '[MeldSystem] detachGlyph: composition has no parent canvas');
         return null;
     }
 
     const compositionId = composition.getAttribute('data-glyph-id') || '';
-    const storedComp = findCompositionByGlyph(glyphId);
+    const storedComp = canvasHost.findCompositionByGlyph(glyphId);
     if (!storedComp) {
-        log.warn(SEG.GLYPH, `[MeldSystem] detachGlyph: no stored composition for glyph ${glyphId}`);
+        log.warn(seg, `[MeldSystem] detachGlyph: no stored composition for glyph ${glyphId}`);
         return null;
     }
 
@@ -437,7 +451,7 @@ export function detachGlyph(glyphId: string, composition: HTMLElement): {
 
     // 2-glyph composition → full unmeld
     if (allGlyphIds.length <= 2) {
-        log.info(SEG.GLYPH, '[MeldSystem] detachGlyph: 2-glyph composition, delegating to full unmeld');
+        log.info(seg, '[MeldSystem] detachGlyph: 2-glyph composition, delegating to full unmeld');
         const result = unmeldComposition(composition);
         if (!result) return null;
         const detached = result.glyphElements.find(
@@ -454,7 +468,7 @@ export function detachGlyph(glyphId: string, composition: HTMLElement): {
 
     // Check if remaining edges form a connected graph
     if (!isConnectedGraph(remainingEdges)) {
-        log.info(SEG.GLYPH, `[MeldSystem] detachGlyph: removing ${glyphId} disconnects graph, delegating to full unmeld`);
+        log.info(seg, `[MeldSystem] detachGlyph: removing ${glyphId} disconnects graph, delegating to full unmeld`);
         const result = unmeldComposition(composition);
         if (!result) return null;
         const detached = result.glyphElements.find(
@@ -467,7 +481,7 @@ export function detachGlyph(glyphId: string, composition: HTMLElement): {
     // Partial detach: reparent detached element to canvas
     const detachedEl = composition.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
     if (!detachedEl) {
-        log.error(SEG.GLYPH, `[MeldSystem] detachGlyph: element not found for glyph ${glyphId}`);
+        log.error(seg, `[MeldSystem] detachGlyph: element not found for glyph ${glyphId}`);
         return null;
     }
 
@@ -500,8 +514,8 @@ export function detachGlyph(glyphId: string, composition: HTMLElement): {
     // Persist detached glyph's new position
     const detachedSymbol = detachedEl.dataset.glyphSymbol || '';
     if (detachedSymbol) {
-        const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
-        uiState.addCanvasGlyph({
+        const existing = canvasHost.getCanvasGlyphs().find(g => g.id === glyphId);
+        canvasHost.saveCanvasGlyph({
             ...existing,
             id: glyphId,
             symbol: detachedSymbol,
@@ -512,15 +526,15 @@ export function detachGlyph(glyphId: string, composition: HTMLElement): {
 
     // Update storage: remove old composition, add new with remaining edges
     const newId = `melded-${remainingEdges[0].from}-${remainingEdges[0].to}`;
-    removeComposition(storedComp.id);
+    canvasHost.removeComposition(storedComp.id);
     composition.setAttribute('data-glyph-id', newId);
-    addComposition({
+    canvasHost.saveComposition({
         id: newId,
         edges: remainingEdges,
         x: storedComp.x,
         y: storedComp.y
     });
-    canvasSyncQueue.flush();
+    canvasHost.flushSync();
 
     // Rebuild layout for remaining elements
     const remainingElements = Array.from(
@@ -528,7 +542,7 @@ export function detachGlyph(glyphId: string, composition: HTMLElement): {
     ) as HTMLElement[];
     applyColumnLayout(composition, remainingElements, remainingEdges);
 
-    log.info(SEG.GLYPH, `[MeldSystem] Detached glyph ${glyphId} from composition`, {
+    log.info(seg, `[MeldSystem] Detached glyph ${glyphId} from composition`, {
         oldId: compositionId,
         newId,
         remainingEdges: remainingEdges.length,
@@ -554,14 +568,18 @@ export function isMeldedComposition(element: HTMLElement): boolean {
 export function unmeldComposition(composition: HTMLElement): {
     glyphElements: HTMLElement[];
 } | null {
+    const log = getLogger();
+    const seg = getLogSegment();
+    const canvasHost = getCanvasHost();
+
     if (!isMeldedComposition(composition)) {
-        log.warn(SEG.GLYPH, '[MeldSystem] Not a melded composition');
+        log.warn(seg, '[MeldSystem] Not a melded composition');
         return null;
     }
 
     const canvas = composition.parentElement;
     if (!canvas) {
-        log.error(SEG.GLYPH, '[MeldSystem] Composition has no parent canvas');
+        log.error(seg, '[MeldSystem] Composition has no parent canvas');
         return null;
     }
 
@@ -572,9 +590,9 @@ export function unmeldComposition(composition: HTMLElement): {
     const glyphElements = Array.from(composition.querySelectorAll('[data-glyph-id]')) as HTMLElement[];
 
     if (glyphElements.length === 0) {
-        log.error(SEG.GLYPH, '[MeldSystem] No glyphs found in composition - removing corrupted composition');
+        log.error(seg, '[MeldSystem] No glyphs found in composition - removing corrupted composition');
         if (compositionId) {
-            removeComposition(compositionId);
+            canvasHost.removeComposition(compositionId);
         }
         composition.remove();
         return null;
@@ -586,10 +604,10 @@ export function unmeldComposition(composition: HTMLElement): {
 
     // Validate parsed values - fallback to 0 if NaN
     if (isNaN(compLeft)) {
-        log.warn(SEG.GLYPH, `[MeldSystem] Invalid composition.style.left: "${composition.style.left}", using 0`);
+        log.warn(seg, `[MeldSystem] Invalid composition.style.left: "${composition.style.left}", using 0`);
     }
     if (isNaN(compTop)) {
-        log.warn(SEG.GLYPH, `[MeldSystem] Invalid composition.style.top: "${composition.style.top}", using 0`);
+        log.warn(seg, `[MeldSystem] Invalid composition.style.top: "${composition.style.top}", using 0`);
     }
     const left = isNaN(compLeft) ? 0 : compLeft;
     const top = isNaN(compTop) ? 0 : compTop;
@@ -621,13 +639,13 @@ export function unmeldComposition(composition: HTMLElement): {
         animatePosition(element, startX, startY, targetX, targetY);
 
         // Persist new position so it survives refresh
-        const glyphId = element.getAttribute('data-glyph-id') || element.dataset.glyphId || '';
+        const glyphIdAttr = element.getAttribute('data-glyph-id') || element.dataset.glyphId || '';
         const symbol = element.dataset.glyphSymbol || '';
-        if (glyphId && symbol) {
-            const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
-            uiState.addCanvasGlyph({
+        if (glyphIdAttr && symbol) {
+            const existing = canvasHost.getCanvasGlyphs().find(g => g.id === glyphIdAttr);
+            canvasHost.saveCanvasGlyph({
                 ...existing,
-                id: glyphId,
+                id: glyphIdAttr,
                 symbol,
                 x: targetX,
                 y: targetY,
@@ -637,14 +655,14 @@ export function unmeldComposition(composition: HTMLElement): {
 
     // Remove composition from storage
     if (compositionId) {
-        removeComposition(compositionId);
+        canvasHost.removeComposition(compositionId);
     }
-    canvasSyncQueue.flush();
+    canvasHost.flushSync();
 
     // Remove composition container
     composition.remove();
 
-    log.info(SEG.GLYPH, '[MeldSystem] Unmeld complete - elements restored and removed from storage', {
+    log.info(seg, '[MeldSystem] Unmeld complete - elements restored and removed from storage', {
         compositionId,
         glyphCount: glyphElements.length
     });

@@ -6,7 +6,7 @@
  */
 
 import { getInitiatorClasses, getTargetClasses, getCompatibleDirections, getGlyphClass, isPortFree, type EdgeDirection } from './meldability';
-import { findCompositionByGlyph } from '../../../state/compositions';
+import { getCanvasHost } from '../config';
 
 // Configuration
 export const PROXIMITY_THRESHOLD = 100; // px - distance at which proximity feedback starts
@@ -135,6 +135,8 @@ export function findMeldTarget(draggedElement: HTMLElement): {
         return noMatch;
     }
 
+    const canvasHost = getCanvasHost();
+
     let closestTarget: HTMLElement | null = null;
     let closestDistance = Infinity;
     let closestDirection: EdgeDirection = 'right';
@@ -149,7 +151,6 @@ export function findMeldTarget(draggedElement: HTMLElement): {
                 const targetElement = el as HTMLElement;
                 if (targetElement === draggedElement) return;
                 // Skip elements in the same composition (no internal rearrangement)
-                // Uses .closest() to handle elements inside sub-containers
                 const targetComp = targetElement.closest('.melded-composition');
                 if (targetComp) {
                     if (draggedElement.closest('.melded-composition') === targetComp) return;
@@ -165,7 +166,7 @@ export function findMeldTarget(draggedElement: HTMLElement): {
                     if (targetComp) {
                         const targetId = targetElement.dataset.glyphId;
                         if (targetId) {
-                            const comp = findCompositionByGlyph(targetId);
+                            const comp = canvasHost.findCompositionByGlyph(targetId);
                             if (comp && !isPortFree(targetId, direction, 'incoming', comp.edges)) continue;
                         }
                     }
@@ -205,7 +206,7 @@ export function findMeldTarget(draggedElement: HTMLElement): {
                     if (nearbyComp) {
                         const nearbyId = nearbyElement.dataset.glyphId;
                         if (nearbyId) {
-                            const comp = findCompositionByGlyph(nearbyId);
+                            const comp = canvasHost.findCompositionByGlyph(nearbyId);
                             if (comp && !isPortFree(nearbyId, direction, 'outgoing', comp.edges)) continue;
                         }
                     }

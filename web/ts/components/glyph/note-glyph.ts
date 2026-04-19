@@ -14,7 +14,7 @@ import { MAX_VIEWPORT_HEIGHT_RATIO } from '@qntx/glyphs';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
-import { storeCleanup, preventDrag } from './glyph-interaction';
+import { storeCleanup, preventDrag } from '@qntx/glyphs';
 import { tooltip } from '../tooltip';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { wireExpandToWindow } from '@qntx/glyphs';

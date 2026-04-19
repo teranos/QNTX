@@ -1,32 +1,37 @@
 /**
- * Shared drag and resize interaction for canvas glyphs.
+ * Canvas drag and resize interaction for glyphs.
  *
- * All glyphs that live on the canvas need the same pointer-driven
- * move / resize behaviour.  The logic was previously duplicated
- * across py-glyph and result-glyph.
+ * All glyphs on the canvas need pointer-driven move/resize.
+ * Uses DI (CanvasHost) for position persistence, transform,
+ * selection, and composition state.
  */
 
-import type { Glyph } from '@qntx/glyphs';
-import { isInWindowState } from '@qntx/glyphs';
-import { log, SEG } from '../../logger';
-import { uiState } from '../../state/ui';
+import type { Glyph } from './glyph';
+import type { MakeDraggableOptions } from './glyph-ui';
+import { isInWindowState } from './dataset';
+import { getLogger, getLogSegment, getCanvasHost } from './config';
 import {
     canInitiateMeld,
     canReceiveMeld,
     findMeldTarget,
     checkDirectionalProximity,
-    applyMeldFeedback,
-    clearMeldFeedback,
+    PROXIMITY_THRESHOLD,
+    MELD_THRESHOLD,
+} from './meld/meld-detect';
+import { applyMeldFeedback, clearMeldFeedback } from './meld/meld-feedback';
+import {
     performMeld,
     extendComposition,
     isMeldedComposition,
-    PROXIMITY_THRESHOLD,
-    MELD_THRESHOLD
-} from './meld/meld-system';
-import { getMeldOptions, selectPreferredMeldOption, getGlyphClass, getCompatibleDirections, isPortFree, type EdgeDirection } from './meld/meldability';
-import { isGlyphSelected, getSelectedGlyphIds } from './canvas/selection';
-import { getTransform } from './canvas/canvas-pan.js';
-import { addComposition, findCompositionByGlyph } from '../../state/compositions';
+} from './meld/meld-composition';
+import {
+    getMeldOptions,
+    selectPreferredMeldOption,
+    getGlyphClass,
+    getCompatibleDirections,
+    isPortFree,
+    type EdgeDirection,
+} from './meld/meldability';
 
 // Monotonic z-index counter — each drag/click brings glyph to front
 let topZIndex = 1;
@@ -70,7 +75,6 @@ function findBestAnchorInComposition(
         const glyphRect = glyphEl.getBoundingClientRect();
 
         // Append: composition glyph → standalone (outgoing port)
-        // Use directional proximity so spatial relationship determines direction
         for (const dir of getCompatibleDirections(glyphClass, standaloneClass)) {
             if (!isPortFree(glyphId, dir, 'outgoing', edges)) continue;
             const dist = checkDirectionalProximity(glyphRect, standaloneRect, dir);
@@ -101,8 +105,7 @@ function findBestAnchorInComposition(
 
 // ── Options ─────────────────────────────────────────────────────────
 
-import type { MakeDraggableOptions } from '@qntx/glyphs';
-export type { MakeDraggableOptions } from '@qntx/glyphs';
+export type { MakeDraggableOptions };
 
 export interface MakeResizableOptions {
     /** Label used in log messages, e.g. "PyGlyph". */
@@ -174,12 +177,14 @@ export function runCleanup(element: HTMLElement): void {
  * Prevents memory leaks when glyphs are removed or re-rendered.
  */
 export function cleanupResizeObserver(element: HTMLElement, glyphId?: string): void {
+    const log = getLogger();
+    const seg = getLogSegment();
     const existing = (element as any).__resizeObserver;
     if (existing && typeof existing.disconnect === 'function') {
         existing.disconnect();
         delete (element as any).__resizeObserver;
         if (glyphId) {
-            log.debug(SEG.GLYPH, `[${glyphId}] Disconnected ResizeObserver`);
+            log.debug(seg, `[${glyphId}] Disconnected ResizeObserver`);
         }
     }
 }
@@ -219,18 +224,6 @@ export function preventDrag(...elements: HTMLElement[]): void {
  * @param glyph - The glyph model to update with position
  * @param opts - Optional configuration
  * @returns Cleanup function to remove all event listeners
- *
- * @example
- * // Basic usage
- * const cleanup = makeDraggable(element, titleBar, glyph, { logLabel: 'PyGlyph' });
- * // Later: cleanup();
- *
- * @example
- * // Ignore button clicks in the handle
- * makeDraggable(element, header, glyph, {
- *   logLabel: 'ResultGlyph',
- *   ignoreButtons: true
- * });
  */
 export function makeDraggable(
     element: HTMLElement,
@@ -239,6 +232,9 @@ export function makeDraggable(
     opts: MakeDraggableOptions = {},
 ): () => void {
     const { ignoreButtons = false, logLabel = 'Glyph' } = opts;
+    const log = getLogger();
+    const seg = getLogSegment();
+    const canvasHost = getCanvasHost();
 
     // AbortController for all event listeners (including mousedown)
     const setupController = new AbortController();
@@ -250,7 +246,7 @@ export function makeDraggable(
     let elementStartY = 0;
     let dragController: AbortController | null = null;
     let currentMeldTarget: HTMLElement | null = null;
-    let rafId: number | null = null; // Track requestAnimationFrame for meld feedback
+    let rafId: number | null = null;
     let dragCanvasId = '';
 
     // Multi-selection drag support
@@ -260,12 +256,11 @@ export function makeDraggable(
     const handleMouseMove = (e: MouseEvent) => {
         if (!isDragging) return;
 
-        const scale = getTransform(dragCanvasId).scale || 1;
+        const scale = canvasHost.getTransform(dragCanvasId).scale || 1;
         const deltaX = (e.clientX - dragStartX) / scale;
         const deltaY = (e.clientY - dragStartY) / scale;
 
         if (isMultiDrag) {
-            // Move all selected glyphs together
             for (const { element: el, startX, startY } of multiDragElements) {
                 const newX = startX + deltaX;
                 const newY = startY + deltaY;
@@ -273,25 +268,23 @@ export function makeDraggable(
                 el.style.top = `${newY}px`;
             }
         } else {
-            // Single glyph drag
             const newX = elementStartX + deltaX;
             const newY = elementStartY + deltaY;
             element.style.left = `${newX}px`;
             element.style.top = `${newY}px`;
         }
 
-        // Cancel any pending meld feedback update to prevent race conditions
+        // Cancel any pending meld feedback update
         if (rafId !== null) {
             cancelAnimationFrame(rafId);
         }
 
-        // Schedule meld feedback for next frame (prevents interleaving during fast drags)
+        // Schedule meld feedback for next frame
         if (canInitiateMeld(element) || canReceiveMeld(element)) {
             rafId = requestAnimationFrame(() => {
                 rafId = null;
                 const meldInfo = findMeldTarget(element);
                 if (meldInfo.target && meldInfo.distance < PROXIMITY_THRESHOLD) {
-                    // When reversed, the nearby element is the meld initiator — glow from its edge
                     const [initiator, target] = meldInfo.reversed
                         ? [meldInfo.target, element]
                         : [element, meldInfo.target];
@@ -309,13 +302,11 @@ export function makeDraggable(
         if (!isDragging) return;
         isDragging = false;
 
-        // Cancel any pending meld feedback animation
         if (rafId !== null) {
             cancelAnimationFrame(rafId);
             rafId = null;
         }
 
-        // Remove dragging class from all elements
         element.classList.remove('is-dragging');
         if (isMultiDrag) {
             for (const { element: el } of multiDragElements) {
@@ -323,7 +314,7 @@ export function makeDraggable(
             }
         }
 
-        // Check if we should meld (forward: dragged initiates, or reverse: nearby initiates toward dragged)
+        // Check if we should meld
         if (canInitiateMeld(element) || canReceiveMeld(element)) {
             const meldInfo = findMeldTarget(element);
             if (meldInfo.target && meldInfo.distance < MELD_THRESHOLD) {
@@ -336,7 +327,6 @@ export function makeDraggable(
                     renderContent: () => nearbyElement
                 };
 
-                // Clean up event listeners, animations, and meld feedback before melding
                 if (rafId !== null) {
                     cancelAnimationFrame(rafId);
                     rafId = null;
@@ -346,14 +336,10 @@ export function makeDraggable(
                 setupController.abort();
                 dragController?.abort();
 
-                // When reversed, the nearby element is the meld initiator (from) and
-                // the dragged element is the target (to) — swap arguments to performMeld
                 const [meldInitiator, meldTarget, meldInitiatorGlyph, meldTargetGlyph] = meldInfo.reversed
                     ? [nearbyElement, element, nearbyGlyph, glyph]
                     : [element, nearbyElement, glyph, nearbyGlyph];
 
-                // Check if either element is inside an existing composition → extend it
-                // Uses .closest() to handle elements nested in sub-containers
                 const targetComp = meldTarget.closest('.melded-composition') as HTMLElement | null;
                 const initiatorComp = meldInitiator.closest('.melded-composition') as HTMLElement | null;
 
@@ -363,12 +349,10 @@ export function makeDraggable(
                     const standaloneId = standaloneElement.dataset.glyphId || '';
                     const standaloneClass = getGlyphClass(standaloneElement);
                     const fallbackAnchorId = (targetComp ? meldTarget : meldInitiator).dataset.glyphId || '';
-                    const existingComp = findCompositionByGlyph(fallbackAnchorId);
+                    const existingComp = canvasHost.findCompositionByGlyph(fallbackAnchorId);
 
                     if (existingComp && standaloneClass) {
-                        // If a glyph inside the composition is selected, use it as the anchor —
-                        // the user is explicitly saying "connect to this one"
-                        const selectedIds = getSelectedGlyphIds(dragCanvasId);
+                        const selectedIds = canvasHost.getSelectedGlyphIds(dragCanvasId);
                         const selectedAnchor = selectedIds.find(id =>
                             compositionElement.querySelector(`[data-glyph-id="${id}"]`) !== null
                         );
@@ -402,19 +386,17 @@ export function makeDraggable(
                                 logLabel: 'MeldedComposition'
                             });
 
-                            log.info(SEG.GLYPH, `[${logLabel}] Extended composition with ${standaloneId} (${option.direction}, ${option.incomingRole})`);
+                            log.info(seg, `[${logLabel}] Extended composition with ${standaloneId} (${option.direction}, ${option.incomingRole})`);
                             return;
                         }
                     }
-                    // No valid options (ports occupied) — don't fall through to performMeld
-                    log.debug(SEG.GLYPH, `[${logLabel}] No free ports for ${standaloneId}, skipping meld`);
+                    log.debug(seg, `[${logLabel}] No free ports for ${standaloneId}, skipping meld`);
                     return;
                 }
 
                 // Neither is in a composition — create new 2-glyph composition
                 const composition = performMeld(meldInitiator, meldTarget, meldInitiatorGlyph, meldTargetGlyph, meldInfo.direction);
 
-                // Make the composition draggable as a unit
                 const compositionGlyph: Glyph = {
                     id: composition.getAttribute('data-glyph-id') || `melded-${meldInitiatorGlyph.id}-${meldTargetGlyph.id}`,
                     title: 'Melded Composition',
@@ -425,7 +407,7 @@ export function makeDraggable(
                     logLabel: 'MeldedComposition'
                 });
 
-                log.info(SEG.GLYPH, `[${logLabel}] Melded ${meldInitiatorGlyph.id} → ${meldTargetGlyph.id} (${meldInfo.direction}${meldInfo.reversed ? ', reversed' : ''})`);
+                log.info(seg, `[${logLabel}] Melded ${meldInitiatorGlyph.id} → ${meldTargetGlyph.id} (${meldInfo.direction}${meldInfo.reversed ? ', reversed' : ''})`);
                 return;
             }
         }
@@ -434,47 +416,29 @@ export function makeDraggable(
         clearMeldFeedback(element);
         currentMeldTarget = null;
 
-        // Save positions for all dragged glyphs
-        // Check if we're dragging a melded composition
+        // Save positions
         if (isMeldedComposition(element)) {
-            // Read position from style (content-layer space) — not bounding rect (screen space)
             const x = Math.round(parseFloat(element.style.left) || 0);
             const y = Math.round(parseFloat(element.style.top) || 0);
-
-            // Get composition data from DOM
             const compositionId = element.getAttribute('data-glyph-id') || '';
-
-            // Find existing composition in storage via first child glyph
             const firstChild = element.querySelector('[data-glyph-id]');
             const childId = firstChild?.getAttribute('data-glyph-id') || '';
-            const existingComp = findCompositionByGlyph(childId);
+            const existingComp = canvasHost.findCompositionByGlyph(childId);
             if (existingComp) {
-                // Update composition position
-                addComposition({
-                    ...existingComp,
-                    x,
-                    y
-                });
-                log.debug(SEG.GLYPH, `[${logLabel}] Updated composition position`, {
-                    compositionId,
-                    x,
-                    y
-                });
+                canvasHost.saveComposition({ ...existingComp, x, y });
+                log.debug(seg, `[${logLabel}] Updated composition position`, { compositionId, x, y });
             } else {
-                log.warn(SEG.GLYPH, `[${logLabel}] Composition ${compositionId} not found in storage`);
+                log.warn(seg, `[${logLabel}] Composition ${compositionId} not found in storage`);
             }
         } else if (isMultiDrag) {
-            // Save positions for all selected glyphs
             for (const { element: el, glyph: g } of multiDragElements) {
-                // Read position from style (content-layer space) — not bounding rect (screen space)
                 const x = Math.round(parseFloat(el.style.left) || 0);
                 const y = Math.round(parseFloat(el.style.top) || 0);
                 g.x = x;
                 g.y = y;
-
                 if (g.symbol) {
-                    const existing = uiState.getCanvasGlyphs().find(cg => cg.id === g.id);
-                    uiState.addCanvasGlyph({
+                    const existing = canvasHost.getCanvasGlyphs().find(cg => cg.id === g.id);
+                    canvasHost.saveCanvasGlyph({
                         ...existing,
                         id: g.id,
                         symbol: g.symbol,
@@ -485,19 +449,17 @@ export function makeDraggable(
                     });
                 }
             }
-            log.debug(SEG.GLYPH, `[${logLabel}] Finished multi-dragging ${multiDragElements.length} glyphs`);
+            log.debug(seg, `[${logLabel}] Finished multi-dragging ${multiDragElements.length} glyphs`);
             multiDragElements = [];
             isMultiDrag = false;
         } else {
-            // Single glyph position save — read from style (content-layer space)
             const x = Math.round(parseFloat(element.style.left) || 0);
             const y = Math.round(parseFloat(element.style.top) || 0);
             glyph.x = x;
             glyph.y = y;
-
             if (glyph.symbol) {
-                const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
-                uiState.addCanvasGlyph({
+                const existing = canvasHost.getCanvasGlyphs().find(g => g.id === glyph.id);
+                canvasHost.saveCanvasGlyph({
                     ...existing,
                     id: glyph.id,
                     symbol: glyph.symbol,
@@ -507,7 +469,7 @@ export function makeDraggable(
                     height: glyph.height,
                 });
             }
-            log.debug(SEG.GLYPH, `[${logLabel}] Finished dragging ${glyph.id}`);
+            log.debug(seg, `[${logLabel}] Finished dragging ${glyph.id}`);
         }
 
         dragController?.abort();
@@ -519,12 +481,10 @@ export function makeDraggable(
             return;
         }
 
-        // Don't allow canvas drag when glyph is in window manifestation
         if (isInWindowState(element)) {
             return;
         }
 
-        // Don't allow dragging child glyphs inside compositions - only drag the composition itself
         if (element.closest('.melded-composition') && !element.classList.contains('melded-composition')) {
             return;
         }
@@ -535,29 +495,23 @@ export function makeDraggable(
 
         dragStartX = e.clientX;
         dragStartY = e.clientY;
-        // Use offsetLeft/Top to get position relative to parent (ignores pan transform)
         elementStartX = element.offsetLeft;
         elementStartY = element.offsetTop;
 
         element.classList.add('is-dragging');
-
-        // Bring to front — stays on top after release
         element.style.zIndex = String(++topZIndex);
 
-        // Check if this glyph is part of a multi-selection
         const canvasId = (element.closest('[data-canvas-id]') as HTMLElement | null)?.dataset?.canvasId ?? 'canvas-workspace';
         dragCanvasId = canvasId;
-        const selectedIds = getSelectedGlyphIds(canvasId);
-        if (selectedIds.length > 1 && isGlyphSelected(canvasId, glyph.id)) {
+        const selectedIds = canvasHost.getSelectedGlyphIds(canvasId);
+        if (selectedIds.length > 1 && canvasHost.isGlyphSelected(canvasId, glyph.id)) {
             isMultiDrag = true;
             const canvas = element.parentElement;
             if (canvas) {
-                // Gather all selected glyphs with their initial positions
                 for (const id of selectedIds) {
                     const el = canvas.querySelector(`[data-glyph-id="${id}"]`) as HTMLElement | null;
                     if (el) {
                         const elRect = el.getBoundingClientRect();
-                        // Create a glyph object for tracking with current dimensions
                         const glyphData: Glyph = {
                             id,
                             title: el.dataset.glyphTitle || 'Glyph',
@@ -568,7 +522,6 @@ export function makeDraggable(
                         };
                         multiDragElements.push({
                             element: el,
-                            // Use offsetLeft/Top to get position relative to parent (ignores pan transform)
                             startX: el.offsetLeft,
                             startY: el.offsetTop,
                             glyph: glyphData
@@ -584,10 +537,9 @@ export function makeDraggable(
         document.addEventListener('mousemove', handleMouseMove, { signal: dragController.signal });
         document.addEventListener('mouseup', handleMouseUp, { signal: dragController.signal });
 
-        log.debug(SEG.GLYPH, `[${logLabel}] Started dragging ${isMultiDrag ? `${selectedIds.length} glyphs` : glyph.id}`);
+        log.debug(seg, `[${logLabel}] Started dragging ${isMultiDrag ? `${selectedIds.length} glyphs` : glyph.id}`);
     }, { signal: setupController.signal });
 
-    // Return cleanup function
     return () => {
         if (rafId !== null) {
             cancelAnimationFrame(rafId);
@@ -603,24 +555,12 @@ export function makeDraggable(
  * Make an element resizable by a handle.
  *
  * Enables resize via a handle (typically in the bottom-right corner).
- * Final dimensions are persisted to the glyph model and uiState.
+ * Final dimensions are persisted via CanvasHost.
  *
  * @param element - The element to make resizable
  * @param handle - The resize handle element
  * @param glyph - The glyph model to update with dimensions
  * @param opts - Optional configuration
- *
- * @example
- * // Basic usage with default min size (200x120)
- * makeResizable(element, resizeHandle, glyph, { logLabel: 'AX Glyph' });
- *
- * @example
- * // Custom minimum dimensions
- * makeResizable(element, resizeHandle, glyph, {
- *   logLabel: 'PyGlyph',
- *   minWidth: 300,
- *   minHeight: 200
- * });
  */
 export function makeResizable(
     element: HTMLElement,
@@ -629,6 +569,9 @@ export function makeResizable(
     opts: MakeResizableOptions = {},
 ): () => void {
     const { logLabel = 'Glyph', minWidth = 200, minHeight = 120 } = opts;
+    const log = getLogger();
+    const seg = getLogSegment();
+    const canvasHost = getCanvasHost();
 
     const setupController = new AbortController();
     let isResizing = false;
@@ -642,7 +585,7 @@ export function makeResizable(
     const handleMouseMove = (e: MouseEvent) => {
         if (!isResizing) return;
 
-        const scale = getTransform(resizeCanvasId).scale || 1;
+        const scale = canvasHost.getTransform(resizeCanvasId).scale || 1;
         const deltaX = (e.clientX - startX) / scale;
         const deltaY = (e.clientY - startY) / scale;
 
@@ -659,17 +602,15 @@ export function makeResizable(
 
         element.classList.remove('is-resizing');
 
-        // Save final size (offsetWidth/Height gives CSS-space, unaffected by canvas zoom)
         const finalWidth = element.offsetWidth;
         const finalHeight = element.offsetHeight;
 
         glyph.width = finalWidth;
         glyph.height = finalHeight;
 
-        // Persist to uiState (read existing content from state, not glyph object)
         if (glyph.symbol && glyph.x !== undefined && glyph.y !== undefined) {
-            const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
-            uiState.addCanvasGlyph({
+            const existing = canvasHost.getCanvasGlyphs().find(g => g.id === glyph.id);
+            canvasHost.saveCanvasGlyph({
                 ...existing,
                 id: glyph.id,
                 symbol: glyph.symbol,
@@ -680,7 +621,7 @@ export function makeResizable(
             });
         }
 
-        log.debug(SEG.GLYPH, `[${logLabel}] Finished resizing to ${finalWidth}x${finalHeight}`);
+        log.debug(seg, `[${logLabel}] Finished resizing to ${finalWidth}x${finalHeight}`);
 
         abortController?.abort();
         abortController = null;
@@ -703,7 +644,7 @@ export function makeResizable(
         document.addEventListener('mousemove', handleMouseMove, { signal: abortController.signal });
         document.addEventListener('mouseup', handleMouseUp, { signal: abortController.signal });
 
-        log.debug(SEG.GLYPH, `[${logLabel}] Started resizing`);
+        log.debug(seg, `[${logLabel}] Started resizing`);
     }, { signal: setupController.signal });
 
     return () => {

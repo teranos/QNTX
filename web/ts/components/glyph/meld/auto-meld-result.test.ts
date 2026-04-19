@@ -7,11 +7,29 @@
  * Persona: Tim (Happy Path)
  */
 
-import { describe, test, expect } from 'bun:test';
+import { describe, test, expect, beforeEach } from 'bun:test';
 import { autoMeldResultBelow } from './auto-meld-result';
-import { performMeld } from './meld-composition';
+import { performMeld, configureGlyphs } from '@qntx/glyphs';
 import type { Glyph } from '@qntx/glyphs';
 import { uiState } from '../../../state/ui';
+import { addComposition, removeComposition, findCompositionByGlyph } from '../../../state/compositions';
+
+// Wire CanvasHost so package meld code can access composition state
+beforeEach(() => {
+    configureGlyphs({
+        canvasHost: {
+            saveCanvasGlyph: (glyph) => uiState.addCanvasGlyph(glyph),
+            getCanvasGlyphs: () => uiState.getCanvasGlyphs(),
+            getTransform: () => ({ panX: 0, panY: 0, scale: 1 }),
+            getSelectedGlyphIds: () => [],
+            isGlyphSelected: () => false,
+            saveComposition: (composition) => addComposition(composition),
+            removeComposition: (id) => removeComposition(id),
+            findCompositionByGlyph: (glyphId) => findCompositionByGlyph(glyphId),
+            flushSync() {},
+        },
+    });
+});
 
 describe('Auto-Meld Result Below - Tim (Happy Path)', () => {
     function clearState() {

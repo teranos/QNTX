@@ -14,7 +14,7 @@
 import { describe, test, expect, beforeEach, jest } from 'bun:test';
 import { createAxGlyph, updateAxGlyphResults } from '../ax-glyph';
 import { createPromptGlyph } from '../prompt-glyph';
-import { findMeldTarget, performMeld, MELD_THRESHOLD } from './meld-system';
+import { findMeldTarget, performMeld, MELD_THRESHOLD } from '@qntx/glyphs';
 import type { Attestation } from '../../../generated/proto/plugin/grpc/protocol/atsstore';
 import type { Glyph } from '@qntx/glyphs';
 import { AX, SO } from '@generated/sym.js';

@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin scry-plugin meili-plugin rust-sqlite rust-embeddings wasm rust-python rust-reduce
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin rust-sqlite rust-embeddings wasm rust-python rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -39,7 +39,6 @@ dev: web cli ## Build frontend and CLI, then start development servers (backend 
 	TOML_FRONTEND_PORT=$$(grep -E '^frontend_port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
 	BACKEND_PORT=$${BACKEND_PORT:-$${TOML_BACKEND_PORT:-877}}; \
 	FRONTEND_PORT=$${FRONTEND_PORT:-$${TOML_FRONTEND_PORT:-8820}}; \
-	: > tmp/qntx-$$BACKEND_PORT.log 2>/dev/null || true; \
 	echo "🚀 Starting development environment..."; \
 	echo "  Backend:  http://localhost:$$BACKEND_PORT"; \
 	echo "  Frontend: http://localhost:$$FRONTEND_PORT (with live reload)"; \
@@ -190,6 +189,18 @@ clean: ## Clean build artifacts
 	@rm -rf web/node_modules
 	@rm -rf plugins/qntx-fuzzy/target
 
+install: cli ## Install QNTX binary to ~/.qntx/bin (override with PREFIX=/custom/path)
+	@echo "Installing qntx to $(PREFIX)/bin..."
+	@mkdir -p $(PREFIX)/bin
+	@cp bin/qntx $(PREFIX)/bin/qntx
+	@chmod +x $(PREFIX)/bin/qntx
+	@echo "✓ qntx installed to $(PREFIX)/bin/qntx"
+	@if ! echo $$PATH | grep -q "$(PREFIX)/bin"; then \
+		echo ""; \
+		echo "⚠️  $(PREFIX)/bin is not in your PATH"; \
+		echo "Add this to your shell config:"; \
+		echo "  export PATH=\"$(PREFIX)/bin:\$$PATH\""; \
+	fi
 
 desktop-prepare: cli web ## Prepare desktop app (icons + sidecar binary)
 	# TODO: Add proper Nix package for Tauri desktop app (rustPlatform.buildRustPackage)
@@ -228,7 +239,7 @@ desktop-build: desktop-prepare ## Build production desktop app (requires: cargo 
 		cp web/src-tauri/bin/qntx-$$TARGET target/release/bundle/macos/QNTX.app/Contents/MacOS/
 	@echo "✓ Desktop app built in target/release/bundle/"
 
-proto: ## Generate all proto bindings (Go, TypeScript, OCaml)
+proto: ## Generate Go code from protobuf definitions (via Nix)
 	@nix run .#generate-proto
 
 proto-rust: ## Rust proto types are now generated automatically at build time
@@ -309,16 +320,11 @@ kern-plugin: ## Build, install, and restart kern plugin (OCaml Ax parser)
 	@$(MAKE) -C qntx-plugins/kern install PREFIX=$(PREFIX)
 	$(call restart-plugin,kern)
 
-scry-plugin: ## Build, install, and restart scry plugin (C++ local LLM)
-	$(call check-plugin-version,qntx-plugins/scry,cpp,qntx-plugins/scry/src/plugin.h)
-	$(call check-plugin-version,qntx-plugins/scry,h,qntx-plugins/scry/src/plugin.h)
-	@$(MAKE) -C qntx-plugins/scry install PREFIX=$(PREFIX)
-	$(call restart-plugin,scry)
-
-meili-plugin: ## Build, install, and restart meili plugin (Rust MeiliSearch)
-	$(call check-plugin-version,qntx-plugins/qntx-meili,rs,qntx-plugins/qntx-meili/Cargo.toml)
-	@$(MAKE) -C qntx-plugins/qntx-meili install PREFIX=$(PREFIX)
-	$(call restart-plugin,meili)
+llama-cpp-plugin: ## Build, install, and restart llama-cpp plugin (C++ local LLM)
+	$(call check-plugin-version,qntx-plugins/llama-cpp,cpp,qntx-plugins/llama-cpp/src/plugin.h)
+	$(call check-plugin-version,qntx-plugins/llama-cpp,h,qntx-plugins/llama-cpp/src/plugin.h)
+	@$(MAKE) -C qntx-plugins/llama-cpp install PREFIX=$(PREFIX)
+	$(call restart-plugin,llama-cpp)
 
 
 rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO integration)
