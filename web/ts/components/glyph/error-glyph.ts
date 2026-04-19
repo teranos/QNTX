@@ -12,7 +12,7 @@ import type { Glyph } from '@qntx/glyphs';
 import { SO } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { applyCanvasGlyphLayout, storeCleanup, cleanupResizeObserver, runCleanup } from './glyph-interaction';
+import { applyCanvasGlyphLayout, storeCleanup, cleanupResizeObserver, runCleanup } from '@qntx/glyphs';
 import { createPromptGlyph } from './prompt-glyph';
 import { MAX_VIEWPORT_HEIGHT_RATIO, CANVAS_GLYPH_TITLE_BAR_HEIGHT } from '@qntx/glyphs';
 
