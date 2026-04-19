@@ -34,6 +34,9 @@ import { initDebugInterceptor } from './dev-debug-interceptor.ts';
 import { glyphRun } from '@qntx/glyphs';
 import { configureGlyphs } from '@qntx/glyphs';
 import { canvasToScreen, screenToCanvas, getTransform } from './components/glyph/canvas/canvas-pan.ts';
+import { isGlyphSelected, getSelectedGlyphIds } from './components/glyph/canvas/selection.ts';
+import { addComposition, removeComposition, findCompositionByGlyph } from './state/compositions.ts';
+import { canvasSyncQueue } from './api/canvas-sync.ts';
 import { registerDefaultGlyphs } from './default-glyphs.ts';
 import { initialize as initQntxWasm } from './qntx-wasm.ts';
 import { initStorage } from './indexeddb-storage.ts';
@@ -249,6 +252,17 @@ async function init(): Promise<void> {
         stripHtml: (html) => {
             const doc = new DOMParser().parseFromString(html, 'text/html');
             return doc.body.textContent ?? '';
+        },
+        canvasHost: {
+            saveCanvasGlyph: (glyph) => uiState.addCanvasGlyph(glyph),
+            getCanvasGlyphs: (canvasId) => uiState.getCanvasGlyphs(canvasId),
+            getTransform: (canvasId) => getTransform(canvasId),
+            getSelectedGlyphIds: (canvasId) => getSelectedGlyphIds(canvasId),
+            isGlyphSelected: (canvasId, glyphId) => isGlyphSelected(canvasId, glyphId),
+            saveComposition: (composition) => addComposition(composition),
+            removeComposition: (id) => removeComposition(id),
+            findCompositionByGlyph: (glyphId) => findCompositionByGlyph(glyphId),
+            flushSync: () => canvasSyncQueue.flush(),
         },
     });
 

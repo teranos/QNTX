@@ -22,7 +22,7 @@ import { createDocGlyph, type DocGlyphContent } from '../doc-glyph';
 import { uiState } from '../../../state/ui';
 import { getMinimizeDuration } from '@qntx/glyphs';
 import { unmeldComposition, reconstructMeld, detachGlyph, autoMeldResultBelow } from '../meld/meld-system';
-import { makeDraggable } from '../glyph-interaction';
+import { makeDraggable } from '@qntx/glyphs';
 import { showActionBar, hideActionBar } from './action-bar';
 import { showSpawnMenu } from './spawn-menu';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';

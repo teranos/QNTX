@@ -15,7 +15,7 @@ import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/ats
 import { AS } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from './manifestations/canvas-placed';
-import { preventDrag, makeDraggable, makeResizable, storeCleanup } from './glyph-interaction';
+import { preventDrag, makeDraggable, makeResizable, storeCleanup } from '@qntx/glyphs';
 import { screenToCanvas } from './canvas/canvas-pan';
 import { uiState } from '../../state/ui';
 import { getGlyphTypeBySymbol } from './glyph-registry';

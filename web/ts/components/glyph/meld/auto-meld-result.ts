@@ -8,7 +8,7 @@
 import { log, SEG } from '../../../logger';
 import type { Glyph } from '@qntx/glyphs';
 import { performMeld, extendComposition } from './meld-composition';
-import { makeDraggable } from '../glyph-interaction';
+import { makeDraggable } from '@qntx/glyphs';
 
 /**
  * Auto-meld a result glyph below a parent glyph.

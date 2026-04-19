@@ -25,16 +25,16 @@ The package currently has morph, tray, and manifestations. The next series moves
 - [x] `TYPS` — Extract pure type definitions (`GlyphUI`, `RenderFn`, `GlyphDef`, etc.) from web/ into package — no logic, just interfaces
 - [x] `JSRP` — First JSR publish: `jsr.json`, self-contained package, `@qntx/glyphs` on jsr.io
 - [ ] `CPLCD` — Canvas-placed: `canvasPlaced()` factory, `applyCanvasGlyphLayout`, positioning logic
-- [ ] `DRAGR` — Canvas drag/resize: `makeDraggable`, `makeResizable`, z-index stacking
-- [ ] `MELDT` — Meld detection: proximity-based meld triggering during drag
-- [ ] `MELDF` — Meld feedback: visual indicators (glow, snap) during meld approach
-- [ ] `MELDX` — Meld execution: `performMeld`, `extendComposition`, `unmeldComposition`, `detachGlyph`
+- [x] `DRAGR` — Canvas drag/resize: `makeDraggable`, `makeResizable`, z-index stacking
+- [x] `MELDT` — Meld detection: proximity-based meld triggering during drag
+- [x] `MELDF` — Meld feedback: visual indicators (glow, snap) during meld approach
+- [x] `MELDX` — Meld execution: `performMeld`, `extendComposition`, `unmeldComposition`, `detachGlyph`
 - [ ] `GLYUI` — `createGlyphUI` + SDK primitives (glyph, input, button, statusLine) into package
 - [ ] `DSDMO` — Design system demo: mini-canvas with real drag-to-meld, compositions from edge data
 
 ### Cleanup
 
-- [x] `REXP` — Eliminate re-exports: move imports in web/ to point directly at `@qntx/glyphs`
+- [ ] `REXP` — Eliminate re-exports: move imports in web/ to point directly at `@qntx/glyphs`
 - `TEST` — Move tests to live with the package code, not in web/
 - `EXAM` — Canonical examples: minimal host app consuming the package
 - `DSGN` — Design system integration: make sure the broader design system uses this

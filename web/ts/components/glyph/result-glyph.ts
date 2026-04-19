@@ -20,7 +20,7 @@ import type { LLMTokenSignal, SamplerStageSignal } from '@generated/server';
 import { log, SEG } from '../../logger';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { unmeldComposition } from './meld/meld-composition';
-import { makeDraggable, storeCleanup, preventDrag } from './glyph-interaction';
+import { makeDraggable, storeCleanup, preventDrag } from '@qntx/glyphs';
 import { wireExpandToWindow } from '@qntx/glyphs';
 import { autoMeldResultBelow } from './meld/meld-system';
 import { uiState } from '../../state/ui';
