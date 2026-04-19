@@ -11,6 +11,15 @@ service EmbeddingService {
 
   // BatchEmbed generates vector embeddings for multiple texts
   rpc BatchEmbed(BatchEmbedRequest) returns (BatchEmbedResponse);
+
+  // GetLabelEligibleClusters returns clusters eligible for labeling
+  rpc GetLabelEligibleClusters(GetLabelEligibleClustersRequest) returns (GetLabelEligibleClustersResponse);
+
+  // SampleClusterTexts returns random sample texts from a cluster
+  rpc SampleClusterTexts(SampleClusterTextsRequest) returns (SampleClusterTextsResponse);
+
+  // SetClusterLabel sets or updates the label on a cluster
+  rpc SetClusterLabel(SetClusterLabelRequest) returns (SetClusterLabelResponse);
 }
 
 message EmbedRequest {
@@ -41,3 +50,37 @@ message EmbeddingVector {
   repeated float vector = 1;
   int32 tokens = 2;
 }
+
+message GetLabelEligibleClustersRequest {
+  string auth_token = 1;
+  int32 min_size = 2;
+  int32 cooldown_days = 3;
+  int32 limit = 4;
+}
+
+message GetLabelEligibleClustersResponse {
+  repeated EligibleCluster clusters = 1;
+}
+
+message EligibleCluster {
+  int32 id = 1;
+  int32 members = 2;
+}
+
+message SampleClusterTextsRequest {
+  string auth_token = 1;
+  int32 cluster_id = 2;
+  int32 sample_size = 3;
+}
+
+message SampleClusterTextsResponse {
+  repeated string texts = 1;
+}
+
+message SetClusterLabelRequest {
+  string auth_token = 1;
+  int32 cluster_id = 2;
+  string label = 3;
+}
+
+message SetClusterLabelResponse {}
