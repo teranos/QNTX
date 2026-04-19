@@ -34,7 +34,7 @@ The package currently has morph, tray, and manifestations. The next series moves
 
 ### Cleanup
 
-- [ ] `REXP` — Eliminate re-exports: move imports in web/ to point directly at `@qntx/glyphs`
+- [x] `REXP` — Eliminate re-exports: move imports in web/ to point directly at `@qntx/glyphs`
 - `TEST` — Move tests to live with the package code, not in web/
 - `EXAM` — Canonical examples: minimal host app consuming the package
 - `DSGN` — Design system integration: make sure the broader design system uses this
