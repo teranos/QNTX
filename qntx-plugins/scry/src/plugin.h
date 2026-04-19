@@ -39,7 +39,7 @@ struct ForkBranch {
     bool active;
 };
 
-// TODO(#777): no branch navigation — can't switch between or scrub within fork branches from UI
+// TODO: no branch navigation — can't switch between or scrub within fork branches from UI
 struct ForkTree {
     std::vector<ForkBranch> branches;
     int active_branch = 0;
