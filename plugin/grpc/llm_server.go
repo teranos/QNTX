@@ -240,10 +240,10 @@ func (s *LLMServer) createWeave(ctx context.Context, req *protocol.LLMChatReques
 	}
 
 	attrs := map[string]interface{}{
-		"prompt":      prompt,
-		"text":        responseText,
-		"model":       model,
-		"token_count": totalTokens,
+		"prompt":       prompt,
+		"text":         responseText,
+		"model":        model,
+		"token_count":  totalTokens,
 		"weave_source": provider,
 	}
 

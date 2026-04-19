@@ -40,7 +40,10 @@ func GetConfigIntrospection() (*ConfigIntrospection, error) {
 	v := GetViper()
 
 	// If sources haven't been tracked yet, force a load
-	if len(ConfigSources) == 0 {
+	configSourcesMu.RLock()
+	empty := len(ConfigSources) == 0
+	configSourcesMu.RUnlock()
+	if empty {
 		_, err := Load()
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to load config for introspection")
@@ -57,7 +60,9 @@ func GetConfigIntrospection() (*ConfigIntrospection, error) {
 
 	// Use the sources we tracked during loading (single source of truth!)
 	// This ensures introspection matches exactly what was loaded
+	configSourcesMu.RLock()
 	flattenSettingsWithSources(allSettings, "", introspection, ConfigSources)
+	configSourcesMu.RUnlock()
 
 	return introspection, nil
 }
