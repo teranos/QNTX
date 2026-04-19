@@ -66,6 +66,7 @@ InferenceEngine::ChatResult InferenceEngine::fork_and_generate(
                   << " fork_pos=" << fork_pos_absolute
                   << " token=" << fork_token
                   << " n_ctx=" << llama_n_ctx(ctx_) << ")" << std::endl;
+        llama_memory_seq_rm(mem, new_seq, 0, -1);
         result.content = "error: fork token decode failed";
         return result;
     }
@@ -83,9 +84,6 @@ InferenceEngine::ChatResult InferenceEngine::fork_and_generate(
     int n_generated = 0;
     auto gen_start = std::chrono::steady_clock::now();
     long signal_us = 0, decode_us = 0, callback_us = 0;
-
-    // First iteration: capture signal from the fork token decode, then generate
-    llama_token current_token = fork_token;
 
     for (int i = 0; i < max_tokens; i++) {
         auto t0 = std::chrono::steady_clock::now();
@@ -144,6 +142,7 @@ InferenceEngine::ChatResult InferenceEngine::fork_and_generate(
               << total_ms << "ms on seq " << new_seq << std::endl;
 
     llama_sampler_free(sampler);
+    llama_memory_seq_rm(mem, new_seq, 0, -1);
     result.content = output.str();
     result.completion_tokens = n_generated;
     result.generation_ms = total_ms;

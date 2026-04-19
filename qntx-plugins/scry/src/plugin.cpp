@@ -357,8 +357,15 @@ grpc::Status ScryPlugin::HandleHTTP(grpc::ServerContext* ctx,
             state = "ready";
         }
         std::string act = activity();
+        // Escape quotes in activity to prevent malformed JSON
+        std::string escaped_act;
+        for (char c : act) {
+            if (c == '"') escaped_act += "\\\"";
+            else if (c == '\\') escaped_act += "\\\\";
+            else escaped_act += c;
+        }
         std::string body = "{\"state\":\"" + state + "\",\"version\":\"" + PLUGIN_VERSION + "\"";
-        if (!act.empty()) body += ",\"activity\":\"" + act + "\"";
+        if (!escaped_act.empty()) body += ",\"activity\":\"" + escaped_act + "\"";
         body += "}";
         resp->set_status_code(200);
         resp->set_body(body);
@@ -408,13 +415,14 @@ grpc::Status ScryPlugin::HandleWebSocket(
                     try {
                         int idx = std::stoi(data.substr(6));
                         renderer->set_scrub_index(idx);
-                    } catch (...) {}
+                    } catch (const std::exception& e) {
+                        std::cerr << "[scry] scrub: parse error '" << data << "': " << e.what() << std::endl;
+                    }
                 } else if (data == "cam:r") {
                     renderer->reset_camera();
                 } else if (data.size() > 4 && data.substr(0, 4) == "cam:") {
                     // cam:dx,dy,dz,dyaw,dpitch
                     auto rest = data.substr(4);
-                    // Split on commas
                     float vals[5] = {0, 0, 1, 0, 0};
                     int vi = 0;
                     size_t pos = 0;
@@ -422,7 +430,9 @@ grpc::Status ScryPlugin::HandleWebSocket(
                         auto next = rest.find(',', pos);
                         try {
                             vals[vi] = std::stof(rest.substr(pos, next - pos));
-                        } catch (...) {}
+                        } catch (const std::exception& e) {
+                            std::cerr << "[scry] cam: parse error '" << data << "': " << e.what() << std::endl;
+                        }
                         vi++;
                         if (next == std::string::npos) break;
                         pos = next + 1;
@@ -437,7 +447,9 @@ grpc::Status ScryPlugin::HandleWebSocket(
                             auto key = rest.substr(0, sep);
                             float val = std::stof(rest.substr(sep + 1));
                             renderer->set_param(key, val);
-                        } catch (...) {}
+                        } catch (const std::exception& e) {
+                            std::cerr << "[scry] param: parse error '" << data << "': " << e.what() << std::endl;
+                        }
                     }
                 } else if (data.size() > 6 && data.substr(0, 6) == "mouse:") {
                     // mouse:x,y — update cursor position for GPU pick
@@ -478,8 +490,15 @@ grpc::Status ScryPlugin::HandleWebSocket(
                     try {
                         int fork_token_id = std::stoi(data.substr(5));
 
-                        // Join any previous fork thread before starting a new one
-                        if (fork_thread.joinable()) fork_thread.join();
+                        // Reject if a fork is already running
+                        if (fork_thread.joinable()) {
+                            protocol::WebSocketMessage busy_msg;
+                            busy_msg.set_type(protocol::WebSocketMessage::DATA);
+                            busy_msg.set_data("fork_busy:");
+                            std::lock_guard<std::mutex> lock(pong_mutex);
+                            pong_queue.push_back(busy_msg);
+                            continue;
+                        }
 
                         // Fork generation on separate thread (joined before HandleWebSocket returns)
                         fork_thread = std::thread([plugin, renderer, engine, fork_token_id,
