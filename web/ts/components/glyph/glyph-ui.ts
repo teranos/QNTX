@@ -4,7 +4,8 @@
  */
 
 import type { Glyph, GlyphUI, GlyphOpts, FetchOpts, MeldEvent, SpawnResultDetail } from '@qntx/glyphs';
-import { canvasPlaced, type CanvasPlacedConfig } from './manifestations/canvas-placed';
+import { canvasPlaced } from '@qntx/glyphs';
+import type { CanvasPlacedConfig } from '@qntx/glyphs';
 import { preventDrag, storeCleanup } from '@qntx/glyphs';
 import { apiFetch, getBackendUrl } from '../../api';
 import { log, SEG } from '../../logger';

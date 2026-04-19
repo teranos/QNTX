@@ -16,7 +16,7 @@ import { uiState } from '../../state/ui';
 import { createAutoSave } from './glyph-autosave';
 import { storeCleanup, preventDrag } from '@qntx/glyphs';
 import { tooltip } from '../tooltip';
-import { canvasPlaced } from './manifestations/canvas-placed';
+import { canvasPlaced } from '@qntx/glyphs';
 import { wireExpandToWindow } from '@qntx/glyphs';
 import { Prose } from '@generated/sym.js';
 import { EditorState } from 'prosemirror-state';

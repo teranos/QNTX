@@ -12,7 +12,7 @@ import type { Glyph } from '@qntx/glyphs';
 import { SE } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { preventDrag, storeCleanup, cleanupResizeObserver } from '@qntx/glyphs';
-import { canvasPlaced } from './manifestations/canvas-placed';
+import { canvasPlaced } from '@qntx/glyphs';
 import { sendMessage } from '../../websocket';
 import { apiFetch } from '../../api';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';

@@ -24,7 +24,7 @@ Drag, resize, and the full meld pipeline are in the package. Hosts implement `Ca
 - [x] `GRDLP` — Grid layout from edges: `computeGridPositions` and layout application, pure geometry
 - [x] `TYPS` — Extract pure type definitions (`GlyphUI`, `RenderFn`, `GlyphDef`, etc.) from web/ into package — no logic, just interfaces
 - [x] `JSRP` — First JSR publish: `jsr.json`, self-contained package, `@qntx/glyphs` on jsr.io
-- [ ] `CPLCD` — Canvas-placed: `canvasPlaced()` factory, `applyCanvasGlyphLayout`, positioning logic
+- [x] `CPLCD` — Canvas-placed: `canvasPlaced()` factory, `applyCanvasGlyphLayout`, positioning logic
 - [x] `DRAGR` — Canvas drag/resize: `makeDraggable`, `makeResizable`, z-index stacking
 - [x] `MELDT` — Meld detection: proximity-based meld triggering during drag
 - [x] `MELDF` — Meld feedback: visual indicators (glow, snap) during meld approach

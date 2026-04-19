@@ -11,15 +11,16 @@
  *   titleBar?.appendChild(extraButton);    // optional: extend the title bar
  */
 
-import { type Glyph, DEFAULT_GLYPH_COLOR, DEFAULT_GLYPH_TEXT_COLOR } from '@qntx/glyphs';
+import type { Glyph } from '../glyph';
+import { DEFAULT_GLYPH_COLOR, DEFAULT_GLYPH_TEXT_COLOR } from '../glyph';
 import {
     applyCanvasGlyphLayout,
     makeDraggable,
     makeResizable,
     preventDrag,
     storeCleanup,
-} from '@qntx/glyphs';
-import type { MakeDraggableOptions } from '@qntx/glyphs';
+} from '../canvas-drag';
+import type { MakeDraggableOptions } from '../glyph-ui';
 
 // ── Config ──────────────────────────────────────────────────────────
 

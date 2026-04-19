@@ -14,7 +14,7 @@
 
 import type { Glyph } from '@qntx/glyphs';
 import { log, SEG } from '../../logger';
-import { canvasPlaced } from './manifestations/canvas-placed';
+import { canvasPlaced } from '@qntx/glyphs';
 import { morphCanvasPlacedToFullscreen } from './manifestations/canvas-expanded';
 import { uiState } from '../../state/ui';
 

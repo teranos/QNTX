@@ -18,7 +18,7 @@ import type { Glyph } from '@qntx/glyphs';
 import type { LLMStreamMessage } from '../../../types/websocket';
 import type { LLMTokenSignal, SamplerStageSignal } from '@generated/server';
 import { log, SEG } from '../../logger';
-import { canvasPlaced } from './manifestations/canvas-placed';
+import { canvasPlaced } from '@qntx/glyphs';
 import { unmeldComposition, makeDraggable, storeCleanup, preventDrag, wireExpandToWindow } from '@qntx/glyphs';
 import { autoMeldResultBelow } from './meld/auto-meld-result';
 import { uiState } from '../../state/ui';

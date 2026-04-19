@@ -16,7 +16,7 @@
 import type { Glyph } from '@qntx/glyphs';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { canvasPlaced } from './manifestations/canvas-placed';
+import { canvasPlaced } from '@qntx/glyphs';
 import { fileUrl } from '../../api/files';
 
 /** Metadata stored in the glyph content field */

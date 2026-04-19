@@ -14,7 +14,7 @@ import { wireExpandToWindow, teardownWindowDrag, removeWindowControls, isInWindo
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { AS } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { canvasPlaced } from './manifestations/canvas-placed';
+import { canvasPlaced } from '@qntx/glyphs';
 import { preventDrag, makeDraggable, makeResizable, storeCleanup } from '@qntx/glyphs';
 import { screenToCanvas } from './canvas/canvas-pan';
 import { uiState } from '../../state/ui';

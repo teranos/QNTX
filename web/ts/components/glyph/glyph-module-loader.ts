@@ -16,7 +16,7 @@ import type { GlyphModule } from './glyph-ui';
 import { createGlyphUI } from './glyph-ui';
 import { loadPluginCSS } from './plugin-provided-glyphs';
 import { log, SEG } from '../../logger';
-import { canvasPlaced } from './manifestations/canvas-placed';
+import { canvasPlaced } from '@qntx/glyphs';
 import { preventDrag } from '@qntx/glyphs';
 import { wireExpandToWindow } from '@qntx/glyphs';
 
