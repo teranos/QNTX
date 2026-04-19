@@ -15,7 +15,7 @@
 #include "llm.grpc.pb.h"
 #include "ats_client.h"
 
-#define PLUGIN_VERSION "0.37.7"
+#define PLUGIN_VERSION "0.37.8"
 
 // Forward declarations
 struct llama_model;
@@ -35,9 +35,6 @@ struct ForkBranch {
     int32_t fork_token;              // the alternative token that starts this branch (llama_token)
 
     std::vector<int32_t> tokens;     // generated token IDs
-    std::vector<float> trail_positions;
-    std::vector<float> ghost_vertices;
-    std::vector<std::vector<float>> keyframes;
     float orbit_phase;               // radians, parent_phase + π/2 per fork depth
     bool active;
 };
