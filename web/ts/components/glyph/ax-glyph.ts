@@ -25,7 +25,7 @@ import type { Glyph } from '@qntx/glyphs';
 import { AX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { preventDrag, storeCleanup, cleanupResizeObserver } from '@qntx/glyphs';
-import { canvasPlaced } from './manifestations/canvas-placed';
+import { canvasPlaced } from '@qntx/glyphs';
 import { sendMessage } from '../../websocket';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { queryAttestations, parseQuery } from '../../qntx-wasm';

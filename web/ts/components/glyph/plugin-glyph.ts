@@ -7,7 +7,7 @@
 
 import type { Glyph } from '@qntx/glyphs';
 import type { PluginGlyphDef } from './plugin-provided-glyphs';
-import { canvasPlaced } from './manifestations/canvas-placed';
+import { canvasPlaced } from '@qntx/glyphs';
 import { loadPluginCSS } from './plugin-provided-glyphs';
 import { apiFetch } from '../../api';
 import { log, SEG } from '../../logger';
