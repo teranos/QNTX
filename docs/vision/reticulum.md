@@ -1,7 +1,5 @@
 # Sync Vision: Reticulum & Beyond
 
-> For the current implementation, see [../sync.md](../sync.md).
-
 The sync protocol is transport-agnostic by design. The `Conn` interface abstracts the wire — tests use channels, production uses WebSockets. This document is about what comes after WebSockets.
 
 ## Reticulum
