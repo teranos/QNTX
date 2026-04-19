@@ -119,6 +119,7 @@ vertex TrailVertexOut trailVertex(
     constant int& scrubIndex     [[buffer(3)]],
     constant float& orbitRadius  [[buffer(4)]],
     constant float& angleStep    [[buffer(5)]],
+    constant float& phaseOffset  [[buffer(6)]],
     uint vid [[vertex_id]]
 ) {
     float3 pos = float3(positions[vid * 3], positions[vid * 3 + 1], positions[vid * 3 + 2]);
@@ -126,9 +127,10 @@ vertex TrailVertexOut trailVertex(
     // Drift: newest point (head) sits on the nebula, older points curve
     // along a circular arc. Each token advances by angleStep radians
     // around a circle of orbitRadius, centered below the head.
+    // phaseOffset rotates the orbit plane for fork branches (π/2 per fork depth).
     int headIndex = (scrubIndex >= 0) ? scrubIndex : int(trailCount - 1);
     float age = float(headIndex - int(vid));
-    float theta = age * angleStep;
+    float theta = age * angleStep + phaseOffset;
     pos.x += orbitRadius * sin(theta);
     pos.y -= orbitRadius * (1.0 - cos(theta));
 
@@ -176,6 +178,7 @@ vertex TrailVertexOut ghostBranchVertex(
     constant int& scrubIndex    [[buffer(3)]],
     constant float& orbitRadius [[buffer(4)]],
     constant float& angleStep   [[buffer(5)]],
+    constant float& phaseOffset [[buffer(6)]],
     uint vid [[vertex_id]]
 ) {
     float3 pos = float3(data[vid*5], data[vid*5+1], data[vid*5+2]);
@@ -185,7 +188,7 @@ vertex TrailVertexOut ghostBranchVertex(
     // Same orbit transform as the main trail
     int headIndex = (scrubIndex >= 0) ? scrubIndex : int(trailCount - 1);
     float age = float(headIndex - trailIdx);
-    float theta = age * angleStep;
+    float theta = age * angleStep + phaseOffset;
     pos.x += orbitRadius * sin(theta);
     pos.y -= orbitRadius * (1.0 - cos(theta));
 

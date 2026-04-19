@@ -364,6 +364,14 @@ func (s *QNTXServer) ReloadWatchers() error {
 	return s.watcherEngine.ReloadWatchers()
 }
 
+// InvalidatePluginMux clears cached HTTP mux state for a plugin so the next
+// request re-initializes it. Called after plugin auto-restart to avoid stale
+// sync.Once that was poisoned by a previous failed init.
+func (s *QNTXServer) InvalidatePluginMux(name string) {
+	s.pluginMuxes.Delete(name)
+	s.pluginMuxInit.Delete(name)
+}
+
 // getAttestationByID retrieves a single attestation through the attestation store (Rust FFI).
 // Falls back to Go's *sql.DB if the store doesn't support direct get.
 func (s *QNTXServer) getAttestationByID(id string) (*types.As, error) {

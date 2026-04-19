@@ -357,8 +357,15 @@ grpc::Status ScryPlugin::HandleHTTP(grpc::ServerContext* ctx,
             state = "ready";
         }
         std::string act = activity();
+        // Escape quotes in activity to prevent malformed JSON
+        std::string escaped_act;
+        for (char c : act) {
+            if (c == '"') escaped_act += "\\\"";
+            else if (c == '\\') escaped_act += "\\\\";
+            else escaped_act += c;
+        }
         std::string body = "{\"state\":\"" + state + "\",\"version\":\"" + PLUGIN_VERSION + "\"";
-        if (!act.empty()) body += ",\"activity\":\"" + act + "\"";
+        if (!escaped_act.empty()) body += ",\"activity\":\"" + escaped_act + "\"";
         body += "}";
         resp->set_status_code(200);
         resp->set_body(body);
@@ -386,8 +393,10 @@ grpc::Status ScryPlugin::HandleWebSocket(
 
     std::mutex pong_mutex;
     std::vector<protocol::WebSocketMessage> pong_queue;
+    std::thread fork_thread;  // tracked so we can join before locals are destroyed
 
-    std::thread reader([stream, &closed, renderer, engine, &pong_mutex, &pong_queue]() {
+    auto* plugin = this;
+    std::thread reader([stream, &closed, renderer, engine, plugin, &pong_mutex, &pong_queue, &fork_thread]() {
         protocol::WebSocketMessage in_msg;
         while (stream->Read(&in_msg)) {
             if (in_msg.type() == protocol::WebSocketMessage::PING) {
@@ -406,13 +415,14 @@ grpc::Status ScryPlugin::HandleWebSocket(
                     try {
                         int idx = std::stoi(data.substr(6));
                         renderer->set_scrub_index(idx);
-                    } catch (...) {}
+                    } catch (const std::exception& e) {
+                        std::cerr << "[scry] scrub: parse error '" << data << "': " << e.what() << std::endl;
+                    }
                 } else if (data == "cam:r") {
                     renderer->reset_camera();
                 } else if (data.size() > 4 && data.substr(0, 4) == "cam:") {
                     // cam:dx,dy,dz,dyaw,dpitch
                     auto rest = data.substr(4);
-                    // Split on commas
                     float vals[5] = {0, 0, 1, 0, 0};
                     int vi = 0;
                     size_t pos = 0;
@@ -420,7 +430,9 @@ grpc::Status ScryPlugin::HandleWebSocket(
                         auto next = rest.find(',', pos);
                         try {
                             vals[vi] = std::stof(rest.substr(pos, next - pos));
-                        } catch (...) {}
+                        } catch (const std::exception& e) {
+                            std::cerr << "[scry] cam: parse error '" << data << "': " << e.what() << std::endl;
+                        }
                         vi++;
                         if (next == std::string::npos) break;
                         pos = next + 1;
@@ -435,7 +447,9 @@ grpc::Status ScryPlugin::HandleWebSocket(
                             auto key = rest.substr(0, sep);
                             float val = std::stof(rest.substr(sep + 1));
                             renderer->set_param(key, val);
-                        } catch (...) {}
+                        } catch (const std::exception& e) {
+                            std::cerr << "[scry] param: parse error '" << data << "': " << e.what() << std::endl;
+                        }
                     }
                 } else if (data.size() > 6 && data.substr(0, 6) == "mouse:") {
                     // mouse:x,y — update cursor position for GPU pick
@@ -468,6 +482,156 @@ grpc::Status ScryPlugin::HandleWebSocket(
                             std::lock_guard<std::mutex> lock(pong_mutex);
                             pong_queue.push_back(pick_msg);
                         }
+                    }
+                } else if (data.size() > 5 && data.substr(0, 5) == "fork:") {
+                    // Fork: pick an alternative token and generate from that point.
+                    // Format: fork:token_id
+                    // Uses current scrub_index as fork position, active branch as parent.
+                    try {
+                        int fork_token_id = std::stoi(data.substr(5));
+
+                        // Reject if a fork is already running
+                        if (fork_thread.joinable()) {
+                            protocol::WebSocketMessage busy_msg;
+                            busy_msg.set_type(protocol::WebSocketMessage::DATA);
+                            busy_msg.set_data("fork_busy:");
+                            std::lock_guard<std::mutex> lock(pong_mutex);
+                            pong_queue.push_back(busy_msg);
+                            continue;
+                        }
+
+                        // Fork generation on separate thread (joined before HandleWebSocket returns)
+                        fork_thread = std::thread([plugin, renderer, engine, fork_token_id,
+                                     &pong_mutex, &pong_queue, &closed]() {
+                            int branch_id = -1;
+                            int render_branch_id = 0;
+                            int parent_seq = 0;
+                            int new_seq = 0;
+                            int fork_pos_absolute = 0;
+
+                            // Lock fork tree only for setup, release before generation
+                            {
+                                std::lock_guard<std::mutex> flock(plugin->fork_mutex());
+                                auto& tree = plugin->fork_tree();
+
+                                // Use scrub index as fork position (where user is looking)
+                                int scrub = renderer->scrub_index();
+                                int active_id = tree.active_branch;
+                                int fork_pos = 0;
+                                int max_pos = (active_id >= 0 && active_id < (int)tree.branches.size())
+                                    ? (int)tree.branches[active_id].tokens.size() : 0;
+                                if (scrub >= 0 && scrub <= max_pos) {
+                                    fork_pos = scrub;
+                                } else if (max_pos > 0) {
+                                    fork_pos = max_pos;
+                                }
+
+                                new_seq = tree.next_seq_id++;
+                                parent_seq = (active_id >= 0 && active_id < (int)tree.branches.size())
+                                    ? tree.branches[active_id].seq_id : 0;
+
+                                // Create renderer branch (copies parent trail up to fork point)
+                                render_branch_id = renderer->add_fork_branch(active_id, fork_pos);
+                                renderer->set_active_branch(render_branch_id);
+
+                                // Create data model branch
+                                ForkBranch branch;
+                                branch.id = (int)tree.branches.size();
+                                branch.parent_id = active_id;
+                                branch.fork_position = fork_pos;
+                                branch.seq_id = new_seq;
+                                branch.fork_token = fork_token_id;
+                                branch.orbit_phase = (active_id >= 0 && active_id < (int)tree.branches.size())
+                                    ? tree.branches[active_id].orbit_phase + (float)M_PI / 2.0f : (float)M_PI / 2.0f;
+                                branch.active = true;
+                                tree.branches.push_back(branch);
+
+                                branch_id = branch.id;
+                                tree.active_branch = branch_id;
+                                fork_pos_absolute = tree.prompt_token_count + fork_pos;
+                            }
+
+                            // Send forked: response
+                            {
+                                std::string resp = "forked:" + std::to_string(branch_id);
+                                protocol::WebSocketMessage msg;
+                                msg.set_type(protocol::WebSocketMessage::DATA);
+                                msg.set_data(resp);
+                                std::lock_guard<std::mutex> lock(pong_mutex);
+                                pong_queue.push_back(msg);
+                            }
+
+                            plugin->set_activity("forking (branch " + std::to_string(branch_id) + ")");
+
+                            // Generate on the fork — no fork_mutex held during generation
+                            // TODO(#777): temperature and max_tokens hardcoded for forks
+                            auto result = engine->fork_and_generate(
+                                parent_seq, fork_pos_absolute,
+                                fork_token_id, new_seq,
+                                0.7f, 256,
+                                [&](const std::string& token_text, const TokenSignal& sig) -> bool {
+                                    if (closed.load()) return false;
+
+                                    // Feed renderer with fork branch data
+                                    if (renderer->is_ready() && !sig.full_distribution.empty()) {
+                                        renderer->submit_distribution(
+                                            sig.full_distribution.data(), sig.full_distribution.size());
+                                        renderer->store_keyframe(
+                                            sig.full_distribution.data(), sig.full_distribution.size(),
+                                            render_branch_id);
+                                        renderer->add_trail_point(sig.token_id, render_branch_id);
+
+                                        if (sig.top_k.size() > 1) {
+                                            std::vector<std::pair<int,float>> runners;
+                                            for (size_t i = 0; i < sig.top_k.size() && runners.size() < 10; i++) {
+                                                if (sig.top_k[i].id != sig.token_id) {
+                                                    runners.emplace_back(sig.top_k[i].id, sig.top_k[i].prob);
+                                                }
+                                            }
+                                            renderer->add_ghost_branches(sig.token_id, runners, render_branch_id);
+                                        }
+                                    }
+
+                                    // Stream fork token to frontend
+                                    std::string tok_resp = "fork_token:" + sanitize_utf8(token_text);
+                                    protocol::WebSocketMessage msg;
+                                    msg.set_type(protocol::WebSocketMessage::DATA);
+                                    msg.set_data(tok_resp);
+                                    {
+                                        std::lock_guard<std::mutex> lock(pong_mutex);
+                                        pong_queue.push_back(msg);
+                                    }
+
+                                    // Record token in branch
+                                    {
+                                        std::lock_guard<std::mutex> flock(plugin->fork_mutex());
+                                        auto& b = plugin->fork_tree().branches[branch_id];
+                                        b.tokens.push_back((int32_t)sig.token_id);
+                                    }
+
+                                    return !closed.load();
+                                },
+                                plugin->sampler_config());
+
+                            plugin->set_activity("");
+
+                            std::cout << "[scry] Fork branch " << branch_id
+                                      << " complete: " << result.completion_tokens
+                                      << " tokens" << std::endl;
+
+                            // Send fork_done to frontend
+                            {
+                                std::string done_resp = "fork_done:" + std::to_string(branch_id);
+                                protocol::WebSocketMessage msg;
+                                msg.set_type(protocol::WebSocketMessage::DATA);
+                                msg.set_data(done_resp);
+                                std::lock_guard<std::mutex> lock(pong_mutex);
+                                pong_queue.push_back(msg);
+                            }
+                        });
+                    } catch (const std::exception& e) {
+                        std::cerr << "[scry] fork: invalid message '"
+                                  << data << "': " << e.what() << std::endl;
                     }
                 }
             }
@@ -513,6 +677,7 @@ grpc::Status ScryPlugin::HandleWebSocket(
     }
 
     if (reader.joinable()) reader.join();
+    if (fork_thread.joinable()) fork_thread.join();
     return grpc::Status::OK;
 }
 

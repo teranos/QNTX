@@ -514,6 +514,37 @@ export function createResultGlyph(
                     return;
                 }
 
+                // Fork responses
+                if (decoded.indexOf('forked:') === 0) {
+                    const branchId = parseInt(decoded.substring(7), 10);
+                    log.debug(SEG.GLYPH, `[ResultGlyph] Fork started: branch ${branchId}`);
+                    // TODO(#777): no visual link between fork point and fork text in the DOM
+                    const forkMarker = document.createElement('div');
+                    forkMarker.className = 'fork-marker';
+                    forkMarker.style.cssText = 'border-top:1px solid rgba(100,180,255,0.4);margin:6px 0 4px;padding:2px 0 0;font:9px monospace;color:rgba(100,180,255,0.5);';
+                    forkMarker.textContent = '\u2500 fork ' + branchId;
+                    output.appendChild(forkMarker);
+                    output.scrollTop = output.scrollHeight;
+                    // Enable frame drawing for fork generation
+                    nebulaScrub = true;
+                    return;
+                }
+                if (decoded.indexOf('fork_token:') === 0) {
+                    // TODO(#777): fork spans lack data-token-index/data-confidence — not scrub-navigable or dimmable
+                    const tokenText = decoded.substring(11);
+                    const span = document.createElement('span');
+                    span.textContent = tokenText;
+                    span.style.color = 'rgba(140,190,255,0.9)';
+                    output.appendChild(span);
+                    output.scrollTop = output.scrollHeight;
+                    return;
+                }
+                if (decoded.indexOf('fork_done:') === 0) {
+                    const branchId = parseInt(decoded.substring(10), 10);
+                    log.debug(SEG.GLYPH, `[ResultGlyph] Fork complete: branch ${branchId}`);
+                    return;
+                }
+
                 const bytes = new Uint8Array(decoded.length);
                 for (let i = 0; i < decoded.length; i++) {
                     bytes[i] = decoded.charCodeAt(i);
