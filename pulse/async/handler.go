@@ -70,6 +70,14 @@ func (r *HandlerRegistry) Register(handler JobHandler) {
 	r.handlers[handlerName] = handler
 }
 
+// Replace registers a handler, overwriting any existing handler with the same name.
+// Used during plugin hot-restart to update the proxy to the new plugin connection.
+func (r *HandlerRegistry) Replace(handler JobHandler) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.handlers[handler.Name()] = handler
+}
+
 // Get retrieves the handler for a handler name.
 // Returns nil if no handler is registered.
 func (r *HandlerRegistry) Get(handlerName string) JobHandler {
