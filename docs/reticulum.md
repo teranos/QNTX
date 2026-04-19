@@ -1,6 +1,6 @@
-# Sync Vision: Reticulum & Beyond
+# Reticulum Vision
 
-The sync protocol is transport-agnostic by design. The `Conn` interface abstracts the wire — tests use channels, production uses WebSockets. This document is about what comes after WebSockets.
+> For implementation research, see [reticulum-research.md](./reticulum-research.md).
 
 ## Reticulum
 
@@ -14,23 +14,11 @@ Reticulum eliminates these assumptions. Nodes are identified by cryptographic ke
 
 This is the network that attestation sync needs. Not because QNTX is building a LoRa mesh (though it could), but because the properties Reticulum provides — cryptographic identity, transport agnosticism, delay tolerance, self-configuration — are exactly the properties that make decentralized attestation propagation work.
 
-### QNTX nodes as Reticulum destinations (proposed)
+### QNTX nodes as Reticulum destinations
 
-A Reticulum destination is a cryptographic identity (X25519 for key exchange, Ed25519 for signing) that can receive messages over any Reticulum link. A QNTX node running on Reticulum would be a destination that accepts sync protocol messages.
+A Reticulum destination is a cryptographic identity (X25519 for key exchange, Ed25519 for signing) that can receive messages over any Reticulum link. A QNTX node running on Reticulum would be a destination that accepts attestation messages.
 
-The `Conn` interface is already transport-agnostic:
-
-```go
-type Conn interface {
-    ReadJSON(v interface{}) error
-    WriteJSON(v interface{}) error
-    Close() error
-}
-```
-
-A Reticulum link implements `Conn`. The reconciliation protocol runs over it unchanged. The same `Peer.Reconcile()` that works over WebSocket channels in tests works over a Reticulum link between two nodes on opposite sides of the planet — or across a LoRa radio in a field station with no internet.
-
-The sync protocol was designed symmetric for exactly this reason. There is no "server" to connect to. Two destinations find each other on the Reticulum mesh, establish a link, and reconcile. Either side can initiate.
+The sync protocol should be symmetric. There is no "server" to connect to. Two destinations find each other on the Reticulum mesh, establish a link, and reconcile. Either side can initiate.
 
 ### Identity convergence (open question)
 
@@ -50,15 +38,13 @@ This doesn't need to be decided now. The sync protocol is identity-agnostic — 
 
 Reticulum is built for links that come and go. LoRa radios, intermittent WiFi, satellite uplinks with minutes of latency. Messages are stored and forwarded when links become available.
 
-The Merkle reconciliation protocol already has this property. The tree encodes "what I have," not "what changed since last sync." Two nodes that haven't spoken in a week reconcile just as efficiently as two that spoke a minute ago. Each `Reconcile()` call is stateless — no session to maintain between syncs.
-
-On Reticulum, this means a QNTX node on an intermittent link (a field station, a mobile device, a sensor network) participates in sync whenever its link is up. No special "offline mode" — the protocol inherently handles gaps. Jenny's tube journey isn't a special case to engineer around; it's the normal mode of operation for any Reticulum link.
+A QNTX node on an intermittent link (a field station, a mobile device, a sensor network) participates in sync whenever its link is up. No special "offline mode" — the protocol inherently handles gaps. Jenny's tube journey isn't a special case to engineer around; it's the normal mode of operation for any Reticulum link.
 
 ### Transport diversity
 
 A single QNTX node could be reachable over multiple Reticulum interfaces simultaneously: WiFi at home, cellular on the train, LoRa at the field station. Reticulum handles the routing — the node is the same destination regardless of which physical link carries the traffic.
 
-This means attestation sync works across transport boundaries without QNTX knowing or caring. A field researcher's attestations might travel over LoRa to a gateway, then over TCP to a university server, then over WiFi to a colleague's laptop. The reconciliation protocol sees a `Conn` at each hop. The attestations arrive with the same content hashes regardless of path.
+This means attestation sync works across transport boundaries without QNTX knowing or caring. A field researcher's attestations might travel over LoRa to a gateway, then over TCP to a university server, then over WiFi to a colleague's laptop. The attestations arrive with the same content hashes regardless of path.
 
 ### What Reticulum doesn't solve
 
@@ -76,11 +62,11 @@ These are QNTX-layer decisions. Reticulum is the plumbing; QNTX is the semantics
 
 Nodes sharing contexts form natural sync groups. A node carrying `team-eng` attestations discovers other `team-eng` nodes and syncs selectively — requesting only groups matching shared contexts, ignoring the rest.
 
-On Reticulum, this could use announce/discover: a node announces a hash of its context list. Other nodes with overlapping contexts respond. The Merkle tree's group structure supports partial sync — you exchange group hashes for everything but only request groups you care about.
+On Reticulum, this could use announce/discover: a node announces a hash of its context list. Other nodes with overlapping contexts respond.
 
 ### Gossip: epidemic dissemination
 
-Each node periodically picks a random known peer and syncs. Attestations spread probabilistically. The Merkle tree makes each round efficient — matching roots cost one message, diffs transfer only the delta.
+Each node periodically picks a random known peer and syncs. Attestations spread probabilistically.
 
 On a Reticulum mesh, gossip happens naturally. Every node routes, so attestations propagate through the mesh as nodes reconcile with their neighbors. A field researcher syncs with a local relay; the relay syncs with the university server; the university syncs with a collaborator's instance. No node is configured as a "relay" — every node that syncs becomes one.
 
@@ -88,7 +74,7 @@ On a Reticulum mesh, gossip happens naturally. Every node routes, so attestation
 
 Your laptop, phone, and tablet form a three-node network. Any two that can see each other sync directly. If your laptop syncs with your phone and your phone syncs with your tablet, all three converge.
 
-On Reticulum, these three devices are three destinations on a mesh. They find each other automatically if they share a transport (local WiFi, Bluetooth). The reconciliation protocol runs over Reticulum links. No URLs to configure, no IP addresses to know — just cryptographic identities that discover each other.
+On Reticulum, these three devices are three destinations on a mesh. They find each other automatically if they share a transport (local WiFi, Bluetooth). No URLs to configure, no IP addresses to know — just cryptographic identities that discover each other.
 
 Jenny's commute: her phone is a Reticulum destination. The office server is a Reticulum destination. When she reaches a station, her phone discovers the server over WiFi (or cellular, or whatever link is available), establishes a Reticulum link, and reconciles. The transport changed three times during her commute — WiFi at Morden, cellular at Stockwell, WiFi again at Old Street. The reconciliation protocol didn't notice.
 
@@ -105,13 +91,15 @@ Jenny's commute: her phone is a Reticulum destination. The office server is a Re
 
 An append-only set grows without bound. Several mechanisms limit growth:
 
-- **Bounded storage**: The existing system caps attestations per (actor, context) group. The Merkle tree mirrors these groups. When bounded storage evicts, the tree removes.
+- **Bounded storage**: Cap attestations per (actor, context) group. When bounded storage evicts, the sync set shrinks.
 - **Time-based expiry**: Prune attestations older than a threshold. Requires consistent thresholds across peers — if one prunes and another hasn't, the next sync re-sends the pruned attestations.
 - **Explicit tombstones**: A revocation marks the original for removal. After propagation, both can be pruned. Knowing when propagation is complete is hard in a decentralized system.
 
 ## Related
 
-- [Mobile Vision](./mobile.md) — Jenny's tube journey depends on sync across intermittent connectivity
-- [Glyphs](./glyphs.md) — attestable glyph state syncs through the same Merkle tree
-- [Time-Travel](./time-travel.md) — navigating attestation history across synced nodes
+- [Implementation Research](./reticulum-research.md) — Reticulum implementations, integration paths, license landscape
+- [Mobile Vision](./vision/mobile.md) — Jenny's tube journey depends on sync across intermittent connectivity
+- [Glyphs](./vision/glyphs.md) — attestable glyph state syncs through the same protocol
+- [Time-Travel](./vision/time-travel.md) — navigating attestation history across synced nodes
 - [Reticulum](https://reticulum.network/) — the cryptographic mesh network QNTX aims to operate on
+- [Leviculum](https://codeberg.org/Lew_Palm/leviculum) — Rust implementation of Reticulum
