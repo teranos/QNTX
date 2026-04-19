@@ -119,6 +119,9 @@
         --ocaml_out=plugin/grpc/ocaml/proto/ \
         plugin/grpc/protocol/domain.proto \
         plugin/grpc/protocol/atsstore.proto \
+        plugin/grpc/protocol/embedding.proto \
+        plugin/grpc/protocol/llm.proto \
+        plugin/grpc/protocol/vectorsearch.proto \
         plugin/grpc/protocol/search.proto
 
       echo "✓ OCaml proto files generated in plugin/grpc/ocaml/proto/"
