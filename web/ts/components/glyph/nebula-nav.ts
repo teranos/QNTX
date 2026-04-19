@@ -115,7 +115,7 @@ export function createNebulaNav(config: NebulaNavConfig): NebulaNavHandle {
         }
         if (e.key === 'f' && examine) {
             e.preventDefault();
-            // Fork from the currently hovered/selected candidate
+            // TODO(#777): move fork trigger from f-key to token popup click
             const hoveredId = element.dataset.hoveredTokenId;
             if (hoveredId) {
                 sendMessage('fork:' + hoveredId);

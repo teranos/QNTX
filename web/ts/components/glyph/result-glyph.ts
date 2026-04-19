@@ -520,7 +520,7 @@ export function createResultGlyph(
                 if (decoded.indexOf('forked:') === 0) {
                     const branchId = parseInt(decoded.substring(7), 10);
                     log.debug(SEG.GLYPH, `[ResultGlyph] Fork started: branch ${branchId}`);
-                    // Add a visual separator for the fork
+                    // TODO(#777): no visual link between fork point and fork text in the DOM
                     const forkMarker = document.createElement('div');
                     forkMarker.className = 'fork-marker';
                     forkMarker.style.cssText = 'border-top:1px solid rgba(100,180,255,0.4);margin:6px 0 4px;padding:2px 0 0;font:9px monospace;color:rgba(100,180,255,0.5);';
@@ -532,6 +532,7 @@ export function createResultGlyph(
                     return;
                 }
                 if (decoded.indexOf('fork_token:') === 0) {
+                    // TODO(#777): fork spans lack data-token-index/data-confidence — not scrub-navigable or dimmable
                     const tokenText = decoded.substring(11);
                     const span = document.createElement('span');
                     span.textContent = tokenText;

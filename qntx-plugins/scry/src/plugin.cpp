@@ -564,6 +564,7 @@ grpc::Status ScryPlugin::HandleWebSocket(
                             plugin->set_activity("forking (branch " + std::to_string(branch_id) + ")");
 
                             // Generate on the fork — no fork_mutex held during generation
+                            // TODO(#777): temperature and max_tokens hardcoded for forks
                             auto result = engine->fork_and_generate(
                                 parent_seq, fork_pos_absolute,
                                 fork_token_id, new_seq,
