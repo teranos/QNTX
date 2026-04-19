@@ -129,10 +129,19 @@ func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetA
 		}, nil
 	}
 
+	s.logger.Infow("GetAttestations",
+		"results", len(attestations),
+		"predicates", filter.Predicates,
+		"subjects", filter.Subjects,
+		"contexts", filter.Contexts,
+		"actors", filter.Actors,
+		"limit", filter.Limit)
+
 	protoAttestations := make([]*protocol.Attestation, len(attestations))
 	for i, as := range attestations {
 		protoAtt, err := protocol.AttestationFromTypes(as)
 		if err != nil {
+			s.logger.Errorw("GetAttestations proto conversion failed", "index", i, "id", as.ID, "error", err)
 			return &protocol.GetAttestationsResponse{
 				Success: false,
 				Error:   fmt.Sprintf("failed to convert attestation %s to proto: %v", as.ID, err),
@@ -140,6 +149,8 @@ func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetA
 		}
 		protoAttestations[i] = protoAtt
 	}
+
+	s.logger.Infow("GetAttestations returning", "count", len(protoAttestations))
 
 	return &protocol.GetAttestationsResponse{
 		Success:      true,
