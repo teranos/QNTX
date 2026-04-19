@@ -131,9 +131,9 @@ func TestDiffConfig_Changes(t *testing.T) {
 		"key": "abc",
 	}
 	after := map[string]string{
-		"url":    "http://new:7700",
-		"key":    "abc",
-		"extra":  "val",
+		"url":   "http://new:7700",
+		"key":   "abc",
+		"extra": "val",
 	}
 	diffs := DiffConfig(before, after)
 
