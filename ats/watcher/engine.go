@@ -95,6 +95,10 @@ type Engine struct {
 	// Persistent execution queue (replaces in-memory retry)
 	queueStore *QueueStore
 
+	// Glyph types that can actually execute (e.g. "prompt", "py", "se").
+	// Set by the server after plugin discovery. If nil, all types are allowed.
+	availableGlyphTypes map[string]bool
+
 	// Control
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -131,6 +135,16 @@ func NewEngine(db *sql.DB, reader AttestationReader, apiBaseURL string, logger *
 		queueStore:      NewQueueStore(db),
 		ctx:             ctx,
 		cancel:          cancel,
+	}
+}
+
+// SetAvailableGlyphTypes configures which glyph types can execute.
+// Watchers targeting unavailable types are skipped during loadWatchers.
+// Call before Start() or before ReloadWatchers().
+func (e *Engine) SetAvailableGlyphTypes(types []string) {
+	e.availableGlyphTypes = make(map[string]bool, len(types))
+	for _, t := range types {
+		e.availableGlyphTypes[t] = true
 	}
 }
 
@@ -286,6 +300,20 @@ func (e *Engine) loadWatchers() error {
 		// Apply edge cursor for meld-edge watchers: skip attestations already processed
 		if w.ActionType == storage.ActionTypeGlyphExecute {
 			e.applyEdgeCursor(w)
+
+			// Skip watchers whose target glyph type requires a plugin that isn't enabled.
+			// Prevents 404 spam when e.g. python plugin is disabled but py glyphs exist in DB.
+			if e.availableGlyphTypes != nil {
+				var glyphAction GlyphExecuteAction
+				if err := json.Unmarshal([]byte(w.ActionData), &glyphAction); err == nil {
+					if glyphAction.TargetGlyphType != "" && !e.availableGlyphTypes[glyphAction.TargetGlyphType] {
+						e.logger.Infow("Skipping watcher: target glyph type not available (plugin disabled?)",
+							"watcher_id", w.ID,
+							"glyph_type", glyphAction.TargetGlyphType)
+						continue
+					}
+				}
+			}
 		}
 
 		e.watchers[w.ID] = w

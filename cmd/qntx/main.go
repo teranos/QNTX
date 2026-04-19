@@ -216,6 +216,9 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 					pluginLogger.Warnw("Failed to reload watchers after plugin setup", "error", err)
 				}
 			})
+			pm.SetOnPluginRestarted(func(name string) {
+				defaultServer.InvalidatePluginMux(name)
+			})
 		}
 
 		// Initialize each plugin individually, registering provider services

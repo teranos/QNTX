@@ -39,14 +39,14 @@ type BannerInfo struct {
 // bannerPalette contains 8 distinct ANSI colors for plugin identity.
 // Selected for contrast on dark and light terminals.
 var bannerPalette = []string{
-	"\033[36m",  // cyan
-	"\033[33m",  // yellow
-	"\033[35m",  // magenta
-	"\033[32m",  // green
-	"\033[34m",  // blue
-	"\033[91m",  // bright red
-	"\033[93m",  // bright yellow
-	"\033[96m",  // bright cyan
+	"\033[36m", // cyan
+	"\033[33m", // yellow
+	"\033[35m", // magenta
+	"\033[32m", // green
+	"\033[34m", // blue
+	"\033[91m", // bright red
+	"\033[93m", // bright yellow
+	"\033[96m", // bright cyan
 }
 
 const (
