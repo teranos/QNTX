@@ -829,11 +829,9 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 
 	if m.handlerRegistry != nil {
 		for _, handlerName := range proxy.GetHandlerNames() {
-			if !m.handlerRegistry.Has(handlerName) {
-				proxyHandler := NewPluginProxyHandler(handlerName, proxy, m.db, m.logger)
-				m.handlerRegistry.Register(proxyHandler)
-				m.logger.Debugw("Re-registered plugin async handler", "plugin", name, "handler", handlerName)
-			}
+			proxyHandler := NewPluginProxyHandler(handlerName, proxy, m.db, m.logger)
+			m.handlerRegistry.Replace(proxyHandler)
+			m.logger.Debugw("Re-registered plugin async handler", "plugin", name, "handler", handlerName)
 		}
 	}
 
