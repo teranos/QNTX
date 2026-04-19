@@ -406,6 +406,11 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 			router.SetService(server.embeddingService)
 		}
 	}
+	if server.embeddingStore != nil && server.servicesManager != nil {
+		if router := server.servicesManager.GetEmbeddingRouter(); router != nil {
+			router.SetStore(server.embeddingStore)
+		}
+	}
 
 	// Wire embedding service into watcher engine now that it's available
 	// (watcher engine starts before embeddings — reconnect and reload)
