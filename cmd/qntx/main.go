@@ -290,6 +290,9 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 			handlerRegistry := daemon.Registry()
 			db := defaultServer.GetDB()
 
+			// Store Pulse resources so hot-restarts can re-register handlers/schedules
+			manager.SetPulseResources(db, handlerRegistry)
+
 			for _, p := range loadedPlugins {
 				externalPlugin, ok := p.(*grpc.ExternalDomainProxy)
 				if !ok {

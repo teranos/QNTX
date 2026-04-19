@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -17,6 +18,7 @@ import (
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/pulse/async"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -102,6 +104,8 @@ type PluginManager struct {
 	onWatchersSetup   func()            // called after plugin watchers are written to DB
 	onPluginRestarted func(name string) // called after auto-restart succeeds (clear HTTP mux state)
 	pidFile           *pidFile
+	db                *sql.DB                // for schedule setup on restart
+	handlerRegistry   *async.HandlerRegistry // for handler re-registration on restart
 }
 
 // managedPlugin tracks a running plugin.
@@ -169,6 +173,12 @@ func (m *PluginManager) SetPidFile(dir string, serverPort int) {
 // SetServicesManager sets the services manager for LLM provider re-registration after restart.
 func (m *PluginManager) SetServicesManager(sm *ServicesManager) {
 	m.servicesManager = sm
+}
+
+// SetPulseResources stores DB and handler registry for schedule/handler re-registration on plugin restart.
+func (m *PluginManager) SetPulseResources(db *sql.DB, registry *async.HandlerRegistry) {
+	m.db = db
+	m.handlerRegistry = registry
 }
 
 // SetOnWatchersSetup sets a callback invoked after plugin watchers are written to DB.
@@ -807,15 +817,40 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		}
 	}
 
-	// Re-register service providers if applicable
+	// Re-register async handlers and schedules
 	m.mu.RLock()
 	p, exists := m.plugins[name]
 	m.mu.RUnlock()
-	if !exists || m.servicesManager == nil {
+	if !exists {
 		m.logger.Debugf("Plugin '%s' restarted successfully", name)
 		return
 	}
 	proxy := p.client
+
+	if m.handlerRegistry != nil {
+		for _, handlerName := range proxy.GetHandlerNames() {
+			if !m.handlerRegistry.Has(handlerName) {
+				proxyHandler := NewPluginProxyHandler(handlerName, proxy, m.db, m.logger)
+				m.handlerRegistry.Register(proxyHandler)
+				m.logger.Debugw("Re-registered plugin async handler", "plugin", name, "handler", handlerName)
+			}
+		}
+	}
+
+	if m.db != nil {
+		schedules := proxy.GetSchedules()
+		if len(schedules) > 0 {
+			if err := SetupPluginSchedules(m.db, name, schedules, m.logger); err != nil {
+				m.logger.Errorw("Failed to setup plugin schedules on restart",
+					"plugin", name, "error", err)
+			}
+		}
+	}
+
+	if m.servicesManager == nil {
+		m.logger.Debugf("Plugin '%s' restarted successfully", name)
+		return
+	}
 	var roles []string
 	if proxy.IsLLMProvider() {
 		roles = append(roles, "llm-provider")
