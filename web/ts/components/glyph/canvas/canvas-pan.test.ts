@@ -16,7 +16,7 @@ import {
     resetCanvasState,
     flushSaveState
 } from './canvas-pan';
-import { makeDraggable, makeResizable } from '../glyph-interaction';
+import { makeDraggable, makeResizable, configureGlyphs } from '@qntx/glyphs';
 import type { Glyph } from '@qntx/glyphs';
 import { uiState } from '../../../state/ui';
 
@@ -555,6 +555,19 @@ describe('Drag respects canvas zoom - Tim (Happy Path)', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
         resetCanvasState('drag-zoom');
+        configureGlyphs({
+            canvasHost: {
+                saveCanvasGlyph() {},
+                getCanvasGlyphs: () => [],
+                getTransform: (canvasId) => getTransform(canvasId),
+                getSelectedGlyphIds: () => [],
+                isGlyphSelected: () => false,
+                saveComposition() {},
+                removeComposition() {},
+                findCompositionByGlyph: () => null,
+                flushSync() {},
+            },
+        });
     });
 
     test('Tim drags glyph at scale 1.0 — delta matches mouse', () => {
@@ -614,6 +627,19 @@ describe('Resize respects canvas zoom - Tim (Happy Path)', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
         resetCanvasState('resize-zoom');
+        configureGlyphs({
+            canvasHost: {
+                saveCanvasGlyph() {},
+                getCanvasGlyphs: () => [],
+                getTransform: (canvasId) => getTransform(canvasId),
+                getSelectedGlyphIds: () => [],
+                isGlyphSelected: () => false,
+                saveComposition() {},
+                removeComposition() {},
+                findCompositionByGlyph: () => null,
+                flushSync() {},
+            },
+        });
     });
 
     test('Tim resizes glyph at scale 0.5 — size grows 2x mouse delta', () => {

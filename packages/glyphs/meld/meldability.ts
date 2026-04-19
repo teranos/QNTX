@@ -8,21 +8,14 @@
  * - right: horizontal data flow (ax → py → prompt, py → py)
  * - bottom: result/output attachment (py ↓ result, prompt ↓ result)
  * - top: (reserved for future upward connections)
- *
- * Pure graph functions (getRootGlyphIds, getLeafGlyphIds, isPortFree,
- * computeGridPositions) live in @qntx/glyphs and are re-exported here.
  */
 
-// Re-export pure graph functions and types from @qntx/glyphs (canonical)
-export type { EdgeDirection } from '@qntx/glyphs';
-export {
-    getRootGlyphIds,
-    getLeafGlyphIds,
-    isPortFree,
-    computeGridPositions,
-} from '@qntx/glyphs';
+import type { EdgeDirection } from '../composition';
+import { isPortFree } from '../edge-graph';
 
-import type { EdgeDirection } from '@qntx/glyphs';
+// Re-export for consumers within the package
+export { isPortFree };
+export type { EdgeDirection };
 
 export interface PortRule {
     direction: EdgeDirection;
@@ -56,7 +49,6 @@ export const MELDABILITY: Record<string, readonly PortRule[]> = {
         { direction: 'bottom', targets: ['canvas-result-glyph', 'canvas-subcanvas-glyph'] }
     ],
     'canvas-doc-glyph': [
-        // Right-meld onto result chains targets topmost result (#521)
         { direction: 'right', targets: ['canvas-result-glyph', 'canvas-prompt-glyph', 'canvas-doc-glyph', 'canvas-subcanvas-glyph'] },
         { direction: 'bottom', targets: ['canvas-prompt-glyph', 'canvas-doc-glyph', 'canvas-subcanvas-glyph'] }
     ],
@@ -159,14 +151,12 @@ export function getCompositionGlyphIds(composition: HTMLElement): string[] {
     return glyphIds;
 }
 
-const GLYPH_CLASS_RE = /^canvas-\w+-glyph$/;
-
 /**
  * Extract the canonical glyph class (e.g. 'canvas-py-glyph') from an element's classList
  */
 export function getGlyphClass(element: HTMLElement): string | null {
     for (const cls of element.classList) {
-        if (GLYPH_CLASS_RE.test(cls)) return cls;
+        if (cls.startsWith('canvas-') && cls.endsWith('-glyph')) return cls;
     }
     return null;
 }

@@ -8,7 +8,7 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { getMeldOptions, isPortFree } from './meldability';
+import { getMeldOptions, isPortFree } from '@qntx/glyphs';
 
 /** Helper: build a composition DOM with children matching the edge IDs */
 function compWith(...glyphs: Array<{ id: string; cls: string }>): HTMLElement {

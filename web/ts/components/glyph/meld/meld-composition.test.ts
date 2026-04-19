@@ -9,11 +9,28 @@
  * - Spike: Tries to break things, edge cases
  */
 
-import { describe, test, expect } from 'bun:test';
-import { performMeld, unmeldComposition, isMeldedComposition, reconstructMeld, extendComposition, detachGlyph } from './meld-composition';
-import { MELD_THRESHOLD } from './meld-detect';
+import { describe, test, expect, beforeEach } from 'bun:test';
+import { performMeld, unmeldComposition, isMeldedComposition, reconstructMeld, extendComposition, detachGlyph, MELD_THRESHOLD, configureGlyphs } from '@qntx/glyphs';
 import type { Glyph } from '@qntx/glyphs';
 import { uiState } from '../../../state/ui';
+import { addComposition, removeComposition, findCompositionByGlyph } from '../../../state/compositions';
+
+// Wire CanvasHost so package meld code can access composition state
+beforeEach(() => {
+    configureGlyphs({
+        canvasHost: {
+            saveCanvasGlyph: (glyph) => uiState.addCanvasGlyph(glyph),
+            getCanvasGlyphs: () => uiState.getCanvasGlyphs(),
+            getTransform: () => ({ panX: 0, panY: 0, scale: 1 }),
+            getSelectedGlyphIds: () => [],
+            isGlyphSelected: () => false,
+            saveComposition: (composition) => addComposition(composition),
+            removeComposition: (id) => removeComposition(id),
+            findCompositionByGlyph: (glyphId) => findCompositionByGlyph(glyphId),
+            flushSync() {},
+        },
+    });
+});
 
 /** Get direct glyph children of a composition (no column wrappers with absolute positioning) */
 function getGlyphChildren(composition: HTMLElement): HTMLElement[] {

@@ -15,7 +15,7 @@ import type { Glyph } from '@qntx/glyphs';
 import { SO, Prose } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { runCleanup } from './glyph-interaction';
+import { runCleanup } from '@qntx/glyphs';
 import { setupPromptGlyph } from './prompt-glyph';
 import { setupNoteGlyph } from './note-glyph';
 
