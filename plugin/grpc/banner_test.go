@@ -3,6 +3,10 @@ package grpc
 import (
 	"strings"
 	"testing"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestFormatBanner_Boot(t *testing.T) {
@@ -238,5 +242,31 @@ func TestAccumulator_SnapshotAndDiff(t *testing.T) {
 	}
 	if !strings.Contains(diffs[0], "url changed") {
 		t.Errorf("expected url change diff, got %s", diffs[0])
+	}
+}
+
+func TestPluginLogger_NoVersionPrefix(t *testing.T) {
+	core, logs := observer.New(zapcore.InfoLevel)
+	sugar := zap.New(core).Named("spindle").Sugar()
+
+	pl := &pluginLogger{
+		logger: sugar,
+		level:  "info",
+	}
+
+	pl.Write([]byte("[spindle] ATSClient connected to 127.0.0.1:50648\n"))
+
+	if logs.Len() != 1 {
+		t.Fatalf("expected 1 log entry, got %d", logs.Len())
+	}
+
+	msg := logs.All()[0].Message
+	// Must NOT contain a version prefix like "[spindle v0.4.1]"
+	if strings.Contains(msg, "[spindle v") {
+		t.Errorf("message should not contain version prefix, got: %s", msg)
+	}
+	// The raw line from the plugin is passed through as-is
+	if msg != "[spindle] ATSClient connected to 127.0.0.1:50648" {
+		t.Errorf("expected raw plugin line, got: %s", msg)
 	}
 }

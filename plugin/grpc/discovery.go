@@ -404,14 +404,6 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		return errors.WithHint(err, "verify the correct plugin binary is installed or update the plugin name in config")
 	}
 
-	// Add version to plugin loggers now that metadata is available
-	if stdoutLogger != nil {
-		stdoutLogger.setVersion(meta.Name, meta.Version)
-	}
-	if stderrLogger != nil {
-		stderrLogger.setVersion(meta.Name, meta.Version)
-	}
-
 	// Wire watcher reload callback so engine picks up plugin-declared watchers
 	if m.onWatchersSetup != nil {
 		client.OnWatchersSetup = m.onWatchersSetup
@@ -929,19 +921,10 @@ func (m *PluginManager) Shutdown(ctx context.Context) error {
 // pluginLogger logs plugin output and captures port announcements.
 type pluginLogger struct {
 	logger    *zap.SugaredLogger
-	prefix    string // e.g. "[scry v0.35.0] " — set after metadata arrives
 	level     string
 	buf       strings.Builder
 	portChan  chan int   // Optional channel to send discovered port
 	logBuffer *LogBuffer // Optional ring buffer for log streaming
-	mu        sync.Mutex // Protects prefix field for dynamic updates
-}
-
-// setVersion sets the log line prefix to [name vX.Y.Z]
-func (l *pluginLogger) setVersion(name, version string) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.prefix = fmt.Sprintf("[%s v%s] ", name, version)
 }
 
 func (l *pluginLogger) Write(p []byte) (n int, err error) {
@@ -993,23 +976,19 @@ func (l *pluginLogger) Write(p []byte) (n int, err error) {
 				})
 			}
 
-			// Log with plugin identity from logger name, version from prefix
-			l.mu.Lock()
-			lg := l.logger
-			pfx := l.prefix
-			l.mu.Unlock()
-			msg := pfx + line
+			// Log with plugin identity from logger name
+			msg := line
 			switch actualLevel {
 			case "debug":
-				lg.Debug(msg)
+				l.logger.Debug(msg)
 			case "info":
-				lg.Info(msg)
+				l.logger.Info(msg)
 			case "warn":
-				lg.Warn(msg)
+				l.logger.Warn(msg)
 			case "error":
-				lg.Error(msg)
+				l.logger.Error(msg)
 			default:
-				lg.Warn(msg)
+				l.logger.Warn(msg)
 			}
 		}
 	}
