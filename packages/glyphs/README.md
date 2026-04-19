@@ -29,6 +29,7 @@ Drag, resize, and the full meld pipeline are in the package. Hosts implement `Ca
 - [x] `MELDT` — Meld detection: proximity-based meld triggering during drag
 - [x] `MELDF` — Meld feedback: visual indicators (glow, snap) during meld approach
 - [x] `MELDX` — Meld execution: `performMeld`, `extendComposition`, `unmeldComposition`, `detachGlyph`
+- [ ] `CNVWS` — Canvas workspace: pan, zoom, selection, rectangle select, spawn, keyboard shortcuts — generic glyph hosting
 - [ ] `GLYUI` — `createGlyphUI` + SDK primitives (glyph, input, button, statusLine) into package
 - [ ] `DSDMO` — Design system demo: mini-canvas with real drag-to-meld, compositions from edge data
 
