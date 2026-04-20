@@ -94,7 +94,7 @@ grpc::Status GazePlugin::Initialize(grpc::ServerContext* ctx,
             std::string name = engine->model_name();
             engines_[name] = std::move(engine);
         } else {
-            std::cout << "[gaze] Failed to load model: " << path << std::endl;
+            std::cout << "[init] Failed to load model: " << path << std::endl;
         }
     }
 

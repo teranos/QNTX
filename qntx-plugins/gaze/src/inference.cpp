@@ -66,7 +66,7 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
     model_params.progress_callback = [](float, void*) -> bool { return true; };
     model_ = llama_model_load_from_file(model_path.c_str(), model_params);
     if (!model_) {
-        std::cout << "[gaze] Failed to load model from " << model_path << std::endl;
+        std::cout << "[model] Failed to load model from " << model_path << std::endl;
         return false;
     }
 
@@ -79,7 +79,7 @@ bool InferenceEngine::load_model(const std::string& model_path, int n_ctx) {
     ctx_params.n_batch = effective_ctx;
     ctx_ = llama_init_from_model(model_, ctx_params);
     if (!ctx_) {
-        std::cout << "[gaze] Failed to create context for " << model_path << std::endl;
+        std::cout << "[model] Failed to create context for " << model_path << std::endl;
         llama_model_free(model_);
         model_ = nullptr;
         return false;
@@ -254,7 +254,7 @@ int InferenceEngine::prepare_prompt(
         result.warning = "Prompt truncated from " + std::to_string(original)
             + " to " + std::to_string(n_tokens) + " tokens (context window: "
             + std::to_string(ctx_size) + ")";
-        std::cerr << "[gaze] WARNING: " << result.warning << std::endl;
+        std::cerr << "[model] WARNING: " << result.warning << std::endl;
     }
 
     llama_memory_clear(llama_get_memory(ctx_), true);
@@ -327,7 +327,7 @@ InferenceEngine::ChatResult InferenceEngine::stream_chat(
 
     auto gen_end = std::chrono::steady_clock::now();
     auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(gen_end - gen_start).count();
-    std::cout << "[gaze] " << n_generated << " tokens in "
+    std::cout << "[inference] " << n_generated << " tokens in "
               << total_ms << "ms (" << (total_ms > 0 ? (n_generated * 1000 / total_ms) : 0)
               << " tok/s)" << std::endl;
     llama_sampler_free(sampler);

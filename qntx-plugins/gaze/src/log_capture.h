@@ -27,7 +27,7 @@ public:
 
         // Always show actual errors
         for (auto& line : error_lines_) {
-            std::cout << "[gaze] ERROR: " << line << std::endl;
+            std::cout << "[model] ERROR: " << line << std::endl;
         }
 
         if (log_level == "error") return;
@@ -36,7 +36,7 @@ public:
         // info: 3 condensed lines
         // Line 1: Metal device
         if (!device_name_.empty()) {
-            std::cout << "[gaze] Metal: " << device_name_;
+            std::cout << "[metal] " << device_name_;
             if (!gpu_family_.empty()) std::cout << " (" << gpu_family_ << ")";
             if (vram_free_mib_ > 0) std::cout << ", " << vram_free_mib_ << " MiB free";
             std::string caps;
@@ -49,7 +49,7 @@ public:
 
         // Line 2: Buffers
         if (kv_buffer_mib_ > 0 || compute_buffer_mib_ > 0) {
-            std::cout << "[gaze] Buffers: KV " << kv_buffer_mib_ << " MiB ("
+            std::cout << "[metal] Buffers: KV " << kv_buffer_mib_ << " MiB ("
                       << n_layers_ << " layers), compute " << compute_buffer_mib_ << " MiB";
             if (cpu_buffer_mib_ > 0) std::cout << " + " << cpu_buffer_mib_ << " MiB (CPU)";
             std::cout << std::endl;
@@ -57,7 +57,7 @@ public:
 
         // Line 3: Model
         if (!model_name_.empty()) {
-            std::cout << "[gaze] Model: " << model_name_;
+            std::cout << "[model] " << model_name_;
             if (!quant_type_.empty()) std::cout << ", " << quant_type_;
             if (!file_size_.empty()) std::cout << ", " << file_size_;
             std::cout << std::endl;
@@ -67,17 +67,17 @@ public:
 
         // debug: additional detail
         if (metal_load_secs_ > 0) {
-            std::cout << "[gaze] Metal library loaded in " << metal_load_secs_ << " sec" << std::endl;
+            std::cout << "[metal] Library loaded in " << metal_load_secs_ << " sec" << std::endl;
         }
         if (graph_nodes_ > 0) {
-            std::cout << "[gaze] Graph: " << graph_nodes_ << " nodes, "
+            std::cout << "[metal] Graph: " << graph_nodes_ << " nodes, "
                       << graph_splits_ << " splits" << std::endl;
         }
         if (reserve_ms_ > 0) {
-            std::cout << "[gaze] Scheduler reserve took " << reserve_ms_ << " ms" << std::endl;
+            std::cout << "[metal] Scheduler reserve took " << reserve_ms_ << " ms" << std::endl;
         }
         if (n_tensors_ > 0) {
-            std::cout << "[gaze] Tensors: " << n_tensors_ << " total" << std::endl;
+            std::cout << "[metal] Tensors: " << n_tensors_ << " total" << std::endl;
         }
     }
 
