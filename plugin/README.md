@@ -14,4 +14,4 @@
 
 Plugins receive configuration through the `plugin.Config` interface. They don't know where values come from — they just call `config.GetString("model")` or `config.GetString("_llm_endpoint")`.
 
-The implementation that actually resolves those calls lives here in `plugin/config.go`, not in the server. The server passes in service endpoints (gRPC addresses), and the config provider merges them with `am.toml` values. This keeps the server out of plugin concerns — it just hands over addresses at startup and walks away.
+The implementation that actually resolves those calls lives in `plugin/grpc/config_provider.go`, not in the server. The server passes in service endpoints (gRPC addresses), and the config provider merges them with `am.toml` values. This keeps the server out of plugin concerns — it just hands over addresses at startup and walks away.

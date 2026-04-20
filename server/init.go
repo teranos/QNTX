@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/ai/tracker"
@@ -86,7 +85,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	}
 
 	// Create all server dependencies (builder, services, trackers, daemon)
-	deps, err := createServerDependencies(db, atsStore, verbosity, wsCore, wsTransport, serverLogger)
+	deps, err := createServerDependencies(db, atsStore, verbosity, serverLogger)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create server dependencies")
 	}
@@ -180,6 +179,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		bindAddr = "127.0.0.1"
 	}
 	if !appcfg.IsLoopbackAddress(bindAddr) && !deps.config.Auth.Enabled {
+		cancel()
 		return nil, errors.Newf(
 			"auth.enabled must be true when server.bind_address is %q (non-loopback bind exposes all endpoints to the network)",
 			bindAddr,
@@ -300,10 +300,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		}
 
 		// Wrap config provider to inject service endpoints for plugins
-		configProvider := &pluginConfigProvider{
-			base:      &simpleConfigProvider{},
-			endpoints: endpoints,
-		}
+		configProvider := grpcplugin.NewConfigProvider(endpoints)
 
 		services := plugin.NewServiceRegistry(db, serverLogger, atsStore, configProvider, queue)
 
@@ -449,7 +446,7 @@ func createServerLogger(verbosity int) (*zap.SugaredLogger, *wslogs.WebSocketCor
 }
 
 // createServerDependencies creates all components needed for QNTXServer initialization
-func createServerDependencies(db *sql.DB, atsStore ats.AttestationStore, verbosity int, wsCore zapcore.Core, wsTransport *wslogs.Transport, serverLogger *zap.SugaredLogger) (*serverDependencies, error) {
+func createServerDependencies(db *sql.DB, atsStore ats.AttestationStore, verbosity int, serverLogger *zap.SugaredLogger) (*serverDependencies, error) {
 	start := time.Now()
 
 	// Create builder with server logger — atsStore routes attestation queries through Rust FFI
@@ -566,157 +563,3 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 	serverLogger.Infow("Config watcher started", "path", configPath)
 }
 
-// simpleConfigProvider provides plugin configuration
-type simpleConfigProvider struct{}
-
-func (p *simpleConfigProvider) GetPluginConfig(domain string) plugin.Config {
-	return &simpleConfig{domain: domain}
-}
-
-// simpleConfig implements plugin.Config using am package
-type simpleConfig struct {
-	domain string
-}
-
-func (c *simpleConfig) GetString(key string) string {
-	return appcfg.GetString(c.domain + "." + key)
-}
-
-func (c *simpleConfig) GetInt(key string) int {
-	return appcfg.GetInt(c.domain + "." + key)
-}
-
-func (c *simpleConfig) GetBool(key string) bool {
-	return appcfg.GetBool(c.domain + "." + key)
-}
-
-func (c *simpleConfig) GetStringSlice(key string) []string {
-	return appcfg.GetStringSlice(c.domain + "." + key)
-}
-
-func (c *simpleConfig) Get(key string) interface{} {
-	return appcfg.Get(c.domain + "." + key)
-}
-
-func (c *simpleConfig) Set(key string, value interface{}) {
-	appcfg.Set(c.domain+"."+key, value)
-}
-
-func (c *simpleConfig) GetKeys() []string {
-	v := appcfg.GetViper()
-	if v == nil {
-		return []string{}
-	}
-
-	allKeys := v.AllKeys()
-	prefix := c.domain + "."
-	var keys []string
-
-	for _, key := range allKeys {
-		if strings.HasPrefix(key, prefix) {
-			// Strip the domain prefix to get the plugin-specific key
-			pluginKey := strings.TrimPrefix(key, prefix)
-			keys = append(keys, pluginKey)
-		}
-	}
-
-	return keys
-}
-
-// pluginConfigProvider wraps a base config provider to inject service endpoints
-type pluginConfigProvider struct {
-	base      plugin.ConfigProvider
-	endpoints *grpcplugin.ServiceEndpoints
-}
-
-func (p *pluginConfigProvider) GetPluginConfig(domain string) plugin.Config {
-	baseConfig := p.base.GetPluginConfig(domain)
-	return &pluginConfigWithEndpoints{
-		base:      baseConfig,
-		endpoints: p.endpoints,
-	}
-}
-
-// pluginConfigWithEndpoints wraps a plugin config to inject service endpoints
-type pluginConfigWithEndpoints struct {
-	base      plugin.Config
-	endpoints *grpcplugin.ServiceEndpoints
-}
-
-func (c *pluginConfigWithEndpoints) GetString(key string) string {
-	// Inject service endpoints for plugins (Issue #138)
-	if c.endpoints != nil {
-		switch key {
-		case "_ats_store_endpoint":
-			return c.endpoints.ATSStoreAddress
-		case "_queue_endpoint":
-			return c.endpoints.QueueAddress
-		case "_schedule_endpoint":
-			return c.endpoints.ScheduleAddress
-		case "_file_service_endpoint":
-			return c.endpoints.FileServiceAddress
-		case "_llm_endpoint":
-			return c.endpoints.LLMAddress
-		case "_embedding_endpoint":
-			return c.endpoints.EmbeddingAddress
-		case "_vector_search_endpoint":
-			return c.endpoints.VectorSearchAddress
-		case "_ground_endpoint":
-			return c.endpoints.GroundAddress
-		case "_search_endpoint":
-			return c.endpoints.SearchAddress
-		case "_auth_token":
-			return c.endpoints.AuthToken
-		}
-	}
-	return c.base.GetString(key)
-}
-
-func (c *pluginConfigWithEndpoints) GetInt(key string) int {
-	return c.base.GetInt(key)
-}
-
-func (c *pluginConfigWithEndpoints) GetBool(key string) bool {
-	return c.base.GetBool(key)
-}
-
-func (c *pluginConfigWithEndpoints) GetStringSlice(key string) []string {
-	return c.base.GetStringSlice(key)
-}
-
-func (c *pluginConfigWithEndpoints) Get(key string) interface{} {
-	// Inject service endpoints for plugins
-	if c.endpoints != nil {
-		switch key {
-		case "_ats_store_endpoint":
-			return c.endpoints.ATSStoreAddress
-		case "_queue_endpoint":
-			return c.endpoints.QueueAddress
-		case "_schedule_endpoint":
-			return c.endpoints.ScheduleAddress
-		case "_file_service_endpoint":
-			return c.endpoints.FileServiceAddress
-		case "_llm_endpoint":
-			return c.endpoints.LLMAddress
-		case "_embedding_endpoint":
-			return c.endpoints.EmbeddingAddress
-		case "_vector_search_endpoint":
-			return c.endpoints.VectorSearchAddress
-		case "_ground_endpoint":
-			return c.endpoints.GroundAddress
-		case "_search_endpoint":
-			return c.endpoints.SearchAddress
-		case "_auth_token":
-			return c.endpoints.AuthToken
-		}
-	}
-	return c.base.Get(key)
-}
-
-func (c *pluginConfigWithEndpoints) Set(key string, value interface{}) {
-	c.base.Set(key, value)
-}
-
-func (c *pluginConfigWithEndpoints) GetKeys() []string {
-	return c.base.GetKeys()
-}
