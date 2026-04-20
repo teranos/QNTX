@@ -45,7 +45,9 @@ API Call → ai/tracker (records) → pulse/budget (aggregates) → Decision
 
 ## Distributed Enforcement
 
-When [sync](../sync.md) is configured, each reconciliation's `sync_done` message carries the sender's spend summary and cluster limit configuration. No extra round-trips — the data piggybacks on an existing protocol message.
+> **Dormant.** P2P sync was removed from core (#779). This section describes future behavior that depends on the Reticulum plugin providing a transport layer. See [reticulum.md](../reticulum.md).
+
+When sync is configured, each reconciliation's `sync_done` message carries the sender's spend summary and cluster limit configuration. No extra round-trips — the data piggybacks on an existing protocol message.
 
 ### Two-tier model
 

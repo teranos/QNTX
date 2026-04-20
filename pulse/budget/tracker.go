@@ -251,7 +251,6 @@ func (bt *Tracker) GetBudgetLimits() BudgetConfig {
 }
 
 // GetSpendSummary returns current local spend across all three windows.
-// Implements sync.BudgetProvider so the sync protocol can include spend data.
 func (bt *Tracker) GetSpendSummary() (daily, weekly, monthly float64, err error) {
 	status, err := bt.GetStatus()
 	if err != nil {
@@ -261,7 +260,6 @@ func (bt *Tracker) GetSpendSummary() (daily, weekly, monthly float64, err error)
 }
 
 // GetClusterLimits returns this node's configured cluster budget limits.
-// Implements sync.BudgetProvider so limits are exchanged during sync.
 func (bt *Tracker) GetClusterLimits() (daily, weekly, monthly float64) {
 	bt.mu.RLock()
 	defer bt.mu.RUnlock()

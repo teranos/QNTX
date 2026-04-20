@@ -32,7 +32,7 @@ After expiry, the node can't act until you re-authenticate. No revocation infras
 
 A QNTX node's DID and its Reticulum destination identity can be the same ed25519 keypair. Unified identity — no mapping layer. An attestation signed by DID `z6Mk...` can be verified by anyone who can address Reticulum destination `z6Mk...`.
 
-This answers the open question from [reticulum.md](./reticulum.md): yes, a QNTX actor should be a Reticulum identity.
+This answers the open question from [reticulum.md](../reticulum.md): yes, a QNTX actor should be a Reticulum identity.
 
 ## Implementation Path
 
@@ -45,7 +45,7 @@ This answers the open question from [reticulum.md](./reticulum.md): yes, a QNTX 
 
 ## Related
 
-- [Reticulum](./reticulum.md) — transport layer, identity convergence
+- [Reticulum](../reticulum.md) — transport layer, identity convergence
 - [Glyphs](./glyphs.md) — attestable state, self-describing grammar
 - [Clusters](./clusters.md) — distributed consensus via attestation propagation
 - [Security](../security.md) — node-to-node auth shortcoming

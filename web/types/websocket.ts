@@ -78,7 +78,6 @@ export type MessageType =
   | 'glyph_fired'
   | 'watcher_queue_status'
   | 'database_stats'
-  | 'sync_status'
   | 'rich_search_results'
 
 
@@ -455,19 +454,6 @@ export interface DatabaseStatsMessage extends BaseMessage {
 }
 
 /**
- * Sync status response — Merkle tree state, peers, availability
- */
-export interface SyncStatusMessage extends BaseMessage {
-  type: 'sync_status';
-  available: boolean;
-  root?: string;      // Merkle root hash (64-char hex)
-  groups?: number;    // Number of (actor, context) groups in the tree
-  peers?: Array<{ name: string; url: string; status?: string; advertised_name?: string }>;
-  reason?: string;    // Why sync is unavailable
-  error?: string;     // Error reading tree state
-}
-
-/**
  * Rich search results response — extends proto-generated type with WS discriminator (ADR-006)
  */
 export interface RichSearchResultsMessage extends ProtoRichSearchResultsMessage, BaseMessage {
@@ -565,7 +551,6 @@ export type WebSocketMessage =
   | GlyphFiredMessage
   | WatcherQueueStatusMessage
   | DatabaseStatsMessage
-  | SyncStatusMessage
   | RichSearchResultsMessage
 
 // ============================================================================
@@ -611,7 +596,6 @@ export interface MessageHandlers {
   glyph_fired?: MessageHandler<GlyphFiredMessage>;
   watcher_queue_status?: MessageHandler<WatcherQueueStatusMessage>;
   database_stats?: MessageHandler<DatabaseStatsMessage>;
-  sync_status?: MessageHandler<SyncStatusMessage>;
   rich_search_results?: MessageHandler<RichSearchResultsMessage>;
 }
 
