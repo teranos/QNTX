@@ -218,7 +218,7 @@ let ingest ~file_path ~branch_override =
           let results = process_line json ~branch_override ~project_prefix in
           all_results := results @ !all_results
         | exception Yojson.Json_error msg ->
-          Printf.eprintf "[loom] JSONL parse error at %s: %s\n%!" file_path msg
+          Printf.eprintf "[jsonl] JSONL parse error at %s: %s\n%!" file_path msg
       )
     done
   with End_of_file -> ());

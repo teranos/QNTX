@@ -24,7 +24,7 @@ void AtsClient::configure(const std::string& endpoint, const std::string& auth_t
     auth_token_ = auth_token;
     auto channel = grpc::CreateChannel(endpoint, grpc::InsecureChannelCredentials());
     stub_ = protocol::ATSStoreService::NewStub(channel);
-    std::cout << "[scry] ATS client configured: " << endpoint << std::endl;
+    std::cout << "[ats] ATS client configured: " << endpoint << std::endl;
 }
 
 bool AtsClient::create_weave(const std::string& model_name,
@@ -112,15 +112,15 @@ bool AtsClient::create_weave(const std::string& model_name,
     auto status = stub_->GenerateAndCreateAttestation(&ctx, req, &resp);
 
     if (!status.ok()) {
-        std::cerr << "[scry] ATS weave write failed: " << status.error_message() << std::endl;
+        std::cerr << "[ats] ATS weave write failed: " << status.error_message() << std::endl;
         return false;
     }
     if (!resp.success()) {
-        std::cerr << "[scry] ATS weave rejected: " << resp.error() << std::endl;
+        std::cerr << "[ats] ATS weave rejected: " << resp.error() << std::endl;
         return false;
     }
 
-    std::cout << "[scry] Weave attestation created: " << resp.attestation().id()
+    std::cout << "[ats] Weave attestation created: " << resp.attestation().id()
               << " (" << signals.size() << " tokens embedded)" << std::endl;
     return true;
 }

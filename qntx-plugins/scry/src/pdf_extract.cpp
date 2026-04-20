@@ -14,7 +14,7 @@ std::string extract_pdf_text(const uint8_t* data, size_t len) {
     // Not thread-safe: one context per thread (or per call, as we do here).
     fz_context* ctx = fz_new_context(nullptr, nullptr, FZ_STORE_DEFAULT);
     if (!ctx) {
-        std::cout << "[scry] Failed to create MuPDF context" << std::endl;
+        std::cout << "[pdf] Failed to create MuPDF context" << std::endl;
         return "";
     }
 
@@ -84,7 +84,7 @@ std::string extract_pdf_text(const uint8_t* data, size_t len) {
         result = std::string(fz_string_from_buffer(ctx, buf));
     }
     fz_catch(ctx) {
-        std::cout << "[scry] PDF extraction failed: "
+        std::cout << "[pdf] PDF extraction failed: "
                   << fz_caught_message(ctx) << std::endl;
     }
 
