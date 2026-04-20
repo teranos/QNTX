@@ -91,7 +91,7 @@ Every node generates a `did:key` identity (ed25519) on first boot. No authority 
 Current: WebSocket sync between known peers, nodes identified by DID.
 Vision: Reticulum — transport-agnostic, delay-tolerant, self-routing. Node DID and Reticulum destination converge to the same keypair.
 
-See [sync.md](sync.md), [vision/reticulum.md](vision/reticulum.md), [vision/identity.md](vision/identity.md).
+See [reticulum.md](reticulum.md), [vision/identity.md](vision/identity.md).
 
 ### Technical Context
 
@@ -244,7 +244,7 @@ See [vision/continuous-intelligence.md](vision/continuous-intelligence.md).
 
 Attestations are append-only. Sync is set union — commutative, idempotent, convergent. No vector clocks, no conflict resolution. Two claims about the same subject aren't a conflict — they're two claims.
 
-See [sync.md](sync.md), [vision/reticulum.md](vision/reticulum.md).
+See [reticulum.md](reticulum.md).
 
 ### Vision Documents
 
@@ -253,7 +253,7 @@ See [sync.md](sync.md), [vision/reticulum.md](vision/reticulum.md).
 - [Glyph Melding](vision/glyph-melding.md) — reactive DAG composition
 - [Time-Travel](vision/time-travel.md) — attestation state across time
 - [Identity](vision/identity.md) — decentralized identity via did:key, short-lived delegations
-- [Reticulum](vision/reticulum.md) — cryptographic mesh networking
+- [Reticulum](reticulum.md) — cryptographic mesh networking
 - [Clusters](vision/clusters.md) — spatial organization
 - [Mobile](vision/mobile.md) — mobile-native experience
 

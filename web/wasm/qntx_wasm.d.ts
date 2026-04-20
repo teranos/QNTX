@@ -150,60 +150,6 @@ export function query_attestations(filter_json: string): Promise<string>;
 export function rich_search(query: string, limit: number): Promise<string>;
 
 /**
- * Compute content hash for an attestation.
- * Input: JSON-serialized proto Attestation (attributes as JSON object)
- * Returns: `{"hash":"<64-char hex>"}` or `{"error":"..."}`
- */
-export function sync_content_hash(attestation_json: string): string;
-
-/**
- * Check if a content hash exists in the global Merkle tree.
- * Input: `{"content_hash":"<hex>"}`
- * Returns: `{"exists":true|false}`
- */
-export function sync_merkle_contains(input: string): string;
-
-/**
- * Diff Merkle tree against remote group hashes.
- * Input: `{"remote":{"<hex>":"<hex>",...}}`
- * Returns: `{"local_only":[...],"remote_only":[...],"divergent":[...]}`
- */
-export function sync_merkle_diff(remote_json: string): string;
-
-/**
- * Reverse-lookup a group key hash to its (actor, context) pair.
- * Input: `{"group_key_hash":"<hex>"}`
- * Returns: `{"actor":"...","context":"..."}` or `{"error":"group not found"}`
- */
-export function sync_merkle_find_group_key(input: string): string;
-
-/**
- * Get all group hashes from the Merkle tree.
- * Returns: `{"groups":{"<hex>":"<hex>",...}}`
- */
-export function sync_merkle_group_hashes(): string;
-
-/**
- * Insert into the global Merkle tree.
- * Input: `{"actor":"...","context":"...","content_hash":"<hex>"}`
- * Returns: `{"ok":true}` or `{"error":"..."}`
- */
-export function sync_merkle_insert(input: string): string;
-
-/**
- * Remove from the global Merkle tree.
- * Input: `{"actor":"...","context":"...","content_hash":"<hex>"}`
- * Returns: `{"ok":true}`
- */
-export function sync_merkle_remove(input: string): string;
-
-/**
- * Get the Merkle tree root hash and stats.
- * Returns: `{"root":"<hex>","size":N,"groups":N}`
- */
-export function sync_merkle_root(): string;
-
-/**
  * Get the qntx-core version.
  */
 export function version(): string;
@@ -231,14 +177,6 @@ export interface InitOutput {
     readonly put_attestation: (a: number, b: number) => any;
     readonly query_attestations: (a: number, b: number) => any;
     readonly rich_search: (a: number, b: number, c: number) => any;
-    readonly sync_content_hash: (a: number, b: number) => [number, number];
-    readonly sync_merkle_contains: (a: number, b: number) => [number, number];
-    readonly sync_merkle_diff: (a: number, b: number) => [number, number];
-    readonly sync_merkle_find_group_key: (a: number, b: number) => [number, number];
-    readonly sync_merkle_group_hashes: () => [number, number];
-    readonly sync_merkle_insert: (a: number, b: number) => [number, number];
-    readonly sync_merkle_remove: (a: number, b: number) => [number, number];
-    readonly sync_merkle_root: () => [number, number];
     readonly version: () => [number, number];
     readonly wasm_bindgen__closure__destroy__h182a2abd191e3067: (a: number, b: number) => void;
     readonly wasm_bindgen__closure__destroy__h622d11ff1c80a730: (a: number, b: number) => void;

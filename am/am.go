@@ -12,7 +12,6 @@ type Config struct {
 	Plugin       PluginConfig     `mapstructure:"plugin"`
 	Embeddings   EmbeddingsConfig `mapstructure:"embeddings"`
 	Watcher      WatcherConfig    `mapstructure:"watcher"`
-	Sync         SyncConfig       `mapstructure:"sync"`
 	GroundDBPath string           `mapstructure:"ground_db_path"` // Path to Ground's database for deferred news delivery
 }
 
@@ -33,13 +32,6 @@ type WatcherConfig struct {
 type AuthConfig struct {
 	Enabled            bool `mapstructure:"enabled"`              // Enable biometric auth gate (default: false)
 	SessionExpiryHours int  `mapstructure:"session_expiry_hours"` // Session lifetime in hours (default: 24)
-}
-
-// SyncConfig configures peer-to-peer attestation sync
-type SyncConfig struct {
-	Name            string            `mapstructure:"name"`             // advertised to peers in hello (e.g., "laptop")
-	IntervalSeconds int               `mapstructure:"interval_seconds"` // 0 = manual only
-	Peers           map[string]string `mapstructure:"peers"`            // name = "url" (e.g., phone = "http://phone.local:877")
 }
 
 // DatabaseConfig configures the SQLite database
