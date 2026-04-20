@@ -9,3 +9,9 @@
 | [ADR-003](../docs/adr/ADR-003-plugin-communication.md) | Plugin communication patterns |
 | [ADR-004](../docs/adr/ADR-004-plugin-pulse-integration.md) | Plugin-Pulse integration for dynamic async handlers |
 | [ADR-006](../docs/adr/ADR-006-proto-as-source-of-truth.md) | Protocol Buffers as single source of truth for types |
+
+## Configuration
+
+Plugins receive configuration through the `plugin.Config` interface. They don't know where values come from — they just call `config.GetString("model")` or `config.GetString("_llm_endpoint")`.
+
+The implementation that actually resolves those calls lives here in `plugin/config.go`, not in the server. The server passes in service endpoints (gRPC addresses), and the config provider merges them with `am.toml` values. This keeps the server out of plugin concerns — it just hands over addresses at startup and walks away.
