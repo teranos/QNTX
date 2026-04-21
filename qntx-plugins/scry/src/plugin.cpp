@@ -82,7 +82,7 @@ grpc::Status ScryPlugin::Initialize(grpc::ServerContext* ctx,
             if (n_ctx <= 0) n_ctx = 2048;
         }
         if (!engine_.load_model(it->second, n_ctx)) {
-            std::cout << "[scry] Failed to load model: " << it->second << std::endl;
+            std::cout << "[init] Failed to load model: " << it->second << std::endl;
         }
     }
 
@@ -106,7 +106,7 @@ grpc::Status ScryPlugin::Initialize(grpc::ServerContext* ctx,
     sampler_cfg_.penalty_freq = parse_float("freq_penalty", 0.0f);
     sampler_cfg_.penalty_present = parse_float("presence_penalty", 0.0f);
 
-    std::cout << "[scry] Sampler config: top_k=" << sampler_cfg_.top_k
+    std::cout << "[init] Sampler config: top_k=" << sampler_cfg_.top_k
               << " top_p=" << sampler_cfg_.top_p
               << " min_p=" << sampler_cfg_.min_p
               << " typical_p=" << sampler_cfg_.typical_p
@@ -154,7 +154,7 @@ grpc::Status ScryPlugin::Shutdown(grpc::ServerContext* ctx,
     // Wait for background PCA to finish before unloading model
     if (pca_thread_.joinable()) pca_thread_.join();
     engine_.unload();
-    std::cout << "[scry] Shutdown complete" << std::endl;
+    std::cout << "[shutdown] Shutdown complete" << std::endl;
     return grpc::Status::OK;
 }
 
@@ -416,7 +416,7 @@ grpc::Status ScryPlugin::HandleWebSocket(
                         int idx = std::stoi(data.substr(6));
                         renderer->set_scrub_index(idx);
                     } catch (const std::exception& e) {
-                        std::cerr << "[scry] scrub: parse error '" << data << "': " << e.what() << std::endl;
+                        std::cerr << "[scrub] parse error '" << data << "': " << e.what() << std::endl;
                     }
                 } else if (data == "cam:r") {
                     renderer->reset_camera();
@@ -431,7 +431,7 @@ grpc::Status ScryPlugin::HandleWebSocket(
                         try {
                             vals[vi] = std::stof(rest.substr(pos, next - pos));
                         } catch (const std::exception& e) {
-                            std::cerr << "[scry] cam: parse error '" << data << "': " << e.what() << std::endl;
+                            std::cerr << "[cam] parse error '" << data << "': " << e.what() << std::endl;
                         }
                         vi++;
                         if (next == std::string::npos) break;
@@ -448,7 +448,7 @@ grpc::Status ScryPlugin::HandleWebSocket(
                             float val = std::stof(rest.substr(sep + 1));
                             renderer->set_param(key, val);
                         } catch (const std::exception& e) {
-                            std::cerr << "[scry] param: parse error '" << data << "': " << e.what() << std::endl;
+                            std::cerr << "[param] parse error '" << data << "': " << e.what() << std::endl;
                         }
                     }
                 } else if (data.size() > 6 && data.substr(0, 6) == "mouse:") {
@@ -615,7 +615,7 @@ grpc::Status ScryPlugin::HandleWebSocket(
 
                             plugin->set_activity("");
 
-                            std::cout << "[scry] Fork branch " << branch_id
+                            std::cout << "[fork] Branch " << branch_id
                                       << " complete: " << result.completion_tokens
                                       << " tokens" << std::endl;
 
@@ -630,7 +630,7 @@ grpc::Status ScryPlugin::HandleWebSocket(
                             }
                         });
                     } catch (const std::exception& e) {
-                        std::cerr << "[scry] fork: invalid message '"
+                        std::cerr << "[fork] invalid message '"
                                   << data << "': " << e.what() << std::endl;
                     }
                 }

@@ -252,7 +252,7 @@ let stitch_turn ~branch ~context ~predicate ~label ~text ~paths:turn_path ?(time
          let total_words = buffer_word_count existing.turns in
          let num_turns = List.length existing.turns in
          Hashtbl.remove buffers old_key;
-         Printf.printf "[loom] Emitting %d-word block for branch %s (branch change to %s)\n%!"
+         Printf.printf "[stitch] Emitting %d-word block for branch %s (branch change to %s)\n%!"
            total_words prev branch;
          [{ branch = prev; context = existing.context; buffered_words = 0;
             emitted = Some block; turn_count = num_turns; paths = existing.paths;
@@ -271,7 +271,7 @@ let stitch_turn ~branch ~context ~predicate ~label ~text ~paths:turn_path ?(time
           let block = existing.turns |> List.rev |> String.concat "\n\n" in
           let total_words = buffer_word_count existing.turns in
           let num_turns = List.length existing.turns in
-          Printf.printf "[loom] Emitting %d-word block for branch %s (session start)\n%!"
+          Printf.printf "[stitch] Emitting %d-word block for branch %s (session start)\n%!"
             total_words branch;
           Some (block, existing.context, num_turns, existing.paths, existing.timestamp)
         | _ -> None
@@ -303,7 +303,7 @@ let stitch_turn ~branch ~context ~predicate ~label ~text ~paths:turn_path ?(time
       if should_emit && total_words > 0 then (
         let block = entry.turns |> List.rev |> String.concat "\n\n" in
         Hashtbl.remove buffers key;
-        Printf.printf "[loom] Emitting %d-word block for branch %s (%s)\n%!"
+        Printf.printf "[stitch] Emitting %d-word block for branch %s (%s)\n%!"
           total_words branch
           (if predicate = "SessionEnd" then "session end" else "threshold");
         let num_turns = List.length entry.turns in
@@ -326,12 +326,12 @@ let stitch payload =
   let json =
     try Some (Yojson.Safe.from_string payload)
     with Yojson.Json_error msg ->
-      Printf.eprintf "[loom] JSON parse error: %s\n%!" msg;
+      Printf.eprintf "[stitch] JSON parse error: %s\n%!" msg;
       None
   in
   match json with
   | None ->
-    Printf.printf "[loom] Skipping malformed payload\n%!";
+    Printf.printf "[stitch] Skipping malformed payload\n%!";
     [{ branch = "unknown"; context = "_"; buffered_words = 0; emitted = None; turn_count = 0; paths = []; timestamp = 0 }]
   | Some json ->
     let branch = match extract_branch json with Some b -> b | None -> "unknown" in
@@ -385,7 +385,7 @@ let flush_context target_context =
         | Some i -> String.sub key 0 i
         | None -> key
       in
-      Printf.printf "[loom] Flushing %d-word buffer for %s (import complete)\n%!"
+      Printf.printf "[stitch] Flushing %d-word buffer for %s (import complete)\n%!"
         total_words key;
       results := { branch; context = entry.context; buffered_words = 0;
                    emitted = Some block; turn_count = num_turns; paths = entry.paths;
@@ -410,7 +410,7 @@ let flush_all () =
         | Some i -> String.sub key 0 i
         | None -> key
       in
-      Printf.printf "[loom] Flushing %d-word buffer for %s (shutdown)\n%!"
+      Printf.printf "[stitch] Flushing %d-word buffer for %s (shutdown)\n%!"
         total_words key;
       results := { branch; context = entry.context; buffered_words = 0;
                    emitted = Some block; turn_count = num_turns; paths = entry.paths;

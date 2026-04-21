@@ -47,7 +47,7 @@ let persist_weaves results =
       (match ats_result with
        | Ok () -> ()
        | Error msg ->
-         Printf.eprintf "[loom] Failed to persist imported weave for %s: %s\n%!" result.branch msg);
+         Printf.eprintf "[http] Failed to persist imported weave for %s: %s\n%!" result.branch msg);
       Lwt.return_unit
     | None -> Lwt.return_unit
   ) results
@@ -119,7 +119,7 @@ let handle_http reqd =
           respond_json reqd `Bad_request {|{"error":"missing file_path"}|};
           Lwt.return_unit
         | Some file_path ->
-          Printf.printf "[loom] Importing JSONL: %s\n%!" file_path;
+          Printf.printf "[http] Importing JSONL: %s\n%!" file_path;
           let results = Jsonl_reader.ingest ~file_path ~branch_override:None in
           let weave_count = List.length results in
           let* () = persist_weaves results in
@@ -135,7 +135,7 @@ let handle_http reqd =
           let session_id = Filename.remove_extension basename in
           let* _wc = Ats_client.create_weave_complete
             ~session_id ~file_path ~file_size ~line_count ~weave_count in
-          Printf.printf "[loom] Import complete: %d weaves from %s\n%!" weave_count file_path;
+          Printf.printf "[http] Import complete: %d weaves from %s\n%!" weave_count file_path;
           respond_json reqd `OK
             (Printf.sprintf {|{"success":true,"weaves_created":%d,"file":"%s","session_id":"%s"}|}
                weave_count file_path session_id);
@@ -158,7 +158,7 @@ let start () =
       | `Bad_request -> "Bad request"
       | `Internal_server_error -> "Internal server error"
     in
-    Printf.eprintf "[loom] HTTP/2 error: %s\n%!" msg;
+    Printf.eprintf "[http] HTTP/2 error: %s\n%!" msg;
     let body = respond H2.Headers.empty in
     H2.Body.Writer.close body
   in
@@ -173,8 +173,8 @@ let start () =
       (fun () ->
         let open Lwt.Syntax in
         let* _s = Lwt_io.establish_server_with_client_socket http_addr http_connection in
-        Printf.printf "[loom] HTTP API listening on port %d\n%!" http_port;
+        Printf.printf "[http] HTTP API listening on port %d\n%!" http_port;
         Lwt.return_unit)
       (fun exn ->
-        Printf.eprintf "[loom] Failed to bind HTTP port %d: %s\n%!" http_port (Printexc.to_string exn);
+        Printf.eprintf "[http] Failed to bind HTTP port %d: %s\n%!" http_port (Printexc.to_string exn);
         Lwt.return_unit))

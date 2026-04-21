@@ -18,10 +18,10 @@ let start () =
   let* () = Lwt.catch
     (fun () -> Lwt_unix.bind socket addr)
     (fun exn ->
-      Printf.eprintf "[loom] Failed to bind UDP port %d: %s\n%!" udp_port (Printexc.to_string exn);
+      Printf.eprintf "[udp] Failed to bind UDP port %d: %s\n%!" udp_port (Printexc.to_string exn);
       Lwt.fail exn)
   in
-  Printf.printf "[loom] UDP listener on port %d\n%!" udp_port;
+  Printf.printf "[udp] UDP listener on port %d\n%!" udp_port;
 
   let buf = Bytes.create 65536 in
   let rec loop () =
@@ -48,7 +48,7 @@ let start () =
           (match ats_result with
            | Ok () -> ()
            | Error msg ->
-             Printf.eprintf "[loom] Failed to persist weave: %s\n%!" msg);
+             Printf.eprintf "[udp] Failed to persist weave: %s\n%!" msg);
           Lwt.return_unit)
       | None -> ()
     ) results;

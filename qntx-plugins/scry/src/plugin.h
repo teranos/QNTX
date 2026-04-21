@@ -15,7 +15,7 @@
 #include "llm.grpc.pb.h"
 #include "ats_client.h"
 
-#define PLUGIN_VERSION "0.37.8"
+#define PLUGIN_VERSION "0.37.9"
 
 // Forward declarations
 struct llama_model;

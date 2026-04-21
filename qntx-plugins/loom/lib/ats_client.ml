@@ -14,7 +14,7 @@ let auth_token = ref ""
 let configure ~ats_endpoint ~token =
   endpoint := ats_endpoint;
   auth_token := token;
-  Printf.printf "[loom] ATS client configured: %s\n%!" ats_endpoint
+  Printf.printf "[ats] ATS client configured: %s\n%!" ats_endpoint
 
 (* --- gRPC call helper --- *)
 
@@ -25,7 +25,7 @@ let grpc_call ~path ~request_bytes =
     | _ -> ("127.0.0.1", 0)
   in
   if port = 0 then (
-    Printf.eprintf "[loom] Invalid ATS endpoint: %s\n%!" !endpoint;
+    Printf.eprintf "[ats] Invalid ATS endpoint: %s\n%!" !endpoint;
     Lwt.return_error "invalid ATS endpoint"
   ) else
     let open Lwt.Syntax in
@@ -37,7 +37,7 @@ let grpc_call ~path ~request_bytes =
 
         let* conn =
           H2_lwt_unix.Client.create_connection
-            ~error_handler:(fun _ -> Printf.eprintf "[loom] ATS h2 connection error\n%!")
+            ~error_handler:(fun _ -> Printf.eprintf "[ats] ATS h2 connection error\n%!")
             socket
         in
 
@@ -72,7 +72,7 @@ let grpc_call ~path ~request_bytes =
           H2_lwt_unix.Client.request conn
             ~flush_headers_immediately:true
             h2_request
-            ~error_handler:(fun _ -> Printf.eprintf "[loom] ATS request error\n%!")
+            ~error_handler:(fun _ -> Printf.eprintf "[ats] ATS request error\n%!")
             ~response_handler
         in
         let grpc_frame = Grpc.Message.make request_bytes in
@@ -98,14 +98,14 @@ let grpc_call ~path ~request_bytes =
         let* () = H2_lwt_unix.Client.shutdown conn in
         Lwt.return payload)
       (fun exn ->
-        Printf.eprintf "[loom] ATS client error: %s\n%!" (Printexc.to_string exn);
+        Printf.eprintf "[ats] ATS client error: %s\n%!" (Printexc.to_string exn);
         Lwt.return_error (Printexc.to_string exn))
 
 (* --- Create a weave attestation --- *)
 
 let create_weave ~branch ~context ~text ~word_count ~turn_count ~paths ?(original_timestamp=0) ~weave_source () =
   if !endpoint = "" then (
-    Printf.eprintf "[loom] ATS client not configured, dropping weave\n%!";
+    Printf.eprintf "[ats] ATS client not configured, dropping weave\n%!";
     Lwt.return_error "ATS client not configured"
   ) else
     let open Lwt.Syntax in
@@ -158,14 +158,14 @@ let create_weave ~branch ~context ~text ~word_count ~turn_count ~paths ?(origina
       let reader = Ocaml_protoc_plugin.Reader.create payload in
       (match Protocol.GenerateAttestationResponse.from_proto reader with
        | Ok resp when resp.success ->
-         Printf.printf "[loom] Weave created for branch %s\n%!" branch;
+         Printf.printf "[ats] Weave created for branch %s\n%!" branch;
          Lwt.return_ok ()
        | Ok resp ->
-         Printf.eprintf "[loom] Weave creation failed: %s\n%!" resp.error;
+         Printf.eprintf "[ats] Weave creation failed: %s\n%!" resp.error;
          Lwt.return_error resp.error
        | Error e ->
          let msg = Ocaml_protoc_plugin.Result.show_error e in
-         Printf.eprintf "[loom] Proto decode error: %s\n%!" msg;
+         Printf.eprintf "[ats] Proto decode error: %s\n%!" msg;
          Lwt.return_error msg)
 
 (* --- WeaveComplete attestation --- *)
@@ -174,7 +174,7 @@ let create_weave ~branch ~context ~text ~word_count ~turn_count ~paths ?(origina
  * so we can detect stale sessions (file grew since last import). *)
 let create_weave_complete ~session_id ~file_path ~file_size ~line_count ~weave_count =
   if !endpoint = "" then (
-    Printf.eprintf "[loom] ATS client not configured, dropping WeaveComplete\n%!";
+    Printf.eprintf "[ats] ATS client not configured, dropping WeaveComplete\n%!";
     Lwt.return_error "ATS client not configured"
   ) else
     let open Lwt.Syntax in
@@ -216,21 +216,21 @@ let create_weave_complete ~session_id ~file_path ~file_size ~line_count ~weave_c
       let reader = Ocaml_protoc_plugin.Reader.create payload in
       (match Protocol.GenerateAttestationResponse.from_proto reader with
        | Ok resp when resp.success ->
-         Printf.printf "[loom] WeaveComplete attestation created for session %s\n%!" session_id;
+         Printf.printf "[ats] WeaveComplete attestation created for session %s\n%!" session_id;
          Lwt.return_ok ()
        | Ok resp ->
-         Printf.eprintf "[loom] WeaveComplete creation failed: %s\n%!" resp.error;
+         Printf.eprintf "[ats] WeaveComplete creation failed: %s\n%!" resp.error;
          Lwt.return_error resp.error
        | Error e ->
          let msg = Ocaml_protoc_plugin.Result.show_error e in
-         Printf.eprintf "[loom] Proto decode error: %s\n%!" msg;
+         Printf.eprintf "[ats] Proto decode error: %s\n%!" msg;
          Lwt.return_error msg)
 
 (* --- Query WeaveComplete attestations --- *)
 
 let get_weave_completes ?subjects () =
   if !endpoint = "" then (
-    Printf.eprintf "[loom] ATS client not configured\n%!";
+    Printf.eprintf "[ats] ATS client not configured\n%!";
     Lwt.return_error "ATS client not configured"
   ) else
     let open Lwt.Syntax in
@@ -266,7 +266,7 @@ let get_weave_completes ?subjects () =
 
 let get_weaves ?subjects ?contexts ?limit () =
   if !endpoint = "" then (
-    Printf.eprintf "[loom] ATS client not configured\n%!";
+    Printf.eprintf "[ats] ATS client not configured\n%!";
     Lwt.return_error "ATS client not configured"
   ) else
     let open Lwt.Syntax in

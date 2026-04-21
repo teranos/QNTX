@@ -135,7 +135,7 @@ grpc::Status ScryLLMService::Chat(grpc::ServerContext* ctx,
             if (sig.confidence < conf_min) conf_min = sig.confidence;
         }
         int n = result.signals.size();
-        std::cout << "[scry] signals: " << n << " tokens"
+        std::cout << "[signals] signals: " << n << " tokens"
                   << " | entropy avg=" << (ent_sum / n)
                   << " max=" << ent_max
                   << " | confidence avg=" << (conf_sum / n)
@@ -148,7 +148,7 @@ grpc::Status ScryLLMService::Chat(grpc::ServerContext* ctx,
                           [&result](size_t a, size_t b) {
                               return result.signals[a].confidence < result.signals[b].confidence;
                           });
-        std::cout << "[scry] least confident:";
+        std::cout << "[signals] least confident:";
         for (int i = 0; i < std::min(3, n); i++) {
             const auto& s = result.signals[idx[i]];
             std::cout << " \"" << s.token_text << "\"(p=" << s.confidence

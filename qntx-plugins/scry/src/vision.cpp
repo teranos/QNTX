@@ -87,7 +87,7 @@ void InferenceEngine::init_vision(const std::string& model_path) {
 
     if (mtmd_ctx_ && mtmd_support_vision(mtmd_ctx_)) {
         int n_lines = count_lines(clip_stderr);
-        std::cout << "[scry] Vision: yes"
+        std::cout << "[vision] Vision: yes"
                   << (mmproj_path.empty() ? " (bundled)" : " (" + mmproj_path + ")");
         if (n_lines > 0) {
             std::cout << ", " << n_lines << " clip loader lines condensed";
@@ -190,7 +190,7 @@ int InferenceEngine::prepare_prompt_vision(
     }
 
     size_t n_tokens = mtmd_helper_get_n_tokens(chunks.ptr.get());
-    std::cout << "[scry] Vision prompt: " << n_tokens << " tokens ("
+    std::cout << "[vision] Vision prompt: " << n_tokens << " tokens ("
               << images.size() << " images, " << chunks.size() << " chunks)" << std::endl;
 
     // Clear KV cache
@@ -352,7 +352,7 @@ InferenceEngine::ChatResult InferenceEngine::stream_chat_vision(
 
     auto gen_end = std::chrono::steady_clock::now();
     auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(gen_end - gen_start).count();
-    std::cout << "[scry] vision: " << n_generated << " tokens in "
+    std::cout << "[vision] vision: " << n_generated << " tokens in "
               << total_ms << "ms (" << (total_ms > 0 ? (n_generated * 1000 / total_ms) : 0)
               << " tok/s)" << std::endl;
     llama_sampler_free(sampler);
