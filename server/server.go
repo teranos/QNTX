@@ -26,6 +26,7 @@ import (
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/auth"
+	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/server/nodedid"
 	"github.com/teranos/QNTX/server/wslogs"
 	"go.uber.org/zap"
@@ -98,7 +99,11 @@ type QNTXServer struct {
 	reloadCoalescer *watcherReloadCoalescer
 
 	// Canvas state handlers
-	canvasHandler         *handlers.CanvasHandler
+	canvasHandler *handlers.CanvasHandler
+
+	// Embedding handlers (semantic search, clustering, projection)
+	embeddingsHandler *serverembeddings.Handler
+
 	conversationAssembler *ConversationAssembler
 
 	// Embedding service for semantic search (optional, requires rustembeddings build tag)
