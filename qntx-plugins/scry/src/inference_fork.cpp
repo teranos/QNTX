@@ -13,7 +13,7 @@ InferenceEngine::ChatResult InferenceEngine::fork_and_generate(
 
     std::lock_guard<std::mutex> lock(mutex_);
 
-    std::cout << "[scry] fork_and_generate: parent_seq=" << parent_seq
+    std::cout << "[fork] fork_and_generate: parent_seq=" << parent_seq
               << " fork_pos=" << fork_pos_absolute
               << " fork_token=" << fork_token
               << " new_seq=" << new_seq
@@ -36,7 +36,7 @@ InferenceEngine::ChatResult InferenceEngine::fork_and_generate(
     // Check parent sequence state before fork
     auto parent_min = llama_memory_seq_pos_min(mem, parent_seq);
     auto parent_max = llama_memory_seq_pos_max(mem, parent_seq);
-    std::cout << "[scry] fork: parent seq " << parent_seq
+    std::cout << "[fork] fork: parent seq " << parent_seq
               << " pos range [" << parent_min << "," << parent_max << "]"
               << " fork_pos=" << fork_pos_absolute << std::endl;
 
@@ -47,7 +47,7 @@ InferenceEngine::ChatResult InferenceEngine::fork_and_generate(
 
     auto new_min = llama_memory_seq_pos_min(mem, new_seq);
     auto new_max = llama_memory_seq_pos_max(mem, new_seq);
-    std::cout << "[scry] fork: new seq " << new_seq
+    std::cout << "[fork] fork: new seq " << new_seq
               << " pos range [" << new_min << "," << new_max << "]" << std::endl;
 
     // Decode the fork token on the new sequence at the fork position
@@ -62,7 +62,7 @@ InferenceEngine::ChatResult InferenceEngine::fork_and_generate(
     int decode_rc = llama_decode(ctx_, batch);
     llama_batch_free(batch);
     if (decode_rc != 0) {
-        std::cout << "[scry] fork: decode failed (rc=" << decode_rc
+        std::cout << "[fork] fork: decode failed (rc=" << decode_rc
                   << " fork_pos=" << fork_pos_absolute
                   << " token=" << fork_token
                   << " n_ctx=" << llama_n_ctx(ctx_) << ")" << std::endl;
@@ -138,7 +138,7 @@ InferenceEngine::ChatResult InferenceEngine::fork_and_generate(
 
     auto gen_end = std::chrono::steady_clock::now();
     auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(gen_end - gen_start).count();
-    std::cout << "[scry] fork: " << n_generated << " tokens in "
+    std::cout << "[fork] fork: " << n_generated << " tokens in "
               << total_ms << "ms on seq " << new_seq << std::endl;
 
     llama_sampler_free(sampler);
