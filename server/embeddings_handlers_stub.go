@@ -10,70 +10,13 @@ import (
 
 // Stub handlers when rustembeddings build tag is not present
 
-// HandleSemanticSearch handles semantic search requests (GET /api/search/semantic)
-func (s *QNTXServer) HandleSemanticSearch(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
-}
-
-// HandleEmbeddingGenerate handles embedding generation requests (POST /api/embeddings/generate)
-func (s *QNTXServer) HandleEmbeddingGenerate(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
-}
-
-// HandleEmbeddingBatch handles batch embedding generation (POST /api/embeddings/batch)
-func (s *QNTXServer) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
-}
-
-// HandleEmbeddingsBySource returns embeddings by source IDs (POST /api/embeddings/by-source)
-func (s *QNTXServer) HandleEmbeddingsBySource(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
-}
-
-// HandleEmbeddingInfo returns embedding service status (GET /api/embeddings/info)
-func (s *QNTXServer) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"available":false,"model_name":"","dimensions":0,"embedding_count":0,"attestation_count":0}`))
-}
-
 // HandleEmbeddingCluster runs HDBSCAN clustering (POST /api/embeddings/cluster)
 func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
 }
 
-// HandleEmbeddingClusters lists stable clusters (GET /api/embeddings/clusters)
-func (s *QNTXServer) HandleEmbeddingClusters(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
-}
-
-// HandleClusterSamples returns sample texts from a cluster (GET /api/embeddings/clusters/samples)
-func (s *QNTXServer) HandleClusterSamples(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
-}
-
-// HandleClusterMembers returns recent attestations in a cluster (GET /api/embeddings/clusters/members)
-func (s *QNTXServer) HandleClusterMembers(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
-}
-
-// HandleClusterMemberships returns cluster assignments for attestation IDs (GET /api/embeddings/clusters/memberships)
-func (s *QNTXServer) HandleClusterMemberships(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
-}
-
-// HandleClusterTimeline serves cluster evolution data (GET /api/embeddings/cluster-timeline)
-func (s *QNTXServer) HandleClusterTimeline(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`[]`))
-}
-
 // HandleEmbeddingProject runs UMAP projection (POST /api/embeddings/project)
 func (s *QNTXServer) HandleEmbeddingProject(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
-}
-
-// HandleEmbeddingProjections serves 2D projections (GET /api/embeddings/projections)
-func (s *QNTXServer) HandleEmbeddingProjections(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
 }
 
