@@ -24,3 +24,9 @@ there is this thing called typegen that generates the api documentation, you can
 - PROSE: The prose question, currently I am writinganother plugin called Voor, prose was meant to be a visual way in QNTX to craft the perfect prompt, and use different strats for finding out what works best. Voor seems to be taking over this role and is supposed to do it much better, Loom seems likely to be the UI for Voor looking forward. but that leaved the question of what we do with this functionality in QNTX, im starting to feel like it should just be taken out actually, deprecate Prose, also in the UI, it uses a prosemirror edit, and I can't get it to work for me in a way that its going to replace the way i promptright now, there is a lot about Prose and the built-in documentation, that just isnt pulling its weight.
 - INTERNAL: this thing is basically QNTX, it belongs in internal/
 - WSLOGS: find out how wslogs is used, i think it used to just be forthe logs drawer in the ui, but sincethat changed, im not sure if we stillneed wslogs/
+
+## Embeddings Sub-package (`server/embeddings/`)
+
+The embedding handlers (semantic search, clustering, projection, observer) are being extracted from the server root into `server/embeddings/`. The server currently has ~2,600 lines of embedding code scattered across 6 files, all behind the `cgo && rustembeddings` build tag.
+
+The `embeddingService` interface in QNTXServer already defines the contract. The extraction creates an `EmbeddingsHandler` struct that receives its dependencies (db, store, service, atsStore, logger) at construction — same pattern as `canvasHandler`. The server wires it up in init and delegates HTTP handlers to it.
