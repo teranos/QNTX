@@ -26,6 +26,7 @@ import (
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/auth"
+	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/server/nodedid"
 	"github.com/teranos/QNTX/server/wslogs"
 	"go.uber.org/zap"
@@ -384,6 +385,13 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	// Initialize embedding service for semantic search (optional)
 	server.groundDBPath = deps.config.GroundDBPath
 	server.SetupEmbeddingService()
+	server.embeddingsHandler = &serverembeddings.Handler{
+		DB:       db,
+		Store:    server.embeddingStore,
+		Service:  server.embeddingService,
+		ATSStore: atsStore,
+		Logger:   serverLogger,
+	}
 	if server.embeddingStats != nil {
 		ticker.SetEmbeddingStats(server.embeddingStats)
 	}
