@@ -26,10 +26,12 @@ pub(crate) struct ReduceState {
 }
 
 /// Handler context wrapping shared state.
+#[derive(Clone)]
 pub struct HandlerContext {
     pub(crate) state: Arc<RwLock<ReduceState>>,
 }
 
+#[allow(clippy::result_large_err)]
 impl HandlerContext {
     pub(crate) fn new(state: Arc<RwLock<ReduceState>>) -> Self {
         Self { state }
@@ -363,6 +365,7 @@ impl HandlerContext {
 }
 
 /// Create a JSON HTTP response.
+#[allow(clippy::result_large_err)]
 fn json_response<T: Serialize>(status_code: i32, data: &T) -> Result<HttpResponse, Status> {
     let body = serde_json::to_vec(data)
         .map_err(|e| Status::internal(format!("Failed to serialize response: {}", e)))?;
