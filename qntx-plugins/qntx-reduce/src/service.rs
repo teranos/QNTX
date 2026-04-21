@@ -13,6 +13,10 @@ use tokio_stream::Stream;
 use tonic::{Request, Response, Status, Streaming};
 use tracing::{debug, info, warn};
 
+/// Routes that hold the Python GIL for extended computation.
+/// Run on tokio's blocking pool so gRPC health checks still respond.
+const BLOCKING_ROUTES: &[(&str, &str)] = &[("POST", "/fit"), ("POST", "/transform")];
+
 /// Dimensionality reduction plugin gRPC service.
 pub struct ReducePluginService {
     handlers: HandlerContext,
@@ -68,6 +72,10 @@ impl DomainPluginService for ReducePluginService {
                 "reduce.pca".to_string(),
             ],
             schedules: vec![],
+            llm_provider: false,
+            search_provider: false,
+            vector_search_provider: false,
+            watchers: vec![],
         }))
     }
 
@@ -89,8 +97,8 @@ impl DomainPluginService for ReducePluginService {
         request: Request<HttpRequest>,
     ) -> Result<Response<HttpResponse>, Status> {
         let req = request.into_inner();
-        let path = &req.path;
-        let method = &req.method;
+        let path = req.path.clone();
+        let method = req.method.clone();
 
         debug!("HTTP request: {} {}", method, path);
 
@@ -101,14 +109,30 @@ impl DomainPluginService for ReducePluginService {
                 .map_err(|e| Status::invalid_argument(format!("Invalid JSON body: {}", e)))?
         };
 
-        let result = match (method.as_str(), path.as_str()) {
-            ("POST", "/fit") => self.handlers.handle_fit(body),
-            ("POST", "/transform") => self.handlers.handle_transform(body),
-            ("GET", "/status") => self.handlers.handle_status(),
-            _ => Err(Status::not_found(format!(
-                "Unknown endpoint: {} {}",
-                method, path
-            ))),
+        let is_blocking = BLOCKING_ROUTES
+            .iter()
+            .any(|(m, p)| *m == method.as_str() && *p == path.as_str());
+
+        let result = if is_blocking {
+            let handlers = self.handlers.clone();
+            let m = method.clone();
+            let p = path.clone();
+            #[allow(clippy::result_large_err)]
+            tokio::task::spawn_blocking(move || match (m.as_str(), p.as_str()) {
+                ("POST", "/fit") => handlers.handle_fit(body),
+                ("POST", "/transform") => handlers.handle_transform(body),
+                _ => unreachable!(),
+            })
+            .await
+            .map_err(|e| Status::internal(format!("Blocking task failed: {}", e)))?
+        } else {
+            match (method.as_str(), path.as_str()) {
+                ("GET", "/status") => self.handlers.handle_status(),
+                _ => Err(Status::not_found(format!(
+                    "Unknown endpoint: {} {}",
+                    method, path
+                ))),
+            }
         };
 
         match result {
