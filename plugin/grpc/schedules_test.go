@@ -5,9 +5,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/schedule"
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -35,7 +35,7 @@ func TestSetupPluginSchedules(t *testing.T) {
 	require.Len(t, jobs, 1)
 
 	job := jobs[0]
-	assert.Equal(t, "test.handler", job.HandlerName)
+	assert.Equal(t, "testplugin/test.handler", job.HandlerName)
 	assert.Equal(t, 3600, job.IntervalSeconds)
 	assert.Equal(t, schedule.StateActive, job.State)
 	assert.Equal(t, "ats{test.handler}", job.ATSCode)
@@ -162,9 +162,9 @@ func TestSetupPluginSchedules_MultipleSchedules(t *testing.T) {
 	// Find jobs by handler name
 	var job1, job2 *schedule.Job
 	for i := range jobs {
-		if jobs[i].HandlerName == "test.handler1" {
+		if jobs[i].HandlerName == "testplugin/test.handler1" {
 			job1 = jobs[i]
-		} else if jobs[i].HandlerName == "test.handler2" {
+		} else if jobs[i].HandlerName == "testplugin/test.handler2" {
 			job2 = jobs[i]
 		}
 	}
