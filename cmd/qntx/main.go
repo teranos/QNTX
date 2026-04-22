@@ -302,8 +302,9 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 				meta := p.Metadata()
 				for _, handlerName := range externalPlugin.GetHandlerNames() {
 					pluginLogger.Debugw("Registering plugin async handler",
-						"plugin", meta.Name, "handler", handlerName)
-					proxyHandler := grpc.NewPluginProxyHandler(handlerName, externalPlugin, db, pluginLogger)
+						"plugin", meta.Name, "handler", handlerName,
+						"registry_key", grpc.PluginHandlerName(meta.Name, handlerName))
+					proxyHandler := grpc.NewPluginProxyHandler(meta.Name, handlerName, externalPlugin, db, pluginLogger)
 					handlerRegistry.Register(proxyHandler)
 				}
 
@@ -449,8 +450,9 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 			meta := p.Metadata()
 			for _, handlerName := range externalPlugin.GetHandlerNames() {
 				logger.Debugw("Registering plugin async handler",
-					"plugin", meta.Name, "handler", handlerName)
-				proxyHandler := grpc.NewPluginProxyHandler(handlerName, externalPlugin, db, logger)
+					"plugin", meta.Name, "handler", handlerName,
+					"registry_key", grpc.PluginHandlerName(meta.Name, handlerName))
+				proxyHandler := grpc.NewPluginProxyHandler(meta.Name, handlerName, externalPlugin, db, logger)
 				handlerRegistry.Register(proxyHandler)
 			}
 			schedules := externalPlugin.GetSchedules()
