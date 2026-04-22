@@ -584,6 +584,17 @@ func (wp *WorkerPool) processNextJob() error {
 			}
 			return nil // Return nil to avoid logging as error
 		default:
+			// Handler not registered yet (e.g. plugins still loading) — re-queue
+			if errors.Is(err, ErrHandlerNotRegistered) {
+				wp.logger.SugaredLogger.Debugw("Handler not registered yet, re-queuing job",
+					"job_id", job.ID, "handler", job.HandlerName)
+				job.Status = JobStatusQueued
+				if updateErr := wp.queue.UpdateJob(job); updateErr != nil {
+					wp.logger.SugaredLogger.Errorw("Failed to re-queue job for missing handler",
+						"job_id", job.ID, "error", updateErr)
+				}
+				return nil
+			}
 			// Real error - fail the job
 			return errors.Wrapf(wp.queue.FailJob(job.ID, err), "failed to mark job %s as failed (handler: %s)", job.ID, job.HandlerName)
 		}

@@ -25,6 +25,48 @@ func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.S
 		"count", len(schedules),
 	)
 
+	// Build set of namespaced handler names this plugin currently declares
+	declaredHandlers := make(map[string]bool, len(schedules))
+	for _, s := range schedules {
+		if s.IntervalSeconds > 0 || s.EnabledByDefault {
+			declaredHandlers[PluginHandlerName(pluginName, s.HandlerName)] = true
+		}
+	}
+
+	// Prune stale schedules owned by this plugin that are no longer declared.
+	// Metadata contains {"plugin":"<name>"} — match on that.
+	pluginMeta := fmt.Sprintf(`"plugin":"%s"`, pluginName)
+	rows, err := db.Query(`
+		SELECT id, handler_name FROM scheduled_pulse_jobs
+		WHERE state != 'deleted' AND metadata LIKE '%' || ? || '%'
+	`, pluginMeta)
+	if err != nil {
+		return errors.Wrapf(err, "failed to list schedules for pruning plugin %s", pluginName)
+	}
+	defer rows.Close()
+
+	var staleIDs []string
+	for rows.Next() {
+		var id, handlerName string
+		if err := rows.Scan(&id, &handlerName); err != nil {
+			return errors.Wrapf(err, "failed to scan schedule row for plugin %s", pluginName)
+		}
+		if !declaredHandlers[handlerName] {
+			staleIDs = append(staleIDs, id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return errors.Wrapf(err, "failed to iterate schedules for plugin %s", pluginName)
+	}
+
+	for _, id := range staleIDs {
+		if _, err := db.Exec(`UPDATE scheduled_pulse_jobs SET state = 'deleted', updated_at = ? WHERE id = ?`, time.Now(), id); err != nil {
+			logger.Warnw("Failed to prune stale plugin schedule", "plugin", pluginName, "schedule_id", id, "error", err)
+		} else {
+			logger.Infow("Pruned stale plugin schedule", "plugin", pluginName, "schedule_id", id)
+		}
+	}
+
 	for _, s := range schedules {
 		// Skip disabled schedules (interval <= 0 and not enabled by default)
 		if s.IntervalSeconds <= 0 && !s.EnabledByDefault {
@@ -38,11 +80,12 @@ func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.S
 		// Check if schedule already exists
 		var existingID string
 		var existingInterval int
+		namespacedHandler := PluginHandlerName(pluginName, s.HandlerName)
 		err := db.QueryRow(`
 			SELECT id, interval_seconds
 			FROM scheduled_pulse_jobs
 			WHERE handler_name = ?
-		`, s.HandlerName).Scan(&existingID, &existingInterval)
+		`, namespacedHandler).Scan(&existingID, &existingInterval)
 
 		if err == sql.ErrNoRows {
 			// Create new schedule
@@ -122,7 +165,7 @@ func createPluginSchedule(db *sql.DB, pluginName string, s *protocol.ScheduleInf
 	`,
 		jobID,
 		s.AtsCode,
-		s.HandlerName,
+		PluginHandlerName(pluginName, s.HandlerName),
 		nil, // No payload for plugin schedules
 		"",  // No source URL
 		s.IntervalSeconds,
