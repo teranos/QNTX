@@ -372,10 +372,19 @@ func TestGRACEGradualRecovery(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	pollInterval := 100 * time.Millisecond
 	wp := NewWorkerPoolWithContext(ctx, db, cfg, WorkerPoolConfig{
 		Workers:            1,
 		GracefulStartPhase: 10 * time.Second, // Test mode: 10s phases (warm start = 2s, slow start = 30s)
+		PollInterval:       &pollInterval,
 	}, zap.NewNop().Sugar())
+
+	// Register handler so recovered jobs can actually execute and complete
+	wp.Registry().Register(&GRACETestHandler{
+		taskDuration: 10 * time.Millisecond,
+		totalTasks:   1,
+	})
+
 	wp.Start()
 	defer wp.Stop()
 
