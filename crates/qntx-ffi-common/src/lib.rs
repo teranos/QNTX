@@ -1,7 +1,7 @@
 //! Common FFI utilities for QNTX C-compatible interfaces.
 //!
 //! This crate provides shared utilities for building C-compatible FFI layers,
-//! reducing boilerplate across `qntx-sqlite` and `fuzzy-ax`.
+//! reducing boilerplate across `qntx-sqlite` and related crates.
 //!
 //! # Memory Ownership
 //!

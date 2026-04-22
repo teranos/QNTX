@@ -80,68 +80,6 @@ export function exists_attestation(id) {
 }
 
 /**
- * Rebuild the fuzzy search index from current IndexedDB vocabulary.
- * Pulls distinct subjects, predicates, contexts, and actors from the attestation store.
- * Returns JSON: {"subjects": N, "predicates": N, "contexts": N, "actors": N, "hash": "..."}
- * @returns {Promise<string>}
- */
-export function fuzzy_rebuild_index() {
-    const ret = wasm.fuzzy_rebuild_index();
-    return ret;
-}
-
-/**
- * Search the fuzzy index for matching vocabulary.
- * vocab_type: "subjects", "predicates", "contexts", or "actors"
- * Returns JSON array: [{"value":"...", "score":0.95, "strategy":"exact"}, ...]
- * @param {string} query
- * @param {string} vocab_type
- * @param {number} limit
- * @param {number} min_score
- * @returns {string}
- */
-export function fuzzy_search(query, vocab_type, limit, min_score) {
-    let deferred4_0;
-    let deferred4_1;
-    try {
-        const ptr0 = passStringToWasm0(query, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passStringToWasm0(vocab_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        const len1 = WASM_VECTOR_LEN;
-        const ret = wasm.fuzzy_search(ptr0, len0, ptr1, len1, limit, min_score);
-        var ptr3 = ret[0];
-        var len3 = ret[1];
-        if (ret[3]) {
-            ptr3 = 0; len3 = 0;
-            throw takeFromExternrefTable0(ret[2]);
-        }
-        deferred4_0 = ptr3;
-        deferred4_1 = len3;
-        return getStringFromWasm0(ptr3, len3);
-    } finally {
-        wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
-    }
-}
-
-/**
- * Get fuzzy engine status.
- * Returns JSON: {"ready": bool, "subjects": N, "predicates": N, "contexts": N, "actors": N, "hash": "..."}
- * @returns {string}
- */
-export function fuzzy_status() {
-    let deferred1_0;
-    let deferred1_1;
-    try {
-        const ret = wasm.fuzzy_status();
-        deferred1_0 = ret[0];
-        deferred1_1 = ret[1];
-        return getStringFromWasm0(ret[0], ret[1]);
-    } finally {
-        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
-    }
-}
-
-/**
  * Generate a content-addressed ASUID from SPC components and a content hash.
  * Returns JSON: `{"full":"AS-SARAH-AUTHOR-GITHUB-7K4M3B9X","short":"AS-SARAH-AUTHOR-GITHUB-7K4M"}`
  * or `{"error":"..."}` on invalid input.
@@ -177,32 +115,6 @@ export function get_attestation(id) {
     const len0 = WASM_VECTOR_LEN;
     const ret = wasm.get_attestation(ptr0, len0);
     return ret;
-}
-
-/**
- * Get context-aware completions for a partial AX query.
- *
- * Parses the partial query to determine which AX slot the cursor is in,
- * then fuzzy-matches the trailing word against the appropriate vocabulary.
- *
- * Returns JSON: `{"slot":"predicates","prefix":"auth","items":[{"value":"...","score":0.95,"strategy":"exact"},...]}`
- * @param {string} partial_query
- * @param {number} limit
- * @returns {string}
- */
-export function get_completions(partial_query, limit) {
-    let deferred2_0;
-    let deferred2_1;
-    try {
-        const ptr0 = passStringToWasm0(partial_query, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ret = wasm.get_completions(ptr0, len0, limit);
-        deferred2_0 = ret[0];
-        deferred2_1 = ret[1];
-        return getStringFromWasm0(ret[0], ret[1]);
-    } finally {
-        wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
-    }
 }
 
 /**
@@ -326,29 +238,6 @@ export function query_attestations(filter_json) {
     const ptr0 = passStringToWasm0(filter_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ret = wasm.query_attestations(ptr0, len0);
-    return ret;
-}
-
-/**
- * Perform rich text search over IndexedDB attestations.
- *
- * Algorithm (mirrors Go rich_search_qntx.go):
- * 1. Discover rich_string_fields from type definition attestations
- * 2. Load recent attestations that have those fields
- * 3. Tokenize field values into a word vocabulary
- * 4. Rebuild RICH_FUZZY engine with that vocabulary
- * 5. Fuzzy-match each query word against vocabulary
- * 6. Map matched words back to attestation nodes, score, rank
- *
- * Returns JSON: `{"query":"...","matches":[...],"total":N}`
- * @param {string} query
- * @param {number} limit
- * @returns {Promise<string>}
- */
-export function rich_search(query, limit) {
-    const ptr0 = passStringToWasm0(query, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.rich_search(ptr0, len0, limit);
     return ret;
 }
 
@@ -532,7 +421,7 @@ function __wbg_get_imports() {
                     const a = state0.a;
                     state0.a = 0;
                     try {
-                        return wasm_bindgen__convert__closures_____invoke__h0970674685b3ee7c(a, state0.b, arg0, arg1);
+                        return wasm_bindgen__convert__closures_____invoke__h7360c8efb9a95e5b(a, state0.b, arg0, arg1);
                     } finally {
                         state0.a = a;
                     }
@@ -640,18 +529,18 @@ function __wbg_get_imports() {
             return ret;
         }, arguments); },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { dtor_idx: 121, function: Function { arguments: [NamedExternref("Event")], shim_idx: 122, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h182a2abd191e3067, wasm_bindgen__convert__closures_____invoke__h768c0c6f6cd75d67);
+            // Cast intrinsic for `Closure(Closure { dtor_idx: 129, function: Function { arguments: [Externref], shim_idx: 130, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h0b10cf666a0fcdb7, wasm_bindgen__convert__closures_____invoke__h10d39837d52e97df);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { dtor_idx: 121, function: Function { arguments: [NamedExternref("IDBVersionChangeEvent")], shim_idx: 122, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h182a2abd191e3067, wasm_bindgen__convert__closures_____invoke__h768c0c6f6cd75d67);
+            // Cast intrinsic for `Closure(Closure { dtor_idx: 95, function: Function { arguments: [NamedExternref("Event")], shim_idx: 96, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h078189f2bfbdcfe4, wasm_bindgen__convert__closures_____invoke__h331fab369fed6b82);
             return ret;
         },
         __wbindgen_cast_0000000000000003: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { dtor_idx: 140, function: Function { arguments: [Externref], shim_idx: 141, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h622d11ff1c80a730, wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea);
+            // Cast intrinsic for `Closure(Closure { dtor_idx: 95, function: Function { arguments: [NamedExternref("IDBVersionChangeEvent")], shim_idx: 96, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h078189f2bfbdcfe4, wasm_bindgen__convert__closures_____invoke__h331fab369fed6b82);
             return ret;
         },
         __wbindgen_cast_0000000000000004: function(arg0) {
@@ -680,16 +569,16 @@ function __wbg_get_imports() {
     };
 }
 
-function wasm_bindgen__convert__closures_____invoke__h768c0c6f6cd75d67(arg0, arg1, arg2) {
-    wasm.wasm_bindgen__convert__closures_____invoke__h768c0c6f6cd75d67(arg0, arg1, arg2);
+function wasm_bindgen__convert__closures_____invoke__h10d39837d52e97df(arg0, arg1, arg2) {
+    wasm.wasm_bindgen__convert__closures_____invoke__h10d39837d52e97df(arg0, arg1, arg2);
 }
 
-function wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea(arg0, arg1, arg2) {
-    wasm.wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea(arg0, arg1, arg2);
+function wasm_bindgen__convert__closures_____invoke__h331fab369fed6b82(arg0, arg1, arg2) {
+    wasm.wasm_bindgen__convert__closures_____invoke__h331fab369fed6b82(arg0, arg1, arg2);
 }
 
-function wasm_bindgen__convert__closures_____invoke__h0970674685b3ee7c(arg0, arg1, arg2, arg3) {
-    wasm.wasm_bindgen__convert__closures_____invoke__h0970674685b3ee7c(arg0, arg1, arg2, arg3);
+function wasm_bindgen__convert__closures_____invoke__h7360c8efb9a95e5b(arg0, arg1, arg2, arg3) {
+    wasm.wasm_bindgen__convert__closures_____invoke__h7360c8efb9a95e5b(arg0, arg1, arg2, arg3);
 }
 
 

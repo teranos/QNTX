@@ -90,7 +90,6 @@ export interface AutocompleteConfig {
   minLength: number;
   maxResults: number;
   caseSensitive: boolean;
-  fuzzyMatch: boolean;
 }
 
 /**

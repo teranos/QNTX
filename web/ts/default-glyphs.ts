@@ -253,11 +253,6 @@ function renderSelf(): void {
             `<span style="color: #4ade80;">✓ qntx-core WASM ${caps.parser_size ? `(${caps.parser_size})` : ''}</span>` :
             `<span style="color: #fbbf24;">⚠ Go native parser</span>`;
 
-        const fuzzyBackendLabel = caps.fuzzy_backend === 'wasm' ? 'WASM' : caps.fuzzy_backend === 'rust' ? 'Rust' : 'Go';
-        const fuzzyStatus = caps.fuzzy_optimized ?
-            `<span style="color: #4ade80;">✓ Optimized (${fuzzyBackendLabel})</span>` :
-            `<span style="color: #fbbf24;">⚠ Fallback (Go)</span>`;
-
         const storageStatus = caps.storage_optimized ?
             `<span style="color: #4ade80;">✓ Optimized (Rust)</span>` :
             `<span style="color: #fbbf24;">⚠ Fallback (Go)</span>`;
@@ -270,13 +265,6 @@ function renderSelf(): void {
                     <span class="glyph-value">
                         ${caps.parser_version ? `v${caps.parser_version}` : ''}
                         ${parserStatus}
-                    </span>
-                </div>
-                <div class="glyph-row">
-                    <span class="glyph-label">fuzzy-ax:</span>
-                    <span class="glyph-value">
-                        ${caps.fuzzy_version ? `v${caps.fuzzy_version}` : 'unknown'}
-                        ${fuzzyStatus}
                     </span>
                 </div>
                 <div class="glyph-row">

@@ -27,8 +27,8 @@ type TypeRequest struct {
 }
 
 // TestRichStringFieldsForRestaurantDomain tests that restaurant ecosystem types
-// can configure which fields are fuzzy-searchable, enabling discovery of
-// restaurants by cuisine, menu items by ingredients, and cities by neighborhoods
+// can declare which fields are indexable for plugin-driven search, enabling
+// discovery of restaurants by cuisine, menu items by ingredients, and cities by neighborhoods
 func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 	// Create file-backed test database so Go and Rust share the same file
 	dbPath := filepath.Join(t.TempDir(), "test.db")

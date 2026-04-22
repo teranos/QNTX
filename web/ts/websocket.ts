@@ -17,8 +17,8 @@ import type {
     WatcherErrorMessage,
     GlyphFiredMessage,
     WatcherQueueStatusMessage,
+    RichSearchResultsMessage,
 } from '../types/websocket';
-import type { RichSearchResultsMessage } from './generated/proto/plugin/grpc/protocol/server.ts';
 import { handleJobNotification, handleDaemonStatusNotification } from './tauri-notifications';
 import { handlePluginHealth } from './websocket-handlers/plugin-health';
 import { handleSystemCapabilities } from './websocket-handlers/system-capabilities';
@@ -129,8 +129,10 @@ const MESSAGE_HANDLERS = {
 
     system_capabilities: (data: SystemCapabilitiesMessage) => {
         log.info(SEG.CONFIG, 'System capabilities:', {
-            fuzzy_backend: data.fuzzy_backend,
-            fuzzy_optimized: data.fuzzy_optimized ? 'optimized' : 'fallback'
+            storage_backend: data.storage_backend,
+            storage_optimized: data.storage_optimized ? 'optimized' : 'fallback',
+            parser_backend: data.parser_backend,
+            parser_optimized: data.parser_optimized ? 'optimized' : 'fallback',
         });
 
         // Handle capability-based UI updates
@@ -158,12 +160,42 @@ const MESSAGE_HANDLERS = {
     },
 
     rich_search_results: (data: RichSearchResultsMessage) => {
-        log.info(SEG.QUERY, 'Rich search results:', data.total, 'matches');
+        log.info(SEG.QUERY, 'Plugin search results:', data.total, 'hits');
 
-        // Pass results to the unified search drawer
-        // Backend sends {query, matches, total} but generated type is incomplete — cast through unknown
+        // Map plugin gRPC hits to SearchView's SearchMatch shape. Documents are
+        // opaque JSON from the provider — surface common fields when present.
         import('./system-drawer.js').then(({ handleSearchResults }) => {
-            handleSearchResults(data as unknown as import('./search-view').SearchResultsMessage);
+            import('./search-view').then(({ TYPE_PLUGIN }) => {
+                const hits = Array.isArray(data.hits) ? data.hits : [];
+                const matches = hits.map((h) => {
+                    const doc = (h.document && typeof h.document === 'object')
+                        ? h.document as Record<string, unknown>
+                        : {};
+                    const excerpt =
+                        (typeof doc.excerpt === 'string' && doc.excerpt) ||
+                        (typeof doc.label === 'string' && doc.label) ||
+                        (typeof doc.name === 'string' && doc.name) ||
+                        (typeof doc.title === 'string' && doc.title) ||
+                        h.id;
+                    const typeLabel =
+                        (typeof doc.type_label === 'string' && doc.type_label) ||
+                        (typeof doc.type_name === 'string' && doc.type_name) ||
+                        '';
+                    const matchedWords = Array.isArray(doc.matched_words)
+                        ? (doc.matched_words as unknown[]).filter((w): w is string => typeof w === 'string')
+                        : undefined;
+                    return {
+                        node_id: h.id,
+                        type_name: TYPE_PLUGIN,
+                        type_label: typeLabel,
+                        excerpt,
+                        score: h.score,
+                        attributes: doc,
+                        matched_words: matchedWords,
+                    };
+                });
+                handleSearchResults({ query: data.query, matches, total: data.total });
+            });
         });
     },
 

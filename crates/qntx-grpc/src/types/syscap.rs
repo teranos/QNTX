@@ -22,12 +22,6 @@
 pub struct Message {
     /// "system_capabilities"
     pub r#type: String,
-    /// "rust" or "go" - which fuzzy matching implementation is active
-    pub fuzzy_backend: String,
-    /// true if using Rust (optimized), false if Go fallback
-    pub fuzzy_optimized: bool,
-    /// fuzzy-ax library version (e.g., "0.1.0")
-    pub fuzzy_version: String,
     /// "rust" or "go" - which storage implementation is active
     pub storage_backend: String,
     /// true if using Rust SQLite (optimized), false if Go fallback

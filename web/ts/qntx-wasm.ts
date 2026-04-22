@@ -30,42 +30,6 @@ export type ParseResult =
     | { ok: true; query: AxQuery }
     | { ok: false; error: string };
 
-/** A fuzzy match result from the WASM engine */
-export interface FuzzyMatch {
-    value: string;
-    score: number;
-    strategy: string;
-}
-
-/** Fuzzy index rebuild statistics */
-export interface FuzzyIndexStats {
-    subjects: number;
-    predicates: number;
-    contexts: number;
-    actors: number;
-    hash: string;
-}
-
-/** Fuzzy engine status */
-export interface FuzzyStatus {
-    ready: boolean;
-    subjects: number;
-    predicates: number;
-    contexts: number;
-    actors: number;
-    hash: string;
-}
-
-/** Vocabulary type for fuzzy search */
-export type FuzzyVocabType = 'subjects' | 'predicates' | 'contexts' | 'actors';
-
-/** Completion result from parser-aware fuzzy matching */
-export interface CompletionResult {
-    slot: FuzzyVocabType;
-    prefix: string;
-    items: FuzzyMatch[];
-}
-
 /** Promise that resolves when WASM is initialized */
 let initPromise: Promise<void> | null = null;
 
@@ -111,10 +75,7 @@ export async function initialize(dbName: string = DEFAULT_DB_NAME): Promise<void
         // Initialize IndexedDB store
         await wasm.init_store(dbName);
 
-        // Build fuzzy index from existing IndexedDB vocabulary
-        const statsJson = await wasm.fuzzy_rebuild_index();
-        const stats: FuzzyIndexStats = JSON.parse(statsJson);
-        log.info(SEG.WASM, `[qntx-wasm] Initialized (v${wasm.version()}) fuzzy: ${stats.subjects}S/${stats.predicates}P/${stats.contexts}C/${stats.actors}A`);
+        log.info(SEG.WASM, `[qntx-wasm] Initialized (v${wasm.version()})`);
     })();
 
     return initPromise;
@@ -209,52 +170,6 @@ export async function listAttestationIds(): Promise<string[]> {
 }
 
 // ============================================================================
-// Fuzzy Search
-// ============================================================================
-
-/**
- * Rebuild the fuzzy search index from current IndexedDB vocabulary.
- * Call after init, and again after storing attestations with new predicates/contexts.
- * Hash-based dedup makes redundant calls cheap.
- */
-export async function rebuildFuzzyIndex(): Promise<FuzzyIndexStats> {
-    await ensureInit();
-    const json = await wasm.fuzzy_rebuild_index();
-    return JSON.parse(json);
-}
-
-/**
- * Search vocabulary using the fuzzy engine.
- * Returns matches sorted by score descending.
- */
-export function fuzzySearch(
-    query: string,
-    vocabType: FuzzyVocabType,
-    limit: number = 20,
-    minScore: number = 0.6,
-): FuzzyMatch[] {
-    const json = wasm.fuzzy_search(query, vocabType, limit, minScore);
-    return JSON.parse(json);
-}
-
-/**
- * Get fuzzy engine status (ready state, vocabulary counts, index hash).
- */
-export function getFuzzyStatus(): FuzzyStatus {
-    return JSON.parse(wasm.fuzzy_status());
-}
-
-/**
- * Get context-aware completions for a partial AX query.
- * Parses the query to determine which slot the cursor is in,
- * then fuzzy-matches against the appropriate vocabulary.
- */
-export function getCompletions(partialQuery: string, limit: number = 10): CompletionResult {
-    const json = wasm.get_completions(partialQuery, limit);
-    return JSON.parse(json);
-}
-
-// ============================================================================
 // Cosine Similarity
 // ============================================================================
 
@@ -266,40 +181,6 @@ export function getCompletions(partialQuery: string, limit: number = 10): Comple
  */
 export function cosineSimilarity(query: Float32Array, candidate: Float32Array): number {
     return wasm.cosine_similarity_f32(query, candidate);
-}
-
-// ============================================================================
-// Rich Search
-// ============================================================================
-
-/** Result from rich_search — matches RichSearchResultsMessage proto shape. */
-export interface RichSearchResult {
-    query: string;
-    matches: Array<{
-        node_id: string;
-        type_name: string;
-        type_label: string;
-        field_name: string;
-        field_value: string;
-        excerpt: string;
-        score: number;
-        strategy: string;
-        display_label: string;
-        attributes: Record<string, unknown>;
-        matched_words: string[];
-    }>;
-    total: number;
-}
-
-/**
- * Perform browser-side rich text search over IndexedDB attestations.
- * Fuzzy-matches query against attribute values discovered via type definition
- * rich_string_fields. Mirrors server-side ats/storage/rich_search_qntx.go.
- */
-export async function richSearch(query: string, limit: number = 50): Promise<RichSearchResult> {
-    await ensureInit();
-    const json = await wasm.rich_search(query, limit);
-    return JSON.parse(json);
 }
 
 // ============================================================================

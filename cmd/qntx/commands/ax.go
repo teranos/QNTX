@@ -69,7 +69,7 @@ func runAxCommand(cmd *cobra.Command, args []string) error {
 	}
 	defer database.Close()
 
-	// Create executor (uses default fuzzy matcher)
+	// Create executor
 	executor := storage.NewExecutor(database)
 
 	// Execute query

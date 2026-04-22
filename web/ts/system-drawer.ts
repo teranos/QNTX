@@ -4,8 +4,7 @@ import { log, SEG } from './logger.ts';
 import { getStorageItem, setStorageItem } from './indexeddb-storage.ts';
 import { sendMessage } from './websocket.ts';
 import { connectivityManager } from './connectivity.ts';
-import { getCompletions, richSearch } from './qntx-wasm.ts';
-import { SearchView, STRATEGY_FUZZY, TYPE_COMMAND, TYPE_SUBCANVAS } from './search-view.ts';
+import { SearchView, TYPE_COMMAND, TYPE_SUBCANVAS } from './search-view.ts';
 import type { SearchMatch, SearchResultsMessage } from './search-view.ts';
 import { spawnGlyphByCommand, getMatchingCommands, getCommandLabel } from './components/glyph/canvas/spawn-menu.ts';
 import { uiState } from './state/ui.ts';
@@ -20,7 +19,6 @@ let searchView: SearchView | null = null;
 let drawerPanel: HTMLElement | null = null;
 let searchInput: HTMLInputElement | null = null;
 let queryTimeout: ReturnType<typeof setTimeout> | null = null;
-let searchVersion = 0;
 let lastExpandedHeight = DRAWER_MAX;
 
 function setDrawerHeight(panel: HTMLElement, height: number): void {
@@ -69,14 +67,9 @@ function computeLocalResults(query: string): SearchMatch[] {
             node_id: '',
             type_name: TYPE_COMMAND,
             type_label: '⌘',
-            field_name: 'spawn',
             field_value: cmd,
             excerpt: getCommandLabel(cmd),
             score: 1,
-            strategy: 'local',
-            display_label: cmd,
-            attributes: {},
-            matched_words: [],
         });
     }
 
@@ -91,14 +84,9 @@ function computeLocalResults(query: string): SearchMatch[] {
             node_id: glyph.id,
             type_name: TYPE_SUBCANVAS,
             type_label: '⌗',
-            field_name: 'navigate',
             field_value: glyph.id,
             excerpt: name || 'Untitled',
             score: 1,
-            strategy: 'local',
-            display_label: name,
-            attributes: {},
-            matched_words: [],
         });
     }
 
@@ -118,62 +106,11 @@ function dispatchSearch(text: string): void {
         searchView.setLocalResults(computeLocalResults(text.trim()));
     }
 
-    // WASM rich search — instant results from IndexedDB
-    searchLocal(text.trim());
-
-    // Server enrichment when online (semantic search, full DB coverage)
+    // Forward to server; the server routes to the registered SearchService plugin.
+    // When offline or no provider is registered, results come back empty.
     if (connectivityManager.state === 'online') {
         sendMessage({ type: 'rich_search', query: text });
     }
-}
-
-async function searchLocal(query: string): Promise<void> {
-    if (!searchView) return;
-    const version = ++searchVersion;
-    try {
-        const results = await richSearch(query, 50);
-        if (version !== searchVersion) return; // stale result, newer search in flight
-        searchView.updateResults(results as unknown as SearchResultsMessage);
-    } catch {
-        if (version !== searchVersion) return;
-        searchOffline(query);
-    }
-}
-
-/** Slot display labels */
-const SLOT_LABELS: Record<string, string> = {
-    subjects: 'S',
-    predicates: 'P',
-    contexts: 'C',
-    actors: 'A',
-};
-
-function searchOffline(query: string): void {
-    if (!searchView) return;
-
-    const completion = getCompletions(query, 20);
-
-    const matches: SearchMatch[] = completion.items.map(m => ({
-        node_id: '',
-        type_name: completion.slot,
-        type_label: SLOT_LABELS[completion.slot] || completion.slot,
-        field_name: completion.slot,
-        field_value: m.value,
-        excerpt: m.value,
-        score: m.score,
-        strategy: STRATEGY_FUZZY,
-        display_label: m.value,
-        attributes: {},
-        matched_words: [],
-    }));
-
-    const message: SearchResultsMessage = {
-        query,
-        matches,
-        total: matches.length,
-    };
-
-    searchView.updateResults(message);
 }
 
 // --- Subcanvas navigation ---
@@ -187,12 +124,12 @@ function navigateToSubcanvas(glyphId: string): void {
 // --- Action dispatch for selected result ---
 
 function actOnSelectedResult(match: SearchMatch): void {
-    if (match.type_name === TYPE_COMMAND) {
+    if (match.type_name === TYPE_COMMAND && match.field_value) {
         spawnGlyphByCommand(match.field_value);
     } else if (match.type_name === TYPE_SUBCANVAS) {
         navigateToSubcanvas(match.node_id);
     } else {
-        // Regular search result — dispatch search-select event
+        // Plugin search result — dispatch search-select event
         document.dispatchEvent(new CustomEvent('search-select', {
             detail: { nodeId: match.node_id, match }
         }));
@@ -218,7 +155,7 @@ export function focusDrawerSearch(): void {
     searchInput.focus();
 }
 
-/** Handle search results from WebSocket (proto: RichSearchResultsMessage). */
+/** Handle search results forwarded from the SearchService plugin via WebSocket. */
 export function handleSearchResults(message: SearchResultsMessage): void {
     if (!searchView) return;
     searchView.updateResults(message);

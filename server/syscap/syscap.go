@@ -1,16 +1,8 @@
 package syscap
 
-import (
-	"github.com/teranos/QNTX/ats/ax"
-)
-
-// Get returns system capability information based on build configuration
-// This detects available optimizations (Rust fuzzy matching, ONNX video inference, Rust storage)
-func Get(fuzzyBackend ax.MatcherBackend) Message {
-	// Detect fuzzy backend
-	fuzzyOptimized := (fuzzyBackend == ax.MatcherBackendWasm)
-	fuzzyVersion := fuzzyBackendVersion()
-
+// Get returns system capability information based on build configuration.
+// Detects available optimizations (Rust storage, WASM parser).
+func Get() Message {
 	// Detect storage backend (requires CGO build with rustsqlite tag)
 	storageOptimized := storageAvailable()
 	storageBackend := "rust"
@@ -32,9 +24,6 @@ func Get(fuzzyBackend ax.MatcherBackend) Message {
 
 	return Message{
 		Type:             "system_capabilities",
-		FuzzyBackend:     string(fuzzyBackend),
-		FuzzyOptimized:   fuzzyOptimized,
-		FuzzyVersion:     fuzzyVersion,
 		StorageBackend:   storageBackend,
 		StorageOptimized: storageOptimized,
 		StorageVersion:   storageVersion,

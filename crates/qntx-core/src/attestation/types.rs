@@ -213,7 +213,7 @@ pub struct AxFilter {
     #[serde(default)]
     pub subjects: Vec<String>,
 
-    /// Predicates to match (supports fuzzy)
+    /// Predicates to match
     #[serde(default)]
     pub predicates: Vec<String>,
 

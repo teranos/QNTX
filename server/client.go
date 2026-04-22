@@ -1,11 +1,11 @@
 package server
 
 import (
+	"context"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -19,6 +19,7 @@ import (
 	"github.com/teranos/QNTX/graph"
 	grapherr "github.com/teranos/QNTX/graph/error"
 	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server/syscap"
 	"github.com/teranos/QNTX/server/wslogs"
 )
@@ -38,10 +39,10 @@ const (
 	// Maximum message size allowed from peer
 	maxMessageSize = 2 * 1024 * 1024
 
-	// Semantic search defaults for unified search
-	// TODO(#486): Make configurable via am.toml and UI
-	semanticSearchLimit     = 20
-	semanticSearchThreshold = float32(0.3)
+	// pluginSearchTimeout caps how long a rich_search WebSocket request waits for a plugin response.
+	pluginSearchTimeout = 10 * time.Second
+	// pluginSearchTopK is the default max hits returned from a plugin search.
+	pluginSearchTopK = 50
 )
 
 // createErrorGraph creates an empty graph with error metadata.
@@ -918,176 +919,105 @@ func (c *Client) handleGetDatabaseStats() {
 	)
 }
 
-// richSearchResponse is the typed WS response for rich_search_results.
-// Mirrors proto: protocol.RichSearchResultsMessage (server.proto)
-type richSearchResponse struct {
-	Type    string                    `json:"type"`
-	Query   string                    `json:"query"`
-	Matches []storage.RichSearchMatch `json:"matches"`
-	Total   int                       `json:"total"`
+// pluginSearchHit mirrors protocol.SearchHit for WebSocket delivery.
+// The document is the plugin-authored JSON blob — frontend interprets per-plugin schema.
+type pluginSearchHit struct {
+	ID       string          `json:"id"`
+	Score    float64         `json:"score"`
+	Document json.RawMessage `json:"document"`
 }
 
-// handleRichSearch performs unified search: text search + semantic search
+// richSearchResponse is the WebSocket response for rich_search_results.
+// Shape follows protocol.SearchResponse — search is plugin-provided, so the
+// server forwards raw hits without interpreting the document payload.
+type richSearchResponse struct {
+	Type         string            `json:"type"`
+	Query        string            `json:"query"`
+	Hits         []pluginSearchHit `json:"hits"`
+	Total        int               `json:"total"`
+	ProcessingMs int               `json:"processing_ms"`
+}
+
+// handleRichSearch forwards the query to the registered SearchService plugin (qntx-meili et al).
+// Returns empty hits when no provider is registered; errors from the provider are surfaced verbatim.
 func (c *Client) handleRichSearch(query string) {
-	// Trim and validate query
 	query = strings.TrimSpace(query)
 	if query == "" {
 		c.sendJSON(richSearchResponse{
-			Type:    "rich_search_results",
-			Query:   query,
-			Matches: []storage.RichSearchMatch{},
-			Total:   0,
+			Type:  "rich_search_results",
+			Query: query,
+			Hits:  []pluginSearchHit{},
 		})
 		return
 	}
 
-	c.server.logger.Infow("Unified search",
-		"query", query,
-		"client_id", c.id,
-	)
+	if c.server.servicesManager == nil {
+		c.sendJSON(richSearchResponse{
+			Type:  "rich_search_results",
+			Query: query,
+			Hits:  []pluginSearchHit{},
+		})
+		return
+	}
 
-	// Text search (fuzzy/exact)
-	boundedStore := storage.NewBoundedStore(c.server.db, nil, c.server.logger.Named("search"))
-	ctx := c.server.ctx
-	matches, err := boundedStore.SearchRichStringFields(ctx, query, 50)
+	router := c.server.servicesManager.GetSearchRouter()
+	if router == nil || !router.HasProvider() {
+		c.sendJSON(richSearchResponse{
+			Type:  "rich_search_results",
+			Query: query,
+			Hits:  []pluginSearchHit{},
+		})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.server.ctx, pluginSearchTimeout)
+	defer cancel()
+
+	resp, err := router.Search(ctx, &protocol.SearchRequest{
+		Query: query,
+		TopK:  pluginSearchTopK,
+	})
 	if err != nil {
-		err = errors.Wrapf(err, "text search failed for query %q", query)
-		c.server.logger.Warnw("Text search failed",
+		c.server.logger.Warnw("Plugin search failed",
 			"query", query,
 			"error", err,
 			"client_id", c.id,
 		)
 		c.sendJSON(map[string]interface{}{
 			"type":  "rich_search_error",
+			"query": query,
 			"error": err.Error(),
 		})
 		return
 	}
 
-	// Semantic search (if embedding service available)
-	if c.server.embeddingService != nil && c.server.embeddingStore != nil {
-		semanticMatches := c.searchSemantic(query)
-		if len(semanticMatches) > 0 {
-			matches = mergeSearchResults(matches, semanticMatches)
+	hits := make([]pluginSearchHit, len(resp.Hits))
+	for i, h := range resp.Hits {
+		doc := json.RawMessage(h.Document)
+		if len(doc) == 0 {
+			doc = json.RawMessage("null")
 		}
-	}
-
-	// Ensure matches is never nil (nil serializes as JSON null, breaking frontend)
-	if matches == nil {
-		matches = []storage.RichSearchMatch{}
+		hits[i] = pluginSearchHit{
+			ID:       h.Id,
+			Score:    float64(h.Score),
+			Document: doc,
+		}
 	}
 
 	c.sendJSON(richSearchResponse{
-		Type:    "rich_search_results",
-		Query:   query,
-		Matches: matches,
-		Total:   len(matches),
+		Type:         "rich_search_results",
+		Query:        query,
+		Hits:         hits,
+		Total:        int(resp.Total),
+		ProcessingMs: int(resp.ProcessingMs),
 	})
 
-	c.server.logger.Infow("Unified search results sent",
+	c.server.logger.Infow("Plugin search results sent",
 		"query", query,
-		"text_matches", len(matches),
-		"semantic_available", c.server.embeddingService != nil,
+		"hit_count", len(hits),
+		"total", resp.Total,
 		"client_id", c.id,
 	)
-}
-
-// searchSemantic generates an embedding for the query and searches the vector store.
-// Returns empty slice on any failure — semantic search is best-effort.
-func (c *Client) searchSemantic(query string) []storage.RichSearchMatch {
-	queryResult, err := c.server.embeddingService.GenerateEmbedding(query)
-	if err != nil {
-		c.server.logger.Debugw("Semantic embedding failed", "query", query, "error", err)
-		return nil
-	}
-
-	queryBlob, err := c.server.embeddingService.SerializeEmbedding(queryResult.Embedding)
-	if err != nil {
-		c.server.logger.Debugw("Semantic serialization failed", "query", query, "error", err)
-		return nil
-	}
-
-	searchResults, err := c.server.embeddingStore.SemanticSearch(queryBlob, semanticSearchLimit, semanticSearchThreshold, nil)
-	if err != nil {
-		c.server.logger.Debugw("Semantic search failed", "query", query, "error", err)
-		return nil
-	}
-
-	var matches []storage.RichSearchMatch
-	for _, result := range searchResults {
-		if result.SourceType != "attestation" {
-			continue
-		}
-
-		attestation, err := c.server.getAttestationByID(result.SourceID)
-		if err != nil || attestation == nil {
-			continue
-		}
-
-		nodeID := result.SourceID
-		if len(attestation.Subjects) > 0 {
-			nodeID = attestation.Subjects[0]
-		}
-
-		displayLabel := nodeID
-		typeName := "Document"
-		var attributes map[string]interface{}
-		if attestation.Attributes != nil {
-			attributes = attestation.Attributes
-			if label, ok := attributes["label"].(string); ok && label != "" {
-				displayLabel = label
-			} else if name, ok := attributes["name"].(string); ok && name != "" {
-				displayLabel = name
-			}
-			if t, ok := attributes["type"].(string); ok {
-				typeName = t
-			}
-		}
-
-		excerpt := result.Text
-
-		matches = append(matches, storage.RichSearchMatch{
-			NodeID:       nodeID,
-			TypeName:     typeName,
-			TypeLabel:    typeName,
-			FieldName:    "content",
-			FieldValue:   result.Text,
-			Excerpt:      excerpt,
-			Score:        float64(result.Similarity),
-			Strategy:     storage.StrategySemantic,
-			DisplayLabel: displayLabel,
-			Attributes:   attributes,
-		})
-	}
-
-	return matches
-}
-
-// mergeSearchResults combines text and semantic results, deduplicating by NodeID.
-func mergeSearchResults(text, semantic []storage.RichSearchMatch) []storage.RichSearchMatch {
-	seen := make(map[string]int) // NodeID -> index in result
-	result := make([]storage.RichSearchMatch, len(text))
-	copy(result, text)
-	for i, m := range result {
-		seen[m.NodeID] = i
-	}
-
-	for _, s := range semantic {
-		if idx, exists := seen[s.NodeID]; exists {
-			if s.Score > result[idx].Score {
-				result[idx] = s
-			}
-		} else {
-			seen[s.NodeID] = len(result)
-			result = append(result, s)
-		}
-	}
-
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Score > result[j].Score
-	})
-
-	return result
 }
 
 // handleVisibility updates client visibility preferences and refreshes the graph
@@ -1296,31 +1226,27 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 }
 
 // sendSystemCapabilitiesToClient sends system capability information to a newly connected client.
-// This informs the frontend about available optimizations (e.g., Rust fuzzy matching, ONNX video).
+// This informs the frontend about available optimizations (Rust storage, WASM parser).
 // Sends are routed through broadcast worker (thread-safe).
 func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
-	// Get system capabilities from syscap package
-	fuzzyBackend := s.builder.FuzzyBackend()
-	msg := syscap.Get(fuzzyBackend)
+	msg := syscap.Get()
 
-	// Send to broadcast worker (thread-safe)
 	req := &broadcastRequest{
 		reqType:  "message",
 		msg:      msg,
-		clientID: client.id, // Send to specific client only
+		clientID: client.id,
 	}
 
 	select {
 	case s.broadcastReq <- req:
 		s.logger.Debugw("Queued system capabilities to client",
 			"client_id", client.id,
-			"fuzzy_backend", fuzzyBackend,
-			"fuzzy_optimized", msg.FuzzyOptimized,
+			"storage_backend", msg.StorageBackend,
+			"parser_backend", msg.ParserBackend,
 		)
 	case <-s.ctx.Done():
 		return
 	default:
-		// Broadcast queue full (should never happen with proper sizing)
 		s.logger.Warnw("Broadcast request queue full, skipping system capabilities",
 			"client_id", client.id,
 		)

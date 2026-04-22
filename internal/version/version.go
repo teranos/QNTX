@@ -3,8 +3,6 @@ package version
 import (
 	"fmt"
 	"runtime"
-
-	"github.com/teranos/QNTX/ats/ax"
 )
 
 // Build information. These variables are set at build time via ldflags.
@@ -21,26 +19,21 @@ var (
 
 // Info contains version and build information
 type Info struct {
-	CommitHash   string `json:"commit_hash"`
-	BuildTime    string `json:"build_time"`
-	Version      string `json:"version"`
-	GoVersion    string `json:"go_version"`
-	Platform     string `json:"platform"`
-	FuzzyBackend string `json:"fuzzy_backend"` // "go" or "rust"
+	CommitHash string `json:"commit_hash"`
+	BuildTime  string `json:"build_time"`
+	Version    string `json:"version"`
+	GoVersion  string `json:"go_version"`
+	Platform   string `json:"platform"`
 }
 
 // Get returns the current version information
 func Get() Info {
-	// Detect which fuzzy matcher is available (without creating instance)
-	backend := string(ax.DetectBackend())
-
 	return Info{
-		CommitHash:   CommitHash,
-		BuildTime:    BuildTime,
-		Version:      VersionTag,
-		GoVersion:    runtime.Version(),
-		Platform:     fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-		FuzzyBackend: backend,
+		CommitHash: CommitHash,
+		BuildTime:  BuildTime,
+		Version:    VersionTag,
+		GoVersion:  runtime.Version(),
+		Platform:   fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 	}
 }
 

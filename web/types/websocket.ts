@@ -7,7 +7,6 @@
 
 import type { Attestation } from '../ts/generated/proto/plugin/grpc/protocol/atsstore';
 import type { GlyphFired } from '../ts/generated/proto/glyph/proto/events';
-import type { RichSearchResultsMessage as ProtoRichSearchResultsMessage } from '../ts/generated/proto/plugin/grpc/protocol/server';
 // Import LSP types for parse-related messages to ensure consistency
 import type {
   SemanticToken as LSPSemanticToken,
@@ -454,10 +453,25 @@ export interface DatabaseStatsMessage extends BaseMessage {
 }
 
 /**
- * Rich search results response — extends proto-generated type with WS discriminator (ADR-006)
+ * Plugin search result hit — mirrors protocol.SearchHit in plugin/grpc/protocol/search.proto.
+ * The `document` payload is opaque provider-authored JSON.
  */
-export interface RichSearchResultsMessage extends ProtoRichSearchResultsMessage, BaseMessage {
+export interface PluginSearchHit {
+  id: string;
+  score: number;
+  document: unknown;
+}
+
+/**
+ * Search results forwarded from the SearchService plugin provider via WebSocket.
+ * Shape follows protocol.SearchResponse.
+ */
+export interface RichSearchResultsMessage extends BaseMessage {
   type: 'rich_search_results';
+  query: string;
+  hits: PluginSearchHit[];
+  total: number;
+  processing_ms?: number;
 }
 
 // ============================================================================

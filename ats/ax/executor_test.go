@@ -67,7 +67,6 @@ func TestNewAxExecutor_DefaultsApplied(t *testing.T) {
 	// Verify default options are applied
 	assert.NotNil(t, executor.entityResolver, "EntityResolver should have default")
 	assert.NotNil(t, executor.queryExpander, "QueryExpander should have default")
-	assert.NotNil(t, executor.fuzzy, "FuzzyMatcher should be created")
 }
 
 func TestNewAxExecutorWithOptions_LoggerSet(t *testing.T) {
@@ -237,38 +236,3 @@ func TestExecuteAdvancedClassification_DeterministicOrdering(t *testing.T) {
 	assert.Equal(t, []string{"as-2", "as-3", "as-1"}, firstOrder, "should be sorted most-recent first")
 }
 
-// emptyMatcher returns no matches for any query, simulating WASM engine failure.
-type emptyMatcher struct{}
-
-func (e *emptyMatcher) FindMatches(query string, all []string) []string        { return nil }
-func (e *emptyMatcher) FindContextMatches(query string, all []string) []string { return nil }
-func (e *emptyMatcher) Backend() MatcherBackend                                { return MatcherBackendGo }
-func (e *emptyMatcher) SetLogger(logger interface{})                           {}
-
-func TestExpandFuzzyPredicates_PreservesOriginalWhenNoMatches(t *testing.T) {
-	queryStore := &mockQueryStore{
-		predicates: []string{"engineer", "manager"},
-	}
-	aliasResolver := alias.NewResolver(&mockAliasStore{})
-	executor := NewAxExecutorWithOptions(queryStore, aliasResolver, AxExecutorOptions{
-		Matcher: &emptyMatcher{},
-	})
-
-	expanded, err := executor.expandFuzzyPredicates(context.Background(), []string{"engineer"})
-	require.NoError(t, err)
-	assert.Equal(t, []string{"engineer"}, expanded, "original term must survive when fuzzy returns nothing")
-}
-
-func TestExpandFuzzyContexts_PreservesOriginalWhenNoMatches(t *testing.T) {
-	queryStore := &mockQueryStore{
-		contexts: []string{"GitHub", "GitLab"},
-	}
-	aliasResolver := alias.NewResolver(&mockAliasStore{})
-	executor := NewAxExecutorWithOptions(queryStore, aliasResolver, AxExecutorOptions{
-		Matcher: &emptyMatcher{},
-	})
-
-	expanded, err := executor.expandFuzzyContexts(context.Background(), []string{"GitHub"})
-	require.NoError(t, err)
-	assert.Equal(t, []string{"GitHub"}, expanded, "original term must survive when fuzzy returns nothing")
-}
