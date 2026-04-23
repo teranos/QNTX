@@ -125,7 +125,7 @@ type ServiceRegistry interface {
     Database() *sql.DB              // Direct DB access
     Logger(domain string) *zap.SugaredLogger
     Config(domain string) Config
-    ATSStore() *storage.SQLStore    // Attestation CRUD
+    ATSStore() storage.Store        // Attestation CRUD (Rust FFI backend)
 }
 ```
 

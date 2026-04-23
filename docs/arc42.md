@@ -88,7 +88,7 @@ Full definitions: [AXIOMS.md](AXIOMS.md)
 
 Every node generates a `did:key` identity (ed25519) on first boot. No authority issues it.
 
-Current: WebSocket sync between known peers, nodes identified by DID.
+Current: Single-node. P2P sync implementation removed — the concept (set union, append-only, convergent) holds, but the Go implementation was premature.
 Vision: Reticulum — transport-agnostic, delay-tolerant, self-routing. Node DID and Reticulum destination converge to the same keypair.
 
 See [reticulum.md](reticulum.md), [vision/identity.md](vision/identity.md).
@@ -139,7 +139,6 @@ See [Design Philosophy](design-philosophy.md) and [Distribution Strategy](distri
 │  am/        Configuration (5-layer precedence)│
 │  pulse/     Async execution + scheduling     │
 │  server/    HTTP, WebSocket, LSP             │
-│  sync/      Merkle reconciliation            │
 └──────────────────────────────────────────────┘
          │                    │
     gRPC (plugins)      WASM (qntx-core)
@@ -318,9 +317,9 @@ See [Design Philosophy](design-philosophy.md).
 |------|--------|------------|
 | Abstraction barrier — "attestations" may be too abstract | Adoption friction | Good ingestion (⨳ ix), gradual onboarding |
 | Cold start — empty store = no value | Poor first-run experience | Prioritize connectors: git, files, APIs |
-| Complexity budget — ATS + Pulse + Glyphs + Sync each carry weight | Layers compound instead of compose | Each layer independently useful, clear contracts |
+| Complexity budget — ATS + Pulse + Glyphs each carry weight | Layers compound instead of compose | Each layer independently useful, clear contracts |
 | Single steward — bus factor of one | Project continuity | Community formation, honest docs, public good model |
-| Parser migration — ATS parser moving Go → Rust/WASM | Temporary dual implementations | ADR-005; WASM already serving browser |
+| Parser migration — ATS parser moving Go → Rust/WASM | Temporary dual implementations | ADR-005; WASM migration largely complete |
 
 ---
 

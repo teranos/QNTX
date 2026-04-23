@@ -111,8 +111,6 @@ Other tests: ❌ FAIL
 
 1. Add JSON adapter layer in `sqlitecgo` package
 2. Run full Go integration test suite against Rust backend
-3. Performance benchmarks (Go SQLStore vs Rust SqliteStore)
-4. Consider replacing `ats/storage/sql_store.go` with CGO wrapper
 
 ## Files
 

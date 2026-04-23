@@ -47,8 +47,6 @@ Code: `server/init.go` (safety check), `am/defaults.go` (default + env binding `
 
 ### P2 — Should fix for hardened deployment
 
-**DNS rebinding on sync connections.** `server/sync_handler.go:122` — Standard `websocket.Dialer` resolves DNS at connect time.
-
 **SQLite database unencrypted at rest.** Anyone with filesystem access reads all attestations, credentials, embeddings.
 
 **Watcher engine doesn't use SaferClient.** `ats/watcher/engine.go:110` — Standard `http.Client` on user-configured URLs. See `docs/security/ssrf-protection.md`.

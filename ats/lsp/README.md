@@ -82,7 +82,7 @@ See open issues for planned improvements:
 
 ## Related
 
-- **LSP handler**: `server/lsp_handler.go` - WebSocket endpoint implementation
+- **LSP handler**: `server/lsp_handler.go` - WebSocket endpoint implementation (deprecated — superseded by canvas)
 - **Symbol index**: `ats/storage/lsp_index.go` - Attestation caching for completions
 - **Parser**: `ats/parser` - ATS query parsing with semantic tokens
 - **Web UI**: Connects to `/lsp` endpoint for editor features
