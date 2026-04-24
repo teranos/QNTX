@@ -124,10 +124,10 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/embeddings/clusters/members", wrap(s.embeddingsHandler.HandleClusterMembers))   // Recent attestations in a cluster (GET)
 	http.HandleFunc("/api/embeddings/clusters/memberships", wrap(s.embeddingsHandler.HandleClusterMemberships)) // Cluster assignments for attestation IDs (GET)
 	http.HandleFunc("/api/embeddings/cluster-timeline", wrap(s.embeddingsHandler.HandleClusterTimeline))  // Cluster evolution timeline (GET)
-	http.HandleFunc("/api/embeddings/cluster", wrap(s.HandleEmbeddingCluster))                      // HDBSCAN clustering (POST)
+	http.HandleFunc("/api/embeddings/cluster", wrap(s.embeddingsHandler.HandleCluster))              // HDBSCAN clustering (POST)
 	http.HandleFunc("/api/embeddings/by-source", wrap(s.embeddingsHandler.HandleEmbeddingsBySource)) // Embeddings by attestation source IDs (POST)
 	http.HandleFunc("/api/embeddings/info", wrap(s.embeddingsHandler.HandleEmbeddingInfo))          // Embedding service status (GET)
-	http.HandleFunc("/api/embeddings/project", wrap(s.HandleEmbeddingProject))                      // UMAP projection (POST)
+	http.HandleFunc("/api/embeddings/project", wrap(s.embeddingsHandler.HandleProject))              // UMAP projection (POST)
 	http.HandleFunc("/api/embeddings/projections", wrap(s.embeddingsHandler.HandleEmbeddingProjections)) // Get 2D projections (GET)
 	http.HandleFunc("/", wrapPublic(s.HandleStatic))
 }
