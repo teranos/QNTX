@@ -386,11 +386,15 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	server.groundDBPath = deps.config.GroundDBPath
 	server.SetupEmbeddingService()
 	server.embeddingsHandler = &serverembeddings.Handler{
-		DB:       db,
-		Store:    server.embeddingStore,
-		Service:  server.embeddingService,
-		ATSStore: atsStore,
-		Logger:   serverLogger,
+		DB:           db,
+		Store:        server.embeddingStore,
+		Service:      server.embeddingService,
+		ATSStore:     atsStore,
+		Logger:       serverLogger,
+		CallReduce:   server.callReducePlugin,
+		Invalidator:  server.embeddingClusterInvalidator,
+		GroundDBPath: deps.config.GroundDBPath,
+		GroundWrite:  writeToGround,
 	}
 	if server.embeddingStats != nil {
 		ticker.SetEmbeddingStats(server.embeddingStats)

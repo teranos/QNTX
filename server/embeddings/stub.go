@@ -62,3 +62,13 @@ func (h *Handler) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleEmbeddingProjections(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, unavailableMsg, http.StatusServiceUnavailable)
 }
+
+// HandleCluster is a no-op when embeddings are not available.
+func (h *Handler) HandleCluster(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, unavailableMsg, http.StatusServiceUnavailable)
+}
+
+// HandleProject is a no-op when embeddings are not available.
+func (h *Handler) HandleProject(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, unavailableMsg, http.StatusServiceUnavailable)
+}

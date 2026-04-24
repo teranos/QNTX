@@ -27,6 +27,6 @@ there is this thing called typegen that generates the api documentation, you can
 
 ## Embeddings Sub-package (`server/embeddings/`)
 
-The embedding handlers (semantic search, clustering, projection, observer) are being extracted from the server root into `server/embeddings/`. The server currently has ~2,600 lines of embedding code scattered across 6 files, all behind the `cgo && rustembeddings` build tag.
+Embedding code lives in `server/embeddings/` — HTTP handlers, clustering logic, projection, the auto-embed observer. The server root keeps only thin wiring: `SetupEmbeddingService` (populates server fields), `callReducePlugin`/`projectToCanvas` (plugin registry coupling, passed as callbacks), and schedule setup methods that register Pulse handlers.
 
-The `embeddingService` interface in QNTXServer already defines the contract. The extraction creates an `EmbeddingsHandler` struct that receives its dependencies (db, store, service, atsStore, logger) at construction — same pattern as `canvasHandler`. The server wires it up in init and delegates HTTP handlers to it.
+Everything else — the actual domain logic — lives in the sub-package. Handler struct receives dependencies at construction (same pattern as canvasHandler). Pulse functions (`RunHDBSCANClustering`, `RunAllProjections`) take all deps as explicit params, no server coupling. The observer is self-contained with callback hooks for watcher integration and projection.

@@ -1,6 +1,6 @@
 //go:build cgo && rustembeddings
 
-package server
+package embeddings
 
 import (
 	"encoding/json"

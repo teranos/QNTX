@@ -3,21 +3,17 @@
 package server
 
 import (
-	"net/http"
+	"context"
 
 	am "github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/errors"
 )
 
 // Stub handlers when rustembeddings build tag is not present
 
-// HandleEmbeddingCluster runs HDBSCAN clustering (POST /api/embeddings/cluster)
-func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
-}
-
-// HandleEmbeddingProject runs UMAP projection (POST /api/embeddings/project)
-func (s *QNTXServer) HandleEmbeddingProject(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Embeddings feature not available (compile with -tags=rustembeddings)", http.StatusServiceUnavailable)
+// callReducePlugin is a no-op when embeddings are not available.
+func (s *QNTXServer) callReducePlugin(_ context.Context, _, _ string, _ []byte) ([]byte, error) {
+	return nil, errors.New("reduce plugin not available (build without rustembeddings tag)")
 }
 
 // SetupEmbeddingService is a no-op when embeddings are not available
