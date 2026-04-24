@@ -4,6 +4,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         use std::path::PathBuf;
 
+        // QNTX_PROTO_DIR: override proto file location for out-of-workspace builds.
+        // Default assumes crates/qntx-grpc/ inside the QNTX workspace.
         let proto_dir = match std::env::var("QNTX_PROTO_DIR") {
             Ok(dir) => PathBuf::from(dir),
             Err(_) => PathBuf::from("../../plugin/grpc/protocol"),
