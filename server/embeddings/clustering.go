@@ -3,7 +3,9 @@
 package embeddings
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"sort"
@@ -215,8 +217,8 @@ func RunHDBSCANClustering(
 	swept, err := store.SweepStaleEmbeddings()
 	if err != nil {
 		logger.Warnw("Stale embedding sweep failed, continuing with clustering", "error", err)
-	} else if swept > 0 {
-		logger.Infow("Swept stale embeddings before clustering", "count", swept)
+	} else {
+		logger.Infow("Stale embedding sweep complete", "swept", swept)
 	}
 
 	// Read all embedding vectors
@@ -243,11 +245,35 @@ func RunHDBSCANClustering(
 		flat = append(flat, vec...)
 	}
 
+	// Hash input for determinism verification — same hash must yield same clusters
+	inputHash := sha256.New()
+	buf := make([]byte, 4)
+	for _, v := range flat {
+		binary.LittleEndian.PutUint32(buf, math.Float32bits(v))
+		inputHash.Write(buf)
+	}
+	logger.Infow("HDBSCAN input fingerprint",
+		"n_points", len(ids),
+		"dims", dims,
+		"min_cluster_size", minClusterSize,
+		"input_sha256", fmt.Sprintf("%x", inputHash.Sum(nil)))
+
 	// Run HDBSCAN
 	result, err := embeddings.ClusterHDBSCAN(flat, len(ids), dims, minClusterSize)
 	if err != nil {
 		return nil, errors.Wrapf(err, "HDBSCAN failed (n_points=%d, dims=%d, min_cluster_size=%d)", len(ids), dims, minClusterSize)
 	}
+
+	// Hash raw HDBSCAN output for determinism verification
+	outputHash := sha256.New()
+	for _, l := range result.Labels {
+		binary.LittleEndian.PutUint32(buf, uint32(l))
+		outputHash.Write(buf)
+	}
+	logger.Infow("HDBSCAN output fingerprint",
+		"n_clusters", result.NClusters,
+		"n_noise", result.NNoise,
+		"output_sha256", fmt.Sprintf("%x", outputHash.Sum(nil)))
 
 	// Create run record first — clusters and events reference it via FK
 	runID, _ := vanity.GenerateRandomID(12)
