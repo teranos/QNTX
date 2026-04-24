@@ -4,8 +4,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Use protoc-bin-vendored to avoid needing protoc installed
     std::env::set_var("PROTOC", protoc_bin_vendored::protoc_bin_path().unwrap());
 
-    let project_root = PathBuf::from("../../");
-    let proto_dir = project_root.join("plugin/grpc/protocol");
+    let proto_dir = match std::env::var("QNTX_PROTO_DIR") {
+        Ok(dir) => PathBuf::from(dir),
+        Err(_) => PathBuf::from("../../plugin/grpc/protocol"),
+    };
     let protos = [
         proto_dir.join("domain.proto"),
         proto_dir.join("atsstore.proto"),
@@ -55,7 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     config.field_attribute("protocol.Attestation.signer_did", "#[serde(default)]");
 
-    config.compile_protos(&protos, &[&project_root])?;
+    config.compile_protos(&protos, &[&proto_dir])?;
 
     for proto in &protos {
         println!("cargo:rerun-if-changed={}", proto.display());
