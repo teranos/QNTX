@@ -1,6 +1,6 @@
 //go:build cgo && rustembeddings
 
-package server
+package embeddings
 
 import (
 	"encoding/json"
@@ -12,27 +12,27 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 )
 
-// ClusterRequest represents a clustering API request
+// ClusterRequest represents a clustering API request.
 type ClusterRequest struct {
 	MinClusterSize        int      `json:"min_cluster_size,omitempty"`
 	ClusterThreshold      *float64 `json:"cluster_threshold,omitempty"`
 	ClusterMatchThreshold *float64 `json:"cluster_match_threshold,omitempty"`
 }
 
-// ClusterResponse represents the result of a clustering operation
+// ClusterResponse represents the result of a clustering operation.
 type ClusterResponse struct {
 	Summary *storage.ClusterSummary `json:"summary"`
 	TimeMS  float64                 `json:"time_ms"`
 }
 
-// HandleEmbeddingCluster runs HDBSCAN clustering on all stored embeddings (POST /api/embeddings/cluster)
-func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Request) {
+// HandleCluster runs HDBSCAN clustering on all stored embeddings (POST /api/embeddings/cluster).
+func (h *Handler) HandleCluster(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	if s.embeddingService == nil || s.embeddingStore == nil {
+	if h.Service == nil || h.Store == nil {
 		http.Error(w, "Embedding service not available", http.StatusServiceUnavailable)
 		return
 	}
@@ -60,18 +60,19 @@ func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Reque
 	projectCtx := "project:" + filepath.Join(filepath.Base(filepath.Dir(cwd)), filepath.Base(cwd))
 
 	result, err := RunHDBSCANClustering(
-		s.embeddingStore,
-		s.embeddingService,
-		s.embeddingClusterInvalidator,
+		h.Store,
+		h.Service,
+		h.Invalidator,
 		minClusterSize,
 		clusterMatchThreshold,
-		s.atsStore,
+		h.ATSStore,
 		projectCtx,
-		s.groundDBPath,
-		s.logger,
+		h.GroundDBPath,
+		h.GroundWrite,
+		h.Logger,
 	)
 	if err != nil {
-		s.logger.Errorw("HDBSCAN clustering failed", "error", err)
+		h.Logger.Errorw("HDBSCAN clustering failed", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -79,17 +80,17 @@ func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Reque
 	// Persist parameters only after successful clustering
 	if req.MinClusterSize > 0 {
 		if err := appcfg.UpdateEmbeddingsMinClusterSize(req.MinClusterSize); err != nil {
-			s.logger.Warnw("Failed to persist min_cluster_size", "error", err)
+			h.Logger.Warnw("Failed to persist min_cluster_size", "error", err)
 		}
 	}
 	if req.ClusterThreshold != nil {
 		if err := appcfg.UpdateEmbeddingsClusterThreshold(*req.ClusterThreshold); err != nil {
-			s.logger.Warnw("Failed to persist cluster_threshold", "error", err)
+			h.Logger.Warnw("Failed to persist cluster_threshold", "error", err)
 		}
 	}
 	if req.ClusterMatchThreshold != nil {
 		if err := appcfg.UpdateEmbeddingsClusterMatchThreshold(*req.ClusterMatchThreshold); err != nil {
-			s.logger.Warnw("Failed to persist cluster_match_threshold", "error", err)
+			h.Logger.Warnw("Failed to persist cluster_match_threshold", "error", err)
 		}
 	}
 
@@ -100,6 +101,6 @@ func (s *QNTXServer) HandleEmbeddingCluster(w http.ResponseWriter, r *http.Reque
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		s.logger.Errorw("Failed to encode cluster response", "error", err)
+		h.Logger.Errorw("Failed to encode cluster response", "error", err)
 	}
 }

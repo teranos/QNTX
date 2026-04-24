@@ -32,14 +32,20 @@ type Service interface {
 // ReduceFunc calls the reduce plugin via gRPC for projection operations.
 type ReduceFunc func(ctx context.Context, method, path string, body []byte) ([]byte, error)
 
+// GroundWriteFunc writes an attestation to Ground's standalone database.
+type GroundWriteFunc func(dbPath string, as *types.As, logger *zap.SugaredLogger)
+
 // Handler handles HTTP requests for the embedding service.
 type Handler struct {
-	DB          *sql.DB
-	Store       *storage.EmbeddingStore
-	Service     Service
-	ATSStore    ats.AttestationStore
-	Logger      *zap.SugaredLogger
-	CallReduce  ReduceFunc // optional: for projection via reduce plugin
+	DB           *sql.DB
+	Store        *storage.EmbeddingStore
+	Service      Service
+	ATSStore     ats.AttestationStore
+	Logger       *zap.SugaredLogger
+	CallReduce   ReduceFunc      // optional: for projection via reduce plugin
+	Invalidator  func()          // cluster cache invalidation callback
+	GroundDBPath string          // for cluster lifecycle attestations
+	GroundWrite  GroundWriteFunc // writes deferred news to Ground's DB
 }
 
 // getAttestationByID retrieves a single attestation through the attestation store (Rust FFI).
