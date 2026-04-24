@@ -1,0 +1,216 @@
+/* tslint:disable */
+/* eslint-disable */
+
+/**
+ * Classify claim conflicts. Takes JSON input with claim groups, temporal config,
+ * and current time. Returns JSON with classified conflicts, resolution strategies,
+ * and actor rankings.
+ *
+ * Input:
+ * ```json
+ * {
+ *   "claim_groups": [{"key": "...", "claims": [...]}],
+ *   "config": {"verification_window_ms": 60000, ...},
+ *   "now_ms": 1234567890
+ * }
+ * ```
+ *
+ * Returns JSON with conflicts, auto_resolved count, review_required count.
+ */
+export function classify_claims(input: string): string;
+
+/**
+ * Compute cosine similarity between two f32 vectors.
+ * Uses typed arrays directly from JavaScript (no JSON overhead).
+ * Throws JS exception if vectors have different dimensions.
+ */
+export function cosine_similarity_f32(query: Float32Array, candidate: Float32Array): number;
+
+/**
+ * Delete an attestation by ID from IndexedDB.
+ * Returns a Promise that resolves to true if deleted, false if not found.
+ */
+export function delete_attestation(id: string): Promise<boolean>;
+
+/**
+ * Check if an attestation exists in IndexedDB.
+ * Returns a Promise that resolves to true if exists, false otherwise.
+ */
+export function exists_attestation(id: string): Promise<boolean>;
+
+/**
+ * Rebuild the fuzzy search index from current IndexedDB vocabulary.
+ * Pulls distinct subjects, predicates, contexts, and actors from the attestation store.
+ * Returns JSON: {"subjects": N, "predicates": N, "contexts": N, "actors": N, "hash": "..."}
+ */
+export function fuzzy_rebuild_index(): Promise<string>;
+
+/**
+ * Search the fuzzy index for matching vocabulary.
+ * vocab_type: "subjects", "predicates", "contexts", or "actors"
+ * Returns JSON array: [{"value":"...", "score":0.95, "strategy":"exact"}, ...]
+ */
+export function fuzzy_search(query: string, vocab_type: string, limit: number, min_score: number): string;
+
+/**
+ * Get fuzzy engine status.
+ * Returns JSON: {"ready": bool, "subjects": N, "predicates": N, "contexts": N, "actors": N, "hash": "..."}
+ */
+export function fuzzy_status(): string;
+
+/**
+ * Generate a content-addressed ASUID from SPC components and a content hash.
+ * Returns JSON: `{"full":"AS-SARAH-AUTHOR-GITHUB-7K4M3B9X","short":"AS-SARAH-AUTHOR-GITHUB-7K4M"}`
+ * or `{"error":"..."}` on invalid input.
+ */
+export function generate_asuid(input: string): string;
+
+/**
+ * Retrieve an attestation by ID from IndexedDB.
+ * Returns a Promise that resolves to JSON-serialized attestation or null if not found.
+ *
+ * Returns JSON matching proto schema (timestamps as numbers, attributes as JSON object).
+ * Converts from internal core::Attestation format before serialization.
+ */
+export function get_attestation(id: string): Promise<string | undefined>;
+
+/**
+ * Get context-aware completions for a partial AX query.
+ *
+ * Parses the partial query to determine which AX slot the cursor is in,
+ * then fuzzy-matches the trailing word against the appropriate vocabulary.
+ *
+ * Returns JSON: `{"slot":"predicates","prefix":"auth","items":[{"value":"...","score":0.95,"strategy":"exact"},...]}`
+ */
+export function get_completions(partial_query: string, limit: number): string;
+
+/**
+ * Clean a seed string for ID generation (normalize, uppercase, collapse repeats).
+ */
+export function id_clean_seed(input: string): string;
+
+/**
+ * Normalize input for ID lookup (uppercase, map 0→O/1→I, strip invalid).
+ */
+export function id_normalize_for_lookup(input: string): string;
+
+/**
+ * Initialize the IndexedDB store. Must be called before any storage operations.
+ * Returns a Promise that resolves when initialization is complete.
+ */
+export function init_store(db_name?: string | null): Promise<void>;
+
+/**
+ * Check if the store is initialized.
+ */
+export function is_store_initialized(): boolean;
+
+/**
+ * Get all attestation IDs from IndexedDB.
+ * Returns a Promise that resolves to JSON array of IDs.
+ */
+export function list_attestation_ids(): Promise<string>;
+
+/**
+ * Parse an AX query string. Returns JSON-serialized AxQuery or error.
+ *
+ * Returns: `{"subjects":["ALICE"],"predicates":["author"],...}` on success
+ *          `{"error":"description"}` on error
+ */
+export function parse_query(input: string): string;
+
+/**
+ * Store an attestation in IndexedDB.
+ * Returns a Promise that resolves to null on success or error message on failure.
+ *
+ * Expects JSON matching proto schema (timestamps as numbers, attributes as JSON object).
+ * Converts to internal core::Attestation format before storage.
+ */
+export function put_attestation(json: string): Promise<void>;
+
+/**
+ * Query attestations from IndexedDB using an AxFilter.
+ * Expects JSON-serialized AxFilter. Returns JSON array of proto-format attestations.
+ */
+export function query_attestations(filter_json: string): Promise<string>;
+
+/**
+ * Perform rich text search over IndexedDB attestations.
+ *
+ * Algorithm (mirrors Go rich_search_qntx.go):
+ * 1. Discover rich_string_fields from type definition attestations
+ * 2. Load recent attestations that have those fields
+ * 3. Tokenize field values into a word vocabulary
+ * 4. Rebuild RICH_FUZZY engine with that vocabulary
+ * 5. Fuzzy-match each query word against vocabulary
+ * 6. Map matched words back to attestation nodes, score, rank
+ *
+ * Returns JSON: `{"query":"...","matches":[...],"total":N}`
+ */
+export function rich_search(query: string, limit: number): Promise<string>;
+
+/**
+ * Get the qntx-core version.
+ */
+export function version(): string;
+
+export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
+
+export interface InitOutput {
+    readonly memory: WebAssembly.Memory;
+    readonly classify_claims: (a: number, b: number) => [number, number];
+    readonly cosine_similarity_f32: (a: number, b: number, c: number, d: number) => [number, number, number];
+    readonly delete_attestation: (a: number, b: number) => any;
+    readonly exists_attestation: (a: number, b: number) => any;
+    readonly fuzzy_rebuild_index: () => any;
+    readonly fuzzy_search: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly fuzzy_status: () => [number, number];
+    readonly generate_asuid: (a: number, b: number) => [number, number];
+    readonly get_attestation: (a: number, b: number) => any;
+    readonly get_completions: (a: number, b: number, c: number) => [number, number];
+    readonly id_clean_seed: (a: number, b: number) => [number, number];
+    readonly id_normalize_for_lookup: (a: number, b: number) => [number, number];
+    readonly init_store: (a: number, b: number) => any;
+    readonly is_store_initialized: () => number;
+    readonly list_attestation_ids: () => any;
+    readonly parse_query: (a: number, b: number) => [number, number];
+    readonly put_attestation: (a: number, b: number) => any;
+    readonly query_attestations: (a: number, b: number) => any;
+    readonly rich_search: (a: number, b: number, c: number) => any;
+    readonly version: () => [number, number];
+    readonly wasm_bindgen__closure__destroy__h182a2abd191e3067: (a: number, b: number) => void;
+    readonly wasm_bindgen__closure__destroy__h622d11ff1c80a730: (a: number, b: number) => void;
+    readonly wasm_bindgen__convert__closures_____invoke__h0970674685b3ee7c: (a: number, b: number, c: any, d: any) => void;
+    readonly wasm_bindgen__convert__closures_____invoke__h768c0c6f6cd75d67: (a: number, b: number, c: any) => void;
+    readonly wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea: (a: number, b: number, c: any) => void;
+    readonly __wbindgen_malloc: (a: number, b: number) => number;
+    readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+    readonly __wbindgen_exn_store: (a: number) => void;
+    readonly __externref_table_alloc: () => number;
+    readonly __wbindgen_externrefs: WebAssembly.Table;
+    readonly __wbindgen_free: (a: number, b: number, c: number) => void;
+    readonly __externref_table_dealloc: (a: number) => void;
+    readonly __wbindgen_start: () => void;
+}
+
+export type SyncInitInput = BufferSource | WebAssembly.Module;
+
+/**
+ * Instantiates the given `module`, which can either be bytes or
+ * a precompiled `WebAssembly.Module`.
+ *
+ * @param {{ module: SyncInitInput }} module - Passing `SyncInitInput` directly is deprecated.
+ *
+ * @returns {InitOutput}
+ */
+export function initSync(module: { module: SyncInitInput } | SyncInitInput): InitOutput;
+
+/**
+ * If `module_or_path` is {RequestInfo} or {URL}, makes a request and
+ * for everything else, calls `WebAssembly.instantiate` directly.
+ *
+ * @param {{ module_or_path: InitInput | Promise<InitInput> }} module_or_path - Passing `InitInput` directly is deprecated.
+ *
+ * @returns {Promise<InitOutput>}
+ */
+export default function __wbg_init (module_or_path?: { module_or_path: InitInput | Promise<InitInput> } | InitInput | Promise<InitInput>): Promise<InitOutput>;
