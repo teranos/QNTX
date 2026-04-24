@@ -4,9 +4,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         use std::path::PathBuf;
 
-        // Proto files are relative to workspace root
-        let project_root = PathBuf::from("../../");
-        let proto_dir = project_root.join("plugin/grpc/protocol");
+        let proto_dir = match std::env::var("QNTX_PROTO_DIR") {
+            Ok(dir) => PathBuf::from(dir),
+            Err(_) => PathBuf::from("../../plugin/grpc/protocol"),
+        };
 
         let protos = [
             proto_dir.join("domain.proto"),
@@ -31,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .compile_well_known_types(false)
             // Use extern_path to reference types from qntx-proto instead of generating
             .extern_path(".protocol", "::qntx_proto")
-            .compile_protos(&protos, &[&project_root])?;
+            .compile_protos(&protos, &[&proto_dir])?;
 
         // Rerun if proto files change
         for proto in &protos {
