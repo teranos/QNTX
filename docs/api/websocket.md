@@ -10,7 +10,6 @@ Real-time communication protocol for the QNTX web interface.
 | Path | Purpose |
 |------|--------|
 | `/ws` | Main WebSocket (graph updates, job status, logs) |
-| `/lsp` | ATS Language Server Protocol (completions, hover) |
 
 ## Message Types
 

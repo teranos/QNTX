@@ -78,8 +78,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	}
 
 	// Core QNTX handlers
-	http.HandleFunc("/ws", wrapWS(s.HandleWebSocket))      // Custom WebSocket protocol (graph updates, logs, etc.)
-	http.HandleFunc("/lsp", wrapWS(s.HandleGLSPWebSocket)) // ATS LSP protocol (completions, hover, semantic tokens)
+	http.HandleFunc("/ws", wrapWS(s.HandleWebSocket)) // Custom WebSocket protocol (graph updates, logs, etc.)
 	http.HandleFunc("/health", wrapPublic(s.HandleHealth)) // Health check always public
 	http.HandleFunc("/logs/download", wrap(s.HandleLogDownload))
 	http.HandleFunc("/api/timeseries/usage", wrap(s.HandleUsageTimeSeries))

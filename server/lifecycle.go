@@ -150,7 +150,7 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		// ReadTimeout and WriteTimeout must be 0 — non-zero values kill
-		// long-lived WebSocket connections (graph, sync, LSP).
+		// long-lived WebSocket connections (graph, sync).
 	}
 	s.logger.Infow(fmt.Sprintf("HTTP server listening on %s:%d", s.bindAddress, actualPort))
 	return s.httpServer.ListenAndServe()

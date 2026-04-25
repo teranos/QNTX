@@ -1,7 +1,7 @@
 {
   "name": "qntx-web",
   "version": "1.0.0",
-  "description": "QNTX Web UI - CodeMirror 6 editor with LSP support",
+  "description": "QNTX Web UI",
   "type": "module",
   "scripts": {
     "build": "bun run build.ts",
@@ -25,7 +25,6 @@
     "@tauri-apps/api": "^2.10.1",
     "@types/d3": "7.4.3",
     "@types/jsdom": "27.0.0",
-    "codemirror-languageserver": "1.17.0",
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "20.0.11",
     "jsdom": "27.4.0",

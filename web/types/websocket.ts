@@ -8,12 +8,6 @@
 import type { Attestation } from '../ts/generated/proto/plugin/grpc/protocol/atsstore';
 import type { GlyphFired } from '../ts/generated/proto/glyph/proto/events';
 import type { RichSearchResultsMessage as ProtoRichSearchResultsMessage } from '../ts/generated/proto/plugin/grpc/protocol/server';
-// Import LSP types for parse-related messages to ensure consistency
-import type {
-  SemanticToken as LSPSemanticToken,
-  Diagnostic as LSPDiagnostic,
-} from './lsp';
-
 // Import generated types from Go source (single source of truth)
 import {
   Job,
@@ -322,8 +316,8 @@ export interface ParseRequestMessage extends BaseMessage {
  */
 export interface ParseResponseMessage extends BaseMessage {
   type: 'parse_response';
-  tokens: LSPSemanticToken[];
-  diagnostics: LSPDiagnostic[];
+  tokens: SemanticToken[];
+  diagnostics: Diagnostic[];
   parse_state?: unknown;
   requestId?: string;
 }
