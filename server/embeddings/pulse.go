@@ -120,6 +120,11 @@ func (h *ReprojectHandler) writeLog(jobID, stage, level, message, metadata strin
 // EmitPulseDeferredNews queries recent Pulse execution stats and writes a deferred
 // news attestation for Ground. Emitted after every recluster run (success or failure)
 // as the recluster heartbeat is the natural place for periodic Pulse health reporting.
+//
+// Dedup: only emits when the failure picture changes — different failing handlers
+// or a different failure count. Increasing totals with the same failures is not news.
+// The fingerprint (failure count + handler names) is compared against the last
+// emitted pulse-summary attestation in the attestation store.
 func EmitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx string, groundDBPath string, groundWrite GroundWriteFunc, logger *zap.SugaredLogger) {
 	if atsStore == nil {
 		return
