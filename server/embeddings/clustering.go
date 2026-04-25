@@ -15,7 +15,6 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
-	vanity "github.com/teranos/vanity-id"
 	"go.uber.org/zap"
 )
 
@@ -274,7 +273,7 @@ func RunHDBSCANClustering(
 		"output_sha256", fmt.Sprintf("%x", outputHash.Sum(nil)))
 
 	// Create run record first — clusters and events reference it via FK
-	runID, _ := vanity.GenerateRandomID(12)
+	runID, _ := identity.GenerateRandomID(12)
 	runID = "CR_" + runID
 	clusterRun := &storage.ClusterRun{
 		ID:             runID,
