@@ -26,6 +26,7 @@ enum FailureMode {
     slow_responses,      // delay every RPC response
     bad_metadata,        // return corrupt Metadata
     random,              // pick a random misbehavior per RPC
+    test_ats,            // test ATS gRPC endpoint during Initialize
 }
 
 // ---------------------------------------------------------------------------
@@ -56,6 +57,7 @@ private FailureMode parseMode(string s) {
     if (s == "slow_responses")      return FailureMode.slow_responses;
     if (s == "bad_metadata")        return FailureMode.bad_metadata;
     if (s == "random")              return FailureMode.random;
+    if (s == "test_ats")            return FailureMode.test_ats;
     return FailureMode.none;
 }
 
@@ -132,6 +134,9 @@ private bool applyFailure(string rpcName) {
 
         case FailureMode.random:
             return false; // already resolved above
+
+        case FailureMode.test_ats:
+            return false; // handled in initialize()
     }
 }
 
@@ -145,6 +150,7 @@ private string modeStr(FailureMode m) {
         case FailureMode.slow_responses:      return "slow_responses";
         case FailureMode.bad_metadata:        return "bad_metadata";
         case FailureMode.random:              return "random";
+        case FailureMode.test_ats:            return "test_ats";
     }
 }
 
@@ -201,6 +207,55 @@ InitializeResponse initialize(ref const InitializeRequest req) {
     }
 
     logInfo("[faal] Initialize: mode=%s delay=%dms", modeStr(state.mode), state.delayMs);
+
+    // test_ats: call GenerateAndCreateAttestation via gRPC during init
+    if (state.mode == FailureMode.test_ats) {
+        auto endpoint = req.atsStoreEndpoint;
+        auto token = req.authToken;
+        logInfo("[faal] test_ats: ATS endpoint=%s token=%dB", endpoint, token.length);
+
+        if (endpoint.length == 0) {
+            logError("[faal] test_ats: no ats_store_endpoint provided");
+        } else if (token.length == 0) {
+            logError("[faal] test_ats: no auth_token provided");
+        } else {
+            import faal.grpc : grpcCall;
+
+            // Build GenerateAttestationRequest
+            auto cmd = AttestationCommand();
+            cmd.subjects = ["faal-test"];
+            cmd.predicates = ["ats-probe"];
+            cmd.contexts = ["chaos-test"];
+            cmd.actors = ["faal"];
+            cmd.source = "faal";
+            cmd.sourceVersion = PLUGIN_VERSION;
+
+            auto request = GenerateAttestationRequest();
+            request.authToken = token;
+            request.command = cmd;
+
+            auto requestBytes = encode(request);
+            logInfo("[faal] test_ats: sending %d bytes to %s", requestBytes.length, endpoint);
+
+            auto responseBytes = grpcCall(
+                endpoint,
+                "/protocol.ATSStoreService/GenerateAndCreateAttestation",
+                requestBytes,
+                10_000
+            );
+
+            if (responseBytes is null) {
+                logError("[faal] test_ats: RPC returned null (timeout or connection failure)");
+            } else {
+                auto resp = decode!GenerateAttestationResponse(responseBytes);
+                if (resp.success) {
+                    logInfo("[faal] test_ats: SUCCESS — attestation created");
+                } else {
+                    logError("[faal] test_ats: FAILED — %s", resp.error);
+                }
+            }
+        }
+    }
 
     // crash_once: crash on first launch, work on second
     if (state.mode == FailureMode.crash_once) {
@@ -312,7 +367,7 @@ void registerHandlers(ref GrpcServer server) {
 
     server.registerHandler("/protocol.DomainPluginService/ConfigSchema", (const ubyte[] _) {
         ConfigSchemaResponse resp;
-        resp.fields["failure_mode"] = "none|crash_once|crash_before_health|crash_after_health|hang_on_initialize|slow_responses|bad_metadata|random";
+        resp.fields["failure_mode"] = "none|crash_once|crash_before_health|crash_after_health|hang_on_initialize|slow_responses|bad_metadata|random|test_ats";
         resp.fields["delay_ms"]     = "Delay in milliseconds for slow_responses mode (default: 3000)";
         return encode(resp);
     });
