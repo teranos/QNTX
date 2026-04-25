@@ -7,6 +7,7 @@ import (
 
 	am "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 )
 
 // Stub handlers when rustembeddings build tag is not present
@@ -19,6 +20,13 @@ func (s *QNTXServer) callReducePlugin(_ context.Context, _, _ string, _ []byte) 
 // SetupEmbeddingService is a no-op when embeddings are not available
 func (s *QNTXServer) SetupEmbeddingService() {
 	s.logger.Debugw("Embeddings service not available (build without rustembeddings tag)")
+}
+
+// SetupPluginEmbeddingService is a no-op in non-CGO builds.
+// Full plugin embedding support (observer, clustering, projection) requires CGO build tags
+// because the HTTP handlers, observer, and Pulse schedules are gated behind rustembeddings.
+func (s *QNTXServer) SetupPluginEmbeddingService(_ protocol.EmbeddingServiceClient) {
+	s.logger.Warnw("Plugin embedding provider detected but embedding handlers not available (build without rustembeddings tag)")
 }
 
 // setupEmbeddingReclusterSchedule is a no-op when embeddings are not available

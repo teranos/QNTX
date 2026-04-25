@@ -12,9 +12,9 @@ import (
 	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
-	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 )
 
 // SetupEmbeddingService initializes the embedding service if available
@@ -88,6 +88,43 @@ func (s *QNTXServer) SetupEmbeddingService() {
 	s.logger.Infow("Embedding service initialized",
 		"path", modelPath,
 		"name", modelName)
+}
+
+// SetupPluginEmbeddingService initializes the embedding service backed by a plugin's
+// EmbeddingService gRPC (e.g., Cyrnel). Replaces the local CGO/FFI path with remote calls.
+func (s *QNTXServer) SetupPluginEmbeddingService(client protocol.EmbeddingServiceClient) {
+	svc := serverembeddings.NewPluginEmbeddingServiceFromClient(client, s.logger.Named("plugin-embeddings"))
+
+	embStore := storage.NewEmbeddingStore(s.db, s.logger.Desugar())
+
+	s.embeddingService = svc
+	s.embeddingStore = embStore
+
+	// Update the handler to use the plugin backend
+	if s.embeddingsHandler != nil {
+		s.embeddingsHandler.Service = svc
+		s.embeddingsHandler.Store = embStore
+		s.embeddingsHandler.ClusterFunc = svc.ClusterHDBSCAN
+	}
+
+	observer := serverembeddings.NewEmbeddingObserver(
+		svc,
+		embStore,
+		storage.NewBoundedStore(s.db, nil, s.logger.Named("auto-embed")),
+		s.logger.Named("auto-embed"),
+		float32(appcfg.GetFloat64("embeddings.cluster_threshold")),
+		s.projectToCanvas,
+	)
+
+	if s.watcherEngine != nil {
+		observer.SetOnEmbedded(s.watcherEngine.OnAttestationEmbedded)
+	}
+
+	storage.RegisterObserver(observer)
+	s.embeddingClusterInvalidator = observer.InvalidateClusterCache
+	s.embeddingStats = observer
+
+	s.logger.Infow("Plugin embedding service initialized")
 }
 
 // hasRustEmbeddings returns true if compiled with rustembeddings build tag
