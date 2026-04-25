@@ -29,6 +29,16 @@ type Service interface {
 	Close() error
 }
 
+// EmbeddingServiceForClustering is the subset of the embedding service needed for clustering and projection.
+type EmbeddingServiceForClustering interface {
+	DeserializeEmbedding(data []byte) ([]float32, error)
+	SerializeEmbedding(embedding []float32) ([]byte, error)
+}
+
+// ClusterFunc runs HDBSCAN clustering on a flat array of embeddings.
+// CGO path passes embeddings.ClusterHDBSCAN; plugin path passes PluginEmbeddingService.ClusterHDBSCAN.
+type ClusterFunc func(data []float32, nPoints, dims, minClusterSize int) (*embeddings.ClusterResult, error)
+
 // ReduceFunc calls the reduce plugin via gRPC for projection operations.
 type ReduceFunc func(ctx context.Context, method, path string, body []byte) ([]byte, error)
 
@@ -43,6 +53,7 @@ type Handler struct {
 	ATSStore     ats.AttestationStore
 	Logger       *zap.SugaredLogger
 	CallReduce   ReduceFunc      // optional: for projection via reduce plugin
+	ClusterFunc  ClusterFunc     // optional: overrides embeddings.ClusterHDBSCAN when set
 	Invalidator  func()          // cluster cache invalidation callback
 	GroundDBPath string          // for cluster lifecycle attestations
 	GroundWrite  GroundWriteFunc // writes deferred news to Ground's DB
