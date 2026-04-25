@@ -692,8 +692,16 @@ Core registers it as the search backend in the service mesh.</p>
 %}
       *)
 
+      embedding_provider:bool;
+      (**
+{%html:
+<p>embedding_provider indicates this plugin implements EmbeddingService (Embed, BatchEmbed, Cluster, ModelInfo RPCs).
+Core routes embedding calls to it instead of using the builtin CGO/FFI path.</p>
+%}
+      *)
+
     }
-    val make: ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> unit -> t
+    val make: ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> ?embedding_provider:bool -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -712,7 +720,7 @@ Core registers it as the search backend in the service mesh.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> unit -> t
+    type make_t = ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> ?embedding_provider:bool -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -2512,8 +2520,16 @@ Core registers it as the search backend in the service mesh.</p>
 %}
       *)
 
+      embedding_provider:bool;
+      (**
+{%html:
+<p>embedding_provider indicates this plugin implements EmbeddingService (Embed, BatchEmbed, Cluster, ModelInfo RPCs).
+Core routes embedding calls to it instead of using the builtin CGO/FFI path.</p>
+%}
+      *)
+
     }
-    val make: ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> unit -> t
+    val make: ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> ?embedding_provider:bool -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -2532,7 +2548,7 @@ Core registers it as the search backend in the service mesh.</p>
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> unit -> t
+    type make_t = ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> ?embedding_provider:bool -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -2548,9 +2564,10 @@ Core registers it as the search backend in the service mesh.</p>
       watchers:WatcherRegistration.t list;
       vector_search_provider:bool;
       search_provider:bool;
+      embedding_provider:bool;
     }
-    type make_t = ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> unit -> t
-    let make ?(handler_names = []) ?(schedules = []) ?(llm_provider = false) ?(watchers = []) ?(vector_search_provider = false) ?(search_provider = false) () = { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider }
+    type make_t = ?handler_names:string list -> ?schedules:ScheduleInfo.t list -> ?llm_provider:bool -> ?watchers:WatcherRegistration.t list -> ?vector_search_provider:bool -> ?search_provider:bool -> ?embedding_provider:bool -> unit -> t
+    let make ?(handler_names = []) ?(schedules = []) ?(llm_provider = false) ?(watchers = []) ?(vector_search_provider = false) ?(search_provider = false) ?(embedding_provider = false) () = { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider; embedding_provider }
     let merge =
     let merge_handler_names = Runtime'.Merge.merge Runtime'.Spec.( repeated ((1, "handler_names", "handlerNames"), string, not_packed) ) in
     let merge_schedules = Runtime'.Merge.merge Runtime'.Spec.( repeated ((2, "schedules", "schedules"), (message (module ScheduleInfo)), not_packed) ) in
@@ -2558,6 +2575,7 @@ Core registers it as the search backend in the service mesh.</p>
     let merge_watchers = Runtime'.Merge.merge Runtime'.Spec.( repeated ((4, "watchers", "watchers"), (message (module WatcherRegistration)), not_packed) ) in
     let merge_vector_search_provider = Runtime'.Merge.merge Runtime'.Spec.( basic ((5, "vector_search_provider", "vectorSearchProvider"), bool, (false)) ) in
     let merge_search_provider = Runtime'.Merge.merge Runtime'.Spec.( basic ((6, "search_provider", "searchProvider"), bool, (false)) ) in
+    let merge_embedding_provider = Runtime'.Merge.merge Runtime'.Spec.( basic ((7, "embedding_provider", "embeddingProvider"), bool, (false)) ) in
     fun t1 t2 -> {
     	handler_names = (merge_handler_names t1.handler_names t2.handler_names);
     	schedules = (merge_schedules t1.schedules t2.schedules);
@@ -2565,22 +2583,23 @@ Core registers it as the search backend in the service mesh.</p>
     	watchers = (merge_watchers t1.watchers t2.watchers);
     	vector_search_provider = (merge_vector_search_provider t1.vector_search_provider t2.vector_search_provider);
     	search_provider = (merge_search_provider t1.search_provider t2.search_provider);
+    	embedding_provider = (merge_embedding_provider t1.embedding_provider t2.embedding_provider);
      }
-    let spec () = Runtime'.Spec.( repeated ((1, "handler_names", "handlerNames"), string, not_packed) ^:: repeated ((2, "schedules", "schedules"), (message (module ScheduleInfo)), not_packed) ^:: basic ((3, "llm_provider", "llmProvider"), bool, (false)) ^:: repeated ((4, "watchers", "watchers"), (message (module WatcherRegistration)), not_packed) ^:: basic ((5, "vector_search_provider", "vectorSearchProvider"), bool, (false)) ^:: basic ((6, "search_provider", "searchProvider"), bool, (false)) ^:: nil )
+    let spec () = Runtime'.Spec.( repeated ((1, "handler_names", "handlerNames"), string, not_packed) ^:: repeated ((2, "schedules", "schedules"), (message (module ScheduleInfo)), not_packed) ^:: basic ((3, "llm_provider", "llmProvider"), bool, (false)) ^:: repeated ((4, "watchers", "watchers"), (message (module WatcherRegistration)), not_packed) ^:: basic ((5, "vector_search_provider", "vectorSearchProvider"), bool, (false)) ^:: basic ((6, "search_provider", "searchProvider"), bool, (false)) ^:: basic ((7, "embedding_provider", "embeddingProvider"), bool, (false)) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider } -> serialize writer handler_names schedules llm_provider watchers vector_search_provider search_provider
+      fun writer { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider; embedding_provider } -> serialize writer handler_names schedules llm_provider watchers vector_search_provider search_provider embedding_provider
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor handler_names schedules llm_provider watchers vector_search_provider search_provider = { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider } in
+      let constructor handler_names schedules llm_provider watchers vector_search_provider search_provider embedding_provider = { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider; embedding_provider } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider } -> serialize handler_names schedules llm_provider watchers vector_search_provider search_provider
+      fun { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider; embedding_provider } -> serialize handler_names schedules llm_provider watchers vector_search_provider search_provider embedding_provider
     let from_json_exn =
-      let constructor handler_names schedules llm_provider watchers vector_search_provider search_provider = { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider } in
+      let constructor handler_names schedules llm_provider watchers vector_search_provider search_provider embedding_provider = { handler_names; schedules; llm_provider; watchers; vector_search_provider; search_provider; embedding_provider } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end

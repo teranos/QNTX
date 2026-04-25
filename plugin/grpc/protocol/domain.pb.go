@@ -910,8 +910,11 @@ type InitializeResponse struct {
 	// search_provider indicates this plugin implements SearchProvider (Search RPCs).
 	// Core registers it as the search backend in the service mesh.
 	SearchProvider bool `protobuf:"varint,6,opt,name=search_provider,json=searchProvider,proto3" json:"search_provider,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// embedding_provider indicates this plugin implements EmbeddingService (Embed, BatchEmbed, Cluster, ModelInfo RPCs).
+	// Core routes embedding calls to it instead of using the builtin CGO/FFI path.
+	EmbeddingProvider bool `protobuf:"varint,7,opt,name=embedding_provider,json=embeddingProvider,proto3" json:"embedding_provider,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *InitializeResponse) Reset() {
@@ -982,6 +985,13 @@ func (x *InitializeResponse) GetVectorSearchProvider() bool {
 func (x *InitializeResponse) GetSearchProvider() bool {
 	if x != nil {
 		return x.SearchProvider
+	}
+	return false
+}
+
+func (x *InitializeResponse) GetEmbeddingProvider() bool {
+	if x != nil {
+		return x.EmbeddingProvider
 	}
 	return false
 }
@@ -1671,14 +1681,15 @@ const file_plugin_grpc_protocol_domain_proto_rawDesc = "" +
 	"\x10interval_seconds\x18\x02 \x01(\x05R\x0fintervalSeconds\x12,\n" +
 	"\x12enabled_by_default\x18\x03 \x01(\bR\x10enabledByDefault\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x19\n" +
-	"\bats_code\x18\x05 \x01(\tR\aatsCode\"\xac\x02\n" +
+	"\bats_code\x18\x05 \x01(\tR\aatsCode\"\xdb\x02\n" +
 	"\x12InitializeResponse\x12#\n" +
 	"\rhandler_names\x18\x01 \x03(\tR\fhandlerNames\x124\n" +
 	"\tschedules\x18\x02 \x03(\v2\x16.protocol.ScheduleInfoR\tschedules\x12!\n" +
 	"\fllm_provider\x18\x03 \x01(\bR\vllmProvider\x129\n" +
 	"\bwatchers\x18\x04 \x03(\v2\x1d.protocol.WatcherRegistrationR\bwatchers\x124\n" +
 	"\x16vector_search_provider\x18\x05 \x01(\bR\x14vectorSearchProvider\x12'\n" +
-	"\x0fsearch_provider\x18\x06 \x01(\bR\x0esearchProvider\"\xe9\x01\n" +
+	"\x0fsearch_provider\x18\x06 \x01(\bR\x0esearchProvider\x12-\n" +
+	"\x12embedding_provider\x18\a \x01(\bR\x11embeddingProvider\"\xe9\x01\n" +
 	"\x13WatcherRegistration\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fhandler_name\x18\x02 \x01(\tR\vhandlerName\x12\x1a\n" +
