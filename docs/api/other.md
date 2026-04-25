@@ -14,24 +14,22 @@
 | GET | `/api/canvas/glyphs/` | canvasHandler.HandleGlyphs |
 | GET | `/api/canvas/minimized-windows` | canvasHandler.HandleMinimizedWindows |
 | GET | `/api/canvas/minimized-windows/` | canvasHandler.HandleMinimizedWindows |
-| GET | `/api/embeddings/batch` | HandleEmbeddingBatch |
-| GET | `/api/embeddings/by-source` | HandleEmbeddingsBySource |
-| GET | `/api/embeddings/cluster` | HandleEmbeddingCluster |
-| GET | `/api/embeddings/cluster-timeline` | HandleClusterTimeline |
-| GET | `/api/embeddings/clusters` | HandleEmbeddingClusters |
-| GET | `/api/embeddings/clusters/members` | HandleClusterMembers |
-| GET | `/api/embeddings/clusters/memberships` | HandleClusterMemberships |
-| GET | `/api/embeddings/clusters/samples` | HandleClusterSamples |
-| GET | `/api/embeddings/generate` | HandleEmbeddingGenerate |
-| GET | `/api/embeddings/info` | HandleEmbeddingInfo |
-| GET | `/api/embeddings/project` | HandleEmbeddingProject |
-| GET | `/api/embeddings/projections` | HandleEmbeddingProjections |
+| GET | `/api/embeddings/batch` | embeddingsHandler.HandleEmbeddingBatch |
+| GET | `/api/embeddings/by-source` | embeddingsHandler.HandleEmbeddingsBySource |
+| GET | `/api/embeddings/cluster` | embeddingsHandler.HandleCluster |
+| GET | `/api/embeddings/cluster-timeline` | embeddingsHandler.HandleClusterTimeline |
+| GET | `/api/embeddings/clusters` | embeddingsHandler.HandleEmbeddingClusters |
+| GET | `/api/embeddings/clusters/members` | embeddingsHandler.HandleClusterMembers |
+| GET | `/api/embeddings/clusters/memberships` | embeddingsHandler.HandleClusterMemberships |
+| GET | `/api/embeddings/clusters/samples` | embeddingsHandler.HandleClusterSamples |
+| GET | `/api/embeddings/generate` | embeddingsHandler.HandleEmbeddingGenerate |
+| GET | `/api/embeddings/info` | embeddingsHandler.HandleEmbeddingInfo |
+| GET | `/api/embeddings/project` | embeddingsHandler.HandleProject |
+| GET | `/api/embeddings/projections` | embeddingsHandler.HandleEmbeddingProjections |
 | GET | `/api/files` | HandleFiles |
 | GET | `/api/files/` | HandleFiles |
 | GET, POST, PATCH | `/api/glyph-config` | HandleGlyphConfig |
-| GET | `/api/search/semantic` | HandleSemanticSearch |
-| GET | `/api/sync` | HandleSync |
-| GET | `/api/sync/status` | HandleSyncStatus |
+| GET | `/api/search/semantic` | embeddingsHandler.HandleSemanticSearch |
 | GET | `/api/types` | HandleTypes |
 | GET | `/api/types/` | HandleTypes |
 | GET | `/api/watchers` | HandleWatchers |
@@ -99,107 +97,73 @@ POST /api/attestations — idempotent (returns 200 if already exists).
 
 ### `GET` /api/embeddings/batch
 
-HandleEmbeddingBatch handles batch embedding generation (POST /api/embeddings/batch)
-
-**Handler**: `HandleEmbeddingBatch`
-
-**Response**: [`EmbeddingBatchResponse`](../types/server.md#embeddingbatchresponse)
+**Handler**: `embeddingsHandler.HandleEmbeddingBatch`
 
 ---
 
 ### `GET` /api/embeddings/by-source
 
-HandleEmbeddingsBySource returns embeddings by source IDs (POST /api/embeddings/by-source)
-
-**Handler**: `HandleEmbeddingsBySource`
-
-**Response**: [`EmbeddingsBySourceResponse`](../types/server.md#embeddingsbysourceresponse)
+**Handler**: `embeddingsHandler.HandleEmbeddingsBySource`
 
 ---
 
 ### `GET` /api/embeddings/cluster
 
-HandleEmbeddingCluster runs HDBSCAN clustering (POST /api/embeddings/cluster)
-
-**Handler**: `HandleEmbeddingCluster`
-
-**Response**: [`ClusterResponse`](../types/server.md#clusterresponse)
+**Handler**: `embeddingsHandler.HandleCluster`
 
 ---
 
 ### `GET` /api/embeddings/cluster-timeline
 
-HandleClusterTimeline serves cluster evolution data (GET /api/embeddings/cluster-timeline)
-
-**Handler**: `HandleClusterTimeline`
+**Handler**: `embeddingsHandler.HandleClusterTimeline`
 
 ---
 
 ### `GET` /api/embeddings/clusters
 
-HandleEmbeddingClusters lists stable clusters (GET /api/embeddings/clusters)
-
-**Handler**: `HandleEmbeddingClusters`
+**Handler**: `embeddingsHandler.HandleEmbeddingClusters`
 
 ---
 
 ### `GET` /api/embeddings/clusters/members
 
-HandleClusterMembers returns recent attestations in a cluster (GET /api/embeddings/clusters/members)
-
-**Handler**: `HandleClusterMembers`
+**Handler**: `embeddingsHandler.HandleClusterMembers`
 
 ---
 
 ### `GET` /api/embeddings/clusters/memberships
 
-HandleClusterMemberships returns cluster assignments for attestation IDs (GET /api/embeddings/clusters/memberships)
-
-**Handler**: `HandleClusterMemberships`
+**Handler**: `embeddingsHandler.HandleClusterMemberships`
 
 ---
 
 ### `GET` /api/embeddings/clusters/samples
 
-HandleClusterSamples returns sample texts from a cluster (GET /api/embeddings/clusters/samples)
-
-**Handler**: `HandleClusterSamples`
+**Handler**: `embeddingsHandler.HandleClusterSamples`
 
 ---
 
 ### `GET` /api/embeddings/generate
 
-HandleEmbeddingGenerate handles embedding generation requests (POST /api/embeddings/generate)
-
-**Handler**: `HandleEmbeddingGenerate`
-
-**Response**: [`EmbeddingGenerateResponse`](../types/server.md#embeddinggenerateresponse)
+**Handler**: `embeddingsHandler.HandleEmbeddingGenerate`
 
 ---
 
 ### `GET` /api/embeddings/info
 
-HandleEmbeddingInfo returns embedding service status (GET /api/embeddings/info)
-
-**Handler**: `HandleEmbeddingInfo`
-
-**Response**: [`EmbeddingInfoResponse`](../types/server.md#embeddinginforesponse)
+**Handler**: `embeddingsHandler.HandleEmbeddingInfo`
 
 ---
 
 ### `GET` /api/embeddings/project
 
-HandleEmbeddingProject runs UMAP projection (POST /api/embeddings/project)
-
-**Handler**: `HandleEmbeddingProject`
+**Handler**: `embeddingsHandler.HandleProject`
 
 ---
 
 ### `GET` /api/embeddings/projections
 
-HandleEmbeddingProjections serves 2D projections (GET /api/embeddings/projections)
-
-**Handler**: `HandleEmbeddingProjections`
+**Handler**: `embeddingsHandler.HandleEmbeddingProjections`
 
 ---
 
@@ -227,31 +191,7 @@ HandleGlyphConfig handles plugin glyph configuration via attestations.
 
 ### `GET` /api/search/semantic
 
-HandleSemanticSearch handles semantic search requests (GET /api/search/semantic)
-
-**Handler**: `HandleSemanticSearch`
-
-**Response**: [`SemanticSearchResponse`](../types/server.md#semanticsearchresponse)
-
----
-
-### `GET` /api/sync
-
-HandleSync initiates outbound sync with a peer.
-POST /api/sync {"peer":"https://phone.local:877"}
-
-**Handler**: `HandleSync`
-
-**Response**: [`syncResponse`](../types/server.md#syncresponse)
-
----
-
-### `GET` /api/sync/status
-
-HandleSyncStatus returns the current sync tree state.
-GET /api/sync/status
-
-**Handler**: `HandleSyncStatus`
+**Handler**: `embeddingsHandler.HandleSemanticSearch`
 
 ---
 
