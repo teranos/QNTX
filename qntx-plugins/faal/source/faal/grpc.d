@@ -342,6 +342,167 @@ struct GrpcServer {
 }
 
 // ---------------------------------------------------------------------------
+// gRPC Client — makes a single unary RPC call to a gRPC server
+// ---------------------------------------------------------------------------
+
+/// Make a single unary gRPC call. Returns response proto bytes, or null on failure.
+/// `address` is "host:port", `method` is e.g. "/protocol.ATSStoreService/GenerateAndCreateAttestation"
+ubyte[] grpcCall(string address, string method, const ubyte[] requestProto, int timeoutMs = 10_000) {
+    import core.time : dur;
+
+    // Parse host:port
+    string host = "127.0.0.1";
+    ushort port = 50061;
+    auto colonIdx = lastIndexOf(address, ':');
+    if (colonIdx >= 0) {
+        host = address[0 .. colonIdx];
+        try {
+            port = to!ushort(address[colonIdx + 1 .. $]);
+        } catch (Exception) {}
+    }
+
+    logInfo("[faal] grpc_client: connecting to %s:%d for %s", host, port, method);
+
+    Socket sock;
+    try {
+        sock = new TcpSocket();
+        sock.setOption(SocketOptionLevel.SOCKET, SocketOption.RCVTIMEO, dur!"msecs"(timeoutMs));
+        sock.setOption(SocketOptionLevel.SOCKET, SocketOption.SNDTIMEO, dur!"msecs"(timeoutMs));
+        sock.connect(new InternetAddress(host, port));
+    } catch (Exception e) {
+        logError("[faal] grpc_client: connect failed: %s", e.msg);
+        return null;
+    }
+    scope(exit) sock.close();
+
+    logInfo("[faal] grpc_client: connected, sending H2 preface");
+
+    // Send HTTP/2 client preface
+    auto sent = sock.send(cast(const(ubyte)[])H2_PREFACE);
+    if (sent != 24) {
+        logError("[faal] grpc_client: failed to send preface");
+        return null;
+    }
+
+    // Send client SETTINGS
+    if (!sendSettings(sock)) {
+        logError("[faal] grpc_client: failed to send SETTINGS");
+        return null;
+    }
+
+    // Read server SETTINGS
+    auto serverSettings = readFrame(sock);
+    if (serverSettings is null) {
+        logError("[faal] grpc_client: no server SETTINGS received");
+        return null;
+    }
+    logInfo("[faal] grpc_client: got server SETTINGS (type=%d)", serverSettings.type);
+
+    // ACK server SETTINGS
+    sendSettingsAck(sock);
+
+    // Send WINDOW_UPDATE on connection
+    sendWindowUpdate(sock, 0, 1_073_741_823);
+
+    // Read until we get SETTINGS ACK from server
+    int maxFrames = 10;
+    while (maxFrames-- > 0) {
+        auto f = readFrame(sock);
+        if (f is null) break;
+        if (f.type == FrameType.SETTINGS && (f.flags & FrameFlags.ACK) != 0) {
+            logInfo("[faal] grpc_client: got SETTINGS ACK");
+            break;
+        }
+        if (f.type == FrameType.WINDOW_UPDATE) continue;
+    }
+
+    // Build request HEADERS
+    uint streamId = 1;
+    ubyte[] headers;
+    headers ~= encodeIndexedHeader(3);  // :method POST
+    headers ~= encodeIndexedHeader(6);  // :scheme http
+    headers ~= encodeLiteralHeader(":path", method);
+    headers ~= encodeLiteralHeader(":authority", host ~ ":" ~ to!string(port));
+    headers ~= encodeLiteralHeader("content-type", "application/grpc");
+    headers ~= encodeLiteralHeader("te", "trailers");
+
+    logInfo("[faal] grpc_client: sending HEADERS + DATA on stream %d", streamId);
+
+    writeFrame(sock, FrameType.HEADERS, FrameFlags.END_HEADERS, streamId, headers);
+
+    // Send DATA with gRPC-framed request
+    auto grpcData = grpcFrame(requestProto);
+    writeFrame(sock, FrameType.DATA, FrameFlags.END_STREAM, streamId, grpcData);
+
+    logInfo("[faal] grpc_client: request sent, waiting for response...");
+
+    // Read response frames
+    ubyte[] responseData;
+    bool gotResponse = false;
+    int readFrames = 50;
+
+    while (readFrames-- > 0) {
+        auto f = readFrame(sock);
+        if (f is null) {
+            logError("[faal] grpc_client: connection closed while reading response");
+            break;
+        }
+
+        switch (f.type) {
+            case FrameType.SETTINGS:
+                if ((f.flags & FrameFlags.ACK) == 0) sendSettingsAck(sock);
+                break;
+            case FrameType.WINDOW_UPDATE:
+                break;
+            case FrameType.PING:
+                writeFrame(sock, FrameType.PING, 0x1, 0, f.payload);
+                break;
+            case FrameType.HEADERS:
+                if ((f.flags & FrameFlags.END_STREAM) != 0) {
+                    logInfo("[faal] grpc_client: got trailers (END_STREAM)");
+                    gotResponse = true;
+                }
+                break;
+            case FrameType.DATA:
+                responseData ~= f.payload;
+                if (f.length > 0) sendWindowUpdate(sock, f.streamId, f.length);
+                break;
+            case FrameType.RST_STREAM:
+                logError("[faal] grpc_client: RST_STREAM received");
+                gotResponse = true;
+                break;
+            case FrameType.GOAWAY:
+                logError("[faal] grpc_client: GOAWAY received");
+                gotResponse = true;
+                break;
+            default:
+                break;
+        }
+        if (gotResponse) break;
+    }
+
+    if (responseData.length > 0) {
+        auto proto = grpcUnframe(responseData);
+        logInfo("[faal] grpc_client: got %d bytes response proto", proto.length);
+        return proto;
+    }
+
+    logError("[faal] grpc_client: no response data received (gotResponse=%s, framesLeft=%d)",
+             gotResponse ? "true" : "false", readFrames);
+    return null;
+}
+
+private ptrdiff_t lastIndexOf(string s, char c) {
+    for (ptrdiff_t i = cast(ptrdiff_t)s.length - 1; i >= 0; i--) {
+        if (s[i] == c) return i;
+    }
+    return -1;
+}
+
+// Re-export HPACK functions needed by client
+public import faal.hpack : encodeIndexedHeader, encodeLiteralHeader;
+
+// ---------------------------------------------------------------------------
 // Unit tests
 // ---------------------------------------------------------------------------
 
