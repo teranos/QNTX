@@ -69,30 +69,19 @@ func (s *ATSStoreServer) AttestationExists(ctx context.Context, req *protocol.At
 
 // GenerateAndCreateAttestation generates an ID and creates an attestation
 func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *protocol.GenerateAttestationRequest) (*protocol.GenerateAttestationResponse, error) {
-	source := ""
-	if req.Command != nil {
-		source = req.Command.Source
-	}
-	s.logger.Infow("GenerateAndCreateAttestation: entry", "source", source)
-
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
-		s.logger.Infow("GenerateAndCreateAttestation: auth failed", "source", source, "error", err)
 		return &protocol.GenerateAttestationResponse{
 			Success: false,
 			Error:   err.Error(),
 		}, nil
 	}
-	s.logger.Infow("GenerateAndCreateAttestation: auth OK", "source", source, "has_command", req.Command != nil)
 
 	if req.Command == nil {
-		s.logger.Errorw("GenerateAndCreateAttestation: nil command", "source", source)
 		return &protocol.GenerateAttestationResponse{
 			Success: false,
 			Error:   "command is nil",
 		}, nil
 	}
-
-	s.logger.Infow("GenerateAndCreateAttestation: converting command", "source", req.Command.Source, "subjects", req.Command.Subjects)
 
 	// Convert protobuf command to types.AsCommand
 	cmd, err := protoToCommand(req.Command)
@@ -102,18 +91,16 @@ func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *
 			Error:   fmt.Sprintf("failed to convert command: %v", err),
 		}, nil
 	}
-	s.logger.Infow("GenerateAndCreateAttestation: calling store", "source", source, "subjects", cmd.Subjects)
 
 	// Generate and create the attestation
 	as, err := s.store.GenerateAndCreateAttestation(ctx, cmd)
 	if err != nil {
-		s.logger.Errorw("GenerateAndCreateAttestation: store failed", "source", source, "error", err)
+		s.logger.Errorw("GenerateAndCreateAttestation failed", "source", req.Command.Source, "error", err)
 		return &protocol.GenerateAttestationResponse{
 			Success: false,
 			Error:   fmt.Sprintf("failed to generate attestation: %v", err),
 		}, nil
 	}
-	s.logger.Infow("GenerateAndCreateAttestation: created", "source", source, "id", as.ID)
 
 	protoAtt, err := protocol.AttestationFromTypes(as)
 	if err != nil {
