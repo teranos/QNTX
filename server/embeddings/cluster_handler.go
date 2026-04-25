@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	appcfg "github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/ats/storage"
 )
 
@@ -59,9 +60,15 @@ func (h *Handler) HandleCluster(w http.ResponseWriter, r *http.Request) {
 	cwd, _ := os.Getwd()
 	projectCtx := "project:" + filepath.Join(filepath.Base(filepath.Dir(cwd)), filepath.Base(cwd))
 
+	clusterFn := h.ClusterFunc
+	if clusterFn == nil {
+		clusterFn = embeddings.ClusterHDBSCAN
+	}
+
 	result, err := RunHDBSCANClustering(
 		h.Store,
 		h.Service,
+		clusterFn,
 		h.Invalidator,
 		minClusterSize,
 		clusterMatchThreshold,

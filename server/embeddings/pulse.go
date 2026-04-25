@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
@@ -24,6 +25,7 @@ type ReclusterHandler struct {
 	ProjectCtx            string // e.g. "project:tmp3/QNTX"
 	Store                 *storage.EmbeddingStore
 	Svc                   EmbeddingServiceForClustering
+	ClusterFunc           ClusterFunc
 	ATSStore              ats.AttestationStore
 	Invalidator           func()
 	MinClusterSize        int
@@ -38,7 +40,12 @@ func (h *ReclusterHandler) Name() string { return ReclusterHandlerName }
 func (h *ReclusterHandler) Execute(ctx context.Context, job *async.Job) error {
 	h.writeLog(job.ID, "clustering", "info", "Starting HDBSCAN re-clustering", fmt.Sprintf(`{"min_cluster_size":%d}`, h.MinClusterSize))
 
-	result, err := RunHDBSCANClustering(h.Store, h.Svc, h.Invalidator, h.MinClusterSize, h.ClusterMatchThreshold, h.ATSStore, h.ProjectCtx, h.GroundDBPath, h.GroundWrite, h.Logger)
+	clusterFn := h.ClusterFunc
+	if clusterFn == nil {
+		clusterFn = embeddings.ClusterHDBSCAN
+	}
+
+	result, err := RunHDBSCANClustering(h.Store, h.Svc, clusterFn, h.Invalidator, h.MinClusterSize, h.ClusterMatchThreshold, h.ATSStore, h.ProjectCtx, h.GroundDBPath, h.GroundWrite, h.Logger)
 	if err != nil {
 		h.writeLog(job.ID, "clustering", "error", fmt.Sprintf("Clustering failed: %s", err), "")
 		EmitPulseDeferredNews(h.DB, h.ATSStore, h.ProjectCtx, h.GroundDBPath, h.GroundWrite, h.Logger)
