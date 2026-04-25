@@ -972,6 +972,51 @@ func TestRegistry_AsyncLoadingReadiness(t *testing.T) {
 		assert.Equal(t, []string{"registered"}, list)
 	})
 
+	t.Run("MarkStopped transitions to stopped state", func(t *testing.T) {
+		registry := NewRegistry("1.0.0", testLogger(t))
+		plugin := newMockPlugin("test")
+		require.NoError(t, registry.Register(plugin))
+
+		ctx := context.Background()
+		services := newMockServiceRegistry()
+		require.NoError(t, registry.InitializeAll(ctx, services))
+
+		// Running after init
+		state, _ := registry.GetState("test")
+		assert.Equal(t, StateRunning, state)
+
+		// Unregister sets restarting
+		registry.Unregister("test")
+		state, _ = registry.GetState("test")
+		assert.Equal(t, StateRestarting, state)
+
+		// MarkStopped overrides to stopped
+		registry.MarkStopped("test")
+		state, _ = registry.GetState("test")
+		assert.Equal(t, StateStopped, state)
+
+		// Plugin is no longer retrievable
+		_, ok := registry.Get("test")
+		assert.False(t, ok)
+	})
+
+	t.Run("Unregister then re-register", func(t *testing.T) {
+		registry := NewRegistry("1.0.0", testLogger(t))
+		plugin1 := newMockPlugin("test")
+		require.NoError(t, registry.Register(plugin1))
+
+		registry.Unregister("test")
+
+		// Can re-register after unregister
+		plugin2 := newMockPlugin("test")
+		err := registry.Register(plugin2)
+		require.NoError(t, err)
+
+		retrieved, ok := registry.Get("test")
+		assert.True(t, ok)
+		assert.Equal(t, plugin2, retrieved)
+	})
+
 	t.Run("async loading state transitions", func(t *testing.T) {
 		registry := NewRegistry("1.0.0", testLogger(t))
 

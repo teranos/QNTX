@@ -879,6 +879,85 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 	}
 }
 
+// EnablePlugin discovers, loads, registers, and initializes a plugin at runtime.
+// The plugin must not already be loaded. Search paths are used to find the binary.
+func (m *PluginManager) EnablePlugin(ctx context.Context, name string, searchPaths []string, registry *plugin.Registry, services plugin.ServiceRegistry) error {
+	// Check if already loaded
+	m.mu.RLock()
+	_, exists := m.plugins[name]
+	m.mu.RUnlock()
+	if exists {
+		return errors.Newf("plugin '%s' is already loaded", name)
+	}
+
+	// Discover binary
+	config, err := discoverPlugin(name, searchPaths, m.logger)
+	if err != nil {
+		return errors.Wrapf(err, "failed to discover plugin '%s'", name)
+	}
+
+	// Load (launch process + connect gRPC)
+	if err := m.loadPlugin(ctx, config); err != nil {
+		return errors.Wrapf(err, "failed to load plugin '%s'", name)
+	}
+
+	// Register + initialize + setup handlers/watchers/schedules/providers
+	m.registerRestarted(ctx, name, registry, services)
+
+	return nil
+}
+
+// DisablePlugin shuts down a running plugin, unregisters it, and kills its process.
+// Prunes the plugin's watchers from the DB and removes async handlers.
+func (m *PluginManager) DisablePlugin(ctx context.Context, name string, registry *plugin.Registry) error {
+	m.mu.Lock()
+	p, exists := m.plugins[name]
+	if !exists {
+		m.mu.Unlock()
+		return errors.Newf("plugin '%s' is not loaded", name)
+	}
+	process := p.process
+	client := p.client
+	delete(m.plugins, name)
+	delete(m.failedPlugins, name)
+	m.mu.Unlock()
+
+	// Shutdown via gRPC (best-effort)
+	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	if err := client.Shutdown(shutdownCtx); err != nil {
+		m.logger.Warnw("Plugin shutdown RPC failed (will kill process)", "plugin", name, "error", err)
+	}
+	cancel()
+
+	// Kill process
+	if process != nil {
+		process.Kill()
+	}
+
+	// Unregister from plugin registry and mark stopped (not restarting)
+	registry.Unregister(name)
+	registry.MarkStopped(name)
+
+	// Prune watchers: pass empty list so all watchers with this plugin's prefix are deleted
+	if m.db != nil {
+		if err := SetupPluginWatchers(m.db, name, nil, m.logger); err != nil {
+			m.logger.Warnw("Failed to prune watchers for disabled plugin", "plugin", name, "error", err)
+		}
+		if m.onWatchersSetup != nil {
+			m.onWatchersSetup()
+		}
+	}
+
+	// Unregister async handlers
+	if m.handlerRegistry != nil {
+		for _, handlerName := range client.GetHandlerNames() {
+			m.handlerRegistry.Remove(handlerName)
+		}
+	}
+
+	return nil
+}
+
 // Shutdown stops all managed plugins and retry goroutines.
 func (m *PluginManager) Shutdown(ctx context.Context) error {
 	// Stop retry goroutines first

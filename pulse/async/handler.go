@@ -80,6 +80,13 @@ func (r *HandlerRegistry) Replace(handler JobHandler) {
 	r.handlers[handler.Name()] = handler
 }
 
+// Remove deletes a handler by name. No-op if the handler doesn't exist.
+func (r *HandlerRegistry) Remove(handlerName string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.handlers, handlerName)
+}
+
 // Get retrieves the handler for a handler name.
 // Returns nil if no handler is registered.
 func (r *HandlerRegistry) Get(handlerName string) JobHandler {
