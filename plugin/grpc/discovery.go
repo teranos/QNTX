@@ -102,8 +102,9 @@ type PluginManager struct {
 	servicesManager   *ServicesManager // for re-registering LLM providers after restart
 	accumulator       *PluginAccumulator
 	onWatchersSetup   func()            // called after plugin watchers are written to DB
-	onPluginRestarted func(name string) // called after auto-restart succeeds (clear HTTP mux state)
-	pidFile           *pidFile
+	onPluginRestarted        func(name string)                              // called after auto-restart succeeds (clear HTTP mux state)
+	onEmbeddingProviderReady func(name string, client protocol.EmbeddingServiceClient) // called when embedding provider is ready (init or restart)
+	pidFile                  *pidFile
 	db                *sql.DB                // for schedule setup on restart
 	handlerRegistry   *async.HandlerRegistry // for handler re-registration on restart
 }
@@ -191,6 +192,13 @@ func (m *PluginManager) SetOnWatchersSetup(fn func()) {
 // The server uses this to clear stale HTTP mux state (sync.Once + cached ServeMux).
 func (m *PluginManager) SetOnPluginRestarted(fn func(name string)) {
 	m.onPluginRestarted = fn
+}
+
+// SetOnEmbeddingProviderReady sets a callback invoked when an embedding provider
+// plugin is ready (on init or after restart). The server uses this to re-wire
+// the embedding service with the plugin's fresh gRPC client.
+func (m *PluginManager) SetOnEmbeddingProviderReady(fn func(name string, client protocol.EmbeddingServiceClient)) {
+	m.onEmbeddingProviderReady = fn
 }
 
 // Accumulator returns the plugin banner accumulator.
@@ -855,6 +863,13 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		if searchRouter := m.servicesManager.GetSearchRouter(); searchRouter != nil {
 			searchRouter.RegisterProvider(name, proxy.SearchServiceClient())
 			m.logger.Debugf("Re-registered search provider '%s' after restart", name)
+		}
+	}
+	if proxy.IsEmbeddingProvider() {
+		roles = append(roles, "embedding-provider")
+		if m.onEmbeddingProviderReady != nil {
+			m.onEmbeddingProviderReady(name, proxy.EmbeddingServiceClient())
+			m.logger.Debugf("Re-registered embedding provider '%s' after restart", name)
 		}
 	}
 

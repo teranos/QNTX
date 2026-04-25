@@ -407,6 +407,166 @@ module rec Protocol : sig
     (**/**)
   end
 
+  and ClusterRequest : sig
+    type t = {
+      auth_token:string;
+      data:float list;
+      n_points:int;
+      dimensions:int;
+      min_cluster_size:int;
+    }
+    val make: ?auth_token:string -> ?data:float list -> ?n_points:int -> ?dimensions:int -> ?min_cluster_size:int -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?auth_token:string -> ?data:float list -> ?n_points:int -> ?dimensions:int -> ?min_cluster_size:int -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+  and ClusterResponse : sig
+    type t = {
+      labels:int list;
+      probabilities:float list;
+      n_clusters:int;
+      centroids:Centroid.t list;
+    }
+    val make: ?labels:int list -> ?probabilities:float list -> ?n_clusters:int -> ?centroids:Centroid.t list -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?labels:int list -> ?probabilities:float list -> ?n_clusters:int -> ?centroids:Centroid.t list -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+  and Centroid : sig
+    type t = (float list)
+    val make: ?vector:float list -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?vector:float list -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+  and ModelInfoRequest : sig
+    type t = (string)
+    val make: ?auth_token:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?auth_token:string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+  and ModelInfoResponse : sig
+    type t = {
+      name:string;
+      dimensions:int;
+      max_sequence_length:int;
+    }
+    val make: ?name:string -> ?dimensions:int -> ?max_sequence_length:int -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?name:string -> ?dimensions:int -> ?max_sequence_length:int -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
   module EmbeddingService : sig
     module Embed : sig
       include Runtime'.Service.Rpc with type Request.t = EmbedRequest.t and type Response.t = EmbedResponse.t
@@ -430,6 +590,28 @@ module rec Protocol : sig
     end
 
     val batchEmbed : (module Runtime'.Spec.Message with type t = BatchEmbedRequest.t) * (module Runtime'.Spec.Message with type t = BatchEmbedResponse.t)
+    module Cluster : sig
+      include Runtime'.Service.Rpc with type Request.t = ClusterRequest.t and type Response.t = ClusterResponse.t
+      module Request : Runtime'.Spec.Message with type t = ClusterRequest.t and type make_t = ClusterRequest.make_t
+      (** Module alias for the request message for this method call *)
+
+      module Response : Runtime'.Spec.Message with type t = ClusterResponse.t and type make_t = ClusterResponse.make_t
+      (** Module alias for the response message for this method call *)
+
+    end
+
+    val cluster : (module Runtime'.Spec.Message with type t = ClusterRequest.t) * (module Runtime'.Spec.Message with type t = ClusterResponse.t)
+    module ModelInfo : sig
+      include Runtime'.Service.Rpc with type Request.t = ModelInfoRequest.t and type Response.t = ModelInfoResponse.t
+      module Request : Runtime'.Spec.Message with type t = ModelInfoRequest.t and type make_t = ModelInfoRequest.make_t
+      (** Module alias for the request message for this method call *)
+
+      module Response : Runtime'.Spec.Message with type t = ModelInfoResponse.t and type make_t = ModelInfoResponse.make_t
+      (** Module alias for the response message for this method call *)
+
+    end
+
+    val modelInfo : (module Runtime'.Spec.Message with type t = ModelInfoRequest.t) * (module Runtime'.Spec.Message with type t = ModelInfoResponse.t)
     module GetLabelEligibleClusters : sig
       include Runtime'.Service.Rpc with type Request.t = GetLabelEligibleClustersRequest.t and type Response.t = GetLabelEligibleClustersResponse.t
       module Request : Runtime'.Spec.Message with type t = GetLabelEligibleClustersRequest.t and type make_t = GetLabelEligibleClustersRequest.make_t
@@ -1248,6 +1430,335 @@ end = struct
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
 
+  and ClusterRequest : sig
+    type t = {
+      auth_token:string;
+      data:float list;
+      n_points:int;
+      dimensions:int;
+      min_cluster_size:int;
+    }
+    val make: ?auth_token:string -> ?data:float list -> ?n_points:int -> ?dimensions:int -> ?min_cluster_size:int -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?auth_token:string -> ?data:float list -> ?n_points:int -> ?dimensions:int -> ?min_cluster_size:int -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = ClusterRequest
+    let name () = ".protocol.ClusterRequest"
+    type t = {
+      auth_token:string;
+      data:float list;
+      n_points:int;
+      dimensions:int;
+      min_cluster_size:int;
+    }
+    type make_t = ?auth_token:string -> ?data:float list -> ?n_points:int -> ?dimensions:int -> ?min_cluster_size:int -> unit -> t
+    let make ?(auth_token = {||}) ?(data = []) ?(n_points = 0) ?(dimensions = 0) ?(min_cluster_size = 0) () = { auth_token; data; n_points; dimensions; min_cluster_size }
+    let merge =
+    let merge_auth_token = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ) in
+    let merge_data = Runtime'.Merge.merge Runtime'.Spec.( repeated ((2, "data", "data"), float, packed) ) in
+    let merge_n_points = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "n_points", "nPoints"), int32_int, (0)) ) in
+    let merge_dimensions = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "dimensions", "dimensions"), int32_int, (0)) ) in
+    let merge_min_cluster_size = Runtime'.Merge.merge Runtime'.Spec.( basic ((5, "min_cluster_size", "minClusterSize"), int32_int, (0)) ) in
+    fun t1 t2 -> {
+    	auth_token = (merge_auth_token t1.auth_token t2.auth_token);
+    	data = (merge_data t1.data t2.data);
+    	n_points = (merge_n_points t1.n_points t2.n_points);
+    	dimensions = (merge_dimensions t1.dimensions t2.dimensions);
+    	min_cluster_size = (merge_min_cluster_size t1.min_cluster_size t2.min_cluster_size);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ^:: repeated ((2, "data", "data"), float, packed) ^:: basic ((3, "n_points", "nPoints"), int32_int, (0)) ^:: basic ((4, "dimensions", "dimensions"), int32_int, (0)) ^:: basic ((5, "min_cluster_size", "minClusterSize"), int32_int, (0)) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { auth_token; data; n_points; dimensions; min_cluster_size } -> serialize writer auth_token data n_points dimensions min_cluster_size
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor auth_token data n_points dimensions min_cluster_size = { auth_token; data; n_points; dimensions; min_cluster_size } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { auth_token; data; n_points; dimensions; min_cluster_size } -> serialize auth_token data n_points dimensions min_cluster_size
+    let from_json_exn =
+      let constructor auth_token data n_points dimensions min_cluster_size = { auth_token; data; n_points; dimensions; min_cluster_size } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and ClusterResponse : sig
+    type t = {
+      labels:int list;
+      probabilities:float list;
+      n_clusters:int;
+      centroids:Centroid.t list;
+    }
+    val make: ?labels:int list -> ?probabilities:float list -> ?n_clusters:int -> ?centroids:Centroid.t list -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?labels:int list -> ?probabilities:float list -> ?n_clusters:int -> ?centroids:Centroid.t list -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = ClusterResponse
+    let name () = ".protocol.ClusterResponse"
+    type t = {
+      labels:int list;
+      probabilities:float list;
+      n_clusters:int;
+      centroids:Centroid.t list;
+    }
+    type make_t = ?labels:int list -> ?probabilities:float list -> ?n_clusters:int -> ?centroids:Centroid.t list -> unit -> t
+    let make ?(labels = []) ?(probabilities = []) ?(n_clusters = 0) ?(centroids = []) () = { labels; probabilities; n_clusters; centroids }
+    let merge =
+    let merge_labels = Runtime'.Merge.merge Runtime'.Spec.( repeated ((1, "labels", "labels"), int32_int, packed) ) in
+    let merge_probabilities = Runtime'.Merge.merge Runtime'.Spec.( repeated ((2, "probabilities", "probabilities"), float, packed) ) in
+    let merge_n_clusters = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "n_clusters", "nClusters"), int32_int, (0)) ) in
+    let merge_centroids = Runtime'.Merge.merge Runtime'.Spec.( repeated ((4, "centroids", "centroids"), (message (module Centroid)), not_packed) ) in
+    fun t1 t2 -> {
+    	labels = (merge_labels t1.labels t2.labels);
+    	probabilities = (merge_probabilities t1.probabilities t2.probabilities);
+    	n_clusters = (merge_n_clusters t1.n_clusters t2.n_clusters);
+    	centroids = (merge_centroids t1.centroids t2.centroids);
+     }
+    let spec () = Runtime'.Spec.( repeated ((1, "labels", "labels"), int32_int, packed) ^:: repeated ((2, "probabilities", "probabilities"), float, packed) ^:: basic ((3, "n_clusters", "nClusters"), int32_int, (0)) ^:: repeated ((4, "centroids", "centroids"), (message (module Centroid)), not_packed) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { labels; probabilities; n_clusters; centroids } -> serialize writer labels probabilities n_clusters centroids
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor labels probabilities n_clusters centroids = { labels; probabilities; n_clusters; centroids } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { labels; probabilities; n_clusters; centroids } -> serialize labels probabilities n_clusters centroids
+    let from_json_exn =
+      let constructor labels probabilities n_clusters centroids = { labels; probabilities; n_clusters; centroids } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and Centroid : sig
+    type t = (float list)
+    val make: ?vector:float list -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?vector:float list -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = Centroid
+    let name () = ".protocol.Centroid"
+    type t = (float list)
+    type make_t = ?vector:float list -> unit -> t
+    let make ?(vector = []) () = (vector)
+    let merge =
+    let merge_vector = Runtime'.Merge.merge Runtime'.Spec.( repeated ((1, "vector", "vector"), float, packed) ) in
+    fun (t1_vector) (t2_vector) -> merge_vector t1_vector t2_vector
+    let spec () = Runtime'.Spec.( repeated ((1, "vector", "vector"), float, packed) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer (vector) -> serialize writer vector
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor vector = (vector) in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun (vector) -> serialize vector
+    let from_json_exn =
+      let constructor vector = (vector) in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and ModelInfoRequest : sig
+    type t = (string)
+    val make: ?auth_token:string -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?auth_token:string -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = ModelInfoRequest
+    let name () = ".protocol.ModelInfoRequest"
+    type t = (string)
+    type make_t = ?auth_token:string -> unit -> t
+    let make ?(auth_token = {||}) () = (auth_token)
+    let merge =
+    let merge_auth_token = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ) in
+    fun (t1_auth_token) (t2_auth_token) -> merge_auth_token t1_auth_token t2_auth_token
+    let spec () = Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer (auth_token) -> serialize writer auth_token
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor auth_token = (auth_token) in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun (auth_token) -> serialize auth_token
+    let from_json_exn =
+      let constructor auth_token = (auth_token) in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and ModelInfoResponse : sig
+    type t = {
+      name:string;
+      dimensions:int;
+      max_sequence_length:int;
+    }
+    val make: ?name:string -> ?dimensions:int -> ?max_sequence_length:int -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?name:string -> ?dimensions:int -> ?max_sequence_length:int -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = ModelInfoResponse
+    let name () = ".protocol.ModelInfoResponse"
+    type t = {
+      name:string;
+      dimensions:int;
+      max_sequence_length:int;
+    }
+    type make_t = ?name:string -> ?dimensions:int -> ?max_sequence_length:int -> unit -> t
+    let make ?(name = {||}) ?(dimensions = 0) ?(max_sequence_length = 0) () = { name; dimensions; max_sequence_length }
+    let merge =
+    let merge_name = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "name", "name"), string, ({||})) ) in
+    let merge_dimensions = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "dimensions", "dimensions"), int32_int, (0)) ) in
+    let merge_max_sequence_length = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "max_sequence_length", "maxSequenceLength"), int32_int, (0)) ) in
+    fun t1 t2 -> {
+    	name = (merge_name t1.name t2.name);
+    	dimensions = (merge_dimensions t1.dimensions t2.dimensions);
+    	max_sequence_length = (merge_max_sequence_length t1.max_sequence_length t2.max_sequence_length);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "name", "name"), string, ({||})) ^:: basic ((2, "dimensions", "dimensions"), int32_int, (0)) ^:: basic ((3, "max_sequence_length", "maxSequenceLength"), int32_int, (0)) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { name; dimensions; max_sequence_length } -> serialize writer name dimensions max_sequence_length
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor name dimensions max_sequence_length = { name; dimensions; max_sequence_length } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { name; dimensions; max_sequence_length } -> serialize name dimensions max_sequence_length
+    let from_json_exn =
+      let constructor name dimensions max_sequence_length = { name; dimensions; max_sequence_length } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
   module EmbeddingService = struct
     module Embed = struct
       let package_name = Some "protocol"
@@ -1274,6 +1785,32 @@ end = struct
     let batchEmbed =
       (module BatchEmbedRequest : Runtime'.Spec.Message with type t = BatchEmbedRequest.t ),
       (module BatchEmbedResponse : Runtime'.Spec.Message with type t = BatchEmbedResponse.t )
+
+    module Cluster = struct
+      let package_name = Some "protocol"
+      let service_name = "EmbeddingService"
+      let method_name = "Cluster"
+      let name = "/protocol.EmbeddingService/Cluster"
+      module Request = ClusterRequest
+      module Response = ClusterResponse
+    end
+
+    let cluster =
+      (module ClusterRequest : Runtime'.Spec.Message with type t = ClusterRequest.t ),
+      (module ClusterResponse : Runtime'.Spec.Message with type t = ClusterResponse.t )
+
+    module ModelInfo = struct
+      let package_name = Some "protocol"
+      let service_name = "EmbeddingService"
+      let method_name = "ModelInfo"
+      let name = "/protocol.EmbeddingService/ModelInfo"
+      module Request = ModelInfoRequest
+      module Response = ModelInfoResponse
+    end
+
+    let modelInfo =
+      (module ModelInfoRequest : Runtime'.Spec.Message with type t = ModelInfoRequest.t ),
+      (module ModelInfoResponse : Runtime'.Spec.Message with type t = ModelInfoResponse.t )
 
     module GetLabelEligibleClusters = struct
       let package_name = Some "protocol"

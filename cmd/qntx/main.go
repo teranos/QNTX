@@ -16,6 +16,7 @@ import (
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server"
 	"go.uber.org/zap"
 )
@@ -219,6 +220,10 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 			pm.SetOnPluginRestarted(func(name string) {
 				defaultServer.InvalidatePluginMux(name)
 			})
+			pm.SetOnEmbeddingProviderReady(func(name string, client protocol.EmbeddingServiceClient) {
+				defaultServer.SetupPluginEmbeddingService(client)
+				pluginLogger.Debugw("Re-wired embedding provider after restart", "plugin", name)
+			})
 		}
 
 		// Initialize each plugin individually, registering provider services
@@ -271,6 +276,11 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 						searchRouter.RegisterProvider(meta.Name, proxy.SearchServiceClient())
 						pluginLogger.Debugw("Registered Search provider", "plugin", meta.Name)
 					}
+				}
+				if proxy.IsEmbeddingProvider() {
+					roles = append(roles, "embedding-provider")
+					defaultServer.SetupPluginEmbeddingService(proxy.EmbeddingServiceClient())
+					pluginLogger.Debugw("Registered embedding provider", "plugin", meta.Name)
 				}
 			}
 
@@ -432,6 +442,11 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 						searchRouter.RegisterProvider(meta.Name, proxy.SearchServiceClient())
 						logger.Debugw("Registered Search provider", "plugin", meta.Name)
 					}
+				}
+				if proxy.IsEmbeddingProvider() {
+					roles = append(roles, "embedding-provider")
+					defaultServer.SetupPluginEmbeddingService(proxy.EmbeddingServiceClient())
+					logger.Debugw("Registered embedding provider", "plugin", meta.Name)
 				}
 			}
 			if acc != nil {

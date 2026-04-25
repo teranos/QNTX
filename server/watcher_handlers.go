@@ -10,12 +10,12 @@ import (
 	"context"
 
 	"github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/errors"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
+	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
 )
@@ -689,10 +689,10 @@ func (s *QNTXServer) runDilationLoop() {
 }
 
 // watcherEmbeddingAdapter adapts the server's embedding service (which returns
-// *embeddings.EmbeddingResult) to the watcher engine's simpler interface.
+// *serverembeddings.EmbeddingResult) to the watcher engine's simpler interface.
 type watcherEmbeddingAdapter struct {
 	svc interface {
-		GenerateEmbedding(text string) (*embeddings.EmbeddingResult, error)
+		GenerateEmbedding(text string) (*serverembeddings.EmbeddingResult, error)
 		ComputeSimilarity(a, b []float32) (float32, error)
 		SerializeEmbedding(embedding []float32) ([]byte, error)
 	}

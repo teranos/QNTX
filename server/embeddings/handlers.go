@@ -1,5 +1,3 @@
-//go:build cgo && rustembeddings
-
 package embeddings
 
 import (
@@ -10,7 +8,6 @@ import (
 	"time"
 
 	appcfg "github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
@@ -199,7 +196,7 @@ func (h *Handler) HandleEmbeddingGenerate(w http.ResponseWriter, r *http.Request
 	modelInfo, err := h.Service.GetModelInfo()
 	if err != nil {
 		h.Logger.Errorw("Failed to get model info", "error", err)
-		modelInfo = &embeddings.ModelInfo{
+		modelInfo = &ModelInfo{
 			Name:       "all-MiniLM-L6-v2",
 			Dimensions: 384,
 		}

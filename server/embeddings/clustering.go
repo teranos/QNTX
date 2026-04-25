@@ -1,5 +1,3 @@
-//go:build cgo && rustembeddings
-
 package embeddings
 
 import (
@@ -13,7 +11,6 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/attrs"
-	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
@@ -202,6 +199,7 @@ func matchClusters(
 func RunHDBSCANClustering(
 	store *storage.EmbeddingStore,
 	svc EmbeddingServiceForClustering,
+	clusterFn ClusterFunc,
 	invalidator func(),
 	minClusterSize int,
 	clusterMatchThreshold float64,
@@ -259,7 +257,7 @@ func RunHDBSCANClustering(
 		"input_sha256", fmt.Sprintf("%x", inputHash.Sum(nil)))
 
 	// Run HDBSCAN
-	result, err := embeddings.ClusterHDBSCAN(flat, len(ids), dims, minClusterSize)
+	result, err := clusterFn(flat, len(ids), dims, minClusterSize)
 	if err != nil {
 		return nil, errors.Wrapf(err, "HDBSCAN failed (n_points=%d, dims=%d, min_cluster_size=%d)", len(ids), dims, minClusterSize)
 	}

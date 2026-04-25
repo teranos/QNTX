@@ -1,5 +1,3 @@
-//go:build cgo && rustembeddings
-
 package embeddings
 
 import (
@@ -37,6 +35,11 @@ func (h *Handler) HandleCluster(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.ClusterFunc == nil {
+		http.Error(w, "Clustering not available (no embedding provider plugin)", http.StatusServiceUnavailable)
+		return
+	}
+
 	// Parse optional clustering parameters from body
 	minClusterSize := appcfg.GetInt("embeddings.min_cluster_size")
 	if minClusterSize <= 0 {
@@ -62,6 +65,7 @@ func (h *Handler) HandleCluster(w http.ResponseWriter, r *http.Request) {
 	result, err := RunHDBSCANClustering(
 		h.Store,
 		h.Service,
+		h.ClusterFunc,
 		h.Invalidator,
 		minClusterSize,
 		clusterMatchThreshold,
