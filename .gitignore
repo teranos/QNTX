@@ -16,6 +16,8 @@ internal/server/dist/
 tmp/
 *.log
 web/wasm/qntx_wasm.js
+web/wasm/qntx_wasm.d.ts
+web/wasm/qntx_wasm_bg.wasm.d.ts
 
 # Test coverage
 web/coverage/
