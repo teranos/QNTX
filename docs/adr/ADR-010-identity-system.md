@@ -1,11 +1,11 @@
 # ADR-010: QNTX Identity System — Vanity Subjects and Attestation System Unique IDs
 
 Date: 2026-03-06
-Status: Accepted
+Status: Completed (steps 1-4, 6). Step 5 won't-do.
 
 ## Context
 
-QNTX uses `teranos/vanity-id` (Go, v0.3.0) for all ID generation — attestation IDs, subject names, job IDs. The library is imported in 25+ files. It works, but it's a single Go module that can't run in the browser, and it conflates two fundamentally different concerns: human-readable names and unique attestation identity.
+QNTX used `teranos/vanity-id` (Go, v0.3.0) for all ID generation — attestation IDs, subject names, job IDs. The library was imported in 25+ files. It worked, but it was a single Go module that couldn't run in the browser, and it conflated two fundamentally different concerns: human-readable names and unique attestation identity.
 
 ## Decision
 
@@ -56,7 +56,7 @@ AS-SARAH-AUTHOR-GITHUB-7K4M3B9X
 
 ### Implementation: Rust crate `qntx-id`
 
-Both layers are implemented in a new Rust crate, maintained in this repository. The Go dependency on `teranos/vanity-id` is retired.
+Both layers are implemented in the Rust crate `qntx-id`, maintained in this repository. The Go dependency on `teranos/vanity-id` has been retired (#793).
 
 **Design principles:**
 
@@ -67,12 +67,12 @@ Both layers are implemented in a new Rust crate, maintained in this repository. 
 
 **Migration order** (each phase independently shippable):
 
-1. **Core alphabet and normalization** — Custom alphabet (Crockford-inspired, no 0/1), Unicode-to-ASCII, seed cleaning. Foundation for display segments in ASUIDs.
-2. **ASUID generation** — Prefix system (`AS`, `JB`, `PX`), SPC display segments, random suffix. Replaces all `GenerateASID*` calls (~20 call sites). This is the critical path.
-3. **Random ID generation** — For non-attestation uses (embedding IDs, run IDs). Replaces `GenerateRandomID`.
-4. **WASM bridge** — Expose to both wazero and browser targets as each piece lands, not as a separate phase.
-5. **Vanity ID generation** — Subject name derivation (name→handle). Not actively used in the codebase today — build when the feature is needed, not before.
-6. **Retire `teranos/vanity-id`** — Remove from `go.mod` once all callers are migrated.
+1. **Core alphabet and normalization** — Done. Custom alphabet (Crockford-inspired, no 0/1), Unicode-to-ASCII, seed cleaning.
+2. **ASUID generation** — Done. Prefix system (`AS`, `JB`, `PX`), SPC display segments, random suffix.
+3. **Random ID generation** — Done (#793). For non-attestation uses (embedding IDs, run IDs).
+4. **WASM bridge** — Done. Both wazero and browser targets.
+5. **Vanity ID generation** — Won't do. Subject name derivation (name→handle) is not needed.
+6. **Retire `teranos/vanity-id`** — Done (#793). Removed from `go.mod`, all callers migrated.
 
 ## Consequences
 
@@ -85,12 +85,12 @@ Both layers are implemented in a new Rust crate, maintained in this repository. 
 
 ### Negative
 
-- **Migration cost.** 25+ Go files need updating, incrementally.
+- **Migration cost.** 25+ Go files were updated across multiple PRs.
 
 ### Neutral
 
 - **Performance.** ID generation is not a bottleneck. The motivation is portability and readability.
-- **vanity-id retirement.** The Go module served its purpose as prior art. The lessons carry forward; the code doesn't.
+- **vanity-id retired.** The Go module served its purpose as prior art. The lessons carried forward; the code didn't.
 
 ## References
 

@@ -495,6 +495,15 @@ mod wazero {
         write_result(&crate::identity::generate_asuid_impl(input))
     }
 
+    /// Generate a random ID using the QNTX alphabet.
+    /// Input: `{"length":8,"random_bytes":[161,178,...]}`
+    /// Returns packed u64 pointing to `{"id":"A3B7X9K2"}` or `{"error":"..."}`.
+    #[no_mangle]
+    pub extern "C" fn generate_random_id(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+        write_result(&crate::identity::generate_random_id_impl(input))
+    }
+
     /// Clean a seed string for ID generation (normalize, uppercase, collapse repeats).
     /// Input: raw UTF-8 string
     /// Returns packed u64 pointing to the cleaned string.
