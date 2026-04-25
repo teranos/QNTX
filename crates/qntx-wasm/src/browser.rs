@@ -772,6 +772,14 @@ pub fn generate_asuid(input: &str) -> String {
     crate::identity::generate_asuid_impl(input)
 }
 
+/// Generate a random ID using the QNTX alphabet.
+/// Input: `{"length":8,"random_bytes":[161,178,...]}`
+/// Returns JSON: `{"id":"A3B7X9K2"}` or `{"error":"..."}`.
+#[wasm_bindgen]
+pub fn generate_random_id(input: &str) -> String {
+    crate::identity::generate_random_id_impl(input)
+}
+
 /// Clean a seed string for ID generation (normalize, uppercase, collapse repeats).
 #[wasm_bindgen]
 pub fn id_clean_seed(input: &str) -> String {

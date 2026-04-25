@@ -284,7 +284,7 @@ impl SmartClassifier {
             .collect();
 
         // Sort by credibility descending
-        rankings.sort_by(|a, b| b.credibility.cmp(&a.credibility));
+        rankings.sort_by_key(|r| std::cmp::Reverse(r.credibility));
         rankings
     }
 }

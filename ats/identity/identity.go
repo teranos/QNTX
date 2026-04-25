@@ -1,7 +1,7 @@
 // Package identity provides ASUID generation for all QNTX components.
 //
 // This is the single entry point for identity generation. Implementation
-// dispatches to Rust WASM (qntxwasm build tag) or falls back to vanity-id.
+// dispatches to Rust WASM (qntxwasm build tag).
 //
 // Usage:
 //
@@ -37,6 +37,11 @@ func GenerateASUIDWithRetry(prefix, subject, predicate, context string, checkExi
 // GenerateJobID generates a Job ASUID (JB prefix).
 func GenerateJobID(jobType, source string) (string, error) {
 	return generateASUID("JB", jobType, "process", source)
+}
+
+// GenerateRandomID generates a random ID of the given length using the QNTX alphabet.
+func GenerateRandomID(length int) (string, error) {
+	return generateRandomID(length)
 }
 
 // GenerateExecutionID generates a Pulse Execution ID (PX prefix).
