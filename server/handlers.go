@@ -808,9 +808,12 @@ func (s *QNTXServer) HandlePluginGlyphs(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, glyphs)
 }
 
-// HandlePluginAction handles pause/resume actions for plugins
+// HandlePluginAction handles lifecycle actions for plugins
 // POST /api/plugins/{name}/pause - Pause a plugin
 // POST /api/plugins/{name}/resume - Resume a plugin
+// POST /api/plugins/{name}/restart - Restart a plugin
+// POST /api/plugins/{name}/enable - Enable a plugin at runtime
+// POST /api/plugins/{name}/disable - Disable a plugin at runtime
 func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) {
 	if !requireMethod(w, r, http.MethodPost) {
 		return

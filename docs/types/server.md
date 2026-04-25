@@ -293,7 +293,7 @@ type ParsedATSCode struct {
 
 ## PluginGlyphDef {#pluginglyphdef}
 
-**Source**: [`server/handlers.go:738`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L738)
+**Source**: [`server/handlers.go:739`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L739)
 
 
 ```go
@@ -328,7 +328,7 @@ type PluginHealthMessage struct {
 
 ## PluginInfo {#plugininfo}
 
-**Source**: [`server/handlers.go:659`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L659)
+**Source**: [`server/handlers.go:660`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L660)
 
 
 ```go
@@ -731,7 +731,7 @@ type WatcherBroadcastStats struct {
 
 ## WatcherCreateRequest {#watchercreaterequest}
 
-**Source**: [`server/watcher_handlers.go:23`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L23)
+**Source**: [`server/watcher_handlers.go:24`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L24)
 
 
 ```go
@@ -804,7 +804,7 @@ type WatcherQueueStatusMessage struct {
 
 ## WatcherResponse {#watcherresponse}
 
-**Source**: [`server/watcher_handlers.go:42`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L42)
+**Source**: [`server/watcher_handlers.go:43`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L43)
 
 
 ```go
