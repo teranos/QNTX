@@ -68,10 +68,8 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("server.rate_limit.public_rate", 10.0)
 	v.SetDefault("server.rate_limit.public_burst", 20)
 
-	// Embeddings (semantic search) defaults
-	v.SetDefault("embeddings.enabled", false) // Disabled by default - requires ONNX model
-	v.SetDefault("embeddings.path", "ats/embeddings/models/all-MiniLM-L6-v2/model.onnx")
-	v.SetDefault("embeddings.name", "all-MiniLM-L6-v2")
+	// Embeddings (semantic search) defaults — provided by embedding_provider plugins
+	v.SetDefault("embeddings.enabled", false)
 	v.SetDefault("embeddings.cluster_threshold", 0.5) // Minimum cosine similarity for cluster prediction
 	// recluster_interval_seconds: omit for default (not scheduled). Set positive value to enable.
 	// reproject_interval_seconds: omit for default (not scheduled). Set positive value to enable.
