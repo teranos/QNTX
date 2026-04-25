@@ -1,8 +1,6 @@
 package embeddings
 
-import (
-	"time"
-)
+import "time"
 
 // ClusterNoise is the label assigned to points not belonging to any cluster.
 // HDBSCAN convention: -1 means noise/outlier.
@@ -30,22 +28,14 @@ type BatchEmbeddingResult struct {
 	TotalInferenceMS float64           `json:"total_inference_ms"`
 }
 
-// EmbeddingService defines the interface for embedding operations
-type EmbeddingService interface {
-	// Initialize the engine with a model
-	Init(modelPath string) error
-
-	// Get model information
-	ModelInfo() (*ModelInfo, error)
-
-	// Embed a single text
-	Embed(text string) (*EmbeddingResult, error)
-
-	// Embed multiple texts
-	EmbedBatch(texts []string) (*BatchEmbeddingResult, error)
-
-	// Clean up resources
-	Close() error
+// ClusterResult holds the output of HDBSCAN clustering.
+type ClusterResult struct {
+	Labels        []int32     `json:"labels"`
+	Probabilities []float32   `json:"probabilities"`
+	NClusters     int         `json:"n_clusters"`
+	NPoints       int         `json:"n_points"`
+	NNoise        int         `json:"n_noise"`
+	Centroids     [][]float32 `json:"centroids"` // one centroid per cluster, indexed by label
 }
 
 // VectorSearchResult represents a semantic search result

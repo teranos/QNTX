@@ -1,15 +1,11 @@
-//go:build cgo && rustembeddings
-
 package server
 
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"time"
 
 	appcfg "github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
@@ -17,81 +13,14 @@ import (
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 )
 
-// SetupEmbeddingService initializes the embedding service if available
+// SetupEmbeddingService is a no-op — embedding service is provided by plugins.
+// Call SetupPluginEmbeddingService when an embedding_provider plugin is detected.
 func (s *QNTXServer) SetupEmbeddingService() {
-	// Check for rustembeddings build tag
-	if !hasRustEmbeddings() {
-		s.logger.Infow("Embeddings service not available (build without rustembeddings tag)")
-		return
-	}
-
-	// Check if embeddings are enabled in config
-	if !appcfg.GetBool("embeddings.enabled") {
-		s.logger.Debugw("Embeddings service disabled in config (embeddings.enabled=false)")
-		return
-	}
-
-	// Read model path from config and validate it exists before attempting init
-	modelPath := appcfg.GetString("embeddings.path")
-	modelName := appcfg.GetString("embeddings.name")
-
-	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
-		s.logger.Errorw("Embeddings enabled but model file not found — set embeddings.path in am.toml",
-			"path", modelPath)
-		return
-	}
-
-	embService, err := embeddings.NewManagedEmbeddingService(modelPath)
-	if err != nil {
-		s.logger.Errorw("Failed to create embedding service",
-			"path", modelPath,
-			"error", err)
-		return
-	}
-
-	// Initialize the service
-	if err := embService.Initialize(); err != nil {
-		s.logger.Errorw("Failed to initialize embedding service",
-			"path", modelPath,
-			"error", err)
-		return
-	}
-
-	// Create embedding store
-	embStore := storage.NewEmbeddingStore(s.db, s.logger.Desugar())
-
-	// Store references
-	s.embeddingService = embService
-	s.embeddingStore = embStore
-
-	// Register observer for automatic embedding of attestations with rich text
-	observer := serverembeddings.NewEmbeddingObserver(
-		embService,
-		embStore,
-		storage.NewBoundedStore(s.db, nil, s.logger.Named("auto-embed")),
-		s.logger.Named("auto-embed"),
-		float32(appcfg.GetFloat64("embeddings.cluster_threshold")),
-		s.projectToCanvas,
-	)
-
-	// Wire semantic watcher matching through the embedding observer.
-	// After embedding, the observer passes the attestation + vector to the watcher
-	// engine — eliminates redundant GenerateEmbedding FFI calls per semantic watcher.
-	if s.watcherEngine != nil {
-		observer.SetOnEmbedded(s.watcherEngine.OnAttestationEmbedded)
-	}
-
-	storage.RegisterObserver(observer)
-	s.embeddingClusterInvalidator = observer.InvalidateClusterCache
-	s.embeddingStats = observer
-
-	s.logger.Infow("Embedding service initialized",
-		"path", modelPath,
-		"name", modelName)
+	s.logger.Debugw("Embedding service requires an embedding_provider plugin")
 }
 
 // SetupPluginEmbeddingService initializes the embedding service backed by a plugin's
-// EmbeddingService gRPC (e.g., Cyrnel). Replaces the local CGO/FFI path with remote calls.
+// EmbeddingService gRPC. Replaces the local CGO/FFI path with remote calls.
 func (s *QNTXServer) SetupPluginEmbeddingService(client protocol.EmbeddingServiceClient) {
 	svc := serverembeddings.NewPluginEmbeddingServiceFromClient(client, s.logger.Named("plugin-embeddings"))
 
@@ -125,12 +54,6 @@ func (s *QNTXServer) SetupPluginEmbeddingService(client protocol.EmbeddingServic
 	s.embeddingStats = observer
 
 	s.logger.Infow("Plugin embedding service initialized")
-}
-
-// hasRustEmbeddings returns true if compiled with rustembeddings build tag
-func hasRustEmbeddings() bool {
-	// This function will be overridden by the build tag
-	return true
 }
 
 // callReducePlugin sends an HTTP request to the reduce plugin via gRPC.

@@ -1,9 +1,7 @@
 // Package embeddings provides HTTP handlers for the QNTX embedding service:
 // semantic search, vector generation, HDBSCAN clustering, UMAP projection.
 //
-// All handler files are gated behind the `cgo && rustembeddings` build tag.
-// When the tag is absent, the stub file provides no-op handlers that return
-// 501 Not Implemented.
+// Embedding inference and clustering are served by an external plugin via gRPC.
 package embeddings
 
 import (
@@ -11,7 +9,6 @@ import (
 	"database/sql"
 
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"go.uber.org/zap"
@@ -20,9 +17,9 @@ import (
 // Service defines the embedding operations used by handlers.
 // Matches the interface already defined on QNTXServer.embeddingService.
 type Service interface {
-	GenerateEmbedding(text string) (*embeddings.EmbeddingResult, error)
-	GenerateBatchEmbeddings(texts []string) (*embeddings.BatchEmbeddingResult, error)
-	GetModelInfo() (*embeddings.ModelInfo, error)
+	GenerateEmbedding(text string) (*EmbeddingResult, error)
+	GenerateBatchEmbeddings(texts []string) (*BatchEmbeddingResult, error)
+	GetModelInfo() (*ModelInfo, error)
 	SerializeEmbedding(embedding []float32) ([]byte, error)
 	DeserializeEmbedding(data []byte) ([]float32, error)
 	ComputeSimilarity(a, b []float32) (float32, error)
@@ -36,8 +33,8 @@ type EmbeddingServiceForClustering interface {
 }
 
 // ClusterFunc runs HDBSCAN clustering on a flat array of embeddings.
-// CGO path passes embeddings.ClusterHDBSCAN; plugin path passes PluginEmbeddingService.ClusterHDBSCAN.
-type ClusterFunc func(data []float32, nPoints, dims, minClusterSize int) (*embeddings.ClusterResult, error)
+// Plugin path passes PluginEmbeddingService.ClusterHDBSCAN.
+type ClusterFunc func(data []float32, nPoints, dims, minClusterSize int) (*ClusterResult, error)
 
 // ReduceFunc calls the reduce plugin via gRPC for projection operations.
 type ReduceFunc func(ctx context.Context, method, path string, body []byte) ([]byte, error)
@@ -53,13 +50,13 @@ type Handler struct {
 	ATSStore     ats.AttestationStore
 	Logger       *zap.SugaredLogger
 	CallReduce   ReduceFunc      // optional: for projection via reduce plugin
-	ClusterFunc  ClusterFunc     // optional: overrides embeddings.ClusterHDBSCAN when set
+	ClusterFunc  ClusterFunc     // required: clustering via plugin gRPC
 	Invalidator  func()          // cluster cache invalidation callback
 	GroundDBPath string          // for cluster lifecycle attestations
 	GroundWrite  GroundWriteFunc // writes deferred news to Ground's DB
 }
 
-// getAttestationByID retrieves a single attestation through the attestation store (Rust FFI).
+// getAttestationByID retrieves a single attestation through the attestation store.
 // Falls back to Go's *sql.DB if the store doesn't support direct get.
 func (h *Handler) getAttestationByID(id string) (*types.As, error) {
 	type singleGetter interface {
