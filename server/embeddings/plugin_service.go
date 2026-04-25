@@ -5,7 +5,6 @@ import (
 	"math"
 	"unsafe"
 
-	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
@@ -50,7 +49,7 @@ func NewPluginEmbeddingServiceFromClient(client protocol.EmbeddingServiceClient,
 }
 
 // GenerateEmbedding creates an embedding for the given text via plugin gRPC.
-func (s *PluginEmbeddingService) GenerateEmbedding(text string) (*embeddings.EmbeddingResult, error) {
+func (s *PluginEmbeddingService) GenerateEmbedding(text string) (*EmbeddingResult, error) {
 	resp, err := s.client.Embed(context.Background(), &protocol.EmbedRequest{
 		AuthToken: s.authToken,
 		Text:      text,
@@ -59,7 +58,7 @@ func (s *PluginEmbeddingService) GenerateEmbedding(text string) (*embeddings.Emb
 		return nil, errors.Wrapf(err, "plugin Embed RPC failed for text (%d chars)", len(text))
 	}
 
-	return &embeddings.EmbeddingResult{
+	return &EmbeddingResult{
 		Text:      text,
 		Embedding: resp.Vector,
 		Tokens:    int(resp.Tokens),
@@ -67,7 +66,7 @@ func (s *PluginEmbeddingService) GenerateEmbedding(text string) (*embeddings.Emb
 }
 
 // GenerateBatchEmbeddings creates embeddings for multiple texts via plugin gRPC.
-func (s *PluginEmbeddingService) GenerateBatchEmbeddings(texts []string) (*embeddings.BatchEmbeddingResult, error) {
+func (s *PluginEmbeddingService) GenerateBatchEmbeddings(texts []string) (*BatchEmbeddingResult, error) {
 	resp, err := s.client.BatchEmbed(context.Background(), &protocol.BatchEmbedRequest{
 		AuthToken: s.authToken,
 		Texts:     texts,
@@ -76,27 +75,27 @@ func (s *PluginEmbeddingService) GenerateBatchEmbeddings(texts []string) (*embed
 		return nil, errors.Wrapf(err, "plugin BatchEmbed RPC failed for %d texts", len(texts))
 	}
 
-	results := make([]embeddings.EmbeddingResult, len(resp.Results))
+	results := make([]EmbeddingResult, len(resp.Results))
 	for i, vec := range resp.Results {
 		text := ""
 		if i < len(texts) {
 			text = texts[i]
 		}
-		results[i] = embeddings.EmbeddingResult{
+		results[i] = EmbeddingResult{
 			Text:      text,
 			Embedding: vec.Vector,
 			Tokens:    int(vec.Tokens),
 		}
 	}
 
-	return &embeddings.BatchEmbeddingResult{
+	return &BatchEmbeddingResult{
 		Embeddings:  results,
 		TotalTokens: int(resp.TotalTokens),
 	}, nil
 }
 
 // GetModelInfo returns metadata about the loaded model via plugin gRPC.
-func (s *PluginEmbeddingService) GetModelInfo() (*embeddings.ModelInfo, error) {
+func (s *PluginEmbeddingService) GetModelInfo() (*ModelInfo, error) {
 	resp, err := s.client.ModelInfo(context.Background(), &protocol.ModelInfoRequest{
 		AuthToken: s.authToken,
 	})
@@ -104,7 +103,7 @@ func (s *PluginEmbeddingService) GetModelInfo() (*embeddings.ModelInfo, error) {
 		return nil, errors.Wrap(err, "plugin ModelInfo RPC failed")
 	}
 
-	return &embeddings.ModelInfo{
+	return &ModelInfo{
 		Name:       resp.Name,
 		Dimensions: int(resp.Dimensions),
 	}, nil
@@ -175,7 +174,7 @@ func (s *PluginEmbeddingService) ComputeSimilarity(a, b []float32) (float32, err
 }
 
 // ClusterHDBSCAN runs HDBSCAN clustering via the plugin's Cluster RPC.
-func (s *PluginEmbeddingService) ClusterHDBSCAN(flat []float32, nPoints, dims, minClusterSize int) (*embeddings.ClusterResult, error) {
+func (s *PluginEmbeddingService) ClusterHDBSCAN(flat []float32, nPoints, dims, minClusterSize int) (*ClusterResult, error) {
 	resp, err := s.client.Cluster(context.Background(), &protocol.ClusterRequest{
 		AuthToken:      s.authToken,
 		Data:           flat,
@@ -199,7 +198,7 @@ func (s *PluginEmbeddingService) ClusterHDBSCAN(flat []float32, nPoints, dims, m
 		}
 	}
 
-	return &embeddings.ClusterResult{
+	return &ClusterResult{
 		Labels:        resp.Labels,
 		Probabilities: resp.Probabilities,
 		NClusters:     int(resp.NClusters),

@@ -6,13 +6,13 @@ Accepted
 
 ## Context
 
-QNTX's embedding engine (ONNX inference + HDBSCAN clustering) is compiled into the main binary via CGO/Rust FFI, gated behind `cgo && rustembeddings` build tags. This creates build complexity, prevents hot-reload, and locks to a single hardcoded model (384-dim).
+QNTX's embedding engine (ONNX inference + HDBSCAN clustering) was compiled into the main binary via CGO/Rust FFI, gated behind `cgo && rustembeddings` build tags. This created build complexity, prevented hot-reload, and locked to a single hardcoded model (384-dim).
 
-Cyrnel (`ctp/Cyrnel/`) packages the same embedding + clustering capabilities as a standalone Rust plugin. The existing provider pattern (ADR-014 for LLM, ADR-015 for search) provides the model: a plugin declares `embedding_provider = true` during Initialize, QNTX routes embedding calls to it via gRPC.
+The existing provider pattern (ADR-014 for LLM, ADR-015 for search) provides the model: a plugin declares `embedding_provider = true` during Initialize, QNTX routes embedding calls to it via gRPC.
 
 ## Decision
 
-Add `embedding_provider` to the plugin provider pattern. Cyrnel implements `EmbeddingService` gRPC (Embed, BatchEmbed, Cluster, ModelInfo) alongside `DomainPluginService`. QNTX creates a `PluginEmbeddingService` that satisfies the existing `Service` interface by making gRPC calls to the plugin instead of CGO/FFI calls.
+Add `embedding_provider` to the plugin provider pattern. Any plugin implementing `EmbeddingService` gRPC (Embed, BatchEmbed, Cluster, ModelInfo) alongside `DomainPluginService` can serve as the embedding backend. QNTX creates a `PluginEmbeddingService` that satisfies the existing `Service` interface by making gRPC calls to the plugin instead of CGO/FFI calls.
 
 ### Protocol changes
 
@@ -20,19 +20,18 @@ Add `embedding_provider` to the plugin provider pattern. Cyrnel implements `Embe
 - `domain.proto`: Add `embedding_provider` bool to `InitializeResponse`
 - Rust proto builds (`qntx-proto`, `qntx-grpc`): Include `embedding.proto`
 
-### Plugin side (Cyrnel)
+### Plugin side
 
 - Implement `EmbeddingService` trait (Embed, BatchEmbed, Cluster, ModelInfo)
-- Register `EmbeddingServiceServer` on the tonic server alongside `DomainPluginServiceServer`
+- Register `EmbeddingServiceServer` on the gRPC server alongside `DomainPluginServiceServer`
 - Set `embedding_provider: true` in `InitializeResponse`
-- Drop HTTP-based `/api/cyrnel/embed` and `/api/cyrnel/cluster` endpoints (replaced by typed gRPC)
 
 ### Core side (QNTX)
 
-- `PluginEmbeddingService` (new, no build tags): gRPC client implementing `Service` interface
-- Plugin discovery: detect `embedding_provider` flag, store plugin endpoint
-- `SetupEmbeddingService`: when Cyrnel detected, use `PluginEmbeddingService` instead of `ManagedEmbeddingService`
-- Clustering: `RunHDBSCANClustering` calls `Cluster` RPC when using plugin backend
+- `PluginEmbeddingService` (no build tags): gRPC client implementing `Service` interface
+- Plugin discovery: detect `embedding_provider` flag, call `SetupPluginEmbeddingService`
+- Clustering: `RunHDBSCANClustering` accepts a `ClusterFunc` — plugin provides its own via `Cluster` RPC
+- Restart re-wiring: `onEmbeddingProviderReady` callback re-establishes the embedding backend when a plugin restarts
 
 ### Pure Go operations (no RPC needed)
 
@@ -41,7 +40,7 @@ Add `embedding_provider` to the plugin provider pattern. Cyrnel implements `Embe
 ## Consequences
 
 - Embedding service available without CGO/Rust FFI build complexity
-- Hot-reload: restart Cyrnel plugin without restarting QNTX
-- Multi-model: Cyrnel detects model dimensions at load time
-- Existing builtin path unchanged — `cgo && rustembeddings` builds continue to work
+- Hot-reload: restart embedding plugin without restarting QNTX
+- Multi-model: plugin detects model dimensions at load time
 - `PluginEmbeddingService` has no build tags — pure Go gRPC client
+- CGO/FFI embedding path removed — plugin is the only backend
