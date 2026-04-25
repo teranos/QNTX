@@ -1,5 +1,3 @@
-//go:build cgo && rustembeddings
-
 package embeddings
 
 import (
@@ -11,12 +9,6 @@ import (
 	"github.com/teranos/QNTX/errors"
 	"go.uber.org/zap"
 )
-
-// EmbeddingServiceForClustering is the subset of the embedding service needed for clustering and projection.
-type EmbeddingServiceForClustering interface {
-	DeserializeEmbedding(data []byte) ([]float32, error)
-	SerializeEmbedding(embedding []float32) ([]byte, error)
-}
 
 // ProjectionResult holds the outcome of a single-method projection run.
 type ProjectionResult struct {

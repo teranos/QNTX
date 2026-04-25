@@ -1,5 +1,3 @@
-//go:build cgo && rustembeddings
-
 package embeddings
 
 import (
@@ -8,7 +6,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
@@ -22,11 +19,11 @@ import (
 // trigger embedding; structural-only attestations are silently skipped.
 type EmbeddingObserver struct {
 	embeddingService interface {
-		GenerateEmbedding(text string) (*embeddings.EmbeddingResult, error)
+		GenerateEmbedding(text string) (*EmbeddingResult, error)
 		SerializeEmbedding(embedding []float32) ([]byte, error)
 		DeserializeEmbedding(data []byte) ([]float32, error)
 		ComputeSimilarity(a, b []float32) (float32, error)
-		GetModelInfo() (*embeddings.ModelInfo, error)
+		GetModelInfo() (*ModelInfo, error)
 	}
 	embeddingStore   *storage.EmbeddingStore
 	richStore        *storage.BoundedStore // Reused across calls for 5-min rich field cache
@@ -51,11 +48,11 @@ type EmbeddingObserver struct {
 // NewEmbeddingObserver creates an observer with the given dependencies.
 func NewEmbeddingObserver(
 	svc interface {
-		GenerateEmbedding(text string) (*embeddings.EmbeddingResult, error)
+		GenerateEmbedding(text string) (*EmbeddingResult, error)
 		SerializeEmbedding(embedding []float32) ([]byte, error)
 		DeserializeEmbedding(data []byte) ([]float32, error)
 		ComputeSimilarity(a, b []float32) (float32, error)
-		GetModelInfo() (*embeddings.ModelInfo, error)
+		GetModelInfo() (*ModelInfo, error)
 	},
 	embStore *storage.EmbeddingStore,
 	richStore *storage.BoundedStore,

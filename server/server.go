@@ -11,7 +11,6 @@ import (
 	"github.com/teranos/QNTX/ai/tracker"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/QNTX/ats/embeddings/embeddings"
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
@@ -106,16 +105,8 @@ type QNTXServer struct {
 
 	conversationAssembler *ConversationAssembler
 
-	// Embedding service for semantic search (optional, requires rustembeddings build tag)
-	embeddingService interface {
-		GenerateEmbedding(text string) (*embeddings.EmbeddingResult, error)
-		GenerateBatchEmbeddings(texts []string) (*embeddings.BatchEmbeddingResult, error)
-		GetModelInfo() (*embeddings.ModelInfo, error)
-		SerializeEmbedding(embedding []float32) ([]byte, error)
-		DeserializeEmbedding(data []byte) ([]float32, error)
-		ComputeSimilarity(a, b []float32) (float32, error)
-		Close() error
-	}
+	// Embedding service for semantic search (provided by embedding_provider plugin)
+	embeddingService serverembeddings.Service
 	embeddingStore              *storage.EmbeddingStore
 	embeddingClusterInvalidator func()                  // called after re-cluster to invalidate centroid cache
 	embeddingStats              schedule.EmbeddingStats // drained by ticker for periodic summary

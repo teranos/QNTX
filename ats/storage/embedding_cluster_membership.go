@@ -1,5 +1,3 @@
-//go:build cgo && rustembeddings
-
 package storage
 
 import "github.com/teranos/QNTX/errors"

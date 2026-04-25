@@ -1,5 +1,3 @@
-//go:build cgo && rustembeddings
-
 package server
 
 import (
