@@ -37,6 +37,37 @@ pub(crate) fn generate_asuid_impl(input: &str) -> String {
     }
 }
 
+/// JSON input for random ID generation.
+#[derive(serde::Deserialize)]
+pub(crate) struct RandomIdInput {
+    pub length: usize,
+    pub random_bytes: Vec<u8>,
+}
+
+/// Generate a random ID from JSON input, returning JSON with the ID string.
+pub(crate) fn generate_random_id_impl(input: &str) -> String {
+    let parsed: RandomIdInput = match serde_json::from_str(input) {
+        Ok(v) => v,
+        Err(e) => {
+            return format!(
+                r#"{{"error":"invalid JSON: {}"}}"#,
+                e.to_string().replace('"', "\\\"")
+            )
+        }
+    };
+
+    if parsed.random_bytes.len() < parsed.length {
+        return format!(
+            r#"{{"error":"need at least {} random bytes, got {}"}}"#,
+            parsed.length,
+            parsed.random_bytes.len()
+        );
+    }
+
+    let id = qntx_id::random_id_from_bytes(parsed.length, &parsed.random_bytes);
+    format!(r#"{{"id":"{}"}}"#, id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -94,6 +125,31 @@ mod tests {
         let result = generate_asuid_impl(&input.to_string());
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
         assert!(parsed["error"].as_str().is_some());
+    }
+
+    #[test]
+    fn generate_random_id_basic() {
+        let input = serde_json::json!({
+            "length": 8,
+            "random_bytes": [0xA1, 0xB2, 0xC3, 0xD4, 0xE5, 0xF6, 0xA7, 0xB8]
+        });
+        let result = generate_random_id_impl(&input.to_string());
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert!(parsed["error"].is_null(), "unexpected error: {}", result);
+        let id = parsed["id"].as_str().unwrap();
+        assert_eq!(id.len(), 8);
+        assert!(id.chars().all(|c| matches!(c, '2'..='9' | 'A'..='Z')));
+    }
+
+    #[test]
+    fn generate_random_id_insufficient_bytes() {
+        let input = serde_json::json!({
+            "length": 8,
+            "random_bytes": [0x01, 0x02]
+        });
+        let result = generate_random_id_impl(&input.to_string());
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert!(parsed["error"].as_str().unwrap().contains("need at least"));
     }
 
     #[test]

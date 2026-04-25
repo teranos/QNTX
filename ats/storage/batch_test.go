@@ -190,7 +190,7 @@ func TestPersistItems_EmptySubject(t *testing.T) {
 
 	bp := NewBatchPersister(db, store, "test-actor", "test-source")
 
-	// Empty subject is valid - vanity-id library accepts empty strings
+	// Empty subject is valid - identity library accepts empty strings
 	items := []AttestationItem{
 		&mockItem{
 			subject:   "alice",

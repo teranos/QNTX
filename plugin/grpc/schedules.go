@@ -125,7 +125,7 @@ func SetupPluginSchedules(db *sql.DB, pluginName string, schedules []*protocol.S
 
 // createPluginSchedule creates a new schedule.Job for a plugin-announced schedule.
 func createPluginSchedule(db *sql.DB, pluginName string, s *protocol.ScheduleInfo, logger *zap.SugaredLogger) error {
-	// Generate schedule ID using vanity-id
+	// Generate schedule ID
 	jobID, err := identity.GenerateASUID(
 		"AS",
 		fmt.Sprintf("plugin:%s:%s", pluginName, s.HandlerName),
