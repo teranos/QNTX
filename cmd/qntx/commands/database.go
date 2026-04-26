@@ -5,7 +5,9 @@ package commands
 import (
 	"database/sql"
 	"fmt"
+	"runtime"
 	"sync"
+	"time"
 
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
@@ -60,6 +62,17 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, error) 
 		rustStore.Close()
 		return nil, nil, "", fmt.Errorf("failed to create attestation store: %w", err)
 	}
+
+	// Start mutex watchdog — alerts when RustStore mutex is held too long
+	sqlitecgo.StartMutexWatchdog(rustStore.Mu(), sqlitecgo.WatchdogConfig{
+		Interval: 30 * time.Second,
+		Timeout:  5 * time.Second,
+		OnAlert: func(blocked time.Duration) {
+			buf := make([]byte, 64*1024)
+			n := runtime.Stack(buf, true)
+			logger.Logger.Warnf("RustStore mutex held for %s — possible deadlock\n%s", blocked, buf[:n])
+		},
+	})
 
 	return database, atsStore, dbPath, nil
 }
