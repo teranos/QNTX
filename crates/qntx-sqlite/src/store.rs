@@ -33,6 +33,8 @@ type StoreResult<T> = Result<T, StoreError>;
 /// SQLite-backed attestation store
 pub struct SqliteStore {
     pub(crate) conn: Connection,
+    /// Database file path, if file-backed. Used by backup to open a separate read connection.
+    pub(crate) db_path: Option<String>,
 }
 
 impl SqliteStore {
@@ -41,7 +43,10 @@ impl SqliteStore {
     /// The connection should already have migrations applied.
     /// Use [`crate::migrate::migrate`] to initialize a fresh database.
     pub fn new(conn: Connection) -> Self {
-        Self { conn }
+        Self {
+            conn,
+            db_path: None,
+        }
     }
 
     /// Create a new in-memory SQLite store (for testing)
@@ -59,13 +64,17 @@ impl SqliteStore {
         // Initialize sqlite-vec extension BEFORE creating connection
         crate::vec::init_vec_extension();
 
+        let path_str = path.as_ref().to_string_lossy().to_string();
         let conn = Connection::open(path)?;
 
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
         conn.pragma_update(None, "busy_timeout", "5000")?;
         crate::migrate::migrate(&conn)?;
-        Ok(Self::new(conn))
+        Ok(Self {
+            conn,
+            db_path: Some(path_str),
+        })
     }
 
     /// Run PRAGMA integrity_check and return the result lines.
@@ -86,12 +95,34 @@ impl SqliteStore {
     }
 
     /// Create a hot backup of the database to the given path.
-    /// Uses SQLite's online backup API — safe to call while the database is in use.
+    /// Opens a separate read-only source connection so the backup does not need
+    /// exclusive access to `self.conn` — callers do NOT need to hold the mutex.
     pub fn backup(&self, dest_path: &str) -> StoreResult<()> {
+        let src_path = self
+            .db_path
+            .as_deref()
+            .ok_or_else(|| StoreError::Backend("backup requires a file-backed database".into()))?;
+        let src = Connection::open_with_flags(
+            src_path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(SqliteError::from)?;
         let mut dest = Connection::open(dest_path).map_err(SqliteError::from)?;
-        let b = backup::Backup::new(&self.conn, &mut dest).map_err(SqliteError::from)?;
-        b.run_to_completion(100, std::time::Duration::from_millis(10), None)
-            .map_err(SqliteError::from)?;
+        let b = backup::Backup::new(&src, &mut dest).map_err(SqliteError::from)?;
+
+        loop {
+            match b.step(5_000).map_err(SqliteError::from)? {
+                backup::StepResult::Done => break,
+                backup::StepResult::More => {
+                    // Yield briefly so writers aren't starved
+                    std::thread::yield_now();
+                }
+                backup::StepResult::Busy | backup::StepResult::Locked | _ => {
+                    // Short backoff — long waits let writers invalidate more pages
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+            }
+        }
         Ok(())
     }
 
