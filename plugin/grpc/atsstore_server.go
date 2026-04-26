@@ -137,7 +137,7 @@ func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetA
 		}, nil
 	}
 
-	s.logger.Infow("GetAttestations",
+	s.logger.Debugw("GetAttestations",
 		"results", len(attestations),
 		"predicates", filter.Predicates,
 		"subjects", filter.Subjects,
@@ -158,7 +158,7 @@ func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetA
 		protoAttestations[i] = protoAtt
 	}
 
-	s.logger.Infow("GetAttestations returning", "count", len(protoAttestations))
+	s.logger.Debugw("GetAttestations returning", "count", len(protoAttestations))
 
 	return &protocol.GetAttestationsResponse{
 		Success:      true,
