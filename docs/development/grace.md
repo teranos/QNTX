@@ -292,11 +292,15 @@ config := async.WorkerPoolConfig{
 | `SIGTERM` | `kill <pid>` | Same as SIGINT |
 | `SIGQUIT` | Ctrl+\ or `kill -QUIT` | Go default: goroutine stacks to stderr, exit 2. Fallback when HTTP is unreachable |
 
-### Mutex watchdog (planned)
+### Mutex watchdog
 
 The RustStore shared mutex (`ats/storage/sqlitecgo/storage_cgo.go`) serializes all SQLite access. A leaked transaction or slow CGO call can hold this mutex indefinitely, deadlocking all attestation operations.
 
 A background goroutine periodically attempts to acquire the mutex with a timeout. If acquisition takes longer than the threshold, it logs a warning with the current goroutine stacks. This provides early warning before a full deadlock develops.
+
+### Database backup
+
+Hot backup runs on the Pulse ticker without holding the Go mutex. See [database-backup.md](../architecture/database-backup.md) for architecture, write-load behavior, and why `run_to_completion` stalls under sustained writes.
 
 ---
 **Status**: Implemented and tested
