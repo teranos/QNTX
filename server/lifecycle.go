@@ -5,11 +5,17 @@ import (
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
+	"runtime"
 	"time"
 
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
 )
+
+func init() {
+	runtime.SetMutexProfileFraction(5)
+	runtime.SetBlockProfileRate(1000)
+}
 
 // Opening/Closing Phase 4: Server state management
 
