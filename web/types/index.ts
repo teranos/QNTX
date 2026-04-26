@@ -22,7 +22,6 @@ export type {
   AxFilter,
   AxResult,
   AxSummary,
-  CompletionItem,
   Conflict,
   OverFilter,
   // Async job types (pulse/async)
@@ -126,9 +125,6 @@ export type {
   WebSocketState,
   WebSocketConfig,
 } from './websocket';
-
-// LSP types
-export * from './lsp';
 
 // Configuration types
 export * from './config';

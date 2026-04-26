@@ -174,7 +174,7 @@ func inferMethods(handler, pattern string) []string {
 	handlerLower := strings.ToLower(handler)
 
 	// WebSocket endpoints
-	if strings.Contains(handlerLower, "websocket") || strings.Contains(handlerLower, "glsp") {
+	if strings.Contains(handlerLower, "websocket") {
 		return []string{"WS"}
 	}
 
@@ -658,7 +658,6 @@ func (g *Generator) generateWebSocketDoc() string {
 	sb.WriteString("| Path | Purpose |\n")
 	sb.WriteString("|------|--------|\n")
 	sb.WriteString("| `/ws` | Main WebSocket (graph updates, job status, logs) |\n")
-	sb.WriteString("| `/lsp` | ATS Language Server Protocol (completions, hover) |\n")
 	sb.WriteString("\n")
 
 	sb.WriteString("## Message Types\n\n")
@@ -776,7 +775,7 @@ func categorizeEndpoint(ep Endpoint) string {
 	pattern := ep.Pattern
 	handler := strings.ToLower(ep.Handler)
 
-	if strings.Contains(handler, "websocket") || strings.Contains(handler, "glsp") {
+	if strings.Contains(handler, "websocket") {
 		return "WebSocket"
 	}
 	if strings.Contains(pattern, "/prompt") || strings.Contains(handler, "prompt") {

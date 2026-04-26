@@ -4,14 +4,12 @@ import { listen } from '@tauri-apps/api/event';
 import { connectWebSocket } from './websocket.ts';
 import { initSystemDrawer, focusDrawerSearch } from './system-drawer.ts';
 import { initGlobalKeyboard } from './keyboard.ts';
-import { initCodeMirrorEditor } from './codemirror-editor.ts';
 import { formatDateTime } from './html-utils.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
 import { uiState } from './state/ui.ts';
 import { appState } from './state/app.ts';
 import { initUsageBadge, handleUsageUpdate } from './usage-badge.ts';
 import { initSyncBadge } from './sync-badge.ts';
-import { handleParseResponse } from './ats-semantic-tokens-client.ts';
 import { handleDaemonStatus } from './websocket-handlers/daemon-status.ts';
 import { statusIndicators } from './status-indicators.ts';
 import {
@@ -129,7 +127,6 @@ async function init(): Promise<void> {
         'import_stats': handleImportStats,
         'import_complete': handleImportComplete,
         'usage_update': handleUsageUpdate,
-        'parse_response': handleParseResponse,
         'daemon_status': handleDaemonStatus,
         'pulse_execution_started': handlePulseExecutionStarted,
         'pulse_execution_failed': handlePulseExecutionFailed,
@@ -230,9 +227,7 @@ async function init(): Promise<void> {
     if (window.logLoaderStep) window.logLoaderStep('Initializing system drawer...');
     initSystemDrawer();
 
-    // Initialize CodeMirror editor (replaces textarea)
     if (window.logLoaderStep) window.logLoaderStep('Setting up editor...', false, true);
-    initCodeMirrorEditor();
 
     // Wire @qntx/glyphs with QNTX's logger, persistence, canvas bridge, and stripHtml
     configureGlyphs({

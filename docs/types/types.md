@@ -116,22 +116,6 @@ type AxSummary struct {
 }
 ```
 
-## CompletionItem {#completionitem}
-
-**Source**: [`ats/types/lsp.go:4`](https://github.com/teranos/QNTX/blob/main/ats/types/lsp.go#L4)
-
-
-```go
-type CompletionItem struct {
-	Label string `json:"label"`
-	Kind string `json:"kind"`
-	InsertText string `json:"insert_text"`
-	Detail string `json:"detail,omitempty"`
-	Documentation string `json:"documentation,omitempty"`
-	SortText string `json:"sort_text"`
-}
-```
-
 ## Conflict {#conflict}
 
 **Source**: [`ats/types/attestation.go:149`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L149)

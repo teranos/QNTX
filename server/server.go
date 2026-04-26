@@ -11,7 +11,6 @@ import (
 	"github.com/teranos/QNTX/ai/tracker"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 
@@ -44,7 +43,6 @@ type QNTXServer struct {
 	authEnabled         bool                 // resolved at init, never changes
 	nodeDID             *nodedid.Handler     // node's decentralized identity
 	builder             *graph.AxGraphBuilder
-	langService         *lsp.Service          // Language service for ATS LSP features
 	usageTracker        *tracker.UsageTracker // Cached usage tracker (eliminates 172k+ allocations/day)
 	budgetTracker       *budget.Tracker       // Budget tracking for Pulse daemon
 	daemon              *async.WorkerPool     // Background job processor (daemon)
