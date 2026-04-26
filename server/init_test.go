@@ -25,9 +25,6 @@ func TestServerInitialization(t *testing.T) {
 	if server.builder == nil {
 		t.Error("Graph builder not initialized")
 	}
-	if server.langService == nil {
-		t.Error("Language service not initialized")
-	}
 	if server.usageTracker == nil {
 		t.Error("Usage tracker not initialized")
 	}

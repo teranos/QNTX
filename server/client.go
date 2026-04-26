@@ -237,12 +237,6 @@ func (c *Client) routeMessage(msg *QueryMessage) {
 		c.handleSetGraphLimit(msg.GraphLimit)
 	case "upload":
 		c.handleUpload(msg.Filename, msg.FileType, msg.Data)
-	case "parse_request":
-		c.handleParseRequest(*msg)
-	case "completion_request":
-		c.handleCompletionRequest(*msg)
-	case "hover_request":
-		c.handleHoverRequest(*msg)
 	case "daemon_control":
 		c.handleDaemonControl(*msg)
 	case "pulse_config_update":
@@ -530,37 +524,6 @@ func (c *Client) handleUpload(filename, fileType, data string) {
 	}()
 }
 
-// handleParseRequest processes parse requests for semantic highlighting
-func (c *Client) handleParseRequest(msg QueryMessage) {
-	ctx := c.server.ctx
-	// Use language service to parse with semantic tokens
-	resp, err := c.server.langService.Parse(ctx, msg.Query, int(c.server.verbosity.Load()))
-	if err != nil {
-		c.sendJSON(map[string]interface{}{
-			"type":  "error",
-			"error": err.Error(),
-		})
-		return
-	}
-	// Send parse response to client
-	c.sendJSON(map[string]interface{}{
-		"type":        "parse_response",
-		"timestamp":   msg.Line, // Reuse Line field for timestamp correlation
-		"tokens":      resp.Tokens,
-		"diagnostics": resp.Diagnostics,
-		"parse_state": resp.ParseState,
-	})
-}
-
-// handleCompletionRequest processes completion requests for autocomplete
-func (c *Client) handleCompletionRequest(msg QueryMessage) {
-	return
-}
-
-// handleHoverRequest processes hover requests for entity information
-func (c *Client) handleHoverRequest(msg QueryMessage) {
-	return
-}
 
 // sendJSON is a helper to send JSON messages to the client
 func (c *Client) sendJSON(data interface{}) {

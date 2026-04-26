@@ -116,7 +116,6 @@ export type {
   AxFilter,
   AxResult,
   AxSummary,
-  CompletionItem,
   Conflict,
   OverFilter,
   RelationshipTypeDef,

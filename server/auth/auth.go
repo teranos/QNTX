@@ -111,7 +111,7 @@ func (h *Handler) StartSessionSweep(done func(), cancel <-chan struct{}) {
 
 func isAPIRequest(r *http.Request) bool {
 	path := r.URL.Path
-	if strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/ws") || strings.HasPrefix(path, "/lsp") {
+	if strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/ws") {
 		return true
 	}
 	return strings.Contains(r.Header.Get("Accept"), "application/json")

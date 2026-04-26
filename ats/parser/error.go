@@ -38,7 +38,7 @@ type ParseError struct {
 	Position    int                    // Token position where error occurred
 	TokenCount  int                    // Total tokens being parsed
 	Token       *axToken               // Token that caused the error (optional)
-	Range       *Range                 // Source range for LSP integration (optional)
+	Range       *Range                 // Source range (optional)
 	Suggestions []string               // Possible fixes
 	Context     map[string]interface{} // Additional debug context
 	Timestamp   time.Time              // When error occurred
@@ -106,53 +106,6 @@ func (e *ParseError) formatTerminalError() string {
 	return fmt.Sprintf("%s%s", baseMsg, context)
 }
 
-// ToLSPDiagnostic converts ParseError to LSP Diagnostic format
-// This requires the lsp.Diagnostic type, so we return the fields as a map
-// to avoid circular imports. LSP layer will construct the actual Diagnostic.
-func (e *ParseError) ToLSPDiagnostic() map[string]interface{} {
-	severity := string(e.Severity)
-	message := e.formatPlainError() // Use plain format for LSP
-
-	// Construct range from position or use provided range
-	var diagRange map[string]interface{}
-	if e.Range != nil {
-		diagRange = map[string]interface{}{
-			"start": map[string]interface{}{
-				"line":      e.Range.Start.Line,
-				"character": e.Range.Start.Character,
-				"offset":    e.Range.Start.Offset,
-			},
-			"end": map[string]interface{}{
-				"line":      e.Range.End.Line,
-				"character": e.Range.End.Character,
-				"offset":    e.Range.End.Offset,
-			},
-		}
-	} else if e.Position >= 0 {
-		// Infer range from position
-		diagRange = map[string]interface{}{
-			"start": map[string]interface{}{
-				"line":      1,
-				"character": e.Position,
-				"offset":    e.Position,
-			},
-			"end": map[string]interface{}{
-				"line":      1,
-				"character": e.Position + 1,
-				"offset":    e.Position + 1,
-			},
-		}
-	}
-
-	return map[string]interface{}{
-		"range":       diagRange,
-		"severity":    severity,
-		"message":     message,
-		"kind":        string(e.Kind),
-		"suggestions": e.Suggestions,
-	}
-}
-
 // Unwrap for errors.Is/As compatibility
 func (e *ParseError) Unwrap() error {
 	return e.Err
@@ -190,7 +143,7 @@ func (e *ParseError) WithToken(token *axToken) *ParseError {
 	return e
 }
 
-// WithRange sets the source range for LSP integration
+// WithRange sets the source range
 func (e *ParseError) WithRange(r Range) *ParseError {
 	e.Range = &r
 	return e

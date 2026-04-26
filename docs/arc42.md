@@ -138,7 +138,7 @@ See [Design Philosophy](design-philosophy.md) and [Distribution Strategy](distri
 │  db/        SQLite + migrations              │
 │  am/        Configuration (5-layer precedence)│
 │  pulse/     Async execution + scheduling     │
-│  server/    HTTP, WebSocket, LSP             │
+│  server/    HTTP, WebSocket                  │
 │  sync/      Merkle reconciliation            │
 └──────────────────────────────────────────────┘
          │                    │
@@ -185,7 +185,7 @@ meld detection → edge creation → subscription activates → attestation arri
 hello (root hash) → group hashes → need → attestations → done
 
 **Browser ↔ Server:**
-WebSocket: semantic tokens, LSP protocol, ꩜ Pulse updates.
+WebSocket: semantic tokens, ꩜ Pulse updates.
 REST: CRUD, sync triggers, status.
 
 Detailed flows:

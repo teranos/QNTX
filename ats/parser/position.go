@@ -1,7 +1,7 @@
 package parser
 
 // Position represents a line/column position in source text
-// Uses LSP conventions: 1-based line numbers, 0-based character offsets
+// 1-based line numbers, 0-based character offsets
 type Position struct {
 	Line      int `json:"line"`      // 1-based line number
 	Character int `json:"character"` // 0-based character offset within line

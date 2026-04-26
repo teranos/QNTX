@@ -11,7 +11,6 @@ import (
 	"github.com/teranos/QNTX/ai/tracker"
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/signing"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
@@ -41,7 +40,6 @@ import (
 // 4. (Optional) Global storage if needed (e.g., SetDefaultPluginManager)
 type serverDependencies struct {
 	builder       *graph.AxGraphBuilder
-	langService   *lsp.Service
 	usageTracker  *tracker.UsageTracker
 	budgetTracker *budget.Tracker
 	daemon        *async.WorkerPool
@@ -94,9 +92,6 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	// Defensive: Validate critical dependencies (nil daemon is allowed)
 	if deps.builder == nil {
 		return nil, errors.New("graph builder creation failed")
-	}
-	if deps.langService == nil {
-		return nil, errors.New("language service creation failed")
 	}
 	if deps.usageTracker == nil {
 		return nil, errors.New("usage tracker creation failed")
@@ -197,7 +192,6 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		logPath:       logPath,
 		bindAddress:   bindAddr,
 		builder:       deps.builder,
-		langService:   deps.langService,
 		usageTracker:  deps.usageTracker,
 		budgetTracker: deps.budgetTracker,
 		daemon:        daemon,             // Use daemon with server context
@@ -468,15 +462,6 @@ func createServerDependencies(db *sql.DB, atsStore ats.AttestationStore, verbosi
 	}
 	serverLogger.Debugw("Graph builder created", "duration_ms", time.Since(start).Milliseconds())
 
-	// Create language service for ATS LSP features
-	langStart := time.Now()
-	symbolIndex, err := storage.NewSymbolIndex(db)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create symbol index")
-	}
-	langService := lsp.NewService(symbolIndex)
-	serverLogger.Debugw("Language service created", "duration_ms", time.Since(langStart).Milliseconds())
-
 	// Load configuration for daemon setup
 	cfgStart := time.Now()
 	cfg, err := appcfg.Load()
@@ -514,7 +499,6 @@ func createServerDependencies(db *sql.DB, atsStore ats.AttestationStore, verbosi
 
 	return &serverDependencies{
 		builder:       builder,
-		langService:   langService,
 		usageTracker:  usageTracker,
 		budgetTracker: budgetTracker,
 		daemon:        daemon,

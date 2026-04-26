@@ -9,7 +9,7 @@ The core primitive is the **attestation**: structured facts of the form "X has p
 - **ATS (Attestation Type System)**: A semantic query language for exploring attestations
 - **Pulse (꩜)**: Continuous execution that keeps attestations current
 - **Prose/Views**: Ways to compose and visualize attestation-derived intelligence
-- **LSP Integration**: First-class editor support for ATS as a language
+- **WASM Runtime**: ATS parsing, completions, and search run locally in the browser
 
 ## Technical Architecture Patterns
 
@@ -57,7 +57,6 @@ This means the browser is not a thin client. It runs the same attestation logic 
 When a server is present, WebSocket connections provide live updates (see [WebSocket API](api/websocket.md)):
 
 - Semantic tokens and diagnostics via custom protocol
-- LSP protocol (completions, hover)
 - ꩜ Pulse execution updates
 - Sync status
 
@@ -67,13 +66,12 @@ The server is not required for core ATS operations — those run in WASM. The se
 
 QNTX treats ATS as a **programming language**, not a query box:
 
-- Full LSP server implementation
 - Semantic token highlighting
 - Real-time diagnostics
-- Completion support
+- Completion support (via WASM)
 - Hover documentation
 
-The current editor surface is CodeMirror 6 with LSP integration. This is transitional — the canvas (glyphs ⧉) is the primary interaction surface, and the editor becomes one glyph manifestation within it. The LSP and language tooling persist; the dedicated editor view does not.
+The canvas (glyphs ⧉) is the primary interaction surface. The editor is one glyph manifestation within it. Language tooling (parsing, completions, search) runs in WASM.
 
 ## Core Philosophical Stance
 
@@ -137,22 +135,22 @@ The types *are* the data model. The queries *are* the API. There's no separation
 
 1. **Killer demo effect**: If you can show "here's my scattered data → here's live intelligence" in 60 seconds, people get it
 2. **Composability wins**: Each piece (ATS, Pulse, Prose, Graph) is independently useful
-3. **Developer ergonomics**: The LSP integration could make ATS feel like "SQL but better"
+3. **Developer ergonomics**: ATS completions and diagnostics could make it feel like "SQL but better"
 4. **Personal intelligence first**: Start with one person's workflow, expand outward
 
 ### What Could Go Wrong
 
 1. **Abstraction barrier**: "Attestations" might be too abstract. People think in docs, tasks, entities—not facts.
 2. **Cold start problem**: Empty attestation store = no value. Need great import/ingestion.
-3. **Complexity budget**: Each layer (ATS, Pulse, Prose, Graph, LSP) is complex. Do they compound or compose?
+3. **Complexity budget**: Each layer (ATS, Pulse, Prose, Graph) is complex. Do they compound or compose?
 4. **Market positioning**: Is this for developers? Knowledge workers? Data analysts? Trying to be all = being none.
 
 ### Timing Risks
 
-The real-time everything, LSP integration, D3 visualization, scheduled execution—this is a **2024-2025 stack**. It assumes:
+The real-time everything, D3 visualization, WASM in browser, scheduled execution—this is a **2024-2025 stack**. It assumes:
 
 - Users want real-time (do they, or do they want fast refresh?)
-- LSP in browser is viable (CodeMirror 6 makes it work, but it's cutting edge)
+- WASM in browser is viable (it is, and getting better)
 - WebSocket is reliable enough (most users are on good connections now, but not all)
 
 If built in 2020, it would've felt premature. In 2026, it might feel expected.
