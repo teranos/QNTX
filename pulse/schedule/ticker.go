@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -86,6 +87,7 @@ type Ticker struct {
 	backupDBPath    string        // source db path, used to derive backup destination
 	backupInterval  time.Duration // how often to backup (0 = disabled)
 	lastBackupAt    time.Time
+	backupRunning   atomic.Bool
 }
 
 // TickerConfig contains configuration for the Pulse ticker
@@ -337,6 +339,7 @@ func (t *Ticker) logActivitySummary() {
 
 // checkBackup runs a hot backup if the backup interval has elapsed.
 // Rotates .bak1 → .bak2, keeping 2 backups. .bak1 is always the newest.
+// Runs the backup in a goroutine so the ticker loop is never blocked.
 func (t *Ticker) checkBackup(now time.Time) {
 	if t.backupProvider == nil || t.backupInterval == 0 {
 		return
@@ -344,22 +347,31 @@ func (t *Ticker) checkBackup(now time.Time) {
 	if !t.lastBackupAt.IsZero() && now.Sub(t.lastBackupAt) < t.backupInterval {
 		return
 	}
+	if t.backupRunning.Load() {
+		return
+	}
+
+	// Mark backup started and update lastBackupAt so we don't re-trigger
+	t.backupRunning.Store(true)
+	t.lastBackupAt = now
 
 	bak1 := t.backupDBPath + ".bak1"
 	bak2 := t.backupDBPath + ".bak2"
 
-	// Rotate: .bak1 → .bak2
-	os.Rename(bak1, bak2)
+	go func() {
+		defer t.backupRunning.Store(false)
 
-	start := time.Now()
-	if err := t.backupProvider.Backup(bak1); err != nil {
-		t.pulseLog.Errorw("Database backup failed", "dest", bak1, "error", err)
-		return
-	}
-	duration := time.Since(start)
+		// Rotate: .bak1 → .bak2
+		os.Rename(bak1, bak2)
 
-	t.lastBackupAt = now
-	t.pulseLog.Infow("Database backup complete", "dest", bak1, "duration", duration.Round(time.Millisecond))
+		start := time.Now()
+		if err := t.backupProvider.Backup(bak1); err != nil {
+			t.pulseLog.Errorw("Database backup failed", "dest", bak1, "error", err)
+			return
+		}
+		duration := time.Since(start)
+		t.pulseLog.Infow("Database backup complete", "dest", bak1, "duration", duration.Round(time.Millisecond))
+	}()
 }
 
 // checkScheduledJobs finds scheduled jobs ready to run and enqueues them
