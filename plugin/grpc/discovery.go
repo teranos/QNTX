@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -88,25 +89,25 @@ type PluginConfig struct {
 
 // PluginManager manages plugin processes and connections.
 type PluginManager struct {
-	mu                sync.RWMutex
-	plugins           map[string]*managedPlugin
-	failedPlugins     map[string]string // plugin name → error message for plugins that failed to load
-	logger            *zap.SugaredLogger
-	rootLogger        *zap.SugaredLogger // un-named root logger for creating per-plugin named loggers
-	basePort          int
-	nextPort          int             // Track the next port to allocate
-	portMu            sync.Mutex      // Separate mutex for port allocation
-	typescriptRuntime string          // Path to TypeScript runtime (main.ts)
-	shutdownCtx       context.Context // cancelled on Shutdown to stop retry goroutines
-	shutdownCancel    context.CancelFunc
-	servicesManager   *ServicesManager // for re-registering LLM providers after restart
-	accumulator       *PluginAccumulator
-	onWatchersSetup   func()            // called after plugin watchers are written to DB
-	onPluginRestarted        func(name string)                              // called after auto-restart succeeds (clear HTTP mux state)
+	mu                       sync.RWMutex
+	plugins                  map[string]*managedPlugin
+	failedPlugins            map[string]string // plugin name → error message for plugins that failed to load
+	logger                   *zap.SugaredLogger
+	rootLogger               *zap.SugaredLogger // un-named root logger for creating per-plugin named loggers
+	basePort                 int
+	nextPort                 int             // Track the next port to allocate
+	portMu                   sync.Mutex      // Separate mutex for port allocation
+	typescriptRuntime        string          // Path to TypeScript runtime (main.ts)
+	shutdownCtx              context.Context // cancelled on Shutdown to stop retry goroutines
+	shutdownCancel           context.CancelFunc
+	servicesManager          *ServicesManager // for re-registering LLM providers after restart
+	accumulator              *PluginAccumulator
+	onWatchersSetup          func()                                                    // called after plugin watchers are written to DB
+	onPluginRestarted        func(name string)                                         // called after auto-restart succeeds (clear HTTP mux state)
 	onEmbeddingProviderReady func(name string, client protocol.EmbeddingServiceClient) // called when embedding provider is ready (init or restart)
 	pidFile                  *pidFile
-	db                *sql.DB                // for schedule setup on restart
-	handlerRegistry   *async.HandlerRegistry // for handler re-registration on restart
+	db                       *sql.DB                // for schedule setup on restart
+	handlerRegistry          *async.HandlerRegistry // for handler re-registration on restart
 }
 
 // managedPlugin tracks a running plugin.
@@ -812,6 +813,10 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 	registry.MarkReady(name)
 
 	if services != nil {
+		// Re-read am.toml from disk so plugin gets fresh config without server restart
+		if err := am.ReloadPluginSection(name); err != nil {
+			m.logger.Warnf("Failed to reload config for plugin '%s' from am.toml: %v", name, err)
+		}
 		if err := m.ReinitializePlugin(ctx, name, services); err != nil {
 			m.logger.Errorf("Failed to reinitialize plugin '%s' after restart: %v", name, err)
 		}
