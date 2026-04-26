@@ -81,6 +81,39 @@ func LoadFromFile(configPath string) (*Config, error) {
 	return &config, nil
 }
 
+// ReloadPluginSection re-reads am.toml from disk and updates Viper's keys
+// for the given plugin section. This allows plugin re-initialization to pick
+// up config changes without restarting the entire server.
+func ReloadPluginSection(pluginName string) error {
+	v, err := initViper()
+	if err != nil {
+		return errors.Wrap(err, "viper not initialized")
+	}
+
+	configPath := findProjectConfig()
+	if configPath == "" {
+		return nil // no project config, nothing to reload
+	}
+
+	// Read am.toml with a fresh viper to get current disk state
+	fresh := viper.New()
+	fresh.SetConfigFile(configPath)
+	fresh.SetConfigType("toml")
+	if err := fresh.ReadInConfig(); err != nil {
+		return errors.Wrapf(err, "failed to re-read config from %s", configPath)
+	}
+
+	// Copy all keys under [pluginName] into the global viper
+	prefix := pluginName + "."
+	for _, key := range fresh.AllKeys() {
+		if len(key) > len(prefix) && key[:len(prefix)] == prefix {
+			v.Set(key, fresh.Get(key))
+		}
+	}
+
+	return nil
+}
+
 // Reset clears the cached configuration (useful for testing)
 func Reset() {
 	globalConfig = nil

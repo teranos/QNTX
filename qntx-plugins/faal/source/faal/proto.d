@@ -469,3 +469,20 @@ struct GenerateAttestationResponse {
     @Proto(1) bool success;
     @Proto(2) string error;
 }
+
+struct AttestationFilter {
+    @Proto(1) @Repeated string[] subjects;
+    @Proto(2) @Repeated string[] predicates;
+    @Proto(3) @Repeated string[] contexts;
+    @Proto(4) @Repeated string[] actors;
+}
+
+struct GetAttestationsRequest {
+    @Proto(1) string authToken;
+    @Proto(2) AttestationFilter filter;
+}
+
+struct GetAttestationsResponse {
+    @Proto(1) bool success;
+    @Proto(2) string error;
+}
