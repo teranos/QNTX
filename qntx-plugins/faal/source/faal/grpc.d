@@ -361,7 +361,6 @@ ubyte[] grpcCall(string address, string method, const ubyte[] requestProto, int 
         } catch (Exception) {}
     }
 
-    logInfo("[faal] grpc_client: connecting to %s:%d for %s", host, port, method);
 
     Socket sock;
     try {
@@ -375,7 +374,6 @@ ubyte[] grpcCall(string address, string method, const ubyte[] requestProto, int 
     }
     scope(exit) sock.close();
 
-    logInfo("[faal] grpc_client: connected, sending H2 preface");
 
     // Send HTTP/2 client preface
     auto sent = sock.send(cast(const(ubyte)[])H2_PREFACE);
@@ -396,7 +394,6 @@ ubyte[] grpcCall(string address, string method, const ubyte[] requestProto, int 
         logError("[faal] grpc_client: no server SETTINGS received");
         return null;
     }
-    logInfo("[faal] grpc_client: got server SETTINGS (type=%d)", serverSettings.type);
 
     // ACK server SETTINGS
     sendSettingsAck(sock);
@@ -410,7 +407,6 @@ ubyte[] grpcCall(string address, string method, const ubyte[] requestProto, int 
         auto f = readFrame(sock);
         if (f is null) break;
         if (f.type == FrameType.SETTINGS && (f.flags & FrameFlags.ACK) != 0) {
-            logInfo("[faal] grpc_client: got SETTINGS ACK");
             break;
         }
         if (f.type == FrameType.WINDOW_UPDATE) continue;
@@ -426,7 +422,6 @@ ubyte[] grpcCall(string address, string method, const ubyte[] requestProto, int 
     headers ~= encodeLiteralHeader("content-type", "application/grpc");
     headers ~= encodeLiteralHeader("te", "trailers");
 
-    logInfo("[faal] grpc_client: sending HEADERS + DATA on stream %d", streamId);
 
     writeFrame(sock, FrameType.HEADERS, FrameFlags.END_HEADERS, streamId, headers);
 
@@ -434,7 +429,6 @@ ubyte[] grpcCall(string address, string method, const ubyte[] requestProto, int 
     auto grpcData = grpcFrame(requestProto);
     writeFrame(sock, FrameType.DATA, FrameFlags.END_STREAM, streamId, grpcData);
 
-    logInfo("[faal] grpc_client: request sent, waiting for response...");
 
     // Read response frames
     ubyte[] responseData;
@@ -459,7 +453,6 @@ ubyte[] grpcCall(string address, string method, const ubyte[] requestProto, int 
                 break;
             case FrameType.HEADERS:
                 if ((f.flags & FrameFlags.END_STREAM) != 0) {
-                    logInfo("[faal] grpc_client: got trailers (END_STREAM)");
                     gotResponse = true;
                 }
                 break;
@@ -483,7 +476,6 @@ ubyte[] grpcCall(string address, string method, const ubyte[] requestProto, int 
 
     if (responseData.length > 0) {
         auto proto = grpcUnframe(responseData);
-        logInfo("[faal] grpc_client: got %d bytes response proto", proto.length);
         return proto;
     }
 

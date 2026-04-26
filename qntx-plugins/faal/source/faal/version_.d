@@ -2,4 +2,4 @@
 module faal.version_;
 
 enum PLUGIN_NAME    = "faal";
-enum PLUGIN_VERSION = "0.3.0";
+enum PLUGIN_VERSION = "0.4.3";
