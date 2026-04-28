@@ -39,8 +39,7 @@ func TestResolver_BasicAliasResolution(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"United States"}, aliases, "Should return only aliases, not original")
 
-	// Note for LSP integration:
-	// When user types "USA" in a query, LSP could use ResolveIdentifier()
+	// When user types "USA" in a query, completions could use ResolveIdentifier()
 	// to suggest completions for both "USA" and "United States"
 	// This would help users discover canonical names and related entities
 }

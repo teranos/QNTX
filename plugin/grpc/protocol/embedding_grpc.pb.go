@@ -21,6 +21,8 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	EmbeddingService_Embed_FullMethodName                    = "/protocol.EmbeddingService/Embed"
 	EmbeddingService_BatchEmbed_FullMethodName               = "/protocol.EmbeddingService/BatchEmbed"
+	EmbeddingService_Cluster_FullMethodName                  = "/protocol.EmbeddingService/Cluster"
+	EmbeddingService_ModelInfo_FullMethodName                = "/protocol.EmbeddingService/ModelInfo"
 	EmbeddingService_GetLabelEligibleClusters_FullMethodName = "/protocol.EmbeddingService/GetLabelEligibleClusters"
 	EmbeddingService_SampleClusterTexts_FullMethodName       = "/protocol.EmbeddingService/SampleClusterTexts"
 	EmbeddingService_SetClusterLabel_FullMethodName          = "/protocol.EmbeddingService/SetClusterLabel"
@@ -36,6 +38,10 @@ type EmbeddingServiceClient interface {
 	Embed(ctx context.Context, in *EmbedRequest, opts ...grpc.CallOption) (*EmbedResponse, error)
 	// BatchEmbed generates vector embeddings for multiple texts
 	BatchEmbed(ctx context.Context, in *BatchEmbedRequest, opts ...grpc.CallOption) (*BatchEmbedResponse, error)
+	// Cluster runs HDBSCAN clustering on a flat array of embeddings
+	Cluster(ctx context.Context, in *ClusterRequest, opts ...grpc.CallOption) (*ClusterResponse, error)
+	// ModelInfo returns metadata about the loaded embedding model
+	ModelInfo(ctx context.Context, in *ModelInfoRequest, opts ...grpc.CallOption) (*ModelInfoResponse, error)
 	// GetLabelEligibleClusters returns clusters eligible for labeling
 	GetLabelEligibleClusters(ctx context.Context, in *GetLabelEligibleClustersRequest, opts ...grpc.CallOption) (*GetLabelEligibleClustersResponse, error)
 	// SampleClusterTexts returns random sample texts from a cluster
@@ -66,6 +72,26 @@ func (c *embeddingServiceClient) BatchEmbed(ctx context.Context, in *BatchEmbedR
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(BatchEmbedResponse)
 	err := c.cc.Invoke(ctx, EmbeddingService_BatchEmbed_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *embeddingServiceClient) Cluster(ctx context.Context, in *ClusterRequest, opts ...grpc.CallOption) (*ClusterResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ClusterResponse)
+	err := c.cc.Invoke(ctx, EmbeddingService_Cluster_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *embeddingServiceClient) ModelInfo(ctx context.Context, in *ModelInfoRequest, opts ...grpc.CallOption) (*ModelInfoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ModelInfoResponse)
+	err := c.cc.Invoke(ctx, EmbeddingService_ModelInfo_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -112,6 +138,10 @@ type EmbeddingServiceServer interface {
 	Embed(context.Context, *EmbedRequest) (*EmbedResponse, error)
 	// BatchEmbed generates vector embeddings for multiple texts
 	BatchEmbed(context.Context, *BatchEmbedRequest) (*BatchEmbedResponse, error)
+	// Cluster runs HDBSCAN clustering on a flat array of embeddings
+	Cluster(context.Context, *ClusterRequest) (*ClusterResponse, error)
+	// ModelInfo returns metadata about the loaded embedding model
+	ModelInfo(context.Context, *ModelInfoRequest) (*ModelInfoResponse, error)
 	// GetLabelEligibleClusters returns clusters eligible for labeling
 	GetLabelEligibleClusters(context.Context, *GetLabelEligibleClustersRequest) (*GetLabelEligibleClustersResponse, error)
 	// SampleClusterTexts returns random sample texts from a cluster
@@ -133,6 +163,12 @@ func (UnimplementedEmbeddingServiceServer) Embed(context.Context, *EmbedRequest)
 }
 func (UnimplementedEmbeddingServiceServer) BatchEmbed(context.Context, *BatchEmbedRequest) (*BatchEmbedResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method BatchEmbed not implemented")
+}
+func (UnimplementedEmbeddingServiceServer) Cluster(context.Context, *ClusterRequest) (*ClusterResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Cluster not implemented")
+}
+func (UnimplementedEmbeddingServiceServer) ModelInfo(context.Context, *ModelInfoRequest) (*ModelInfoResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ModelInfo not implemented")
 }
 func (UnimplementedEmbeddingServiceServer) GetLabelEligibleClusters(context.Context, *GetLabelEligibleClustersRequest) (*GetLabelEligibleClustersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetLabelEligibleClusters not implemented")
@@ -196,6 +232,42 @@ func _EmbeddingService_BatchEmbed_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(EmbeddingServiceServer).BatchEmbed(ctx, req.(*BatchEmbedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EmbeddingService_Cluster_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClusterRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EmbeddingServiceServer).Cluster(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EmbeddingService_Cluster_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EmbeddingServiceServer).Cluster(ctx, req.(*ClusterRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EmbeddingService_ModelInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ModelInfoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EmbeddingServiceServer).ModelInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EmbeddingService_ModelInfo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EmbeddingServiceServer).ModelInfo(ctx, req.(*ModelInfoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -268,6 +340,14 @@ var EmbeddingService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "BatchEmbed",
 			Handler:    _EmbeddingService_BatchEmbed_Handler,
+		},
+		{
+			MethodName: "Cluster",
+			Handler:    _EmbeddingService_Cluster_Handler,
+		},
+		{
+			MethodName: "ModelInfo",
+			Handler:    _EmbeddingService_ModelInfo_Handler,
 		},
 		{
 			MethodName: "GetLabelEligibleClusters",

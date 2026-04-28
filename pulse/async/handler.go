@@ -42,9 +42,11 @@ type JobHandler interface {
 // Thread-safe for concurrent handler registration and lookup.
 //
 // ARCHITECTURE: Generic handler registry
-// - Handlers register by name (e.g., "data.batch-import", "ml.inference")
-// - Infrastructure routes jobs by HandlerName, not domain-specific types
-// - Domain packages own handler names and payload structures
+//   - Handlers register by name (e.g., "data.batch-import", "ml.inference")
+//   - Infrastructure routes jobs by HandlerName, not domain-specific types
+//   - Domain packages own handler names and payload structures
+//   - Plugin handlers MUST be namespaced as "pluginName/handlerName" (e.g. "duif/route-changed")
+//     to prevent collisions when multiple plugins declare the same raw handler name.
 type HandlerRegistry struct {
 	handlers map[string]JobHandler // Handler name -> handler
 	mu       sync.RWMutex
@@ -78,12 +80,11 @@ func (r *HandlerRegistry) Replace(handler JobHandler) {
 	r.handlers[handler.Name()] = handler
 }
 
-// Unregister removes the handler for a given name.
-// No-op if no handler is registered with that name.
-func (r *HandlerRegistry) Unregister(name string) {
+// Remove deletes a handler by name. No-op if the handler doesn't exist.
+func (r *HandlerRegistry) Remove(handlerName string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	delete(r.handlers, name)
+	delete(r.handlers, handlerName)
 }
 
 // Get retrieves the handler for a handler name.
@@ -130,6 +131,11 @@ func NewRegistryExecutor(registry *HandlerRegistry, fallback JobExecutor) *Regis
 	}
 }
 
+// ErrHandlerNotRegistered is returned when no handler exists for a job's handler name.
+// The worker uses this to re-queue the job instead of permanently failing it,
+// since the handler may not be registered yet (e.g. plugins still loading at boot).
+var ErrHandlerNotRegistered = errors.New("handler not registered")
+
 // Execute implements JobExecutor by dispatching to registered handlers.
 func (e *RegistryExecutor) Execute(ctx context.Context, job *Job) error {
 	if job.HandlerName == "" {
@@ -146,5 +152,5 @@ func (e *RegistryExecutor) Execute(ctx context.Context, job *Job) error {
 		return e.fallback.Execute(ctx, job)
 	}
 
-	return errors.Newf("no handler registered for handler name: %s", job.HandlerName)
+	return errors.Wrapf(ErrHandlerNotRegistered, "%s", job.HandlerName)
 }

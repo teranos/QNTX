@@ -804,7 +804,7 @@ func TestPluginManager_LoadedPluginNames(t *testing.T) {
 	assert.Equal(t, []string{"alpha"}, names)
 }
 
-func TestPluginManager_StopPlugin(t *testing.T) {
+func TestPluginManager_DisablePlugin(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping in short mode")
 	}
@@ -829,7 +829,7 @@ func TestPluginManager_StopPlugin(t *testing.T) {
 	registry.MarkReady("removable")
 
 	// Stop it
-	err := manager.StopPlugin(context.Background(), "removable", registry)
+	err := manager.DisablePlugin(context.Background(), "removable", registry)
 	require.NoError(t, err)
 
 	// Plugin should be gone from manager
@@ -841,12 +841,12 @@ func TestPluginManager_StopPlugin(t *testing.T) {
 	assert.False(t, ok)
 }
 
-func TestPluginManager_StopPlugin_NotLoaded(t *testing.T) {
+func TestPluginManager_DisablePlugin_NotLoaded(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	registry := pluginpkg.NewRegistry("test", logger)
 	manager := NewPluginManager(logger, logger, "")
 
-	err := manager.StopPlugin(context.Background(), "nonexistent", registry)
+	err := manager.DisablePlugin(context.Background(), "nonexistent", registry)
 	assert.Error(t, err)
 }
 

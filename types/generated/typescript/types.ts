@@ -188,21 +188,6 @@ export interface AxSummary {
   unique_actors: Record<string, number>;
 }
 
-export interface CompletionItem {
-  label: string;
-  /**
-   * predicate, subject, context, actor, keyword, symbol
-   */
-  kind: string;
-  insert_text: string;
-  detail?: string;
-  documentation?: string;
-  /**
-   * For ranking
-   */
-  sort_text: string;
-}
-
 export interface Conflict {
   subject: string;
   predicate: string;

@@ -162,22 +162,6 @@ pub struct AxSummary {
     pub unique_actors: std::collections::HashMap<String, i64>,
 }
 
-/// CompletionItem represents an autocomplete suggestion
-#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#completionitem>"]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct CompletionItem {
-    pub label: String,
-    /// predicate, subject, context, actor, keyword, symbol
-    pub kind: String,
-    pub insert_text: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub detail: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub documentation: Option<String>,
-    /// For ranking
-    pub sort_text: String,
-}
-
 /// Conflict represents conflicting attestations
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#conflict>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

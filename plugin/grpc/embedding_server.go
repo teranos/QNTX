@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/teranos/QNTX/ats/embeddings/embeddings"
+	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
@@ -25,9 +25,9 @@ type EmbeddingServer struct {
 
 // embeddingBackend is the subset of ManagedEmbeddingService needed by the gRPC server.
 type embeddingBackend interface {
-	GenerateEmbedding(text string) (*embeddings.EmbeddingResult, error)
-	GenerateBatchEmbeddings(texts []string) (*embeddings.BatchEmbeddingResult, error)
-	GetModelInfo() (*embeddings.ModelInfo, error)
+	GenerateEmbedding(text string) (*serverembeddings.EmbeddingResult, error)
+	GenerateBatchEmbeddings(texts []string) (*serverembeddings.BatchEmbeddingResult, error)
+	GetModelInfo() (*serverembeddings.ModelInfo, error)
 }
 
 // NewEmbeddingServer creates a new embedding gRPC server.

@@ -336,6 +336,8 @@ function hydratePluginButtons(container: HTMLElement): void {
                 }
             };
         }
+
+        // TODO(#791): hydrate enable/disable buttons here
     }
 
     const buttons = hydrateButtons(container, config);
@@ -453,6 +455,7 @@ function renderPlugin(plugin: PluginInfo): string {
     }
 
     let restartBtn = '';
+    // TODO(#791): add enable/disable buttons — stopped plugins show enable, running show disable
     if (plugin.state === 'running') {
         restartBtn = buttonPlaceholder(`plugin-restart-${plugin.name}`, 'Restart', 'plugin-restart-btn');
     }

@@ -31,6 +31,18 @@ func generateTestID() string {
 	return fmt.Sprintf("test-id-%d", testIDCounter)
 }
 
+func testEmbedding(text string) *EmbeddingModel {
+	return &EmbeddingModel{
+		ID:         generateTestID(),
+		SourceType: "attestation",
+		SourceID:   generateTestID(),
+		Text:       text,
+		Embedding:  createTestEmbedding(384),
+		Model:      "all-MiniLM-L6-v2",
+		Dimensions: 384,
+	}
+}
+
 // Helper function to create a test FLOAT32_BLOB embedding
 func createTestEmbedding(dimensions int) []byte {
 	embedding := make([]float32, dimensions)
@@ -57,6 +69,7 @@ func TestEmbeddingStore_Save(t *testing.T) {
 	store := NewEmbeddingStore(db, logger)
 
 	embedding := &EmbeddingModel{
+		ID:         generateTestID(),
 		SourceType: "attestation",
 		SourceID:   generateTestID(),
 		Text:       "test attestation content",
@@ -99,6 +112,7 @@ func TestEmbeddingStore_SemanticSearch(t *testing.T) {
 	// Create test embeddings with different similarities
 	embeddings := []*EmbeddingModel{
 		{
+			ID:         generateTestID(),
 			SourceType: "attestation",
 			SourceID:   generateTestID(),
 			Text:       "cat kitten feline",
@@ -107,6 +121,7 @@ func TestEmbeddingStore_SemanticSearch(t *testing.T) {
 			Dimensions: 384,
 		},
 		{
+			ID:         generateTestID(),
 			SourceType: "attestation",
 			SourceID:   generateTestID(),
 			Text:       "dog puppy canine",
@@ -115,6 +130,7 @@ func TestEmbeddingStore_SemanticSearch(t *testing.T) {
 			Dimensions: 384,
 		},
 		{
+			ID:         generateTestID(),
 			SourceType: "attestation",
 			SourceID:   generateTestID(),
 			Text:       "car vehicle automobile",
@@ -154,14 +170,7 @@ func TestEmbeddingStore_DeleteBySource(t *testing.T) {
 	logger := zap.NewNop()
 	store := NewEmbeddingStore(db, logger)
 
-	embedding := &EmbeddingModel{
-		SourceType: "attestation",
-		SourceID:   generateTestID(),
-		Text:       "test content to delete",
-		Embedding:  createTestEmbedding(384),
-		Model:      "all-MiniLM-L6-v2",
-		Dimensions: 384,
-	}
+	embedding := testEmbedding("test content to delete")
 
 	// Save the embedding
 	err := store.Save(embedding)
@@ -193,6 +202,7 @@ func TestEmbeddingStore_BatchSaveAttestationEmbeddings(t *testing.T) {
 
 	embeddings := []*EmbeddingModel{
 		{
+			ID:         generateTestID(),
 			SourceType: "attestation",
 			SourceID:   generateTestID(),
 			Text:       "batch test 1",
@@ -201,6 +211,7 @@ func TestEmbeddingStore_BatchSaveAttestationEmbeddings(t *testing.T) {
 			Dimensions: 384,
 		},
 		{
+			ID:         generateTestID(),
 			SourceType: "attestation",
 			SourceID:   generateTestID(),
 			Text:       "batch test 2",
@@ -209,6 +220,7 @@ func TestEmbeddingStore_BatchSaveAttestationEmbeddings(t *testing.T) {
 			Dimensions: 384,
 		},
 		{
+			ID:         generateTestID(),
 			SourceType: "attestation",
 			SourceID:   generateTestID(),
 			Text:       "batch test 3",
@@ -251,14 +263,7 @@ func TestEmbeddingStore_UpdateExisting(t *testing.T) {
 	logger := zap.NewNop()
 	store := NewEmbeddingStore(db, logger)
 
-	embedding := &EmbeddingModel{
-		SourceType: "attestation",
-		SourceID:   generateTestID(),
-		Text:       "original text",
-		Embedding:  createTestEmbedding(384),
-		Model:      "all-MiniLM-L6-v2",
-		Dimensions: 384,
-	}
+	embedding := testEmbedding("original text")
 
 	// Save initial
 	err := store.Save(embedding)
@@ -292,6 +297,7 @@ func TestEmbeddingStore_UpdateProjections(t *testing.T) {
 	embeddings := make([]*EmbeddingModel, 3)
 	for i := range embeddings {
 		embeddings[i] = &EmbeddingModel{
+			ID:         generateTestID(),
 			SourceType: "attestation",
 			SourceID:   generateTestID(),
 			Text:       fmt.Sprintf("projection test %d", i),
@@ -340,6 +346,7 @@ func TestEmbeddingStore_MultiMethodProjections(t *testing.T) {
 	embeddings := make([]*EmbeddingModel, 2)
 	for i := range embeddings {
 		embeddings[i] = &EmbeddingModel{
+			ID:         generateTestID(),
 			SourceType: "attestation",
 			SourceID:   generateTestID(),
 			Text:       fmt.Sprintf("multi-method test %d", i),
@@ -395,14 +402,7 @@ func TestEmbeddingStore_GetProjectionsByMethod_ExcludesUnprojected(t *testing.T)
 	// Save 3 embeddings
 	embeddings := make([]*EmbeddingModel, 3)
 	for i := range embeddings {
-		embeddings[i] = &EmbeddingModel{
-			SourceType: "attestation",
-			SourceID:   generateTestID(),
-			Text:       fmt.Sprintf("exclude test %d", i),
-			Embedding:  createTestEmbedding(384),
-			Model:      "all-MiniLM-L6-v2",
-			Dimensions: 384,
-		}
+		embeddings[i] = testEmbedding(fmt.Sprintf("exclude test %d", i))
 		require.NoError(t, store.Save(embeddings[i]))
 	}
 
@@ -442,14 +442,7 @@ func TestEmbeddingStore_ProjectionRoundTrip(t *testing.T) {
 	logger := zap.NewNop()
 	store := NewEmbeddingStore(db, logger)
 
-	embedding := &EmbeddingModel{
-		SourceType: "attestation",
-		SourceID:   generateTestID(),
-		Text:       "round trip test",
-		Embedding:  createTestEmbedding(384),
-		Model:      "all-MiniLM-L6-v2",
-		Dimensions: 384,
-	}
+	embedding := testEmbedding("round trip test")
 	require.NoError(t, store.Save(embedding))
 
 	// Project it
@@ -607,29 +600,17 @@ func TestEmbeddingStore_GetLabelEligibleClusters(t *testing.T) {
 
 	// Assign embeddings: c1=5, c2=10, c3=2
 	for i := 0; i < 5; i++ {
-		emb := &EmbeddingModel{
-			SourceType: "attestation", SourceID: generateTestID(),
-			Text: fmt.Sprintf("c1 text %d", i), Embedding: createTestEmbedding(384),
-			Model: "test", Dimensions: 384,
-		}
+		emb := testEmbedding(fmt.Sprintf("c1 text %d", i))
 		require.NoError(t, store.Save(emb))
 		require.NoError(t, store.UpdateClusterAssignments([]ClusterAssignment{{ID: emb.ID, ClusterID: c1, Probability: 0.9}}))
 	}
 	for i := 0; i < 10; i++ {
-		emb := &EmbeddingModel{
-			SourceType: "attestation", SourceID: generateTestID(),
-			Text: fmt.Sprintf("c2 text %d", i), Embedding: createTestEmbedding(384),
-			Model: "test", Dimensions: 384,
-		}
+		emb := testEmbedding(fmt.Sprintf("c2 text %d", i))
 		require.NoError(t, store.Save(emb))
 		require.NoError(t, store.UpdateClusterAssignments([]ClusterAssignment{{ID: emb.ID, ClusterID: c2, Probability: 0.9}}))
 	}
 	for i := 0; i < 2; i++ {
-		emb := &EmbeddingModel{
-			SourceType: "attestation", SourceID: generateTestID(),
-			Text: fmt.Sprintf("c3 text %d", i), Embedding: createTestEmbedding(384),
-			Model: "test", Dimensions: 384,
-		}
+		emb := testEmbedding(fmt.Sprintf("c3 text %d", i))
 		require.NoError(t, store.Save(emb))
 		require.NoError(t, store.UpdateClusterAssignments([]ClusterAssignment{{ID: emb.ID, ClusterID: c3, Probability: 0.9}}))
 	}
@@ -685,11 +666,7 @@ func TestEmbeddingStore_SampleClusterTexts(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		text := fmt.Sprintf("sample text %d", i)
 		expectedTexts[text] = true
-		emb := &EmbeddingModel{
-			SourceType: "attestation", SourceID: generateTestID(),
-			Text: text, Embedding: createTestEmbedding(384),
-			Model: "test", Dimensions: 384,
-		}
+		emb := testEmbedding(text)
 		require.NoError(t, store.Save(emb))
 		require.NoError(t, store.UpdateClusterAssignments([]ClusterAssignment{{ID: emb.ID, ClusterID: cid, Probability: 0.9}}))
 	}
@@ -830,14 +807,7 @@ func TestEmbeddingStore_GetClusterDetails(t *testing.T) {
 
 	// Save some embeddings and assign them to the cluster
 	for i := 0; i < 3; i++ {
-		emb := &EmbeddingModel{
-			SourceType: "attestation",
-			SourceID:   generateTestID(),
-			Text:       fmt.Sprintf("detail test %d", i),
-			Embedding:  createTestEmbedding(384),
-			Model:      "all-MiniLM-L6-v2",
-			Dimensions: 384,
-		}
+		emb := testEmbedding(fmt.Sprintf("detail test %d", i))
 		require.NoError(t, store.Save(emb))
 		require.NoError(t, store.UpdateClusterAssignments([]ClusterAssignment{
 			{ID: emb.ID, ClusterID: cid, Probability: 0.9},

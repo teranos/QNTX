@@ -76,6 +76,13 @@ func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *
 		}, nil
 	}
 
+	if req.Command == nil {
+		return &protocol.GenerateAttestationResponse{
+			Success: false,
+			Error:   "command is nil",
+		}, nil
+	}
+
 	// Convert protobuf command to types.AsCommand
 	cmd, err := protoToCommand(req.Command)
 	if err != nil {
@@ -88,6 +95,7 @@ func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *
 	// Generate and create the attestation
 	as, err := s.store.GenerateAndCreateAttestation(ctx, cmd)
 	if err != nil {
+		s.logger.Errorw("GenerateAndCreateAttestation failed", "source", req.Command.Source, "error", err)
 		return &protocol.GenerateAttestationResponse{
 			Success: false,
 			Error:   fmt.Sprintf("failed to generate attestation: %v", err),
@@ -129,7 +137,7 @@ func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetA
 		}, nil
 	}
 
-	s.logger.Infow("GetAttestations",
+	s.logger.Debugw("GetAttestations",
 		"results", len(attestations),
 		"predicates", filter.Predicates,
 		"subjects", filter.Subjects,
@@ -150,7 +158,7 @@ func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetA
 		protoAttestations[i] = protoAtt
 	}
 
-	s.logger.Infow("GetAttestations returning", "count", len(protoAttestations))
+	s.logger.Debugw("GetAttestations returning", "count", len(protoAttestations))
 
 	return &protocol.GetAttestationsResponse{
 		Success:      true,

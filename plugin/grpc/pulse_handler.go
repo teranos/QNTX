@@ -19,16 +19,26 @@ import (
 // - PluginProxyHandler routes job to Python plugin via ExecuteJob RPC
 // - Plugin executes script and returns result
 // - Handler updates job state (progress, cost, error) and writes logs to task_logs
+// PluginHandlerName returns the namespaced registry key for a plugin handler.
+// This is the single source of truth for the naming convention.
+func PluginHandlerName(pluginName, handlerName string) string {
+	return pluginName + "/" + handlerName
+}
+
 type PluginProxyHandler struct {
-	handlerName string
+	pluginName  string // plugin that owns this handler
+	handlerName string // raw name the plugin uses internally
 	plugin      *ExternalDomainProxy
 	db          *sql.DB
 	logger      *zap.SugaredLogger
 }
 
 // NewPluginProxyHandler creates a handler that forwards execution to a plugin.
-func NewPluginProxyHandler(handlerName string, plugin *ExternalDomainProxy, db *sql.DB, logger *zap.SugaredLogger) *PluginProxyHandler {
+// The registry key is automatically namespaced as "pluginName/handlerName"
+// so multiple plugins can declare the same raw handler name without collision.
+func NewPluginProxyHandler(pluginName, handlerName string, plugin *ExternalDomainProxy, db *sql.DB, logger *zap.SugaredLogger) *PluginProxyHandler {
 	return &PluginProxyHandler{
+		pluginName:  pluginName,
 		handlerName: handlerName,
 		plugin:      plugin,
 		db:          db,
@@ -36,9 +46,9 @@ func NewPluginProxyHandler(handlerName string, plugin *ExternalDomainProxy, db *
 	}
 }
 
-// Name returns the handler identifier (e.g., "python.script", "python.webhook").
+// Name returns the namespaced registry key (e.g. "duif/route-changed").
 func (h *PluginProxyHandler) Name() string {
-	return h.handlerName
+	return PluginHandlerName(h.pluginName, h.handlerName)
 }
 
 // Execute forwards the job to the plugin for execution.
@@ -46,7 +56,7 @@ func (h *PluginProxyHandler) Execute(ctx context.Context, job *async.Job) error 
 	timeout := int64(300) // TODO: Make configurable or derive from job
 	req := &protocol.ExecuteJobRequest{
 		JobId:       job.ID,
-		HandlerName: h.handlerName,
+		HandlerName: h.handlerName, // raw name — the plugin doesn't know about namespacing
 		Payload:     job.Payload,
 		TimeoutSecs: &timeout,
 	}

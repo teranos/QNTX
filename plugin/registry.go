@@ -72,6 +72,13 @@ func (r *Registry) Unregister(name string) {
 	r.logger.Debugf("Unregistered plugin '%s' for restart", name)
 }
 
+// MarkStopped sets a plugin's state to stopped (used when disabling at runtime).
+func (r *Registry) MarkStopped(name string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.states[name] = StateStopped
+}
+
 // Get retrieves a domain plugin by name
 func (r *Registry) Get(name string) (DomainPlugin, bool) {
 	r.mu.RLock()

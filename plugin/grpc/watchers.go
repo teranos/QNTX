@@ -19,10 +19,12 @@ import (
 // Uses CreateOrReplace for idempotency — safe across plugin restarts.
 // Prunes stale watchers that the plugin no longer declares.
 func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protocol.WatcherRegistration, logger *zap.SugaredLogger) error {
-	logger.Infow("Setting up plugin watchers",
-		"plugin", pluginName,
-		"count", len(registrations),
-	)
+	if len(registrations) > 0 {
+		logger.Infow("Setting up plugin watchers",
+			"plugin", pluginName,
+			"count", len(registrations),
+		)
+	}
 
 	ws := storage.NewWatcherStore(db)
 	ctx := context.Background()

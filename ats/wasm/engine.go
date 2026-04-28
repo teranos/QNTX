@@ -488,6 +488,49 @@ func (e *Engine) GenerateASUID(prefix, subject, predicate, context string) (stri
 	return result.Full, nil
 }
 
+// GenerateRandomID generates a random ID of the given length using the QNTX alphabet.
+// Randomness comes from crypto/rand.
+func (e *Engine) GenerateRandomID(length int) (string, error) {
+	randomBytes := make([]byte, length)
+	if _, err := rand.Read(randomBytes); err != nil {
+		return "", errors.Wrap(err, "crypto/rand failed for random ID generation")
+	}
+
+	byteArray := make([]int, len(randomBytes))
+	for i, b := range randomBytes {
+		byteArray[i] = int(b)
+	}
+
+	input, err := json.Marshal(struct {
+		Length      int   `json:"length"`
+		RandomBytes []int `json:"random_bytes"`
+	}{
+		Length:      length,
+		RandomBytes: byteArray,
+	})
+	if err != nil {
+		return "", errors.Wrap(err, "marshal generate_random_id input")
+	}
+
+	raw, err := e.Call("generate_random_id", string(input))
+	if err != nil {
+		return "", err
+	}
+
+	var result struct {
+		ID    string `json:"id"`
+		Error string `json:"error,omitempty"`
+	}
+	if err := json.Unmarshal([]byte(raw), &result); err != nil {
+		return "", errors.Wrapf(err, "unmarshal generate_random_id result: %s", raw)
+	}
+	if result.Error != "" {
+		return "", errors.Newf("generate_random_id: %s", result.Error)
+	}
+
+	return result.ID, nil
+}
+
 // GetWASMSize returns the size of the embedded WASM module in bytes.
 func GetWASMSize() int {
 	return len(wasmBytes)

@@ -609,11 +609,11 @@ func (rs *RustStore) IntegrityCheck() ([]string, error) {
 }
 
 // Backup creates a hot backup of the database to destPath.
-// Safe to call while the database is in use.
+// Safe to call while the database is in use — SQLite's backup API handles
+// concurrency internally. Must NOT hold rs.mu: the backup reads the database
+// while other operations write, and holding the Go mutex deadlocks the system.
 func (rs *RustStore) Backup(destPath string) error {
-	rs.mu.Lock()
 	if rs.store == nil {
-		rs.mu.Unlock()
 		return errors.New("store is closed")
 	}
 
@@ -627,7 +627,6 @@ func (rs *RustStore) Backup(destPath string) error {
 		errMsg = C.GoString(result.error_msg)
 	}
 	C.storage_result_free(result)
-	rs.mu.Unlock()
 
 	if !success {
 		return errors.Newf("backup failed for %s: %s", destPath, errMsg)

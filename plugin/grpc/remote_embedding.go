@@ -3,7 +3,7 @@ package grpc
 import (
 	"context"
 
-	"github.com/teranos/QNTX/ats/embeddings/embeddings"
+	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
@@ -47,7 +47,7 @@ func (r *RemoteEmbedding) Close() error {
 }
 
 // Embed generates a vector embedding for a single text.
-func (r *RemoteEmbedding) Embed(text string) (*embeddings.EmbeddingResult, error) {
+func (r *RemoteEmbedding) Embed(text string) (*serverembeddings.EmbeddingResult, error) {
 	resp, err := r.client.Embed(r.ctx, &protocol.EmbedRequest{
 		AuthToken: r.authToken,
 		Text:      text,
@@ -56,7 +56,7 @@ func (r *RemoteEmbedding) Embed(text string) (*embeddings.EmbeddingResult, error
 		return nil, errors.Wrapf(err, "gRPC Embed failed for text (%d chars)", len(text))
 	}
 
-	return &embeddings.EmbeddingResult{
+	return &serverembeddings.EmbeddingResult{
 		Text:      text,
 		Embedding: resp.Vector,
 		Tokens:    int(resp.Tokens),
@@ -64,7 +64,7 @@ func (r *RemoteEmbedding) Embed(text string) (*embeddings.EmbeddingResult, error
 }
 
 // BatchEmbed generates vector embeddings for multiple texts.
-func (r *RemoteEmbedding) BatchEmbed(texts []string) (*embeddings.BatchEmbeddingResult, error) {
+func (r *RemoteEmbedding) BatchEmbed(texts []string) (*serverembeddings.BatchEmbeddingResult, error) {
 	resp, err := r.client.BatchEmbed(r.ctx, &protocol.BatchEmbedRequest{
 		AuthToken: r.authToken,
 		Texts:     texts,
@@ -73,20 +73,20 @@ func (r *RemoteEmbedding) BatchEmbed(texts []string) (*embeddings.BatchEmbedding
 		return nil, errors.Wrapf(err, "gRPC BatchEmbed failed for %d texts", len(texts))
 	}
 
-	results := make([]embeddings.EmbeddingResult, len(resp.Results))
+	results := make([]serverembeddings.EmbeddingResult, len(resp.Results))
 	for i, vec := range resp.Results {
 		text := ""
 		if i < len(texts) {
 			text = texts[i]
 		}
-		results[i] = embeddings.EmbeddingResult{
+		results[i] = serverembeddings.EmbeddingResult{
 			Text:      text,
 			Embedding: vec.Vector,
 			Tokens:    int(vec.Tokens),
 		}
 	}
 
-	return &embeddings.BatchEmbeddingResult{
+	return &serverembeddings.BatchEmbeddingResult{
 		Embeddings:  results,
 		TotalTokens: int(resp.TotalTokens),
 	}, nil

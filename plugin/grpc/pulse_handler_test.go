@@ -28,11 +28,7 @@ func TestWriteLogs(t *testing.T) {
 	}
 	require.NoError(t, store.CreateJob(job))
 
-	handler := &PluginProxyHandler{
-		handlerName: "test.handler",
-		db:          db,
-		logger:      logger,
-	}
+	handler := NewPluginProxyHandler("test", "handler", nil, db, logger)
 
 	entries := []*protocol.JobLogEntry{
 		{
@@ -81,15 +77,33 @@ func TestWriteLogs(t *testing.T) {
 	assert.Equal(t, `{"items_synced": 42}`, *logs[1].metadata)
 }
 
+// Two plugins both declare a handler with the same raw name.
+// The constructor namespaces the registry key as "pluginName/handlerName"
+// so both coexist without collision.
+func TestTwoPluginsSameHandlerName(t *testing.T) {
+	registry := async.NewHandlerRegistry()
+	db := qntxtest.CreateTestDB(t)
+	logger := zaptest.NewLogger(t).Sugar()
+
+	rawName := "data-sync"
+
+	gazeHandler := NewPluginProxyHandler("gaze", rawName, nil, db, logger)
+	registry.Register(gazeHandler)
+
+	scryHandler := NewPluginProxyHandler("scry", rawName, nil, db, logger)
+	registry.Register(scryHandler) // must not panic
+
+	assert.True(t, registry.Has("gaze/data-sync"))
+	assert.True(t, registry.Has("scry/data-sync"))
+	assert.False(t, registry.Has("data-sync"), "raw name must not appear in registry")
+	assert.Equal(t, 2, len(registry.Names()))
+}
+
 func TestWriteLogsEmpty(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zaptest.NewLogger(t).Sugar()
 
-	handler := &PluginProxyHandler{
-		handlerName: "test.handler",
-		db:          db,
-		logger:      logger,
-	}
+	handler := NewPluginProxyHandler("test", "handler", nil, db, logger)
 
 	// Empty entries should be a no-op (no panic, no DB writes)
 	handler.writeLogs("JOB_nonexistent", nil)

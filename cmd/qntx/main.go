@@ -16,6 +16,7 @@ import (
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/server"
 	"go.uber.org/zap"
 )
@@ -219,6 +220,10 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 			pm.SetOnPluginRestarted(func(name string) {
 				defaultServer.InvalidatePluginMux(name)
 			})
+			pm.SetOnEmbeddingProviderReady(func(name string, client protocol.EmbeddingServiceClient) {
+				defaultServer.SetupPluginEmbeddingService(client)
+				pluginLogger.Debugw("Re-wired embedding provider after restart", "plugin", name)
+			})
 		}
 
 		// Initialize each plugin individually, registering provider services
@@ -272,6 +277,11 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 						pluginLogger.Debugw("Registered Search provider", "plugin", meta.Name)
 					}
 				}
+				if proxy.IsEmbeddingProvider() {
+					roles = append(roles, "embedding-provider")
+					defaultServer.SetupPluginEmbeddingService(proxy.EmbeddingServiceClient())
+					pluginLogger.Debugw("Registered embedding provider", "plugin", meta.Name)
+				}
 			}
 
 			if acc != nil {
@@ -302,8 +312,9 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 				meta := p.Metadata()
 				for _, handlerName := range externalPlugin.GetHandlerNames() {
 					pluginLogger.Debugw("Registering plugin async handler",
-						"plugin", meta.Name, "handler", handlerName)
-					proxyHandler := grpc.NewPluginProxyHandler(handlerName, externalPlugin, db, pluginLogger)
+						"plugin", meta.Name, "handler", handlerName,
+						"registry_key", grpc.PluginHandlerName(meta.Name, handlerName))
+					proxyHandler := grpc.NewPluginProxyHandler(meta.Name, handlerName, externalPlugin, db, pluginLogger)
 					handlerRegistry.Register(proxyHandler)
 				}
 
@@ -432,6 +443,11 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 						logger.Debugw("Registered Search provider", "plugin", meta.Name)
 					}
 				}
+				if proxy.IsEmbeddingProvider() {
+					roles = append(roles, "embedding-provider")
+					defaultServer.SetupPluginEmbeddingService(proxy.EmbeddingServiceClient())
+					logger.Debugw("Registered embedding provider", "plugin", meta.Name)
+				}
 			}
 			if acc != nil {
 				acc.SetRoles(meta.Name, roles)
@@ -449,8 +465,9 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 			meta := p.Metadata()
 			for _, handlerName := range externalPlugin.GetHandlerNames() {
 				logger.Debugw("Registering plugin async handler",
-					"plugin", meta.Name, "handler", handlerName)
-				proxyHandler := grpc.NewPluginProxyHandler(handlerName, externalPlugin, db, logger)
+					"plugin", meta.Name, "handler", handlerName,
+					"registry_key", grpc.PluginHandlerName(meta.Name, handlerName))
+				proxyHandler := grpc.NewPluginProxyHandler(meta.Name, handlerName, externalPlugin, db, logger)
 				handlerRegistry.Register(proxyHandler)
 			}
 			schedules := externalPlugin.GetSchedules()
