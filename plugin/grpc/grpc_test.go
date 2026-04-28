@@ -780,6 +780,77 @@ func TestPluginManager_Shutdown(t *testing.T) {
 }
 
 // =============================================================================
+// Hot-Swap
+// =============================================================================
+
+func TestPluginManager_LoadedPluginNames(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping in short mode")
+	}
+
+	logger := zaptest.NewLogger(t).Sugar()
+
+	p := newMockPlugin()
+	addr, cleanup := startTestServer(t, p)
+	defer cleanup()
+
+	manager := NewPluginManager(logger, logger, "")
+	configs := []PluginConfig{
+		{Name: "alpha", Enabled: true, Address: addr},
+	}
+	manager.LoadPlugins(context.Background(), configs)
+
+	names := manager.LoadedPluginNames()
+	assert.Equal(t, []string{"alpha"}, names)
+}
+
+func TestPluginManager_StopPlugin(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping in short mode")
+	}
+
+	logger := zaptest.NewLogger(t).Sugar()
+	registry := pluginpkg.NewRegistry("test", logger)
+
+	p := newMockPlugin()
+	addr, cleanup := startTestServer(t, p)
+	defer cleanup()
+
+	manager := NewPluginManager(logger, logger, "")
+	configs := []PluginConfig{
+		{Name: "removable", Enabled: true, Address: addr},
+	}
+	manager.LoadPlugins(context.Background(), configs)
+
+	// Register with domain registry
+	loaded, ok := manager.GetPlugin("removable")
+	require.True(t, ok)
+	require.NoError(t, registry.Register(loaded))
+	registry.MarkReady("removable")
+
+	// Stop it
+	err := manager.StopPlugin(context.Background(), "removable", registry)
+	require.NoError(t, err)
+
+	// Plugin should be gone from manager
+	assert.Empty(t, manager.LoadedPluginNames())
+	assert.Empty(t, manager.GetAllPlugins())
+
+	// Plugin should be gone from registry
+	_, ok = registry.Get("removable")
+	assert.False(t, ok)
+}
+
+func TestPluginManager_StopPlugin_NotLoaded(t *testing.T) {
+	logger := zaptest.NewLogger(t).Sugar()
+	registry := pluginpkg.NewRegistry("test", logger)
+	manager := NewPluginManager(logger, logger, "")
+
+	err := manager.StopPlugin(context.Background(), "nonexistent", registry)
+	assert.Error(t, err)
+}
+
+// =============================================================================
 // Edge Cases and Error Handling
 // =============================================================================
 

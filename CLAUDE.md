@@ -61,6 +61,8 @@ See [GLOSSARY.md](docs/GLOSSARY.md) for symbol definitions and [glyphs.md](docs/
 
 **ANY edit to a plugin MUST bump its version in `Metadata().Version`.** Plugins run as separate processes — the version in the UI or logs is the only way to confirm new code is running. No exceptions.
 
+**Hot-swap:** Adding or removing plugins in `[plugin] enabled` in am.toml takes effect immediately — no server restart needed. The config watcher diffs the list and starts/stops plugins. See `docs/plugin-hot-swap.md`.
+
 ## Go Development Standards
 
 ### WASM Integration

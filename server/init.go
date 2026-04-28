@@ -513,8 +513,8 @@ func createServerDependencies(db *sql.DB, atsStore ats.AttestationStore, verbosi
 
 // setupConfigWatcher sets up config file watching with reload callbacks
 func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.SugaredLogger) {
-	// Get the config file path from Viper
-	configPath := appcfg.GetViper().ConfigFileUsed()
+	// Get the project config file path
+	configPath := appcfg.ProjectConfigPath()
 	if configPath == "" {
 		serverLogger.Debugw("No config file found, using defaults (config watching disabled)")
 		return
@@ -554,6 +554,55 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 
 		// Broadcast updated daemon status to all clients (includes new budget limits)
 		server.broadcastDaemonStatus()
+
+		return nil
+	})
+
+	// Register callback to hot-swap plugins when [plugin].enabled changes
+	configWatcher.OnReload(func(newCfg *appcfg.Config) error {
+		manager := grpcplugin.GetDefaultPluginManager()
+		registry := plugin.GetDefaultRegistry()
+		if manager == nil || registry == nil {
+			return nil
+		}
+
+		// Build sets for diff
+		nowEnabled := make(map[string]bool, len(newCfg.Plugin.Enabled))
+		for _, name := range newCfg.Plugin.Enabled {
+			nowEnabled[name] = true
+		}
+		currentlyLoaded := make(map[string]bool)
+		for _, name := range manager.LoadedPluginNames() {
+			currentlyLoaded[name] = true
+		}
+
+		// Stop plugins that were removed from enabled list
+		for name := range currentlyLoaded {
+			if !nowEnabled[name] {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				if err := manager.StopPlugin(ctx, name, registry); err != nil {
+					serverLogger.Errorw("Failed to stop plugin", "plugin", name, "error", err)
+				}
+				cancel()
+				server.InvalidatePluginMux(name)
+				server.broadcastDaemonStatus()
+			}
+		}
+
+		// Load plugins that were added to enabled list
+		for name := range nowEnabled {
+			if !currentlyLoaded[name] {
+				go func(pluginName string) {
+					ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+					defer cancel()
+					services := server.GetServices()
+					if err := manager.HotLoadPlugin(ctx, pluginName, newCfg.Plugin.Paths, registry, services); err != nil {
+						serverLogger.Errorw("Failed to hot-load plugin", "plugin", pluginName, "error", err)
+					}
+					server.broadcastDaemonStatus()
+				}(name)
+			}
+		}
 
 		return nil
 	})
