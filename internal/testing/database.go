@@ -75,10 +75,6 @@ func (s *sqlTestStore) CreateAttestation(as *types.As) error {
 	return s.insertAttestation(as)
 }
 
-func (s *sqlTestStore) CreateAttestationInbound(as *types.As) error {
-	return s.insertAttestation(as)
-}
-
 func (s *sqlTestStore) AttestationExists(asid string) bool {
 	var count int
 	err := s.db.QueryRow("SELECT COUNT(*) FROM attestations WHERE id = ?", asid).Scan(&count)

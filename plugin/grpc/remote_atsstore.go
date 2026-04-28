@@ -167,9 +167,3 @@ func (r *RemoteATSStore) CreateAttestation(a *types.As) error {
 	return nil
 }
 
-// CreateAttestationInbound sends a synced attestation to the remote store.
-// For remote stores, this currently maps to CreateAttestation - the remote
-// server is responsible for deciding whether to sign based on its context.
-func (r *RemoteATSStore) CreateAttestationInbound(a *types.As) error {
-	return r.CreateAttestation(a)
-}

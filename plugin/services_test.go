@@ -206,9 +206,8 @@ var _ Config = (*mockConfigWithID)(nil)
 // mockATSStore satisfies ats.AttestationStore for tests that only need a non-nil value
 type mockATSStore struct{}
 
-func (m *mockATSStore) CreateAttestation(as *types.As) error        { return nil }
-func (m *mockATSStore) CreateAttestationInbound(as *types.As) error { return nil }
-func (m *mockATSStore) AttestationExists(asid string) bool          { return false }
+func (m *mockATSStore) CreateAttestation(as *types.As) error { return nil }
+func (m *mockATSStore) AttestationExists(asid string) bool   { return false }
 func (m *mockATSStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
 	return nil, nil
 }

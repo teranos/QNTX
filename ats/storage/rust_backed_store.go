@@ -33,19 +33,7 @@ func (s *RustBackedStore) CreateAttestation(as *types.As) error {
 	}
 
 	if err := s.rust.CreateAttestation(as); err != nil {
-		return errors.Wrapf(err, "rust create attestation %s", as.ID)
-	}
-
-	notifyObservers(as)
-	s.enforceLimitsViaRust(as)
-
-	return nil
-}
-
-// CreateAttestationInbound inserts a synced attestation without signing (preserves provenance).
-func (s *RustBackedStore) CreateAttestationInbound(as *types.As) error {
-	if err := s.rust.CreateAttestationInbound(as); err != nil {
-		return errors.Wrapf(err, "rust create inbound attestation %s", as.ID)
+		return errors.Wrapf(err, "failed to create attestation %s in rust store", as.ID)
 	}
 
 	notifyObservers(as)
