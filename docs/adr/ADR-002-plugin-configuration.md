@@ -320,5 +320,6 @@ biotech  -       [available] Bioinformatics domain
 
 - [ADR-001: Domain Plugin Architecture](./ADR-001-domain-plugin-architecture.md)
 - [ADR-003: Plugin Communication Patterns](./ADR-003-plugin-communication.md)
+- [Plugin Hot-Swap](../plugin-hot-swap.md) — the enabled list is watched at runtime
 - PR #136: Phase 3 - Plugin Discovery and Optional Loading
 - Issue #135: Phase 4 - Extract qntx-code to Separate Repository
