@@ -94,6 +94,21 @@ func (s *SearchServer) DeleteDocuments(ctx context.Context, req *protocol.Delete
 	return resp, nil
 }
 
+// ConfigureIndex routes an index configuration request to the provider plugin.
+func (s *SearchServer) ConfigureIndex(ctx context.Context, req *protocol.ConfigureIndexRequest) (*protocol.ConfigureIndexResponse, error) {
+	client, name, err := s.getProvider()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := client.ConfigureIndex(ctx, req)
+	if err != nil {
+		return nil, errors.Wrapf(err, "configure index via provider %s failed", name)
+	}
+
+	return resp, nil
+}
+
 // getProvider returns the search client or an error if none is registered.
 func (s *SearchServer) getProvider() (protocol.SearchServiceClient, string, error) {
 	s.mu.RLock()

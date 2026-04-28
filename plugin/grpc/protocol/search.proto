@@ -11,6 +11,7 @@ service SearchService {
   rpc Search(SearchRequest) returns (SearchResponse);
   rpc IndexDocuments(IndexDocumentsRequest) returns (IndexDocumentsResponse);
   rpc DeleteDocuments(DeleteDocumentsRequest) returns (DeleteDocumentsResponse);
+  rpc ConfigureIndex(ConfigureIndexRequest) returns (ConfigureIndexResponse);
 }
 
 message SearchRequest {
@@ -18,18 +19,21 @@ message SearchRequest {
   string index = 2;
   int32 top_k = 3;
   bytes filters = 4;          // filter expression as JSON — interpreted by the provider
+  repeated string facets = 5; // facet fields to include in response
 }
 
 message SearchResponse {
   repeated SearchHit hits = 1;
   int32 total = 2;
   int32 processing_ms = 3;
+  bytes facet_distribution = 4; // facet counts as JSON
 }
 
 message SearchHit {
   string id = 1;
   float score = 2;
   bytes document = 3;         // indexed content as JSON
+  bytes highlighted = 4;      // highlighted fields as JSON (_formatted from provider)
 }
 
 message IndexDocumentsRequest {
@@ -48,4 +52,16 @@ message DeleteDocumentsRequest {
 
 message DeleteDocumentsResponse {
   int32 deleted = 1;
+}
+
+message ConfigureIndexRequest {
+  string index = 1;
+  string primary_key = 2;
+  repeated string filterable_attributes = 3;
+  repeated string sortable_attributes = 4;
+  repeated string searchable_attributes = 5;
+}
+
+message ConfigureIndexResponse {
+  bool accepted = 1;
 }

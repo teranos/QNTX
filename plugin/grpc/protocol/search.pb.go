@@ -27,6 +27,7 @@ type SearchRequest struct {
 	Index         string                 `protobuf:"bytes,2,opt,name=index,proto3" json:"index,omitempty"`
 	TopK          int32                  `protobuf:"varint,3,opt,name=top_k,json=topK,proto3" json:"top_k,omitempty"`
 	Filters       []byte                 `protobuf:"bytes,4,opt,name=filters,proto3" json:"filters,omitempty"` // filter expression as JSON — interpreted by the provider
+	Facets        []string               `protobuf:"bytes,5,rep,name=facets,proto3" json:"facets,omitempty"`   // facet fields to include in response
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -89,13 +90,21 @@ func (x *SearchRequest) GetFilters() []byte {
 	return nil
 }
 
+func (x *SearchRequest) GetFacets() []string {
+	if x != nil {
+		return x.Facets
+	}
+	return nil
+}
+
 type SearchResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Hits          []*SearchHit           `protobuf:"bytes,1,rep,name=hits,proto3" json:"hits,omitempty"`
-	Total         int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
-	ProcessingMs  int32                  `protobuf:"varint,3,opt,name=processing_ms,json=processingMs,proto3" json:"processing_ms,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Hits              []*SearchHit           `protobuf:"bytes,1,rep,name=hits,proto3" json:"hits,omitempty"`
+	Total             int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	ProcessingMs      int32                  `protobuf:"varint,3,opt,name=processing_ms,json=processingMs,proto3" json:"processing_ms,omitempty"`
+	FacetDistribution []byte                 `protobuf:"bytes,4,opt,name=facet_distribution,json=facetDistribution,proto3" json:"facet_distribution,omitempty"` // facet counts as JSON
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *SearchResponse) Reset() {
@@ -149,11 +158,19 @@ func (x *SearchResponse) GetProcessingMs() int32 {
 	return 0
 }
 
+func (x *SearchResponse) GetFacetDistribution() []byte {
+	if x != nil {
+		return x.FacetDistribution
+	}
+	return nil
+}
+
 type SearchHit struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Score         float32                `protobuf:"fixed32,2,opt,name=score,proto3" json:"score,omitempty"`
-	Document      []byte                 `protobuf:"bytes,3,opt,name=document,proto3" json:"document,omitempty"` // indexed content as JSON
+	Document      []byte                 `protobuf:"bytes,3,opt,name=document,proto3" json:"document,omitempty"`       // indexed content as JSON
+	Highlighted   []byte                 `protobuf:"bytes,4,opt,name=highlighted,proto3" json:"highlighted,omitempty"` // highlighted fields as JSON (_formatted from provider)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -205,6 +222,13 @@ func (x *SearchHit) GetScore() float32 {
 func (x *SearchHit) GetDocument() []byte {
 	if x != nil {
 		return x.Document
+	}
+	return nil
+}
+
+func (x *SearchHit) GetHighlighted() []byte {
+	if x != nil {
+		return x.Highlighted
 	}
 	return nil
 }
@@ -401,24 +425,147 @@ func (x *DeleteDocumentsResponse) GetDeleted() int32 {
 	return 0
 }
 
+type ConfigureIndexRequest struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Index                string                 `protobuf:"bytes,1,opt,name=index,proto3" json:"index,omitempty"`
+	PrimaryKey           string                 `protobuf:"bytes,2,opt,name=primary_key,json=primaryKey,proto3" json:"primary_key,omitempty"`
+	FilterableAttributes []string               `protobuf:"bytes,3,rep,name=filterable_attributes,json=filterableAttributes,proto3" json:"filterable_attributes,omitempty"`
+	SortableAttributes   []string               `protobuf:"bytes,4,rep,name=sortable_attributes,json=sortableAttributes,proto3" json:"sortable_attributes,omitempty"`
+	SearchableAttributes []string               `protobuf:"bytes,5,rep,name=searchable_attributes,json=searchableAttributes,proto3" json:"searchable_attributes,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *ConfigureIndexRequest) Reset() {
+	*x = ConfigureIndexRequest{}
+	mi := &file_plugin_grpc_protocol_search_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfigureIndexRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfigureIndexRequest) ProtoMessage() {}
+
+func (x *ConfigureIndexRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_search_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfigureIndexRequest.ProtoReflect.Descriptor instead.
+func (*ConfigureIndexRequest) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_search_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ConfigureIndexRequest) GetIndex() string {
+	if x != nil {
+		return x.Index
+	}
+	return ""
+}
+
+func (x *ConfigureIndexRequest) GetPrimaryKey() string {
+	if x != nil {
+		return x.PrimaryKey
+	}
+	return ""
+}
+
+func (x *ConfigureIndexRequest) GetFilterableAttributes() []string {
+	if x != nil {
+		return x.FilterableAttributes
+	}
+	return nil
+}
+
+func (x *ConfigureIndexRequest) GetSortableAttributes() []string {
+	if x != nil {
+		return x.SortableAttributes
+	}
+	return nil
+}
+
+func (x *ConfigureIndexRequest) GetSearchableAttributes() []string {
+	if x != nil {
+		return x.SearchableAttributes
+	}
+	return nil
+}
+
+type ConfigureIndexResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Accepted      bool                   `protobuf:"varint,1,opt,name=accepted,proto3" json:"accepted,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConfigureIndexResponse) Reset() {
+	*x = ConfigureIndexResponse{}
+	mi := &file_plugin_grpc_protocol_search_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfigureIndexResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfigureIndexResponse) ProtoMessage() {}
+
+func (x *ConfigureIndexResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_search_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfigureIndexResponse.ProtoReflect.Descriptor instead.
+func (*ConfigureIndexResponse) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_search_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ConfigureIndexResponse) GetAccepted() bool {
+	if x != nil {
+		return x.Accepted
+	}
+	return false
+}
+
 var File_plugin_grpc_protocol_search_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_search_proto_rawDesc = "" +
 	"\n" +
-	"!plugin/grpc/protocol/search.proto\x12\bprotocol\"j\n" +
+	"!plugin/grpc/protocol/search.proto\x12\bprotocol\"\x82\x01\n" +
 	"\rSearchRequest\x12\x14\n" +
 	"\x05query\x18\x01 \x01(\tR\x05query\x12\x14\n" +
 	"\x05index\x18\x02 \x01(\tR\x05index\x12\x13\n" +
 	"\x05top_k\x18\x03 \x01(\x05R\x04topK\x12\x18\n" +
-	"\afilters\x18\x04 \x01(\fR\afilters\"t\n" +
+	"\afilters\x18\x04 \x01(\fR\afilters\x12\x16\n" +
+	"\x06facets\x18\x05 \x03(\tR\x06facets\"\xa3\x01\n" +
 	"\x0eSearchResponse\x12'\n" +
 	"\x04hits\x18\x01 \x03(\v2\x13.protocol.SearchHitR\x04hits\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12#\n" +
-	"\rprocessing_ms\x18\x03 \x01(\x05R\fprocessingMs\"M\n" +
+	"\rprocessing_ms\x18\x03 \x01(\x05R\fprocessingMs\x12-\n" +
+	"\x12facet_distribution\x18\x04 \x01(\fR\x11facetDistribution\"o\n" +
 	"\tSearchHit\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05score\x18\x02 \x01(\x02R\x05score\x12\x1a\n" +
-	"\bdocument\x18\x03 \x01(\fR\bdocument\"K\n" +
+	"\bdocument\x18\x03 \x01(\fR\bdocument\x12 \n" +
+	"\vhighlighted\x18\x04 \x01(\fR\vhighlighted\"K\n" +
 	"\x15IndexDocumentsRequest\x12\x14\n" +
 	"\x05index\x18\x01 \x01(\tR\x05index\x12\x1c\n" +
 	"\tdocuments\x18\x02 \x03(\fR\tdocuments\"4\n" +
@@ -428,11 +575,21 @@ const file_plugin_grpc_protocol_search_proto_rawDesc = "" +
 	"\x05index\x18\x01 \x01(\tR\x05index\x12\x10\n" +
 	"\x03ids\x18\x02 \x03(\tR\x03ids\"3\n" +
 	"\x17DeleteDocumentsResponse\x12\x18\n" +
-	"\adeleted\x18\x01 \x01(\x05R\adeleted2\xf9\x01\n" +
+	"\adeleted\x18\x01 \x01(\x05R\adeleted\"\xe9\x01\n" +
+	"\x15ConfigureIndexRequest\x12\x14\n" +
+	"\x05index\x18\x01 \x01(\tR\x05index\x12\x1f\n" +
+	"\vprimary_key\x18\x02 \x01(\tR\n" +
+	"primaryKey\x123\n" +
+	"\x15filterable_attributes\x18\x03 \x03(\tR\x14filterableAttributes\x12/\n" +
+	"\x13sortable_attributes\x18\x04 \x03(\tR\x12sortableAttributes\x123\n" +
+	"\x15searchable_attributes\x18\x05 \x03(\tR\x14searchableAttributes\"4\n" +
+	"\x16ConfigureIndexResponse\x12\x1a\n" +
+	"\baccepted\x18\x01 \x01(\bR\baccepted2\xce\x02\n" +
 	"\rSearchService\x12;\n" +
 	"\x06Search\x12\x17.protocol.SearchRequest\x1a\x18.protocol.SearchResponse\x12S\n" +
 	"\x0eIndexDocuments\x12\x1f.protocol.IndexDocumentsRequest\x1a .protocol.IndexDocumentsResponse\x12V\n" +
-	"\x0fDeleteDocuments\x12 .protocol.DeleteDocumentsRequest\x1a!.protocol.DeleteDocumentsResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
+	"\x0fDeleteDocuments\x12 .protocol.DeleteDocumentsRequest\x1a!.protocol.DeleteDocumentsResponse\x12S\n" +
+	"\x0eConfigureIndex\x12\x1f.protocol.ConfigureIndexRequest\x1a .protocol.ConfigureIndexResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
 var (
 	file_plugin_grpc_protocol_search_proto_rawDescOnce sync.Once
@@ -446,7 +603,7 @@ func file_plugin_grpc_protocol_search_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_search_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_search_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_plugin_grpc_protocol_search_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_plugin_grpc_protocol_search_proto_goTypes = []any{
 	(*SearchRequest)(nil),           // 0: protocol.SearchRequest
 	(*SearchResponse)(nil),          // 1: protocol.SearchResponse
@@ -455,17 +612,21 @@ var file_plugin_grpc_protocol_search_proto_goTypes = []any{
 	(*IndexDocumentsResponse)(nil),  // 4: protocol.IndexDocumentsResponse
 	(*DeleteDocumentsRequest)(nil),  // 5: protocol.DeleteDocumentsRequest
 	(*DeleteDocumentsResponse)(nil), // 6: protocol.DeleteDocumentsResponse
+	(*ConfigureIndexRequest)(nil),   // 7: protocol.ConfigureIndexRequest
+	(*ConfigureIndexResponse)(nil),  // 8: protocol.ConfigureIndexResponse
 }
 var file_plugin_grpc_protocol_search_proto_depIdxs = []int32{
 	2, // 0: protocol.SearchResponse.hits:type_name -> protocol.SearchHit
 	0, // 1: protocol.SearchService.Search:input_type -> protocol.SearchRequest
 	3, // 2: protocol.SearchService.IndexDocuments:input_type -> protocol.IndexDocumentsRequest
 	5, // 3: protocol.SearchService.DeleteDocuments:input_type -> protocol.DeleteDocumentsRequest
-	1, // 4: protocol.SearchService.Search:output_type -> protocol.SearchResponse
-	4, // 5: protocol.SearchService.IndexDocuments:output_type -> protocol.IndexDocumentsResponse
-	6, // 6: protocol.SearchService.DeleteDocuments:output_type -> protocol.DeleteDocumentsResponse
-	4, // [4:7] is the sub-list for method output_type
-	1, // [1:4] is the sub-list for method input_type
+	7, // 4: protocol.SearchService.ConfigureIndex:input_type -> protocol.ConfigureIndexRequest
+	1, // 5: protocol.SearchService.Search:output_type -> protocol.SearchResponse
+	4, // 6: protocol.SearchService.IndexDocuments:output_type -> protocol.IndexDocumentsResponse
+	6, // 7: protocol.SearchService.DeleteDocuments:output_type -> protocol.DeleteDocumentsResponse
+	8, // 8: protocol.SearchService.ConfigureIndex:output_type -> protocol.ConfigureIndexResponse
+	5, // [5:9] is the sub-list for method output_type
+	1, // [1:5] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
 	1, // [1:1] is the sub-list for extension extendee
 	0, // [0:1] is the sub-list for field type_name
@@ -482,7 +643,7 @@ func file_plugin_grpc_protocol_search_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_search_proto_rawDesc), len(file_plugin_grpc_protocol_search_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

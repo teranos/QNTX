@@ -568,6 +568,7 @@ func (s *searchPluginServer) Search(ctx context.Context, req *protocol.SearchReq
 		Index:   req.Index,
 		TopK:    int(req.TopK),
 		Filters: req.Filters,
+		Facets:  req.Facets,
 	})
 	if err != nil {
 		return nil, err
@@ -576,16 +577,18 @@ func (s *searchPluginServer) Search(ctx context.Context, req *protocol.SearchReq
 	hits := make([]*protocol.SearchHit, len(resp.Hits))
 	for i, h := range resp.Hits {
 		hits[i] = &protocol.SearchHit{
-			Id:       h.ID,
-			Score:    h.Score,
-			Document: h.Document,
+			Id:          h.ID,
+			Score:       h.Score,
+			Document:    h.Document,
+			Highlighted: h.Highlighted,
 		}
 	}
 
 	return &protocol.SearchResponse{
-		Hits:         hits,
-		Total:        int32(resp.Total),
-		ProcessingMs: int32(resp.ProcessingMs),
+		Hits:              hits,
+		Total:             int32(resp.Total),
+		ProcessingMs:      int32(resp.ProcessingMs),
+		FacetDistribution: resp.FacetDistribution,
 	}, nil
 }
 
@@ -614,5 +617,22 @@ func (s *searchPluginServer) DeleteDocuments(ctx context.Context, req *protocol.
 
 	return &protocol.DeleteDocumentsResponse{
 		Deleted: int32(resp.Deleted),
+	}, nil
+}
+
+func (s *searchPluginServer) ConfigureIndex(ctx context.Context, req *protocol.ConfigureIndexRequest) (*protocol.ConfigureIndexResponse, error) {
+	resp, err := s.provider.ConfigureIndex(ctx, plugin.ConfigureIndexRequest{
+		Index:                req.Index,
+		PrimaryKey:           req.PrimaryKey,
+		FilterableAttributes: req.FilterableAttributes,
+		SortableAttributes:   req.SortableAttributes,
+		SearchableAttributes: req.SearchableAttributes,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &protocol.ConfigureIndexResponse{
+		Accepted: resp.Accepted,
 	}, nil
 }

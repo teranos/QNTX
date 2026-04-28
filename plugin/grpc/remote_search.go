@@ -49,6 +49,7 @@ func (r *RemoteSearch) Search(ctx context.Context, req plugin.SearchRequest) (*p
 		Index:   req.Index,
 		TopK:    int32(req.TopK),
 		Filters: req.Filters,
+		Facets:  req.Facets,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "search service gRPC call failed")
@@ -57,16 +58,18 @@ func (r *RemoteSearch) Search(ctx context.Context, req plugin.SearchRequest) (*p
 	hits := make([]plugin.SearchHit, len(resp.Hits))
 	for i, h := range resp.Hits {
 		hits[i] = plugin.SearchHit{
-			ID:       h.Id,
-			Score:    h.Score,
-			Document: h.Document,
+			ID:          h.Id,
+			Score:       h.Score,
+			Document:    h.Document,
+			Highlighted: h.Highlighted,
 		}
 	}
 
 	return &plugin.SearchResponse{
-		Hits:         hits,
-		Total:        int(resp.Total),
-		ProcessingMs: int(resp.ProcessingMs),
+		Hits:              hits,
+		Total:             int(resp.Total),
+		ProcessingMs:      int(resp.ProcessingMs),
+		FacetDistribution: resp.FacetDistribution,
 	}, nil
 }
 
@@ -97,5 +100,23 @@ func (r *RemoteSearch) DeleteDocuments(ctx context.Context, req plugin.DeleteDoc
 
 	return &plugin.DeleteDocumentsResponse{
 		Deleted: int(resp.Deleted),
+	}, nil
+}
+
+// ConfigureIndex sends an index configuration request via gRPC.
+func (r *RemoteSearch) ConfigureIndex(ctx context.Context, req plugin.ConfigureIndexRequest) (*plugin.ConfigureIndexResponse, error) {
+	resp, err := r.client.ConfigureIndex(ctx, &protocol.ConfigureIndexRequest{
+		Index:                req.Index,
+		PrimaryKey:           req.PrimaryKey,
+		FilterableAttributes: req.FilterableAttributes,
+		SortableAttributes:   req.SortableAttributes,
+		SearchableAttributes: req.SearchableAttributes,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "configure index gRPC call failed")
+	}
+
+	return &plugin.ConfigureIndexResponse{
+		Accepted: resp.Accepted,
 	}, nil
 }
