@@ -878,6 +878,193 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 	}
 }
 
+// StopPlugin stops a single running plugin, cleaning up its process, gRPC connection,
+// and registry entry. Used for hot-swapping plugins at runtime.
+func (m *PluginManager) StopPlugin(ctx context.Context, name string, registry *plugin.Registry) error {
+	m.mu.Lock()
+	p, exists := m.plugins[name]
+	if !exists {
+		m.mu.Unlock()
+		return errors.Newf("plugin not loaded: %s", name)
+	}
+	// Capture metadata and handler names before teardown
+	meta := p.client.Metadata()
+	handlerNames := p.client.GetHandlerNames()
+	delete(m.plugins, name)
+	delete(m.failedPlugins, name)
+	m.mu.Unlock()
+
+	// Unregister async handlers
+	if m.handlerRegistry != nil {
+		for _, h := range handlerNames {
+			m.handlerRegistry.Unregister(h)
+		}
+	}
+
+	// Shutdown gRPC
+	if err := p.client.Shutdown(ctx); err != nil {
+		m.logger.Warnw("Plugin shutdown error during stop", "plugin", name, "error", err)
+	}
+
+	// Kill process
+	if p.process != nil {
+		if err := p.process.Signal(os.Interrupt); err != nil {
+			p.process.Kill()
+		}
+	}
+
+	// Remove from registry
+	registry.Unregister(name)
+
+	// Clear HTTP mux state
+	if m.onPluginRestarted != nil {
+		m.onPluginRestarted(name)
+	}
+
+	// Emit stop banner
+	if m.accumulator != nil {
+		m.accumulator.SetLoading(name, meta.Version)
+		m.accumulator.Emit(name, BannerStopped)
+	}
+
+	return nil
+}
+
+// HotLoadPlugin discovers, loads, registers, and initializes a single plugin at runtime.
+// This is the full boot sequence for one plugin, used when am.toml adds a new plugin.
+func (m *PluginManager) HotLoadPlugin(ctx context.Context, name string, searchPaths []string, registry *plugin.Registry, services plugin.ServiceRegistry) error {
+	// Check if already loaded
+	m.mu.RLock()
+	_, exists := m.plugins[name]
+	m.mu.RUnlock()
+	if exists {
+		return errors.Newf("plugin '%s' already loaded", name)
+	}
+
+	// Discover the binary
+	pluginConfig, err := discoverPlugin(name, searchPaths, m.logger)
+	if err != nil {
+		m.mu.Lock()
+		m.failedPlugins[name] = fmt.Sprintf("binary not found: %v", err)
+		m.mu.Unlock()
+		return errors.Wrapf(err, "failed to discover plugin '%s'", name)
+	}
+
+	// Pre-register so routes work
+	registry.PreRegister(name)
+
+	// Load (start process, connect gRPC)
+	if err := m.loadPlugin(ctx, pluginConfig); err != nil {
+		m.mu.Lock()
+		m.failedPlugins[name] = err.Error()
+		m.mu.Unlock()
+		registry.MarkFailed(name, err.Error())
+		go m.retryPluginForever(m.shutdownCtx, pluginConfig, registry, services)
+		return errors.Wrapf(err, "failed to load plugin '%s' — retrying in background", name)
+	}
+
+	// Register with domain registry
+	domainPlugin, _ := m.GetPlugin(name)
+	if err := registry.Register(domainPlugin); err != nil {
+		return errors.Wrapf(err, "failed to register plugin '%s'", name)
+	}
+
+	// Initialize with services
+	if services != nil {
+		initCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+		if err := domainPlugin.Initialize(initCtx, services); err != nil {
+			cancel()
+			m.logger.Errorw("Failed to initialize hot-loaded plugin", "plugin", name, "error", err)
+			registry.MarkFailed(name, err.Error())
+			return errors.Wrapf(err, "failed to initialize plugin '%s'", name)
+		}
+		cancel()
+	}
+	registry.MarkReady(name)
+
+	// Register provider services (LLM, VectorSearch, Search)
+	proxy, ok := domainPlugin.(*ExternalDomainProxy)
+	if ok && m.servicesManager != nil {
+		if proxy.IsLLMProvider() {
+			if llmRouter := m.servicesManager.GetLLMRouter(); llmRouter != nil {
+				llmRouter.RegisterProvider(name, proxy.LLMServiceClient())
+				m.logger.Infow("Registered LLM provider (hot-loaded)", "plugin", name)
+			}
+		}
+		if proxy.IsVectorSearchProvider() {
+			if vsRouter := m.servicesManager.GetVectorSearchRouter(); vsRouter != nil {
+				vsRouter.SetService(proxy.VectorSearchServiceClient())
+				m.logger.Infow("Registered VectorSearch provider (hot-loaded)", "plugin", name)
+			}
+		}
+		if proxy.IsSearchProvider() {
+			if searchRouter := m.servicesManager.GetSearchRouter(); searchRouter != nil {
+				searchRouter.RegisterProvider(name, proxy.SearchServiceClient())
+				m.logger.Infow("Registered Search provider (hot-loaded)", "plugin", name)
+			}
+		}
+	}
+
+	// Register async handlers and schedules
+	if ok && m.handlerRegistry != nil {
+		for _, handlerName := range proxy.GetHandlerNames() {
+			proxyHandler := NewPluginProxyHandler(handlerName, proxy, m.db, m.logger)
+			m.handlerRegistry.Replace(proxyHandler)
+		}
+	}
+	if ok && m.db != nil {
+		schedules := proxy.GetSchedules()
+		if len(schedules) > 0 {
+			if err := SetupPluginSchedules(m.db, name, schedules, m.logger); err != nil {
+				m.logger.Errorw("Failed to setup schedules for hot-loaded plugin", "plugin", name, "error", err)
+			}
+		}
+	}
+
+	// Reload watchers
+	if m.onWatchersSetup != nil {
+		m.onWatchersSetup()
+	}
+
+	// Emit banner
+	if m.accumulator != nil {
+		meta := proxy.Metadata()
+		m.accumulator.SetLoading(name, meta.Version)
+		var roles []string
+		if proxy.IsLLMProvider() {
+			roles = append(roles, "llm-provider")
+		}
+		if proxy.IsSearchProvider() {
+			roles = append(roles, "search-provider")
+		}
+		m.accumulator.SetRoles(name, roles)
+		m.accumulator.SetHandlers(name, proxy.GetHandlerNames(), len(proxy.GetSchedules()), len(proxy.GetWatchers()))
+		healthCtx, hCancel := context.WithTimeout(ctx, 5*time.Second)
+		health := proxy.Health(healthCtx)
+		hCancel()
+		details := make(map[string]string)
+		for k, v := range health.Details {
+			if s, ok := v.(string); ok {
+				details[k] = s
+			}
+		}
+		m.accumulator.SetHealth(name, health.Healthy, health.Message, details)
+		m.accumulator.Emit(name, BannerHotLoaded)
+	}
+	return nil
+}
+
+// LoadedPluginNames returns the names of all currently loaded plugins.
+func (m *PluginManager) LoadedPluginNames() []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	names := make([]string, 0, len(m.plugins))
+	for name := range m.plugins {
+		names = append(names, name)
+	}
+	return names
+}
+
 // Shutdown stops all managed plugins and retry goroutines.
 func (m *PluginManager) Shutdown(ctx context.Context) error {
 	// Stop retry goroutines first

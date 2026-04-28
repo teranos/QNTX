@@ -18,6 +18,7 @@ var globalConfig *Config
 var viperInstance *viper.Viper
 var viperOnce sync.Once
 var viperInitErr error
+var projectConfigPath string // Path to the project-level config file (am.toml)
 
 // ConfigSources tracks where each setting came from during loading
 // Exported for use by introspection
@@ -42,6 +43,12 @@ func Load() (*Config, error) {
 
 	globalConfig = &config
 	return globalConfig, nil
+}
+
+// ProjectConfigPath returns the path to the project-level config file (am.toml).
+// Empty if no project config was found.
+func ProjectConfigPath() string {
+	return projectConfigPath
 }
 
 // GetViper returns the Viper instance for advanced configuration access.
@@ -87,6 +94,7 @@ func Reset() {
 	viperInstance = nil
 	viperOnce = sync.Once{}
 	viperInitErr = nil
+	projectConfigPath = ""
 	configSourcesMu.Lock()
 	ConfigSources = make(map[string]SourceInfo)
 	configSourcesMu.Unlock()
@@ -215,6 +223,7 @@ func mergeConfigFiles(v *viper.Viper) error {
 	// Add project config if found (highest file precedence, below env vars)
 	if projectConfig != "" {
 		configFiles = append(configFiles, configFile{projectConfig, SourceProject})
+		projectConfigPath = projectConfig
 	}
 
 	// Track defaults first
