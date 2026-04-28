@@ -808,9 +808,12 @@ func (s *QNTXServer) HandlePluginGlyphs(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, glyphs)
 }
 
-// HandlePluginAction handles pause/resume actions for plugins
+// HandlePluginAction handles lifecycle actions for plugins
 // POST /api/plugins/{name}/pause - Pause a plugin
 // POST /api/plugins/{name}/resume - Resume a plugin
+// POST /api/plugins/{name}/restart - Restart a plugin
+// POST /api/plugins/{name}/enable - Enable a plugin at runtime
+// POST /api/plugins/{name}/disable - Disable a plugin at runtime
 func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) {
 	if !requireMethod(w, r, http.MethodPost) {
 		return
@@ -898,8 +901,71 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 		s.logger.Debugw("Plugin restarted", "plugin", name)
 		s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin restarted")
 
+	case "enable":
+		pm := s.getPluginManager()
+		if pm == nil {
+			writeError(w, http.StatusServiceUnavailable, "Plugin manager not available")
+			return
+		}
+		// Re-read config to get current search paths
+		appcfg.Reset()
+		cfg, cfgErr := appcfg.Load()
+		if cfgErr != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to load config: %v", cfgErr))
+			return
+		}
+		err = pm.EnablePlugin(ctx, name, cfg.Plugin.Paths, s.pluginRegistry, s.services)
+		if err != nil {
+			s.logger.Warnw("Failed to enable plugin", "plugin", name, "error", err)
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		// Invalidate HTTP mux cache for the newly enabled plugin
+		s.pluginMuxes.Delete(name)
+		s.pluginMuxInit.Delete(name)
+		// Emit banner
+		if acc := pm.Accumulator(); acc != nil {
+			acc.Emit(name, plugingrpc.BannerBoot)
+		}
+		s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin enabled")
+
+	case "disable":
+		pm := s.getPluginManager()
+		if pm == nil {
+			writeError(w, http.StatusServiceUnavailable, "Plugin manager not available")
+			return
+		}
+		// Capture metadata before disabling (plugin will be gone after)
+		var disabledVersion string
+		var handlerCount, watcherCount int
+		if p, ok := s.pluginRegistry.Get(name); ok {
+			disabledVersion = p.Metadata().Version
+			if proxy, ok := p.(*plugingrpc.ExternalDomainProxy); ok {
+				handlerCount = len(proxy.GetHandlerNames())
+				watcherCount = len(proxy.GetWatchers())
+			}
+		}
+		err = pm.DisablePlugin(ctx, name, s.pluginRegistry)
+		if err != nil {
+			s.logger.Warnw("Failed to disable plugin", "plugin", name, "error", err)
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		// Clear cached HTTP mux
+		s.pluginMuxes.Delete(name)
+		s.pluginMuxInit.Delete(name)
+		// Emit disabled banner with cleanup summary
+		if acc := pm.Accumulator(); acc != nil {
+			acc.SetLoading(name, disabledVersion)
+			acc.SetHandlers(name, nil, 0, watcherCount)
+			status := fmt.Sprintf("stopped, %d handlers, %d watchers removed", handlerCount, watcherCount)
+			acc.SetHealth(name, true, status, nil)
+			acc.Emit(name, plugingrpc.BannerDisabled)
+		}
+		s.BroadcastPluginHealth(name, false, string(plugin.StateStopped), "Plugin disabled")
+
 	default:
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("Unknown action: %s (expected 'pause', 'resume', or 'restart')", action))
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("Unknown action: %s (expected 'pause', 'resume', 'restart', 'enable', or 'disable')", action))
 		return
 	}
 

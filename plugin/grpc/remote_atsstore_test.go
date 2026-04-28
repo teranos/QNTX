@@ -14,6 +14,7 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap/zaptest"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // startATSStoreServer starts an ATSStoreService gRPC server for testing
@@ -74,6 +75,63 @@ func TestRemoteATSStore_CreateAttestation(t *testing.T) {
 	// Verify it exists
 	exists := client.AttestationExists("test-id-123")
 	assert.True(t, exists)
+}
+
+func TestATSStoreServer_GenerateAndCreate_NilCommand(t *testing.T) {
+	store, _ := qntxtest.CreateTestStore(t)
+
+	authToken := "test-token"
+	addr, cleanup := startATSStoreServer(t, store, authToken)
+	defer cleanup()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(t, err)
+	defer conn.Close()
+
+	client := protocol.NewATSStoreServiceClient(conn)
+
+	// Send request with nil command — must return error, not panic/hang
+	resp, err := client.GenerateAndCreateAttestation(ctx, &protocol.GenerateAttestationRequest{
+		AuthToken: authToken,
+		Command:   nil,
+	})
+	require.NoError(t, err, "RPC should not return transport error")
+	assert.False(t, resp.Success)
+	assert.Contains(t, resp.Error, "nil")
+}
+
+func TestATSStoreServer_GenerateAndCreate_ValidCommand(t *testing.T) {
+	store, _ := qntxtest.CreateTestStore(t)
+
+	authToken := "test-token"
+	addr, cleanup := startATSStoreServer(t, store, authToken)
+	defer cleanup()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(t, err)
+	defer conn.Close()
+
+	client := protocol.NewATSStoreServiceClient(conn)
+
+	resp, err := client.GenerateAndCreateAttestation(ctx, &protocol.GenerateAttestationRequest{
+		AuthToken: authToken,
+		Command: &protocol.AttestationCommand{
+			Subjects:   []string{"test-subject"},
+			Predicates: []string{"test-predicate"},
+			Contexts:   []string{"test-context"},
+			Actors:     []string{"test-actor"},
+			Source:     "test",
+		},
+	})
+	require.NoError(t, err, "RPC should not return transport error")
+	assert.True(t, resp.Success, "expected success, got error: %s", resp.Error)
+	assert.NotEmpty(t, resp.Attestation.Id)
 }
 
 func TestRemoteATSStore_CreateAttestation_InvalidToken(t *testing.T) {

@@ -41,9 +41,9 @@ Ports are configured in `../am.toml` at project root:
 
 ### Runtime Dependencies
 - **No NPM required at runtime** - All TypeScript is bundled and embedded in the Go binary
-- WebSocket for real-time updates and LSP
+- WebSocket for real-time updates
 - WAAPI (Web Animations API) for glyph morphing
-- CodeMirror 6 for the ATS query editor with LSP integration
+- CodeMirror 6 for the ATS query editor
 
 ### Build System: Bun
 
@@ -84,7 +84,6 @@ The `package.json` locks **exact versions** (no `^` or `~`):
     "@codemirror/state": "6.4.1",
     "@codemirror/view": "6.34.3",
     "@lezer/highlight": "1.2.1",
-    "codemirror-languageserver": "1.17.0",   // LSP client
     "d3": "7.9.0"                             // Graph visualization (Prose relationships)
   }
 }
@@ -161,9 +160,9 @@ make cli
 - Canvas glyph with spatial grid layout
 - Python programmature glyphs with `attest()` support
 
-### CodeMirror 6 with LSP
-- Syntax highlighting (semantic tokens from LSP)
-- Autocomplete (via LSP)
+### CodeMirror 6
+- Syntax highlighting (semantic tokens)
+- Autocomplete
 - Error/warning linting (via `@codemirror/lint`)
 - Real-time editing with live updates
 

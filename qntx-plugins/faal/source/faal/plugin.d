@@ -26,6 +26,10 @@ enum FailureMode {
     slow_responses,      // delay every RPC response
     bad_metadata,        // return corrupt Metadata
     random,              // pick a random misbehavior per RPC
+    test_ats,            // test ATS gRPC endpoint during Initialize
+    ats_flood,           // continuously create attestations on a timer
+    read_flood,          // continuously query attestations on a timer
+    rw_flood,            // interspersed reads and writes on a timer
 }
 
 // ---------------------------------------------------------------------------
@@ -56,6 +60,10 @@ private FailureMode parseMode(string s) {
     if (s == "slow_responses")      return FailureMode.slow_responses;
     if (s == "bad_metadata")        return FailureMode.bad_metadata;
     if (s == "random")              return FailureMode.random;
+    if (s == "test_ats")            return FailureMode.test_ats;
+    if (s == "ats_flood")           return FailureMode.ats_flood;
+    if (s == "read_flood")          return FailureMode.read_flood;
+    if (s == "rw_flood")            return FailureMode.rw_flood;
     return FailureMode.none;
 }
 
@@ -132,6 +140,18 @@ private bool applyFailure(string rpcName) {
 
         case FailureMode.random:
             return false; // already resolved above
+
+        case FailureMode.test_ats:
+            return false; // handled in initialize()
+
+        case FailureMode.ats_flood:
+            return false; // handled in initialize()
+
+        case FailureMode.read_flood:
+            return false; // handled in initialize()
+
+        case FailureMode.rw_flood:
+            return false; // handled in initialize()
     }
 }
 
@@ -145,6 +165,10 @@ private string modeStr(FailureMode m) {
         case FailureMode.slow_responses:      return "slow_responses";
         case FailureMode.bad_metadata:        return "bad_metadata";
         case FailureMode.random:              return "random";
+        case FailureMode.test_ats:            return "test_ats";
+        case FailureMode.ats_flood:           return "ats_flood";
+        case FailureMode.read_flood:          return "read_flood";
+        case FailureMode.rw_flood:            return "rw_flood";
     }
 }
 
@@ -201,6 +225,275 @@ InitializeResponse initialize(ref const InitializeRequest req) {
     }
 
     logInfo("[faal] Initialize: mode=%s delay=%dms", modeStr(state.mode), state.delayMs);
+
+    // test_ats: call GenerateAndCreateAttestation via gRPC during init
+    if (state.mode == FailureMode.test_ats) {
+        auto endpoint = req.atsStoreEndpoint;
+        auto token = req.authToken;
+        logInfo("[faal] test_ats: ATS endpoint=%s token=%dB", endpoint, token.length);
+
+        if (endpoint.length == 0) {
+            logError("[faal] test_ats: no ats_store_endpoint provided");
+        } else if (token.length == 0) {
+            logError("[faal] test_ats: no auth_token provided");
+        } else {
+            import faal.grpc : grpcCall;
+
+            // Build GenerateAttestationRequest
+            auto cmd = AttestationCommand();
+            cmd.subjects = ["faal-test"];
+            cmd.predicates = ["ats-probe"];
+            cmd.contexts = ["chaos-test"];
+            cmd.actors = ["faal"];
+            cmd.source = "faal";
+            cmd.sourceVersion = PLUGIN_VERSION;
+
+            auto request = GenerateAttestationRequest();
+            request.authToken = token;
+            request.command = cmd;
+
+            auto requestBytes = encode(request);
+            logInfo("[faal] test_ats: sending %d bytes to %s", requestBytes.length, endpoint);
+
+            auto responseBytes = grpcCall(
+                endpoint,
+                "/protocol.ATSStoreService/GenerateAndCreateAttestation",
+                requestBytes,
+                10_000
+            );
+
+            if (responseBytes is null) {
+                logError("[faal] test_ats: RPC returned null (timeout or connection failure)");
+            } else {
+                auto resp = decode!GenerateAttestationResponse(responseBytes);
+                if (resp.success) {
+                    logInfo("[faal] test_ats: SUCCESS — attestation created");
+                } else {
+                    logError("[faal] test_ats: FAILED — %s", resp.error);
+                }
+            }
+        }
+    }
+
+    // ats_flood: spawn background thread that continuously creates attestations
+    if (state.mode == FailureMode.ats_flood) {
+        auto endpoint = req.atsStoreEndpoint;
+        auto token = req.authToken;
+        int intervalMs = state.delayMs; // reuse delay_ms config, default 3000
+
+        if ("flood_interval_ms" in state.config) {
+            import std.conv : to;
+            try {
+                intervalMs = state.config["flood_interval_ms"].to!int;
+            } catch (Exception) {
+                intervalMs = 100;
+            }
+        }
+
+        if (endpoint.length > 0 && token.length > 0) {
+            logInfo("[faal] ats_flood: starting — interval=%dms endpoint=%s", intervalMs, endpoint);
+
+            auto floodThread = new Thread({
+                int count = 0;
+                while (true) {
+                    count++;
+                    auto cmd = AttestationCommand();
+                    cmd.subjects = ["faal-flood"];
+                    cmd.predicates = ["ats-flood"];
+                    cmd.contexts = ["chaos-test"];
+                    cmd.actors = ["faal"];
+                    cmd.source = "faal";
+                    cmd.sourceVersion = PLUGIN_VERSION;
+
+                    auto request = GenerateAttestationRequest();
+                    request.authToken = token;
+                    request.command = cmd;
+
+                    auto requestBytes = encode(request);
+
+                    import faal.grpc : grpcCall;
+                    auto responseBytes = grpcCall(
+                        endpoint,
+                        "/protocol.ATSStoreService/GenerateAndCreateAttestation",
+                        requestBytes,
+                        5_000
+                    );
+
+                    if (responseBytes is null) {
+                        logError("[faal] ats_flood #%d: RPC timeout", count);
+                    } else {
+                        auto resp = decode!GenerateAttestationResponse(responseBytes);
+                        if (resp.success) {
+                            if (count % 100 == 0)
+                                logInfo("[faal] ats_flood: %d attestations created", count);
+                        } else {
+                            logError("[faal] ats_flood #%d: %s", count, resp.error);
+                        }
+                    }
+
+                    Thread.sleep(dur!"msecs"(intervalMs));
+                }
+            });
+            floodThread.isDaemon = true;
+            floodThread.start();
+        } else {
+            logError("[faal] ats_flood: no endpoint or token — skipping");
+        }
+    }
+
+    // read_flood: spawn background thread that continuously queries attestations
+    if (state.mode == FailureMode.read_flood) {
+        auto endpoint = req.atsStoreEndpoint;
+        auto token = req.authToken;
+        int intervalMs = 10;
+
+        if ("flood_interval_ms" in state.config) {
+            import std.conv : to;
+            try {
+                intervalMs = state.config["flood_interval_ms"].to!int;
+            } catch (Exception) {
+                intervalMs = 100;
+            }
+        }
+
+        if (endpoint.length > 0 && token.length > 0) {
+            logInfo("[faal] read_flood: starting — interval=%dms endpoint=%s", intervalMs, endpoint);
+
+            auto readThread = new Thread({
+                int count = 0;
+                while (true) {
+                    count++;
+
+                    auto filter = AttestationFilter();
+                    filter.predicates = ["ats-flood"];
+                    filter.contexts = ["chaos-test"];
+
+                    auto request = GetAttestationsRequest();
+                    request.authToken = token;
+                    request.filter = filter;
+
+                    auto requestBytes = encode(request);
+
+                    import faal.grpc : grpcCall;
+                    auto responseBytes = grpcCall(
+                        endpoint,
+                        "/protocol.ATSStoreService/GetAttestations",
+                        requestBytes,
+                        5_000
+                    );
+
+                    if (responseBytes is null) {
+                        logError("[faal] read_flood #%d: RPC timeout", count);
+                    } else {
+                        auto resp = decode!GetAttestationsResponse(responseBytes);
+                        if (resp.success) {
+                            if (count % 100 == 0)
+                                logInfo("[faal] read_flood: %d queries completed", count);
+                        } else {
+                            logError("[faal] read_flood #%d: %s", count, resp.error);
+                        }
+                    }
+
+                    Thread.sleep(dur!"msecs"(intervalMs));
+                }
+            });
+            readThread.isDaemon = true;
+            readThread.start();
+        } else {
+            logError("[faal] read_flood: no endpoint or token — skipping");
+        }
+    }
+
+    // rw_flood: interspersed reads and writes
+    if (state.mode == FailureMode.rw_flood) {
+        auto endpoint = req.atsStoreEndpoint;
+        auto token = req.authToken;
+        int intervalMs = 10;
+
+        if ("flood_interval_ms" in state.config) {
+            import std.conv : to;
+            try {
+                intervalMs = state.config["flood_interval_ms"].to!int;
+            } catch (Exception) {
+                intervalMs = 10;
+            }
+        }
+
+        if (endpoint.length > 0 && token.length > 0) {
+            logInfo("[faal] rw_flood: starting — interval=%dms endpoint=%s", intervalMs, endpoint);
+
+            auto rwThread = new Thread({
+                int count = 0;
+                while (true) {
+                    count++;
+                    import faal.grpc : grpcCall;
+
+                    if (count % 2 == 1) {
+                        // Odd: write
+                        auto cmd = AttestationCommand();
+                        cmd.subjects = ["faal-flood"];
+                        cmd.predicates = ["ats-flood"];
+                        cmd.contexts = ["chaos-test"];
+                        cmd.actors = ["faal"];
+                        cmd.source = "faal";
+                        cmd.sourceVersion = PLUGIN_VERSION;
+
+                        auto request = GenerateAttestationRequest();
+                        request.authToken = token;
+                        request.command = cmd;
+
+                        auto responseBytes = grpcCall(
+                            endpoint,
+                            "/protocol.ATSStoreService/GenerateAndCreateAttestation",
+                            encode(request),
+                            5_000
+                        );
+
+                        if (responseBytes is null) {
+                            logError("[faal] rw_flood W#%d: RPC timeout", count);
+                        } else {
+                            auto resp = decode!GenerateAttestationResponse(responseBytes);
+                            if (!resp.success)
+                                logError("[faal] rw_flood W#%d: %s", count, resp.error);
+                        }
+                    } else {
+                        // Even: read
+                        auto filter = AttestationFilter();
+                        filter.predicates = ["ats-flood"];
+                        filter.contexts = ["chaos-test"];
+
+                        auto request = GetAttestationsRequest();
+                        request.authToken = token;
+                        request.filter = filter;
+
+                        auto responseBytes = grpcCall(
+                            endpoint,
+                            "/protocol.ATSStoreService/GetAttestations",
+                            encode(request),
+                            5_000
+                        );
+
+                        if (responseBytes is null) {
+                            logError("[faal] rw_flood R#%d: RPC timeout", count);
+                        } else {
+                            auto resp = decode!GetAttestationsResponse(responseBytes);
+                            if (!resp.success)
+                                logError("[faal] rw_flood R#%d: %s", count, resp.error);
+                        }
+                    }
+
+                    if (count % 200 == 0)
+                        logInfo("[faal] rw_flood: %d ops completed", count);
+
+                    Thread.sleep(dur!"msecs"(intervalMs));
+                }
+            });
+            rwThread.isDaemon = true;
+            rwThread.start();
+        } else {
+            logError("[faal] rw_flood: no endpoint or token — skipping");
+        }
+    }
 
     // crash_once: crash on first launch, work on second
     if (state.mode == FailureMode.crash_once) {
@@ -312,8 +605,9 @@ void registerHandlers(ref GrpcServer server) {
 
     server.registerHandler("/protocol.DomainPluginService/ConfigSchema", (const ubyte[] _) {
         ConfigSchemaResponse resp;
-        resp.fields["failure_mode"] = "none|crash_once|crash_before_health|crash_after_health|hang_on_initialize|slow_responses|bad_metadata|random";
-        resp.fields["delay_ms"]     = "Delay in milliseconds for slow_responses mode (default: 3000)";
+        resp.fields["failure_mode"]     = "none|crash_once|crash_before_health|crash_after_health|hang_on_initialize|slow_responses|bad_metadata|random|test_ats|ats_flood|read_flood|rw_flood";
+        resp.fields["delay_ms"]         = "Delay in milliseconds for slow_responses mode (default: 3000)";
+        resp.fields["flood_interval_ms"] = "Interval between attestations in ats_flood mode (default: 100)";
         return encode(resp);
     });
 

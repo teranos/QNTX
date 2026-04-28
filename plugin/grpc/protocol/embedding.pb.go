@@ -677,6 +677,298 @@ func (*SetClusterLabelResponse) Descriptor() ([]byte, []int) {
 	return file_plugin_grpc_protocol_embedding_proto_rawDescGZIP(), []int{11}
 }
 
+type ClusterRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AuthToken      string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
+	Data           []float32              `protobuf:"fixed32,2,rep,packed,name=data,proto3" json:"data,omitempty"`
+	NPoints        int32                  `protobuf:"varint,3,opt,name=n_points,json=nPoints,proto3" json:"n_points,omitempty"`
+	Dimensions     int32                  `protobuf:"varint,4,opt,name=dimensions,proto3" json:"dimensions,omitempty"`
+	MinClusterSize int32                  `protobuf:"varint,5,opt,name=min_cluster_size,json=minClusterSize,proto3" json:"min_cluster_size,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ClusterRequest) Reset() {
+	*x = ClusterRequest{}
+	mi := &file_plugin_grpc_protocol_embedding_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClusterRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClusterRequest) ProtoMessage() {}
+
+func (x *ClusterRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_embedding_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClusterRequest.ProtoReflect.Descriptor instead.
+func (*ClusterRequest) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_embedding_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ClusterRequest) GetAuthToken() string {
+	if x != nil {
+		return x.AuthToken
+	}
+	return ""
+}
+
+func (x *ClusterRequest) GetData() []float32 {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ClusterRequest) GetNPoints() int32 {
+	if x != nil {
+		return x.NPoints
+	}
+	return 0
+}
+
+func (x *ClusterRequest) GetDimensions() int32 {
+	if x != nil {
+		return x.Dimensions
+	}
+	return 0
+}
+
+func (x *ClusterRequest) GetMinClusterSize() int32 {
+	if x != nil {
+		return x.MinClusterSize
+	}
+	return 0
+}
+
+type ClusterResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Labels        []int32                `protobuf:"varint,1,rep,packed,name=labels,proto3" json:"labels,omitempty"`
+	Probabilities []float32              `protobuf:"fixed32,2,rep,packed,name=probabilities,proto3" json:"probabilities,omitempty"`
+	NClusters     int32                  `protobuf:"varint,3,opt,name=n_clusters,json=nClusters,proto3" json:"n_clusters,omitempty"`
+	Centroids     []*Centroid            `protobuf:"bytes,4,rep,name=centroids,proto3" json:"centroids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClusterResponse) Reset() {
+	*x = ClusterResponse{}
+	mi := &file_plugin_grpc_protocol_embedding_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClusterResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClusterResponse) ProtoMessage() {}
+
+func (x *ClusterResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_embedding_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClusterResponse.ProtoReflect.Descriptor instead.
+func (*ClusterResponse) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_embedding_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ClusterResponse) GetLabels() []int32 {
+	if x != nil {
+		return x.Labels
+	}
+	return nil
+}
+
+func (x *ClusterResponse) GetProbabilities() []float32 {
+	if x != nil {
+		return x.Probabilities
+	}
+	return nil
+}
+
+func (x *ClusterResponse) GetNClusters() int32 {
+	if x != nil {
+		return x.NClusters
+	}
+	return 0
+}
+
+func (x *ClusterResponse) GetCentroids() []*Centroid {
+	if x != nil {
+		return x.Centroids
+	}
+	return nil
+}
+
+type Centroid struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Vector        []float32              `protobuf:"fixed32,1,rep,packed,name=vector,proto3" json:"vector,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Centroid) Reset() {
+	*x = Centroid{}
+	mi := &file_plugin_grpc_protocol_embedding_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Centroid) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Centroid) ProtoMessage() {}
+
+func (x *Centroid) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_embedding_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Centroid.ProtoReflect.Descriptor instead.
+func (*Centroid) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_embedding_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *Centroid) GetVector() []float32 {
+	if x != nil {
+		return x.Vector
+	}
+	return nil
+}
+
+type ModelInfoRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AuthToken     string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ModelInfoRequest) Reset() {
+	*x = ModelInfoRequest{}
+	mi := &file_plugin_grpc_protocol_embedding_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ModelInfoRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ModelInfoRequest) ProtoMessage() {}
+
+func (x *ModelInfoRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_embedding_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ModelInfoRequest.ProtoReflect.Descriptor instead.
+func (*ModelInfoRequest) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_embedding_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ModelInfoRequest) GetAuthToken() string {
+	if x != nil {
+		return x.AuthToken
+	}
+	return ""
+}
+
+type ModelInfoResponse struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Name              string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Dimensions        int32                  `protobuf:"varint,2,opt,name=dimensions,proto3" json:"dimensions,omitempty"`
+	MaxSequenceLength int32                  `protobuf:"varint,3,opt,name=max_sequence_length,json=maxSequenceLength,proto3" json:"max_sequence_length,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ModelInfoResponse) Reset() {
+	*x = ModelInfoResponse{}
+	mi := &file_plugin_grpc_protocol_embedding_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ModelInfoResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ModelInfoResponse) ProtoMessage() {}
+
+func (x *ModelInfoResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_embedding_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ModelInfoResponse.ProtoReflect.Descriptor instead.
+func (*ModelInfoResponse) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_embedding_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ModelInfoResponse) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ModelInfoResponse) GetDimensions() int32 {
+	if x != nil {
+		return x.Dimensions
+	}
+	return 0
+}
+
+func (x *ModelInfoResponse) GetMaxSequenceLength() int32 {
+	if x != nil {
+		return x.MaxSequenceLength
+	}
+	return 0
+}
+
 var File_plugin_grpc_protocol_embedding_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_embedding_proto_rawDesc = "" +
@@ -733,11 +1025,39 @@ const file_plugin_grpc_protocol_embedding_proto_rawDesc = "" +
 	"\n" +
 	"cluster_id\x18\x02 \x01(\x05R\tclusterId\x12\x14\n" +
 	"\x05label\x18\x03 \x01(\tR\x05label\"\x19\n" +
-	"\x17SetClusterLabelResponse2\xc1\x03\n" +
+	"\x17SetClusterLabelResponse\"\xa8\x01\n" +
+	"\x0eClusterRequest\x12\x1d\n" +
+	"\n" +
+	"auth_token\x18\x01 \x01(\tR\tauthToken\x12\x12\n" +
+	"\x04data\x18\x02 \x03(\x02R\x04data\x12\x19\n" +
+	"\bn_points\x18\x03 \x01(\x05R\anPoints\x12\x1e\n" +
+	"\n" +
+	"dimensions\x18\x04 \x01(\x05R\n" +
+	"dimensions\x12(\n" +
+	"\x10min_cluster_size\x18\x05 \x01(\x05R\x0eminClusterSize\"\xa0\x01\n" +
+	"\x0fClusterResponse\x12\x16\n" +
+	"\x06labels\x18\x01 \x03(\x05R\x06labels\x12$\n" +
+	"\rprobabilities\x18\x02 \x03(\x02R\rprobabilities\x12\x1d\n" +
+	"\n" +
+	"n_clusters\x18\x03 \x01(\x05R\tnClusters\x120\n" +
+	"\tcentroids\x18\x04 \x03(\v2\x12.protocol.CentroidR\tcentroids\"\"\n" +
+	"\bCentroid\x12\x16\n" +
+	"\x06vector\x18\x01 \x03(\x02R\x06vector\"1\n" +
+	"\x10ModelInfoRequest\x12\x1d\n" +
+	"\n" +
+	"auth_token\x18\x01 \x01(\tR\tauthToken\"w\n" +
+	"\x11ModelInfoResponse\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1e\n" +
+	"\n" +
+	"dimensions\x18\x02 \x01(\x05R\n" +
+	"dimensions\x12.\n" +
+	"\x13max_sequence_length\x18\x03 \x01(\x05R\x11maxSequenceLength2\xc7\x04\n" +
 	"\x10EmbeddingService\x128\n" +
 	"\x05Embed\x12\x16.protocol.EmbedRequest\x1a\x17.protocol.EmbedResponse\x12G\n" +
 	"\n" +
-	"BatchEmbed\x12\x1b.protocol.BatchEmbedRequest\x1a\x1c.protocol.BatchEmbedResponse\x12q\n" +
+	"BatchEmbed\x12\x1b.protocol.BatchEmbedRequest\x1a\x1c.protocol.BatchEmbedResponse\x12>\n" +
+	"\aCluster\x12\x18.protocol.ClusterRequest\x1a\x19.protocol.ClusterResponse\x12D\n" +
+	"\tModelInfo\x12\x1a.protocol.ModelInfoRequest\x1a\x1b.protocol.ModelInfoResponse\x12q\n" +
 	"\x18GetLabelEligibleClusters\x12).protocol.GetLabelEligibleClustersRequest\x1a*.protocol.GetLabelEligibleClustersResponse\x12_\n" +
 	"\x12SampleClusterTexts\x12#.protocol.SampleClusterTextsRequest\x1a$.protocol.SampleClusterTextsResponse\x12V\n" +
 	"\x0fSetClusterLabel\x12 .protocol.SetClusterLabelRequest\x1a!.protocol.SetClusterLabelResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
@@ -754,7 +1074,7 @@ func file_plugin_grpc_protocol_embedding_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_embedding_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_embedding_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_plugin_grpc_protocol_embedding_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_plugin_grpc_protocol_embedding_proto_goTypes = []any{
 	(*EmbedRequest)(nil),                     // 0: protocol.EmbedRequest
 	(*EmbedResponse)(nil),                    // 1: protocol.EmbedResponse
@@ -768,25 +1088,35 @@ var file_plugin_grpc_protocol_embedding_proto_goTypes = []any{
 	(*SampleClusterTextsResponse)(nil),       // 9: protocol.SampleClusterTextsResponse
 	(*SetClusterLabelRequest)(nil),           // 10: protocol.SetClusterLabelRequest
 	(*SetClusterLabelResponse)(nil),          // 11: protocol.SetClusterLabelResponse
+	(*ClusterRequest)(nil),                   // 12: protocol.ClusterRequest
+	(*ClusterResponse)(nil),                  // 13: protocol.ClusterResponse
+	(*Centroid)(nil),                         // 14: protocol.Centroid
+	(*ModelInfoRequest)(nil),                 // 15: protocol.ModelInfoRequest
+	(*ModelInfoResponse)(nil),                // 16: protocol.ModelInfoResponse
 }
 var file_plugin_grpc_protocol_embedding_proto_depIdxs = []int32{
 	4,  // 0: protocol.BatchEmbedResponse.results:type_name -> protocol.EmbeddingVector
 	7,  // 1: protocol.GetLabelEligibleClustersResponse.clusters:type_name -> protocol.EligibleCluster
-	0,  // 2: protocol.EmbeddingService.Embed:input_type -> protocol.EmbedRequest
-	2,  // 3: protocol.EmbeddingService.BatchEmbed:input_type -> protocol.BatchEmbedRequest
-	5,  // 4: protocol.EmbeddingService.GetLabelEligibleClusters:input_type -> protocol.GetLabelEligibleClustersRequest
-	8,  // 5: protocol.EmbeddingService.SampleClusterTexts:input_type -> protocol.SampleClusterTextsRequest
-	10, // 6: protocol.EmbeddingService.SetClusterLabel:input_type -> protocol.SetClusterLabelRequest
-	1,  // 7: protocol.EmbeddingService.Embed:output_type -> protocol.EmbedResponse
-	3,  // 8: protocol.EmbeddingService.BatchEmbed:output_type -> protocol.BatchEmbedResponse
-	6,  // 9: protocol.EmbeddingService.GetLabelEligibleClusters:output_type -> protocol.GetLabelEligibleClustersResponse
-	9,  // 10: protocol.EmbeddingService.SampleClusterTexts:output_type -> protocol.SampleClusterTextsResponse
-	11, // 11: protocol.EmbeddingService.SetClusterLabel:output_type -> protocol.SetClusterLabelResponse
-	7,  // [7:12] is the sub-list for method output_type
-	2,  // [2:7] is the sub-list for method input_type
-	2,  // [2:2] is the sub-list for extension type_name
-	2,  // [2:2] is the sub-list for extension extendee
-	0,  // [0:2] is the sub-list for field type_name
+	14, // 2: protocol.ClusterResponse.centroids:type_name -> protocol.Centroid
+	0,  // 3: protocol.EmbeddingService.Embed:input_type -> protocol.EmbedRequest
+	2,  // 4: protocol.EmbeddingService.BatchEmbed:input_type -> protocol.BatchEmbedRequest
+	12, // 5: protocol.EmbeddingService.Cluster:input_type -> protocol.ClusterRequest
+	15, // 6: protocol.EmbeddingService.ModelInfo:input_type -> protocol.ModelInfoRequest
+	5,  // 7: protocol.EmbeddingService.GetLabelEligibleClusters:input_type -> protocol.GetLabelEligibleClustersRequest
+	8,  // 8: protocol.EmbeddingService.SampleClusterTexts:input_type -> protocol.SampleClusterTextsRequest
+	10, // 9: protocol.EmbeddingService.SetClusterLabel:input_type -> protocol.SetClusterLabelRequest
+	1,  // 10: protocol.EmbeddingService.Embed:output_type -> protocol.EmbedResponse
+	3,  // 11: protocol.EmbeddingService.BatchEmbed:output_type -> protocol.BatchEmbedResponse
+	13, // 12: protocol.EmbeddingService.Cluster:output_type -> protocol.ClusterResponse
+	16, // 13: protocol.EmbeddingService.ModelInfo:output_type -> protocol.ModelInfoResponse
+	6,  // 14: protocol.EmbeddingService.GetLabelEligibleClusters:output_type -> protocol.GetLabelEligibleClustersResponse
+	9,  // 15: protocol.EmbeddingService.SampleClusterTexts:output_type -> protocol.SampleClusterTextsResponse
+	11, // 16: protocol.EmbeddingService.SetClusterLabel:output_type -> protocol.SetClusterLabelResponse
+	10, // [10:17] is the sub-list for method output_type
+	3,  // [3:10] is the sub-list for method input_type
+	3,  // [3:3] is the sub-list for extension type_name
+	3,  // [3:3] is the sub-list for extension extendee
+	0,  // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_embedding_proto_init() }
@@ -800,7 +1130,7 @@ func file_plugin_grpc_protocol_embedding_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_embedding_proto_rawDesc), len(file_plugin_grpc_protocol_embedding_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

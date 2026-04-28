@@ -24,7 +24,7 @@
  *   - WebSocket handlers: storage-warning.ts, storage-eviction.ts, system-capabilities.ts
  *   - Graph visualization: renderer.ts, focus.ts, focus/dimensions.ts, focus/physics.ts, tile/controls.ts
  *   - Panels: pulse-panel.ts, prose/panel.ts, config-panel.ts
- *   - Editors: prose/editor.ts, code/panel.ts, code/suggestions.ts, codemirror-editor.ts
+ *   - Editors: prose/editor.ts, code/panel.ts, code/suggestions.ts
  *   - Components: type-attestations.ts, base-panel-error.ts, glyph/py-glyph.ts
  *   - Prose nodes: ats-code-block.ts, go-code-block.ts, frontmatter-block.ts
  *   - Utilities: tauri-notifications.ts, symbol-palette.ts, search-view.ts

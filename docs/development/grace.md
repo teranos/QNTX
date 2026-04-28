@@ -269,5 +269,38 @@ config := async.WorkerPoolConfig{
 }
 ```
 
+## Diagnostics
+
+### pprof (always on)
+
+`net/http/pprof` is registered on the main HTTP server. Available whenever QNTX is running:
+
+| Endpoint | Use |
+|----------|-----|
+| `/debug/pprof/goroutine?debug=2` | Full goroutine stacks with mutex wait times — primary deadlock diagnostic |
+| `/debug/pprof/mutex` | Mutex contention profile |
+| `/debug/pprof/heap` | Memory allocation profile |
+| `/debug/pprof/profile?seconds=30` | CPU profile (30s sample) |
+
+**Example**: to diagnose a hanging ATS store, hit `http://localhost:{port}/debug/pprof/goroutine?debug=2` and look for goroutines blocked on mutex acquisition.
+
+### Signal behavior
+
+| Signal | Trigger | Behavior |
+|--------|---------|----------|
+| `SIGINT` | Ctrl+C | Graceful shutdown: stop workers (20s timeout), checkpoint jobs, stop plugins, exit 0 |
+| `SIGTERM` | `kill <pid>` | Same as SIGINT |
+| `SIGQUIT` | Ctrl+\ or `kill -QUIT` | Go default: goroutine stacks to stderr, exit 2. Fallback when HTTP is unreachable |
+
+### Mutex watchdog
+
+The RustStore shared mutex (`ats/storage/sqlitecgo/storage_cgo.go`) serializes all SQLite access. A leaked transaction or slow CGO call can hold this mutex indefinitely, deadlocking all attestation operations.
+
+A background goroutine periodically attempts to acquire the mutex with a timeout. If acquisition takes longer than the threshold, it logs a warning with the current goroutine stacks. This provides early warning before a full deadlock develops.
+
+### Database backup
+
+Hot backup runs on the Pulse ticker without holding the Go mutex. See [database-backup.md](../architecture/database-backup.md) for architecture, write-load behavior, and why `run_to_completion` stalls under sustained writes.
+
 ---
 **Status**: Implemented and tested

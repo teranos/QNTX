@@ -4,15 +4,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         use std::path::PathBuf;
 
-        // Proto files are relative to workspace root
-        let project_root = PathBuf::from("../../");
-        let proto_dir = project_root.join("plugin/grpc/protocol");
+        // QNTX_PROTO_DIR: override proto file location for out-of-workspace builds.
+        // Default assumes crates/qntx-grpc/ inside the QNTX workspace.
+        let proto_dir = match std::env::var("QNTX_PROTO_DIR") {
+            Ok(dir) => PathBuf::from(dir),
+            Err(_) => PathBuf::from("../../plugin/grpc/protocol"),
+        };
 
         let protos = [
             proto_dir.join("domain.proto"),
             proto_dir.join("atsstore.proto"),
             proto_dir.join("queue.proto"),
             proto_dir.join("search.proto"),
+            proto_dir.join("embedding.proto"),
         ];
 
         // Check that proto files exist
@@ -31,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .compile_well_known_types(false)
             // Use extern_path to reference types from qntx-proto instead of generating
             .extern_path(".protocol", "::qntx_proto")
-            .compile_protos(&protos, &[&project_root])?;
+            .compile_protos(&protos, &[&proto_dir])?;
 
         // Rerun if proto files change
         for proto in &protos {

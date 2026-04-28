@@ -48,7 +48,6 @@ var ExcludedTypes = map[string]bool{
 	"ConsoleBuffer":       true, // Internal buffer
 	"StorageEventsPoller": true, // Internal poller
 	"GraphViewState":      true, // Internal state
-	"GLSPHandler":         true, // Internal handler
 	"QNTXServer":          true, // Internal server
 }
 

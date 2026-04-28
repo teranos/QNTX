@@ -2,15 +2,12 @@
 
 package identity
 
-import (
-	id "github.com/teranos/vanity-id"
-)
+import "github.com/teranos/QNTX/errors"
 
-// generateASUID falls back to vanity-id when WASM is not available.
-// TODO(#645): remove this file once vanity-id is retired.
 func generateASUID(prefix, subject, predicate, context string) (string, error) {
-	if prefix != "AS" {
-		return id.GenerateASIDWithPrefix(prefix, subject, predicate, context, "")
-	}
-	return id.GenerateASID(subject, predicate, context, "")
+	return "", errors.New("ASUID generation requires qntxwasm build tag")
+}
+
+func generateRandomID(length int) (string, error) {
+	return "", errors.New("random ID generation requires qntxwasm build tag")
 }

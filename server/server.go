@@ -11,8 +11,6 @@ import (
 	"github.com/teranos/QNTX/ai/tracker"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/QNTX/ats/embeddings/embeddings"
-	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 
@@ -26,6 +24,7 @@ import (
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/auth"
+	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/server/nodedid"
 	"github.com/teranos/QNTX/server/wslogs"
 	"go.uber.org/zap"
@@ -44,7 +43,6 @@ type QNTXServer struct {
 	authEnabled         bool                 // resolved at init, never changes
 	nodeDID             *nodedid.Handler     // node's decentralized identity
 	builder             *graph.AxGraphBuilder
-	langService         *lsp.Service          // Language service for ATS LSP features
 	usageTracker        *tracker.UsageTracker // Cached usage tracker (eliminates 172k+ allocations/day)
 	budgetTracker       *budget.Tracker       // Budget tracking for Pulse daemon
 	daemon              *async.WorkerPool     // Background job processor (daemon)
@@ -98,19 +96,15 @@ type QNTXServer struct {
 	reloadCoalescer *watcherReloadCoalescer
 
 	// Canvas state handlers
-	canvasHandler         *handlers.CanvasHandler
+	canvasHandler *handlers.CanvasHandler
+
+	// Embedding handlers (semantic search, clustering, projection)
+	embeddingsHandler *serverembeddings.Handler
+
 	conversationAssembler *ConversationAssembler
 
-	// Embedding service for semantic search (optional, requires rustembeddings build tag)
-	embeddingService interface {
-		GenerateEmbedding(text string) (*embeddings.EmbeddingResult, error)
-		GenerateBatchEmbeddings(texts []string) (*embeddings.BatchEmbeddingResult, error)
-		GetModelInfo() (*embeddings.ModelInfo, error)
-		SerializeEmbedding(embedding []float32) ([]byte, error)
-		DeserializeEmbedding(data []byte) ([]float32, error)
-		ComputeSimilarity(a, b []float32) (float32, error)
-		Close() error
-	}
+	// Embedding service for semantic search (provided by embedding_provider plugin)
+	embeddingService serverembeddings.Service
 	embeddingStore              *storage.EmbeddingStore
 	embeddingClusterInvalidator func()                  // called after re-cluster to invalidate centroid cache
 	embeddingStats              schedule.EmbeddingStats // drained by ticker for periodic summary

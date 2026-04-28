@@ -15,3 +15,12 @@ func generateASUID(prefix, subject, predicate, context string) (string, error) {
 	}
 	return engine.GenerateASUID(prefix, subject, predicate, context)
 }
+
+// generateRandomID generates a random ID via the Rust WASM engine.
+func generateRandomID(length int) (string, error) {
+	engine, err := wasm.GetEngine()
+	if err != nil {
+		return "", errors.Wrapf(err, "WASM engine unavailable for random ID (length %d)", length)
+	}
+	return engine.GenerateRandomID(length)
+}

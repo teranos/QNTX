@@ -11,7 +11,6 @@ import (
 	"github.com/teranos/QNTX/ai/tracker"
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/signing"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
@@ -26,6 +25,7 @@ import (
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/auth"
+	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/server/nodedid"
 	"github.com/teranos/QNTX/server/wslogs"
 	"go.uber.org/zap"
@@ -40,7 +40,6 @@ import (
 // 4. (Optional) Global storage if needed (e.g., SetDefaultPluginManager)
 type serverDependencies struct {
 	builder       *graph.AxGraphBuilder
-	langService   *lsp.Service
 	usageTracker  *tracker.UsageTracker
 	budgetTracker *budget.Tracker
 	daemon        *async.WorkerPool
@@ -93,9 +92,6 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	// Defensive: Validate critical dependencies (nil daemon is allowed)
 	if deps.builder == nil {
 		return nil, errors.New("graph builder creation failed")
-	}
-	if deps.langService == nil {
-		return nil, errors.New("language service creation failed")
 	}
 	if deps.usageTracker == nil {
 		return nil, errors.New("usage tracker creation failed")
@@ -196,7 +192,6 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		logPath:       logPath,
 		bindAddress:   bindAddr,
 		builder:       deps.builder,
-		langService:   deps.langService,
 		usageTracker:  deps.usageTracker,
 		budgetTracker: deps.budgetTracker,
 		daemon:        daemon,             // Use daemon with server context
@@ -384,6 +379,17 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	// Initialize embedding service for semantic search (optional)
 	server.groundDBPath = deps.config.GroundDBPath
 	server.SetupEmbeddingService()
+	server.embeddingsHandler = &serverembeddings.Handler{
+		DB:           db,
+		Store:        server.embeddingStore,
+		Service:      server.embeddingService,
+		ATSStore:     atsStore,
+		Logger:       serverLogger,
+		CallReduce:   server.callReducePlugin,
+		Invalidator:  server.embeddingClusterInvalidator,
+		GroundDBPath: deps.config.GroundDBPath,
+		GroundWrite:  writeToGround,
+	}
 	if server.embeddingStats != nil {
 		ticker.SetEmbeddingStats(server.embeddingStats)
 	}
@@ -456,15 +462,6 @@ func createServerDependencies(db *sql.DB, atsStore ats.AttestationStore, verbosi
 	}
 	serverLogger.Debugw("Graph builder created", "duration_ms", time.Since(start).Milliseconds())
 
-	// Create language service for ATS LSP features
-	langStart := time.Now()
-	symbolIndex, err := storage.NewSymbolIndex(db)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create symbol index")
-	}
-	langService := lsp.NewService(symbolIndex)
-	serverLogger.Debugw("Language service created", "duration_ms", time.Since(langStart).Milliseconds())
-
 	// Load configuration for daemon setup
 	cfgStart := time.Now()
 	cfg, err := appcfg.Load()
@@ -502,7 +499,6 @@ func createServerDependencies(db *sql.DB, atsStore ats.AttestationStore, verbosi
 
 	return &serverDependencies{
 		builder:       builder,
-		langService:   langService,
 		usageTracker:  usageTracker,
 		budgetTracker: budgetTracker,
 		daemon:        daemon,
@@ -576,12 +572,12 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 			currentlyLoaded[name] = true
 		}
 
-		// Stop plugins that were removed from enabled list
+		// Disable plugins that were removed from enabled list
 		for name := range currentlyLoaded {
 			if !nowEnabled[name] {
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				if err := manager.StopPlugin(ctx, name, registry); err != nil {
-					serverLogger.Errorw("Failed to stop plugin", "plugin", name, "error", err)
+				if err := manager.DisablePlugin(ctx, name, registry); err != nil {
+					serverLogger.Errorw("Failed to disable plugin", "plugin", name, "error", err)
 				}
 				cancel()
 				server.InvalidatePluginMux(name)
@@ -589,15 +585,15 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 			}
 		}
 
-		// Load plugins that were added to enabled list
+		// Enable plugins that were added to enabled list
 		for name := range nowEnabled {
 			if !currentlyLoaded[name] {
 				go func(pluginName string) {
 					ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 					defer cancel()
 					services := server.GetServices()
-					if err := manager.HotLoadPlugin(ctx, pluginName, newCfg.Plugin.Paths, registry, services); err != nil {
-						serverLogger.Errorw("Failed to hot-load plugin", "plugin", pluginName, "error", err)
+					if err := manager.EnablePlugin(ctx, pluginName, newCfg.Plugin.Paths, registry, services); err != nil {
+						serverLogger.Errorw("Failed to enable plugin", "plugin", pluginName, "error", err)
 					}
 					server.broadcastDaemonStatus()
 				}(name)

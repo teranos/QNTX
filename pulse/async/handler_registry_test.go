@@ -159,6 +159,65 @@ func TestHandlerRegistry_PhoneBook(t *testing.T) {
 		phoneBook.Register(techSupport2) // Should panic
 	})
 
+	t.Run("phone company removes department from phone book", func(t *testing.T) {
+		phoneBook := NewHandlerRegistry()
+
+		techSupport := &phoneBookTestHandler{name: "tech-support"}
+		billing := &phoneBookTestHandler{name: "billing"}
+		phoneBook.Register(techSupport)
+		phoneBook.Register(billing)
+
+		// Remove tech support
+		phoneBook.Remove("tech-support")
+
+		// tech-support should be gone
+		if phoneBook.Has("tech-support") {
+			t.Error("Expected tech-support to be removed")
+		}
+		if phoneBook.Get("tech-support") != nil {
+			t.Error("Expected nil for removed department")
+		}
+
+		// billing should still be there
+		if !phoneBook.Has("billing") {
+			t.Error("Expected billing to still exist")
+		}
+
+		// Names should only have billing
+		names := phoneBook.Names()
+		if len(names) != 1 {
+			t.Errorf("Expected 1 department, got %d", len(names))
+		}
+	})
+
+	t.Run("phone company removes non-existent department (no-op)", func(t *testing.T) {
+		phoneBook := NewHandlerRegistry()
+
+		// Should not panic
+		phoneBook.Remove("nonexistent")
+
+		if len(phoneBook.Names()) != 0 {
+			t.Errorf("Expected empty phone book after removing nonexistent entry")
+		}
+	})
+
+	t.Run("phone company re-registers after removal", func(t *testing.T) {
+		phoneBook := NewHandlerRegistry()
+
+		original := &phoneBookTestHandler{name: "tech-support"}
+		phoneBook.Register(original)
+		phoneBook.Remove("tech-support")
+
+		// Should be able to re-register without panic
+		replacement := &phoneBookTestHandler{name: "tech-support"}
+		phoneBook.Register(replacement)
+
+		handler := phoneBook.Get("tech-support")
+		if handler != replacement {
+			t.Error("Expected replacement handler after re-registration")
+		}
+	})
+
 	t.Run("phone company handles unknown departments", func(t *testing.T) {
 		phoneBook := NewHandlerRegistry()
 

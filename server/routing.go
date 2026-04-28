@@ -78,8 +78,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	}
 
 	// Core QNTX handlers
-	http.HandleFunc("/ws", wrapWS(s.HandleWebSocket))      // Custom WebSocket protocol (graph updates, logs, etc.)
-	http.HandleFunc("/lsp", wrapWS(s.HandleGLSPWebSocket)) // ATS LSP protocol (completions, hover, semantic tokens)
+	http.HandleFunc("/ws", wrapWS(s.HandleWebSocket)) // Custom WebSocket protocol (graph updates, logs, etc.)
 	http.HandleFunc("/health", wrapPublic(s.HandleHealth)) // Health check always public
 	http.HandleFunc("/logs/download", wrap(s.HandleLogDownload))
 	http.HandleFunc("/api/timeseries/usage", wrap(s.HandleUsageTimeSeries))
@@ -116,19 +115,19 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/canvas/export", wrap(s.canvasHandler.HandleExportStatic))                 // Export canvas via server-side rendering (GET /api/canvas/export?canvas_id={id})
 	http.HandleFunc("/api/files/", wrap(s.HandleFiles))                                             // Serve stored file (GET /api/files/{id})
 	http.HandleFunc("/api/files", wrap(s.HandleFiles))                                              // Upload file (POST)
-	http.HandleFunc("/api/search/semantic", wrap(s.HandleSemanticSearch))                           // Semantic search (GET)
-	http.HandleFunc("/api/embeddings/generate", wrap(s.HandleEmbeddingGenerate))                    // Generate embedding (POST)
-	http.HandleFunc("/api/embeddings/batch", wrap(s.HandleEmbeddingBatch))                          // Batch generate embeddings (POST)
-	http.HandleFunc("/api/embeddings/clusters", wrap(s.HandleEmbeddingClusters))                    // List stable clusters (GET)
-	http.HandleFunc("/api/embeddings/clusters/samples", wrap(s.HandleClusterSamples))               // Sample texts from a cluster (GET)
-	http.HandleFunc("/api/embeddings/clusters/members", wrap(s.HandleClusterMembers))               // Recent attestations in a cluster (GET)
-	http.HandleFunc("/api/embeddings/clusters/memberships", wrap(s.HandleClusterMemberships))       // Cluster assignments for attestation IDs (GET)
-	http.HandleFunc("/api/embeddings/cluster-timeline", wrap(s.HandleClusterTimeline))              // Cluster evolution timeline (GET)
-	http.HandleFunc("/api/embeddings/cluster", wrap(s.HandleEmbeddingCluster))                      // HDBSCAN clustering (POST)
-	http.HandleFunc("/api/embeddings/by-source", wrap(s.HandleEmbeddingsBySource))                  // Embeddings by attestation source IDs (POST)
-	http.HandleFunc("/api/embeddings/info", wrap(s.HandleEmbeddingInfo))                            // Embedding service status (GET)
-	http.HandleFunc("/api/embeddings/project", wrap(s.HandleEmbeddingProject))                      // UMAP projection (POST)
-	http.HandleFunc("/api/embeddings/projections", wrap(s.HandleEmbeddingProjections))              // Get 2D projections (GET)
+	http.HandleFunc("/api/search/semantic", wrap(s.embeddingsHandler.HandleSemanticSearch))           // Semantic search (GET)
+	http.HandleFunc("/api/embeddings/generate", wrap(s.embeddingsHandler.HandleEmbeddingGenerate))  // Generate embedding (POST)
+	http.HandleFunc("/api/embeddings/batch", wrap(s.embeddingsHandler.HandleEmbeddingBatch))        // Batch generate embeddings (POST)
+	http.HandleFunc("/api/embeddings/clusters", wrap(s.embeddingsHandler.HandleEmbeddingClusters))    // List stable clusters (GET)
+	http.HandleFunc("/api/embeddings/clusters/samples", wrap(s.embeddingsHandler.HandleClusterSamples))   // Sample texts from a cluster (GET)
+	http.HandleFunc("/api/embeddings/clusters/members", wrap(s.embeddingsHandler.HandleClusterMembers))   // Recent attestations in a cluster (GET)
+	http.HandleFunc("/api/embeddings/clusters/memberships", wrap(s.embeddingsHandler.HandleClusterMemberships)) // Cluster assignments for attestation IDs (GET)
+	http.HandleFunc("/api/embeddings/cluster-timeline", wrap(s.embeddingsHandler.HandleClusterTimeline))  // Cluster evolution timeline (GET)
+	http.HandleFunc("/api/embeddings/cluster", wrap(s.embeddingsHandler.HandleCluster))              // HDBSCAN clustering (POST)
+	http.HandleFunc("/api/embeddings/by-source", wrap(s.embeddingsHandler.HandleEmbeddingsBySource)) // Embeddings by attestation source IDs (POST)
+	http.HandleFunc("/api/embeddings/info", wrap(s.embeddingsHandler.HandleEmbeddingInfo))          // Embedding service status (GET)
+	http.HandleFunc("/api/embeddings/project", wrap(s.embeddingsHandler.HandleProject))              // UMAP projection (POST)
+	http.HandleFunc("/api/embeddings/projections", wrap(s.embeddingsHandler.HandleEmbeddingProjections)) // Get 2D projections (GET)
 	http.HandleFunc("/", wrapPublic(s.HandleStatic))
 }
 

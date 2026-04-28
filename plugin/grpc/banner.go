@@ -19,8 +19,8 @@ const (
 	BannerRestart      BannerReason = "restart"
 	BannerRecovered    BannerReason = "recovered"
 	BannerReconfigured BannerReason = "reconfigured"
-	BannerHotLoaded    BannerReason = "hot-loaded"
-	BannerStopped      BannerReason = "stopped"
+	BannerEnabled      BannerReason = "enabled"
+	BannerDisabled     BannerReason = "disabled"
 )
 
 // BannerInfo holds accumulated lifecycle data for a single plugin banner.

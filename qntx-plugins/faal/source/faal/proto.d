@@ -163,6 +163,13 @@ private ubyte[] encodeField(FT)(int fieldNum, const FT value) {
             result ~= encodeVarint(sub.length);
             result ~= sub;
         }
+    } else static if (is(FT == struct)) {
+        auto sub = encode(value);
+        if (sub.length > 0) {
+            result ~= encodeTag(fieldNum, WireType.LengthDelimited);
+            result ~= encodeVarint(sub.length);
+            result ~= sub;
+        }
     }
     return result;
 }
@@ -303,6 +310,16 @@ private void decodeFieldInto(FT)(const ubyte[] data, ref size_t pos, WireType wt
         } else {
             skipField(data, pos, wt);
         }
+    } else static if (is(FT == struct)) {
+        if (wt == WireType.LengthDelimited) {
+            auto len = cast(size_t)decodeVarint(data, pos);
+            if (pos + len <= data.length) {
+                target = decode!FT(data[pos .. pos + len]);
+                pos += len;
+            }
+        } else {
+            skipField(data, pos, wt);
+        }
     } else {
         skipField(data, pos, wt);
     }
@@ -428,4 +445,44 @@ struct ExecuteJobResponse {
     @Proto(6) double costActual;
     @Proto(7) JobLogEntry[] logEntries;
     @Proto(8) string pluginVersion;
+}
+
+// ---------------------------------------------------------------------------
+// ATS Store protocol messages (mirrors atsstore.proto)
+// ---------------------------------------------------------------------------
+
+struct AttestationCommand {
+    @Proto(1) string[] subjects;
+    @Proto(2) string[] predicates;
+    @Proto(3) string[] contexts;
+    @Proto(4) string[] actors;
+    @Proto(7) string source;
+    @Proto(8) string sourceVersion;
+}
+
+struct GenerateAttestationRequest {
+    @Proto(1) string authToken;
+    @Proto(2) AttestationCommand command;
+}
+
+struct GenerateAttestationResponse {
+    @Proto(1) bool success;
+    @Proto(2) string error;
+}
+
+struct AttestationFilter {
+    @Proto(1) @Repeated string[] subjects;
+    @Proto(2) @Repeated string[] predicates;
+    @Proto(3) @Repeated string[] contexts;
+    @Proto(4) @Repeated string[] actors;
+}
+
+struct GetAttestationsRequest {
+    @Proto(1) string authToken;
+    @Proto(2) AttestationFilter filter;
+}
+
+struct GetAttestationsResponse {
+    @Proto(1) bool success;
+    @Proto(2) string error;
 }

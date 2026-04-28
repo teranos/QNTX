@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/errors"
-	vanity "github.com/teranos/vanity-id"
 	"go.uber.org/zap"
 )
 
@@ -50,8 +50,11 @@ func (s *EmbeddingStore) Save(embedding *EmbeddingModel) error {
 	}
 
 	if embedding.ID == "" {
-		// Generate a random 8-character ID for embeddings
-		embedding.ID, _ = vanity.GenerateRandomID(8)
+		id, err := identity.GenerateRandomID(8)
+		if err != nil {
+			return errors.Wrap(err, "failed to generate embedding ID")
+		}
+		embedding.ID = id
 	}
 
 	now := time.Now().UTC()
@@ -350,8 +353,12 @@ func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingM
 	now := time.Now().UTC()
 	for _, embedding := range embeddings {
 		if embedding.ID == "" {
-			// Generate a random 8-character ID for embeddings
-			embedding.ID, _ = vanity.GenerateRandomID(8)
+			id, idErr := identity.GenerateRandomID(8)
+			if idErr != nil {
+				err = errors.Wrap(idErr, "failed to generate embedding ID in batch save")
+				return err
+			}
+			embedding.ID = id
 		}
 		if embedding.CreatedAt.IsZero() {
 			embedding.CreatedAt = now

@@ -46,6 +46,9 @@ type ExternalDomainProxy struct {
 	// searchProvider indicates this plugin implements SearchProvider (populated during Initialize)
 	searchProvider bool
 
+	// embeddingProvider indicates this plugin implements EmbeddingService (populated during Initialize)
+	embeddingProvider bool
+
 	// Watchers this plugin wants registered (populated during Initialize)
 	watchers []*protocol.WatcherRegistration
 
@@ -192,6 +195,17 @@ func (c *ExternalDomainProxy) IsSearchProvider() bool {
 // Only meaningful when IsSearchProvider() is true.
 func (c *ExternalDomainProxy) SearchServiceClient() protocol.SearchServiceClient {
 	return protocol.NewSearchServiceClient(c.conn)
+}
+
+// IsEmbeddingProvider returns true if this plugin declared embedding provider capability during Initialize.
+func (c *ExternalDomainProxy) IsEmbeddingProvider() bool {
+	return c.embeddingProvider
+}
+
+// EmbeddingServiceClient returns an EmbeddingServiceClient using this plugin's existing gRPC connection.
+// Only meaningful when IsEmbeddingProvider() is true.
+func (c *ExternalDomainProxy) EmbeddingServiceClient() protocol.EmbeddingServiceClient {
+	return protocol.NewEmbeddingServiceClient(c.conn)
 }
 
 // Initialize initializes the remote plugin. Idempotent — safe to call from multiple code paths.
@@ -355,6 +369,9 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	// Store search provider capability
 	c.searchProvider = resp.GetSearchProvider()
 
+	// Store embedding provider capability
+	c.embeddingProvider = resp.GetEmbeddingProvider()
+
 	// Store and create watcher registrations
 	c.watchers = resp.GetWatchers()
 	if len(c.watchers) > 0 {
@@ -376,6 +393,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 		"llm_provider", c.llmProvider,
 		"vector_search_provider", c.vectorSearchProvider,
 		"search_provider", c.searchProvider,
+		"embedding_provider", c.embeddingProvider,
 	)
 	return nil
 }

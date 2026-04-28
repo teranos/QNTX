@@ -179,6 +179,13 @@ type SearchProvider interface {
 	DeleteDocuments(ctx context.Context, req DeleteDocumentsRequest) (*DeleteDocumentsResponse, error)
 }
 
+// EmbeddingProvider is an optional interface marker for plugins that provide
+// EmbeddingService (Embed, BatchEmbed, Cluster, ModelInfo RPCs).
+// The actual service is registered as a separate gRPC service on the plugin server.
+type EmbeddingProvider interface {
+	DomainPlugin
+}
+
 // GlyphDef defines a custom glyph type provided by a plugin.
 type GlyphDef struct {
 	// Symbol is the glyph identifier (e.g., "⚗" for a chemistry plugin).

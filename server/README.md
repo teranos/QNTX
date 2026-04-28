@@ -24,3 +24,9 @@ there is this thing called typegen that generates the api documentation, you can
 - PROSE: The prose question, currently I am writinganother plugin called Voor, prose was meant to be a visual way in QNTX to craft the perfect prompt, and use different strats for finding out what works best. Voor seems to be taking over this role and is supposed to do it much better, Loom seems likely to be the UI for Voor looking forward. but that leaved the question of what we do with this functionality in QNTX, im starting to feel like it should just be taken out actually, deprecate Prose, also in the UI, it uses a prosemirror edit, and I can't get it to work for me in a way that its going to replace the way i promptright now, there is a lot about Prose and the built-in documentation, that just isnt pulling its weight.
 - INTERNAL: this thing is basically QNTX, it belongs in internal/
 - WSLOGS: find out how wslogs is used, i think it used to just be forthe logs drawer in the ui, but sincethat changed, im not sure if we stillneed wslogs/
+
+## Embeddings Sub-package (`server/embeddings/`)
+
+Embedding code lives in `server/embeddings/` — HTTP handlers, clustering logic, projection, the auto-embed observer. The server root keeps only thin wiring: `SetupEmbeddingService` (populates server fields), `callReducePlugin`/`projectToCanvas` (plugin registry coupling, passed as callbacks), and schedule setup methods that register Pulse handlers.
+
+Everything else — the actual domain logic — lives in the sub-package. Handler struct receives dependencies at construction (same pattern as canvasHandler). Pulse functions (`RunHDBSCANClustering`, `RunAllProjections`) take all deps as explicit params, no server coupling. The observer is self-contained with callback hooks for watcher integration and projection.

@@ -251,12 +251,14 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 
 	_, isLLMProvider := s.plugin.(plugin.LLMProvider)
 	_, isSearchProvider := s.plugin.(plugin.SearchProvider)
+	_, isEmbeddingProvider := s.plugin.(plugin.EmbeddingProvider)
 
 	return &protocol.InitializeResponse{
-		HandlerNames:   handlerNames,
-		Schedules:      schedules,
-		LlmProvider:    isLLMProvider,
-		SearchProvider: isSearchProvider,
+		HandlerNames:      handlerNames,
+		Schedules:         schedules,
+		LlmProvider:       isLLMProvider,
+		SearchProvider:    isSearchProvider,
+		EmbeddingProvider: isEmbeddingProvider,
 	}, nil
 }
 
