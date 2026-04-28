@@ -48,3 +48,7 @@ Scry instruments every token with signal data and renders a 3D nebula. Gaze is t
 - **IBP** — Image-based PDFs return empty text. OCR not supported.
 - **UIG** — UI still references scry. The LLM provider glyph (`llm-provider-glyph.ts`) hardcodes scry as the local provider option. Needs a gaze option or a generic "local" toggle that discovers whichever local LLM plugin is running.
 - **SDR** — Shutdown race between gRPC teardown and llama.cpp destructor. Cosmetic log noise.
+
+## Feature Requests
+
+- **NMOD** — Gaze should refuse to start (or report unhealthy) when no models are configured. Currently it starts successfully with "no models loaded", which masks configuration errors and causes silent downstream failures for any plugin relying on the LLM service.
