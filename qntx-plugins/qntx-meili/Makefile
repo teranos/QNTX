@@ -18,6 +18,7 @@ install: ## Build, install, and restart qntx-meili plugin
 	@mkdir -p $(PREFIX)/plugins
 	@cp $(WORKSPACE_ROOT)/target/release/qntx-meili $(PREFIX)/plugins/qntx-meili
 	@chmod +x $(PREFIX)/plugins/qntx-meili
+	@codesign -s - --force $(PREFIX)/plugins/qntx-meili
 	@echo "✓ BUILD OK — binary installed to $(PREFIX)/plugins/qntx-meili"
 	$(call restart-plugin)
 
