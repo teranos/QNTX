@@ -50,28 +50,25 @@ Core ATS intelligence — parser, fuzzy search, Merkle sync, completions — is 
 - **Browser** (via wasm-bindgen) — ATS parsing, completions, semantic search, and sync happen locally in the browser. No server round-trip needed.
 - **Server** (via wazero) — the Go backend loads the same WASM module for server-side operations.
 
-This means the browser is not a thin client. It runs the same attestation logic the server does. The server provides persistence, sync coordination, and plugin hosting — but the intelligence layer runs wherever you are.
+This means the browser is not a thin client. It runs the same attestation logic the server does. The server provides persistence, sync coordination, and plugin-provided services — but the intelligence layer runs wherever you are.
 
-### 4. Real-Time Updates
+### 4. Plugin-Provided Services
+
+Plugins are separate processes that register capabilities via gRPC. Core services — LLM inference, embeddings, vector search, full-text search — are all plugin-provided. The plugin infrastructure handles discovery, lifecycle, health, hot-swap, and restart.
+
+### 5. Real-Time Updates
 
 When a server is present, WebSocket connections provide live updates (see [WebSocket API](api/websocket.md)):
 
-- Semantic tokens and diagnostics via custom protocol
+- Attestation mutations and plugin state changes
 - ꩜ Pulse execution updates
 - Sync status
 
-The server is not required for core ATS operations — those run in WASM. The server adds persistence, sync between nodes, and plugin execution.
+The server is not required for core ATS operations — those run in WASM. The server adds persistence, sync between nodes, plugin lifecycle management, and plugin-provided services.
 
-### 5. ATS as a Language
+### 5. Glyphs as the UI Primitive
 
-QNTX treats ATS as a **programming language**, not a query box:
-
-- Semantic token highlighting
-- Real-time diagnostics
-- Completion support (via WASM)
-- Hover documentation
-
-The canvas (glyphs ⧉) is the primary interaction surface. The editor is one glyph manifestation within it. Language tooling (parsing, completions, search) runs in WASM.
+The canvas (glyphs ⧉) is the primary interaction surface. A glyph is a composable unit of interaction — it can manifest as an editor, a chart, a search panel, a plugin control. Glyphs compose into compositions via edge-based DAGs. ATS parsing, completions, and search run in WASM within glyph manifestations.
 
 ## Core Philosophical Stance
 
@@ -147,25 +144,19 @@ The types *are* the data model. The queries *are* the API. There's no separation
 
 ### Timing Risks
 
-The real-time everything, D3 visualization, WASM in browser, scheduled execution—this is a **2024-2025 stack**. It assumes:
+Real-time updates, WASM in browser, plugin-provided services, scheduled execution—this is a **current-generation stack**. It assumes:
 
 - Users want real-time (do they, or do they want fast refresh?)
 - WASM in browser is viable (it is, and getting better)
 - WebSocket is reliable enough (most users are on good connections now, but not all)
 
-If built in 2020, it would've felt premature. In 2026, it might feel expected.
+If built in 2020, it would've felt premature. Now, it feels expected.
 
 ## What Would Make It Succeed
 
 ### 1. One Perfect Workflow
 
-Don't try to be general-purpose. Pick **one workflow** that's currently painful:
-
-- "Track attestations about my codebase and query them while coding"
-- "Monitor data pipelines and get alerted when assumptions break"
-- "Build a personal knowledge graph from scattered sources"
-
-Make that workflow **10x better** than alternatives. Expand from there.
+Don't try to be general-purpose. Pick **one workflow** that's currently painful and make it **10x better** than alternatives. Expand from there.
 
 ### 2. Gradual Onboarding
 
@@ -182,13 +173,7 @@ By Week 4, they're using the full system without realizing it.
 
 The fastest path to value: "Here's my existing data → here's QNTX making sense of it."
 
-If you can import:
-- Git repos (commits, branches, authors as attestations)
-- Slack history (messages, reactions, threads as attestations)
-- Linear issues (tasks, states, assignments as attestations)
-- File systems (files, directories, metadata as attestations)
-
-Then users get **immediate value** from data they already have.
+If you can turn existing data into attestations, users get **immediate value** from data they already have.
 
 ### 4. Show The Maintenance
 
