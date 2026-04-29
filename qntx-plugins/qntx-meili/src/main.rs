@@ -61,6 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_thread_ids(false)
         .with_file(false)
         .with_line_number(false)
+        .with_writer(std::io::stderr)
         .init();
 
     info!("Initializing QNTX MeiliSearch Plugin");
@@ -79,6 +80,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = listener.local_addr()?;
     info!("gRPC server listening on {}", addr);
     println!("QNTX_PLUGIN_PORT={}", addr.port());
+    use std::io::Write;
+    std::io::stdout().flush().ok();
 
     let search_service = Arc::new(MeiliSearchService::new());
     let plugin_service =

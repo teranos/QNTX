@@ -156,6 +156,9 @@ type SearchService interface {
 
 	// DeleteDocuments removes documents from an index by ID.
 	DeleteDocuments(ctx context.Context, req DeleteDocumentsRequest) (*DeleteDocumentsResponse, error)
+
+	// ConfigureIndex creates/configures an index with filterable, sortable, and searchable attributes.
+	ConfigureIndex(ctx context.Context, req ConfigureIndexRequest) (*ConfigureIndexResponse, error)
 }
 
 // SearchRequest is a search query against an index.
@@ -163,21 +166,24 @@ type SearchRequest struct {
 	Query   string
 	Index   string
 	TopK    int
-	Filters []byte // filter expression as JSON — interpreted by the provider
+	Filters []byte   // filter expression as JSON — interpreted by the provider
+	Facets  []string // facet fields to include in response
 }
 
 // SearchResponse contains ranked search results.
 type SearchResponse struct {
-	Hits         []SearchHit
-	Total        int
-	ProcessingMs int
+	Hits              []SearchHit
+	Total             int
+	ProcessingMs      int
+	FacetDistribution []byte // facet counts as JSON
 }
 
 // SearchHit is a single search result.
 type SearchHit struct {
-	ID       string
-	Score    float32
-	Document []byte // indexed content as JSON
+	ID          string
+	Score       float32
+	Document    []byte // indexed content as JSON
+	Highlighted []byte // highlighted fields as JSON
 }
 
 // IndexDocumentsRequest pushes documents into an index.
@@ -200,6 +206,20 @@ type DeleteDocumentsRequest struct {
 // DeleteDocumentsResponse reports how many documents were deleted.
 type DeleteDocumentsResponse struct {
 	Deleted int
+}
+
+// ConfigureIndexRequest creates/configures an index with its settings.
+type ConfigureIndexRequest struct {
+	Index                string
+	PrimaryKey           string
+	FilterableAttributes []string
+	SortableAttributes   []string
+	SearchableAttributes []string
+}
+
+// ConfigureIndexResponse reports whether the configuration was accepted.
+type ConfigureIndexResponse struct {
+	Accepted bool
 }
 
 // ServiceRegistry provides access to QNTX core services for domain plugins.
