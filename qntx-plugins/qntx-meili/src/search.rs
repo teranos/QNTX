@@ -2,8 +2,8 @@ use meilisearch_sdk::client::Client;
 use parking_lot::RwLock;
 use qntx_grpc::plugin::proto::search_service_server::SearchService;
 use qntx_grpc::plugin::proto::{
-    DeleteDocumentsRequest, DeleteDocumentsResponse, IndexDocumentsRequest, IndexDocumentsResponse,
-    SearchHit, SearchRequest, SearchResponse,
+    ConfigureIndexRequest, ConfigureIndexResponse, DeleteDocumentsRequest, DeleteDocumentsResponse,
+    IndexDocumentsRequest, IndexDocumentsResponse, SearchHit, SearchRequest, SearchResponse,
 };
 use tonic::{Request, Response, Status};
 use tracing::{info, warn};
@@ -96,7 +96,35 @@ impl SearchService for MeiliSearchService {
             query.with_limit(req.top_k as usize);
         }
 
-        // TODO: apply filters from req.filters (JSON bytes)
+        // Apply filters from req.filters (JSON bytes — expect a string filter expression)
+        let filter_str = if !req.filters.is_empty() {
+            match serde_json::from_slice::<String>(&req.filters) {
+                Ok(f) if !f.is_empty() => Some(f),
+                _ => {
+                    // Try raw UTF-8 string (non-JSON-quoted filter)
+                    match std::str::from_utf8(&req.filters) {
+                        Ok(s) if !s.is_empty() => Some(s.to_string()),
+                        _ => None,
+                    }
+                }
+            }
+        } else {
+            None
+        };
+        if let Some(ref f) = filter_str {
+            query.with_filter(f);
+        }
+
+        // Apply facets
+        let facet_refs: Vec<&str> = req.facets.iter().map(|s| s.as_str()).collect();
+        if !facet_refs.is_empty() {
+            query.with_facets(meilisearch_sdk::search::Selectors::Some(&facet_refs));
+        }
+
+        // Request highlights on all attributes
+        query.with_attributes_to_highlight(meilisearch_sdk::search::Selectors::All);
+        query.with_highlight_pre_tag("<em>");
+        query.with_highlight_post_tag("</em>");
 
         let start = std::time::Instant::now();
         let results = query
@@ -111,6 +139,11 @@ impl SearchService for MeiliSearchService {
             .into_iter()
             .map(|hit| {
                 let doc_bytes = serde_json::to_vec(&hit.result).unwrap_or_default();
+                let highlighted = hit
+                    .formatted_result
+                    .as_ref()
+                    .and_then(|v| serde_json::to_vec(v).ok())
+                    .unwrap_or_default();
                 SearchHit {
                     id: hit
                         .result
@@ -120,16 +153,24 @@ impl SearchService for MeiliSearchService {
                         .to_string(),
                     score: 0.0, // MeiliSearch doesn't expose relevance scores by default
                     document: doc_bytes,
+                    highlighted,
                 }
             })
             .collect();
 
         let total = results.estimated_total_hits.unwrap_or(hits.len());
 
+        let facet_distribution = results
+            .facet_distribution
+            .as_ref()
+            .and_then(|fd| serde_json::to_vec(fd).ok())
+            .unwrap_or_default();
+
         Ok(Response::new(SearchResponse {
             hits,
             total: total as i32,
             processing_ms,
+            facet_distribution,
         }))
     }
 
@@ -174,5 +215,79 @@ impl SearchService for MeiliSearchService {
             .map_err(|e| Status::internal(format!("MeiliSearch delete failed: {}", e)))?;
 
         Ok(Response::new(DeleteDocumentsResponse { deleted: count }))
+    }
+
+    async fn configure_index(
+        &self,
+        request: Request<ConfigureIndexRequest>,
+    ) -> Result<Response<ConfigureIndexResponse>, Status> {
+        let req = request.into_inner();
+        let client = self.get_client()?;
+
+        // Create the index with the specified primary key
+        let pk = if req.primary_key.is_empty() {
+            None
+        } else {
+            Some(req.primary_key.as_str())
+        };
+        // create_index is idempotent — returns TaskInfo even if index exists
+        let _ = client
+            .create_index(&req.index, pk)
+            .await
+            .map_err(|e| Status::internal(format!("create index '{}' failed: {}", req.index, e)))?;
+
+        let index = client.index(&req.index);
+
+        // Set filterable attributes
+        if !req.filterable_attributes.is_empty() {
+            let attrs: Vec<&str> = req
+                .filterable_attributes
+                .iter()
+                .map(|s| s.as_str())
+                .collect();
+            index.set_filterable_attributes(&attrs).await.map_err(|e| {
+                Status::internal(format!(
+                    "set filterable attributes on '{}' failed: {}",
+                    req.index, e
+                ))
+            })?;
+        }
+
+        // Set sortable attributes
+        if !req.sortable_attributes.is_empty() {
+            let attrs: Vec<&str> = req.sortable_attributes.iter().map(|s| s.as_str()).collect();
+            index.set_sortable_attributes(&attrs).await.map_err(|e| {
+                Status::internal(format!(
+                    "set sortable attributes on '{}' failed: {}",
+                    req.index, e
+                ))
+            })?;
+        }
+
+        // Set searchable attributes
+        if !req.searchable_attributes.is_empty() {
+            let attrs: Vec<&str> = req
+                .searchable_attributes
+                .iter()
+                .map(|s| s.as_str())
+                .collect();
+            index.set_searchable_attributes(&attrs).await.map_err(|e| {
+                Status::internal(format!(
+                    "set searchable attributes on '{}' failed: {}",
+                    req.index, e
+                ))
+            })?;
+        }
+
+        info!(
+            "Configured index '{}' (pk={}, filterable={}, sortable={}, searchable={})",
+            req.index,
+            pk.unwrap_or("auto"),
+            req.filterable_attributes.len(),
+            req.sortable_attributes.len(),
+            req.searchable_attributes.len(),
+        );
+
+        Ok(Response::new(ConfigureIndexResponse { accepted: true }))
     }
 }

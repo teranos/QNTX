@@ -1,7 +1,7 @@
 # ADR-015: Search as a Plugin-Provided Service
 
 ## Status
-Accepted
+Completed
 
 ## Context
 
@@ -21,52 +21,7 @@ This is the second plugin-provided service on `ServiceRegistry`, after LLMServic
 
 ## Protocol
 
-`plugin/grpc/protocol/search.proto`
-
-```protobuf
-service SearchService {
-  rpc Search(SearchRequest) returns (SearchResponse);
-  rpc IndexDocuments(IndexDocumentsRequest) returns (IndexDocumentsResponse);
-  rpc DeleteDocuments(DeleteDocumentsRequest) returns (DeleteDocumentsResponse);
-}
-
-message SearchRequest {
-  string query = 1;           // search query text
-  string index = 2;           // which index to search
-  int32 top_k = 3;            // max results to return
-  bytes filters = 4;          // filter expression as JSON — interpreted by the provider
-}
-
-message SearchResponse {
-  repeated SearchHit hits = 1;
-  int32 total = 2;            // total matches (before top_k limit)
-  int32 processing_ms = 3;
-}
-
-message SearchHit {
-  string id = 1;
-  float score = 2;
-  bytes document = 3;         // indexed content as JSON
-}
-
-message IndexDocumentsRequest {
-  string index = 1;           // index name (created implicitly if needed)
-  repeated bytes documents = 2; // documents as JSON — schema is qntx-meili's concern
-}
-
-message IndexDocumentsResponse {
-  int32 accepted = 1;         // number of documents accepted for indexing
-}
-
-message DeleteDocumentsRequest {
-  string index = 1;
-  repeated string ids = 2;    // document IDs to remove
-}
-
-message DeleteDocumentsResponse {
-  int32 deleted = 1;
-}
-```
+See `plugin/grpc/protocol/search.proto`. Four RPCs: `Search`, `IndexDocuments`, `DeleteDocuments`, `ConfigureIndex`. Documents and filters flow as JSON bytes — the proto is engine-agnostic.
 
 ## Responsibility boundary
 
@@ -88,7 +43,7 @@ Same pattern as LLMService: `SearchServer` in core holds a reference to the prov
 
 ## Startup ordering
 
-If a plugin calls `services.Search()` before `qntx-meili` has initialized, the call fails. The plugin should fail its own initialization and be restarted until SearchService is available.
+If a plugin calls `services.Search()` before `qntx-meili` has initialized, the call fails. Consumer plugins should defer configuration (e.g. `ConfigureIndex`) and retry lazily rather than failing initialization — the search provider may register seconds after the consumer starts.
 
 ## Meili Panel Glyph
 

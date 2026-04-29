@@ -36,8 +36,15 @@ module rec Protocol : sig
 %}
       *)
 
+      facets:string list;
+      (**
+{%html:
+<p>facet fields to include in response</p>
+%}
+      *)
+
     }
-    val make: ?query:string -> ?index:string -> ?top_k:int -> ?filters:bytes -> unit -> t
+    val make: ?query:string -> ?index:string -> ?top_k:int -> ?filters:bytes -> ?facets:string list -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -56,7 +63,7 @@ module rec Protocol : sig
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?query:string -> ?index:string -> ?top_k:int -> ?filters:bytes -> unit -> t
+    type make_t = ?query:string -> ?index:string -> ?top_k:int -> ?filters:bytes -> ?facets:string list -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -69,8 +76,15 @@ module rec Protocol : sig
       hits:SearchHit.t list;
       total:int;
       processing_ms:int;
+      facet_distribution:bytes;
+      (**
+{%html:
+<p>facet counts as JSON</p>
+%}
+      *)
+
     }
-    val make: ?hits:SearchHit.t list -> ?total:int -> ?processing_ms:int -> unit -> t
+    val make: ?hits:SearchHit.t list -> ?total:int -> ?processing_ms:int -> ?facet_distribution:bytes -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -89,7 +103,7 @@ module rec Protocol : sig
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?hits:SearchHit.t list -> ?total:int -> ?processing_ms:int -> unit -> t
+    type make_t = ?hits:SearchHit.t list -> ?total:int -> ?processing_ms:int -> ?facet_distribution:bytes -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -108,8 +122,15 @@ module rec Protocol : sig
 %}
       *)
 
+      highlighted:bytes;
+      (**
+{%html:
+<p>highlighted fields as JSON (_formatted from provider)</p>
+%}
+      *)
+
     }
-    val make: ?id:string -> ?score:float -> ?document:bytes -> unit -> t
+    val make: ?id:string -> ?score:float -> ?document:bytes -> ?highlighted:bytes -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -128,7 +149,7 @@ module rec Protocol : sig
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?id:string -> ?score:float -> ?document:bytes -> unit -> t
+    type make_t = ?id:string -> ?score:float -> ?document:bytes -> ?highlighted:bytes -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -264,6 +285,70 @@ module rec Protocol : sig
     (**/**)
   end
 
+  and ConfigureIndexRequest : sig
+    type t = {
+      index:string;
+      primary_key:string;
+      filterable_attributes:string list;
+      sortable_attributes:string list;
+      searchable_attributes:string list;
+    }
+    val make: ?index:string -> ?primary_key:string -> ?filterable_attributes:string list -> ?sortable_attributes:string list -> ?searchable_attributes:string list -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?index:string -> ?primary_key:string -> ?filterable_attributes:string list -> ?sortable_attributes:string list -> ?searchable_attributes:string list -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+  and ConfigureIndexResponse : sig
+    type t = (bool)
+    val make: ?accepted:bool -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?accepted:bool -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
   module SearchService : sig
     module Search : sig
       include Runtime'.Service.Rpc with type Request.t = SearchRequest.t and type Response.t = SearchResponse.t
@@ -298,6 +383,17 @@ module rec Protocol : sig
     end
 
     val deleteDocuments : (module Runtime'.Spec.Message with type t = DeleteDocumentsRequest.t) * (module Runtime'.Spec.Message with type t = DeleteDocumentsResponse.t)
+    module ConfigureIndex : sig
+      include Runtime'.Service.Rpc with type Request.t = ConfigureIndexRequest.t and type Response.t = ConfigureIndexResponse.t
+      module Request : Runtime'.Spec.Message with type t = ConfigureIndexRequest.t and type make_t = ConfigureIndexRequest.make_t
+      (** Module alias for the request message for this method call *)
+
+      module Response : Runtime'.Spec.Message with type t = ConfigureIndexResponse.t and type make_t = ConfigureIndexResponse.make_t
+      (** Module alias for the response message for this method call *)
+
+    end
+
+    val configureIndex : (module Runtime'.Spec.Message with type t = ConfigureIndexRequest.t) * (module Runtime'.Spec.Message with type t = ConfigureIndexResponse.t)
   end
 
 end = struct
@@ -313,8 +409,15 @@ end = struct
 %}
       *)
 
+      facets:string list;
+      (**
+{%html:
+<p>facet fields to include in response</p>
+%}
+      *)
+
     }
-    val make: ?query:string -> ?index:string -> ?top_k:int -> ?filters:bytes -> unit -> t
+    val make: ?query:string -> ?index:string -> ?top_k:int -> ?filters:bytes -> ?facets:string list -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -333,7 +436,7 @@ end = struct
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?query:string -> ?index:string -> ?top_k:int -> ?filters:bytes -> unit -> t
+    type make_t = ?query:string -> ?index:string -> ?top_k:int -> ?filters:bytes -> ?facets:string list -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -347,35 +450,38 @@ end = struct
       index:string;
       top_k:int;
       filters:bytes;
+      facets:string list;
     }
-    type make_t = ?query:string -> ?index:string -> ?top_k:int -> ?filters:bytes -> unit -> t
-    let make ?(query = {||}) ?(index = {||}) ?(top_k = 0) ?(filters = (Bytes.of_string {||})) () = { query; index; top_k; filters }
+    type make_t = ?query:string -> ?index:string -> ?top_k:int -> ?filters:bytes -> ?facets:string list -> unit -> t
+    let make ?(query = {||}) ?(index = {||}) ?(top_k = 0) ?(filters = (Bytes.of_string {||})) ?(facets = []) () = { query; index; top_k; filters; facets }
     let merge =
     let merge_query = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "query", "query"), string, ({||})) ) in
     let merge_index = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "index", "index"), string, ({||})) ) in
     let merge_top_k = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "top_k", "topK"), int32_int, (0)) ) in
     let merge_filters = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "filters", "filters"), bytes, ((Bytes.of_string {||}))) ) in
+    let merge_facets = Runtime'.Merge.merge Runtime'.Spec.( repeated ((5, "facets", "facets"), string, not_packed) ) in
     fun t1 t2 -> {
     	query = (merge_query t1.query t2.query);
     	index = (merge_index t1.index t2.index);
     	top_k = (merge_top_k t1.top_k t2.top_k);
     	filters = (merge_filters t1.filters t2.filters);
+    	facets = (merge_facets t1.facets t2.facets);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "query", "query"), string, ({||})) ^:: basic ((2, "index", "index"), string, ({||})) ^:: basic ((3, "top_k", "topK"), int32_int, (0)) ^:: basic ((4, "filters", "filters"), bytes, ((Bytes.of_string {||}))) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "query", "query"), string, ({||})) ^:: basic ((2, "index", "index"), string, ({||})) ^:: basic ((3, "top_k", "topK"), int32_int, (0)) ^:: basic ((4, "filters", "filters"), bytes, ((Bytes.of_string {||}))) ^:: repeated ((5, "facets", "facets"), string, not_packed) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { query; index; top_k; filters } -> serialize writer query index top_k filters
+      fun writer { query; index; top_k; filters; facets } -> serialize writer query index top_k filters facets
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor query index top_k filters = { query; index; top_k; filters } in
+      let constructor query index top_k filters facets = { query; index; top_k; filters; facets } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { query; index; top_k; filters } -> serialize query index top_k filters
+      fun { query; index; top_k; filters; facets } -> serialize query index top_k filters facets
     let from_json_exn =
-      let constructor query index top_k filters = { query; index; top_k; filters } in
+      let constructor query index top_k filters facets = { query; index; top_k; filters; facets } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
@@ -385,8 +491,15 @@ end = struct
       hits:SearchHit.t list;
       total:int;
       processing_ms:int;
+      facet_distribution:bytes;
+      (**
+{%html:
+<p>facet counts as JSON</p>
+%}
+      *)
+
     }
-    val make: ?hits:SearchHit.t list -> ?total:int -> ?processing_ms:int -> unit -> t
+    val make: ?hits:SearchHit.t list -> ?total:int -> ?processing_ms:int -> ?facet_distribution:bytes -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -405,7 +518,7 @@ end = struct
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?hits:SearchHit.t list -> ?total:int -> ?processing_ms:int -> unit -> t
+    type make_t = ?hits:SearchHit.t list -> ?total:int -> ?processing_ms:int -> ?facet_distribution:bytes -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -418,33 +531,36 @@ end = struct
       hits:SearchHit.t list;
       total:int;
       processing_ms:int;
+      facet_distribution:bytes;
     }
-    type make_t = ?hits:SearchHit.t list -> ?total:int -> ?processing_ms:int -> unit -> t
-    let make ?(hits = []) ?(total = 0) ?(processing_ms = 0) () = { hits; total; processing_ms }
+    type make_t = ?hits:SearchHit.t list -> ?total:int -> ?processing_ms:int -> ?facet_distribution:bytes -> unit -> t
+    let make ?(hits = []) ?(total = 0) ?(processing_ms = 0) ?(facet_distribution = (Bytes.of_string {||})) () = { hits; total; processing_ms; facet_distribution }
     let merge =
     let merge_hits = Runtime'.Merge.merge Runtime'.Spec.( repeated ((1, "hits", "hits"), (message (module SearchHit)), not_packed) ) in
     let merge_total = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "total", "total"), int32_int, (0)) ) in
     let merge_processing_ms = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "processing_ms", "processingMs"), int32_int, (0)) ) in
+    let merge_facet_distribution = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "facet_distribution", "facetDistribution"), bytes, ((Bytes.of_string {||}))) ) in
     fun t1 t2 -> {
     	hits = (merge_hits t1.hits t2.hits);
     	total = (merge_total t1.total t2.total);
     	processing_ms = (merge_processing_ms t1.processing_ms t2.processing_ms);
+    	facet_distribution = (merge_facet_distribution t1.facet_distribution t2.facet_distribution);
      }
-    let spec () = Runtime'.Spec.( repeated ((1, "hits", "hits"), (message (module SearchHit)), not_packed) ^:: basic ((2, "total", "total"), int32_int, (0)) ^:: basic ((3, "processing_ms", "processingMs"), int32_int, (0)) ^:: nil )
+    let spec () = Runtime'.Spec.( repeated ((1, "hits", "hits"), (message (module SearchHit)), not_packed) ^:: basic ((2, "total", "total"), int32_int, (0)) ^:: basic ((3, "processing_ms", "processingMs"), int32_int, (0)) ^:: basic ((4, "facet_distribution", "facetDistribution"), bytes, ((Bytes.of_string {||}))) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { hits; total; processing_ms } -> serialize writer hits total processing_ms
+      fun writer { hits; total; processing_ms; facet_distribution } -> serialize writer hits total processing_ms facet_distribution
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor hits total processing_ms = { hits; total; processing_ms } in
+      let constructor hits total processing_ms facet_distribution = { hits; total; processing_ms; facet_distribution } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { hits; total; processing_ms } -> serialize hits total processing_ms
+      fun { hits; total; processing_ms; facet_distribution } -> serialize hits total processing_ms facet_distribution
     let from_json_exn =
-      let constructor hits total processing_ms = { hits; total; processing_ms } in
+      let constructor hits total processing_ms facet_distribution = { hits; total; processing_ms; facet_distribution } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
@@ -460,8 +576,15 @@ end = struct
 %}
       *)
 
+      highlighted:bytes;
+      (**
+{%html:
+<p>highlighted fields as JSON (_formatted from provider)</p>
+%}
+      *)
+
     }
-    val make: ?id:string -> ?score:float -> ?document:bytes -> unit -> t
+    val make: ?id:string -> ?score:float -> ?document:bytes -> ?highlighted:bytes -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -480,7 +603,7 @@ end = struct
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?id:string -> ?score:float -> ?document:bytes -> unit -> t
+    type make_t = ?id:string -> ?score:float -> ?document:bytes -> ?highlighted:bytes -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -493,33 +616,36 @@ end = struct
       id:string;
       score:float;
       document:bytes;
+      highlighted:bytes;
     }
-    type make_t = ?id:string -> ?score:float -> ?document:bytes -> unit -> t
-    let make ?(id = {||}) ?(score = 0.) ?(document = (Bytes.of_string {||})) () = { id; score; document }
+    type make_t = ?id:string -> ?score:float -> ?document:bytes -> ?highlighted:bytes -> unit -> t
+    let make ?(id = {||}) ?(score = 0.) ?(document = (Bytes.of_string {||})) ?(highlighted = (Bytes.of_string {||})) () = { id; score; document; highlighted }
     let merge =
     let merge_id = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ) in
     let merge_score = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "score", "score"), float, (0.)) ) in
     let merge_document = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "document", "document"), bytes, ((Bytes.of_string {||}))) ) in
+    let merge_highlighted = Runtime'.Merge.merge Runtime'.Spec.( basic ((4, "highlighted", "highlighted"), bytes, ((Bytes.of_string {||}))) ) in
     fun t1 t2 -> {
     	id = (merge_id t1.id t2.id);
     	score = (merge_score t1.score t2.score);
     	document = (merge_document t1.document t2.document);
+    	highlighted = (merge_highlighted t1.highlighted t2.highlighted);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ^:: basic ((2, "score", "score"), float, (0.)) ^:: basic ((3, "document", "document"), bytes, ((Bytes.of_string {||}))) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "id", "id"), string, ({||})) ^:: basic ((2, "score", "score"), float, (0.)) ^:: basic ((3, "document", "document"), bytes, ((Bytes.of_string {||}))) ^:: basic ((4, "highlighted", "highlighted"), bytes, ((Bytes.of_string {||}))) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { id; score; document } -> serialize writer id score document
+      fun writer { id; score; document; highlighted } -> serialize writer id score document highlighted
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor id score document = { id; score; document } in
+      let constructor id score document highlighted = { id; score; document; highlighted } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { id; score; document } -> serialize id score document
+      fun { id; score; document; highlighted } -> serialize id score document highlighted
     let from_json_exn =
-      let constructor id score document = { id; score; document } in
+      let constructor id score document highlighted = { id; score; document; highlighted } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
@@ -770,6 +896,138 @@ end = struct
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
 
+  and ConfigureIndexRequest : sig
+    type t = {
+      index:string;
+      primary_key:string;
+      filterable_attributes:string list;
+      sortable_attributes:string list;
+      searchable_attributes:string list;
+    }
+    val make: ?index:string -> ?primary_key:string -> ?filterable_attributes:string list -> ?sortable_attributes:string list -> ?searchable_attributes:string list -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?index:string -> ?primary_key:string -> ?filterable_attributes:string list -> ?sortable_attributes:string list -> ?searchable_attributes:string list -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = ConfigureIndexRequest
+    let name () = ".protocol.ConfigureIndexRequest"
+    type t = {
+      index:string;
+      primary_key:string;
+      filterable_attributes:string list;
+      sortable_attributes:string list;
+      searchable_attributes:string list;
+    }
+    type make_t = ?index:string -> ?primary_key:string -> ?filterable_attributes:string list -> ?sortable_attributes:string list -> ?searchable_attributes:string list -> unit -> t
+    let make ?(index = {||}) ?(primary_key = {||}) ?(filterable_attributes = []) ?(sortable_attributes = []) ?(searchable_attributes = []) () = { index; primary_key; filterable_attributes; sortable_attributes; searchable_attributes }
+    let merge =
+    let merge_index = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "index", "index"), string, ({||})) ) in
+    let merge_primary_key = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "primary_key", "primaryKey"), string, ({||})) ) in
+    let merge_filterable_attributes = Runtime'.Merge.merge Runtime'.Spec.( repeated ((3, "filterable_attributes", "filterableAttributes"), string, not_packed) ) in
+    let merge_sortable_attributes = Runtime'.Merge.merge Runtime'.Spec.( repeated ((4, "sortable_attributes", "sortableAttributes"), string, not_packed) ) in
+    let merge_searchable_attributes = Runtime'.Merge.merge Runtime'.Spec.( repeated ((5, "searchable_attributes", "searchableAttributes"), string, not_packed) ) in
+    fun t1 t2 -> {
+    	index = (merge_index t1.index t2.index);
+    	primary_key = (merge_primary_key t1.primary_key t2.primary_key);
+    	filterable_attributes = (merge_filterable_attributes t1.filterable_attributes t2.filterable_attributes);
+    	sortable_attributes = (merge_sortable_attributes t1.sortable_attributes t2.sortable_attributes);
+    	searchable_attributes = (merge_searchable_attributes t1.searchable_attributes t2.searchable_attributes);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "index", "index"), string, ({||})) ^:: basic ((2, "primary_key", "primaryKey"), string, ({||})) ^:: repeated ((3, "filterable_attributes", "filterableAttributes"), string, not_packed) ^:: repeated ((4, "sortable_attributes", "sortableAttributes"), string, not_packed) ^:: repeated ((5, "searchable_attributes", "searchableAttributes"), string, not_packed) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { index; primary_key; filterable_attributes; sortable_attributes; searchable_attributes } -> serialize writer index primary_key filterable_attributes sortable_attributes searchable_attributes
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor index primary_key filterable_attributes sortable_attributes searchable_attributes = { index; primary_key; filterable_attributes; sortable_attributes; searchable_attributes } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { index; primary_key; filterable_attributes; sortable_attributes; searchable_attributes } -> serialize index primary_key filterable_attributes sortable_attributes searchable_attributes
+    let from_json_exn =
+      let constructor index primary_key filterable_attributes sortable_attributes searchable_attributes = { index; primary_key; filterable_attributes; sortable_attributes; searchable_attributes } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and ConfigureIndexResponse : sig
+    type t = (bool)
+    val make: ?accepted:bool -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?accepted:bool -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = ConfigureIndexResponse
+    let name () = ".protocol.ConfigureIndexResponse"
+    type t = (bool)
+    type make_t = ?accepted:bool -> unit -> t
+    let make ?(accepted = false) () = (accepted)
+    let merge =
+    let merge_accepted = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "accepted", "accepted"), bool, (false)) ) in
+    fun (t1_accepted) (t2_accepted) -> merge_accepted t1_accepted t2_accepted
+    let spec () = Runtime'.Spec.( basic ((1, "accepted", "accepted"), bool, (false)) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer (accepted) -> serialize writer accepted
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor accepted = (accepted) in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun (accepted) -> serialize accepted
+    let from_json_exn =
+      let constructor accepted = (accepted) in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
   module SearchService = struct
     module Search = struct
       let package_name = Some "protocol"
@@ -809,6 +1067,19 @@ end = struct
     let deleteDocuments =
       (module DeleteDocumentsRequest : Runtime'.Spec.Message with type t = DeleteDocumentsRequest.t ),
       (module DeleteDocumentsResponse : Runtime'.Spec.Message with type t = DeleteDocumentsResponse.t )
+
+    module ConfigureIndex = struct
+      let package_name = Some "protocol"
+      let service_name = "SearchService"
+      let method_name = "ConfigureIndex"
+      let name = "/protocol.SearchService/ConfigureIndex"
+      module Request = ConfigureIndexRequest
+      module Response = ConfigureIndexResponse
+    end
+
+    let configureIndex =
+      (module ConfigureIndexRequest : Runtime'.Spec.Message with type t = ConfigureIndexRequest.t ),
+      (module ConfigureIndexResponse : Runtime'.Spec.Message with type t = ConfigureIndexResponse.t )
 
   end
 

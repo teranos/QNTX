@@ -177,6 +177,9 @@ type SearchProvider interface {
 
 	// DeleteDocuments removes documents from an index by ID.
 	DeleteDocuments(ctx context.Context, req DeleteDocumentsRequest) (*DeleteDocumentsResponse, error)
+
+	// ConfigureIndex creates/configures an index with filterable, sortable, and searchable attributes.
+	ConfigureIndex(ctx context.Context, req ConfigureIndexRequest) (*ConfigureIndexResponse, error)
 }
 
 // EmbeddingProvider is an optional interface marker for plugins that provide
