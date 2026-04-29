@@ -796,12 +796,12 @@ func TestPluginManager_LoadedPluginNames(t *testing.T) {
 
 	manager := NewPluginManager(logger, logger, "")
 	configs := []PluginConfig{
-		{Name: "alpha", Enabled: true, Address: addr},
+		{Name: "mock", Enabled: true, Address: addr},
 	}
 	manager.LoadPlugins(context.Background(), configs)
 
 	names := manager.LoadedPluginNames()
-	assert.Equal(t, []string{"alpha"}, names)
+	assert.Equal(t, []string{"mock"}, names)
 }
 
 func TestPluginManager_DisablePlugin(t *testing.T) {
@@ -818,18 +818,18 @@ func TestPluginManager_DisablePlugin(t *testing.T) {
 
 	manager := NewPluginManager(logger, logger, "")
 	configs := []PluginConfig{
-		{Name: "removable", Enabled: true, Address: addr},
+		{Name: "mock", Enabled: true, Address: addr},
 	}
 	manager.LoadPlugins(context.Background(), configs)
 
 	// Register with domain registry
-	loaded, ok := manager.GetPlugin("removable")
+	loaded, ok := manager.GetPlugin("mock")
 	require.True(t, ok)
 	require.NoError(t, registry.Register(loaded))
-	registry.MarkReady("removable")
+	registry.MarkReady("mock")
 
 	// Stop it
-	err := manager.DisablePlugin(context.Background(), "removable", registry)
+	err := manager.DisablePlugin(context.Background(), "mock", registry)
 	require.NoError(t, err)
 
 	// Plugin should be gone from manager
@@ -837,7 +837,7 @@ func TestPluginManager_DisablePlugin(t *testing.T) {
 	assert.Empty(t, manager.GetAllPlugins())
 
 	// Plugin should be gone from registry
-	_, ok = registry.Get("removable")
+	_, ok = registry.Get("mock")
 	assert.False(t, ok)
 }
 
