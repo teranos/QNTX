@@ -810,7 +810,7 @@ func TestPluginManager_DisablePlugin(t *testing.T) {
 	}
 
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := pluginpkg.NewRegistry("test", logger)
+	registry := pluginpkg.NewRegistry("0.1.0", logger)
 
 	p := newMockPlugin()
 	addr, cleanup := startTestServer(t, p)
@@ -843,7 +843,7 @@ func TestPluginManager_DisablePlugin(t *testing.T) {
 
 func TestPluginManager_DisablePlugin_NotLoaded(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := pluginpkg.NewRegistry("test", logger)
+	registry := pluginpkg.NewRegistry("0.1.0", logger)
 	manager := NewPluginManager(logger, logger, "")
 
 	err := manager.DisablePlugin(context.Background(), "nonexistent", registry)
