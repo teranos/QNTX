@@ -19,6 +19,7 @@ const (
 	BannerRestart      BannerReason = "restart"
 	BannerRecovered    BannerReason = "recovered"
 	BannerReconfigured BannerReason = "reconfigured"
+	BannerEnabled      BannerReason = "enabled"
 	BannerDisabled     BannerReason = "disabled"
 )
 

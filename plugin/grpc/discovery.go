@@ -851,36 +851,32 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		}
 	}
 
-	if m.servicesManager == nil {
-		m.logger.Debugf("Plugin '%s' restarted successfully", name)
-		return
-	}
 	var roles []string
-	if proxy.IsLLMProvider() {
-		roles = append(roles, "llm-provider")
-		if llmRouter := m.servicesManager.GetLLMRouter(); llmRouter != nil {
-			llmRouter.RegisterProvider(name, proxy.LLMServiceClient())
-			m.logger.Debugf("Re-registered LLM provider '%s' after restart", name)
+	if m.servicesManager != nil {
+		if proxy.IsLLMProvider() {
+			roles = append(roles, "llm-provider")
+			if llmRouter := m.servicesManager.GetLLMRouter(); llmRouter != nil {
+				llmRouter.RegisterProvider(name, proxy.LLMServiceClient())
+				m.logger.Debugf("Re-registered LLM provider '%s' after restart", name)
+			}
 		}
-	}
-	if proxy.IsSearchProvider() {
-		roles = append(roles, "search-provider")
-		if searchRouter := m.servicesManager.GetSearchRouter(); searchRouter != nil {
-			searchRouter.RegisterProvider(name, proxy.SearchServiceClient())
-			m.logger.Debugf("Re-registered search provider '%s' after restart", name)
+		if proxy.IsSearchProvider() {
+			roles = append(roles, "search-provider")
+			if searchRouter := m.servicesManager.GetSearchRouter(); searchRouter != nil {
+				searchRouter.RegisterProvider(name, proxy.SearchServiceClient())
+				m.logger.Debugf("Re-registered search provider '%s' after restart", name)
+			}
 		}
-	}
-	if proxy.IsEmbeddingProvider() {
-		roles = append(roles, "embedding-provider")
-		if m.onEmbeddingProviderReady != nil {
-			m.onEmbeddingProviderReady(name, proxy.EmbeddingServiceClient())
-			m.logger.Debugf("Re-registered embedding provider '%s' after restart", name)
+		if proxy.IsEmbeddingProvider() {
+			roles = append(roles, "embedding-provider")
+			if m.onEmbeddingProviderReady != nil {
+				m.onEmbeddingProviderReady(name, proxy.EmbeddingServiceClient())
+				m.logger.Debugf("Re-registered embedding provider '%s' after restart", name)
+			}
 		}
 	}
 
-	m.logger.Debugf("Plugin '%s' restarted successfully", name)
-
-	// Emit banner for restarted plugin
+	// Populate accumulator for banner (caller emits with appropriate reason)
 	if m.accumulator != nil {
 		meta := proxy.Metadata()
 		m.accumulator.SetLoading(name, meta.Version)
@@ -924,6 +920,11 @@ func (m *PluginManager) EnablePlugin(ctx context.Context, name string, searchPat
 	// Register + initialize + setup handlers/watchers/schedules/providers
 	m.registerRestarted(ctx, name, registry, services)
 
+	// Emit enabled banner
+	if m.accumulator != nil {
+		m.accumulator.Emit(name, BannerEnabled)
+	}
+
 	return nil
 }
 
@@ -936,6 +937,7 @@ func (m *PluginManager) DisablePlugin(ctx context.Context, name string, registry
 		m.mu.Unlock()
 		return errors.Newf("plugin '%s' is not loaded", name)
 	}
+	meta := p.client.Metadata()
 	process := p.process
 	client := p.client
 	delete(m.plugins, name)
@@ -975,7 +977,24 @@ func (m *PluginManager) DisablePlugin(ctx context.Context, name string, registry
 		}
 	}
 
+	// Emit disabled banner
+	if m.accumulator != nil {
+		m.accumulator.SetLoading(name, meta.Version)
+		m.accumulator.Emit(name, BannerDisabled)
+	}
+
 	return nil
+}
+
+// LoadedPluginNames returns the names of all currently loaded plugins.
+func (m *PluginManager) LoadedPluginNames() []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	names := make([]string, 0, len(m.plugins))
+	for name := range m.plugins {
+		names = append(names, name)
+	}
+	return names
 }
 
 // Shutdown stops all managed plugins and retry goroutines.

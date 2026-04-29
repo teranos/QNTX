@@ -157,5 +157,6 @@ type DomainPlugin interface {
 
 - [ADR-002: Plugin Configuration Management](./ADR-002-plugin-configuration.md)
 - [ADR-003: Plugin Communication Patterns](./ADR-003-plugin-communication.md)
+- [Plugin Hot-Swap](../plugin-hot-swap.md) — runtime enable/disable via am.toml or API
 - PR #130: Domain Plugin Architecture
 - Issue #128: Implement gRPC Protocol and Externalize Code Domain
