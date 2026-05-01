@@ -9,13 +9,18 @@
 #include <thread>
 #include <vector>
 
+// Mobile builds set SCRY_NO_GRPC to skip gRPC headers and the service
+// classes at the bottom of this file — the InferenceEngine + data types
+// above are gRPC-free and reused as-is.
+#ifndef SCRY_NO_GRPC
 #include <grpcpp/grpcpp.h>
 
 #include "domain.grpc.pb.h"
 #include "llm.grpc.pb.h"
 #include "ats_client.h"
+#endif
 
-#define PLUGIN_VERSION "0.37.9"
+#define PLUGIN_VERSION "0.37.10"
 
 // Forward declarations
 struct llama_model;
@@ -212,6 +217,8 @@ private:
     std::vector<float> vocab_positions_;  // cached positions+colors (n_vocab × 6: 3 pos + 3 color)
 };
 
+#ifndef SCRY_NO_GRPC
+
 // DomainPluginService implementation
 class ScryPlugin final : public protocol::DomainPluginService::Service {
 public:
@@ -310,3 +317,5 @@ public:
 private:
     ScryPlugin* plugin_;
 };
+
+#endif  // SCRY_NO_GRPC

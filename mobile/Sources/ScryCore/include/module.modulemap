@@ -1,0 +1,5 @@
+module ScryCore {
+    umbrella header "ScryEngine.h"
+    export *
+    module * { export * }
+}
