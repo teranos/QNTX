@@ -19,7 +19,7 @@
 
 ## Development Workflow
 
-Hot-reloading TypeScript frontend dev server. Restart `make dev` to pick up QNTX backend changes. Ports are configured in `am.toml`.
+Hot-reloading TypeScript frontend dev server. Restart `make dev` to pick up QNTX backend changes. Ports are configured in `am.toml`. Initial startup takes 10+ seconds (Go build + WASM + frontend bundling).
 
 **KNOW** the developer is always running the latest version of QNTX. It is **FORBIDDEN** to discuss or question whether the developer has run the latest version. If there is an issue, it is in the code, not with running the latest binary or configuration.
 
