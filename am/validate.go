@@ -9,7 +9,7 @@ func (c *Config) Validate() error {
 
 	// Server port: 0 is invalid (omit for default), negative is invalid
 	if c.Server.Port != nil && *c.Server.Port == 0 {
-		return errors.New("server.port cannot be 0 (omit for default port 877)")
+		return errors.New("server.port cannot be 0 (omit for default port 8770)")
 	}
 	if c.Server.Port != nil && *c.Server.Port < 0 {
 		return errors.Newf("server.port must be positive, got %d", *c.Server.Port)

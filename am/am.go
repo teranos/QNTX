@@ -51,7 +51,7 @@ type BoundedStorageConfig struct {
 
 // ServerConfig configures the QNTX web server
 type ServerConfig struct {
-	Port           *int            `mapstructure:"port"`          // Server port: nil = default 877, 0 is invalid (omit for default)
+	Port           *int            `mapstructure:"port"`          // Server port: nil = default 8770, 0 is invalid (omit for default)
 	BindAddress    string          `mapstructure:"bind_address"`  // Network interface to bind: "127.0.0.1" (default, local only) or "0.0.0.0" (all interfaces)
 	FrontendPort   int             `mapstructure:"frontend_port"` // Frontend dev server port (default: 8820)
 	AllowedOrigins []string        `mapstructure:"allowed_origins"`
@@ -76,8 +76,8 @@ type RateLimitConfig struct {
 
 // Server port constants
 const (
-	DefaultServerPort     = 877  // Development port (easy to type, above privileged range)
-	DefaultGraphEventPort = 878  // Event viewer port
+	DefaultServerPort     = 8770 // Development port
+	DefaultGraphEventPort = 8780 // Event viewer port
 	FallbackServerPort    = 7878 // Production fallback port
 )
 

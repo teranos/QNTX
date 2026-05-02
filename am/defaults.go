@@ -182,7 +182,7 @@ func IsLoopbackAddress(addr string) bool {
 }
 
 // GetServerPort returns the configured QNTX server port
-// Returns server.port from config, or DefaultServerPort (877) if not configured
+// Returns server.port from config, or DefaultServerPort (8770) if not configured
 func GetServerPort() int {
 	cfg, err := Load()
 	if err != nil || cfg.Server.Port == nil {

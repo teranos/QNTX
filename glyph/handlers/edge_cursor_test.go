@@ -23,7 +23,7 @@ import (
 func TestEdgeCursor_AppliedOnReload(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 	if err := engine.Start(); err != nil {
 		t.Fatalf("Failed to start engine: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestEdgeCursor_DeletedWithComposition(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	canvasStore := glyphstorage.NewCanvasStore(db)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 	if err := engine.Start(); err != nil {
 		t.Fatalf("Failed to start engine: %v", err)
 	}

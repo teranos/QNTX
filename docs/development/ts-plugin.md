@@ -431,7 +431,7 @@ test('renders canvas with note glyph', async () => {
         content: 'Test note'
     }];
 
-    const response = await fetch('http://localhost:877/api/canvas-renderer/render', {
+    const response = await fetch('http://localhost:8770/api/canvas-renderer/render', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ canvasId: 'test', glyphs })

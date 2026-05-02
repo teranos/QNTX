@@ -22,7 +22,7 @@ func setupHandlerWithWatcher(t *testing.T) (*CanvasHandler, *watcher.Engine, *st
 	db := qntxtest.CreateTestDB(t)
 	canvasStore := glyphstorage.NewCanvasStore(db)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 	if err := engine.Start(); err != nil {
 		t.Fatalf("Failed to start watcher engine: %v", err)
 	}

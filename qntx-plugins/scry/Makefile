@@ -6,7 +6,7 @@ BUILD_DIR = build
 # Restart — tell running QNTX to hot-restart scry. Silent no-op if QNTX isn't running.
 define restart-plugin
 	@TOML_PORT=$$(grep -E '^port\s*=' ../../am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
-	 PORT=$${BACKEND_PORT:-$${TOML_PORT:-877}}; \
+	 PORT=$${BACKEND_PORT:-$${TOML_PORT:-8770}}; \
 	 curl -sf -X POST http://127.0.0.1:$$PORT/api/plugins/scry/restart > /dev/null 2>&1 \
 		&& echo "  ↻ scry restarted — live at http://127.0.0.1:$$PORT" \
 		|| echo "  ⊘ QNTX not running — restart make dev to pick up new binary"

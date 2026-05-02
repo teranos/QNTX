@@ -65,7 +65,7 @@ make dev
 
 ```
 [Python plugin] Initializing Python plugin
-[Python plugin] ATSStore endpoint: localhost:877
+[Python plugin] ATSStore endpoint: localhost:8770
 [Python plugin] Discovering Python handlers from ATS store
 [Python plugin] Discovered 1 handler(s) from ATS store: ["vacancies"]
 [Python plugin] Announcing async handlers: ["python.script", "python.vacancies"]

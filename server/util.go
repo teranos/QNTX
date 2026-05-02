@@ -51,7 +51,7 @@ func checkOrigin(r *http.Request) bool {
 }
 
 // matchOrigin checks if origin matches an allowed origin (scheme+host).
-// Allows any port: "http://localhost" matches "http://localhost:877"
+// Allows any port: "http://localhost" matches "http://localhost:8770"
 // but NOT "http://localhost.evil.com" (the old prefix matching did).
 func matchOrigin(origin, allowed string) bool {
 	if !strings.HasPrefix(origin, allowed) {
@@ -74,7 +74,7 @@ func isPortAvailable(port int) bool {
 }
 
 // findAvailablePort tries to find an available port starting from the requested port
-// It tries: requested port, preferred fallbacks (877, 7878), then high-range ports (56787-56796)
+// It tries: requested port, preferred fallbacks (8770, 7878), then high-range ports (56787-56796)
 func findAvailablePort(requestedPort int) (int, error) {
 	// Try the requested port first
 	if isPortAvailable(requestedPort) {

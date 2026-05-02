@@ -214,7 +214,7 @@ Clients:
 
 WASM (qntx-core) runs in both server (wazero) and browser (wasm-bindgen) — same Rust logic, two runtimes.
 
-Development: `make dev` (Go on :877, TS hot-reload on :8820)
+Development: `make dev` (Go on :8770, TS hot-reload on :8820)
 
 See [Installation](installation.md), [Nix Development](nix-development.md), [Distribution Strategy](distribution-strategy.md).
 
