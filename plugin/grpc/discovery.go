@@ -882,16 +882,21 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		m.accumulator.SetLoading(name, meta.Version)
 		m.accumulator.SetRoles(name, roles)
 		m.accumulator.SetHandlers(name, proxy.GetHandlerNames(), len(proxy.GetSchedules()), len(proxy.GetWatchers()))
-		healthCtx, hCancel := context.WithTimeout(ctx, 5*time.Second)
-		health := proxy.Health(healthCtx)
-		hCancel()
-		details := make(map[string]string)
-		for k, v := range health.Details {
-			if s, ok := v.(string); ok {
-				details[k] = s
+		// Collect health asynchronously — synchronous Health() blocks plugin restart
+		// while the plugin makes ATS calls back to QNTX
+		m.accumulator.SetHealth(name, false, "initializing", nil)
+		go func() {
+			healthCtx, hCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			health := proxy.Health(healthCtx)
+			hCancel()
+			details := make(map[string]string)
+			for k, v := range health.Details {
+				if s, ok := v.(string); ok {
+					details[k] = s
+				}
 			}
-		}
-		m.accumulator.SetHealth(name, health.Healthy, health.Message, details)
+			m.accumulator.SetHealth(name, health.Healthy, health.Message, details)
+		}()
 	}
 }
 

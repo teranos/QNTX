@@ -90,6 +90,56 @@ func (bs *BoundedStore) CreateAttestationWithLimits(cmd *types.AsCommand) (*type
 	return as, nil
 }
 
+// FlushEnforcement runs enforcement directly through Rust for all recent attestations.
+// Used by tests to verify enforcement behavior synchronously.
+func (bs *BoundedStore) FlushEnforcement() {
+	rbs, ok := bs.store.(*RustBackedStore)
+	if !ok {
+		return
+	}
+	// Get all unique actors/contexts/subjects and enforce
+	actors, _ := rbs.rust.GetAllContexts()
+	if actors == nil {
+		actors = []string{}
+	}
+	// Run a broad enforcement pass
+	allActors := []string{}
+	allContexts := []string{}
+	allSubjects := []string{}
+
+	// Query all attestations to collect dimensions
+	all, err := rbs.rust.GetAttestations(ats.AttestationFilter{})
+	if err != nil {
+		return
+	}
+	actorSet := map[string]struct{}{}
+	contextSet := map[string]struct{}{}
+	subjectSet := map[string]struct{}{}
+	for _, a := range all {
+		for _, v := range a.Actors {
+			actorSet[v] = struct{}{}
+		}
+		for _, v := range a.Contexts {
+			contextSet[v] = struct{}{}
+		}
+		for _, v := range a.Subjects {
+			subjectSet[v] = struct{}{}
+		}
+	}
+	for k := range actorSet {
+		allActors = append(allActors, k)
+	}
+	for k := range contextSet {
+		allContexts = append(allContexts, k)
+	}
+	for k := range subjectSet {
+		allSubjects = append(allSubjects, k)
+	}
+
+	cfg := rbs.enforcementCfg
+	rbs.rust.EnforceLimits(allActors, allContexts, allSubjects, cfg)
+}
+
 // nullIfEmpty returns nil for empty strings (for nullable SQL columns)
 func nullIfEmpty(s string) interface{} {
 	if s == "" {

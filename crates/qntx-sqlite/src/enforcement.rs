@@ -87,12 +87,9 @@ impl SqliteStore {
         limit: usize,
     ) -> Result<Option<EnforcementEvent>, SqliteError> {
         let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM attestations
-             WHERE EXISTS (
-                 SELECT 1 FROM json_each(attestations.actors) WHERE value = ?1
-             ) AND EXISTS (
-                 SELECT 1 FROM json_each(attestations.contexts) WHERE value = ?2 COLLATE NOCASE
-             )",
+            "SELECT COUNT(*) FROM attestation_actors a
+             JOIN attestation_contexts c ON a.attestation_id = c.attestation_id
+             WHERE a.actor = ?1 AND c.context = ?2 COLLATE NOCASE",
             rusqlite::params![actor, context],
             |row| row.get::<_, i64>(0),
         )?;
@@ -114,9 +111,12 @@ impl SqliteStore {
 
         {
             let mut stmt = self.conn.prepare(
-                "SELECT predicates, subjects, timestamp FROM attestations, json_each(actors) as a, json_each(contexts) as c
-                 WHERE a.value = ?1 AND c.value = ?2
-                 ORDER BY timestamp ASC
+                "SELECT att.predicates, att.subjects, att.timestamp
+                 FROM attestations att
+                 JOIN attestation_actors a ON att.id = a.attestation_id
+                 JOIN attestation_contexts c ON att.id = c.attestation_id
+                 WHERE a.actor = ?1 AND c.context = ?2
+                 ORDER BY att.timestamp ASC
                  LIMIT 3",
             )?;
             let mut rows = stmt.query(rusqlite::params![actor, context])?;
@@ -134,17 +134,15 @@ impl SqliteStore {
             }
         }
 
-        // Delete oldest attestations
+        // Delete oldest attestations (CASCADE deletes junction rows)
         self.conn.execute(
             "DELETE FROM attestations
              WHERE id IN (
-                 SELECT id FROM attestations
-                 WHERE EXISTS (
-                     SELECT 1 FROM json_each(attestations.actors) WHERE value = ?1
-                 ) AND EXISTS (
-                     SELECT 1 FROM json_each(attestations.contexts) WHERE value = ?2 COLLATE NOCASE
-                 )
-                 ORDER BY timestamp ASC
+                 SELECT att.id FROM attestations att
+                 JOIN attestation_actors a ON att.id = a.attestation_id
+                 JOIN attestation_contexts c ON att.id = c.attestation_id
+                 WHERE a.actor = ?1 AND c.context = ?2 COLLATE NOCASE
+                 ORDER BY att.timestamp ASC
                  LIMIT ?3
              )",
             rusqlite::params![actor, context, delete_count],
@@ -167,19 +165,18 @@ impl SqliteStore {
         actor: &str,
         limit: usize,
     ) -> Result<Option<EnforcementEvent>, SqliteError> {
-        // Get all contexts for this actor with usage counts, ordered by usage ASC
+        // Get distinct contexts for this actor with usage counts, ordered by usage ASC
         let mut stmt = self.conn.prepare(
-            "SELECT DISTINCT json_extract(contexts, '$') as context_array, COUNT(*) as usage_count
-             FROM attestations
-             WHERE EXISTS (
-                 SELECT 1 FROM json_each(attestations.actors) WHERE value = ?1
-             )
-             GROUP BY context_array
+            "SELECT c.context, COUNT(*) as usage_count
+             FROM attestation_actors a
+             JOIN attestation_contexts c ON a.attestation_id = c.attestation_id
+             WHERE a.actor = ?1
+             GROUP BY c.context
              ORDER BY usage_count ASC",
         )?;
 
         struct ContextUsage {
-            context_array: String,
+            context: String,
             _usage_count: i64,
         }
 
@@ -188,7 +185,7 @@ impl SqliteStore {
             let mut result = Vec::new();
             while let Some(row) = rows.next()? {
                 result.push(ContextUsage {
-                    context_array: row.get(0)?,
+                    context: row.get(0)?,
                     _usage_count: row.get(1)?,
                 });
             }
@@ -211,18 +208,19 @@ impl SqliteStore {
         };
 
         for (i, cu) in contexts_to_delete.iter().enumerate() {
-            details.evicted_contexts.push(cu.context_array.clone());
+            details.evicted_contexts.push(cu.context.clone());
 
             // Collect sample data from first context being evicted
             if i == 0 {
                 let mut sample_stmt = self.conn.prepare(
-                    "SELECT predicates, subjects, timestamp FROM attestations
-                     WHERE EXISTS (
-                         SELECT 1 FROM json_each(attestations.actors) WHERE value = ?1
-                     ) AND contexts = ?2
+                    "SELECT att.predicates, att.subjects, att.timestamp
+                     FROM attestations att
+                     JOIN attestation_actors a ON att.id = a.attestation_id
+                     JOIN attestation_contexts c ON att.id = c.attestation_id
+                     WHERE a.actor = ?1 AND c.context = ?2
                      LIMIT 3",
                 )?;
-                let mut rows = sample_stmt.query(rusqlite::params![actor, cu.context_array])?;
+                let mut rows = sample_stmt.query(rusqlite::params![actor, cu.context])?;
                 while let Some(row) = rows.next()? {
                     let pred_json: String = row.get(0)?;
                     let subj_json: String = row.get(1)?;
@@ -237,13 +235,16 @@ impl SqliteStore {
                 }
             }
 
-            // Delete all attestations with this context array for this actor
+            // Delete all attestations with this context for this actor (CASCADE deletes junction rows)
             let deleted = self.conn.execute(
                 "DELETE FROM attestations
-                 WHERE EXISTS (
-                     SELECT 1 FROM json_each(attestations.actors) WHERE value = ?1
-                 ) AND contexts = ?2",
-                rusqlite::params![actor, cu.context_array],
+                 WHERE id IN (
+                     SELECT a.attestation_id
+                     FROM attestation_actors a
+                     JOIN attestation_contexts c ON a.attestation_id = c.attestation_id
+                     WHERE a.actor = ?1 AND c.context = ?2
+                 )",
+                rusqlite::params![actor, cu.context],
             )?;
             total_deleted += deleted;
         }
@@ -271,12 +272,12 @@ impl SqliteStore {
     ) -> Result<Option<EnforcementEvent>, SqliteError> {
         // Get all actors for this entity with most recent timestamps, ordered ASC
         let mut stmt = self.conn.prepare(
-            "SELECT value as actor, MAX(timestamp) as last_seen
-             FROM attestations, json_each(actors)
-             WHERE EXISTS (
-                 SELECT 1 FROM json_each(attestations.subjects) WHERE value = ?1
-             )
-             GROUP BY actor
+            "SELECT a.actor, MAX(att.timestamp) as last_seen
+             FROM attestation_actors a
+             JOIN attestation_subjects s ON a.attestation_id = s.attestation_id
+             JOIN attestations att ON att.id = a.attestation_id
+             WHERE s.subject = ?1
+             GROUP BY a.actor
              ORDER BY last_seen ASC",
         )?;
 
@@ -323,12 +324,12 @@ impl SqliteStore {
             // Collect sample data from first actor being evicted
             if i == 0 {
                 let mut sample_stmt = self.conn.prepare(
-                    "SELECT predicates, subjects FROM attestations
-                     WHERE EXISTS (
-                         SELECT 1 FROM json_each(attestations.actors) WHERE value = ?1
-                     ) AND EXISTS (
-                         SELECT 1 FROM json_each(attestations.subjects) WHERE value = ?2
-                     ) LIMIT 3",
+                    "SELECT att.predicates, att.subjects
+                     FROM attestations att
+                     JOIN attestation_actors a ON att.id = a.attestation_id
+                     JOIN attestation_subjects s ON att.id = s.attestation_id
+                     WHERE a.actor = ?1 AND s.subject = ?2
+                     LIMIT 3",
                 )?;
                 let mut rows = sample_stmt.query(rusqlite::params![ai.actor, entity])?;
                 while let Some(row) = rows.next()? {
@@ -339,13 +340,14 @@ impl SqliteStore {
                 }
             }
 
-            // Delete all attestations by this actor that mention this entity
+            // Delete all attestations by this actor that mention this entity (CASCADE deletes junction rows)
             let deleted = self.conn.execute(
                 "DELETE FROM attestations
-                 WHERE EXISTS (
-                     SELECT 1 FROM json_each(attestations.actors) WHERE value = ?1
-                 ) AND EXISTS (
-                     SELECT 1 FROM json_each(attestations.subjects) WHERE value = ?2
+                 WHERE id IN (
+                     SELECT a.attestation_id
+                     FROM attestation_actors a
+                     JOIN attestation_subjects s ON a.attestation_id = s.attestation_id
+                     WHERE a.actor = ?1 AND s.subject = ?2
                  )",
                 rusqlite::params![ai.actor, entity],
             )?;

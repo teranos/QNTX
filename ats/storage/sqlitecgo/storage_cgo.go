@@ -99,6 +99,33 @@ func (rs *RustStore) Mu() *sync.Mutex {
 	return &rs.mu
 }
 
+// SetEnforcementConfig sets the enforcement config on the Rust store.
+// When set, Rust runs enforcement automatically after every put().
+func (rs *RustStore) SetEnforcementConfig(config *EnforcementConfig) error {
+	configJSON, err := json.Marshal(config)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal enforcement config")
+	}
+
+	cJSON := C.CString(string(configJSON))
+	defer C.free(unsafe.Pointer(cJSON))
+
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	if rs.store == nil {
+		return errors.New("store is closed")
+	}
+
+	result := C.storage_set_enforcement_config(rs.store, cJSON)
+	defer C.storage_result_free(result)
+
+	if !result.success {
+		return errors.New(C.GoString(result.error_msg))
+	}
+
+	return nil
+}
+
 // Close frees the underlying Rust store.
 // Safe to call multiple times.
 func (rs *RustStore) Close() error {
@@ -270,15 +297,6 @@ func (rs *RustStore) CountAttestations() (int, error) {
 	return int(result.count), nil
 }
 
-// existsLocked checks existence without acquiring the lock (caller must hold mu).
-func (rs *RustStore) existsLocked(asid string) bool {
-	cID := C.CString(asid)
-	defer C.free(unsafe.Pointer(cID))
-	result := C.storage_exists(rs.store, cID)
-	defer C.storage_result_free(result)
-	return bool(result.success)
-}
-
 // putLocked stores an attestation without acquiring the lock (caller must hold mu).
 func (rs *RustStore) putLocked(jsonBytes []byte) error {
 	cJSON := C.CString(string(jsonBytes))
@@ -293,17 +311,6 @@ func (rs *RustStore) putLocked(jsonBytes []byte) error {
 
 // GenerateAndCreateAttestation generates a vanity ASID and creates a self-certifying attestation (implements ats.AttestationStore).
 func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
-	if rs.store == nil {
-		return nil, errors.New("store is closed")
-	}
-
-	// Generate vanity ASID with collision detection (lock held throughout)
-	checkExists := func(asid string) bool {
-		return rs.existsLocked(asid)
-	}
-
 	// Use first subject, predicate, and context for vanity generation
 	subject := "_"
 	if len(cmd.Subjects) > 0 {
@@ -318,6 +325,11 @@ func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *type
 		ctxStr = cmd.Contexts[0]
 	}
 
+	// Collision check takes the lock briefly per check, not for the entire generation
+	checkExists := func(asid string) bool {
+		return rs.AttestationExists(asid)
+	}
+
 	asid, err := identity.GenerateASUIDWithRetry("AS", subject, predicate, ctxStr, checkExists)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate vanity ASID")
@@ -329,10 +341,17 @@ func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *type
 	// Make attestation self-certifying: use ASID as its own actor
 	as.Actors = []string{asid}
 
-	// Store via Rust backend (using unlocked helper since we hold mu)
+	// Serialize outside the lock
 	jsonBytes, err := toRustJSON(as)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to convert attestation")
+	}
+
+	// Lock only for the write
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	if rs.store == nil {
+		return nil, errors.New("store is closed")
 	}
 	if err := rs.putLocked(jsonBytes); err != nil {
 		return nil, errors.Wrap(err, "failed to store attestation")
