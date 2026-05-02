@@ -76,6 +76,16 @@ SqliteStore *storage_new_file(const char *path);
  */
 void storage_free(SqliteStore *store);
 
+/**
+ * Set enforcement config on the store.
+ * When set, enforcement runs automatically after every storage_put().
+ *
+ * @param store Store handle
+ * @param config_json JSON enforcement config, e.g. {"actor_context_limit":16,"actor_contexts_limit":64,"entity_actors_limit":64}
+ * @return Result indicating success/failure
+ */
+StorageResultC storage_set_enforcement_config(SqliteStore *store, const char *config_json);
+
 // ============================================================================
 // CRUD Operations
 // ============================================================================

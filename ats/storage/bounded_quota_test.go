@@ -91,6 +91,8 @@ func TestBoundedStorage_DeletesWhenExceeding16PerActorContext(t *testing.T) {
 		require.NoError(t, err, "Failed to catalog astronomy scroll %d", i)
 	}
 
+	store.FlushEnforcement()
+
 	// Only 16 should exist (shelf capacity limit enforced)
 	var count int
 	err := db.QueryRow("SELECT COUNT(*) FROM attestations").Scan(&count)
@@ -158,6 +160,8 @@ func TestBoundedStorage_DoesNotDeleteCrossingContextBoundaries(t *testing.T) {
 		err := store.CreateAttestation(attestation)
 		require.NoError(t, err)
 	}
+
+	store.FlushEnforcement()
 
 	// Should have 16 from Philosophy + 16 from Medicine = 32 total
 	var count int
@@ -227,6 +231,8 @@ func TestBoundedStorage_MixedContextsPreservation(t *testing.T) {
 		err := store.CreateAttestation(attestation)
 		require.NoError(t, err)
 	}
+
+	store.FlushEnforcement()
 
 	// Verify ALL critical attestations still exist
 	for _, att := range criticalAttestations {
@@ -305,6 +311,8 @@ func TestBoundedStorage_ExactDomainReproduction(t *testing.T) {
 			require.NoError(t, err)
 		}
 	}
+
+	store.FlushEnforcement()
 
 	// Verify ALL duration attestations for ALL entities still exist
 	for entity := 1; entity <= 9; entity++ {

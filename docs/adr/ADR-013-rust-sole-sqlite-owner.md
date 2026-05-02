@@ -20,3 +20,9 @@ sqlite-vec is not a blocker: the Rust side already loads it (`crates/qntx-sqlite
 - One copy of `sqlite3.c`, one WAL, one lock strategy
 - Corruption from dual-driver contention is eliminated
 - All pragmas, busy_timeout, and journal_mode are set once in Rust
+
+## Update: Rust-owned enforcement (2026-05)
+
+Enforcement (16/64/64 limits) moved from Go to Rust. Go held the mutex for 5+ seconds per enforcement pass — `json_each()` over JSON array columns doesn't scale.
+
+Migration 048 adds junction tables (`attestation_actors`, `_contexts`, `_subjects`, `_predicates`) with indexed columns and FK CASCADE. Rust triggers enforcement internally after every `put()`. Go no longer calls enforcement.
