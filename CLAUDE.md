@@ -1,6 +1,6 @@
 # QNTX LAW
 
-**Read, don't infer:**
+**Read, Verify, Proof. Don't infer, don't assume, don't theorize.**
 
 - Stick to what's explicitly stated in code and documentation
 - Don't add features, explanations, or context that weren't requested
