@@ -853,7 +853,7 @@ func setupSEtoSE(t *testing.T) (*CanvasHandler, *storage.WatcherStore, context.C
 	db := qntxtest.CreateTestDB(t)
 	canvasStore := glyphstorage.NewCanvasStore(db)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 	if err := engine.Start(); err != nil {
 		t.Fatalf("Engine start failed: %v", err)
 	}
@@ -1022,7 +1022,7 @@ func TestCompileSubscriptions_SEtoSEtoPrompt_PropagatesUpstream(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	canvasStore := glyphstorage.NewCanvasStore(db)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 	if err := engine.Start(); err != nil {
 		t.Fatalf("Engine start failed: %v", err)
 	}

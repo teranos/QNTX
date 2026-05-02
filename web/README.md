@@ -36,7 +36,7 @@ While `ax` queries provide the data, glyphs make the relationships tangible.
 
 ### Configuration
 Ports are configured in `../am.toml` at project root:
-- `[server].port` - Backend API port (default: 877)
+- `[server].port` - Backend API port (default: 8770)
 - `[server].frontend_port` - Development server port (default: 8820)
 
 ### Runtime Dependencies
@@ -144,7 +144,7 @@ make cli
 # Or without test mode (requires existing database)
 ./bin/qntx server
 
-# Visit http://localhost:877 in browser
+# Visit http://localhost:8770 in browser
 # Verify:
 # - Page loads
 # - CodeMirror editor appears

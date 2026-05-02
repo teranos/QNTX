@@ -26,7 +26,7 @@ use qntx_proto::protocol::{DaemonStatusMessage, MessageType, StorageWarningMessa
 #[allow(unused_imports)]
 use qntx_grpc::types::async_types::{Job, JobStatus};
 
-const SERVER_PORT: &str = "877";
+const SERVER_PORT: &str = "8770";
 
 struct ServerState {
     child: Arc<Mutex<Option<std::process::Child>>>,

@@ -37,7 +37,7 @@ dev: web cli ## Build frontend and CLI, then start development servers (backend 
 	@# Read ports from am.toml if exists, otherwise use defaults
 	@TOML_BACKEND_PORT=$$(grep -E '^port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
 	TOML_FRONTEND_PORT=$$(grep -E '^frontend_port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
-	BACKEND_PORT=$${BACKEND_PORT:-$${TOML_BACKEND_PORT:-877}}; \
+	BACKEND_PORT=$${BACKEND_PORT:-$${TOML_BACKEND_PORT:-87700}}; \
 	FRONTEND_PORT=$${FRONTEND_PORT:-$${TOML_FRONTEND_PORT:-8820}}; \
 	echo "🚀 Starting development environment..."; \
 	echo "  Backend:  http://localhost:$$BACKEND_PORT"; \
@@ -64,7 +64,7 @@ dev: web cli ## Build frontend and CLI, then start development servers (backend 
 	wait
 
 demo: web cli ## Start QNTX in demo mode with canvas export enabled
-	@BACKEND_PORT=$${BACKEND_PORT:-877}; \
+	@BACKEND_PORT=$${BACKEND_PORT:-8770}; \
 	FRONTEND_PORT=$${FRONTEND_PORT:-8820}; \
 	echo "📋 Starting demo canvas environment..."; \
 	echo "  Backend:  http://localhost:$$BACKEND_PORT"; \
@@ -92,7 +92,7 @@ demo: web cli ## Start QNTX in demo mode with canvas export enabled
 
 dev-mobile: web cli ## Start dev servers and run iOS app in simulator
 	@echo "📱 Starting mobile development environment..."
-	@echo "  Backend:  http://localhost:$${BACKEND_PORT:-877}"
+	@echo "  Backend:  http://localhost:$${BACKEND_PORT:-8770}"
 	@echo "  Frontend: http://localhost:$${FRONTEND_PORT:-8820} (with live reload)"
 	@echo "  iOS:      Launching simulator..."
 	@echo ""
@@ -213,7 +213,7 @@ desktop-prepare: cli web ## Prepare desktop app (icons + sidecar binary)
 desktop-dev: desktop-prepare ## Run desktop app in development mode
 	@echo "Starting QNTX Desktop in development mode..."
 	@echo "  Frontend dev server: http://localhost:$${FRONTEND_PORT:-8820}"
-	@echo "  Backend will start as sidecar on port $${BACKEND_PORT:-877}"
+	@echo "  Backend will start as sidecar on port $${BACKEND_PORT:-8770}"
 	@echo ""
 	@# Clean up any lingering dev server processes
 	@lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true
@@ -251,7 +251,7 @@ proto-rust: ## Rust proto types are now generated automatically at build time
 # Tells running QNTX to kill and relaunch a plugin. Silent no-op if QNTX isn't running.
 define restart-plugin
 	@TOML_PORT=$$(grep -E '^port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
-	 PORT=$${BACKEND_PORT:-$${TOML_PORT:-877}}; \
+	 PORT=$${BACKEND_PORT:-$${TOML_PORT:-8770}}; \
 	 curl -sf -X POST http://127.0.0.1:$$PORT/api/plugins/$(1)/restart > /dev/null 2>&1 \
 		&& echo "  ↻ $(1) restarted — live at http://127.0.0.1:$$PORT (no restart needed)" \
 		|| echo "  ⊘ QNTX not running — restart make dev to pick up new binary"

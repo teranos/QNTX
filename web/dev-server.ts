@@ -41,7 +41,7 @@ const config = readAmConfig();
 const BACKEND_PORT = parseInt(
     process.env.BACKEND_PORT ||
     process.env.QNTX_SERVER_PORT ||
-    String(config.Server?.port || 877),
+    String(config.Server?.port || 8770),
     10
 );
 const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;  // Go backend

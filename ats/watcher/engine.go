@@ -59,7 +59,7 @@ type Engine struct {
 	reader AttestationReader // Attestation reads through Rust FFI
 	db     *sql.DB           // Legacy: still used for non-attestation tables (edge cursors, queue)
 
-	// Base URL for API calls (e.g., "http://localhost:877")
+	// Base URL for API calls (e.g., "http://localhost:8770")
 	apiBaseURL string
 
 	// HTTP client with timeout for external calls

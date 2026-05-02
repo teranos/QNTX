@@ -240,7 +240,7 @@ qntx am show
 | Linux | arm64 | GitHub Releases, Nix, Docker, Source | ✅ |
 | macOS | Intel (x64) | GitHub Releases, Nix, Tauri, Source | ✅ |
 | macOS | Apple Silicon (ARM) | GitHub Releases, Nix, Tauri, Source | ✅ |
-| Windows | x64 | GitHub Releases, Tauri, Source | ✅ |
+| Windows | x64 | GitHub Releases, Tauri, Source | ⚠️ (no CGO — limited functionality) |
 | Android | ARM | Tauri | ✅ |
 | iOS | ARM | Tauri | ⚠️ (experimental) |
 

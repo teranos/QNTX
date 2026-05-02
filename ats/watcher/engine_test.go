@@ -22,7 +22,7 @@ import (
 func TestEngine_StartStop(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 
 	// Start engine
 	if err := engine.Start(); err != nil {
@@ -36,7 +36,7 @@ func TestEngine_StartStop(t *testing.T) {
 func TestEngine_LoadWatchers(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 
 	// Create some watchers
 	store := storage.NewWatcherStore(db)
@@ -114,7 +114,7 @@ func TestEngine_LoadWatchers(t *testing.T) {
 func TestEngine_MatchesFilter(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 
 	// Create watcher with specific filter
 	store := storage.NewWatcherStore(db)
@@ -234,7 +234,7 @@ func TestEngine_MatchesFilter(t *testing.T) {
 func TestEngine_RateLimiting(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 
 	// Create watcher with low rate limit (60/min = 1/sec)
 	store := storage.NewWatcherStore(db)
@@ -361,7 +361,7 @@ func TestEngine_ExecuteWebhook(t *testing.T) {
 	}))
 	defer server.Close()
 
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 
 	// Create webhook watcher
 	store := storage.NewWatcherStore(db)
@@ -410,7 +410,7 @@ func TestEngine_ExecuteWebhook(t *testing.T) {
 func TestEngine_QueryHistoricalMatches(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 
 	// Insert some historical attestations
 	ctx := context.Background()
@@ -479,7 +479,7 @@ func TestEngine_QueryHistoricalMatches(t *testing.T) {
 func TestEngine_TimeFilters(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 
 	now := time.Now()
 	past := now.Add(-1 * time.Hour)
@@ -629,7 +629,7 @@ func TestEngine_NoSharedMutation(t *testing.T) {
 	}))
 	defer server.Close()
 
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 	store := storage.NewWatcherStore(db)
 
 	// Create multiple webhook watchers
@@ -701,7 +701,7 @@ func TestEngine_NoSharedMutation(t *testing.T) {
 func TestEngine_GetParseError_SuccessfulWatcher(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 
 	// Create watcher with valid AX query
 	store := storage.NewWatcherStore(db)
@@ -751,7 +751,7 @@ func (f pluginExecutorFunc) IsPluginLoaded(pluginName string) bool {
 func TestEngine_ExecutePlugin(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 
 	// Mock plugin executor that captures the call
 	var mu sync.Mutex
@@ -818,7 +818,7 @@ func TestEngine_ExecutePlugin(t *testing.T) {
 func TestEngine_ExecutePlugin_NotConfigured(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 	// No SetPluginExecutor — executor is nil
 
 	store := storage.NewWatcherStore(db)
@@ -867,7 +867,7 @@ func TestEngine_ExecutePlugin_NotConfigured(t *testing.T) {
 func TestEngine_AttributeFilter_Equals(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 
 	var mu sync.Mutex
 	var fireCount int
@@ -929,7 +929,7 @@ func TestEngine_AttributeFilter_Equals(t *testing.T) {
 func TestEngine_AttributeFilter_ContainsNestedPath(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	logger := zap.NewNop().Sugar()
-	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:877", logger)
+	engine := watcher.NewEngine(db, watcher.NewSQLReader(db), "http://localhost:8770", logger)
 
 	var mu sync.Mutex
 	var firedAttestationIDs []string
