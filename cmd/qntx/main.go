@@ -119,6 +119,14 @@ func initializePluginRegistry() {
 		return
 	}
 
+	// Always create a plugin manager so hot-swap can enable plugins later via am.toml
+	manager := grpc.NewPluginManager(pluginLogger, logger.Logger, cfg.Plugin.Runtime.TypeScriptRuntime)
+	manager.SetAccumulator(grpc.NewPluginAccumulator(pluginLogger))
+	if home, err := os.UserHomeDir(); err == nil {
+		manager.SetPidFile(filepath.Join(home, ".qntx"), am.GetServerPort())
+	}
+	grpc.SetDefaultPluginManager(manager)
+
 	// If no plugins enabled, run in minimal mode
 	if len(cfg.Plugin.Enabled) == 0 {
 		pluginLogger.Infow("No plugins enabled - QNTX running in minimal core mode")

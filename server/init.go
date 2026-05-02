@@ -559,6 +559,8 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 		manager := grpcplugin.GetDefaultPluginManager()
 		registry := plugin.GetDefaultRegistry()
 		if manager == nil || registry == nil {
+			serverLogger.Warnw("Plugin hot-swap skipped: manager or registry not initialized",
+				"manager_nil", manager == nil, "registry_nil", registry == nil)
 			return nil
 		}
 
@@ -589,6 +591,11 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 		for name := range nowEnabled {
 			if !currentlyLoaded[name] {
 				go func(pluginName string) {
+					defer func() {
+						if r := recover(); r != nil {
+							serverLogger.Errorw("Plugin enable panicked", "plugin", pluginName, "panic", r)
+						}
+					}()
 					ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 					defer cancel()
 					services := server.GetServices()

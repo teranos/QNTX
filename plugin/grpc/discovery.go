@@ -207,6 +207,11 @@ func (m *PluginManager) Accumulator() *PluginAccumulator {
 	return m.accumulator
 }
 
+// SetAccumulator sets the plugin banner accumulator.
+func (m *PluginManager) SetAccumulator(acc *PluginAccumulator) {
+	m.accumulator = acc
+}
+
 // LoadPlugins loads and connects to plugins from configuration.
 // Enabled plugins are retried forever — enabled means the operator is certain
 // this plugin must run. Disabled plugins are skipped entirely.
