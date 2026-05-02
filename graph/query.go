@@ -11,7 +11,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	grapherr "github.com/teranos/QNTX/graph/error"
-	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/internal/logger"
 )
 
 // BuildFromRecentAttestations builds a graph from the most recent attestations in the database

@@ -89,7 +89,7 @@ Ax queries have granular output control:
 Use `logger.ShouldOutput()` to check if output should be shown:
 
 ```go
-import "github.com/teranos/QNTX/logger"
+import "github.com/teranos/QNTX/internal/logger"
 
 func executeQuery(verbosity int, query string) {
     // Level 1+: Show parsed AST

@@ -6,7 +6,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/types"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
-	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/internal/logger"
 )
 
 // Helper to create a test builder

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/errors"
-	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/internal/logger"
 	"go.uber.org/zap"
 )
 

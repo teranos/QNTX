@@ -22,7 +22,7 @@ import (
 	"github.com/teranos/QNTX/graph"
 	grapherr "github.com/teranos/QNTX/graph/error"
 	"github.com/teranos/QNTX/internal/version"
-	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/plugin"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"

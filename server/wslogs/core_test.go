@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/internal/logger"
 	"go.uber.org/zap/zapcore"
 )
 
