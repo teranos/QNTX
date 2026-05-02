@@ -25,6 +25,8 @@ Hot-reloading TypeScript frontend dev server. Restart `make dev` to pick up QNTX
 
 **The developer announces every `make dev` kill and start.** These announcements are authoritative — when they say it's killed, it's dead; when they say it's started, the latest code is running. Never contradict or second-guess these statements.
 
+**A commit is verified code** — the developer has tested it and confirmed it matches intent. Uncommitted changes in the working tree ARE the running code via `make dev`. Never use commit history to determine what is or isn't running.
+
 **Log files append across restarts.** The current run is at the bottom, not the top. Always read the tail first.
 
 ## Testing
