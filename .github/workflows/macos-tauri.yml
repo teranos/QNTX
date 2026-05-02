@@ -28,6 +28,9 @@ jobs:
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin,wasm32-unknown-unknown
 
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
       - name: Setup Node/Bun
         uses: oven-sh/setup-bun@v2
 
@@ -80,10 +83,13 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-ios-sim
+          targets: aarch64-apple-ios-sim,wasm32-unknown-unknown
 
       - name: Install CocoaPods
         run: brew install cocoapods
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
 
       - name: Setup Node/Bun
         uses: oven-sh/setup-bun@v2
