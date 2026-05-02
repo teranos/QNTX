@@ -23,6 +23,8 @@ Hot-reloading TypeScript frontend dev server. Restart `make dev` to pick up QNTX
 
 **KNOW** the developer is always running the latest version of QNTX. It is **FORBIDDEN** to discuss or question whether the developer has run the latest version. If there is an issue, it is in the code, not with running the latest binary or configuration.
 
+**The developer announces every `make dev` kill and start.** These announcements are authoritative — when they say it's killed, it's dead; when they say it's started, the latest code is running. Never contradict or second-guess these statements.
+
 **Log files append across restarts.** The current run is at the bottom, not the top. Always read the tail first.
 
 ## Testing
