@@ -7,6 +7,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 )
 
 // queryBuilder accumulates SQL WHERE clauses and parameters for attestation queries
@@ -129,15 +130,15 @@ func (qb *queryBuilder) buildNaturalLanguageFilter(expander ats.QueryExpander, f
 
 // buildOverComparisonFilter handles numeric comparison queries (OVER duration)
 // Supports temporal aggregation: sums duration values across multiple attestations per subject
-func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, overComparison *types.OverFilter, hasOtherClauses bool, filter types.AxFilter) {
+func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, overComparison *types.OverFilter, hasOtherClauses bool, filter types.AxFilter) error {
 	if overComparison == nil {
-		return
+		return nil
 	}
 
 	// Get numeric predicates from query expander (domain-specific)
 	numericPredicates := expander.GetNumericPredicates()
 	if len(numericPredicates) == 0 {
-		return
+		return nil
 	}
 
 	// Check if this is a duration aggregation predicate
@@ -153,7 +154,7 @@ func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, ov
 	if !isDurationAggregation {
 		// Legacy behavior: single-value comparison for non-duration predicates
 		qb.buildLegacyOverComparison(numericPredicates, overComparison, hasOtherClauses)
-		return
+		return nil
 	}
 
 	// Temporal aggregation: SUM durations across multiple attestations per subject
@@ -247,8 +248,7 @@ func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, ov
 		"duration_years":   true,
 	}
 	if !allowedDurationFields[durationField] {
-		// This should never happen with current code logic, but guards against future changes
-		panic(fmt.Sprintf("invalid duration field: %s (not in whitelist)", durationField))
+		return errors.Newf("invalid duration field: %s (not in whitelist)", durationField)
 	}
 
 	// Build predicate conditions for subquery
@@ -282,6 +282,7 @@ func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, ov
 	// Add as subject filter
 	qb.whereClauses = append(qb.whereClauses, "json_extract(subjects, '$[0]') IN ("+aggregationSubquery+")")
 	qb.args = append(qb.args, threshold)
+	return nil
 }
 
 // buildLegacyOverComparison handles single-value numeric comparisons (non-aggregation)
