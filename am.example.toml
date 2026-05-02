@@ -51,7 +51,7 @@ entity_actors_limit = 64
 [server]
 # HTTP server port for QNTX web UI
 # Default: 8770 (development), fallback 7878 (production)
-port = 877
+port = 8770
 
 # Network interface to bind
 # "127.0.0.1" = local only (default), "0.0.0.0" = all interfaces
