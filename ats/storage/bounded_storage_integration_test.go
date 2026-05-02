@@ -76,6 +76,8 @@ func TestBoundedStorage_SameActorContextPruning(t *testing.T) {
 		require.NoError(t, err, "Failed to create attestation %d", i)
 	}
 
+	store.FlushEnforcement()
+
 	// Count total attestations - should be limited to 16
 	var count int
 	err := db.QueryRow("SELECT COUNT(*) FROM attestations WHERE json_extract(subjects, '$[0]') = ?", subject).Scan(&count)

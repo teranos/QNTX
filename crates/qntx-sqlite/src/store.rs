@@ -28,6 +28,8 @@ use crate::json::{
     sql_to_timestamp, timestamp_to_sql,
 };
 
+use qntx_core::storage::enforcement::{EnforcementConfig, EnforcementInput};
+
 type StoreResult<T> = Result<T, StoreError>;
 
 /// SQLite-backed attestation store
@@ -35,6 +37,9 @@ pub struct SqliteStore {
     pub(crate) conn: Connection,
     /// Database file path, if file-backed. Used by backup to open a separate read connection.
     pub(crate) db_path: Option<String>,
+    /// Enforcement config for bounded storage limits (16/64/64 default).
+    /// When set, enforcement runs automatically after every put().
+    pub(crate) enforcement_config: Option<EnforcementConfig>,
 }
 
 impl SqliteStore {
@@ -46,6 +51,7 @@ impl SqliteStore {
         Self {
             conn,
             db_path: None,
+            enforcement_config: None,
         }
     }
 
@@ -74,6 +80,7 @@ impl SqliteStore {
         Ok(Self {
             conn,
             db_path: Some(path_str),
+            enforcement_config: None,
         })
     }
 
@@ -124,6 +131,11 @@ impl SqliteStore {
             }
         }
         Ok(())
+    }
+
+    /// Set enforcement config. When set, enforcement runs after every put().
+    pub fn set_enforcement_config(&mut self, config: EnforcementConfig) {
+        self.enforcement_config = Some(config);
     }
 
     /// Get a reference to the underlying connection
@@ -272,6 +284,10 @@ impl AttestationStore for SqliteStore {
         let timestamp_sql = timestamp_to_sql(attestation.timestamp);
         let created_at_sql = timestamp_to_sql(attestation.created_at);
 
+        let actors = attestation.actors.clone();
+        let contexts = attestation.contexts.clone();
+        let subjects = attestation.subjects.clone();
+
         self.conn
             .execute(
                 "INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did)
@@ -291,6 +307,53 @@ impl AttestationStore for SqliteStore {
                 ],
             )
             .map_err(SqliteError::from)?;
+
+        // Populate junction tables for indexed lookups
+        for actor in &actors {
+            self.conn
+                .execute(
+                    "INSERT INTO attestation_actors (attestation_id, actor) VALUES (?, ?)",
+                    rusqlite::params![attestation.id, actor],
+                )
+                .map_err(SqliteError::from)?;
+        }
+        for context in &contexts {
+            self.conn
+                .execute(
+                    "INSERT INTO attestation_contexts (attestation_id, context) VALUES (?, ?)",
+                    rusqlite::params![attestation.id, context],
+                )
+                .map_err(SqliteError::from)?;
+        }
+        for subject in &subjects {
+            self.conn
+                .execute(
+                    "INSERT INTO attestation_subjects (attestation_id, subject) VALUES (?, ?)",
+                    rusqlite::params![attestation.id, subject],
+                )
+                .map_err(SqliteError::from)?;
+        }
+        for predicate in &attestation.predicates {
+            self.conn
+                .execute(
+                    "INSERT INTO attestation_predicates (attestation_id, predicate) VALUES (?, ?)",
+                    rusqlite::params![attestation.id, predicate],
+                )
+                .map_err(SqliteError::from)?;
+        }
+
+        // Enforce bounded storage limits after every insert
+        if let Some(ref config) = self.enforcement_config {
+            let input = EnforcementInput {
+                actors,
+                contexts,
+                subjects,
+                config: config.clone(),
+            };
+            if let Err(e) = self.enforce_limits(&input) {
+                eprintln!("qntx-sqlite: post-put enforcement failed: {}", e);
+            }
+        }
 
         Ok(())
     }
@@ -404,17 +467,20 @@ impl AttestationStore for SqliteStore {
 
 impl QueryStore for SqliteStore {
     fn query(&self, filter: &AxFilter) -> StoreResult<AxResult> {
-        // Build dynamic SQL query based on filter
+        // Build dynamic SQL query based on filter using junction tables
         let mut sql = String::from(
-            "SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did \
-             FROM attestations WHERE 1=1"
+            "SELECT DISTINCT att.id, att.subjects, att.predicates, att.contexts, att.actors, att.timestamp, att.source, att.attributes, att.created_at, att.signature, att.signer_did \
+             FROM attestations att"
         );
+        let mut joins = Vec::new();
+        let mut conditions = Vec::new();
         let mut params: Vec<String> = Vec::new();
 
-        // Filter by subjects (JSON array contains check)
+        // Filter by subjects via junction table
         if !filter.subjects.is_empty() {
-            sql.push_str(&format!(
-                " AND EXISTS (SELECT 1 FROM json_each(subjects) WHERE value IN ({}))",
+            joins.push("JOIN attestation_subjects js ON att.id = js.attestation_id");
+            conditions.push(format!(
+                "js.subject IN ({})",
                 filter
                     .subjects
                     .iter()
@@ -425,10 +491,11 @@ impl QueryStore for SqliteStore {
             params.extend(filter.subjects.iter().cloned());
         }
 
-        // Filter by predicates
+        // Filter by predicates via junction table
         if !filter.predicates.is_empty() {
-            sql.push_str(&format!(
-                " AND EXISTS (SELECT 1 FROM json_each(predicates) WHERE value IN ({}))",
+            joins.push("JOIN attestation_predicates jp ON att.id = jp.attestation_id");
+            conditions.push(format!(
+                "jp.predicate IN ({})",
                 filter
                     .predicates
                     .iter()
@@ -439,10 +506,11 @@ impl QueryStore for SqliteStore {
             params.extend(filter.predicates.iter().cloned());
         }
 
-        // Filter by contexts
+        // Filter by contexts via junction table
         if !filter.contexts.is_empty() {
-            sql.push_str(&format!(
-                " AND EXISTS (SELECT 1 FROM json_each(contexts) WHERE value IN ({}))",
+            joins.push("JOIN attestation_contexts jc ON att.id = jc.attestation_id");
+            conditions.push(format!(
+                "jc.context IN ({})",
                 filter
                     .contexts
                     .iter()
@@ -453,10 +521,11 @@ impl QueryStore for SqliteStore {
             params.extend(filter.contexts.iter().cloned());
         }
 
-        // Filter by actors
+        // Filter by actors via junction table
         if !filter.actors.is_empty() {
-            sql.push_str(&format!(
-                " AND EXISTS (SELECT 1 FROM json_each(actors) WHERE value IN ({}))",
+            joins.push("JOIN attestation_actors ja ON att.id = ja.attestation_id");
+            conditions.push(format!(
+                "ja.actor IN ({})",
                 filter
                     .actors
                     .iter()
@@ -469,16 +538,26 @@ impl QueryStore for SqliteStore {
 
         // Filter by time range
         if let Some(start) = filter.time_start {
-            sql.push_str(" AND timestamp >= ?");
+            conditions.push("att.timestamp >= ?".to_string());
             params.push(crate::json::timestamp_to_sql(start));
         }
         if let Some(end) = filter.time_end {
-            sql.push_str(" AND timestamp <= ?");
+            conditions.push("att.timestamp <= ?".to_string());
             params.push(crate::json::timestamp_to_sql(end));
         }
 
+        for join in &joins {
+            sql.push(' ');
+            sql.push_str(join);
+        }
+
+        if !conditions.is_empty() {
+            sql.push_str(" WHERE ");
+            sql.push_str(&conditions.join(" AND "));
+        }
+
         // Apply ordering and limit
-        sql.push_str(" ORDER BY created_at DESC, rowid DESC");
+        sql.push_str(" ORDER BY att.created_at DESC, att.rowid DESC");
         if let Some(limit) = filter.limit {
             sql.push_str(&format!(" LIMIT {}", limit));
         }
@@ -525,26 +604,24 @@ impl QueryStore for SqliteStore {
 
     fn predicates(&self) -> StoreResult<Vec<String>> {
         self.query_distinct_values(
-            "SELECT DISTINCT value FROM attestations, json_each(predicates) WHERE predicates != 'null' AND value IS NOT NULL ORDER BY value",
+            "SELECT DISTINCT predicate FROM attestation_predicates ORDER BY predicate",
         )
     }
 
     fn contexts(&self) -> StoreResult<Vec<String>> {
         self.query_distinct_values(
-            "SELECT DISTINCT value FROM attestations, json_each(contexts) WHERE contexts != 'null' AND value IS NOT NULL ORDER BY value",
+            "SELECT DISTINCT context FROM attestation_contexts ORDER BY context",
         )
     }
 
     fn subjects(&self) -> StoreResult<Vec<String>> {
         self.query_distinct_values(
-            "SELECT DISTINCT value FROM attestations, json_each(subjects) WHERE subjects != 'null' AND value IS NOT NULL ORDER BY value",
+            "SELECT DISTINCT subject FROM attestation_subjects ORDER BY subject",
         )
     }
 
     fn actors(&self) -> StoreResult<Vec<String>> {
-        self.query_distinct_values(
-            "SELECT DISTINCT value FROM attestations, json_each(actors) WHERE actors != 'null' AND value IS NOT NULL ORDER BY value",
-        )
+        self.query_distinct_values("SELECT DISTINCT actor FROM attestation_actors ORDER BY actor")
     }
 
     fn stats(&self) -> StoreResult<StorageStats> {

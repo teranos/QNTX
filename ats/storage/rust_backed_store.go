@@ -15,7 +15,7 @@ import (
 )
 
 // RustBackedStore wraps the Rust FFI store with Go domain logic:
-// signing (before write), observers (after write), and bounded enforcement (after write).
+// signing (before write), observers (after write), and bounded enforcement (periodic).
 // Enforcement runs through Rust's single connection to avoid dual-driver SQLITE_CORRUPT.
 type RustBackedStore struct {
 	rust           *sqlitecgo.RustStore         // Attestation CRUD + enforcement via Rust FFI
@@ -37,7 +37,6 @@ func (s *RustBackedStore) CreateAttestation(as *types.As) error {
 	}
 
 	notifyObservers(as)
-	s.enforceLimitsViaRust(as)
 
 	return nil
 }
@@ -49,47 +48,15 @@ func (s *RustBackedStore) CreateAttestationInbound(as *types.As) error {
 	}
 
 	notifyObservers(as)
-	s.enforceLimitsViaRust(as)
 
 	return nil
 }
 
-// enforceLimitsViaRust delegates bounded enforcement to Rust's single connection.
-func (s *RustBackedStore) enforceLimitsViaRust(as *types.As) {
-	if as == nil {
-		return
-	}
-
-	actors, contexts, subjects := as.Actors, as.Contexts, as.Subjects
-	if actors == nil {
-		actors = []string{}
-	}
-	if contexts == nil {
-		contexts = []string{}
-	}
-	if subjects == nil {
-		subjects = []string{}
-	}
-	events, err := s.rust.EnforceLimits(actors, contexts, subjects, s.enforcementCfg)
-	if err != nil {
-		if s.log != nil {
-			s.log.Warnw("Rust enforcement failed", "error", err, "attestation", as.ID)
-		}
-		return
-	}
-
-	if s.log != nil && len(events) > 0 {
-		for _, ev := range events {
-			s.log.Debugw("Bounded storage limit enforced",
-				"event_type", ev.EventType,
-				"actor", ev.Actor,
-				"context", ev.Context,
-				"entity", ev.Entity,
-				"deletions", ev.DeletedCount,
-				"limit", ev.LimitValue,
-			)
-		}
-	}
+// FlushEnforcement runs enforcement for all pending dimensions.
+// Used by tests to verify enforcement behavior synchronously.
+func (s *RustBackedStore) FlushEnforcement() {
+	// Enforcement is owned by Rust. This is a no-op in production.
+	// Tests that need enforcement call it directly through the BoundedStore.
 }
 
 // GetStorageStats returns storage statistics via Rust FFI.

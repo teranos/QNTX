@@ -201,6 +201,37 @@ pub extern "C" fn storage_free(store: *mut SqliteStore) {
     unsafe { free_boxed(store) };
 }
 
+/// Set enforcement config on the store. When set, enforcement runs after every put().
+/// config_json: `{"actor_context_limit":16,"actor_contexts_limit":64,"entity_actors_limit":64}`
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn storage_set_enforcement_config(
+    store: *mut SqliteStore,
+    config_json: *const c_char,
+) -> StorageResultC {
+    if store.is_null() {
+        return StorageResultC::error("null store pointer");
+    }
+
+    let json_str = match unsafe { cstr_to_str(config_json) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+
+    let store = unsafe { &mut *store };
+
+    let config: qntx_core::storage::enforcement::EnforcementConfig =
+        match serde_json::from_str(json_str) {
+            Ok(c) => c,
+            Err(e) => {
+                return StorageResultC::error(&format!("invalid enforcement config JSON: {}", e))
+            }
+        };
+
+    store.set_enforcement_config(config);
+    StorageResultC::ok()
+}
+
 // ============================================================================
 // CRUD Operations
 // ============================================================================

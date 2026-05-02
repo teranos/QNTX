@@ -189,6 +189,14 @@ const MIGRATIONS: &[(&str, &str)] = &[
             "../../../db/sqlite/migrations/046_optional_add_z_to_embedding_projections.sql"
         ),
     ),
+    (
+        "047",
+        include_str!("../../../db/sqlite/migrations/047_relax_composition_edge_fk.sql"),
+    ),
+    (
+        "048",
+        include_str!("../../../db/sqlite/migrations/048_create_attestation_junction_tables.sql"),
+    ),
 ];
 
 /// Versions whose migrations are allowed to fail (they depend on sqlite-vec).
