@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/teranos/QNTX/internal/version"
-	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/sym"
 )
 

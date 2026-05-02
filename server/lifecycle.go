@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/errors"
-	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/internal/logger"
 )
 
 func init() {

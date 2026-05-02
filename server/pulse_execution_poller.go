@@ -7,7 +7,7 @@ package server
 import (
 	"time"
 
-	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/schedule"
 )
 

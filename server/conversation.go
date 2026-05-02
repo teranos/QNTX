@@ -7,7 +7,7 @@ import (
 	"github.com/teranos/QNTX/ai/provider"
 	"github.com/teranos/QNTX/ats/types"
 	glyphstorage "github.com/teranos/QNTX/glyph/storage"
-	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/internal/logger"
 )
 
 // ConversationAssembler builds a multi-turn message history from the

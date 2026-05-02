@@ -12,8 +12,6 @@ Global singleton for CLI simplicity. Server package creates enhanced multi-outpu
 
 Built on uber-go/zap (chosen for convenience, open to alternatives).
 
-- INTERNAL: Should be moved to internal, the logger is very QNTX Specific
-
 ## See Also
 
-- [Verbosity Levels](../docs/development/verbosity.md) - CLI verbosity pattern and logger integration
+- [Verbosity Levels](../../docs/development/verbosity.md) - CLI verbosity pattern and logger integration
