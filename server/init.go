@@ -398,9 +398,8 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 			ticker.SetWeaveStats(llmRouter)
 		}
 	}
-	server.setupEmbeddingReclusterSchedule(deps.config)
-	server.setupEmbeddingReprojectSchedule(deps.config)
-	server.setupClusterLabelSchedule(deps.config)
+	// Embedding schedule setup (recluster, reproject, cluster-label) deferred to
+	// SetupPluginEmbeddingService — embeddingService is nil until a plugin connects.
 
 	// Wire embedding service into gRPC for plugin access
 	if server.embeddingService != nil && server.servicesManager != nil {
@@ -607,4 +606,3 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 	configWatcher.Start()
 	serverLogger.Infow("Config watcher started", "path", configPath)
 }
-

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	appcfg "github.com/teranos/QNTX/am"
-	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/pulse/schedule"
+	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 )
 
 // setupEmbeddingReclusterSchedule registers the recluster handler and auto-creates
@@ -31,6 +31,7 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 		ProjectCtx:            projectCtx,
 		Store:                 s.embeddingStore,
 		Svc:                   s.embeddingService,
+		ClusterFunc:           s.embeddingService.(*serverembeddings.PluginEmbeddingService).ClusterHDBSCAN,
 		ATSStore:              s.atsStore,
 		Invalidator:           s.embeddingClusterInvalidator,
 		MinClusterSize:        minClusterSize,
