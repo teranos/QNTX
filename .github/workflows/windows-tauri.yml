@@ -2,6 +2,17 @@
 name: Windows Tauri
 
 on:
+  # pull_request:
+  #   branches: [main]
+  #   paths:
+  #     - 'web/src-tauri/**'
+  #     - 'web/src/**'
+  #     - '.github/workflows/windows-tauri.yml'
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - 'web/src-tauri/**'
+  #     - 'web/src/**'
   workflow_dispatch:
 
 jobs:
