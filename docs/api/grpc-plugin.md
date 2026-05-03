@@ -221,6 +221,18 @@ InitializeResponse is returned by Initialize RPC
 | watchers | WatcherRegistration | Watchers this plugin wants registered on its behalf. Core creates watchers with action_type=plugin_execute targeting this plugin. On match, core calls ExecuteJob with the matching attestation as payload. |
 | vector_search_provider | bool | vector_search_provider indicates this plugin implements VectorSearchService (ADR-016). Core registers it as a vector search backend in the service mesh. |
 | search_provider | bool | search_provider indicates this plugin implements SearchProvider (Search RPCs). Core registers it as the search backend in the service mesh. |
+| embedding_provider | bool | embedding_provider indicates this plugin implements EmbeddingService (Embed, BatchEmbed, Cluster, ModelInfo RPCs). Core routes embedding calls to it instead of using the builtin CGO/FFI path. |
+| http_routes | RouteInfo | http_routes lists the HTTP endpoints this plugin handles via HandleHTTP. Core exposes these under /api/{plugin}/ and makes them discoverable via GET /api/plugins/routes. |
+
+### RouteInfo
+
+RouteInfo describes an HTTP endpoint a plugin handles
+
+| Field | Type | Description |
+|-------|------|-------------|
+| method | string | - |
+| path | string | - |
+| description | string | - |
 
 ### WatcherRegistration
 

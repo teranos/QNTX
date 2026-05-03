@@ -380,6 +380,17 @@ export interface PluginInfo {
   pausable: boolean;
 }
 
+export interface PluginRoute {
+  name: string;
+  http: string;
+  ws?: string;
+  roles?: string[];
+  handlers?: string[];
+  schedules?: number;
+  watchers?: number;
+  endpoints?: RouteEndpoint[];
+}
+
 export interface PreviewSample {
   /**
    * The sampled attestation
@@ -790,6 +801,12 @@ export interface Result {
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
+}
+
+export interface RouteEndpoint {
+  method: string;
+  path: string;
+  description?: string;
 }
 
 export interface SamplerStageSignal {

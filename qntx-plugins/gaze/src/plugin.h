@@ -12,7 +12,7 @@
 #include "domain.grpc.pb.h"
 #include "llm.grpc.pb.h"
 
-#define PLUGIN_VERSION "0.3.2"
+#define PLUGIN_VERSION "0.3.3"
 
 // Forward declarations
 struct llama_model;

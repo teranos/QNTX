@@ -127,6 +127,16 @@ grpc::Status GazePlugin::Initialize(grpc::ServerContext* ctx,
 
     resp->set_llm_provider(true);
 
+    auto* version_route = resp->add_http_routes();
+    version_route->set_method("GET");
+    version_route->set_path("/version");
+    version_route->set_description("Returns plugin version string");
+
+    auto* status_route = resp->add_http_routes();
+    status_route->set_method("GET");
+    status_route->set_path("/status");
+    status_route->set_description("Returns JSON with state, version, model count, and current activity");
+
     return grpc::Status::OK;
 }
 

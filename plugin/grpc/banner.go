@@ -36,6 +36,8 @@ type BannerInfo struct {
 	Details    map[string]string // from Health().Details
 	Error      string            // non-empty = failed
 	ConfigDiff []string          // "url changed: old → new"
+	HTTPRoutes []string          // "GET /version", "GET /status", etc.
+
 }
 
 // bannerPalette contains 8 distinct ANSI colors for plugin identity.
@@ -195,6 +197,21 @@ func FormatBanner(info BannerInfo) string {
 		b.WriteByte('\n')
 	}
 
+	// HTTP routes
+	if len(info.HTTPRoutes) > 0 {
+		b.WriteString("   ")
+		b.WriteString(ansiDim)
+		b.WriteString(strings.Join(info.HTTPRoutes, ", "))
+		b.WriteString(ansiReset)
+		b.WriteByte('\n')
+	} else if info.Error == "" {
+		b.WriteString("   ")
+		b.WriteString(ansiDim)
+		b.WriteString("no routes advertised (set http_routes in InitializeResponse)")
+		b.WriteString(ansiReset)
+		b.WriteByte('\n')
+	}
+
 	// Config diff lines
 	for _, diff := range info.ConfigDiff {
 		b.WriteString("   ")
@@ -316,6 +333,14 @@ func (a *PluginAccumulator) SetHandlers(name string, handlers []string, schedule
 	info.Handlers = handlers
 	info.Schedules = scheduleCount
 	info.Watchers = watcherCount
+}
+
+// SetHTTPRoutes records the HTTP routes a plugin advertised.
+func (a *PluginAccumulator) SetHTTPRoutes(name string, routes []string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	info := a.getOrCreate(name)
+	info.HTTPRoutes = routes
 }
 
 // SetHealth records health check results.

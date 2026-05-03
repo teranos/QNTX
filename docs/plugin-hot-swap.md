@@ -45,6 +45,12 @@ Plugins not mentioned in the change are untouched. Both transitions emit a color
 - Plugin binary must be discoverable in the configured search paths.
 - The server must be past initialization (services and registry available).
 
+## Route discovery
+
+Plugins can advertise their HTTP endpoints by setting `http_routes` in `InitializeResponse`. These show up in the plugin banner at startup and are queryable via `GET /api/plugins/routes`. This is optional — plugins that don't set it get a nudge in the banner.
+
+`GET /api/plugins/routes` also maps provider roles to core invocation endpoints (e.g. an `llm-provider` plugin includes `POST /api/prompt/direct` with the provider name).
+
 ## Not supported
 
 - Changing plugin search paths at runtime. Restart required.

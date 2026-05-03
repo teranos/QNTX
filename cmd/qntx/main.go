@@ -337,7 +337,13 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 				// Accumulate handler/schedule/watcher counts and emit banner
 				if acc != nil {
 					acc.SetHandlers(meta.Name, externalPlugin.GetHandlerNames(), len(schedules), len(externalPlugin.GetWatchers()))
-					// Call Health for status enrichment
+					if routes := externalPlugin.GetHTTPRoutes(); len(routes) > 0 {
+						routeStrs := make([]string, len(routes))
+						for i, r := range routes {
+							routeStrs[i] = r.GetMethod() + " " + r.GetPath()
+						}
+						acc.SetHTTPRoutes(meta.Name, routeStrs)
+					}
 					healthCtx, hCancel := context.WithTimeout(context.Background(), 5*time.Second)
 					health := externalPlugin.Health(healthCtx)
 					hCancel()
@@ -486,9 +492,15 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 				}
 			}
 
-			// Accumulate and emit banner
 			if acc != nil {
 				acc.SetHandlers(meta.Name, externalPlugin.GetHandlerNames(), len(schedules), len(externalPlugin.GetWatchers()))
+				if routes := externalPlugin.GetHTTPRoutes(); len(routes) > 0 {
+					routeStrs := make([]string, len(routes))
+					for i, r := range routes {
+						routeStrs[i] = r.GetMethod() + " " + r.GetPath()
+					}
+					acc.SetHTTPRoutes(meta.Name, routeStrs)
+				}
 				healthCtx, hCancel := context.WithTimeout(context.Background(), 5*time.Second)
 				health := externalPlugin.Health(healthCtx)
 				hCancel()

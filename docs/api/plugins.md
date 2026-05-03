@@ -8,6 +8,7 @@
 | GET | `/api/plugins` | HandlePlugins |
 | POST | `/api/plugins/` | HandlePluginAction |
 | GET | `/api/plugins/glyphs` | HandlePluginGlyphs |
+| GET | `/api/plugins/routes` | HandlePluginRoutes |
 | GET, PUT | `/api/plugins/{name}/config` | HandlePluginConfig |
 | GET | `/api/plugins/{name}/logs` | HandlePluginLogs |
 
@@ -41,6 +42,15 @@ HandlePluginGlyphs returns custom glyph type definitions from all plugins.
 GET /api/plugins/glyphs
 
 **Handler**: `HandlePluginGlyphs`
+
+---
+
+### `GET` /api/plugins/routes
+
+HandlePluginRoutes returns all plugin-registered routes and capabilities.
+GET /api/plugins/routes
+
+**Handler**: `HandlePluginRoutes`
 
 ---
 

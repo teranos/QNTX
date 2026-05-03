@@ -217,6 +217,18 @@ message InitializeResponse {
   // embedding_provider indicates this plugin implements EmbeddingService (Embed, BatchEmbed, Cluster, ModelInfo RPCs).
   // Core routes embedding calls to it instead of using the builtin CGO/FFI path.
   bool embedding_provider = 7;
+
+  // http_routes lists the HTTP endpoints this plugin handles via HandleHTTP.
+  // Core exposes these under /api/{plugin}/ and makes them discoverable
+  // via GET /api/plugins/routes.
+  repeated RouteInfo http_routes = 8;
+}
+
+// RouteInfo describes an HTTP endpoint a plugin handles
+message RouteInfo {
+  string method = 1;       // HTTP method: GET, POST, PUT, DELETE
+  string path = 2;         // Path relative to plugin root (e.g., "/status")
+  string description = 3;  // Human-readable description for LLM discovery
 }
 
 // WatcherRegistration declares a watcher a plugin wants core to manage.

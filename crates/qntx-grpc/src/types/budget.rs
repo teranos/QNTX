@@ -3,7 +3,7 @@
 // TODO: Migrate to proto generation
 // Source package: budget
 // Source last modified: 2026-01-31T02:59:58+01:00
-// Source version: 45309758
+// Source version: fe09fe35
 
 //! # budget module
 //!

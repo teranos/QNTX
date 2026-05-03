@@ -3,7 +3,7 @@
 // TODO: Migrate to proto generation
 // Source package: async
 // Source last modified: 2026-03-24T23:05:21+01:00
-// Source version: 9c711bc8
+// Source version: 393cc820
 
 //! # async module
 //!

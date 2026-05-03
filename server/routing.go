@@ -96,6 +96,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/plugins/{name}/logs", wrap(s.HandlePluginLogs))                           // Plugin log stream (SSE)
 	http.HandleFunc("/api/plugins/{name}/config", wrap(s.HandlePluginConfig))                       // Plugin configuration (GET/PUT)
 	http.HandleFunc("/api/plugins/glyphs", wrap(s.HandlePluginGlyphs))                              // List custom plugin glyphs (GET)
+	http.HandleFunc("/api/plugins/routes", wrap(s.HandlePluginRoutes))                              // List plugin routes and capabilities (GET)
 	http.HandleFunc("/api/plugins/", wrap(s.HandlePluginAction))                                    // Plugin actions: pause/resume (POST)
 	http.HandleFunc("/api/plugins", wrap(s.HandlePlugins))                                          // List installed plugins (GET)
 	http.HandleFunc("/api/types/", wrap(s.HandleTypes))                                             // Get specific type (GET /api/types/{typename})

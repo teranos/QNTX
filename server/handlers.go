@@ -724,6 +724,87 @@ func (s *QNTXServer) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
+// HandlePluginRoutes returns all plugin-registered routes and capabilities.
+// GET /api/plugins/routes
+func (s *QNTXServer) HandlePluginRoutes(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+
+	if s.pluginRegistry == nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{"routes": []interface{}{}})
+		return
+	}
+
+	type RouteEndpoint struct {
+		Method      string `json:"method"`
+		Path        string `json:"path"`
+		Description string `json:"description,omitempty"`
+	}
+
+	type PluginRoute struct {
+		Name      string          `json:"name"`
+		HTTP      string          `json:"http"`
+		WebSocket string          `json:"ws,omitempty"`
+		Roles     []string        `json:"roles,omitempty"`
+		Handlers  []string        `json:"handlers,omitempty"`
+		Schedules int             `json:"schedules,omitempty"`
+		Watchers  int             `json:"watchers,omitempty"`
+		Endpoints []RouteEndpoint `json:"endpoints,omitempty"`
+	}
+
+	routes := make([]PluginRoute, 0)
+	for _, name := range s.pluginRegistry.List() {
+		p, ok := s.pluginRegistry.Get(name)
+		if !ok {
+			continue
+		}
+
+		route := PluginRoute{
+			Name: name,
+			HTTP: "/api/" + name + "/",
+		}
+
+		// Check WebSocket registration
+		wsHandlers, err := p.RegisterWebSocket()
+		if err == nil && len(wsHandlers) > 0 {
+			route.WebSocket = "/ws/" + name
+		}
+
+		// Check capabilities via type assertion to ExternalDomainProxy
+		if proxy, ok := p.(*plugingrpc.ExternalDomainProxy); ok {
+			if proxy.IsLLMProvider() {
+				route.Roles = append(route.Roles, "llm-provider")
+				route.Endpoints = append(route.Endpoints, RouteEndpoint{
+					Method:      "POST",
+					Path:        "/api/prompt/direct",
+					Description: "LLM inference via " + name + " (set \"provider\": \"" + name + "\" in request body)",
+				})
+			}
+			if proxy.IsSearchProvider() {
+				route.Roles = append(route.Roles, "search-provider")
+			}
+			if proxy.IsEmbeddingProvider() {
+				route.Roles = append(route.Roles, "embedding-provider")
+			}
+			route.Handlers = proxy.GetHandlerNames()
+			route.Schedules = len(proxy.GetSchedules())
+			route.Watchers = len(proxy.GetWatchers())
+			for _, rt := range proxy.GetHTTPRoutes() {
+				route.Endpoints = append(route.Endpoints, RouteEndpoint{
+					Method:      rt.GetMethod(),
+					Path:        "/api/" + name + rt.GetPath(),
+					Description: rt.GetDescription(),
+				})
+			}
+		}
+
+		routes = append(routes, route)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{"routes": routes})
+}
+
 // HandlePluginGlyphs returns custom glyph type definitions from all plugins.
 // GET /api/plugins/glyphs
 func (s *QNTXServer) HandlePluginGlyphs(w http.ResponseWriter, r *http.Request) {

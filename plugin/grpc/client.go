@@ -52,6 +52,9 @@ type ExternalDomainProxy struct {
 	// Watchers this plugin wants registered (populated during Initialize)
 	watchers []*protocol.WatcherRegistration
 
+	// httpRoutes lists HTTP endpoints this plugin handles (populated during Initialize, optional)
+	httpRoutes []*protocol.RouteInfo
+
 	// WebSocket configuration (set via SetWebSocketConfig)
 	keepaliveConfig *KeepaliveConfig
 	wsConfig        *WebSocketConfig
@@ -206,6 +209,11 @@ func (c *ExternalDomainProxy) IsEmbeddingProvider() bool {
 // Only meaningful when IsEmbeddingProvider() is true.
 func (c *ExternalDomainProxy) EmbeddingServiceClient() protocol.EmbeddingServiceClient {
 	return protocol.NewEmbeddingServiceClient(c.conn)
+}
+
+// GetHTTPRoutes returns the HTTP routes this plugin advertised during Initialize.
+func (c *ExternalDomainProxy) GetHTTPRoutes() []*protocol.RouteInfo {
+	return c.httpRoutes
 }
 
 // Initialize initializes the remote plugin. Idempotent — safe to call from multiple code paths.
@@ -371,6 +379,9 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 
 	// Store embedding provider capability
 	c.embeddingProvider = resp.GetEmbeddingProvider()
+
+	// Store HTTP routes (optional, for discovery)
+	c.httpRoutes = resp.GetHttpRoutes()
 
 	// Store and create watcher registrations
 	c.watchers = resp.GetWatchers()

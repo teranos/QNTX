@@ -887,6 +887,13 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		m.accumulator.SetLoading(name, meta.Version)
 		m.accumulator.SetRoles(name, roles)
 		m.accumulator.SetHandlers(name, proxy.GetHandlerNames(), len(proxy.GetSchedules()), len(proxy.GetWatchers()))
+		if routes := proxy.GetHTTPRoutes(); len(routes) > 0 {
+			routeStrs := make([]string, len(routes))
+			for i, r := range routes {
+				routeStrs[i] = r.GetMethod() + " " + r.GetPath()
+			}
+			m.accumulator.SetHTTPRoutes(name, routeStrs)
+		}
 		// Collect health asynchronously — synchronous Health() blocks plugin restart
 		// while the plugin makes ATS calls back to QNTX
 		m.accumulator.SetHealth(name, false, "initializing", nil)

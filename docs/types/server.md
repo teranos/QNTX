@@ -293,7 +293,7 @@ type ParsedATSCode struct {
 
 ## PluginGlyphDef {#pluginglyphdef}
 
-**Source**: [`server/handlers.go:739`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L739)
+**Source**: [`server/handlers.go:820`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L820)
 
 
 ```go
@@ -344,6 +344,24 @@ type PluginInfo struct {
 	Details map[string]interface{} `json:"details,omitempty"`
 	State string `json:"state"`
 	Pausable bool `json:"pausable"`
+}
+```
+
+## PluginRoute {#pluginroute}
+
+**Source**: [`server/handlers.go:745`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L745)
+
+
+```go
+type PluginRoute struct {
+	Name string `json:"name"`
+	HTTP string `json:"http"`
+	WebSocket string `json:"ws,omitempty"`
+	Roles []string `json:"roles,omitempty"`
+	Handlers []string `json:"handlers,omitempty"`
+	Schedules int `json:"schedules,omitempty"`
+	Watchers int `json:"watchers,omitempty"`
+	Endpoints []RouteEndpoint `json:"endpoints,omitempty"`
 }
 ```
 
@@ -619,6 +637,19 @@ type Result struct {
 	PromptTokens int `json:"prompt_tokens,omitempty"`
 	CompletionTokens int `json:"completion_tokens,omitempty"`
 	TotalTokens int `json:"total_tokens,omitempty"`
+}
+```
+
+## RouteEndpoint {#routeendpoint}
+
+**Source**: [`server/handlers.go:739`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L739)
+
+
+```go
+type RouteEndpoint struct {
+	Method string `json:"method"`
+	Path string `json:"path"`
+	Description string `json:"description,omitempty"`
 }
 ```
 

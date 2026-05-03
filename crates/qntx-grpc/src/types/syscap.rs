@@ -3,7 +3,7 @@
 // TODO: Migrate to proto generation
 // Source package: syscap
 // Source last modified: 2026-02-09T21:59:10+01:00
-// Source version: b646ca20
+// Source version: 14c8bee7
 
 //! # syscap module
 //!
