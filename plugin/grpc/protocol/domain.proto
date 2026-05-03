@@ -18,7 +18,10 @@ service DomainPluginService {
   // HandleHTTP handles an HTTP request
   rpc HandleHTTP(HTTPRequest) returns (HTTPResponse);
 
-  // HandleWebSocket handles a WebSocket connection (bidirectional streaming)
+  // HandleWebSocket handles a WebSocket connection (bidirectional streaming).
+  // QNTX sends PING messages on the incoming stream and expects PONG responses.
+  // Rust plugins: use PluginWebSocket from qntx-grpc which handles this automatically.
+  // C++ plugins: read the incoming stream in a separate thread and reply to PING with PONG.
   rpc HandleWebSocket(stream WebSocketMessage) returns (stream WebSocketMessage);
 
   // Health checks plugin health

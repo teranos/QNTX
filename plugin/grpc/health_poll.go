@@ -204,10 +204,7 @@ func (m *PluginManager) pollAllPlugins(registry *plugin.Registry, services plugi
 					m.logger.Errorf("Failed to restart plugin '%s': %v", pluginName, err)
 					return
 				}
-				// Emit recovered banner (RestartPlugin already populated the accumulator)
-				if m.accumulator != nil {
-					m.accumulator.Emit(pluginName, BannerRecovered)
-				}
+				// Banner is emitted by registerRestarted's health goroutine
 				// Notify UI that plugin recovered
 				if onEvent != nil {
 					onEvent(HealthEvent{

@@ -957,23 +957,20 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 		}
 		// Re-read config from disk so the restarted plugin gets fresh values
 		appcfg.Reset()
-		err = pm.RestartPlugin(ctx, name, s.pluginRegistry, s.services)
-		if err != nil {
+		cfg, cfgErr := appcfg.Load()
+		if cfgErr != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to load config: %v", cfgErr))
+			return
+		}
+		// Restart = disable (best-effort) + enable. This handles plugins that
+		// are mid-retry or not in the map — no "not loaded" errors.
+		disableCtx, disableCancel := context.WithTimeout(ctx, 10*time.Second)
+		_ = pm.DisablePlugin(disableCtx, name, s.pluginRegistry) // best-effort
+		disableCancel()
+		if err = pm.EnablePlugin(ctx, name, cfg.Plugin.Paths, s.pluginRegistry, s.services); err != nil {
 			s.logger.Warnw("Failed to restart plugin", "plugin", name, "error", err)
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
-		}
-		// Emit restart/reconfigured banner
-		if acc := pm.Accumulator(); acc != nil {
-			reason := plugingrpc.BannerRestart
-			if v := appcfg.GetViper(); v != nil {
-				diffs := acc.ComputeConfigDiff(name, v.GetStringMapString(name))
-				if len(diffs) > 0 {
-					reason = plugingrpc.BannerReconfigured
-					acc.SetConfigDiff(name, diffs)
-				}
-			}
-			acc.Emit(name, reason)
 		}
 		// Invalidate cached HTTP mux and sync.Once so next request
 		// re-initializes with the new gRPC connection
