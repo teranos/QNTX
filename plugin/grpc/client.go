@@ -231,6 +231,9 @@ func (c *ExternalDomainProxy) ForceInitialize(ctx context.Context, services plug
 }
 
 // doInitialize performs the actual gRPC Initialize RPC.
+// Called once per proxy via initOnce (boot/restart), or directly via ForceInitialize (config update).
+// Plugins must handle being initialized again: stop previous state before starting new.
+// See ADR-018 for the full Initialize contract.
 func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.ServiceRegistry) error {
 	// Build config map from service registry
 	config := make(map[string]string)
@@ -386,7 +389,7 @@ func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.
 	// Store and create watcher registrations
 	c.watchers = resp.GetWatchers()
 	if len(c.watchers) > 0 {
-		if err := SetupPluginWatchers(services.Database(), c.metadata.Name, c.watchers, c.logger); err != nil {
+		if err := SetupPluginWatchers(services.Database(), c.metadata.Name, c.watchers, c.handlerNames, c.logger); err != nil {
 			c.logger.Errorw("Failed to setup plugin watchers",
 				"plugin", c.metadata.Name,
 				"error", err,

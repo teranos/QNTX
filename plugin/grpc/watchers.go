@@ -18,9 +18,10 @@ import (
 // Called during plugin initialization to register plugin-declared watchers.
 // Uses CreateOrReplace for idempotency — safe across plugin restarts.
 // Prunes stale watchers that the plugin no longer declares.
-func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protocol.WatcherRegistration, logger *zap.SugaredLogger) error {
+// See ADR-018 for the full watcher lifecycle.
+func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protocol.WatcherRegistration, handlerNames []string, logger *zap.SugaredLogger) error {
 	if len(registrations) > 0 {
-		logger.Infow("Setting up plugin watchers",
+		logger.Debugw("Setting up plugin watchers",
 			"plugin", pluginName,
 			"count", len(registrations),
 		)
@@ -41,6 +42,7 @@ func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protoco
 	if err != nil {
 		return errors.Wrapf(err, "failed to list watchers for pruning plugin %s", pluginName)
 	}
+	var pruned int
 	for _, w := range existing {
 		if w.ActionType != storage.ActionTypePluginExecute {
 			continue
@@ -58,14 +60,31 @@ func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protoco
 				"watcher_id", w.ID,
 				"error", err)
 		} else {
-			logger.Infow("Pruned stale plugin watcher",
-				"plugin", pluginName,
-				"watcher_id", w.ID)
+			pruned++
 		}
+	}
+	if pruned > 0 {
+		logger.Infow("Pruned stale plugin watchers",
+			"plugin", pluginName,
+			"count", pruned)
+	}
+
+	// Build handler name set for validation
+	declaredHandlers := make(map[string]bool, len(handlerNames))
+	for _, h := range handlerNames {
+		declaredHandlers[h] = true
 	}
 
 	// Register current watchers
 	for _, reg := range registrations {
+		if len(handlerNames) > 0 && !declaredHandlers[reg.HandlerName] {
+			logger.Warnw("Watcher references undeclared handler_name — ExecuteJob will never be called",
+				"plugin", pluginName,
+				"watcher_id", reg.Id,
+				"handler_name", reg.HandlerName,
+				"declared_handlers", handlerNames,
+			)
+		}
 		watcherID := fmt.Sprintf("%s-%s", pluginName, reg.Id)
 
 		actionData, err := json.Marshal(watcher.PluginExecuteAction{
@@ -95,7 +114,7 @@ func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protoco
 			return errors.Wrapf(err, "failed to create watcher %s for plugin %s", watcherID, pluginName)
 		}
 
-		logger.Infow("Registered plugin watcher",
+		logger.Debugw("Registered plugin watcher",
 			"plugin", pluginName,
 			"watcher_id", watcherID,
 			"handler", reg.HandlerName,

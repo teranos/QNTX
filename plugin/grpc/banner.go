@@ -204,7 +204,7 @@ func FormatBanner(info BannerInfo) string {
 		b.WriteString(strings.Join(info.HTTPRoutes, ", "))
 		b.WriteString(ansiReset)
 		b.WriteByte('\n')
-	} else if info.Error == "" {
+	} else if info.Error == "" && info.Reason != BannerDisabled {
 		b.WriteString("   ")
 		b.WriteString(ansiDim)
 		b.WriteString("no routes advertised (set http_routes in InitializeResponse)")

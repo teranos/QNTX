@@ -31,7 +31,8 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 		}
 
 		// Broadcast match to frontend (for live results display)
-		if e.broadcastMatch != nil {
+		// Plugin-execute watchers have no browser-side consumer — skip broadcast.
+		if e.broadcastMatch != nil && watcher.ActionType != storage.ActionTypePluginExecute {
 			e.broadcastMatch(watcher.ID, as, score)
 		}
 
@@ -138,7 +139,7 @@ func (e *Engine) OnAttestationEmbedded(as *types.As, attestationEmbedding []floa
 		}
 
 		// Broadcast match to frontend (downstream similarity as score)
-		if e.broadcastMatch != nil {
+		if e.broadcastMatch != nil && watcher.ActionType != storage.ActionTypePluginExecute {
 			e.broadcastMatch(watcher.ID, as, similarity)
 		}
 

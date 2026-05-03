@@ -60,4 +60,5 @@ Plugins can advertise their HTTP endpoints by setting `http_routes` in `Initiali
 
 - [ADR-001: Domain Plugin Architecture](adr/ADR-001-domain-plugin-architecture.md)
 - [ADR-002: Plugin Configuration Management](adr/ADR-002-plugin-configuration.md)
+- [ADR-018: Plugin Lifecycle, Watchers, and Developer Experience](adr/ADR-018-watcher-lifecycle.md)
 - [Plugin API reference](api/plugins.md)

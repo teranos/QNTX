@@ -108,6 +108,7 @@ type PluginManager struct {
 	pidFile                  *pidFile
 	db                       *sql.DB                // for schedule setup on restart
 	handlerRegistry          *async.HandlerRegistry // for handler re-registration on restart
+	retryCancels             map[string]context.CancelFunc // per-plugin retry cancellation
 }
 
 // managedPlugin tracks a running plugin.
@@ -135,6 +136,7 @@ func NewPluginManager(logger *zap.SugaredLogger, rootLogger *zap.SugaredLogger, 
 	return &PluginManager{
 		plugins:           make(map[string]*managedPlugin),
 		failedPlugins:     make(map[string]string),
+		retryCancels:      make(map[string]context.CancelFunc),
 		logger:            logger,
 		rootLogger:        rootLogger,
 		basePort:          DefaultPluginBasePort,
@@ -249,17 +251,31 @@ func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig)
 // Each cycle: launch process → try connecting 3 times (1s, 3s, 9s) → if all fail, kill and relaunch.
 // registry and services may be nil during early boot (before server is ready).
 func (m *PluginManager) retryPluginForever(ctx context.Context, config PluginConfig, registry *plugin.Registry, services plugin.ServiceRegistry) {
+	// Register per-plugin cancel so EnablePlugin can stop this loop
+	retryCtx, retryCancel := context.WithCancel(ctx)
+	defer retryCancel()
+	m.mu.Lock()
+	m.retryCancels[config.Name] = retryCancel
+	m.mu.Unlock()
+	defer func() {
+		m.mu.Lock()
+		delete(m.retryCancels, config.Name)
+		m.mu.Unlock()
+	}()
+
 	cycle := 0
 	for {
 		cycle++
 		select {
-		case <-ctx.Done():
-			m.logger.Warnf("Context cancelled, stopping retry for plugin '%s'", config.Name)
+		case <-retryCtx.Done():
+			m.logger.Debugf("Retry cancelled for plugin '%s'", config.Name)
 			return
 		default:
 		}
 
-		m.logger.Infof("Restarting plugin '%s' process (cycle %d)", config.Name, cycle)
+		if cycle <= 3 || cycle%10 == 0 {
+			m.logger.Infof("Restarting plugin '%s' process (cycle %d)", config.Name, cycle)
+		}
 
 		// Clean up previous state so loadPlugin doesn't see "already loaded"
 		m.mu.Lock()
@@ -271,14 +287,14 @@ func (m *PluginManager) retryPluginForever(ctx context.Context, config PluginCon
 		}
 		m.mu.Unlock()
 
-		err := m.loadPlugin(ctx, config)
+		err := m.loadPlugin(retryCtx, config)
 		if err == nil {
 			m.mu.Lock()
 			delete(m.failedPlugins, config.Name)
 			m.mu.Unlock()
 
 			if registry != nil {
-				m.registerRestarted(ctx, config.Name, registry, services)
+				m.registerRestarted(retryCtx, config.Name, registry, services, BannerRecovered)
 			}
 
 			// Clear stale HTTP mux state so next request re-initializes
@@ -286,16 +302,13 @@ func (m *PluginManager) retryPluginForever(ctx context.Context, config PluginCon
 				m.onPluginRestarted(config.Name)
 			}
 
-			// Emit recovered banner
-			if m.accumulator != nil {
-				m.accumulator.Emit(config.Name, BannerRecovered)
-			}
-
 			m.logger.Debugf("Plugin '%s' loaded successfully on restart cycle %d", config.Name, cycle)
 			return
 		}
 
-		m.logger.Errorf("Plugin '%s' restart cycle %d failed: %v", config.Name, cycle, err)
+		if cycle <= 3 || cycle%10 == 0 {
+			m.logger.Errorf("Plugin '%s' restart cycle %d failed: %v", config.Name, cycle, err)
+		}
 		m.mu.Lock()
 		m.failedPlugins[config.Name] = err.Error()
 		m.mu.Unlock()
@@ -305,7 +318,7 @@ func (m *PluginManager) retryPluginForever(ctx context.Context, config PluginCon
 
 		// Wait before next full restart cycle
 		select {
-		case <-ctx.Done():
+		case <-retryCtx.Done():
 			return
 		case <-time.After(5 * time.Second):
 		}
@@ -771,6 +784,11 @@ func (m *PluginManager) ReinitializePlugin(ctx context.Context, pluginName strin
 func (m *PluginManager) RestartPlugin(ctx context.Context, name string, registry *plugin.Registry, services plugin.ServiceRegistry) error {
 	// Grab config and kill old process
 	m.mu.Lock()
+	// Cancel any active retry loop first
+	if cancel, ok := m.retryCancels[name]; ok {
+		cancel()
+		delete(m.retryCancels, name)
+	}
 	p, exists := m.plugins[name]
 	if !exists {
 		m.mu.Unlock()
@@ -802,14 +820,14 @@ func (m *PluginManager) RestartPlugin(ctx context.Context, name string, registry
 		return nil // not an error to the caller — retry is in progress
 	}
 
-	m.registerRestarted(ctx, name, registry, services)
-	// Accumulator is populated by registerRestarted — callers emit with the appropriate reason
+	m.registerRestarted(ctx, name, registry, services, BannerRecovered)
 	return nil
 }
 
 // registerRestarted re-registers a successfully relaunched plugin with the
-// registry and reinitializes it with services.
-func (m *PluginManager) registerRestarted(ctx context.Context, name string, registry *plugin.Registry, services plugin.ServiceRegistry) {
+// registry and reinitializes it with services. Emits the banner after health
+// check completes (async) so it shows actual health, not "initializing".
+func (m *PluginManager) registerRestarted(ctx context.Context, name string, registry *plugin.Registry, services plugin.ServiceRegistry, reason BannerReason) {
 	newPlugin, _ := m.GetPlugin(name)
 	if err := registry.Register(newPlugin); err != nil {
 		m.logger.Errorf("Failed to re-register plugin '%s': %v", name, err)
@@ -822,8 +840,17 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		if err := am.ReloadPluginSection(name); err != nil {
 			m.logger.Warnf("Failed to reload config for plugin '%s' from am.toml: %v", name, err)
 		}
-		if err := m.ReinitializePlugin(ctx, name, services); err != nil {
-			m.logger.Errorf("Failed to reinitialize plugin '%s' after restart: %v", name, err)
+		// Use Initialize (not ForceInitialize/ReinitializePlugin) — this is a new
+		// proxy with a fresh initOnce. ForceInitialize would bypass the once-guard,
+		// leaving it unfired, so the HTTP routing lazy-init would call Initialize
+		// again and double-initialize the plugin.
+		m.mu.RLock()
+		p, exists := m.plugins[name]
+		m.mu.RUnlock()
+		if exists {
+			if err := p.client.Initialize(ctx, services); err != nil {
+				m.logger.Errorf("Failed to initialize plugin '%s' after restart: %v", name, err)
+			}
 		}
 	}
 
@@ -895,8 +922,8 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 			m.accumulator.SetHTTPRoutes(name, routeStrs)
 		}
 		// Collect health asynchronously — synchronous Health() blocks plugin restart
-		// while the plugin makes ATS calls back to QNTX
-		m.accumulator.SetHealth(name, false, "initializing", nil)
+		// while the plugin makes ATS calls back to QNTX.
+		// Emit the banner inside the goroutine so it shows actual health status.
 		go func() {
 			healthCtx, hCancel := context.WithTimeout(context.Background(), 5*time.Second)
 			health := proxy.Health(healthCtx)
@@ -908,6 +935,7 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 				}
 			}
 			m.accumulator.SetHealth(name, health.Healthy, health.Message, details)
+			m.accumulator.Emit(name, reason)
 		}()
 	}
 }
@@ -915,10 +943,14 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 // EnablePlugin discovers, loads, registers, and initializes a plugin at runtime.
 // The plugin must not already be loaded. Search paths are used to find the binary.
 func (m *PluginManager) EnablePlugin(ctx context.Context, name string, searchPaths []string, registry *plugin.Registry, services plugin.ServiceRegistry) error {
-	// Check if already loaded
+	// Skip if a retry loop is already working on this plugin
 	m.mu.RLock()
+	_, retrying := m.retryCancels[name]
 	_, exists := m.plugins[name]
 	m.mu.RUnlock()
+	if retrying {
+		return nil // retry loop will handle it
+	}
 	if exists {
 		return errors.Newf("plugin '%s' is already loaded", name)
 	}
@@ -935,12 +967,8 @@ func (m *PluginManager) EnablePlugin(ctx context.Context, name string, searchPat
 	}
 
 	// Register + initialize + setup handlers/watchers/schedules/providers
-	m.registerRestarted(ctx, name, registry, services)
-
-	// Emit enabled banner
-	if m.accumulator != nil {
-		m.accumulator.Emit(name, BannerEnabled)
-	}
+	// Banner emits asynchronously after health check completes
+	m.registerRestarted(ctx, name, registry, services, BannerEnabled)
 
 	return nil
 }
@@ -979,7 +1007,7 @@ func (m *PluginManager) DisablePlugin(ctx context.Context, name string, registry
 
 	// Prune watchers: pass empty list so all watchers with this plugin's prefix are deleted
 	if m.db != nil {
-		if err := SetupPluginWatchers(m.db, name, nil, m.logger); err != nil {
+		if err := SetupPluginWatchers(m.db, name, nil, nil, m.logger); err != nil {
 			m.logger.Warnw("Failed to prune watchers for disabled plugin", "plugin", name, "error", err)
 		}
 		if m.onWatchersSetup != nil {
@@ -1003,13 +1031,20 @@ func (m *PluginManager) DisablePlugin(ctx context.Context, name string, registry
 	return nil
 }
 
-// LoadedPluginNames returns the names of all currently loaded plugins.
+// LoadedPluginNames returns the names of all currently loaded or retrying plugins.
 func (m *PluginManager) LoadedPluginNames() []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	names := make([]string, 0, len(m.plugins))
+	seen := make(map[string]bool, len(m.plugins)+len(m.retryCancels))
+	names := make([]string, 0, len(m.plugins)+len(m.retryCancels))
 	for name := range m.plugins {
 		names = append(names, name)
+		seen[name] = true
+	}
+	for name := range m.retryCancels {
+		if !seen[name] {
+			names = append(names, name)
+		}
 	}
 	return names
 }
