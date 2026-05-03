@@ -33,7 +33,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::Streaming;
 use tracing::debug;
 
-use qntx_proto::{WebSocketMessage, web_socket_message};
+use qntx_proto::{web_socket_message, WebSocketMessage};
 
 /// A WebSocket helper that handles PING/PONG automatically.
 ///
@@ -53,7 +53,9 @@ impl PluginWebSocket {
     /// - `ReceiverStream` to return from `handle_web_socket` as the response stream
     ///
     /// PING/PONG is handled internally — the receiver only gets DATA.
-    pub fn new(incoming: Streaming<WebSocketMessage>) -> (
+    pub fn new(
+        incoming: Streaming<WebSocketMessage>,
+    ) -> (
         Self,
         mpsc::Receiver<Vec<u8>>,
         ReceiverStream<Result<WebSocketMessage, tonic::Status>>,
