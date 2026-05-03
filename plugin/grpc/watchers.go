@@ -18,6 +18,7 @@ import (
 // Called during plugin initialization to register plugin-declared watchers.
 // Uses CreateOrReplace for idempotency — safe across plugin restarts.
 // Prunes stale watchers that the plugin no longer declares.
+// See ADR-018 for the full watcher lifecycle.
 func SetupPluginWatchers(db *sql.DB, pluginName string, registrations []*protocol.WatcherRegistration, handlerNames []string, logger *zap.SugaredLogger) error {
 	if len(registrations) > 0 {
 		logger.Debugw("Setting up plugin watchers",

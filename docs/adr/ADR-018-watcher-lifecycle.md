@@ -1,4 +1,4 @@
-# ADR-018: Watcher Lifecycle and Plugin Developer Experience
+# ADR-018: Plugin Lifecycle, Watchers, and Developer Experience
 
 **Status:** Accepted
 **Date:** 2026-05-03
@@ -7,21 +7,70 @@
 
 ## Context
 
-Watchers are the reactive primitive in QNTX. A plugin declares watchers in `InitializeResponse`, core writes them to the database, and the watcher engine fires `ExecuteJob` when attestations match. This works, but the developer experience has gaps that cause silent failures and confusion.
+Plugins are separate processes that communicate with QNTX over gRPC. The lifecycle — boot, initialization, health monitoring, restart, shutdown — has implicit contracts that caused real bugs: double initialization, stale connections, silent watcher failures. This ADR documents the full plugin lifecycle and the watcher subsystem as canonical references.
 
 ### Problems observed
 
-1. **WebSocket ping-pong is undocumented.** Plugins implementing `HandleWebSocket` must read the incoming gRPC stream and respond to PING messages with PONG. If they ignore the stream (natural first instinct), QNTX logs "WebSocket pong timeout" and the connection dies. Nothing in the proto, docs, or examples explains this requirement.
+1. **Double initialization.** `ForceInitialize` bypassed `initOnce` without consuming it. The HTTP routing lazy-init then called `Initialize` again, causing plugins to start their work twice and tear down what they just built.
 
-2. **Watcher lifecycle is implicit.** The full path — `InitializeResponse.watchers` -> `SetupPluginWatchers` writes to DB -> `ReloadWatchers` loads into engine -> attestation match -> `ExecuteJob` routes to plugin — is spread across `client.go`, `watchers.go`, `engine.go`, and `watcher_handlers.go`. A plugin developer sees only the proto field and `ExecuteJob`.
+2. **WebSocket ping-pong is undocumented.** Plugins implementing `HandleWebSocket` must read the incoming gRPC stream and respond to PING messages with PONG. If they ignore the stream (natural first instinct), QNTX logs "WebSocket pong timeout" and the connection dies.
 
-3. **Error messages don't guide.** When a watcher fails to fire, the errors reference internal concepts (queue entries, execution records) rather than telling the plugin developer what went wrong and how to fix it.
+3. **Watcher lifecycle is implicit.** The full path — `InitializeResponse.watchers` → DB → engine → `ExecuteJob` — is spread across four files. A plugin developer sees only the proto field and `ExecuteJob`.
 
-4. **Predicate matching rules are undocumented.** Watchers match on predicates, but the matching semantics (exact vs prefix, single vs multi-predicate, rate limiting via `max_fires_per_second`) are only discoverable by reading `engine.go`.
+4. **Predicate matching rules are undocumented.** Matching semantics (exact, OR, rate limiting) are only discoverable by reading `engine.go`.
 
 ## Decision
 
-Document the watcher lifecycle as a first-class concept. This ADR serves as the canonical reference for how watchers work end-to-end.
+Document the plugin lifecycle and watcher system as first-class concepts.
+
+### Plugin Lifecycle
+
+```
+Binary launch          gRPC connect          Initialize RPC         Health poll (10s)
+     |                      |                      |                      |
+  process starts        Metadata()           Initialize()            Health()
+  binds port            validates name       plugin starts work      monitors liveness
+  prints QNTX_PLUGIN_PORT                    returns watchers,       restarts on 2
+                                             routes, handlers        consecutive failures
+```
+
+#### Boot sequence
+
+1. QNTX launches the plugin binary and waits for it to bind a port
+2. gRPC connection established, `Metadata()` called to validate plugin identity
+3. `Initialize(InitializeRequest)` sent with config, ATS endpoint, auth token
+4. Plugin returns `InitializeResponse` with watchers, routes, handlers, schedules
+5. QNTX registers watchers in DB, sets up HTTP proxy routes, registers async handlers
+6. Health polling begins (every 10s)
+
+#### Initialize contract
+
+- **Called once per proxy lifetime.** A fresh process gets one `Initialize` call. The `initOnce` guard ensures HTTP routing lazy-init doesn't trigger a second call.
+- **Re-initialization** (`ReinitializePlugin` / `ForceInitialize`) is only for config updates on an existing proxy — not for new processes after restart.
+- **Plugins must handle re-init gracefully.** Stop previous state (nodes, connections, goroutines) before starting new ones. The `Initialize` handler may be called on a proxy that already has running state from a previous call.
+- **Config comes from `am.toml`.** The `config` map in `InitializeRequest` contains key-value pairs from the plugin's config section.
+
+#### Restart
+
+Restart = disable (best-effort) + enable. There is no special restart path.
+
+- Disable: gRPC `Shutdown()`, kill process, prune watchers, unregister handlers
+- Enable: discover binary, launch process, connect gRPC, `Initialize`, register everything
+
+This means a restart always produces a new process, new gRPC connection, new proxy with fresh `initOnce`.
+
+#### Health polling
+
+- Every 10 seconds, QNTX calls `Health()` on each running plugin
+- 2 consecutive failures trigger automatic restart with exponential backoff (10s, 20s, 40s, ... capped at 640s)
+- A single transient failure is tolerated
+- Health resets on success
+
+#### Shutdown
+
+- QNTX sends `Shutdown()` RPC (best-effort, 5s timeout)
+- Plugin process is killed
+- Watchers pruned from DB, handlers unregistered
 
 ### Watcher Lifecycle
 

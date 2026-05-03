@@ -231,6 +231,9 @@ func (c *ExternalDomainProxy) ForceInitialize(ctx context.Context, services plug
 }
 
 // doInitialize performs the actual gRPC Initialize RPC.
+// Called once per proxy via initOnce (boot/restart), or directly via ForceInitialize (config update).
+// Plugins must handle being initialized again: stop previous state before starting new.
+// See ADR-018 for the full Initialize contract.
 func (c *ExternalDomainProxy) doInitialize(ctx context.Context, services plugin.ServiceRegistry) error {
 	// Build config map from service registry
 	config := make(map[string]string)

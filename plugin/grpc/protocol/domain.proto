@@ -9,7 +9,9 @@ service DomainPluginService {
   // Metadata returns plugin metadata
   rpc Metadata(Empty) returns (MetadataResponse);
 
-  // Initialize initializes the plugin
+  // Initialize initializes the plugin with config and ATS endpoint.
+  // Called once per process lifetime. Plugins must handle re-init: stop previous state first.
+  // See ADR-018 for the full lifecycle contract.
   rpc Initialize(InitializeRequest) returns (InitializeResponse);
 
   // Shutdown shuts down the plugin

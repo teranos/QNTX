@@ -102,9 +102,9 @@ func (h *healthPollState) inCooldown(name string) bool {
 
 // StartHealthPolling begins periodic health checks on all running plugins.
 // When a plugin fails consecutiveFailuresBeforeRestart health checks in a row,
-// it is automatically restarted via RestartPlugin with exponential backoff.
+// it is automatically restarted with exponential backoff (disable + enable).
 // The onEvent callback (if non-nil) is called on health state changes for UI broadcast.
-// Stops when shutdownCtx is cancelled.
+// Stops when shutdownCtx is cancelled. See ADR-018 for health polling behavior.
 func (m *PluginManager) StartHealthPolling(registry *plugin.Registry, services plugin.ServiceRegistry, onEvent func(HealthEvent)) {
 	state := newHealthPollState()
 
