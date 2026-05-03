@@ -555,7 +555,7 @@ func (e *Engine) queryHistoricalSemantic(watcherID string, watcher *storage.Watc
 		}
 
 		matchCount++
-		if e.broadcastMatch != nil {
+		if e.broadcastMatch != nil && watcher.ActionType != storage.ActionTypePluginExecute {
 			e.broadcastMatch(watcherID, as, downstreamSimilarity)
 		}
 	}
@@ -582,7 +582,7 @@ func (e *Engine) queryHistoricalStructural(watcherID string, watcher *storage.Wa
 	for _, as := range attestations {
 		if matched, score := e.matchesWatcher(as, watcher); matched {
 			matchCount++
-			if e.broadcastMatch != nil {
+			if e.broadcastMatch != nil && watcher.ActionType != storage.ActionTypePluginExecute {
 				e.broadcastMatch(watcherID, as, score)
 			}
 		}

@@ -840,8 +840,17 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		if err := am.ReloadPluginSection(name); err != nil {
 			m.logger.Warnf("Failed to reload config for plugin '%s' from am.toml: %v", name, err)
 		}
-		if err := m.ReinitializePlugin(ctx, name, services); err != nil {
-			m.logger.Errorf("Failed to reinitialize plugin '%s' after restart: %v", name, err)
+		// Use Initialize (not ForceInitialize/ReinitializePlugin) — this is a new
+		// proxy with a fresh initOnce. ForceInitialize would bypass the once-guard,
+		// leaving it unfired, so the HTTP routing lazy-init would call Initialize
+		// again and double-initialize the plugin.
+		m.mu.RLock()
+		p, exists := m.plugins[name]
+		m.mu.RUnlock()
+		if exists {
+			if err := p.client.Initialize(ctx, services); err != nil {
+				m.logger.Errorf("Failed to initialize plugin '%s' after restart: %v", name, err)
+			}
 		}
 	}
 
