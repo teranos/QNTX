@@ -22,8 +22,8 @@ service DomainPluginService {
 
   // HandleWebSocket handles a WebSocket connection (bidirectional streaming).
   // QNTX sends PING messages on the incoming stream and expects PONG responses.
-  // Rust plugins: use PluginWebSocket from qntx-grpc which handles this automatically.
-  // C++ plugins: read the incoming stream in a separate thread and reply to PING with PONG.
+  // Plugins must read the incoming stream and reply to PING with PONG.
+  // See ADR-018 for the keepalive contract.
   rpc HandleWebSocket(stream WebSocketMessage) returns (stream WebSocketMessage);
 
   // Health checks plugin health

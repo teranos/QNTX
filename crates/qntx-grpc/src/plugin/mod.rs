@@ -7,7 +7,6 @@
 
 mod server;
 mod shutdown;
-mod websocket;
 
 pub mod proto {
     //! Protobuf definitions and gRPC services.
@@ -23,4 +22,3 @@ pub mod proto {
 
 pub use server::PluginServer;
 pub use shutdown::shutdown_signal;
-pub use websocket::PluginWebSocket;

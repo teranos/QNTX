@@ -122,16 +122,7 @@ Watchers survive plugin restart. On every `Initialize`:
 
 QNTX sends PING messages on the gRPC stream and expects PONG responses. This tells the plugin whether a browser client is still connected.
 
-**Rust plugins:** Use `PluginWebSocket` from `qntx-grpc` — it handles PING/PONG automatically:
-
-```rust
-let (ws, data_rx, response_stream) = PluginWebSocket::new(request.into_inner());
-// data_rx receives DATA from browser (PINGs handled transparently)
-// ws.send(b"...") sends DATA to browser
-Ok(Response::new(response_stream))
-```
-
-**C++ plugins:** Read the incoming stream in a separate thread and reply to PING with PONG (echo the timestamp).
+Plugins must read the incoming gRPC stream and reply to PING with PONG (echo the timestamp). Spawn a reader task or thread that checks the message type and responds accordingly.
 
 Failure to respond causes QNTX to log `WebSocket pong timeout`. The keepalive interval and timeout are configurable in `am.toml` under `[plugin.websocket.keepalive]`:
 
@@ -150,7 +141,7 @@ When things go wrong, QNTX emits:
 | `Failed to parse AX query for watcher` | Watcher predicate is malformed | Fix the predicate string in `WatcherRegistration` |
 | `gRPC ExecuteJob failed` | Plugin returned an error from `ExecuteJob` | Check plugin-side handler logic |
 | `Max retries exceeded, giving up` | `ExecuteJob` failed repeatedly | Check plugin health, logs |
-| `WebSocket pong timeout` | Plugin ignores incoming WebSocket stream | Rust: use `PluginWebSocket` from `qntx-grpc`. C++: read stream, reply PING with PONG |
+| `WebSocket pong timeout` | Plugin ignores incoming WebSocket stream | Read the incoming stream and reply to PING with PONG |
 | `Failed to setup plugin watchers` | DB write failed during `Initialize` | Check DB connectivity |
 
 ## Consequences
