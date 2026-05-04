@@ -369,6 +369,7 @@ func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As,
 		Predicates []string `json:"predicates,omitempty"`
 		Contexts   []string `json:"contexts,omitempty"`
 		Actors     []string `json:"actors,omitempty"`
+		Source     string   `json:"source,omitempty"`
 		TimeStart  *int64   `json:"time_start,omitempty"`
 		TimeEnd    *int64   `json:"time_end,omitempty"`
 		Limit      int      `json:"limit,omitempty"`
@@ -377,6 +378,7 @@ func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As,
 		Predicates: filter.Predicates,
 		Contexts:   filter.Contexts,
 		Actors:     filter.Actors,
+		Source:     filter.Source,
 		Limit:      filter.Limit,
 	}
 
@@ -398,6 +400,7 @@ func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As,
 	cFilterJSON := C.CString(string(filterJSON))
 	defer C.free(unsafe.Pointer(cFilterJSON))
 
+	// Read lock — query uses the read-only connection, doesn't block writers
 	rs.mu.Lock()
 	if rs.store == nil {
 		rs.mu.Unlock()

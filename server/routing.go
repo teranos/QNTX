@@ -104,7 +104,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/watchers/queue/stats", wrap(s.HandleWatcherQueueStats))                   // Watcher execution queue stats (GET)
 	http.HandleFunc("/api/watchers/", wrap(s.HandleWatchers))                                       // Watcher CRUD (GET/PUT/DELETE /api/watchers/{id})
 	http.HandleFunc("/api/watchers", wrap(s.HandleWatchers))                                        // List/create watchers (GET/POST)
-	http.HandleFunc("/api/attestations", wrap(s.HandleCreateAttestation))                           // Sync browser-created attestations (POST)
+	http.HandleFunc("/api/attestations", wrap(s.HandleAttestations))                                // Query (GET) / create (POST) attestations
 	http.HandleFunc("/api/glyph-config", wrap(s.HandleGlyphConfig))                                 // Plugin glyph config via attestations (GET/POST)
 	http.HandleFunc("/api/canvas/glyphs/", wrap(s.canvasHandler.HandleGlyphs))                      // Glyph CRUD (GET/POST/DELETE /api/canvas/glyphs/{id})
 	http.HandleFunc("/api/canvas/glyphs", wrap(s.canvasHandler.HandleGlyphs))                       // List/create glyphs (GET/POST)

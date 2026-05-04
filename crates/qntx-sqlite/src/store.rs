@@ -536,6 +536,12 @@ impl QueryStore for SqliteStore {
             params.extend(filter.actors.iter().cloned());
         }
 
+        // Filter by source (exact match on plain column)
+        if let Some(ref source) = filter.source {
+            conditions.push("att.source = ?".to_string());
+            params.push(source.clone());
+        }
+
         // Filter by time range
         if let Some(start) = filter.time_start {
             conditions.push("att.timestamp >= ?".to_string());
