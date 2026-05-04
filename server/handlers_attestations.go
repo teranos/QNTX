@@ -1,13 +1,15 @@
 package server
 
-// Attestation HTTP handler — accepts attestations created offline in the browser
-// and persists them to the server-side SQLite store.
+// Attestation HTTP handlers — query and create attestations.
 
 import (
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
 )
@@ -24,12 +26,87 @@ const (
 	maxStringLength  = 1000
 )
 
-// HandleCreateAttestation accepts a browser-created attestation and stores it server-side.
-// POST /api/attestations — idempotent (returns 200 if already exists).
-func (s *QNTXServer) HandleCreateAttestation(w http.ResponseWriter, r *http.Request) {
-	if !requireMethod(w, r, http.MethodPost) {
+// HandleAttestations routes GET (query) and POST (create) for /api/attestations.
+// GET returns attestations matching optional filters (JSON array).
+// Query parameters:
+//   - ?subject=x    — filter by subject(s), comma-separated
+//   - ?predicate=y  — filter by predicate(s), comma-separated
+//   - ?context=z    — filter by context(s), comma-separated
+//   - ?actor=a      — filter by actor(s), comma-separated
+//   - ?source=s     — filter by source (exact match, e.g. "levi", "cli")
+//   - ?limit=N      — max results (default 100, max 1000)
+//
+// POST creates an attestation (idempotent, returns 200 if already exists).
+func (s *QNTXServer) HandleAttestations(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		s.handleGetAttestations(w, r)
+	case http.MethodPost:
+		s.handleCreateAttestation(w, r)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	}
+}
+
+// handleGetAttestations queries attestations with optional filters.
+// GET /api/attestations?subject=x&predicate=y&context=z&actor=a&limit=100
+// Multiple values for the same param use comma separation: ?predicate=a,b
+func (s *QNTXServer) handleGetAttestations(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+
+	filter := ats.AttestationFilter{
+		Subjects:   splitParam(q.Get("subject")),
+		Predicates: splitParam(q.Get("predicate")),
+		Contexts:   splitParam(q.Get("context")),
+		Actors:     splitParam(q.Get("actor")),
+		Source:     q.Get("source"),
+		Limit:      100, // default
+	}
+
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid limit: %s", v))
+			return
+		}
+		if n > 1000 {
+			n = 1000
+		}
+		filter.Limit = n
+	}
+
+	attestations, err := s.atsStore.GetAttestations(filter)
+	if err != nil {
+		writeWrappedError(w, s.logger, err, "failed to query attestations", http.StatusInternalServerError)
 		return
 	}
+
+	writeJSON(w, http.StatusOK, attestations)
+}
+
+// splitParam splits a comma-separated query parameter into a string slice.
+// Returns nil for empty input.
+func splitParam(v string) []string {
+	if v == "" {
+		return nil
+	}
+	parts := strings.Split(v, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
+// handleCreateAttestation accepts a browser-created attestation and stores it server-side.
+// POST /api/attestations — idempotent (returns 200 if already exists).
+func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Request) {
 
 	// Cap request body to prevent unbounded memory allocation.
 	r.Body = http.MaxBytesReader(w, r.Body, maxAttestationBody)

@@ -34,6 +34,10 @@ func GetAttestations(db *sql.DB, filters ats.AttestationFilter) ([]*types.As, er
 	qb.buildPredicateFilter(filters.Predicates)
 	qb.buildContextFilter(filters.Contexts)
 
+	if filters.Source != "" {
+		qb.addClause("source = ?", filters.Source)
+	}
+
 	if filters.TimeStart != nil {
 		qb.addClause("timestamp >= ?", filters.TimeStart.UTC().Format(time.RFC3339))
 	}

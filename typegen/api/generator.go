@@ -195,6 +195,11 @@ func inferMethods(handler, pattern string) []string {
 		}
 	}
 
+	// Attestations: GET (query) + POST (create)
+	if strings.Contains(handlerLower, "attestations") {
+		return []string{"GET", "POST"}
+	}
+
 	// Collection endpoints (no trailing slash)
 	if strings.Contains(handlerLower, "schedules") {
 		return []string{"GET", "POST"}
@@ -745,6 +750,7 @@ func (g *Generator) groupByCategory() []Category {
 	// Define category order
 	order := []string{
 		"Health & Status",
+		"Attestations",
 		"Configuration",
 		"Prompt",
 		"Pulse Schedules",
@@ -792,6 +798,9 @@ func categorizeEndpoint(ep Endpoint) string {
 	}
 	if strings.Contains(pattern, "/plugins") {
 		return "Plugins"
+	}
+	if strings.Contains(pattern, "/attestations") {
+		return "Attestations"
 	}
 	if strings.Contains(pattern, "/config") {
 		return "Configuration"

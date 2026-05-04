@@ -43,7 +43,12 @@ Hot-reloading TypeScript frontend dev server. Restart `make dev` to pick up QNTX
 
 ## Type Generation
 
-**NEVER manually edit files in `types/generated/`.** Fix the generator in `typegen/` instead, then run `make types`. See [typegen.md](docs/typegen.md) for struct tags and troubleshooting.
+`make types` generates documentation from Go source code via `typegen/`. Generated outputs:
+
+- `docs/api/` — REST, WebSocket, and gRPC API reference
+- `docs/types/` — Type documentation in Markdown
+
+**NEVER manually edit generated files.** Enrich handler doc comments and struct tags in Go source to improve the output, or fix the generator in `typegen/` if the pipeline itself needs changes. Then run `make types`. See [typegen.md](docs/typegen.md) for struct tags and troubleshooting.
 
 ## UI: No Ellipsis
 

@@ -231,6 +231,9 @@ pub struct AxFilter {
     /// Temporal range end (Unix timestamp ms)
     pub time_end: Option<i64>,
 
+    /// Filter by source (exact match, e.g., "levi", "cli")
+    pub source: Option<String>,
+
     /// Temporal comparison (e.g., "over 5y")
     pub over_comparison: Option<OverFilter>,
 

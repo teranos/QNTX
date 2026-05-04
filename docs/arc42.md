@@ -18,7 +18,7 @@ Building blocks: `+` (as/assert), `=` (is/identity), `∈` (of/membership), `⌬
 
 Current subsystems:
 
-- **ATS** — Attestation Type System: attest your own types, store and retrieve them (⋈ ax/ask)
+- **ATS** — Attestation Type System: attest your own types, store and retrieve them (⋈ ax/ask, [REST API](api/attestations.md))
 - **꩜ Pulse** — provides async execution with resource-aware scheduling
 - **Glyphs ⧉** — persistent interactive UI primitive
 - **Plugins** — domain logic via gRPC, isolated from core (e.g. local AI via llama.cpp)
