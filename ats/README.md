@@ -68,6 +68,7 @@ type AttestationFields struct {
 
 - **ASID generation** with vanity ID support and collision detection
 - **Attestation existence checking** to prevent duplicates
+- **[REST API](../docs/api/attestations.md)** for querying and creating attestations over HTTP
 
 **Supporting Packages:**
 

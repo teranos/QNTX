@@ -33,7 +33,7 @@ Metadata returns plugin metadata
 
 ### Initialize
 
-Initialize initializes the plugin
+Initialize initializes the plugin with config and ATS endpoint. Called once per process lifetime. Plugins must handle re-init: stop previous state first. See ADR-018 for the full lifecycle contract.
 
 - **Request**: `InitializeRequest`
 - **Response**: `InitializeResponse`
@@ -60,7 +60,7 @@ HandleHTTP handles an HTTP request
 
 ### HandleWebSocket
 
-HandleWebSocket handles a WebSocket connection (bidirectional streaming)
+HandleWebSocket handles a WebSocket connection (bidirectional streaming). QNTX sends PING messages on the incoming stream and expects PONG responses. Plugins must read the incoming stream and reply to PING with PONG. See ADR-018 for the keepalive contract.
 
 - **Request**: `WebSocketMessage`
 - **Response**: `WebSocketMessage`

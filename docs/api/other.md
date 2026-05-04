@@ -5,7 +5,6 @@
 
 | Method | Endpoint | Handler |
 |--------|----------|----------|
-| GET | `/api/attestations` | HandleCreateAttestation |
 | GET | `/api/canvas/compositions` | canvasHandler.HandleCompositions |
 | GET | `/api/canvas/compositions/` | canvasHandler.HandleCompositions |
 | GET | `/api/canvas/export` | canvasHandler.HandleExportStatic |
@@ -35,15 +34,6 @@
 | GET | `/api/watchers` | HandleWatchers |
 | GET | `/api/watchers/` | HandleWatchers |
 | GET | `/api/watchers/queue/stats` | HandleWatcherQueueStats |
-
----
-
-### `GET` /api/attestations
-
-HandleCreateAttestation accepts a browser-created attestation and stores it server-side.
-POST /api/attestations — idempotent (returns 200 if already exists).
-
-**Handler**: `HandleCreateAttestation`
 
 ---
 

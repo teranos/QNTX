@@ -39,13 +39,18 @@ const (
 type DomainPluginServiceClient interface {
 	// Metadata returns plugin metadata
 	Metadata(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MetadataResponse, error)
-	// Initialize initializes the plugin
+	// Initialize initializes the plugin with config and ATS endpoint.
+	// Called once per process lifetime. Plugins must handle re-init: stop previous state first.
+	// See ADR-018 for the full lifecycle contract.
 	Initialize(ctx context.Context, in *InitializeRequest, opts ...grpc.CallOption) (*InitializeResponse, error)
 	// Shutdown shuts down the plugin
 	Shutdown(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 	// HandleHTTP handles an HTTP request
 	HandleHTTP(ctx context.Context, in *HTTPRequest, opts ...grpc.CallOption) (*HTTPResponse, error)
-	// HandleWebSocket handles a WebSocket connection (bidirectional streaming)
+	// HandleWebSocket handles a WebSocket connection (bidirectional streaming).
+	// QNTX sends PING messages on the incoming stream and expects PONG responses.
+	// Plugins must read the incoming stream and reply to PING with PONG.
+	// See ADR-018 for the keepalive contract.
 	HandleWebSocket(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[WebSocketMessage, WebSocketMessage], error)
 	// Health checks plugin health
 	Health(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*HealthResponse, error)
@@ -180,13 +185,18 @@ func (c *domainPluginServiceClient) ParseAxQuery(ctx context.Context, in *ParseA
 type DomainPluginServiceServer interface {
 	// Metadata returns plugin metadata
 	Metadata(context.Context, *Empty) (*MetadataResponse, error)
-	// Initialize initializes the plugin
+	// Initialize initializes the plugin with config and ATS endpoint.
+	// Called once per process lifetime. Plugins must handle re-init: stop previous state first.
+	// See ADR-018 for the full lifecycle contract.
 	Initialize(context.Context, *InitializeRequest) (*InitializeResponse, error)
 	// Shutdown shuts down the plugin
 	Shutdown(context.Context, *Empty) (*Empty, error)
 	// HandleHTTP handles an HTTP request
 	HandleHTTP(context.Context, *HTTPRequest) (*HTTPResponse, error)
-	// HandleWebSocket handles a WebSocket connection (bidirectional streaming)
+	// HandleWebSocket handles a WebSocket connection (bidirectional streaming).
+	// QNTX sends PING messages on the incoming stream and expects PONG responses.
+	// Plugins must read the incoming stream and reply to PING with PONG.
+	// See ADR-018 for the keepalive contract.
 	HandleWebSocket(grpc.BidiStreamingServer[WebSocketMessage, WebSocketMessage]) error
 	// Health checks plugin health
 	Health(context.Context, *Empty) (*HealthResponse, error)
