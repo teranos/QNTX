@@ -749,7 +749,7 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 		for {
 			msg, err := stream.Recv()
 			if err != nil {
-				if err != io.EOF {
+				if err != io.EOF && err != context.Canceled {
 					h.logger.Errorw("gRPC stream read error", "error", err)
 				}
 				errChan <- err
@@ -810,7 +810,7 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 	// Wait for error from either direction
 	err = <-errChan
-	if err != nil && err != io.EOF {
+	if err != nil && err != io.EOF && !websocket.IsCloseError(err, websocket.CloseNormalClosure) {
 		h.logger.Errorw("WebSocket proxy error", "error", err)
 	}
 
