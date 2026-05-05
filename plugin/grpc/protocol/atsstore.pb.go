@@ -846,12 +846,13 @@ const file_plugin_grpc_protocol_atsstore_proto_rawDesc = "" +
 	"\x17GetAttestationsResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x129\n" +
-	"\fattestations\x18\x03 \x03(\v2\x15.protocol.AttestationR\fattestations2\x92\x03\n" +
+	"\fattestations\x18\x03 \x03(\v2\x15.protocol.AttestationR\fattestations2\xe6\x03\n" +
 	"\x0fATSStoreService\x12\\\n" +
 	"\x11CreateAttestation\x12\".protocol.CreateAttestationRequest\x1a#.protocol.CreateAttestationResponse\x12\\\n" +
 	"\x11AttestationExists\x12\".protocol.AttestationExistsRequest\x1a#.protocol.AttestationExistsResponse\x12k\n" +
 	"\x1cGenerateAndCreateAttestation\x12$.protocol.GenerateAttestationRequest\x1a%.protocol.GenerateAttestationResponse\x12V\n" +
-	"\x0fGetAttestations\x12 .protocol.GetAttestationsRequest\x1a!.protocol.GetAttestationsResponseB.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
+	"\x0fGetAttestations\x12 .protocol.GetAttestationsRequest\x1a!.protocol.GetAttestationsResponse\x12R\n" +
+	"\x15GetAttestationsStream\x12 .protocol.GetAttestationsRequest\x1a\x15.protocol.Attestation0\x01B.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
 var (
 	file_plugin_grpc_protocol_atsstore_proto_rawDescOnce sync.Once
@@ -892,12 +893,14 @@ var file_plugin_grpc_protocol_atsstore_proto_depIdxs = []int32{
 	5,  // 8: protocol.ATSStoreService.AttestationExists:input_type -> protocol.AttestationExistsRequest
 	7,  // 9: protocol.ATSStoreService.GenerateAndCreateAttestation:input_type -> protocol.GenerateAttestationRequest
 	9,  // 10: protocol.ATSStoreService.GetAttestations:input_type -> protocol.GetAttestationsRequest
-	4,  // 11: protocol.ATSStoreService.CreateAttestation:output_type -> protocol.CreateAttestationResponse
-	6,  // 12: protocol.ATSStoreService.AttestationExists:output_type -> protocol.AttestationExistsResponse
-	8,  // 13: protocol.ATSStoreService.GenerateAndCreateAttestation:output_type -> protocol.GenerateAttestationResponse
-	10, // 14: protocol.ATSStoreService.GetAttestations:output_type -> protocol.GetAttestationsResponse
-	11, // [11:15] is the sub-list for method output_type
-	7,  // [7:11] is the sub-list for method input_type
+	9,  // 11: protocol.ATSStoreService.GetAttestationsStream:input_type -> protocol.GetAttestationsRequest
+	4,  // 12: protocol.ATSStoreService.CreateAttestation:output_type -> protocol.CreateAttestationResponse
+	6,  // 13: protocol.ATSStoreService.AttestationExists:output_type -> protocol.AttestationExistsResponse
+	8,  // 14: protocol.ATSStoreService.GenerateAndCreateAttestation:output_type -> protocol.GenerateAttestationResponse
+	10, // 15: protocol.ATSStoreService.GetAttestations:output_type -> protocol.GetAttestationsResponse
+	0,  // 16: protocol.ATSStoreService.GetAttestationsStream:output_type -> protocol.Attestation
+	12, // [12:17] is the sub-list for method output_type
+	7,  // [7:12] is the sub-list for method input_type
 	7,  // [7:7] is the sub-list for extension type_name
 	7,  // [7:7] is the sub-list for extension extendee
 	0,  // [0:7] is the sub-list for field type_name

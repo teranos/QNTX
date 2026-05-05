@@ -166,6 +166,37 @@ func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetA
 	}, nil
 }
 
+// GetAttestationsStream queries attestations and streams them individually.
+func (s *ATSStoreServer) GetAttestationsStream(req *protocol.GetAttestationsRequest, stream protocol.ATSStoreService_GetAttestationsStreamServer) error {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+		return err
+	}
+
+	filter := protoToFilter(req.Filter)
+
+	attestations, err := s.store.GetAttestations(filter)
+	if err != nil {
+		return fmt.Errorf("failed to query attestations: %w", err)
+	}
+
+	s.logger.Debugw("GetAttestationsStream",
+		"results", len(attestations),
+		"predicates", filter.Predicates,
+		"subjects", filter.Subjects)
+
+	for _, as := range attestations {
+		protoAtt, err := protocol.AttestationFromTypes(as)
+		if err != nil {
+			return fmt.Errorf("failed to convert attestation %s to proto: %w", as.ID, err)
+		}
+		if err := stream.Send(protoAtt); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error) {
 	attributes := make(map[string]interface{})
 	if proto.Attributes != nil {

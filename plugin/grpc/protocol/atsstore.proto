@@ -19,6 +19,10 @@ service ATSStoreService {
 
   // GetAttestations queries attestations with filters
   rpc GetAttestations(GetAttestationsRequest) returns (GetAttestationsResponse);
+
+  // GetAttestationsStream queries attestations and streams them back individually.
+  // Use this for large result sets that may exceed gRPC message size limits.
+  rpc GetAttestationsStream(GetAttestationsRequest) returns (stream Attestation);
 }
 
 // Attestation represents a complete attestation

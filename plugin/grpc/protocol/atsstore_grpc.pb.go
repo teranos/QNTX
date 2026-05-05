@@ -23,6 +23,7 @@ const (
 	ATSStoreService_AttestationExists_FullMethodName            = "/protocol.ATSStoreService/AttestationExists"
 	ATSStoreService_GenerateAndCreateAttestation_FullMethodName = "/protocol.ATSStoreService/GenerateAndCreateAttestation"
 	ATSStoreService_GetAttestations_FullMethodName              = "/protocol.ATSStoreService/GetAttestations"
+	ATSStoreService_GetAttestationsStream_FullMethodName        = "/protocol.ATSStoreService/GetAttestationsStream"
 )
 
 // ATSStoreServiceClient is the client API for ATSStoreService service.
@@ -39,6 +40,9 @@ type ATSStoreServiceClient interface {
 	GenerateAndCreateAttestation(ctx context.Context, in *GenerateAttestationRequest, opts ...grpc.CallOption) (*GenerateAttestationResponse, error)
 	// GetAttestations queries attestations with filters
 	GetAttestations(ctx context.Context, in *GetAttestationsRequest, opts ...grpc.CallOption) (*GetAttestationsResponse, error)
+	// GetAttestationsStream queries attestations and streams them back individually.
+	// Use this for large result sets that may exceed gRPC message size limits.
+	GetAttestationsStream(ctx context.Context, in *GetAttestationsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Attestation], error)
 }
 
 type aTSStoreServiceClient struct {
@@ -89,6 +93,25 @@ func (c *aTSStoreServiceClient) GetAttestations(ctx context.Context, in *GetAtte
 	return out, nil
 }
 
+func (c *aTSStoreServiceClient) GetAttestationsStream(ctx context.Context, in *GetAttestationsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Attestation], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &ATSStoreService_ServiceDesc.Streams[0], ATSStoreService_GetAttestationsStream_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[GetAttestationsRequest, Attestation]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ATSStoreService_GetAttestationsStreamClient = grpc.ServerStreamingClient[Attestation]
+
 // ATSStoreServiceServer is the server API for ATSStoreService service.
 // All implementations must embed UnimplementedATSStoreServiceServer
 // for forward compatibility.
@@ -103,6 +126,9 @@ type ATSStoreServiceServer interface {
 	GenerateAndCreateAttestation(context.Context, *GenerateAttestationRequest) (*GenerateAttestationResponse, error)
 	// GetAttestations queries attestations with filters
 	GetAttestations(context.Context, *GetAttestationsRequest) (*GetAttestationsResponse, error)
+	// GetAttestationsStream queries attestations and streams them back individually.
+	// Use this for large result sets that may exceed gRPC message size limits.
+	GetAttestationsStream(*GetAttestationsRequest, grpc.ServerStreamingServer[Attestation]) error
 	mustEmbedUnimplementedATSStoreServiceServer()
 }
 
@@ -124,6 +150,9 @@ func (UnimplementedATSStoreServiceServer) GenerateAndCreateAttestation(context.C
 }
 func (UnimplementedATSStoreServiceServer) GetAttestations(context.Context, *GetAttestationsRequest) (*GetAttestationsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAttestations not implemented")
+}
+func (UnimplementedATSStoreServiceServer) GetAttestationsStream(*GetAttestationsRequest, grpc.ServerStreamingServer[Attestation]) error {
+	return status.Error(codes.Unimplemented, "method GetAttestationsStream not implemented")
 }
 func (UnimplementedATSStoreServiceServer) mustEmbedUnimplementedATSStoreServiceServer() {}
 func (UnimplementedATSStoreServiceServer) testEmbeddedByValue()                         {}
@@ -218,6 +247,17 @@ func _ATSStoreService_GetAttestations_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ATSStoreService_GetAttestationsStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetAttestationsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ATSStoreServiceServer).GetAttestationsStream(m, &grpc.GenericServerStream[GetAttestationsRequest, Attestation]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ATSStoreService_GetAttestationsStreamServer = grpc.ServerStreamingServer[Attestation]
+
 // ATSStoreService_ServiceDesc is the grpc.ServiceDesc for ATSStoreService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -242,6 +282,12 @@ var ATSStoreService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ATSStoreService_GetAttestations_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "GetAttestationsStream",
+			Handler:       _ATSStoreService_GetAttestationsStream_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "plugin/grpc/protocol/atsstore.proto",
 }
