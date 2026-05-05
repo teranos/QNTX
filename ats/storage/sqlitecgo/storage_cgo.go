@@ -33,6 +33,7 @@ import (
 	"encoding/json"
 	"runtime"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/teranos/QNTX/ats"
@@ -150,16 +151,23 @@ func (rs *RustStore) CreateAttestation(as *types.As) error {
 	defer C.free(unsafe.Pointer(cJSON))
 
 	rs.mu.Lock()
-	defer rs.mu.Unlock()
 	if rs.store == nil {
+		rs.mu.Unlock()
 		return errors.New("store is closed")
 	}
 
+	start := time.Now()
 	result := C.storage_put(rs.store, cJSON)
-	defer C.storage_result_free(result)
+	success := bool(result.success)
+	var errMsg string
+	if !success {
+		errMsg = C.GoString(result.error_msg)
+	}
+	C.storage_result_free(result)
+	rs.mu.Unlock()
+	logSlow(start, "storage_put")
 
-	if !result.success {
-		errMsg := C.GoString(result.error_msg)
+	if !success {
 		return errors.New(errMsg)
 	}
 
@@ -349,11 +357,15 @@ func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *type
 
 	// Lock only for the write
 	rs.mu.Lock()
-	defer rs.mu.Unlock()
 	if rs.store == nil {
+		rs.mu.Unlock()
 		return nil, errors.New("store is closed")
 	}
-	if err := rs.putLocked(jsonBytes); err != nil {
+	start := time.Now()
+	err = rs.putLocked(jsonBytes)
+	rs.mu.Unlock()
+	logSlow(start, "storage_put (GenerateAndCreate)")
+	if err != nil {
 		return nil, errors.Wrap(err, "failed to store attestation")
 	}
 
@@ -407,6 +419,7 @@ func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As,
 		return nil, errors.New("store is closed")
 	}
 
+	start := time.Now()
 	result := C.storage_query(rs.store, cFilterJSON)
 	// Copy result data before unlocking — C strings are valid until result is freed
 	var success bool
@@ -419,6 +432,7 @@ func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As,
 	}
 	C.attestation_result_free(result)
 	rs.mu.Unlock()
+	logSlow(start, "storage_query filter="+string(filterJSON))
 
 	if !success {
 		return nil, errors.New(errMsg)
@@ -470,6 +484,7 @@ func (rs *RustStore) EnforceLimits(actors, contexts, subjects []string, config *
 		return nil, errors.New("store is closed")
 	}
 
+	start := time.Now()
 	result := C.storage_enforce_limits(rs.store, cJSON)
 	var success bool
 	var errMsg, jsonStr string
@@ -481,6 +496,7 @@ func (rs *RustStore) EnforceLimits(actors, contexts, subjects []string, config *
 	}
 	C.attestation_result_free(result)
 	rs.mu.Unlock()
+	logSlow(start, "storage_enforce_limits")
 
 	if !success {
 		return nil, errors.New(errMsg)
@@ -679,6 +695,7 @@ func (rs *RustStore) QueryAttestationsRaw(sql string, params []interface{}) ([]*
 		return nil, errors.New("store is closed")
 	}
 
+	start := time.Now()
 	result := C.storage_query_raw(rs.store, cSQL, cParams)
 	var success bool
 	var errMsg, jsonStr string
@@ -690,6 +707,7 @@ func (rs *RustStore) QueryAttestationsRaw(sql string, params []interface{}) ([]*
 	}
 	C.attestation_result_free(result)
 	rs.mu.Unlock()
+	logSlow(start, "storage_query_raw sql="+sql)
 
 	if !success {
 		return nil, errors.Newf("raw query failed: %s", errMsg)
