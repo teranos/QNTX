@@ -6,7 +6,7 @@ QNTX is an **attestation-based continuous intelligence system**. Not a knowledge
 
 The core primitive is the **attestation**: structured facts of the form "X has property Y in context Z". Everything flows from this:
 
-- **ATS (Attestation Type System)**: A semantic query language for exploring attestations ([REST API](api/attestations.md))
+- **ATS (Attestation Type System)**: A semantic query language for exploring attestations ([REST API](api/attestations.md), [gRPC API](api/grpc-atsstore.md))
 - **Pulse (꩜)**: Continuous execution that keeps attestations current
 - **Prose/Views**: Ways to compose and visualize attestation-derived intelligence
 - **WASM Runtime**: ATS parsing, completions, and search run locally in the browser

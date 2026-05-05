@@ -21,7 +21,7 @@ This is the second plugin-provided service on `ServiceRegistry`, after LLMServic
 
 ## Protocol
 
-See `plugin/grpc/protocol/search.proto`. Four RPCs: `Search`, `IndexDocuments`, `DeleteDocuments`, `ConfigureIndex`. Documents and filters flow as JSON bytes — the proto is engine-agnostic.
+See `plugin/grpc/protocol/search.proto` ([SearchService gRPC API](../api/grpc-search.md)). Four RPCs: `Search`, `IndexDocuments`, `DeleteDocuments`, `ConfigureIndex`. Documents and filters flow as JSON bytes — the proto is engine-agnostic.
 
 ## Responsibility boundary
 

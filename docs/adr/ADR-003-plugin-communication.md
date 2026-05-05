@@ -118,7 +118,7 @@ store.Create(ctx, &types.As{
 
 ### ServiceRegistry: Plugin ↔ QNTX Communication
 
-Plugins interact with QNTX via ServiceRegistry:
+Plugins interact with QNTX via ServiceRegistry ([ATSStore gRPC API](../api/grpc-atsstore.md)):
 
 ```go
 type ServiceRegistry interface {
