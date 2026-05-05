@@ -72,13 +72,21 @@ type WebSocketMessageType struct {
 	Fields      map[string]string // Field name to description
 }
 
+// GRPCService represents a gRPC service parsed from a proto file
+type GRPCService struct {
+	Name        string         // Service name (e.g., "ATSStoreService")
+	Description string         // Doc comment on the service
+	ProtoFile   string         // Filename only (e.g., "atsstore.proto")
+	Methods     []GRPCMethod   // RPC methods in this service
+	Messages    []ProtoMessage // Messages defined in the same proto file
+}
+
 // Generator generates API documentation
 type Generator struct {
 	serverDir      string
 	protoDir       string
 	endpoints      []Endpoint
-	grpcMethods    []GRPCMethod
-	protoMessages  []ProtoMessage
+	grpcServices   []GRPCService
 	wsMessageTypes []WebSocketMessageType
 }
 
@@ -88,8 +96,7 @@ func NewGenerator(serverDir, protoDir string) *Generator {
 		serverDir:      serverDir,
 		protoDir:       protoDir,
 		endpoints:      make([]Endpoint, 0),
-		grpcMethods:    make([]GRPCMethod, 0),
-		protoMessages:  make([]ProtoMessage, 0),
+		grpcServices:   make([]GRPCService, 0),
 		wsMessageTypes: make([]WebSocketMessageType, 0),
 	}
 }
@@ -343,16 +350,42 @@ func (g *Generator) extractTypes(endpoint *Endpoint, fn *ast.FuncDecl) {
 	})
 }
 
-// parseProto extracts gRPC service definitions from proto files
+// parseProto extracts gRPC service definitions from all proto files in the proto directory
 func (g *Generator) parseProto() error {
-	protoPath := filepath.Join(g.protoDir, "domain.proto")
+	entries, err := os.ReadDir(g.protoDir)
+	if err != nil {
+		// Proto dir is optional
+		return nil
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".proto") {
+			continue
+		}
+		svc, err := g.parseProtoFile(entry.Name())
+		if err != nil {
+			return err
+		}
+		if svc != nil {
+			g.grpcServices = append(g.grpcServices, *svc)
+		}
+	}
+	return nil
+}
+
+// parseProtoFile parses a single proto file and returns a GRPCService if it contains a service definition
+func (g *Generator) parseProtoFile(filename string) (*GRPCService, error) {
+	protoPath := filepath.Join(g.protoDir, filename)
 
 	file, err := os.Open(protoPath)
 	if err != nil {
-		// Proto file is optional
-		return nil
+		return nil, nil
 	}
 	defer file.Close()
+
+	svc := &GRPCService{
+		ProtoFile: filename,
+	}
 
 	scanner := bufio.NewScanner(file)
 	var currentComment string
@@ -381,6 +414,12 @@ func (g *Generator) parseProto() error {
 		// Service start
 		if strings.HasPrefix(trimmed, "service ") {
 			inService = true
+			// Extract service name
+			parts := strings.Fields(trimmed)
+			if len(parts) >= 2 {
+				svc.Name = parts[1]
+			}
+			svc.Description = currentComment
 			currentComment = ""
 			continue
 		}
@@ -412,7 +451,7 @@ func (g *Generator) parseProto() error {
 					method.Streaming = "server"
 				}
 
-				g.grpcMethods = append(g.grpcMethods, method)
+				svc.Methods = append(svc.Methods, method)
 				currentComment = ""
 			}
 			continue
@@ -421,7 +460,7 @@ func (g *Generator) parseProto() error {
 		// Message start
 		if matches := messagePattern.FindStringSubmatch(trimmed); matches != nil {
 			if currentMessage != nil {
-				g.protoMessages = append(g.protoMessages, *currentMessage)
+				svc.Messages = append(svc.Messages, *currentMessage)
 			}
 			currentMessage = &ProtoMessage{
 				Name:        matches[1],
@@ -434,7 +473,7 @@ func (g *Generator) parseProto() error {
 
 		// Message end
 		if currentMessage != nil && trimmed == "}" {
-			g.protoMessages = append(g.protoMessages, *currentMessage)
+			svc.Messages = append(svc.Messages, *currentMessage)
 			currentMessage = nil
 			continue
 		}
@@ -465,7 +504,16 @@ func (g *Generator) parseProto() error {
 		}
 	}
 
-	return scanner.Err()
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	// Only return a service if it has methods or messages
+	if len(svc.Methods) == 0 && len(svc.Messages) == 0 {
+		return nil, nil
+	}
+
+	return svc, nil
 }
 
 // parseWebSocketTypes extracts WebSocket message type definitions from server/types.go
@@ -572,20 +620,41 @@ func (g *Generator) parseWebSocketTypes() error {
 	return nil
 }
 
-// generateGRPCDoc creates the gRPC plugin API documentation
-func (g *Generator) generateGRPCDoc() string {
+// grpcServiceTitle returns the display title for a gRPC service doc
+func grpcServiceTitle(svc GRPCService) string {
+	if svc.ProtoFile == "domain.proto" {
+		return "Plugin gRPC API"
+	}
+	return svc.Name + " gRPC API"
+}
+
+// grpcServiceFilename returns the output filename for a gRPC service doc
+func grpcServiceFilename(svc GRPCService) string {
+	if svc.ProtoFile == "domain.proto" {
+		return "grpc-plugin.md"
+	}
+	name := strings.TrimSuffix(svc.ProtoFile, ".proto")
+	return "grpc-" + name + ".md"
+}
+
+// generateGRPCServiceDoc creates gRPC API documentation for a single service
+func (g *Generator) generateGRPCServiceDoc(svc GRPCService) string {
 	var sb strings.Builder
 
-	sb.WriteString("# Plugin gRPC API\n\n")
+	title := grpcServiceTitle(svc)
+	sb.WriteString(fmt.Sprintf("# %s\n\n", title))
 	sb.WriteString("<!-- Code generated by typegen. DO NOT EDIT. -->\n")
 	sb.WriteString("<!-- Regenerate with: make types -->\n\n")
 
-	sb.WriteString("gRPC interface for external QNTX domain plugins.\n\n")
+	if svc.Description != "" {
+		sb.WriteString(svc.Description + "\n\n")
+	}
 
 	// Link to proto file if GitHub URL is available
 	if gitHubBaseURL := typegen.DetectGitHubBaseURL(); gitHubBaseURL != "" {
-		protoURL := gitHubBaseURL + "/plugin/grpc/protocol/domain.proto"
-		sb.WriteString(fmt.Sprintf("**Proto file**: [`plugin/grpc/protocol/domain.proto`](%s)\n\n", protoURL))
+		protoRelPath := "plugin/grpc/protocol/" + svc.ProtoFile
+		protoURL := gitHubBaseURL + "/" + protoRelPath
+		sb.WriteString(fmt.Sprintf("**Proto file**: [`%s`](%s)\n\n", protoRelPath, protoURL))
 	}
 
 	// Service methods
@@ -593,7 +662,7 @@ func (g *Generator) generateGRPCDoc() string {
 	sb.WriteString("| Method | Request | Response | Streaming |\n")
 	sb.WriteString("|--------|---------|----------|-----------|\n")
 
-	for _, m := range g.grpcMethods {
+	for _, m := range svc.Methods {
 		streaming := "No"
 		if m.Streaming == "bidi" {
 			streaming = "Bidirectional"
@@ -607,7 +676,7 @@ func (g *Generator) generateGRPCDoc() string {
 	sb.WriteString("\n")
 
 	// Method details
-	for _, m := range g.grpcMethods {
+	for _, m := range svc.Methods {
 		sb.WriteString(fmt.Sprintf("### %s\n\n", m.Name))
 		if m.Description != "" {
 			sb.WriteString(m.Description + "\n\n")
@@ -622,7 +691,7 @@ func (g *Generator) generateGRPCDoc() string {
 
 	// Message types
 	sb.WriteString("## Message Types\n\n")
-	for _, msg := range g.protoMessages {
+	for _, msg := range svc.Messages {
 		if msg.Name == "Empty" {
 			continue // Skip empty message
 		}
@@ -907,14 +976,18 @@ func GenerateAPIDoc(serverDir, outputDir string) error {
 		fmt.Printf("✓ Generated %s (%d %s)\n", filePath, len(cat.Endpoints), pluralize(len(cat.Endpoints), "endpoint", "endpoints"))
 	}
 
-	// Generate gRPC plugin API documentation
-	if len(gen.grpcMethods) > 0 {
-		grpcContent := gen.generateGRPCDoc()
-		grpcPath := filepath.Join(outputDir, "grpc-plugin.md")
-		if err := os.WriteFile(grpcPath, []byte(grpcContent), 0644); err != nil {
-			return fmt.Errorf("failed to write gRPC docs: %w", err)
+	// Generate gRPC API documentation (one file per service)
+	for _, svc := range gen.grpcServices {
+		if len(svc.Methods) == 0 {
+			continue
 		}
-		fmt.Printf("✓ Generated %s (%d %s)\n", grpcPath, len(gen.grpcMethods), pluralize(len(gen.grpcMethods), "method", "methods"))
+		content := gen.generateGRPCServiceDoc(svc)
+		filename := grpcServiceFilename(svc)
+		filePath := filepath.Join(outputDir, filename)
+		if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+			return fmt.Errorf("failed to write gRPC docs %s: %w", filename, err)
+		}
+		fmt.Printf("✓ Generated %s (%d %s)\n", filePath, len(svc.Methods), pluralize(len(svc.Methods), "method", "methods"))
 	}
 
 	// Generate WebSocket protocol documentation
@@ -970,11 +1043,19 @@ func (g *Generator) generateIndex(categories []Category) string {
 		sb.WriteString(fmt.Sprintf("- **[WebSocket Protocol](./websocket.md)** (%d message %s)\n\n", count, pluralize(count, "type", "types")))
 	}
 
-	// gRPC Plugin API section
-	if len(g.grpcMethods) > 0 {
-		sb.WriteString("## Plugin gRPC API\n\n")
-		count := len(g.grpcMethods)
-		sb.WriteString(fmt.Sprintf("- **[Plugin gRPC API](./grpc-plugin.md)** (%d %s)\n\n", count, pluralize(count, "method", "methods")))
+	// gRPC API section
+	if len(g.grpcServices) > 0 {
+		sb.WriteString("## gRPC APIs\n\n")
+		for _, svc := range g.grpcServices {
+			if len(svc.Methods) == 0 {
+				continue
+			}
+			title := grpcServiceTitle(svc)
+			filename := grpcServiceFilename(svc)
+			count := len(svc.Methods)
+			sb.WriteString(fmt.Sprintf("- **[%s](./%s)** (%d %s)\n", title, filename, count, pluralize(count, "method", "methods")))
+		}
+		sb.WriteString("\n")
 	}
 
 	sb.WriteString("## Type References\n\n")
