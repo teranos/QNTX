@@ -333,7 +333,7 @@ func (enc *minimalEncoder) EncodeEntry(ent zapcore.Entry, fields []zapcore.Field
 
 	// Time: theme-aware color
 	final.AppendString(colorTime())
-	final.AppendString(ent.Time.Format("15:04:05"))
+	final.AppendString(ent.Time.Format("2006-01-02T15:04:05"))
 	final.AppendString(colorReset)
 
 	// Level: only show for WARN/ERROR with bold + background
