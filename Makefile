@@ -252,9 +252,20 @@ proto-rust: ## Rust proto types are now generated automatically at build time
 define restart-plugin
 	@TOML_PORT=$$(grep -E '^port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
 	 PORT=$${BACKEND_PORT:-$${TOML_PORT:-8770}}; \
-	 curl -sf -X POST http://127.0.0.1:$$PORT/api/plugins/$(1)/restart > /dev/null 2>&1 \
-		&& echo "  ↻ $(1) restarted — live at http://127.0.0.1:$$PORT (no restart needed)" \
-		|| echo "  ⊘ QNTX not running — restart make dev to pick up new binary"
+	 curl -sf -X POST http://127.0.0.1:$$PORT/api/plugins/$(1)/restart > /dev/null 2>&1 || { \
+		echo "  ⊘ QNTX not running — start QNTX to pick up new binary"; exit 0; }; \
+	 echo "  ↻ RESTARTING $(1)..."; \
+	 for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do \
+		STATE=$$(curl -sf http://127.0.0.1:$$PORT/api/plugins 2>/dev/null \
+			| python3 -c "import sys,json; plugins=json.load(sys.stdin).get('plugins',[]); p=[x for x in plugins if x.get('name')=='$(1)']; print(p[0].get('state','') if p else '')" 2>/dev/null); \
+		if [ "$$STATE" = "running" ]; then \
+			VERSION=$$(curl -sf http://127.0.0.1:$$PORT/api/plugins 2>/dev/null \
+				| python3 -c "import sys,json; plugins=json.load(sys.stdin).get('plugins',[]); p=[x for x in plugins if x.get('name')=='$(1)']; print(p[0].get('version','') if p else '')" 2>/dev/null); \
+			echo "  ✓ LOADED — $(1) $$VERSION live at http://127.0.0.1:$$PORT"; exit 0; \
+		fi; \
+		sleep 1; \
+	 done; \
+	 echo "  ✗ $(1) did not reach running state within 20s"
 endef
 
 # check-plugin-version DIR EXT VERSION_FILE

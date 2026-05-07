@@ -33,6 +33,7 @@ type ServiceEndpoints struct {
 // ServicesManager manages gRPC service servers for plugin callbacks
 type ServicesManager struct {
 	atsStoreServer     *grpc.Server
+	atsStore           *ATSStoreServer // for stream cancellation on plugin restart
 	queueServer        *grpc.Server
 	scheduleServer     *grpc.Server
 	fileServiceServer  *grpc.Server
@@ -178,8 +179,8 @@ func (m *ServicesManager) startATSStoreService(ctx context.Context, store ats.At
 
 	// Create gRPC server
 	m.atsStoreServer = grpc.NewServer()
-	atsServer := NewATSStoreServer(store, authToken, m.logger)
-	protocol.RegisterATSStoreServiceServer(m.atsStoreServer, atsServer)
+	m.atsStore = NewATSStoreServer(store, authToken, m.logger)
+	protocol.RegisterATSStoreServiceServer(m.atsStoreServer, m.atsStore)
 
 	// Handle context cancellation for graceful shutdown
 	go func() {
@@ -451,6 +452,14 @@ func (m *ServicesManager) startSearchService(ctx context.Context) (string, error
 // Returns nil if the search service is not running.
 func (m *ServicesManager) GetSearchRouter() *SearchServer {
 	return m.searchRouter
+}
+
+// CancelATSStreams cancels all active ATSStore streams.
+// Called during plugin restart to free the database mutex before launching the new process.
+func (m *ServicesManager) CancelATSStreams() {
+	if m.atsStore != nil {
+		m.atsStore.CancelStreams()
+	}
 }
 
 // GetLLMRouter returns the LLM router for provider registration.

@@ -181,6 +181,17 @@ func IsLoopbackAddress(addr string) bool {
 	return addr == "" || addr == "127.0.0.1" || addr == "::1" || addr == "localhost"
 }
 
+// IsDevMode returns true when QNTX is running in development mode.
+// Set by the --dev flag on the server command.
+func IsDevMode() bool {
+	return os.Getenv("DEV") == "true"
+}
+
+// SetDevMode sets the DEV environment variable. Called early in server startup.
+func SetDevMode() {
+	os.Setenv("DEV", "true")
+}
+
 // GetServerPort returns the configured QNTX server port
 // Returns server.port from config, or DefaultServerPort (8770) if not configured
 func GetServerPort() int {

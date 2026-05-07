@@ -54,9 +54,12 @@ func (p *pidFile) CleanStale() {
 		if err := proc.Signal(syscall.Signal(0)); err != nil {
 			continue // already dead
 		}
-		if err := proc.Kill(); err == nil {
-			p.logger.Infow("Killed stale plugin process", "pid", pid)
+		// Kill entire process group to also terminate children (e.g. Reticulum)
+		if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil {
+			// Fallback to single-process kill if group kill fails
+			proc.Kill()
 		}
+		p.logger.Infow("Killed stale plugin process", "pid", pid)
 	}
 
 	os.Remove(p.path)

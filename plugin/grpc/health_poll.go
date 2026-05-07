@@ -200,7 +200,7 @@ func (m *PluginManager) pollAllPlugins(registry *plugin.Registry, services plugi
 
 			// Restart in a goroutine so we don't block the polling loop
 			go func(pluginName string) {
-				if err := m.RestartPlugin(m.shutdownCtx, pluginName, registry, services); err != nil {
+				if err := m.RestartPlugin(m.shutdownCtx, pluginName, nil, registry, services); err != nil {
 					m.logger.Errorf("Failed to restart plugin '%s': %v", pluginName, err)
 					return
 				}

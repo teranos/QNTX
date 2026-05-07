@@ -6,12 +6,15 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/server"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // ServerCmd starts the QNTX web server
@@ -41,6 +44,13 @@ func init() {
 }
 
 func runServer(cmd *cobra.Command, args []string) error {
+	// Bootstrap logger for pre-server startup logging
+	zapCfg := zap.NewDevelopmentConfig()
+	zapCfg.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	zapLog, _ := zapCfg.Build()
+	bootLog := zapLog.Sugar()
+	defer bootLog.Sync()
+
 	// Get verbosity flag - default to 1 (Info) for server
 	verbosity, _ := cmd.Flags().GetCount("verbose")
 	if verbosity == 0 {
@@ -59,12 +69,19 @@ func runServer(cmd *cobra.Command, args []string) error {
 	}
 	// If dbPath still empty, openDatabase will use am.GetDatabasePath()
 
+	// Set dev mode early — openDatabase skips integrity check in dev mode
+	if serverDevMode {
+		am.SetDevMode()
+	}
+
 	// Open and migrate database
+	dbStart := time.Now()
 	database, atsStore, dbPath, err := openDatabase(dbPath)
 	if err != nil {
 		return errors.Wrap(err, "failed to open database")
 	}
 	defer database.Close()
+	bootLog.Infow("openDatabase complete", "took", time.Since(dbStart))
 
 	// Resolve log path from config
 	cfg, err := am.Load()
@@ -80,16 +97,13 @@ func runServer(cmd *cobra.Command, args []string) error {
 		pterm.Info.Printf("Pre-loaded query: %s\n", serverAtsQuery)
 	}
 
-	// Set dev mode environment variable if flag is set
-	if serverDevMode {
-		os.Setenv("DEV", "true")
-	}
-
 	// Create server with pre-created attestation store
+	srvStart := time.Now()
 	srv, err := server.NewQNTXServer(database, atsStore, dbPath, verbosity, serverAtsQuery)
 	if err != nil {
 		return errors.Wrap(err, "failed to create server")
 	}
+	bootLog.Infow("NewQNTXServer complete", "took", time.Since(srvStart))
 
 	// Start server in goroutine
 	// The server will call openBrowser with the actual port (unless --no-browser is set)

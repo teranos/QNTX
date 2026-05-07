@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -115,11 +116,65 @@ type PluginManager struct {
 type managedPlugin struct {
 	config       PluginConfig
 	client       *ExternalDomainProxy
-	process      *os.Process
+	cmd          *exec.Cmd   // full command — use cmd.Process.Kill() + cmd.Wait()
+	process      *os.Process // shortcut to cmd.Process (nil for remote plugins)
 	port         int
 	stdoutLogger *pluginLogger
 	stderrLogger *pluginLogger
 	logBuffer    *LogBuffer
+}
+
+// killAndWait terminates the plugin process and waits for exit.
+// Sends SIGTERM first for graceful shutdown (lock file cleanup), then SIGKILL.
+// Uses a timeout because cmd.Wait() blocks until stdout/stderr pipes close,
+// and child processes may inherit those pipes.
+func (p *managedPlugin) killAndWait() {
+	proc := p.process
+	if p.cmd != nil {
+		proc = p.cmd.Process
+	}
+	if proc == nil {
+		return
+	}
+
+	pid := proc.Pid
+
+	// SIGTERM the entire process group first. If the process was launched with
+	// Setpgid (its own group leader), this kills it and all children.
+	// If not (legacy launch), the negative-pid kill returns ESRCH and we
+	// fall back to signaling the process directly.
+	if err := syscall.Kill(-pid, syscall.SIGTERM); err != nil {
+		proc.Signal(os.Interrupt)
+	}
+
+	done := make(chan struct{})
+	if p.cmd != nil {
+		go func() {
+			p.cmd.Wait()
+			close(done)
+		}()
+	} else {
+		go func() {
+			proc.Wait()
+			close(done)
+		}()
+	}
+
+	// Wait up to 3s for graceful exit
+	select {
+	case <-done:
+		return
+	case <-time.After(3 * time.Second):
+	}
+
+	// Force kill — try process group first, fall back to direct kill
+	if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil {
+		proc.Kill()
+	}
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+	}
 }
 
 const (
@@ -280,9 +335,7 @@ func (m *PluginManager) retryPluginForever(ctx context.Context, config PluginCon
 		// Clean up previous state so loadPlugin doesn't see "already loaded"
 		m.mu.Lock()
 		if old, exists := m.plugins[config.Name]; exists {
-			if old.process != nil {
-				old.process.Kill()
-			}
+			old.killAndWait()
 			delete(m.plugins, config.Name)
 		}
 		m.mu.Unlock()
@@ -339,7 +392,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 	}
 
 	var addr string
-	var process *os.Process
+	var pluginCmd *exec.Cmd
 	var port int
 	var stdoutLogger *pluginLogger
 	var stderrLogger *pluginLogger
@@ -354,7 +407,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 
 		var err error
 		var actualPort int
-		process, actualPort, stdoutLogger, stderrLogger, logBuf, err = m.launchPlugin(ctx, config, port)
+		pluginCmd, actualPort, stdoutLogger, stderrLogger, logBuf, err = m.launchPlugin(ctx, config, port)
 		if err != nil {
 			return errors.Wrapf(err, "failed to launch plugin %s (binary=%s, port=%d)",
 				config.Name, config.Binary, port)
@@ -367,16 +420,17 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		}
 
 		m.logger.Debugf("Started '%s' plugin process (pid=%d, port=%d, addr=%s)",
-			config.Name, process.Pid, port, addr)
+			config.Name, pluginCmd.Process.Pid, port, addr)
 
 		if m.pidFile != nil {
-			m.pidFile.Add(process.Pid)
+			m.pidFile.Add(pluginCmd.Process.Pid)
 		}
 
-		if err := m.waitForPlugin(ctx, config.Name, addr, 5*time.Second); err != nil {
-			process.Kill()
+		if err := m.waitForPlugin(ctx, config.Name, addr, 15*time.Second); err != nil {
+			pluginCmd.Process.Kill()
+			pluginCmd.Wait()
 			return errors.Wrapf(err, "plugin %s failed to start (binary=%s, addr=%s, pid=%d)",
-				config.Name, config.Binary, addr, process.Pid)
+				config.Name, config.Binary, addr, pluginCmd.Process.Pid)
 		}
 	} else if config.Binary != "" {
 		m.logger.Warnw("Plugin binary specified but auto_start is false",
@@ -404,8 +458,9 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		if attempt < len(connectBackoffs)-1 {
 			select {
 			case <-ctx.Done():
-				if process != nil {
-					process.Kill()
+				if pluginCmd != nil {
+					pluginCmd.Process.Kill()
+					pluginCmd.Wait()
 				}
 				return ctx.Err()
 			case <-time.After(backoff):
@@ -413,8 +468,9 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		}
 	}
 	if connectErr != nil {
-		if process != nil {
-			process.Kill()
+		if pluginCmd != nil {
+			pluginCmd.Process.Kill()
+			pluginCmd.Wait()
 		}
 		return errors.Wrapf(connectErr, "failed to connect to plugin %s at %s after %d attempts",
 			config.Name, addr, len(connectBackoffs))
@@ -423,8 +479,9 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 	// Validate plugin metadata matches config
 	meta := client.Metadata()
 	if meta.Name != config.Name {
-		if process != nil {
-			process.Kill()
+		if pluginCmd != nil {
+			pluginCmd.Process.Kill()
+			pluginCmd.Wait()
 		}
 		err := errors.Newf("plugin metadata mismatch: binary at %s reports name='%s' but config expects '%s'",
 			config.Binary, meta.Name, config.Name)
@@ -436,11 +493,18 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		client.OnWatchersSetup = m.onWatchersSetup
 	}
 
+	// Derive process shortcut for code that only needs the PID
+	var process *os.Process
+	if pluginCmd != nil {
+		process = pluginCmd.Process
+	}
+
 	// Register — lock only for the final state write
 	m.mu.Lock()
 	m.plugins[config.Name] = &managedPlugin{
 		config:       config,
 		client:       client,
+		cmd:          pluginCmd,
 		process:      process,
 		port:         port,
 		stdoutLogger: stdoutLogger,
@@ -488,9 +552,9 @@ func (m *PluginManager) allocatePort() int {
 	return port
 }
 
-// launchPlugin starts a plugin binary and returns the process, actual port, loggers, and log buffer.
+// launchPlugin starts a plugin binary and returns the command, actual port, loggers, and log buffer.
 // If the plugin outputs QNTX_PLUGIN_PORT=XXXX, that port is returned instead of the requested port.
-func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, port int) (*os.Process, int, *pluginLogger, *pluginLogger, *LogBuffer, error) {
+func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, port int) (*exec.Cmd, int, *pluginLogger, *pluginLogger, *LogBuffer, error) {
 	binary := config.Binary
 
 	// Resolve relative paths
@@ -610,7 +674,7 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 			"port", port)
 	}
 
-	return cmd.Process, actualPort, stdoutLogger, stderrLogger, logBuf, nil
+	return cmd, actualPort, stdoutLogger, stderrLogger, logBuf, nil
 }
 
 // waitForPlugin waits for a plugin's gRPC server to become ready.
@@ -781,7 +845,9 @@ func (m *PluginManager) ReinitializePlugin(ctx context.Context, pluginName strin
 // RestartPlugin kills a running plugin and relaunches it from its binary.
 // The new process picks up whatever binary is on disk — use after rebuilding.
 // If the relaunch fails, retries forever in the background (same as boot).
-func (m *PluginManager) RestartPlugin(ctx context.Context, name string, registry *plugin.Registry, services plugin.ServiceRegistry) error {
+// searchPaths is needed when the plugin isn't in the map (e.g. removed by health poller
+// or retry loop) — pass nil to skip the "not loaded" fallback.
+func (m *PluginManager) RestartPlugin(ctx context.Context, name string, searchPaths []string, registry *plugin.Registry, services plugin.ServiceRegistry) error {
 	// Grab config and kill old process
 	m.mu.Lock()
 	// Cancel any active retry loop first
@@ -790,14 +856,43 @@ func (m *PluginManager) RestartPlugin(ctx context.Context, name string, registry
 		delete(m.retryCancels, name)
 	}
 	p, exists := m.plugins[name]
+	pluginNames := make([]string, 0, len(m.plugins))
+	for n := range m.plugins {
+		pluginNames = append(pluginNames, n)
+	}
+	retryNames := make([]string, 0, len(m.retryCancels))
+	for n := range m.retryCancels {
+		retryNames = append(retryNames, n)
+	}
+	m.logger.Infow("RestartPlugin: map check",
+		"plugin", name,
+		"in_map", exists,
+		"all_plugins", pluginNames,
+		"all_retries", retryNames)
 	if !exists {
 		m.mu.Unlock()
-		return errors.Newf("plugin not loaded: %s", name)
+		if len(searchPaths) == 0 {
+			return errors.Newf("plugin not loaded: %s", name)
+		}
+		// Plugin not in map — kill any stale OS process, then discover + enable from scratch.
+		if m.servicesManager != nil {
+			m.servicesManager.CancelATSStreams()
+		}
+		m.logger.Infow("RestartPlugin: plugin not in map, killing stale processes and re-enabling",
+			"plugin", name)
+		m.killStalePluginProcesses(name)
+		registry.Unregister(name)
+		return m.EnablePlugin(ctx, name, searchPaths, registry, services)
 	}
 	config := p.config
-	if p.process != nil {
-		p.process.Kill()
+
+	// Cancel active ATSStore streams before killing — frees the database mutex
+	// so the new process can initialize without contention.
+	if m.servicesManager != nil {
+		m.servicesManager.CancelATSStreams()
 	}
+
+	p.killAndWait()
 	delete(m.plugins, name)
 	m.mu.Unlock()
 
@@ -824,11 +919,76 @@ func (m *PluginManager) RestartPlugin(ctx context.Context, name string, registry
 	return nil
 }
 
+// killStalePluginProcesses finds and kills any OS process running a plugin binary
+// for the given plugin name. Uses process group kill to also terminate children
+// (e.g. Reticulum). Only targets processes started with --port (plugin mode),
+// not --mcp instances.
+func (m *PluginManager) killStalePluginProcesses(name string) {
+	// Binary naming convention: qntx-{name} or qntx-{name}-plugin
+	targets := []string{
+		"qntx-" + name + "-plugin",
+		"qntx-" + name,
+	}
+
+	out, err := exec.Command("ps", "-e", "-o", "pid=,args=").Output()
+	if err != nil {
+		m.logger.Warnw("Failed to list processes for stale plugin kill", "plugin", name, "error", err)
+		return
+	}
+
+	myPid := os.Getpid()
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Must contain --port (plugin mode) and NOT --mcp
+		if !strings.Contains(line, "--port") || strings.Contains(line, "--mcp") {
+			continue
+		}
+
+		// Check if line matches any target binary name
+		matched := false
+		for _, target := range targets {
+			if strings.Contains(line, target) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			continue
+		}
+
+		// Extract PID (first whitespace-delimited field)
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		pid, err := strconv.Atoi(fields[0])
+		if err != nil || pid == myPid {
+			continue
+		}
+
+		m.logger.Infow("Killing stale plugin process", "plugin", name, "pid", pid)
+
+		proc, findErr := os.FindProcess(pid)
+		if findErr != nil {
+			continue
+		}
+		proc.Kill()
+		proc.Wait()
+	}
+}
+
 // registerRestarted re-registers a successfully relaunched plugin with the
 // registry and reinitializes it with services. Emits the banner after health
 // check completes (async) so it shows actual health, not "initializing".
 func (m *PluginManager) registerRestarted(ctx context.Context, name string, registry *plugin.Registry, services plugin.ServiceRegistry, reason BannerReason) {
 	newPlugin, _ := m.GetPlugin(name)
+	// Unregister first to handle races between health poller restarts and
+	// manual restarts — both can call registerRestarted concurrently.
+	registry.Unregister(name)
 	if err := registry.Register(newPlugin); err != nil {
 		m.logger.Errorf("Failed to re-register plugin '%s': %v", name, err)
 		return
@@ -840,16 +1000,28 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		if err := am.ReloadPluginSection(name); err != nil {
 			m.logger.Warnf("Failed to reload config for plugin '%s' from am.toml: %v", name, err)
 		}
-		// Use Initialize (not ForceInitialize/ReinitializePlugin) — this is a new
-		// proxy with a fresh initOnce. ForceInitialize would bypass the once-guard,
-		// leaving it unfired, so the HTTP routing lazy-init would call Initialize
-		// again and double-initialize the plugin.
+		// Initialize with a 30s deadline. Levi's ATS connectivity check can take
+		// 10-15s when the RustStore mutex is contended (5s watchdog alerts).
+		// Use a goroutine + select so we never block banner emission.
 		m.mu.RLock()
 		p, exists := m.plugins[name]
 		m.mu.RUnlock()
 		if exists {
-			if err := p.client.Initialize(ctx, services); err != nil {
-				m.logger.Errorf("Failed to initialize plugin '%s' after restart: %v", name, err)
+			m.logger.Infow("registerRestarted: calling Initialize", "plugin", name)
+			initDone := make(chan error, 1)
+			go func() {
+				initCtx, initCancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer initCancel()
+				initDone <- p.client.Initialize(initCtx, services)
+			}()
+			select {
+			case err := <-initDone:
+				if err != nil {
+					m.logger.Errorf("Failed to initialize plugin '%s' after restart: %v", name, err)
+				}
+				m.logger.Infow("registerRestarted: Initialize returned", "plugin", name)
+			case <-time.After(30 * time.Second):
+				m.logger.Warnw("registerRestarted: Initialize timed out, continuing with banner", "plugin", name)
 			}
 		}
 	}
@@ -924,10 +1096,13 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		// Collect health asynchronously — synchronous Health() blocks plugin restart
 		// while the plugin makes ATS calls back to QNTX.
 		// Emit the banner inside the goroutine so it shows actual health status.
+		m.logger.Infow("registerRestarted: launching banner goroutine", "plugin", name, "reason", reason)
 		go func() {
+			m.logger.Infow("registerRestarted: calling Health()", "plugin", name)
 			healthCtx, hCancel := context.WithTimeout(context.Background(), 5*time.Second)
 			health := proxy.Health(healthCtx)
 			hCancel()
+			m.logger.Infow("registerRestarted: Health() returned", "plugin", name, "healthy", health.Healthy, "message", health.Message)
 			details := make(map[string]string)
 			for k, v := range health.Details {
 				if s, ok := v.(string); ok {
@@ -936,8 +1111,12 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 			}
 			m.accumulator.SetHealth(name, health.Healthy, health.Message, details)
 			m.accumulator.Emit(name, reason)
+			m.logger.Infow("registerRestarted: banner emitted", "plugin", name, "reason", reason)
 		}()
+	} else {
+		m.logger.Warnw("registerRestarted: accumulator is nil, no banner will be emitted", "plugin", name)
 	}
+	m.logger.Infow("registerRestarted: completed", "plugin", name)
 }
 
 // EnablePlugin discovers, loads, registers, and initializes a plugin at runtime.
@@ -983,11 +1162,16 @@ func (m *PluginManager) DisablePlugin(ctx context.Context, name string, registry
 		return errors.Newf("plugin '%s' is not loaded", name)
 	}
 	meta := p.client.Metadata()
-	process := p.process
 	client := p.client
 	delete(m.plugins, name)
 	delete(m.failedPlugins, name)
 	m.mu.Unlock()
+
+	// Cancel active ATSStore streams before killing — frees the database mutex
+	// so the new process can initialize without contention.
+	if m.servicesManager != nil {
+		m.servicesManager.CancelATSStreams()
+	}
 
 	// Shutdown via gRPC (best-effort)
 	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -996,10 +1180,9 @@ func (m *PluginManager) DisablePlugin(ctx context.Context, name string, registry
 	}
 	cancel()
 
-	// Kill process
-	if process != nil {
-		process.Kill()
-	}
+	// Kill process and wait for exit so file locks are released
+	// before the new process launches.
+	p.killAndWait()
 
 	// Unregister from plugin registry and mark stopped (not restarting)
 	registry.Unregister(name)
@@ -1066,11 +1249,9 @@ func (m *PluginManager) Shutdown(ctx context.Context) error {
 			errs = append(errs, err)
 		}
 
-		// Kill the process if we launched it
+		// Signal the process to exit
 		if p.process != nil {
 			if err := p.process.Signal(os.Interrupt); err != nil {
-				m.logger.Warnw("Failed to signal plugin process", "name", name, "error", err)
-				// Try harder
 				p.process.Kill()
 			}
 		}

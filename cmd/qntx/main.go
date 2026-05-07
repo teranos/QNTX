@@ -150,18 +150,15 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 		pluginLogger.Warnw("Plugin configuration errors detected", "error", err)
 	}
 
-	// Load plugins from configuration with timeout
+	// Load plugins into the existing manager (created in initializePluginRegistry)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	manager, err := grpc.LoadPluginsFromConfig(ctx, cfg, pluginLogger, logger.Logger)
-	if err != nil {
+	manager := grpc.GetDefaultPluginManager()
+	if err := grpc.LoadPluginsFromConfig(ctx, manager, cfg, pluginLogger); err != nil {
 		pluginLogger.Errorw("Failed to load plugins from configuration", "error", err)
 		return
 	}
-
-	// Store manager globally for server access
-	grpc.SetDefaultPluginManager(manager)
 
 	// Register loaded plugins with registry
 	loadedPlugins := manager.GetAllPlugins()
@@ -395,16 +392,19 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 
 		defaultServer := server.GetDefaultServer()
 		if defaultServer == nil {
+			logger.Debugw("Waiting for server", "attempt", i+1, "blocked_by", "server not started")
 			continue
 		}
 
 		services := defaultServer.GetServices()
 		if services == nil {
+			logger.Debugw("Waiting for server", "attempt", i+1, "blocked_by", "services not ready")
 			continue
 		}
 
 		daemon := defaultServer.GetDaemon()
 		if daemon == nil {
+			logger.Debugw("Waiting for server", "attempt", i+1, "blocked_by", "daemon not ready")
 			continue
 		}
 
@@ -523,7 +523,16 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 		return
 	}
 
-	logger.Errorw("Gave up waiting for server after 30 seconds")
+	defaultServer := server.GetDefaultServer()
+	blocked := "server not started"
+	if defaultServer != nil {
+		if defaultServer.GetServices() == nil {
+			blocked = "services not ready"
+		} else if defaultServer.GetDaemon() == nil {
+			blocked = "daemon not ready"
+		}
+	}
+	logger.Errorw("Gave up waiting for server after 30 seconds", "blocked_by", blocked)
 }
 
 // findTauriBinary looks for the QNTX Tauri desktop binary.
