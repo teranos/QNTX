@@ -20,8 +20,9 @@
 extern "C" {
 #endif
 
-// Opaque store handle
+// Opaque store handles
 typedef struct SqliteStore SqliteStore;
+typedef struct ReadConn ReadConn;
 
 // Result types
 typedef struct {
@@ -75,6 +76,71 @@ SqliteStore *storage_new_file(const char *path);
  * @param store Store to free
  */
 void storage_free(SqliteStore *store);
+
+// ============================================================================
+// Read Connection (separate pointer, concurrent with store)
+// ============================================================================
+
+/**
+ * Open a read-only connection from a file-backed store.
+ * Returns NULL for in-memory stores or on failure.
+ */
+ReadConn *storage_open_read_conn(const SqliteStore *store);
+
+/**
+ * Free a read connection.
+ */
+void read_conn_free(ReadConn *rc);
+
+/**
+ * Get an attestation by ID through the read connection.
+ */
+AttestationResultC read_conn_get(const ReadConn *rc, const char *id);
+
+/**
+ * Check if an attestation exists through the read connection.
+ */
+StorageResultC read_conn_exists(const ReadConn *rc, const char *id);
+
+/**
+ * Query attestations through the read connection.
+ */
+AttestationResultC read_conn_query(const ReadConn *rc, const char *filter_json);
+
+/**
+ * Get all attestation IDs through the read connection.
+ */
+StringArrayResultC read_conn_ids(const ReadConn *rc);
+
+/**
+ * Get total count through the read connection.
+ */
+CountResultC read_conn_count(const ReadConn *rc);
+
+/**
+ * Get distinct predicates through the read connection.
+ */
+StringArrayResultC read_conn_predicates(const ReadConn *rc);
+
+/**
+ * Get distinct contexts through the read connection.
+ */
+StringArrayResultC read_conn_contexts(const ReadConn *rc);
+
+/**
+ * Get storage stats through the read connection.
+ */
+AttestationResultC read_conn_stats(const ReadConn *rc);
+
+/**
+ * Execute a raw SELECT query through the read connection.
+ */
+AttestationResultC read_conn_query_raw(const ReadConn *rc, const char *sql, const char *params_json);
+
+/**
+ * Run PRAGMA integrity_check through the read connection.
+ */
+StringArrayResultC read_conn_integrity_check(const ReadConn *rc);
 
 /**
  * Set enforcement config on the store.
@@ -273,6 +339,11 @@ ExecResultC sql_commit(SqliteStore *store);
  * Rollback the current transaction.
  */
 ExecResultC sql_rollback(SqliteStore *store);
+
+/**
+ * Execute a SELECT query through the read connection (for database/sql/driver).
+ */
+QueryResultC read_conn_sql_query(const ReadConn *rc, const char *sql, const char *params_json);
 
 /**
  * Free an ExecResultC.

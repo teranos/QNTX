@@ -46,7 +46,7 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, error) 
 
 	// Register the Rust SQL driver (once per process)
 	driverOnce.Do(func() {
-		rustdriver.Register(rustStore.StorePtr(), rustStore.Mu())
+		rustdriver.Register(rustStore.StorePtr(), rustStore.ReadConnPtr(), rustStore.Mu(), rustStore.MuRead())
 	})
 
 	// Open *sql.DB through the Rust driver — single connection, no pooling

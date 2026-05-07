@@ -14,11 +14,13 @@ use std::path::Path;
 use std::ptr;
 
 use qntx_core::storage::AttestationStore;
+use rusqlite::OptionalExtension;
 use qntx_ffi_common::{
     cstr_to_str, cstring_new_or_empty, free_boxed, free_cstring, vec_into_raw, FfiResult,
 };
 use qntx_proto::proto_convert;
 
+use crate::store::ReadConn;
 use crate::SqliteStore;
 
 // Safety limits
@@ -199,6 +201,412 @@ pub extern "C" fn storage_new_file(path: *const c_char) -> *mut SqliteStore {
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn storage_free(store: *mut SqliteStore) {
     unsafe { free_boxed(store) };
+}
+
+// ============================================================================
+// Read Connection (separate pointer, independent of SqliteStore)
+// ============================================================================
+
+/// Open a read-only connection from a file-backed store.
+/// Returns NULL for in-memory stores or on failure.
+/// The returned pointer is independent of the store — Go can access it
+/// without creating overlapping Rust references.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn storage_open_read_conn(store: *const SqliteStore) -> *mut ReadConn {
+    if store.is_null() {
+        return ptr::null_mut();
+    }
+    let store = unsafe { &*store };
+    match store.open_read_conn() {
+        Ok(rc) => Box::into_raw(Box::new(rc)),
+        Err(e) => {
+            eprintln!("qntx-sqlite: failed to open read connection: {}", e);
+            ptr::null_mut()
+        }
+    }
+}
+
+/// Free a read connection.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn read_conn_free(rc: *mut ReadConn) {
+    unsafe { free_boxed(rc) };
+}
+
+/// Get an attestation by ID through the read connection.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn read_conn_get(rc: *const ReadConn, id: *const c_char) -> AttestationResultC {
+    if rc.is_null() {
+        return AttestationResultC::error("null read connection");
+    }
+    let id_str = match unsafe { cstr_to_str(id) } {
+        Ok(s) => s,
+        Err(e) => return AttestationResultC::error(e),
+    };
+    if id_str.len() > MAX_ID_LENGTH {
+        return AttestationResultC::error("ID exceeds maximum length");
+    }
+    let rc = unsafe { &*rc };
+    let mut stmt = match rc.conn.prepare(
+        "SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did FROM attestations WHERE id = ?",
+    ) {
+        Ok(s) => s,
+        Err(e) => return AttestationResultC::error(&format!("{}", e)),
+    };
+    let result = match stmt
+        .query_row([id_str], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, Option<String>>(7)?,
+                row.get::<_, String>(8)?,
+                row.get::<_, Option<Vec<u8>>>(9)?,
+                row.get::<_, Option<String>>(10)?,
+            ))
+        })
+        .optional()
+    {
+        Ok(r) => r,
+        Err(e) => return AttestationResultC::error(&format!("{}", e)),
+    };
+    match result {
+        None => AttestationResultC::not_found(),
+        Some(row_data) => {
+            match SqliteStore::row_to_attestation(row_data) {
+                Ok(attestation) => {
+                    let proto = proto_convert::to_proto(attestation);
+                    match serde_json::to_string(&proto) {
+                        Ok(json) => AttestationResultC::ok(json),
+                        Err(e) => AttestationResultC::error(&format!("failed to serialize: {}", e)),
+                    }
+                }
+                Err(e) => AttestationResultC::error(&format!("{}", e)),
+            }
+        }
+    }
+}
+
+/// Check if an attestation exists through the read connection.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn read_conn_exists(rc: *const ReadConn, id: *const c_char) -> StorageResultC {
+    if rc.is_null() {
+        return StorageResultC::error("null read connection");
+    }
+    let id_str = match unsafe { cstr_to_str(id) } {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
+    let rc = unsafe { &*rc };
+    match rc.conn.query_row(
+        "SELECT 1 FROM attestations WHERE id = ?",
+        [id_str],
+        |_| Ok(()),
+    ) {
+        Ok(()) => StorageResultC::ok(),
+        Err(rusqlite::Error::QueryReturnedNoRows) => StorageResultC {
+            success: false,
+            error_msg: ptr::null_mut(),
+        },
+        Err(e) => StorageResultC::error(&format!("{}", e)),
+    }
+}
+
+/// Query attestations through the read connection.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn read_conn_query(
+    rc: *const ReadConn,
+    filter_json: *const c_char,
+) -> AttestationResultC {
+    if rc.is_null() {
+        return AttestationResultC::error("null read connection");
+    }
+    let filter_str = match unsafe { cstr_to_str(filter_json) } {
+        Ok(s) => s,
+        Err(e) => return AttestationResultC::error(e),
+    };
+    if filter_str.len() > MAX_JSON_LENGTH {
+        return AttestationResultC::error("filter JSON exceeds maximum length");
+    }
+    let rc = unsafe { &*rc };
+    let filter: qntx_core::AxFilter = match serde_json::from_str(filter_str) {
+        Ok(f) => f,
+        Err(e) => return AttestationResultC::error(&format!("invalid filter JSON: {}", e)),
+    };
+
+    // Build the same query as QueryStore::query but using rc.conn
+    use crate::store::build_query_sql;
+    let (sql, params) = build_query_sql(&filter);
+
+    let mut stmt = match rc.conn.prepare(&sql) {
+        Ok(s) => s,
+        Err(e) => return AttestationResultC::error(&format!("{}", e)),
+    };
+
+    let param_refs: Vec<&dyn rusqlite::ToSql> =
+        params.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
+
+    let rows = match stmt
+        .query_map(&param_refs[..], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, Option<String>>(7)?,
+                row.get::<_, String>(8)?,
+                row.get::<_, Option<Vec<u8>>>(9)?,
+                row.get::<_, Option<String>>(10)?,
+            ))
+        })
+    {
+        Ok(r) => r,
+        Err(e) => return AttestationResultC::error(&format!("{}", e)),
+    };
+
+    let mut attestations = Vec::new();
+    for row_result in rows {
+        let row_data = match row_result {
+            Ok(r) => r,
+            Err(e) => return AttestationResultC::error(&format!("{}", e)),
+        };
+        match SqliteStore::row_to_attestation(row_data) {
+            Ok(a) => attestations.push(a),
+            Err(e) => return AttestationResultC::error(&format!("{}", e)),
+        }
+    }
+
+    let proto_attestations: Vec<qntx_proto::Attestation> = attestations
+        .into_iter()
+        .map(proto_convert::to_proto)
+        .collect();
+    match serde_json::to_string(&proto_attestations) {
+        Ok(json) => AttestationResultC::ok(json),
+        Err(e) => AttestationResultC::error(&format!("failed to serialize results: {}", e)),
+    }
+}
+
+/// Get all attestation IDs through the read connection.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn read_conn_ids(rc: *const ReadConn) -> StringArrayResultC {
+    if rc.is_null() {
+        return StringArrayResultC::error("null read connection");
+    }
+    let rc = unsafe { &*rc };
+    match query_distinct(&rc.conn, "SELECT id FROM attestations ORDER BY created_at DESC") {
+        Ok(ids) => StringArrayResultC::ok(ids),
+        Err(e) => StringArrayResultC::error(&e),
+    }
+}
+
+/// Get total count through the read connection.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn read_conn_count(rc: *const ReadConn) -> CountResultC {
+    if rc.is_null() {
+        return CountResultC::error("null read connection");
+    }
+    let rc = unsafe { &*rc };
+    match rc.conn.query_row("SELECT COUNT(*) FROM attestations", [], |row| row.get::<_, usize>(0)) {
+        Ok(count) => CountResultC::ok(count),
+        Err(e) => CountResultC::error(&format!("{}", e)),
+    }
+}
+
+/// Get distinct predicates through the read connection.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn read_conn_predicates(rc: *const ReadConn) -> StringArrayResultC {
+    if rc.is_null() {
+        return StringArrayResultC::error("null read connection");
+    }
+    let rc = unsafe { &*rc };
+    match query_distinct(&rc.conn, "SELECT DISTINCT predicate FROM attestation_predicates ORDER BY predicate") {
+        Ok(values) => StringArrayResultC::ok(values),
+        Err(e) => StringArrayResultC::error(&e.to_string()),
+    }
+}
+
+/// Get distinct contexts through the read connection.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn read_conn_contexts(rc: *const ReadConn) -> StringArrayResultC {
+    if rc.is_null() {
+        return StringArrayResultC::error("null read connection");
+    }
+    let rc = unsafe { &*rc };
+    match query_distinct(&rc.conn, "SELECT DISTINCT context FROM attestation_contexts ORDER BY context") {
+        Ok(values) => StringArrayResultC::ok(values),
+        Err(e) => StringArrayResultC::error(&e.to_string()),
+    }
+}
+
+/// Get storage stats through the read connection.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn read_conn_stats(rc: *const ReadConn) -> AttestationResultC {
+    if rc.is_null() {
+        return AttestationResultC::error("null read connection");
+    }
+    let rc = unsafe { &*rc };
+    let count = |sql: &str| -> Result<usize, String> {
+        rc.conn.query_row(sql, [], |row| row.get::<_, usize>(0))
+            .map_err(|e| format!("{}", e))
+    };
+    let total = match count("SELECT COUNT(*) FROM attestations") {
+        Ok(v) => v, Err(e) => return AttestationResultC::error(&e),
+    };
+    let subjects = match count("SELECT COUNT(DISTINCT subject) FROM attestation_subjects") {
+        Ok(v) => v, Err(e) => return AttestationResultC::error(&e),
+    };
+    let predicates = match count("SELECT COUNT(DISTINCT predicate) FROM attestation_predicates") {
+        Ok(v) => v, Err(e) => return AttestationResultC::error(&e),
+    };
+    let contexts = match count("SELECT COUNT(DISTINCT context) FROM attestation_contexts") {
+        Ok(v) => v, Err(e) => return AttestationResultC::error(&e),
+    };
+    let actors = match count("SELECT COUNT(DISTINCT actor) FROM attestation_actors") {
+        Ok(v) => v, Err(e) => return AttestationResultC::error(&e),
+    };
+    let json = format!(
+        r#"{{"total_attestations":{},"unique_subjects":{},"unique_predicates":{},"unique_contexts":{},"unique_actors":{}}}"#,
+        total, subjects, predicates, contexts, actors,
+    );
+    AttestationResultC::ok(json)
+}
+
+/// Execute a raw SQL query through the read connection.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn read_conn_query_raw(
+    rc: *const ReadConn,
+    sql: *const c_char,
+    params_json: *const c_char,
+) -> AttestationResultC {
+    if rc.is_null() {
+        return AttestationResultC::error("null read connection");
+    }
+    let sql_str = match unsafe { cstr_to_str(sql) } {
+        Ok(s) => s,
+        Err(e) => return AttestationResultC::error(e),
+    };
+    let params_str = match unsafe { cstr_to_str(params_json) } {
+        Ok(s) => s,
+        Err(e) => return AttestationResultC::error(e),
+    };
+    let sql_upper = sql_str.trim().to_uppercase();
+    if !sql_upper.starts_with("SELECT") {
+        return AttestationResultC::error("raw query must be a SELECT statement");
+    }
+    let rc = unsafe { &*rc };
+
+    let params: Vec<serde_json::Value> = if params_str.is_empty() || params_str == "[]" {
+        Vec::new()
+    } else {
+        match serde_json::from_str(params_str) {
+            Ok(p) => p,
+            Err(e) => return AttestationResultC::error(&format!("invalid params JSON: {}", e)),
+        }
+    };
+    let mut stmt = match rc.conn.prepare(sql_str) {
+        Ok(s) => s,
+        Err(e) => return AttestationResultC::error(&format!("{}", e)),
+    };
+    let param_refs: Vec<Box<dyn rusqlite::types::ToSql>> = params
+        .iter()
+        .map(|v| -> Box<dyn rusqlite::types::ToSql> {
+            match v {
+                serde_json::Value::String(s) => Box::new(s.clone()),
+                serde_json::Value::Number(n) => {
+                    if let Some(i) = n.as_i64() { Box::new(i) }
+                    else if let Some(f) = n.as_f64() { Box::new(f) }
+                    else { Box::new(n.to_string()) }
+                }
+                serde_json::Value::Bool(b) => Box::new(*b),
+                serde_json::Value::Null => Box::new(rusqlite::types::Null),
+                _ => Box::new(v.to_string()),
+            }
+        })
+        .collect();
+    let param_slice: Vec<&dyn rusqlite::types::ToSql> =
+        param_refs.iter().map(|p| p.as_ref()).collect();
+
+    let rows = match stmt.query_map(param_slice.as_slice(), |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, String>(3)?,
+            row.get::<_, String>(4)?,
+            row.get::<_, String>(5)?,
+            row.get::<_, String>(6)?,
+            row.get::<_, Option<String>>(7)?,
+            row.get::<_, String>(8)?,
+            row.get::<_, Option<Vec<u8>>>(9)?,
+            row.get::<_, Option<String>>(10)?,
+        ))
+    }) {
+        Ok(r) => r,
+        Err(e) => return AttestationResultC::error(&format!("{}", e)),
+    };
+    let mut attestations = Vec::new();
+    for row_result in rows {
+        let row_data = match row_result {
+            Ok(r) => r,
+            Err(e) => return AttestationResultC::error(&format!("{}", e)),
+        };
+        match SqliteStore::row_to_attestation(row_data) {
+            Ok(a) => attestations.push(a),
+            Err(e) => return AttestationResultC::error(&format!("{}", e)),
+        }
+    }
+    let protos: Vec<qntx_proto::Attestation> = attestations
+        .into_iter()
+        .map(proto_convert::to_proto)
+        .collect();
+    match serde_json::to_string(&protos) {
+        Ok(json) => AttestationResultC::ok(json),
+        Err(e) => AttestationResultC::error(&format!("failed to serialize results: {}", e)),
+    }
+}
+
+/// Run PRAGMA integrity_check through the read connection.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn read_conn_integrity_check(rc: *const ReadConn) -> StringArrayResultC {
+    if rc.is_null() {
+        return StringArrayResultC::error("null read connection");
+    }
+    let rc = unsafe { &*rc };
+    match query_distinct(&rc.conn, "PRAGMA integrity_check") {
+        Ok(lines) => StringArrayResultC::ok(lines),
+        Err(e) => StringArrayResultC::error(&format!("integrity check failed: {}", e)),
+    }
+}
+
+/// Helper: query a single-column result set.
+fn query_distinct(conn: &rusqlite::Connection, sql: &str) -> Result<Vec<String>, String> {
+    let mut stmt = conn.prepare(sql).map_err(|e| format!("{}", e))?;
+    let rows = stmt
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|e| format!("{}", e))?;
+    let mut results = Vec::new();
+    for row in rows {
+        results.push(row.map_err(|e| format!("{}", e))?);
+    }
+    Ok(results)
 }
 
 /// Set enforcement config on the store. When set, enforcement runs after every put().

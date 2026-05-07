@@ -13,6 +13,7 @@ use rusqlite::types::ValueRef;
 
 use qntx_ffi_common::{cstr_to_str, cstring_new_or_empty, free_cstring, FfiResult};
 
+use crate::store::ReadConn;
 use crate::SqliteStore;
 
 const MAX_SQL_LENGTH: usize = 1_000_000; // 1MB
@@ -333,6 +334,102 @@ pub extern "C" fn sql_rollback(store: *mut SqliteStore) -> ExecResultC {
         Ok(()) => ExecResultC::ok(0, 0),
         Err(e) => ExecResultC::error(&format!("{}", e)),
     }
+}
+
+/// Execute a query SQL statement through the read connection.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn read_conn_sql_query(
+    rc: *const ReadConn,
+    sql: *const c_char,
+    params_json: *const c_char,
+) -> QueryResultC {
+    if rc.is_null() {
+        return QueryResultC::error("null read connection");
+    }
+
+    let sql_str = match unsafe { cstr_to_str(sql) } {
+        Ok(s) => s,
+        Err(e) => return QueryResultC::error(e),
+    };
+    if sql_str.len() > MAX_SQL_LENGTH {
+        return QueryResultC::error("SQL exceeds maximum length");
+    }
+
+    let params_str = match unsafe { cstr_to_str(params_json) } {
+        Ok(s) => s,
+        Err(e) => return QueryResultC::error(e),
+    };
+    if params_str.len() > MAX_PARAMS_LENGTH {
+        return QueryResultC::error("params JSON exceeds maximum length");
+    }
+
+    let rc = unsafe { &*rc };
+
+    let param_refs = match parse_params(params_str) {
+        Ok(p) => p,
+        Err(e) => return QueryResultC::error(&e),
+    };
+    let param_slice: Vec<&dyn rusqlite::types::ToSql> =
+        param_refs.iter().map(|p| p.as_ref()).collect();
+
+    let mut stmt = match rc.conn.prepare(sql_str) {
+        Ok(s) => s,
+        Err(e) => return QueryResultC::error(&format!("{}", e)),
+    };
+
+    let columns: Vec<String> = stmt.column_names().iter().map(|c| c.to_string()).collect();
+    let columns_json = match serde_json::to_string(&columns) {
+        Ok(j) => j,
+        Err(e) => return QueryResultC::error(&format!("failed to serialize columns: {}", e)),
+    };
+
+    let column_count = columns.len();
+    let rows_result = stmt.query_map(param_slice.as_slice(), |row| {
+        let mut values = Vec::with_capacity(column_count);
+        for i in 0..column_count {
+            let val = match row.get_ref(i)? {
+                ValueRef::Null => serde_json::Value::Null,
+                ValueRef::Integer(i) => serde_json::Value::Number(i.into()),
+                ValueRef::Real(f) => serde_json::Value::Number(
+                    serde_json::Number::from_f64(f).unwrap_or_else(|| 0i64.into()),
+                ),
+                ValueRef::Text(t) => {
+                    let s = String::from_utf8_lossy(t).into_owned();
+                    serde_json::Value::String(s)
+                }
+                ValueRef::Blob(b) => {
+                    use base64::Engine;
+                    let encoded = base64::engine::general_purpose::STANDARD.encode(b);
+                    let mut map = serde_json::Map::new();
+                    map.insert("$blob".to_string(), serde_json::Value::String(encoded));
+                    serde_json::Value::Object(map)
+                }
+            };
+            values.push(val);
+        }
+        Ok(serde_json::Value::Array(values))
+    });
+
+    let rows_iter = match rows_result {
+        Ok(r) => r,
+        Err(e) => return QueryResultC::error(&format!("{}", e)),
+    };
+
+    let mut all_rows = Vec::new();
+    for row_result in rows_iter {
+        match row_result {
+            Ok(row) => all_rows.push(row),
+            Err(e) => return QueryResultC::error(&format!("row iteration failed: {}", e)),
+        }
+    }
+
+    let rows_json = match serde_json::to_string(&all_rows) {
+        Ok(j) => j,
+        Err(e) => return QueryResultC::error(&format!("failed to serialize rows: {}", e)),
+    };
+
+    QueryResultC::ok(columns_json, rows_json)
 }
 
 // ============================================================================
