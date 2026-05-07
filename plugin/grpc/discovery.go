@@ -426,7 +426,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 			m.pidFile.Add(pluginCmd.Process.Pid)
 		}
 
-		if err := m.waitForPlugin(ctx, config.Name, addr, 15*time.Second); err != nil {
+		if err := m.waitForPlugin(ctx, config.Name, addr, 5*time.Second); err != nil {
 			pluginCmd.Process.Kill()
 			pluginCmd.Wait()
 			return errors.Wrapf(err, "plugin %s failed to start (binary=%s, addr=%s, pid=%d)",
@@ -916,6 +916,13 @@ func (m *PluginManager) RestartPlugin(ctx context.Context, name string, searchPa
 	}
 
 	m.registerRestarted(ctx, name, registry, services, BannerRecovered)
+
+	// Clear stale HTTP mux and pre-register new proxy routes.
+	// Must run AFTER registerRestarted which registers the plugin in the registry.
+	if m.onPluginRestarted != nil {
+		m.onPluginRestarted(config.Name)
+	}
+
 	return nil
 }
 

@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -17,6 +18,7 @@ import (
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server"
 	"go.uber.org/zap"
 )
@@ -224,6 +226,7 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 			})
 			pm.SetOnPluginRestarted(func(name string) {
 				defaultServer.InvalidatePluginMux(name)
+				defaultServer.RegisterPluginMux(name)
 			})
 			pm.SetOnEmbeddingProviderReady(func(name string, client protocol.EmbeddingServiceClient) {
 				defaultServer.SetupPluginEmbeddingService(client)
@@ -231,133 +234,112 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 			})
 		}
 
-		// Initialize each plugin individually, registering provider services
-		// (LLM, VectorSearch) immediately after each init. This ensures provider
-		// plugins like faiss make their services available before consumer plugins
-		// like werf attempt to connect. No hardcoded ordering — alphabetical
-		// sort is sufficient (faiss < werf).
-		sorted := sortPluginsByName(loadedPlugins)
-		pluginLogger.Debugw("Initializing plugins", "count", len(sorted))
-		for _, p := range sorted {
-			meta := p.Metadata()
-			initCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-			if err := p.Initialize(initCtx, services); err != nil {
-				pluginLogger.Errorw("Failed to initialize plugin",
-					"plugin", meta.Name, "version", meta.Version, "error", err)
-				registry.MarkFailed(meta.Name, err.Error())
-				if acc != nil {
-					acc.SetFailed(meta.Name, err.Error())
-					acc.Emit(meta.Name, grpc.BannerBoot)
-				}
-				cancel()
-				continue
-			}
-			cancel()
-			registry.MarkReady(meta.Name)
-			pluginLogger.Debugw("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
-
-			// Collect provider roles for banner
-			var roles []string
-
-			// Provider services register immediately — before the next plugin inits
-			if proxy, ok := p.(*grpc.ExternalDomainProxy); ok && sm != nil {
-				if proxy.IsLLMProvider() {
-					roles = append(roles, "llm-provider")
-					if llmRouter := sm.GetLLMRouter(); llmRouter != nil {
-						llmRouter.RegisterProvider(meta.Name, proxy.LLMServiceClient())
-						pluginLogger.Debugw("Registered LLM provider", "plugin", meta.Name)
-					}
-				}
-				if proxy.IsVectorSearchProvider() {
-					roles = append(roles, "vector-search-provider")
-					if vsRouter := sm.GetVectorSearchRouter(); vsRouter != nil {
-						vsRouter.SetService(proxy.VectorSearchServiceClient())
-						pluginLogger.Debugw("Registered VectorSearch provider", "plugin", meta.Name)
-					}
-				}
-				if proxy.IsSearchProvider() {
-					roles = append(roles, "search-provider")
-					if searchRouter := sm.GetSearchRouter(); searchRouter != nil {
-						searchRouter.RegisterProvider(meta.Name, proxy.SearchServiceClient())
-						pluginLogger.Debugw("Registered Search provider", "plugin", meta.Name)
-					}
-				}
-				if proxy.IsEmbeddingProvider() {
-					roles = append(roles, "embedding-provider")
-					defaultServer.SetupPluginEmbeddingService(proxy.EmbeddingServiceClient())
-					pluginLogger.Debugw("Registered embedding provider", "plugin", meta.Name)
-				}
-			}
-
-			if acc != nil {
-				acc.SetRoles(meta.Name, roles)
-			}
+		// Capture Pulse resources before init loop so goroutines can register handlers.
+		daemon := defaultServer.GetDaemon()
+		var handlerRegistry *async.HandlerRegistry
+		var db *sql.DB
+		if daemon != nil {
+			handlerRegistry = daemon.Registry()
+			db = defaultServer.GetDB()
+			manager.SetPulseResources(db, handlerRegistry)
 		}
+
+		// Initialize all plugins concurrently — each plugin gets its own goroutine.
+		// Each goroutine handles its own post-init work (providers, handlers, banner).
+		// If Initialize doesn't respond within 30s, HTTP routes are pre-registered and
+		// a partial banner is emitted; Initialize continues in the background.
+		const initTimeout = 30 * time.Second
+		pluginLogger.Debugw("Initializing plugins concurrently", "count", len(loadedPlugins))
+		var initWg sync.WaitGroup
+		for _, p := range loadedPlugins {
+			initWg.Add(1)
+			go func(p plugin.DomainPlugin) {
+				defer initWg.Done()
+				meta := p.Metadata()
+
+				initCtx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+				initDone := make(chan error, 1)
+				go func() {
+					initDone <- p.Initialize(initCtx, services)
+				}()
+
+				var initErr error
+				var timedOut bool
+				select {
+				case initErr = <-initDone:
+					cancel()
+				case <-time.After(initTimeout):
+					timedOut = true
+					pluginLogger.Warnw("Initialize not responding, continuing startup",
+						"plugin", meta.Name, "timeout", initTimeout)
+				}
+
+				if timedOut {
+					// Pre-register HTTP proxy routes so the plugin is reachable now
+					defaultServer.RegisterPluginMux(meta.Name)
+
+					// Emit partial banner so the UI shows something
+					if acc != nil {
+						acc.SetHealth(meta.Name, false, "initializing (waiting for gRPC response)", nil)
+						acc.Emit(meta.Name, grpc.BannerBoot)
+					}
+
+					// Continue waiting in background — complete setup when Initialize returns
+					go func() {
+						defer cancel()
+						bgErr := <-initDone
+						if bgErr != nil {
+							pluginLogger.Errorw("Background Initialize failed",
+								"plugin", meta.Name, "version", meta.Version, "error", bgErr)
+							registry.MarkFailed(meta.Name, bgErr.Error())
+							if acc != nil {
+								acc.SetFailed(meta.Name, bgErr.Error())
+								acc.Emit(meta.Name, grpc.BannerBoot)
+							}
+							return
+						}
+						pluginLogger.Infow("Background Initialize completed",
+							"plugin", meta.Name, "version", meta.Version)
+						registry.MarkReady(meta.Name)
+						registerPluginProviders(p, meta, sm, defaultServer, pluginLogger, acc)
+						registerPluginHandlers(p, meta, handlerRegistry, db, pluginLogger, acc)
+						if err := defaultServer.ReloadWatchers(); err != nil {
+							pluginLogger.Warnw("Failed to reload watchers after background init",
+								"plugin", meta.Name, "error", err)
+						}
+					}()
+					return
+				}
+
+				if initErr != nil {
+					pluginLogger.Errorw("Failed to initialize plugin",
+						"plugin", meta.Name, "version", meta.Version, "error", initErr)
+					registry.MarkFailed(meta.Name, initErr.Error())
+					if acc != nil {
+						acc.SetFailed(meta.Name, initErr.Error())
+						acc.Emit(meta.Name, grpc.BannerBoot)
+					}
+					return
+				}
+
+				registry.MarkReady(meta.Name)
+				pluginLogger.Debugw("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
+				registerPluginProviders(p, meta, sm, defaultServer, pluginLogger, acc)
+				registerPluginHandlers(p, meta, handlerRegistry, db, pluginLogger, acc)
+			}(p)
+		}
+		initWg.Wait()
 
 		// Reload watcher engine — plugins may have registered watchers during Initialize
 		if err := defaultServer.ReloadWatchers(); err != nil {
 			pluginLogger.Errorw("Failed to reload watchers after plugin init", "error", err)
 		}
 
-		// Register plugin async handlers with Pulse and emit banners
-		daemon := defaultServer.GetDaemon()
-		if daemon != nil {
-			handlerRegistry := daemon.Registry()
-			db := defaultServer.GetDB()
-
-			// Store Pulse resources so hot-restarts can re-register handlers/schedules
-			manager.SetPulseResources(db, handlerRegistry)
-
-			for _, p := range loadedPlugins {
-				externalPlugin, ok := p.(*grpc.ExternalDomainProxy)
-				if !ok {
-					continue
-				}
-
-				meta := p.Metadata()
-				for _, handlerName := range externalPlugin.GetHandlerNames() {
-					pluginLogger.Debugw("Registering plugin async handler",
-						"plugin", meta.Name, "handler", handlerName,
-						"registry_key", grpc.PluginHandlerName(meta.Name, handlerName))
-					proxyHandler := grpc.NewPluginProxyHandler(meta.Name, handlerName, externalPlugin, db, pluginLogger)
-					handlerRegistry.Register(proxyHandler)
-				}
-
-				schedules := externalPlugin.GetSchedules()
-				if len(schedules) > 0 {
-					if err := grpc.SetupPluginSchedules(db, meta.Name, schedules, pluginLogger); err != nil {
-						pluginLogger.Errorw("Failed to setup plugin schedules",
-							"plugin", meta.Name, "error", err)
-					}
-				}
-
-				// Accumulate handler/schedule/watcher counts and emit banner
-				if acc != nil {
-					acc.SetHandlers(meta.Name, externalPlugin.GetHandlerNames(), len(schedules), len(externalPlugin.GetWatchers()))
-					if routes := externalPlugin.GetHTTPRoutes(); len(routes) > 0 {
-						routeStrs := make([]string, len(routes))
-						for i, r := range routes {
-							routeStrs[i] = r.GetMethod() + " " + r.GetPath()
-						}
-						acc.SetHTTPRoutes(meta.Name, routeStrs)
-					}
-					healthCtx, hCancel := context.WithTimeout(context.Background(), 5*time.Second)
-					health := externalPlugin.Health(healthCtx)
-					hCancel()
-					details := make(map[string]string)
-					for k, v := range health.Details {
-						if s, ok := v.(string); ok {
-							details[k] = s
-						}
-					}
-					acc.SetHealth(meta.Name, health.Healthy, health.Message, details)
-					acc.Emit(meta.Name, grpc.BannerBoot)
-				}
-			}
-			pluginLogger.Debugw("Plugin async handler registration complete")
-		} else {
+		if daemon == nil {
 			pluginLogger.Warnw("Cannot register handlers - Pulse daemon not available, will retry")
 			go retryPluginSetup(loadedPlugins, registry, pluginLogger, acc)
+		} else {
+			pluginLogger.Debugw("Plugin init complete")
 		}
 	} else {
 		pluginLogger.Debugw("Cannot initialize plugins - server or services not available yet, will retry")
@@ -372,16 +354,89 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 	}
 }
 
-// sortPluginsByName returns plugins sorted alphabetically by name.
-// This gives deterministic init order without hardcoding dependencies —
-// provider plugins (faiss, openrouter) naturally init before consumers (werf).
-func sortPluginsByName(plugins []plugin.DomainPlugin) []plugin.DomainPlugin {
-	sorted := make([]plugin.DomainPlugin, len(plugins))
-	copy(sorted, plugins)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].Metadata().Name < sorted[j].Metadata().Name
-	})
-	return sorted
+
+// registerPluginProviders registers provider services (LLM, VectorSearch, Search, Embedding)
+// for a plugin that has successfully completed Initialize.
+func registerPluginProviders(p plugin.DomainPlugin, meta plugin.Metadata, sm *grpc.ServicesManager, srv *server.QNTXServer, logger *zap.SugaredLogger, acc *grpc.PluginAccumulator) {
+	var roles []string
+	if proxy, ok := p.(*grpc.ExternalDomainProxy); ok && sm != nil {
+		if proxy.IsLLMProvider() {
+			roles = append(roles, "llm-provider")
+			if llmRouter := sm.GetLLMRouter(); llmRouter != nil {
+				llmRouter.RegisterProvider(meta.Name, proxy.LLMServiceClient())
+				logger.Debugw("Registered LLM provider", "plugin", meta.Name)
+			}
+		}
+		if proxy.IsVectorSearchProvider() {
+			roles = append(roles, "vector-search-provider")
+			if vsRouter := sm.GetVectorSearchRouter(); vsRouter != nil {
+				vsRouter.SetService(proxy.VectorSearchServiceClient())
+				logger.Debugw("Registered VectorSearch provider", "plugin", meta.Name)
+			}
+		}
+		if proxy.IsSearchProvider() {
+			roles = append(roles, "search-provider")
+			if searchRouter := sm.GetSearchRouter(); searchRouter != nil {
+				searchRouter.RegisterProvider(meta.Name, proxy.SearchServiceClient())
+				logger.Debugw("Registered Search provider", "plugin", meta.Name)
+			}
+		}
+		if proxy.IsEmbeddingProvider() {
+			roles = append(roles, "embedding-provider")
+			srv.SetupPluginEmbeddingService(proxy.EmbeddingServiceClient())
+			logger.Debugw("Registered embedding provider", "plugin", meta.Name)
+		}
+	}
+	if acc != nil {
+		acc.SetRoles(meta.Name, roles)
+	}
+}
+
+// registerPluginHandlers registers Pulse async handlers/schedules and emits the plugin banner.
+func registerPluginHandlers(p plugin.DomainPlugin, meta plugin.Metadata, handlerRegistry *async.HandlerRegistry, db *sql.DB, logger *zap.SugaredLogger, acc *grpc.PluginAccumulator) {
+	externalPlugin, ok := p.(*grpc.ExternalDomainProxy)
+	if !ok {
+		return
+	}
+	if handlerRegistry != nil {
+		for _, handlerName := range externalPlugin.GetHandlerNames() {
+			logger.Debugw("Registering plugin async handler",
+				"plugin", meta.Name, "handler", handlerName,
+				"registry_key", grpc.PluginHandlerName(meta.Name, handlerName))
+			proxyHandler := grpc.NewPluginProxyHandler(meta.Name, handlerName, externalPlugin, db, logger)
+			handlerRegistry.Register(proxyHandler)
+		}
+	}
+
+	schedules := externalPlugin.GetSchedules()
+	if len(schedules) > 0 {
+		if err := grpc.SetupPluginSchedules(db, meta.Name, schedules, logger); err != nil {
+			logger.Errorw("Failed to setup plugin schedules",
+				"plugin", meta.Name, "error", err)
+		}
+	}
+
+	if acc != nil {
+		acc.SetHandlers(meta.Name, externalPlugin.GetHandlerNames(), len(schedules), len(externalPlugin.GetWatchers()))
+		if routes := externalPlugin.GetHTTPRoutes(); len(routes) > 0 {
+			routeStrs := make([]string, len(routes))
+			for i, r := range routes {
+				routeStrs[i] = r.GetMethod() + " " + r.GetPath()
+			}
+			acc.SetHTTPRoutes(meta.Name, routeStrs)
+		}
+		healthCtx, hCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		health := externalPlugin.Health(healthCtx)
+		hCancel()
+		details := make(map[string]string)
+		for k, v := range health.Details {
+			if s, ok := v.(string); ok {
+				details[k] = s
+			}
+		}
+		acc.SetHealth(meta.Name, health.Healthy, health.Message, details)
+		acc.Emit(meta.Name, grpc.BannerBoot)
+	}
 }
 
 // retryPluginSetup waits for server infrastructure to be ready, then initializes plugins.
@@ -409,111 +464,39 @@ func retryPluginSetup(plugins []plugin.DomainPlugin, pluginRegistry *plugin.Regi
 		}
 
 		sm := defaultServer.GetServicesManager()
-
-		// Init each plugin, register providers inline
-		sorted := sortPluginsByName(plugins)
-		logger.Debugw("Server ready, initializing plugins", "count", len(sorted))
-		for _, p := range sorted {
-			meta := p.Metadata()
-			if acc != nil {
-				acc.SetLoading(meta.Name, meta.Version)
-			}
-			initCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-			if err := p.Initialize(initCtx, services); err != nil {
-				logger.Errorw("Failed to initialize plugin",
-					"plugin", meta.Name, "version", meta.Version, "error", err)
-				pluginRegistry.MarkFailed(meta.Name, err.Error())
-				if acc != nil {
-					acc.SetFailed(meta.Name, err.Error())
-					acc.Emit(meta.Name, grpc.BannerBoot)
-				}
-				cancel()
-				continue
-			}
-			cancel()
-			pluginRegistry.MarkReady(meta.Name)
-			logger.Debugw("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
-
-			var roles []string
-			if proxy, ok := p.(*grpc.ExternalDomainProxy); ok && sm != nil {
-				if proxy.IsLLMProvider() {
-					roles = append(roles, "llm-provider")
-					if llmRouter := sm.GetLLMRouter(); llmRouter != nil {
-						llmRouter.RegisterProvider(meta.Name, proxy.LLMServiceClient())
-						logger.Debugw("Registered LLM provider", "plugin", meta.Name)
-					}
-				}
-				if proxy.IsVectorSearchProvider() {
-					roles = append(roles, "vector-search-provider")
-					if vsRouter := sm.GetVectorSearchRouter(); vsRouter != nil {
-						vsRouter.SetService(proxy.VectorSearchServiceClient())
-						logger.Debugw("Registered VectorSearch provider", "plugin", meta.Name)
-					}
-				}
-				if proxy.IsSearchProvider() {
-					roles = append(roles, "search-provider")
-					if searchRouter := sm.GetSearchRouter(); searchRouter != nil {
-						searchRouter.RegisterProvider(meta.Name, proxy.SearchServiceClient())
-						logger.Debugw("Registered Search provider", "plugin", meta.Name)
-					}
-				}
-				if proxy.IsEmbeddingProvider() {
-					roles = append(roles, "embedding-provider")
-					defaultServer.SetupPluginEmbeddingService(proxy.EmbeddingServiceClient())
-					logger.Debugw("Registered embedding provider", "plugin", meta.Name)
-				}
-			}
-			if acc != nil {
-				acc.SetRoles(meta.Name, roles)
-			}
-		}
-
-		// Register async handlers with Pulse
 		handlerRegistry := daemon.Registry()
 		db := defaultServer.GetDB()
-		for _, p := range plugins {
-			externalPlugin, ok := p.(*grpc.ExternalDomainProxy)
-			if !ok {
-				continue
-			}
-			meta := p.Metadata()
-			for _, handlerName := range externalPlugin.GetHandlerNames() {
-				logger.Debugw("Registering plugin async handler",
-					"plugin", meta.Name, "handler", handlerName,
-					"registry_key", grpc.PluginHandlerName(meta.Name, handlerName))
-				proxyHandler := grpc.NewPluginProxyHandler(meta.Name, handlerName, externalPlugin, db, logger)
-				handlerRegistry.Register(proxyHandler)
-			}
-			schedules := externalPlugin.GetSchedules()
-			if len(schedules) > 0 {
-				if err := grpc.SetupPluginSchedules(db, meta.Name, schedules, logger); err != nil {
-					logger.Errorw("Failed to setup plugin schedules",
-						"plugin", meta.Name, "error", err)
-				}
-			}
 
-			if acc != nil {
-				acc.SetHandlers(meta.Name, externalPlugin.GetHandlerNames(), len(schedules), len(externalPlugin.GetWatchers()))
-				if routes := externalPlugin.GetHTTPRoutes(); len(routes) > 0 {
-					routeStrs := make([]string, len(routes))
-					for i, r := range routes {
-						routeStrs[i] = r.GetMethod() + " " + r.GetPath()
-					}
-					acc.SetHTTPRoutes(meta.Name, routeStrs)
+		// Initialize all plugins concurrently
+		logger.Debugw("Server ready, initializing plugins concurrently", "count", len(plugins))
+		var retryWg sync.WaitGroup
+		for _, p := range plugins {
+			retryWg.Add(1)
+			go func(p plugin.DomainPlugin) {
+				defer retryWg.Done()
+				meta := p.Metadata()
+				if acc != nil {
+					acc.SetLoading(meta.Name, meta.Version)
 				}
-				healthCtx, hCancel := context.WithTimeout(context.Background(), 5*time.Second)
-				health := externalPlugin.Health(healthCtx)
-				hCancel()
-				details := make(map[string]string)
-				for k, v := range health.Details {
-					if s, ok := v.(string); ok {
-						details[k] = s
+				initCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+				defer cancel()
+				if err := p.Initialize(initCtx, services); err != nil {
+					logger.Errorw("Failed to initialize plugin",
+						"plugin", meta.Name, "version", meta.Version, "error", err)
+					pluginRegistry.MarkFailed(meta.Name, err.Error())
+					if acc != nil {
+						acc.SetFailed(meta.Name, err.Error())
+						acc.Emit(meta.Name, grpc.BannerBoot)
 					}
+					return
 				}
-				acc.SetHealth(meta.Name, health.Healthy, health.Message, details)
-				acc.Emit(meta.Name, grpc.BannerBoot)
-			}
+				pluginRegistry.MarkReady(meta.Name)
+				logger.Debugw("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
+				registerPluginProviders(p, meta, sm, defaultServer, logger, acc)
+				registerPluginHandlers(p, meta, handlerRegistry, db, logger, acc)
+			}(p)
 		}
+		retryWg.Wait()
 
 		if err := defaultServer.ReloadWatchers(); err != nil {
 			logger.Errorw("Failed to reload watchers after plugin init", "error", err)
