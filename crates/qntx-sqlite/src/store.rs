@@ -105,12 +105,11 @@ impl SqliteStore {
     /// Open a separate read-only connection for concurrent queries.
     /// Only works for file-backed stores.
     pub fn open_read_conn(&self) -> crate::error::Result<ReadConn> {
-        let path = self
-            .db_path
-            .as_deref()
-            .ok_or_else(|| crate::error::SqliteError::Migration(
+        let path = self.db_path.as_deref().ok_or_else(|| {
+            crate::error::SqliteError::Migration(
                 "read connection requires a file-backed database".into(),
-            ))?;
+            )
+        })?;
         let conn = Connection::open_with_flags(
             path,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
@@ -514,7 +513,12 @@ pub fn build_query_sql(filter: &AxFilter) -> (String, Vec<String>) {
         joins.push("JOIN attestation_subjects js ON att.id = js.attestation_id");
         conditions.push(format!(
             "js.subject IN ({})",
-            filter.subjects.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
+            filter
+                .subjects
+                .iter()
+                .map(|_| "?")
+                .collect::<Vec<_>>()
+                .join(", ")
         ));
         params.extend(filter.subjects.iter().cloned());
     }
@@ -522,7 +526,12 @@ pub fn build_query_sql(filter: &AxFilter) -> (String, Vec<String>) {
         joins.push("JOIN attestation_predicates jp ON att.id = jp.attestation_id");
         conditions.push(format!(
             "jp.predicate IN ({})",
-            filter.predicates.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
+            filter
+                .predicates
+                .iter()
+                .map(|_| "?")
+                .collect::<Vec<_>>()
+                .join(", ")
         ));
         params.extend(filter.predicates.iter().cloned());
     }
@@ -530,7 +539,12 @@ pub fn build_query_sql(filter: &AxFilter) -> (String, Vec<String>) {
         joins.push("JOIN attestation_contexts jc ON att.id = jc.attestation_id");
         conditions.push(format!(
             "jc.context IN ({})",
-            filter.contexts.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
+            filter
+                .contexts
+                .iter()
+                .map(|_| "?")
+                .collect::<Vec<_>>()
+                .join(", ")
         ));
         params.extend(filter.contexts.iter().cloned());
     }
@@ -538,7 +552,12 @@ pub fn build_query_sql(filter: &AxFilter) -> (String, Vec<String>) {
         joins.push("JOIN attestation_actors ja ON att.id = ja.attestation_id");
         conditions.push(format!(
             "ja.actor IN ({})",
-            filter.actors.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
+            filter
+                .actors
+                .iter()
+                .map(|_| "?")
+                .collect::<Vec<_>>()
+                .join(", ")
         ));
         params.extend(filter.actors.iter().cloned());
     }

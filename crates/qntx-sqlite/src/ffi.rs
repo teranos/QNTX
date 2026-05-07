@@ -14,11 +14,11 @@ use std::path::Path;
 use std::ptr;
 
 use qntx_core::storage::AttestationStore;
-use rusqlite::OptionalExtension;
 use qntx_ffi_common::{
     cstr_to_str, cstring_new_or_empty, free_boxed, free_cstring, vec_into_raw, FfiResult,
 };
 use qntx_proto::proto_convert;
+use rusqlite::OptionalExtension;
 
 use crate::store::ReadConn;
 use crate::SqliteStore;
@@ -278,18 +278,16 @@ pub extern "C" fn read_conn_get(rc: *const ReadConn, id: *const c_char) -> Attes
     };
     match result {
         None => AttestationResultC::not_found(),
-        Some(row_data) => {
-            match SqliteStore::row_to_attestation(row_data) {
-                Ok(attestation) => {
-                    let proto = proto_convert::to_proto(attestation);
-                    match serde_json::to_string(&proto) {
-                        Ok(json) => AttestationResultC::ok(json),
-                        Err(e) => AttestationResultC::error(&format!("failed to serialize: {}", e)),
-                    }
+        Some(row_data) => match SqliteStore::row_to_attestation(row_data) {
+            Ok(attestation) => {
+                let proto = proto_convert::to_proto(attestation);
+                match serde_json::to_string(&proto) {
+                    Ok(json) => AttestationResultC::ok(json),
+                    Err(e) => AttestationResultC::error(&format!("failed to serialize: {}", e)),
                 }
-                Err(e) => AttestationResultC::error(&format!("{}", e)),
             }
-        }
+            Err(e) => AttestationResultC::error(&format!("{}", e)),
+        },
     }
 }
 
@@ -305,11 +303,11 @@ pub extern "C" fn read_conn_exists(rc: *const ReadConn, id: *const c_char) -> St
         Err(e) => return StorageResultC::error(e),
     };
     let rc = unsafe { &*rc };
-    match rc.conn.query_row(
-        "SELECT 1 FROM attestations WHERE id = ?",
-        [id_str],
-        |_| Ok(()),
-    ) {
+    match rc
+        .conn
+        .query_row("SELECT 1 FROM attestations WHERE id = ?", [id_str], |_| {
+            Ok(())
+        }) {
         Ok(()) => StorageResultC::ok(),
         Err(rusqlite::Error::QueryReturnedNoRows) => StorageResultC {
             success: false,
@@ -354,23 +352,21 @@ pub extern "C" fn read_conn_query(
     let param_refs: Vec<&dyn rusqlite::ToSql> =
         params.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
 
-    let rows = match stmt
-        .query_map(&param_refs[..], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, String>(5)?,
-                row.get::<_, String>(6)?,
-                row.get::<_, Option<String>>(7)?,
-                row.get::<_, String>(8)?,
-                row.get::<_, Option<Vec<u8>>>(9)?,
-                row.get::<_, Option<String>>(10)?,
-            ))
-        })
-    {
+    let rows = match stmt.query_map(&param_refs[..], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, String>(3)?,
+            row.get::<_, String>(4)?,
+            row.get::<_, String>(5)?,
+            row.get::<_, String>(6)?,
+            row.get::<_, Option<String>>(7)?,
+            row.get::<_, String>(8)?,
+            row.get::<_, Option<Vec<u8>>>(9)?,
+            row.get::<_, Option<String>>(10)?,
+        ))
+    }) {
         Ok(r) => r,
         Err(e) => return AttestationResultC::error(&format!("{}", e)),
     };
@@ -405,7 +401,10 @@ pub extern "C" fn read_conn_ids(rc: *const ReadConn) -> StringArrayResultC {
         return StringArrayResultC::error("null read connection");
     }
     let rc = unsafe { &*rc };
-    match query_distinct(&rc.conn, "SELECT id FROM attestations ORDER BY created_at DESC") {
+    match query_distinct(
+        &rc.conn,
+        "SELECT id FROM attestations ORDER BY created_at DESC",
+    ) {
         Ok(ids) => StringArrayResultC::ok(ids),
         Err(e) => StringArrayResultC::error(&e),
     }
@@ -419,7 +418,11 @@ pub extern "C" fn read_conn_count(rc: *const ReadConn) -> CountResultC {
         return CountResultC::error("null read connection");
     }
     let rc = unsafe { &*rc };
-    match rc.conn.query_row("SELECT COUNT(*) FROM attestations", [], |row| row.get::<_, usize>(0)) {
+    match rc
+        .conn
+        .query_row("SELECT COUNT(*) FROM attestations", [], |row| {
+            row.get::<_, usize>(0)
+        }) {
         Ok(count) => CountResultC::ok(count),
         Err(e) => CountResultC::error(&format!("{}", e)),
     }
@@ -433,7 +436,10 @@ pub extern "C" fn read_conn_predicates(rc: *const ReadConn) -> StringArrayResult
         return StringArrayResultC::error("null read connection");
     }
     let rc = unsafe { &*rc };
-    match query_distinct(&rc.conn, "SELECT DISTINCT predicate FROM attestation_predicates ORDER BY predicate") {
+    match query_distinct(
+        &rc.conn,
+        "SELECT DISTINCT predicate FROM attestation_predicates ORDER BY predicate",
+    ) {
         Ok(values) => StringArrayResultC::ok(values),
         Err(e) => StringArrayResultC::error(&e.to_string()),
     }
@@ -447,7 +453,10 @@ pub extern "C" fn read_conn_contexts(rc: *const ReadConn) -> StringArrayResultC 
         return StringArrayResultC::error("null read connection");
     }
     let rc = unsafe { &*rc };
-    match query_distinct(&rc.conn, "SELECT DISTINCT context FROM attestation_contexts ORDER BY context") {
+    match query_distinct(
+        &rc.conn,
+        "SELECT DISTINCT context FROM attestation_contexts ORDER BY context",
+    ) {
         Ok(values) => StringArrayResultC::ok(values),
         Err(e) => StringArrayResultC::error(&e.to_string()),
     }
@@ -462,23 +471,29 @@ pub extern "C" fn read_conn_stats(rc: *const ReadConn) -> AttestationResultC {
     }
     let rc = unsafe { &*rc };
     let count = |sql: &str| -> Result<usize, String> {
-        rc.conn.query_row(sql, [], |row| row.get::<_, usize>(0))
+        rc.conn
+            .query_row(sql, [], |row| row.get::<_, usize>(0))
             .map_err(|e| format!("{}", e))
     };
     let total = match count("SELECT COUNT(*) FROM attestations") {
-        Ok(v) => v, Err(e) => return AttestationResultC::error(&e),
+        Ok(v) => v,
+        Err(e) => return AttestationResultC::error(&e),
     };
     let subjects = match count("SELECT COUNT(DISTINCT subject) FROM attestation_subjects") {
-        Ok(v) => v, Err(e) => return AttestationResultC::error(&e),
+        Ok(v) => v,
+        Err(e) => return AttestationResultC::error(&e),
     };
     let predicates = match count("SELECT COUNT(DISTINCT predicate) FROM attestation_predicates") {
-        Ok(v) => v, Err(e) => return AttestationResultC::error(&e),
+        Ok(v) => v,
+        Err(e) => return AttestationResultC::error(&e),
     };
     let contexts = match count("SELECT COUNT(DISTINCT context) FROM attestation_contexts") {
-        Ok(v) => v, Err(e) => return AttestationResultC::error(&e),
+        Ok(v) => v,
+        Err(e) => return AttestationResultC::error(&e),
     };
     let actors = match count("SELECT COUNT(DISTINCT actor) FROM attestation_actors") {
-        Ok(v) => v, Err(e) => return AttestationResultC::error(&e),
+        Ok(v) => v,
+        Err(e) => return AttestationResultC::error(&e),
     };
     let json = format!(
         r#"{{"total_attestations":{},"unique_subjects":{},"unique_predicates":{},"unique_contexts":{},"unique_actors":{}}}"#,
@@ -530,9 +545,13 @@ pub extern "C" fn read_conn_query_raw(
             match v {
                 serde_json::Value::String(s) => Box::new(s.clone()),
                 serde_json::Value::Number(n) => {
-                    if let Some(i) = n.as_i64() { Box::new(i) }
-                    else if let Some(f) = n.as_f64() { Box::new(f) }
-                    else { Box::new(n.to_string()) }
+                    if let Some(i) = n.as_i64() {
+                        Box::new(i)
+                    } else if let Some(f) = n.as_f64() {
+                        Box::new(f)
+                    } else {
+                        Box::new(n.to_string())
+                    }
                 }
                 serde_json::Value::Bool(b) => Box::new(*b),
                 serde_json::Value::Null => Box::new(rusqlite::types::Null),
