@@ -54,6 +54,17 @@ func (s *QNTXServer) SetupPluginEmbeddingService(client protocol.EmbeddingServic
 	s.embeddingStats = observer
 
 	s.logger.Infow("Plugin embedding service initialized")
+
+	// Register recluster/reproject handlers now that embedding service is available.
+	// Must happen here (not in init) because embeddingService is nil until plugin connects.
+	cfg, err := appcfg.Load()
+	if err == nil {
+		s.setupEmbeddingReclusterSchedule(cfg)
+		s.setupEmbeddingReprojectSchedule(cfg)
+		s.setupClusterLabelSchedule(cfg)
+	} else {
+		s.logger.Warnw("Failed to load config for embedding schedule setup", "error", err)
+	}
 }
 
 // callReducePlugin sends an HTTP request to the reduce plugin via gRPC.

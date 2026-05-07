@@ -120,6 +120,10 @@ func (h *ReprojectHandler) writeLog(jobID, stage, level, message, metadata strin
 // EmitPulseDeferredNews queries recent Pulse execution stats and writes a deferred
 // news attestation for Ground. Emitted after every recluster run (success or failure)
 // as the recluster heartbeat is the natural place for periodic Pulse health reporting.
+//
+// Dedup: only emits when the failure picture changes — different failing handlers.
+// Increasing totals with the same failures is not news. The fingerprint (handler
+// names only) is compared against the last emitted pulse-summary attestation.
 func EmitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx string, groundDBPath string, groundWrite GroundWriteFunc, logger *zap.SugaredLogger) {
 	if atsStore == nil {
 		return
@@ -177,6 +181,24 @@ func EmitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx
 		}
 	}
 
+	// Only emit when the failure picture changes — increasing totals with the
+	// same failures is not news. Fingerprint is only the failing handler names.
+	fingerprint := "ok"
+	for _, h := range failedHandlers {
+		fingerprint += ":" + h
+	}
+
+	existing, _ := atsStore.GetAttestations(ats.AttestationFilter{
+		Predicates: []string{"deferred:pulse-summary"},
+		Contexts:   []string{projectCtx},
+		Limit:      1,
+	})
+	if len(existing) > 0 {
+		if prev, ok := existing[0].Attributes["fingerprint"].(string); ok && prev == fingerprint {
+			return
+		}
+	}
+
 	asid, err := identity.GenerateASUID("AS", "pulse", "deferred:pulse-summary", projectCtx)
 	if err != nil {
 		logger.Warnw("Failed to generate ASID for Pulse deferred news", "error", err)
@@ -193,9 +215,10 @@ func EmitPulseDeferredNews(db *sql.DB, atsStore ats.AttestationStore, projectCtx
 		Timestamp:  now,
 		Source:     "pulse-heartbeat",
 		Attributes: map[string]any{
-			"event":  "pulse-summary",
-			"detail": detail,
-			"after":  now.Unix(),
+			"event":       "pulse-summary",
+			"detail":      detail,
+			"after":       now.Unix(),
+			"fingerprint": fingerprint,
 		},
 		CreatedAt: now,
 	}
