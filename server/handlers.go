@@ -962,22 +962,24 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to load config: %v", cfgErr))
 			return
 		}
-		// Restart = disable (best-effort) + enable. This handles plugins that
-		// are mid-retry or not in the map — no "not loaded" errors.
-		disableCtx, disableCancel := context.WithTimeout(ctx, 10*time.Second)
-		_ = pm.DisablePlugin(disableCtx, name, s.pluginRegistry) // best-effort
-		disableCancel()
-		if err = pm.EnablePlugin(ctx, name, cfg.Plugin.Paths, s.pluginRegistry, s.services); err != nil {
-			s.logger.Warnw("Failed to restart plugin", "plugin", name, "error", err)
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		// Invalidate cached HTTP mux and sync.Once so next request
-		// re-initializes with the new gRPC connection
+		// Run restart asynchronously — RestartPlugin can block for tens of seconds
+		// when ATS queries are queued behind the RustStore mutex.
+		// The caller sees banners in make dev output when the restart completes.
+		searchPaths := cfg.Plugin.Paths
+		// Mark plugin not-ready so browser requests get 503 during restart
+		s.pluginRegistry.Unregister(name)
+		// Invalidate mux so it re-creates with the new plugin after restart
 		s.pluginMuxes.Delete(name)
 		s.pluginMuxInit.Delete(name)
-		s.logger.Debugw("Plugin restarted", "plugin", name)
-		s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin restarted")
+		go func() {
+			s.logger.Infow("Restart: restarting plugin", "plugin", name)
+			restartCtx := context.Background()
+			if err := pm.RestartPlugin(restartCtx, name, searchPaths, s.pluginRegistry, s.services); err != nil {
+				s.logger.Warnw("Failed to restart plugin", "plugin", name, "error", err)
+				return
+			}
+			s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin restarted")
+		}()
 
 	case "enable":
 		pm := s.getPluginManager()
@@ -1049,6 +1051,11 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 
 	// Return updated state
 	state, _ := s.pluginRegistry.GetState(name)
+	// For async actions, report the transitional state — the actual outcome
+	// is observed via banners/health, not this response.
+	if action == "restart" {
+		state = plugin.StateRestarting
+	}
 	response := map[string]interface{}{
 		"name":   name,
 		"state":  string(state),

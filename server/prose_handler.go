@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/errors"
 )
 
@@ -228,8 +229,8 @@ func (s *QNTXServer) readProseFile(prosePath string) ([]byte, error) {
 	return s.readProseFileEmbedded(prosePath)
 }
 
+// TODO: prose_handler will be sunset
 // isDevMode checks if the server is running in development mode
 func (s *QNTXServer) isDevMode() bool {
-	// Check for DEV environment variable (set by --dev flag in server command)
-	return os.Getenv("DEV") == "true"
+	return appcfg.IsDevMode()
 }

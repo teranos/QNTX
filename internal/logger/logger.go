@@ -1,9 +1,11 @@
 package logger
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/teranos/QNTX/errors"
 	"go.uber.org/zap"
@@ -176,7 +178,7 @@ func AddFileOutput(logPath string) error {
 
 	encoderConfig := zap.NewDevelopmentEncoderConfig()
 	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-	encoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("15:04:05.000")
+	encoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02T15:04:05.000")
 	encoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
 
 	fileCore := zapcore.NewCore(
@@ -189,6 +191,10 @@ func AddFileOutput(logPath string) error {
 	Logger = zap.New(combined).Sugar()
 	fileOutputAdded = true
 	fileWriter = file
+
+	// Write a startup marker so log runs are visually distinct
+	marker := fmt.Sprintf("\n========== QNTX START %s ==========\n", time.Now().Format("2006-01-02T15:04:05.000"))
+	file.WriteString(marker)
 
 	return nil
 }

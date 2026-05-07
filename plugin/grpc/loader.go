@@ -16,22 +16,13 @@ import (
 	"go.uber.org/zap"
 )
 
-// LoadPluginsFromConfig loads plugins based on am configuration.
+// LoadPluginsFromConfig loads plugins into an existing PluginManager based on am configuration.
 // It discovers plugin binaries from configured paths and loads enabled plugins.
-func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.SugaredLogger, rootLogger *zap.SugaredLogger) (*PluginManager, error) {
-	manager := NewPluginManager(logger, rootLogger, cfg.Plugin.Runtime.TypeScriptRuntime)
-	manager.accumulator = NewPluginAccumulator(logger)
-
-	// Set up PID file for stale process cleanup, keyed by server port
-	// so multiple QNTX instances on the same machine don't interfere.
-	if home, err := os.UserHomeDir(); err == nil {
-		manager.SetPidFile(filepath.Join(home, ".qntx"), am.GetServerPort())
-	}
-
-	// If no plugins enabled, return empty manager
+func LoadPluginsFromConfig(ctx context.Context, manager *PluginManager, cfg *am.Config, logger *zap.SugaredLogger) error {
+	// If no plugins enabled, nothing to do
 	if len(cfg.Plugin.Enabled) == 0 {
 		logger.Infow("No plugins enabled in configuration")
-		return manager, nil
+		return nil
 	}
 
 	// Build map of enabled plugins for deduplication
@@ -70,7 +61,7 @@ func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.Suga
 	// Load discovered plugins
 	if len(pluginConfigs) > 0 {
 		if err := manager.LoadPlugins(ctx, pluginConfigs); err != nil {
-			return nil, errors.Wrap(err, "failed to load plugins")
+			return errors.Wrap(err, "failed to load plugins")
 		}
 
 		// Configure WebSocket settings from am.Config
@@ -105,7 +96,7 @@ func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.Suga
 		)
 	}
 
-	return manager, nil
+	return nil
 }
 
 // discoverPlugin finds a plugin binary in the configured search paths.

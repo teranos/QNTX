@@ -105,12 +105,21 @@ message HTTPRequest {
 		t.Fatalf("parseProto failed: %v", err)
 	}
 
-	if len(gen.grpcMethods) != 3 {
-		t.Errorf("expected 3 gRPC methods, got %d", len(gen.grpcMethods))
+	if len(gen.grpcServices) != 1 {
+		t.Fatalf("expected 1 gRPC service, got %d", len(gen.grpcServices))
+	}
+
+	svc := gen.grpcServices[0]
+	if svc.Name != "DomainPluginService" {
+		t.Errorf("expected service name DomainPluginService, got %q", svc.Name)
+	}
+
+	if len(svc.Methods) != 3 {
+		t.Errorf("expected 3 gRPC methods, got %d", len(svc.Methods))
 	}
 
 	// Check HandleWebSocket is bidirectional
-	for _, m := range gen.grpcMethods {
+	for _, m := range svc.Methods {
 		if m.Name == "HandleWebSocket" {
 			if m.Streaming != "bidi" {
 				t.Errorf("expected HandleWebSocket to be bidi streaming, got %q", m.Streaming)
@@ -118,8 +127,8 @@ message HTTPRequest {
 		}
 	}
 
-	if len(gen.protoMessages) < 3 {
-		t.Errorf("expected at least 3 proto messages, got %d", len(gen.protoMessages))
+	if len(svc.Messages) < 3 {
+		t.Errorf("expected at least 3 proto messages, got %d", len(svc.Messages))
 	}
 }
 
@@ -129,8 +138,14 @@ func TestGenerateIndex(t *testing.T) {
 			{Pattern: "/health", Methods: []string{"GET"}, Handler: "HandleHealth"},
 			{Pattern: "/api/config", Methods: []string{"GET", "POST"}, Handler: "HandleConfig"},
 		},
-		grpcMethods: []GRPCMethod{
-			{Name: "Metadata", Request: "Empty", Response: "MetadataResponse"},
+		grpcServices: []GRPCService{
+			{
+				Name:      "DomainPluginService",
+				ProtoFile: "domain.proto",
+				Methods: []GRPCMethod{
+					{Name: "Metadata", Request: "Empty", Response: "MetadataResponse"},
+				},
+			},
 		},
 		wsMessageTypes: []WebSocketMessageType{
 			{Type: "query", Direction: "client→server"},

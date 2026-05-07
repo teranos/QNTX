@@ -41,7 +41,7 @@ New: Plugin announces async handlers
 
 ### Protocol Changes
 
-Extended `domain.proto`:
+Extended `domain.proto` ([Plugin gRPC API](../api/grpc-plugin.md)):
 - `Initialize` returns `InitializeResponse` with `handler_names[]`
 - New `ExecuteJob` RPC for plugin execution
 - Backward compatible (empty handler lists work)

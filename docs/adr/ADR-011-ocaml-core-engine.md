@@ -47,7 +47,7 @@ kern only parses — it returns a JSON AST and the Go side does everything else 
 
 The hard question. To move beyond parsing into classification and expansion, kern needs to read and write attestations. Three paths:
 
-1. **ATSStoreService expands massively** — kern calls back into Go for every DB operation. More gRPC surface, more latency, but the plugin boundary stays clean. This is the incremental path.
+1. **[ATSStoreService](../api/grpc-atsstore.md) expands massively** — kern calls back into Go for every DB operation. More gRPC surface, more latency, but the plugin boundary stays clean. This is the incremental path.
 2. **kern gets direct DB access** — breaks the plugin model. kern would need SQLite bindings in OCaml, or a shared DB connection. Worst of both worlds.
 3. **kern stops being a plugin** — it becomes a linked library (OCaml compiled to a C-compatible shared object, called into from Rust or Go). No gRPC overhead, direct access to everything. The Rust migration makes this more natural — kern links into the Rust layer rather than Go.
 

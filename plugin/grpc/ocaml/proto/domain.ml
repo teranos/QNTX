@@ -103,15 +103,15 @@ Plugins should use attestations via ats_store_endpoint instead.</p>
       ats_store_endpoint:string;
       (**
 {%html:
-<p>ats_store_endpoint: gRPC endpoint for ATSStoreService
-Provides: Attestation creation, querying, and management</p>
+<p>ats_store_endpoint: gRPC endpoint for <a href="https://qntx.sbvh.nl/api/grpc-atsstore.html">ATSStoreService</a>
+Provides: Attestation creation, querying, and streaming</p>
 %}
       *)
 
       queue_endpoint:string;
       (**
 {%html:
-<p>queue_endpoint: gRPC endpoint for QueueService
+<p>queue_endpoint: gRPC endpoint for <a href="https://qntx.sbvh.nl/api/grpc-queue.html">QueueService</a>
 Provides: Async job enqueue, status, and management</p>
 %}
       *)
@@ -137,7 +137,7 @@ Plugins should parse and validate values appropriate to their schema</p>
       schedule_endpoint:string;
       (**
 {%html:
-<p>schedule_endpoint: gRPC endpoint for ScheduleService
+<p>schedule_endpoint: gRPC endpoint for <a href="https://qntx.sbvh.nl/api/grpc-schedule.html">ScheduleService</a>
 Provides: Runtime schedule creation, pause, resume, delete</p>
 %}
       *)
@@ -145,7 +145,7 @@ Provides: Runtime schedule creation, pause, resume, delete</p>
       file_service_endpoint:string;
       (**
 {%html:
-<p>file_service_endpoint: gRPC endpoint for FileService
+<p>file_service_endpoint: gRPC endpoint for <a href="https://qntx.sbvh.nl/api/grpc-fileservice.html">FileService</a>
 Provides: Read stored files (for multimodal attachments)</p>
 %}
       *)
@@ -153,7 +153,7 @@ Provides: Read stored files (for multimodal attachments)</p>
       llm_endpoint:string;
       (**
 {%html:
-<p>llm_endpoint: gRPC endpoint for LLMService
+<p>llm_endpoint: gRPC endpoint for <a href="https://qntx.sbvh.nl/api/grpc-llm.html">LLMService</a>
 Provides: Provider-agnostic LLM chat (routed through core to provider plugins)</p>
 %}
       *)
@@ -161,7 +161,7 @@ Provides: Provider-agnostic LLM chat (routed through core to provider plugins)</
       embedding_endpoint:string;
       (**
 {%html:
-<p>embedding_endpoint: gRPC endpoint for EmbeddingService
+<p>embedding_endpoint: gRPC endpoint for <a href="https://qntx.sbvh.nl/api/grpc-embedding.html">EmbeddingService</a>
 Provides: Text-to-vector embedding generation</p>
 %}
       *)
@@ -169,7 +169,7 @@ Provides: Text-to-vector embedding generation</p>
       vector_search_endpoint:string;
       (**
 {%html:
-<p>vector_search_endpoint: gRPC endpoint for VectorSearchService
+<p>vector_search_endpoint: gRPC endpoint for <a href="https://qntx.sbvh.nl/api/grpc-vectorsearch.html">VectorSearchService</a>
 Provides: Nearest-neighbor search over dense vector indexes (ADR-016)</p>
 %}
       *)
@@ -177,7 +177,7 @@ Provides: Nearest-neighbor search over dense vector indexes (ADR-016)</p>
       ground_endpoint:string;
       (**
 {%html:
-<p>ground_endpoint: gRPC endpoint for GroundService
+<p>ground_endpoint: gRPC endpoint for <a href="https://qntx.sbvh.nl/api/grpc-ground.html">GroundService</a>
 Provides: Write attestations to Ground's deferred news database</p>
 %}
       *)
@@ -185,7 +185,7 @@ Provides: Write attestations to Ground's deferred news database</p>
       search_endpoint:string;
       (**
 {%html:
-<p>search_endpoint: gRPC endpoint for SearchService
+<p>search_endpoint: gRPC endpoint for <a href="https://qntx.sbvh.nl/api/grpc-search.html">SearchService</a>
 Provides: Full-text search over indexed documents (routed through core to provider plugin)</p>
 %}
       *)
@@ -1554,15 +1554,15 @@ end = struct
       ats_store_endpoint:string;
       (**
 {%html:
-<p>ats_store_endpoint: gRPC endpoint for ATSStoreService
-Provides: Attestation creation, querying, and management</p>
+<p>ats_store_endpoint: gRPC endpoint for <a href="https://qntx.sbvh.nl/api/grpc-atsstore.html">ATSStoreService</a>
+Provides: Attestation creation, querying, and streaming</p>
 %}
       *)
 
       queue_endpoint:string;
       (**
 {%html:
-<p>queue_endpoint: gRPC endpoint for QueueService
+<p>queue_endpoint: gRPC endpoint for <a href="https://qntx.sbvh.nl/api/grpc-queue.html">QueueService</a>
 Provides: Async job enqueue, status, and management</p>
 %}
       *)
@@ -1588,7 +1588,7 @@ Plugins should parse and validate values appropriate to their schema</p>
       schedule_endpoint:string;
       (**
 {%html:
-<p>schedule_endpoint: gRPC endpoint for ScheduleService
+<p>schedule_endpoint: gRPC endpoint for <a href="https://qntx.sbvh.nl/api/grpc-schedule.html">ScheduleService</a>
 Provides: Runtime schedule creation, pause, resume, delete</p>
 %}
       *)
@@ -1596,7 +1596,7 @@ Provides: Runtime schedule creation, pause, resume, delete</p>
       file_service_endpoint:string;
       (**
 {%html:
-<p>file_service_endpoint: gRPC endpoint for FileService
+<p>file_service_endpoint: gRPC endpoint for <a href="https://qntx.sbvh.nl/api/grpc-fileservice.html">FileService</a>
 Provides: Read stored files (for multimodal attachments)</p>
 %}
       *)
@@ -1604,7 +1604,7 @@ Provides: Read stored files (for multimodal attachments)</p>
       llm_endpoint:string;
       (**
 {%html:
-<p>llm_endpoint: gRPC endpoint for LLMService
+<p>llm_endpoint: gRPC endpoint for <a href="https://qntx.sbvh.nl/api/grpc-llm.html">LLMService</a>
 Provides: Provider-agnostic LLM chat (routed through core to provider plugins)</p>
 %}
       *)
@@ -1612,7 +1612,7 @@ Provides: Provider-agnostic LLM chat (routed through core to provider plugins)</
       embedding_endpoint:string;
       (**
 {%html:
-<p>embedding_endpoint: gRPC endpoint for EmbeddingService
+<p>embedding_endpoint: gRPC endpoint for <a href="https://qntx.sbvh.nl/api/grpc-embedding.html">EmbeddingService</a>
 Provides: Text-to-vector embedding generation</p>
 %}
       *)
@@ -1620,7 +1620,7 @@ Provides: Text-to-vector embedding generation</p>
       vector_search_endpoint:string;
       (**
 {%html:
-<p>vector_search_endpoint: gRPC endpoint for VectorSearchService
+<p>vector_search_endpoint: gRPC endpoint for <a href="https://qntx.sbvh.nl/api/grpc-vectorsearch.html">VectorSearchService</a>
 Provides: Nearest-neighbor search over dense vector indexes (ADR-016)</p>
 %}
       *)
@@ -1628,7 +1628,7 @@ Provides: Nearest-neighbor search over dense vector indexes (ADR-016)</p>
       ground_endpoint:string;
       (**
 {%html:
-<p>ground_endpoint: gRPC endpoint for GroundService
+<p>ground_endpoint: gRPC endpoint for <a href="https://qntx.sbvh.nl/api/grpc-ground.html">GroundService</a>
 Provides: Write attestations to Ground's deferred news database</p>
 %}
       *)
@@ -1636,7 +1636,7 @@ Provides: Write attestations to Ground's deferred news database</p>
       search_endpoint:string;
       (**
 {%html:
-<p>search_endpoint: gRPC endpoint for SearchService
+<p>search_endpoint: gRPC endpoint for <a href="https://qntx.sbvh.nl/api/grpc-search.html">SearchService</a>
 Provides: Full-text search over indexed documents (routed through core to provider plugin)</p>
 %}
       *)

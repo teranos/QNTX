@@ -16,9 +16,11 @@ import (
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 // ExternalDomainProxy implements DomainPlugin by proxying to a gRPC plugin process.
@@ -535,8 +537,12 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 		resp, err = c.client.HandleHTTP(r.Context(), req)
 	}
 
-	// Handle errors
+	// Handle errors — context canceled means the browser navigated away or refreshed.
+	// The request is abandoned; no response needed, no error to log.
 	if err != nil {
+		if r.Context().Err() != nil {
+			return
+		}
 		c.logger.Errorw("Remote HTTP request failed",
 			"plugin", c.metadata.Name,
 			"method", r.Method,
@@ -648,8 +654,12 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	defer wsConn.Close()
 
 	// Establish bidirectional gRPC stream
-	// Forward query params as gRPC metadata (e.g. session_id)
-	ctx := r.Context()
+	// Use a standalone context — NOT r.Context(). The HTTP request context
+	// cancels when the browser disconnects, which kills the gRPC stream and
+	// produces "context canceled" errors. The WebSocket read loop already
+	// detects disconnection and sends CLOSE, so we don't need r.Context().
+	ctx, streamCancel := context.WithCancel(context.Background())
+	defer streamCancel()
 	md := metadata.New(nil)
 	for key, values := range r.URL.Query() {
 		if len(values) > 0 {
@@ -749,7 +759,10 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 		for {
 			msg, err := stream.Recv()
 			if err != nil {
-				if err != io.EOF {
+				// Unavailable = plugin process was killed (restart/shutdown) — expected.
+				// EOF / Canceled / ctx done = normal teardown.
+				if err != io.EOF && err != context.Canceled && ctx.Err() == nil &&
+					status.Code(err) != codes.Unavailable {
 					h.logger.Errorw("gRPC stream read error", "error", err)
 				}
 				errChan <- err
@@ -810,7 +823,9 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 	// Wait for error from either direction
 	err = <-errChan
-	if err != nil && err != io.EOF {
+	if err != nil && err != io.EOF &&
+		!websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) &&
+		status.Code(err) != codes.Unavailable {
 		h.logger.Errorw("WebSocket proxy error", "error", err)
 	}
 

@@ -32,7 +32,13 @@ use qntx_core::storage::enforcement::{EnforcementConfig, EnforcementInput};
 
 type StoreResult<T> = Result<T, StoreError>;
 
-/// SQLite-backed attestation store
+/// SQLite-backed attestation store (write connection).
+///
+/// File-backed stores also create a separate `ReadConn` for queries.
+/// SQLite WAL mode allows one writer and multiple concurrent readers,
+/// so reads never block writes. Each connection is single-threaded
+/// (rusqlite uses RefCell), but Go serializes access per-connection
+/// with separate mutexes.
 pub struct SqliteStore {
     pub(crate) conn: Connection,
     /// Database file path, if file-backed. Used by backup to open a separate read connection.
@@ -40,6 +46,14 @@ pub struct SqliteStore {
     /// Enforcement config for bounded storage limits (16/64/64 default).
     /// When set, enforcement runs automatically after every put().
     pub(crate) enforcement_config: Option<EnforcementConfig>,
+}
+
+/// Read-only SQLite connection for concurrent queries.
+///
+/// Separate from `SqliteStore` so the Rust borrow checker (and FFI)
+/// can access them independently without creating overlapping references.
+pub struct ReadConn {
+    pub(crate) conn: Connection,
 }
 
 impl SqliteStore {
@@ -66,22 +80,42 @@ impl SqliteStore {
     }
 
     /// Create a new file-backed SQLite store
+    ///
+    /// Opens a read-write connection. Use [`open_read_conn`] to create a
+    /// separate read-only connection for concurrent queries.
     pub fn open(path: impl AsRef<std::path::Path>) -> crate::error::Result<Self> {
         // Initialize sqlite-vec extension BEFORE creating connection
         crate::vec::init_vec_extension();
 
         let path_str = path.as_ref().to_string_lossy().to_string();
-        let conn = Connection::open(path)?;
+        let conn = Connection::open(&path)?;
 
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
         conn.pragma_update(None, "busy_timeout", "5000")?;
         crate::migrate::migrate(&conn)?;
+
         Ok(Self {
             conn,
             db_path: Some(path_str),
             enforcement_config: None,
         })
+    }
+
+    /// Open a separate read-only connection for concurrent queries.
+    /// Only works for file-backed stores.
+    pub fn open_read_conn(&self) -> crate::error::Result<ReadConn> {
+        let path = self.db_path.as_deref().ok_or_else(|| {
+            crate::error::SqliteError::Migration(
+                "read connection requires a file-backed database".into(),
+            )
+        })?;
+        let conn = Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?;
+        conn.pragma_update(None, "busy_timeout", "5000")?;
+        Ok(ReadConn { conn })
     }
 
     /// Run PRAGMA integrity_check and return the result lines.
@@ -138,13 +172,13 @@ impl SqliteStore {
         self.enforcement_config = Some(config);
     }
 
-    /// Get a reference to the underlying connection
+    /// Get a reference to the underlying write connection
     pub fn connection(&self) -> &Connection {
         &self.conn
     }
 
-    /// Helper to extract a row into an Attestation, converting errors through SqliteError.
-    fn row_to_attestation(row_data: AttestationRow) -> StoreResult<Attestation> {
+    /// Extract a row tuple into an Attestation, converting errors through SqliteError.
+    pub fn row_to_attestation(row_data: AttestationRow) -> StoreResult<Attestation> {
         let (
             id,
             subjects_json,
@@ -465,110 +499,101 @@ impl AttestationStore for SqliteStore {
     }
 }
 
+/// Build SQL and params for an AxFilter query. Used by both SqliteStore and ReadConn.
+pub fn build_query_sql(filter: &AxFilter) -> (String, Vec<String>) {
+    let mut sql = String::from(
+        "SELECT DISTINCT att.id, att.subjects, att.predicates, att.contexts, att.actors, att.timestamp, att.source, att.attributes, att.created_at, att.signature, att.signer_did \
+         FROM attestations att"
+    );
+    let mut joins = Vec::new();
+    let mut conditions = Vec::new();
+    let mut params: Vec<String> = Vec::new();
+
+    if !filter.subjects.is_empty() {
+        joins.push("JOIN attestation_subjects js ON att.id = js.attestation_id");
+        conditions.push(format!(
+            "js.subject IN ({})",
+            filter
+                .subjects
+                .iter()
+                .map(|_| "?")
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+        params.extend(filter.subjects.iter().cloned());
+    }
+    if !filter.predicates.is_empty() {
+        joins.push("JOIN attestation_predicates jp ON att.id = jp.attestation_id");
+        conditions.push(format!(
+            "jp.predicate IN ({})",
+            filter
+                .predicates
+                .iter()
+                .map(|_| "?")
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+        params.extend(filter.predicates.iter().cloned());
+    }
+    if !filter.contexts.is_empty() {
+        joins.push("JOIN attestation_contexts jc ON att.id = jc.attestation_id");
+        conditions.push(format!(
+            "jc.context IN ({})",
+            filter
+                .contexts
+                .iter()
+                .map(|_| "?")
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+        params.extend(filter.contexts.iter().cloned());
+    }
+    if !filter.actors.is_empty() {
+        joins.push("JOIN attestation_actors ja ON att.id = ja.attestation_id");
+        conditions.push(format!(
+            "ja.actor IN ({})",
+            filter
+                .actors
+                .iter()
+                .map(|_| "?")
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+        params.extend(filter.actors.iter().cloned());
+    }
+    if let Some(ref source) = filter.source {
+        conditions.push("att.source = ?".to_string());
+        params.push(source.clone());
+    }
+    if let Some(start) = filter.time_start {
+        conditions.push("att.timestamp >= ?".to_string());
+        params.push(crate::json::timestamp_to_sql(start));
+    }
+    if let Some(end) = filter.time_end {
+        conditions.push("att.timestamp <= ?".to_string());
+        params.push(crate::json::timestamp_to_sql(end));
+    }
+
+    for join in &joins {
+        sql.push(' ');
+        sql.push_str(join);
+    }
+    if !conditions.is_empty() {
+        sql.push_str(" WHERE ");
+        sql.push_str(&conditions.join(" AND "));
+    }
+    sql.push_str(" ORDER BY att.created_at DESC, att.rowid DESC");
+    if let Some(limit) = filter.limit {
+        sql.push_str(&format!(" LIMIT {}", limit));
+    }
+
+    (sql, params)
+}
+
 impl QueryStore for SqliteStore {
     fn query(&self, filter: &AxFilter) -> StoreResult<AxResult> {
-        // Build dynamic SQL query based on filter using junction tables
-        let mut sql = String::from(
-            "SELECT DISTINCT att.id, att.subjects, att.predicates, att.contexts, att.actors, att.timestamp, att.source, att.attributes, att.created_at, att.signature, att.signer_did \
-             FROM attestations att"
-        );
-        let mut joins = Vec::new();
-        let mut conditions = Vec::new();
-        let mut params: Vec<String> = Vec::new();
+        let (sql, params) = build_query_sql(filter);
 
-        // Filter by subjects via junction table
-        if !filter.subjects.is_empty() {
-            joins.push("JOIN attestation_subjects js ON att.id = js.attestation_id");
-            conditions.push(format!(
-                "js.subject IN ({})",
-                filter
-                    .subjects
-                    .iter()
-                    .map(|_| "?")
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ));
-            params.extend(filter.subjects.iter().cloned());
-        }
-
-        // Filter by predicates via junction table
-        if !filter.predicates.is_empty() {
-            joins.push("JOIN attestation_predicates jp ON att.id = jp.attestation_id");
-            conditions.push(format!(
-                "jp.predicate IN ({})",
-                filter
-                    .predicates
-                    .iter()
-                    .map(|_| "?")
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ));
-            params.extend(filter.predicates.iter().cloned());
-        }
-
-        // Filter by contexts via junction table
-        if !filter.contexts.is_empty() {
-            joins.push("JOIN attestation_contexts jc ON att.id = jc.attestation_id");
-            conditions.push(format!(
-                "jc.context IN ({})",
-                filter
-                    .contexts
-                    .iter()
-                    .map(|_| "?")
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ));
-            params.extend(filter.contexts.iter().cloned());
-        }
-
-        // Filter by actors via junction table
-        if !filter.actors.is_empty() {
-            joins.push("JOIN attestation_actors ja ON att.id = ja.attestation_id");
-            conditions.push(format!(
-                "ja.actor IN ({})",
-                filter
-                    .actors
-                    .iter()
-                    .map(|_| "?")
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ));
-            params.extend(filter.actors.iter().cloned());
-        }
-
-        // Filter by source (exact match on plain column)
-        if let Some(ref source) = filter.source {
-            conditions.push("att.source = ?".to_string());
-            params.push(source.clone());
-        }
-
-        // Filter by time range
-        if let Some(start) = filter.time_start {
-            conditions.push("att.timestamp >= ?".to_string());
-            params.push(crate::json::timestamp_to_sql(start));
-        }
-        if let Some(end) = filter.time_end {
-            conditions.push("att.timestamp <= ?".to_string());
-            params.push(crate::json::timestamp_to_sql(end));
-        }
-
-        for join in &joins {
-            sql.push(' ');
-            sql.push_str(join);
-        }
-
-        if !conditions.is_empty() {
-            sql.push_str(" WHERE ");
-            sql.push_str(&conditions.join(" AND "));
-        }
-
-        // Apply ordering and limit
-        sql.push_str(" ORDER BY att.created_at DESC, att.rowid DESC");
-        if let Some(limit) = filter.limit {
-            sql.push_str(&format!(" LIMIT {}", limit));
-        }
-
-        // Execute query
         let mut stmt = self.conn.prepare(&sql).map_err(SqliteError::from)?;
 
         let param_refs: Vec<&dyn rusqlite::ToSql> =

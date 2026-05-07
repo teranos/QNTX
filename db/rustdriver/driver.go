@@ -1,12 +1,12 @@
-// Package rustdriver implements database/sql/driver over Rust's single SQLite connection.
+// Package rustdriver implements database/sql/driver over Rust's SQLite connections.
 //
 // Go's database/sql routes all SQL through Rust via CGO FFI, eliminating
 // the dual-driver architecture (rusqlite + mattn/go-sqlite3) that caused
 // SQLITE_CORRUPT errors.
 //
-// The driver shares the *C.SqliteStore pointer and sync.Mutex with the
-// existing RustStore (ats/storage/sqlitecgo). All operations are serialized
-// through the mutex since rusqlite::Connection is not thread-safe.
+// The Rust store holds two connections: one for writes, one for reads (WAL mode).
+// The driver uses separate mutexes (muWrite for Exec/Begin/Commit/Rollback,
+// muRead for Query) so reads never block writes and vice versa.
 package rustdriver
 
 /*
@@ -34,36 +34,43 @@ import (
 )
 
 // Register registers the "rustsqlite" driver with database/sql.
-// storePtr is an unsafe.Pointer to *C.SqliteStore, and mu serializes access.
-func Register(storePtr unsafe.Pointer, mu *sync.Mutex) {
+// storePtr is the write store, readConnPtr is the read-only connection (may be nil).
+// muWrite serializes write operations, muRead serializes read operations.
+func Register(storePtr, readConnPtr unsafe.Pointer, muWrite, muRead *sync.Mutex) {
 	sql.Register("rustsqlite", &RustDriver{
-		store: (*C.SqliteStore)(storePtr),
-		mu:    mu,
+		store:    (*C.SqliteStore)(storePtr),
+		readConn: (*C.ReadConn)(readConnPtr),
+		muWrite:  muWrite,
+		muRead:   muRead,
 	})
 }
 
 // RustDriver implements driver.Driver.
 type RustDriver struct {
-	store *C.SqliteStore
-	mu    *sync.Mutex
+	store    *C.SqliteStore
+	readConn *C.ReadConn
+	muWrite  *sync.Mutex
+	muRead   *sync.Mutex
 }
 
 func (d *RustDriver) Open(_ string) (driver.Conn, error) {
-	return &RustConn{store: d.store, mu: d.mu}, nil
+	return &RustConn{store: d.store, readConn: d.readConn, muWrite: d.muWrite, muRead: d.muRead}, nil
 }
 
 // RustConn implements driver.Conn.
 type RustConn struct {
-	store *C.SqliteStore
-	mu    *sync.Mutex
+	store    *C.SqliteStore
+	readConn *C.ReadConn
+	muWrite  *sync.Mutex
+	muRead   *sync.Mutex
 }
 
 func (c *RustConn) Prepare(query string) (driver.Stmt, error) {
-	return &RustStmt{store: c.store, mu: c.mu, query: query}, nil
+	return &RustStmt{store: c.store, readConn: c.readConn, muWrite: c.muWrite, muRead: c.muRead, query: query}, nil
 }
 
 func (c *RustConn) Begin() (driver.Tx, error) {
-	c.mu.Lock()
+	c.muWrite.Lock()
 	result := C.sql_begin(c.store)
 	success := bool(result.success)
 	var errMsg string
@@ -71,12 +78,12 @@ func (c *RustConn) Begin() (driver.Tx, error) {
 		errMsg = C.GoString(result.error_msg)
 	}
 	C.exec_result_free(result)
-	c.mu.Unlock()
+	c.muWrite.Unlock()
 
 	if !success {
 		return nil, errors.Newf("BEGIN IMMEDIATE failed: %s", errMsg)
 	}
-	return &RustTx{store: c.store, mu: c.mu}, nil
+	return &RustTx{store: c.store, muWrite: c.muWrite}, nil
 }
 
 func (c *RustConn) Close() error {
@@ -86,12 +93,12 @@ func (c *RustConn) Close() error {
 
 // RustTx implements driver.Tx.
 type RustTx struct {
-	store *C.SqliteStore
-	mu    *sync.Mutex
+	store   *C.SqliteStore
+	muWrite *sync.Mutex
 }
 
 func (tx *RustTx) Commit() error {
-	tx.mu.Lock()
+	tx.muWrite.Lock()
 	result := C.sql_commit(tx.store)
 	success := bool(result.success)
 	var errMsg string
@@ -99,7 +106,7 @@ func (tx *RustTx) Commit() error {
 		errMsg = C.GoString(result.error_msg)
 	}
 	C.exec_result_free(result)
-	tx.mu.Unlock()
+	tx.muWrite.Unlock()
 
 	if !success {
 		return errors.Newf("COMMIT failed: %s", errMsg)
@@ -108,7 +115,7 @@ func (tx *RustTx) Commit() error {
 }
 
 func (tx *RustTx) Rollback() error {
-	tx.mu.Lock()
+	tx.muWrite.Lock()
 	result := C.sql_rollback(tx.store)
 	success := bool(result.success)
 	var errMsg string
@@ -116,7 +123,7 @@ func (tx *RustTx) Rollback() error {
 		errMsg = C.GoString(result.error_msg)
 	}
 	C.exec_result_free(result)
-	tx.mu.Unlock()
+	tx.muWrite.Unlock()
 
 	if !success {
 		return errors.Newf("ROLLBACK failed: %s", errMsg)
@@ -126,9 +133,11 @@ func (tx *RustTx) Rollback() error {
 
 // RustStmt implements driver.Stmt.
 type RustStmt struct {
-	store *C.SqliteStore
-	mu    *sync.Mutex
-	query string
+	store    *C.SqliteStore
+	readConn *C.ReadConn
+	muWrite  *sync.Mutex
+	muRead   *sync.Mutex
+	query    string
 }
 
 // NumInput returns -1 to indicate variable number of args.
@@ -151,7 +160,7 @@ func (s *RustStmt) Exec(args []driver.Value) (driver.Result, error) {
 	cParams := C.CString(paramsJSON)
 	defer C.free(unsafe.Pointer(cParams))
 
-	s.mu.Lock()
+	s.muWrite.Lock()
 	result := C.sql_exec(s.store, cSQL, cParams)
 	success := bool(result.success)
 	var errMsg string
@@ -163,7 +172,7 @@ func (s *RustStmt) Exec(args []driver.Value) (driver.Result, error) {
 		errMsg = C.GoString(result.error_msg)
 	}
 	C.exec_result_free(result)
-	s.mu.Unlock()
+	s.muWrite.Unlock()
 
 	if !success {
 		return nil, errors.Newf("exec failed: %s", errMsg)
@@ -182,8 +191,17 @@ func (s *RustStmt) Query(args []driver.Value) (driver.Rows, error) {
 	cParams := C.CString(paramsJSON)
 	defer C.free(unsafe.Pointer(cParams))
 
-	s.mu.Lock()
-	result := C.sql_query(s.store, cSQL, cParams)
+	if s.readConn != nil {
+		s.muRead.Lock()
+	} else {
+		s.muWrite.Lock()
+	}
+	var result C.QueryResultC
+	if s.readConn != nil {
+		result = C.read_conn_sql_query(s.readConn, cSQL, cParams)
+	} else {
+		result = C.sql_query(s.store, cSQL, cParams)
+	}
 	var success bool
 	var errMsg, colsJSON, rowsJSON string
 	success = bool(result.success)
@@ -198,7 +216,11 @@ func (s *RustStmt) Query(args []driver.Value) (driver.Rows, error) {
 		}
 	}
 	C.query_result_free(result)
-	s.mu.Unlock()
+	if s.readConn != nil {
+		s.muRead.Unlock()
+	} else {
+		s.muWrite.Unlock()
+	}
 
 	if !success {
 		return nil, errors.Newf("query failed: %s", errMsg)

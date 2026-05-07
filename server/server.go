@@ -359,6 +359,23 @@ func (s *QNTXServer) InvalidatePluginMux(name string) {
 	s.pluginMuxInit.Delete(name)
 }
 
+// RegisterPluginMux proactively registers HTTP proxy handlers for a plugin.
+// Called after plugin restart so HTTP routes work immediately without waiting
+// for a slow lazy-init gRPC Initialize call.
+func (s *QNTXServer) RegisterPluginMux(name string) {
+	p, ok := s.pluginRegistry.Get(name)
+	if !ok {
+		return
+	}
+	mux := http.NewServeMux()
+	if err := p.RegisterHTTP(mux); err != nil {
+		s.logger.Errorw("Failed to pre-register HTTP handlers for plugin", "plugin", name, "error", err)
+		return
+	}
+	s.pluginMuxes.Store(name, mux)
+	s.logger.Infow("Registered HTTP proxy handlers", "plugin", name)
+}
+
 // getAttestationByID retrieves a single attestation through the attestation store (Rust FFI).
 // Falls back to Go's *sql.DB if the store doesn't support direct get.
 func (s *QNTXServer) getAttestationByID(id string) (*types.As, error) {

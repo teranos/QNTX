@@ -69,6 +69,7 @@ type AttestationFields struct {
 - **ASID generation** with vanity ID support and collision detection
 - **Attestation existence checking** to prevent duplicates
 - **[REST API](../docs/api/attestations.md)** for querying and creating attestations over HTTP
+- **[gRPC API](../docs/api/grpc-atsstore.md)** for plugin access to attestation storage (includes server-side streaming)
 
 **Supporting Packages:**
 

@@ -5,6 +5,8 @@ package commands
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"time"
@@ -44,7 +46,7 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, error) 
 
 	// Register the Rust SQL driver (once per process)
 	driverOnce.Do(func() {
-		rustdriver.Register(rustStore.StorePtr(), rustStore.Mu())
+		rustdriver.Register(rustStore.StorePtr(), rustStore.ReadConnPtr(), rustStore.Mu(), rustStore.MuRead())
 	})
 
 	// Open *sql.DB through the Rust driver — single connection, no pooling
@@ -63,14 +65,25 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, error) 
 		return nil, nil, "", fmt.Errorf("failed to create attestation store: %w", err)
 	}
 
-	// Start mutex watchdog — alerts when RustStore mutex is held too long
+	// Start mutex watchdog — alerts when RustStore mutex is held too long.
+	// Dumps all goroutine stacks to tmp/watchdog/ so the log stays scannable.
 	sqlitecgo.StartMutexWatchdog(rustStore.Mu(), sqlitecgo.WatchdogConfig{
 		Interval: 30 * time.Second,
 		Timeout:  5 * time.Second,
 		OnAlert: func(blocked time.Duration) {
 			buf := make([]byte, 64*1024)
 			n := runtime.Stack(buf, true)
-			logger.Logger.Warnf("RustStore mutex held for %s — possible deadlock\n%s", blocked, buf[:n])
+
+			dir := "tmp/watchdog"
+			os.MkdirAll(dir, 0755)
+			filename := time.Now().Format("2006-01-02T15-04-05") + ".txt"
+			path := filepath.Join(dir, filename)
+
+			if err := os.WriteFile(path, buf[:n], 0644); err != nil {
+				logger.Logger.Warnf("RustStore mutex held for %s — failed to write dump: %s", blocked, err)
+				return
+			}
+			logger.Logger.Warnf("RustStore mutex held for %s — goroutine dump: %s", blocked, path)
 		},
 	})
 

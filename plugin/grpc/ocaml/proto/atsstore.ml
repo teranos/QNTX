@@ -537,6 +537,17 @@ module rec Protocol : sig
     end
 
     val getAttestations : (module Runtime'.Spec.Message with type t = GetAttestationsRequest.t) * (module Runtime'.Spec.Message with type t = GetAttestationsResponse.t)
+    module GetAttestationsStream : sig
+      include Runtime'.Service.Rpc with type Request.t = GetAttestationsRequest.t and type Response.t = Attestation.t
+      module Request : Runtime'.Spec.Message with type t = GetAttestationsRequest.t and type make_t = GetAttestationsRequest.make_t
+      (** Module alias for the request message for this method call *)
+
+      module Response : Runtime'.Spec.Message with type t = Attestation.t and type make_t = Attestation.make_t
+      (** Module alias for the response message for this method call *)
+
+    end
+
+    val getAttestationsStream : (module Runtime'.Spec.Message with type t = GetAttestationsRequest.t) * (module Runtime'.Spec.Message with type t = Attestation.t)
   end
 
 end = struct
@@ -1463,6 +1474,19 @@ end = struct
     let getAttestations =
       (module GetAttestationsRequest : Runtime'.Spec.Message with type t = GetAttestationsRequest.t ),
       (module GetAttestationsResponse : Runtime'.Spec.Message with type t = GetAttestationsResponse.t )
+
+    module GetAttestationsStream = struct
+      let package_name = Some "protocol"
+      let service_name = "ATSStoreService"
+      let method_name = "GetAttestationsStream"
+      let name = "/protocol.ATSStoreService/GetAttestationsStream"
+      module Request = GetAttestationsRequest
+      module Response = Attestation
+    end
+
+    let getAttestationsStream =
+      (module GetAttestationsRequest : Runtime'.Spec.Message with type t = GetAttestationsRequest.t ),
+      (module Attestation : Runtime'.Spec.Message with type t = Attestation.t )
 
   end
 

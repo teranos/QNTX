@@ -3,6 +3,7 @@
 package storage
 
 import (
+	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
 	"github.com/teranos/QNTX/errors"
@@ -23,17 +24,7 @@ func NewStoreFromRust(rustStore *sqlitecgo.RustStore, logger *zap.SugaredLogger)
 
 // NewStoreFromRustWithConfig wraps a pre-created RustStore with custom enforcement limits.
 func NewStoreFromRustWithConfig(rustStore *sqlitecgo.RustStore, logger *zap.SugaredLogger, config *sqlitecgo.EnforcementConfig) (ats.AttestationStore, error) {
-	// Run integrity check before accepting the database
-	lines, err := rustStore.IntegrityCheck()
-	if err != nil {
-		logger.Errorw("SQLite integrity check failed to execute", "error", err)
-	} else if len(lines) != 1 || lines[0] != "ok" {
-		logger.Errorw("SQLite integrity check detected corruption — database may be damaged",
-			"integrity_lines", lines,
-		)
-	} else {
-		logger.Infow("SQLite integrity check passed")
-	}
+	runIntegrityCheck(rustStore, logger, "")
 
 	if config == nil {
 		config = &sqlitecgo.EnforcementConfig{
@@ -65,18 +56,7 @@ func NewStoreWithConfig(dbPath string, logger *zap.SugaredLogger, config *sqlite
 		return nil, errors.Wrapf(err, "failed to open Rust storage at %s", dbPath)
 	}
 
-	// Run integrity check before accepting the database
-	lines, err := rustStore.IntegrityCheck()
-	if err != nil {
-		logger.Errorw("SQLite integrity check failed to execute", "error", err, "db_path", dbPath)
-	} else if len(lines) != 1 || lines[0] != "ok" {
-		logger.Errorw("SQLite integrity check detected corruption — database may be damaged",
-			"db_path", dbPath,
-			"integrity_lines", lines,
-		)
-	} else {
-		logger.Infow("SQLite integrity check passed", "db_path", dbPath)
-	}
+	runIntegrityCheck(rustStore, logger, dbPath)
 
 	if config == nil {
 		config = &sqlitecgo.EnforcementConfig{
@@ -92,4 +72,25 @@ func NewStoreWithConfig(dbPath string, logger *zap.SugaredLogger, config *sqlite
 	}
 
 	return &RustBackedStore{rust: rustStore, enforcementCfg: config, log: logger}, nil
+}
+
+// runIntegrityCheck runs PRAGMA integrity_check unless DEV mode is set.
+// In dev mode the check is skipped — it takes 88s on a 1GB database.
+func runIntegrityCheck(rustStore *sqlitecgo.RustStore, logger *zap.SugaredLogger, dbPath string) {
+	if am.IsDevMode() {
+		logger.Infow("Skipping SQLite integrity check (dev mode)", "db_path", dbPath)
+		return
+	}
+
+	lines, err := rustStore.IntegrityCheck()
+	if err != nil {
+		logger.Errorw("SQLite integrity check failed to execute", "error", err, "db_path", dbPath)
+	} else if len(lines) != 1 || lines[0] != "ok" {
+		logger.Errorw("SQLite integrity check detected corruption — database may be damaged",
+			"db_path", dbPath,
+			"integrity_lines", lines,
+		)
+	} else {
+		logger.Infow("SQLite integrity check passed", "db_path", dbPath)
+	}
 }

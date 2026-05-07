@@ -24,9 +24,18 @@ Complete API documentation for the QNTX server.
 
 - **[WebSocket Protocol](./websocket.md)** (6 message types)
 
-## Plugin gRPC API
+## gRPC APIs
 
+- **[ATSStoreService gRPC API](./grpc-atsstore.md)** (5 methods)
 - **[Plugin gRPC API](./grpc-plugin.md)** (10 methods)
+- **[EmbeddingService gRPC API](./grpc-embedding.md)** (7 methods)
+- **[FileService gRPC API](./grpc-fileservice.md)** (1 method)
+- **[GroundService gRPC API](./grpc-ground.md)** (2 methods)
+- **[LLMService gRPC API](./grpc-llm.md)** (2 methods)
+- **[QueueService gRPC API](./grpc-queue.md)** (4 methods)
+- **[ScheduleService gRPC API](./grpc-schedule.md)** (5 methods)
+- **[SearchService gRPC API](./grpc-search.md)** (4 methods)
+- **[VectorSearchService gRPC API](./grpc-vectorsearch.md)** (3 methods)
 
 ## Type References
 

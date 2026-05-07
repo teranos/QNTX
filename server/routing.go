@@ -183,54 +183,57 @@ func (s *QNTXServer) handlePluginRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Lazy-initialize plugin mux on first request (after plugin loads)
-	// Use sync.Once per plugin to ensure thread-safe one-time initialization
-	onceVal, _ := s.pluginMuxInit.LoadOrStore(pluginName, &sync.Once{})
-	once := onceVal.(*sync.Once)
-
-	// All concurrent requests will block here until initialization completes
-	var initErr error
-	once.Do(func() {
-		plugin, ok := s.pluginRegistry.Get(pluginName)
-		if !ok {
-			initErr = fmt.Errorf("plugin '%s' not found", pluginName)
-			return
-		}
-
-		// Initialize plugin with services (calls gRPC Init which populates plugin's httpMux)
-		if err := plugin.Initialize(r.Context(), s.services); err != nil {
-			s.logger.Errorw("Failed to initialize plugin",
-				"plugin", pluginName,
-				"error", err)
-			initErr = err
-			return
-		}
-
-		mux := http.NewServeMux()
-		if err := plugin.RegisterHTTP(mux); err != nil {
-			s.logger.Errorw("Failed to register HTTP handlers for plugin",
-				"plugin", pluginName,
-				"error", err)
-			initErr = err
-			return
-		}
-
-		s.pluginMuxes.Store(pluginName, mux)
-		s.logger.Infow("Initialized HTTP handlers for plugin", "plugin", pluginName)
-	})
-
-	// Check if initialization failed
-	if initErr != nil {
-		http.Error(w, fmt.Sprintf("Plugin '%s' initialization failed: %v", pluginName, initErr), http.StatusInternalServerError)
-		return
-	}
-
-	// Load the initialized mux
+	// Check if mux was pre-registered (e.g. by plugin restart callback).
+	// This avoids the slow lazy-init path that calls Initialize over gRPC.
 	muxVal, muxExists := s.pluginMuxes.Load(pluginName)
 	if !muxExists {
-		// Should never happen after sync.Once completes successfully
-		http.Error(w, fmt.Sprintf("Plugin '%s' mux not found after initialization", pluginName), http.StatusInternalServerError)
-		return
+		// Lazy-initialize plugin mux on first request (after plugin loads)
+		// Use sync.Once per plugin to ensure thread-safe one-time initialization
+		onceVal, _ := s.pluginMuxInit.LoadOrStore(pluginName, &sync.Once{})
+		once := onceVal.(*sync.Once)
+
+		// All concurrent requests will block here until initialization completes
+		var initErr error
+		once.Do(func() {
+			plugin, ok := s.pluginRegistry.Get(pluginName)
+			if !ok {
+				initErr = fmt.Errorf("plugin '%s' not found", pluginName)
+				return
+			}
+
+			// Initialize plugin with services (calls gRPC Init which populates plugin's httpMux)
+			if err := plugin.Initialize(r.Context(), s.services); err != nil {
+				s.logger.Errorw("Failed to initialize plugin",
+					"plugin", pluginName,
+					"error", err)
+				initErr = err
+				return
+			}
+
+			mux := http.NewServeMux()
+			if err := plugin.RegisterHTTP(mux); err != nil {
+				s.logger.Errorw("Failed to register HTTP handlers for plugin",
+					"plugin", pluginName,
+					"error", err)
+				initErr = err
+				return
+			}
+
+			s.pluginMuxes.Store(pluginName, mux)
+			s.logger.Infow("Initialized HTTP handlers for plugin", "plugin", pluginName)
+		})
+
+		// Check if initialization failed
+		if initErr != nil {
+			http.Error(w, fmt.Sprintf("Plugin '%s' initialization failed: %v", pluginName, initErr), http.StatusInternalServerError)
+			return
+		}
+
+		muxVal, muxExists = s.pluginMuxes.Load(pluginName)
+		if !muxExists {
+			http.Error(w, fmt.Sprintf("Plugin '%s' mux not found after initialization", pluginName), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Serve request through plugin's mux

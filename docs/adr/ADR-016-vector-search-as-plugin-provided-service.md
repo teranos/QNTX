@@ -21,7 +21,7 @@ This is the third plugin-provided service on `ServiceRegistry`.
 
 ## Protocol
 
-`plugin/grpc/protocol/vectorsearch.proto`
+`plugin/grpc/protocol/vectorsearch.proto` ([VectorSearchService gRPC API](../api/grpc-vectorsearch.md))
 
 ```protobuf
 service VectorSearchService {
@@ -48,9 +48,9 @@ message VectorSearchHit {
 
 Three services, three plugins, three concerns:
 
-- **EmbeddingService** (core, Rust FFI) — text → vector
-- **SearchService** (ADR-015, `qntx-meili`, Rust) — full-text/keyword search over documents
-- **VectorSearchService** (`qntx-faiss`, C++) — nearest-neighbor search over vector indexes
+- **[EmbeddingService](../api/grpc-embedding.md)** (core, Rust FFI) — text → vector
+- **[SearchService](../api/grpc-search.md)** (ADR-015, `qntx-meili`, Rust) — full-text/keyword search over documents
+- **[VectorSearchService](../api/grpc-vectorsearch.md)** (`qntx-faiss`, C++) — nearest-neighbor search over vector indexes
 
 A plugin may use all three. A workflow might embed text via EmbeddingService, find semantically similar items via VectorSearchService, then search documents by keyword via SearchService. Different tools for different jobs.
 

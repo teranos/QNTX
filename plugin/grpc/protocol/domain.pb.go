@@ -201,10 +201,10 @@ func (x *MetadataResponse) GetLicense() string {
 
 type InitializeRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// ats_store_endpoint: gRPC endpoint for ATSStoreService
-	// Provides: Attestation creation, querying, and management
+	// ats_store_endpoint: gRPC endpoint for [ATSStoreService](https://qntx.sbvh.nl/api/grpc-atsstore.html)
+	// Provides: Attestation creation, querying, and streaming
 	AtsStoreEndpoint string `protobuf:"bytes,1,opt,name=ats_store_endpoint,json=atsStoreEndpoint,proto3" json:"ats_store_endpoint,omitempty"`
-	// queue_endpoint: gRPC endpoint for QueueService
+	// queue_endpoint: gRPC endpoint for [QueueService](https://qntx.sbvh.nl/api/grpc-queue.html)
 	// Provides: Async job enqueue, status, and management
 	QueueEndpoint string `protobuf:"bytes,2,opt,name=queue_endpoint,json=queueEndpoint,proto3" json:"queue_endpoint,omitempty"`
 	// auth_token: Simple token for authenticating with service endpoints
@@ -215,25 +215,25 @@ type InitializeRequest struct {
 	// Complex types (maps, slices) JSON-encoded as strings
 	// Plugins should parse and validate values appropriate to their schema
 	Config map[string]string `protobuf:"bytes,4,rep,name=config,proto3" json:"config,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// schedule_endpoint: gRPC endpoint for ScheduleService
+	// schedule_endpoint: gRPC endpoint for [ScheduleService](https://qntx.sbvh.nl/api/grpc-schedule.html)
 	// Provides: Runtime schedule creation, pause, resume, delete
 	ScheduleEndpoint string `protobuf:"bytes,5,opt,name=schedule_endpoint,json=scheduleEndpoint,proto3" json:"schedule_endpoint,omitempty"`
-	// file_service_endpoint: gRPC endpoint for FileService
+	// file_service_endpoint: gRPC endpoint for [FileService](https://qntx.sbvh.nl/api/grpc-fileservice.html)
 	// Provides: Read stored files (for multimodal attachments)
 	FileServiceEndpoint string `protobuf:"bytes,6,opt,name=file_service_endpoint,json=fileServiceEndpoint,proto3" json:"file_service_endpoint,omitempty"`
-	// llm_endpoint: gRPC endpoint for LLMService
+	// llm_endpoint: gRPC endpoint for [LLMService](https://qntx.sbvh.nl/api/grpc-llm.html)
 	// Provides: Provider-agnostic LLM chat (routed through core to provider plugins)
 	LlmEndpoint string `protobuf:"bytes,7,opt,name=llm_endpoint,json=llmEndpoint,proto3" json:"llm_endpoint,omitempty"`
-	// embedding_endpoint: gRPC endpoint for EmbeddingService
+	// embedding_endpoint: gRPC endpoint for [EmbeddingService](https://qntx.sbvh.nl/api/grpc-embedding.html)
 	// Provides: Text-to-vector embedding generation
 	EmbeddingEndpoint string `protobuf:"bytes,8,opt,name=embedding_endpoint,json=embeddingEndpoint,proto3" json:"embedding_endpoint,omitempty"`
-	// vector_search_endpoint: gRPC endpoint for VectorSearchService
+	// vector_search_endpoint: gRPC endpoint for [VectorSearchService](https://qntx.sbvh.nl/api/grpc-vectorsearch.html)
 	// Provides: Nearest-neighbor search over dense vector indexes (ADR-016)
 	VectorSearchEndpoint string `protobuf:"bytes,9,opt,name=vector_search_endpoint,json=vectorSearchEndpoint,proto3" json:"vector_search_endpoint,omitempty"`
-	// ground_endpoint: gRPC endpoint for GroundService
+	// ground_endpoint: gRPC endpoint for [GroundService](https://qntx.sbvh.nl/api/grpc-ground.html)
 	// Provides: Write attestations to Ground's deferred news database
 	GroundEndpoint string `protobuf:"bytes,10,opt,name=ground_endpoint,json=groundEndpoint,proto3" json:"ground_endpoint,omitempty"`
-	// search_endpoint: gRPC endpoint for SearchService
+	// search_endpoint: gRPC endpoint for [SearchService](https://qntx.sbvh.nl/api/grpc-search.html)
 	// Provides: Full-text search over indexed documents (routed through core to provider plugin)
 	SearchEndpoint string `protobuf:"bytes,11,opt,name=search_endpoint,json=searchEndpoint,proto3" json:"search_endpoint,omitempty"`
 	unknownFields  protoimpl.UnknownFields

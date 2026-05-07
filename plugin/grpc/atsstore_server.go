@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
@@ -18,15 +19,40 @@ type ATSStoreServer struct {
 	store     ats.AttestationStore
 	authToken string
 	logger    *zap.SugaredLogger
+
+	// streamMu protects streamCtx/streamCancel
+	streamMu     sync.Mutex
+	streamCtx    context.Context
+	streamCancel context.CancelFunc
 }
 
 // NewATSStoreServer creates a new ATS store gRPC server
 func NewATSStoreServer(store ats.AttestationStore, authToken string, logger *zap.SugaredLogger) *ATSStoreServer {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &ATSStoreServer{
-		store:     store,
-		authToken: authToken,
-		logger:    logger,
+		store:        store,
+		authToken:    authToken,
+		logger:       logger,
+		streamCtx:    ctx,
+		streamCancel: cancel,
 	}
+}
+
+// CancelStreams cancels all active streams and resets the context for new ones.
+// Called during plugin restart to free the database mutex before launching the new process.
+func (s *ATSStoreServer) CancelStreams() {
+	s.streamMu.Lock()
+	defer s.streamMu.Unlock()
+	s.streamCancel()
+	s.streamCtx, s.streamCancel = context.WithCancel(context.Background())
+	s.logger.Infow("Cancelled active ATSStore streams for plugin restart")
+}
+
+// getStreamCtx returns the current stream context (safe for concurrent use).
+func (s *ATSStoreServer) getStreamCtx() context.Context {
+	s.streamMu.Lock()
+	defer s.streamMu.Unlock()
+	return s.streamCtx
 }
 
 // CreateAttestation creates a new attestation
@@ -164,6 +190,53 @@ func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetA
 		Success:      true,
 		Attestations: protoAttestations,
 	}, nil
+}
+
+// GetAttestationsStream queries attestations and streams them individually.
+func (s *ATSStoreServer) GetAttestationsStream(req *protocol.GetAttestationsRequest, stream protocol.ATSStoreService_GetAttestationsStreamServer) error {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+		return err
+	}
+
+	// Check if streams were cancelled (plugin restart in progress)
+	ctx := s.getStreamCtx()
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	filter := protoToFilter(req.Filter)
+
+	attestations, err := s.store.GetAttestations(filter)
+	if err != nil {
+		return fmt.Errorf("failed to query attestations: %w", err)
+	}
+
+	// Check again after query — plugin may have been killed while we held the mutex
+	if ctx.Err() != nil {
+		s.logger.Debugw("Stream cancelled after query, discarding results",
+			"results", len(attestations))
+		return ctx.Err()
+	}
+
+	s.logger.Debugw("GetAttestationsStream",
+		"results", len(attestations),
+		"predicates", filter.Predicates,
+		"subjects", filter.Subjects)
+
+	for _, as := range attestations {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		protoAtt, err := protocol.AttestationFromTypes(as)
+		if err != nil {
+			return fmt.Errorf("failed to convert attestation %s to proto: %w", as.ID, err)
+		}
+		if err := stream.Send(protoAtt); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error) {

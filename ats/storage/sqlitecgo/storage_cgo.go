@@ -33,6 +33,7 @@ import (
 	"encoding/json"
 	"runtime"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/teranos/QNTX/ats"
@@ -42,11 +43,18 @@ import (
 )
 
 // RustStore wraps the Rust SqliteStore via CGO.
-// All access is serialized via mu because rusqlite::Connection
-// uses RefCell internally and is not thread-safe.
+//
+// File-backed stores hold a separate ReadConn for queries (conn_read).
+// muWrite serializes write operations against the store's write connection.
+// muRead serializes read operations against the read connection.
+// Reads never block writes and vice versa — SQLite WAL handles concurrency.
+//
+// For in-memory stores, readConn is nil and reads go through the write path.
 type RustStore struct {
-	mu    sync.Mutex
-	store *C.SqliteStore
+	muWrite  sync.Mutex
+	muRead   sync.Mutex
+	store    *C.SqliteStore
+	readConn *C.ReadConn
 }
 
 // NewMemoryStore creates a new in-memory Rust storage backend.
@@ -78,7 +86,14 @@ func NewFileStore(path string) (*RustStore, error) {
 		return nil, errors.Newf("failed to create file store at %s", path)
 	}
 
-	rs := &RustStore{store: store}
+	// Open a separate read-only connection for concurrent queries
+	readConn := C.storage_open_read_conn(store)
+	if readConn == nil {
+		C.storage_free(store)
+		return nil, errors.Newf("failed to open read connection for %s", path)
+	}
+
+	rs := &RustStore{store: store, readConn: readConn}
 
 	runtime.SetFinalizer(rs, func(s *RustStore) {
 		s.Close()
@@ -88,15 +103,41 @@ func NewFileStore(path string) (*RustStore, error) {
 }
 
 // StorePtr returns the raw C store pointer for sharing with the Rust SQL driver.
-// The caller must hold the mutex (via Mu()) while using this pointer.
 func (rs *RustStore) StorePtr() unsafe.Pointer {
 	return unsafe.Pointer(rs.store)
 }
 
-// Mu returns the mutex that serializes access to the Rust store.
-// The SQL driver shares this mutex to ensure single-threaded access.
+// ReadConnPtr returns the raw C read connection pointer for sharing with the Rust SQL driver.
+func (rs *RustStore) ReadConnPtr() unsafe.Pointer {
+	return unsafe.Pointer(rs.readConn)
+}
+
+// Mu returns the write mutex that serializes write access to the Rust store.
 func (rs *RustStore) Mu() *sync.Mutex {
-	return &rs.mu
+	return &rs.muWrite
+}
+
+// MuRead returns the read mutex that serializes read access to the Rust store.
+func (rs *RustStore) MuRead() *sync.Mutex {
+	return &rs.muRead
+}
+
+// lockRead acquires the appropriate mutex for read operations.
+// If readConn is available, uses muRead. Otherwise falls back to muWrite.
+func (rs *RustStore) lockRead() {
+	if rs.readConn != nil {
+		rs.muRead.Lock()
+	} else {
+		rs.muWrite.Lock()
+	}
+}
+
+func (rs *RustStore) unlockRead() {
+	if rs.readConn != nil {
+		rs.muRead.Unlock()
+	} else {
+		rs.muWrite.Unlock()
+	}
 }
 
 // SetEnforcementConfig sets the enforcement config on the Rust store.
@@ -110,8 +151,8 @@ func (rs *RustStore) SetEnforcementConfig(config *EnforcementConfig) error {
 	cJSON := C.CString(string(configJSON))
 	defer C.free(unsafe.Pointer(cJSON))
 
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
+	rs.muWrite.Lock()
+	defer rs.muWrite.Unlock()
 	if rs.store == nil {
 		return errors.New("store is closed")
 	}
@@ -129,8 +170,14 @@ func (rs *RustStore) SetEnforcementConfig(config *EnforcementConfig) error {
 // Close frees the underlying Rust store.
 // Safe to call multiple times.
 func (rs *RustStore) Close() error {
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
+	rs.muWrite.Lock()
+	rs.muRead.Lock()
+	defer rs.muRead.Unlock()
+	defer rs.muWrite.Unlock()
+	if rs.readConn != nil {
+		C.read_conn_free(rs.readConn)
+		rs.readConn = nil
+	}
 	if rs.store != nil {
 		C.storage_free(rs.store)
 		rs.store = nil
@@ -149,17 +196,24 @@ func (rs *RustStore) CreateAttestation(as *types.As) error {
 	cJSON := C.CString(string(jsonBytes))
 	defer C.free(unsafe.Pointer(cJSON))
 
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
+	rs.muWrite.Lock()
 	if rs.store == nil {
+		rs.muWrite.Unlock()
 		return errors.New("store is closed")
 	}
 
+	start := time.Now()
 	result := C.storage_put(rs.store, cJSON)
-	defer C.storage_result_free(result)
+	success := bool(result.success)
+	var errMsg string
+	if !success {
+		errMsg = C.GoString(result.error_msg)
+	}
+	C.storage_result_free(result)
+	rs.muWrite.Unlock()
+	logSlow(start, "storage_put")
 
-	if !result.success {
-		errMsg := C.GoString(result.error_msg)
+	if !success {
 		return errors.New(errMsg)
 	}
 
@@ -177,13 +231,14 @@ func (rs *RustStore) GetAttestation(id string) (*types.As, error) {
 	cID := C.CString(id)
 	defer C.free(unsafe.Pointer(cID))
 
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
-	if rs.store == nil {
-		return nil, errors.New("store is closed")
+	rs.lockRead()
+	var result C.AttestationResultC
+	if rs.readConn != nil {
+		result = C.read_conn_get(rs.readConn, cID)
+	} else {
+		result = C.storage_get(rs.store, cID)
 	}
-
-	result := C.storage_get(rs.store, cID)
+	rs.unlockRead()
 	defer C.attestation_result_free(result)
 
 	if !result.success {
@@ -209,13 +264,18 @@ func (rs *RustStore) AttestationExists(id string) bool {
 	cID := C.CString(id)
 	defer C.free(unsafe.Pointer(cID))
 
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
-	if rs.store == nil {
-		return false
+	rs.lockRead()
+	var result C.StorageResultC
+	if rs.readConn != nil {
+		result = C.read_conn_exists(rs.readConn, cID)
+	} else {
+		if rs.store == nil {
+			rs.unlockRead()
+			return false
+		}
+		result = C.storage_exists(rs.store, cID)
 	}
-
-	result := C.storage_exists(rs.store, cID)
+	rs.unlockRead()
 	defer C.storage_result_free(result)
 
 	return bool(result.success)
@@ -231,8 +291,8 @@ func (rs *RustStore) UpdateAttestation(as *types.As) error {
 	cJSON := C.CString(string(jsonBytes))
 	defer C.free(unsafe.Pointer(cJSON))
 
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
+	rs.muWrite.Lock()
+	defer rs.muWrite.Unlock()
 	if rs.store == nil {
 		return errors.New("store is closed")
 	}
@@ -250,13 +310,18 @@ func (rs *RustStore) UpdateAttestation(as *types.As) error {
 
 // ListAttestationIDs returns all attestation IDs.
 func (rs *RustStore) ListAttestationIDs() ([]string, error) {
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
-	if rs.store == nil {
-		return nil, errors.New("store is closed")
+	rs.lockRead()
+	var result C.StringArrayResultC
+	if rs.readConn != nil {
+		result = C.read_conn_ids(rs.readConn)
+	} else {
+		if rs.store == nil {
+			rs.unlockRead()
+			return nil, errors.New("store is closed")
+		}
+		result = C.storage_ids(rs.store)
 	}
-
-	result := C.storage_ids(rs.store)
+	rs.unlockRead()
 	defer C.string_array_result_free(result)
 
 	if !result.success {
@@ -280,13 +345,18 @@ func (rs *RustStore) ListAttestationIDs() ([]string, error) {
 
 // CountAttestations returns the total count of attestations.
 func (rs *RustStore) CountAttestations() (int, error) {
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
-	if rs.store == nil {
-		return 0, errors.New("store is closed")
+	rs.lockRead()
+	var result C.CountResultC
+	if rs.readConn != nil {
+		result = C.read_conn_count(rs.readConn)
+	} else {
+		if rs.store == nil {
+			rs.unlockRead()
+			return 0, errors.New("store is closed")
+		}
+		result = C.storage_count(rs.store)
 	}
-
-	result := C.storage_count(rs.store)
+	rs.unlockRead()
 	defer C.count_result_free(result)
 
 	if !result.success {
@@ -297,7 +367,7 @@ func (rs *RustStore) CountAttestations() (int, error) {
 	return int(result.count), nil
 }
 
-// putLocked stores an attestation without acquiring the lock (caller must hold mu).
+// putLocked stores an attestation without acquiring the lock (caller must hold muWrite).
 func (rs *RustStore) putLocked(jsonBytes []byte) error {
 	cJSON := C.CString(string(jsonBytes))
 	defer C.free(unsafe.Pointer(cJSON))
@@ -348,12 +418,16 @@ func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *type
 	}
 
 	// Lock only for the write
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
+	rs.muWrite.Lock()
 	if rs.store == nil {
+		rs.muWrite.Unlock()
 		return nil, errors.New("store is closed")
 	}
-	if err := rs.putLocked(jsonBytes); err != nil {
+	start := time.Now()
+	err = rs.putLocked(jsonBytes)
+	rs.muWrite.Unlock()
+	logSlow(start, "storage_put (GenerateAndCreate)")
+	if err != nil {
 		return nil, errors.Wrap(err, "failed to store attestation")
 	}
 
@@ -400,15 +474,19 @@ func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As,
 	cFilterJSON := C.CString(string(filterJSON))
 	defer C.free(unsafe.Pointer(cFilterJSON))
 
-	// Read lock — query uses the read-only connection, doesn't block writers
-	rs.mu.Lock()
-	if rs.store == nil {
-		rs.mu.Unlock()
+	rs.lockRead()
+	if rs.readConn == nil && rs.store == nil {
+		rs.unlockRead()
 		return nil, errors.New("store is closed")
 	}
 
-	result := C.storage_query(rs.store, cFilterJSON)
-	// Copy result data before unlocking — C strings are valid until result is freed
+	start := time.Now()
+	var result C.AttestationResultC
+	if rs.readConn != nil {
+		result = C.read_conn_query(rs.readConn, cFilterJSON)
+	} else {
+		result = C.storage_query(rs.store, cFilterJSON)
+	}
 	var success bool
 	var errMsg, jsonStr string
 	success = bool(result.success)
@@ -418,7 +496,8 @@ func (rs *RustStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As,
 		jsonStr = C.GoString(result.attestation_json)
 	}
 	C.attestation_result_free(result)
-	rs.mu.Unlock()
+	rs.unlockRead()
+	logSlow(start, "storage_query filter="+string(filterJSON))
 
 	if !success {
 		return nil, errors.New(errMsg)
@@ -464,12 +543,13 @@ func (rs *RustStore) EnforceLimits(actors, contexts, subjects []string, config *
 	cJSON := C.CString(string(inputJSON))
 	defer C.free(unsafe.Pointer(cJSON))
 
-	rs.mu.Lock()
+	rs.muWrite.Lock()
 	if rs.store == nil {
-		rs.mu.Unlock()
+		rs.muWrite.Unlock()
 		return nil, errors.New("store is closed")
 	}
 
+	start := time.Now()
 	result := C.storage_enforce_limits(rs.store, cJSON)
 	var success bool
 	var errMsg, jsonStr string
@@ -480,7 +560,8 @@ func (rs *RustStore) EnforceLimits(actors, contexts, subjects []string, config *
 		jsonStr = C.GoString(result.attestation_json)
 	}
 	C.attestation_result_free(result)
-	rs.mu.Unlock()
+	rs.muWrite.Unlock()
+	logSlow(start, "storage_enforce_limits")
 
 	if !success {
 		return nil, errors.New(errMsg)
@@ -500,13 +581,17 @@ func (rs *RustStore) EnforceLimits(actors, contexts, subjects []string, config *
 
 // GetStorageStats returns storage statistics from Rust.
 func (rs *RustStore) GetStorageStats() (*StorageStats, error) {
-	rs.mu.Lock()
-	if rs.store == nil {
-		rs.mu.Unlock()
-		return nil, errors.New("store is closed")
+	rs.lockRead()
+	var result C.AttestationResultC
+	if rs.readConn != nil {
+		result = C.read_conn_stats(rs.readConn)
+	} else {
+		if rs.store == nil {
+			rs.unlockRead()
+			return nil, errors.New("store is closed")
+		}
+		result = C.storage_get_stats(rs.store)
 	}
-
-	result := C.storage_get_stats(rs.store)
 	var success bool
 	var errMsg, jsonStr string
 	success = bool(result.success)
@@ -516,7 +601,7 @@ func (rs *RustStore) GetStorageStats() (*StorageStats, error) {
 		jsonStr = C.GoString(result.attestation_json)
 	}
 	C.attestation_result_free(result)
-	rs.mu.Unlock()
+	rs.unlockRead()
 
 	if !success {
 		return nil, errors.New(errMsg)
@@ -532,13 +617,17 @@ func (rs *RustStore) GetStorageStats() (*StorageStats, error) {
 
 // GetAllPredicates returns all distinct predicates via Rust FFI.
 func (rs *RustStore) GetAllPredicates() ([]string, error) {
-	rs.mu.Lock()
-	if rs.store == nil {
-		rs.mu.Unlock()
-		return nil, errors.New("store is closed")
+	rs.lockRead()
+	var result C.StringArrayResultC
+	if rs.readConn != nil {
+		result = C.read_conn_predicates(rs.readConn)
+	} else {
+		if rs.store == nil {
+			rs.unlockRead()
+			return nil, errors.New("store is closed")
+		}
+		result = C.storage_predicates(rs.store)
 	}
-
-	result := C.storage_predicates(rs.store)
 	var success bool
 	var errMsg string
 	success = bool(result.success)
@@ -555,7 +644,7 @@ func (rs *RustStore) GetAllPredicates() ([]string, error) {
 		}
 	}
 	C.string_array_result_free(result)
-	rs.mu.Unlock()
+	rs.unlockRead()
 
 	if !success {
 		return nil, errors.Newf("failed to get predicates: %s", errMsg)
@@ -565,13 +654,17 @@ func (rs *RustStore) GetAllPredicates() ([]string, error) {
 
 // GetAllContexts returns all distinct contexts via Rust FFI.
 func (rs *RustStore) GetAllContexts() ([]string, error) {
-	rs.mu.Lock()
-	if rs.store == nil {
-		rs.mu.Unlock()
-		return nil, errors.New("store is closed")
+	rs.lockRead()
+	var result C.StringArrayResultC
+	if rs.readConn != nil {
+		result = C.read_conn_contexts(rs.readConn)
+	} else {
+		if rs.store == nil {
+			rs.unlockRead()
+			return nil, errors.New("store is closed")
+		}
+		result = C.storage_contexts(rs.store)
 	}
-
-	result := C.storage_contexts(rs.store)
 	var success bool
 	var errMsg string
 	success = bool(result.success)
@@ -588,7 +681,7 @@ func (rs *RustStore) GetAllContexts() ([]string, error) {
 		}
 	}
 	C.string_array_result_free(result)
-	rs.mu.Unlock()
+	rs.unlockRead()
 
 	if !success {
 		return nil, errors.Newf("failed to get contexts: %s", errMsg)
@@ -599,13 +692,17 @@ func (rs *RustStore) GetAllContexts() ([]string, error) {
 // IntegrityCheck runs PRAGMA integrity_check via Rust FFI.
 // A healthy database returns []string{"ok"}.
 func (rs *RustStore) IntegrityCheck() ([]string, error) {
-	rs.mu.Lock()
-	if rs.store == nil {
-		rs.mu.Unlock()
-		return nil, errors.New("store is closed")
+	rs.lockRead()
+	var result C.StringArrayResultC
+	if rs.readConn != nil {
+		result = C.read_conn_integrity_check(rs.readConn)
+	} else {
+		if rs.store == nil {
+			rs.unlockRead()
+			return nil, errors.New("store is closed")
+		}
+		result = C.storage_integrity_check(rs.store)
 	}
-
-	result := C.storage_integrity_check(rs.store)
 	var success bool
 	var errMsg string
 	success = bool(result.success)
@@ -622,7 +719,7 @@ func (rs *RustStore) IntegrityCheck() ([]string, error) {
 		}
 	}
 	C.string_array_result_free(result)
-	rs.mu.Unlock()
+	rs.unlockRead()
 
 	if !success {
 		return nil, errors.Newf("integrity check failed: %s", errMsg)
@@ -632,8 +729,8 @@ func (rs *RustStore) IntegrityCheck() ([]string, error) {
 
 // Backup creates a hot backup of the database to destPath.
 // Safe to call while the database is in use — SQLite's backup API handles
-// concurrency internally. Must NOT hold rs.mu: the backup reads the database
-// while other operations write, and holding the Go mutex deadlocks the system.
+// concurrency internally. Does not hold any mutex: the Rust side opens its
+// own read-only source connection for the backup.
 func (rs *RustStore) Backup(destPath string) error {
 	if rs.store == nil {
 		return errors.New("store is closed")
@@ -673,13 +770,19 @@ func (rs *RustStore) QueryAttestationsRaw(sql string, params []interface{}) ([]*
 	cParams := C.CString(string(paramsJSON))
 	defer C.free(unsafe.Pointer(cParams))
 
-	rs.mu.Lock()
-	if rs.store == nil {
-		rs.mu.Unlock()
+	rs.lockRead()
+	if rs.readConn == nil && rs.store == nil {
+		rs.unlockRead()
 		return nil, errors.New("store is closed")
 	}
 
-	result := C.storage_query_raw(rs.store, cSQL, cParams)
+	start := time.Now()
+	var result C.AttestationResultC
+	if rs.readConn != nil {
+		result = C.read_conn_query_raw(rs.readConn, cSQL, cParams)
+	} else {
+		result = C.storage_query_raw(rs.store, cSQL, cParams)
+	}
 	var success bool
 	var errMsg, jsonStr string
 	success = bool(result.success)
@@ -689,7 +792,8 @@ func (rs *RustStore) QueryAttestationsRaw(sql string, params []interface{}) ([]*
 		jsonStr = C.GoString(result.attestation_json)
 	}
 	C.attestation_result_free(result)
-	rs.mu.Unlock()
+	rs.unlockRead()
+	logSlow(start, "storage_query_raw sql="+sql)
 
 	if !success {
 		return nil, errors.Newf("raw query failed: %s", errMsg)

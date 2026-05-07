@@ -14,7 +14,7 @@ Refactor LLM access into a first-class service on `ServiceRegistry`. Plugins cal
 Multiple providers can run simultaneously. The caller specifies which backend to use.
 
 ## Protocol
-`plugin/grpc/protocol/llm.proto`
+`plugin/grpc/protocol/llm.proto` ([LLMService gRPC API](../api/grpc-llm.md))
 
 ## Multi-turn conversation
 

@@ -23,7 +23,8 @@ func TestLoadPluginsFromConfig_NoDuplicates(t *testing.T) {
 		},
 	}
 
-	manager, err := LoadPluginsFromConfig(ctx, cfg, logger, logger)
+	manager := NewPluginManager(logger, logger, "")
+	err := LoadPluginsFromConfig(ctx, manager, cfg, logger)
 	assert.NoError(t, err, "Loading should not error even if plugins not found")
 
 	// Verify no plugins loaded (binaries don't exist)
@@ -56,7 +57,8 @@ func TestLoadPluginsFromConfig_UniquePlugins(t *testing.T) {
 		},
 	}
 
-	manager, err := LoadPluginsFromConfig(ctx, cfg, logger, logger)
+	manager := NewPluginManager(logger, logger, "")
+	err := LoadPluginsFromConfig(ctx, manager, cfg, logger)
 	assert.NoError(t, err)
 
 	plugins := manager.GetAllPlugins()
