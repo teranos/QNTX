@@ -26,3 +26,7 @@ db.Migrate(database, logger)
 ## Migrations
 
 Located in `db/sqlite/migrations/`, named `NNN_description.sql`. Run via `db.Migrate()`.
+
+---
+
+TODO: INTERNAL: Move db/ package to internal.
