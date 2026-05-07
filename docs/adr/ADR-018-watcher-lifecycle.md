@@ -52,12 +52,17 @@ Binary launch          gRPC connect          Initialize RPC         Health poll 
 
 #### Restart
 
-Restart = disable (best-effort) + enable. There is no special restart path.
+`POST /api/plugins/{name}/restart` or `make install` from a plugin directory.
 
-- Disable: gRPC `Shutdown()`, kill process, prune watchers, unregister handlers
-- Enable: discover binary, launch process, connect gRPC, `Initialize`, register everything
+1. QNTX unregisters the plugin from the registry (state → `Restarting`). Browser requests get `503 Plugin still loading` during restart.
+2. Mux cache invalidated so the next request after restart builds a fresh HTTP proxy.
+3. Active ATS streams cancelled to release the database mutex.
+4. Old process killed (`SIGKILL` to process group), old gRPC connection closed.
+5. New binary discovered, launched, gRPC connected — new proxy with fresh `initOnce`.
+6. `registerRestarted`: re-registers in registry, calls `Initialize`, re-registers handlers/schedules/providers, marks ready.
+7. Banner emitted with health status after async health check.
 
-This means a restart always produces a new process, new gRPC connection, new proxy with fresh `initOnce`.
+A restart always produces a new process, new gRPC connection, new proxy. The single `PluginManager` is reused — `LoadPluginsFromConfig` receives the existing manager, no second manager is created.
 
 #### Health polling
 
