@@ -812,7 +812,7 @@ func (c *Client) handleGetDatabaseStats() {
 	// Get recent eviction events from storage_events table
 	var recentEvictions []map[string]interface{}
 	evictionRows, err := c.server.db.Query(`
-		SELECT event_type, actor, context, entity, deletions_count, limit_value, timestamp
+		SELECT event_type, actor, context, entity, deletions_count, limit_value, timestamp, eviction_details
 		FROM storage_events
 		WHERE event_type != 'storage_warning'
 		ORDER BY id DESC
@@ -822,15 +822,16 @@ func (c *Client) handleGetDatabaseStats() {
 		defer evictionRows.Close()
 		for evictionRows.Next() {
 			var (
-				eventType      string
-				actor          sql.NullString
-				ctx            sql.NullString
-				entity         sql.NullString
-				deletionsCount int
-				limitValue     sql.NullInt64
-				timestamp      string
+				eventType       string
+				actor           sql.NullString
+				ctx             sql.NullString
+				entity          sql.NullString
+				deletionsCount  int
+				limitValue      sql.NullInt64
+				timestamp       string
+				evictionDetails sql.NullString
 			)
-			if err := evictionRows.Scan(&eventType, &actor, &ctx, &entity, &deletionsCount, &limitValue, &timestamp); err != nil {
+			if err := evictionRows.Scan(&eventType, &actor, &ctx, &entity, &deletionsCount, &limitValue, &timestamp, &evictionDetails); err != nil {
 				continue
 			}
 			limit := int(limitValue.Int64)
@@ -848,7 +849,7 @@ func (c *Client) handleGetDatabaseStats() {
 			default:
 				message = fmt.Sprintf("Evicted %d attestations (%s)", deletionsCount, eventType)
 			}
-			recentEvictions = append(recentEvictions, map[string]interface{}{
+			record := map[string]interface{}{
 				"event_type":      eventType,
 				"actor":           actor.String,
 				"context":         ctx.String,
@@ -856,7 +857,22 @@ func (c *Client) handleGetDatabaseStats() {
 				"deletions_count": deletionsCount,
 				"message":         message,
 				"timestamp":       timestamp,
-			})
+			}
+			if limitValue.Valid {
+				record["limit_value"] = limit
+			}
+			if evictionDetails.Valid && evictionDetails.String != "" {
+				var detailsMap map[string]interface{}
+				if err := json.Unmarshal([]byte(evictionDetails.String), &detailsMap); err != nil {
+					c.server.logger.Debugw("Failed to parse eviction_details for seed record",
+						"error", err,
+						"event_type", eventType,
+						"raw_json", evictionDetails.String)
+				} else if detailsMap != nil {
+					record["eviction_details"] = detailsMap
+				}
+			}
+			recentEvictions = append(recentEvictions, record)
 		}
 	}
 

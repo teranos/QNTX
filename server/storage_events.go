@@ -169,6 +169,7 @@ func (p *StorageEventsPoller) broadcastEviction(eventType, actor, context, entit
 		"context":         context,
 		"entity":          entity,
 		"deletions_count": deletionsCount,
+		"limit_value":     limit,
 		"message":         message,
 	}
 	if detailsMap != nil {

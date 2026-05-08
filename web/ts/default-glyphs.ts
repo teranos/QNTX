@@ -57,7 +57,7 @@ import { createChartGlyph } from './components/glyph/chart-glyph';
 import { createEmbeddingsGlyph } from './embeddings-glyph';
 import { sendMessage } from './websocket';
 import { DB } from '@generated/sym.js';
-import { seedEvictions, recordEviction as recordEvictionEvent, getEvictionSummary, hasEvictions, renderEvictionChart } from './eviction-chart';
+import { seedEvictions, recordEviction as recordEvictionEvent, getEvictionSummary, hasEvictions, renderEvictionChart, type LiveEvictionRecord } from './eviction-chart';
 import { log, SEG } from './logger.ts';
 import { formatBuildTime } from './components/tooltip.ts';
 import type { VersionMessage, SystemCapabilitiesMessage } from '../types/websocket';
@@ -84,7 +84,7 @@ export function updateDatabaseStats(stats: any): void {
     }
 }
 
-export function recordEviction(data: { event_type: string; actor: string; context: string; entity: string; deletions_count: number; message: string }): void {
+export function recordEviction(data: LiveEvictionRecord): void {
     recordEvictionEvent(data);
     if (dbStatsElement) {
         renderDbStats();

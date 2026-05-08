@@ -359,6 +359,19 @@ export interface LogsMessage extends BaseMessage {
 }
 
 /**
+ * Structured detail about what an eviction removed (mirrors
+ * ats/storage/sqlitecgo/enforcement_types.go:EvictionDetails).
+ * All fields are optional because Rust emits them with `omitempty`.
+ */
+export interface EvictionDetails {
+  evicted_actors?: string[];
+  evicted_contexts?: string[];
+  sample_predicates?: string[];
+  sample_subjects?: string[];
+  last_seen?: string;
+}
+
+/**
  * Storage eviction notification when attestations are deleted due to limits
  */
 export interface StorageEvictionMessage extends BaseMessage {
@@ -368,6 +381,8 @@ export interface StorageEvictionMessage extends BaseMessage {
   context: string;
   entity: string;
   deletions_count: number;
+  limit_value?: number;
+  eviction_details?: EvictionDetails;
   message: string;
 }
 

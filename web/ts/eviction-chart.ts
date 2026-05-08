@@ -4,6 +4,7 @@
  */
 
 import * as d3 from 'd3';
+import type { EvictionDetails } from '../types/websocket';
 
 export interface EvictionRecord {
     event_type: string;
@@ -11,15 +12,42 @@ export interface EvictionRecord {
     context: string;
     entity: string;
     deletions_count: number;
+    limit_value?: number;
+    eviction_details?: EvictionDetails;
     message: string;
     timestamp: number;
+}
+
+/** Shape of a record in the database_stats.recent_evictions seed payload. */
+export interface SeedEvictionRecord {
+    event_type: string;
+    actor: string;
+    context: string;
+    entity: string;
+    deletions_count: number;
+    limit_value?: number;
+    eviction_details?: EvictionDetails;
+    message: string;
+    timestamp: string;
+}
+
+/** Shape of a live storage_eviction WebSocket message payload. */
+export interface LiveEvictionRecord {
+    event_type: string;
+    actor: string;
+    context: string;
+    entity: string;
+    deletions_count: number;
+    limit_value?: number;
+    eviction_details?: EvictionDetails;
+    message: string;
 }
 
 const MAX_EVICTIONS = 1000;
 const evictions: EvictionRecord[] = [];
 
 /** Seed eviction history from backend response (called once on glyph open). */
-export function seedEvictions(records: Array<{ event_type: string; actor: string; context: string; entity: string; deletions_count: number; message: string; timestamp: string }>): void {
+export function seedEvictions(records: SeedEvictionRecord[]): void {
     if (evictions.length > 0 || !records || records.length === 0) return;
     for (const ev of records) {
         evictions.push({
@@ -28,6 +56,8 @@ export function seedEvictions(records: Array<{ event_type: string; actor: string
             context: ev.context,
             entity: ev.entity,
             deletions_count: ev.deletions_count,
+            limit_value: ev.limit_value,
+            eviction_details: ev.eviction_details,
             message: ev.message,
             timestamp: new Date(ev.timestamp).getTime(),
         });
@@ -35,7 +65,7 @@ export function seedEvictions(records: Array<{ event_type: string; actor: string
 }
 
 /** Record a live eviction from WebSocket. */
-export function recordEviction(data: { event_type: string; actor: string; context: string; entity: string; deletions_count: number; message: string }): void {
+export function recordEviction(data: LiveEvictionRecord): void {
     evictions.unshift({
         ...data,
         timestamp: Date.now(),
