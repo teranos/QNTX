@@ -5,16 +5,28 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"golang.org/x/time/rate"
 )
 
 // OnAttestationCreated is called when a new attestation is created.
 // Handles structural watchers only — semantic watchers are handled by
 // OnAttestationEmbedded after the embedding observer generates the vector.
 func (e *Engine) OnAttestationCreated(as *types.As) {
+	// Snapshot under brief RLock to avoid starving loadWatchers' write lock.
+	// Without this, continuous backfill attestations hold RLock for the entire
+	// match loop, preventing loadWatchers from ever acquiring the write lock.
 	e.mu.RLock()
-	defer e.mu.RUnlock()
+	watchers := make([]*storage.Watcher, 0, len(e.watchers))
+	limiters := make(map[string]*rate.Limiter, len(e.rateLimiters))
+	for _, w := range e.watchers {
+		watchers = append(watchers, w)
+	}
+	for k, v := range e.rateLimiters {
+		limiters[k] = v
+	}
+	e.mu.RUnlock()
 
-	for _, watcher := range e.watchers {
+	for _, watcher := range watchers {
 		if !watcher.Enabled {
 			continue
 		}
@@ -41,7 +53,7 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 		if watcher.MaxFiresPerSecond == 0 {
 			continue
 		}
-		limiter := e.rateLimiters[watcher.ID]
+		limiter := limiters[watcher.ID]
 		if limiter != nil && !limiter.Allow() {
 			e.enqueueAttestation(watcher.ID, as, "rate_limited", 0, "")
 			continue
@@ -57,14 +69,28 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 // has been embedded and stored. It handles semantic watcher matching using the
 // pre-computed attestation embedding, avoiding redundant GenerateEmbedding FFI calls.
 func (e *Engine) OnAttestationEmbedded(as *types.As, attestationEmbedding []float32) {
+	// Snapshot under brief RLock (same pattern as OnAttestationCreated).
 	e.mu.RLock()
-	defer e.mu.RUnlock()
-
 	if e.embeddingService == nil {
+		e.mu.RUnlock()
 		return
 	}
+	embSvc := e.embeddingService
+	watchers := make([]*storage.Watcher, 0, len(e.watchers))
+	limiters := make(map[string]*rate.Limiter, len(e.rateLimiters))
+	queryEmbs := make(map[string][]float32, len(e.queryEmbeddings))
+	for _, w := range e.watchers {
+		watchers = append(watchers, w)
+	}
+	for k, v := range e.rateLimiters {
+		limiters[k] = v
+	}
+	for k, v := range e.queryEmbeddings {
+		queryEmbs[k] = v
+	}
+	e.mu.RUnlock()
 
-	for _, watcher := range e.watchers {
+	for _, watcher := range watchers {
 		if !watcher.Enabled {
 			continue
 		}
@@ -80,13 +106,13 @@ func (e *Engine) OnAttestationEmbedded(as *types.As, attestationEmbedding []floa
 		}
 
 		// Get cached query embedding for this watcher
-		queryEmbedding := e.queryEmbeddings[watcher.ID]
+		queryEmbedding := queryEmbs[watcher.ID]
 		if queryEmbedding == nil {
 			continue
 		}
 
 		// Compute cosine similarity (cheap — pure math, no FFI)
-		similarity, err := e.embeddingService.ComputeSimilarity(queryEmbedding, attestationEmbedding)
+		similarity, err := embSvc.ComputeSimilarity(queryEmbedding, attestationEmbedding)
 		if err != nil {
 			e.logger.Debugw("Failed to compute similarity",
 				"watcher_id", watcher.ID,
@@ -106,11 +132,11 @@ func (e *Engine) OnAttestationEmbedded(as *types.As, attestationEmbedding []floa
 
 		// Compound SE→SE watcher: upstream must also pass
 		if watcher.UpstreamSemanticQuery != "" {
-			upstreamEmbedding := e.queryEmbeddings[watcher.ID+":upstream"]
+			upstreamEmbedding := queryEmbs[watcher.ID+":upstream"]
 			if upstreamEmbedding == nil {
 				continue
 			}
-			upstreamSimilarity, err := e.embeddingService.ComputeSimilarity(upstreamEmbedding, attestationEmbedding)
+			upstreamSimilarity, err := embSvc.ComputeSimilarity(upstreamEmbedding, attestationEmbedding)
 			if err != nil {
 				e.logger.Debugw("Failed to compute upstream similarity",
 					"watcher_id", watcher.ID,
@@ -147,7 +173,7 @@ func (e *Engine) OnAttestationEmbedded(as *types.As, attestationEmbedding []floa
 		if watcher.MaxFiresPerSecond == 0 {
 			continue
 		}
-		limiter := e.rateLimiters[watcher.ID]
+		limiter := limiters[watcher.ID]
 		if limiter != nil && !limiter.Allow() {
 			e.enqueueAttestation(watcher.ID, as, "rate_limited", 0, "")
 			continue
