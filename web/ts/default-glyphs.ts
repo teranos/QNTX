@@ -57,9 +57,10 @@ import { createChartGlyph } from './components/glyph/chart-glyph';
 import { createEmbeddingsGlyph } from './embeddings-glyph';
 import { sendMessage } from './websocket';
 import { DB } from '@generated/sym.js';
-import { seedEvictions, recordEviction as recordEvictionEvent, getEvictionSummary, hasEvictions, renderEvictionChart, type LiveEvictionRecord } from './eviction-chart';
+import { seedEvictions, recordEviction as recordEvictionEvent, getEvictionSummary, hasEvictions, getRecentEvictions, renderEvictionChart, type EvictionRecord, type LiveEvictionRecord } from './eviction-chart';
 import { log, SEG } from './logger.ts';
 import { formatBuildTime } from './components/tooltip.ts';
+import { escapeHtml, formatTimestamp } from './html-utils.ts';
 import type { VersionMessage, SystemCapabilitiesMessage } from '../types/websocket';
 import { createPluginGlyph } from './plugin-panel.ts';
 import { createLlmProviderGlyph } from './llm-provider-glyph.ts';
@@ -105,6 +106,51 @@ export function updateSelfCapabilities(data: SystemCapabilitiesMessage): void {
     }
 }
 
+const EVENT_TYPE_LABEL: Record<string, string> = {
+    actor_context_limit: 'actor·context',
+    actor_contexts_limit: 'actor·contexts',
+    entity_actors_limit: 'entity·actors',
+};
+
+function renderRecentEvictionItems(records: EvictionRecord[]): string {
+    if (records.length === 0) return '';
+    const items = records.map(ev => {
+        const time = formatTimestamp(new Date(ev.timestamp));
+        const label = escapeHtml(EVENT_TYPE_LABEL[ev.event_type] ?? ev.event_type);
+        const limit = ev.limit_value !== undefined ? ` <span style="opacity: 0.6;">(limit ${ev.limit_value})</span>` : '';
+        const detailLines: string[] = [];
+        const d = ev.eviction_details;
+        if (d) {
+            if (d.evicted_actors && d.evicted_actors.length > 0) {
+                detailLines.push(`evicted actors: ${d.evicted_actors.map(escapeHtml).join(', ')}`);
+            }
+            if (d.evicted_contexts && d.evicted_contexts.length > 0) {
+                detailLines.push(`evicted contexts: ${d.evicted_contexts.map(escapeHtml).join(', ')}`);
+            }
+            if (d.sample_subjects && d.sample_subjects.length > 0) {
+                detailLines.push(`sample subjects: ${d.sample_subjects.map(escapeHtml).join(', ')}`);
+            }
+            if (d.sample_predicates && d.sample_predicates.length > 0) {
+                detailLines.push(`sample predicates: ${d.sample_predicates.map(escapeHtml).join(', ')}`);
+            }
+            if (d.last_seen) {
+                detailLines.push(`last seen: ${escapeHtml(d.last_seen)}`);
+            }
+        }
+        const detailHtml = detailLines.length > 0
+            ? `<div style="margin-top: 2px; opacity: 0.75; word-break: break-word; overflow-wrap: break-word;">${detailLines.map(l => `<div>${l}</div>`).join('')}</div>`
+            : '';
+        return `
+            <div style="margin-top: 6px; padding: 4px 6px; background: rgba(239, 68, 68, 0.08); border-left: 2px solid #ef4444; border-radius: 2px; font-size: 11px; word-break: break-word; overflow-wrap: break-word;">
+                <div><span style="opacity: 0.7;">${time}</span> · ${label}${limit} · <span style="color: #ef4444;">−${ev.deletions_count}</span></div>
+                <div>${escapeHtml(ev.message)}</div>
+                ${detailHtml}
+            </div>
+        `;
+    }).join('');
+    return `<div class="glyph-recent-evictions" style="margin-top: 6px;">${items}</div>`;
+}
+
 function renderDbStats(): void {
     if (!dbStatsElement) return;
 
@@ -142,16 +188,20 @@ function renderDbStats(): void {
         `;
     }
 
-    // Build eviction section — bar chart aggregated by hour
+    // Build eviction section — bar chart aggregated by hour, plus the most
+    // recent few events in detail so you can see *what* was evicted (which
+    // actors / contexts / sample subjects+predicates), not only the count.
     let evictionSection = '';
     if (hasEvictions()) {
         const summary = getEvictionSummary();
+        const recentItems = renderRecentEvictionItems(getRecentEvictions(3));
         evictionSection = `
             <div class="glyph-row" style="margin-top: 8px; border-top: 1px solid var(--border-color, #333); padding-top: 8px;">
                 <span class="glyph-label">Evictions:</span>
                 <span class="glyph-value">${summary.count} events, ${summary.totalEvicted.toLocaleString()} attestations evicted</span>
             </div>
             <div class="eviction-chart-container"></div>
+            ${recentItems}
         `;
     }
 

@@ -88,6 +88,11 @@ export function hasEvictions(): boolean {
     return evictions.length > 0;
 }
 
+/** Get the most recent N eviction records (newest first). */
+export function getRecentEvictions(n: number): EvictionRecord[] {
+    return evictions.slice(0, n);
+}
+
 /** Render the eviction bar chart into the given container element. */
 export function renderEvictionChart(container: HTMLElement): void {
     container.innerHTML = '';
