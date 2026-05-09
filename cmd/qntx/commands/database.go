@@ -49,13 +49,19 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, error) 
 		rustdriver.Register(rustStore.StorePtr(), rustStore.ReadConnPtr(), rustStore.Mu(), rustStore.MuRead())
 	})
 
-	// Open *sql.DB through the Rust driver — single connection, no pooling
+	// Open *sql.DB through the Rust driver.
+	// MaxOpenConns(4) lets multiple goroutines reach the driver concurrently.
+	// The driver's RustConn is stateless (Close is a no-op) — all connections
+	// delegate to the same Rust store with muWrite/muRead mutex serialization.
+	// With MaxOpenConns(1), reads and writes queue behind each other at the Go
+	// pool layer even though the driver can handle them in parallel via separate
+	// read/write connections (WAL mode). 4 slots eliminate the pool bottleneck.
 	database, err := sql.Open("rustsqlite", dbPath)
 	if err != nil {
 		rustStore.Close()
 		return nil, nil, "", fmt.Errorf("failed to open rustsqlite driver: %w", err)
 	}
-	database.SetMaxOpenConns(1)
+	database.SetMaxOpenConns(4)
 
 	// Create attestation store wrapping the Rust backend
 	atsStore, err := storage.NewStoreFromRust(rustStore, logger.Logger)

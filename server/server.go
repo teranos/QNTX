@@ -109,6 +109,7 @@ type QNTXServer struct {
 	embeddingClusterInvalidator func()                  // called after re-cluster to invalidate centroid cache
 	embeddingStats              schedule.EmbeddingStats // drained by ticker for periodic summary
 	groundDBPath                string
+	watcherDB                   *sql.DB                // Separate DB connection for watcher engine (avoids RustStore contention)
 }
 
 // handleClientRegister handles a new client connection

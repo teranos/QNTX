@@ -201,6 +201,9 @@ func (s *QNTXServer) Stop() error {
 	if s.watcherEngine != nil {
 		s.watcherEngine.Stop()
 	}
+	if s.watcherDB != nil {
+		s.watcherDB.Close()
+	}
 
 	// Shutdown plugins and gRPC services
 	if s.pluginRegistry != nil {

@@ -1,13 +1,13 @@
 package server
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
-
-	"context"
 
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/storage"
@@ -518,10 +518,21 @@ func (s *QNTXServer) broadcastGlyphFired(glyphID string, attestationID string, s
 func (s *QNTXServer) initWatcherEngine() error {
 	apiBaseURL := fmt.Sprintf("http://127.0.0.1:%d", am.GetServerPort())
 
+	// Open a separate DB connection for watcher engine operations (enqueue, recordFire,
+	// edge cursors). This eliminates contention with the main RustStore connection —
+	// without it, watcher goroutines pile up waiting for the single MaxOpenConns(1) slot,
+	// blocking attestation writes for 5+ seconds during high-volume crawls.
+	watcherDB, err := sql.Open("rustsqlite", s.dbPath)
+	if err != nil {
+		return errors.Wrap(err, "failed to open watcher DB connection")
+	}
+	watcherDB.SetMaxOpenConns(4)
+	s.watcherDB = watcherDB
+
 	// Pass atsStore as AttestationReader so watcher queries go through Rust's connection,
 	// eliminating dual-driver access to the attestations table.
 	reader, _ := s.atsStore.(watcher.AttestationReader)
-	s.watcherEngine = watcher.NewEngine(s.db, reader, apiBaseURL, s.logger)
+	s.watcherEngine = watcher.NewEngine(watcherDB, reader, apiBaseURL, s.logger)
 	s.reloadCoalescer = newWatcherReloadCoalescer(s, 50*time.Millisecond)
 
 	// TODO(#780): This is a boot-time snapshot of which glyph types can execute.
