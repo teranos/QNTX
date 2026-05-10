@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/internal/logger"
+	"github.com/teranos/QNTX/internal/version"
 )
 
 func init() {
@@ -138,6 +141,9 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 		"port", actualPort,
 	)
 
+	// Attest startup via ground delivery
+	s.emitLifecycleNews("started", actualPort)
+
 	// Open browser if callback provided
 	if openBrowserFunc != nil {
 		s.logger.Infow("Opening browser", "url", url)
@@ -150,6 +156,11 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 			defer s.wg.Done()
 			s.monitorBrowserConnection()
 		}()
+	}
+
+	// Signal that the server is fully ready — plugins can now initialize.
+	if s.onReady != nil {
+		go s.onReady()
 	}
 
 	s.httpServer = &http.Server{
@@ -188,6 +199,9 @@ func (s *QNTXServer) monitorBrowserConnection() {
 // Stop gracefully shuts down the server and cleans up resources
 func (s *QNTXServer) Stop() error {
 	s.logger.Infow("Initiating server shutdown")
+
+	// Attest shutdown immediately — before any teardown that might get interrupted
+	s.emitLifecycleNews("stopped", 0)
 
 	// Opening/Closing Phase 4: Transition to draining state
 	s.setState(ServerStateDraining)
@@ -284,4 +298,53 @@ func (s *QNTXServer) Stop() error {
 	)
 
 	return nil
+}
+
+// emitLifecycleNews writes an immediate news attestation to ground for startup/shutdown.
+func (s *QNTXServer) emitLifecycleNews(event string, port int) {
+	v := version.Get()
+
+	// Collect plugin names — at startup these are enabled (not yet initialized),
+	// at shutdown these are the plugins that were registered during the session.
+	var plugins []string
+	if s.pluginRegistry != nil {
+		plugins = s.pluginRegistry.List()
+	}
+
+	ts := time.Now().Format("15:04:05")
+	detail := fmt.Sprintf("QNTX %s (%s) %s at %s", v.Version, v.Short(), event, ts)
+	if port > 0 {
+		detail += fmt.Sprintf(" on port %d", port)
+	}
+	if len(plugins) > 0 {
+		if event == "started" {
+			detail += fmt.Sprintf(" plugins enabled: %s", strings.Join(plugins, ", "))
+		} else {
+			detail += fmt.Sprintf(" with %s", strings.Join(plugins, ", "))
+		}
+	}
+
+	attrs := map[string]interface{}{
+		"event":      event,
+		"version":    v.Version,
+		"commit":     v.CommitHash,
+		"build_time": v.BuildTime,
+		"log_path":   s.logPath,
+		"db_path":    s.dbPath,
+	}
+	if port > 0 {
+		attrs["port"] = port
+		attrs["url"] = fmt.Sprintf("http://localhost:%d", port)
+	}
+	if len(plugins) > 0 {
+		attrs["plugins"] = plugins
+		logDir := filepath.Dir(s.logPath)
+		pluginLogs := make(map[string]string, len(plugins))
+		for _, name := range plugins {
+			pluginLogs[name] = filepath.Join(logDir, name+".log")
+		}
+		attrs["plugin_logs"] = pluginLogs
+	}
+
+	WriteImmediateNews(s.groundDBPath, "qntx", "lifecycle", "qntx-server", detail, attrs, s.logger)
 }

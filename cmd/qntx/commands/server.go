@@ -34,6 +34,10 @@ var (
 	serverDBPath    string
 )
 
+// DeferredPluginInit is set by main's init() to hold the plugin initialization
+// function. The server fires this via onReady after it's fully started.
+var DeferredPluginInit func()
+
 func init() {
 	// Server command flags
 	ServerCmd.Flags().BoolVar(&serverTestMode, "test-mode", false, "Run with test database")
@@ -91,11 +95,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	logPath := cfg.GetLogPath(serverPort)
 
 	// Print startup banner
-	printStartupBanner(verbosity, dbPath, logPath)
-
-	if serverAtsQuery != "" {
-		pterm.Info.Printf("Pre-loaded query: %s\n", serverAtsQuery)
-	}
+	printStartupBanner(verbosity, dbPath, logPath, cfg.Plugin.Enabled)
 
 	// Create server with pre-created attestation store
 	srvStart := time.Now()
@@ -104,6 +104,12 @@ func runServer(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to create server")
 	}
 	bootLog.Infow("NewQNTXServer complete", "took", time.Since(srvStart))
+
+	// Wire deferred plugin initialization — fires when server is fully ready
+	// (migrations done, HTTP listening), not before.
+	if DeferredPluginInit != nil {
+		srv.SetOnReady(DeferredPluginInit)
+	}
 
 	// Start server in goroutine
 	// The server will call openBrowser with the actual port (unless --no-browser is set)

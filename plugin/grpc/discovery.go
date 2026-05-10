@@ -95,6 +95,7 @@ type PluginManager struct {
 	failedPlugins            map[string]string // plugin name → error message for plugins that failed to load
 	logger                   *zap.SugaredLogger
 	rootLogger               *zap.SugaredLogger // un-named root logger for creating per-plugin named loggers
+	logDir                   string             // directory for per-plugin log files (default: "tmp")
 	basePort                 int
 	nextPort                 int             // Track the next port to allocate
 	portMu                   sync.Mutex      // Separate mutex for port allocation
@@ -106,6 +107,7 @@ type PluginManager struct {
 	onWatchersSetup          func()                                                    // called after plugin watchers are written to DB
 	onPluginRestarted        func(name string)                                         // called after auto-restart succeeds (clear HTTP mux state)
 	onEmbeddingProviderReady func(name string, client protocol.EmbeddingServiceClient) // called when embedding provider is ready (init or restart)
+	onLifecycleEvent         func(pluginName, version, event string, routes []string)  // called on plugin lifecycle events (started, stopped, restarted, enabled, disabled)
 	pidFile                  *pidFile
 	db                       *sql.DB                // for schedule setup on restart
 	handlerRegistry          *async.HandlerRegistry // for handler re-registration on restart
@@ -122,6 +124,7 @@ type managedPlugin struct {
 	stdoutLogger *pluginLogger
 	stderrLogger *pluginLogger
 	logBuffer    *LogBuffer
+	logFile      *os.File    // per-plugin log file, closed on shutdown/restart
 }
 
 // killAndWait terminates the plugin process and waits for exit.
@@ -194,6 +197,7 @@ func NewPluginManager(logger *zap.SugaredLogger, rootLogger *zap.SugaredLogger, 
 		retryCancels:      make(map[string]context.CancelFunc),
 		logger:            logger,
 		rootLogger:        rootLogger,
+		logDir:            "tmp",
 		basePort:          DefaultPluginBasePort,
 		nextPort:          DefaultPluginBasePort,
 		typescriptRuntime: typescriptRuntime,
@@ -229,6 +233,11 @@ func (m *PluginManager) SetPidFile(dir string, serverPort int) {
 	m.pidFile = newPidFile(filepath.Join(dir, name), m.logger)
 }
 
+// SetLogDir sets the directory for per-plugin log files.
+func (m *PluginManager) SetLogDir(dir string) {
+	m.logDir = dir
+}
+
 // SetServicesManager sets the services manager for LLM provider re-registration after restart.
 func (m *PluginManager) SetServicesManager(sm *ServicesManager) {
 	m.servicesManager = sm
@@ -250,6 +259,26 @@ func (m *PluginManager) SetOnWatchersSetup(fn func()) {
 // The server uses this to clear stale HTTP mux state (sync.Once + cached ServeMux).
 func (m *PluginManager) SetOnPluginRestarted(fn func(name string)) {
 	m.onPluginRestarted = fn
+}
+
+// SetOnLifecycleEvent sets a callback invoked on plugin lifecycle events
+// (started, stopped, restarted, enabled, disabled). The server uses this to
+// write deferred news attestations to Ground.
+func (m *PluginManager) SetOnLifecycleEvent(fn func(pluginName, version, event string, routes []string)) {
+	m.onLifecycleEvent = fn
+}
+
+// emitLifecycle fires the lifecycle callback if set.
+// Every banner emission is a lifecycle moment worth attesting.
+func (m *PluginManager) emitLifecycle(name, version, event string, routes []string) {
+	if m.onLifecycleEvent != nil {
+		m.onLifecycleEvent(name, version, event, routes)
+	}
+}
+
+// EmitLifecycle is the exported version for callers outside the package.
+func (m *PluginManager) EmitLifecycle(name, version, event string, routes []string) {
+	m.emitLifecycle(name, version, event, routes)
 }
 
 // SetOnEmbeddingProviderReady sets a callback invoked when an embedding provider
@@ -397,6 +426,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 	var stdoutLogger *pluginLogger
 	var stderrLogger *pluginLogger
 	var logBuf *LogBuffer
+	var logFile *os.File
 
 	if config.Address != "" {
 		addr = config.Address
@@ -407,7 +437,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 
 		var err error
 		var actualPort int
-		pluginCmd, actualPort, stdoutLogger, stderrLogger, logBuf, err = m.launchPlugin(ctx, config, port)
+		pluginCmd, actualPort, stdoutLogger, stderrLogger, logBuf, logFile, err = m.launchPlugin(ctx, config, port)
 		if err != nil {
 			return errors.Wrapf(err, "failed to launch plugin %s (binary=%s, port=%d)",
 				config.Name, config.Binary, port)
@@ -510,6 +540,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		stdoutLogger: stdoutLogger,
 		stderrLogger: stderrLogger,
 		logBuffer:    logBuf,
+		logFile:      logFile,
 	}
 	m.mu.Unlock()
 
@@ -554,14 +585,14 @@ func (m *PluginManager) allocatePort() int {
 
 // launchPlugin starts a plugin binary and returns the command, actual port, loggers, and log buffer.
 // If the plugin outputs QNTX_PLUGIN_PORT=XXXX, that port is returned instead of the requested port.
-func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, port int) (*exec.Cmd, int, *pluginLogger, *pluginLogger, *LogBuffer, error) {
+func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, port int) (*exec.Cmd, int, *pluginLogger, *pluginLogger, *LogBuffer, *os.File, error) {
 	binary := config.Binary
 
 	// Resolve relative paths
 	if !filepath.IsAbs(binary) {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return nil, 0, nil, nil, nil, errors.Wrapf(err, "failed to get home directory for plugin %s", config.Name)
+			return nil, 0, nil, nil, nil, nil, errors.Wrapf(err, "failed to get home directory for plugin %s", config.Name)
 		}
 		binary = filepath.Join(home, ".qntx", "plugins", binary)
 	}
@@ -569,7 +600,7 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	// Check if binary exists
 	if _, err := os.Stat(binary); os.IsNotExist(err) {
 		err := errors.Newf("plugin binary not found for %s: %s", config.Name, binary)
-		return nil, 0, nil, nil, nil, errors.WithHint(err, "install the plugin binary to ~/.qntx/plugins/ or specify the full path in config")
+		return nil, 0, nil, nil, nil, nil, errors.WithHint(err, "install the plugin binary to ~/.qntx/plugins/ or specify the full path in config")
 	}
 
 	// Detect TypeScript plugins and wrap with Bun runtime
@@ -581,14 +612,14 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 		runtimePath := m.typescriptRuntime
 		if runtimePath == "" {
 			err := errors.New("TypeScript runtime not configured")
-			return nil, 0, nil, nil, nil, errors.WithHint(err,
+			return nil, 0, nil, nil, nil, nil, errors.WithHint(err,
 				"set plugin.runtime.typescript_runtime in am.toml or QNTX_ROOT environment variable")
 		}
 
 		// Validate runtime exists
 		if _, err := os.Stat(runtimePath); os.IsNotExist(err) {
 			err := errors.Newf("TypeScript runtime not found at %s", runtimePath)
-			return nil, 0, nil, nil, nil, errors.WithHint(err,
+			return nil, 0, nil, nil, nil, nil, errors.WithHint(err,
 				"verify QNTX installation or set correct path in plugin.runtime.typescript_runtime")
 		}
 
@@ -632,17 +663,35 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	// Create shared log buffer for live streaming
 	logBuf := NewLogBuffer(200)
 
+	// Open per-plugin log file (e.g. tmp/levi.log).
+	// Plugin output goes here instead of the main QNTX log.
+	var logFile *os.File
+	if m.logDir != "" {
+		if err := os.MkdirAll(m.logDir, 0755); err != nil {
+			m.logger.Warnw("Failed to create plugin log directory", "dir", m.logDir, "error", err)
+		} else {
+			logPath := filepath.Join(m.logDir, config.Name+".log")
+			f, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+			if err != nil {
+				m.logger.Warnw("Failed to open plugin log file", "path", logPath, "error", err)
+			} else {
+				logFile = f
+				marker := fmt.Sprintf("\n========== %s START %s ==========\n",
+					strings.ToUpper(config.Name), time.Now().Format("2006-01-02T15:04:05.000"))
+				logFile.WriteString(marker)
+			}
+		}
+	}
+
 	// Capture output for debugging and port discovery.
-	// Each plugin gets its own named logger so the zap name shows "scry" not "plugin-loader".
-	pLogger := m.rootLogger.Named(config.Name)
 	stdoutLogger := &pluginLogger{
-		logger:    pLogger,
+		file:      logFile,
 		level:     "info",
 		portChan:  portChan,
 		logBuffer: logBuf,
 	}
 	stderrLogger := &pluginLogger{
-		logger:    pLogger,
+		file:      logFile,
 		level:     "debug",
 		logBuffer: logBuf,
 		// Don't pass portChan to stderr - port announcement should be on stdout
@@ -652,7 +701,7 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	cmd.Stderr = stderrLogger
 
 	if err := cmd.Start(); err != nil {
-		return nil, 0, nil, nil, nil, errors.Wrapf(err, "failed to start plugin %s (cmd=%v)",
+		return nil, 0, nil, nil, nil, nil, errors.Wrapf(err, "failed to start plugin %s (cmd=%v)",
 			config.Name, cmd.Args)
 	}
 
@@ -674,7 +723,7 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 			"port", port)
 	}
 
-	return cmd, actualPort, stdoutLogger, stderrLogger, logBuf, nil
+	return cmd, actualPort, stdoutLogger, stderrLogger, logBuf, logFile, nil
 }
 
 // waitForPlugin waits for a plugin's gRPC server to become ready.
@@ -893,6 +942,9 @@ func (m *PluginManager) RestartPlugin(ctx context.Context, name string, searchPa
 	}
 
 	p.killAndWait()
+	if p.logFile != nil {
+		p.logFile.Close()
+	}
 	delete(m.plugins, name)
 	m.mu.Unlock()
 
@@ -1093,8 +1145,9 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		m.accumulator.SetLoading(name, meta.Version)
 		m.accumulator.SetRoles(name, roles)
 		m.accumulator.SetHandlers(name, proxy.GetHandlerNames(), len(proxy.GetSchedules()), len(proxy.GetWatchers()))
+		var routeStrs []string
 		if routes := proxy.GetHTTPRoutes(); len(routes) > 0 {
-			routeStrs := make([]string, len(routes))
+			routeStrs = make([]string, len(routes))
 			for i, r := range routes {
 				routeStrs[i] = r.GetMethod() + " " + r.GetPath()
 			}
@@ -1119,6 +1172,7 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 			m.accumulator.SetHealth(name, health.Healthy, health.Message, details)
 			m.accumulator.Emit(name, reason)
 			m.logger.Infow("registerRestarted: banner emitted", "plugin", name, "reason", reason)
+			m.emitLifecycle(name, meta.Version, string(reason), routeStrs)
 		}()
 	} else {
 		m.logger.Warnw("registerRestarted: accumulator is nil, no banner will be emitted", "plugin", name)
@@ -1218,6 +1272,8 @@ func (m *PluginManager) DisablePlugin(ctx context.Context, name string, registry
 		m.accumulator.Emit(name, BannerDisabled)
 	}
 
+	m.emitLifecycle(name, meta.Version, "disabled", nil)
+
 	return nil
 }
 
@@ -1250,6 +1306,8 @@ func (m *PluginManager) Shutdown(ctx context.Context) error {
 	var errs []error
 
 	for name, p := range m.plugins {
+		meta := p.client.Metadata()
+
 		// Shutdown the plugin via gRPC
 		if err := p.client.Shutdown(ctx); err != nil {
 			m.logger.Warnw("Plugin shutdown error", "name", name, "error", err)
@@ -1262,6 +1320,13 @@ func (m *PluginManager) Shutdown(ctx context.Context) error {
 				p.process.Kill()
 			}
 		}
+
+		// Close per-plugin log file
+		if p.logFile != nil {
+			p.logFile.Close()
+		}
+
+		m.emitLifecycle(name, meta.Version, "stopped", nil)
 	}
 
 	m.plugins = make(map[string]*managedPlugin)
@@ -1277,9 +1342,10 @@ func (m *PluginManager) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-// pluginLogger logs plugin output and captures port announcements.
+// pluginLogger captures plugin stdout/stderr, writes to a per-plugin log file,
+// and feeds the LogBuffer for WebSocket live streaming.
 type pluginLogger struct {
-	logger    *zap.SugaredLogger
+	file      *os.File   // per-plugin log file (e.g. tmp/levi.log)
 	level     string
 	buf       strings.Builder
 	portChan  chan int   // Optional channel to send discovered port
@@ -1335,19 +1401,10 @@ func (l *pluginLogger) Write(p []byte) (n int, err error) {
 				})
 			}
 
-			// Log with plugin identity from logger name
-			msg := line
-			switch actualLevel {
-			case "debug":
-				l.logger.Debug(msg)
-			case "info":
-				l.logger.Info(msg)
-			case "warn":
-				l.logger.Warn(msg)
-			case "error":
-				l.logger.Error(msg)
-			default:
-				l.logger.Warn(msg)
+			// Write to per-plugin log file with timestamp and level
+			if l.file != nil {
+				ts := time.Now().Format("2006-01-02T15:04:05.000")
+				fmt.Fprintf(l.file, "%s\t%s\t%s\n", ts, strings.ToUpper(actualLevel), line)
 			}
 		}
 	}

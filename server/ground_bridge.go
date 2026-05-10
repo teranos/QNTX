@@ -3,7 +3,11 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"time"
 
+	"github.com/teranos/QNTX/ats/identity"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	_ "github.com/mattn/go-sqlite3"
@@ -49,5 +53,64 @@ func writeToGround(dbPath string, as *types.As, logger *zap.SugaredLogger) {
 		return
 	}
 
-	logger.Infow("Wrote deferred news to Ground db", "path", dbPath, "asid", as.ID)
+	logger.Infow("Wrote news to Ground db", "path", dbPath, "asid", as.ID, "predicate", as.Predicates[0])
+}
+
+// cachedProjectCtx is computed once at init from the startup working directory.
+// os.Getwd() can shift during shutdown, so we freeze it early.
+var cachedProjectCtx string
+
+func init() {
+	cwd, _ := os.Getwd()
+	cachedProjectCtx = "project:" + filepath.Join(filepath.Base(filepath.Dir(cwd)), filepath.Base(cwd))
+}
+
+// writeGroundNews writes an attestation to Ground's database with the given
+// predicate prefix ("deferred:" or "immediate:").
+func writeGroundNews(dbPath string, prefix, subject, predicate, actor, detail string, extraAttrs map[string]interface{}, logger *zap.SugaredLogger) {
+	if dbPath == "" {
+		return
+	}
+
+	projectCtx := cachedProjectCtx
+	fullPred := prefix + predicate
+
+	asid, err := identity.GenerateASUID("AS", subject, fullPred, projectCtx)
+	if err != nil {
+		logger.Warnw("Failed to generate ASID for ground news", "predicate", fullPred, "error", err)
+		return
+	}
+
+	attrs := map[string]interface{}{
+		"detail": detail,
+		"after":  time.Now().Unix(),
+	}
+	for k, v := range extraAttrs {
+		attrs[k] = v
+	}
+
+	now := time.Now()
+	writeToGround(dbPath, &types.As{
+		ID:         asid,
+		Subjects:   []string{subject},
+		Predicates: []string{fullPred},
+		Contexts:   []string{projectCtx},
+		Actors:     []string{actor},
+		Timestamp:  now,
+		Source:     actor,
+		Attributes: attrs,
+		CreatedAt:  now,
+	}, logger)
+}
+
+// WriteDeferredNews writes a deferred news attestation to Ground's database.
+// Delivered at the next Stop hook after the "after" timestamp passes.
+func WriteDeferredNews(dbPath string, subject, predicate, actor, detail string, extraAttrs map[string]interface{}, logger *zap.SugaredLogger) {
+	writeGroundNews(dbPath, "deferred:", subject, predicate, actor, detail, extraAttrs, logger)
+}
+
+// WriteImmediateNews writes an immediate news attestation to Ground's database.
+// Delivered in real time by Ground's asyncRewake watcher polling every 2s.
+func WriteImmediateNews(dbPath string, subject, predicate, actor, detail string, extraAttrs map[string]interface{}, logger *zap.SugaredLogger) {
+	writeGroundNews(dbPath, "immediate:", subject, predicate, actor, detail, extraAttrs, logger)
 }

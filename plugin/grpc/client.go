@@ -129,6 +129,11 @@ func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDo
 	return proxy, nil
 }
 
+// Addr returns the gRPC address this proxy is connected to.
+func (c *ExternalDomainProxy) Addr() string {
+	return c.addr
+}
+
 // Close closes the gRPC connection.
 func (c *ExternalDomainProxy) Close() error {
 	return c.conn.Close()
@@ -547,6 +552,7 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 			"plugin", c.metadata.Name,
 			"method", r.Method,
 			"path", req.Path,
+			"addr", c.addr,
 			"error", err)
 		http.Error(w, fmt.Sprintf("Plugin '%s' error: %v (%s %s)", c.metadata.Name, err, r.Method, req.Path), http.StatusBadGateway)
 		return

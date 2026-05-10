@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -127,6 +128,8 @@ func initializePluginRegistry() {
 	if home, err := os.UserHomeDir(); err == nil {
 		manager.SetPidFile(filepath.Join(home, ".qntx"), am.GetServerPort())
 	}
+	logPath := cfg.GetLogPath(am.GetServerPort())
+	manager.SetLogDir(filepath.Dir(logPath))
 	grpc.SetDefaultPluginManager(manager)
 
 	// If no plugins enabled, run in minimal mode
@@ -139,10 +142,18 @@ func initializePluginRegistry() {
 	for _, pluginName := range cfg.Plugin.Enabled {
 		registry.PreRegister(pluginName)
 	}
+	logDir := filepath.Dir(logPath)
+	for _, name := range cfg.Plugin.Enabled {
+		pluginLogger.Infow("Plugin log", "plugin", name, "path", filepath.Join(logDir, name+".log"))
+	}
 	pluginLogger.Debugf("Pre-registered %d plugins, loading in background", len(cfg.Plugin.Enabled))
 
-	// Load plugins asynchronously in background
-	go loadPluginsAsync(cfg, pluginLogger, registry)
+	// Plugin loading is deferred until the server signals it's ready.
+	// The server calls onReady after migrations, routes, and HTTP listener
+	// are all set up — no timeout polling, no race with migrations.
+	commands.DeferredPluginInit = func() {
+		loadPluginsAsync(cfg, pluginLogger, registry)
+	}
 }
 
 // loadPluginsAsync performs async plugin loading without blocking server startup
@@ -232,6 +243,23 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 				defaultServer.SetupPluginEmbeddingService(client)
 				pluginLogger.Debugw("Re-wired embedding provider after restart", "plugin", name)
 			})
+			groundDBPath := cfg.GroundDBPath
+			pm.SetOnLifecycleEvent(func(pluginName, version, event string, routes []string) {
+				ts := time.Now().Format("15:04:05")
+				detail := fmt.Sprintf("%s %s %s at %s", pluginName, version, event, ts)
+				if len(routes) > 0 {
+					detail += " — " + strings.Join(routes, ", ")
+				}
+				attrs := map[string]interface{}{
+					"event":          event,
+					"plugin_version": version,
+					"log_path":       filepath.Join(filepath.Dir(cfg.GetLogPath(am.GetServerPort())), pluginName+".log"),
+				}
+				if len(routes) > 0 {
+					attrs["routes"] = routes
+				}
+				server.WriteImmediateNews(groundDBPath, pluginName, "plugin-lifecycle", pluginName, detail, attrs, pluginLogger)
+			})
 		}
 
 		// Capture Pulse resources before init loop so goroutines can register handlers.
@@ -295,6 +323,9 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 							if acc != nil {
 								acc.SetFailed(meta.Name, bgErr.Error())
 								acc.Emit(meta.Name, grpc.BannerBoot)
+							}
+							if pm := grpc.GetDefaultPluginManager(); pm != nil {
+								pm.EmitLifecycle(meta.Name, meta.Version, "failed", nil)
 							}
 							return
 						}
@@ -416,13 +447,17 @@ func registerPluginHandlers(p plugin.DomainPlugin, meta plugin.Metadata, handler
 		}
 	}
 
+	var routeStrs []string
+	if routes := externalPlugin.GetHTTPRoutes(); len(routes) > 0 {
+		routeStrs = make([]string, len(routes))
+		for i, r := range routes {
+			routeStrs[i] = r.GetMethod() + " " + r.GetPath()
+		}
+	}
+
 	if acc != nil {
 		acc.SetHandlers(meta.Name, externalPlugin.GetHandlerNames(), len(schedules), len(externalPlugin.GetWatchers()))
-		if routes := externalPlugin.GetHTTPRoutes(); len(routes) > 0 {
-			routeStrs := make([]string, len(routes))
-			for i, r := range routes {
-				routeStrs[i] = r.GetMethod() + " " + r.GetPath()
-			}
+		if len(routeStrs) > 0 {
 			acc.SetHTTPRoutes(meta.Name, routeStrs)
 		}
 		healthCtx, hCancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -436,6 +471,10 @@ func registerPluginHandlers(p plugin.DomainPlugin, meta plugin.Metadata, handler
 		}
 		acc.SetHealth(meta.Name, health.Healthy, health.Message, details)
 		acc.Emit(meta.Name, grpc.BannerBoot)
+	}
+
+	if pm := grpc.GetDefaultPluginManager(); pm != nil {
+		pm.EmitLifecycle(meta.Name, meta.Version, "started", routeStrs)
 	}
 }
 

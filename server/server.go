@@ -110,6 +110,7 @@ type QNTXServer struct {
 	embeddingStats              schedule.EmbeddingStats // drained by ticker for periodic summary
 	groundDBPath                string
 	watcherDB                   *sql.DB                // Separate DB connection for watcher engine (avoids RustStore contention)
+	onReady                     func()                 // Called once when server is fully ready (routes, DB, listeners)
 }
 
 // handleClientRegister handles a new client connection
@@ -344,6 +345,13 @@ func (s *QNTXServer) GetServicesManager() *grpcplugin.ServicesManager {
 	return s.servicesManager
 }
 
+// SetOnReady sets a callback invoked once the server is fully ready
+// (migrations complete, routes set up, HTTP listening). Plugins should
+// initialize after this fires, not before.
+func (s *QNTXServer) SetOnReady(fn func()) {
+	s.onReady = fn
+}
+
 // ReloadWatchers reloads the watcher engine's in-memory map from the database.
 func (s *QNTXServer) ReloadWatchers() error {
 	if s.watcherEngine == nil {
@@ -374,7 +382,11 @@ func (s *QNTXServer) RegisterPluginMux(name string) {
 		return
 	}
 	s.pluginMuxes.Store(name, mux)
-	s.logger.Infow("Registered HTTP proxy handlers", "plugin", name)
+	if ep, ok := p.(*grpcplugin.ExternalDomainProxy); ok {
+		s.logger.Infow("Registered HTTP proxy handlers", "plugin", name, "addr", ep.Addr())
+	} else {
+		s.logger.Infow("Registered HTTP proxy handlers", "plugin", name)
+	}
 }
 
 // getAttestationByID retrieves a single attestation through the attestation store (Rust FFI).
