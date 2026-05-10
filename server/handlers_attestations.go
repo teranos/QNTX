@@ -198,7 +198,17 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		CreatedAt:  time.Now(),
 	}
 
-	if err := s.atsStore.CreateAttestation(as); err != nil {
+	// Use high priority so POST jumps ahead of queued plugin writes.
+	var createErr error
+	type highPriorityCreator interface {
+		CreateAttestationHighPriority(as *types.As) error
+	}
+	if hp, ok := s.atsStore.(highPriorityCreator); ok {
+		createErr = hp.CreateAttestationHighPriority(as)
+	} else {
+		createErr = s.atsStore.CreateAttestation(as)
+	}
+	if err := createErr; err != nil {
 		writeWrappedError(w, s.logger, err,
 			fmt.Sprintf("failed to create attestation %s (subjects: %v, predicates: %v, source: %s)",
 				req.ID, req.Subjects, req.Predicates, req.Source),
@@ -206,7 +216,7 @@ func (s *QNTXServer) handleCreateAttestation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	s.logger.Infow("Attestation synced from browser",
+	s.logger.Infow("Attestation created",
 		"id", req.ID,
 		"subjects", req.Subjects,
 		"predicates", req.Predicates,

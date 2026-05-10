@@ -44,6 +44,9 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, error) 
 		return nil, nil, "", fmt.Errorf("failed to create Rust store at %s: %w", dbPath, err)
 	}
 
+	// Start priority write queue — POST (high) jumps ahead of plugin writes (low).
+	rustStore.StartWriteQueue(8, 64)
+
 	// Register the Rust SQL driver (once per process)
 	driverOnce.Do(func() {
 		rustdriver.Register(rustStore.StorePtr(), rustStore.ReadConnPtr(), rustStore.Mu(), rustStore.MuRead())

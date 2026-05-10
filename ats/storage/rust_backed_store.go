@@ -135,8 +135,26 @@ func (s *RustBackedStore) GenerateAndCreateAttestation(ctx context.Context, cmd 
 	return as, nil
 }
 
+// CreateAttestationHighPriority signs and stores with high priority.
+// POST handler uses this to jump ahead of queued plugin writes.
+func (s *RustBackedStore) CreateAttestationHighPriority(as *types.As) error {
+	if signer := getDefaultSigner(); signer != nil {
+		if err := signer.Sign(as); err != nil {
+			return errors.Wrapf(err, "failed to sign attestation %s", as.ID)
+		}
+	}
+
+	if err := s.rust.CreateAttestationHighPriority(as); err != nil {
+		return errors.Wrapf(err, "rust create attestation %s (high priority)", as.ID)
+	}
+
+	notifyObservers(as)
+	return nil
+}
+
 // Backup creates a hot backup of the database to destPath.
 // Implements schedule.BackupProvider.
 func (s *RustBackedStore) Backup(destPath string) error {
 	return s.rust.Backup(destPath)
 }
+
