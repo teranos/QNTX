@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 )
 
 func makeEntry(i int) LogEntry {
@@ -189,7 +188,6 @@ func TestLogBuffer_ConcurrentWrites(t *testing.T) {
 func TestPluginLogger_WritesToLogBuffer(t *testing.T) {
 	buf := NewLogBuffer(10)
 	logger := &pluginLogger{
-		logger:    zap.NewNop().Sugar(),
 		level:     "info",
 		logBuffer: buf,
 	}
@@ -208,7 +206,6 @@ func TestPluginLogger_WritesToLogBuffer(t *testing.T) {
 func TestPluginLogger_JSONLevelExtraction(t *testing.T) {
 	buf := NewLogBuffer(10)
 	logger := &pluginLogger{
-		logger:    zap.NewNop().Sugar(),
 		level:     "info",
 		logBuffer: buf,
 	}
@@ -223,7 +220,6 @@ func TestPluginLogger_JSONLevelExtraction(t *testing.T) {
 func TestPluginLogger_StderrSource(t *testing.T) {
 	buf := NewLogBuffer(10)
 	logger := &pluginLogger{
-		logger:    zap.NewNop().Sugar(),
 		level:     "error", // stderr logger has level "error"
 		logBuffer: buf,
 	}
