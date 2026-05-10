@@ -1,8 +1,9 @@
 package types
 
 import (
-	"log"
 	"time"
+
+	"github.com/teranos/QNTX/internal/logger"
 )
 
 // As represents an attestation - a verifiable claim about subjects,
@@ -62,7 +63,7 @@ func (cmd *AsCommand) ToAs(asid, source string) *As {
 	if effectiveSource == "" {
 		// DEPRECATED: Source should be explicitly provided by all callers
 		// This fallback exists for backwards compatibility but will be removed
-		log.Printf("DEPRECATION WARNING: ToAs() called without source (neither cmd.Source nor parameter set), falling back to 'cli'. Set AsCommand.Source explicitly.")
+		logger.Logger.Warnw("ToAs() called without source, falling back to 'cli'", "hint", "set AsCommand.Source explicitly")
 		effectiveSource = "cli"
 	}
 

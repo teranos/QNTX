@@ -278,6 +278,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		// These services allow plugins to call back to QNTX core
 		servicesManager := grpcplugin.NewServicesManager(deps.config.LLM, serverLogger)
 		filesDir := filepath.Join(filepath.Dir(dbPath), "files")
+
 		endpoints, err := servicesManager.Start(ctx, atsStore, queue, scheduleStore, filesDir, deps.config.GroundDBPath)
 		if err != nil {
 			serverLogger.Warnw("Failed to start plugin services, plugins will not have service access", "error", err)

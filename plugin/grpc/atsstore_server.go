@@ -3,12 +3,12 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 )
@@ -252,7 +252,7 @@ func protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error
 
 	source := proto.Source
 	if source == "" {
-		log.Printf("DEPRECATION WARNING: AttestationCommand.source not set by plugin, falling back to 'plugin'. Set source to your plugin name.")
+		logger.Logger.Warnw("AttestationCommand.source not set by plugin, falling back to 'plugin'", "hint", "set source to your plugin name")
 		source = "plugin"
 	}
 

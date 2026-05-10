@@ -1,12 +1,9 @@
 package grpc
 
 import (
+	"os"
 	"strings"
 	"testing"
-
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestFormatBanner_Boot(t *testing.T) {
@@ -245,28 +242,34 @@ func TestAccumulator_SnapshotAndDiff(t *testing.T) {
 	}
 }
 
-func TestPluginLogger_NoVersionPrefix(t *testing.T) {
-	core, logs := observer.New(zapcore.InfoLevel)
-	sugar := zap.New(core).Named("spindle").Sugar()
+func TestPluginLogger_WritesToFile(t *testing.T) {
+	tmpFile, err := os.CreateTemp(t.TempDir(), "plugin-*.log")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tmpFile.Close()
 
 	pl := &pluginLogger{
-		logger: sugar,
-		level:  "info",
+		file:  tmpFile,
+		level: "info",
 	}
 
 	pl.Write([]byte("[spindle] ATSClient connected to 127.0.0.1:50648\n"))
 
-	if logs.Len() != 1 {
-		t.Fatalf("expected 1 log entry, got %d", logs.Len())
+	content, err := os.ReadFile(tmpFile.Name())
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	msg := logs.All()[0].Message
-	// Must NOT contain a version prefix like "[spindle v0.4.1]"
-	if strings.Contains(msg, "[spindle v") {
-		t.Errorf("message should not contain version prefix, got: %s", msg)
+	line := string(content)
+	// File line should contain the raw message without version prefix
+	if !strings.Contains(line, "[spindle] ATSClient connected to 127.0.0.1:50648") {
+		t.Errorf("expected raw plugin line in file, got: %s", line)
 	}
-	// The raw line from the plugin is passed through as-is
-	if msg != "[spindle] ATSClient connected to 127.0.0.1:50648" {
-		t.Errorf("expected raw plugin line, got: %s", msg)
+	if strings.Contains(line, "[spindle v") {
+		t.Errorf("file should not contain version prefix, got: %s", line)
+	}
+	// Should have timestamp and level prefix
+	if !strings.Contains(line, "INFO") {
+		t.Errorf("expected INFO level in file, got: %s", line)
 	}
 }

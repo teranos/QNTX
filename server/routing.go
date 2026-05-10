@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/teranos/QNTX/plugin/grpc"
 )
 
 // setupHTTPRoutes configures all HTTP handlers
@@ -220,7 +222,11 @@ func (s *QNTXServer) handlePluginRequest(w http.ResponseWriter, r *http.Request)
 			}
 
 			s.pluginMuxes.Store(pluginName, mux)
-			s.logger.Infow("Initialized HTTP handlers for plugin", "plugin", pluginName)
+			if ep, ok := plugin.(*grpc.ExternalDomainProxy); ok {
+				s.logger.Infow("Initialized HTTP handlers for plugin", "plugin", pluginName, "addr", ep.Addr())
+			} else {
+				s.logger.Infow("Initialized HTTP handlers for plugin", "plugin", pluginName)
+			}
 		})
 
 		// Check if initialization failed
