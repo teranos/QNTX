@@ -23,6 +23,13 @@ impl Default for EnforcementConfig {
     }
 }
 
+/// Exact deletion count for a single predicate within one eviction event.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PredicateCount {
+    pub predicate: String,
+    pub count: usize,
+}
+
 /// Details about what was evicted during enforcement
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvictionDetails {
@@ -30,8 +37,11 @@ pub struct EvictionDetails {
     pub evicted_actors: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evicted_contexts: Vec<String>,
+    /// Exact per-predicate deletion counts for this eviction event,
+    /// computed from the attestation_predicates junction over the
+    /// attestations being deleted. Sorted by count descending.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub sample_predicates: Vec<String>,
+    pub predicate_counts: Vec<PredicateCount>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sample_subjects: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

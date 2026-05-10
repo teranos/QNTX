@@ -130,17 +130,15 @@ function renderPredicatePressure(entries: PredicatePressureEntry[]): string {
     if (entries.length === 0) return '';
     const top = entries.slice(0, PRESSURE_TOP_N);
     const rows = top.map(e => `
-        <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 2px 0; font-size: 11px; word-break: break-word; overflow-wrap: break-word;">
+        <div style="display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 2px 0; font-size: 11px; word-break: break-word; overflow-wrap: break-word;">
             <span>${escapeHtml(e.predicate)}</span>
             <span style="opacity: 0.7;">${e.events.toLocaleString()} ev</span>
+            <span style="color: #ef4444;">−${e.deletions.toLocaleString()}</span>
         </div>
     `).join('');
-    // Predicates come from sample_predicates — a per-event sample, not the
-    // exhaustive set — so this is a frequency-of-appearance signal, not a
-    // total-evicted count.
     return `
         <div style="margin-top: 8px;">
-            <div class="glyph-label" style="margin-bottom: 4px;">Pressure by predicate (top ${top.length} of ${entries.length}, sampled)</div>
+            <div class="glyph-label" style="margin-bottom: 4px;">Pressure by predicate (top ${top.length} of ${entries.length})</div>
             ${rows}
         </div>
     `;

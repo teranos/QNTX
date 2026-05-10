@@ -120,25 +120,28 @@ export function getPressureByActor(): ActorPressureEntry[] {
 export interface PredicatePressureEntry {
     predicate: string;
     events: number;
+    deletions: number;
 }
 
 /**
- * Aggregate eviction load per predicate. Predicates only appear in
- * eviction_details.sample_predicates — a sample, not the exhaustive
- * set — so we count how many distinct eviction events surfaced each
- * predicate. Deletion totals are not attributable per predicate.
+ * Aggregate eviction load per predicate using exact per-event counts
+ * from eviction_details.predicate_counts (computed pre-delete via
+ * GROUP BY over the attestation_predicates junction).
  */
 export function getPressureByPredicate(): PredicatePressureEntry[] {
-    const map = new Map<string, number>();
+    const map = new Map<string, { events: number; deletions: number }>();
     for (const ev of evictions) {
-        const preds = ev.eviction_details?.sample_predicates;
-        if (!preds || preds.length === 0) continue;
-        for (const p of preds) {
-            map.set(p, (map.get(p) ?? 0) + 1);
+        const counts = ev.eviction_details?.predicate_counts;
+        if (!counts || counts.length === 0) continue;
+        for (const pc of counts) {
+            const slot = map.get(pc.predicate) ?? { events: 0, deletions: 0 };
+            slot.events += 1;
+            slot.deletions += pc.count;
+            map.set(pc.predicate, slot);
         }
     }
-    return Array.from(map, ([predicate, events]) => ({ predicate, events }))
-        .sort((a, b) => b.events - a.events);
+    return Array.from(map, ([predicate, v]) => ({ predicate, ...v }))
+        .sort((a, b) => b.deletions - a.deletions);
 }
 
 /** Render the eviction bar chart into the given container element. */

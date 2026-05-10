@@ -15,13 +15,23 @@ type enforcementInput struct {
 	Config   EnforcementConfig `json:"config"`
 }
 
+// PredicateCount is the exact deletion count for a single predicate within
+// one eviction event.
+type PredicateCount struct {
+	Predicate string `json:"predicate"`
+	Count     int    `json:"count"`
+}
+
 // EvictionDetails contains information about what was evicted.
 type EvictionDetails struct {
-	EvictedActors    []string `json:"evicted_actors,omitempty"`
-	EvictedContexts  []string `json:"evicted_contexts,omitempty"`
-	SamplePredicates []string `json:"sample_predicates,omitempty"`
-	SampleSubjects   []string `json:"sample_subjects,omitempty"`
-	LastSeen         string   `json:"last_seen,omitempty"`
+	EvictedActors   []string         `json:"evicted_actors,omitempty"`
+	EvictedContexts []string         `json:"evicted_contexts,omitempty"`
+	// PredicateCounts gives exact per-predicate deletion counts for this event,
+	// computed from the attestation_predicates junction over the rows being
+	// deleted. Sorted by count descending.
+	PredicateCounts []PredicateCount `json:"predicate_counts,omitempty"`
+	SampleSubjects  []string         `json:"sample_subjects,omitempty"`
+	LastSeen        string           `json:"last_seen,omitempty"`
 }
 
 // EnforcementEvent is returned by Rust when limits are enforced.

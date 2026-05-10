@@ -359,14 +359,25 @@ export interface LogsMessage extends BaseMessage {
 }
 
 /**
+ * Exact deletion count for a single predicate within one eviction event.
+ */
+export interface PredicateCount {
+  predicate: string;
+  count: number;
+}
+
+/**
  * Structured detail about what an eviction removed (mirrors
  * ats/storage/sqlitecgo/enforcement_types.go:EvictionDetails).
  * All fields are optional because Rust emits them with `omitempty`.
+ *
+ * predicate_counts is exact (computed via GROUP BY over the
+ * attestation_predicates junction); sample_subjects is still a sample.
  */
 export interface EvictionDetails {
   evicted_actors?: string[];
   evicted_contexts?: string[];
-  sample_predicates?: string[];
+  predicate_counts?: PredicateCount[];
   sample_subjects?: string[];
   last_seen?: string;
 }

@@ -7,10 +7,24 @@
 //!
 //! Also handles telemetry logging to the storage_events table.
 
-use qntx_core::storage::enforcement::{EnforcementEvent, EnforcementInput, EvictionDetails};
+use std::collections::HashMap;
+
+use qntx_core::storage::enforcement::{
+    EnforcementEvent, EnforcementInput, EvictionDetails, PredicateCount,
+};
 
 use crate::error::SqliteError;
 use crate::SqliteStore;
+
+/// Sort a predicate-count map into a descending Vec for the eviction event.
+fn predicate_counts_from_map(map: HashMap<String, usize>) -> Vec<PredicateCount> {
+    let mut out: Vec<PredicateCount> = map
+        .into_iter()
+        .map(|(predicate, count)| PredicateCount { predicate, count })
+        .collect();
+    out.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.predicate.cmp(&b.predicate)));
+    out
+}
 
 impl SqliteStore {
     /// Run all enforcement checks for the given actors, contexts, and subjects.
@@ -100,18 +114,45 @@ impl SqliteStore {
 
         let delete_count = count as usize - limit;
 
-        // Collect sample data before deletion
         let mut details = EvictionDetails {
             evicted_actors: Vec::new(),
             evicted_contexts: Vec::new(),
-            sample_predicates: Vec::new(),
+            predicate_counts: Vec::new(),
             sample_subjects: Vec::new(),
             last_seen: None,
         };
 
+        // Exact per-predicate deletion counts for the IDs about to be evicted.
+        // Joins through the attestation_predicates junction (indexed) instead
+        // of sampling JSON blobs.
         {
             let mut stmt = self.conn.prepare(
-                "SELECT att.predicates, att.subjects, att.timestamp
+                "SELECT p.predicate, COUNT(*) AS n
+                 FROM attestation_predicates p
+                 WHERE p.attestation_id IN (
+                     SELECT att.id FROM attestations att
+                     JOIN attestation_actors a ON att.id = a.attestation_id
+                     JOIN attestation_contexts c ON att.id = c.attestation_id
+                     WHERE a.actor = ?1 AND c.context = ?2
+                     ORDER BY att.timestamp ASC
+                     LIMIT ?3
+                 )
+                 GROUP BY p.predicate",
+            )?;
+            let mut rows = stmt.query(rusqlite::params![actor, context, delete_count])?;
+            let mut map: HashMap<String, usize> = HashMap::new();
+            while let Some(row) = rows.next()? {
+                let predicate: String = row.get(0)?;
+                let n: i64 = row.get(1)?;
+                map.insert(predicate, n as usize);
+            }
+            details.predicate_counts = predicate_counts_from_map(map);
+        }
+
+        // Sample subjects + last_seen from the oldest rows being deleted.
+        {
+            let mut stmt = self.conn.prepare(
+                "SELECT att.subjects, att.timestamp
                  FROM attestations att
                  JOIN attestation_actors a ON att.id = a.attestation_id
                  JOIN attestation_contexts c ON att.id = c.attestation_id
@@ -121,10 +162,8 @@ impl SqliteStore {
             )?;
             let mut rows = stmt.query(rusqlite::params![actor, context])?;
             while let Some(row) = rows.next()? {
-                let pred_json: String = row.get(0)?;
-                let subj_json: String = row.get(1)?;
-                let timestamp: String = row.get(2)?;
-                details.sample_predicates.push(pred_json);
+                let subj_json: String = row.get(0)?;
+                let timestamp: String = row.get(1)?;
                 details.sample_subjects.push(subj_json);
                 if details.last_seen.is_none()
                     || details.last_seen.as_deref() < Some(timestamp.as_str())
@@ -202,18 +241,41 @@ impl SqliteStore {
         let mut details = EvictionDetails {
             evicted_actors: Vec::new(),
             evicted_contexts: Vec::new(),
-            sample_predicates: Vec::new(),
+            predicate_counts: Vec::new(),
             sample_subjects: Vec::new(),
             last_seen: None,
         };
+        let mut predicate_map: HashMap<String, usize> = HashMap::new();
 
         for (i, cu) in contexts_to_delete.iter().enumerate() {
             details.evicted_contexts.push(cu.context.clone());
 
-            // Collect sample data from first context being evicted
+            // Exact per-predicate counts for this (actor, context) batch,
+            // accumulated across all contexts being evicted.
+            {
+                let mut count_stmt = self.conn.prepare(
+                    "SELECT p.predicate, COUNT(*) AS n
+                     FROM attestation_predicates p
+                     WHERE p.attestation_id IN (
+                         SELECT a.attestation_id
+                         FROM attestation_actors a
+                         JOIN attestation_contexts c ON a.attestation_id = c.attestation_id
+                         WHERE a.actor = ?1 AND c.context = ?2
+                     )
+                     GROUP BY p.predicate",
+                )?;
+                let mut rows = count_stmt.query(rusqlite::params![actor, cu.context])?;
+                while let Some(row) = rows.next()? {
+                    let predicate: String = row.get(0)?;
+                    let n: i64 = row.get(1)?;
+                    *predicate_map.entry(predicate).or_insert(0) += n as usize;
+                }
+            }
+
+            // Sample subjects + last_seen from the first context being evicted.
             if i == 0 {
                 let mut sample_stmt = self.conn.prepare(
-                    "SELECT att.predicates, att.subjects, att.timestamp
+                    "SELECT att.subjects, att.timestamp
                      FROM attestations att
                      JOIN attestation_actors a ON att.id = a.attestation_id
                      JOIN attestation_contexts c ON att.id = c.attestation_id
@@ -222,10 +284,8 @@ impl SqliteStore {
                 )?;
                 let mut rows = sample_stmt.query(rusqlite::params![actor, cu.context])?;
                 while let Some(row) = rows.next()? {
-                    let pred_json: String = row.get(0)?;
-                    let subj_json: String = row.get(1)?;
-                    let timestamp: String = row.get(2)?;
-                    details.sample_predicates.push(pred_json);
+                    let subj_json: String = row.get(0)?;
+                    let timestamp: String = row.get(1)?;
                     details.sample_subjects.push(subj_json);
                     if details.last_seen.is_none()
                         || details.last_seen.as_deref() < Some(timestamp.as_str())
@@ -248,6 +308,8 @@ impl SqliteStore {
             )?;
             total_deleted += deleted;
         }
+
+        details.predicate_counts = predicate_counts_from_map(predicate_map);
 
         if total_deleted == 0 {
             return Ok(None);
@@ -308,10 +370,11 @@ impl SqliteStore {
         let mut details = EvictionDetails {
             evicted_actors: Vec::new(),
             evicted_contexts: Vec::new(),
-            sample_predicates: Vec::new(),
+            predicate_counts: Vec::new(),
             sample_subjects: Vec::new(),
             last_seen: None,
         };
+        let mut predicate_map: HashMap<String, usize> = HashMap::new();
 
         for (i, ai) in actors_to_delete.iter().enumerate() {
             details.evicted_actors.push(ai.actor.clone());
@@ -321,10 +384,32 @@ impl SqliteStore {
                 details.last_seen = Some(ai.last_seen.clone());
             }
 
-            // Collect sample data from first actor being evicted
+            // Exact per-predicate counts for this (actor, entity) batch,
+            // accumulated across all evicted actors.
+            {
+                let mut count_stmt = self.conn.prepare(
+                    "SELECT p.predicate, COUNT(*) AS n
+                     FROM attestation_predicates p
+                     WHERE p.attestation_id IN (
+                         SELECT a.attestation_id
+                         FROM attestation_actors a
+                         JOIN attestation_subjects s ON a.attestation_id = s.attestation_id
+                         WHERE a.actor = ?1 AND s.subject = ?2
+                     )
+                     GROUP BY p.predicate",
+                )?;
+                let mut rows = count_stmt.query(rusqlite::params![ai.actor, entity])?;
+                while let Some(row) = rows.next()? {
+                    let predicate: String = row.get(0)?;
+                    let n: i64 = row.get(1)?;
+                    *predicate_map.entry(predicate).or_insert(0) += n as usize;
+                }
+            }
+
+            // Sample subjects from the first actor being evicted.
             if i == 0 {
                 let mut sample_stmt = self.conn.prepare(
-                    "SELECT att.predicates, att.subjects
+                    "SELECT att.subjects
                      FROM attestations att
                      JOIN attestation_actors a ON att.id = a.attestation_id
                      JOIN attestation_subjects s ON att.id = s.attestation_id
@@ -333,9 +418,7 @@ impl SqliteStore {
                 )?;
                 let mut rows = sample_stmt.query(rusqlite::params![ai.actor, entity])?;
                 while let Some(row) = rows.next()? {
-                    let pred_json: String = row.get(0)?;
-                    let subj_json: String = row.get(1)?;
-                    details.sample_predicates.push(pred_json);
+                    let subj_json: String = row.get(0)?;
                     details.sample_subjects.push(subj_json);
                 }
             }
@@ -353,6 +436,8 @@ impl SqliteStore {
             )?;
             total_deleted += deleted;
         }
+
+        details.predicate_counts = predicate_counts_from_map(predicate_map);
 
         if total_deleted == 0 {
             return Ok(None);
@@ -471,6 +556,40 @@ mod tests {
         // Verify count is now at limit
         let count = store.count().unwrap();
         assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_actor_context_limit_emits_exact_predicate_counts() {
+        let mut store = make_store();
+
+        // 5 attestations: 3× "knows" then 2× "likes". Limit to 1 — the 4 oldest
+        // get deleted (3 knows + 1 likes), leaving 1 likes.
+        insert_attestation(&mut store, "AS-1", "bob", "work", "ALICE", "knows");
+        insert_attestation(&mut store, "AS-2", "bob", "work", "ALICE", "knows");
+        insert_attestation(&mut store, "AS-3", "bob", "work", "ALICE", "knows");
+        insert_attestation(&mut store, "AS-4", "bob", "work", "ALICE", "likes");
+        insert_attestation(&mut store, "AS-5", "bob", "work", "ALICE", "likes");
+
+        let input = EnforcementInput {
+            actors: vec!["bob".to_string()],
+            contexts: vec!["work".to_string()],
+            subjects: vec!["ALICE".to_string()],
+            config: EnforcementConfig {
+                actor_context_limit: 1,
+                actor_contexts_limit: 64,
+                entity_actors_limit: 64,
+            },
+        };
+
+        let events = store.enforce_limits(&input).unwrap();
+        assert_eq!(events.len(), 1);
+        let details = events[0].eviction_details.as_ref().unwrap();
+        // Sorted by count desc: knows=3, likes=1
+        assert_eq!(details.predicate_counts.len(), 2);
+        assert_eq!(details.predicate_counts[0].predicate, "knows");
+        assert_eq!(details.predicate_counts[0].count, 3);
+        assert_eq!(details.predicate_counts[1].predicate, "likes");
+        assert_eq!(details.predicate_counts[1].count, 1);
     }
 
     #[test]
