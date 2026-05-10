@@ -93,6 +93,54 @@ export function getRecentEvictions(n: number): EvictionRecord[] {
     return evictions.slice(0, n);
 }
 
+export interface ActorPressureEntry {
+    actor: string;
+    events: number;
+    deletions: number;
+}
+
+/**
+ * Aggregate eviction load per actor across the full retained history.
+ * Each event has exactly one top-level actor, so deletions_count is
+ * directly attributable.
+ */
+export function getPressureByActor(): ActorPressureEntry[] {
+    const map = new Map<string, { events: number; deletions: number }>();
+    for (const ev of evictions) {
+        if (!ev.actor) continue;
+        const slot = map.get(ev.actor) ?? { events: 0, deletions: 0 };
+        slot.events += 1;
+        slot.deletions += ev.deletions_count;
+        map.set(ev.actor, slot);
+    }
+    return Array.from(map, ([actor, v]) => ({ actor, ...v }))
+        .sort((a, b) => b.deletions - a.deletions);
+}
+
+export interface PredicatePressureEntry {
+    predicate: string;
+    events: number;
+}
+
+/**
+ * Aggregate eviction load per predicate. Predicates only appear in
+ * eviction_details.sample_predicates — a sample, not the exhaustive
+ * set — so we count how many distinct eviction events surfaced each
+ * predicate. Deletion totals are not attributable per predicate.
+ */
+export function getPressureByPredicate(): PredicatePressureEntry[] {
+    const map = new Map<string, number>();
+    for (const ev of evictions) {
+        const preds = ev.eviction_details?.sample_predicates;
+        if (!preds || preds.length === 0) continue;
+        for (const p of preds) {
+            map.set(p, (map.get(p) ?? 0) + 1);
+        }
+    }
+    return Array.from(map, ([predicate, events]) => ({ predicate, events }))
+        .sort((a, b) => b.events - a.events);
+}
+
 /** Render the eviction bar chart into the given container element. */
 export function renderEvictionChart(container: HTMLElement): void {
     container.innerHTML = '';
