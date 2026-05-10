@@ -44,7 +44,7 @@ pub struct SqliteStore {
     /// Database file path, if file-backed. Used by backup to open a separate read connection.
     pub(crate) db_path: Option<String>,
     /// Enforcement config for bounded storage limits (16/64/64 default).
-    /// When set, enforcement runs automatically after every put().
+    /// When set, enforcement runs on every put() using O(1) counter lookups.
     pub(crate) enforcement_config: Option<EnforcementConfig>,
 }
 
@@ -303,80 +303,126 @@ impl SqliteStore {
     }
 }
 
+/// Insert an attestation through any Connection (shared by SqliteStore and WriteConn).
+/// Handles the main INSERT, junction tables, and enforcement counter updates.
+fn put_attestation(conn: &Connection, attestation: &Attestation) -> StoreResult<()> {
+    let subjects_json = serialize_string_vec(&attestation.subjects)?;
+    let predicates_json = serialize_string_vec(&attestation.predicates)?;
+    let contexts_json = serialize_string_vec(&attestation.contexts)?;
+    let actors_json = serialize_string_vec(&attestation.actors)?;
+    let attributes_json = serialize_attributes(&attestation.attributes)?;
+
+    let timestamp_sql = timestamp_to_sql(attestation.timestamp);
+    let created_at_sql = timestamp_to_sql(attestation.created_at);
+
+    conn.execute(
+        "INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        rusqlite::params![
+            attestation.id,
+            subjects_json,
+            predicates_json,
+            contexts_json,
+            actors_json,
+            timestamp_sql,
+            attestation.source,
+            attributes_json,
+            created_at_sql,
+            attestation.signature,
+            attestation.signer_did,
+        ],
+    )
+    .map_err(SqliteError::from)?;
+
+    // Populate junction tables for indexed lookups
+    for actor in &attestation.actors {
+        conn.execute(
+            "INSERT INTO attestation_actors (attestation_id, actor) VALUES (?, ?)",
+            rusqlite::params![attestation.id, actor],
+        )
+        .map_err(SqliteError::from)?;
+    }
+    for context in &attestation.contexts {
+        conn.execute(
+            "INSERT INTO attestation_contexts (attestation_id, context) VALUES (?, ?)",
+            rusqlite::params![attestation.id, context],
+        )
+        .map_err(SqliteError::from)?;
+    }
+    for subject in &attestation.subjects {
+        conn.execute(
+            "INSERT INTO attestation_subjects (attestation_id, subject) VALUES (?, ?)",
+            rusqlite::params![attestation.id, subject],
+        )
+        .map_err(SqliteError::from)?;
+    }
+    for predicate in &attestation.predicates {
+        conn.execute(
+            "INSERT INTO attestation_predicates (attestation_id, predicate) VALUES (?, ?)",
+            rusqlite::params![attestation.id, predicate],
+        )
+        .map_err(SqliteError::from)?;
+    }
+
+    // Update enforcement counters (O(1) per combination).
+    for actor in &attestation.actors {
+        for context in &attestation.contexts {
+            let new_count: i64 = conn.query_row(
+                "INSERT INTO enforcement_actor_context (actor, context, count)
+                 VALUES (?1, ?2, 1)
+                 ON CONFLICT(actor, context) DO UPDATE SET count = count + 1
+                 RETURNING count",
+                rusqlite::params![actor, context],
+                |row| row.get(0),
+            ).map_err(SqliteError::from)?;
+
+            if new_count == 1 {
+                conn.execute(
+                    "INSERT INTO enforcement_actor_contexts (actor, count)
+                     VALUES (?1, 1)
+                     ON CONFLICT(actor) DO UPDATE SET count = count + 1",
+                    rusqlite::params![actor],
+                )
+                .map_err(SqliteError::from)?;
+            }
+        }
+    }
+    for subject in &attestation.subjects {
+        for actor in &attestation.actors {
+            let changed = conn.execute(
+                "INSERT OR IGNORE INTO enforcement_entity_actors_detail (subject, actor)
+                 VALUES (?1, ?2)",
+                rusqlite::params![subject, actor],
+            )
+            .map_err(SqliteError::from)?;
+            if changed > 0 {
+                conn.execute(
+                    "INSERT INTO enforcement_entity_actors (subject, count)
+                     VALUES (?1, 1)
+                     ON CONFLICT(subject) DO UPDATE SET count = count + 1",
+                    rusqlite::params![subject],
+                )
+                .map_err(SqliteError::from)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
 impl AttestationStore for SqliteStore {
     fn put(&mut self, attestation: Attestation) -> StoreResult<()> {
         if self.exists(&attestation.id)? {
             return Err(StoreError::AlreadyExists(attestation.id.clone()));
         }
 
-        let subjects_json = serialize_string_vec(&attestation.subjects)?;
-        let predicates_json = serialize_string_vec(&attestation.predicates)?;
-        let contexts_json = serialize_string_vec(&attestation.contexts)?;
-        let actors_json = serialize_string_vec(&attestation.actors)?;
-        let attributes_json = serialize_attributes(&attestation.attributes)?;
-
-        let timestamp_sql = timestamp_to_sql(attestation.timestamp);
-        let created_at_sql = timestamp_to_sql(attestation.created_at);
-
         let actors = attestation.actors.clone();
         let contexts = attestation.contexts.clone();
         let subjects = attestation.subjects.clone();
 
-        self.conn
-            .execute(
-                "INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                rusqlite::params![
-                    attestation.id,
-                    subjects_json,
-                    predicates_json,
-                    contexts_json,
-                    actors_json,
-                    timestamp_sql,
-                    attestation.source,
-                    attributes_json,
-                    created_at_sql,
-                    attestation.signature,
-                    attestation.signer_did,
-                ],
-            )
-            .map_err(SqliteError::from)?;
+        put_attestation(&self.conn, &attestation)?;
 
-        // Populate junction tables for indexed lookups
-        for actor in &actors {
-            self.conn
-                .execute(
-                    "INSERT INTO attestation_actors (attestation_id, actor) VALUES (?, ?)",
-                    rusqlite::params![attestation.id, actor],
-                )
-                .map_err(SqliteError::from)?;
-        }
-        for context in &contexts {
-            self.conn
-                .execute(
-                    "INSERT INTO attestation_contexts (attestation_id, context) VALUES (?, ?)",
-                    rusqlite::params![attestation.id, context],
-                )
-                .map_err(SqliteError::from)?;
-        }
-        for subject in &subjects {
-            self.conn
-                .execute(
-                    "INSERT INTO attestation_subjects (attestation_id, subject) VALUES (?, ?)",
-                    rusqlite::params![attestation.id, subject],
-                )
-                .map_err(SqliteError::from)?;
-        }
-        for predicate in &attestation.predicates {
-            self.conn
-                .execute(
-                    "INSERT INTO attestation_predicates (attestation_id, predicate) VALUES (?, ?)",
-                    rusqlite::params![attestation.id, predicate],
-                )
-                .map_err(SqliteError::from)?;
-        }
-
-        // Enforce bounded storage limits after every insert
+        // Enforce bounded storage limits using counter lookups (O(1) per check).
         if let Some(ref config) = self.enforcement_config {
             let input = EnforcementInput {
                 actors,

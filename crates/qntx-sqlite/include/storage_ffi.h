@@ -23,7 +23,6 @@ extern "C" {
 // Opaque store handles
 typedef struct SqliteStore SqliteStore;
 typedef struct ReadConn ReadConn;
-
 // Result types
 typedef struct {
     bool success;

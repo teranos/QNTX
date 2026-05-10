@@ -197,6 +197,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "048",
         include_str!("../../../db/sqlite/migrations/048_create_attestation_junction_tables.sql"),
     ),
+    (
+        "049",
+        include_str!("../../../db/sqlite/migrations/049_create_enforcement_counters.sql"),
+    ),
 ];
 
 /// Versions whose migrations are allowed to fail (they depend on sqlite-vec).

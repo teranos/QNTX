@@ -5,6 +5,10 @@
 //! - N contexts per actor — delete least-used contexts
 //! - N actors per entity/subject — delete least-recent actors
 //!
+//! Enforcement checks use counter tables (enforcement_actor_context, etc.)
+//! for O(1) lookups instead of scanning junction tables with JOINs.
+//! Counters are maintained incrementally in put().
+//!
 //! Also handles telemetry logging to the storage_events table.
 
 use qntx_core::storage::enforcement::{EnforcementEvent, EnforcementInput, EvictionDetails};
@@ -14,7 +18,8 @@ use crate::SqliteStore;
 
 impl SqliteStore {
     /// Run all enforcement checks for the given actors, contexts, and subjects.
-    /// Returns a list of enforcement events for telemetry logging.
+    /// Uses counter tables for O(1) limit checks — only runs expensive DELETE
+    /// queries when a limit is actually exceeded.
     pub fn enforce_limits(
         &mut self,
         input: &EnforcementInput,
@@ -80,19 +85,22 @@ impl SqliteStore {
     }
 
     /// Enforce actor_context_limit: keep only N most recent attestations per (actor, context).
+    /// Counter lookup is O(1) — only runs DELETE when limit is exceeded.
     fn enforce_actor_context_limit(
         &self,
         actor: &str,
         context: &str,
         limit: usize,
     ) -> Result<Option<EnforcementEvent>, SqliteError> {
-        let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM attestation_actors a
-             JOIN attestation_contexts c ON a.attestation_id = c.attestation_id
-             WHERE a.actor = ?1 AND c.context = ?2 COLLATE NOCASE",
-            rusqlite::params![actor, context],
-            |row| row.get::<_, i64>(0),
-        )?;
+        // O(1) counter lookup instead of COUNT + JOIN
+        let count: i64 = self
+            .conn
+            .query_row(
+                "SELECT count FROM enforcement_actor_context WHERE actor = ?1 AND context = ?2",
+                rusqlite::params![actor, context],
+                |row| row.get::<_, i64>(0),
+            )
+            .unwrap_or(0);
 
         if count as usize <= limit {
             return Ok(None);
@@ -135,7 +143,7 @@ impl SqliteStore {
         }
 
         // Delete oldest attestations (CASCADE deletes junction rows)
-        self.conn.execute(
+        let deleted = self.conn.execute(
             "DELETE FROM attestations
              WHERE id IN (
                  SELECT att.id FROM attestations att
@@ -146,6 +154,13 @@ impl SqliteStore {
                  LIMIT ?3
              )",
             rusqlite::params![actor, context, delete_count],
+        )?;
+
+        // Update counter to reflect deletions
+        self.conn.execute(
+            "UPDATE enforcement_actor_context SET count = count - ?3
+             WHERE actor = ?1 AND context = ?2",
+            rusqlite::params![actor, context, deleted],
         )?;
 
         Ok(Some(EnforcementEvent {
@@ -160,19 +175,32 @@ impl SqliteStore {
     }
 
     /// Enforce actor_contexts_limit: keep only N most-used contexts per actor.
+    /// Counter lookup is O(1) — only queries context details when limit is exceeded.
     fn enforce_actor_contexts_limit(
         &self,
         actor: &str,
         limit: usize,
     ) -> Result<Option<EnforcementEvent>, SqliteError> {
-        // Get distinct contexts for this actor with usage counts, ordered by usage ASC
+        // O(1) counter lookup
+        let count: i64 = self
+            .conn
+            .query_row(
+                "SELECT count FROM enforcement_actor_contexts WHERE actor = ?1",
+                rusqlite::params![actor],
+                |row| row.get::<_, i64>(0),
+            )
+            .unwrap_or(0);
+
+        if count as usize <= limit {
+            return Ok(None);
+        }
+
+        // Only now do we need to find which contexts to evict — query the
+        // counter table (small) instead of junction tables (huge).
         let mut stmt = self.conn.prepare(
-            "SELECT c.context, COUNT(*) as usage_count
-             FROM attestation_actors a
-             JOIN attestation_contexts c ON a.attestation_id = c.attestation_id
-             WHERE a.actor = ?1
-             GROUP BY c.context
-             ORDER BY usage_count ASC",
+            "SELECT context, count FROM enforcement_actor_context
+             WHERE actor = ?1
+             ORDER BY count ASC",
         )?;
 
         struct ContextUsage {
@@ -235,7 +263,7 @@ impl SqliteStore {
                 }
             }
 
-            // Delete all attestations with this context for this actor (CASCADE deletes junction rows)
+            // Delete all attestations with this context for this actor
             let deleted = self.conn.execute(
                 "DELETE FROM attestations
                  WHERE id IN (
@@ -247,7 +275,28 @@ impl SqliteStore {
                 rusqlite::params![actor, cu.context],
             )?;
             total_deleted += deleted;
+
+            // Remove counter row for this evicted (actor, context) pair
+            self.conn.execute(
+                "DELETE FROM enforcement_actor_context WHERE actor = ?1 AND context = ?2",
+                rusqlite::params![actor, cu.context],
+            )?;
         }
+
+        // Update distinct context count for this actor
+        let remaining: i64 = self
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM enforcement_actor_context WHERE actor = ?1",
+                rusqlite::params![actor],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+        self.conn.execute(
+            "INSERT INTO enforcement_actor_contexts (actor, count) VALUES (?1, ?2)
+             ON CONFLICT(actor) DO UPDATE SET count = ?2",
+            rusqlite::params![actor, remaining],
+        )?;
 
         if total_deleted == 0 {
             return Ok(None);
@@ -265,12 +314,27 @@ impl SqliteStore {
     }
 
     /// Enforce entity_actors_limit: keep only N most-recent actors per entity/subject.
+    /// Counter lookup is O(1) — only queries actor details when limit is exceeded.
     fn enforce_entity_actors_limit(
         &self,
         entity: &str,
         limit: usize,
     ) -> Result<Option<EnforcementEvent>, SqliteError> {
-        // Get all actors for this entity with most recent timestamps, ordered ASC
+        // O(1) counter lookup
+        let count: i64 = self
+            .conn
+            .query_row(
+                "SELECT count FROM enforcement_entity_actors WHERE subject = ?1",
+                rusqlite::params![entity],
+                |row| row.get::<_, i64>(0),
+            )
+            .unwrap_or(0);
+
+        if count as usize <= limit {
+            return Ok(None);
+        }
+
+        // Only now query which actors to evict
         let mut stmt = self.conn.prepare(
             "SELECT a.actor, MAX(att.timestamp) as last_seen
              FROM attestation_actors a
@@ -340,7 +404,7 @@ impl SqliteStore {
                 }
             }
 
-            // Delete all attestations by this actor that mention this entity (CASCADE deletes junction rows)
+            // Delete all attestations by this actor that mention this entity
             let deleted = self.conn.execute(
                 "DELETE FROM attestations
                  WHERE id IN (
@@ -352,7 +416,28 @@ impl SqliteStore {
                 rusqlite::params![ai.actor, entity],
             )?;
             total_deleted += deleted;
+
+            // Remove detail tracking row
+            self.conn.execute(
+                "DELETE FROM enforcement_entity_actors_detail WHERE subject = ?1 AND actor = ?2",
+                rusqlite::params![entity, ai.actor],
+            )?;
         }
+
+        // Update counter to reflect actual remaining actors
+        let remaining: i64 = self
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM enforcement_entity_actors_detail WHERE subject = ?1",
+                rusqlite::params![entity],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+        self.conn.execute(
+            "INSERT INTO enforcement_entity_actors (subject, count) VALUES (?1, ?2)
+             ON CONFLICT(subject) DO UPDATE SET count = ?2",
+            rusqlite::params![entity, remaining],
+        )?;
 
         if total_deleted == 0 {
             return Ok(None);
