@@ -436,6 +436,9 @@ func (e *Engine) recordFire(watcherID string) {
 
 // recordError persists an error to SQLite and updates the in-memory watcher.
 func (e *Engine) recordError(watcherID string, errMsg string) {
+	if e.ctx.Err() != nil {
+		return
+	}
 	if err := e.store.RecordError(e.ctx, watcherID, errMsg); err != nil {
 		e.logger.Errorw("Failed to record watcher error", "watcher_id", watcherID, "error", err)
 		return
@@ -602,6 +605,18 @@ func (e *Engine) loadAttestation(id string) (*types.As, error) {
 
 // enqueueAttestation serializes an attestation and inserts it into the persistent queue.
 func (e *Engine) enqueueAttestation(watcherID string, as *types.As, reason string, attempt int, lastError string) {
+	if e.ctx.Err() != nil {
+		return
+	}
+	// Guard against stale in-memory watchers after hot-swap: if the watcher
+	// was deleted from the DB (plugin disabled), skip the enqueue to avoid
+	// FOREIGN KEY failures on watcher_execution_queue.
+	e.mu.RLock()
+	_, exists := e.watchers[watcherID]
+	e.mu.RUnlock()
+	if !exists {
+		return
+	}
 	if reason == "retry" && attempt > maxRetries {
 		e.logger.Warnw("Max retries exceeded, giving up",
 			"watcher_id", watcherID,
@@ -690,6 +705,9 @@ func (e *Engine) drainOnce() {
 	}
 
 	for _, entry := range entries {
+		if e.ctx.Err() != nil {
+			return
+		}
 
 		e.mu.RLock()
 		watcher, exists := e.watchers[entry.WatcherID]
