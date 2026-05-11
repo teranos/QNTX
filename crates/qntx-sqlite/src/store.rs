@@ -367,14 +367,16 @@ fn put_attestation(conn: &Connection, attestation: &Attestation) -> StoreResult<
     // Update enforcement counters (O(1) per combination).
     for actor in &attestation.actors {
         for context in &attestation.contexts {
-            let new_count: i64 = conn.query_row(
-                "INSERT INTO enforcement_actor_context (actor, context, count)
+            let new_count: i64 = conn
+                .query_row(
+                    "INSERT INTO enforcement_actor_context (actor, context, count)
                  VALUES (?1, ?2, 1)
                  ON CONFLICT(actor, context) DO UPDATE SET count = count + 1
                  RETURNING count",
-                rusqlite::params![actor, context],
-                |row| row.get(0),
-            ).map_err(SqliteError::from)?;
+                    rusqlite::params![actor, context],
+                    |row| row.get(0),
+                )
+                .map_err(SqliteError::from)?;
 
             if new_count == 1 {
                 conn.execute(
@@ -389,12 +391,13 @@ fn put_attestation(conn: &Connection, attestation: &Attestation) -> StoreResult<
     }
     for subject in &attestation.subjects {
         for actor in &attestation.actors {
-            let changed = conn.execute(
-                "INSERT OR IGNORE INTO enforcement_entity_actors_detail (subject, actor)
+            let changed = conn
+                .execute(
+                    "INSERT OR IGNORE INTO enforcement_entity_actors_detail (subject, actor)
                  VALUES (?1, ?2)",
-                rusqlite::params![subject, actor],
-            )
-            .map_err(SqliteError::from)?;
+                    rusqlite::params![subject, actor],
+                )
+                .map_err(SqliteError::from)?;
             if changed > 0 {
                 conn.execute(
                     "INSERT INTO enforcement_entity_actors (subject, count)

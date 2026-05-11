@@ -274,7 +274,11 @@ fn apply_migration(conn: &Connection, version: &str, sql: &str) -> Result<()> {
 
     tx.commit()?;
 
-    eprintln!("qntx-sqlite: migration {} applied in {:.1}s", version, start.elapsed().as_secs_f64());
+    eprintln!(
+        "qntx-sqlite: migration {} applied in {:.1}s",
+        version,
+        start.elapsed().as_secs_f64()
+    );
 
     if fk_off {
         conn.execute("PRAGMA foreign_keys = ON", [])?;
