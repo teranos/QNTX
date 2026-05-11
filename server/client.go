@@ -1,7 +1,6 @@
 package server
 
 import (
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -14,13 +13,11 @@ import (
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/graph"
 	grapherr "github.com/teranos/QNTX/graph/error"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/server/syscap"
-	"github.com/teranos/QNTX/server/wslogs"
 )
 
 // WebSocket timeout constants following Gorilla best practices
@@ -133,7 +130,6 @@ type Client struct {
 	server    *QNTXServer
 	conn      *websocket.Conn
 	send      chan *graph.Graph
-	sendLog   chan *wslogs.Batch
 	sendMsg   chan interface{} // Generic message channel for ix progress/errors
 	id        string
 	closeOnce sync.Once       // Defensive: Prevents double-close panics
@@ -305,26 +301,6 @@ func (c *Client) writePump() {
 				)
 			}
 
-		case logBatch, ok := <-c.sendLog:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if !ok {
-				return
-			}
-
-			// Send log batch as JSON with type marker
-			message := map[string]interface{}{
-				"type": "logs",
-				"data": logBatch,
-			}
-
-			if err := c.conn.WriteJSON(message); err != nil {
-				c.server.logger.Debugw("Log batch write error",
-					"error", err.Error(),
-					"client_id", c.id,
-				)
-				// Don't return - log errors shouldn't kill connection
-			}
-
 		case msg, ok := <-c.sendMsg:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
@@ -357,17 +333,6 @@ func (c *Client) handleQuery(query string) {
 	// TODO: Extract ix command handling - domain-specific ingestion commands deferred
 	// For now, treat all input as Ax queries
 	c.lastQuery = query
-
-	// Handle as Ax query
-	// Create log batcher for this query
-	batcher := wslogs.NewBatcher(queryID, c.server.logTransport)
-
-	// Set batcher on WebSocket core to start collecting logs
-	c.server.wsCore.SetBatcher(batcher)
-	defer func() {
-		c.server.wsCore.ClearBatcher()
-		batcher.Flush() // Send all collected logs
-	}()
 
 	// Log query start
 	c.server.logger.Infow("Processing Ax query",
@@ -443,10 +408,6 @@ func (c *Client) handleClear() {
 func (c *Client) handleSetVerbosity(verbosity int) {
 	oldVerbosity := int(c.server.verbosity.Load())
 	c.server.verbosity.Store(int32(verbosity))
-
-	// Update the zap logger level
-	level := logger.VerbosityToLevel(verbosity)
-	c.server.wsCore.LevelEnabler = level
 
 	c.server.logger.Infow("Verbosity level changed",
 		"client_id", c.id,
@@ -738,147 +699,18 @@ func (c *Client) handleJobControl(msg QueryMessage) {
 	}
 }
 
-// handleGetDatabaseStats retrieves database statistics and sends them to the client.
-// Stats are fetched via Rust FFI to avoid dual-connection issues with Go's *sql.DB.
+// handleGetDatabaseStats sends cached database statistics to the client.
+// Stats are refreshed every 30s in the background — glyph opens are instant.
 func (c *Client) handleGetDatabaseStats() {
-	c.server.logger.Infow("Database stats request",
-		"client_id", c.id,
-	)
-
-	// Get stats via Rust FFI through the attestation store
-	type statsProvider interface {
-		GetStorageStats() (*sqlitecgo.StorageStats, error)
-	}
-
-	var totalAttestations, uniqueActors, uniqueSubjects, uniqueContexts int
-
-	if sp, ok := c.server.atsStore.(statsProvider); ok {
-		stats, err := sp.GetStorageStats()
-		if err != nil {
-			c.server.logger.Errorw("Failed to query database stats",
-				"error", err,
-				"client_id", c.id,
-				"db_path", c.server.dbPath,
-			)
-			c.sendJSON(map[string]interface{}{
-				"type":  "database_stats",
-				"error": fmt.Sprintf("Failed to query database stats: %v", err),
-			})
-			return
-		}
-		totalAttestations = stats.TotalAttestations
-		uniqueActors = stats.UniqueActors
-		uniqueSubjects = stats.UniqueSubjects
-		uniqueContexts = stats.UniqueContexts
-	} else {
-		c.server.logger.Errorw("Attestation store does not support GetStorageStats",
-			"client_id", c.id,
-		)
+	cached := c.server.dbStatsCache.Load()
+	if cached == nil {
 		c.sendJSON(map[string]interface{}{
-			"type":  "error",
-			"error": "Storage stats not available",
+			"type":  "database_stats",
+			"error": "Database stats not yet available (first refresh pending)",
 		})
 		return
 	}
-
-	// Get discovered rich fields with statistics from a bounded store instance
-	boundedStore := storage.NewBoundedStore(c.server.db, nil, c.server.logger.Named("db-stats"))
-	richFieldsWithStats, err := boundedStore.GetRichFieldsWithStats()
-	if err != nil {
-		c.server.logger.Errorw("Failed to get rich fields with stats",
-			"error", err,
-			"client_id", c.id,
-		)
-		// Fall back to simple field list
-		richFields := boundedStore.GetDiscoveredRichFields()
-		c.sendJSON(map[string]interface{}{
-			"type":               "database_stats",
-			"path":               c.server.dbPath,
-			"total_attestations": totalAttestations,
-			"unique_actors":      uniqueActors,
-			"unique_subjects":    uniqueSubjects,
-			"unique_contexts":    uniqueContexts,
-			"rich_fields":        richFields,
-		})
-		return
-	}
-
-	// Get storage backend info
-	storageBackend := "go"
-	if syscap.IsStorageOptimized() {
-		storageBackend = "rust"
-	}
-
-	// Get recent eviction events from storage_events table
-	var recentEvictions []map[string]interface{}
-	evictionRows, err := c.server.db.Query(`
-		SELECT event_type, actor, context, entity, deletions_count, limit_value, timestamp
-		FROM storage_events
-		WHERE event_type != 'storage_warning'
-		ORDER BY id DESC
-		LIMIT 1000
-	`)
-	if err == nil {
-		defer evictionRows.Close()
-		for evictionRows.Next() {
-			var (
-				eventType      string
-				actor          sql.NullString
-				ctx            sql.NullString
-				entity         sql.NullString
-				deletionsCount int
-				limitValue     sql.NullInt64
-				timestamp      string
-			)
-			if err := evictionRows.Scan(&eventType, &actor, &ctx, &entity, &deletionsCount, &limitValue, &timestamp); err != nil {
-				continue
-			}
-			limit := int(limitValue.Int64)
-			if !limitValue.Valid {
-				limit = 0
-			}
-			var message string
-			switch eventType {
-			case "actor_context_limit":
-				message = fmt.Sprintf("Evicted %d old attestations for %s/%s (limit: %d)", deletionsCount, actor.String, ctx.String, limit)
-			case "actor_contexts_limit":
-				message = fmt.Sprintf("Evicted %d attestations for actor %s (contexts limit: %d)", deletionsCount, actor.String, limit)
-			case "entity_actors_limit":
-				message = fmt.Sprintf("Evicted %d attestations for entity %s (actors limit: %d)", deletionsCount, entity.String, limit)
-			default:
-				message = fmt.Sprintf("Evicted %d attestations (%s)", deletionsCount, eventType)
-			}
-			recentEvictions = append(recentEvictions, map[string]interface{}{
-				"event_type":      eventType,
-				"actor":           actor.String,
-				"context":         ctx.String,
-				"entity":          entity.String,
-				"deletions_count": deletionsCount,
-				"message":         message,
-				"timestamp":       timestamp,
-			})
-		}
-	}
-
-	// Send stats to client with enhanced field information
-	c.sendJSON(map[string]interface{}{
-		"type":               "database_stats",
-		"path":               c.server.dbPath,
-		"storage_backend":    storageBackend,
-		"storage_optimized":  syscap.IsStorageOptimized(),
-		"storage_version":    syscap.GetStorageVersion(),
-		"total_attestations": totalAttestations,
-		"unique_actors":      uniqueActors,
-		"unique_subjects":    uniqueSubjects,
-		"unique_contexts":    uniqueContexts,
-		"rich_fields":        richFieldsWithStats,
-		"recent_evictions":   recentEvictions,
-	})
-
-	c.server.logger.Infow("Database stats sent",
-		"total_attestations", totalAttestations,
-		"client_id", c.id,
-	)
+	c.sendJSON(cached.response)
 }
 
 // richSearchResponse is the typed WS response for rich_search_results.
@@ -1144,9 +976,6 @@ func (c *Client) close() {
 	c.closeOnce.Do(func() {
 		if c.send != nil {
 			close(c.send)
-		}
-		if c.sendLog != nil {
-			close(c.sendLog)
 		}
 		if c.sendMsg != nil {
 			close(c.sendMsg)

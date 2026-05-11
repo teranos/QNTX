@@ -7,7 +7,6 @@ import (
 	"github.com/teranos/QNTX/graph"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/server/syscap"
-	"github.com/teranos/QNTX/server/wslogs"
 )
 
 // TestSendSystemCapabilities verifies that system capabilities are sent to clients
@@ -26,7 +25,7 @@ func TestSendSystemCapabilities(t *testing.T) {
 	client := &Client{
 		server:  srv,
 		send:    make(chan *graph.Graph, 256),
-		sendLog: make(chan *wslogs.Batch, 256),
+
 		sendMsg: make(chan interface{}, 256),
 		id:      "test_client_capabilities",
 	}
@@ -80,7 +79,7 @@ func TestSendSystemCapabilities_ClosedClient(t *testing.T) {
 	client := &Client{
 		server:  srv,
 		send:    make(chan *graph.Graph, 256),
-		sendLog: make(chan *wslogs.Batch, 256),
+
 		sendMsg: make(chan interface{}),
 		id:      "test_client_closed",
 	}
@@ -111,7 +110,7 @@ func TestSendSystemCapabilities_FullChannel(t *testing.T) {
 	client := &Client{
 		server:  srv,
 		send:    make(chan *graph.Graph, 256),
-		sendLog: make(chan *wslogs.Batch, 256),
+
 		sendMsg: make(chan interface{}), // unbuffered
 		id:      "test_client_full",
 	}

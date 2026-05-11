@@ -27,9 +27,7 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/server/nodedid"
-	"github.com/teranos/QNTX/server/wslogs"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 // serverDependencies holds dependencies created for QNTXServer
@@ -73,15 +71,8 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	}
 	logPath := cfg.GetLogPath(appcfg.GetServerPort())
 
-	// Create logger with multi-output (console, WebSocket, file)
-	serverLogger, wsCore, wsTransport, err := createServerLogger(verbosity)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create logger")
-	}
-	// Defensive: Verify logger components
-	if serverLogger == nil || wsCore == nil || wsTransport == nil {
-		return nil, errors.New("logger creation returned nil components")
-	}
+	// Create server logger (wraps global logger with "server" namespace)
+	serverLogger := createServerLogger(verbosity)
 
 	// Create all server dependencies (builder, services, trackers, daemon)
 	deps, err := createServerDependencies(db, atsStore, verbosity, serverLogger)
@@ -203,8 +194,6 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		register:      make(chan *Client),
 		unregister:    make(chan *Client),
 		logger:        serverLogger,
-		logTransport:  wsTransport,
-		wsCore:        wsCore,
 		consoleBuffer: consoleBuffer, // Browser console log buffer with terminal printing
 		initialQuery:  query,
 		rlAuth:        newRateLimitGroup(rl.AuthRate, rl.AuthBurst),
@@ -221,9 +210,6 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 
 	// Set as global default server for async plugin initialization
 	SetDefaultServer(server)
-
-	// Configure log transport to route sends through broadcast worker (thread-safe)
-	wsTransport.SetSendFunc(server.sendLogBatch)
 
 	// Initialize WebAuthn auth gate (if enabled in config)
 	if deps.config.Auth.Enabled {
@@ -433,23 +419,9 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	return server, nil
 }
 
-// createServerLogger creates a multi-output zap logger (console + WebSocket + file)
-func createServerLogger(verbosity int) (*zap.SugaredLogger, *wslogs.WebSocketCore, *wslogs.Transport, error) {
-	// Create WebSocket log transport
-	wsTransport := wslogs.NewTransport()
-
-	// Create WebSocket core for zap
-	wsCore := wslogs.NewWebSocketCore(logger.VerbosityToLevel(verbosity))
-
-	// Build multi-core logger: global (console + file) + WebSocket
-	// File core is already part of the global logger (added in main.go init)
-	core := zapcore.NewTee(
-		logger.Logger.Desugar().Core(), // Console + file (from global logger)
-		wsCore,                         // WebSocket core for UI
-	)
-	serverLogger := zap.New(core).Sugar().Named("server")
-
-	return serverLogger, wsCore, wsTransport, nil
+// createServerLogger creates a named server logger from the global logger.
+func createServerLogger(verbosity int) *zap.SugaredLogger {
+	return logger.Logger.Desugar().Named("server").Sugar()
 }
 
 // createServerDependencies creates all components needed for QNTXServer initialization

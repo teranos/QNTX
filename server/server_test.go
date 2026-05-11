@@ -15,7 +15,6 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/graph"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
-	"github.com/teranos/QNTX/server/wslogs"
 )
 
 // createTestDB is a local alias for qntxtest.CreateTestDB
@@ -53,13 +52,6 @@ func TestNewQNTXServer(t *testing.T) {
 		t.Error("Server clients map not initialized")
 	}
 
-	if srv.logTransport == nil {
-		t.Error("Server log transport not initialized")
-	}
-
-	if srv.wsCore == nil {
-		t.Error("Server WebSocket core not initialized")
-	}
 }
 
 // Test that the hub goroutine handles client registration
@@ -79,7 +71,7 @@ func TestServerHubRegistration(t *testing.T) {
 	client := &Client{
 		server:  srv,
 		send:    make(chan *graph.Graph, 256),
-		sendLog: make(chan *wslogs.Batch, 256),
+
 		sendMsg: make(chan interface{}, 256),
 		id:      "test_client_1",
 	}
@@ -104,10 +96,6 @@ func TestServerHubRegistration(t *testing.T) {
 		t.Errorf("Server should have 1 client, got %d", count)
 	}
 
-	// Verify client was registered in log transport
-	if srv.logTransport.ClientCount() != 1 {
-		t.Errorf("Log transport should have 1 client, got %d", srv.logTransport.ClientCount())
-	}
 }
 
 // Test that the hub goroutine handles client unregistration
@@ -127,7 +115,7 @@ func TestServerHubUnregistration(t *testing.T) {
 	client := &Client{
 		server:  srv,
 		send:    make(chan *graph.Graph, 256),
-		sendLog: make(chan *wslogs.Batch, 256),
+
 		sendMsg: make(chan interface{}, 256),
 		id:      "test_client_unreg",
 	}
@@ -160,11 +148,6 @@ func TestServerHubUnregistration(t *testing.T) {
 
 	if count != 0 {
 		t.Errorf("Server should have 0 clients, got %d", count)
-	}
-
-	// Verify client was unregistered from log transport
-	if srv.logTransport.ClientCount() != 0 {
-		t.Errorf("Log transport should have 0 clients, got %d", srv.logTransport.ClientCount())
 	}
 
 	// Verify channels were closed (reading from closed channel returns zero value immediately)
@@ -202,7 +185,7 @@ func TestServerConcurrentRegistration(t *testing.T) {
 			client := &Client{
 				server:  srv,
 				send:    make(chan *graph.Graph, 256),
-				sendLog: make(chan *wslogs.Batch, 256),
+		
 				id:      fmt.Sprintf("client_%d", id),
 			}
 			srv.register <- client
@@ -520,7 +503,7 @@ func TestBroadcastToMultipleClients(t *testing.T) {
 		client := &Client{
 			server:  srv,
 			send:    make(chan *graph.Graph, 256),
-			sendLog: make(chan *wslogs.Batch, 256),
+	
 			sendMsg: make(chan interface{}, 256),
 			id:      fmt.Sprintf("test_client_%d", i),
 		}
@@ -572,7 +555,6 @@ func TestSlowClientRemoval(t *testing.T) {
 	slowClient := &Client{
 		server:  srv,
 		send:    make(chan *graph.Graph, 1), // Small buffer
-		sendLog: make(chan *wslogs.Batch, 1),
 		sendMsg: make(chan interface{}, 1),
 		id:      "slow_client",
 	}
@@ -583,7 +565,7 @@ func TestSlowClientRemoval(t *testing.T) {
 	fastClient := &Client{
 		server:  srv,
 		send:    make(chan *graph.Graph, 256),
-		sendLog: make(chan *wslogs.Batch, 256),
+
 		sendMsg: make(chan interface{}, 256),
 		id:      "fast_client",
 	}
@@ -653,14 +635,14 @@ func TestBroadcastMessage(t *testing.T) {
 	client1 := &Client{
 		server:  srv,
 		send:    make(chan *graph.Graph, 256),
-		sendLog: make(chan *wslogs.Batch, 256),
+
 		sendMsg: make(chan interface{}, 256),
 		id:      "client1",
 	}
 	client2 := &Client{
 		server:  srv,
 		send:    make(chan *graph.Graph, 256),
-		sendLog: make(chan *wslogs.Batch, 256),
+
 		sendMsg: make(chan interface{}, 256),
 		id:      "client2",
 	}

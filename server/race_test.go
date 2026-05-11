@@ -7,7 +7,6 @@ import (
 
 	"github.com/teranos/QNTX/graph"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
-	"github.com/teranos/QNTX/server/wslogs"
 )
 
 // TestRace_BroadcastDuringUnregister tests for a race condition where:
@@ -37,7 +36,6 @@ func TestRace_BroadcastDuringUnregister(t *testing.T) {
 			client := &Client{
 				server:  srv,
 				send:    make(chan *graph.Graph, 256),
-				sendLog: make(chan *wslogs.Batch, 256),
 				sendMsg: make(chan interface{}, 256),
 				id:      t.Name() + "_client_" + string(rune('A'+i)),
 			}
@@ -111,7 +109,6 @@ func TestRace_ConcurrentBroadcastAndChannelClose(t *testing.T) {
 		client := &Client{
 			server:  srv,
 			send:    make(chan *graph.Graph, 1), // Small buffer to increase contention
-			sendLog: make(chan *wslogs.Batch, 1),
 			sendMsg: make(chan interface{}, 1),
 			id:      t.Name() + "_iteration_" + string(rune('A'+(iteration%26))),
 		}
@@ -167,7 +164,6 @@ func TestRace_UsageBroadcastDuringClientDisconnect(t *testing.T) {
 			client := &Client{
 				server:  srv,
 				send:    make(chan *graph.Graph, 256),
-				sendLog: make(chan *wslogs.Batch, 256),
 				sendMsg: make(chan interface{}, 256),
 				id:      t.Name() + "_client_" + string(rune('A'+i)),
 			}
@@ -222,7 +218,6 @@ func TestRace_GraphBroadcastToDisconnectingClients(t *testing.T) {
 			client := &Client{
 				server:  srv,
 				send:    make(chan *graph.Graph, 2), // Small buffer
-				sendLog: make(chan *wslogs.Batch, 2),
 				sendMsg: make(chan interface{}, 2),
 				id:      t.Name() + "_c_" + string(rune('A'+i)),
 			}
@@ -278,7 +273,6 @@ func TestRace_MultipleWritersToClientChannels(t *testing.T) {
 	client := &Client{
 		server:  srv,
 		send:    make(chan *graph.Graph, 10),
-		sendLog: make(chan *wslogs.Batch, 10),
 		sendMsg: make(chan interface{}, 10),
 		id:      "multi_writer_test",
 	}

@@ -27,7 +27,6 @@ import (
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
-	"github.com/teranos/QNTX/server/wslogs"
 	"go.uber.org/zap"
 )
 
@@ -51,7 +50,6 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		server:  s,
 		conn:    conn,
 		send:    make(chan *graph.Graph, 256),
-		sendLog: make(chan *wslogs.Batch, 256),
 		sendMsg: make(chan interface{}, 256),
 		id:      fmt.Sprintf("%s_%d", r.RemoteAddr, time.Now().UnixNano()),
 		graphView: &GraphViewState{ // Phase 2: Initialize graph visibility state

@@ -21,17 +21,15 @@ import (
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
-	"github.com/teranos/QNTX/server/wslogs"
 )
 
 // broadcastRequest represents a request to broadcast data to clients.
 // All broadcasts go through a dedicated worker goroutine to prevent race conditions.
 type broadcastRequest struct {
-	reqType  string        // "message", "graph", "log", "close", "watcher_match"
-	msg      interface{}   // Generic message (for reqType="message")
-	graph    *graph.Graph  // Graph data (for reqType="graph")
-	logBatch *wslogs.Batch // Log batch (for reqType="log")
-	payload  interface{}   // Generic payload (for reqType="watcher_match")
+	reqType string        // "message", "graph", "close", "watcher_match"
+	msg     interface{}   // Generic message (for reqType="message")
+	graph   *graph.Graph  // Graph data (for reqType="graph")
+	payload interface{}   // Generic payload (for reqType="watcher_match")
 	clientID string        // Target client ID. Empty string means "broadcast to all clients"
 	// (semantically: no specific target = all targets).
 	client *Client // Client to close (for reqType="close")
@@ -198,7 +196,7 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 		return
 	}
 
-	s.logger.Infow("Found pulse execution for async job",
+	s.logger.Debugw("Found pulse execution for async job",
 		"async_job_id", job.ID,
 		"execution_id", execution.ID,
 		"scheduled_job_id", execution.ScheduledJobID)
@@ -830,8 +828,6 @@ func (s *QNTXServer) processBroadcastRequest(req *broadcastRequest) {
 		s.sendMessageToClients(req.msg, req.clientID)
 	case "graph":
 		s.sendGraphToClients(req.graph)
-	case "log":
-		s.sendLogToClient(req.clientID, req.logBatch)
 	case "close":
 		s.closeClientChannels(req.client)
 	case "watcher_match":
@@ -910,60 +906,12 @@ func (s *QNTXServer) sendGraphToClients(g *graph.Graph) {
 	}
 }
 
-// sendLogToClient sends a log batch to a specific client.
-// Only called from broadcast worker - no concurrent access to client channels.
-func (s *QNTXServer) sendLogToClient(clientID string, batch *wslogs.Batch) {
-	s.mu.RLock()
-	var targetClient *Client
-	for client := range s.clients {
-		if client.id == clientID {
-			targetClient = client
-			break
-		}
-	}
-	s.mu.RUnlock()
-
-	if targetClient == nil {
-		return // Client already disconnected
-	}
-
-	select {
-	case targetClient.sendLog <- batch:
-		// Success
-	default:
-		// Channel full
-		s.logger.Warnw("Log channel full for client", "client_id", clientID)
-	}
-}
-
 // closeClientChannels closes all channels for a client.
 // Only called from broadcast worker - no concurrent access to client channels.
 // This ensures all pending messages are sent before channels are closed.
 func (s *QNTXServer) closeClientChannels(client *Client) {
-	// Close channels in order: send, sendLog, sendMsg
+	// Close channels in order: send, sendMsg
 	// These will be called via client.close() which uses sync.Once
 	client.close()
 }
 
-// sendLogBatch is the callback used by wslogs.Transport to route log sends
-// through the broadcast worker (thread-safe)
-func (s *QNTXServer) sendLogBatch(clientID string, batch *wslogs.Batch) {
-	req := &broadcastRequest{
-		reqType:  "log",
-		clientID: clientID,
-		logBatch: batch,
-	}
-
-	select {
-	case s.broadcastReq <- req:
-		// Request queued
-	case <-s.ctx.Done():
-		// Server shutting down
-	default:
-		// Queue full - drop log batch (prevent blocking)
-		s.logger.Warnw("Broadcast request queue full, dropping log batch",
-			"client_id", clientID,
-			"messages", len(batch.Messages),
-		)
-	}
-}

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/teranos/QNTX/ai/tracker"
 	"github.com/teranos/QNTX/am"
@@ -26,7 +25,6 @@ import (
 	"github.com/teranos/QNTX/server/auth"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
 	"github.com/teranos/QNTX/server/nodedid"
-	"github.com/teranos/QNTX/server/wslogs"
 	"go.uber.org/zap"
 )
 
@@ -61,8 +59,6 @@ type QNTXServer struct {
 	verbosity           atomic.Int32        // Thread-safe verbosity level (fixes Issue #64)
 	graphLimit          atomic.Int32        // Thread-safe graph node limit (default 1000)
 	logger              *zap.SugaredLogger
-	logTransport        *wslogs.Transport
-	wsCore              *wslogs.WebSocketCore
 	consoleBuffer       *ConsoleBuffer              // Browser console log buffer for debugging (dev mode only)
 	initialQuery        string                      // Pre-loaded Ax query to execute on client connection
 	pluginRegistry      *plugin.Registry            // Domain plugin registry
@@ -111,6 +107,10 @@ type QNTXServer struct {
 	groundDBPath                string
 	watcherDB                   *sql.DB                // Separate DB connection for watcher engine (avoids RustStore contention)
 	onReady                     func()                 // Called once when server is fully ready (routes, DB, listeners)
+
+	// Cached database stats — refreshed every 30s in the background.
+	// Glyph opens return instantly from cache instead of blocking on 4+ queries.
+	dbStatsCache atomic.Pointer[cachedDBStats]
 }
 
 // handleClientRegister handles a new client connection
@@ -133,9 +133,6 @@ func (s *QNTXServer) handleClientRegister(client *Client) {
 	cachedGraph := s.lastGraph
 	s.mu.Unlock()
 
-	// Register client for log batches
-	s.logTransport.RegisterClient(client.id, client.sendLog)
-
 	s.logger.Infow("Client connected",
 		"client_id", client.id,
 		"total_clients", totalClients,
@@ -147,22 +144,6 @@ func (s *QNTXServer) handleClientRegister(client *Client) {
 		"client_id", client.id,
 		"version", versionInfo.Short(),
 	)
-
-	connectionMsg := wslogs.Message{
-		Level:     "INFO",
-		Timestamp: time.Now(),
-		Logger:    "server",
-		Message:   "WebSocket connection established",
-		Fields: map[string]interface{}{
-			"client_id": client.id,
-			"version":   versionInfo.Short(),
-		},
-	}
-	s.logTransport.SendBatch(&wslogs.Batch{
-		Messages:  []wslogs.Message{connectionMsg},
-		QueryID:   "connection",
-		Timestamp: time.Now(),
-	})
 
 	// Send cached graph to newly connected client
 	if cachedGraph != nil {
@@ -211,8 +192,6 @@ func (s *QNTXServer) handleClientUnregister(client *Client) {
 			client.close()
 		}
 
-		s.logTransport.UnregisterClient(client.id)
-
 		s.logger.Infow("Client disconnected",
 			"client_id", client.id,
 			"total_clients", totalClients,
@@ -236,9 +215,6 @@ func (s *QNTXServer) removeSlowClient(client *Client) {
 
 	// Close channels directly (we're in broadcast worker context, single-writer invariant maintained)
 	client.close()
-
-	// Unregister from log transport
-	s.logTransport.UnregisterClient(client.id)
 
 	s.logger.Warnw("Client send channel full, removing client",
 		"client_id", client.id,
