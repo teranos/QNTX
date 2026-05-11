@@ -38,13 +38,17 @@ func recordWait(start time.Time, mutex string) {
 	collector.record("mutex:"+mutex, elapsed)
 }
 
+const historySize = 12 // 12 x 5min = 1 hour of rolling history
+
 // slowCollector accumulates all slow events (ops and waits) into buckets
 // keyed by operation name. Flushes summaries periodically, suppressing
-// repeats that haven't changed.
+// repeats that haven't changed. Keeps a rolling history of snapshots.
 type slowCollector struct {
 	mu        sync.Mutex
 	buckets   map[string]*bucket
 	lastFlush map[string]bucketSnapshot // previous flush for change detection
+	history   [historySize]map[string]*BucketStats
+	histIdx   int
 	flushOnce sync.Once
 }
 
@@ -58,6 +62,22 @@ type bucket struct {
 type bucketSnapshot struct {
 	count int
 	avg   time.Duration
+}
+
+// BucketStats is the exported snapshot of a single bucket.
+type BucketStats struct {
+	Count int
+	Min   time.Duration
+	Max   time.Duration
+	Avg   time.Duration
+}
+
+// PerformanceSnapshot is the exported rolling history of slow ops and mutex waits.
+type PerformanceSnapshot struct {
+	// Current is the latest flushed window (may be nil if no flush yet).
+	Current map[string]*BucketStats
+	// History is the last N windows (oldest first), each keyed by operation name.
+	History []map[string]*BucketStats
 }
 
 var collector = &slowCollector{
@@ -98,6 +118,20 @@ func (sc *slowCollector) flush() {
 	sc.mu.Lock()
 	snapshot := sc.buckets
 	sc.buckets = make(map[string]*bucket)
+
+	// Store in ring buffer
+	exported := make(map[string]*BucketStats, len(snapshot))
+	for key, b := range snapshot {
+		avg := b.total / time.Duration(b.count)
+		exported[key] = &BucketStats{
+			Count: b.count,
+			Min:   b.min,
+			Max:   b.max,
+			Avg:   avg,
+		}
+	}
+	sc.history[sc.histIdx%historySize] = exported
+	sc.histIdx++
 	sc.mu.Unlock()
 
 	for key, b := range snapshot {
@@ -129,6 +163,41 @@ func (sc *slowCollector) flush() {
 			)
 		}
 	}
+}
+
+// Snapshot returns the rolling performance history. Safe for concurrent use.
+func (sc *slowCollector) Snapshot() PerformanceSnapshot {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+
+	var current map[string]*BucketStats
+	var history []map[string]*BucketStats
+
+	n := sc.histIdx
+	if n > historySize {
+		n = historySize
+	}
+
+	for i := 0; i < n; i++ {
+		idx := (sc.histIdx - n + i) % historySize
+		if sc.history[idx] != nil {
+			history = append(history, sc.history[idx])
+		}
+	}
+
+	if len(history) > 0 {
+		current = history[len(history)-1]
+	}
+
+	return PerformanceSnapshot{
+		Current: current,
+		History: history,
+	}
+}
+
+// GetPerformanceSnapshot returns the current rolling performance data.
+func GetPerformanceSnapshot() PerformanceSnapshot {
+	return collector.Snapshot()
 }
 
 // durSimilar returns true if two durations are within 20% of each other.
