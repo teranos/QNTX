@@ -31,6 +31,7 @@ service EmbeddingService {
 message EmbedRequest {
   string auth_token = 1;
   string text = 2;
+  string model = 3;  // target model name, empty = default
 }
 
 message EmbedResponse {
@@ -43,6 +44,7 @@ message EmbedResponse {
 message BatchEmbedRequest {
   string auth_token = 1;
   repeated string texts = 2;
+  string model = 3;  // target model name, empty = default
 }
 
 message BatchEmbedResponse {
@@ -112,6 +114,7 @@ message Centroid {
 
 message ModelInfoRequest {
   string auth_token = 1;
+  string model = 2;  // target model name, empty = default
 }
 
 message ModelInfoResponse {

@@ -25,9 +25,9 @@ type EmbeddingServer struct {
 
 // embeddingBackend is the subset of ManagedEmbeddingService needed by the gRPC server.
 type embeddingBackend interface {
-	GenerateEmbedding(text string) (*serverembeddings.EmbeddingResult, error)
-	GenerateBatchEmbeddings(texts []string) (*serverembeddings.BatchEmbeddingResult, error)
-	GetModelInfo() (*serverembeddings.ModelInfo, error)
+	GenerateEmbedding(text, model string) (*serverembeddings.EmbeddingResult, error)
+	GenerateBatchEmbeddings(texts []string, model string) (*serverembeddings.BatchEmbeddingResult, error)
+	GetModelInfo(model string) (*serverembeddings.ModelInfo, error)
 }
 
 // NewEmbeddingServer creates a new embedding gRPC server.
@@ -72,12 +72,12 @@ func (s *EmbeddingServer) Embed(ctx context.Context, req *protocol.EmbedRequest)
 		return nil, fmt.Errorf("text cannot be empty")
 	}
 
-	result, err := svc.GenerateEmbedding(req.Text)
+	result, err := svc.GenerateEmbedding(req.Text, req.Model)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate embedding: %w", err)
 	}
 
-	info, err := svc.GetModelInfo()
+	info, err := svc.GetModelInfo(req.Model)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get model info: %w", err)
 	}
@@ -108,12 +108,12 @@ func (s *EmbeddingServer) BatchEmbed(ctx context.Context, req *protocol.BatchEmb
 		return nil, fmt.Errorf("no texts provided")
 	}
 
-	result, err := svc.GenerateBatchEmbeddings(req.Texts)
+	result, err := svc.GenerateBatchEmbeddings(req.Texts, req.Model)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate batch embeddings: %w", err)
 	}
 
-	info, err := svc.GetModelInfo()
+	info, err := svc.GetModelInfo(req.Model)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get model info: %w", err)
 	}

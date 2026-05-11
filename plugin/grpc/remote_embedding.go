@@ -47,10 +47,12 @@ func (r *RemoteEmbedding) Close() error {
 }
 
 // Embed generates a vector embedding for a single text.
-func (r *RemoteEmbedding) Embed(text string) (*serverembeddings.EmbeddingResult, error) {
+// Empty model uses the plugin's default model.
+func (r *RemoteEmbedding) Embed(text, model string) (*serverembeddings.EmbeddingResult, error) {
 	resp, err := r.client.Embed(r.ctx, &protocol.EmbedRequest{
 		AuthToken: r.authToken,
 		Text:      text,
+		Model:     model,
 	})
 	if err != nil {
 		return nil, errors.Wrapf(err, "gRPC Embed failed for text (%d chars)", len(text))
@@ -64,10 +66,12 @@ func (r *RemoteEmbedding) Embed(text string) (*serverembeddings.EmbeddingResult,
 }
 
 // BatchEmbed generates vector embeddings for multiple texts.
-func (r *RemoteEmbedding) BatchEmbed(texts []string) (*serverembeddings.BatchEmbeddingResult, error) {
+// Empty model uses the plugin's default model.
+func (r *RemoteEmbedding) BatchEmbed(texts []string, model string) (*serverembeddings.BatchEmbeddingResult, error) {
 	resp, err := r.client.BatchEmbed(r.ctx, &protocol.BatchEmbedRequest{
 		AuthToken: r.authToken,
 		Texts:     texts,
+		Model:     model,
 	})
 	if err != nil {
 		return nil, errors.Wrapf(err, "gRPC BatchEmbed failed for %d texts", len(texts))

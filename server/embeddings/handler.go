@@ -17,9 +17,9 @@ import (
 // Service defines the embedding operations used by handlers.
 // Matches the interface already defined on QNTXServer.embeddingService.
 type Service interface {
-	GenerateEmbedding(text string) (*EmbeddingResult, error)
-	GenerateBatchEmbeddings(texts []string) (*BatchEmbeddingResult, error)
-	GetModelInfo() (*ModelInfo, error)
+	GenerateEmbedding(text, model string) (*EmbeddingResult, error)
+	GenerateBatchEmbeddings(texts []string, model string) (*BatchEmbeddingResult, error)
+	GetModelInfo(model string) (*ModelInfo, error)
 	SerializeEmbedding(embedding []float32) ([]byte, error)
 	DeserializeEmbedding(data []byte) ([]float32, error)
 	ComputeSimilarity(a, b []float32) (float32, error)

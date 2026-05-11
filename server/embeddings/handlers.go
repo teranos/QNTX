@@ -83,7 +83,7 @@ func (h *Handler) HandleSemanticSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	startInference := time.Now()
-	queryResult, err := h.Service.GenerateEmbedding(query)
+	queryResult, err := h.Service.GenerateEmbedding(query, "")
 	if err != nil {
 		h.Logger.Errorw("Failed to generate query embedding", "query", query, "error", err)
 		http.Error(w, "Failed to generate query embedding", http.StatusInternalServerError)
@@ -151,7 +151,8 @@ func (h *Handler) HandleSemanticSearch(w http.ResponseWriter, r *http.Request) {
 
 // EmbeddingGenerateRequest represents an embedding generation request
 type EmbeddingGenerateRequest struct {
-	Text string `json:"text"`
+	Text  string `json:"text"`
+	Model string `json:"model,omitempty"`
 }
 
 // EmbeddingGenerateResponse represents an embedding generation response
@@ -186,19 +187,19 @@ func (h *Handler) HandleEmbeddingGenerate(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	result, err := h.Service.GenerateEmbedding(req.Text)
+	result, err := h.Service.GenerateEmbedding(req.Text, req.Model)
 	if err != nil {
 		h.Logger.Errorw("Failed to generate embedding", "text_length", len(req.Text), "error", err)
 		http.Error(w, "Failed to generate embedding", http.StatusInternalServerError)
 		return
 	}
 
-	modelInfo, err := h.Service.GetModelInfo()
+	modelInfo, err := h.Service.GetModelInfo(req.Model)
 	if err != nil {
-		h.Logger.Errorw("Failed to get model info", "error", err)
+		h.Logger.Errorw("Failed to get model info", "model", req.Model, "error", err)
 		modelInfo = &ModelInfo{
-			Name:       "all-MiniLM-L6-v2",
-			Dimensions: 384,
+			Name:       "unknown",
+			Dimensions: len(result.Embedding),
 		}
 	}
 
@@ -260,7 +261,7 @@ func (h *Handler) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request) {
 	failed := 0
 	errorMessages := []string{}
 
-	modelInfo, err := h.Service.GetModelInfo()
+	modelInfo, err := h.Service.GetModelInfo("")
 	if err != nil {
 		h.Logger.Errorw("Failed to get model info", "error", err)
 		http.Error(w, "Failed to get model info", http.StatusInternalServerError)
@@ -309,7 +310,7 @@ func (h *Handler) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		result, err := h.Service.GenerateEmbedding(text)
+		result, err := h.Service.GenerateEmbedding(text, "")
 		if err != nil {
 			errorMessages = append(errorMessages, errors.Wrapf(err, "failed to generate embedding for %s",
 				attestationID).Error())
@@ -474,7 +475,7 @@ func (h *Handler) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request) {
 	resp := EmbeddingInfoResponse{Available: h.Service != nil}
 
 	if h.Service != nil {
-		if info, err := h.Service.GetModelInfo(); err == nil {
+		if info, err := h.Service.GetModelInfo(""); err == nil {
 			resp.ModelName = info.Name
 			resp.Dimensions = info.Dimensions
 		}

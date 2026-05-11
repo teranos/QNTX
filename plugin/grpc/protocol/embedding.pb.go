@@ -25,6 +25,7 @@ type EmbedRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AuthToken     string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
 	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	Model         string                 `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"` // target model name, empty = default
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -69,6 +70,13 @@ func (x *EmbedRequest) GetAuthToken() string {
 func (x *EmbedRequest) GetText() string {
 	if x != nil {
 		return x.Text
+	}
+	return ""
+}
+
+func (x *EmbedRequest) GetModel() string {
+	if x != nil {
+		return x.Model
 	}
 	return ""
 }
@@ -145,6 +153,7 @@ type BatchEmbedRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AuthToken     string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
 	Texts         []string               `protobuf:"bytes,2,rep,name=texts,proto3" json:"texts,omitempty"`
+	Model         string                 `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"` // target model name, empty = default
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -191,6 +200,13 @@ func (x *BatchEmbedRequest) GetTexts() []string {
 		return x.Texts
 	}
 	return nil
+}
+
+func (x *BatchEmbedRequest) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
 }
 
 type BatchEmbedResponse struct {
@@ -868,6 +884,7 @@ func (x *Centroid) GetVector() []float32 {
 type ModelInfoRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AuthToken     string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
+	Model         string                 `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"` // target model name, empty = default
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -905,6 +922,13 @@ func (*ModelInfoRequest) Descriptor() ([]byte, []int) {
 func (x *ModelInfoRequest) GetAuthToken() string {
 	if x != nil {
 		return x.AuthToken
+	}
+	return ""
+}
+
+func (x *ModelInfoRequest) GetModel() string {
+	if x != nil {
+		return x.Model
 	}
 	return ""
 }
@@ -973,22 +997,24 @@ var File_plugin_grpc_protocol_embedding_proto protoreflect.FileDescriptor
 
 const file_plugin_grpc_protocol_embedding_proto_rawDesc = "" +
 	"\n" +
-	"$plugin/grpc/protocol/embedding.proto\x12\bprotocol\"A\n" +
+	"$plugin/grpc/protocol/embedding.proto\x12\bprotocol\"W\n" +
 	"\fEmbedRequest\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x01 \x01(\tR\tauthToken\x12\x12\n" +
-	"\x04text\x18\x02 \x01(\tR\x04text\"u\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\x12\x14\n" +
+	"\x05model\x18\x03 \x01(\tR\x05model\"u\n" +
 	"\rEmbedResponse\x12\x16\n" +
 	"\x06vector\x18\x01 \x03(\x02R\x06vector\x12\x1e\n" +
 	"\n" +
 	"dimensions\x18\x02 \x01(\x05R\n" +
 	"dimensions\x12\x14\n" +
 	"\x05model\x18\x03 \x01(\tR\x05model\x12\x16\n" +
-	"\x06tokens\x18\x04 \x01(\x05R\x06tokens\"H\n" +
+	"\x06tokens\x18\x04 \x01(\x05R\x06tokens\"^\n" +
 	"\x11BatchEmbedRequest\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x01 \x01(\tR\tauthToken\x12\x14\n" +
-	"\x05texts\x18\x02 \x03(\tR\x05texts\"\xa2\x01\n" +
+	"\x05texts\x18\x02 \x03(\tR\x05texts\x12\x14\n" +
+	"\x05model\x18\x03 \x01(\tR\x05model\"\xa2\x01\n" +
 	"\x12BatchEmbedResponse\x123\n" +
 	"\aresults\x18\x01 \x03(\v2\x19.protocol.EmbeddingVectorR\aresults\x12\x1e\n" +
 	"\n" +
@@ -1042,10 +1068,11 @@ const file_plugin_grpc_protocol_embedding_proto_rawDesc = "" +
 	"n_clusters\x18\x03 \x01(\x05R\tnClusters\x120\n" +
 	"\tcentroids\x18\x04 \x03(\v2\x12.protocol.CentroidR\tcentroids\"\"\n" +
 	"\bCentroid\x12\x16\n" +
-	"\x06vector\x18\x01 \x03(\x02R\x06vector\"1\n" +
+	"\x06vector\x18\x01 \x03(\x02R\x06vector\"G\n" +
 	"\x10ModelInfoRequest\x12\x1d\n" +
 	"\n" +
-	"auth_token\x18\x01 \x01(\tR\tauthToken\"w\n" +
+	"auth_token\x18\x01 \x01(\tR\tauthToken\x12\x14\n" +
+	"\x05model\x18\x02 \x01(\tR\x05model\"w\n" +
 	"\x11ModelInfoResponse\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1e\n" +
 	"\n" +

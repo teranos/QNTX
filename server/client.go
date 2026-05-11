@@ -790,7 +790,7 @@ func (c *Client) handleRichSearch(query string) {
 // searchSemantic generates an embedding for the query and searches the vector store.
 // Returns empty slice on any failure — semantic search is best-effort.
 func (c *Client) searchSemantic(query string) []storage.RichSearchMatch {
-	queryResult, err := c.server.embeddingService.GenerateEmbedding(query)
+	queryResult, err := c.server.embeddingService.GenerateEmbedding(query, "")
 	if err != nil {
 		c.server.logger.Debugw("Semantic embedding failed", "query", query, "error", err)
 		return nil

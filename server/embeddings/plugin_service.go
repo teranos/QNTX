@@ -49,10 +49,12 @@ func NewPluginEmbeddingServiceFromClient(client protocol.EmbeddingServiceClient,
 }
 
 // GenerateEmbedding creates an embedding for the given text via plugin gRPC.
-func (s *PluginEmbeddingService) GenerateEmbedding(text string) (*EmbeddingResult, error) {
+// Empty model uses the plugin's default model.
+func (s *PluginEmbeddingService) GenerateEmbedding(text, model string) (*EmbeddingResult, error) {
 	resp, err := s.client.Embed(context.Background(), &protocol.EmbedRequest{
 		AuthToken: s.authToken,
 		Text:      text,
+		Model:     model,
 	})
 	if err != nil {
 		return nil, errors.Wrapf(err, "plugin Embed RPC failed for text (%d chars)", len(text))
@@ -66,10 +68,12 @@ func (s *PluginEmbeddingService) GenerateEmbedding(text string) (*EmbeddingResul
 }
 
 // GenerateBatchEmbeddings creates embeddings for multiple texts via plugin gRPC.
-func (s *PluginEmbeddingService) GenerateBatchEmbeddings(texts []string) (*BatchEmbeddingResult, error) {
+// Empty model uses the plugin's default model.
+func (s *PluginEmbeddingService) GenerateBatchEmbeddings(texts []string, model string) (*BatchEmbeddingResult, error) {
 	resp, err := s.client.BatchEmbed(context.Background(), &protocol.BatchEmbedRequest{
 		AuthToken: s.authToken,
 		Texts:     texts,
+		Model:     model,
 	})
 	if err != nil {
 		return nil, errors.Wrapf(err, "plugin BatchEmbed RPC failed for %d texts", len(texts))
@@ -95,9 +99,11 @@ func (s *PluginEmbeddingService) GenerateBatchEmbeddings(texts []string) (*Batch
 }
 
 // GetModelInfo returns metadata about the loaded model via plugin gRPC.
-func (s *PluginEmbeddingService) GetModelInfo() (*ModelInfo, error) {
+// Empty model uses the plugin's default model.
+func (s *PluginEmbeddingService) GetModelInfo(model string) (*ModelInfo, error) {
 	resp, err := s.client.ModelInfo(context.Background(), &protocol.ModelInfoRequest{
 		AuthToken: s.authToken,
+		Model:     model,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "plugin ModelInfo RPC failed")

@@ -703,14 +703,14 @@ func (s *QNTXServer) runDilationLoop() {
 // *serverembeddings.EmbeddingResult) to the watcher engine's simpler interface.
 type watcherEmbeddingAdapter struct {
 	svc interface {
-		GenerateEmbedding(text string) (*serverembeddings.EmbeddingResult, error)
+		GenerateEmbedding(text, model string) (*serverembeddings.EmbeddingResult, error)
 		ComputeSimilarity(a, b []float32) (float32, error)
 		SerializeEmbedding(embedding []float32) ([]byte, error)
 	}
 }
 
 func (a *watcherEmbeddingAdapter) GenerateEmbedding(text string) ([]float32, error) {
-	result, err := a.svc.GenerateEmbedding(text)
+	result, err := a.svc.GenerateEmbedding(text, "")
 	if err != nil {
 		return nil, err
 	}

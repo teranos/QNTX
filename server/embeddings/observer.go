@@ -19,11 +19,11 @@ import (
 // trigger embedding; structural-only attestations are silently skipped.
 type EmbeddingObserver struct {
 	embeddingService interface {
-		GenerateEmbedding(text string) (*EmbeddingResult, error)
+		GenerateEmbedding(text, model string) (*EmbeddingResult, error)
 		SerializeEmbedding(embedding []float32) ([]byte, error)
 		DeserializeEmbedding(data []byte) ([]float32, error)
 		ComputeSimilarity(a, b []float32) (float32, error)
-		GetModelInfo() (*ModelInfo, error)
+		GetModelInfo(model string) (*ModelInfo, error)
 	}
 	embeddingStore   *storage.EmbeddingStore
 	richStore        *storage.BoundedStore // Reused across calls for 5-min rich field cache
@@ -48,11 +48,11 @@ type EmbeddingObserver struct {
 // NewEmbeddingObserver creates an observer with the given dependencies.
 func NewEmbeddingObserver(
 	svc interface {
-		GenerateEmbedding(text string) (*EmbeddingResult, error)
+		GenerateEmbedding(text, model string) (*EmbeddingResult, error)
 		SerializeEmbedding(embedding []float32) ([]byte, error)
 		DeserializeEmbedding(data []byte) ([]float32, error)
 		ComputeSimilarity(a, b []float32) (float32, error)
-		GetModelInfo() (*ModelInfo, error)
+		GetModelInfo(model string) (*ModelInfo, error)
 	},
 	embStore *storage.EmbeddingStore,
 	richStore *storage.BoundedStore,
@@ -101,7 +101,7 @@ func (o *EmbeddingObserver) OnAttestationCreated(as *types.As) {
 	}
 
 	// Generate embedding via Rust FFI (~80ms)
-	result, err := o.embeddingService.GenerateEmbedding(text)
+	result, err := o.embeddingService.GenerateEmbedding(text, "")
 	if err != nil {
 		o.logger.Warnw("Failed to generate embedding",
 			"error", errors.Wrapf(err, "attestation %s (%d chars)", as.ID, len(text)))
@@ -115,7 +115,7 @@ func (o *EmbeddingObserver) OnAttestationCreated(as *types.As) {
 		return
 	}
 
-	modelInfo, err := o.embeddingService.GetModelInfo()
+	modelInfo, err := o.embeddingService.GetModelInfo("")
 	if err != nil {
 		o.logger.Warnw("Failed to get model info",
 			"error", errors.Wrapf(err, "attestation %s", as.ID))

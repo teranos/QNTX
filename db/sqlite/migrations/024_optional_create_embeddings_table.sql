@@ -3,6 +3,8 @@
 -- The vec0 module must be loaded in SQLite for this to work.
 -- Currently fails with "no such module: vec0" when using standard go-sqlite3.
 -- See docs/embeddings_integration_status.md for integration details.
+-- NOTE: FLOAT32_BLOB(384) and vec0 FLOAT32[384] are hardcoded to 384 dimensions.
+-- Multi-model support (ADR-019) will require per-model vec0 tables for different dimensions.
 CREATE TABLE IF NOT EXISTS embeddings (
     id TEXT PRIMARY KEY,
 
