@@ -191,11 +191,15 @@ impl SqliteStore {
             rusqlite::params![actor, context, delete_count],
         )?;
 
-        // Update counter to reflect deletions
+        // Update counter to reflect deletions, delete if zero
         self.conn.execute(
             "UPDATE enforcement_actor_context SET count = count - ?3
              WHERE actor = ?1 AND context = ?2",
             rusqlite::params![actor, context, deleted],
+        )?;
+        self.conn.execute(
+            "DELETE FROM enforcement_actor_context WHERE actor = ?1 AND context = ?2 AND count <= 0",
+            rusqlite::params![actor, context],
         )?;
 
         Ok(Some(EnforcementEvent {
@@ -345,11 +349,18 @@ impl SqliteStore {
                 |row| row.get(0),
             )
             .unwrap_or(0);
-        self.conn.execute(
-            "INSERT INTO enforcement_actor_contexts (actor, count) VALUES (?1, ?2)
-             ON CONFLICT(actor) DO UPDATE SET count = ?2",
-            rusqlite::params![actor, remaining],
-        )?;
+        if remaining <= 0 {
+            self.conn.execute(
+                "DELETE FROM enforcement_actor_contexts WHERE actor = ?1",
+                rusqlite::params![actor],
+            )?;
+        } else {
+            self.conn.execute(
+                "INSERT INTO enforcement_actor_contexts (actor, count) VALUES (?1, ?2)
+                 ON CONFLICT(actor) DO UPDATE SET count = ?2",
+                rusqlite::params![actor, remaining],
+            )?;
+        }
 
         if total_deleted == 0 {
             return Ok(None);
@@ -497,11 +508,18 @@ impl SqliteStore {
                 |row| row.get(0),
             )
             .unwrap_or(0);
-        self.conn.execute(
-            "INSERT INTO enforcement_entity_actors (subject, count) VALUES (?1, ?2)
-             ON CONFLICT(subject) DO UPDATE SET count = ?2",
-            rusqlite::params![entity, remaining],
-        )?;
+        if remaining <= 0 {
+            self.conn.execute(
+                "DELETE FROM enforcement_entity_actors WHERE subject = ?1",
+                rusqlite::params![entity],
+            )?;
+        } else {
+            self.conn.execute(
+                "INSERT INTO enforcement_entity_actors (subject, count) VALUES (?1, ?2)
+                 ON CONFLICT(subject) DO UPDATE SET count = ?2",
+                rusqlite::params![entity, remaining],
+            )?;
+        }
 
         if total_deleted == 0 {
             return Ok(None);
@@ -541,6 +559,17 @@ impl SqliteStore {
                 details_json,
             ],
         )?;
+
+        // Prune storage_events to 15k rows every ~100 inserts
+        let count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM storage_events", [], |row| row.get(0)
+        ).unwrap_or(0);
+        if count > 15100 {
+            self.conn.execute(
+                "DELETE FROM storage_events WHERE id NOT IN (SELECT id FROM storage_events ORDER BY id DESC LIMIT 15000)",
+                [],
+            )?;
+        }
 
         Ok(())
     }
