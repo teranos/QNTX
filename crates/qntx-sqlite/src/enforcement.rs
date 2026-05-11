@@ -134,8 +134,25 @@ impl SqliteStore {
 
         let delete_count = count as usize - limit;
 
-        // Collect distinct predicates from the exact rows being deleted
+        // Collect distinct predicates and oldest timestamp from the exact rows being deleted
         let details = {
+            let oldest: Option<String> = self.conn.query_row(
+                "SELECT MIN(att.timestamp)
+                 FROM attestations att
+                 JOIN attestation_actors a ON att.id = a.attestation_id
+                 JOIN attestation_contexts c ON att.id = c.attestation_id
+                 WHERE att.id IN (
+                     SELECT att2.id FROM attestations att2
+                     JOIN attestation_actors a2 ON att2.id = a2.attestation_id
+                     JOIN attestation_contexts c2 ON att2.id = c2.attestation_id
+                     WHERE a2.actor = ?1 AND c2.context = ?2
+                     ORDER BY att2.timestamp ASC
+                     LIMIT ?3
+                 )",
+                rusqlite::params![actor, context, delete_count],
+                |row| row.get(0),
+            ).ok().flatten();
+
             let mut stmt = self.conn.prepare(
                 "SELECT DISTINCT att.predicates
                  FROM attestations att
@@ -156,7 +173,7 @@ impl SqliteStore {
                 evicted_actors: Vec::new(),
                 evicted_contexts: Vec::new(),
                 predicates,
-                last_seen: None,
+                last_seen: oldest,
             }
         };
 
@@ -245,6 +262,9 @@ impl SqliteStore {
         let contexts_to_delete = &contexts[..contexts.len() - limit];
         let mut total_deleted = 0usize;
 
+        let ctx_list: Vec<&str> = contexts_to_delete.iter().map(|cu| cu.context.as_str()).collect();
+        let placeholders: Vec<String> = (0..ctx_list.len()).map(|i| format!("?{}", i + 2)).collect();
+
         let mut details = EvictionDetails {
             evicted_actors: Vec::new(),
             evicted_contexts: Vec::new(),
@@ -252,10 +272,28 @@ impl SqliteStore {
             last_seen: None,
         };
 
+        // Query oldest timestamp from all contexts being evicted
+        {
+            let query = format!(
+                "SELECT MIN(att.timestamp)
+                 FROM attestations att
+                 JOIN attestation_actors a ON att.id = a.attestation_id
+                 JOIN attestation_contexts c ON att.id = c.attestation_id
+                 WHERE a.actor = ?1 AND c.context IN ({})",
+                placeholders.join(", ")
+            );
+            let mut stmt = self.conn.prepare(&query)?;
+            let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+            params.push(Box::new(actor.to_string()));
+            for ctx in &ctx_list {
+                params.push(Box::new(ctx.to_string()));
+            }
+            let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+            details.last_seen = stmt.query_row(param_refs.as_slice(), |row| row.get(0)).ok().flatten();
+        }
+
         // Collect distinct predicates from all contexts being evicted
         {
-            let ctx_list: Vec<&str> = contexts_to_delete.iter().map(|cu| cu.context.as_str()).collect();
-            let placeholders: Vec<String> = (0..ctx_list.len()).map(|i| format!("?{}", i + 2)).collect();
             let query = format!(
                 "SELECT DISTINCT att.predicates
                  FROM attestations att
@@ -360,19 +398,11 @@ impl SqliteStore {
              ORDER BY last_seen ASC",
         )?;
 
-        struct ActorInfo {
-            actor: String,
-            last_seen: String,
-        }
-
-        let actors: Vec<ActorInfo> = {
+        let actors: Vec<String> = {
             let mut rows = stmt.query(rusqlite::params![entity])?;
             let mut result = Vec::new();
             while let Some(row) = rows.next()? {
-                result.push(ActorInfo {
-                    actor: row.get(0)?,
-                    last_seen: row.get(1)?,
-                });
+                result.push(row.get::<_, String>(0)?);
             }
             result
         };
@@ -384,6 +414,9 @@ impl SqliteStore {
         let actors_to_delete = &actors[..actors.len() - limit];
         let mut total_deleted = 0usize;
 
+        let actor_list: Vec<&str> = actors_to_delete.iter().map(|a| a.as_str()).collect();
+        let placeholders: Vec<String> = (0..actor_list.len()).map(|i| format!("?{}", i + 2)).collect();
+
         let mut details = EvictionDetails {
             evicted_actors: Vec::new(),
             evicted_contexts: Vec::new(),
@@ -391,10 +424,28 @@ impl SqliteStore {
             last_seen: None,
         };
 
+        // Query oldest timestamp from all actors being evicted
+        {
+            let query = format!(
+                "SELECT MIN(att.timestamp)
+                 FROM attestations att
+                 JOIN attestation_actors a ON att.id = a.attestation_id
+                 JOIN attestation_subjects s ON att.id = s.attestation_id
+                 WHERE s.subject = ?1 AND a.actor IN ({})",
+                placeholders.join(", ")
+            );
+            let mut stmt = self.conn.prepare(&query)?;
+            let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+            params.push(Box::new(entity.to_string()));
+            for actor in &actor_list {
+                params.push(Box::new(actor.to_string()));
+            }
+            let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+            details.last_seen = stmt.query_row(param_refs.as_slice(), |row| row.get(0)).ok().flatten();
+        }
+
         // Collect distinct predicates from all actors being evicted
         {
-            let actor_list: Vec<&str> = actors_to_delete.iter().map(|ai| ai.actor.as_str()).collect();
-            let placeholders: Vec<String> = (0..actor_list.len()).map(|i| format!("?{}", i + 2)).collect();
             let query = format!(
                 "SELECT DISTINCT att.predicates
                  FROM attestations att
@@ -414,13 +465,8 @@ impl SqliteStore {
             details.predicates = collect_distinct_predicates(&mut rows, 15)?;
         }
 
-        for ai in actors_to_delete.iter() {
-            details.evicted_actors.push(ai.actor.clone());
-            if details.last_seen.is_none()
-                || details.last_seen.as_deref() < Some(ai.last_seen.as_str())
-            {
-                details.last_seen = Some(ai.last_seen.clone());
-            }
+        for actor in actors_to_delete.iter() {
+            details.evicted_actors.push(actor.clone());
 
             // Delete all attestations by this actor that mention this entity
             let deleted = self.conn.execute(
@@ -431,14 +477,14 @@ impl SqliteStore {
                      JOIN attestation_subjects s ON a.attestation_id = s.attestation_id
                      WHERE a.actor = ?1 AND s.subject = ?2
                  )",
-                rusqlite::params![ai.actor, entity],
+                rusqlite::params![actor, entity],
             )?;
             total_deleted += deleted;
 
             // Remove detail tracking row
             self.conn.execute(
                 "DELETE FROM enforcement_entity_actors_detail WHERE subject = ?1 AND actor = ?2",
-                rusqlite::params![entity, ai.actor],
+                rusqlite::params![entity, actor],
             )?;
         }
 
