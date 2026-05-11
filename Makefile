@@ -6,6 +6,16 @@ PREFIX ?= $(HOME)/.qntx
 # Use prebuilt qntx if available in PATH, otherwise use ./bin/qntx
 QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
+# Ground immediate delivery — notify active Claude sessions of build progress.
+# Usage: @$(call ground-notify,name,detail message)
+GROUND_DB := $(HOME)/.local/share/ground/ground.db
+define ground-notify
+	@if [ -f "$(GROUND_DB)" ]; then \
+		TS=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
+		sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-$(1)-' || strftime('%s','now'), '[\"qntx\"]', '[\"immediate:$(1)\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$TS', 'make', json_object('detail', '$(2) at ' || time('now','localtime'), 'after', 0))"; \
+	fi
+endef
+
 # Optional: KERN=1 make cli/dev to enable OCaml parser plugin
 BUILD_TAGS := rustsqlite,qntxwasm
 ifdef KERN
@@ -14,7 +24,10 @@ endif
 
 cli: rust-sqlite wasm ## Build QNTX CLI binary (with Rust optimizations and WASM parser)
 	@echo "Building QNTX CLI with Rust optimizations (sqlite) and WASM (parser, fuzzy)..."
-	@go build -tags "$(BUILD_TAGS)" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
+	$(call ground-notify,go-build,Go: building qntx cli)
+	@go build -tags "$(BUILD_TAGS)" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx || { \
+		if [ -f "$(GROUND_DB)" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-go-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:go-build-failed\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Go: qntx cli build FAILED\",\"after\":0}')"; fi; \
+		exit 1; }
 
 cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments without Rust toolchain)
 	@echo "Building QNTX CLI (pure Go, no CGO)..."
@@ -33,7 +46,9 @@ server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."
 	@./bin/qntx server
 
-dev: web cli ## Build frontend and CLI, then start development servers (backend + frontend with live reload)
+dev: ## Build frontend and CLI, then start development servers (backend + frontend with live reload)
+	$(call ground-notify,rebuilding,make dev: rebuilding QNTX)
+	@$(MAKE) web cli
 	@# Read ports from am.toml if exists, otherwise use defaults
 	@TOML_BACKEND_PORT=$$(grep -E '^port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
 	TOML_FRONTEND_PORT=$$(grep -E '^frontend_port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
@@ -340,7 +355,10 @@ llama-cpp-plugin: ## Build, install, and restart llama-cpp plugin (C++ local LLM
 
 rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO integration)
 	@echo "Building Rust SQLite storage library..."
-	@cargo build --release --package qntx-sqlite --features ffi --lib
+	$(call ground-notify,rust-build,Rust: building qntx-sqlite)
+	@cargo build --release --package qntx-sqlite --features ffi --lib || { \
+		if [ -f "$(GROUND_DB)" ]; then sqlite3 "$(GROUND_DB)" "INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes) VALUES ('make-rust-build-failed-$$(date +%s)', '[\"qntx\"]', '[\"immediate:rust-build-failed\"]', '[\"project:teranos/QNTX\"]', '[\"make\"]', '$$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'make', '{\"detail\":\"Rust: qntx-sqlite build FAILED\",\"after\":0}')"; fi; \
+		exit 1; }
 	@echo "✓ libqntx_sqlite built in target/release/"
 	@echo "  Static:  libqntx_sqlite.a"
 	@echo "  Shared:  libqntx_sqlite.so (Linux) / libqntx_sqlite.dylib (macOS)"

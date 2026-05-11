@@ -11,10 +11,32 @@
  */
 
 import { cp, mkdir, readdir, rm } from "fs/promises";
+import { existsSync } from "fs";
 import { join } from "path";
+import { Database } from "bun:sqlite";
 
 const sourceDir = import.meta.dir; // web/
 const outputDir = join(sourceDir, "..", "internal", "server", "dist");
+
+// Ground immediate delivery — notify active Claude sessions of build progress.
+const GROUND_DB = join(process.env.HOME ?? "", ".local", "share", "ground", "ground.db");
+
+function groundNotify(name: string, detail: string): void {
+  if (!existsSync(GROUND_DB)) return;
+  try {
+    const db = new Database(GROUND_DB);
+    const id = `make-${name}-${Math.floor(Date.now() / 1000)}`;
+    const now = new Date();
+    const ts = now.toISOString();
+    const time = now.toTimeString().slice(0, 8);
+    db.run(
+      `INSERT OR IGNORE INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, '["qntx"]', `["immediate:${name}"]`, '["project:teranos/QNTX"]', '["make"]', ts, 'build.ts', JSON.stringify({ detail: `${detail} at ${time}`, after: 0 })]
+    );
+    db.close();
+  } catch { /* Ground unavailable — silent */ }
+}
 
 // Peach color palette
 const peach = "\x1b[38;5;217m";
@@ -41,6 +63,7 @@ try {
   await mkdir(outputDir, { recursive: true });
 
   // Bundle TypeScript with Bun
+  groundNotify("web-build", "Web: bundling frontend");
   console.log(`${darkPeach}Bundling JavaScript...${reset}`);
   const result = await Bun.build({
     entrypoints: [join(sourceDir, "ts", "main.ts")],
@@ -62,6 +85,7 @@ try {
       console.error(`  ${loc}${log.message}`);
     }
     console.error(`${red}${'='.repeat(80)}${reset}\n`);
+    groundNotify("web-build-failed", `Web: bundle FAILED — ${result.logs.map(l => l.message).join("; ")}`);
     process.exit(1);
   }
 
@@ -146,5 +170,6 @@ try {
   console.error(`${red}${'='.repeat(80)}${reset}`);
   console.error(`  ${error}`);
   console.error(`${red}${'='.repeat(80)}${reset}\n`);
+  groundNotify("web-build-failed", `Web: build FAILED — ${error}`);
   process.exit(1);
 }
