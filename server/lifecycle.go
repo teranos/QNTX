@@ -105,6 +105,9 @@ func (s *QNTXServer) startBackgroundServices() {
 	if s.watcherEngine != nil {
 		s.startWatcherQueueBroadcaster()
 	}
+
+	// Start database stats cache refresher
+	s.startDBStatsRefresher()
 }
 
 // Start starts the server on the specified port

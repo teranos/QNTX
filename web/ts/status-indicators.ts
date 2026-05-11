@@ -327,7 +327,8 @@ class StatusIndicatorManager {
     /**
      * Handle database stats update
      */
-    handleDatabaseStats(count: number): void {
+    handleDatabaseStats(count: number | undefined): void {
+        if (count == null) return;
         const formatted = count >= 1000 ? `${(count / 1000).toFixed(1)}k` : count.toString();
         this.updateIndicator('database', 'active', `${DB} ${formatted}`);
     }

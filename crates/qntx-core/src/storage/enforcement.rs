@@ -30,10 +30,9 @@ pub struct EvictionDetails {
     pub evicted_actors: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evicted_contexts: Vec<String>,
+    /// Distinct predicates from the evicted attestations (up to 15).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub sample_predicates: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub sample_subjects: Vec<String>,
+    pub predicates: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_seen: Option<String>,
 }
