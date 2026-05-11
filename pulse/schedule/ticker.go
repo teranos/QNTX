@@ -226,14 +226,19 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 	// Create visual indicator based on active work (queued + running)
 	activeWork := stats.Queued + stats.Running
 
-	// Only log if active work count has changed
+	// Only log when work count decreases (job finished) or goes from 0→N
+	// with N>1. A single scheduled job (0→1→0) produces one line per cycle
+	// instead of two.
 	t.mu.Lock()
-	hasChanged := activeWork != t.lastActiveWork
+	prev := t.lastActiveWork
 	t.lastActiveWork = activeWork
 	t.mu.Unlock()
 
-	if !hasChanged {
-		return // Skip logging if no change in queue activity
+	if activeWork == prev {
+		return // No change
+	}
+	if activeWork > prev && activeWork <= 1 {
+		return // Single job started — wait for completion to log
 	}
 
 	// Build visual indicator based on work load
@@ -414,7 +419,7 @@ func (t *Ticker) checkScheduledJobs(now time.Time) error {
 func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 	startTime := time.Now()
 
-	t.pulseLog.Infow("Pulse executing scheduled job",
+	t.pulseLog.Debugw("Pulse executing scheduled job",
 		"job_id", scheduled.ID,
 		"job_short", scheduled.ID[:8],
 		"ats_code", scheduled.ATSCode,
@@ -487,7 +492,7 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 		nextRun := now.Add(time.Duration(scheduled.IntervalSeconds) * time.Second)
 		nextRunRelative := time.Until(nextRun).Round(time.Minute)
 
-		t.pulseLog.Infow("Pulse OK",
+		t.pulseLog.Debugw("Pulse OK",
 			"ats_code", scheduled.ATSCode,
 			"async_job_id", asyncJobID,
 			"async_short", asyncJobID[:8],

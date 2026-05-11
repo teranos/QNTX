@@ -76,9 +76,9 @@ const MESSAGE_HANDLERS = {
     },
 
     job_update: (data: JobUpdateMessage) => {
-        // Only log non-completed jobs — completed jobs are too noisy (e.g. embedding bulk on sync)
-        if (data.job.status !== 'completed') {
-            log.info(SEG.PULSE, 'Job update:', data.job.id, data.job.status);
+        // Only log failed jobs — routine transitions (queued/running/completed) are noise
+        if (data.job.status === 'failed') {
+            log.info(SEG.PULSE, 'Job failed:', data.job.id, data.job.error);
         }
 
         // Send native desktop notification if in Tauri
