@@ -201,6 +201,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "049",
         include_str!("../../../db/sqlite/migrations/049_create_enforcement_counters.sql"),
     ),
+    (
+        "050",
+        include_str!("../../../db/sqlite/migrations/050_junction_tables_nocase.sql"),
+    ),
 ];
 
 /// Versions whose migrations are allowed to fail (they depend on sqlite-vec).
@@ -208,6 +212,11 @@ const MIGRATIONS: &[(&str, &str)] = &[
 const OPTIONAL_VERSIONS: &[&str] = &[
     "024", "029", "030", "031", "032", "034", "035", "036", "046",
 ];
+
+/// Versions that require foreign_keys = OFF (they DROP and recreate tables
+/// with FK references). PRAGMA foreign_keys cannot be changed inside a
+/// transaction, so the runner disables it before BEGIN and re-enables after COMMIT.
+const FK_OFF_VERSIONS: &[&str] = &["050"];
 
 /// Apply all pending migrations to the database
 ///
@@ -244,6 +253,16 @@ fn apply_migration(conn: &Connection, version: &str, sql: &str) -> Result<()> {
         return Ok(());
     }
 
+    // Migrations that DROP/recreate FK-referenced tables need foreign_keys OFF.
+    // PRAGMA foreign_keys cannot be changed inside a transaction.
+    let fk_off = FK_OFF_VERSIONS.contains(&version);
+    if fk_off {
+        conn.execute("PRAGMA foreign_keys = OFF", [])?;
+    }
+
+    let start = std::time::Instant::now();
+    eprintln!("qntx-sqlite: applying migration {}", version);
+
     // Apply migration in a transaction
     let tx = conn.unchecked_transaction()?;
 
@@ -254,6 +273,12 @@ fn apply_migration(conn: &Connection, version: &str, sql: &str) -> Result<()> {
     record_migration(&tx, version)?;
 
     tx.commit()?;
+
+    eprintln!("qntx-sqlite: migration {} applied in {:.1}s", version, start.elapsed().as_secs_f64());
+
+    if fk_off {
+        conn.execute("PRAGMA foreign_keys = ON", [])?;
+    }
 
     Ok(())
 }
