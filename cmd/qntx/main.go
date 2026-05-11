@@ -142,10 +142,6 @@ func initializePluginRegistry() {
 	for _, pluginName := range cfg.Plugin.Enabled {
 		registry.PreRegister(pluginName)
 	}
-	logDir := filepath.Dir(logPath)
-	for _, name := range cfg.Plugin.Enabled {
-		pluginLogger.Infow("Plugin log", "plugin", name, "path", filepath.Join(logDir, name+".log"))
-	}
 	pluginLogger.Debugf("Pre-registered %d plugins, loading in background", len(cfg.Plugin.Enabled))
 
 	// Plugin loading is deferred until the server signals it's ready.
