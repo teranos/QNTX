@@ -947,6 +947,22 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 			writeError(w, http.StatusServiceUnavailable, "Plugin manager not available")
 			return
 		}
+		// Check if plugin is in the enabled list
+		appcfg.Reset()
+		preCheckCfg, preCheckErr := appcfg.Load()
+		if preCheckErr == nil {
+			enabled := false
+			for _, p := range preCheckCfg.Plugin.Enabled {
+				if p == name {
+					enabled = true
+					break
+				}
+			}
+			if !enabled {
+				writeError(w, http.StatusBadRequest, fmt.Sprintf("Plugin %q is not enabled in am.toml — add it to [plugin] enabled to use it", name))
+				return
+			}
+		}
 		// Snapshot config before reset for diff detection
 		if acc := pm.Accumulator(); acc != nil {
 			if v := appcfg.GetViper(); v != nil {
