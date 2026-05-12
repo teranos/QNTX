@@ -64,19 +64,23 @@ sqlite3 ~/.qntx/db/sqlite.db \
 
 ## Enforcement Flow
 
-Enforcement runs through Rust's single `rusqlite` connection (avoids dual-driver SQLite corruption):
+Enforcement runs through Rust's single `rusqlite` connection (avoids dual-driver SQLite corruption). Uses a **half-bound threshold**: triggers at `limit + limit/2`, evicts down to `limit`. For actor_context_limit=16, this means enforcement triggers at 24 and evicts 8 at once, amortizing cost.
 
 ```
 RustBackedStore.CreateAttestation()
   → Rust FFI: INSERT attestation
   → Rust: enforce_limits()
-      ├─ actor_context_limit: DELETE oldest for (actor, context) if > limit
-      ├─ actor_contexts_limit: DELETE least-used contexts if actor has too many
-      └─ entity_actors_limit: DELETE least-recent actors if entity has too many
+      ├─ actor_context_limit: if count > 24, evict oldest down to 16
+      ├─ actor_contexts_limit: if contexts > 96, evict least-used down to 64
+      └─ entity_actors_limit: if actors > 96, evict least-recent down to 64
+      Each path: load batch → distill into summary → delete originals → insert distill attestation
       (each logs to storage_events)
 ```
 
+Evicted attestations are **distilled** into a compressed summary before deletion. See [ADR-020: Attestation Distillation](../adr/ADR-020-attestation-distillation.md) for the full design.
+
 ## See Also
 
+- [ADR-020: Attestation Distillation](../adr/ADR-020-attestation-distillation.md)
 - [Configuration System](config-system.md)
 - [Pulse Architecture](pulse-async-ix.md)
