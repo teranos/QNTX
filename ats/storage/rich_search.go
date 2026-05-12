@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/attrs"
-	"github.com/teranos/QNTX/ats/ax"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 )
@@ -18,10 +17,12 @@ import (
 // There are no hardcoded defaults - all searchable fields must be attested.
 
 // Search strategy constants — must match web/ts/search-view.ts
+// Fuzzy was removed. MeiliSearch via qntx-meili plugin (ADR-015) provides
+// typo-tolerant full-text search when available, with SQL substring fallback.
 const (
-	StrategySubstring = "substring"
-	StrategyFuzzy     = "fuzzy"
-	StrategySemantic  = "semantic"
+	StrategySubstring  = "substring"
+	StrategySemantic   = "semantic"
+	StrategyMeiliSearch = "meilisearch"
 )
 
 // RichSearchMatch represents a match in RichStringFields
@@ -54,9 +55,8 @@ type RichFieldInfo struct {
 	SourceTypes []string `json:"source_types"` // Type definitions that include this field
 }
 
-// SearchRichStringFields searches for matches in RichStringFields across attestations
-// Now with Rust fuzzy matching for typo tolerance!
-// Returns results with potential warnings about degraded functionality
+// SearchRichStringFields searches for matches in RichStringFields across attestations.
+// Returns results with potential warnings about degraded functionality.
 func (bs *BoundedStore) SearchRichStringFields(ctx context.Context, query string, limit int) ([]RichSearchMatch, error) {
 	result, err := bs.SearchRichStringFieldsWithResult(ctx, query, limit)
 	if err != nil {
@@ -66,7 +66,9 @@ func (bs *BoundedStore) SearchRichStringFields(ctx context.Context, query string
 	return result.Matches, nil
 }
 
-// SearchRichStringFieldsWithResult searches and returns full result with warnings
+// SearchRichStringFieldsWithResult searches and returns full result with warnings.
+// Uses substring matching. MeiliSearch via qntx-meili plugin (ADR-015) will provide
+// typo-tolerant search when wired in.
 func (bs *BoundedStore) SearchRichStringFieldsWithResult(ctx context.Context, query string, limit int) (*RichSearchResult, error) {
 	if query == "" {
 		return nil, errors.New("empty search query")
@@ -76,67 +78,15 @@ func (bs *BoundedStore) SearchRichStringFieldsWithResult(ctx context.Context, qu
 		limit = 100 // Default limit
 	}
 
-	result := &RichSearchResult{
-		Matches:        []RichSearchMatch{},
-		Warnings:       []string{},
-		Degraded:       false,
-		SearchedFields: []string{},
-	}
-
-	// For single-word queries, try exact match first
-	queryWords := strings.Fields(query)
-	if len(queryWords) == 1 {
-		matches, err := bs.searchExactSQL(ctx, query, limit)
-		if err == nil && len(matches) > 0 {
-			result.Matches = matches
-			result.SearchedFields = bs.buildDynamicRichStringFields(ctx)
-			return result, nil
-		}
-	}
-
-	// For multi-word queries or when no exact matches, use fuzzy matching
-	backend := ax.DetectBackend()
-	if backend == ax.MatcherBackendWasm {
-		if bs.logger != nil {
-			bs.logger.Debugw("Using fuzzy search for query", "query", query, "wordCount", len(queryWords), "backend", backend)
-		}
-		fuzzyMatches, err := bs.searchFuzzyWithEngine(ctx, query, limit)
-		if err != nil {
-			if bs.logger != nil {
-				bs.logger.Warnw("Fuzzy search error, trying fallback", "error", err, "query", query)
-			}
-			result.Warnings = append(result.Warnings, "Fuzzy search error: "+err.Error())
-			result.Degraded = true
-		} else if len(fuzzyMatches) > 0 {
-			if bs.logger != nil {
-				bs.logger.Debugw("Fuzzy search found matches", "count", len(fuzzyMatches))
-			}
-			result.Matches = fuzzyMatches
-			result.SearchedFields = bs.buildDynamicRichStringFields(ctx)
-			return result, nil
-		}
-	} else {
-		if bs.logger != nil {
-			bs.logger.Debugw("Fuzzy matcher not available")
-		}
-		result.Warnings = append(result.Warnings, "Fuzzy search unavailable (WASM or Rust backend required)")
-		result.Degraded = true
-	}
-
-	// Fallback to exact SQL search
 	matches, err := bs.searchExactSQL(ctx, query, limit)
 	if err != nil {
-		// If even fallback fails, return error
 		return nil, errors.Wrap(err, "search failed")
 	}
 
-	result.Matches = matches
-	result.SearchedFields = bs.buildDynamicRichStringFields(ctx)
-	if result.Degraded && len(matches) > 0 {
-		result.Warnings = append(result.Warnings, "Using exact match (typo tolerance disabled)")
-	}
-
-	return result, nil
+	return &RichSearchResult{
+		Matches:        matches,
+		SearchedFields: bs.buildDynamicRichStringFields(ctx),
+	}, nil
 }
 
 // searchExactSQL performs exact substring matching using SQL

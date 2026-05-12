@@ -329,6 +329,14 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	storage.RegisterObserver(creationStats)
 	ticker.SetCreationStats(creationStats)
 
+	// Index attestations into MeiliSearch when a search provider is available (ADR-015).
+	// The observer checks HasProvider() on each write — no-op when meili isn't running.
+	if server.servicesManager != nil {
+		richStore := storage.NewBoundedStore(db, nil, serverLogger.Named("search-index"))
+		searchObserver := NewSearchIndexObserver(server.servicesManager, richStore, serverLogger.Named("search-index"))
+		storage.RegisterObserver(searchObserver)
+	}
+
 	// Configure periodic database backup via Rust's hot backup API
 	backupInterval := time.Duration(deps.config.Database.BackupIntervalSeconds) * time.Second
 	if bp, ok := atsStore.(schedule.BackupProvider); ok && backupInterval > 0 {
@@ -385,6 +393,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 			ticker.SetWeaveStats(llmRouter)
 		}
 	}
+	server.setupDistillSchedule(deps.config)
 	server.setupEmbeddingReclusterSchedule(deps.config)
 	server.setupEmbeddingReprojectSchedule(deps.config)
 	server.setupClusterLabelSchedule(deps.config)

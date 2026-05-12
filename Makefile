@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin rust-sqlite wasm rust-python rust-reduce
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-ocaml test-d test-coverage test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin atproto-plugin github-plugin ix-json-plugin ix-bin-plugin ix-net-plugin faal-plugin openrouter-plugin pty-glyph-plugin loom-plugin kern-plugin llama-cpp-plugin meili-plugin rust-sqlite wasm rust-python rust-reduce
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -335,6 +335,11 @@ pty-glyph-plugin: ## Build, install, and restart pty-glyph plugin
 	$(call check-plugin-version,qntx-plugins/pty-glyph,rs,qntx-plugins/pty-glyph/Cargo.toml)
 	@$(MAKE) -C qntx-plugins/pty-glyph install PREFIX=$(PREFIX)
 	$(call restart-plugin,pty-glyph)
+
+meili-plugin: ## Build, install, and restart MeiliSearch plugin
+	$(call check-plugin-version,qntx-plugins/qntx-meili,rs,qntx-plugins/qntx-meili/Cargo.toml)
+	@$(MAKE) -C qntx-plugins/qntx-meili install PREFIX=$(PREFIX)
+	$(call restart-plugin,meili)
 
 loom-plugin: ## Build, install, and restart loom plugin (OCaml)
 	$(call check-plugin-version,qntx-plugins/loom,ml,qntx-plugins/loom/lib/version.ml)
