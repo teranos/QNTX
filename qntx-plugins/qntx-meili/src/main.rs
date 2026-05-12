@@ -10,9 +10,11 @@ use tonic::transport::Server;
 use tracing::{info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 
+mod embedded;
 mod search;
 mod service;
 
+use embedded::EmbeddedMeili;
 use search::MeiliSearchService;
 use service::MeiliPluginService;
 
@@ -40,6 +42,21 @@ struct Args {
     /// MeiliSearch API key (optional)
     #[arg(long, default_value = "")]
     meili_key: String,
+
+    /// Run an embedded MeiliSearch subprocess instead of connecting to an external one.
+    /// Data is stored in ~/.qntx/meili-data/ (persistent across restarts).
+    #[arg(long)]
+    embedded: bool,
+
+    /// Path to the meilisearch binary (for --embedded mode).
+    /// Defaults to "meilisearch" (found via PATH).
+    #[arg(long, default_value = "meilisearch")]
+    meili_bin: String,
+
+    /// Data directory for embedded MeiliSearch.
+    /// Defaults to ~/.qntx/meili-data/
+    #[arg(long)]
+    meili_db_path: Option<String>,
 }
 
 const MAX_PORT_RETRIES: u16 = 10;
@@ -66,7 +83,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Initializing QNTX MeiliSearch Plugin");
     info!("  Version: {}", env!("CARGO_PKG_VERSION"));
-    info!("  MeiliSearch URL: {}", args.meili_url);
+
+    // Spawn embedded MeiliSearch if requested.
+    // _embedded_handle is held here to keep the child process alive for the
+    // duration of the plugin. Dropping it kills the subprocess.
+    let (meili_url, meili_key, _embedded_handle);
+
+    if args.embedded {
+        let db_path = match &args.meili_db_path {
+            Some(p) => std::path::PathBuf::from(p),
+            None => {
+                let home = std::env::var("HOME")
+                    .map_err(|_| "HOME not set, cannot determine meili-data path")?;
+                std::path::PathBuf::from(home).join(".qntx/meili-data")
+            }
+        };
+
+        let handle = EmbeddedMeili::spawn(&args.meili_bin, db_path).await?;
+        meili_url = handle.url();
+        meili_key = handle.key().to_string();
+        info!("  Mode: embedded ({})", meili_url);
+        _embedded_handle = Some(handle);
+    } else {
+        meili_url = args.meili_url;
+        meili_key = args.meili_key;
+        info!("  Mode: remote ({})", meili_url);
+        _embedded_handle = None;
+    }
 
     let listener = if let Some(address) = args.address {
         let addr: SocketAddr = address
@@ -84,8 +127,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::io::stdout().flush().ok();
 
     let search_service = Arc::new(MeiliSearchService::new());
+    if _embedded_handle.is_some() {
+        search_service.set_mode("embedded");
+    }
     let plugin_service =
-        MeiliPluginService::new(Arc::clone(&search_service), args.meili_url, args.meili_key);
+        MeiliPluginService::new(Arc::clone(&search_service), meili_url, meili_key);
 
     Server::builder()
         .add_service(DomainPluginServiceServer::new(plugin_service))

@@ -1,6 +1,6 @@
 [package]
 name = "qntx-meili"
-version = "0.7.1"
+version = "0.8.4"
 edition.workspace = true
 description = "QNTX search provider plugin — routes SearchService RPCs to MeiliSearch"
 license.workspace = true
@@ -38,3 +38,6 @@ clap = { version = "4", features = ["derive"] }
 # Utilities
 thiserror.workspace = true
 parking_lot.workspace = true
+
+# HTTP client for embedded mode health polling (blocking, no async needed)
+ureq = "3"

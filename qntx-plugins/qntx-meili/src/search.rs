@@ -1,3 +1,4 @@
+use crate::embedded::EmbeddedMeili;
 use meilisearch_sdk::client::Client;
 use parking_lot::RwLock;
 use qntx_grpc::plugin::proto::search_service_server::SearchService;
@@ -12,6 +13,10 @@ pub struct MeiliSearchService {
     client: RwLock<Option<Client>>,
     url: RwLock<String>,
     index_count: RwLock<usize>,
+    mode: RwLock<String>,
+    /// Holds the embedded MeiliSearch subprocess (if running in embedded mode).
+    /// Dropping this kills the child process.
+    _embedded: RwLock<Option<EmbeddedMeili>>,
 }
 
 impl MeiliSearchService {
@@ -20,12 +25,15 @@ impl MeiliSearchService {
             client: RwLock::new(None),
             url: RwLock::new(String::new()),
             index_count: RwLock::new(0),
+            mode: RwLock::new("remote".to_string()),
+            _embedded: RwLock::new(None),
         }
     }
 
     /// (Re)configure the MeiliSearch client with URL and API key.
     /// Called from initialize() with config from am.toml.
-    /// Validates connectivity by calling the health endpoint.
+    /// For remote mode, validates connectivity by listing indexes.
+    /// For embedded mode, skips validation (wait_for_ready already confirmed the process).
     pub async fn configure(&self, url: &str, key: &str) -> Result<(), String> {
         *self.url.write() = url.to_string();
         let client = match Client::new(url, Some(key)) {
@@ -37,22 +45,32 @@ impl MeiliSearchService {
             }
         };
 
-        // Validate connectivity and auth by listing indexes (requires valid key)
-        match client.list_all_indexes().await {
-            Ok(indexes) => {
-                let count = indexes.results.len();
-                info!("MeiliSearch connected at {} ({} indexes)", url, count);
-                *self.index_count.write() = count;
-                *self.client.write() = Some(client);
-                Ok(())
-            }
-            Err(e) => {
-                warn!(
-                    "MeiliSearch at {} auth/connectivity check failed: {}",
-                    url, e
-                );
-                *self.client.write() = None;
-                Err(format!("MeiliSearch at {} not accessible: {}", url, e))
+        let is_embedded = *self.mode.read() == "embedded";
+
+        if is_embedded {
+            // Embedded mode: trust that wait_for_ready confirmed the process.
+            // list_all_indexes can block for seconds while MeiliSearch initializes LMDB.
+            info!("MeiliSearch client configured for embedded instance at {}", url);
+            *self.client.write() = Some(client);
+            Ok(())
+        } else {
+            // Remote mode: validate connectivity and auth
+            match client.list_all_indexes().await {
+                Ok(indexes) => {
+                    let count = indexes.results.len();
+                    info!("MeiliSearch connected at {} ({} indexes)", url, count);
+                    *self.index_count.write() = count;
+                    *self.client.write() = Some(client);
+                    Ok(())
+                }
+                Err(e) => {
+                    warn!(
+                        "MeiliSearch at {} auth/connectivity check failed: {}",
+                        url, e
+                    );
+                    *self.client.write() = None;
+                    Err(format!("MeiliSearch at {} not accessible: {}", url, e))
+                }
             }
         }
     }
@@ -67,6 +85,24 @@ impl MeiliSearchService {
 
     pub fn get_index_count(&self) -> usize {
         *self.index_count.read()
+    }
+
+    pub fn get_mode(&self) -> String {
+        self.mode.read().clone()
+    }
+
+    pub fn set_mode(&self, mode: &str) {
+        *self.mode.write() = mode.to_string();
+    }
+
+    /// Start an embedded MeiliSearch subprocess and configure the client to use it.
+    pub async fn start_embedded(&self, binary: &str, db_path: std::path::PathBuf) -> Result<(), String> {
+        let handle = EmbeddedMeili::spawn(binary, db_path).await?;
+        let url = handle.url();
+        let key = handle.key().to_string();
+        *self._embedded.write() = Some(handle);
+        self.set_mode("embedded");
+        self.configure(&url, &key).await
     }
 
     #[allow(clippy::result_large_err)] // Status is the standard tonic error type

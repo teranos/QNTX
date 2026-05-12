@@ -48,24 +48,56 @@ impl DomainPluginService for MeiliPluginService {
     ) -> Result<Response<InitializeResponse>, Status> {
         let req = request.into_inner();
 
-        // Read config from am.toml [meili] section, fall back to CLI defaults
-        let url = req
+        let embedded = req
             .config
-            .get("url")
-            .filter(|v| !v.is_empty())
-            .cloned()
-            .unwrap_or_else(|| self.default_url.clone());
-        let key = req
-            .config
-            .get("key")
-            .filter(|v| !v.is_empty())
-            .cloned()
-            .unwrap_or_else(|| self.default_key.clone());
+            .get("embedded")
+            .map(|v| v == "true")
+            .unwrap_or(false);
 
-        info!("Initializing qntx-meili (MeiliSearch at {})", url);
+        if embedded {
+            // Embedded mode: spawn a local MeiliSearch subprocess
+            let binary = req
+                .config
+                .get("meili_bin")
+                .filter(|v| !v.is_empty())
+                .cloned()
+                .unwrap_or_else(|| "meilisearch".to_string());
 
-        if let Err(e) = self.search.configure(&url, &key).await {
-            warn!("MeiliSearch not available: {}", e);
+            let db_path = req
+                .config
+                .get("meili_db_path")
+                .filter(|v| !v.is_empty())
+                .map(std::path::PathBuf::from)
+                .unwrap_or_else(|| {
+                    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+                    std::path::PathBuf::from(home).join(".qntx/meili-data")
+                });
+
+            info!("Initializing qntx-meili (embedded, db: {})", db_path.display());
+
+            if let Err(e) = self.search.start_embedded(&binary, db_path).await {
+                warn!("Embedded MeiliSearch failed to start: {}", e);
+            }
+        } else {
+            // Remote mode: connect to an external MeiliSearch instance
+            let url = req
+                .config
+                .get("url")
+                .filter(|v| !v.is_empty())
+                .cloned()
+                .unwrap_or_else(|| self.default_url.clone());
+            let key = req
+                .config
+                .get("key")
+                .filter(|v| !v.is_empty())
+                .cloned()
+                .unwrap_or_else(|| self.default_key.clone());
+
+            info!("Initializing qntx-meili (remote: {})", url);
+
+            if let Err(e) = self.search.configure(&url, &key).await {
+                warn!("MeiliSearch not available: {}", e);
+            }
         }
 
         Ok(Response::new(InitializeResponse {
@@ -100,17 +132,18 @@ impl DomainPluginService for MeiliPluginService {
     async fn health(&self, _request: Request<Empty>) -> Result<Response<HealthResponse>, Status> {
         let has_client = self.search.has_client();
         let url = self.search.get_url();
+        let mode = self.search.get_mode();
         let mut details = std::collections::HashMap::new();
 
         if has_client {
-            details.insert("backend".into(), format!("MeiliSearch at {}", url));
+            details.insert("backend".into(), format!("MeiliSearch at {} ({})", url, mode));
             details.insert("indexes".into(), self.search.get_index_count().to_string());
         }
 
         Ok(Response::new(HealthResponse {
             healthy: has_client,
             message: if has_client {
-                format!("MeiliSearch at {}", url)
+                format!("MeiliSearch at {} ({})", url, mode)
             } else {
                 format!("MeiliSearch at {} not accessible", url)
             },
