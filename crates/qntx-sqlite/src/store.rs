@@ -46,12 +46,15 @@ pub struct SqliteStore {
     /// Enforcement config for bounded storage limits (16/64/64 default).
     /// When set, enforcement runs on every put() using O(1) counter lookups.
     pub(crate) enforcement_config: Option<EnforcementConfig>,
+    /// When true, put() skips enforcement to prevent infinite loops during distillation.
+    pub(crate) distilling: bool,
 }
 
 /// Read-only SQLite connection for concurrent queries.
 ///
 /// Separate from `SqliteStore` so the Rust borrow checker (and FFI)
 /// can access them independently without creating overlapping references.
+#[allow(dead_code)]
 pub struct ReadConn {
     pub(crate) conn: Connection,
 }
@@ -66,6 +69,7 @@ impl SqliteStore {
             conn,
             db_path: None,
             enforcement_config: None,
+            distilling: false,
         }
     }
 
@@ -99,6 +103,7 @@ impl SqliteStore {
             conn,
             db_path: Some(path_str),
             enforcement_config: None,
+            distilling: false,
         })
     }
 
@@ -305,7 +310,7 @@ impl SqliteStore {
 
 /// Insert an attestation through any Connection (shared by SqliteStore and WriteConn).
 /// Handles the main INSERT, junction tables, and enforcement counter updates.
-fn put_attestation(conn: &Connection, attestation: &Attestation) -> StoreResult<()> {
+pub(crate) fn put_attestation(conn: &Connection, attestation: &Attestation) -> StoreResult<()> {
     let subjects_json = serialize_string_vec(&attestation.subjects)?;
     let predicates_json = serialize_string_vec(&attestation.predicates)?;
     let contexts_json = serialize_string_vec(&attestation.contexts)?;
@@ -426,15 +431,18 @@ impl AttestationStore for SqliteStore {
         put_attestation(&self.conn, &attestation)?;
 
         // Enforce bounded storage limits using counter lookups (O(1) per check).
-        if let Some(ref config) = self.enforcement_config {
-            let input = EnforcementInput {
-                actors,
-                contexts,
-                subjects,
-                config: config.clone(),
-            };
-            if let Err(e) = self.enforce_limits(&input) {
-                eprintln!("qntx-sqlite: post-put enforcement failed: {}", e);
+        // Skip enforcement when distilling to prevent infinite loops (distill insert → enforce → distill).
+        if !self.distilling {
+            if let Some(ref config) = self.enforcement_config {
+                let input = EnforcementInput {
+                    actors,
+                    contexts,
+                    subjects,
+                    config: config.clone(),
+                };
+                if let Err(e) = self.enforce_limits(&input) {
+                    eprintln!("qntx-sqlite: post-put enforcement failed: {}", e);
+                }
             }
         }
 
@@ -550,9 +558,19 @@ impl AttestationStore for SqliteStore {
 
 /// Build SQL and params for an AxFilter query. Used by both SqliteStore and ReadConn.
 pub fn build_query_sql(filter: &AxFilter) -> (String, Vec<String>) {
-    let mut sql = String::from(
-        "SELECT DISTINCT att.id, att.subjects, att.predicates, att.contexts, att.actors, att.timestamp, att.source, att.attributes, att.created_at, att.signature, att.signer_did \
-         FROM attestations att"
+    // DISTINCT is only needed when JOINs are present (multi-value junction
+    // tables can produce duplicate attestation rows). Without JOINs,
+    // attestations.id is already unique and DISTINCT forces a full-table
+    // dedup scan that blocks LIMIT short-circuit (876K rows → ~14 min).
+    let has_joins = !filter.subjects.is_empty()
+        || !filter.predicates.is_empty()
+        || !filter.contexts.is_empty()
+        || !filter.actors.is_empty();
+    let distinct = if has_joins { "DISTINCT " } else { "" };
+    let mut sql = format!(
+        "SELECT {}att.id, att.subjects, att.predicates, att.contexts, att.actors, att.timestamp, att.source, att.attributes, att.created_at, att.signature, att.signer_did \
+         FROM attestations att",
+        distinct
     );
     let mut joins = Vec::new();
     let mut conditions = Vec::new();
