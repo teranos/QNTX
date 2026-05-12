@@ -50,7 +50,10 @@ impl MeiliSearchService {
         if is_embedded {
             // Embedded mode: trust that wait_for_ready confirmed the process.
             // list_all_indexes can block for seconds while MeiliSearch initializes LMDB.
-            info!("MeiliSearch client configured for embedded instance at {}", url);
+            info!(
+                "MeiliSearch client configured for embedded instance at {}",
+                url
+            );
             *self.client.write() = Some(client);
             Ok(())
         } else {
@@ -96,13 +99,28 @@ impl MeiliSearchService {
     }
 
     /// Start an embedded MeiliSearch subprocess and configure the client to use it.
-    pub async fn start_embedded(&self, binary: &str, db_path: std::path::PathBuf) -> Result<(), String> {
+    pub async fn start_embedded(
+        &self,
+        binary: &str,
+        db_path: std::path::PathBuf,
+    ) -> Result<(), String> {
         let handle = EmbeddedMeili::spawn(binary, db_path).await?;
         let url = handle.url();
         let key = handle.key().to_string();
         *self._embedded.write() = Some(handle);
         self.set_mode("embedded");
         self.configure(&url, &key).await
+    }
+
+    /// Check if the embedded MeiliSearch subprocess is still alive.
+    /// Returns true if not in embedded mode (remote is assumed reachable).
+    /// Returns false if embedded and the child process has exited.
+    pub fn is_embedded_alive(&self) -> bool {
+        let mut guard = self._embedded.write();
+        match guard.as_mut() {
+            Some(handle) => handle.is_alive(),
+            None => true, // not embedded — no subprocess to check
+        }
     }
 
     #[allow(clippy::result_large_err)] // Status is the standard tonic error type

@@ -73,7 +73,10 @@ impl DomainPluginService for MeiliPluginService {
                     std::path::PathBuf::from(home).join(".qntx/meili-data")
                 });
 
-            info!("Initializing qntx-meili (embedded, db: {})", db_path.display());
+            info!(
+                "Initializing qntx-meili (embedded, db: {})",
+                db_path.display()
+            );
 
             if let Err(e) = self.search.start_embedded(&binary, db_path).await {
                 warn!("Embedded MeiliSearch failed to start: {}", e);
@@ -135,18 +138,30 @@ impl DomainPluginService for MeiliPluginService {
         let mode = self.search.get_mode();
         let mut details = std::collections::HashMap::new();
 
-        if has_client {
-            details.insert("backend".into(), format!("MeiliSearch at {} ({})", url, mode));
+        // In embedded mode, verify the subprocess is still alive.
+        // A dead subprocess means all RPCs will fail with connection refused.
+        let subprocess_alive = self.search.is_embedded_alive();
+        let healthy = has_client && subprocess_alive;
+
+        if healthy {
+            details.insert(
+                "backend".into(),
+                format!("MeiliSearch at {} ({})", url, mode),
+            );
             details.insert("indexes".into(), self.search.get_index_count().to_string());
         }
 
+        let message = if !subprocess_alive {
+            format!("MeiliSearch subprocess died (was at {})", url)
+        } else if has_client {
+            format!("MeiliSearch at {} ({})", url, mode)
+        } else {
+            format!("MeiliSearch at {} not accessible", url)
+        };
+
         Ok(Response::new(HealthResponse {
-            healthy: has_client,
-            message: if has_client {
-                format!("MeiliSearch at {} ({})", url, mode)
-            } else {
-                format!("MeiliSearch at {} not accessible", url)
-            },
+            healthy,
+            message,
             details,
         }))
     }
