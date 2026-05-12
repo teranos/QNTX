@@ -107,6 +107,8 @@ pub fn merge_attributes(attestations: &[Attestation]) -> HashMap<String, Value> 
                 || key == "_total"
                 || key == "_first_seen"
                 || key == "_last_seen"
+                || key == "_subjects_count"
+                || key == "_subjects_sample"
             {
                 continue;
             }

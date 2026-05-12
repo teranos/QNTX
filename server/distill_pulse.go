@@ -370,7 +370,7 @@ func mergeAttributes(batch []*types.As) map[string]interface{} {
 		}
 		for k, v := range as.Attributes {
 			// Skip distill metadata keys
-			if k == "_distill" || k == "_count" || k == "_total" || k == "_first_seen" || k == "_last_seen" || k == "_version" || k == "_rust_version" {
+			if k == "_distill" || k == "_count" || k == "_total" || k == "_first_seen" || k == "_last_seen" || k == "_version" || k == "_rust_version" || k == "_subjects_count" || k == "_subjects_sample" {
 				continue
 			}
 

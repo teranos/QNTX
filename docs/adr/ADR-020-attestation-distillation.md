@@ -62,7 +62,7 @@ attributes: {
 - **Number** -> `{min, max, sum, count}` — avg derived as sum/count
 - **String** -> `{values: [...], count}` — values capped at 50, then just count. If constant across all attestations, kept as scalar.
 - **Already-aggregated** (from prior distill, detected by `{min, max, sum}` keys) -> merge: min the mins, max the maxes, sum the sums, add counts; union value sets
-- **Distill metadata keys** (`_distill`, `_count`, `_total`, `_first_seen`, `_last_seen`, `_version`, `_rust_version`) are skipped during merging and rebuilt from the batch
+- **Distill metadata keys** (`_distill`, `_count`, `_total`, `_first_seen`, `_last_seen`, `_version`, `_rust_version`, `_subjects_count`, `_subjects_sample`) are skipped during merging and rebuilt from the batch
 
 ## Observation Counting: `_count` vs `_total`
 
