@@ -663,7 +663,7 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	// Create shared log buffer for live streaming
 	logBuf := NewLogBuffer(200)
 
-	// Open per-plugin log file (e.g. tmp/levi.log).
+	// Open per-plugin log file (e.g. tmp/myplugin.log).
 	// Plugin output goes here instead of the main QNTX log.
 	var logFile *os.File
 	if m.logDir != "" {
@@ -1345,7 +1345,7 @@ func (m *PluginManager) Shutdown(ctx context.Context) error {
 // pluginLogger captures plugin stdout/stderr, writes to a per-plugin log file,
 // and feeds the LogBuffer for WebSocket live streaming.
 type pluginLogger struct {
-	file      *os.File   // per-plugin log file (e.g. tmp/levi.log)
+	file      *os.File   // per-plugin log file (e.g. tmp/myplugin.log)
 	level     string
 	buf       strings.Builder
 	portChan  chan int   // Optional channel to send discovered port

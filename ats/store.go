@@ -72,7 +72,7 @@ type AttestationFilter struct {
 	Subjects   []string   // Filter by subjects (OR logic)
 	Predicates []string   // Filter by predicates (OR logic)
 	Contexts   []string   // Filter by contexts (OR logic)
-	Source     string     // Filter by source (exact match, e.g., "levi", "cli")
+	Source     string     // Filter by source (exact match, e.g., "cli", "distill")
 	TimeStart  *time.Time // Temporal range start
 	TimeEnd    *time.Time // Temporal range end
 	Limit      int        // Maximum results
