@@ -21,6 +21,7 @@ export const PulseClose = "❀";
 export const PulseOpen = "✿";
 export const SE = "⊨";
 export const SO = "⟶";
+export const Sigma = "Σ";
 export const Subcanvas = "⌗";
 
 

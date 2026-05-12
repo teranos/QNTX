@@ -18,6 +18,7 @@ import { apiFetch } from '../../api';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { tooltip } from '../tooltip';
 import { spawnAttestationGlyph } from './attestation-glyph';
+import { isSigmaAttestation, renderSigmaResultLine, spawnSigmaGlyph } from './sigma-glyph';
 import { uiState } from '../../state/ui';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
@@ -528,7 +529,7 @@ export function updateSemanticGlyphResults(glyphId: string, attestation: Attesta
         }
     }
 
-    const resultItem = renderAttestation(attestation, score);
+    const resultItem = isSigmaAttestation(attestation) ? renderSigmaResultLine(attestation) : renderAttestation(attestation, score);
 
     // Insert sorted by score (highest first)
     const thisScore = score ?? 0;

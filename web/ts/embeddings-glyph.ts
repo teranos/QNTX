@@ -3,6 +3,7 @@ import createREGL from 'regl';
 import { apiFetch } from './api';
 import { escapeHtml } from './html-utils';
 import { spawnAttestationAsWindow } from './components/glyph/attestation-glyph';
+import { isSigmaAttestation, spawnSigmaAsWindow } from './components/glyph/sigma-glyph';
 import { tooltip } from './components/tooltip';
 // log/SEG available if needed for debugging
 
@@ -17,6 +18,7 @@ let embeddingsInfo: {
     embedding_count: number;
     attestation_count: number;
     unembedded_count: number;
+    lag?: { oldest_unembedded: string; newest_embedded: string };
     cluster_info?: { n_clusters: number; n_noise: number; n_total: number; clusters: Record<string, number>; clusters_by_model?: Record<string, Array<{ model: string; count: number }>> };
     hdbscan_config?: { min_cluster_size: number; cluster_threshold: number; cluster_match_threshold: number };
 } | null = null;
@@ -538,6 +540,19 @@ function renderEmbeddings(): void {
                 <span class="glyph-label">Embedded:</span>
                 <span class="glyph-value">${embedding_count} / ${attestation_count}</span>
             </div>
+            ${embeddingsInfo.lag ? (() => {
+                const oldest = embeddingsInfo.lag.oldest_unembedded;
+                const newest = embeddingsInfo.lag.newest_embedded;
+                const lagMs = oldest && newest ? new Date(newest).getTime() - new Date(oldest).getTime() : 0;
+                const lagDays = lagMs > 0 ? Math.floor(lagMs / 86400000) : 0;
+                const lagLabel = lagDays > 0 ? `${lagDays}d behind` : oldest ? 'catching up' : '';
+                const oldestDate = oldest ? new Date(oldest).toLocaleDateString('en-CA') : '';
+                return `
+                <div class="glyph-row">
+                    <span class="glyph-label">Lag:</span>
+                    <span class="glyph-value">${lagLabel}${oldestDate ? ` (oldest: ${oldestDate})` : ''}</span>
+                </div>`;
+            })() : ''}
         `;
 
         // Make model rows clickable — scroll to scatter section filtered by model
@@ -556,7 +571,7 @@ function renderEmbeddings(): void {
                 <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
                     <button class="emb-reembed-btn panel-btn" style="width:100%"
                         ${embeddingsReembedding ? 'disabled' : ''}>
-                        ${embeddingsReembedding ? 'Embedding...' : `Embed next 100 of ${unembedded} unembedded`}
+                        ${embeddingsReembedding ? 'Embedding...' : `Embed ${Math.min(1000, unembedded)} oldest of ${unembedded} unembedded`}
                     </button>
                     <div class="emb-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
                 </div>
@@ -1046,7 +1061,11 @@ async function renderClusterDetail(clusterID: number): Promise<void> {
 }
 
 function openAttestationWindow(attestation: any): void {
-    spawnAttestationAsWindow(attestation);
+    if (isSigmaAttestation(attestation)) {
+        spawnSigmaAsWindow(attestation);
+    } else {
+        spawnAttestationAsWindow(attestation);
+    }
 }
 
 function renderScatterHighlighted(container: HTMLElement, data: ProjectionPoint[], highlightCluster: number): void {
@@ -1173,7 +1192,7 @@ async function reembedAll(): Promise<void> {
 
     try {
         // Fetch a page of unembedded IDs from the paginated endpoint
-        const pageResp = await apiFetch('/api/embeddings/unembedded?limit=100');
+        const pageResp = await apiFetch('/api/embeddings/unembedded?limit=1000');
         const page = await pageResp.json() as { ids: string[]; count: number };
         if (page.ids.length === 0) return;
 

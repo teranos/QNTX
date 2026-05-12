@@ -8,7 +8,7 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { AX, SO, SE, AS, Prose, Doc, Subcanvas } from '@generated/sym.js';
+import { AX, SO, SE, AS, Sigma, Prose, Doc, Subcanvas } from '@generated/sym.js';
 import { createAxGlyph } from './ax-glyph';
 import { createSemanticGlyph } from './semantic-glyph';
 import { createPyGlyph, PY_DEFAULT_CODE } from './py-glyph';
@@ -18,6 +18,7 @@ import { createTsGlyph, TS_DEFAULT_CODE } from './ts-glyph';
 import { createDocGlyph } from './doc-glyph';
 import { createSubcanvasGlyph } from './subcanvas-glyph';
 import { createAttestationGlyph } from './attestation-glyph';
+import { createSigmaGlyph } from './sigma-glyph';
 import { createResultGlyph } from './result-glyph';
 
 export interface GlyphTypeEntry {
@@ -51,6 +52,7 @@ const GLYPH_TYPES: GlyphTypeEntry[] = [
     { symbol: Subcanvas, className: 'canvas-subcanvas-glyph', title: 'Subcanvas',    label: 'Subcanvas', render: createSubcanvasGlyph, spawnMenuOrder: 6 },
     { symbol: Doc,      className: 'canvas-doc-glyph',     title: 'Document',        label: 'Doc',       render: createDocGlyph },
     { symbol: AS,       className: 'canvas-attestation-glyph', title: 'Attestation', label: 'AS',        render: createAttestationGlyph },
+    { symbol: Sigma,    className: 'canvas-sigma-glyph',       title: 'Sigma',       label: 'Sigma',     render: createSigmaGlyph },
     { symbol: 'stream', className: 'canvas-stream-glyph',      title: 'Stream',      label: 'Stream',    render: (g) => createResultGlyph(g) },
 ];
 

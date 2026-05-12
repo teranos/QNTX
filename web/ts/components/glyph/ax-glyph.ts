@@ -31,6 +31,7 @@ import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/ats
 import { queryAttestations, parseQuery } from '../../qntx-wasm';
 import { tooltip } from '../tooltip';
 import { spawnAttestationGlyph } from './attestation-glyph';
+import { isSigmaAttestation, renderSigmaResultLine, spawnSigmaGlyph } from './sigma-glyph';
 import { uiState } from '../../state/ui';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
@@ -128,16 +129,25 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
         const query = currentQuery.trim();
         if (!query) return;
 
-        // Clear and re-populate results from IndexedDB
+        // Clear and show searching indicator
         resultsContainer.innerHTML = '';
+        const searchingEl = document.createElement('div');
+        searchingEl.style.padding = '8px';
+        searchingEl.style.fontSize = '11px';
+        searchingEl.style.color = 'var(--text-secondary)';
+        searchingEl.style.fontFamily = 'monospace';
+        searchingEl.textContent = 'searching...';
+        resultsContainer.appendChild(searchingEl);
+
         try {
             const parsed = parseQuery(query);
             if (parsed.ok) {
                 const localResults = await queryAttestations(parsed.query);
+                searchingEl.remove();
                 const displayedIds = new Set<string>();
                 for (const att of localResults) {
                     if (att.id) displayedIds.add(att.id);
-                    resultsContainer.appendChild(renderAttestation(att));
+                    resultsContainer.appendChild(isSigmaAttestation(att) ? renderSigmaResultLine(att) : renderAttestation(att));
                 }
                 (element as any)._localIds = displayedIds;
 
@@ -146,6 +156,8 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
                 }
 
                 log.debug(SEG.GLYPH, `[AxGlyph] Local query: ${localResults.length} results for ${glyphId}`);
+            } else {
+                searchingEl.remove();
             }
         } catch (err) {
             log.debug(SEG.GLYPH, `[AxGlyph] Local query failed for ${glyphId}:`, err);
@@ -361,7 +373,7 @@ export function updateAxGlyphResults(glyphId: string, attestation: Attestation):
     }
 
     // Add new result at top (most recent first)
-    const resultItem = renderAttestation(attestation);
+    const resultItem = isSigmaAttestation(attestation) ? renderSigmaResultLine(attestation) : renderAttestation(attestation);
     resultsContainer.insertBefore(resultItem, resultsContainer.firstChild);
 
     log.debug(SEG.GLYPH, `[AxGlyph] Added result to ${glyphId}:`, attestation.id);

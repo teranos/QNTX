@@ -21,6 +21,9 @@ const (
 	OF = "∈" // of - membership/belonging in attestations
 	// TODO: Consider alternative typeable symbol for OF
 
+	// Derived attestation types
+	Sigma = "Σ" // sigma - distilled/summarized attestation (sum of many observations)
+
 	// System infrastructure symbols
 	Pulse      = "꩜" // Pulse system: async jobs, rate limiting, budget management (always prefix logs)
 	PulseOpen  = "✿" // Graceful startup with orphaned job recovery
