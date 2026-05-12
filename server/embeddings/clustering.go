@@ -207,6 +207,7 @@ func RunHDBSCANClustering(
 	groundDBPath string,
 	groundWrite GroundWriteFunc,
 	logger *zap.SugaredLogger,
+	model string,
 ) (*EmbeddingClusterResult, error) {
 	startTime := time.Now()
 
@@ -218,8 +219,8 @@ func RunHDBSCANClustering(
 		logger.Infow("Stale embedding sweep complete", "swept", swept)
 	}
 
-	// Read all embedding vectors
-	ids, blobs, err := store.GetAllEmbeddingVectors("")
+	// Read all embedding vectors for the specified model
+	ids, blobs, err := store.GetAllEmbeddingVectors(model)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read embedding vectors for clustering")
 	}

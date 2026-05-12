@@ -257,6 +257,10 @@
     border-bottom: none;
 }
 
+.emb-model-row:hover {
+    background: var(--panel-hover-bg, #ffffff0a);
+}
+
 .glyph-label {
     font-weight: normal;
     color: var(--text-on-dark-secondary, #a9abaa);

@@ -26,6 +26,8 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 		minClusterSize = 5
 	}
 
+	modelNames := serverembeddings.ModelNamesFromPaths(appcfg.GetStringSlice("cyrnel.models"))
+
 	handler := &serverembeddings.ReclusterHandler{
 		DB:                    s.db,
 		ProjectCtx:            projectCtx,
@@ -37,6 +39,7 @@ func (s *QNTXServer) setupEmbeddingReclusterSchedule(cfg *appcfg.Config) {
 		ClusterMatchThreshold: cfg.Embeddings.ClusterMatchThreshold,
 		GroundDBPath:          cfg.GroundDBPath,
 		GroundWrite:           writeToGround,
+		Models:                modelNames,
 		Logger:                s.logger.Named("recluster"),
 	}
 
@@ -116,12 +119,15 @@ func (s *QNTXServer) setupEmbeddingReprojectSchedule(cfg *appcfg.Config) {
 		methods = []string{"umap"}
 	}
 
+	modelNames := serverembeddings.ModelNamesFromPaths(appcfg.GetStringSlice("cyrnel.models"))
+
 	handler := &serverembeddings.ReprojectHandler{
 		DB:         s.db,
 		Store:      s.embeddingStore,
 		Svc:        s.embeddingService,
 		CallReduce: s.callReducePlugin,
 		Methods:    methods,
+		Models:     modelNames,
 		Logger:     s.logger.Named("reproject"),
 	}
 

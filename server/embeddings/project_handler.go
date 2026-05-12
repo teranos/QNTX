@@ -37,8 +37,10 @@ func (h *Handler) HandleProject(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	model := r.URL.Query().Get("model")
+
 	startTime := time.Now()
-	results, err := RunAllProjections(r.Context(), methods, h.Store, h.Service, h.CallReduce, h.Logger, params)
+	results, err := RunAllProjections(r.Context(), methods, h.Store, h.Service, h.CallReduce, h.Logger, params, model)
 	if err != nil {
 		h.Logger.Errorw("Projection failed", "methods", methods, "error", err)
 		http.Error(w, fmt.Sprintf("Projection failed: %s", err), http.StatusInternalServerError)

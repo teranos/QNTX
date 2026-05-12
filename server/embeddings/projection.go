@@ -51,10 +51,11 @@ func RunProjection(
 	callReduce ReduceFunc,
 	logger *zap.SugaredLogger,
 	params *ProjectionParams,
+	model string,
 ) (*ProjectionResult, error) {
 	startTime := time.Now()
 
-	ids, blobs, err := store.GetAllEmbeddingVectors("")
+	ids, blobs, err := store.GetAllEmbeddingVectors(model)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read embedding vectors for projection")
 	}
@@ -160,11 +161,12 @@ func RunAllProjections(
 	callReduce ReduceFunc,
 	logger *zap.SugaredLogger,
 	params *ProjectionParams,
+	model string,
 ) ([]ProjectionResult, error) {
 	var results []ProjectionResult
 	validated := validProjectionMethods(methods, logger)
 	for _, method := range validated {
-		result, err := RunProjection(ctx, method, store, svc, callReduce, logger, params)
+		result, err := RunProjection(ctx, method, store, svc, callReduce, logger, params, model)
 		if err != nil {
 			return results, errors.Wrapf(err, "projection failed for method %s", method)
 		}

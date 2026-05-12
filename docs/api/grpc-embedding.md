@@ -90,6 +90,7 @@ SetClusterLabel sets or updates the label on a cluster
 |-------|------|-------------|
 | auth_token | string | - |
 | text | string | - |
+| model | string | - |
 
 ### EmbedResponse
 
@@ -106,6 +107,7 @@ SetClusterLabel sets or updates the label on a cluster
 |-------|------|-------------|
 | auth_token | string | - |
 | texts | string | - |
+| model | string | - |
 
 ### BatchEmbedResponse
 
@@ -199,6 +201,7 @@ SetClusterLabel sets or updates the label on a cluster
 | Field | Type | Description |
 |-------|------|-------------|
 | auth_token | string | - |
+| model | string | - |
 
 ### ModelInfoResponse
 

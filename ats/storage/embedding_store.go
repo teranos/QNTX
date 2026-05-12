@@ -544,6 +544,32 @@ func (s *EmbeddingStore) CountEmbeddings() (int, error) {
 	return count, nil
 }
 
+// ModelEmbeddingCount holds the count for a single model.
+type ModelEmbeddingCount struct {
+	Model      string `json:"model"`
+	Dimensions int    `json:"dimensions"`
+	Count      int    `json:"count"`
+}
+
+// CountEmbeddingsByModel returns per-model embedding counts and dimensions.
+func (s *EmbeddingStore) CountEmbeddingsByModel() ([]ModelEmbeddingCount, error) {
+	rows, err := s.db.Query(`SELECT model, dimensions, COUNT(*) FROM embeddings GROUP BY model ORDER BY model`)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to count embeddings by model")
+	}
+	defer rows.Close()
+
+	var results []ModelEmbeddingCount
+	for rows.Next() {
+		var mc ModelEmbeddingCount
+		if err := rows.Scan(&mc.Model, &mc.Dimensions, &mc.Count); err != nil {
+			return nil, errors.Wrap(err, "failed to scan model embedding count")
+		}
+		results = append(results, mc)
+	}
+	return results, rows.Err()
+}
+
 // GetAllEmbeddingVectors reads all embedding IDs and blobs for HDBSCAN input.
 // When model is non-empty, only embeddings from that model are returned.
 func (s *EmbeddingStore) GetAllEmbeddingVectors(model string) (ids []string, blobs [][]byte, err error) {
@@ -583,9 +609,22 @@ type ClusterAssignment struct {
 	Probability float64
 }
 
-// UpdateClusterAssignments batch-updates cluster labels in a single transaction.
+// UpdateClusterAssignments batch-updates cluster labels.
+// Uses a transaction only for multiple assignments; single updates use plain exec
+// to avoid "transaction within a transaction" errors from concurrent goroutines.
 func (s *EmbeddingStore) UpdateClusterAssignments(assignments []ClusterAssignment) error {
 	if len(assignments) == 0 {
+		return nil
+	}
+
+	// Single assignment — no transaction needed
+	if len(assignments) == 1 {
+		a := assignments[0]
+		_, err := s.db.Exec(`UPDATE embeddings SET cluster_id = ?, cluster_probability = ? WHERE id = ?`,
+			a.ClusterID, a.Probability, a.ID)
+		if err != nil {
+			return errors.Wrapf(err, "failed to update cluster for embedding %s", a.ID)
+		}
 		return nil
 	}
 
@@ -617,45 +656,53 @@ func (s *EmbeddingStore) UpdateClusterAssignments(assignments []ClusterAssignmen
 		return errors.Wrap(err, "failed to commit cluster assignments")
 	}
 
-	if len(assignments) > 1 {
-		s.logger.Info("updated cluster assignments", zap.Int("count", len(assignments)))
-	}
+	s.logger.Info("updated cluster assignments", zap.Int("count", len(assignments)))
 	return nil
+}
+
+// ClusterModelCount holds per-model count within a cluster.
+type ClusterModelCount struct {
+	Model string `json:"model"`
+	Count int    `json:"count"`
 }
 
 // ClusterSummary aggregates cluster assignment counts.
 type ClusterSummary struct {
-	NClusters int         `json:"n_clusters"`
-	NNoise    int         `json:"n_noise"`
-	NTotal    int         `json:"n_total"`
-	Clusters  map[int]int `json:"clusters"` // cluster_id → count
+	NClusters    int                          `json:"n_clusters"`
+	NNoise       int                          `json:"n_noise"`
+	NTotal       int                          `json:"n_total"`
+	Clusters     map[int]int                  `json:"clusters"`      // cluster_id → count
+	ClustersByModel map[int][]ClusterModelCount `json:"clusters_by_model,omitempty"` // cluster_id → per-model breakdown
 }
 
-// GetClusterSummary returns aggregated cluster counts.
+// GetClusterSummary returns aggregated cluster counts with per-model breakdown.
 func (s *EmbeddingStore) GetClusterSummary() (*ClusterSummary, error) {
-	rows, err := s.db.Query(`SELECT cluster_id, COUNT(*) FROM embeddings GROUP BY cluster_id ORDER BY cluster_id`)
+	rows, err := s.db.Query(`SELECT cluster_id, model, COUNT(*) FROM embeddings GROUP BY cluster_id, model ORDER BY cluster_id, model`)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query cluster summary")
 	}
 	defer rows.Close()
 
 	summary := &ClusterSummary{
-		Clusters: make(map[int]int),
+		Clusters:        make(map[int]int),
+		ClustersByModel: make(map[int][]ClusterModelCount),
 	}
 
 	for rows.Next() {
 		var clusterID, count int
-		if err := rows.Scan(&clusterID, &count); err != nil {
+		var model string
+		if err := rows.Scan(&clusterID, &model, &count); err != nil {
 			return nil, errors.Wrap(err, "failed to scan cluster summary row")
 		}
 		if clusterID < 0 {
 			summary.NNoise += count
 		} else {
-			summary.Clusters[clusterID] = count
-			summary.NClusters++
+			summary.Clusters[clusterID] += count
+			summary.ClustersByModel[clusterID] = append(summary.ClustersByModel[clusterID], ClusterModelCount{Model: model, Count: count})
 		}
 		summary.NTotal += count
 	}
+	summary.NClusters = len(summary.Clusters)
 	if err := rows.Err(); err != nil {
 		return nil, errors.Wrap(err, "failed to iterate cluster summary rows")
 	}
@@ -788,16 +835,17 @@ type ProjectionWithCluster struct {
 	ID        string   `json:"id"`
 	SourceID  string   `json:"source_id"`
 	Method    string   `json:"method"`
+	Model     string   `json:"model"`
 	X         float64  `json:"x"`
 	Y         float64  `json:"y"`
 	Z         *float64 `json:"z,omitempty"`
 	ClusterID int      `json:"cluster_id"`
 }
 
-// GetProjectionsByMethod returns all projections for a given method, joined with cluster info.
+// GetProjectionsByMethod returns all projections for a given method, joined with cluster and model info.
 func (s *EmbeddingStore) GetProjectionsByMethod(method string) ([]ProjectionWithCluster, error) {
 	rows, err := s.db.Query(`
-		SELECT ep.embedding_id, e.source_id, ep.method, ep.x, ep.y, ep.z, e.cluster_id
+		SELECT ep.embedding_id, e.source_id, ep.method, e.model, ep.x, ep.y, ep.z, e.cluster_id
 		FROM embedding_projections ep
 		JOIN embeddings e ON ep.embedding_id = e.id
 		WHERE ep.method = ?
@@ -811,7 +859,7 @@ func (s *EmbeddingStore) GetProjectionsByMethod(method string) ([]ProjectionWith
 	var results []ProjectionWithCluster
 	for rows.Next() {
 		var p ProjectionWithCluster
-		if err := rows.Scan(&p.ID, &p.SourceID, &p.Method, &p.X, &p.Y, &p.Z, &p.ClusterID); err != nil {
+		if err := rows.Scan(&p.ID, &p.SourceID, &p.Method, &p.Model, &p.X, &p.Y, &p.Z, &p.ClusterID); err != nil {
 			return nil, errors.Wrapf(err, "failed to scan projection row %d for method %s", len(results)+1, method)
 		}
 		results = append(results, p)

@@ -166,8 +166,8 @@ Search("similar to X", model="MiniLM-L6-v2")
 - ✅ `EmbeddingObserver` multi-model strategy — loops over all configured models per attestation
 - ✅ Model names derived from am.toml `cyrnel.models` paths via `ModelNamesFromPaths`
 - ✅ Similarity search accepts model parameter and routes to correct vec table
-- Clustering callers pass actual model (currently `""` = all models)
-- Projection callers pass actual model (currently `""` = all models)
+- ✅ Clustering callers pass actual model — Pulse loops per-model, HTTP accepts `?model=`
+- ✅ Projection callers pass actual model — Pulse loops per-model, HTTP accepts `?model=`
 - ✅ Verified end-to-end: one attestation produces N embeddings (one per model)
 
 ### Phase 4: Internal Model Selection

@@ -62,6 +62,8 @@ func (h *Handler) HandleCluster(w http.ResponseWriter, r *http.Request) {
 	cwd, _ := os.Getwd()
 	projectCtx := "project:" + filepath.Join(filepath.Base(filepath.Dir(cwd)), filepath.Base(cwd))
 
+	model := r.URL.Query().Get("model")
+
 	result, err := RunHDBSCANClustering(
 		h.Store,
 		h.Service,
@@ -74,6 +76,7 @@ func (h *Handler) HandleCluster(w http.ResponseWriter, r *http.Request) {
 		h.GroundDBPath,
 		h.GroundWrite,
 		h.Logger,
+		model,
 	)
 	if err != nil {
 		h.Logger.Errorw("HDBSCAN clustering failed", "error", err)

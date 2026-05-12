@@ -8,20 +8,22 @@ import { tooltip } from './components/tooltip';
 
 // Embeddings state
 let embeddingsElement: HTMLElement | null = null;
+type EmbeddingModelInfo = { name: string; dimensions: number; count: number };
 let embeddingsInfo: {
     available: boolean;
     model_name: string;
     dimensions: number;
+    models: EmbeddingModelInfo[];
     embedding_count: number;
     attestation_count: number;
-    unembedded_ids?: string[];
-    cluster_info?: { n_clusters: number; n_noise: number; n_total: number; clusters: Record<string, number> };
+    unembedded_count: number;
+    cluster_info?: { n_clusters: number; n_noise: number; n_total: number; clusters: Record<string, number>; clusters_by_model?: Record<string, Array<{ model: string; count: number }>> };
     hdbscan_config?: { min_cluster_size: number; cluster_threshold: number; cluster_match_threshold: number };
 } | null = null;
 let embeddingsReembedding = false;
 let embeddingsClustering = false;
 let embeddingsProjecting = false;
-type ProjectionPoint = { id: string; source_id: string; method: string; x: number; y: number; z?: number; cluster_id: number };
+type ProjectionPoint = { id: string; source_id: string; method: string; model: string; x: number; y: number; z?: number; cluster_id: number };
 let projectionsData: Record<string, ProjectionPoint[]> = {};
 let clusterLabels: Map<number, string | null> = new Map();
 const clusterSamplesCache: Map<number, string[]> = new Map();
@@ -240,32 +242,153 @@ function mount3dView(container: HTMLElement, allPoints: Record<string, Projectio
     });
 
     let pointData: { posBuffer: any; colBuffer: any; count: number } | null = null;
+    let lineData: { posBuffer: any; colBuffer: any; count: number } | null = null;
+
+    const drawLines = regl({
+        vert: `
+            precision mediump float;
+            attribute vec3 position;
+            attribute vec3 color;
+            uniform mat4 projection, view;
+            varying vec3 vColor;
+            void main() {
+                vColor = color;
+                gl_Position = projection * view * vec4(position, 1.0);
+            }
+        `,
+        frag: `
+            precision mediump float;
+            varying vec3 vColor;
+            void main() {
+                gl_FragColor = vec4(vColor, 0.35);
+            }
+        `,
+        attributes: {
+            position: regl.prop<any, 'positions'>('positions'),
+            color: regl.prop<any, 'colors'>('colors'),
+        },
+        uniforms: {
+            projection: regl.prop<any, 'projection'>('projection'),
+            view: regl.prop<any, 'view'>('view'),
+        },
+        count: regl.prop<any, 'count'>('count'),
+        primitive: 'lines',
+        blend: {
+            enable: true,
+            func: { srcRGB: 'src alpha', dstRGB: 'one minus src alpha', srcAlpha: 1, dstAlpha: 'one minus src alpha' },
+        },
+        depth: { enable: true },
+        lineWidth: 1,
+    });
+
+    function destroyBuffers() {
+        if (pointData) { pointData.posBuffer.destroy(); pointData.colBuffer.destroy(); pointData = null; }
+        if (lineData) { lineData.posBuffer.destroy(); lineData.colBuffer.destroy(); lineData = null; }
+    }
 
     function loadMethod() {
         const pts = allPoints[activeMethod];
         if (!pts || pts.length === 0) {
-            if (pointData) {
-                pointData.posBuffer.destroy();
-                pointData.colBuffer.destroy();
-            }
-            pointData = null;
+            destroyBuffers();
             statusEl.textContent = `No ${activeMethod} data`;
             return;
         }
-        const has3D = pts.some(p => p.z != null);
-        const { positions, colors } = normalizePoints3d(pts);
-        // Destroy old buffers before allocating new ones
-        if (pointData) {
-            pointData.posBuffer.destroy();
-            pointData.colBuffer.destroy();
+
+        // Group by model
+        const modelGroups = new Map<string, ProjectionPoint[]>();
+        for (const p of pts) {
+            const key = p.model || '(default)';
+            if (!modelGroups.has(key)) modelGroups.set(key, []);
+            modelGroups.get(key)!.push(p);
         }
+        const modelKeys = Array.from(modelGroups.keys()).sort();
+        const multiModel = modelKeys.length > 1;
+
+        destroyBuffers();
+
+        if (!multiModel) {
+            // Single model — render as before
+            const has3D = pts.some(p => p.z != null);
+            const { positions, colors } = normalizePoints3d(pts);
+            pointData = {
+                posBuffer: regl.buffer({ data: positions, type: 'float' }),
+                colBuffer: regl.buffer({ data: colors, type: 'float' }),
+                count: pts.length,
+            };
+            const clusters = new Set(pts.map(p => p.cluster_id).filter(id => id >= 0));
+            statusEl.textContent = `${activeMethod.toUpperCase()} ${pts.length}pts ${clusters.size}cl${has3D ? ' 3D' : ' 2D'}`;
+            return;
+        }
+
+        // Multi-model: normalize each model independently, overlay, build displacement lines
+        const allPositions: number[] = [];
+        const allColors: number[] = [];
+        const normalizedByModel = new Map<string, Map<string, [number, number, number]>>();
+
+        for (let mi = 0; mi < modelKeys.length; mi++) {
+            const model = modelKeys[mi];
+            const modelPts = modelGroups.get(model)!;
+            const { positions, colors } = normalizePoints3d(modelPts);
+
+            // Build source_id → normalized position map
+            const posMap = new Map<string, [number, number, number]>();
+            for (let i = 0; i < modelPts.length; i++) {
+                posMap.set(modelPts[i].source_id, [
+                    positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2],
+                ]);
+            }
+            normalizedByModel.set(model, posMap);
+
+            for (let i = 0; i < modelPts.length; i++) {
+                allPositions.push(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+                if (mi === 0) {
+                    // Primary model: full color
+                    allColors.push(colors[i * 3], colors[i * 3 + 1], colors[i * 3 + 2]);
+                } else {
+                    // Secondary model: muted
+                    allColors.push(colors[i * 3] * 0.4, colors[i * 3 + 1] * 0.4, colors[i * 3 + 2] * 0.4);
+                }
+            }
+        }
+
         pointData = {
-            posBuffer: regl.buffer({ data: positions, type: 'float' }),
-            colBuffer: regl.buffer({ data: colors, type: 'float' }),
-            count: pts.length,
+            posBuffer: regl.buffer({ data: new Float32Array(allPositions), type: 'float' }),
+            colBuffer: regl.buffer({ data: new Float32Array(allColors), type: 'float' }),
+            count: allPositions.length / 3,
         };
-        const clusters = new Set(pts.map(p => p.cluster_id).filter(id => id >= 0));
-        statusEl.textContent = `${activeMethod.toUpperCase()} ${pts.length}pts ${clusters.size}cl${has3D ? ' 3D' : ' 2D'}`;
+
+        // Build displacement lines between first two models
+        const linePositions: number[] = [];
+        const lineColors: number[] = [];
+        const map0 = normalizedByModel.get(modelKeys[0])!;
+        const map1 = normalizedByModel.get(modelKeys[1])!;
+
+        for (const [sourceId, pos0] of map0) {
+            const pos1 = map1.get(sourceId);
+            if (!pos1) continue;
+
+            const dx = pos1[0] - pos0[0], dy = pos1[1] - pos0[1], dz = pos1[2] - pos0[2];
+            const mag = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+            // Color: green (agreement) → red (disagreement)
+            const t = Math.min(mag / 1.5, 1);
+            const r = t, g = 1 - t, b = 0.15;
+
+            linePositions.push(pos0[0], pos0[1], pos0[2]);
+            linePositions.push(pos1[0], pos1[1], pos1[2]);
+            lineColors.push(r, g, b, r, g, b);
+        }
+
+        if (linePositions.length > 0) {
+            lineData = {
+                posBuffer: regl.buffer({ data: new Float32Array(linePositions), type: 'float' }),
+                colBuffer: regl.buffer({ data: new Float32Array(lineColors), type: 'float' }),
+                count: linePositions.length / 3,
+            };
+        }
+
+        const nPairs = linePositions.length / 6;
+        statusEl.textContent = `${activeMethod.toUpperCase()} ${modelKeys.join(' \u2194 ')} ${allPositions.length / 3}pts ${nPairs} displacements`;
     }
 
     let animFrame: number = 0;
@@ -278,12 +401,23 @@ function mount3dView(container: HTMLElement, allPoints: Record<string, Projectio
         }
         regl.poll();
         regl.clear({ color: [0.1, 0.1, 0.18, 1], depth: 1 });
+        const proj = perspective4(Math.PI / 4, w / h, 0.1, 100);
+        const view = orbitViewMatrix(rotX, rotY, distance);
+        if (lineData && lineData.count > 0) {
+            drawLines({
+                positions: { buffer: lineData.posBuffer, size: 3 },
+                colors: { buffer: lineData.colBuffer, size: 3 },
+                projection: proj,
+                view: view,
+                count: lineData.count,
+            });
+        }
         if (pointData && pointData.count > 0) {
             drawPoints({
                 positions: { buffer: pointData.posBuffer, size: 3 },
                 colors: { buffer: pointData.colBuffer, size: 3 },
-                projection: perspective4(Math.PI / 4, w / h, 0.1, 100),
-                view: orbitViewMatrix(rotX, rotY, distance),
+                projection: proj,
+                view: view,
                 pointSize: 15 * devicePixelRatio,
                 count: pointData.count,
             });
@@ -302,6 +436,7 @@ function mount3dView(container: HTMLElement, allPoints: Record<string, Projectio
             observer.disconnect();
             window.removeEventListener('mousemove', onMouseMove);
             window.removeEventListener('mouseup', onMouseUp);
+            destroyBuffers();
             regl.destroy();
         },
     };
@@ -342,6 +477,20 @@ export async function fetchEmbeddingsInfo(): Promise<void> {
     renderEmbeddings();
 }
 
+function scrollToModelScatter(modelName: string): void {
+    if (!sectionScatter) return;
+    const target = sectionScatter.querySelector(`.emb-scatter[data-model="${modelName}"]`) as HTMLElement | null;
+    if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Brief highlight
+        target.style.outline = '2px solid #4ade80';
+        setTimeout(() => { target.style.outline = ''; }, 1500);
+    } else if (sectionScatter.querySelector('.emb-scatter')) {
+        // No per-model scatter but scatter exists — scroll to scatter section
+        sectionScatter.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
 function renderEmbeddings(): void {
     if (!embeddingsElement) return;
 
@@ -359,31 +508,45 @@ function renderEmbeddings(): void {
         return;
     }
 
-    const { available, model_name, dimensions, embedding_count, attestation_count } = embeddingsInfo;
+    const { available, models, embedding_count, attestation_count } = embeddingsInfo;
     const unembedded = attestation_count - embedding_count;
 
     // ── Info section (always safe to replace — no user state) ──
     if (sectionInfo) {
+        const modelRows = (models ?? []).map(m => {
+            const dimLabel = m.dimensions ? ` <span style="color:#6b7280">(${m.dimensions}d)</span>` : '';
+            return `
+            <div class="glyph-row emb-model-row" data-model="${escapeHtml(m.name)}" style="cursor:pointer">
+                <span class="glyph-label" style="padding-left:12px">${escapeHtml(m.name)}${dimLabel}</span>
+                <span class="glyph-value">${m.count}</span>
+            </div>`;
+        }).join('');
+
         sectionInfo.innerHTML = `
             <div class="glyph-row">
                 <span class="glyph-label">Status:</span>
                 <span class="glyph-value">${available ? '<span style="color:#4ade80">Active</span>' : '<span style="color:#fbbf24">Unavailable</span>'}</span>
             </div>
-            ${available ? `
+            ${(models ?? []).length > 0 ? `
             <div class="glyph-row">
-                <span class="glyph-label">Model:</span>
-                <span class="glyph-value">${model_name}</span>
+                <span class="glyph-label">Models:</span>
+                <span class="glyph-value">${models.length}</span>
             </div>
-            <div class="glyph-row">
-                <span class="glyph-label">Dimensions:</span>
-                <span class="glyph-value">${dimensions}</span>
-            </div>
+            ${modelRows}
             ` : ''}
             <div class="glyph-row">
                 <span class="glyph-label">Embedded:</span>
                 <span class="glyph-value">${embedding_count} / ${attestation_count}</span>
             </div>
         `;
+
+        // Make model rows clickable — scroll to scatter section filtered by model
+        for (const row of sectionInfo.querySelectorAll('.emb-model-row')) {
+            row.addEventListener('click', () => {
+                const modelName = (row as HTMLElement).dataset.model ?? '';
+                scrollToModelScatter(modelName);
+            });
+        }
     }
 
     // ── Reembed section ──
@@ -393,7 +556,7 @@ function renderEmbeddings(): void {
                 <div class="glyph-section" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color, #333)">
                     <button class="emb-reembed-btn panel-btn" style="width:100%"
                         ${embeddingsReembedding ? 'disabled' : ''}>
-                        ${embeddingsReembedding ? 'Embedding...' : `Embed ${unembedded} unembedded attestations`}
+                        ${embeddingsReembedding ? 'Embedding...' : `Embed next 100 of ${unembedded} unembedded`}
                     </button>
                     <div class="emb-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
                 </div>
@@ -422,8 +585,20 @@ function renderEmbeddings(): void {
                         const c = pillColor(id);
                         const label = clusterLabels.get(Number(id));
                         const labelText = label ? ` ${escapeHtml(label)}` : '';
-                        const tooltipDefault = label ? `#${id} ${escapeHtml(label)}` : `#${id}`;
-                        return `<span class="emb-cluster-pill has-tooltip" data-cluster-id="${id}" data-tooltip="${escapeHtml(tooltipDefault)}" style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:${c}22;border:1px solid ${c}55;cursor:pointer;white-space:nowrap;font-size:11px;line-height:1.4"><span style="color:${c};font-weight:bold">#${id}</span>${labelText ? `<span style="color:#a0aec0">${labelText}</span>` : ''}<span style="color:#9ca3af">:${count}</span></span>`;
+                        // Build tooltip with model info
+                        const byModel = ci.clusters_by_model?.[id];
+                        let tooltipText = label ? `#${id} ${escapeHtml(label)}` : `#${id}`;
+                        if (byModel && byModel.length > 0) {
+                            tooltipText += ' | ' + byModel.map(m => `${m.model}: ${m.count}`).join(', ');
+                        }
+                        // Show model name inline — abbreviated for single, badges for multi
+                        let modelBadges = '';
+                        if (byModel && byModel.length > 1) {
+                            modelBadges = byModel.map(m => `<span style="color:#6b7280;font-size:9px">${escapeHtml(m.model.slice(0, 3))}:${m.count}</span>`).join(' ');
+                        } else if (byModel && byModel.length === 1) {
+                            modelBadges = `<span style="color:#6b7280;font-size:9px">${escapeHtml(byModel[0].model)}</span>`;
+                        }
+                        return `<span class="emb-cluster-pill has-tooltip" data-cluster-id="${id}" data-tooltip="${escapeHtml(tooltipText)}" style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:${c}22;border:1px solid ${c}55;cursor:pointer;white-space:nowrap;font-size:11px;line-height:1.4"><span style="color:${c};font-weight:bold">#${id}</span>${labelText ? `<span style="color:#a0aec0">${labelText}</span>` : ''}<span style="color:#9ca3af">:${count}</span>${modelBadges ? ` ${modelBadges}` : ''}</span>`;
                     })
                     .join('');
                 clusterRows = `
@@ -526,11 +701,41 @@ function renderEmbeddings(): void {
                     .filter(m => projectionsData[m]?.length > 0)
                     .map(m => {
                         const pts = projectionsData[m];
-                        const nClusters = new Set(pts.filter(p => p.cluster_id !== -1).map(p => p.cluster_id)).size;
                         const params = methodParams[m] || '';
+
+                        // Group by model
+                        const modelGroups = new Map<string, ProjectionPoint[]>();
+                        for (const p of pts) {
+                            const key = p.model || '(default)';
+                            if (!modelGroups.has(key)) modelGroups.set(key, []);
+                            modelGroups.get(key)!.push(p);
+                        }
+                        const modelKeys = Array.from(modelGroups.keys()).sort();
+
+                        if (modelKeys.length <= 1) {
+                            // Single model — render as before
+                            const nClusters = new Set(pts.filter(p => p.cluster_id !== -1).map(p => p.cluster_id)).size;
+                            return `<div style="flex:1;min-width:0">
+                                <div style="font-size:11px;color:#9ca3af;text-align:center;margin-bottom:4px">${m.toUpperCase()} (${pts.length}pts, ${nClusters}cl)</div>
+                                <div class="emb-scatter" data-method="${m}"></div>
+                                ${params ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;font-size:11px;justify-content:center">${params}</div>` : ''}
+                            </div>`;
+                        }
+
+                        // Multi-model — one scatter per model, side by side
+                        const modelScatters = modelKeys.map(model => {
+                            const modelPts = modelGroups.get(model)!;
+                            const nClusters = new Set(modelPts.filter(p => p.cluster_id !== -1).map(p => p.cluster_id)).size;
+                            return `<div style="flex:1;min-width:0">
+                                <div style="font-size:10px;color:#9ca3af;text-align:center;margin-bottom:2px">${escapeHtml(model)}</div>
+                                <div style="font-size:10px;color:#6b7280;text-align:center;margin-bottom:4px">${modelPts.length}pts, ${nClusters}cl</div>
+                                <div class="emb-scatter" data-method="${m}" data-model="${model}"></div>
+                            </div>`;
+                        }).join('');
+
                         return `<div style="flex:1;min-width:0">
-                            <div style="font-size:11px;color:#9ca3af;text-align:center;margin-bottom:4px">${m.toUpperCase()} (${pts.length}pts, ${nClusters}cl)</div>
-                            <div class="emb-scatter" data-method="${m}"></div>
+                            <div style="font-size:11px;color:#9ca3af;text-align:center;margin-bottom:4px">${m.toUpperCase()}</div>
+                            <div style="display:flex;gap:6px">${modelScatters}</div>
                             ${params ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;font-size:11px;justify-content:center">${params}</div>` : ''}
                         </div>`;
                     }).join('');
@@ -559,7 +764,11 @@ function renderEmbeddings(): void {
                 sectionScatter.querySelectorAll('.emb-scatter[data-method]').forEach(el => {
                     const container = el as HTMLElement;
                     const method = container.dataset.method!;
-                    const data = projectionsData[method];
+                    const model = container.dataset.model;
+                    let data = projectionsData[method];
+                    if (model) {
+                        data = data?.filter(p => p.model === model);
+                    }
                     if (data?.length > 0) {
                         renderScatter(container, data);
                     }
@@ -963,13 +1172,15 @@ async function reembedAll(): Promise<void> {
     const resultEl = embeddingsElement?.querySelector('.emb-result');
 
     try {
-        const ids = embeddingsInfo?.unembedded_ids ?? [];
-        if (ids.length === 0) return;
+        // Fetch a page of unembedded IDs from the paginated endpoint
+        const pageResp = await apiFetch('/api/embeddings/unembedded?limit=100');
+        const page = await pageResp.json() as { ids: string[]; count: number };
+        if (page.ids.length === 0) return;
 
         const resp = await apiFetch('/api/embeddings/batch', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ attestation_ids: ids })
+            body: JSON.stringify({ attestation_ids: page.ids })
         });
         const result = await resp.json();
 

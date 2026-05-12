@@ -28,8 +28,15 @@ module rec Protocol : sig
     type t = {
       auth_token:string;
       text:string;
+      model:string;
+      (**
+{%html:
+<p>target model name, empty = default</p>
+%}
+      *)
+
     }
-    val make: ?auth_token:string -> ?text:string -> unit -> t
+    val make: ?auth_token:string -> ?text:string -> ?model:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -48,7 +55,7 @@ module rec Protocol : sig
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?auth_token:string -> ?text:string -> unit -> t
+    type make_t = ?auth_token:string -> ?text:string -> ?model:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -94,8 +101,15 @@ module rec Protocol : sig
     type t = {
       auth_token:string;
       texts:string list;
+      model:string;
+      (**
+{%html:
+<p>target model name, empty = default</p>
+%}
+      *)
+
     }
-    val make: ?auth_token:string -> ?texts:string list -> unit -> t
+    val make: ?auth_token:string -> ?texts:string list -> ?model:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -114,7 +128,7 @@ module rec Protocol : sig
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?auth_token:string -> ?texts:string list -> unit -> t
+    type make_t = ?auth_token:string -> ?texts:string list -> ?model:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -506,8 +520,17 @@ module rec Protocol : sig
   end
 
   and ModelInfoRequest : sig
-    type t = (string)
-    val make: ?auth_token:string -> unit -> t
+    type t = {
+      auth_token:string;
+      model:string;
+      (**
+{%html:
+<p>target model name, empty = default</p>
+%}
+      *)
+
+    }
+    val make: ?auth_token:string -> ?model:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -526,7 +549,7 @@ module rec Protocol : sig
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?auth_token:string -> unit -> t
+    type make_t = ?auth_token:string -> ?model:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -652,8 +675,15 @@ end = struct
     type t = {
       auth_token:string;
       text:string;
+      model:string;
+      (**
+{%html:
+<p>target model name, empty = default</p>
+%}
+      *)
+
     }
-    val make: ?auth_token:string -> ?text:string -> unit -> t
+    val make: ?auth_token:string -> ?text:string -> ?model:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -672,7 +702,7 @@ end = struct
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?auth_token:string -> ?text:string -> unit -> t
+    type make_t = ?auth_token:string -> ?text:string -> ?model:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -684,31 +714,34 @@ end = struct
     type t = {
       auth_token:string;
       text:string;
+      model:string;
     }
-    type make_t = ?auth_token:string -> ?text:string -> unit -> t
-    let make ?(auth_token = {||}) ?(text = {||}) () = { auth_token; text }
+    type make_t = ?auth_token:string -> ?text:string -> ?model:string -> unit -> t
+    let make ?(auth_token = {||}) ?(text = {||}) ?(model = {||}) () = { auth_token; text; model }
     let merge =
     let merge_auth_token = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ) in
     let merge_text = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "text", "text"), string, ({||})) ) in
+    let merge_model = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "model", "model"), string, ({||})) ) in
     fun t1 t2 -> {
     	auth_token = (merge_auth_token t1.auth_token t2.auth_token);
     	text = (merge_text t1.text t2.text);
+    	model = (merge_model t1.model t2.model);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ^:: basic ((2, "text", "text"), string, ({||})) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ^:: basic ((2, "text", "text"), string, ({||})) ^:: basic ((3, "model", "model"), string, ({||})) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { auth_token; text } -> serialize writer auth_token text
+      fun writer { auth_token; text; model } -> serialize writer auth_token text model
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor auth_token text = { auth_token; text } in
+      let constructor auth_token text model = { auth_token; text; model } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { auth_token; text } -> serialize auth_token text
+      fun { auth_token; text; model } -> serialize auth_token text model
     let from_json_exn =
-      let constructor auth_token text = { auth_token; text } in
+      let constructor auth_token text model = { auth_token; text; model } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
@@ -790,8 +823,15 @@ end = struct
     type t = {
       auth_token:string;
       texts:string list;
+      model:string;
+      (**
+{%html:
+<p>target model name, empty = default</p>
+%}
+      *)
+
     }
-    val make: ?auth_token:string -> ?texts:string list -> unit -> t
+    val make: ?auth_token:string -> ?texts:string list -> ?model:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -810,7 +850,7 @@ end = struct
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?auth_token:string -> ?texts:string list -> unit -> t
+    type make_t = ?auth_token:string -> ?texts:string list -> ?model:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -822,31 +862,34 @@ end = struct
     type t = {
       auth_token:string;
       texts:string list;
+      model:string;
     }
-    type make_t = ?auth_token:string -> ?texts:string list -> unit -> t
-    let make ?(auth_token = {||}) ?(texts = []) () = { auth_token; texts }
+    type make_t = ?auth_token:string -> ?texts:string list -> ?model:string -> unit -> t
+    let make ?(auth_token = {||}) ?(texts = []) ?(model = {||}) () = { auth_token; texts; model }
     let merge =
     let merge_auth_token = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ) in
     let merge_texts = Runtime'.Merge.merge Runtime'.Spec.( repeated ((2, "texts", "texts"), string, not_packed) ) in
+    let merge_model = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "model", "model"), string, ({||})) ) in
     fun t1 t2 -> {
     	auth_token = (merge_auth_token t1.auth_token t2.auth_token);
     	texts = (merge_texts t1.texts t2.texts);
+    	model = (merge_model t1.model t2.model);
      }
-    let spec () = Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ^:: repeated ((2, "texts", "texts"), string, not_packed) ^:: nil )
+    let spec () = Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ^:: repeated ((2, "texts", "texts"), string, not_packed) ^:: basic ((3, "model", "model"), string, ({||})) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer { auth_token; texts } -> serialize writer auth_token texts
+      fun writer { auth_token; texts; model } -> serialize writer auth_token texts model
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor auth_token texts = { auth_token; texts } in
+      let constructor auth_token texts model = { auth_token; texts; model } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun { auth_token; texts } -> serialize auth_token texts
+      fun { auth_token; texts; model } -> serialize auth_token texts model
     let from_json_exn =
-      let constructor auth_token texts = { auth_token; texts } in
+      let constructor auth_token texts model = { auth_token; texts; model } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
@@ -1636,8 +1679,17 @@ end = struct
   end
 
   and ModelInfoRequest : sig
-    type t = (string)
-    val make: ?auth_token:string -> unit -> t
+    type t = {
+      auth_token:string;
+      model:string;
+      (**
+{%html:
+<p>target model name, empty = default</p>
+%}
+      *)
+
+    }
+    val make: ?auth_token:string -> ?model:string -> unit -> t
     (** Helper function to generate a message using default values *)
 
     val to_proto: t -> Runtime'.Writer.t
@@ -1656,7 +1708,7 @@ end = struct
     (** Fully qualified protobuf name of this message *)
 
     (**/**)
-    type make_t = ?auth_token:string -> unit -> t
+    type make_t = ?auth_token:string -> ?model:string -> unit -> t
     val merge: t -> t -> t
     val to_proto': Runtime'.Writer.t -> t -> unit
     val from_proto_exn: Runtime'.Reader.t -> t
@@ -1665,27 +1717,34 @@ end = struct
   end = struct
     module This'_ = ModelInfoRequest
     let name () = ".protocol.ModelInfoRequest"
-    type t = (string)
-    type make_t = ?auth_token:string -> unit -> t
-    let make ?(auth_token = {||}) () = (auth_token)
+    type t = {
+      auth_token:string;
+      model:string;
+    }
+    type make_t = ?auth_token:string -> ?model:string -> unit -> t
+    let make ?(auth_token = {||}) ?(model = {||}) () = { auth_token; model }
     let merge =
     let merge_auth_token = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ) in
-    fun (t1_auth_token) (t2_auth_token) -> merge_auth_token t1_auth_token t2_auth_token
-    let spec () = Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ^:: nil )
+    let merge_model = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "model", "model"), string, ({||})) ) in
+    fun t1 t2 -> {
+    	auth_token = (merge_auth_token t1.auth_token t2.auth_token);
+    	model = (merge_model t1.model t2.model);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ^:: basic ((2, "model", "model"), string, ({||})) ^:: nil )
     let to_proto' =
       let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
-      fun writer (auth_token) -> serialize writer auth_token
+      fun writer { auth_token; model } -> serialize writer auth_token model
 
     let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
     let from_proto_exn =
-      let constructor auth_token = (auth_token) in
+      let constructor auth_token model = { auth_token; model } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
     let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
     let to_json options =
       let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
-      fun (auth_token) -> serialize auth_token
+      fun { auth_token; model } -> serialize auth_token model
     let from_json_exn =
-      let constructor auth_token = (auth_token) in
+      let constructor auth_token model = { auth_token; model } in
       Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end

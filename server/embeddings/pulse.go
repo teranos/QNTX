@@ -29,31 +29,45 @@ type ReclusterHandler struct {
 	ClusterMatchThreshold float64
 	GroundDBPath          string
 	GroundWrite           GroundWriteFunc
+	Models                []string // model names to cluster; empty = all models mixed (legacy)
 	Logger                *zap.SugaredLogger
 }
 
 func (h *ReclusterHandler) Name() string { return ReclusterHandlerName }
 
 func (h *ReclusterHandler) Execute(ctx context.Context, job *async.Job) error {
-	h.writeLog(job.ID, "clustering", "info", "Starting HDBSCAN re-clustering", fmt.Sprintf(`{"min_cluster_size":%d}`, h.MinClusterSize))
-
 	if h.ClusterFunc == nil {
 		h.writeLog(job.ID, "clustering", "error", "No ClusterFunc configured (no embedding provider plugin)", "")
 		return fmt.Errorf("no ClusterFunc configured")
 	}
 
-	result, err := RunHDBSCANClustering(h.Store, h.Svc, h.ClusterFunc, h.Invalidator, h.MinClusterSize, h.ClusterMatchThreshold, h.ATSStore, h.ProjectCtx, h.GroundDBPath, h.GroundWrite, h.Logger)
-	if err != nil {
-		h.writeLog(job.ID, "clustering", "error", fmt.Sprintf("Clustering failed: %s", err), "")
-		EmitPulseDeferredNews(h.DB, h.ATSStore, h.ProjectCtx, h.GroundDBPath, h.GroundWrite, h.Logger)
-		return err
+	// Cluster per-model so vectors from different dimensionalities aren't mixed
+	models := h.Models
+	if len(models) == 0 {
+		models = []string{""} // empty string = all models (legacy)
 	}
 
-	h.writeLog(job.ID, "clustering", "info",
-		fmt.Sprintf("Clustering complete: %d points, %d clusters, %d noise, %.0fms",
-			result.Summary.NTotal, result.Summary.NClusters, result.Summary.NNoise, result.TimeMS),
-		fmt.Sprintf(`{"n_points":%d,"n_clusters":%d,"n_noise":%d,"time_ms":%.0f}`,
-			result.Summary.NTotal, result.Summary.NClusters, result.Summary.NNoise, result.TimeMS))
+	for _, model := range models {
+		modelLabel := model
+		if modelLabel == "" {
+			modelLabel = "(all)"
+		}
+		h.writeLog(job.ID, "clustering", "info",
+			fmt.Sprintf("Starting HDBSCAN re-clustering for model %s", modelLabel),
+			fmt.Sprintf(`{"min_cluster_size":%d,"model":"%s"}`, h.MinClusterSize, model))
+
+		result, err := RunHDBSCANClustering(h.Store, h.Svc, h.ClusterFunc, h.Invalidator, h.MinClusterSize, h.ClusterMatchThreshold, h.ATSStore, h.ProjectCtx, h.GroundDBPath, h.GroundWrite, h.Logger, model)
+		if err != nil {
+			h.writeLog(job.ID, "clustering", "error", fmt.Sprintf("Clustering failed for model %s: %s", modelLabel, err), "")
+			continue
+		}
+
+		h.writeLog(job.ID, "clustering", "info",
+			fmt.Sprintf("Clustering complete for model %s: %d points, %d clusters, %d noise, %.0fms",
+				modelLabel, result.Summary.NTotal, result.Summary.NClusters, result.Summary.NNoise, result.TimeMS),
+			fmt.Sprintf(`{"model":"%s","n_points":%d,"n_clusters":%d,"n_noise":%d,"time_ms":%.0f}`,
+				model, result.Summary.NTotal, result.Summary.NClusters, result.Summary.NNoise, result.TimeMS))
+	}
 
 	EmitPulseDeferredNews(h.DB, h.ATSStore, h.ProjectCtx, h.GroundDBPath, h.GroundWrite, h.Logger)
 	return nil
@@ -80,27 +94,41 @@ type ReprojectHandler struct {
 	Svc        EmbeddingServiceForClustering
 	CallReduce ReduceFunc
 	Methods    []string
+	Models     []string // model names to project; empty = all models mixed (legacy)
 	Logger     *zap.SugaredLogger
 }
 
 func (h *ReprojectHandler) Name() string { return ReprojectHandlerName }
 
 func (h *ReprojectHandler) Execute(ctx context.Context, job *async.Job) error {
-	h.writeLog(job.ID, "projection", "info",
-		fmt.Sprintf("Starting re-projection for methods: %v", h.Methods), "")
-
-	results, err := RunAllProjections(ctx, h.Methods, h.Store, h.Svc, h.CallReduce, h.Logger, nil)
-	if err != nil {
-		h.writeLog(job.ID, "projection", "error", fmt.Sprintf("Projection failed: %s", err), "")
-		return err
+	// Project per-model so vectors from different dimensionalities aren't mixed
+	models := h.Models
+	if len(models) == 0 {
+		models = []string{""} // empty string = all models (legacy)
 	}
 
-	for _, r := range results {
+	for _, model := range models {
+		modelLabel := model
+		if modelLabel == "" {
+			modelLabel = "(all)"
+		}
 		h.writeLog(job.ID, "projection", "info",
-			fmt.Sprintf("%s complete: %d points, fit %dms, total %.0fms",
-				r.Method, r.NPoints, r.FitMS, r.TimeMS),
-			fmt.Sprintf(`{"method":"%s","n_points":%d,"fit_ms":%d,"time_ms":%.0f}`,
-				r.Method, r.NPoints, r.FitMS, r.TimeMS))
+			fmt.Sprintf("Starting re-projection for model %s, methods: %v", modelLabel, h.Methods), "")
+
+		results, err := RunAllProjections(ctx, h.Methods, h.Store, h.Svc, h.CallReduce, h.Logger, nil, model)
+		if err != nil {
+			h.writeLog(job.ID, "projection", "error",
+				fmt.Sprintf("Projection failed for model %s: %s", modelLabel, err), "")
+			continue
+		}
+
+		for _, r := range results {
+			h.writeLog(job.ID, "projection", "info",
+				fmt.Sprintf("%s complete for model %s: %d points, fit %dms, total %.0fms",
+					r.Method, modelLabel, r.NPoints, r.FitMS, r.TimeMS),
+				fmt.Sprintf(`{"method":"%s","model":"%s","n_points":%d,"fit_ms":%d,"time_ms":%.0f}`,
+					r.Method, model, r.NPoints, r.FitMS, r.TimeMS))
+		}
 	}
 	return nil
 }

@@ -446,14 +446,22 @@ func (h *Handler) HandleEmbeddingsBySource(w http.ResponseWriter, r *http.Reques
 
 // ── Info ─────────────────────────────────────────────────────────────
 
+// EmbeddingModelInfo describes a single configured model and its embedding count.
+type EmbeddingModelInfo struct {
+	Name       string `json:"name"`
+	Dimensions int    `json:"dimensions"`
+	Count      int    `json:"count"`
+}
+
 // EmbeddingInfoResponse represents embedding service status
 type EmbeddingInfoResponse struct {
 	Available        bool                    `json:"available"`
 	ModelName        string                  `json:"model_name"`
 	Dimensions       int                     `json:"dimensions"`
+	Models           []EmbeddingModelInfo    `json:"models"`
 	EmbeddingCount   int                     `json:"embedding_count"`
 	AttestationCount int                     `json:"attestation_count"`
-	UnembeddedIDs    []string                `json:"unembedded_ids,omitempty"`
+	UnembeddedCount  int                     `json:"unembedded_count"`
 	ClusterInfo      *storage.ClusterSummary `json:"cluster_info,omitempty"`
 	HDBSCANConfig    *HDBSCANConfig          `json:"hdbscan_config,omitempty"`
 }
@@ -481,12 +489,49 @@ func (h *Handler) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var embCount, atsCount int
-	if err := h.DB.QueryRow("SELECT COUNT(*) FROM embeddings").Scan(&embCount); err != nil {
-		h.Logger.Errorw("Failed to count embeddings", "error", err)
-		http.Error(w, "Failed to retrieve embedding count", http.StatusInternalServerError)
-		return
+	// Per-model counts from DB
+	var embCount int
+	if h.Store != nil {
+		perModel, err := h.Store.CountEmbeddingsByModel()
+		if err != nil {
+			h.Logger.Errorw("Failed to count embeddings by model", "error", err)
+		} else {
+			for _, mc := range perModel {
+				embCount += mc.Count
+				resp.Models = append(resp.Models, EmbeddingModelInfo{
+					Name:       mc.Model,
+					Dimensions: mc.Dimensions,
+					Count:      mc.Count,
+				})
+			}
+		}
 	}
+	// Include configured models that have zero embeddings yet
+	configuredModels := ModelNamesFromPaths(appcfg.GetStringSlice("cyrnel.models"))
+	for _, name := range configuredModels {
+		found := false
+		for _, m := range resp.Models {
+			if m.Name == name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			dims := 0
+			if h.Service != nil {
+				if info, err := h.Service.GetModelInfo(name); err == nil {
+					dims = info.Dimensions
+				}
+			}
+			resp.Models = append(resp.Models, EmbeddingModelInfo{
+				Name:       name,
+				Dimensions: dims,
+				Count:      0,
+			})
+		}
+	}
+
+	var atsCount int
 	type counter interface{ CountAttestations() (int, error) }
 	if c, ok := h.ATSStore.(counter); ok {
 		if cnt, err := c.CountAttestations(); err == nil {
@@ -495,28 +540,9 @@ func (h *Handler) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request) {
 	}
 	resp.EmbeddingCount = embCount
 	resp.AttestationCount = atsCount
-
-	rows, err := h.DB.Query(`
-		SELECT a.id FROM attestations a
-		LEFT JOIN embeddings e ON e.source_type = 'attestation' AND e.source_id = a.id
-		WHERE e.id IS NULL
-	`)
-	if err != nil {
-		h.Logger.Errorw("Failed to query unembedded attestations", "error", err)
-		http.Error(w, "Failed to retrieve unembedded attestation list", http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			h.Logger.Warnw("Failed to scan attestation ID", "error", err)
-			continue
-		}
-		resp.UnembeddedIDs = append(resp.UnembeddedIDs, id)
-	}
-	if err := rows.Err(); err != nil {
-		h.Logger.Warnw("Error iterating unembedded attestations", "error", err)
+	resp.UnembeddedCount = atsCount - embCount
+	if resp.UnembeddedCount < 0 {
+		resp.UnembeddedCount = 0
 	}
 
 	if h.Store != nil {
@@ -541,6 +567,49 @@ func (h *Handler) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request) {
 			"available", resp.Available, "embedding_count", resp.EmbeddingCount,
 			"attestation_count", resp.AttestationCount, "error", err)
 	}
+}
+
+// ── Unembedded page ─────────────────────────────────────────────────
+
+// HandleUnembeddedPage returns a page of unembedded attestation IDs.
+// GET /api/embeddings/unembedded?limit=100
+func (h *Handler) HandleUnembeddedPage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	limit := 100
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if parsed, err := strconv.Atoi(limitStr); err == nil && parsed > 0 && parsed <= 500 {
+			limit = parsed
+		}
+	}
+
+	rows, err := h.DB.Query(`
+		SELECT a.id FROM attestations a
+		LEFT JOIN embeddings e ON e.source_type = 'attestation' AND e.source_id = a.id
+		WHERE e.id IS NULL
+		LIMIT ?
+	`, limit)
+	if err != nil {
+		h.Logger.Errorw("Failed to query unembedded attestations", "limit", limit, "error", err)
+		http.Error(w, "Failed to query unembedded attestations", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	ids := make([]string, 0, limit)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			continue
+		}
+		ids = append(ids, id)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"ids": ids, "count": len(ids)})
 }
 
 // ── Projections ─────────────────────────────────────────────────────
