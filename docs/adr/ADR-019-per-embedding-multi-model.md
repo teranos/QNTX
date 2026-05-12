@@ -1,6 +1,6 @@
 # ADR-019: Per-Embedding Multi-Model Support
 
-**Status:** In Progress (Phase 1 complete)
+**Status:** In Progress (Phase 3 verified)
 **Date:** 2026-05-11
 **Related:** [ADR-017: Embedding as Plugin-Provided Service](./ADR-017-embedding-as-plugin-provided-service.md), [ADR-001: Domain Plugin Architecture](./ADR-001-domain-plugin-architecture.md)
 
@@ -64,8 +64,8 @@ Proto changes are additive — existing callers that don't set the `model` field
 │ CyrnelPluginService                          │
 │                                              │
 │  Initialize(config)                          │
-│    ├─ models.0 → Arc<RwLock<LoadedModel>>    │
-│    ├─ models.1 → Arc<RwLock<LoadedModel>>    │
+│    ├─ models[0] → Arc<RwLock<LoadedModel>>   │
+│    ├─ models[1] → Arc<RwLock<LoadedModel>>   │
 │    └─ order[0] = default model               │
 │                                              │
 │  Embed(text, model?) ──► per-model WriteLock │
@@ -151,24 +151,34 @@ Search("similar to X", model="MiniLM-L6-v2")
 - Go/TS/OCaml proto regenerated, QNTX builds and tests pass
 - Health endpoint and `/api/cyrnel/models` list all loaded models
 
-### Phase 2: Schema + Storage
+### Phase 2: Schema + Storage ✅
 
-- Unique index on `(source_type, source_id, model)`
-- Dynamic vec0 table creation per model
-- `GetBySource` scoped by model
-- `EmbeddingStore` methods gain model parameter
+- ✅ Unique index on `(source_type, source_id, model)` — migration 051
+- ✅ Dynamic vec0 table creation per model — `EnsureVecTable` creates `vec_embeddings_{slug}` on first use
+- ✅ `GetBySource` scoped by model — filters by model when non-empty
+- ✅ `SemanticSearch` scoped by model — queries per-model vec table
+- ✅ `EmbeddingStore` methods gain model parameter
+- ✅ `GetAllEmbeddingVectors` scoped by model (for HDBSCAN clustering)
+- ✅ `DeleteBySource` and `SweepStaleEmbeddings` handle multi-model vec tables
 
-### Phase 3: Observer + Query
+### Phase 3: Observer + Query ✅
 
-- `EmbeddingObserver` multi-model strategy
-- Similarity search routed by model
-- Clustering scoped by model
-- Projection scoped by model
+- ✅ `EmbeddingObserver` multi-model strategy — loops over all configured models per attestation
+- ✅ Model names derived from am.toml `cyrnel.models` paths via `ModelNamesFromPaths`
+- ✅ Similarity search accepts model parameter and routes to correct vec table
+- Clustering callers pass actual model (currently `""` = all models)
+- Projection callers pass actual model (currently `""` = all models)
+- ✅ Verified end-to-end: one attestation produces N embeddings (one per model)
 
-### Phase 4: UI
+### Phase 4: Internal Model Selection
 
-- Model selector in embedding/cluster/search views
-- Side-by-side comparison
+Model selection is an internal system concern, not user-facing. Users never choose a model — the system picks underwater based on configured strategy (default model, all models, or subset). No model selector in the UI.
+
+### Rich Text Fields
+
+Embedding is triggered for attestation attributes matching:
+- Fields declared as `rich_string` in type definitions (e.g. `response`, `label`)
+- Builtin fields: `message`, `msg` — always embeddable regardless of type definitions
 
 ## Alternatives Considered
 

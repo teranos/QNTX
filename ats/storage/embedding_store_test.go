@@ -85,7 +85,7 @@ func TestEmbeddingStore_Save(t *testing.T) {
 	assert.False(t, embedding.UpdatedAt.IsZero())
 
 	// Verify it was saved
-	retrieved, err := store.GetBySource(embedding.SourceType, embedding.SourceID)
+	retrieved, err := store.GetBySource(embedding.SourceType, embedding.SourceID, "")
 	require.NoError(t, err)
 	require.NotNil(t, retrieved)
 	assert.Equal(t, embedding.ID, retrieved.ID)
@@ -99,7 +99,7 @@ func TestEmbeddingStore_GetBySource_NotFound(t *testing.T) {
 	logger := zap.NewNop()
 	store := NewEmbeddingStore(db, logger)
 
-	retrieved, err := store.GetBySource("attestation", "non-existent-id")
+	retrieved, err := store.GetBySource("attestation", "non-existent-id", "")
 	require.NoError(t, err)
 	assert.Nil(t, retrieved)
 }
@@ -145,9 +145,9 @@ func TestEmbeddingStore_SemanticSearch(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	// Search with a query embedding
+	// Search with a query embedding — must specify the model so the correct vec table is queried
 	queryEmbedding := createTestEmbedding(384)
-	results, err := store.SemanticSearch(queryEmbedding, 10, 0.0, nil)
+	results, err := store.SemanticSearch(queryEmbedding, 10, 0.0, nil, "all-MiniLM-L6-v2")
 	require.NoError(t, err)
 	assert.Len(t, results, 3)
 
@@ -157,7 +157,7 @@ func TestEmbeddingStore_SemanticSearch(t *testing.T) {
 	}
 
 	// Test with threshold
-	results, err = store.SemanticSearch(queryEmbedding, 10, 0.9, nil)
+	results, err = store.SemanticSearch(queryEmbedding, 10, 0.9, nil, "all-MiniLM-L6-v2")
 	require.NoError(t, err)
 	// Should filter out low similarity results
 	for _, result := range results {
@@ -177,7 +177,7 @@ func TestEmbeddingStore_DeleteBySource(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify it exists
-	retrieved, err := store.GetBySource(embedding.SourceType, embedding.SourceID)
+	retrieved, err := store.GetBySource(embedding.SourceType, embedding.SourceID, "")
 	require.NoError(t, err)
 	require.NotNil(t, retrieved)
 
@@ -186,7 +186,7 @@ func TestEmbeddingStore_DeleteBySource(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify it's gone
-	retrieved, err = store.GetBySource(embedding.SourceType, embedding.SourceID)
+	retrieved, err = store.GetBySource(embedding.SourceType, embedding.SourceID, "")
 	require.NoError(t, err)
 	assert.Nil(t, retrieved)
 
@@ -235,15 +235,15 @@ func TestEmbeddingStore_BatchSaveAttestationEmbeddings(t *testing.T) {
 
 	// Verify all were saved
 	for _, emb := range embeddings {
-		retrieved, err := store.GetBySource(emb.SourceType, emb.SourceID)
+		retrieved, err := store.GetBySource(emb.SourceType, emb.SourceID, "")
 		require.NoError(t, err)
 		require.NotNil(t, retrieved)
 		assert.Equal(t, emb.Text, retrieved.Text)
 	}
 
-	// Verify they're searchable
+	// Verify they're searchable — must specify model to query the right vec table
 	queryEmbedding := createTestEmbedding(384)
-	results, err := store.SemanticSearch(queryEmbedding, 10, 0.0, nil)
+	results, err := store.SemanticSearch(queryEmbedding, 10, 0.0, nil, "all-MiniLM-L6-v2")
 	require.NoError(t, err)
 	assert.Len(t, results, 3)
 }
@@ -280,7 +280,7 @@ func TestEmbeddingStore_UpdateExisting(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify update
-	retrieved, err := store.GetBySource(embedding.SourceType, embedding.SourceID)
+	retrieved, err := store.GetBySource(embedding.SourceType, embedding.SourceID, "")
 	require.NoError(t, err)
 	assert.Equal(t, originalID, retrieved.ID) // ID should remain the same
 	assert.Equal(t, "updated text", retrieved.Text)
@@ -452,7 +452,7 @@ func TestEmbeddingStore_ProjectionRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 
 	// Retrieve via GetBySource — embedding still intact
-	retrieved, err := store.GetBySource(embedding.SourceType, embedding.SourceID)
+	retrieved, err := store.GetBySource(embedding.SourceType, embedding.SourceID, "")
 	require.NoError(t, err)
 	require.NotNil(t, retrieved)
 	assert.Equal(t, embedding.Text, retrieved.Text)

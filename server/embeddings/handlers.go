@@ -100,7 +100,7 @@ func (h *Handler) HandleSemanticSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	startSearch := time.Now()
-	searchResults, err := h.Store.SemanticSearch(queryBlob, limit, threshold, clusterID)
+	searchResults, err := h.Store.SemanticSearch(queryBlob, limit, threshold, clusterID, "")
 	if err != nil {
 		h.Logger.Errorw("Failed to perform semantic search",
 			"query", query, "limit", limit, "threshold", threshold, "error", err)
@@ -274,7 +274,7 @@ func (h *Handler) HandleEmbeddingBatch(w http.ResponseWriter, r *http.Request) {
 	richFields := richStore.GetDiscoveredRichFields()
 
 	for _, attestationID := range req.AttestationIDs {
-		existing, err := h.Store.GetBySource("attestation", attestationID)
+		existing, err := h.Store.GetBySource("attestation", attestationID, "")
 		if err != nil {
 			errorMessages = append(errorMessages, errors.Wrapf(err, "failed to check existing embedding for %s",
 				attestationID).Error())

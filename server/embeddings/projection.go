@@ -54,7 +54,7 @@ func RunProjection(
 ) (*ProjectionResult, error) {
 	startTime := time.Now()
 
-	ids, blobs, err := store.GetAllEmbeddingVectors()
+	ids, blobs, err := store.GetAllEmbeddingVectors("")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read embedding vectors for projection")
 	}

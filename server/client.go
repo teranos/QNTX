@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/graph"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	grapherr "github.com/teranos/QNTX/graph/error"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/server/syscap"
@@ -736,28 +738,54 @@ func (c *Client) handleRichSearch(query string) {
 		return
 	}
 
+	ctx := c.server.ctx
+
+	// Text search: MeiliSearch if available, SQL substring fallback
+	var matches []storage.RichSearchMatch
+	var searchStrategy string
+
+	if router := c.server.servicesManager.GetSearchRouter(); router != nil && router.HasProvider() {
+		searchStrategy = "meilisearch"
+		meiliMatches, err := c.searchMeili(ctx, query, 50)
+		if err != nil {
+			c.server.logger.Warnw("MeiliSearch failed, falling back to substring",
+				"query", query,
+				"error", err,
+			)
+			searchStrategy = "substring (meili fallback)"
+			meiliMatches = nil
+		}
+		matches = meiliMatches
+	}
+
+	// SQL substring fallback (no MeiliSearch provider, or MeiliSearch failed)
+	if matches == nil {
+		if searchStrategy == "" {
+			searchStrategy = "substring"
+		}
+		boundedStore := storage.NewBoundedStore(c.server.db, nil, c.server.logger.Named("search"))
+		var err error
+		matches, err = boundedStore.SearchRichStringFields(ctx, query, 50)
+		if err != nil {
+			err = errors.Wrapf(err, "text search failed for query %q", query)
+			c.server.logger.Warnw("Text search failed",
+				"query", query,
+				"error", err,
+				"client_id", c.id,
+			)
+			c.sendJSON(map[string]interface{}{
+				"type":  "rich_search_error",
+				"error": err.Error(),
+			})
+			return
+		}
+	}
+
 	c.server.logger.Infow("Unified search",
 		"query", query,
+		"strategy", searchStrategy,
 		"client_id", c.id,
 	)
-
-	// Text search (fuzzy/exact)
-	boundedStore := storage.NewBoundedStore(c.server.db, nil, c.server.logger.Named("search"))
-	ctx := c.server.ctx
-	matches, err := boundedStore.SearchRichStringFields(ctx, query, 50)
-	if err != nil {
-		err = errors.Wrapf(err, "text search failed for query %q", query)
-		c.server.logger.Warnw("Text search failed",
-			"query", query,
-			"error", err,
-			"client_id", c.id,
-		)
-		c.sendJSON(map[string]interface{}{
-			"type":  "rich_search_error",
-			"error": err.Error(),
-		})
-		return
-	}
 
 	// Semantic search (if embedding service available)
 	if c.server.embeddingService != nil && c.server.embeddingStore != nil {
@@ -787,6 +815,67 @@ func (c *Client) handleRichSearch(query string) {
 	)
 }
 
+// searchMeili queries the MeiliSearch provider via the SearchService gRPC.
+// Returns matches converted to RichSearchMatch format, or error on failure.
+// The index name is "attestations" — the standard index for attestation rich fields.
+func (c *Client) searchMeili(ctx context.Context, query string, limit int) ([]storage.RichSearchMatch, error) {
+	router := c.server.servicesManager.GetSearchRouter()
+	if router == nil {
+		return nil, errors.New("no search router available")
+	}
+
+	resp, err := router.Search(ctx, &protocol.SearchRequest{
+		Query: query,
+		Index: "attestations",
+		TopK:  int32(limit),
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "MeiliSearch query failed for %q", query)
+	}
+
+	matches := make([]storage.RichSearchMatch, 0, len(resp.Hits))
+	for _, hit := range resp.Hits {
+		// Parse the document JSON to extract fields
+		var doc map[string]interface{}
+		if err := json.Unmarshal(hit.Document, &doc); err != nil {
+			continue
+		}
+
+		nodeID, _ := doc["node_id"].(string)
+		typeName, _ := doc["type_name"].(string)
+		typeLabel, _ := doc["type_label"].(string)
+		fieldName, _ := doc["field_name"].(string)
+		fieldValue, _ := doc["field_value"].(string)
+		displayLabel, _ := doc["display_label"].(string)
+
+		// Use highlighted text as excerpt if available
+		excerpt := fieldValue
+		if len(hit.Highlighted) > 0 {
+			var highlighted map[string]interface{}
+			if err := json.Unmarshal(hit.Highlighted, &highlighted); err == nil {
+				if hl, ok := highlighted["field_value"].(string); ok {
+					excerpt = hl
+				}
+			}
+		}
+
+		matches = append(matches, storage.RichSearchMatch{
+			NodeID:       nodeID,
+			TypeName:     typeName,
+			TypeLabel:    typeLabel,
+			FieldName:    fieldName,
+			FieldValue:   fieldValue,
+			Excerpt:      excerpt,
+			Score:        float64(hit.Score),
+			Strategy:     storage.StrategyMeiliSearch,
+			DisplayLabel: displayLabel,
+			Attributes:   doc,
+		})
+	}
+
+	return matches, nil
+}
+
 // searchSemantic generates an embedding for the query and searches the vector store.
 // Returns empty slice on any failure — semantic search is best-effort.
 func (c *Client) searchSemantic(query string) []storage.RichSearchMatch {
@@ -802,7 +891,7 @@ func (c *Client) searchSemantic(query string) []storage.RichSearchMatch {
 		return nil
 	}
 
-	searchResults, err := c.server.embeddingStore.SemanticSearch(queryBlob, semanticSearchLimit, semanticSearchThreshold, nil)
+	searchResults, err := c.server.embeddingStore.SemanticSearch(queryBlob, semanticSearchLimit, semanticSearchThreshold, nil, "")
 	if err != nil {
 		c.server.logger.Debugw("Semantic search failed", "query", query, "error", err)
 		return nil
@@ -1088,12 +1177,10 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 }
 
 // sendSystemCapabilitiesToClient sends system capability information to a newly connected client.
-// This informs the frontend about available optimizations (e.g., Rust fuzzy matching, ONNX video).
+// This informs the frontend about available optimizations (storage backend, parser backend).
 // Sends are routed through broadcast worker (thread-safe).
 func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
-	// Get system capabilities from syscap package
-	fuzzyBackend := s.builder.FuzzyBackend()
-	msg := syscap.Get(fuzzyBackend)
+	msg := syscap.Get()
 
 	// Send to broadcast worker (thread-safe)
 	req := &broadcastRequest{
@@ -1106,8 +1193,6 @@ func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
 	case s.broadcastReq <- req:
 		s.logger.Debugw("Queued system capabilities to client",
 			"client_id", client.id,
-			"fuzzy_backend", fuzzyBackend,
-			"fuzzy_optimized", msg.FuzzyOptimized,
 		)
 	case <-s.ctx.Done():
 		return

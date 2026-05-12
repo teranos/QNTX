@@ -2,7 +2,9 @@ package storage
 
 import (
 	"database/sql"
+	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/ats/identity"
@@ -31,16 +33,67 @@ type EmbeddingModel struct {
 
 // EmbeddingStore provides database operations for embeddings
 type EmbeddingStore struct {
-	db     *sql.DB
-	logger *zap.Logger
+	db        *sql.DB
+	logger    *zap.Logger
+	vecTables sync.Map // tracks created vec0 tables by name
 }
 
 // NewEmbeddingStore creates a new embedding store
 func NewEmbeddingStore(db *sql.DB, logger *zap.Logger) *EmbeddingStore {
-	return &EmbeddingStore{
+	s := &EmbeddingStore{
 		db:     db,
 		logger: logger,
 	}
+	// Register the legacy vec_embeddings table (created by migration 024)
+	s.vecTables.Store("vec_embeddings", true)
+	return s
+}
+
+// modelSlug converts a model name to a safe SQL identifier suffix.
+// Only alphanumeric characters are kept; everything else becomes underscore.
+func modelSlug(model string) string {
+	if model == "" {
+		return ""
+	}
+	var b strings.Builder
+	for _, r := range strings.ToLower(model) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		} else {
+			b.WriteRune('_')
+		}
+	}
+	return b.String()
+}
+
+// vecTableName returns the vec0 virtual table name for a given model.
+// Empty model uses the legacy "vec_embeddings" table.
+func vecTableName(model string) string {
+	if model == "" {
+		return "vec_embeddings"
+	}
+	return "vec_embeddings_" + modelSlug(model)
+}
+
+// EnsureVecTable creates the per-model vec0 virtual table if it doesn't exist.
+func (s *EmbeddingStore) EnsureVecTable(model string, dimensions int) error {
+	table := vecTableName(model)
+
+	if _, ok := s.vecTables.Load(table); ok {
+		return nil
+	}
+
+	query := fmt.Sprintf(
+		`CREATE VIRTUAL TABLE IF NOT EXISTS %s USING vec0(embedding_id TEXT PRIMARY KEY, embedding FLOAT32[%d])`,
+		table, dimensions,
+	)
+	if _, err := s.db.Exec(query); err != nil {
+		return errors.Wrapf(err, "failed to create vec table %s with %d dimensions", table, dimensions)
+	}
+
+	s.vecTables.Store(table, true)
+	s.logger.Info("created vec0 table", zap.String("table", table), zap.Int("dimensions", dimensions))
+	return nil
 }
 
 // Save stores an embedding in the database
@@ -93,15 +146,19 @@ func (s *EmbeddingStore) Save(embedding *EmbeddingModel) error {
 			embedding.ID, embedding.SourceType, embedding.SourceID)
 	}
 
-	// Also update the vec_embeddings virtual table for vector search
-	// Virtual tables don't support UPSERT, so we delete then insert
-	_, _ = s.db.Exec("DELETE FROM vec_embeddings WHERE embedding_id = ?", embedding.ID)
+	// Ensure the per-model vec0 table exists, then insert
+	table := vecTableName(embedding.Model)
+	if err := s.EnsureVecTable(embedding.Model, embedding.Dimensions); err != nil {
+		return err
+	}
 
-	vecQuery := `INSERT INTO vec_embeddings (embedding_id, embedding) VALUES (?, ?)`
+	// Virtual tables don't support UPSERT, so we delete then insert
+	_, _ = s.db.Exec(fmt.Sprintf("DELETE FROM %s WHERE embedding_id = ?", table), embedding.ID)
+
+	vecQuery := fmt.Sprintf(`INSERT INTO %s (embedding_id, embedding) VALUES (?, ?)`, table)
 	_, err = s.db.Exec(vecQuery, embedding.ID, embedding.Embedding)
 	if err != nil {
-		return errors.Wrapf(err, "failed to save embedding %s to vec_embeddings table",
-			embedding.ID)
+		return errors.Wrapf(err, "failed to save embedding %s to %s", embedding.ID, table)
 	}
 
 	s.logger.Debug("saved embedding",
@@ -113,19 +170,35 @@ func (s *EmbeddingStore) Save(embedding *EmbeddingModel) error {
 	return nil
 }
 
-// GetBySource retrieves an embedding by its source
-func (s *EmbeddingStore) GetBySource(sourceType, sourceID string) (*EmbeddingModel, error) {
-	query := `
-		SELECT id, source_type, source_id, text, embedding,
-		       model, dimensions, created_at, updated_at
-		FROM embeddings
-		WHERE source_type = ? AND source_id = ?
-	`
+// GetBySource retrieves an embedding by its source.
+// When model is non-empty, scopes the lookup to that specific model.
+// When model is empty, returns the first matching embedding regardless of model.
+func (s *EmbeddingStore) GetBySource(sourceType, sourceID, model string) (*EmbeddingModel, error) {
+	var query string
+	var args []interface{}
+
+	if model != "" {
+		query = `
+			SELECT id, source_type, source_id, text, embedding,
+			       model, dimensions, created_at, updated_at
+			FROM embeddings
+			WHERE source_type = ? AND source_id = ? AND model = ?
+		`
+		args = []interface{}{sourceType, sourceID, model}
+	} else {
+		query = `
+			SELECT id, source_type, source_id, text, embedding,
+			       model, dimensions, created_at, updated_at
+			FROM embeddings
+			WHERE source_type = ? AND source_id = ?
+		`
+		args = []interface{}{sourceType, sourceID}
+	}
 
 	var embedding EmbeddingModel
 	var createdAt, updatedAt string
 
-	err := s.db.QueryRow(query, sourceType, sourceID).Scan(
+	err := s.db.QueryRow(query, args...).Scan(
 		&embedding.ID,
 		&embedding.SourceType,
 		&embedding.SourceID,
@@ -164,8 +237,9 @@ type SearchResult struct {
 }
 
 // SemanticSearch performs a vector similarity search.
+// When model is non-empty, results are scoped to that model's embeddings.
 // When clusterID is non-nil, results are scoped to that cluster only.
-func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, threshold float32, clusterID *int) ([]*SearchResult, error) {
+func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, threshold float32, clusterID *int, model string) ([]*SearchResult, error) {
 	if len(queryEmbedding) == 0 {
 		return nil, errors.New("query embedding is empty")
 	}
@@ -179,36 +253,39 @@ func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, thresh
 	var query string
 	var args []interface{}
 
+	// Build WHERE clauses
+	var filters []string
 	if clusterID != nil {
-		query = `
-			SELECT
-				v.embedding_id,
-				e.source_type,
-				e.source_id,
-				e.text,
-				vec_distance_L2(v.embedding, ?) as distance
-			FROM vec_embeddings v
-			JOIN embeddings e ON v.embedding_id = e.id
-			WHERE e.cluster_id = ?
-			ORDER BY distance
-			LIMIT ?
-		`
-		args = []interface{}{queryEmbedding, *clusterID, limit}
-	} else {
-		query = `
-			SELECT
-				v.embedding_id,
-				e.source_type,
-				e.source_id,
-				e.text,
-				vec_distance_L2(v.embedding, ?) as distance
-			FROM vec_embeddings v
-			JOIN embeddings e ON v.embedding_id = e.id
-			ORDER BY distance
-			LIMIT ?
-		`
-		args = []interface{}{queryEmbedding, limit}
+		filters = append(filters, "e.cluster_id = ?")
+		args = append(args, *clusterID)
 	}
+	if model != "" {
+		filters = append(filters, "e.model = ?")
+		args = append(args, model)
+	}
+
+	whereClause := ""
+	if len(filters) > 0 {
+		whereClause = "WHERE " + strings.Join(filters, " AND ")
+	}
+
+	table := vecTableName(model)
+	query = fmt.Sprintf(`
+		SELECT
+			v.embedding_id,
+			e.source_type,
+			e.source_id,
+			e.text,
+			vec_distance_L2(v.embedding, ?) as distance
+		FROM %s v
+		JOIN embeddings e ON v.embedding_id = e.id
+		%s
+		ORDER BY distance
+		LIMIT ?
+	`, table, whereClause)
+	// Prepend queryEmbedding, append limit
+	args = append([]interface{}{queryEmbedding}, args...)
+	args = append(args, limit)
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
@@ -257,29 +334,45 @@ func (s *EmbeddingStore) SemanticSearch(queryEmbedding []byte, limit int, thresh
 	return results, nil
 }
 
-// DeleteBySource removes an embedding by its source
+// DeleteBySource removes all embeddings for a source (may span multiple models/vec tables).
 func (s *EmbeddingStore) DeleteBySource(sourceType, sourceID string) error {
-	// First get the embedding ID for vec_embeddings deletion
-	var embeddingID string
-	err := s.db.QueryRow(
-		`SELECT id FROM embeddings WHERE source_type = ? AND source_id = ?`,
+	// Find all embeddings for this source to know which vec tables to clean
+	rows, err := s.db.Query(
+		`SELECT id, model FROM embeddings WHERE source_type = ? AND source_id = ?`,
 		sourceType, sourceID,
-	).Scan(&embeddingID)
-
-	if err == sql.ErrNoRows {
-		return nil // Nothing to delete
+	)
+	if err != nil {
+		return errors.Wrapf(err, "failed to find embeddings for %s:%s", sourceType, sourceID)
 	}
 
-	if err != nil {
-		return errors.Wrapf(err, "failed to find embedding for %s:%s",
-			sourceType, sourceID)
+	type entry struct {
+		id    string
+		model string
+	}
+	var entries []entry
+	for rows.Next() {
+		var e entry
+		if err := rows.Scan(&e.id, &e.model); err != nil {
+			rows.Close()
+			return errors.Wrapf(err, "failed to scan embedding for %s:%s", sourceType, sourceID)
+		}
+		entries = append(entries, e)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return errors.Wrapf(err, "failed to iterate embeddings for %s:%s", sourceType, sourceID)
 	}
 
-	// Delete from vec_embeddings first
-	_, err = s.db.Exec(`DELETE FROM vec_embeddings WHERE embedding_id = ?`, embeddingID)
-	if err != nil {
-		return errors.Wrapf(err, "failed to delete from vec_embeddings for %s",
-			embeddingID)
+	if len(entries) == 0 {
+		return nil
+	}
+
+	// Delete from each model's vec table
+	for _, e := range entries {
+		table := vecTableName(e.model)
+		if _, err := s.db.Exec(fmt.Sprintf("DELETE FROM %s WHERE embedding_id = ?", table), e.id); err != nil {
+			return errors.Wrapf(err, "failed to delete from %s for %s", table, e.id)
+		}
 	}
 
 	// Delete from embeddings table
@@ -288,14 +381,13 @@ func (s *EmbeddingStore) DeleteBySource(sourceType, sourceID string) error {
 		sourceType, sourceID,
 	)
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete embedding for %s:%s",
-			sourceType, sourceID)
+		return errors.Wrapf(err, "failed to delete embeddings for %s:%s", sourceType, sourceID)
 	}
 
-	s.logger.Debug("deleted embedding",
-		zap.String("id", embeddingID),
+	s.logger.Debug("deleted embeddings",
 		zap.String("source_type", sourceType),
-		zap.String("source_id", sourceID))
+		zap.String("source_id", sourceID),
+		zap.Int("count", len(entries)))
 
 	return nil
 }
@@ -304,6 +396,14 @@ func (s *EmbeddingStore) DeleteBySource(sourceType, sourceID string) error {
 func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingModel) error {
 	if len(embeddings) == 0 {
 		return nil
+	}
+
+	// Ensure per-model vec tables exist before opening the transaction
+	// (EnsureVecTable uses s.db.Exec which would deadlock inside an open tx on SQLite)
+	for _, embedding := range embeddings {
+		if err := s.EnsureVecTable(embedding.Model, embedding.Dimensions); err != nil {
+			return err
+		}
 	}
 
 	tx, err := s.db.Begin()
@@ -337,19 +437,6 @@ func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingM
 	}
 	defer embStmt.Close()
 
-	// Virtual tables don't support UPSERT, so we need to delete then insert
-	delVecStmt, err := tx.Prepare(`DELETE FROM vec_embeddings WHERE embedding_id = ?`)
-	if err != nil {
-		return errors.Wrap(err, "failed to prepare vec_embeddings delete statement")
-	}
-	defer delVecStmt.Close()
-
-	vecStmt, err := tx.Prepare(`INSERT INTO vec_embeddings (embedding_id, embedding) VALUES (?, ?)`)
-	if err != nil {
-		return errors.Wrap(err, "failed to prepare vec_embeddings insert statement")
-	}
-	defer vecStmt.Close()
-
 	now := time.Now().UTC()
 	for _, embedding := range embeddings {
 		if embedding.ID == "" {
@@ -381,11 +468,12 @@ func (s *EmbeddingStore) BatchSaveAttestationEmbeddings(embeddings []*EmbeddingM
 			return errors.Wrapf(err, "failed to insert embedding %s", embedding.ID)
 		}
 
-		// Delete existing vec_embeddings entry if it exists, then insert new one
-		_, _ = delVecStmt.Exec(embedding.ID)
-		_, err = vecStmt.Exec(embedding.ID, embedding.Embedding)
+		// Delete existing vec entry if it exists, then insert into per-model vec table
+		table := vecTableName(embedding.Model)
+		_, _ = tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE embedding_id = ?", table), embedding.ID)
+		_, err = tx.Exec(fmt.Sprintf("INSERT INTO %s (embedding_id, embedding) VALUES (?, ?)", table), embedding.ID, embedding.Embedding)
 		if err != nil {
-			return errors.Wrapf(err, "failed to insert into vec_embeddings %s", embedding.ID)
+			return errors.Wrapf(err, "failed to insert into %s for %s", table, embedding.ID)
 		}
 	}
 
@@ -457,8 +545,16 @@ func (s *EmbeddingStore) CountEmbeddings() (int, error) {
 }
 
 // GetAllEmbeddingVectors reads all embedding IDs and blobs for HDBSCAN input.
-func (s *EmbeddingStore) GetAllEmbeddingVectors() (ids []string, blobs [][]byte, err error) {
-	rows, err := s.db.Query(`SELECT id, embedding FROM embeddings ORDER BY id`)
+// When model is non-empty, only embeddings from that model are returned.
+func (s *EmbeddingStore) GetAllEmbeddingVectors(model string) (ids []string, blobs [][]byte, err error) {
+	query := `SELECT id, embedding FROM embeddings`
+	var args []interface{}
+	if model != "" {
+		query += ` WHERE model = ?`
+		args = append(args, model)
+	}
+	query += ` ORDER BY id`
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to query embedding vectors")
 	}

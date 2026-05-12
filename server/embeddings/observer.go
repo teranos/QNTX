@@ -1,6 +1,7 @@
 package embeddings
 
 import (
+	"path/filepath"
 	"sort"
 	"strconv"
 	"sync"
@@ -11,6 +12,24 @@ import (
 	"github.com/teranos/QNTX/errors"
 	"go.uber.org/zap"
 )
+
+// ModelNamesFromPaths derives model names from ONNX file paths.
+// Uses the parent directory name (e.g. "/path/to/all-MiniLM-L6-v2/model.onnx" → "all-MiniLM-L6-v2").
+// Mirrors cyrnel's naming logic. Returns nil if no valid paths.
+func ModelNamesFromPaths(paths []string) []string {
+	var names []string
+	for _, p := range paths {
+		if p == "" {
+			continue
+		}
+		name := filepath.Base(filepath.Dir(p))
+		if name == "" || name == "." || name == "/" {
+			continue
+		}
+		names = append(names, name)
+	}
+	return names
+}
 
 // EmbeddingObserver automatically embeds attestations that contain rich text.
 // Implements storage.AttestationObserver — called asynchronously in a goroutine
@@ -28,6 +47,7 @@ type EmbeddingObserver struct {
 	embeddingStore   *storage.EmbeddingStore
 	richStore        *storage.BoundedStore // Reused across calls for 5-min rich field cache
 	logger           *zap.SugaredLogger
+	models           []string             // model names to embed with; empty slice = default model only
 	clusterMu        sync.RWMutex
 	clusterCache     []storage.ClusterCentroid // loaded once, refreshed on re-cluster
 	clusterThreshold float32                   // minimum similarity for cluster assignment
@@ -46,6 +66,7 @@ type EmbeddingObserver struct {
 }
 
 // NewEmbeddingObserver creates an observer with the given dependencies.
+// models is the list of model names to embed with. If empty, uses the default model only.
 func NewEmbeddingObserver(
 	svc interface {
 		GenerateEmbedding(text, model string) (*EmbeddingResult, error)
@@ -59,12 +80,14 @@ func NewEmbeddingObserver(
 	logger *zap.SugaredLogger,
 	clusterThreshold float32,
 	projectFunc func(embeddingID string, embedding []float32),
+	models []string,
 ) *EmbeddingObserver {
 	return &EmbeddingObserver{
 		embeddingService: svc,
 		embeddingStore:   embStore,
 		richStore:        richStore,
 		logger:           logger,
+		models:           models,
 		clusterThreshold: clusterThreshold,
 		projectFunc:      projectFunc,
 	}
@@ -83,46 +106,60 @@ func (o *EmbeddingObserver) InvalidateClusterCache() {
 }
 
 // OnAttestationCreated selectively embeds attestations with rich text content.
+// Embeds with each configured model. If no models are configured, uses the default.
 func (o *EmbeddingObserver) OnAttestationCreated(as *types.As) {
 	text := o.extractRichText(as)
 	if text == "" {
 		return
 	}
 
-	// Check if already embedded
-	existing, err := o.embeddingStore.GetBySource("attestation", as.ID)
+	// Determine which models to embed with
+	models := o.models
+	if len(models) == 0 {
+		models = []string{""} // empty string = default model
+	}
+
+	for _, modelName := range models {
+		o.embedForModel(as, text, modelName)
+	}
+}
+
+// embedForModel generates and stores an embedding for one model.
+func (o *EmbeddingObserver) embedForModel(as *types.As, text, modelName string) {
+	// Check if already embedded for this model
+	existing, err := o.embeddingStore.GetBySource("attestation", as.ID, modelName)
 	if err != nil {
 		o.logger.Warnw("Failed to check existing embedding",
-			"error", errors.Wrapf(err, "attestation %s", as.ID))
+			"error", errors.Wrapf(err, "attestation %s model %s", as.ID, modelName))
 		return
 	}
 	if existing != nil {
 		return
 	}
 
-	// Generate embedding via Rust FFI (~80ms)
-	result, err := o.embeddingService.GenerateEmbedding(text, "")
+	// Generate embedding via plugin gRPC
+	result, err := o.embeddingService.GenerateEmbedding(text, modelName)
 	if err != nil {
 		o.logger.Warnw("Failed to generate embedding",
-			"error", errors.Wrapf(err, "attestation %s (%d chars)", as.ID, len(text)))
+			"error", errors.Wrapf(err, "attestation %s model %s (%d chars)", as.ID, modelName, len(text)))
 		return
 	}
 
 	blob, err := o.embeddingService.SerializeEmbedding(result.Embedding)
 	if err != nil {
 		o.logger.Warnw("Failed to serialize embedding",
-			"error", errors.Wrapf(err, "attestation %s (%d dimensions)", as.ID, len(result.Embedding)))
+			"error", errors.Wrapf(err, "attestation %s model %s (%d dimensions)", as.ID, modelName, len(result.Embedding)))
 		return
 	}
 
-	modelInfo, err := o.embeddingService.GetModelInfo("")
+	modelInfo, err := o.embeddingService.GetModelInfo(modelName)
 	if err != nil {
 		o.logger.Warnw("Failed to get model info",
-			"error", errors.Wrapf(err, "attestation %s", as.ID))
+			"error", errors.Wrapf(err, "attestation %s model %s", as.ID, modelName))
 		return
 	}
 
-	model := &storage.EmbeddingModel{
+	emb := &storage.EmbeddingModel{
 		SourceType: "attestation",
 		SourceID:   as.ID,
 		Text:       text,
@@ -130,9 +167,9 @@ func (o *EmbeddingObserver) OnAttestationCreated(as *types.As) {
 		Model:      modelInfo.Name,
 		Dimensions: modelInfo.Dimensions,
 	}
-	if err := o.embeddingStore.Save(model); err != nil {
+	if err := o.embeddingStore.Save(emb); err != nil {
 		o.logger.Warnw("Failed to save embedding",
-			"error", errors.Wrapf(err, "attestation %s", as.ID))
+			"error", errors.Wrapf(err, "attestation %s model %s", as.ID, modelName))
 		return
 	}
 
@@ -140,20 +177,22 @@ func (o *EmbeddingObserver) OnAttestationCreated(as *types.As) {
 
 	o.logger.Debugw("Auto-embedded attestation",
 		"attestation_id", as.ID,
+		"model", modelInfo.Name,
 		"text_length", len(text),
 		"inference_ms", result.InferenceMS)
 
 	// Notify watcher engine with the pre-computed embedding for semantic matching
+	// (uses the first model's embedding — watchers operate on default model)
 	if o.onEmbedded != nil {
 		o.onEmbedded(as, result.Embedding)
 	}
 
 	// Predict cluster assignment for the new embedding
-	o.predictCluster(model.ID, as.ID, result.Embedding)
+	o.predictCluster(emb.ID, as.ID, result.Embedding)
 
 	// Project to 2D canvas if reduce plugin is available
 	if o.projectFunc != nil {
-		o.projectFunc(model.ID, result.Embedding)
+		o.projectFunc(emb.ID, result.Embedding)
 	}
 }
 
@@ -224,6 +263,10 @@ func (o *EmbeddingObserver) predictCluster(embeddingID, attestationID string, em
 		"similarity", prob)
 }
 
+// builtinRichFields are attribute keys that are always considered embeddable text,
+// regardless of type definitions.
+var builtinRichFields = []string{"message", "msg"}
+
 // extractRichText returns the concatenated rich text fields from an attestation's
 // attributes. Returns empty string if no rich text is found — this is the
 // selective gate that prevents embedding structural-only attestations.
@@ -233,11 +276,24 @@ func (o *EmbeddingObserver) extractRichText(as *types.As) string {
 	}
 
 	richFields := o.richStore.GetDiscoveredRichFields()
-	if len(richFields) == 0 {
+
+	// Merge builtin fields with discovered ones
+	seen := make(map[string]bool, len(richFields)+len(builtinRichFields))
+	for _, f := range richFields {
+		seen[f] = true
+	}
+	merged := append([]string{}, richFields...)
+	for _, f := range builtinRichFields {
+		if !seen[f] {
+			merged = append(merged, f)
+		}
+	}
+
+	if len(merged) == 0 {
 		return ""
 	}
 
-	return ExtractRichTextFromAttributes(as.Attributes, richFields)
+	return ExtractRichTextFromAttributes(as.Attributes, merged)
 }
 
 // clusterDisplayName returns a human-readable name for a cluster ID.

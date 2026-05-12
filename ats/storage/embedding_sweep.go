@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"fmt"
+
 	"github.com/teranos/QNTX/errors"
 	"go.uber.org/zap"
 )
@@ -9,7 +11,7 @@ import (
 // Returns the number of stale embeddings removed.
 func (s *EmbeddingStore) SweepStaleEmbeddings() (int, error) {
 	rows, err := s.db.Query(`
-		SELECT e.id FROM embeddings e
+		SELECT e.id, e.model FROM embeddings e
 		WHERE e.source_type = 'attestation'
 		AND NOT EXISTS (SELECT 1 FROM attestations a WHERE a.id = e.source_id)
 	`)
@@ -18,19 +20,23 @@ func (s *EmbeddingStore) SweepStaleEmbeddings() (int, error) {
 	}
 	defer rows.Close()
 
-	var staleIDs []string
+	type staleEntry struct {
+		id    string
+		model string
+	}
+	var stale []staleEntry
 	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return 0, errors.Wrap(err, "failed to scan stale embedding ID")
+		var e staleEntry
+		if err := rows.Scan(&e.id, &e.model); err != nil {
+			return 0, errors.Wrap(err, "failed to scan stale embedding")
 		}
-		staleIDs = append(staleIDs, id)
+		stale = append(stale, e)
 	}
 	if err := rows.Err(); err != nil {
 		return 0, errors.Wrap(err, "failed to iterate stale embeddings")
 	}
 
-	if len(staleIDs) == 0 {
+	if len(stale) == 0 {
 		return 0, nil
 	}
 
@@ -39,14 +45,15 @@ func (s *EmbeddingStore) SweepStaleEmbeddings() (int, error) {
 		return 0, errors.Wrap(err, "failed to begin transaction for stale sweep")
 	}
 
-	for _, id := range staleIDs {
-		if _, err := tx.Exec(`DELETE FROM vec_embeddings WHERE embedding_id = ?`, id); err != nil {
+	for _, e := range stale {
+		table := vecTableName(e.model)
+		if _, err := tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE embedding_id = ?", table), e.id); err != nil {
 			tx.Rollback()
-			return 0, errors.Wrapf(err, "failed to delete vec_embedding for stale embedding %s", id)
+			return 0, errors.Wrapf(err, "failed to delete from %s for stale embedding %s", table, e.id)
 		}
-		if _, err := tx.Exec(`DELETE FROM embeddings WHERE id = ?`, id); err != nil {
+		if _, err := tx.Exec(`DELETE FROM embeddings WHERE id = ?`, e.id); err != nil {
 			tx.Rollback()
-			return 0, errors.Wrapf(err, "failed to delete stale embedding %s", id)
+			return 0, errors.Wrapf(err, "failed to delete stale embedding %s", e.id)
 		}
 	}
 
@@ -55,7 +62,7 @@ func (s *EmbeddingStore) SweepStaleEmbeddings() (int, error) {
 	}
 
 	s.logger.Info("swept stale embeddings",
-		zap.Int("count", len(staleIDs)))
+		zap.Int("count", len(stale)))
 
-	return len(staleIDs), nil
+	return len(stale), nil
 }

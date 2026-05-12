@@ -36,6 +36,9 @@ func (s *QNTXServer) SetupPluginEmbeddingService(client protocol.EmbeddingServic
 		s.embeddingsHandler.ClusterFunc = svc.ClusterHDBSCAN
 	}
 
+	// Derive model names from configured ONNX paths
+	modelNames := serverembeddings.ModelNamesFromPaths(appcfg.GetStringSlice("cyrnel.models"))
+
 	observer := serverembeddings.NewEmbeddingObserver(
 		svc,
 		embStore,
@@ -43,6 +46,7 @@ func (s *QNTXServer) SetupPluginEmbeddingService(client protocol.EmbeddingServic
 		s.logger.Named("auto-embed"),
 		float32(appcfg.GetFloat64("embeddings.cluster_threshold")),
 		s.projectToCanvas,
+		modelNames,
 	)
 
 	if s.watcherEngine != nil {
