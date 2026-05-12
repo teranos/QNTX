@@ -12,7 +12,18 @@ type Config struct {
 	Plugin       PluginConfig     `mapstructure:"plugin"`
 	Embeddings   EmbeddingsConfig `mapstructure:"embeddings"`
 	Watcher      WatcherConfig    `mapstructure:"watcher"`
+	Distill      DistillConfig    `mapstructure:"distill"`
 	GroundDBPath string           `mapstructure:"ground_db_path"` // Path to Ground's database for deferred news delivery
+}
+
+// DistillConfig configures age-based attestation distillation.
+// When enabled, a Pulse job periodically folds old attestations into
+// compressed summaries, keeping the database from growing unbounded.
+type DistillConfig struct {
+	IntervalSeconds *int `mapstructure:"interval_seconds"` // nil = disabled, 600 = 10m dev, 21600 = 6h prod
+	MaxAgeHours     int  `mapstructure:"max_age_hours"`    // Attestations older than this get distilled (default: 96 = 4d)
+	BatchSize       int  `mapstructure:"batch_size"`       // Max attestations to process per tick (default: 500)
+	DryRun          bool `mapstructure:"dry_run"`          // Log what would be distilled without doing it
 }
 
 // LLMConfig configures LLM request queuing and rate limiting at the core routing layer.

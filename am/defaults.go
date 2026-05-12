@@ -86,6 +86,12 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("embeddings.cluster_label_max_tokens", 2000)
 	v.SetDefault("embeddings.cluster_label_model", "") // empty = system default
 
+	// Distillation defaults (age-based attestation compaction)
+	// interval_seconds: omit for default (disabled). Set positive value to enable.
+	v.SetDefault("distill.max_age_hours", 720) // 30 days — start with oldest, decrement as confidence grows
+	v.SetDefault("distill.batch_size", 500)    // attestations per tick
+	v.SetDefault("distill.dry_run", false)
+
 	// Watcher defaults
 	v.SetDefault("watcher.max_fires_per_second", 3)
 
