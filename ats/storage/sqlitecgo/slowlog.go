@@ -145,9 +145,9 @@ func (sc *slowCollector) flush() {
 
 		sc.lastFlush[key] = bucketSnapshot{count: b.count, avg: avg}
 
-		if strings.HasPrefix(key, "mutex:") {
+		if name, ok := strings.CutPrefix(key, "mutex:"); ok {
 			logger.Logger.Infow("Mutex contention (5m)",
-				"mutex", strings.TrimPrefix(key, "mutex:"),
+				"mutex", name,
 				"waiters", b.count,
 				"min", b.min,
 				"max", b.max,
@@ -174,9 +174,7 @@ func (sc *slowCollector) Snapshot() PerformanceSnapshot {
 	var history []map[string]*BucketStats
 
 	n := sc.histIdx
-	if n > historySize {
-		n = historySize
-	}
+	n = min(n, historySize)
 
 	for i := 0; i < n; i++ {
 		idx := (sc.histIdx - n + i) % historySize
@@ -209,10 +207,7 @@ func durSimilar(a, b time.Duration) bool {
 	if diff < 0 {
 		diff = -diff
 	}
-	larger := a
-	if b > larger {
-		larger = b
-	}
+	larger := max(a, b)
 	return diff <= larger/5
 }
 

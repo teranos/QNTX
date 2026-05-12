@@ -92,7 +92,7 @@ func NewMemoryStore() (*RustStore, error) {
 }
 
 // readPoolSize is the number of concurrent read connections.
-// SQLite WAL supports unlimited readers. With levi running 4+ concurrent
+// SQLite WAL supports unlimited readers. With plugins running 4+ concurrent
 // multi-second queries, 16 connections give the POST path's microsecond
 // AttestationExists lookups a high chance of hitting a free connection.
 const readPoolSize = 16
@@ -121,7 +121,7 @@ func NewFileStore(path string) (*RustStore, error) {
 		rc := C.storage_open_read_conn(store)
 		if rc == nil {
 			// Clean up already-opened connections
-			for j := 0; j < i; j++ {
+			for j := range i {
 				C.read_conn_free(pool[j].conn)
 			}
 			C.read_conn_free(readConn)
@@ -173,7 +173,7 @@ func (rs *RustStore) acquireReadConn() *readConnEntry {
 
 	// Try each slot once without blocking.
 	base := rs.readNext.Add(1) - 1
-	for i := 0; i < n; i++ {
+	for i := range n {
 		entry := rs.readPool[(base+uint64(i))%uint64(n)]
 		if entry.mu.TryLock() {
 			return entry

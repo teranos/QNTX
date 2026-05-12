@@ -55,7 +55,7 @@ func TestDistillHandler_BasicCycle(t *testing.T) {
 			fmt.Sprintf("OLD_%d", i),
 			[]string{fmt.Sprintf("subject_%d", i)},
 			[]string{"crawl-stage-changed"},
-			"levi", "reticulum",
+			"crawler", "network",
 			oldTime.Add(time.Duration(i)*time.Minute),
 			"test",
 			map[string]interface{}{"stage": "connecting", "elapsed_ms": float64(i * 100)},
@@ -68,7 +68,7 @@ func TestDistillHandler_BasicCycle(t *testing.T) {
 			fmt.Sprintf("RECENT_%d", i),
 			[]string{"recent_subject"},
 			[]string{"crawl-stage-changed"},
-			"levi", "reticulum",
+			"crawler", "network",
 			recentTime.Add(time.Duration(i)*time.Minute),
 			"test", nil,
 		)
@@ -137,7 +137,7 @@ func TestDistillHandler_MultiplePredicateGroups(t *testing.T) {
 			fmt.Sprintf("ANN_%d", i),
 			[]string{fmt.Sprintf("node_%d", i)},
 			[]string{"announced"},
-			"levi", "reticulum",
+			"crawler", "network",
 			oldTime.Add(time.Duration(i)*time.Minute),
 			"test", nil,
 		)
@@ -148,7 +148,7 @@ func TestDistillHandler_MultiplePredicateGroups(t *testing.T) {
 			fmt.Sprintf("PATH_%d", i),
 			[]string{fmt.Sprintf("path_%d", i)},
 			[]string{"path-found"},
-			"levi", "reticulum",
+			"crawler", "network",
 			oldTime.Add(time.Duration(i)*time.Minute),
 			"test", nil,
 		)
@@ -185,7 +185,7 @@ func TestDistillHandler_MetaDistillation(t *testing.T) {
 		"AS-distill-old-1",
 		[]string{"distill:announced"},
 		[]string{"distill:announced"},
-		"levi", "reticulum",
+		"crawler", "network",
 		oldTime, "distill",
 		map[string]interface{}{
 			"_distill":        true,
@@ -202,7 +202,7 @@ func TestDistillHandler_MetaDistillation(t *testing.T) {
 			fmt.Sprintf("REG_%d", i),
 			[]string{fmt.Sprintf("node_%d", i)},
 			[]string{"distill:announced"},
-			"levi", "reticulum",
+			"crawler", "network",
 			oldTime.Add(time.Duration(i)*time.Minute),
 			"test", nil,
 		)

@@ -1059,7 +1059,7 @@ func (m *PluginManager) registerRestarted(ctx context.Context, name string, regi
 		if err := am.ReloadPluginSection(name); err != nil {
 			m.logger.Warnf("Failed to reload config for plugin '%s' from am.toml: %v", name, err)
 		}
-		// Initialize with a 30s deadline. Levi's ATS connectivity check can take
+		// Initialize with a 30s deadline. Plugin ATS connectivity checks can take
 		// 10-15s when the RustStore mutex is contended (5s watchdog alerts).
 		// Use a goroutine + select so we never block banner emission.
 		m.mu.RLock()
