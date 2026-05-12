@@ -5,32 +5,26 @@
 //!
 //! # Features
 //!
-//! - `native` - Enable all native optimizations (SIMD, parallel, phonetic)
-//! - `simd` - SIMD-accelerated substring search via memchr
-//! - `parallel` - Parallel matching via rayon for large vocabularies
-//! - `phonetic` - Phonetic matching via Double Metaphone algorithm
 //! - `wasm` - WASM-compatible build (excludes native-only features)
 //!
 //! # Example
 //!
 //! ```rust
 //! use qntx_core::parser::Parser;
-//! use qntx_core::fuzzy::FuzzyEngine;
 //!
 //! // Parse an AX query
 //! let query = Parser::parse("ALICE is author_of of GitHub").unwrap();
 //! assert_eq!(query.subjects, vec!["ALICE"]);
-//!
-//! // Fuzzy search
-//! let mut engine = FuzzyEngine::new();
-//! engine.rebuild_index(vec![], vec!["author_of".into(), "maintainer_of".into()], vec![], vec![]);
-//! let matches = engine.search_predicates("author", 10, 0.6);
 //! ```
+//!
+//! # Search
+//!
+//! Fuzzy search was removed. Rich text search will be provided by MeiliSearch
+//! via the qntx-meili plugin (ADR-015).
 
 pub mod attestation;
 pub mod classify;
 pub mod expand;
-pub mod fuzzy;
 pub mod parser;
 pub mod similarity;
 pub mod storage;
@@ -46,6 +40,5 @@ pub use expand::{
     group_claims_json, DedupInput, DedupOutput, ExpandAttestation, ExpandInput, ExpandOutput,
     GroupInput, GroupOutput, IndividualClaim,
 };
-pub use fuzzy::{FuzzyEngine, FuzzyMatch};
 pub use parser::{AxQuery, Lexer, ParseError, Parser, TemporalClause, Token, TokenKind};
 pub use storage::{AttestationStore, MemoryStore, QueryStore, StoreError};

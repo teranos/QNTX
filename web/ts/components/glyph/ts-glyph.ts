@@ -84,11 +84,6 @@ function buildQntxApi(outputLines: string[]) {
 
             await putAttestation(attestation);
 
-            // Rebuild fuzzy index so new predicates/contexts are searchable immediately
-            import('../../qntx-wasm').then(({ rebuildFuzzyIndex }) =>
-                rebuildFuzzyIndex()
-            ).catch(() => {});
-
             // Enqueue for server sync (lazy import to avoid circular deps)
             try {
                 const { syncQueue } = await import('../../api/attestation-sync');

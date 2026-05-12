@@ -51,12 +51,7 @@ func TestSendSystemCapabilities(t *testing.T) {
 			t.Errorf("Message type = %q, want %q", capMsg.Type, "system_capabilities")
 		}
 
-		if capMsg.FuzzyBackend == "" {
-			t.Error("FuzzyBackend should not be empty")
-		}
-
-		// FuzzyOptimized should be a boolean (true for Rust, false for Go)
-		t.Logf("System capabilities: backend=%s, optimized=%v", capMsg.FuzzyBackend, capMsg.FuzzyOptimized)
+		t.Logf("System capabilities: storage=%s, parser=%s", capMsg.StorageBackend, capMsg.ParserBackend)
 
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("Timeout waiting for system capabilities message")

@@ -129,8 +129,8 @@ const MESSAGE_HANDLERS = {
 
     system_capabilities: (data: SystemCapabilitiesMessage) => {
         log.info(SEG.CONFIG, 'System capabilities:', {
-            fuzzy_backend: data.fuzzy_backend,
-            fuzzy_optimized: data.fuzzy_optimized ? 'optimized' : 'fallback'
+            storage_backend: data.storage_backend,
+            storage_optimized: data.storage_optimized ? 'optimized' : 'fallback',
         });
 
         // Handle capability-based UI updates

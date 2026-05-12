@@ -13,8 +13,8 @@ export type SearchMatch = RichSearchMatch;
 export type SearchResultsMessage = RichSearchResultsMessage;
 
 // Search strategy constants — must match ats/storage/rich_search.go
+// MeiliSearch via qntx-meili plugin (ADR-015) will provide typo-tolerant search.
 export const STRATEGY_SUBSTRING = 'substring';
-export const STRATEGY_FUZZY = 'fuzzy';
 export const STRATEGY_SEMANTIC = 'semantic';
 
 // Local result type constants

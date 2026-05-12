@@ -1,12 +1,10 @@
 package syscap
 
 // Message represents system capability information
-// Sent once on WebSocket connection to inform client of available optimizations
+// Sent once on WebSocket connection to inform client of available optimizations.
+// Fuzzy fields removed — search will be provided by MeiliSearch (ADR-015).
 type Message struct {
 	Type             string `json:"type"`              // "system_capabilities"
-	FuzzyBackend     string `json:"fuzzy_backend"`     // "rust" or "go" - which fuzzy matching implementation is active
-	FuzzyOptimized   bool   `json:"fuzzy_optimized"`   // true if using Rust (optimized), false if Go fallback
-	FuzzyVersion     string `json:"fuzzy_version"`     // fuzzy-ax library version (e.g., "0.1.0")
 	StorageBackend   string `json:"storage_backend"`   // "rust" or "go" - which storage implementation is active
 	StorageOptimized bool   `json:"storage_optimized"` // true if using Rust SQLite (optimized), false if Go fallback
 	StorageVersion   string `json:"storage_version"`   // qntx-sqlite library version (e.g., "0.1.0")

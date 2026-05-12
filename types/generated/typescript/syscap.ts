@@ -10,18 +10,6 @@ export interface Message {
    */
   type: string;
   /**
-   * "rust" or "go" - which fuzzy matching implementation is active
-   */
-  fuzzy_backend: string;
-  /**
-   * true if using Rust (optimized), false if Go fallback
-   */
-  fuzzy_optimized: boolean;
-  /**
-   * fuzzy-ax library version (e.g., "0.1.0")
-   */
-  fuzzy_version: string;
-  /**
    * "rust" or "go" - which storage implementation is active
    */
   storage_backend: string;

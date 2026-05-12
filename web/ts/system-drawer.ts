@@ -4,8 +4,7 @@ import { log, SEG } from './logger.ts';
 import { getStorageItem, setStorageItem } from './indexeddb-storage.ts';
 import { sendMessage } from './websocket.ts';
 import { connectivityManager } from './connectivity.ts';
-import { getCompletions, richSearch } from './qntx-wasm.ts';
-import { SearchView, STRATEGY_FUZZY, TYPE_COMMAND, TYPE_SUBCANVAS } from './search-view.ts';
+import { SearchView, TYPE_COMMAND, TYPE_SUBCANVAS } from './search-view.ts';
 import type { SearchMatch, SearchResultsMessage } from './search-view.ts';
 import { spawnGlyphByCommand, getMatchingCommands, getCommandLabel } from './components/glyph/canvas/spawn-menu.ts';
 import { uiState } from './state/ui.ts';
@@ -118,62 +117,11 @@ function dispatchSearch(text: string): void {
         searchView.setLocalResults(computeLocalResults(text.trim()));
     }
 
-    // WASM rich search — instant results from IndexedDB
-    searchLocal(text.trim());
-
-    // Server enrichment when online (semantic search, full DB coverage)
+    // Server search (substring + semantic). MeiliSearch via qntx-meili (ADR-015)
+    // will replace this with typo-tolerant search when wired in.
     if (connectivityManager.state === 'online') {
         sendMessage({ type: 'rich_search', query: text });
     }
-}
-
-async function searchLocal(query: string): Promise<void> {
-    if (!searchView) return;
-    const version = ++searchVersion;
-    try {
-        const results = await richSearch(query, 50);
-        if (version !== searchVersion) return; // stale result, newer search in flight
-        searchView.updateResults(results as unknown as SearchResultsMessage);
-    } catch {
-        if (version !== searchVersion) return;
-        searchOffline(query);
-    }
-}
-
-/** Slot display labels */
-const SLOT_LABELS: Record<string, string> = {
-    subjects: 'S',
-    predicates: 'P',
-    contexts: 'C',
-    actors: 'A',
-};
-
-function searchOffline(query: string): void {
-    if (!searchView) return;
-
-    const completion = getCompletions(query, 20);
-
-    const matches: SearchMatch[] = completion.items.map(m => ({
-        node_id: '',
-        type_name: completion.slot,
-        type_label: SLOT_LABELS[completion.slot] || completion.slot,
-        field_name: completion.slot,
-        field_value: m.value,
-        excerpt: m.value,
-        score: m.score,
-        strategy: STRATEGY_FUZZY,
-        display_label: m.value,
-        attributes: {},
-        matched_words: [],
-    }));
-
-    const message: SearchResultsMessage = {
-        query,
-        matches,
-        total: matches.length,
-    };
-
-    searchView.updateResults(message);
 }
 
 // --- Subcanvas navigation ---

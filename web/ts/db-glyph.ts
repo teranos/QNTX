@@ -56,6 +56,35 @@ function renderDbStats(): void {
         `;
     }
 
+    // Build distillation section
+    let distillSection = '';
+    if (dbStats.distillation) {
+        const d = dbStats.distillation;
+        const preserved = d.preserved_count ? d.preserved_count.toLocaleString() : '0';
+        const oldest = d.oldest ? formatAge(d.oldest) : '';
+        const newest = d.newest ? formatAge(d.newest) : '';
+        const timeRange = oldest && newest ? `${oldest} – ${newest}` : '';
+
+        let predRows = '';
+        if (d.predicates && d.predicates.length > 0) {
+            predRows = d.predicates.map((p: { predicate: string; count: number }) =>
+                `<div style="display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0;">
+                    <span style="color: #e2e8f0; word-break: break-word; overflow-wrap: break-word;">${p.predicate}</span>
+                    <span style="color: #94a3b8; white-space: nowrap; margin-left: 8px;">${p.count}</span>
+                </div>`
+            ).join('');
+        }
+
+        distillSection = `
+            <div class="glyph-row" style="margin-top: 8px; border-top: 1px solid var(--border-color, #333); padding-top: 8px;">
+                <span class="glyph-label">⚗ Distillation:</span>
+                <span class="glyph-value">${d.distill_attestations} distill attestations, ${preserved} original preserved</span>
+            </div>
+            ${timeRange ? `<div class="glyph-row"><span class="glyph-label">Range:</span><span class="glyph-value" style="color: #94a3b8;">${timeRange}</span></div>` : ''}
+            ${predRows ? `<div style="margin-top: 6px;"><span class="glyph-label" style="font-size: 11px;">Distilled predicates:</span>${predRows}</div>` : ''}
+        `;
+    }
+
     // Build eviction section — bar chart aggregated by hour + predicate breakdown
     let evictionSection = '';
     if (hasEvictions()) {
@@ -118,6 +147,7 @@ function renderDbStats(): void {
             </div>
             ${typesSection}
             ${evictionSection}
+            ${distillSection}
             <div class="perf-section-container"></div>
         </div>
     `;

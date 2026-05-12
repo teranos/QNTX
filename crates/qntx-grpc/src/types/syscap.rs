@@ -2,8 +2,8 @@
 // Regenerate with: make types
 // TODO: Migrate to proto generation
 // Source package: syscap
-// Source last modified: 2026-02-09T21:59:10+01:00
-// Source version: 14c8bee7
+// Source last modified: 2026-02-01T22:30:48+01:00
+// Source version: 72a03034
 
 //! # syscap module
 //!
@@ -16,18 +16,13 @@
 #![allow(unused_imports)]
 
 /// Message represents system capability information
-/// Sent once on WebSocket connection to inform client of available optimizations
+/// Sent once on WebSocket connection to inform client of available optimizations.
+/// Fuzzy fields removed — search will be provided by MeiliSearch (ADR-015).
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/syscap.md#message>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Message {
     /// "system_capabilities"
     pub r#type: String,
-    /// "rust" or "go" - which fuzzy matching implementation is active
-    pub fuzzy_backend: String,
-    /// true if using Rust (optimized), false if Go fallback
-    pub fuzzy_optimized: bool,
-    /// fuzzy-ax library version (e.g., "0.1.0")
-    pub fuzzy_version: String,
     /// "rust" or "go" - which storage implementation is active
     pub storage_backend: String,
     /// true if using Rust SQLite (optimized), false if Go fallback
