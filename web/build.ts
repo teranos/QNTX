@@ -63,7 +63,6 @@ try {
   await mkdir(outputDir, { recursive: true });
 
   // Bundle TypeScript with Bun
-  groundNotify("web-build", "Web: bundling frontend");
   console.log(`${darkPeach}Bundling JavaScript...${reset}`);
   const result = await Bun.build({
     entrypoints: [join(sourceDir, "ts", "main.ts")],
