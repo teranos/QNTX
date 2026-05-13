@@ -53,7 +53,7 @@ func writeToGround(dbPath string, as *types.As, logger *zap.SugaredLogger) {
 		return
 	}
 
-	logger.Infow("Wrote news to Ground db", "path", dbPath, "asid", as.ID, "predicate", as.Predicates[0])
+	logger.Debugw("Wrote news to Ground db", "path", dbPath, "asid", as.ID, "predicate", as.Predicates[0])
 }
 
 // cachedProjectCtx is computed once at init from the startup working directory.

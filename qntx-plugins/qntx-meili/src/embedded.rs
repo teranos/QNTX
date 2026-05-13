@@ -102,6 +102,28 @@ impl EmbeddedMeili {
     pub fn db_path(&self) -> &PathBuf {
         &self.db_path
     }
+
+    /// Check if the MeiliSearch child process is still running.
+    /// Returns false if the process has exited (crashed, killed, etc).
+    pub fn is_alive(&mut self) -> bool {
+        match self.child.try_wait() {
+            Ok(None) => true, // still running
+            Ok(Some(status)) => {
+                warn!(
+                    "Embedded MeiliSearch exited with {} (port {})",
+                    status, self.port
+                );
+                false
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to check MeiliSearch process status: {} (port {})",
+                    e, self.port
+                );
+                false
+            }
+        }
+    }
 }
 
 impl Drop for EmbeddedMeili {

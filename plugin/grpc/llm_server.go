@@ -66,6 +66,24 @@ func (s *LLMServer) RegisterProvider(name string, client protocol.LLMServiceClie
 	s.logger.Debugw("LLM provider registered", "provider", name, "is_default", s.defaultProvider == name)
 }
 
+// UnregisterProvider removes a provider plugin's client connection.
+// Called when an LLM provider plugin is disabled via hot-swap.
+func (s *LLMServer) UnregisterProvider(name string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.providers, name)
+	if s.defaultProvider == name {
+		s.defaultProvider = ""
+		// Promote another provider if available
+		for k := range s.providers {
+			s.defaultProvider = k
+			break
+		}
+	}
+	s.logger.Debugw("LLM provider unregistered", "provider", name, "new_default", s.defaultProvider)
+}
+
 // HasProvider returns true if the named provider is registered.
 func (s *LLMServer) HasProvider(name string) bool {
 	s.mu.RLock()

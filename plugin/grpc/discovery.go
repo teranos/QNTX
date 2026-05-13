@@ -1259,6 +1259,20 @@ func (m *PluginManager) DisablePlugin(ctx context.Context, name string, registry
 		}
 	}
 
+	// Unregister service providers so observers stop routing to dead connections
+	if m.servicesManager != nil {
+		if client.IsSearchProvider() {
+			if searchRouter := m.servicesManager.GetSearchRouter(); searchRouter != nil {
+				searchRouter.UnregisterProvider(name)
+			}
+		}
+		if client.IsLLMProvider() {
+			if llmRouter := m.servicesManager.GetLLMRouter(); llmRouter != nil {
+				llmRouter.UnregisterProvider(name)
+			}
+		}
+	}
+
 	// Unregister async handlers
 	if m.handlerRegistry != nil {
 		for _, handlerName := range client.GetHandlerNames() {

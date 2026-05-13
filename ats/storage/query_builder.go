@@ -82,6 +82,40 @@ func (qb *queryBuilder) buildActorFilter(actors []string) {
 	qb.whereClauses = append(qb.whereClauses, "("+strings.Join(actorClauses, " OR ")+")")
 }
 
+// BuildFilterQuery builds a SQL query from an AxFilter, returning the full SELECT
+// with WHERE clauses and ORDER BY. Used by the watcher engine to push structural
+// filters into SQL instead of loading the entire table.
+func BuildFilterQuery(filter types.AxFilter) (string, []interface{}) {
+	qb := &queryBuilder{}
+	qb.buildSubjectFilter(filter.Subjects)
+	qb.buildPredicateFilter(filter.Predicates)
+	qb.buildContextFilter(filter.Contexts)
+	qb.buildActorFilter(filter.Actors)
+
+	if filter.TimeStart != nil {
+		qb.addClause("timestamp >= ?", filter.TimeStart.UTC().Format(time.RFC3339))
+	}
+	if filter.TimeEnd != nil {
+		qb.addClause("timestamp <= ?", filter.TimeEnd.UTC().Format(time.RFC3339))
+	}
+
+	query := AttestationSelectQuery
+	if len(qb.whereClauses) > 0 {
+		query += " WHERE " + qb.build()
+	}
+	query += " ORDER BY timestamp DESC"
+
+	if filter.Limit > 0 {
+		limit := filter.Limit
+		if limit > MaxAttestationLimit {
+			limit = MaxAttestationLimit
+		}
+		query += fmt.Sprintf(" LIMIT %d", limit)
+	}
+
+	return query, qb.args
+}
+
 // escapeLikePattern escapes special characters in LIKE patterns for SQL ESCAPE clause
 func escapeLikePattern(s string) string {
 	s = strings.ReplaceAll(s, "\\", "\\\\")

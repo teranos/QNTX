@@ -42,6 +42,19 @@ func (s *SearchServer) RegisterProvider(name string, client protocol.SearchServi
 	s.logger.Debugw("Search provider registered", "provider", name)
 }
 
+// UnregisterProvider clears the search provider, making HasProvider() return false.
+// Called when a search provider plugin is disabled via hot-swap.
+func (s *SearchServer) UnregisterProvider(name string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.name == name {
+		s.provider = nil
+		s.name = ""
+		s.logger.Debugw("Search provider unregistered", "provider", name)
+	}
+}
+
 // HasProvider returns true if a search provider is registered.
 func (s *SearchServer) HasProvider() bool {
 	s.mu.RLock()

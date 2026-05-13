@@ -572,17 +572,20 @@ func (e *Engine) queryHistoricalSemantic(watcherID string, watcher *storage.Watc
 	return nil
 }
 
-// queryHistoricalStructural scans all attestations and applies structural filters.
+// queryHistoricalStructural queries attestations matching a watcher's structural filters.
+// Pushes subject/predicate/context/actor/time filters into SQL WHERE clauses
+// instead of loading the entire table and filtering in Go.
 func (e *Engine) queryHistoricalStructural(watcherID string, watcher *storage.Watcher) error {
-	query := storage.AttestationSelectQuery + ` ORDER BY timestamp DESC`
+	query, args := storage.BuildFilterQuery(watcher.Filter)
 
-	attestations, err := e.reader.QueryAttestationsRaw(query, nil)
+	attestations, err := e.reader.QueryAttestationsRaw(query, args)
 	if err != nil {
 		return errors.Wrap(err, "failed to query attestations via Rust")
 	}
 
 	matchCount := 0
 	for _, as := range attestations {
+		// Post-filter for attribute filters (can't be pushed to SQL)
 		if matched, score := e.matchesWatcher(as, watcher); matched {
 			matchCount++
 			if e.broadcastMatch != nil && watcher.ActionType != storage.ActionTypePluginExecute {
@@ -593,6 +596,7 @@ func (e *Engine) queryHistoricalStructural(watcherID string, watcher *storage.Wa
 
 	e.logger.Infow("Historical structural query completed",
 		"watcher_id", watcherID,
+		"total_scanned", len(attestations),
 		"matches_found", matchCount)
 
 	return nil
