@@ -19,7 +19,6 @@ let searchView: SearchView | null = null;
 let drawerPanel: HTMLElement | null = null;
 let searchInput: HTMLInputElement | null = null;
 let queryTimeout: ReturnType<typeof setTimeout> | null = null;
-let searchVersion = 0;
 let lastExpandedHeight = DRAWER_MAX;
 
 function setDrawerHeight(panel: HTMLElement, height: number): void {
