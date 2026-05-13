@@ -66,6 +66,15 @@ func (s *LLMServer) RegisterProvider(name string, client protocol.LLMServiceClie
 	s.logger.Debugw("LLM provider registered", "provider", name, "is_default", s.defaultProvider == name)
 }
 
+// ClearProviders removes all providers. Called during server shutdown
+// to prevent routing to dead gRPC connections.
+func (s *LLMServer) ClearProviders() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.providers = make(map[string]protocol.LLMServiceClient)
+	s.defaultProvider = ""
+}
+
 // UnregisterProvider removes a provider plugin's client connection.
 // Called when an LLM provider plugin is disabled via hot-swap.
 func (s *LLMServer) UnregisterProvider(name string) {

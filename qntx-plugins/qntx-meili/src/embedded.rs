@@ -11,6 +11,7 @@ use std::io::{BufRead, BufReader};
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+use std::sync::mpsc;
 use std::time::Duration;
 use tracing::{info, warn};
 
@@ -57,20 +58,51 @@ impl EmbeddedMeili {
                 "--max-indexing-memory",
                 "256MB",
             ])
-            .stdout(Stdio::piped())
+            .stdout(Stdio::null())
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| format!("failed to spawn meilisearch at '{}': {}", binary, e))?;
 
-        // Wait for MeiliSearch to become ready by watching stderr for the ready message,
-        // or fall back to HTTP polling if the message format changes.
+        // Drain stderr continuously in a background thread.
+        // Dropping stderr causes SIGPIPE to the child on macOS, killing it (exit 101).
         let stderr = child.stderr.take();
-        let ready = tokio::task::spawn_blocking(move || wait_for_ready(stderr, port))
-            .await
-            .map_err(|e| format!("ready-wait task failed: {}", e))?;
+        let (ready_tx, ready_rx) = mpsc::sync_channel::<bool>(1);
+        let drain_port = port;
+
+        std::thread::spawn(move || {
+            let Some(stderr) = stderr else {
+                let _ = ready_tx.send(false);
+                return;
+            };
+            let reader = BufReader::new(stderr);
+            let mut ready_tx = Some(ready_tx);
+            for line in reader.lines() {
+                match line {
+                    Ok(text) => {
+                        if let Some(tx) = ready_tx.take() {
+                            if text.contains("Server listening on") {
+                                let _ = tx.send(true);
+                            } else {
+                                ready_tx = Some(tx);
+                            }
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+            if let Some(tx) = ready_tx {
+                let _ = tx.send(false);
+            }
+            info!("MeiliSearch stderr drainer exited (port {})", drain_port);
+        });
+
+        let ready = tokio::task::spawn_blocking(move || {
+            ready_rx.recv_timeout(Duration::from_secs(25)).unwrap_or(false)
+        })
+        .await
+        .map_err(|e| format!("ready-wait task failed: {}", e))?;
 
         if !ready {
-            // Try to kill the child if it didn't start properly
             let _ = child.kill();
             return Err(format!(
                 "MeiliSearch did not become ready within timeout on port {}",
@@ -148,41 +180,3 @@ fn find_available_port() -> Result<u16, std::io::Error> {
     Ok(port)
 }
 
-/// Wait for MeiliSearch to be ready, either by reading its stderr output
-/// or by polling the health endpoint. Returns true if ready, false on timeout.
-fn wait_for_ready(stderr: Option<std::process::ChildStderr>, port: u16) -> bool {
-    let deadline = std::time::Instant::now() + Duration::from_secs(25);
-
-    // Spawn a thread to drain stderr and look for the "ready" indicator
-    if let Some(stderr) = stderr {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines() {
-            if std::time::Instant::now() > deadline {
-                return false;
-            }
-            match line {
-                Ok(text) => {
-                    // MeiliSearch logs "Server listening on: http://127.0.0.1:<port>"
-                    // when ready to accept connections
-                    if text.contains("Server listening on") {
-                        return true;
-                    }
-                }
-                Err(_) => break,
-            }
-        }
-    }
-
-    // Fallback: poll the health endpoint
-    let url = format!("http://127.0.0.1:{}/health", port);
-    while std::time::Instant::now() < deadline {
-        if let Ok(resp) = ureq::get(&url).call() {
-            if resp.status() == 200 {
-                return true;
-            }
-        }
-        std::thread::sleep(Duration::from_millis(100));
-    }
-
-    false
-}

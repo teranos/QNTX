@@ -222,6 +222,17 @@ func (s *QNTXServer) Stop() error {
 		s.watcherDB.Close()
 	}
 
+	// Clear service providers before killing plugins — observers check HasProvider()
+	// and will skip routing once providers are cleared.
+	if s.servicesManager != nil {
+		if searchRouter := s.servicesManager.GetSearchRouter(); searchRouter != nil {
+			searchRouter.ClearProviders()
+		}
+		if llmRouter := s.servicesManager.GetLLMRouter(); llmRouter != nil {
+			llmRouter.ClearProviders()
+		}
+	}
+
 	// Shutdown plugins and gRPC services
 	if s.pluginRegistry != nil {
 		if err := s.pluginRegistry.ShutdownAll(s.ctx); err != nil {

@@ -130,8 +130,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if _embedded_handle.is_some() {
         search_service.set_mode("embedded");
     }
-    let plugin_service =
-        MeiliPluginService::new(Arc::clone(&search_service), meili_url, meili_key);
+    let plugin_service = MeiliPluginService::new(Arc::clone(&search_service), meili_url, meili_key);
 
     Server::builder()
         .add_service(DomainPluginServiceServer::new(plugin_service))

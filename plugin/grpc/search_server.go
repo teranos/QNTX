@@ -55,6 +55,15 @@ func (s *SearchServer) UnregisterProvider(name string) {
 	}
 }
 
+// ClearProviders removes all providers. Called during server shutdown
+// to prevent observers from routing to dead gRPC connections.
+func (s *SearchServer) ClearProviders() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.provider = nil
+	s.name = ""
+}
+
 // HasProvider returns true if a search provider is registered.
 func (s *SearchServer) HasProvider() bool {
 	s.mu.RLock()
