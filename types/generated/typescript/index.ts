@@ -93,6 +93,7 @@ export type {
   RouteEndpoint,
   SamplerStageSignal,
   ScheduledJobResponse,
+  SearchIndexObserver,
   StatsMessage,
   TaskLogsResponse,
   UpdateScheduledJobRequest,

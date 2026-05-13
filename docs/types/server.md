@@ -293,7 +293,7 @@ type ParsedATSCode struct {
 
 ## PluginGlyphDef {#pluginglyphdef}
 
-**Source**: [`server/handlers.go:820`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L820)
+**Source**: [`server/handlers.go:818`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L818)
 
 
 ```go
@@ -328,7 +328,7 @@ type PluginHealthMessage struct {
 
 ## PluginInfo {#plugininfo}
 
-**Source**: [`server/handlers.go:660`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L660)
+**Source**: [`server/handlers.go:658`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L658)
 
 
 ```go
@@ -349,7 +349,7 @@ type PluginInfo struct {
 
 ## PluginRoute {#pluginroute}
 
-**Source**: [`server/handlers.go:745`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L745)
+**Source**: [`server/handlers.go:743`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L743)
 
 
 ```go
@@ -512,7 +512,7 @@ type PromptSaveRequest struct {
 
 ## ProseEntry {#proseentry}
 
-**Source**: [`server/prose_handler.go:16`](https://github.com/teranos/QNTX/blob/main/server/prose_handler.go#L16)
+**Source**: [`server/prose_handler.go:17`](https://github.com/teranos/QNTX/blob/main/server/prose_handler.go#L17)
 
 
 ```go
@@ -642,7 +642,7 @@ type Result struct {
 
 ## RouteEndpoint {#routeendpoint}
 
-**Source**: [`server/handlers.go:739`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L739)
+**Source**: [`server/handlers.go:737`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L737)
 
 
 ```go
@@ -687,6 +687,16 @@ type ScheduledJobResponse struct {
 	Metadata string `json:"metadata,omitempty"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
+}
+```
+
+## SearchIndexObserver {#searchindexobserver}
+
+**Source**: [`server/search_observer.go:22`](https://github.com/teranos/QNTX/blob/main/server/search_observer.go#L22)
+
+
+```go
+type SearchIndexObserver struct {
 }
 ```
 

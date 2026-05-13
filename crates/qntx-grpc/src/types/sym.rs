@@ -2,8 +2,8 @@
 // Regenerate with: make types
 // TODO: Migrate to proto generation
 // Source package: sym
-// Source last modified: 2026-02-15T01:43:16+01:00
-// Source version: 40e876c8
+// Source last modified: 2026-05-13T01:03:59+02:00
+// Source version: 990ce870
 
 //! # sym module
 //!

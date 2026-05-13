@@ -862,6 +862,9 @@ export interface ScheduledJobResponse {
   updated_at: string;
 }
 
+export interface SearchIndexObserver {
+}
+
 export interface StatsMessage {
   /**
    * "import_stats"

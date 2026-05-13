@@ -18,7 +18,7 @@ Query parameters:
   - ?predicate=y  — filter by predicate(s), comma-separated
   - ?context=z    — filter by context(s), comma-separated
   - ?actor=a      — filter by actor(s), comma-separated
-  - ?source=s     — filter by source (exact match, e.g. "levi", "cli")
+  - ?source=s     — filter by source (exact match, e.g. "cli", "distill")
   - ?limit=N      — max results (default 100, max 1000)
 
 **Handler**: `HandleAttestations`

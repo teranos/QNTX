@@ -12,15 +12,12 @@ This document shows Go type definitions from the codebase.
 
 ## Message {#message}
 
-**Source**: [`server/syscap/types.go:5`](https://github.com/teranos/QNTX/blob/main/server/syscap/types.go#L5)
+**Source**: [`server/syscap/types.go:6`](https://github.com/teranos/QNTX/blob/main/server/syscap/types.go#L6)
 
 
 ```go
 type Message struct {
 	Type string `json:"type"`
-	FuzzyBackend string `json:"fuzzy_backend"`
-	FuzzyOptimized bool `json:"fuzzy_optimized"`
-	FuzzyVersion string `json:"fuzzy_version"`
 	StorageBackend string `json:"storage_backend"`
 	StorageOptimized bool `json:"storage_optimized"`
 	StorageVersion string `json:"storage_version"`

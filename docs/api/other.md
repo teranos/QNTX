@@ -25,6 +25,7 @@
 | GET | `/api/embeddings/info` | embeddingsHandler.HandleEmbeddingInfo |
 | GET | `/api/embeddings/project` | embeddingsHandler.HandleProject |
 | GET | `/api/embeddings/projections` | embeddingsHandler.HandleEmbeddingProjections |
+| GET | `/api/embeddings/unembedded` | embeddingsHandler.HandleUnembeddedPage |
 | GET | `/api/files` | HandleFiles |
 | GET | `/api/files/` | HandleFiles |
 | GET, POST, PATCH | `/api/glyph-config` | HandleGlyphConfig |
@@ -154,6 +155,12 @@
 ### `GET` /api/embeddings/projections
 
 **Handler**: `embeddingsHandler.HandleEmbeddingProjections`
+
+---
+
+### `GET` /api/embeddings/unembedded
+
+**Handler**: `embeddingsHandler.HandleUnembeddedPage`
 
 ---
 
