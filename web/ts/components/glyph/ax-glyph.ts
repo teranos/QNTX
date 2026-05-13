@@ -219,6 +219,19 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
     // Set up ResizeObserver for auto-sizing glyph to content
     setupAxGlyphResizeObserver(element, resultsContainer, glyphId);
 
+    // Disable server-side watcher on cleanup (glyph deletion)
+    storeCleanup(element, () => {
+        if (connectivityManager.state === 'online') {
+            sendMessage({
+                type: 'watcher_upsert',
+                watcher_id: `ax-glyph-${glyphId}`,
+                watcher_query: currentQuery,
+                watcher_name: `AX Glyph: ${currentQuery.substring(0, 30)}`,
+                enabled: false
+            });
+        }
+    });
+
     // Subscribe to sync state changes for visual feedback
     const syncUnsub = syncStateManager.subscribe(glyphId, (state) => {
         element.dataset.syncState = state;

@@ -23,7 +23,7 @@ import { uiState } from '../../../state/ui';
 import { getMinimizeDuration } from '@qntx/glyphs';
 import { unmeldComposition, reconstructMeld, detachGlyph } from '@qntx/glyphs';
 import { autoMeldResultBelow } from '../meld/auto-meld-result';
-import { makeDraggable } from '@qntx/glyphs';
+import { makeDraggable, runCleanup } from '@qntx/glyphs';
 import { showActionBar, hideActionBar } from './action-bar';
 import { showSpawnMenu } from './spawn-menu';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
@@ -206,6 +206,7 @@ function deleteSelectedGlyphs(canvasId: string, container: HTMLElement): void {
         uiState.removeCanvasGlyph(glyphId);
         container.dispatchEvent(new CustomEvent('glyph-deleted', { detail: { glyphId } }));
         if (!el) continue;
+        runCleanup(el);
         el.classList.remove('canvas-glyph-selected');
         if (duration === 0) { el.remove(); continue; }
         const animation = el.animate([

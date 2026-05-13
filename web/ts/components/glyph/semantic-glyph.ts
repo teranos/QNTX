@@ -324,6 +324,21 @@ export function createSemanticGlyph(glyph: Glyph): HTMLElement {
     // ResizeObserver for auto-sizing
     setupSeGlyphResizeObserver(element, resultsContainer, glyphId);
 
+    // Disable server-side watcher on cleanup (glyph deletion)
+    storeCleanup(element, () => {
+        if (connectivityManager.state === 'online') {
+            sendMessage({
+                type: 'watcher_upsert',
+                watcher_id: `se-glyph-${glyphId}`,
+                semantic_query: currentQuery,
+                semantic_threshold: currentThreshold,
+                semantic_cluster_id: currentClusterId,
+                watcher_name: `SE: ${currentQuery.substring(0, 30)}`,
+                enabled: false
+            });
+        }
+    });
+
     // Sync state subscription
     const syncUnsub = syncStateManager.subscribe(glyphId, (state) => {
         element.dataset.syncState = state;
