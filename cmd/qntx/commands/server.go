@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -130,7 +131,10 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 	select {
 	case err := <-errChan:
-		// Server failed to start or stopped unexpectedly
+		// Server crashed — write deferred news to Ground so the user
+		// gets notified at the next stop hook, even if the crash was silent.
+		server.WriteDeferredNews(cfg.GroundDBPath, "qntx", "crash",
+			"qntx-server", fmt.Sprintf("QNTX crashed: %v", err), nil, bootLog)
 		return errors.Wrap(err, "server failed to start")
 	case <-sigChan:
 		// First Ctrl+C - graceful shutdown

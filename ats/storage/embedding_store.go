@@ -79,7 +79,8 @@ func vecTableName(model string) string {
 func (s *EmbeddingStore) EnsureVecTable(model string, dimensions int) error {
 	table := vecTableName(model)
 
-	if _, ok := s.vecTables.Load(table); ok {
+	// LoadOrStore is atomic — only one goroutine proceeds to CREATE
+	if _, loaded := s.vecTables.LoadOrStore(table, true); loaded {
 		return nil
 	}
 
@@ -88,10 +89,10 @@ func (s *EmbeddingStore) EnsureVecTable(model string, dimensions int) error {
 		table, dimensions,
 	)
 	if _, err := s.db.Exec(query); err != nil {
+		s.vecTables.Delete(table) // rollback on failure so next call retries
 		return errors.Wrapf(err, "failed to create vec table %s with %d dimensions", table, dimensions)
 	}
 
-	s.vecTables.Store(table, true)
 	s.logger.Info("created vec0 table", zap.String("table", table), zap.Int("dimensions", dimensions))
 	return nil
 }

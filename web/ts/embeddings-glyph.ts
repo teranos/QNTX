@@ -18,7 +18,7 @@ let embeddingsInfo: {
     embedding_count: number;
     attestation_count: number;
     unembedded_count: number;
-    lag?: { oldest_unembedded: string; newest_embedded: string };
+    lag?: { oldest_embedding: string; newest_attestation: string };
     cluster_info?: { n_clusters: number; n_noise: number; n_total: number; clusters: Record<string, number>; clusters_by_model?: Record<string, Array<{ model: string; count: number }>> };
     hdbscan_config?: { min_cluster_size: number; cluster_threshold: number; cluster_match_threshold: number };
 } | null = null;
@@ -445,22 +445,13 @@ function mount3dView(container: HTMLElement, allPoints: Record<string, Projectio
 }
 
 export async function fetchEmbeddingsInfo(): Promise<void> {
+    // Phase 1: info + clusters (fast) — render immediately
     try {
-        const [infoResp, projResp, clustersResp, timelineResp] = await Promise.all([
+        const [infoResp, clustersResp] = await Promise.all([
             apiFetch('/api/embeddings/info'),
-            apiFetch('/api/embeddings/projections'),
             apiFetch('/api/embeddings/clusters'),
-            apiFetch('/api/embeddings/cluster-timeline'),
         ]);
         embeddingsInfo = await infoResp.json();
-        const raw = projResp.ok ? await projResp.json() : {};
-        // Backend returns Record<string, ProjectionPoint[]> — validate shape
-        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-            projectionsData = raw as Record<string, ProjectionPoint[]>;
-        } else {
-            projectionsData = {};
-        }
-        // Build cluster label map from /api/embeddings/clusters
         clusterLabels = new Map();
         if (clustersResp.ok) {
             const clusters = await clustersResp.json() as Array<{ id: number; label: string | null }>;
@@ -468,12 +459,27 @@ export async function fetchEmbeddingsInfo(): Promise<void> {
                 clusterLabels.set(c.id, c.label);
             }
         }
-        // Timeline data for cluster evolution chart
-        timelineData = timelineResp.ok ? await timelineResp.json() as TimelinePoint[] : [];
     } catch {
         embeddingsInfo = null;
-        projectionsData = {};
         clusterLabels = new Map();
+    }
+    renderEmbeddings();
+
+    // Phase 2: projections + timeline (heavy) — load in background, re-render when ready
+    try {
+        const [projResp, timelineResp] = await Promise.all([
+            apiFetch('/api/embeddings/projections'),
+            apiFetch('/api/embeddings/cluster-timeline'),
+        ]);
+        const raw = projResp.ok ? await projResp.json() : {};
+        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+            projectionsData = raw as Record<string, ProjectionPoint[]>;
+        } else {
+            projectionsData = {};
+        }
+        timelineData = timelineResp.ok ? await timelineResp.json() as TimelinePoint[] : [];
+    } catch {
+        projectionsData = {};
         timelineData = [];
     }
     renderEmbeddings();
@@ -520,7 +526,10 @@ function renderEmbeddings(): void {
             return `
             <div class="glyph-row emb-model-row" data-model="${escapeHtml(m.name)}" style="cursor:pointer">
                 <span class="glyph-label" style="padding-left:12px">${escapeHtml(m.name)}${dimLabel}</span>
-                <span class="glyph-value">${m.count}</span>
+                <span class="glyph-value" style="display:flex;align-items:center;gap:6px">
+                    ${m.count}
+                    ${m.count >= 5 ? `<button class="emb-model-cluster-btn panel-btn" data-model="${escapeHtml(m.name)}" style="padding:1px 6px;font-size:10px;line-height:1.2" title="Cluster ${escapeHtml(m.name)}">cluster</button>` : ''}
+                </span>
             </div>`;
         }).join('');
 
@@ -541,25 +550,35 @@ function renderEmbeddings(): void {
                 <span class="glyph-value">${embedding_count} / ${attestation_count}</span>
             </div>
             ${embeddingsInfo.lag ? (() => {
-                const oldest = embeddingsInfo.lag.oldest_unembedded;
-                const newest = embeddingsInfo.lag.newest_embedded;
-                const lagMs = oldest && newest ? new Date(newest).getTime() - new Date(oldest).getTime() : 0;
+                const oldestEmb = embeddingsInfo.lag.oldest_embedding;
+                const newestAts = embeddingsInfo.lag.newest_attestation;
+                const lagMs = oldestEmb && newestAts ? new Date(newestAts).getTime() - new Date(oldestEmb).getTime() : 0;
                 const lagDays = lagMs > 0 ? Math.floor(lagMs / 86400000) : 0;
-                const lagLabel = lagDays > 0 ? `${lagDays}d behind` : oldest ? 'catching up' : '';
-                const oldestDate = oldest ? new Date(oldest).toLocaleDateString('en-CA') : '';
+                const lagLabel = lagDays > 0 ? `${lagDays}d span` : 'current';
+                const oldestDate = oldestEmb ? new Date(oldestEmb).toLocaleDateString('en-CA') : '';
                 return `
                 <div class="glyph-row">
-                    <span class="glyph-label">Lag:</span>
-                    <span class="glyph-value">${lagLabel}${oldestDate ? ` (oldest: ${oldestDate})` : ''}</span>
+                    <span class="glyph-label">Coverage:</span>
+                    <span class="glyph-value">${lagLabel}${oldestDate ? ` (from ${oldestDate})` : ''}</span>
                 </div>`;
             })() : ''}
         `;
 
         // Make model rows clickable — scroll to scatter section filtered by model
         for (const row of sectionInfo.querySelectorAll('.emb-model-row')) {
-            row.addEventListener('click', () => {
+            row.addEventListener('click', (e) => {
+                // Don't scroll if clicking the cluster button
+                if ((e.target as HTMLElement).classList.contains('emb-model-cluster-btn')) return;
                 const modelName = (row as HTMLElement).dataset.model ?? '';
                 scrollToModelScatter(modelName);
+            });
+        }
+        // Per-model cluster buttons
+        for (const btn of sectionInfo.querySelectorAll('.emb-model-cluster-btn')) {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const modelName = (btn as HTMLElement).dataset.model ?? '';
+                recluster(modelName);
             });
         }
     }
@@ -655,7 +674,7 @@ function renderEmbeddings(): void {
                     <div class="emb-cluster-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
                 </div>
             `;
-            sectionCluster.querySelector('.emb-cluster-btn')?.addEventListener('click', recluster);
+            sectionCluster.querySelector('.emb-cluster-btn')?.addEventListener('click', () => recluster());
 
             // Cluster pill tooltips and click handlers
             tooltip.attach(sectionCluster, '.emb-cluster-pill');
@@ -1218,7 +1237,7 @@ async function reembedAll(): Promise<void> {
     }
 }
 
-async function recluster(): Promise<void> {
+async function recluster(model?: string): Promise<void> {
     if (embeddingsClustering || !embeddingsInfo?.available) return;
 
     embeddingsClustering = true;
@@ -1230,7 +1249,10 @@ async function recluster(): Promise<void> {
         const minClusterSize = Number((embeddingsElement?.querySelector('.emb-param-min-cluster-size') as HTMLInputElement)?.value) || 5;
         const clusterThreshold = Number((embeddingsElement?.querySelector('.emb-param-cluster-threshold') as HTMLInputElement)?.value) || 0.5;
         const clusterMatchThreshold = Number((embeddingsElement?.querySelector('.emb-param-match-threshold') as HTMLInputElement)?.value) || 0.7;
-        const resp = await apiFetch('/api/embeddings/cluster', {
+        const url = model
+            ? `/api/embeddings/cluster?model=${encodeURIComponent(model)}`
+            : '/api/embeddings/cluster';
+        const resp = await apiFetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ min_cluster_size: minClusterSize, cluster_threshold: clusterThreshold, cluster_match_threshold: clusterMatchThreshold })
@@ -1253,15 +1275,15 @@ async function recluster(): Promise<void> {
 }
 
 function renderScatter(container: HTMLElement, data: ProjectionPoint[]): void {
-    const width = 280;
-    const height = 280;
-    const pad = 8;
+    const containerWidth = container.clientWidth || 280;
+    const width = containerWidth;
+    const height = Math.min(width, 600); // square-ish, cap at 600px tall
+    const pad = Math.max(8, width * 0.02);
 
     const svg = d3.select(container)
         .append('svg')
-        .attr('viewBox', `0 0 ${width} ${height}`)
-        .style('width', '100%')
-        .style('height', 'auto')
+        .attr('width', width)
+        .attr('height', height)
         .style('background', '#1e293b')
         .style('border-radius', '4px');
 
@@ -1278,7 +1300,7 @@ function renderScatter(container: HTMLElement, data: ProjectionPoint[]): void {
         .join('circle')
         .attr('cx', d => xScale(d.x))
         .attr('cy', d => yScale(d.y))
-        .attr('r', 3)
+        .attr('r', Math.max(3, width / 100))
         .attr('fill', d => d.cluster_id === -1 ? '#6b7280' : color(String(d.cluster_id)))
         .attr('opacity', d => d.cluster_id === -1 ? 0.35 : 0.85);
 }

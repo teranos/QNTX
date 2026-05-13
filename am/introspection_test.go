@@ -54,7 +54,7 @@ func TestMarkSettingsFromSource(t *testing.T) {
 		settings := map[string]interface{}{
 			"database": map[string]interface{}{
 				"bounded_storage": map[string]interface{}{
-					"actor_context_limit": 16,
+					"actor_context_limit": 32,
 				},
 			},
 		}

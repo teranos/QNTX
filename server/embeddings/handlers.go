@@ -453,6 +453,12 @@ type EmbeddingModelInfo struct {
 	Count      int    `json:"count"`
 }
 
+// EmbeddingLag describes how far behind the embedding pipeline is.
+type EmbeddingLag struct {
+	OldestEmbedding    string `json:"oldest_embedding"`    // earliest embedding timestamp (= how far back we've reached)
+	NewestAttestation  string `json:"newest_attestation"`  // latest attestation timestamp (= frontier)
+}
+
 // EmbeddingInfoResponse represents embedding service status
 type EmbeddingInfoResponse struct {
 	Available        bool                    `json:"available"`
@@ -462,6 +468,7 @@ type EmbeddingInfoResponse struct {
 	EmbeddingCount   int                     `json:"embedding_count"`
 	AttestationCount int                     `json:"attestation_count"`
 	UnembeddedCount  int                     `json:"unembedded_count"`
+	Lag              *EmbeddingLag           `json:"lag,omitempty"`
 	ClusterInfo      *storage.ClusterSummary `json:"cluster_info,omitempty"`
 	HDBSCANConfig    *HDBSCANConfig          `json:"hdbscan_config,omitempty"`
 }
@@ -545,6 +552,25 @@ func (h *Handler) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request) {
 		resp.UnembeddedCount = 0
 	}
 
+	// Lag: oldest embedded (= how far back we've reached) + newest attestation (= frontier)
+	if resp.UnembeddedCount > 0 {
+		lag := &EmbeddingLag{}
+		var oldest, newest string
+		// Oldest embedded attestation — indexed scan on embeddings.created_at
+		err := h.DB.QueryRow(`SELECT MIN(created_at) FROM embeddings`).Scan(&oldest)
+		if err == nil && oldest != "" {
+			lag.OldestEmbedding = oldest
+		}
+		// Newest attestation — indexed scan on attestations.created_at
+		err = h.DB.QueryRow(`SELECT MAX(created_at) FROM attestations`).Scan(&newest)
+		if err == nil && newest != "" {
+			lag.NewestAttestation = newest
+		}
+		if lag.OldestEmbedding != "" || lag.NewestAttestation != "" {
+			resp.Lag = lag
+		}
+	}
+
 	if h.Store != nil {
 		if summary, err := h.Store.GetClusterSummary(); err == nil && summary.NClusters > 0 {
 			resp.ClusterInfo = summary
@@ -581,7 +607,7 @@ func (h *Handler) HandleUnembeddedPage(w http.ResponseWriter, r *http.Request) {
 
 	limit := 100
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		if parsed, err := strconv.Atoi(limitStr); err == nil && parsed > 0 && parsed <= 500 {
+		if parsed, err := strconv.Atoi(limitStr); err == nil && parsed > 0 {
 			limit = parsed
 		}
 	}
@@ -590,6 +616,7 @@ func (h *Handler) HandleUnembeddedPage(w http.ResponseWriter, r *http.Request) {
 		SELECT a.id FROM attestations a
 		LEFT JOIN embeddings e ON e.source_type = 'attestation' AND e.source_id = a.id
 		WHERE e.id IS NULL
+		ORDER BY a.created_at ASC
 		LIMIT ?
 	`, limit)
 	if err != nil {

@@ -6,7 +6,24 @@ import type { Glyph } from '@qntx/glyphs';
 let dbStatsElement: HTMLElement | null = null;
 let dbStats: any = null;
 
+// Chart viewport: indices into sorted allKeys array
+let chartViewStart = 0;
+let chartViewEnd = 0; // 0 = will be set to allKeys.length on first render
+let allSortedKeys: string[] = [];
+
+// Section containers (created once, survive re-renders)
+let sectionOverview: HTMLElement | null = null;
+let sectionChart: HTMLElement | null = null;
+let sectionPredicates: HTMLElement | null = null;
+let sectionEvictions: HTMLElement | null = null;
+let sectionPerformance: HTMLElement | null = null;
+
 export function updateDatabaseStats(stats: any): void {
+    if (stats.error && dbStatsElement) {
+        // Cache not ready yet — retry in 2s
+        setTimeout(() => sendMessage({ type: 'get_database_stats' }), 2000);
+        return;
+    }
     dbStats = stats;
     if (stats.recent_evictions) {
         seedEvictions(stats.recent_evictions);
@@ -23,21 +40,82 @@ export function recordEviction(data: { event_type: string; actor: string; contex
     }
 }
 
+function createSections(root: HTMLElement): void {
+    sectionChart = document.createElement('div');
+    sectionChart.className = 'db-section-chart';
+
+    sectionOverview = document.createElement('div');
+    sectionOverview.className = 'db-section-overview';
+
+    // 3-column grid below the chart
+    const columns = document.createElement('div');
+    columns.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 8px;';
+
+    sectionPredicates = document.createElement('div');
+    sectionPredicates.className = 'db-section-predicates';
+
+    sectionEvictions = document.createElement('div');
+    sectionEvictions.className = 'db-section-evictions';
+
+    sectionPerformance = document.createElement('div');
+    sectionPerformance.className = 'db-section-performance';
+
+    columns.appendChild(sectionPredicates);
+    columns.appendChild(sectionEvictions);
+    columns.appendChild(sectionPerformance);
+
+    // Chart is the hero — full width at the top
+    root.appendChild(sectionChart);
+    root.appendChild(sectionOverview);
+    root.appendChild(columns);
+}
+
+// Color palette for predicate lines
+const PREDICATE_COLORS = [
+    '#4ade80', // green
+    '#60a5fa', // blue
+    '#f59e0b', // amber
+    '#ef4444', // red
+    '#a78bfa', // purple
+    '#f472b6', // pink
+    '#2dd4bf', // teal
+    '#fb923c', // orange
+    '#818cf8', // indigo
+    '#34d399', // emerald
+];
+
 function renderDbStats(): void {
-    if (!dbStatsElement) return;
+    if (!dbStatsElement || !sectionChart || !sectionOverview || !sectionPredicates || !sectionEvictions || !sectionPerformance) return;
 
     if (!dbStats || !dbStats.total_attestations) {
         const msg = dbStats?.error ?? 'Loading database statistics...';
-        dbStatsElement.innerHTML = `<div class="glyph-loading">${msg}</div>`;
+        sectionChart.innerHTML = `<div class="glyph-loading">${msg}</div>`;
         return;
     }
 
+    // -- Chart: multi-predicate timeseries with range selector --
+    renderChartWithControls(sectionChart, dbStats.predicate_histograms);
+
+    // -- Overview: compact stats row --
     const storageBackend = dbStats.storage_optimized
         ? `rust (optimized) v${dbStats.storage_version}`
         : 'go (fallback)';
 
-    // Build rich fields / types section
-    let typesSection = '';
+    sectionOverview.innerHTML = `
+        <div style="display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--border-color, #333); font-size: 11px;">
+            <span><span class="glyph-label">Path:</span> <span class="glyph-value">${dbStats.path}</span></span>
+            <span><span class="glyph-label">Backend:</span> <span class="glyph-value">${storageBackend}</span></span>
+            <span><span class="glyph-label">Attestations:</span> <span class="glyph-value">${dbStats.total_attestations.toLocaleString()}</span></span>
+            <span><span class="glyph-label">Actors:</span> <span class="glyph-value">${dbStats.unique_actors.toLocaleString()}</span></span>
+            <span><span class="glyph-label">Subjects:</span> <span class="glyph-value">${dbStats.unique_subjects.toLocaleString()}</span></span>
+            <span><span class="glyph-label">Contexts:</span> <span class="glyph-value">${dbStats.unique_contexts.toLocaleString()}</span></span>
+        </div>
+    `;
+
+    // -- Predicates: types + distillation --
+    let predicatesHTML = '';
+
+    // Rich fields / types
     const richFields = dbStats.rich_fields;
     if (richFields && richFields.length > 0) {
         const isEnhanced = typeof richFields[0] === 'object' && 'field' in richFields[0];
@@ -48,45 +126,59 @@ function renderDbStats(): void {
                 .join('')
             : richFields.sort().map((f: string) => `<span class="glyph-type-link" data-type="${f}" style="cursor: pointer; text-decoration: underline; margin-right: 8px;">${f}</span>`).join('');
 
-        typesSection = `
-            <div class="glyph-row" style="margin-top: 8px; border-top: 1px solid var(--border-color, #333); padding-top: 8px;">
+        predicatesHTML += `
+            <div style="margin-bottom: 8px;">
                 <span class="glyph-label">Types (${richFields.length}):</span>
                 <span class="glyph-value" style="display: flex; flex-wrap: wrap; gap: 4px;">${fieldItems}</span>
             </div>
         `;
     }
 
-    // Build distillation section
-    let distillSection = '';
+    // Distillation summary
     if (dbStats.distillation) {
         const d = dbStats.distillation;
         const preserved = d.preserved_count ? d.preserved_count.toLocaleString() : '0';
         const oldest = d.oldest ? formatAge(d.oldest) : '';
         const newest = d.newest ? formatAge(d.newest) : '';
-        const timeRange = oldest && newest ? `${oldest} – ${newest}` : '';
+        const timeRange = oldest && newest ? `${oldest} - ${newest}` : '';
 
-        let predRows = '';
-        if (d.predicates && d.predicates.length > 0) {
-            predRows = d.predicates.map((p: { predicate: string; count: number }) =>
-                `<div style="display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0;">
-                    <span style="color: #e2e8f0; word-break: break-word; overflow-wrap: break-word;">${p.predicate}</span>
-                    <span style="color: #94a3b8; white-space: nowrap; margin-left: 8px;">${p.count}</span>
-                </div>`
-            ).join('');
-        }
-
-        distillSection = `
-            <div class="glyph-row" style="margin-top: 8px; border-top: 1px solid var(--border-color, #333); padding-top: 8px;">
-                <span class="glyph-label">⚗ Distillation:</span>
-                <span class="glyph-value">${d.distill_attestations} distill attestations, ${preserved} original preserved</span>
+        predicatesHTML += `
+            <div style="margin-bottom: 4px;">
+                <span class="glyph-label">Distillation:</span>
+                <span class="glyph-value">${d.sigmas} sigmas, ${preserved} original preserved</span>
+                ${timeRange ? `<span style="color: #64748b; margin-left: 8px;">${timeRange}</span>` : ''}
             </div>
-            ${timeRange ? `<div class="glyph-row"><span class="glyph-label">Range:</span><span class="glyph-value" style="color: #94a3b8;">${timeRange}</span></div>` : ''}
-            ${predRows ? `<div style="margin-top: 6px;"><span class="glyph-label" style="font-size: 11px;">Distilled predicates:</span>${predRows}</div>` : ''}
         `;
+
+        // Predicate list with color indicators matching chart
+        if (d.predicates && d.predicates.length > 0) {
+            const predRows = d.predicates.map((p: { predicate: string; count: number }, i: number) => {
+                const color = PREDICATE_COLORS[i % PREDICATE_COLORS.length];
+                return `<div style="display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 2px 0;">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: ${color}; flex-shrink: 0;"></span>
+                    <span style="color: #e2e8f0; word-break: break-word; overflow-wrap: break-word; flex: 1;">${p.predicate}</span>
+                    <span style="color: #94a3b8; white-space: nowrap;">${p.count}</span>
+                </div>`;
+            }).join('');
+            predicatesHTML += `<div style="margin-top: 4px;">${predRows}</div>`;
+        }
     }
 
-    // Build eviction section — bar chart aggregated by hour + predicate breakdown
-    let evictionSection = '';
+    sectionPredicates.innerHTML = predicatesHTML ? `<div style="padding: 8px 0; border-bottom: 1px solid var(--border-color, #333);">${predicatesHTML}</div>` : '';
+
+    // Wire type links
+    sectionPredicates.querySelectorAll('.glyph-type-link').forEach(el => {
+        el.addEventListener('click', () => {
+            const typeName = (el as HTMLElement).dataset.type;
+            if (typeName) {
+                import('./type-definition-window.js').then(({ openTypeDefinition }) => {
+                    openTypeDefinition(typeName);
+                });
+            }
+        });
+    });
+
+    // -- Evictions --
     if (hasEvictions()) {
         const summary = getEvictionSummary();
         const breakdown = getPredicateBreakdown();
@@ -109,97 +201,288 @@ function renderDbStats(): void {
             `;
         }
 
-        evictionSection = `
-            <div class="glyph-row" style="margin-top: 8px; border-top: 1px solid var(--border-color, #333); padding-top: 8px;">
-                <span class="glyph-label">Evictions:</span>
-                <span class="glyph-value">${summary.count} events, ${summary.totalEvicted.toLocaleString()} attestations evicted</span>
+        sectionEvictions.innerHTML = `
+            <div style="padding: 8px 0; border-bottom: 1px solid var(--border-color, #333);">
+                <div style="margin-bottom: 4px;">
+                    <span class="glyph-label">Evictions:</span>
+                    <span class="glyph-value">${summary.count} events, ${summary.totalEvicted.toLocaleString()} attestations evicted</span>
+                </div>
+                <div class="eviction-chart-container"></div>
+                ${predicateRows}
             </div>
-            <div class="eviction-chart-container"></div>
-            ${predicateRows}
         `;
+
+        const chartContainer = sectionEvictions.querySelector('.eviction-chart-container');
+        if (chartContainer) {
+            renderEvictionChart(chartContainer as HTMLElement);
+        }
+
+        // Wire predicate drill-down
+        sectionEvictions.querySelectorAll('.eviction-pred-row').forEach(el => {
+            el.addEventListener('click', () => {
+                const idx = parseInt((el as HTMLElement).dataset.predIdx ?? '', 10);
+                const detail = sectionEvictions!.querySelector(`[data-pred-detail="${idx}"]`) as HTMLElement;
+                if (!detail || isNaN(idx)) return;
+                if (detail.style.display === 'none') {
+                    detail.style.display = 'block';
+                    renderPredicateDetail(detail, breakdown[idx]);
+                } else {
+                    detail.style.display = 'none';
+                }
+            });
+        });
+    } else {
+        sectionEvictions.innerHTML = '';
     }
 
-    dbStatsElement.innerHTML = `
-        <div class="glyph-content">
-            <div class="glyph-row">
-                <span class="glyph-label">Database Path:</span>
-                <span class="glyph-value">${dbStats.path}</span>
-            </div>
-            <div class="glyph-row">
-                <span class="glyph-label">Storage Backend:</span>
-                <span class="glyph-value">${storageBackend}</span>
-            </div>
-            <div class="glyph-row">
-                <span class="glyph-label">Total Attestations:</span>
-                <span class="glyph-value">${dbStats.total_attestations.toLocaleString()}</span>
-            </div>
-            <div class="glyph-row">
-                <span class="glyph-label">Unique Actors:</span>
-                <span class="glyph-value">${dbStats.unique_actors.toLocaleString()}</span>
-            </div>
-            <div class="glyph-row">
-                <span class="glyph-label">Unique Subjects:</span>
-                <span class="glyph-value">${dbStats.unique_subjects.toLocaleString()}</span>
-            </div>
-            <div class="glyph-row">
-                <span class="glyph-label">Unique Contexts:</span>
-                <span class="glyph-value">${dbStats.unique_contexts.toLocaleString()}</span>
-            </div>
-            ${typesSection}
-            ${evictionSection}
-            ${distillSection}
-            <div class="perf-section-container"></div>
+    // -- Performance --
+    if (dbStats.performance) {
+        renderPerformanceSection(sectionPerformance, dbStats.performance);
+    } else {
+        sectionPerformance.innerHTML = '';
+    }
+}
+
+function renderChartWithControls(container: HTMLElement, histograms: Record<string, Record<string, number>> | null): void {
+    if (!histograms) {
+        container.innerHTML = '<div style="padding: 16px; color: #64748b; font-size: 11px;">No histogram data yet (waiting for distillation)</div>';
+        return;
+    }
+
+    // Build full sorted key set once
+    const keySet = new Set<string>();
+    for (const pred of Object.keys(histograms)) {
+        for (const key of Object.keys(histograms[pred])) {
+            keySet.add(key);
+        }
+    }
+    allSortedKeys = Array.from(keySet).sort();
+    if (allSortedKeys.length === 0) return;
+
+    // Initialize viewport to show all on first render
+    if (chartViewEnd === 0 || chartViewEnd > allSortedKeys.length) {
+        chartViewStart = 0;
+        chartViewEnd = allSortedKeys.length;
+    }
+
+    let chartArea = container.querySelector('.db-chart-area') as HTMLElement;
+    if (!chartArea) {
+        chartArea = document.createElement('div');
+        chartArea.className = 'db-chart-area';
+        chartArea.style.cursor = 'grab';
+        container.appendChild(chartArea);
+
+        // Wheel: deltaY = zoom, deltaX = pan
+        chartArea.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const total = allSortedKeys.length;
+            const span = chartViewEnd - chartViewStart;
+
+            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                // Zoom: deltaY > 0 = zoom out, < 0 = zoom in
+                const zoomFactor = e.deltaY > 0 ? 1.15 : 0.85;
+                const newSpan = Math.max(64, Math.min(total, Math.round(span * zoomFactor)));
+                const center = (chartViewStart + chartViewEnd) / 2;
+                chartViewStart = Math.max(0, Math.round(center - newSpan / 2));
+                chartViewEnd = Math.min(total, chartViewStart + newSpan);
+                if (chartViewStart === 0) chartViewEnd = Math.min(total, newSpan);
+            } else {
+                // Pan: deltaX > 0 = pan right (forward), < 0 = pan left (back)
+                const panAmount = Math.max(1, Math.round(span * 0.05)) * Math.sign(e.deltaX);
+                const newStart = Math.max(0, Math.min(total - span, chartViewStart + panAmount));
+                chartViewEnd = newStart + span;
+                chartViewStart = newStart;
+            }
+
+            renderViewport(chartArea!, histograms!);
+        }, { passive: false });
+    }
+
+    renderViewport(chartArea, histograms);
+}
+
+function renderViewport(chartArea: HTMLElement, histograms: Record<string, Record<string, number>>): void {
+    // Slice keys to viewport
+    const viewKeys = allSortedKeys.slice(chartViewStart, chartViewEnd);
+    if (viewKeys.length === 0) return;
+
+    // Build filtered histograms for visible range
+    const filtered: Record<string, Record<string, number>> = {};
+    for (const [pred, hist] of Object.entries(histograms)) {
+        const filt: Record<string, number> = {};
+        for (const key of viewKeys) {
+            if (hist[key]) filt[key] = hist[key];
+        }
+        if (Object.keys(filt).length > 0) {
+            filtered[pred] = filt;
+        }
+    }
+
+    // Show viewport indicator
+    const total = allSortedKeys.length;
+    const pct = ((chartViewEnd - chartViewStart) / total * 100).toFixed(0);
+    const rangeLabel = viewKeys.length < total
+        ? `${viewKeys[0]} \u2014 ${viewKeys[viewKeys.length - 1]} (${pct}%)`
+        : 'all';
+
+    renderTimeseriesChart(chartArea, Object.keys(filtered).length > 0 ? filtered : null, rangeLabel);
+}
+
+// Render multi-series timeseries chart from predicate histogram data
+function renderTimeseriesChart(container: HTMLElement, histograms: Record<string, Record<string, number>> | null, rangeLabel?: string): void {
+    if (!histograms) {
+        container.innerHTML = '<div style="padding: 16px; color: #64748b; font-size: 11px;">No histogram data yet (waiting for distillation)</div>';
+        return;
+    }
+
+    const predicates = Object.keys(histograms);
+    if (predicates.length === 0) {
+        container.innerHTML = '<div style="padding: 16px; color: #64748b; font-size: 11px;">No histogram data</div>';
+        return;
+    }
+
+    // Collect all time keys across all predicates, sorted
+    const allKeysSet = new Set<string>();
+    for (const pred of predicates) {
+        for (const key of Object.keys(histograms[pred])) {
+            allKeysSet.add(key);
+        }
+    }
+    const allKeys = Array.from(allKeysSet).sort();
+    if (allKeys.length === 0) return;
+
+    // Sort predicates by total observations descending, cap at top 10
+    const predTotals = predicates.map(p => {
+        let total = 0;
+        for (const v of Object.values(histograms[p])) total += v;
+        return { predicate: p, total };
+    }).sort((a, b) => b.total - a.total);
+
+    const topPredicates = predTotals.slice(0, 10);
+    const sortedPredicates = topPredicates.map(p => p.predicate);
+
+    // Build series data
+    const series: { predicate: string; color: string; points: { key: string; value: number }[] }[] = [];
+    for (let i = 0; i < sortedPredicates.length; i++) {
+        const pred = sortedPredicates[i];
+        const color = PREDICATE_COLORS[i % PREDICATE_COLORS.length];
+        const hist = histograms[pred];
+        const points = allKeys.map(key => ({ key, value: hist[key] || 0 }));
+        series.push({ predicate: pred, color, points });
+    }
+
+    // Chart dimensions
+    const chartWidth = container.clientWidth || 800;
+    const chartHeight = 200;
+    const marginLeft = 50;
+    const marginRight = 16;
+    const marginTop = 8;
+    const marginBottom = 24;
+    const plotWidth = chartWidth - marginLeft - marginRight;
+    const plotHeight = chartHeight - marginTop - marginBottom;
+
+    // Find max value across all series
+    let maxValue = 0;
+    for (const s of series) {
+        for (const p of s.points) {
+            if (p.value > maxValue) maxValue = p.value;
+        }
+    }
+    if (maxValue === 0) maxValue = 1;
+
+    // X scale: index-based
+    const xScale = (i: number) => marginLeft + (i / Math.max(1, allKeys.length - 1)) * plotWidth;
+    const yScale = (v: number) => marginTop + plotHeight - (v / maxValue) * plotHeight;
+
+    // Build SVG paths
+    const paths = series.map(s => {
+        const d = s.points.map((p, i) => {
+            const x = xScale(i);
+            const y = yScale(p.value);
+            return `${i === 0 ? 'M' : 'L'}${x},${y}`;
+        }).join(' ');
+        return `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="1.5" opacity="0.8" />`;
+    }).join('\n');
+
+    // Y-axis labels
+    const yTicks = 4;
+    const yLabels: string[] = [];
+    for (let i = 0; i <= yTicks; i++) {
+        const val = (maxValue / yTicks) * i;
+        const y = yScale(val);
+        const label = val >= 1000 ? `${(val / 1000).toFixed(1)}k` : Math.round(val).toString();
+        yLabels.push(`<text x="${marginLeft - 4}" y="${y}" text-anchor="end" dominant-baseline="middle" fill="#64748b" font-size="9">${label}</text>`);
+        yLabels.push(`<line x1="${marginLeft}" y1="${y}" x2="${marginLeft + plotWidth}" y2="${y}" stroke="#1e293b" stroke-width="0.5" />`);
+    }
+
+    // X-axis labels (show ~8 labels max)
+    // Determine if data spans multiple days
+    const firstDate = allKeys[0].substring(0, 10);
+    const lastDate = allKeys[allKeys.length - 1].substring(0, 10);
+    const multiDay = firstDate !== lastDate;
+
+    const xLabelStep = Math.max(1, Math.floor(allKeys.length / 8));
+    const xLabels: string[] = [];
+    let lastLabelDate = '';
+    for (let i = 0; i < allKeys.length; i += xLabelStep) {
+        const x = xScale(i);
+        const key = allKeys[i];
+        let label: string;
+
+        if (multiDay) {
+            // Show "MM-DD HH:MM" for multi-day spans
+            const date = key.substring(5, 10);
+            const time = key.length >= 13 ? key.substring(11) : '';
+            if (date !== lastLabelDate) {
+                label = time ? `${date} ${time}` : date;
+                lastLabelDate = date;
+            } else {
+                label = time || date;
+            }
+        } else if (key.length >= 13) {
+            label = key.substring(11);
+        } else if (key.length === 10) {
+            label = key.substring(5);
+        } else {
+            label = key;
+        }
+        xLabels.push(`<text x="${x}" y="${chartHeight - 4}" text-anchor="middle" fill="#64748b" font-size="9">${label}</text>`);
+    }
+
+    // Legend
+    const legendItems = series.map(s => {
+        const total = predTotals.find(p => p.predicate === s.predicate)?.total || 0;
+        return `<span style="display: inline-flex; align-items: center; gap: 4px; margin-right: 12px; font-size: 10px;">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: ${s.color};"></span>
+            <span style="color: #e2e8f0;">${s.predicate}</span>
+            <span style="color: #64748b;">${total.toLocaleString()}</span>
+        </span>`;
+    }).join('');
+
+    const rangeIndicator = rangeLabel
+        ? `<div style="font-size: 9px; color: #475569; text-align: right; padding: 2px 0;">${rangeLabel} \u2014 scroll to zoom, swipe to pan</div>`
+        : '';
+
+    container.innerHTML = `
+        <div style="padding: 8px 0;">
+            ${rangeIndicator}
+            <svg viewBox="0 0 ${chartWidth} ${chartHeight}" style="width: 100%; height: ${chartHeight}px;">
+                ${yLabels.join('\n')}
+                ${xLabels.join('\n')}
+                ${paths}
+            </svg>
+            <div style="padding: 4px 0; display: flex; flex-wrap: wrap;">${legendItems}</div>
         </div>
     `;
-
-    // Wire up type links to open type definition window
-    dbStatsElement.querySelectorAll('.glyph-type-link').forEach(el => {
-        el.addEventListener('click', () => {
-            const typeName = (el as HTMLElement).dataset.type;
-            if (typeName) {
-                import('./type-definition-window.js').then(({ openTypeDefinition }) => {
-                    openTypeDefinition(typeName);
-                });
-            }
-        });
-    });
-
-    // Render eviction bar chart
-    const chartContainer = dbStatsElement.querySelector('.eviction-chart-container');
-    if (chartContainer && hasEvictions()) {
-        renderEvictionChart(chartContainer as HTMLElement);
-    }
-
-    // Wire predicate drill-down
-    const breakdown = getPredicateBreakdown();
-    dbStatsElement.querySelectorAll('.eviction-pred-row').forEach(el => {
-        el.addEventListener('click', () => {
-            const idx = parseInt((el as HTMLElement).dataset.predIdx ?? '', 10);
-            const detail = dbStatsElement!.querySelector(`[data-pred-detail="${idx}"]`) as HTMLElement;
-            if (!detail || isNaN(idx)) return;
-            if (detail.style.display === 'none') {
-                detail.style.display = 'block';
-                renderPredicateDetail(detail, breakdown[idx]);
-            } else {
-                detail.style.display = 'none';
-            }
-        });
-    });
-
-    // Render performance section
-    const perfContainer = dbStatsElement.querySelector('.perf-section-container');
-    if (perfContainer && dbStats.performance) {
-        renderPerformanceSection(perfContainer as HTMLElement, dbStats.performance);
-    }
 }
 
 interface PerfEntry {
     name: string;
     kind: 'op' | 'mutex';
     count: number;
-    min: number; // ms
-    max: number; // ms
-    avg: number; // ms
+    min: number;
+    max: number;
+    avg: number;
 }
 
 interface PerfData {
@@ -227,20 +510,19 @@ function renderPerformanceSection(container: HTMLElement, perf: PerfData): void 
         const spread = entry.max - entry.min;
         const relVariance = entry.avg > 0 ? spread / entry.avg : 0;
 
-        // Color by severity: green < 0.5 variance, amber 0.5-2, red > 2
-        let color = '#4ade80'; // green
-        if (relVariance > 2) color = '#ef4444'; // red
-        else if (relVariance > 0.5) color = '#f59e0b'; // amber
+        let color = '#4ade80';
+        if (relVariance > 2) color = '#ef4444';
+        else if (relVariance > 0.5) color = '#f59e0b';
 
         const isMutex = entry.kind === 'mutex';
-        const label = isMutex ? `⏳ ${entry.name}` : entry.name;
+        const label = isMutex ? `\u23F3 ${entry.name}` : entry.name;
         const sparkKey = isMutex ? `mutex:${entry.name}` : entry.name;
         const sparkData = perf.sparklines[sparkKey];
         const sparkSvg = sparkData ? renderSparkline(sparkData) : '';
 
         return `<div style="margin-bottom: 6px;">
             <div style="display: flex; justify-content: space-between; font-size: 10px; color: #e2e8f0; margin-bottom: 2px;">
-                <span style="word-break: break-word; overflow-wrap: break-word;">${label} <span style="color: #64748b;">×${entry.count}</span></span>
+                <span style="word-break: break-word; overflow-wrap: break-word;">${label} <span style="color: #64748b;">\u00D7${entry.count}</span></span>
                 <span style="white-space: nowrap; margin-left: 8px; color: #94a3b8;">${formatMs(entry.avg)}</span>
             </div>
             <div style="position: relative; height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden;">
@@ -256,7 +538,7 @@ function renderPerformanceSection(container: HTMLElement, perf: PerfData): void 
     }).join('');
 
     container.innerHTML = `
-        <div style="margin-top: 8px; border-top: 1px solid var(--border-color, #333); padding-top: 8px;">
+        <div style="padding: 8px 0; border-bottom: 1px solid var(--border-color, #333);">
             <span class="glyph-label" style="font-size: 11px;">Performance (5m windows):</span>
             <div style="margin-top: 4px;">${rows}</div>
         </div>
@@ -324,17 +606,15 @@ function renderPredicateDetail(container: HTMLElement, detail: PredicateDetail):
 export function createDbGlyph(): Glyph {
     return {
         id: 'database-glyph',
-        title: `${DB} Database Statistics`,
+        title: `${DB} Database`,
+        manifestationType: 'panel' as const,
         renderContent: () => {
             const content = document.createElement('div');
             dbStatsElement = content;
+            createSections(content);
             sendMessage({ type: 'get_database_stats' });
             renderDbStats();
             return content;
         },
-        initialWidth: '400px',
-        initialHeight: '240px',
-        defaultX: 100,
-        defaultY: 100
     };
 }

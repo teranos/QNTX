@@ -163,8 +163,9 @@ export function renderEvictionChart(container: HTMLElement): void {
     const svg = d3.select(container)
         .append('svg')
         .attr('viewBox', `0 0 ${width} ${height}`)
-        .style('width', '100%')
-        .style('height', 'auto')
+        .style('width', `${width}px`)
+        .style('max-width', '100%')
+        .style('height', `${height}px`)
         .style('border-radius', '4px');
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);

@@ -31,8 +31,8 @@ interface DistillAttrs {
     _last_seen: string;
     _subjects_count?: number;
     _subjects_sample?: string[];
-    _version?: string;
-    _rust_version?: string;
+    _version?: string | { count: number; values: string[] };
+    _rust_version?: string | { count: number; values: string[] };
     [key: string]: unknown;
 }
 
@@ -87,17 +87,18 @@ function isNumberAggregate(v: unknown): v is { min: number; max: number; sum: nu
     return typeof o.min === 'number' && typeof o.max === 'number' && typeof o.sum === 'number' && typeof o.count === 'number';
 }
 
-/** Check if a value is a string aggregate {values, count} */
-function isStringAggregate(v: unknown): v is { values: string[]; count: number } {
+/** Check if a value is a string aggregate {frequencies, count} or legacy {values, count} */
+function isStringAggregate(v: unknown): v is { frequencies?: Record<string, number>; values?: string[]; unplaced?: string[]; count: number } {
     if (typeof v !== 'object' || v === null) return false;
     const o = v as Record<string, unknown>;
-    return Array.isArray(o.values) && typeof o.count === 'number';
+    return typeof o.count === 'number' && (typeof o.frequencies === 'object' || Array.isArray(o.values));
 }
 
 /** Keys that are structural metadata, not domain data */
 const META_KEYS = new Set([
     '_distill', '_count', '_total', '_first_seen', '_last_seen',
     '_subjects_count', '_subjects_sample', '_version', '_rust_version',
+    '_histogram', '_actors_count', '_actors_sample',
 ]);
 
 // ─── Rendering ───────────────────────────────────────────────
@@ -165,6 +166,70 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
         container.appendChild(timeRow);
     }
 
+    // ── Histogram ──
+    const histogram = (attrs as Record<string, unknown>)['_histogram'] as Record<string, number> | undefined;
+    if (histogram && typeof histogram === 'object') {
+        const histSection = document.createElement('div');
+        histSection.style.marginBottom = '10px';
+
+        const entries = Object.entries(histogram).sort((a, b) => a[0].localeCompare(b[0]));
+        if (entries.length > 0) {
+            const maxVal = Math.max(...entries.map(e => e[1]));
+            const barContainer = document.createElement('div');
+            barContainer.style.display = 'flex';
+            barContainer.style.alignItems = 'flex-end';
+            barContainer.style.gap = '1px';
+            barContainer.style.height = '60px';
+
+            for (const [key, val] of entries) {
+                const barWrap = document.createElement('div');
+                barWrap.style.flex = '1';
+                barWrap.style.height = '100%';
+                barWrap.style.display = 'flex';
+                barWrap.style.flexDirection = 'column';
+                barWrap.style.justifyContent = 'flex-end';
+
+                const bar = document.createElement('div');
+                const pct = maxVal > 0 ? (val / maxVal) * 100 : 0;
+                bar.style.height = `${pct}%`;
+                bar.style.minHeight = '1px';
+                bar.style.backgroundColor = AMBER_BAR;
+                bar.style.borderRadius = '1px 1px 0 0';
+                bar.title = `${key}: ${formatNum(val)}`;
+                barWrap.appendChild(bar);
+                barContainer.appendChild(barWrap);
+            }
+
+            histSection.appendChild(barContainer);
+
+            // X-axis labels: first and last key
+            const axisRow = document.createElement('div');
+            axisRow.style.display = 'flex';
+            axisRow.style.justifyContent = 'space-between';
+            axisRow.style.fontSize = '9px';
+            axisRow.style.color = AMBER_DIM;
+            axisRow.style.marginTop = '2px';
+
+            const firstKey = document.createElement('span');
+            firstKey.textContent = entries[0][0];
+            const lastKey = document.createElement('span');
+            lastKey.textContent = entries[entries.length - 1][0];
+            axisRow.append(firstKey, lastKey);
+            histSection.appendChild(axisRow);
+
+            // Summary line
+            const histTotal = entries.reduce((s, e) => s + e[1], 0);
+            const summary = document.createElement('div');
+            summary.style.fontSize = '9px';
+            summary.style.color = AMBER_DIM;
+            summary.style.marginTop = '2px';
+            summary.textContent = `${entries.length} buckets · ${formatNum(histTotal)} placed`;
+            histSection.appendChild(summary);
+        }
+
+        container.appendChild(histSection);
+    }
+
     // ── Domain attributes (non-meta) ──
     for (const [key, value] of Object.entries(attrs)) {
         if (META_KEYS.has(key)) continue;
@@ -180,31 +245,134 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
         section.appendChild(label);
 
         if (isStringAggregate(value)) {
-            // String aggregate — inline tags
-            const tagRow = document.createElement('div');
-            tagRow.style.display = 'flex';
-            tagRow.style.flexWrap = 'wrap';
-            tagRow.style.gap = '4px';
-            tagRow.style.alignItems = 'center';
+            if (value.frequencies) {
+                // Pie chart + legend for frequency data
+                const entries = Object.entries(value.frequencies)
+                    .sort((a, b) => b[1] - a[1]);
+                const freqTotal = entries.reduce((s, e) => s + e[1], 0);
 
-            for (const v of value.values.slice(0, 20)) {
-                const tag = document.createElement('span');
-                tag.style.fontSize = '11px';
-                tag.style.color = AMBER_VALUE;
-                tag.style.padding = '1px 5px';
-                tag.style.backgroundColor = AMBER_BAR_BG;
-                tag.style.borderRadius = '2px';
-                tag.textContent = String(v);
-                tagRow.appendChild(tag);
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.alignItems = 'center';
+                row.style.gap = '10px';
+
+                // SVG pie chart
+                const size = 48;
+                const r = 20;
+                const cx = size / 2;
+                const cy = size / 2;
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('width', String(size));
+                svg.setAttribute('height', String(size));
+                svg.style.flexShrink = '0';
+
+                const pieColors = ['#d4a574', '#c49a6c', '#a07850', '#8a7560', '#6e5a40', '#e8d0b4', '#b8956a', '#927048'];
+                let startAngle = -Math.PI / 2;
+                const slices = entries.slice(0, 8);
+                const sliceTotal = slices.reduce((s, e) => s + e[1], 0);
+                const otherCount = freqTotal - sliceTotal;
+
+                for (let i = 0; i < slices.length; i++) {
+                    const [, freq] = slices[i];
+                    const sliceAngle = (freq / freqTotal) * Math.PI * 2;
+                    const endAngle = startAngle + sliceAngle;
+                    const largeArc = sliceAngle > Math.PI ? 1 : 0;
+                    const x1 = cx + r * Math.cos(startAngle);
+                    const y1 = cy + r * Math.sin(startAngle);
+                    const x2 = cx + r * Math.cos(endAngle);
+                    const y2 = cy + r * Math.sin(endAngle);
+
+                    if (slices.length === 1 && otherCount === 0) {
+                        // Full circle
+                        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                        circle.setAttribute('cx', String(cx));
+                        circle.setAttribute('cy', String(cy));
+                        circle.setAttribute('r', String(r));
+                        circle.setAttribute('fill', pieColors[0]);
+                        svg.appendChild(circle);
+                    } else {
+                        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                        path.setAttribute('d', `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} Z`);
+                        path.setAttribute('fill', pieColors[i % pieColors.length]);
+                        svg.appendChild(path);
+                    }
+                    startAngle = endAngle;
+                }
+
+                if (otherCount > 0) {
+                    const sliceAngle = (otherCount / freqTotal) * Math.PI * 2;
+                    const endAngle = startAngle + sliceAngle;
+                    const largeArc = sliceAngle > Math.PI ? 1 : 0;
+                    const x1 = cx + r * Math.cos(startAngle);
+                    const y1 = cy + r * Math.sin(startAngle);
+                    const x2 = cx + r * Math.cos(endAngle);
+                    const y2 = cy + r * Math.sin(endAngle);
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    path.setAttribute('d', `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} Z`);
+                    path.setAttribute('fill', '#4a3d30');
+                    svg.appendChild(path);
+                }
+
+                row.appendChild(svg);
+
+                // Legend
+                const legend = document.createElement('div');
+                legend.style.display = 'flex';
+                legend.style.flexWrap = 'wrap';
+                legend.style.gap = '3px 8px';
+                legend.style.fontSize = '10px';
+
+                for (let i = 0; i < slices.length; i++) {
+                    const [v, freq] = slices[i];
+                    const item = document.createElement('span');
+                    item.style.color = pieColors[i % pieColors.length];
+                    const pct = freqTotal > 0 ? Math.round((freq / freqTotal) * 100) : 0;
+                    item.textContent = `${v} ${pct}%`;
+                    legend.appendChild(item);
+                }
+                if (otherCount > 0) {
+                    const item = document.createElement('span');
+                    item.style.color = '#4a3d30';
+                    const remaining = entries.length - slices.length;
+                    item.textContent = `+${remaining} more ${Math.round((otherCount / freqTotal) * 100)}%`;
+                    legend.appendChild(item);
+                }
+                if (value.unplaced && value.unplaced.length > 0) {
+                    const item = document.createElement('span');
+                    item.style.color = AMBER_DIM;
+                    item.textContent = `+${value.unplaced.length} unplaced`;
+                    legend.appendChild(item);
+                }
+
+                row.appendChild(legend);
+                section.appendChild(row);
+            } else if (value.values) {
+                // Legacy format: values without frequencies — inline tags
+                const tagRow = document.createElement('div');
+                tagRow.style.display = 'flex';
+                tagRow.style.flexWrap = 'wrap';
+                tagRow.style.gap = '4px';
+                tagRow.style.alignItems = 'center';
+
+                for (const v of value.values.slice(0, 20)) {
+                    const tag = document.createElement('span');
+                    tag.style.fontSize = '11px';
+                    tag.style.color = AMBER_VALUE;
+                    tag.style.padding = '1px 5px';
+                    tag.style.backgroundColor = AMBER_BAR_BG;
+                    tag.style.borderRadius = '2px';
+                    tag.textContent = String(v);
+                    tagRow.appendChild(tag);
+                }
+                if (value.count > 20) {
+                    const more = document.createElement('span');
+                    more.style.fontSize = '10px';
+                    more.style.color = AMBER_DIM;
+                    more.textContent = `+${value.count - 20} more`;
+                    tagRow.appendChild(more);
+                }
+                section.appendChild(tagRow);
             }
-            if (value.count > 20) {
-                const more = document.createElement('span');
-                more.style.fontSize = '10px';
-                more.style.color = AMBER_DIM;
-                more.textContent = `+${value.count - 20} more`;
-                tagRow.appendChild(more);
-            }
-            section.appendChild(tagRow);
         } else if (isNumberAggregate(value)) {
             // Number aggregate — range bar
             const rangeRow = document.createElement('div');
@@ -309,8 +477,8 @@ function buildSigmaReport(attestation: Attestation, attrs: DistillAttrs): HTMLEl
         footer.style.marginTop = '4px';
         footer.style.textAlign = 'right';
         const parts: string[] = [];
-        if (attrs._rust_version) parts.push(attrs._rust_version);
-        if (attrs._version) parts.push(attrs._version.split(' ')[0]); // just version, not hash
+        if (attrs._rust_version && typeof attrs._rust_version === 'string') parts.push(attrs._rust_version);
+        if (attrs._version && typeof attrs._version === 'string') parts.push(attrs._version.split(' ')[0]); // just version, not hash
         footer.textContent = parts.join(' · ');
         container.appendChild(footer);
     }
@@ -366,7 +534,7 @@ export function createSigmaGlyph(glyph: Glyph): HTMLElement {
     const { element } = canvasPlaced({
         glyph,
         className: 'canvas-sigma-glyph',
-        defaults: { x: 200, y: 200, width: 380, height: 300 },
+        defaults: { x: 200, y: 200, width: 520, height: 400 },
         resizable: true,
         useMinHeight: true,
         logLabel: 'SigmaGlyph',
@@ -448,8 +616,8 @@ export function spawnSigmaGlyph(attestation: Attestation, mouseX?: number, mouse
         symbol: Sigma,
         x: glyph.x!,
         y: glyph.y!,
-        width: Math.round(rect.width) || 380,
-        height: Math.round(rect.height) || 300,
+        width: Math.round(rect.width) || 520,
+        height: Math.round(rect.height) || 400,
         content: JSON.stringify(attestation),
     });
 

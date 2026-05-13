@@ -249,6 +249,10 @@ function handleSymbolClick(e: Event): void {
             // Database - show database statistics glyph
             glyphRun.openGlyph('database-glyph');
             break;
+        case 'sigma':
+            // Sigma - show sigma overview panel
+            glyphRun.openGlyph('sigma-panel');
+            break;
         case 'prose':
             // Prose - show documentation panel
             showProsePanel();

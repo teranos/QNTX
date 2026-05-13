@@ -708,9 +708,11 @@ func TestGetDaemon(t *testing.T) {
 		t.Fatal("daemon.Registry() returned nil")
 	}
 
-	// Verify registry is empty initially (no handlers registered yet)
+	// Verify registry has only built-in handlers (e.g. distill if configured)
 	handlers := registry.Names()
-	if len(handlers) != 0 {
-		t.Errorf("Expected 0 handlers, got %d: %v", len(handlers), handlers)
+	for _, h := range handlers {
+		if h != "distill" {
+			t.Errorf("Unexpected handler registered: %s", h)
+		}
 	}
 }

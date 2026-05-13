@@ -9,7 +9,7 @@
 import { sendMessage } from './websocket.ts';
 import { toast } from './toast.ts';
 import type { DaemonStatusMessage } from '../types/websocket';
-import { DB } from '@generated/sym.js';
+import { DB, Sigma } from '@generated/sym.js';
 import { connectivityManager, type ConnectivityState } from './connectivity';
 import { spawnAuthGlyph } from './components/glyph/auth-glyph';
 import { glyphRun } from '@qntx/glyphs';
@@ -57,6 +57,7 @@ class StatusIndicatorManager {
         this.addConnectionIndicator();
         this.addPulseIndicator();
         this.addDatabaseIndicator();
+        this.addSigmaIndicator();
 
         // Auth: spawn auth glyph when unauthenticated, add logout to connection context menu
         this.setupAuthIntegration();
@@ -325,12 +326,38 @@ class StatusIndicatorManager {
     }
 
     /**
+     * Add Sigma indicator
+     */
+    private addSigmaIndicator(): void {
+        this.addIndicator({
+            id: 'sigma',
+            label: `${Sigma}`,
+            clickable: true,
+            onClick: () => glyphRun.openGlyph('sigma-panel'),
+            initialState: 'inactive'
+        });
+    }
+
+    /**
      * Handle database stats update
      */
     handleDatabaseStats(count: number | undefined): void {
         if (count == null) return;
         const formatted = count >= 1000 ? `${(count / 1000).toFixed(1)}k` : count.toString();
         this.updateIndicator('database', 'active', `${DB} ${formatted}`);
+    }
+
+    /**
+     * Handle sigma stats from distillation data
+     */
+    handleSigmaStats(distillation: any): void {
+        if (!distillation) return;
+        const count = distillation.sigmas || 0;
+        const topSigmas = distillation.top_sigmas || [];
+        const bigCount = topSigmas.length;
+        if (count > 0) {
+            this.updateIndicator('sigma', 'active', `${Sigma} ${bigCount}`);
+        }
     }
 }
 

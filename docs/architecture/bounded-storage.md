@@ -73,11 +73,11 @@ RustBackedStore.CreateAttestation()
       ├─ actor_context_limit: if count > 24, evict oldest down to 16
       ├─ actor_contexts_limit: if contexts > 96, evict least-used down to 64
       └─ entity_actors_limit: if actors > 96, evict least-recent down to 64
-      Each path: load batch → distill into summary → delete originals → insert distill attestation
+      Each path: load batch → distill into sigma (Σ) → delete originals → insert sigma
       (each logs to storage_events)
 ```
 
-Evicted attestations are **distilled** into a compressed summary before deletion. See [ADR-020: Attestation Distillation](../adr/ADR-020-attestation-distillation.md) for the full design.
+Evicted attestations are **distilled** into a sigma (Σ) — a compressed aggregate attestation — before deletion. Sigmas are normal attestations that participate in future enforcement, enabling recursive meta-distillation. See [ADR-020: Attestation Distillation](../adr/ADR-020-attestation-distillation.md) for the full design.
 
 ## See Also
 

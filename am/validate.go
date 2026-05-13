@@ -52,9 +52,9 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Bounded storage limits: must be positive (omit for defaults: 16/64/64)
+	// Bounded storage limits: must be positive (omit for defaults: 32/64/64)
 	if c.Database.BoundedStorage.ActorContextLimit <= 0 {
-		return errors.Newf("database.bounded_storage.actor_context_limit must be > 0, got %d (omit for default 16)", c.Database.BoundedStorage.ActorContextLimit)
+		return errors.Newf("database.bounded_storage.actor_context_limit must be > 0, got %d (omit for default 32)", c.Database.BoundedStorage.ActorContextLimit)
 	}
 	if c.Database.BoundedStorage.ActorContextsLimit <= 0 {
 		return errors.Newf("database.bounded_storage.actor_contexts_limit must be > 0, got %d (omit for default 64)", c.Database.BoundedStorage.ActorContextsLimit)

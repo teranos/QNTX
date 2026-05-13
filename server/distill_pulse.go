@@ -43,7 +43,7 @@ func (h *distillHandler) Execute(ctx context.Context, job *async.Job) error {
 	}
 
 	cutoff := time.Now().Add(-h.maxAge).UTC().Format(time.RFC3339)
-	h.logger.Infow("Distill query starting", "cutoff", cutoff, "batch_size", h.batchSize)
+	h.logger.Debugw("Σ Sigma query starting", "cutoff", cutoff, "batch_size", h.batchSize)
 
 	// Find old attestations, grouped by (actor, context)
 	rows, err := h.db.QueryContext(ctx, `
@@ -96,14 +96,14 @@ func (h *distillHandler) Execute(ctx context.Context, job *async.Job) error {
 		candidates = append(candidates, as)
 	}
 
-	h.logger.Infow("Distill scan complete", "scanned", scanned, "scan_errors", scanErrors, "candidates", len(candidates))
+	h.logger.Debugw("Σ Sigma scan complete", "scanned", scanned, "scan_errors", scanErrors, "candidates", len(candidates))
 
 	if len(candidates) == 0 {
-		h.logger.Debugw("Nothing to distill", "cutoff", cutoff)
+		h.logger.Debugw("Σ Nothing to distill", "cutoff", cutoff)
 		return nil
 	}
 
-	// Group by predicate — one distill attestation per predicate.
+	// Group by predicate — one sigma per predicate.
 	// Subjects collapse into a count, actors/contexts into sets.
 	groups := make(map[string][]*types.As)
 	for _, as := range candidates {
@@ -122,7 +122,9 @@ func (h *distillHandler) Execute(ctx context.Context, job *async.Job) error {
 			return ctx.Err()
 		}
 
+		buildStart := time.Now()
 		distillAs := buildDistillAttestation(batch, predicate)
+		buildDur := time.Since(buildStart)
 
 		if h.dryRun {
 			h.logger.Infow("Dry run: would distill",
@@ -133,14 +135,16 @@ func (h *distillHandler) Execute(ctx context.Context, job *async.Job) error {
 			continue
 		}
 
-		// Insert the distill attestation via normal store path (updates counters)
+		// Insert sigma via normal store path (updates counters)
+		createStart := time.Now()
 		if err := h.atsStore.CreateAttestation(distillAs); err != nil {
-			h.logger.Warnw("Failed to create distill attestation",
+			h.logger.Warnw("Σ Failed to create sigma",
 				"predicate", predicate,
 				"count", len(batch),
 				"error", err)
 			continue
 		}
+		createDur := time.Since(createStart)
 		totalCreated++
 
 		// Delete originals — CASCADE handles junction tables,
@@ -149,7 +153,9 @@ func (h *distillHandler) Execute(ctx context.Context, job *async.Job) error {
 		for i, a := range batch {
 			ids[i] = a.ID
 		}
+		deleteStart := time.Now()
 		deleted, err := h.deleteAndUpdateCounters(ctx, ids, batch)
+		deleteDur := time.Since(deleteStart)
 		if err != nil {
 			h.logger.Warnw("Failed to delete distilled attestations",
 				"predicate", predicate,
@@ -157,70 +163,123 @@ func (h *distillHandler) Execute(ctx context.Context, job *async.Job) error {
 			continue
 		}
 		totalDistilled += deleted
+
+		h.logger.Debugw("Σ Sigma group timing",
+			"predicate", predicate,
+			"batch_size", len(batch),
+			"build_ms", buildDur.Milliseconds(),
+			"create_ms", createDur.Milliseconds(),
+			"delete_ms", deleteDur.Milliseconds())
 	}
 
 	if h.dryRun {
-		h.logger.Infow("Distill dry run complete",
+		h.logger.Infow("Σ Sigma dry run complete",
 			"groups", len(groups),
 			"candidates", len(candidates))
 	} else {
-		h.logger.Infow("Distill complete",
+		h.logger.Infow("Σ Sigma complete",
 			"distilled", totalDistilled,
-			"created", totalCreated,
+			"sigmas_created", totalCreated,
 			"groups", len(groups))
 	}
 	return nil
 }
 
-// deleteAndUpdateCounters deletes attestations by ID and decrements enforcement counters.
-// No explicit transaction — the Pulse worker already holds one via the rustsqlite driver.
+// deleteAndUpdateCounters deletes attestations by ID in batches and decrements enforcement counters.
 func (h *distillHandler) deleteAndUpdateCounters(ctx context.Context, ids []string, batch []*types.As) (int, error) {
+	deleteStart := time.Now()
+	// Batch delete using IN clauses (chunks of 500 to stay within SQLite limits)
 	deleted := 0
-	for _, id := range ids {
-		result, err := h.db.ExecContext(ctx, "DELETE FROM attestations WHERE id = ?", id)
+	const chunkSize = 500
+	for i := 0; i < len(ids); i += chunkSize {
+		end := i + chunkSize
+		if end > len(ids) {
+			end = len(ids)
+		}
+		chunk := ids[i:end]
+
+		placeholders := make([]string, len(chunk))
+		args := make([]interface{}, len(chunk))
+		for j, id := range chunk {
+			placeholders[j] = "?"
+			args[j] = id
+		}
+		query := "DELETE FROM attestations WHERE id IN (" + strings.Join(placeholders, ",") + ")"
+		result, err := h.db.ExecContext(ctx, query, args...)
 		if err != nil {
-			return deleted, errors.Wrapf(err, "delete attestation %s", id)
+			return deleted, errors.Wrapf(err, "batch delete %d attestations (chunk %d)", len(chunk), i/chunkSize)
 		}
 		n, _ := result.RowsAffected()
 		deleted += int(n)
 	}
 
-	// Decrement enforcement counters for each (actor, context) pair
-	counterDeltas := make(map[string]map[string]int) // actor -> context -> count
+	deleteDur := time.Since(deleteStart)
+
+	// Rebuild enforcement counters for affected actors from actual data.
+	// Instead of decrementing one-by-one (3,584 queries for 896 actors),
+	// delete stale counter rows and repopulate from junction tables.
+	counterStart := time.Now()
+
+	// Collect unique actors from the deleted batch
+	actorSet := make(map[string]bool)
 	for _, as := range batch {
 		for _, actor := range as.Actors {
-			if counterDeltas[actor] == nil {
-				counterDeltas[actor] = make(map[string]int)
-			}
-			for _, c := range as.Contexts {
-				counterDeltas[actor][c]++
-			}
+			actorSet[actor] = true
 		}
 	}
-
-	for actor, contexts := range counterDeltas {
-		for c, count := range contexts {
-			h.db.ExecContext(ctx,
-				"UPDATE enforcement_actor_context SET count = count - ? WHERE actor = ? AND context = ?",
-				count, actor, c)
-			h.db.ExecContext(ctx,
-				"DELETE FROM enforcement_actor_context WHERE actor = ? AND context = ? AND count <= 0",
-				actor, c)
-		}
-
-		var remaining int
-		if err := h.db.QueryRowContext(ctx,
-			"SELECT COUNT(*) FROM enforcement_actor_context WHERE actor = ?", actor,
-		).Scan(&remaining); err == nil {
-			if remaining == 0 {
-				h.db.ExecContext(ctx, "DELETE FROM enforcement_actor_contexts WHERE actor = ?", actor)
-			} else {
-				h.db.ExecContext(ctx,
-					"UPDATE enforcement_actor_contexts SET count = ? WHERE actor = ?",
-					remaining, actor)
-			}
-		}
+	actors := make([]string, 0, len(actorSet))
+	for a := range actorSet {
+		actors = append(actors, a)
 	}
+
+	// Process in chunks to stay within SQLite parameter limits
+	const actorChunkSize = 200
+	for i := 0; i < len(actors); i += actorChunkSize {
+		end := i + actorChunkSize
+		if end > len(actors) {
+			end = len(actors)
+		}
+		chunk := actors[i:end]
+
+		placeholders := make([]string, len(chunk))
+		args := make([]interface{}, len(chunk))
+		for j, actor := range chunk {
+			placeholders[j] = "?"
+			args[j] = actor
+		}
+		inClause := strings.Join(placeholders, ",")
+
+		// 1. Delete stale counter rows for these actors
+		h.db.ExecContext(ctx,
+			"DELETE FROM enforcement_actor_context WHERE actor IN ("+inClause+")", args...)
+
+		// 2. Rebuild from actual attestation data
+		h.db.ExecContext(ctx, `
+			INSERT OR REPLACE INTO enforcement_actor_context (actor, context, count)
+			SELECT aa.actor, ac.context, COUNT(DISTINCT aa.attestation_id)
+			FROM attestation_actors aa
+			JOIN attestation_contexts ac ON ac.attestation_id = aa.attestation_id
+			WHERE aa.actor IN (`+inClause+`)
+			GROUP BY aa.actor, ac.context
+		`, args...)
+
+		// 3. Rebuild actor_contexts counts
+		h.db.ExecContext(ctx,
+			"DELETE FROM enforcement_actor_contexts WHERE actor IN ("+inClause+")", args...)
+		h.db.ExecContext(ctx, `
+			INSERT OR REPLACE INTO enforcement_actor_contexts (actor, count)
+			SELECT actor, COUNT(*) FROM enforcement_actor_context
+			WHERE actor IN (`+inClause+`)
+			GROUP BY actor
+		`, args...)
+	}
+
+	counterDur := time.Since(counterStart)
+	h.logger.Debugw("deleteAndUpdateCounters timing",
+		"delete_ms", deleteDur.Milliseconds(),
+		"counter_rebuild_ms", counterDur.Milliseconds(),
+		"ids", len(ids),
+		"actors", len(actors))
 
 	return deleted, nil
 }
@@ -312,6 +371,9 @@ func buildDistillAttestation(batch []*types.As, predicate string) *types.As {
 		merged["_subjects_sample"] = sample
 	}
 
+	// Build temporal histogram from attestation timestamps
+	merged["_histogram"] = buildHistogram(batch)
+
 	// Strip existing distill: prefixes before adding one. Without this,
 	// meta-distillation stacks prefixes infinitely: distill:distill:distill:...
 	// Each cycle adds one prefix, so after N cycles a predicate becomes
@@ -352,13 +414,14 @@ type distillNumAgg struct {
 }
 
 type distillStrAgg struct {
-	values map[string]bool
-	count  int
+	frequencies map[string]int // value → observation count
+	unplaced    map[string]bool // values from old-format aggregates (no frequency data)
+	count       int
 }
 
 // mergeAttributes mechanically merges attributes from a batch of attestations.
 //   - Numbers: {min, max, sum, count}
-//   - Strings: {values: [...], count} (values capped at 50)
+//   - Strings: {frequencies: {val: count, ...}, count} (frequencies capped at 50)
 //   - Constants (same value across all): kept as scalar
 //   - Already-aggregated (_distill): merge aggregates
 func mergeAttributes(batch []*types.As) map[string]interface{} {
@@ -377,7 +440,7 @@ func mergeAttributes(batch []*types.As) map[string]interface{} {
 		}
 		for k, v := range as.Attributes {
 			// Skip distill metadata keys
-			if k == "_distill" || k == "_count" || k == "_total" || k == "_first_seen" || k == "_last_seen" || k == "_version" || k == "_rust_version" || k == "_subjects_count" || k == "_subjects_sample" || k == "_actors_count" || k == "_actors_sample" {
+			if k == "_distill" || k == "_count" || k == "_total" || k == "_first_seen" || k == "_last_seen" || k == "_version" || k == "_rust_version" || k == "_subjects_count" || k == "_subjects_sample" || k == "_actors_count" || k == "_actors_sample" || k == "_histogram" {
 				continue
 			}
 
@@ -399,12 +462,14 @@ func mergeAttributes(batch []*types.As) map[string]interface{} {
 				}
 			case string:
 				if agg, ok := strs[k]; ok {
-					if len(agg.values) < 50 {
-						agg.values[val] = true
-					}
+					agg.frequencies[val]++
 					agg.count++
 				} else {
-					strs[k] = &distillStrAgg{values: map[string]bool{val: true}, count: 1}
+					strs[k] = &distillStrAgg{
+						frequencies: map[string]int{val: 1},
+						unplaced:    make(map[string]bool),
+						count:       1,
+					}
 				}
 			case map[string]interface{}:
 				// Already-aggregated from prior distill — merge aggregates
@@ -413,6 +478,23 @@ func mergeAttributes(batch []*types.As) map[string]interface{} {
 						mergeNumAgg(agg, val)
 					} else {
 						nums[k] = numAggFromMap(val)
+					}
+				} else if isStrAgg(val) {
+					aCount := 0
+					if c, ok := val["count"].(float64); ok {
+						aCount = int(c)
+					}
+					if agg, ok := strs[k]; ok {
+						agg.count += aCount
+						mergeStrAgg(agg, val)
+					} else {
+						agg := &distillStrAgg{
+							frequencies: make(map[string]int),
+							unplaced:    make(map[string]bool),
+							count:       aCount,
+						}
+						mergeStrAgg(agg, val)
+						strs[k] = agg
 					}
 				}
 			default:
@@ -440,20 +522,52 @@ func mergeAttributes(batch []*types.As) map[string]interface{} {
 	}
 
 	for k, agg := range strs {
-		if agg.count == len(batch) && len(agg.values) == 1 {
+		if agg.count == len(batch) && len(agg.frequencies) == 1 && len(agg.unplaced) == 0 {
 			// Constant string — keep as scalar
-			for v := range agg.values {
+			for v := range agg.frequencies {
 				result[k] = v
 			}
 		} else {
-			values := make([]string, 0, len(agg.values))
-			for v := range agg.values {
-				values = append(values, v)
+			// Cap frequencies at 50 entries, keep highest
+			freqMap := make(map[string]interface{})
+			if len(agg.frequencies) <= 50 {
+				for v, c := range agg.frequencies {
+					freqMap[v] = c
+				}
+			} else {
+				type freqEntry struct {
+					val   string
+					count int
+				}
+				entries := make([]freqEntry, 0, len(agg.frequencies))
+				for v, c := range agg.frequencies {
+					entries = append(entries, freqEntry{v, c})
+				}
+				// Sort by count descending — simple selection of top 50
+				for i := 0; i < 50 && i < len(entries); i++ {
+					maxIdx := i
+					for j := i + 1; j < len(entries); j++ {
+						if entries[j].count > entries[maxIdx].count {
+							maxIdx = j
+						}
+					}
+					entries[i], entries[maxIdx] = entries[maxIdx], entries[i]
+					freqMap[entries[i].val] = entries[i].count
+				}
 			}
-			result[k] = map[string]interface{}{
-				"values": values,
-				"count":  agg.count,
+
+			out := map[string]interface{}{
+				"frequencies": freqMap,
+				"count":       agg.count,
 			}
+			if len(agg.unplaced) > 0 {
+				unplaced := make([]string, 0, len(agg.unplaced))
+				for v := range agg.unplaced {
+					unplaced = append(unplaced, v)
+				}
+				out["unplaced"] = unplaced
+			}
+			result[k] = out
 		}
 	}
 
@@ -494,6 +608,46 @@ func numAggFromMap(m map[string]interface{}) *distillNumAgg {
 	return agg
 }
 
+// isStrAgg checks if a map is a string aggregate ({frequencies, count} or legacy {values, count}).
+func isStrAgg(m map[string]interface{}) bool {
+	_, hasCount := m["count"]
+	_, hasFreqs := m["frequencies"]
+	_, hasValues := m["values"]
+	return hasCount && (hasFreqs || hasValues)
+}
+
+// mergeStrAgg merges a string aggregate map into an existing distillStrAgg.
+// New-format {frequencies: {val: count}} merges by summing frequencies.
+// Old-format {values: [...]} passes values as unplaced (no fabricated counts).
+func mergeStrAgg(agg *distillStrAgg, m map[string]interface{}) {
+	if freqs, ok := m["frequencies"].(map[string]interface{}); ok {
+		for key, val := range freqs {
+			if c, ok := val.(float64); ok {
+				agg.frequencies[key] += int(c)
+			}
+		}
+	} else if vals, ok := m["values"].([]interface{}); ok {
+		// Old format — values without frequencies
+		for _, v := range vals {
+			if s, ok := v.(string); ok {
+				if _, inFreqs := agg.frequencies[s]; !inFreqs {
+					agg.unplaced[s] = true
+				}
+			}
+		}
+	}
+	// Merge unplaced from prior new-format aggregates
+	if unplaced, ok := m["unplaced"].([]interface{}); ok {
+		for _, v := range unplaced {
+			if s, ok := v.(string); ok {
+				if _, inFreqs := agg.frequencies[s]; !inFreqs {
+					agg.unplaced[s] = true
+				}
+			}
+		}
+	}
+}
+
 func mergeNumAgg(agg *distillNumAgg, m map[string]interface{}) {
 	if v, ok := m["min"].(float64); ok && v < agg.min {
 		agg.min = v
@@ -506,6 +660,111 @@ func mergeNumAgg(agg *distillNumAgg, m map[string]interface{}) {
 	}
 	if v, ok := m["count"].(float64); ok {
 		agg.count += int(v)
+	}
+}
+
+const histogramKeyBudget = 200
+
+// buildHistogram creates a temporal histogram from attestation timestamps.
+// Raw attestations get bucketed into 10min keys. Existing distill attestations
+// with _histogram get their histograms merged. Legacy sigmas without _histogram
+// contribute nothing (their _total is still counted — sum(histogram) <= _total).
+func buildHistogram(batch []*types.As) map[string]int {
+	histogram := make(map[string]int)
+
+	for _, as := range batch {
+		if as.Attributes != nil {
+			if existing, ok := as.Attributes["_histogram"]; ok {
+				if histMap, ok := existing.(map[string]interface{}); ok {
+					for key, val := range histMap {
+						if count, ok := val.(float64); ok {
+							histogram[key] += int(count)
+						}
+					}
+					continue
+				}
+			}
+		}
+
+		// Skip distill attestations without histogram (legacy unplaced)
+		if as.Attributes != nil {
+			if _, ok := as.Attributes["_distill"]; ok {
+				continue
+			}
+		}
+
+		// Raw attestation — bucket its timestamp
+		key := timestampTo10minKey(as.Timestamp)
+		histogram[key]++
+	}
+
+	return coarsenHistogram(histogram)
+}
+
+// timestampTo10minKey converts a timestamp to a 10-minute bucket key.
+// Format: "2026-05-13T14:10" (truncated to 10min boundary).
+func timestampTo10minKey(t time.Time) string {
+	t = t.UTC()
+	minute := (t.Minute() / 10) * 10
+	return fmt.Sprintf("%sT%02d:%02d", t.Format("2006-01-02"), t.Hour(), minute)
+}
+
+// coarsenHistogram collapses the finest tier if key count exceeds budget.
+//
+// Tiers by key length:
+//   - 16 chars: 10min ("2026-05-13T14:10")
+//   - 13 chars: hourly ("2026-05-13T14")
+//   - 10 chars: daily  ("2026-05-13")
+//   - 8 chars:  weekly ("2026-W20")
+func coarsenHistogram(histogram map[string]int) map[string]int {
+	if len(histogram) <= histogramKeyBudget {
+		return histogram
+	}
+
+	// Find finest tier (longest key)
+	maxLen := 0
+	for key := range histogram {
+		if len(key) > maxLen {
+			maxLen = len(key)
+		}
+	}
+
+	coarsened := make(map[string]int)
+	for key, count := range histogram {
+		if len(key) == maxLen {
+			coarsened[coarsenKey(key)] += count
+		} else {
+			coarsened[key] += count
+		}
+	}
+
+	if len(coarsened) > histogramKeyBudget {
+		return coarsenHistogram(coarsened)
+	}
+	return coarsened
+}
+
+// coarsenKey collapses a histogram key to the next coarser tier.
+//
+//	"2026-05-13T14:10" (10min) → "2026-05-13T14" (hourly)
+//	"2026-05-13T14"    (hourly) → "2026-05-13"    (daily)
+//	"2026-05-13"       (daily)  → ISO week key     (weekly)
+func coarsenKey(key string) string {
+	switch len(key) {
+	case 16:
+		return key[:13] // 10min → hourly: drop ":MM"
+	case 13:
+		return key[:10] // hourly → daily: drop "THH"
+	case 10:
+		// daily → weekly
+		t, err := time.Parse("2006-01-02", key)
+		if err != nil {
+			return key
+		}
+		year, week := t.ISOWeek()
+		return fmt.Sprintf("%d-W%02d", year, week)
+	default:
+		return key
 	}
 }
 

@@ -18,7 +18,6 @@ import (
 // AxExecutor executes ask queries against attestation storage
 type AxExecutor struct {
 	queryStore     ats.AttestationQueryStore
-	fuzzy          Matcher
 	classifier     Classifier
 	aliasResolver  *alias.Resolver
 	entityResolver ats.EntityResolver
@@ -39,7 +38,6 @@ type AxExecutorOptions struct {
 	EntityResolver ats.EntityResolver // Optional entity ID resolution (default: NoOpEntityResolver)
 	QueryExpander  ats.QueryExpander  // Optional query expansion (default: NoOpQueryExpander)
 	Logger         *zap.SugaredLogger // Optional logger for debug output (default: nil, no logging)
-	Matcher        Matcher            // Optional fuzzy matcher (default: WasmMatcher via wazero)
 	RawQuerier     interface{}        // Optional: routes attestation queries through Rust FFI (storage.RawQuerier)
 }
 
@@ -52,18 +50,8 @@ func NewAxExecutorWithOptions(queryStore ats.AttestationQueryStore, aliasResolve
 	if opts.QueryExpander == nil {
 		opts.QueryExpander = &ats.NoOpQueryExpander{}
 	}
-	if opts.Matcher == nil {
-		opts.Matcher = NewDefaultMatcher()
-	}
-
-	// Pass logger to matcher if available
-	if opts.Logger != nil {
-		opts.Matcher.SetLogger(opts.Logger)
-	}
-
 	return &AxExecutor{
 		queryStore:     queryStore,
-		fuzzy:          opts.Matcher,
 		classifier:     NewDefaultClassifier(classification.DefaultTemporalConfig()),
 		aliasResolver:  aliasResolver,
 		entityResolver: opts.EntityResolver,
@@ -75,11 +63,6 @@ func NewAxExecutorWithOptions(queryStore ats.AttestationQueryStore, aliasResolve
 // SetClassificationConfig replaces the classifier with one using the provided config
 func (ae *AxExecutor) SetClassificationConfig(config classification.TemporalConfig) {
 	ae.classifier = NewDefaultClassifier(config)
-}
-
-// FuzzyBackend returns which fuzzy matching implementation is currently in use
-func (ae *AxExecutor) FuzzyBackend() MatcherBackend {
-	return ae.fuzzy.Backend()
 }
 
 // ExecuteAsk executes an ask query and returns results
@@ -113,40 +96,8 @@ func (ae *AxExecutor) ExecuteAsk(ctx context.Context, filter types.AxFilter) (*t
 		return nil, err
 	}
 
-	// 2. Check if this might be a natural language query
-	// NL queries have multiple predicates (first is NL verb, rest are context values)
-	// Skip fuzzy matching for NL queries to preserve the predicate-context structure
-	isPotentiallyNLQuery := len(expandedFilter.Predicates) > 1 && len(expandedFilter.Contexts) == 0
-
-	// 2. Expand fuzzy predicates if any (skip for NL queries)
-	expandedPredicates := expandedFilter.Predicates
-	if len(expandedFilter.Predicates) > 0 && !isPotentiallyNLQuery {
-		var err error
-		expandedPredicates, err = ae.expandFuzzyPredicates(ctx, expandedFilter.Predicates)
-		if err != nil {
-			err = errors.Wrap(err, "failed to expand fuzzy predicates")
-			err = errors.WithDetail(err, fmt.Sprintf("Query predicates: %v", expandedFilter.Predicates))
-			err = errors.WithDetail(err, fmt.Sprintf("Fuzzy backend: %s", ae.FuzzyBackend()))
-			return nil, err
-		}
-	}
-
-	// 2.5. Expand fuzzy contexts if any (skip for NL queries)
-	expandedContexts := expandedFilter.Contexts
-	if len(expandedFilter.Contexts) > 0 && !isPotentiallyNLQuery {
-		var err error
-		expandedContexts, err = ae.expandFuzzyContexts(ctx, expandedFilter.Contexts)
-		if err != nil {
-			err = errors.Wrap(err, "failed to expand fuzzy contexts")
-			err = errors.WithDetail(err, fmt.Sprintf("Query contexts: %v", expandedFilter.Contexts))
-			err = errors.WithDetail(err, fmt.Sprintf("Fuzzy backend: %s", ae.FuzzyBackend()))
-			return nil, err
-		}
-	}
-
-	// Update filter with expanded contexts and predicates
-	expandedFilter.Contexts = expandedContexts
-	expandedFilter.Predicates = expandedPredicates
+	// Predicates and contexts are matched literally. Fuzzy expansion was removed;
+	// MeiliSearch via the qntx-meili plugin (ADR-015) will provide search.
 
 	// Store debug information
 	result.Debug.ExpandedFilter = expandedFilter
@@ -156,8 +107,8 @@ func (ae *AxExecutor) ExecuteAsk(ctx context.Context, filter types.AxFilter) (*t
 	if err != nil {
 		err = errors.Wrap(err, "failed to execute query")
 		err = errors.WithDetail(err, fmt.Sprintf("Expanded subjects: %v", expandedFilter.Subjects))
-		err = errors.WithDetail(err, fmt.Sprintf("Expanded predicates: %v", expandedPredicates))
-		err = errors.WithDetail(err, fmt.Sprintf("Expanded contexts: %v", expandedContexts))
+		err = errors.WithDetail(err, fmt.Sprintf("Predicates: %v", expandedFilter.Predicates))
+		err = errors.WithDetail(err, fmt.Sprintf("Contexts: %v", expandedFilter.Contexts))
 		err = errors.WithDetail(err, fmt.Sprintf("Actors: %v", expandedFilter.Actors))
 		err = errors.WithDetail(err, fmt.Sprintf("Limit: %d", expandedFilter.Limit))
 		return nil, err
@@ -346,65 +297,6 @@ func claimConfidence(claim ats.IndividualClaim, confidenceMap map[string]float64
 	return 0.5
 }
 
-// expandFuzzyPredicates expands query predicates using fuzzy matching
-func (ae *AxExecutor) expandFuzzyPredicates(ctx context.Context, queryPredicates []string) ([]string, error) {
-	if len(queryPredicates) == 0 {
-		return []string{}, nil
-	}
-
-	// Get all unique predicates from database
-	allPredicates, err := ae.queryStore.GetAllPredicates(ctx)
-	if err != nil {
-		err = errors.Wrap(err, "failed to get predicates from database")
-		err = errors.WithDetail(err, fmt.Sprintf("Query predicates: %v", queryPredicates))
-		err = errors.WithDetail(err, "Operation: fuzzy predicate expansion")
-		return nil, err
-	}
-
-	expanded := []string{}
-	for _, queryPred := range queryPredicates {
-		matches := ae.fuzzy.FindMatches(queryPred, allPredicates)
-		if len(matches) == 0 {
-			expanded = append(expanded, queryPred)
-		} else {
-			expanded = append(expanded, matches...)
-		}
-	}
-
-	// Remove duplicates
-	return removeDuplicates(expanded), nil
-}
-
-// expandFuzzyContexts expands query contexts using fuzzy matching
-// NOTE: Basic implementation - see GitHub issue #32 for advanced matching plans
-func (ae *AxExecutor) expandFuzzyContexts(ctx context.Context, queryContexts []string) ([]string, error) {
-	if len(queryContexts) == 0 {
-		return []string{}, nil
-	}
-
-	// Get all unique contexts from database
-	allContexts, err := ae.queryStore.GetAllContexts(ctx)
-	if err != nil {
-		err = errors.Wrap(err, "failed to get contexts from database")
-		err = errors.WithDetail(err, fmt.Sprintf("Query contexts: %v", queryContexts))
-		err = errors.WithDetail(err, "Operation: fuzzy context expansion")
-		return nil, err
-	}
-
-	expanded := []string{}
-	for _, queryContext := range queryContexts {
-		matches := ae.fuzzy.FindContextMatches(queryContext, allContexts)
-		if len(matches) == 0 {
-			expanded = append(expanded, queryContext)
-		} else {
-			expanded = append(expanded, matches...)
-		}
-	}
-
-	// Remove duplicates
-	return removeDuplicates(expanded), nil
-}
-
 // generateSummary generates a basic summary of the results
 func (ae *AxExecutor) generateSummary(attestations []types.As) types.AxSummary {
 	// Simplified summary - just basic counts
@@ -501,7 +393,7 @@ func (ae *AxExecutor) expandAliasesInFilter(ctx context.Context, filter types.Ax
 		expandedFilter.Actors = removeDuplicates(expandedActors)
 	}
 
-	// Note: We don't expand predicates as they should be resolved via fuzzy matching instead
+	// Predicates are not alias-expanded — they are matched literally
 
 	return expandedFilter, nil
 }

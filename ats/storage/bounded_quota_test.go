@@ -61,12 +61,12 @@ func TestBoundedStorage_DoesNotDeleteDifferentContexts(t *testing.T) {
 }
 
 // TestBoundedStorage_DeletesWhenExceeding16PerActorContext validates that
-// when we exceed 16 attestations for the SAME (actor, context) pair,
-// the OLDEST ones are deleted
+// when we exceed the half-bound threshold (limit + limit/2 = 24) for the
+// SAME (actor, context) pair, the OLDEST ones are deleted down to limit (16).
 //
 // 📚 The Library of Alexandria: Shelf Space Limits
-// A librarian tries to shelve 20 astronomy scrolls, but the astronomy shelf
-// only has room for 16. The oldest 4 scrolls are moved to archives (deleted).
+// A librarian shelves 25 astronomy scrolls. The shelf tolerates up to 24
+// (half-bound threshold), but at 25 it evicts down to 16.
 func TestBoundedStorage_DeletesWhenExceeding16PerActorContext(t *testing.T) {
 	rustStore, db := createTestStore(t)
 
@@ -74,8 +74,8 @@ func TestBoundedStorage_DeletesWhenExceeding16PerActorContext(t *testing.T) {
 	librarian := "ptolemy@alexandria"
 	subject := "Astronomy" // All scrolls about the same subject
 
-	// Create 20 astronomy scrolls - but the shelf only holds 16!
-	for i := 1; i <= 20; i++ {
+	// Create 25 astronomy scrolls — exceeds half-bound threshold (24)
+	for i := 1; i <= 25; i++ {
 		attestation := &types.As{
 			ID:         fmt.Sprintf("ASTRO_SCROLL_%d", i),
 			Subjects:   []string{"Library"},
@@ -93,22 +93,22 @@ func TestBoundedStorage_DeletesWhenExceeding16PerActorContext(t *testing.T) {
 
 	store.FlushEnforcement()
 
-	// Only 16 should exist (shelf capacity limit enforced)
+	// Only 16 should exist (evicted down to limit)
 	var count int
 	err := db.QueryRow("SELECT COUNT(*) FROM attestations").Scan(&count)
 	require.NoError(t, err)
 
-	assert.Equal(t, 16, count, "Astronomy shelf should hold exactly 16 scrolls (capacity limit)")
+	assert.Equal(t, 16, count, "Astronomy shelf should hold exactly 16 scrolls (evicted to limit)")
 
-	// First 4 scrolls should be archived (oldest)
-	for i := 1; i <= 4; i++ {
+	// First 10 scrolls should be archived (oldest, 25-16+1=10 evicted to make room for distill att)
+	for i := 1; i <= 10; i++ {
 		var exists bool
 		db.QueryRow("SELECT EXISTS(SELECT 1 FROM attestations WHERE id = ?)", fmt.Sprintf("ASTRO_SCROLL_%d", i)).Scan(&exists)
 		assert.False(t, exists, "Oldest astronomy scroll %d should be archived", i)
 	}
 
-	// Last 16 scrolls should remain on shelf (newest)
-	for i := 5; i <= 20; i++ {
+	// Last 15 scrolls + 1 distill attestation should remain on shelf
+	for i := 11; i <= 25; i++ {
 		var exists bool
 		db.QueryRow("SELECT EXISTS(SELECT 1 FROM attestations WHERE id = ?)", fmt.Sprintf("ASTRO_SCROLL_%d", i)).Scan(&exists)
 		assert.True(t, exists, "Recent astronomy scroll %d should remain on shelf", i)
@@ -119,16 +119,16 @@ func TestBoundedStorage_DeletesWhenExceeding16PerActorContext(t *testing.T) {
 // enforcing limits for one context does NOT affect attestations with different contexts
 //
 // 📚 The Library of Alexandria: Independent Shelves
-// A librarian manages two overfull shelves: Philosophy (17 scrolls) and Medicine (17 scrolls).
-// Each shelf independently archives its oldest scroll. Philosophy doesn't affect Medicine.
+// A librarian manages two overfull shelves: Philosophy (25 scrolls) and Medicine (25 scrolls).
+// Each shelf independently evicts down to 16. Philosophy doesn't affect Medicine.
 func TestBoundedStorage_DoesNotDeleteCrossingContextBoundaries(t *testing.T) {
 	rustStore, db := createTestStore(t)
 
 	store := NewBoundedStore(db, rustStore, nil)
 	librarian := "eratosthenes@alexandria"
 
-	// Shelve 17 Philosophy scrolls (shelf holds 16)
-	for i := 1; i <= 17; i++ {
+	// Shelve 25 Philosophy scrolls (exceeds half-bound threshold of 24)
+	for i := 1; i <= 25; i++ {
 		attestation := &types.As{
 			ID:         fmt.Sprintf("PHIL_SCROLL_%d", i),
 			Subjects:   []string{"Library"},
@@ -144,8 +144,8 @@ func TestBoundedStorage_DoesNotDeleteCrossingContextBoundaries(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	// Shelve 17 Medicine scrolls (shelf holds 16)
-	for i := 1; i <= 17; i++ {
+	// Shelve 25 Medicine scrolls (exceeds half-bound threshold of 24)
+	for i := 1; i <= 25; i++ {
 		attestation := &types.As{
 			ID:         fmt.Sprintf("MED_SCROLL_%d", i),
 			Subjects:   []string{"Library"},
@@ -170,7 +170,7 @@ func TestBoundedStorage_DoesNotDeleteCrossingContextBoundaries(t *testing.T) {
 
 	assert.Equal(t, 32, count, "Library should have 16 scrolls per subject (independent shelf limits)")
 
-	// Verify both shelves archived their oldest scroll independently
+	// Verify both shelves archived their oldest scrolls independently
 	var philOldest, medOldest bool
 	db.QueryRow("SELECT EXISTS(SELECT 1 FROM attestations WHERE id = 'PHIL_SCROLL_1')").Scan(&philOldest)
 	db.QueryRow("SELECT EXISTS(SELECT 1 FROM attestations WHERE id = 'MED_SCROLL_1')").Scan(&medOldest)
@@ -188,7 +188,8 @@ func TestBoundedStorage_MixedContextsPreservation(t *testing.T) {
 	actor := "test@domain-integration"
 
 	// Simulate domain pattern: First create many empty-context attestations
-	for i := 1; i <= 17; i++ {
+	// Need 25+ to exceed half-bound threshold (limit=16, threshold=24)
+	for i := 1; i <= 25; i++ {
 		attestation := &types.As{
 			ID:         fmt.Sprintf("EMPTY_%d", i),
 			Subjects:   []string{"ENTITY"},
@@ -241,7 +242,7 @@ func TestBoundedStorage_MixedContextsPreservation(t *testing.T) {
 		assert.True(t, exists, "Critical attestation %s (%s=%s) should be preserved", att.id, att.pred, att.ctx)
 	}
 
-	// Verify empty-context attestations are limited to 16
+	// Verify empty-context attestations are limited to 16 (evicted down to limit)
 	var emptyCount int
 	db.QueryRow(`SELECT COUNT(*) FROM attestations WHERE json_extract(contexts, '$[0]') = ''`).Scan(&emptyCount)
 	assert.LessOrEqual(t, emptyCount, 16, "Empty-context attestations should be limited to 16")
@@ -329,7 +330,7 @@ func TestBoundedStorage_ExactDomainReproduction(t *testing.T) {
 			"Entity %d should have total_duration attestation", entity)
 	}
 
-	// Verify empty-context attestations are limited
+	// Verify empty-context attestations are limited to 16 (evicted down to limit)
 	var emptyCount int
 	db.QueryRow(`SELECT COUNT(*) FROM attestations WHERE json_extract(contexts, '$[0]') = ''`).Scan(&emptyCount)
 	assert.LessOrEqual(t, emptyCount, 16, "Empty-context attestations should be limited to 16")

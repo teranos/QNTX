@@ -1,10 +1,11 @@
-//! Attestation distillation: fold evicted attestations into aggregate summaries.
+//! Attestation distillation: fold evicted attestations into sigmas (Σ).
 //!
 //! When enforcement evicts a batch of attestations, distillation preserves their
-//! aggregate data in a single "distill attestation" before deletion. The distill
-//! attestation is a normal attestation — it participates in enforcement like any
-//! other, enabling recursive meta-distillation.
+//! aggregate data in a single sigma before deletion. A sigma is a normal
+//! attestation — it participates in enforcement like any other, enabling
+//! recursive meta-distillation (sigma of sigmas).
 
+use chrono::Datelike;
 use qntx_core::attestation::Attestation;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -12,9 +13,12 @@ use std::collections::{HashMap, HashSet};
 /// Cap on unique string values collected per attribute before switching to count-only.
 const STRING_VALUES_CAP: usize = 50;
 
-/// Build a distill attestation from a batch of evicted attestations.
+/// Maximum histogram keys before coarsening to next tier.
+const HISTOGRAM_KEY_BUDGET: usize = 200;
+
+/// Build a sigma (Σ) from a batch of evicted attestations.
 ///
-/// The distill attestation captures:
+/// The sigma captures:
 /// - Union of all subjects
 /// - Union of all predicates (original names, no prefix)
 /// - Union of all actors from evicted attestations
@@ -96,7 +100,7 @@ pub fn build_distill_attestation(evicted: &[Attestation], context: &str) -> Atte
 /// Merge attributes from a batch of attestations using mechanical defaults:
 ///
 /// - **Number** → `{min, max, sum, count}`
-/// - **String** → `{values: [...unique...], count: N}` (values capped at 50)
+/// - **String** → `{frequencies: {val: count, ...}, count: N}` (entries capped at 50)
 /// - **Constant** (same value in every attestation) → kept as scalar
 /// - **Already-aggregated** (`_distill: true` attestations) → merge aggregates
 /// - **Null/missing** → tracked via presence count
@@ -122,6 +126,7 @@ pub fn merge_attributes(attestations: &[Attestation]) -> HashMap<String, Value> 
                 || key == "_subjects_sample"
                 || key == "_actors_count"
                 || key == "_actors_sample"
+                || key == "_histogram"
             {
                 continue;
             }
@@ -211,6 +216,16 @@ pub fn merge_attributes(attestations: &[Attestation]) -> HashMap<String, Value> 
         result.insert("_last_seen".to_string(), Value::String(dt));
     }
 
+    // Build temporal histogram from attestation timestamps
+    let histogram = build_histogram(attestations);
+    if !histogram.is_empty() {
+        let map: serde_json::Map<String, Value> = histogram
+            .into_iter()
+            .map(|(k, v)| (k, Value::Number(v.into())))
+            .collect();
+        result.insert("_histogram".to_string(), Value::Object(map));
+    }
+
     result
 }
 
@@ -270,9 +285,11 @@ fn is_numeric_aggregate(v: &Value) -> bool {
         && v.get("count").is_some()
 }
 
-/// Check if a value is a string aggregate `{values, count}`.
+/// Check if a value is a string aggregate `{frequencies, count}` or legacy `{values, count}`.
 fn is_string_aggregate(v: &Value) -> bool {
-    v.is_object() && v.get("count").is_some() && v.get("values").is_some()
+    v.is_object()
+        && v.get("count").is_some()
+        && (v.get("frequencies").is_some() || v.get("values").is_some())
 }
 
 /// Merge numeric values, handling both raw numbers and prior aggregates.
@@ -337,47 +354,179 @@ fn json_number(n: f64) -> Value {
 }
 
 /// Merge string values, handling both raw strings and prior aggregates.
+///
+/// Output format: `{frequencies: {"val": count, ...}, count: N}`
+/// - Raw strings contribute frequency 1 each.
+/// - New-format aggregates (`{frequencies, count}`) merge by summing frequencies.
+/// - Old-format aggregates (`{values, count}`) pass values through without
+///   fabricating frequencies — the values are known to exist but their
+///   individual counts are not.
 fn merge_strings(
     present: &[&Value],
     has_aggregated: bool,
     presence_count: usize,
     total: usize,
 ) -> Value {
-    let mut unique_values: Vec<String> = Vec::new();
-    let mut seen = HashSet::new();
+    let mut frequencies: HashMap<String, u64> = HashMap::new();
+    let mut unplaced_values: Vec<String> = Vec::new();
+    let mut unplaced_seen = HashSet::new();
     let mut count = 0u64;
 
     for v in present {
         if has_aggregated && is_string_aggregate(v) {
             let a_count = v.get("count").and_then(|n| n.as_u64()).unwrap_or(0);
             count += a_count;
-            if let Some(vals) = v.get("values").and_then(|a| a.as_array()) {
+
+            if let Some(freqs) = v.get("frequencies").and_then(|f| f.as_object()) {
+                // New format: merge frequencies by summing
+                for (key, val) in freqs {
+                    let freq = val.as_u64().or_else(|| val.as_f64().map(|f| f as u64)).unwrap_or(0);
+                    *frequencies.entry(key.clone()).or_insert(0) += freq;
+                }
+            } else if let Some(vals) = v.get("values").and_then(|a| a.as_array()) {
+                // Old format: values without frequencies — track as unplaced
                 for val in vals {
                     if let Some(s) = val.as_str() {
-                        if seen.len() < STRING_VALUES_CAP && seen.insert(s.to_string()) {
-                            unique_values.push(s.to_string());
+                        if unplaced_seen.len() < STRING_VALUES_CAP
+                            && unplaced_seen.insert(s.to_string())
+                            && !frequencies.contains_key(s)
+                        {
+                            unplaced_values.push(s.to_string());
                         }
                     }
                 }
             }
         } else if let Some(s) = v.as_str() {
             count += 1;
-            if seen.len() < STRING_VALUES_CAP && seen.insert(s.to_string()) {
-                unique_values.push(s.to_string());
-            }
+            *frequencies.entry(s.to_string()).or_insert(0) += 1;
         }
     }
 
+    // Cap frequencies at STRING_VALUES_CAP entries
+    let mut freq_map = serde_json::Map::new();
+    let mut freq_entries: Vec<(String, u64)> = frequencies.into_iter().collect();
+    freq_entries.sort_by_key(|b| std::cmp::Reverse(b.1)); // highest frequency first
+    for (key, val) in freq_entries.into_iter().take(STRING_VALUES_CAP) {
+        freq_map.insert(key, Value::Number(val.into()));
+    }
+
     let mut obj = serde_json::Map::new();
-    obj.insert(
-        "values".to_string(),
-        Value::Array(unique_values.into_iter().map(Value::String).collect()),
-    );
+    obj.insert("frequencies".to_string(), Value::Object(freq_map));
     obj.insert("count".to_string(), Value::Number(count.into()));
+
+    // Preserve unplaced values from old-format aggregates
+    if !unplaced_values.is_empty() {
+        obj.insert(
+            "unplaced".to_string(),
+            Value::Array(unplaced_values.into_iter().map(Value::String).collect()),
+        );
+    }
+
     if presence_count < total {
         obj.insert("present".to_string(), Value::Number(presence_count.into()));
     }
     Value::Object(obj)
+}
+
+/// Build a temporal histogram from attestation timestamps.
+///
+/// Raw attestations get their timestamp bucketed into 10min keys.
+/// Existing distill attestations with `_histogram` get their histograms merged.
+/// Existing distill attestations without `_histogram` contribute nothing
+/// (their `_total` is still counted — `sum(histogram) <= _total` is expected).
+fn build_histogram(attestations: &[Attestation]) -> HashMap<String, u64> {
+    let mut histogram: HashMap<String, u64> = HashMap::new();
+
+    for att in attestations {
+        if let Some(existing) = att.attributes.get("_histogram").and_then(|v| v.as_object()) {
+            // Merge existing histogram from prior distill
+            for (key, val) in existing {
+                if let Some(count) = val.as_u64().or_else(|| val.as_f64().map(|f| f as u64)) {
+                    *histogram.entry(key.clone()).or_insert(0) += count;
+                }
+            }
+        } else if !att.attributes.contains_key("_distill") {
+            // Raw attestation — bucket its timestamp
+            let ts = if att.timestamp > 0 {
+                att.timestamp
+            } else {
+                att.created_at
+            };
+            let key = timestamp_to_10min_key(ts);
+            *histogram.entry(key).or_insert(0) += 1;
+        }
+        // Distill attestation without _histogram: unplaced, contributes to _total only
+    }
+
+    coarsen_histogram(histogram)
+}
+
+/// Convert a millisecond timestamp to a 10-minute bucket key.
+/// Format: "2026-05-13T14:10" (truncated to 10min boundary).
+fn timestamp_to_10min_key(ts_ms: i64) -> String {
+    let dt = chrono::DateTime::from_timestamp_millis(ts_ms).unwrap_or_default();
+    let minute = (dt.format("%M").to_string().parse::<u32>().unwrap_or(0) / 10) * 10;
+    format!("{}:{:02}", dt.format("%Y-%m-%dT%H"), minute)
+}
+
+/// Coarsen a histogram if it exceeds the key budget.
+///
+/// Tiers by key length:
+/// - 16 chars: 10min ("2026-05-13T14:10")
+/// - 13 chars: hourly ("2026-05-13T14")
+/// - 10 chars: daily  ("2026-05-13")
+/// -  8 chars: weekly ("2026-W20")
+///
+/// Collapses the finest tier by prefix-grouping and summing.
+/// Recurses if still over budget after one collapse.
+fn coarsen_histogram(histogram: HashMap<String, u64>) -> HashMap<String, u64> {
+    if histogram.len() <= HISTOGRAM_KEY_BUDGET {
+        return histogram;
+    }
+
+    // Find the finest tier (longest key)
+    let max_len = histogram.keys().map(|k| k.len()).max().unwrap_or(0);
+
+    let mut coarsened: HashMap<String, u64> = HashMap::new();
+
+    for (key, count) in histogram {
+        if key.len() == max_len {
+            // Collapse to next coarser tier
+            let coarse_key = coarsen_key(&key);
+            *coarsened.entry(coarse_key).or_insert(0) += count;
+        } else {
+            *coarsened.entry(key).or_insert(0) += count;
+        }
+    }
+
+    // Recurse if still over budget
+    if coarsened.len() > HISTOGRAM_KEY_BUDGET {
+        coarsen_histogram(coarsened)
+    } else {
+        coarsened
+    }
+}
+
+/// Collapse a histogram key to the next coarser tier.
+///
+/// "2026-05-13T14:10" (10min) → "2026-05-13T14" (hourly)
+/// "2026-05-13T14"    (hourly) → "2026-05-13"    (daily)
+/// "2026-05-13"       (daily)  → ISO week key     (weekly)
+fn coarsen_key(key: &str) -> String {
+    match key.len() {
+        16 => key[..13].to_string(), // 10min → hourly: drop ":MM"
+        13 => key[..10].to_string(), // hourly → daily: drop "THH"
+        10 => {
+            // daily → weekly
+            if let Ok(date) = chrono::NaiveDate::parse_from_str(key, "%Y-%m-%d") {
+                let iso = date.iso_week();
+                format!("{}-W{:02}", iso.year(), iso.week())
+            } else {
+                key.to_string()
+            }
+        }
+        _ => key.to_string(), // already at coarsest or unknown format
+    }
 }
 
 #[cfg(test)]
@@ -437,8 +586,10 @@ mod tests {
 
         let merged = merge_attributes(&atts);
         let stage = merged.get("stage").unwrap();
-        let values = stage.get("values").unwrap().as_array().unwrap();
-        assert_eq!(values.len(), 2); // "connecting" and "discovered" deduplicated
+        let freqs = stage.get("frequencies").unwrap().as_object().unwrap();
+        assert_eq!(freqs.len(), 2); // "connecting" and "discovered"
+        assert_eq!(freqs.get("connecting").unwrap(), &Value::Number(2.into()));
+        assert_eq!(freqs.get("discovered").unwrap(), &Value::Number(1.into()));
         assert_eq!(stage.get("count").unwrap(), &Value::Number(3.into()));
     }
 
@@ -629,7 +780,7 @@ mod tests {
     }
 
     #[test]
-    fn test_string_values_cap() {
+    fn test_string_frequencies_cap() {
         // Create attestations with many distinct string values
         let atts: Vec<Attestation> = (0..60)
             .map(|i| {
@@ -643,11 +794,253 @@ mod tests {
 
         let merged = merge_attributes(&atts);
         let tag = merged.get("tag").unwrap();
-        let values = tag.get("values").unwrap().as_array().unwrap();
-        // Capped at 50 unique values
-        assert_eq!(values.len(), STRING_VALUES_CAP);
+        let freqs = tag.get("frequencies").unwrap().as_object().unwrap();
+        // Capped at 50 entries
+        assert_eq!(freqs.len(), STRING_VALUES_CAP);
         // But count reflects all 60
         assert_eq!(tag.get("count").unwrap(), &Value::Number(60.into()));
+    }
+
+    #[test]
+    fn test_histogram_from_raw_attestations() {
+        let atts = vec![
+            AttestationBuilder::new()
+                .id("AS-1")
+                .subject("X")
+                .timestamp(1747137000000) // 2025-05-13T11:50:00 UTC
+                .build(),
+            AttestationBuilder::new()
+                .id("AS-2")
+                .subject("X")
+                .timestamp(1747137060000) // 2025-05-13T11:51:00 UTC (same 10min bucket)
+                .build(),
+            AttestationBuilder::new()
+                .id("AS-3")
+                .subject("X")
+                .timestamp(1747137600000) // 2025-05-13T12:00:00 UTC (next bucket)
+                .build(),
+        ];
+
+        let merged = merge_attributes(&atts);
+        let hist = merged.get("_histogram").unwrap().as_object().unwrap();
+
+        // Two buckets: 11:50 (2 attestations) and 12:00 (1 attestation)
+        assert_eq!(hist.len(), 2);
+        assert_eq!(
+            hist.get("2025-05-13T11:50").unwrap(),
+            &Value::Number(2.into())
+        );
+        assert_eq!(
+            hist.get("2025-05-13T12:00").unwrap(),
+            &Value::Number(1.into())
+        );
+    }
+
+    #[test]
+    fn test_histogram_meta_distill_merges() {
+        let mut attrs1 = HashMap::new();
+        attrs1.insert("_distill".to_string(), Value::Bool(true));
+        attrs1.insert("_count".to_string(), Value::Number(3.into()));
+        attrs1.insert("_total".to_string(), Value::Number(3.into()));
+        let mut hist1 = serde_json::Map::new();
+        hist1.insert("2025-05-13T14:10".to_string(), Value::Number(2.into()));
+        hist1.insert("2025-05-13T14:20".to_string(), Value::Number(1.into()));
+        attrs1.insert("_histogram".to_string(), Value::Object(hist1));
+
+        let mut attrs2 = HashMap::new();
+        attrs2.insert("_distill".to_string(), Value::Bool(true));
+        attrs2.insert("_count".to_string(), Value::Number(5.into()));
+        attrs2.insert("_total".to_string(), Value::Number(5.into()));
+        let mut hist2 = serde_json::Map::new();
+        hist2.insert("2025-05-13T14:10".to_string(), Value::Number(3.into()));
+        hist2.insert("2025-05-13T14:30".to_string(), Value::Number(2.into()));
+        attrs2.insert("_histogram".to_string(), Value::Object(hist2));
+
+        let att1 = Attestation {
+            id: "AS-distill-1".into(),
+            subjects: vec!["X".into()],
+            predicates: vec!["test".into()],
+            contexts: vec!["ctx".into()],
+            actors: vec!["distill".into()],
+            timestamp: 1747137000000,
+            source: "distill".into(),
+            attributes: attrs1,
+            created_at: 1747137000000,
+            signature: None,
+            signer_did: None,
+        };
+        let att2 = Attestation {
+            id: "AS-distill-2".into(),
+            subjects: vec!["X".into()],
+            predicates: vec!["test".into()],
+            contexts: vec!["ctx".into()],
+            actors: vec!["distill".into()],
+            timestamp: 1747138200000,
+            source: "distill".into(),
+            attributes: attrs2,
+            created_at: 1747138200000,
+            signature: None,
+            signer_did: None,
+        };
+
+        let merged = merge_attributes(&[att1, att2]);
+        let hist = merged.get("_histogram").unwrap().as_object().unwrap();
+
+        // 14:10 merged: 2 + 3 = 5
+        assert_eq!(
+            hist.get("2025-05-13T14:10").unwrap(),
+            &Value::Number(5.into())
+        );
+        // 14:20 from first only
+        assert_eq!(
+            hist.get("2025-05-13T14:20").unwrap(),
+            &Value::Number(1.into())
+        );
+        // 14:30 from second only
+        assert_eq!(
+            hist.get("2025-05-13T14:30").unwrap(),
+            &Value::Number(2.into())
+        );
+        assert_eq!(hist.len(), 3);
+    }
+
+    #[test]
+    fn test_histogram_legacy_sigma_unplaced() {
+        // Old sigma without _histogram — its observations stay unplaced
+        let mut attrs1 = HashMap::new();
+        attrs1.insert("_distill".to_string(), Value::Bool(true));
+        attrs1.insert("_count".to_string(), Value::Number(100.into()));
+        attrs1.insert("_total".to_string(), Value::Number(100.into()));
+        // No _histogram
+
+        let att1 = Attestation {
+            id: "AS-distill-old".into(),
+            subjects: vec!["X".into()],
+            predicates: vec!["test".into()],
+            contexts: vec!["ctx".into()],
+            actors: vec!["distill".into()],
+            timestamp: 1747137000000,
+            source: "distill".into(),
+            attributes: attrs1,
+            created_at: 1747137000000,
+            signature: None,
+            signer_did: None,
+        };
+
+        // New raw attestation with timestamp
+        let att2 = AttestationBuilder::new()
+            .id("AS-new")
+            .subject("X")
+            .timestamp(1747137600000) // 2025-05-13T12:00 UTC
+            .build();
+
+        let merged = merge_attributes(&[att1, att2]);
+
+        // _total = 100 + 1 = 101
+        assert_eq!(merged.get("_total").unwrap(), &Value::Number(101u64.into()));
+
+        // Histogram only has the new attestation's bucket
+        let hist = merged.get("_histogram").unwrap().as_object().unwrap();
+        assert_eq!(hist.len(), 1);
+        assert_eq!(
+            hist.get("2025-05-13T12:00").unwrap(),
+            &Value::Number(1.into())
+        );
+
+        // sum(histogram) = 1, _total = 101 — gap of 100 is unplaced legacy
+    }
+
+    #[test]
+    fn test_coarsen_10min_to_hourly() {
+        let mut hist = HashMap::new();
+        // 201 keys at 10min resolution (exceeds budget of 200)
+        for hour in 0..4 {
+            for ten_min in 0..6 {
+                for day in 1..=9 {
+                    let key = format!("2025-05-{:02}T{:02}:{:02}", day, hour, ten_min * 10);
+                    hist.insert(key, 1u64);
+                    if hist.len() > HISTOGRAM_KEY_BUDGET {
+                        break;
+                    }
+                }
+                if hist.len() > HISTOGRAM_KEY_BUDGET {
+                    break;
+                }
+            }
+            if hist.len() > HISTOGRAM_KEY_BUDGET {
+                break;
+            }
+        }
+        assert!(hist.len() > HISTOGRAM_KEY_BUDGET);
+
+        let coarsened = coarsen_histogram(hist);
+
+        // All keys should be hourly (13 chars) now
+        assert!(coarsened.len() <= HISTOGRAM_KEY_BUDGET);
+        for key in coarsened.keys() {
+            assert_eq!(key.len(), 13, "Expected hourly key, got: {}", key);
+        }
+    }
+
+    #[test]
+    fn test_coarsen_key_tiers() {
+        assert_eq!(coarsen_key("2025-05-13T14:10"), "2025-05-13T14"); // 10min → hourly
+        assert_eq!(coarsen_key("2025-05-13T14"), "2025-05-13"); // hourly → daily
+        assert_eq!(coarsen_key("2025-05-13"), "2025-W20"); // daily → weekly
+    }
+
+    #[test]
+    fn test_old_format_string_agg_becomes_unplaced() {
+        // Old-format {values, count} from prior distill — values become unplaced
+        let mut attrs1 = HashMap::new();
+        attrs1.insert("_distill".to_string(), Value::Bool(true));
+        attrs1.insert("_count".to_string(), Value::Number(5.into()));
+        let mut old_agg = serde_json::Map::new();
+        old_agg.insert(
+            "values".to_string(),
+            Value::Array(vec![
+                Value::String("connecting".into()),
+                Value::String("timeout".into()),
+            ]),
+        );
+        old_agg.insert("count".to_string(), Value::Number(5.into()));
+        attrs1.insert("stage".to_string(), Value::Object(old_agg));
+
+        let att1 = Attestation {
+            id: "AS-distill-old".into(),
+            subjects: vec!["X".into()],
+            predicates: vec!["test".into()],
+            contexts: vec!["ctx".into()],
+            actors: vec!["distill".into()],
+            timestamp: 1747137000000,
+            source: "distill".into(),
+            attributes: attrs1,
+            created_at: 1747137000000,
+            signature: None,
+            signer_did: None,
+        };
+
+        // New raw attestation with a string value
+        let att2 = AttestationBuilder::new()
+            .id("AS-new")
+            .subject("X")
+            .attribute("stage".to_string(), Value::String("connecting".into()))
+            .build();
+
+        let merged = merge_attributes(&[att1, att2]);
+        let stage = merged.get("stage").unwrap();
+
+        // "connecting" from raw attestation has frequency 1
+        let freqs = stage.get("frequencies").unwrap().as_object().unwrap();
+        assert_eq!(freqs.get("connecting").unwrap(), &Value::Number(1.into()));
+
+        // "timeout" from old format has no frequency — it's unplaced
+        assert!(freqs.get("timeout").is_none());
+        let unplaced = stage.get("unplaced").unwrap().as_array().unwrap();
+        assert!(unplaced.contains(&Value::String("timeout".into())));
+
+        // count = 5 (old) + 1 (new) = 6
+        assert_eq!(stage.get("count").unwrap(), &Value::Number(6.into()));
     }
 
     #[test]
@@ -659,11 +1052,15 @@ mod tests {
         attrs1.insert("_distill".to_string(), Value::Bool(true));
         attrs1.insert(
             "_count".to_string(),
-            serde_json::Number::from_f64(2101.0).map(Value::Number).unwrap(),
+            serde_json::Number::from_f64(2101.0)
+                .map(Value::Number)
+                .unwrap(),
         );
         attrs1.insert(
             "_total".to_string(),
-            serde_json::Number::from_f64(2101.0).map(Value::Number).unwrap(),
+            serde_json::Number::from_f64(2101.0)
+                .map(Value::Number)
+                .unwrap(),
         );
 
         let att1 = Attestation {
@@ -684,11 +1081,15 @@ mod tests {
         attrs2.insert("_distill".to_string(), Value::Bool(true));
         attrs2.insert(
             "_count".to_string(),
-            serde_json::Number::from_f64(500.0).map(Value::Number).unwrap(),
+            serde_json::Number::from_f64(500.0)
+                .map(Value::Number)
+                .unwrap(),
         );
         attrs2.insert(
             "_total".to_string(),
-            serde_json::Number::from_f64(500.0).map(Value::Number).unwrap(),
+            serde_json::Number::from_f64(500.0)
+                .map(Value::Number)
+                .unwrap(),
         );
 
         let att2 = Attestation {
@@ -708,7 +1109,10 @@ mod tests {
         let merged = merge_attributes(&[att1, att2]);
 
         // _total must be 2101 + 500 = 2601, NOT 2 (fallback to 1 per attestation)
-        assert_eq!(merged.get("_total").unwrap(), &Value::Number(2601u64.into()));
+        assert_eq!(
+            merged.get("_total").unwrap(),
+            &Value::Number(2601u64.into())
+        );
         // _count is batch size
         assert_eq!(merged.get("_count").unwrap(), &Value::Number(2.into()));
     }

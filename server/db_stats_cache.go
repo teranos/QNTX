@@ -46,15 +46,16 @@ func (s *QNTXServer) startDBStatsRefresher() {
 func (s *QNTXServer) refreshDBStats() {
 	var totalAttestations, uniqueActors, uniqueSubjects, uniqueContexts int
 
-	// Open a dedicated read connection — bypasses the shared pool which can be
-	// starved by Rust FFI, backups, and plugin queries at startup.
-	statsDB, err := sql.Open("sqlite3", s.dbPath+"?mode=ro&_journal_mode=WAL&_busy_timeout=5000")
+	// Use the rustsqlite driver — same SQLite library instance as the write path.
+	// Opening a separate Go sqlite3 connection causes WAL checkpoint corruption
+	// because mattn/go-sqlite3 and rusqlite are independent SQLite C libraries
+	// with separate WAL-index mappings.
+	statsDB, err := sql.Open("rustsqlite", s.dbPath)
 	if err != nil {
 		s.logger.Warnw("Failed to open stats connection", "error", err)
 		return
 	}
 	defer statsDB.Close()
-	statsDB.SetMaxOpenConns(1)
 
 	queryStart := time.Now()
 	if err := statsDB.QueryRow("SELECT COUNT(*) FROM attestations").Scan(&totalAttestations); err != nil {
@@ -64,7 +65,7 @@ func (s *QNTXServer) refreshDBStats() {
 	_ = statsDB.QueryRow("SELECT COUNT(DISTINCT actor) FROM attestation_actors").Scan(&uniqueActors)
 	_ = statsDB.QueryRow("SELECT COUNT(DISTINCT subject) FROM attestation_subjects").Scan(&uniqueSubjects)
 	_ = statsDB.QueryRow("SELECT COUNT(DISTINCT context) FROM attestation_contexts").Scan(&uniqueContexts)
-	s.logger.Infow("DB stats queries complete", "elapsed", time.Since(queryStart), "attestations", totalAttestations)
+	s.logger.Debugw("DB stats queries complete", "elapsed", time.Since(queryStart), "attestations", totalAttestations)
 
 	// Rich fields
 	boundedStore := storage.NewBoundedStore(statsDB, nil, s.logger.Named("db-stats-cache"))
@@ -81,6 +82,12 @@ func (s *QNTXServer) refreshDBStats() {
 	if syscap.IsStorageOptimized() {
 		storageBackend = "rust"
 	}
+
+	// Distillation stats
+	distillStats := queryDistillStats(statsDB)
+
+	// Predicate histograms (from distill _histogram attributes)
+	predicateHistograms := queryPredicateHistograms(statsDB)
 
 	// Recent evictions
 	recentEvictions := queryRecentEvictions(statsDB)
@@ -100,7 +107,9 @@ func (s *QNTXServer) refreshDBStats() {
 		"unique_contexts":    uniqueContexts,
 		"rich_fields":        richFields,
 		"recent_evictions":   recentEvictions,
-		"performance":        perfData,
+		"distillation":          distillStats,
+		"predicate_histograms": predicateHistograms,
+		"performance":          perfData,
 	}
 
 	s.dbStatsCache.Store(&cachedDBStats{response: response})
@@ -205,6 +214,169 @@ func parseLegacyPredicates(raw interface{}) []string {
 				}
 			}
 		}
+	}
+	return result
+}
+
+func queryDistillStats(db *sql.DB) map[string]interface{} {
+	var distillCount int
+	var totalPreserved sql.NullInt64
+	var oldestDistill, newestDistill sql.NullString
+
+	_ = db.QueryRow("SELECT COUNT(*) FROM attestations WHERE source = 'distill'").Scan(&distillCount)
+	if distillCount == 0 {
+		return nil
+	}
+
+	_ = db.QueryRow(`
+		SELECT SUM(json_extract(attributes, '$._count')),
+		       MIN(json_extract(attributes, '$._first_seen')),
+		       MAX(json_extract(attributes, '$._last_seen'))
+		FROM attestations WHERE source = 'distill'
+		  AND json_extract(attributes, '$._first_seen') > '0002'
+	`).Scan(&totalPreserved, &oldestDistill, &newestDistill)
+
+	result := map[string]interface{}{
+		"sigmas": distillCount,
+	}
+	if totalPreserved.Valid {
+		result["preserved_count"] = totalPreserved.Int64
+	}
+	if oldestDistill.Valid {
+		result["oldest"] = oldestDistill.String
+	}
+	if newestDistill.Valid {
+		result["newest"] = newestDistill.String
+	}
+
+	// Top distill predicates
+	rows, err := db.Query(`
+		SELECT jp.predicate, COUNT(*) as cnt
+		FROM attestation_predicates jp
+		JOIN attestations a ON a.id = jp.attestation_id
+		WHERE a.source = 'distill'
+		GROUP BY jp.predicate
+		ORDER BY cnt DESC
+		LIMIT 10
+	`)
+	if err == nil {
+		defer rows.Close()
+		var predicates []map[string]interface{}
+		for rows.Next() {
+			var pred string
+			var cnt int
+			if rows.Scan(&pred, &cnt) == nil {
+				predicates = append(predicates, map[string]interface{}{
+					"predicate": pred,
+					"count":     cnt,
+				})
+			}
+		}
+		if len(predicates) > 0 {
+			result["predicates"] = predicates
+		}
+	}
+
+	// Top sigmas ranked by total observations (>= 100 obs only)
+	// Includes full row data so the frontend can open sigma windows on click.
+	sigmaRows, err := db.Query(`
+		SELECT id, subjects, predicates, actors, contexts,
+		       timestamp, source, attributes
+		FROM attestations
+		WHERE source = 'distill'
+		  AND COALESCE(json_extract(attributes, '$._total'), json_extract(attributes, '$._count'), 0) >= 100
+		ORDER BY COALESCE(json_extract(attributes, '$._total'), json_extract(attributes, '$._count'), 0) DESC
+		LIMIT 200
+	`)
+	if err == nil {
+		defer sigmaRows.Close()
+		var topSigmas []map[string]interface{}
+		for sigmaRows.Next() {
+			var id, subjects, predicates, actors, contexts, source string
+			var timestamp sql.NullString
+			var attributes string
+			if sigmaRows.Scan(&id, &subjects, &predicates, &actors, &contexts, &timestamp, &source, &attributes) == nil {
+				sigma := map[string]interface{}{
+					"id":         id,
+					"subjects":   subjects,
+					"predicates": predicates,
+					"actors":     actors,
+					"contexts":   contexts,
+					"source":     source,
+					"attributes": attributes,
+				}
+				if timestamp.Valid {
+					sigma["timestamp"] = timestamp.String
+				}
+				topSigmas = append(topSigmas, sigma)
+			}
+		}
+		if len(topSigmas) > 0 {
+			result["top_sigmas"] = topSigmas
+		}
+	}
+
+	return result
+}
+
+// queryPredicateHistograms aggregates _histogram data from distill attestations
+// grouped by predicate. Returns map[predicate] -> map[timeKey] -> count.
+func queryPredicateHistograms(db *sql.DB) map[string]map[string]int64 {
+	rows, err := db.Query(`
+		SELECT jp.predicate, a.attributes
+		FROM attestation_predicates jp
+		JOIN attestations a ON a.id = jp.attestation_id
+		WHERE a.source = 'distill'
+		  AND json_extract(a.attributes, '$._histogram') IS NOT NULL
+	`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	result := make(map[string]map[string]int64)
+	for rows.Next() {
+		var predicate, attrsJSON string
+		if rows.Scan(&predicate, &attrsJSON) != nil {
+			continue
+		}
+
+		// Strip distill: prefix layers for clean predicate names
+		clean := predicate
+		for strings.HasPrefix(clean, "distill:") {
+			clean = clean[len("distill:"):]
+		}
+
+		var attrs map[string]interface{}
+		if json.Unmarshal([]byte(attrsJSON), &attrs) != nil {
+			continue
+		}
+		histRaw, ok := attrs["_histogram"]
+		if !ok {
+			continue
+		}
+		hist, ok := histRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		if result[clean] == nil {
+			result[clean] = make(map[string]int64)
+		}
+		for key, val := range hist {
+			switch v := val.(type) {
+			case float64:
+				result[clean][key] += int64(v)
+			case json.Number:
+				if n, err := v.Int64(); err == nil {
+					result[clean][key] += n
+				}
+			}
+		}
+	}
+
+	if len(result) == 0 {
+		return nil
 	}
 	return result
 }

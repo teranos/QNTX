@@ -56,6 +56,7 @@ import { createCanvasGlyph } from './components/glyph/canvas/canvas-glyph';
 import { createChartGlyph } from './components/glyph/chart-glyph';
 import { createDbGlyph } from './db-glyph';
 import { createEmbeddingsGlyph } from './embeddings-glyph';
+import { createSigmaPanel } from './sigma-panel';
 import { log, SEG } from './logger.ts';
 import { formatBuildTime } from './components/tooltip.ts';
 import type { VersionMessage, SystemCapabilitiesMessage } from '../types/websocket';
@@ -68,6 +69,7 @@ let selfVersion: VersionMessage | null = null;
 let selfCapabilities: SystemCapabilitiesMessage | null = null;
 
 export { updateDatabaseStats, recordEviction } from './db-glyph';
+export { updateSigmaPanel } from './sigma-panel';
 
 export function updateSelfVersion(data: VersionMessage): void {
     selfVersion = data;
@@ -172,6 +174,9 @@ export function registerDefaultGlyphs(): void {
 
     // Database Statistics Glyph
     glyphRun.add(createDbGlyph());
+
+    // Sigma Overview Panel
+    glyphRun.add(createSigmaPanel());
 
     // Embeddings Glyph
     glyphRun.add(createEmbeddingsGlyph());

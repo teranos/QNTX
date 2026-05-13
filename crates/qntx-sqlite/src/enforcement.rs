@@ -1,6 +1,6 @@
 //! Bounded storage enforcement for SqliteStore
 //!
-//! Implements the 16/64/64 enforcement strategy:
+//! Implements the 32/64/64 enforcement strategy:
 //! - N attestations per (actor, context) pair — delete oldest
 //! - N contexts per actor — delete least-used contexts
 //! - N actors per entity/subject — delete least-recent actors
@@ -229,16 +229,16 @@ impl SqliteStore {
             rusqlite::params![actor, context],
         )?;
 
-        // Distill: insert summary after deleting originals so the distill
-        // attestation's counter increment doesn't inflate the count.
+        // Σ Insert sigma after deleting originals so the sigma's
+        // counter increment doesn't inflate the count.
         if !eviction_batch.is_empty() {
-            let distill_att = distill::build_distill_attestation(&eviction_batch, context);
+            let sigma = distill::build_distill_attestation(&eviction_batch, context);
             self.distilling = true;
-            let insert_result = put_attestation(&self.conn, &distill_att);
+            let insert_result = put_attestation(&self.conn, &sigma);
             self.distilling = false;
             if let Err(e) = insert_result {
                 eprintln!(
-                    "qntx-sqlite: failed to insert distill attestation for actor={} context={}: {}",
+                    "qntx-sqlite: Σ failed to insert sigma for actor={} context={}: {}",
                     actor, context, e
                 );
             }
@@ -396,15 +396,15 @@ impl SqliteStore {
             )?;
             total_deleted += deleted;
 
-            // Distill: insert summary after deleting originals
+            // Σ Insert sigma after deleting originals
             if !eviction_batch.is_empty() {
-                let distill_att = distill::build_distill_attestation(&eviction_batch, "_distill");
+                let sigma = distill::build_distill_attestation(&eviction_batch, "_distill");
                 self.distilling = true;
-                let insert_result = put_attestation(&self.conn, &distill_att);
+                let insert_result = put_attestation(&self.conn, &sigma);
                 self.distilling = false;
                 if let Err(e) = insert_result {
                     eprintln!(
-                        "qntx-sqlite: failed to insert distill attestation for actor={} context={}: {}",
+                        "qntx-sqlite: Σ failed to insert sigma for actor={} context={}: {}",
                         actor, cu.context, e
                     );
                 }
@@ -588,15 +588,15 @@ impl SqliteStore {
             )?;
             total_deleted += deleted;
 
-            // Distill: insert summary after deleting originals
+            // Σ Insert sigma after deleting originals
             if !eviction_batch.is_empty() {
-                let distill_att = distill::build_distill_attestation(&eviction_batch, "_distill");
+                let sigma = distill::build_distill_attestation(&eviction_batch, "_distill");
                 self.distilling = true;
-                let insert_result = put_attestation(&self.conn, &distill_att);
+                let insert_result = put_attestation(&self.conn, &sigma);
                 self.distilling = false;
                 if let Err(e) = insert_result {
                     eprintln!(
-                        "qntx-sqlite: failed to insert distill attestation for entity={} actor={}: {}",
+                        "qntx-sqlite: Σ failed to insert sigma for entity={} actor={}: {}",
                         entity, actor, e
                     );
                 }
@@ -760,7 +760,7 @@ mod tests {
             actors: vec!["bob".to_string()],
             contexts: vec!["work".to_string()],
             subjects: vec!["ALICE".to_string()],
-            config: EnforcementConfig::default(), // limit=16
+            config: EnforcementConfig::default(), // limit=32
         };
 
         let events = store.enforce_limits(&input).unwrap();
@@ -971,17 +971,16 @@ mod tests {
 
         // Check merged elapsed_ms: min=50, max=200, sum=350, count=3
         let elapsed = distill_att.attributes.get("elapsed_ms").unwrap();
-        assert_eq!(elapsed.get("min").unwrap(), &serde_json::json!(50));   // AS-3
-        assert_eq!(elapsed.get("max").unwrap(), &serde_json::json!(200));  // AS-2
-        assert_eq!(elapsed.get("sum").unwrap(), &serde_json::json!(350));  // 100+200+50
+        assert_eq!(elapsed.get("min").unwrap(), &serde_json::json!(50)); // AS-3
+        assert_eq!(elapsed.get("max").unwrap(), &serde_json::json!(200)); // AS-2
+        assert_eq!(elapsed.get("sum").unwrap(), &serde_json::json!(350)); // 100+200+50
         assert_eq!(elapsed.get("count").unwrap(), &serde_json::json!(3));
 
-        // Check merged stage: values should contain "connecting" and "discovered"
+        // Check merged stage: frequencies should contain "connecting" and "discovered"
         let stage = distill_att.attributes.get("stage").unwrap();
-        let stage_values = stage.get("values").unwrap().as_array().unwrap();
-        let stage_strs: Vec<&str> = stage_values.iter().map(|v| v.as_str().unwrap()).collect();
-        assert!(stage_strs.contains(&"connecting"));
-        assert!(stage_strs.contains(&"discovered"));
+        let freqs = stage.get("frequencies").unwrap().as_object().unwrap();
+        assert!(freqs.contains_key("connecting"));
+        assert!(freqs.contains_key("discovered"));
 
         // Predicates should be distill-prefixed
         assert!(distill_att

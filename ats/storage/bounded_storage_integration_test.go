@@ -58,9 +58,9 @@ func TestBoundedStorage_SameActorContextPruning(t *testing.T) {
 	subject := "KYSTSN"
 	context := "10.0" // Same context for all
 
-	// Insert 20 attestations with the same actor AND same context
-	// This triggers the 16-per-actor/context limit
-	for i := 0; i < 20; i++ {
+	// Insert 25 attestations with the same actor AND same context
+	// This exceeds the half-bound threshold (limit=16, threshold=24)
+	for i := 0; i < 25; i++ {
 		attestation := &types.As{
 			ID:         fmt.Sprintf("TEST_SAME_CTX_%d", i),
 			Subjects:   []string{subject},

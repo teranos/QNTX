@@ -146,14 +146,16 @@ const MESSAGE_HANDLERS = {
             path: data.path
         });
 
-        // Update database stats glyph
-        import('./default-glyphs.js').then(({ updateDatabaseStats }) => {
+        // Update database stats glyph + sigma panel
+        import('./default-glyphs.js').then(({ updateDatabaseStats, updateSigmaPanel }) => {
             updateDatabaseStats(data);
+            updateSigmaPanel(data);
         });
 
-        // Update status indicator with total count
+        // Update status indicators
         import('./status-indicators.js').then(({ statusIndicators }) => {
             statusIndicators.handleDatabaseStats(data.total_attestations);
+            statusIndicators.handleSigmaStats(data.distillation);
         });
     },
 

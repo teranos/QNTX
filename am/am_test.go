@@ -45,7 +45,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 			name: "zero workers is valid (no background workers)",
 			config: Config{
 				Pulse:    PulseConfig{Workers: 0},
-				Database: DatabaseConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 16, ActorContextsLimit: 64, EntityActorsLimit: 64}},
+				Database: DatabaseConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}},
 			},
 			wantErr: false,
 		},
@@ -53,7 +53,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 			name: "negative workers is invalid",
 			config: Config{
 				Pulse:    PulseConfig{Workers: -1},
-				Database: DatabaseConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 16, ActorContextsLimit: 64, EntityActorsLimit: 64}},
+				Database: DatabaseConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}},
 			},
 			wantErr: true,
 		},
@@ -61,7 +61,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 			name: "zero ticker interval is valid (no periodic ticking)",
 			config: Config{
 				Pulse:    PulseConfig{TickerIntervalSeconds: 0},
-				Database: DatabaseConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 16, ActorContextsLimit: 64, EntityActorsLimit: 64}},
+				Database: DatabaseConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}},
 			},
 			wantErr: false,
 		},
@@ -69,14 +69,14 @@ func TestValidate_ZeroValues(t *testing.T) {
 			name: "negative ticker interval is invalid",
 			config: Config{
 				Pulse:    PulseConfig{TickerIntervalSeconds: -1},
-				Database: DatabaseConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 16, ActorContextsLimit: 64, EntityActorsLimit: 64}},
+				Database: DatabaseConfig{BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}},
 			},
 			wantErr: true,
 		},
 		{
 			name: "empty database path is valid",
 			config: Config{
-				Database: DatabaseConfig{Path: "", BoundedStorage: BoundedStorageConfig{ActorContextLimit: 16, ActorContextsLimit: 64, EntityActorsLimit: 64}},
+				Database: DatabaseConfig{Path: "", BoundedStorage: BoundedStorageConfig{ActorContextLimit: 32, ActorContextsLimit: 64, EntityActorsLimit: 64}},
 			},
 			wantErr: false,
 		},

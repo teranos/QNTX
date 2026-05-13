@@ -3794,7 +3794,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-app"
-version = "0.2.14"
+version = "0.2.28"
 dependencies = [
  "log",
  "qntx-grpc",
@@ -3813,7 +3813,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-core"
-version = "0.2.14"
+version = "0.2.28"
 dependencies = [
  "pretty_assertions",
  "serde",
@@ -3824,11 +3824,11 @@ dependencies = [
 
 [[package]]
 name = "qntx-ffi-common"
-version = "0.2.14"
+version = "0.2.28"
 
 [[package]]
 name = "qntx-grpc"
-version = "0.2.14"
+version = "0.2.28"
 dependencies = [
  "http",
  "lazy_static",
@@ -3847,14 +3847,14 @@ dependencies = [
 
 [[package]]
 name = "qntx-id"
-version = "0.2.14"
+version = "0.2.28"
 dependencies = [
  "unicode-normalization",
 ]
 
 [[package]]
 name = "qntx-indexeddb"
-version = "0.2.14"
+version = "0.2.28"
 dependencies = [
  "js-sys",
  "qntx-core",
@@ -3869,7 +3869,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-meili"
-version = "0.8.5"
+version = "0.8.6"
 dependencies = [
  "clap",
  "meilisearch-sdk",
@@ -3885,12 +3885,11 @@ dependencies = [
  "tonic",
  "tracing",
  "tracing-subscriber",
- "ureq",
 ]
 
 [[package]]
 name = "qntx-proto"
-version = "0.2.14"
+version = "0.2.28"
 dependencies = [
  "base64 0.22.1",
  "prost",
@@ -3967,7 +3966,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-sqlite"
-version = "0.2.14"
+version = "0.2.28"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -4493,7 +4492,6 @@ version = "0.23.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "758025cb5fccfd3bc2fd74708fd4682be41d99e5dff73c377c0646c6012c73a4"
 dependencies = [
- "log",
  "once_cell",
  "ring",
  "rustls-pki-types",
@@ -6240,35 +6238,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
-name = "ureq"
-version = "3.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dea7109cdcd5864d4eeb1b58a1648dc9bf520360d7af16ec26d0a9354bafcfc0"
-dependencies = [
- "base64 0.22.1",
- "flate2",
- "log",
- "percent-encoding",
- "rustls",
- "rustls-pki-types",
- "ureq-proto",
- "utf8-zero",
- "webpki-roots",
-]
-
-[[package]]
-name = "ureq-proto"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e994ba84b0bd1b1b0cf92878b7ef898a5c1760108fe7b6010327e274917a808c"
-dependencies = [
- "base64 0.22.1",
- "http",
- "httparse",
- "log",
-]
-
-[[package]]
 name = "url"
 version = "2.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6304,12 +6273,6 @@ name = "utf8-width"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1292c0d970b54115d14f2492fe0170adf21d68a1de108eebc51c1df4f346a091"
-
-[[package]]
-name = "utf8-zero"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8c0a043c9540bae7c578c88f91dda8bd82e59ae27c21baca69c8b191aaf5a6e"
 
 [[package]]
 name = "utf8_iter"

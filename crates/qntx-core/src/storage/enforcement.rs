@@ -2,10 +2,10 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Configuration for enforcement limits (16/64/64 strategy)
+/// Configuration for enforcement limits (32/64/64 strategy)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnforcementConfig {
-    /// Max attestations per (actor, context) pair (default: 16)
+    /// Max attestations per (actor, context) pair (default: 32)
     pub actor_context_limit: usize,
     /// Max contexts per actor (default: 64)
     pub actor_contexts_limit: usize,
@@ -16,7 +16,7 @@ pub struct EnforcementConfig {
 impl Default for EnforcementConfig {
     fn default() -> Self {
         Self {
-            actor_context_limit: 16,
+            actor_context_limit: 32,
             actor_contexts_limit: 64,
             entity_actors_limit: 64,
         }
