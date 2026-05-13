@@ -38,15 +38,17 @@ In the Rust enforcement path, the distill attestation is inserted AFTER deleting
 ```
 subjects:   ["distill:<predicate>"]
 predicates: ["distill:<predicate>"]
-actors:     [union of evicted actors, capped at 50]
+actors:     ["distill"]                              // canonical actor, avoids entity_actors_limit inflation
 contexts:   [union of evicted contexts, capped at 50]
 source:     "distill"
 attributes: {
   _distill: true,
   _count: 8,
   _total: 342,
+  _actors_count: 12,
+  _actors_sample: ["bot", "crawler", ...],           // up to 50
   _subjects_count: 45,
-  _subjects_sample: ["sub_1", "sub_2", ...],      // up to 10
+  _subjects_sample: ["sub_1", "sub_2", ...],         // up to 10
   _first_seen: "2026-05-04T...",
   _last_seen:  "2026-05-12T...",
   _version: "v0.8.0 (fd7326d)",                   // Go binary version
@@ -62,7 +64,7 @@ attributes: {
 - **Number** -> `{min, max, sum, count}` — avg derived as sum/count
 - **String** -> `{values: [...], count}` — values capped at 50, then just count. If constant across all attestations, kept as scalar.
 - **Already-aggregated** (from prior distill, detected by `{min, max, sum}` keys) -> merge: min the mins, max the maxes, sum the sums, add counts; union value sets
-- **Distill metadata keys** (`_distill`, `_count`, `_total`, `_first_seen`, `_last_seen`, `_version`, `_rust_version`, `_subjects_count`, `_subjects_sample`) are skipped during merging and rebuilt from the batch
+- **Distill metadata keys** (`_distill`, `_count`, `_total`, `_first_seen`, `_last_seen`, `_version`, `_rust_version`, `_subjects_count`, `_subjects_sample`, `_actors_count`, `_actors_sample`) are skipped during merging and rebuilt from the batch
 
 ## Observation Counting: `_count` vs `_total`
 

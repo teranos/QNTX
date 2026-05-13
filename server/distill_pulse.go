@@ -253,9 +253,12 @@ func buildDistillAttestation(batch []*types.As, predicate string) *types.As {
 		}
 	}
 
-	// Actors/contexts as sets (capped at 50 to avoid huge distill attestations)
-	actors := setToSlice(actorSet, 50)
+	// Contexts as set (capped at 50)
 	contexts := setToSlice(contextSet, 50)
+
+	// Actors: use canonical "distill" actor to avoid inflating entity_actors_limit.
+	// The original actor union is preserved as _actors_sample in attributes.
+	actorsSample := setToSlice(actorSet, 50)
 
 	// Merge attributes
 	merged := mergeAttributes(batch)
@@ -286,6 +289,10 @@ func buildDistillAttestation(batch []*types.As, predicate string) *types.As {
 	merged["_subjects_count"] = len(subjectSet)
 	merged["_first_seen"] = firstSeen.UTC().Format(time.RFC3339)
 	merged["_last_seen"] = lastSeen.UTC().Format(time.RFC3339)
+
+	// Preserve original actor set in attributes
+	merged["_actors_count"] = len(actorSet)
+	merged["_actors_sample"] = actorsSample
 
 	// Keep a sample of subjects (up to 10) for debuggability
 	if len(subjectSet) <= 10 {
@@ -320,7 +327,7 @@ func buildDistillAttestation(batch []*types.As, predicate string) *types.As {
 		Subjects:   []string{distillPredicate},
 		Predicates: []string{distillPredicate},
 		Contexts:   contexts,
-		Actors:     actors,
+		Actors:     []string{"distill"},
 		Timestamp:  now,
 		CreatedAt:  now,
 		Source:     "distill",
@@ -370,7 +377,7 @@ func mergeAttributes(batch []*types.As) map[string]interface{} {
 		}
 		for k, v := range as.Attributes {
 			// Skip distill metadata keys
-			if k == "_distill" || k == "_count" || k == "_total" || k == "_first_seen" || k == "_last_seen" || k == "_version" || k == "_rust_version" || k == "_subjects_count" || k == "_subjects_sample" {
+			if k == "_distill" || k == "_count" || k == "_total" || k == "_first_seen" || k == "_last_seen" || k == "_version" || k == "_rust_version" || k == "_subjects_count" || k == "_subjects_sample" || k == "_actors_count" || k == "_actors_sample" {
 				continue
 			}
 

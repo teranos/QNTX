@@ -51,28 +51,39 @@ pub fn build_distill_attestation(evicted: &[Attestation], context: &str) -> Atte
         }
     }
 
-    // Collect all actors (union, deduplicated)
-    let mut actors_set: Vec<String> = Vec::new();
+    // Collect all actors for _actors_sample (not used as attestation actors —
+    // using canonical "distill" actor to avoid inflating entity_actors_limit)
+    let mut actors_sample: Vec<String> = Vec::new();
     {
         let mut seen = HashSet::new();
         for att in evicted {
             for a in &att.actors {
-                if seen.insert(a.clone()) {
-                    actors_set.push(a.clone());
+                if seen.insert(a.clone()) && actors_sample.len() < 50 {
+                    actors_sample.push(a.clone());
                 }
             }
         }
     }
 
     // Merge attributes
-    let attributes = merge_attributes(evicted);
+    let mut attributes = merge_attributes(evicted);
+
+    // Store original actor set in attributes (not as attestation actors)
+    attributes.insert(
+        "_actors_count".to_string(),
+        Value::Number((actors_sample.len() as u64).into()),
+    );
+    attributes.insert(
+        "_actors_sample".to_string(),
+        Value::Array(actors_sample.into_iter().map(Value::String).collect()),
+    );
 
     Attestation {
         id,
         subjects: subjects_set,
         predicates,
         contexts: vec![context.to_string()],
-        actors: actors_set,
+        actors: vec!["distill".to_string()],
         timestamp: now_ms,
         source: "distill".to_string(),
         attributes,
@@ -109,6 +120,8 @@ pub fn merge_attributes(attestations: &[Attestation]) -> HashMap<String, Value> 
                 || key == "_last_seen"
                 || key == "_subjects_count"
                 || key == "_subjects_sample"
+                || key == "_actors_count"
+                || key == "_actors_sample"
             {
                 continue;
             }
@@ -140,13 +153,19 @@ pub fn merge_attributes(attestations: &[Attestation]) -> HashMap<String, Value> 
     // _total: transitive total of original observations this attestation represents.
     // For raw attestations, each counts as 1. For prior distill attestations,
     // use their _total (or fall back to _count for pre-_total distill attestations).
+    // Note: Go stores numbers as float64 — as_u64() returns None for floats,
+    // so we fall back to as_f64() to handle Go-produced sigmas.
     let total: u64 = attestations
         .iter()
         .map(|att| {
             att.attributes
                 .get("_total")
-                .and_then(|v| v.as_u64())
-                .or_else(|| att.attributes.get("_count").and_then(|v| v.as_u64()))
+                .and_then(|v| v.as_u64().or_else(|| v.as_f64().map(|f| f as u64)))
+                .or_else(|| {
+                    att.attributes
+                        .get("_count")
+                        .and_then(|v| v.as_u64().or_else(|| v.as_f64().map(|f| f as u64)))
+                })
                 .unwrap_or(1)
         })
         .sum();
@@ -580,7 +599,7 @@ mod tests {
 
         assert!(distill.id.starts_with("AS-distill-"));
         assert_eq!(distill.source, "distill");
-        assert_eq!(distill.actors, vec!["bot"]);
+        assert_eq!(distill.actors, vec!["distill"]);
         assert_eq!(distill.contexts, vec!["ctx1"]);
 
         // Subjects: union of {X, Y} and {X} = {X, Y}
@@ -629,5 +648,68 @@ mod tests {
         assert_eq!(values.len(), STRING_VALUES_CAP);
         // But count reflects all 60
         assert_eq!(tag.get("count").unwrap(), &Value::Number(60.into()));
+    }
+
+    #[test]
+    fn test_total_from_float64_values() {
+        // Go stores numbers as float64 — serde_json::Value::as_u64() returns None
+        // for float-typed numbers. This test verifies _total is correctly read
+        // from Go-produced sigmas where _total and _count are floats.
+        let mut attrs1 = HashMap::new();
+        attrs1.insert("_distill".to_string(), Value::Bool(true));
+        attrs1.insert(
+            "_count".to_string(),
+            serde_json::Number::from_f64(2101.0).map(Value::Number).unwrap(),
+        );
+        attrs1.insert(
+            "_total".to_string(),
+            serde_json::Number::from_f64(2101.0).map(Value::Number).unwrap(),
+        );
+
+        let att1 = Attestation {
+            id: "AS-distill-go-1".into(),
+            subjects: vec!["X".into()],
+            predicates: vec!["path-found".into()],
+            contexts: vec!["_distill".into()],
+            actors: vec!["qntx".into()],
+            timestamp: 1746057600000,
+            source: "distill".into(),
+            attributes: attrs1,
+            created_at: 1746057600000,
+            signature: None,
+            signer_did: None,
+        };
+
+        let mut attrs2 = HashMap::new();
+        attrs2.insert("_distill".to_string(), Value::Bool(true));
+        attrs2.insert(
+            "_count".to_string(),
+            serde_json::Number::from_f64(500.0).map(Value::Number).unwrap(),
+        );
+        attrs2.insert(
+            "_total".to_string(),
+            serde_json::Number::from_f64(500.0).map(Value::Number).unwrap(),
+        );
+
+        let att2 = Attestation {
+            id: "AS-distill-go-2".into(),
+            subjects: vec!["X".into()],
+            predicates: vec!["path-found".into()],
+            contexts: vec!["_distill".into()],
+            actors: vec!["qntx".into()],
+            timestamp: 1746489600000,
+            source: "distill".into(),
+            attributes: attrs2,
+            created_at: 1746489600000,
+            signature: None,
+            signer_did: None,
+        };
+
+        let merged = merge_attributes(&[att1, att2]);
+
+        // _total must be 2101 + 500 = 2601, NOT 2 (fallback to 1 per attestation)
+        assert_eq!(merged.get("_total").unwrap(), &Value::Number(2601u64.into()));
+        // _count is batch size
+        assert_eq!(merged.get("_count").unwrap(), &Value::Number(2.into()));
     }
 }
