@@ -9,11 +9,10 @@
  */
 
 import type { Glyph } from '@qntx/glyphs';
-import { wireExpandToWindow, isInWindowState, glyphRun, canvasPlaced, preventDrag, setWindowState, teardownWindowDrag, removeWindowControls, makeDraggable, makeResizable, storeCleanup } from '@qntx/glyphs';
+import { wireExpandToWindow, isInWindowState, glyphRun, canvasPlaced, preventDrag } from '@qntx/glyphs';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { Sigma } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { screenToCanvas } from './canvas/canvas-pan';
 import { uiState } from '../../state/ui';
 import { getGlyphTypeBySymbol } from './glyph-registry';
 

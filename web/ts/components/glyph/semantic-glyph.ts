@@ -18,7 +18,7 @@ import { apiFetch } from '../../api';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { tooltip } from '../tooltip';
 import { spawnAttestationGlyph } from './attestation-glyph';
-import { isSigmaAttestation, renderSigmaResultLine, spawnSigmaGlyph } from './sigma-glyph';
+import { isSigmaAttestation, renderSigmaResultLine } from './sigma-glyph';
 import { uiState } from '../../state/ui';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
