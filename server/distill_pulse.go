@@ -353,6 +353,25 @@ func buildDistillAttestation(batch []*types.As, predicate string) *types.As {
 	merged["_rust_version"] = syscap.GetStorageVersion()
 	merged["_count"] = len(batch)
 
+	// Track original source — if all inputs share the same source, preserve it.
+	sourceSet := make(map[string]struct{})
+	for _, as_ := range batch {
+		if as_.Source != "" && as_.Source != "distill" {
+			sourceSet[as_.Source] = struct{}{}
+		}
+	}
+	if len(sourceSet) == 1 {
+		for s := range sourceSet {
+			merged["_source"] = s
+		}
+	} else if len(sourceSet) > 1 {
+		sources := make([]string, 0, len(sourceSet))
+		for s := range sourceSet {
+			sources = append(sources, s)
+		}
+		merged["_source"] = sources
+	}
+
 	// _total: transitive total of original observations this attestation represents.
 	// For raw attestations, each counts as 1. For prior distill attestations,
 	// use their _total (or fall back to _count for pre-_total distill attestations).
