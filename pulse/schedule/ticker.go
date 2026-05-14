@@ -287,9 +287,8 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 // logActivitySummary logs a combined creation + eviction summary.
 func (t *Ticker) logActivitySummary() {
 	var created int
-	var topPCs []string
 	if t.creationStats != nil {
-		created, topPCs = t.creationStats.DrainCreationCounts()
+		created, _ = t.creationStats.DrainCreationCounts()
 	}
 
 	var evictionEvents, evicted int
@@ -332,8 +331,9 @@ func (t *Ticker) logActivitySummary() {
 
 	msg := strings.Join(parts, ", ")
 
-	if len(topPCs) > 0 {
-		msg += " (top: " + strings.Join(topPCs, ", ") + ")"
+	if created > 0 && evicted > 0 {
+		ratio := float64(evicted) * 100 / float64(created)
+		msg += fmt.Sprintf(" (%.0f%% evicted)", ratio)
 	}
 	if len(clusterCounts) > 0 {
 		msg += " [clusters: " + strings.Join(clusterCounts, ", ") + "]"

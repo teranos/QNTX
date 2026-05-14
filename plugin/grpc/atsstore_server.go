@@ -142,6 +142,73 @@ func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *
 	}, nil
 }
 
+// BatchGenerateAndCreateAttestations generates IDs and creates multiple attestations in one write transaction
+func (s *ATSStoreServer) BatchGenerateAndCreateAttestations(ctx context.Context, req *protocol.BatchGenerateAttestationRequest) (*protocol.BatchGenerateAttestationResponse, error) {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
+		return &protocol.BatchGenerateAttestationResponse{
+			Success: false,
+			Error:   err.Error(),
+		}, nil
+	}
+
+	if len(req.Commands) == 0 {
+		return &protocol.BatchGenerateAttestationResponse{
+			Success: true,
+			Created: 0,
+		}, nil
+	}
+
+	cmds := make([]*types.AsCommand, 0, len(req.Commands))
+	for i, proto := range req.Commands {
+		cmd, err := protoToCommand(proto)
+		if err != nil {
+			return &protocol.BatchGenerateAttestationResponse{
+				Success: false,
+				Error:   fmt.Sprintf("failed to convert command %d: %v", i, err),
+			}, nil
+		}
+		cmds = append(cmds, cmd)
+	}
+
+	// RustBackedStore implements this; other stores fall back to individual writes
+	type batchCreator interface {
+		BatchGenerateAndCreateAttestations(ctx context.Context, cmds []*types.AsCommand) (int, error)
+	}
+	if bs, ok := s.store.(batchCreator); ok {
+		created, err := bs.BatchGenerateAndCreateAttestations(ctx, cmds)
+		if err != nil {
+			s.logger.Errorw("BatchGenerateAndCreateAttestations failed", "count", len(cmds), "created", created, "error", err)
+			return &protocol.BatchGenerateAttestationResponse{
+				Success: false,
+				Error:   fmt.Sprintf("batch write failed after %d/%d: %v", created, len(cmds), err),
+				Created: int32(created),
+			}, nil
+		}
+		return &protocol.BatchGenerateAttestationResponse{
+			Success: true,
+			Created: int32(created),
+		}, nil
+	}
+
+	// Fallback: individual writes
+	var created int32
+	for _, cmd := range cmds {
+		if _, err := s.store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
+			s.logger.Errorw("BatchGenerateAndCreateAttestations fallback failed", "created", created, "total", len(cmds), "error", err)
+			return &protocol.BatchGenerateAttestationResponse{
+				Success: false,
+				Error:   fmt.Sprintf("individual write failed at %d/%d: %v", created, len(cmds), err),
+				Created: created,
+			}, nil
+		}
+		created++
+	}
+	return &protocol.BatchGenerateAttestationResponse{
+		Success: true,
+		Created: created,
+	}, nil
+}
+
 // GetAttestations queries attestations with filters
 func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetAttestationsRequest) (*protocol.GetAttestationsResponse, error) {
 	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {

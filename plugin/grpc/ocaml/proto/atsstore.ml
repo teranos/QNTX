@@ -427,6 +427,77 @@ module rec Protocol : sig
     (**/**)
   end
 
+  and BatchGenerateAttestationRequest : sig
+    type t = {
+      auth_token:string;
+      commands:AttestationCommand.t list;
+    }
+    val make: ?auth_token:string -> ?commands:AttestationCommand.t list -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?auth_token:string -> ?commands:AttestationCommand.t list -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
+  and BatchGenerateAttestationResponse : sig
+    type t = {
+      success:bool;
+      error:string;
+      created:int;
+      (**
+{%html:
+<p>Number of attestations successfully created</p>
+%}
+      *)
+
+    }
+    val make: ?success:bool -> ?error:string -> ?created:int -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?success:bool -> ?error:string -> ?created:int -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end
+
   and GetAttestationsRequest : sig
     type t = {
       auth_token:string;
@@ -526,6 +597,17 @@ module rec Protocol : sig
     end
 
     val generateAndCreateAttestation : (module Runtime'.Spec.Message with type t = GenerateAttestationRequest.t) * (module Runtime'.Spec.Message with type t = GenerateAttestationResponse.t)
+    module BatchGenerateAndCreateAttestations : sig
+      include Runtime'.Service.Rpc with type Request.t = BatchGenerateAttestationRequest.t and type Response.t = BatchGenerateAttestationResponse.t
+      module Request : Runtime'.Spec.Message with type t = BatchGenerateAttestationRequest.t and type make_t = BatchGenerateAttestationRequest.make_t
+      (** Module alias for the request message for this method call *)
+
+      module Response : Runtime'.Spec.Message with type t = BatchGenerateAttestationResponse.t and type make_t = BatchGenerateAttestationResponse.make_t
+      (** Module alias for the response message for this method call *)
+
+    end
+
+    val batchGenerateAndCreateAttestations : (module Runtime'.Spec.Message with type t = BatchGenerateAttestationRequest.t) * (module Runtime'.Spec.Message with type t = BatchGenerateAttestationResponse.t)
     module GetAttestations : sig
       include Runtime'.Service.Rpc with type Request.t = GetAttestationsRequest.t and type Response.t = GetAttestationsResponse.t
       module Request : Runtime'.Spec.Message with type t = GetAttestationsRequest.t and type make_t = GetAttestationsRequest.make_t
@@ -1288,6 +1370,146 @@ end = struct
     let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
   end
 
+  and BatchGenerateAttestationRequest : sig
+    type t = {
+      auth_token:string;
+      commands:AttestationCommand.t list;
+    }
+    val make: ?auth_token:string -> ?commands:AttestationCommand.t list -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?auth_token:string -> ?commands:AttestationCommand.t list -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = BatchGenerateAttestationRequest
+    let name () = ".protocol.BatchGenerateAttestationRequest"
+    type t = {
+      auth_token:string;
+      commands:AttestationCommand.t list;
+    }
+    type make_t = ?auth_token:string -> ?commands:AttestationCommand.t list -> unit -> t
+    let make ?(auth_token = {||}) ?(commands = []) () = { auth_token; commands }
+    let merge =
+    let merge_auth_token = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ) in
+    let merge_commands = Runtime'.Merge.merge Runtime'.Spec.( repeated ((2, "commands", "commands"), (message (module AttestationCommand)), not_packed) ) in
+    fun t1 t2 -> {
+    	auth_token = (merge_auth_token t1.auth_token t2.auth_token);
+    	commands = (merge_commands t1.commands t2.commands);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "auth_token", "authToken"), string, ({||})) ^:: repeated ((2, "commands", "commands"), (message (module AttestationCommand)), not_packed) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { auth_token; commands } -> serialize writer auth_token commands
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor auth_token commands = { auth_token; commands } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { auth_token; commands } -> serialize auth_token commands
+    let from_json_exn =
+      let constructor auth_token commands = { auth_token; commands } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
+  and BatchGenerateAttestationResponse : sig
+    type t = {
+      success:bool;
+      error:string;
+      created:int;
+      (**
+{%html:
+<p>Number of attestations successfully created</p>
+%}
+      *)
+
+    }
+    val make: ?success:bool -> ?error:string -> ?created:int -> unit -> t
+    (** Helper function to generate a message using default values *)
+
+    val to_proto: t -> Runtime'.Writer.t
+    (** Serialize the message to binary format *)
+
+    val from_proto: Runtime'.Reader.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from binary format *)
+
+    val to_json: Runtime'.Json_options.t -> t -> Runtime'.Json.t
+    (** Serialize to Json (compatible with Yojson.Basic.t) *)
+
+    val from_json: Runtime'.Json.t -> (t, [> Runtime'.Result.error]) result
+    (** Deserialize from Json (compatible with Yojson.Basic.t) *)
+
+    val name: unit -> string
+    (** Fully qualified protobuf name of this message *)
+
+    (**/**)
+    type make_t = ?success:bool -> ?error:string -> ?created:int -> unit -> t
+    val merge: t -> t -> t
+    val to_proto': Runtime'.Writer.t -> t -> unit
+    val from_proto_exn: Runtime'.Reader.t -> t
+    val from_json_exn: Runtime'.Json.t -> t
+    (**/**)
+  end = struct
+    module This'_ = BatchGenerateAttestationResponse
+    let name () = ".protocol.BatchGenerateAttestationResponse"
+    type t = {
+      success:bool;
+      error:string;
+      created:int;
+    }
+    type make_t = ?success:bool -> ?error:string -> ?created:int -> unit -> t
+    let make ?(success = false) ?(error = {||}) ?(created = 0) () = { success; error; created }
+    let merge =
+    let merge_success = Runtime'.Merge.merge Runtime'.Spec.( basic ((1, "success", "success"), bool, (false)) ) in
+    let merge_error = Runtime'.Merge.merge Runtime'.Spec.( basic ((2, "error", "error"), string, ({||})) ) in
+    let merge_created = Runtime'.Merge.merge Runtime'.Spec.( basic ((3, "created", "created"), int32_int, (0)) ) in
+    fun t1 t2 -> {
+    	success = (merge_success t1.success t2.success);
+    	error = (merge_error t1.error t2.error);
+    	created = (merge_created t1.created t2.created);
+     }
+    let spec () = Runtime'.Spec.( basic ((1, "success", "success"), bool, (false)) ^:: basic ((2, "error", "error"), string, ({||})) ^:: basic ((3, "created", "created"), int32_int, (0)) ^:: nil )
+    let to_proto' =
+      let serialize = Runtime'.apply_lazy (fun () -> Runtime'.Serialize.serialize (spec ())) in
+      fun writer { success; error; created } -> serialize writer success error created
+
+    let to_proto t = let writer = Runtime'.Writer.init () in to_proto' writer t; writer
+    let from_proto_exn =
+      let constructor success error created = { success; error; created } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize.deserialize (spec ()) constructor)
+    let from_proto writer = Runtime'.Result.catch (fun () -> from_proto_exn writer)
+    let to_json options =
+      let serialize = Runtime'.Serialize_json.serialize ~message_name:(name ()) (spec ()) options in
+      fun { success; error; created } -> serialize success error created
+    let from_json_exn =
+      let constructor success error created = { success; error; created } in
+      Runtime'.apply_lazy (fun () -> Runtime'.Deserialize_json.deserialize ~message_name:(name ()) (spec ()) constructor)
+    let from_json json = Runtime'.Result.catch (fun () -> from_json_exn json)
+  end
+
   and GetAttestationsRequest : sig
     type t = {
       auth_token:string;
@@ -1461,6 +1683,19 @@ end = struct
     let generateAndCreateAttestation =
       (module GenerateAttestationRequest : Runtime'.Spec.Message with type t = GenerateAttestationRequest.t ),
       (module GenerateAttestationResponse : Runtime'.Spec.Message with type t = GenerateAttestationResponse.t )
+
+    module BatchGenerateAndCreateAttestations = struct
+      let package_name = Some "protocol"
+      let service_name = "ATSStoreService"
+      let method_name = "BatchGenerateAndCreateAttestations"
+      let name = "/protocol.ATSStoreService/BatchGenerateAndCreateAttestations"
+      module Request = BatchGenerateAttestationRequest
+      module Response = BatchGenerateAttestationResponse
+    end
+
+    let batchGenerateAndCreateAttestations =
+      (module BatchGenerateAttestationRequest : Runtime'.Spec.Message with type t = BatchGenerateAttestationRequest.t ),
+      (module BatchGenerateAttestationResponse : Runtime'.Spec.Message with type t = BatchGenerateAttestationResponse.t )
 
     module GetAttestations = struct
       let package_name = Some "protocol"

@@ -45,6 +45,7 @@ type GroundWriteFunc func(dbPath string, as *types.As, logger *zap.SugaredLogger
 // Handler handles HTTP requests for the embedding service.
 type Handler struct {
 	DB           *sql.DB
+	ReadDB       *sql.DB         // read-only connection, no write lock contention
 	Store        *storage.EmbeddingStore
 	Service      Service
 	ATSStore     ats.AttestationStore
@@ -54,6 +55,14 @@ type Handler struct {
 	Invalidator  func()          // cluster cache invalidation callback
 	GroundDBPath string          // for cluster lifecycle attestations
 	GroundWrite  GroundWriteFunc // writes deferred news to Ground's DB
+}
+
+// readDB returns ReadDB if set, otherwise falls back to DB.
+func (h *Handler) readDB() *sql.DB {
+	if h.ReadDB != nil {
+		return h.ReadDB
+	}
+	return h.DB
 }
 
 // getAttestationByID retrieves a single attestation through the attestation store.

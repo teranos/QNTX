@@ -50,7 +50,7 @@ func (h *distillHandler) Execute(ctx context.Context, job *async.Job) error {
 		SELECT id, subjects, predicates, actors, contexts,
 		       timestamp, source, attributes
 		FROM attestations
-		WHERE timestamp < ?
+		WHERE (timestamp < ? OR source = 'distill')
 		ORDER BY timestamp ASC
 		LIMIT ?
 	`, cutoff, h.batchSize)
@@ -117,9 +117,18 @@ func (h *distillHandler) Execute(ctx context.Context, job *async.Job) error {
 	totalDistilled := 0
 	totalCreated := 0
 
+	totalSkipped := 0
 	for predicate, batch := range groups {
 		if ctx.Err() != nil {
 			return ctx.Err()
+		}
+
+		// Skip groups with fewer than 2 attestations — a sigma that absorbs
+		// a single attestation adds no information, wastes a write, and
+		// deletes the original (net negative).
+		if len(batch) < 2 {
+			totalSkipped += len(batch)
+			continue
 		}
 
 		buildStart := time.Now()
@@ -180,7 +189,8 @@ func (h *distillHandler) Execute(ctx context.Context, job *async.Job) error {
 		h.logger.Infow("Σ Sigma complete",
 			"distilled", totalDistilled,
 			"sigmas_created", totalCreated,
-			"groups", len(groups))
+			"groups", len(groups),
+			"skipped_singles", totalSkipped)
 	}
 	return nil
 }
@@ -318,6 +328,23 @@ func buildDistillAttestation(batch []*types.As, predicate string) *types.As {
 	// Actors: use canonical "distill" actor to avoid inflating entity_actors_limit.
 	// The original actor union is preserved as _actors_sample in attributes.
 	actorsSample := setToSlice(actorSet, 50)
+
+	// Strip already-merged attribute aggregates from prior sigmas before merging.
+	// Without this, re-distilled sigmas accumulate nested frequency maps unboundedly,
+	// eventually exceeding the 1MB JSON limit.
+	for _, as_ := range batch {
+		if as_.Source == "distill" && as_.Attributes != nil {
+			for k, v := range as_.Attributes {
+				if strings.HasPrefix(k, "_") {
+					continue // keep distill metadata
+				}
+				// Drop nested aggregate maps (num aggs, string freq maps)
+				if _, isMap := v.(map[string]interface{}); isMap {
+					delete(as_.Attributes, k)
+				}
+			}
+		}
+	}
 
 	// Merge attributes
 	merged := mergeAttributes(batch)

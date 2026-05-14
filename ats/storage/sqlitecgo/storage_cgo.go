@@ -63,6 +63,7 @@ type RustStore struct {
 	muWrite  sync.Mutex
 	muRead   sync.Mutex // kept for backward compat (driver registration)
 	store    *C.SqliteStore
+	dbPath   string        // filesystem path (empty for in-memory)
 	readConn *C.ReadConn   // primary read conn (kept for driver/backward compat)
 	readPool []*readConnEntry // pooled read connections for concurrent reads
 	readNext atomic.Uint64    // round-robin index into readPool
@@ -92,10 +93,11 @@ func NewMemoryStore() (*RustStore, error) {
 }
 
 // readPoolSize is the number of concurrent read connections.
-// SQLite WAL supports unlimited readers. With plugins running 4+ concurrent
-// multi-second queries, 16 connections give the POST path's microsecond
-// AttestationExists lookups a high chance of hitting a free connection.
-const readPoolSize = 16
+// Each connection memory-maps the WAL -shm file; too many connections
+// increase the risk of SIGBUS when the mapping is invalidated by a
+// checkpoint. 4 connections keeps reads concurrent while limiting mmap
+// surface.
+const readPoolSize = 4
 
 // NewFileStore creates a new file-backed Rust storage backend.
 // The caller must call Close() when done to free resources.
@@ -131,7 +133,7 @@ func NewFileStore(path string) (*RustStore, error) {
 		pool[i] = &readConnEntry{conn: rc}
 	}
 
-	rs := &RustStore{store: store, readConn: readConn, readPool: pool}
+	rs := &RustStore{store: store, dbPath: path, readConn: readConn, readPool: pool}
 
 	runtime.SetFinalizer(rs, func(s *RustStore) {
 		s.Close()
@@ -283,6 +285,57 @@ func (rs *RustStore) createAttestationWithPriority(as *types.As, high bool) erro
 		}
 		return nil
 	})
+}
+
+// BatchCreateAttestations stores multiple attestations in a single write queue slot.
+// All JSON serialization happens upfront; the write function calls putLocked N times
+// under one mutex acquisition. Returns the number of successfully created attestations.
+func (rs *RustStore) BatchCreateAttestations(attestations []*types.As) (int, error) {
+	if len(attestations) == 0 {
+		return 0, nil
+	}
+
+	// Serialize all upfront (outside the write lock)
+	type prepared struct {
+		as        *types.As
+		jsonBytes []byte
+	}
+	items := make([]prepared, 0, len(attestations))
+	for _, as := range attestations {
+		jsonBytes, err := toRustJSON(as)
+		if err != nil {
+			return 0, errors.Wrapf(err, "failed to convert attestation %s", as.ID)
+		}
+		items = append(items, prepared{as: as, jsonBytes: jsonBytes})
+	}
+
+	// Chunk into groups of 500 to avoid holding the write mutex too long.
+	// Each chunk is one SubmitWrite call — readers can interleave between chunks.
+	const chunkSize = 500
+	var created int
+	for i := 0; i < len(items); i += chunkSize {
+		end := i + chunkSize
+		if end > len(items) {
+			end = len(items)
+		}
+		chunk := items[i:end]
+		err := rs.SubmitWrite(false, func() error {
+			if rs.store == nil {
+				return errors.New("store is closed")
+			}
+			for _, item := range chunk {
+				if err := rs.putLocked(item.jsonBytes); err != nil {
+					return errors.Wrapf(err, "batch put failed at attestation %s", item.as.ID)
+				}
+				created++
+			}
+			return nil
+		})
+		if err != nil {
+			return created, err
+		}
+	}
+	return created, nil
 }
 
 // CreateAttestationInbound stores a synced attestation without signing (preserves provenance).
@@ -807,18 +860,19 @@ func (rs *RustStore) IntegrityCheck() ([]string, error) {
 }
 
 // Backup creates a hot backup of the database to destPath.
-// Safe to call while the database is in use — SQLite's backup API handles
-// concurrency internally. Does not hold any mutex: the Rust side opens its
-// own read-only source connection for the backup.
+// Opens its own read-only source connection — does not touch the store pointer,
+// so it's safe to call concurrently with storage_put.
 func (rs *RustStore) Backup(destPath string) error {
-	if rs.store == nil {
-		return errors.New("store is closed")
+	if rs.dbPath == "" {
+		return errors.New("backup requires a file-backed database")
 	}
 
+	cSrc := C.CString(rs.dbPath)
+	defer C.free(unsafe.Pointer(cSrc))
 	cDest := C.CString(destPath)
 	defer C.free(unsafe.Pointer(cDest))
 
-	result := C.storage_backup(rs.store, cDest)
+	result := C.storage_backup(cSrc, cDest)
 	success := bool(result.success)
 	var errMsg string
 	if !success {
@@ -830,6 +884,12 @@ func (rs *RustStore) Backup(destPath string) error {
 		return errors.Newf("backup failed for %s: %s", destPath, errMsg)
 	}
 	return nil
+}
+
+// CrashTest deliberately triggers a SIGBUS to verify the flight recorder.
+// Development/testing only.
+func (rs *RustStore) CrashTest() {
+	C.storage_crash_test()
 }
 
 // QueryAttestationsRaw executes a raw SQL query through Rust's connection.

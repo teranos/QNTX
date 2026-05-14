@@ -221,6 +221,9 @@ func (s *QNTXServer) Stop() error {
 	if s.watcherDB != nil {
 		s.watcherDB.Close()
 	}
+	if s.embeddingsHandler != nil && s.embeddingsHandler.ReadDB != nil {
+		s.embeddingsHandler.ReadDB.Close()
+	}
 
 	// Clear service providers before killing plugins — observers check HasProvider()
 	// and will skip routing once providers are cleared.

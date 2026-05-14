@@ -17,6 +17,9 @@ service ATSStoreService {
   // GenerateAndCreateAttestation generates an attestation ID and creates it
   rpc GenerateAndCreateAttestation(GenerateAttestationRequest) returns (GenerateAttestationResponse);
 
+  // BatchGenerateAndCreateAttestations generates IDs and creates multiple attestations in one write transaction
+  rpc BatchGenerateAndCreateAttestations(BatchGenerateAttestationRequest) returns (BatchGenerateAttestationResponse);
+
   // GetAttestations queries attestations with filters
   rpc GetAttestations(GetAttestationsRequest) returns (GetAttestationsResponse);
 
@@ -91,6 +94,17 @@ message GenerateAttestationResponse {
   bool success = 1;
   string error = 2;
   Attestation attestation = 3; // The created attestation with generated ID
+}
+
+message BatchGenerateAttestationRequest {
+  string auth_token = 1;
+  repeated AttestationCommand commands = 2;
+}
+
+message BatchGenerateAttestationResponse {
+  bool success = 1;
+  string error = 2;
+  int32 created = 3;  // Number of attestations successfully created
 }
 
 message GetAttestationsRequest {

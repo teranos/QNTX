@@ -12,6 +12,7 @@ import (
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/db/rustdriver"
 	"github.com/teranos/QNTX/errors"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
@@ -578,6 +579,7 @@ func (e *Engine) queryHistoricalSemantic(watcherID string, watcher *storage.Watc
 func (e *Engine) queryHistoricalStructural(watcherID string, watcher *storage.Watcher) error {
 	query, args := storage.BuildFilterQuery(watcher.Filter)
 
+	rustdriver.SetCaller("watcher:" + watcherID)
 	attestations, err := e.reader.QueryAttestationsRaw(query, args)
 	if err != nil {
 		return errors.Wrap(err, "failed to query attestations via Rust")

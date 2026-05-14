@@ -67,6 +67,29 @@ func (cb *ConsoleBuffer) GetAll() []ConsoleLog {
 	return result
 }
 
+// HandleCrashTest triggers a deliberate crash to verify the flight recorder.
+// Dev mode only.
+func (s *QNTXServer) HandleCrashTest(w http.ResponseWriter, r *http.Request) {
+	if !s.isDevMode() {
+		writeError(w, http.StatusForbidden, "Crash test only available in dev mode")
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST only")
+		return
+	}
+	type crashTester interface {
+		CrashTest()
+	}
+	if ct, ok := s.atsStore.(crashTester); ok {
+		w.Write([]byte("triggering crash test — check qntx.db.flight\n"))
+		w.(http.Flusher).Flush()
+		ct.CrashTest()
+	} else {
+		writeError(w, http.StatusNotImplemented, "store does not support crash test")
+	}
+}
+
 // HandleDebug handles browser console debugging endpoint
 // POST: Add console log to buffer
 // GET: Retrieve all console logs from buffer

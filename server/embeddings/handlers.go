@@ -557,12 +557,12 @@ func (h *Handler) HandleEmbeddingInfo(w http.ResponseWriter, r *http.Request) {
 		lag := &EmbeddingLag{}
 		var oldest, newest string
 		// Oldest embedded attestation — indexed scan on embeddings.created_at
-		err := h.DB.QueryRow(`SELECT MIN(created_at) FROM embeddings`).Scan(&oldest)
+		err := h.readDB().QueryRow(`SELECT MIN(created_at) FROM embeddings`).Scan(&oldest)
 		if err == nil && oldest != "" {
 			lag.OldestEmbedding = oldest
 		}
 		// Newest attestation — indexed scan on attestations.created_at
-		err = h.DB.QueryRow(`SELECT MAX(created_at) FROM attestations`).Scan(&newest)
+		err = h.readDB().QueryRow(`SELECT MAX(created_at) FROM attestations`).Scan(&newest)
 		if err == nil && newest != "" {
 			lag.NewestAttestation = newest
 		}
@@ -612,7 +612,7 @@ func (h *Handler) HandleUnembeddedPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	rows, err := h.DB.Query(`
+	rows, err := h.readDB().Query(`
 		SELECT a.id FROM attestations a
 		LEFT JOIN embeddings e ON e.source_type = 'attestation' AND e.source_id = a.id
 		WHERE e.id IS NULL

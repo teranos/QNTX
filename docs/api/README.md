@@ -16,9 +16,9 @@ Complete API documentation for the QNTX server.
 - **[Pulse Executions](./pulse-executions.md)** (1 endpoint)
 - **[Plugins](./plugins.md)** (6 endpoints)
 - **[Prose (Documents)](./prose-documents.md)** (2 endpoints)
-- **[Other](./other.md)** (30 endpoints)
+- **[Other](./other.md)** (31 endpoints)
 
-**Total: 55 HTTP endpoints**
+**Total: 56 HTTP endpoints**
 
 ## WebSocket Protocol
 
@@ -26,7 +26,7 @@ Complete API documentation for the QNTX server.
 
 ## gRPC APIs
 
-- **[ATSStoreService gRPC API](./grpc-atsstore.md)** (5 methods)
+- **[ATSStoreService gRPC API](./grpc-atsstore.md)** (6 methods)
 - **[Plugin gRPC API](./grpc-plugin.md)** (10 methods)
 - **[EmbeddingService gRPC API](./grpc-embedding.md)** (7 methods)
 - **[FileService gRPC API](./grpc-fileservice.md)** (1 method)

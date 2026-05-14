@@ -170,6 +170,8 @@ pub extern "C" fn sql_exec(
 
     let store = unsafe { &mut *store };
 
+    crate::flight_recorder::record_fmt("sql_exec", sql_str);
+
     let param_refs = match parse_params(params_str) {
         Ok(p) => p,
         Err(e) => return ExecResultC::error(&e),
@@ -220,6 +222,8 @@ pub extern "C" fn sql_query(
     }
 
     let store = unsafe { &*store };
+
+    crate::flight_recorder::record_fmt("sql_query", sql_str);
 
     let param_refs = match parse_params(params_str) {
         Ok(p) => p,
@@ -302,6 +306,7 @@ pub extern "C" fn sql_begin(store: *mut SqliteStore) -> ExecResultC {
         return ExecResultC::error("null store pointer");
     }
     let store = unsafe { &mut *store };
+    crate::flight_recorder::record("sql_begin");
     match store.conn.execute_batch("BEGIN IMMEDIATE") {
         Ok(()) => ExecResultC::ok(0, 0),
         Err(e) => ExecResultC::error(&format!("{}", e)),
@@ -316,9 +321,20 @@ pub extern "C" fn sql_commit(store: *mut SqliteStore) -> ExecResultC {
         return ExecResultC::error("null store pointer");
     }
     let store = unsafe { &mut *store };
+    crate::flight_recorder::record("sql_commit");
     match store.conn.execute_batch("COMMIT") {
         Ok(()) => ExecResultC::ok(0, 0),
         Err(e) => ExecResultC::error(&format!("{}", e)),
+    }
+}
+
+/// Set the caller tag for the current thread's flight recorder entries.
+/// Called from Go before issuing FFI calls to attribute queries to their source.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn flight_recorder_set_caller(caller: *const c_char) {
+    if let Ok(s) = unsafe { cstr_to_str(caller) } {
+        crate::flight_recorder::set_caller(s);
     }
 }
 
@@ -330,6 +346,7 @@ pub extern "C" fn sql_rollback(store: *mut SqliteStore) -> ExecResultC {
         return ExecResultC::error("null store pointer");
     }
     let store = unsafe { &mut *store };
+    crate::flight_recorder::record("sql_rollback");
     match store.conn.execute_batch("ROLLBACK") {
         Ok(()) => ExecResultC::ok(0, 0),
         Err(e) => ExecResultC::error(&format!("{}", e)),
@@ -365,6 +382,8 @@ pub extern "C" fn read_conn_sql_query(
     }
 
     let rc = unsafe { &*rc };
+
+    crate::flight_recorder::record_fmt("read_conn_sql_query", sql_str);
 
     let param_refs = match parse_params(params_str) {
         Ok(p) => p,

@@ -772,7 +772,7 @@ type WatcherBroadcastStats struct {
 
 ## WatcherCreateRequest {#watchercreaterequest}
 
-**Source**: [`server/watcher_handlers.go:24`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L24)
+**Source**: [`server/watcher_handlers.go:25`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L25)
 
 
 ```go
@@ -845,7 +845,7 @@ type WatcherQueueStatusMessage struct {
 
 ## WatcherResponse {#watcherresponse}
 
-**Source**: [`server/watcher_handlers.go:43`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L43)
+**Source**: [`server/watcher_handlers.go:44`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L44)
 
 
 ```go

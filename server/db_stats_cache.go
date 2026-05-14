@@ -10,6 +10,7 @@ import (
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
+	"github.com/teranos/QNTX/db/rustdriver"
 	"github.com/teranos/QNTX/server/syscap"
 )
 
@@ -57,6 +58,7 @@ func (s *QNTXServer) refreshDBStats() {
 	}
 	defer statsDB.Close()
 
+	rustdriver.SetCaller("db-stats")
 	queryStart := time.Now()
 	if err := statsDB.QueryRow("SELECT COUNT(*) FROM attestations").Scan(&totalAttestations); err != nil {
 		s.logger.Warnw("Failed to refresh database stats cache", "error", err, "elapsed", time.Since(queryStart))
@@ -381,8 +383,8 @@ func queryPredicateHistograms(db *sql.DB) map[string]map[string]int64 {
 	return result
 }
 
-func queryRecentEvictions(db *sql.DB) []map[string]interface{} {
-	var evictions []map[string]interface{}
+func queryRecentEvictions(db *sql.DB) []map[string]any {
+	var evictions []map[string]any
 	rows, err := db.Query(`
 		SELECT event_type, actor, context, entity, deletions_count, limit_value, timestamp, eviction_details
 		FROM storage_events
@@ -425,7 +427,7 @@ func queryRecentEvictions(db *sql.DB) []map[string]interface{} {
 			message = fmt.Sprintf("Evicted %d attestations (%s)", deletionsCount, eventType)
 		}
 
-		ev := map[string]interface{}{
+		ev := map[string]any{
 			"event_type":      eventType,
 			"actor":           actor.String,
 			"context":         ctx.String,
@@ -436,7 +438,7 @@ func queryRecentEvictions(db *sql.DB) []map[string]interface{} {
 		}
 
 		if evictionDetails.Valid && evictionDetails.String != "" {
-			var details map[string]interface{}
+			var details map[string]any
 			if err := json.Unmarshal([]byte(evictionDetails.String), &details); err == nil {
 				if preds, ok := details["predicates"]; ok {
 					ev["predicates"] = preds

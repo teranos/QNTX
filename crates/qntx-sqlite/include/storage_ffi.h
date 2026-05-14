@@ -345,6 +345,14 @@ ExecResultC sql_rollback(SqliteStore *store);
 QueryResultC read_conn_sql_query(const ReadConn *rc, const char *sql, const char *params_json);
 
 /**
+ * Set the caller tag for the current thread's flight recorder entries.
+ * Call before issuing FFI calls to attribute queries to their source.
+ *
+ * @param caller Caller identifier (e.g. "db-stats", "watcher:ax-1234", "plugin:village")
+ */
+void flight_recorder_set_caller(const char *caller);
+
+/**
  * Free an ExecResultC.
  */
 void exec_result_free(ExecResultC result);
@@ -372,14 +380,20 @@ StringArrayResultC storage_integrity_check(const SqliteStore *store);
 // ============================================================================
 
 /**
- * Create a hot backup of the database to the given path.
- * Uses SQLite's online backup API — safe to call while the database is in use.
+ * Create a hot backup of the database.
+ * Opens its own read-only source connection — does not touch the store pointer.
  *
- * @param store Store handle
+ * @param src_path Source database path
  * @param dest_path Filesystem path for the backup file
  * @return Result indicating success/failure
  */
-StorageResultC storage_backup(const SqliteStore *store, const char *dest_path);
+StorageResultC storage_backup(const char *src_path, const char *dest_path);
+
+/**
+ * Deliberately trigger SIGBUS to verify flight recorder.
+ * Development/testing only.
+ */
+void storage_crash_test(void);
 
 // ============================================================================
 // Memory Management

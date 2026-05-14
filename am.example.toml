@@ -45,6 +45,31 @@ actor_contexts_limit = 64
 entity_actors_limit = 64
 
 # ════════════════════════════════════════════════════════════════
+# Attestation Distillation (ADR-020)
+# Folds old attestations into compressed summaries before deletion.
+# Enforcement-path distillation (Rust) is always on.
+# Age-based distillation (Go Pulse) requires interval_seconds.
+# ════════════════════════════════════════════════════════════════
+
+[distill]
+# How often the age-based distill cycle runs (seconds).
+# Omit or comment out to disable age-based distillation.
+# Default: disabled
+# interval_seconds = 300
+
+# Attestations older than this are candidates for distillation.
+# Default: 720 (30 days)
+# max_age_hours = 720
+
+# Maximum attestations to process per cycle.
+# Default: 500
+# batch_size = 500
+
+# Log what would be distilled without doing it.
+# Default: false
+# dry_run = false
+
+# ════════════════════════════════════════════════════════════════
 # Server Configuration (Web UI)
 # ════════════════════════════════════════════════════════════════
 

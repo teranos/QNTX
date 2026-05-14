@@ -93,6 +93,26 @@ func Open(path string, log *zap.SugaredLogger) (*sql.DB, error) {
 	return db, nil
 }
 
+// OpenReadOnly opens a read-only SQLite connection without _txlock=immediate.
+// Reads through this connection never contend with writers in WAL mode.
+func OpenReadOnly(path string, log *zap.SugaredLogger) (*sql.DB, error) {
+	db, err := sql.Open("sqlite3", path+"?mode=ro")
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to open read-only database at %s", path)
+	}
+
+	if _, err := db.Exec("PRAGMA busy_timeout = 1000"); err != nil {
+		db.Close()
+		return nil, errors.Wrapf(err, "failed to set busy timeout for read-only %s", path)
+	}
+
+	if log != nil {
+		logger.AddDBSymbol(log).Infow("Read-only database opened", "path", path)
+	}
+
+	return db, nil
+}
+
 // OpenWithMigrations opens a SQLite database and runs migrations.
 // This is a convenience function that combines Open() and Migrate().
 // Migrations are idempotent and have low overhead for SQLite.

@@ -74,6 +74,23 @@ func (bs *BoundedStore) GenerateAndCreateAttestation(ctx context.Context, cmd *t
 	return bs.store.GenerateAndCreateAttestation(ctx, cmd)
 }
 
+// BatchGenerateAndCreateAttestations delegates to the underlying store's batch method.
+func (bs *BoundedStore) BatchGenerateAndCreateAttestations(ctx context.Context, cmds []*types.AsCommand) (int, error) {
+	type batchCreator interface {
+		BatchGenerateAndCreateAttestations(ctx context.Context, cmds []*types.AsCommand) (int, error)
+	}
+	if bc, ok := bs.store.(batchCreator); ok {
+		return bc.BatchGenerateAndCreateAttestations(ctx, cmds)
+	}
+	// Fallback: individual writes
+	for i, cmd := range cmds {
+		if _, err := bs.store.GenerateAndCreateAttestation(ctx, cmd); err != nil {
+			return i, err
+		}
+	}
+	return len(cmds), nil
+}
+
 // GetAttestations retrieves attestations based on filters (implements ats.AttestationStore)
 func (bs *BoundedStore) GetAttestations(filters ats.AttestationFilter) ([]*types.As, error) {
 	return bs.store.GetAttestations(filters)

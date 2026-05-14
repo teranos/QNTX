@@ -5,8 +5,11 @@ package sqlitecgo
 import (
 	"time"
 
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/internal/logger"
 )
+
+const writeQueueTimeout = 30 * time.Second
 
 // writeRequest is a unit of work submitted to the write queue.
 type writeRequest struct {
@@ -73,15 +76,30 @@ func (rs *RustStore) SubmitWrite(high bool, fn func() error) error {
 	}
 
 	waitStart := time.Now()
-	ch <- req
+
+	// Backpressure: if the channel is full, wait up to writeQueueTimeout
+	// before giving up. This prevents goroutine pile-up under sustained load.
+	select {
+	case ch <- req:
+	case <-time.After(writeQueueTimeout):
+		priority := "low"
+		if high {
+			priority = "high"
+		}
+		logger.Logger.Errorw("Write queue full — dropping write",
+			"priority", priority,
+			"queue_len", len(ch),
+			"timeout", writeQueueTimeout,
+		)
+		return errors.Newf("write queue full: %s-priority write timed out after %s", priority, writeQueueTimeout)
+	}
+
 	err := <-req.result
 	elapsed := time.Since(waitStart)
 
 	if high && elapsed >= slowOpThreshold {
-		// High-priority waits are always worth logging individually.
 		logger.Logger.Warnw("High-priority write wait", "duration", elapsed)
 	} else {
-		// Low-priority waits are expected — aggregate via recordWait.
 		recordWait(waitStart, "write_queue")
 	}
 	return err
