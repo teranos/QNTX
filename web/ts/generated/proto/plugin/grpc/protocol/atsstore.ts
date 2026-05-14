@@ -97,6 +97,18 @@ export interface GenerateAttestationResponse {
   attestation: Attestation | undefined;
 }
 
+export interface BatchGenerateAttestationRequest {
+  auth_token: string;
+  commands: AttestationCommand[];
+}
+
+export interface BatchGenerateAttestationResponse {
+  success: boolean;
+  error: string;
+  /** Number of attestations successfully created */
+  created: number;
+}
+
 export interface GetAttestationsRequest {
   auth_token: string;
   filter: AttestationFilter | undefined;
