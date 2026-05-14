@@ -3,6 +3,7 @@
 *.db-shm
 *.db-wal
 *.db.bak*
+*.db.flight*
 
 .qntx/
 
