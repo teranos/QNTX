@@ -215,3 +215,7 @@ describe('YourComponent', () => {
 ```
 
 See test files for examples.
+
+---
+
+TODO: SIGMA: Surface distilled (Σ) attestations in Global Search view (`ts/search-view.ts`) — distinct badge and source filter.
