@@ -14,6 +14,7 @@ const writeQueueTimeout = 30 * time.Second
 // writeRequest is a unit of work submitted to the write queue.
 type writeRequest struct {
 	fn     func() error
+	caller string // who submitted this write (for watchdog diagnostics)
 	result chan error
 }
 
@@ -51,16 +52,19 @@ func (rs *RustStore) writeLoop() {
 }
 
 func (rs *RustStore) executeWrite(req writeRequest) {
+	rs.SetWriteHolder(req.caller)
 	rs.muWrite.Lock()
 	err := req.fn()
 	rs.muWrite.Unlock()
+	rs.ClearWriteHolder()
 	req.result <- err
 }
 
 // SubmitWrite submits a write to the appropriate priority queue and blocks
 // until it completes. Returns the error from the write function.
-func (rs *RustStore) SubmitWrite(high bool, fn func() error) error {
-	req := writeRequest{fn: fn, result: make(chan error, 1)}
+// The caller label identifies who submitted this write (for watchdog diagnostics).
+func (rs *RustStore) SubmitWrite(high bool, caller string, fn func() error) error {
+	req := writeRequest{fn: fn, caller: caller, result: make(chan error, 1)}
 
 	ch := rs.lowPriority
 	if high {
@@ -70,7 +74,9 @@ func (rs *RustStore) SubmitWrite(high bool, fn func() error) error {
 	if ch == nil {
 		// Queue not started — fall back to direct execution
 		rs.muWrite.Lock()
+		rs.SetWriteHolder(caller)
 		err := fn()
+		rs.ClearWriteHolder()
 		rs.muWrite.Unlock()
 		return err
 	}

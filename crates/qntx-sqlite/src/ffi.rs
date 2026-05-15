@@ -234,6 +234,157 @@ pub extern "C" fn read_conn_free(rc: *mut ReadConn) {
     unsafe { free_boxed(rc) };
 }
 
+/// WAL checkpoint result
+#[repr(C)]
+pub struct CheckpointResultC {
+    pub success: bool,
+    pub error_msg: *mut c_char,
+    pub busy: i32,
+    pub wal_pages: i32,
+    pub checkpointed_pages: i32,
+}
+
+/// Run a TRUNCATE checkpoint. Closes all provided read connections first,
+/// runs the checkpoint on the write connection, then reopens read connections
+/// and writes new pointers back to the array.
+///
+/// `read_conns` is a mutable array of `count` ReadConn pointers. On success,
+/// each slot is replaced with a fresh read connection. On failure, slots that
+/// were closed are set to NULL.
+///
+/// Caller must hold the write mutex (muWrite) before calling.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn storage_wal_checkpoint(
+    store: *mut SqliteStore,
+    read_conns: *mut *mut ReadConn,
+    count: usize,
+) -> CheckpointResultC {
+    if store.is_null() {
+        return CheckpointResultC {
+            success: false,
+            error_msg: cstring_new_or_empty("null store pointer"),
+            busy: 0,
+            wal_pages: 0,
+            checkpointed_pages: 0,
+        };
+    }
+    let store = unsafe { &*store };
+    let slots = if read_conns.is_null() || count == 0 {
+        &mut [][..]
+    } else {
+        unsafe { std::slice::from_raw_parts_mut(read_conns, count) }
+    };
+
+    // Phase 1: close all read connections (drops SQLite file handles)
+    for slot in slots.iter_mut() {
+        if !slot.is_null() {
+            unsafe { free_boxed(*slot) };
+            *slot = ptr::null_mut();
+        }
+    }
+
+    // Phase 2: TRUNCATE checkpoint on write connection
+    let (busy, wal_pages, checkpointed_pages) = match store.wal_checkpoint_truncate() {
+        Ok(r) => r,
+        Err(e) => {
+            // Reopen read connections even on checkpoint failure
+            for slot in slots.iter_mut() {
+                match store.open_read_conn() {
+                    Ok(rc) => *slot = Box::into_raw(Box::new(rc)),
+                    Err(_) => *slot = ptr::null_mut(),
+                }
+            }
+            return CheckpointResultC {
+                success: false,
+                error_msg: cstring_new_or_empty(&format!("{}", e)),
+                busy: 0,
+                wal_pages: 0,
+                checkpointed_pages: 0,
+            };
+        }
+    };
+
+    // Phase 3: reopen all read connections
+    for slot in slots.iter_mut() {
+        match store.open_read_conn() {
+            Ok(rc) => *slot = Box::into_raw(Box::new(rc)),
+            Err(e) => {
+                eprintln!("qntx-sqlite: failed to reopen read connection after checkpoint: {}", e);
+                *slot = ptr::null_mut();
+            }
+        }
+    }
+
+    CheckpointResultC {
+        success: true,
+        error_msg: ptr::null_mut(),
+        busy,
+        wal_pages,
+        checkpointed_pages,
+    }
+}
+
+/// C-compatible distill result
+#[repr(C)]
+pub struct DistillResultC {
+    pub success: bool,
+    pub error_msg: *mut c_char,
+    pub distilled: usize,
+    pub sigmas_created: usize,
+    pub skipped: usize,
+}
+
+/// Run age-triggered distillation: fold old attestations into sigmas.
+/// Caller must hold the write mutex (muWrite) before calling.
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn storage_age_distill(
+    store: *mut SqliteStore,
+    cutoff_rfc3339: *const c_char,
+    batch_size: usize,
+) -> DistillResultC {
+    if store.is_null() {
+        return DistillResultC {
+            success: false,
+            error_msg: cstring_new_or_empty("null store pointer"),
+            distilled: 0,
+            sigmas_created: 0,
+            skipped: 0,
+        };
+    }
+    let store = unsafe { &*store };
+    let cutoff = match unsafe { cstr_to_str(cutoff_rfc3339) } {
+        Ok(s) => s,
+        Err(e) => {
+            return DistillResultC {
+                success: false,
+                error_msg: cstring_new_or_empty(e),
+                distilled: 0,
+                sigmas_created: 0,
+                skipped: 0,
+            }
+        }
+    };
+
+    match store.age_distill(cutoff, batch_size) {
+        Ok((distilled, sigmas_created, skipped)) => DistillResultC {
+            success: true,
+            error_msg: ptr::null_mut(),
+            distilled,
+            sigmas_created,
+            skipped,
+        },
+        Err(e) => DistillResultC {
+            success: false,
+            error_msg: cstring_new_or_empty(&format!("{}", e)),
+            distilled: 0,
+            sigmas_created: 0,
+            skipped: 0,
+        },
+    }
+}
+
 /// Get an attestation by ID through the read connection.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]

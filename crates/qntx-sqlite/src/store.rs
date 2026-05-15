@@ -197,6 +197,129 @@ impl SqliteStore {
         Ok(ReadConn { conn })
     }
 
+    /// Run a TRUNCATE checkpoint on the write connection.
+    /// Caller MUST ensure no read connections are open — TRUNCATE requires
+    /// exclusive access to the WAL. Returns (busy, wal_pages, checkpointed_pages).
+    pub fn wal_checkpoint_truncate(&self) -> StoreResult<(i32, i32, i32)> {
+        let mut busy = 0i32;
+        let mut log = 0i32;
+        let mut checkpointed = 0i32;
+        self.conn
+            .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| {
+                busy = row.get(0)?;
+                log = row.get(1)?;
+                checkpointed = row.get(2)?;
+                Ok(())
+            })
+            .map_err(SqliteError::from)?;
+        Ok((busy, log, checkpointed))
+    }
+
+    /// Age-triggered distillation: fold old attestations into sigmas.
+    ///
+    /// Queries attestations older than `cutoff_rfc3339` plus all existing sigmas
+    /// (source='distill'). Groups by first predicate, builds a sigma per group,
+    /// deletes originals. All within a single transaction.
+    ///
+    /// Returns (distilled_count, sigmas_created, skipped_singles).
+    pub fn age_distill(
+        &self,
+        cutoff_rfc3339: &str,
+        batch_size: usize,
+    ) -> StoreResult<(usize, usize, usize)> {
+        use crate::distill::build_distill_attestation;
+
+        // Load candidates
+        let mut stmt = self.conn.prepare(
+            "SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
+             FROM attestations
+             WHERE (timestamp < ?1 OR source = 'distill')
+             ORDER BY timestamp ASC
+             LIMIT ?2"
+        ).map_err(SqliteError::from)?;
+
+        let rows = stmt.query_map(
+            rusqlite::params![cutoff_rfc3339, batch_size as i64],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, String>(6)?,
+                    row.get::<_, Option<String>>(7)?,
+                    row.get::<_, String>(8)?,
+                    row.get::<_, Option<Vec<u8>>>(9)?,
+                    row.get::<_, Option<String>>(10)?,
+                ))
+            },
+        ).map_err(SqliteError::from)?;
+
+        let mut candidates: Vec<Attestation> = Vec::new();
+        for row in rows {
+            let row_data = row.map_err(SqliteError::from)?;
+            match Self::row_to_attestation(row_data) {
+                Ok(att) => candidates.push(att),
+                Err(_) => continue,
+            }
+        }
+        drop(stmt);
+
+        if candidates.is_empty() {
+            return Ok((0, 0, 0));
+        }
+
+        // Group by first predicate
+        let mut groups: HashMap<String, Vec<Attestation>> = HashMap::new();
+        for att in candidates {
+            let predicate = att.predicates.first().cloned().unwrap_or_else(|| "_".to_string());
+            groups.entry(predicate).or_default().push(att);
+        }
+
+        let tx = self.conn.unchecked_transaction().map_err(SqliteError::from)?;
+
+        let mut total_distilled = 0usize;
+        let mut total_created = 0usize;
+        let mut total_skipped = 0usize;
+
+        for (predicate, batch) in &groups {
+            if batch.len() < 2 {
+                total_skipped += batch.len();
+                continue;
+            }
+
+            // Build sigma — uses distill:<predicate> as context
+            let context = format!("distill:{}", predicate.trim_start_matches("distill:"));
+            let sigma = build_distill_attestation(batch, &context);
+
+            // The sigma predicate should be distill:<original_predicate>
+            let sigma = Attestation {
+                subjects: vec![format!("distill:{}", predicate.trim_start_matches("distill:"))],
+                predicates: vec![format!("distill:{}", predicate.trim_start_matches("distill:"))],
+                ..sigma
+            };
+
+            // Delete originals (CASCADE handles junction tables)
+            for att in batch {
+                tx.execute(
+                    "DELETE FROM attestations WHERE id = ?1",
+                    rusqlite::params![att.id],
+                ).map_err(SqliteError::from)?;
+                total_distilled += 1;
+            }
+
+            // Insert sigma
+            put_attestation(&tx, &sigma)?;
+            total_created += 1;
+        }
+
+        tx.commit().map_err(SqliteError::from)?;
+
+        Ok((total_distilled, total_created, total_skipped))
+    }
+
     /// Run PRAGMA integrity_check and return the result lines.
     /// A healthy database returns a single line: "ok".
     pub fn integrity_check(&self) -> StoreResult<Vec<String>> {

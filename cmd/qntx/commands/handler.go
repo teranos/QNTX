@@ -78,7 +78,7 @@ func runHandlerCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Open database
-	database, atsStore, _, err := openDatabase("")
+	database, atsStore, _, _, err := openDatabase("")
 	if err != nil {
 		return errors.Wrap(err, "failed to open database")
 	}

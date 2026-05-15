@@ -1,7 +1,7 @@
 # ADR-020: Attestation Distillation (Sigma)
 
 Date: 2026-05-12
-Updated: 2026-05-14
+Updated: 2026-05-15
 Status: Accepted
 
 ## Context

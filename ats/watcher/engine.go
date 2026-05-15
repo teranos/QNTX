@@ -110,10 +110,11 @@ const (
 	maxRetries        = 5
 	initialBackoff    = 1 * time.Second
 	maxBackoff        = 60 * time.Second
-	drainInterval     = 200 * time.Millisecond
+	drainInterval     = 2 * time.Second
 	drainBatchSize    = 50
 	purgeRetention    = 1 * time.Hour
 	purgeEveryNthTick = 100 // purge completed entries every 100th drain tick
+	maxQueuePerWatcher = 1000
 )
 
 // NewEngine creates a new watcher engine
@@ -193,6 +194,9 @@ func (e *Engine) Start() error {
 	} else if orphans > 0 {
 		e.logger.Infow("Requeued orphaned execution queue entries from previous run", "count", orphans)
 	}
+
+	// Purge excess queued entries per watcher (prevent unbounded growth)
+	e.pruneOverflowingQueues()
 
 	// Start drain loop (replaces in-memory retry loop)
 	e.wg.Add(1)
@@ -815,6 +819,29 @@ func deepCopyAttestation(as *types.As) *types.As {
 		}
 	}
 	return &asCopy
+}
+
+// pruneOverflowingQueues deletes the oldest queued entries for any watcher
+// that exceeds maxQueuePerWatcher. Runs once at startup to recover from bloat.
+func (e *Engine) pruneOverflowingQueues() {
+	stats, err := e.queueStore.Stats()
+	if err != nil {
+		e.logger.Warnw("Failed to get queue stats for startup prune", "error", err)
+		return
+	}
+	for watcherID, count := range stats.PerWatcher {
+		if count <= maxQueuePerWatcher {
+			continue
+		}
+		pruned, err := e.queueStore.PruneExcess(watcherID, maxQueuePerWatcher)
+		if err != nil {
+			e.logger.Warnw("Failed to prune excess queue entries",
+				"watcher_id", watcherID, "count", count, "error", err)
+			continue
+		}
+		e.logger.Infow("Pruned excess queue entries at startup",
+			"watcher_id", watcherID, "before", count, "pruned", pruned, "cap", maxQueuePerWatcher)
+	}
 }
 
 // GetQueueStore returns the queue store for external access (stats endpoint).

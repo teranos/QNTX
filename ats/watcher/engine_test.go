@@ -435,6 +435,7 @@ func TestEngine_QueryHistoricalMatches(t *testing.T) {
 			t.Fatalf("Failed to insert attestation: %v", err)
 		}
 	}
+	qntxtest.SyncJunctionTables(db)
 
 	// Create watcher that matches some attestations
 	store := storage.NewWatcherStore(db)

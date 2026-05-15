@@ -3794,7 +3794,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-app"
-version = "0.2.36"
+version = "0.2.41"
 dependencies = [
  "log",
  "qntx-grpc",
@@ -3813,7 +3813,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-core"
-version = "0.2.36"
+version = "0.2.41"
 dependencies = [
  "pretty_assertions",
  "serde",
@@ -3824,11 +3824,11 @@ dependencies = [
 
 [[package]]
 name = "qntx-ffi-common"
-version = "0.2.36"
+version = "0.2.41"
 
 [[package]]
 name = "qntx-grpc"
-version = "0.2.36"
+version = "0.2.41"
 dependencies = [
  "http",
  "lazy_static",
@@ -3847,14 +3847,14 @@ dependencies = [
 
 [[package]]
 name = "qntx-id"
-version = "0.2.36"
+version = "0.2.41"
 dependencies = [
  "unicode-normalization",
 ]
 
 [[package]]
 name = "qntx-indexeddb"
-version = "0.2.36"
+version = "0.2.41"
 dependencies = [
  "js-sys",
  "qntx-core",
@@ -3889,7 +3889,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-proto"
-version = "0.2.36"
+version = "0.2.41"
 dependencies = [
  "base64 0.22.1",
  "prost",
@@ -3966,7 +3966,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-sqlite"
-version = "0.2.36"
+version = "0.2.41"
 dependencies = [
  "base64 0.22.1",
  "chrono",

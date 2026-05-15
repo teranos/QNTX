@@ -10,7 +10,6 @@ import (
 
 	"github.com/teranos/QNTX/ai/tracker"
 	appcfg "github.com/teranos/QNTX/am"
-	qntxdb "github.com/teranos/QNTX/db"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/signing"
 	"github.com/teranos/QNTX/ats/storage"
@@ -376,15 +375,13 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	server.groundDBPath = deps.config.GroundDBPath
 	server.SetupEmbeddingService()
 
-	// Open a read-only connection for embedding reads — avoids write lock
-	// contention from _txlock=immediate on the primary connection.
-	readOnlyDB, err := qntxdb.OpenReadOnly(dbPath, serverLogger)
-	if err != nil {
-		serverLogger.Warnw("Failed to open read-only DB for embeddings, falling back to primary", "error", err)
-	}
+	// Use the primary rustsqlite connection for reads — the Rust driver
+	// separates reads/writes internally (muRead/muWrite), no need for a
+	// separate mattn read-only connection (which caused SIGBUS crashes from
+	// concurrent CGO calls via different drivers on the same file).
 	server.embeddingsHandler = &serverembeddings.Handler{
 		DB:           db,
-		ReadDB:       readOnlyDB,
+		ReadDB:       db,
 		Store:        server.embeddingStore,
 		Service:      server.embeddingService,
 		ATSStore:     atsStore,
@@ -403,6 +400,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		}
 	}
 	server.setupDistillSchedule(deps.config)
+	server.setupCheckpointSchedule(deps.config)
 	server.setupEmbeddingReclusterSchedule(deps.config)
 	server.setupEmbeddingReprojectSchedule(deps.config)
 	server.setupClusterLabelSchedule(deps.config)

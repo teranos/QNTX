@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,13 +24,14 @@ var driverOnce sync.Once
 
 // openDatabase creates a unified database setup: Rust owns the SQLite connection,
 // Go's *sql.DB routes all SQL through Rust via the "rustsqlite" driver.
-// Returns the sql.DB handle, the attestation store, and the resolved path.
-func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, error) {
+// Returns the sql.DB handle, the attestation store, the resolved path, and a
+// WALCheckpointer for Rust-side WAL checkpoint (close readers, checkpoint, reopen).
+func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, any, error) {
 	// Determine database path
 	if dbPath == "" {
 		path, err := am.GetDatabasePath()
 		if err != nil {
-			return nil, nil, "", fmt.Errorf("failed to get database path: %w", err)
+			return nil, nil, "", nil, fmt.Errorf("failed to get database path: %w", err)
 		}
 		if path == "" {
 			dbPath = "qntx.db"
@@ -41,7 +43,7 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, error) 
 	// Create Rust store (runs all migrations, sets up WAL/FK/busy_timeout)
 	rustStore, err := sqlitecgo.NewFileStore(dbPath)
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("failed to create Rust store at %s: %w", dbPath, err)
+		return nil, nil, "", nil, fmt.Errorf("failed to create Rust store at %s: %w", dbPath, err)
 	}
 
 	// Start priority write queue — POST (high) jumps ahead of plugin writes (low).
@@ -62,7 +64,7 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, error) 
 	database, err := sql.Open("rustsqlite", dbPath)
 	if err != nil {
 		rustStore.Close()
-		return nil, nil, "", fmt.Errorf("failed to open rustsqlite driver: %w", err)
+		return nil, nil, "", nil, fmt.Errorf("failed to open rustsqlite driver: %w", err)
 	}
 	database.SetMaxOpenConns(4)
 
@@ -71,7 +73,7 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, error) 
 	if err != nil {
 		database.Close()
 		rustStore.Close()
-		return nil, nil, "", fmt.Errorf("failed to create attestation store: %w", err)
+		return nil, nil, "", nil, fmt.Errorf("failed to create attestation store: %w", err)
 	}
 
 	// Start mutex watchdog — alerts when RustStore mutex is held too long.
@@ -82,6 +84,7 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, error) 
 		OnAlert: func(blocked time.Duration) {
 			buf := make([]byte, 64*1024)
 			n := runtime.Stack(buf, true)
+			dump := string(buf[:n])
 
 			dir := "tmp/watchdog"
 			os.MkdirAll(dir, 0755)
@@ -92,9 +95,63 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, error) 
 				logger.Logger.Warnf("RustStore mutex held for %s — failed to write dump: %s", blocked, err)
 				return
 			}
-			logger.Logger.Warnf("RustStore mutex held for %s — goroutine dump: %s", blocked, path)
+
+			// Use write-holder tracking (set by executeWrite) for the current operation,
+			// and scan the dump for goroutines waiting to acquire the lock.
+			holder, held := rustStore.WriteHolderInfo()
+			if holder == "" {
+				holder = "unknown"
+			}
+			waiters := extractWaiters(dump)
+			logger.Logger.Warnf("RustStore mutex held for %s — op: %s (held %s) — waiters: [%s] — dump: %s",
+				blocked, holder, held.Truncate(time.Millisecond), waiters, path)
 		},
 	})
 
-	return database, atsStore, dbPath, nil
+	return database, atsStore, dbPath, rustStore, nil
+}
+
+// extractWaiters scans a goroutine dump for goroutines blocked waiting on
+// the write mutex or write queue result. Returns a comma-separated list of
+// callers, e.g. "put:high, batch-put, watcher:evaluate".
+func extractWaiters(dump string) string {
+	blocks := strings.Split(dump, "\n\n")
+	var waiters []string
+	for _, block := range blocks {
+		lines := strings.Split(block, "\n")
+		// A waiter is a goroutine that contains "semacquire" (mutex contention)
+		// or is blocked on chan receive after SubmitWrite.
+		isWaiting := false
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if strings.Contains(trimmed, "semacquire") || strings.Contains(trimmed, "SubmitWrite") {
+				isWaiting = true
+				break
+			}
+		}
+		if !isWaiting {
+			continue
+		}
+		// Find the deepest QNTX application frame to identify the caller
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if strings.Contains(trimmed, "QNTX/") &&
+				!strings.Contains(trimmed, "writequeue") &&
+				!strings.Contains(trimmed, "watchdog") &&
+				!strings.Contains(trimmed, "runtime") {
+				if idx := strings.LastIndex(trimmed, "/"); idx >= 0 {
+					caller := trimmed[idx+1:]
+					if spaceIdx := strings.Index(caller, " "); spaceIdx > 0 {
+						caller = caller[:spaceIdx]
+					}
+					waiters = append(waiters, caller)
+				}
+				break
+			}
+		}
+	}
+	if len(waiters) == 0 {
+		return "none"
+	}
+	return strings.Join(waiters, ", ")
 }

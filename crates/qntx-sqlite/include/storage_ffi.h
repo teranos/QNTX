@@ -376,6 +376,61 @@ void query_result_free(QueryResultC result);
 StringArrayResultC storage_integrity_check(const SqliteStore *store);
 
 // ============================================================================
+// Age Distillation
+// ============================================================================
+
+typedef struct {
+    bool success;
+    char *error_msg;
+    size_t distilled;
+    size_t sigmas_created;
+    size_t skipped;
+} DistillResultC;
+
+/**
+ * Run age-triggered distillation: fold old attestations into sigmas.
+ * Queries attestations older than cutoff plus all existing sigmas,
+ * groups by predicate, creates one sigma per group, deletes originals.
+ * All within a single transaction.
+ *
+ * Caller must hold the write mutex before calling.
+ *
+ * @param store Store handle
+ * @param cutoff_rfc3339 RFC3339 timestamp cutoff for old attestations
+ * @param batch_size Maximum number of attestations to process
+ * @return Result with distilled/sigmas_created/skipped counts
+ */
+DistillResultC storage_age_distill(SqliteStore *store, const char *cutoff_rfc3339, size_t batch_size);
+
+// ============================================================================
+// WAL Checkpoint
+// ============================================================================
+
+typedef struct {
+    bool success;
+    char *error_msg;
+    int32_t busy;
+    int32_t wal_pages;
+    int32_t checkpointed_pages;
+} CheckpointResultC;
+
+/**
+ * Run a TRUNCATE WAL checkpoint. Closes all provided read connections,
+ * checkpoints the write connection, then reopens read connections.
+ *
+ * read_conns is a mutable array of `count` ReadConn pointers. On return,
+ * each slot is replaced with a fresh connection (or NULL on reopen failure).
+ *
+ * Caller must hold the write mutex before calling.
+ *
+ * @param store Store handle
+ * @param read_conns Array of ReadConn pointers (mutated in place)
+ * @param count Number of read connections
+ * @return Checkpoint result with busy/wal_pages/checkpointed_pages
+ */
+CheckpointResultC storage_wal_checkpoint(SqliteStore *store, ReadConn **read_conns, size_t count);
+
+// ============================================================================
 // Backup
 // ============================================================================
 

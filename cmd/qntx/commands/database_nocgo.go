@@ -10,6 +10,6 @@ import (
 )
 
 // openDatabase is unavailable without CGO — requires Rust SQLite driver.
-func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, error) {
-	return nil, nil, "", fmt.Errorf("database unavailable: this binary was built without CGO (use Nix build for full functionality)")
+func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, any, error) {
+	return nil, nil, "", nil, fmt.Errorf("database unavailable: this binary was built without CGO (use Nix build for full functionality)")
 }
