@@ -76,35 +76,36 @@ func openDatabase(dbPath string) (*sql.DB, ats.AttestationStore, string, any, er
 		return nil, nil, "", nil, fmt.Errorf("failed to create attestation store: %w", err)
 	}
 
-	// Start mutex watchdog — alerts when RustStore mutex is held too long.
-	// Dumps all goroutine stacks to tmp/watchdog/ so the log stays scannable.
+	// Start mutex watchdog — only logs + dumps when there are actual waiters.
+	// Write holder info is surfaced in the UI via live status; the watchdog
+	// is now exclusively for diagnosing real contention (blocked goroutines).
 	sqlitecgo.StartMutexWatchdog(rustStore.Mu(), sqlitecgo.WatchdogConfig{
 		Interval: 30 * time.Second,
 		Timeout:  5 * time.Second,
 		OnAlert: func(blocked time.Duration) {
+			holder, held := rustStore.WriteHolderInfo()
+			if holder == "" {
+				holder = "unknown"
+			}
+
 			buf := make([]byte, 64*1024)
 			n := runtime.Stack(buf, true)
 			dump := string(buf[:n])
+			waiters := extractWaiters(dump)
+
+			// No waiters = lock is held but nobody is blocked. Skip the log.
+			if waiters == "none" {
+				return
+			}
 
 			dir := "tmp/watchdog"
 			os.MkdirAll(dir, 0755)
 			filename := time.Now().Format("2006-01-02T15-04-05") + ".txt"
 			path := filepath.Join(dir, filename)
+			os.WriteFile(path, buf[:n], 0644)
 
-			if err := os.WriteFile(path, buf[:n], 0644); err != nil {
-				logger.Logger.Warnf("RustStore mutex held for %s — failed to write dump: %s", blocked, err)
-				return
-			}
-
-			// Use write-holder tracking (set by executeWrite) for the current operation,
-			// and scan the dump for goroutines waiting to acquire the lock.
-			holder, held := rustStore.WriteHolderInfo()
-			if holder == "" {
-				holder = "unknown"
-			}
-			waiters := extractWaiters(dump)
-			logger.Logger.Warnf("RustStore mutex held for %s — op: %s (held %s) — waiters: [%s] — dump: %s",
-				blocked, holder, held.Truncate(time.Millisecond), waiters, path)
+			logger.Logger.Warnf("RustStore mutex contention — op: %s (held %s) — waiters: [%s] — dump: %s",
+				holder, held.Truncate(time.Millisecond), waiters, path)
 		},
 	})
 

@@ -150,7 +150,7 @@ func (sc *slowCollector) flush() {
 		sc.lastFlush[key] = bucketSnapshot{count: b.count, avg: avg}
 
 		if name, ok := strings.CutPrefix(key, "mutex:"); ok {
-			logger.Logger.Infow("Mutex contention (5m)",
+			logger.Logger.Debugw("Mutex contention (5m)",
 				"mutex", name,
 				"waiters", b.count,
 				"min", b.min,
@@ -158,7 +158,7 @@ func (sc *slowCollector) flush() {
 				"avg", avg,
 			)
 		} else {
-			logger.Logger.Infow("Slow ops (5m)",
+			logger.Logger.Debugw("Slow ops (5m)",
 				"op", key,
 				"count", b.count,
 				"min", b.min,

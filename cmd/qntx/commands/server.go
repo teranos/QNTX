@@ -116,6 +116,11 @@ func runServer(cmd *cobra.Command, args []string) error {
 		srv.SetAgeDistiller(ad)
 	}
 
+	// Wire write lock inspector (diagnostics for UI)
+	if wl, ok := rustStore.(server.WriteLockInspector); ok {
+		srv.SetWriteLockInspector(wl)
+	}
+
 	// Wire deferred plugin initialization — fires when server is fully ready
 	// (migrations done, HTTP listening), not before.
 	if DeferredPluginInit != nil {

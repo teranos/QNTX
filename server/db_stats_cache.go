@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"strings"
@@ -11,8 +12,15 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
 	"github.com/teranos/QNTX/db/rustdriver"
+	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/syscap"
 )
+
+// WriteLockInspector exposes write lock holder diagnostics.
+// Implemented by RustStore.WriteHolderInfo.
+type WriteLockInspector interface {
+	WriteHolderInfo() (holder string, held time.Duration)
+}
 
 const dbStatsRefreshInterval = 30 * time.Second
 
@@ -97,6 +105,9 @@ func (s *QNTXServer) refreshDBStats() {
 	// Performance snapshot (slow ops + mutex contention)
 	perfData := buildPerformanceData()
 
+	// Live system status: write lock, WAL, dilation
+	liveStatus := buildLiveStatus(s)
+
 	response := map[string]interface{}{
 		"type":               "database_stats",
 		"path":               s.dbPath,
@@ -112,9 +123,46 @@ func (s *QNTXServer) refreshDBStats() {
 		"distillation":          distillStats,
 		"predicate_histograms": predicateHistograms,
 		"performance":          perfData,
+		"live":                 liveStatus,
 	}
 
 	s.dbStatsCache.Store(&cachedDBStats{response: response})
+}
+
+// buildLiveStatus collects real-time system metrics for the frontend:
+// write lock holder, WAL file size, and dilation state.
+func buildLiveStatus(s *QNTXServer) map[string]interface{} {
+	status := make(map[string]interface{})
+
+	// Write lock holder
+	if s.writeLockInspector != nil {
+		holder, held := s.writeLockInspector.WriteHolderInfo()
+		if holder != "" {
+			status["write_lock"] = map[string]interface{}{
+				"holder":  holder,
+				"held_ms": held.Milliseconds(),
+			}
+		}
+	}
+
+	// WAL file size (just stat the file — no queries needed)
+	walPath := s.dbPath + "-wal"
+	if info, err := os.Stat(walPath); err == nil {
+		status["wal_bytes"] = info.Size()
+	}
+
+	// DB file size
+	if info, err := os.Stat(s.dbPath); err == nil {
+		status["db_bytes"] = info.Size()
+	}
+
+	// Dilation + system pressure
+	status["dilation"] = async.CalculateDilation()
+	memPct, cpuPct := async.GetPressure()
+	status["mem_pct"] = memPct
+	status["cpu_pct"] = cpuPct
+
+	return status
 }
 
 // buildPerformanceData converts the slow log collector's rolling history

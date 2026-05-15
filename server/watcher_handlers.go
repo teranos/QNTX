@@ -664,7 +664,7 @@ func (s *QNTXServer) runDilationLoop() {
 	}
 
 	logDilation := func(d, memPct, cpuPct float64, tag string) {
-		s.logger.Infof("\n%s", formatDist(d, memPct, cpuPct, tag))
+		s.logger.Debugf("\n%s", formatDist(d, memPct, cpuPct, tag))
 		resetDist()
 	}
 
