@@ -13,6 +13,7 @@
 | GET | `/api/canvas/glyphs/` | canvasHandler.HandleGlyphs |
 | GET | `/api/canvas/minimized-windows` | canvasHandler.HandleMinimizedWindows |
 | GET | `/api/canvas/minimized-windows/` | canvasHandler.HandleMinimizedWindows |
+| GET | `/api/crash-test` | HandleCrashTest |
 | GET | `/api/embeddings/batch` | embeddingsHandler.HandleEmbeddingBatch |
 | GET | `/api/embeddings/by-source` | embeddingsHandler.HandleEmbeddingsBySource |
 | GET | `/api/embeddings/cluster` | embeddingsHandler.HandleCluster |
@@ -83,6 +84,15 @@
 ### `GET` /api/canvas/minimized-windows/
 
 **Handler**: `canvasHandler.HandleMinimizedWindows`
+
+---
+
+### `GET` /api/crash-test
+
+HandleCrashTest triggers a deliberate crash to verify the flight recorder.
+Dev mode only.
+
+**Handler**: `HandleCrashTest`
 
 ---
 

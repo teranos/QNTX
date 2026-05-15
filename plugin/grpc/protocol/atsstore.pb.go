@@ -653,6 +653,118 @@ func (x *GenerateAttestationResponse) GetAttestation() *Attestation {
 	return nil
 }
 
+type BatchGenerateAttestationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AuthToken     string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
+	Commands      []*AttestationCommand  `protobuf:"bytes,2,rep,name=commands,proto3" json:"commands,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BatchGenerateAttestationRequest) Reset() {
+	*x = BatchGenerateAttestationRequest{}
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BatchGenerateAttestationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BatchGenerateAttestationRequest) ProtoMessage() {}
+
+func (x *BatchGenerateAttestationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BatchGenerateAttestationRequest.ProtoReflect.Descriptor instead.
+func (*BatchGenerateAttestationRequest) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *BatchGenerateAttestationRequest) GetAuthToken() string {
+	if x != nil {
+		return x.AuthToken
+	}
+	return ""
+}
+
+func (x *BatchGenerateAttestationRequest) GetCommands() []*AttestationCommand {
+	if x != nil {
+		return x.Commands
+	}
+	return nil
+}
+
+type BatchGenerateAttestationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	Created       int32                  `protobuf:"varint,3,opt,name=created,proto3" json:"created,omitempty"` // Number of attestations successfully created
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BatchGenerateAttestationResponse) Reset() {
+	*x = BatchGenerateAttestationResponse{}
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BatchGenerateAttestationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BatchGenerateAttestationResponse) ProtoMessage() {}
+
+func (x *BatchGenerateAttestationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BatchGenerateAttestationResponse.ProtoReflect.Descriptor instead.
+func (*BatchGenerateAttestationResponse) Descriptor() ([]byte, []int) {
+	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *BatchGenerateAttestationResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *BatchGenerateAttestationResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *BatchGenerateAttestationResponse) GetCreated() int32 {
+	if x != nil {
+		return x.Created
+	}
+	return 0
+}
+
 type GetAttestationsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AuthToken     string                 `protobuf:"bytes,1,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
@@ -663,7 +775,7 @@ type GetAttestationsRequest struct {
 
 func (x *GetAttestationsRequest) Reset() {
 	*x = GetAttestationsRequest{}
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[9]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -675,7 +787,7 @@ func (x *GetAttestationsRequest) String() string {
 func (*GetAttestationsRequest) ProtoMessage() {}
 
 func (x *GetAttestationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[9]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -688,7 +800,7 @@ func (x *GetAttestationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAttestationsRequest.ProtoReflect.Descriptor instead.
 func (*GetAttestationsRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{9}
+	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetAttestationsRequest) GetAuthToken() string {
@@ -716,7 +828,7 @@ type GetAttestationsResponse struct {
 
 func (x *GetAttestationsResponse) Reset() {
 	*x = GetAttestationsResponse{}
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[10]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -728,7 +840,7 @@ func (x *GetAttestationsResponse) String() string {
 func (*GetAttestationsResponse) ProtoMessage() {}
 
 func (x *GetAttestationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[10]
+	mi := &file_plugin_grpc_protocol_atsstore_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -741,7 +853,7 @@ func (x *GetAttestationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAttestationsResponse.ProtoReflect.Descriptor instead.
 func (*GetAttestationsResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{10}
+	return file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetAttestationsResponse) GetSuccess() bool {
@@ -838,7 +950,15 @@ const file_plugin_grpc_protocol_atsstore_proto_rawDesc = "" +
 	"\x1bGenerateAttestationResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x127\n" +
-	"\vattestation\x18\x03 \x01(\v2\x15.protocol.AttestationR\vattestation\"l\n" +
+	"\vattestation\x18\x03 \x01(\v2\x15.protocol.AttestationR\vattestation\"z\n" +
+	"\x1fBatchGenerateAttestationRequest\x12\x1d\n" +
+	"\n" +
+	"auth_token\x18\x01 \x01(\tR\tauthToken\x128\n" +
+	"\bcommands\x18\x02 \x03(\v2\x1c.protocol.AttestationCommandR\bcommands\"l\n" +
+	" BatchGenerateAttestationResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\x12\x18\n" +
+	"\acreated\x18\x03 \x01(\x05R\acreated\"l\n" +
 	"\x16GetAttestationsRequest\x12\x1d\n" +
 	"\n" +
 	"auth_token\x18\x01 \x01(\tR\tauthToken\x123\n" +
@@ -846,11 +966,12 @@ const file_plugin_grpc_protocol_atsstore_proto_rawDesc = "" +
 	"\x17GetAttestationsResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x129\n" +
-	"\fattestations\x18\x03 \x03(\v2\x15.protocol.AttestationR\fattestations2\xe6\x03\n" +
+	"\fattestations\x18\x03 \x03(\v2\x15.protocol.AttestationR\fattestations2\xe3\x04\n" +
 	"\x0fATSStoreService\x12\\\n" +
 	"\x11CreateAttestation\x12\".protocol.CreateAttestationRequest\x1a#.protocol.CreateAttestationResponse\x12\\\n" +
 	"\x11AttestationExists\x12\".protocol.AttestationExistsRequest\x1a#.protocol.AttestationExistsResponse\x12k\n" +
-	"\x1cGenerateAndCreateAttestation\x12$.protocol.GenerateAttestationRequest\x1a%.protocol.GenerateAttestationResponse\x12V\n" +
+	"\x1cGenerateAndCreateAttestation\x12$.protocol.GenerateAttestationRequest\x1a%.protocol.GenerateAttestationResponse\x12{\n" +
+	"\"BatchGenerateAndCreateAttestations\x12).protocol.BatchGenerateAttestationRequest\x1a*.protocol.BatchGenerateAttestationResponse\x12V\n" +
 	"\x0fGetAttestations\x12 .protocol.GetAttestationsRequest\x1a!.protocol.GetAttestationsResponse\x12R\n" +
 	"\x15GetAttestationsStream\x12 .protocol.GetAttestationsRequest\x1a\x15.protocol.Attestation0\x01B.Z,github.com/teranos/QNTX/plugin/grpc/protocolb\x06proto3"
 
@@ -866,44 +987,49 @@ func file_plugin_grpc_protocol_atsstore_proto_rawDescGZIP() []byte {
 	return file_plugin_grpc_protocol_atsstore_proto_rawDescData
 }
 
-var file_plugin_grpc_protocol_atsstore_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_plugin_grpc_protocol_atsstore_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_plugin_grpc_protocol_atsstore_proto_goTypes = []any{
-	(*Attestation)(nil),                 // 0: protocol.Attestation
-	(*AttestationCommand)(nil),          // 1: protocol.AttestationCommand
-	(*AttestationFilter)(nil),           // 2: protocol.AttestationFilter
-	(*CreateAttestationRequest)(nil),    // 3: protocol.CreateAttestationRequest
-	(*CreateAttestationResponse)(nil),   // 4: protocol.CreateAttestationResponse
-	(*AttestationExistsRequest)(nil),    // 5: protocol.AttestationExistsRequest
-	(*AttestationExistsResponse)(nil),   // 6: protocol.AttestationExistsResponse
-	(*GenerateAttestationRequest)(nil),  // 7: protocol.GenerateAttestationRequest
-	(*GenerateAttestationResponse)(nil), // 8: protocol.GenerateAttestationResponse
-	(*GetAttestationsRequest)(nil),      // 9: protocol.GetAttestationsRequest
-	(*GetAttestationsResponse)(nil),     // 10: protocol.GetAttestationsResponse
-	(*structpb.Struct)(nil),             // 11: google.protobuf.Struct
+	(*Attestation)(nil),                      // 0: protocol.Attestation
+	(*AttestationCommand)(nil),               // 1: protocol.AttestationCommand
+	(*AttestationFilter)(nil),                // 2: protocol.AttestationFilter
+	(*CreateAttestationRequest)(nil),         // 3: protocol.CreateAttestationRequest
+	(*CreateAttestationResponse)(nil),        // 4: protocol.CreateAttestationResponse
+	(*AttestationExistsRequest)(nil),         // 5: protocol.AttestationExistsRequest
+	(*AttestationExistsResponse)(nil),        // 6: protocol.AttestationExistsResponse
+	(*GenerateAttestationRequest)(nil),       // 7: protocol.GenerateAttestationRequest
+	(*GenerateAttestationResponse)(nil),      // 8: protocol.GenerateAttestationResponse
+	(*BatchGenerateAttestationRequest)(nil),  // 9: protocol.BatchGenerateAttestationRequest
+	(*BatchGenerateAttestationResponse)(nil), // 10: protocol.BatchGenerateAttestationResponse
+	(*GetAttestationsRequest)(nil),           // 11: protocol.GetAttestationsRequest
+	(*GetAttestationsResponse)(nil),          // 12: protocol.GetAttestationsResponse
+	(*structpb.Struct)(nil),                  // 13: google.protobuf.Struct
 }
 var file_plugin_grpc_protocol_atsstore_proto_depIdxs = []int32{
-	11, // 0: protocol.Attestation.attributes:type_name -> google.protobuf.Struct
-	11, // 1: protocol.AttestationCommand.attributes:type_name -> google.protobuf.Struct
+	13, // 0: protocol.Attestation.attributes:type_name -> google.protobuf.Struct
+	13, // 1: protocol.AttestationCommand.attributes:type_name -> google.protobuf.Struct
 	0,  // 2: protocol.CreateAttestationRequest.attestation:type_name -> protocol.Attestation
 	1,  // 3: protocol.GenerateAttestationRequest.command:type_name -> protocol.AttestationCommand
 	0,  // 4: protocol.GenerateAttestationResponse.attestation:type_name -> protocol.Attestation
-	2,  // 5: protocol.GetAttestationsRequest.filter:type_name -> protocol.AttestationFilter
-	0,  // 6: protocol.GetAttestationsResponse.attestations:type_name -> protocol.Attestation
-	3,  // 7: protocol.ATSStoreService.CreateAttestation:input_type -> protocol.CreateAttestationRequest
-	5,  // 8: protocol.ATSStoreService.AttestationExists:input_type -> protocol.AttestationExistsRequest
-	7,  // 9: protocol.ATSStoreService.GenerateAndCreateAttestation:input_type -> protocol.GenerateAttestationRequest
-	9,  // 10: protocol.ATSStoreService.GetAttestations:input_type -> protocol.GetAttestationsRequest
-	9,  // 11: protocol.ATSStoreService.GetAttestationsStream:input_type -> protocol.GetAttestationsRequest
-	4,  // 12: protocol.ATSStoreService.CreateAttestation:output_type -> protocol.CreateAttestationResponse
-	6,  // 13: protocol.ATSStoreService.AttestationExists:output_type -> protocol.AttestationExistsResponse
-	8,  // 14: protocol.ATSStoreService.GenerateAndCreateAttestation:output_type -> protocol.GenerateAttestationResponse
-	10, // 15: protocol.ATSStoreService.GetAttestations:output_type -> protocol.GetAttestationsResponse
-	0,  // 16: protocol.ATSStoreService.GetAttestationsStream:output_type -> protocol.Attestation
-	12, // [12:17] is the sub-list for method output_type
-	7,  // [7:12] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	1,  // 5: protocol.BatchGenerateAttestationRequest.commands:type_name -> protocol.AttestationCommand
+	2,  // 6: protocol.GetAttestationsRequest.filter:type_name -> protocol.AttestationFilter
+	0,  // 7: protocol.GetAttestationsResponse.attestations:type_name -> protocol.Attestation
+	3,  // 8: protocol.ATSStoreService.CreateAttestation:input_type -> protocol.CreateAttestationRequest
+	5,  // 9: protocol.ATSStoreService.AttestationExists:input_type -> protocol.AttestationExistsRequest
+	7,  // 10: protocol.ATSStoreService.GenerateAndCreateAttestation:input_type -> protocol.GenerateAttestationRequest
+	9,  // 11: protocol.ATSStoreService.BatchGenerateAndCreateAttestations:input_type -> protocol.BatchGenerateAttestationRequest
+	11, // 12: protocol.ATSStoreService.GetAttestations:input_type -> protocol.GetAttestationsRequest
+	11, // 13: protocol.ATSStoreService.GetAttestationsStream:input_type -> protocol.GetAttestationsRequest
+	4,  // 14: protocol.ATSStoreService.CreateAttestation:output_type -> protocol.CreateAttestationResponse
+	6,  // 15: protocol.ATSStoreService.AttestationExists:output_type -> protocol.AttestationExistsResponse
+	8,  // 16: protocol.ATSStoreService.GenerateAndCreateAttestation:output_type -> protocol.GenerateAttestationResponse
+	10, // 17: protocol.ATSStoreService.BatchGenerateAndCreateAttestations:output_type -> protocol.BatchGenerateAttestationResponse
+	12, // 18: protocol.ATSStoreService.GetAttestations:output_type -> protocol.GetAttestationsResponse
+	0,  // 19: protocol.ATSStoreService.GetAttestationsStream:output_type -> protocol.Attestation
+	14, // [14:20] is the sub-list for method output_type
+	8,  // [8:14] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_plugin_grpc_protocol_atsstore_proto_init() }
@@ -919,7 +1045,7 @@ func file_plugin_grpc_protocol_atsstore_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_grpc_protocol_atsstore_proto_rawDesc), len(file_plugin_grpc_protocol_atsstore_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

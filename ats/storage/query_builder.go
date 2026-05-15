@@ -26,60 +26,60 @@ func (qb *queryBuilder) build() string {
 	return strings.Join(qb.whereClauses, " AND ")
 }
 
-// buildSubjectFilter creates LIKE clauses for subject matching (OR logic)
+// buildSubjectFilter uses the attestation_subjects junction table for indexed lookups.
 func (qb *queryBuilder) buildSubjectFilter(subjects []string) {
 	if len(subjects) == 0 {
 		return
 	}
-
-	var subjectClauses []string
-	for _, subject := range subjects {
-		subjectClauses = append(subjectClauses, "subjects LIKE ? ESCAPE '\\'")
-		qb.args = append(qb.args, "%\""+escapeLikePattern(subject)+"\"%")
+	placeholders := make([]string, len(subjects))
+	for i, s := range subjects {
+		placeholders[i] = "?"
+		qb.args = append(qb.args, s)
 	}
-	qb.whereClauses = append(qb.whereClauses, "("+strings.Join(subjectClauses, " OR ")+")")
+	qb.whereClauses = append(qb.whereClauses,
+		"id IN (SELECT attestation_id FROM attestation_subjects WHERE subject IN ("+strings.Join(placeholders, ",")+"))")
 }
 
-// buildPredicateFilter creates LIKE clauses for predicate matching (OR logic)
+// buildPredicateFilter uses the attestation_predicates junction table for indexed lookups.
 func (qb *queryBuilder) buildPredicateFilter(predicates []string) {
 	if len(predicates) == 0 {
 		return
 	}
-
-	var predicateClauses []string
-	for _, predicate := range predicates {
-		predicateClauses = append(predicateClauses, "predicates LIKE ? ESCAPE '\\'")
-		qb.args = append(qb.args, "%\""+escapeLikePattern(predicate)+"\"%")
+	placeholders := make([]string, len(predicates))
+	for i, p := range predicates {
+		placeholders[i] = "?"
+		qb.args = append(qb.args, p)
 	}
-	qb.whereClauses = append(qb.whereClauses, "("+strings.Join(predicateClauses, " OR ")+")")
+	qb.whereClauses = append(qb.whereClauses,
+		"id IN (SELECT attestation_id FROM attestation_predicates WHERE predicate IN ("+strings.Join(placeholders, ",")+"))")
 }
 
-// buildContextFilter creates LIKE clauses for context matching (OR logic)
+// buildContextFilter uses the attestation_contexts junction table for indexed lookups.
 func (qb *queryBuilder) buildContextFilter(contexts []string) {
 	if len(contexts) == 0 {
 		return
 	}
-
-	var contextClauses []string
-	for _, context := range contexts {
-		contextClauses = append(contextClauses, "contexts LIKE ? COLLATE NOCASE ESCAPE '\\'")
-		qb.args = append(qb.args, "%\""+escapeLikePattern(context)+"\"%")
+	placeholders := make([]string, len(contexts))
+	for i, c := range contexts {
+		placeholders[i] = "?"
+		qb.args = append(qb.args, c)
 	}
-	qb.whereClauses = append(qb.whereClauses, "("+strings.Join(contextClauses, " OR ")+")")
+	qb.whereClauses = append(qb.whereClauses,
+		"id IN (SELECT attestation_id FROM attestation_contexts WHERE context IN ("+strings.Join(placeholders, ",")+" COLLATE NOCASE))")
 }
 
-// buildActorFilter creates LIKE clauses for actor matching (OR logic)
+// buildActorFilter uses the attestation_actors junction table for indexed lookups.
 func (qb *queryBuilder) buildActorFilter(actors []string) {
 	if len(actors) == 0 {
 		return
 	}
-
-	var actorClauses []string
-	for _, actor := range actors {
-		actorClauses = append(actorClauses, "actors LIKE ? ESCAPE '\\'")
-		qb.args = append(qb.args, "%\""+escapeLikePattern(actor)+"\"%")
+	placeholders := make([]string, len(actors))
+	for i, a := range actors {
+		placeholders[i] = "?"
+		qb.args = append(qb.args, a)
 	}
-	qb.whereClauses = append(qb.whereClauses, "("+strings.Join(actorClauses, " OR ")+")")
+	qb.whereClauses = append(qb.whereClauses,
+		"id IN (SELECT attestation_id FROM attestation_actors WHERE actor IN ("+strings.Join(placeholders, ",")+"))")
 }
 
 // BuildFilterQuery builds a SQL query from an AxFilter, returning the full SELECT
@@ -116,14 +116,6 @@ func BuildFilterQuery(filter types.AxFilter) (string, []interface{}) {
 	return query, qb.args
 }
 
-// escapeLikePattern escapes special characters in LIKE patterns for SQL ESCAPE clause
-func escapeLikePattern(s string) string {
-	s = strings.ReplaceAll(s, "\\", "\\\\")
-	s = strings.ReplaceAll(s, "%", "\\%")
-	s = strings.ReplaceAll(s, "_", "\\_")
-	return s
-}
-
 // buildNaturalLanguageFilter handles NL query expansion with predicate-context pairing
 func (qb *queryBuilder) buildNaturalLanguageFilter(expander ats.QueryExpander, filter types.AxFilter) {
 	if len(filter.Predicates) == 0 {
@@ -141,12 +133,9 @@ func (qb *queryBuilder) buildNaturalLanguageFilter(expander ats.QueryExpander, f
 	if len(expansions) > 0 {
 		var expansionClauses []string
 		for _, exp := range expansions {
-			escapedPred := escapeLikePattern(exp.Predicate)
-			escapedCtx := escapeLikePattern(exp.Context)
-
 			expansionClauses = append(expansionClauses,
-				"(predicates LIKE ? ESCAPE '\\' AND contexts LIKE ? COLLATE NOCASE ESCAPE '\\')")
-			qb.args = append(qb.args, "%\""+escapedPred+"\"%", "%\""+escapedCtx+"\"%")
+				"(id IN (SELECT attestation_id FROM attestation_predicates WHERE predicate = ?) AND id IN (SELECT attestation_id FROM attestation_contexts WHERE context = ? COLLATE NOCASE))")
+			qb.args = append(qb.args, exp.Predicate, exp.Context)
 		}
 		// Wrap all expansions in OR
 		qb.whereClauses = append(qb.whereClauses, "("+strings.Join(expansionClauses, " OR ")+")")
@@ -154,10 +143,13 @@ func (qb *queryBuilder) buildNaturalLanguageFilter(expander ats.QueryExpander, f
 
 	// Also add any explicit contexts from filter.Contexts
 	if len(filter.Contexts) > 0 {
-		for _, context := range filter.Contexts {
-			qb.whereClauses = append(qb.whereClauses, "contexts LIKE ?")
-			qb.args = append(qb.args, "%\""+context+"\"%")
+		placeholders := make([]string, len(filter.Contexts))
+		for i, ctx := range filter.Contexts {
+			placeholders[i] = "?"
+			qb.args = append(qb.args, ctx)
 		}
+		qb.whereClauses = append(qb.whereClauses,
+			"id IN (SELECT attestation_id FROM attestation_contexts WHERE context IN ("+strings.Join(placeholders, ",")+" COLLATE NOCASE))")
 	}
 }
 

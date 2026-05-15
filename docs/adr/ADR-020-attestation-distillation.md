@@ -1,6 +1,7 @@
 # ADR-020: Attestation Distillation (Sigma)
 
 Date: 2026-05-12
+Updated: 2026-05-15
 Status: Accepted
 
 ## Context
@@ -21,7 +22,11 @@ Fires when bounded limits are exceeded. The eviction batch is loaded, distilled 
 
 ### 2. Age-triggered (Go, `server/distill_pulse.go`)
 
-A Pulse handler that runs on a configurable interval. Queries attestations older than `max_age_hours`, groups by predicate, creates one sigma per predicate group, deletes originals. Handles meta-distillation: old sigmas are re-distilled alongside regular attestations.
+A Pulse handler that runs on a configurable interval. Queries attestations older than `max_age_hours` **plus all existing sigmas regardless of age**. Sigmas are exempt from the age rule — they are always eligible for re-distillation. This means every cycle absorbs the existing sigma for a predicate alongside any newly-aged raw attestations, producing a single growing sigma per predicate.
+
+Groups by predicate, creates one sigma per predicate group, deletes originals.
+
+**Minimum group size:** Groups with fewer than 2 attestations are skipped. A sigma that absorbs a single attestation is a 1:1 copy — it adds no compression, wastes a write, and deletes the original (net negative). Singles remain until more attestations with the same predicate age in.
 
 Also performs ghost row cleanup (NULL/empty IDs, zero timestamps) at the start of each cycle.
 
@@ -51,10 +56,11 @@ attributes: {
   _subjects_sample: ["sub_1", "sub_2", ...],         // up to 10
   _first_seen: "2026-05-04T...",
   _last_seen:  "2026-05-12T...",
+  _histogram: {"2026-05-04T12:10": 3, ...},          // temporal distribution
   _version: "v0.8.0 (fd7326d)",                   // Go binary version
   _rust_version: "0.2.3",                          // Cargo workspace version
   some_number: {min: 0, max: 4500, sum: 14640, count: 8},
-  some_string: {values: ["a", "b"], count: 2},
+  some_string: {frequencies: {"a": 5, "b": 3}, count: 8},
   some_constant: "abc123"                          // constant across all -- kept as scalar
 }
 ```
@@ -63,8 +69,13 @@ attributes: {
 
 - **Number** -> `{min, max, sum, count}` — avg derived as sum/count
 - **String** -> `{frequencies: {val: count, ...}, count}` — frequency-tracked distribution, capped at 50 unique values. Legacy `{values: [...], count}` format (pre-frequency sigmas) passes values through as `unplaced` without fabricating counts. If constant across all attestations, kept as scalar.
-- **Already-aggregated** (from prior sigma, detected by `{min, max, sum}` keys) -> merge: min the mins, max the maxes, sum the sums, add counts; union frequency maps
 - **Sigma metadata keys** (`_distill`, `_count`, `_total`, `_first_seen`, `_last_seen`, `_version`, `_rust_version`, `_subjects_count`, `_subjects_sample`, `_actors_count`, `_actors_sample`, `_histogram`) are skipped during merging and rebuilt from the batch
+
+### Re-distillation attribute stripping
+
+When re-distilling sigmas, nested aggregate maps (numeric `{min,max,sum,count}` and string `{frequencies,count}`) from prior sigmas are **stripped before merging**. Without this, frequency maps and numeric aggregates compound across re-distillation cycles, growing unboundedly until they exceed the 1MB attestation JSON limit.
+
+The first distill (raw -> sigma) preserves full attribute aggregates. Subsequent re-distillation preserves only scalar attributes and distill metadata. The temporal story (`_total`, `_histogram`, `_first_seen`, `_last_seen`) is the primary value of a sigma — attribute aggregates are secondary.
 
 ## Observation Counting: `_count` vs `_total`
 
@@ -74,7 +85,9 @@ attributes: {
 
 ## Meta-Distillation
 
-Sigmas are normal attestations. When they age past `max_age_hours`, the Pulse handler re-distills them alongside any regular attestations in the same predicate group.
+Sigmas are always eligible for re-distillation — they are not gated by `max_age_hours`. Every distill cycle picks up all existing sigmas and merges them with any raw attestations that have aged past the threshold. This produces a single growing sigma per predicate that absorbs more observations each cycle.
+
+The number of sigmas is bounded by the number of unique predicates — a small fixed set. Rewriting ~20-30 sigmas every cycle is negligible cost.
 
 ### Float64 Interop
 
@@ -94,9 +107,9 @@ Go and Rust versions are independent. Rust version lives in `Cargo.toml` workspa
 
 ```toml
 [distill]
-interval_seconds = 120    # omit to disable
-max_age_hours = 350
-batch_size = 500           # default
+interval_seconds = 360    # omit to disable
+max_age_hours = 54
+batch_size = 5000          # default 500
 dry_run = false            # default
 ```
 
@@ -123,11 +136,12 @@ The `_histogram` attribute preserves temporal distribution as bucketed observati
 
 Distillation preserves aggregate statistical properties but destroys:
 
-- **Temporal distribution** — reduced to `_first_seen`/`_last_seen` (mitigated by `_histogram` when implemented)
+- **Temporal distribution** — reduced to `_first_seen`/`_last_seen`, mitigated by `_histogram`
 - **Per-event correlation** — numeric ranges are global, not per-context or per-actor
 - **Ordering** — event sequence within the time window is lost
 - **String value long tail** — capped at 50 unique values, then just a count
 - **Batch boundaries** — meta-distilled sigmas don't record which intermediate contributed what proportion
+- **Attribute aggregates across re-distillation** — stripped to prevent unbounded growth; only first-generation sigmas carry full attribute statistics
 
 ## Consequences
 
@@ -136,3 +150,4 @@ Distillation preserves aggregate statistical properties but destroys:
 - Sigmas carry `source = "distill"` and `_distill: true` in attributes for identification
 - `_version` and `_rust_version` provide deployment traceability across sigma generations
 - High-volume predicates with attribute-level semantic differences (e.g. `crawl-stage-changed` with 7 stages) lose granularity — the fix is upstream: emit distinct predicates per semantic category
+- Sigma count is bounded by unique predicates, not by attestation volume

@@ -4,14 +4,23 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"strings"
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
+	"github.com/teranos/QNTX/db/rustdriver"
+	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/syscap"
 )
+
+// WriteLockInspector exposes write lock holder diagnostics.
+// Implemented by RustStore.WriteHolderInfo.
+type WriteLockInspector interface {
+	WriteHolderInfo() (holder string, held time.Duration)
+}
 
 const dbStatsRefreshInterval = 30 * time.Second
 
@@ -57,6 +66,7 @@ func (s *QNTXServer) refreshDBStats() {
 	}
 	defer statsDB.Close()
 
+	rustdriver.SetCaller("db-stats")
 	queryStart := time.Now()
 	if err := statsDB.QueryRow("SELECT COUNT(*) FROM attestations").Scan(&totalAttestations); err != nil {
 		s.logger.Warnw("Failed to refresh database stats cache", "error", err, "elapsed", time.Since(queryStart))
@@ -95,6 +105,9 @@ func (s *QNTXServer) refreshDBStats() {
 	// Performance snapshot (slow ops + mutex contention)
 	perfData := buildPerformanceData()
 
+	// Live system status: write lock, WAL, dilation
+	liveStatus := buildLiveStatus(s)
+
 	response := map[string]interface{}{
 		"type":               "database_stats",
 		"path":               s.dbPath,
@@ -110,9 +123,46 @@ func (s *QNTXServer) refreshDBStats() {
 		"distillation":          distillStats,
 		"predicate_histograms": predicateHistograms,
 		"performance":          perfData,
+		"live":                 liveStatus,
 	}
 
 	s.dbStatsCache.Store(&cachedDBStats{response: response})
+}
+
+// buildLiveStatus collects real-time system metrics for the frontend:
+// write lock holder, WAL file size, and dilation state.
+func buildLiveStatus(s *QNTXServer) map[string]interface{} {
+	status := make(map[string]interface{})
+
+	// Write lock holder
+	if s.writeLockInspector != nil {
+		holder, held := s.writeLockInspector.WriteHolderInfo()
+		if holder != "" {
+			status["write_lock"] = map[string]interface{}{
+				"holder":  holder,
+				"held_ms": held.Milliseconds(),
+			}
+		}
+	}
+
+	// WAL file size (just stat the file — no queries needed)
+	walPath := s.dbPath + "-wal"
+	if info, err := os.Stat(walPath); err == nil {
+		status["wal_bytes"] = info.Size()
+	}
+
+	// DB file size
+	if info, err := os.Stat(s.dbPath); err == nil {
+		status["db_bytes"] = info.Size()
+	}
+
+	// Dilation + system pressure
+	status["dilation"] = async.CalculateDilation()
+	memPct, cpuPct := async.GetPressure()
+	status["mem_pct"] = memPct
+	status["cpu_pct"] = cpuPct
+
+	return status
 }
 
 // buildPerformanceData converts the slow log collector's rolling history
@@ -381,8 +431,8 @@ func queryPredicateHistograms(db *sql.DB) map[string]map[string]int64 {
 	return result
 }
 
-func queryRecentEvictions(db *sql.DB) []map[string]interface{} {
-	var evictions []map[string]interface{}
+func queryRecentEvictions(db *sql.DB) []map[string]any {
+	var evictions []map[string]any
 	rows, err := db.Query(`
 		SELECT event_type, actor, context, entity, deletions_count, limit_value, timestamp, eviction_details
 		FROM storage_events
@@ -425,7 +475,7 @@ func queryRecentEvictions(db *sql.DB) []map[string]interface{} {
 			message = fmt.Sprintf("Evicted %d attestations (%s)", deletionsCount, eventType)
 		}
 
-		ev := map[string]interface{}{
+		ev := map[string]any{
 			"event_type":      eventType,
 			"actor":           actor.String,
 			"context":         ctx.String,
@@ -436,7 +486,7 @@ func queryRecentEvictions(db *sql.DB) []map[string]interface{} {
 		}
 
 		if evictionDetails.Valid && evictionDetails.String != "" {
-			var details map[string]interface{}
+			var details map[string]any
 			if err := json.Unmarshal([]byte(evictionDetails.String), &details); err == nil {
 				if preds, ok := details["predicates"]; ok {
 					ev["predicates"] = preds

@@ -38,6 +38,7 @@ func setupResolutionTestDB(t *testing.T) *sql.DB {
 		time.Now().Format(time.RFC3339), time.Now().Format(time.RFC3339))
 	require.NoError(t, err, "Failed to insert resolution test fixtures")
 
+	require.NoError(t, qntxtest.SyncJunctionTables(testDB))
 	return testDB
 }
 
@@ -81,6 +82,7 @@ func TestAttestationResolution(t *testing.T) {
 		`, time.Now().Format(time.RFC3339), time.Now().Format(time.RFC3339),
 			time.Now().Format(time.RFC3339), time.Now().Format(time.RFC3339))
 		require.NoError(t, err, "Failed to insert verification test data")
+		require.NoError(t, qntxtest.SyncJunctionTables(db))
 
 		filter := types.AxFilter{
 			Subjects:   []string{"LINK"},
@@ -109,6 +111,7 @@ func TestAttestationResolution(t *testing.T) {
 		`, time.Now().AddDate(0, 0, -2).Format(time.RFC3339), time.Now().Format(time.RFC3339),
 			time.Now().AddDate(0, 0, -1).Format(time.RFC3339), time.Now().Format(time.RFC3339))
 		require.NoError(t, err, "Failed to insert conflict test data")
+		require.NoError(t, qntxtest.SyncJunctionTables(db))
 
 		filter := types.AxFilter{
 			Subjects: []string{"NIOBE"},

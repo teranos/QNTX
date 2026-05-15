@@ -218,6 +218,23 @@ func (s *QueueStore) PurgeCompleted(olderThan time.Duration) (int64, error) {
 	return result.RowsAffected()
 }
 
+// PruneExcess deletes the oldest queued entries for a watcher, keeping only the
+// newest `keep` entries. Returns the number of deleted rows.
+func (s *QueueStore) PruneExcess(watcherID string, keep int) (int64, error) {
+	result, err := s.db.Exec(`
+		DELETE FROM watcher_execution_queue
+		WHERE watcher_id = ? AND status = 'queued'
+		  AND id NOT IN (
+		    SELECT id FROM watcher_execution_queue
+		    WHERE watcher_id = ? AND status = 'queued'
+		    ORDER BY id DESC LIMIT ?
+		  )`, watcherID, watcherID, keep)
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to prune excess queue entries for watcher %s", watcherID)
+	}
+	return result.RowsAffected()
+}
+
 // PurgeForWatcher removes all queued entries for a specific watcher.
 func (s *QueueStore) PurgeForWatcher(watcherID string) (int64, error) {
 	result, err := s.db.Exec(`DELETE FROM watcher_execution_queue WHERE watcher_id = ? AND status = 'queued'`, watcherID)

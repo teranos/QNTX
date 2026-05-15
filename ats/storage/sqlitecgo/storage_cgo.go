@@ -63,6 +63,7 @@ type RustStore struct {
 	muWrite  sync.Mutex
 	muRead   sync.Mutex // kept for backward compat (driver registration)
 	store    *C.SqliteStore
+	dbPath   string        // filesystem path (empty for in-memory)
 	readConn *C.ReadConn   // primary read conn (kept for driver/backward compat)
 	readPool []*readConnEntry // pooled read connections for concurrent reads
 	readNext atomic.Uint64    // round-robin index into readPool
@@ -71,6 +72,10 @@ type RustStore struct {
 	// nil until StartWriteQueue is called (falls back to direct muWrite).
 	highPriority chan writeRequest
 	lowPriority  chan writeRequest
+
+	// Write-lock holder tracking for watchdog diagnostics.
+	writeHolder atomic.Value // string: who holds muWrite (empty = unlocked)
+	writeSince  atomic.Int64 // unix nanos when muWrite was acquired
 }
 
 // NewMemoryStore creates a new in-memory Rust storage backend.
@@ -92,10 +97,11 @@ func NewMemoryStore() (*RustStore, error) {
 }
 
 // readPoolSize is the number of concurrent read connections.
-// SQLite WAL supports unlimited readers. With plugins running 4+ concurrent
-// multi-second queries, 16 connections give the POST path's microsecond
-// AttestationExists lookups a high chance of hitting a free connection.
-const readPoolSize = 16
+// Each connection memory-maps the WAL -shm file; too many connections
+// increase the risk of SIGBUS when the mapping is invalidated by a
+// checkpoint. 4 connections keeps reads concurrent while limiting mmap
+// surface.
+const readPoolSize = 4
 
 // NewFileStore creates a new file-backed Rust storage backend.
 // The caller must call Close() when done to free resources.
@@ -131,7 +137,7 @@ func NewFileStore(path string) (*RustStore, error) {
 		pool[i] = &readConnEntry{conn: rc}
 	}
 
-	rs := &RustStore{store: store, readConn: readConn, readPool: pool}
+	rs := &RustStore{store: store, dbPath: path, readConn: readConn, readPool: pool}
 
 	runtime.SetFinalizer(rs, func(s *RustStore) {
 		s.Close()
@@ -158,6 +164,42 @@ func (rs *RustStore) Mu() *sync.Mutex {
 // MuRead returns the read mutex that serializes read access to the Rust store.
 func (rs *RustStore) MuRead() *sync.Mutex {
 	return &rs.muRead
+}
+
+// SetWriteHolder records who currently holds the write mutex (for watchdog diagnostics).
+func (rs *RustStore) SetWriteHolder(caller string) {
+	rs.writeHolder.Store(caller)
+	rs.writeSince.Store(time.Now().UnixNano())
+}
+
+// ClearWriteHolder clears the write holder when the mutex is released.
+func (rs *RustStore) ClearWriteHolder() {
+	rs.writeHolder.Store("")
+	rs.writeSince.Store(0)
+}
+
+// WriteHolderInfo returns the current write lock holder and how long it has been held.
+func (rs *RustStore) WriteHolderInfo() (holder string, held time.Duration) {
+	if v := rs.writeHolder.Load(); v != nil {
+		holder = v.(string)
+	}
+	if since := rs.writeSince.Load(); since > 0 {
+		held = time.Since(time.Unix(0, since))
+	}
+	return
+}
+
+// PauseReaders locks all pooled read connections, blocking until each is free.
+// Returns an unlock function. Used by WAL checkpoint to get exclusive access.
+func (rs *RustStore) PauseReaders() func() {
+	for _, entry := range rs.readPool {
+		entry.mu.Lock()
+	}
+	return func() {
+		for _, entry := range rs.readPool {
+			entry.mu.Unlock()
+		}
+	}
 }
 
 // acquireReadConn picks a pooled read connection.
@@ -205,7 +247,8 @@ func (rs *RustStore) SetEnforcementConfig(config *EnforcementConfig) error {
 	defer C.free(unsafe.Pointer(cJSON))
 
 	rs.muWrite.Lock()
-	defer rs.muWrite.Unlock()
+	rs.SetWriteHolder("set-enforcement-config")
+	defer func() { rs.ClearWriteHolder(); rs.muWrite.Unlock() }()
 	if rs.store == nil {
 		return errors.New("store is closed")
 	}
@@ -272,7 +315,11 @@ func (rs *RustStore) createAttestationWithPriority(as *types.As, high bool) erro
 	cJSON := C.CString(string(jsonBytes))
 	defer C.free(unsafe.Pointer(cJSON))
 
-	return rs.SubmitWrite(high, func() error {
+	caller := "put"
+	if high {
+		caller = "put:high"
+	}
+	return rs.SubmitWrite(high, caller, func() error {
 		if rs.store == nil {
 			return errors.New("store is closed")
 		}
@@ -283,6 +330,57 @@ func (rs *RustStore) createAttestationWithPriority(as *types.As, high bool) erro
 		}
 		return nil
 	})
+}
+
+// BatchCreateAttestations stores multiple attestations in a single write queue slot.
+// All JSON serialization happens upfront; the write function calls putLocked N times
+// under one mutex acquisition. Returns the number of successfully created attestations.
+func (rs *RustStore) BatchCreateAttestations(attestations []*types.As) (int, error) {
+	if len(attestations) == 0 {
+		return 0, nil
+	}
+
+	// Serialize all upfront (outside the write lock)
+	type prepared struct {
+		as        *types.As
+		jsonBytes []byte
+	}
+	items := make([]prepared, 0, len(attestations))
+	for _, as := range attestations {
+		jsonBytes, err := toRustJSON(as)
+		if err != nil {
+			return 0, errors.Wrapf(err, "failed to convert attestation %s", as.ID)
+		}
+		items = append(items, prepared{as: as, jsonBytes: jsonBytes})
+	}
+
+	// Chunk into groups of 500 to avoid holding the write mutex too long.
+	// Each chunk is one SubmitWrite call — readers can interleave between chunks.
+	const chunkSize = 500
+	var created int
+	for i := 0; i < len(items); i += chunkSize {
+		end := i + chunkSize
+		if end > len(items) {
+			end = len(items)
+		}
+		chunk := items[i:end]
+		err := rs.SubmitWrite(false, "batch-put", func() error {
+			if rs.store == nil {
+				return errors.New("store is closed")
+			}
+			for _, item := range chunk {
+				if err := rs.putLocked(item.jsonBytes); err != nil {
+					return errors.Wrapf(err, "batch put failed at attestation %s", item.as.ID)
+				}
+				created++
+			}
+			return nil
+		})
+		if err != nil {
+			return created, err
+		}
+	}
+	return created, nil
 }
 
 // CreateAttestationInbound stores a synced attestation without signing (preserves provenance).
@@ -361,7 +459,8 @@ func (rs *RustStore) UpdateAttestation(as *types.As) error {
 	defer C.free(unsafe.Pointer(cJSON))
 
 	rs.muWrite.Lock()
-	defer rs.muWrite.Unlock()
+	rs.SetWriteHolder("update")
+	defer func() { rs.ClearWriteHolder(); rs.muWrite.Unlock() }()
 	if rs.store == nil {
 		return errors.New("store is closed")
 	}
@@ -491,7 +590,7 @@ func (rs *RustStore) GenerateAndCreateAttestation(ctx context.Context, cmd *type
 	}
 
 	// Low priority — GenerateAndCreate is used by plugins
-	err = rs.SubmitWrite(false, func() error {
+	err = rs.SubmitWrite(false, "generate-and-create", func() error {
 		if rs.store == nil {
 			return errors.New("store is closed")
 		}
@@ -615,7 +714,9 @@ func (rs *RustStore) EnforceLimits(actors, contexts, subjects []string, config *
 	defer C.free(unsafe.Pointer(cJSON))
 
 	rs.muWrite.Lock()
+	rs.SetWriteHolder("enforce-limits")
 	if rs.store == nil {
+		rs.ClearWriteHolder()
 		rs.muWrite.Unlock()
 		return nil, errors.New("store is closed")
 	}
@@ -631,6 +732,7 @@ func (rs *RustStore) EnforceLimits(actors, contexts, subjects []string, config *
 		jsonStr = C.GoString(result.attestation_json)
 	}
 	C.attestation_result_free(result)
+	rs.ClearWriteHolder()
 	rs.muWrite.Unlock()
 	logSlowOp(start, "storage_enforce_limits")
 
@@ -807,18 +909,19 @@ func (rs *RustStore) IntegrityCheck() ([]string, error) {
 }
 
 // Backup creates a hot backup of the database to destPath.
-// Safe to call while the database is in use — SQLite's backup API handles
-// concurrency internally. Does not hold any mutex: the Rust side opens its
-// own read-only source connection for the backup.
+// Opens its own read-only source connection — does not touch the store pointer,
+// so it's safe to call concurrently with storage_put.
 func (rs *RustStore) Backup(destPath string) error {
-	if rs.store == nil {
-		return errors.New("store is closed")
+	if rs.dbPath == "" {
+		return errors.New("backup requires a file-backed database")
 	}
 
+	cSrc := C.CString(rs.dbPath)
+	defer C.free(unsafe.Pointer(cSrc))
 	cDest := C.CString(destPath)
 	defer C.free(unsafe.Pointer(cDest))
 
-	result := C.storage_backup(rs.store, cDest)
+	result := C.storage_backup(cSrc, cDest)
 	success := bool(result.success)
 	var errMsg string
 	if !success {
@@ -830,6 +933,12 @@ func (rs *RustStore) Backup(destPath string) error {
 		return errors.Newf("backup failed for %s: %s", destPath, errMsg)
 	}
 	return nil
+}
+
+// CrashTest deliberately triggers a SIGBUS to verify the flight recorder.
+// Development/testing only.
+func (rs *RustStore) CrashTest() {
+	C.storage_crash_test()
 }
 
 // QueryAttestationsRaw executes a raw SQL query through Rust's connection.
@@ -898,6 +1007,90 @@ func (rs *RustStore) QueryAttestationsRaw(sql string, params []interface{}) ([]*
 	}
 
 	return attestations, nil
+}
+
+// AgeDistill runs age-triggered distillation through Rust FFI.
+// Folds old attestations (older than cutoff) + existing sigmas into compressed summaries.
+// All within a single SQLite transaction on the Rust side.
+func (rs *RustStore) AgeDistill(cutoffRFC3339 string, batchSize int) (distilled, sigmasCreated, skipped int, err error) {
+	cCutoff := C.CString(cutoffRFC3339)
+	defer C.free(unsafe.Pointer(cCutoff))
+
+	return rs.ageDistillFFI(cCutoff, batchSize)
+}
+
+func (rs *RustStore) ageDistillFFI(cCutoff *C.char, batchSize int) (int, int, int, error) {
+	rs.muWrite.Lock()
+	rs.SetWriteHolder("age-distill")
+	defer func() { rs.ClearWriteHolder(); rs.muWrite.Unlock() }()
+	if rs.store == nil {
+		return 0, 0, 0, errors.New("store is closed")
+	}
+
+	result := C.storage_age_distill(rs.store, cCutoff, C.size_t(batchSize))
+	if !result.success {
+		errMsg := C.GoString(result.error_msg)
+		C.storage_string_free(result.error_msg)
+		return 0, 0, 0, errors.Newf("age distill failed: %s", errMsg)
+	}
+
+	return int(result.distilled), int(result.sigmas_created), int(result.skipped), nil
+}
+
+// WALCheckpointTruncate runs a TRUNCATE WAL checkpoint through Rust FFI.
+// Closes all read connections, checkpoints, and reopens them.
+// Acquires muWrite to prevent concurrent writes during checkpoint.
+func (rs *RustStore) WALCheckpointTruncate() (busy, walPages, checkpointedPages int, err error) {
+	rs.muWrite.Lock()
+	rs.SetWriteHolder("wal-checkpoint")
+	defer func() { rs.ClearWriteHolder(); rs.muWrite.Unlock() }()
+
+	if rs.store == nil {
+		return 0, 0, 0, errors.New("store is closed")
+	}
+
+	n := len(rs.readPool)
+
+	// Lock all read pool entries so no Go code is using them
+	for _, entry := range rs.readPool {
+		entry.mu.Lock()
+	}
+
+	// Build C array of read conn pointers
+	var conns **C.ReadConn
+	if n > 0 {
+		arr := make([]*C.ReadConn, n)
+		for i, entry := range rs.readPool {
+			arr[i] = entry.conn
+		}
+		conns = &arr[0]
+
+		result := C.storage_wal_checkpoint(rs.store, conns, C.size_t(n))
+
+		// Write new pointers back
+		for i, entry := range rs.readPool {
+			entry.conn = arr[i]
+		}
+
+		// Unlock all read pool entries
+		for _, entry := range rs.readPool {
+			entry.mu.Unlock()
+		}
+
+		if !result.success {
+			errMsg := C.GoString(result.error_msg)
+			C.storage_string_free(result.error_msg)
+			return 0, 0, 0, errors.Newf("WAL checkpoint failed: %s", errMsg)
+		}
+
+		return int(result.busy), int(result.wal_pages), int(result.checkpointed_pages), nil
+	}
+
+	// No read pool (in-memory store) — just unlock and return
+	for _, entry := range rs.readPool {
+		entry.mu.Unlock()
+	}
+	return 0, 0, 0, nil
 }
 
 // Version returns the library version.

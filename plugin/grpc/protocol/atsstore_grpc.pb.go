@@ -19,11 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ATSStoreService_CreateAttestation_FullMethodName            = "/protocol.ATSStoreService/CreateAttestation"
-	ATSStoreService_AttestationExists_FullMethodName            = "/protocol.ATSStoreService/AttestationExists"
-	ATSStoreService_GenerateAndCreateAttestation_FullMethodName = "/protocol.ATSStoreService/GenerateAndCreateAttestation"
-	ATSStoreService_GetAttestations_FullMethodName              = "/protocol.ATSStoreService/GetAttestations"
-	ATSStoreService_GetAttestationsStream_FullMethodName        = "/protocol.ATSStoreService/GetAttestationsStream"
+	ATSStoreService_CreateAttestation_FullMethodName                  = "/protocol.ATSStoreService/CreateAttestation"
+	ATSStoreService_AttestationExists_FullMethodName                  = "/protocol.ATSStoreService/AttestationExists"
+	ATSStoreService_GenerateAndCreateAttestation_FullMethodName       = "/protocol.ATSStoreService/GenerateAndCreateAttestation"
+	ATSStoreService_BatchGenerateAndCreateAttestations_FullMethodName = "/protocol.ATSStoreService/BatchGenerateAndCreateAttestations"
+	ATSStoreService_GetAttestations_FullMethodName                    = "/protocol.ATSStoreService/GetAttestations"
+	ATSStoreService_GetAttestationsStream_FullMethodName              = "/protocol.ATSStoreService/GetAttestationsStream"
 )
 
 // ATSStoreServiceClient is the client API for ATSStoreService service.
@@ -38,6 +39,8 @@ type ATSStoreServiceClient interface {
 	AttestationExists(ctx context.Context, in *AttestationExistsRequest, opts ...grpc.CallOption) (*AttestationExistsResponse, error)
 	// GenerateAndCreateAttestation generates an attestation ID and creates it
 	GenerateAndCreateAttestation(ctx context.Context, in *GenerateAttestationRequest, opts ...grpc.CallOption) (*GenerateAttestationResponse, error)
+	// BatchGenerateAndCreateAttestations generates IDs and creates multiple attestations in one write transaction
+	BatchGenerateAndCreateAttestations(ctx context.Context, in *BatchGenerateAttestationRequest, opts ...grpc.CallOption) (*BatchGenerateAttestationResponse, error)
 	// GetAttestations queries attestations with filters
 	GetAttestations(ctx context.Context, in *GetAttestationsRequest, opts ...grpc.CallOption) (*GetAttestationsResponse, error)
 	// GetAttestationsStream queries attestations and streams them back individually.
@@ -77,6 +80,16 @@ func (c *aTSStoreServiceClient) GenerateAndCreateAttestation(ctx context.Context
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GenerateAttestationResponse)
 	err := c.cc.Invoke(ctx, ATSStoreService_GenerateAndCreateAttestation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aTSStoreServiceClient) BatchGenerateAndCreateAttestations(ctx context.Context, in *BatchGenerateAttestationRequest, opts ...grpc.CallOption) (*BatchGenerateAttestationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BatchGenerateAttestationResponse)
+	err := c.cc.Invoke(ctx, ATSStoreService_BatchGenerateAndCreateAttestations_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -124,6 +137,8 @@ type ATSStoreServiceServer interface {
 	AttestationExists(context.Context, *AttestationExistsRequest) (*AttestationExistsResponse, error)
 	// GenerateAndCreateAttestation generates an attestation ID and creates it
 	GenerateAndCreateAttestation(context.Context, *GenerateAttestationRequest) (*GenerateAttestationResponse, error)
+	// BatchGenerateAndCreateAttestations generates IDs and creates multiple attestations in one write transaction
+	BatchGenerateAndCreateAttestations(context.Context, *BatchGenerateAttestationRequest) (*BatchGenerateAttestationResponse, error)
 	// GetAttestations queries attestations with filters
 	GetAttestations(context.Context, *GetAttestationsRequest) (*GetAttestationsResponse, error)
 	// GetAttestationsStream queries attestations and streams them back individually.
@@ -147,6 +162,9 @@ func (UnimplementedATSStoreServiceServer) AttestationExists(context.Context, *At
 }
 func (UnimplementedATSStoreServiceServer) GenerateAndCreateAttestation(context.Context, *GenerateAttestationRequest) (*GenerateAttestationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GenerateAndCreateAttestation not implemented")
+}
+func (UnimplementedATSStoreServiceServer) BatchGenerateAndCreateAttestations(context.Context, *BatchGenerateAttestationRequest) (*BatchGenerateAttestationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BatchGenerateAndCreateAttestations not implemented")
 }
 func (UnimplementedATSStoreServiceServer) GetAttestations(context.Context, *GetAttestationsRequest) (*GetAttestationsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAttestations not implemented")
@@ -229,6 +247,24 @@ func _ATSStoreService_GenerateAndCreateAttestation_Handler(srv interface{}, ctx 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ATSStoreService_BatchGenerateAndCreateAttestations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BatchGenerateAttestationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ATSStoreServiceServer).BatchGenerateAndCreateAttestations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ATSStoreService_BatchGenerateAndCreateAttestations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ATSStoreServiceServer).BatchGenerateAndCreateAttestations(ctx, req.(*BatchGenerateAttestationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ATSStoreService_GetAttestations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetAttestationsRequest)
 	if err := dec(in); err != nil {
@@ -276,6 +312,10 @@ var ATSStoreService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GenerateAndCreateAttestation",
 			Handler:    _ATSStoreService_GenerateAndCreateAttestation_Handler,
+		},
+		{
+			MethodName: "BatchGenerateAndCreateAttestations",
+			Handler:    _ATSStoreService_BatchGenerateAndCreateAttestations_Handler,
 		},
 		{
 			MethodName: "GetAttestations",

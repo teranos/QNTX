@@ -10,62 +10,6 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 )
 
-// TestEscapeLikePattern tests SQL LIKE pattern escaping
-func TestEscapeLikePattern(t *testing.T) {
-	testCases := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "normal text",
-			input:    "normal",
-			expected: "normal",
-		},
-		{
-			name:     "text with underscore",
-			input:    "test_value",
-			expected: "test\\_value",
-		},
-		{
-			name:     "text with percent",
-			input:    "test%value",
-			expected: "test\\%value",
-		},
-		{
-			name:     "text with backslash",
-			input:    "test\\value",
-			expected: "test\\\\value",
-		},
-		{
-			name:     "multiple special chars",
-			input:    "test%value_with\\backslash",
-			expected: "test\\%value\\_with\\\\backslash",
-		},
-		{
-			name:     "SQL injection attempt",
-			input:    "'; DROP TABLE attestations; --",
-			expected: "'; DROP TABLE attestations; --",
-		},
-		{
-			name:     "wildcard injection attempt",
-			input:    "user%' OR '1'='1",
-			expected: "user\\%' OR '1'='1",
-		},
-		{
-			name:     "empty string",
-			input:    "",
-			expected: "",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			result := escapeLikePattern(tc.input)
-			assert.Equal(t, tc.expected, result, "Escaping should match expected output")
-		})
-	}
-}
 
 // TestBuildSubjectFilter tests subject filter SQL generation
 func TestBuildSubjectFilter(t *testing.T) {
@@ -88,21 +32,21 @@ func TestBuildSubjectFilter(t *testing.T) {
 			subjects:         []string{"Alice"},
 			expectedClauses:  1,
 			expectedArgs:     1,
-			expectedContains: "subjects LIKE ? ESCAPE",
+			expectedContains: "attestation_subjects",
 		},
 		{
 			name:             "multiple subjects",
 			subjects:         []string{"Alice", "Bob"},
 			expectedClauses:  1,
 			expectedArgs:     2,
-			expectedContains: "OR",
+			expectedContains: "attestation_subjects",
 		},
 		{
 			name:             "subject with special chars",
 			subjects:         []string{"user_id"},
 			expectedClauses:  1,
 			expectedArgs:     1,
-			expectedContains: "subjects LIKE ? ESCAPE",
+			expectedContains: "attestation_subjects",
 		},
 	}
 
@@ -118,12 +62,9 @@ func TestBuildSubjectFilter(t *testing.T) {
 				assert.Contains(t, qb.whereClauses[0], tc.expectedContains, "Clause should contain expected SQL")
 			}
 
-			// Verify arguments are properly escaped JSON patterns
+			// Verify arguments are the raw subject values (exact match via junction table)
 			for i, subject := range tc.subjects {
-				if len(tc.subjects) > 0 {
-					expected := "%\"" + escapeLikePattern(subject) + "\"%"
-					assert.Equal(t, expected, qb.args[i], "Argument should be escaped JSON pattern")
-				}
+				assert.Equal(t, subject, qb.args[i], "Argument should be the exact subject value")
 			}
 		})
 	}
@@ -166,7 +107,7 @@ func TestBuildPredicateFilter(t *testing.T) {
 			assert.Equal(t, tc.expectedArgs, len(qb.args))
 
 			if len(tc.predicates) > 0 {
-				assert.Contains(t, qb.whereClauses[0], "predicates LIKE ? ESCAPE")
+				assert.Contains(t, qb.whereClauses[0], "attestation_predicates")
 			}
 		})
 	}
@@ -180,9 +121,9 @@ func TestBuildContextFilter(t *testing.T) {
 
 		assert.Equal(t, 1, len(qb.whereClauses))
 		assert.Equal(t, 2, len(qb.args))
-		// Context matching should be case-insensitive (COLLATE NOCASE)
-		assert.Contains(t, qb.whereClauses[0], "contexts LIKE ? COLLATE NOCASE ESCAPE")
-		assert.Contains(t, qb.whereClauses[0], "OR")
+		// Context matching should use junction table with COLLATE NOCASE
+		assert.Contains(t, qb.whereClauses[0], "attestation_contexts")
+		assert.Contains(t, qb.whereClauses[0], "COLLATE NOCASE")
 	})
 
 	t.Run("empty contexts", func(t *testing.T) {
@@ -201,7 +142,7 @@ func TestBuildActorFilter(t *testing.T) {
 
 	assert.Equal(t, 1, len(qb.whereClauses))
 	assert.Equal(t, 1, len(qb.args))
-	assert.Contains(t, qb.whereClauses[0], "actors LIKE ? ESCAPE")
+	assert.Contains(t, qb.whereClauses[0], "attestation_actors")
 }
 
 // TestBuildTemporalFilters tests timestamp range filters
@@ -354,8 +295,8 @@ func TestBuildNaturalLanguageFilter(t *testing.T) {
 		qb.buildNaturalLanguageFilter(mockExpander, filter)
 
 		assert.Equal(t, 1, len(qb.whereClauses))
-		assert.Contains(t, qb.whereClauses[0], "predicates LIKE ? ESCAPE")
-		assert.Contains(t, qb.whereClauses[0], "contexts LIKE ? COLLATE NOCASE ESCAPE")
+		assert.Contains(t, qb.whereClauses[0], "attestation_predicates")
+		assert.Contains(t, qb.whereClauses[0], "attestation_contexts")
 		assert.Contains(t, qb.whereClauses[0], "AND")
 		assert.Contains(t, qb.whereClauses[0], "OR")
 	})

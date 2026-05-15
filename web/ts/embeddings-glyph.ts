@@ -24,6 +24,8 @@ let embeddingsInfo: {
 } | null = null;
 let embeddingsReembedding = false;
 let embeddingsClustering = false;
+let embeddingsResultMsg = '';
+let embeddingsClusterResultMsg = '';
 let embeddingsProjecting = false;
 type ProjectionPoint = { id: string; source_id: string; method: string; model: string; x: number; y: number; z?: number; cluster_id: number };
 let projectionsData: Record<string, ProjectionPoint[]> = {};
@@ -592,7 +594,7 @@ function renderEmbeddings(): void {
                         ${embeddingsReembedding ? 'disabled' : ''}>
                         ${embeddingsReembedding ? 'Embedding...' : `Embed ${Math.min(1000, unembedded)} oldest of ${unembedded} unembedded`}
                     </button>
-                    <div class="emb-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
+                    <div class="emb-result" style="margin-top:6px;font-size:12px;opacity:0.7">${embeddingsResultMsg}</div>
                 </div>
             `;
             sectionReembed.querySelector('.emb-reembed-btn')?.addEventListener('click', reembedAll);
@@ -671,7 +673,7 @@ function renderEmbeddings(): void {
                             ${embeddingsClustering ? 'Clustering...' : 'Recompute'}
                         </button>
                     </div>
-                    <div class="emb-cluster-result" style="margin-top:6px;font-size:12px;opacity:0.7"></div>
+                    <div class="emb-cluster-result" style="margin-top:6px;font-size:12px;opacity:0.7">${embeddingsClusterResultMsg}</div>
                 </div>
             `;
             sectionCluster.querySelector('.emb-cluster-btn')?.addEventListener('click', () => recluster());
@@ -1205,32 +1207,34 @@ async function reembedAll(): Promise<void> {
     if (embeddingsReembedding || !embeddingsInfo?.available) return;
 
     embeddingsReembedding = true;
+    embeddingsResultMsg = '';
     renderEmbeddings();
-
-    const resultEl = embeddingsElement?.querySelector('.emb-result');
 
     try {
         // Fetch a page of unembedded IDs from the paginated endpoint
         const pageResp = await apiFetch('/api/embeddings/unembedded?limit=1000');
         const page = await pageResp.json() as { ids: string[]; count: number };
-        if (page.ids.length === 0) return;
+        if (page.ids.length === 0) {
+            embeddingsResultMsg = 'No unembedded attestations';
+            return;
+        }
 
         const resp = await apiFetch('/api/embeddings/batch', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ attestation_ids: page.ids })
         });
-        const result = await resp.json();
-
-        if (resultEl) {
-            resultEl.textContent = `${result.processed} embedded, ${result.failed} failed (${result.time_ms.toFixed(0)}ms)`;
+        if (!resp.ok) {
+            const errBody = await resp.text();
+            embeddingsResultMsg = `Error ${resp.status}: ${errBody}`;
+            return;
         }
+        const result = await resp.json();
+        embeddingsResultMsg = `${result.processed} embedded, ${result.failed} failed (${result.time_ms.toFixed(0)}ms)`;
 
         await fetchEmbeddingsInfo();
     } catch (err) {
-        if (resultEl) {
-            resultEl.textContent = `Error: ${err}`;
-        }
+        embeddingsResultMsg = `Error: ${err}`;
     } finally {
         embeddingsReembedding = false;
         renderEmbeddings();
@@ -1241,9 +1245,8 @@ async function recluster(model?: string): Promise<void> {
     if (embeddingsClustering || !embeddingsInfo?.available) return;
 
     embeddingsClustering = true;
+    embeddingsClusterResultMsg = '';
     renderEmbeddings();
-
-    const resultEl = embeddingsElement?.querySelector('.emb-cluster-result');
 
     try {
         const minClusterSize = Number((embeddingsElement?.querySelector('.emb-param-min-cluster-size') as HTMLInputElement)?.value) || 5;
@@ -1257,17 +1260,17 @@ async function recluster(model?: string): Promise<void> {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ min_cluster_size: minClusterSize, cluster_threshold: clusterThreshold, cluster_match_threshold: clusterMatchThreshold })
         });
-        const result = await resp.json();
-
-        if (resultEl) {
-            resultEl.textContent = `${result.summary.n_clusters} clusters, ${result.summary.n_noise} noise (${result.time_ms.toFixed(0)}ms)`;
+        if (!resp.ok) {
+            const errBody = await resp.text();
+            embeddingsClusterResultMsg = `Error ${resp.status}: ${errBody}`;
+            return;
         }
+        const result = await resp.json();
+        embeddingsClusterResultMsg = `${result.summary.n_clusters} clusters, ${result.summary.n_noise} noise (${result.time_ms.toFixed(0)}ms)`;
 
         await fetchEmbeddingsInfo();
     } catch (err) {
-        if (resultEl) {
-            resultEl.textContent = `Error: ${err}`;
-        }
+        embeddingsClusterResultMsg = `Error: ${err}`;
     } finally {
         embeddingsClustering = false;
         renderEmbeddings();

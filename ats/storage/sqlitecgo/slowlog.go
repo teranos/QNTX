@@ -13,7 +13,7 @@ import (
 )
 
 // slowOpThreshold is the duration above which FFI operations are collected.
-const slowOpThreshold = 500 * time.Millisecond
+const slowOpThreshold = 2 * time.Second
 
 // flushInterval controls how often collected stats are flushed to the log.
 const flushInterval = 5 * time.Minute
@@ -29,16 +29,20 @@ func logSlowOp(start time.Time, op string) {
 	collector.record(op, elapsed)
 }
 
+// mutexWaitThreshold is the duration above which mutex waits are collected.
+// Higher than slowOpThreshold because moderate contention is expected under load.
+const mutexWaitThreshold = 5 * time.Second
+
 // recordWait records a mutex-wait duration. Only records waits above the threshold.
 func recordWait(start time.Time, mutex string) {
 	elapsed := time.Since(start)
-	if elapsed < slowOpThreshold {
+	if elapsed < mutexWaitThreshold {
 		return
 	}
 	collector.record("mutex:"+mutex, elapsed)
 }
 
-const historySize = 12 // 12 x 5min = 1 hour of rolling history
+const historySize = 60 // 60 x 5min = 5 hours of rolling history
 
 // slowCollector accumulates all slow events (ops and waits) into buckets
 // keyed by operation name. Flushes summaries periodically, suppressing
@@ -146,7 +150,7 @@ func (sc *slowCollector) flush() {
 		sc.lastFlush[key] = bucketSnapshot{count: b.count, avg: avg}
 
 		if name, ok := strings.CutPrefix(key, "mutex:"); ok {
-			logger.Logger.Infow("Mutex contention (5m)",
+			logger.Logger.Debugw("Mutex contention (5m)",
 				"mutex", name,
 				"waiters", b.count,
 				"min", b.min,
@@ -154,7 +158,7 @@ func (sc *slowCollector) flush() {
 				"avg", avg,
 			)
 		} else {
-			logger.Logger.Infow("Slow ops (5m)",
+			logger.Logger.Debugw("Slow ops (5m)",
 				"op", key,
 				"count", b.count,
 				"min", b.min,

@@ -16,13 +16,26 @@ import (
 func TestAxCommand_Integration(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 
-	// Seed test data
+	// Seed test data — insert into both attestations and junction tables
+	// (junction tables are normally populated by Rust on insert)
 	_, err := db.Exec(`
 		INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp)
 		VALUES
 		('TEST1', '["Bohemian Rhapsody"]', '["song"]', '["Queen"]', '["test"]', datetime('now')),
 		('TEST2', '["Imagine"]', '["song"]', '["Beatles"]', '["test"]', datetime('now')),
-		('TEST3', '["Dark Side"]', '["album"]', '["Pink Floyd"]', '["test"]', datetime('now'))
+		('TEST3', '["Dark Side"]', '["album"]', '["Pink Floyd"]', '["test"]', datetime('now'));
+
+		INSERT INTO attestation_subjects (attestation_id, subject) VALUES
+		('TEST1', 'Bohemian Rhapsody'), ('TEST2', 'Imagine'), ('TEST3', 'Dark Side');
+
+		INSERT INTO attestation_predicates (attestation_id, predicate) VALUES
+		('TEST1', 'song'), ('TEST2', 'song'), ('TEST3', 'album');
+
+		INSERT INTO attestation_contexts (attestation_id, context) VALUES
+		('TEST1', 'Queen'), ('TEST2', 'Beatles'), ('TEST3', 'Pink Floyd');
+
+		INSERT INTO attestation_actors (attestation_id, actor) VALUES
+		('TEST1', 'test'), ('TEST2', 'test'), ('TEST3', 'test');
 	`)
 	require.NoError(t, err)
 

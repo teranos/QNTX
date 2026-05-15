@@ -374,8 +374,14 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	// Initialize embedding service for semantic search (optional)
 	server.groundDBPath = deps.config.GroundDBPath
 	server.SetupEmbeddingService()
+
+	// Use the primary rustsqlite connection for reads — the Rust driver
+	// separates reads/writes internally (muRead/muWrite), no need for a
+	// separate mattn read-only connection (which caused SIGBUS crashes from
+	// concurrent CGO calls via different drivers on the same file).
 	server.embeddingsHandler = &serverembeddings.Handler{
 		DB:           db,
+		ReadDB:       db,
 		Store:        server.embeddingStore,
 		Service:      server.embeddingService,
 		ATSStore:     atsStore,
@@ -394,6 +400,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		}
 	}
 	server.setupDistillSchedule(deps.config)
+	server.setupCheckpointSchedule(deps.config)
 	server.setupEmbeddingReclusterSchedule(deps.config)
 	server.setupEmbeddingReprojectSchedule(deps.config)
 	server.setupClusterLabelSchedule(deps.config)

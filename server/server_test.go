@@ -711,7 +711,7 @@ func TestGetDaemon(t *testing.T) {
 	// Verify registry has only built-in handlers (e.g. distill if configured)
 	handlers := registry.Names()
 	for _, h := range handlers {
-		if h != "distill" {
+		if h != "distill" && h != "wal-checkpoint" {
 			t.Errorf("Unexpected handler registered: %s", h)
 		}
 	}

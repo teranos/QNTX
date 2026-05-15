@@ -135,6 +135,63 @@ func (s *RustBackedStore) GenerateAndCreateAttestation(ctx context.Context, cmd 
 	return as, nil
 }
 
+// BatchGenerateAndCreateAttestations generates vanity ASIDs, signs, and stores
+// multiple attestations in a single write queue slot.
+func (s *RustBackedStore) BatchGenerateAndCreateAttestations(ctx context.Context, cmds []*types.AsCommand) (int, error) {
+	if len(cmds) == 0 {
+		return 0, nil
+	}
+
+	checkExists := func(asid string) bool {
+		return s.rust.AttestationExists(asid)
+	}
+
+	signer := getDefaultSigner()
+	attestations := make([]*types.As, 0, len(cmds))
+
+	for _, cmd := range cmds {
+		subject := "_"
+		if len(cmd.Subjects) > 0 {
+			subject = cmd.Subjects[0]
+		}
+		predicate := "_"
+		if len(cmd.Predicates) > 0 {
+			predicate = cmd.Predicates[0]
+		}
+		ctxStr := "_"
+		if len(cmd.Contexts) > 0 {
+			ctxStr = cmd.Contexts[0]
+		}
+
+		asid, err := identity.GenerateASUIDWithRetry("AS", subject, predicate, ctxStr, checkExists)
+		if err != nil {
+			return 0, errors.Wrapf(err, "failed to generate vanity ASID for batch item %d", len(attestations))
+		}
+
+		as := cmd.ToAs(asid, "")
+		as.Actors = []string{asid}
+
+		if signer != nil {
+			if err := signer.Sign(as); err != nil {
+				return 0, errors.Wrapf(err, "failed to sign attestation %s", as.ID)
+			}
+		}
+
+		attestations = append(attestations, as)
+	}
+
+	created, err := s.rust.BatchCreateAttestations(attestations)
+	if err != nil {
+		return created, err
+	}
+
+	for _, as := range attestations {
+		notifyObservers(as)
+	}
+
+	return created, nil
+}
+
 // CreateAttestationHighPriority signs and stores with high priority.
 // POST handler uses this to jump ahead of queued plugin writes.
 func (s *RustBackedStore) CreateAttestationHighPriority(as *types.As) error {
@@ -156,5 +213,10 @@ func (s *RustBackedStore) CreateAttestationHighPriority(as *types.As) error {
 // Implements schedule.BackupProvider.
 func (s *RustBackedStore) Backup(destPath string) error {
 	return s.rust.Backup(destPath)
+}
+
+// CrashTest triggers a deliberate crash for flight recorder verification.
+func (s *RustBackedStore) CrashTest() {
+	s.rust.CrashTest()
 }
 

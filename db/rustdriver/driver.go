@@ -45,16 +45,43 @@ func Register(storePtr, readConnPtr unsafe.Pointer, muWrite, muRead *sync.Mutex)
 	})
 }
 
+// RegisterNamed registers an additional named driver that tags all operations
+// with the given caller in the flight recorder. Use for components that open
+// their own sql.DB (db stats, watcher handlers, etc).
+func RegisterNamed(name, caller string, storePtr, readConnPtr unsafe.Pointer, muWrite, muRead *sync.Mutex) {
+	sql.Register(name, &RustDriver{
+		store:    (*C.SqliteStore)(storePtr),
+		readConn: (*C.ReadConn)(readConnPtr),
+		muWrite:  muWrite,
+		muRead:   muRead,
+		caller:   caller,
+	})
+}
+
+// SetCaller sets the flight recorder caller tag for the current OS thread.
+// Call this before issuing queries to attribute them to their source component.
+// The tag persists on the thread until changed.
+func SetCaller(caller string) {
+	setCaller(caller)
+}
+
+func setCaller(caller string) {
+	cCaller := C.CString(caller)
+	defer C.free(unsafe.Pointer(cCaller))
+	C.flight_recorder_set_caller(cCaller)
+}
+
 // RustDriver implements driver.Driver.
 type RustDriver struct {
 	store    *C.SqliteStore
 	readConn *C.ReadConn
 	muWrite  *sync.Mutex
 	muRead   *sync.Mutex
+	caller   string // flight recorder caller tag (empty = unattributed)
 }
 
 func (d *RustDriver) Open(_ string) (driver.Conn, error) {
-	return &RustConn{store: d.store, readConn: d.readConn, muWrite: d.muWrite, muRead: d.muRead}, nil
+	return &RustConn{store: d.store, readConn: d.readConn, muWrite: d.muWrite, muRead: d.muRead, caller: d.caller}, nil
 }
 
 // RustConn implements driver.Conn.
@@ -63,13 +90,20 @@ type RustConn struct {
 	readConn *C.ReadConn
 	muWrite  *sync.Mutex
 	muRead   *sync.Mutex
+	inTx     bool   // true while Begin() holds muWrite — Exec/Query skip write lock
+	caller   string // flight recorder caller tag
 }
 
 func (c *RustConn) Prepare(query string) (driver.Stmt, error) {
-	return &RustStmt{store: c.store, readConn: c.readConn, muWrite: c.muWrite, muRead: c.muRead, query: query}, nil
+	return &RustStmt{store: c.store, readConn: c.readConn, muWrite: c.muWrite, muRead: c.muRead, conn: c, query: query, caller: c.caller}, nil
 }
 
 func (c *RustConn) Begin() (driver.Tx, error) {
+	// Hold muWrite for the entire transaction lifetime — released by Commit/Rollback.
+	// All connections share one rusqlite::Connection, so only one transaction
+	// can be active at a time. Without holding across the lifetime, a second
+	// goroutine's Begin() would succeed between Lock/Unlock but hit
+	// "cannot start a transaction within a transaction" on the shared connection.
 	c.muWrite.Lock()
 	result := C.sql_begin(c.store)
 	success := bool(result.success)
@@ -78,12 +112,14 @@ func (c *RustConn) Begin() (driver.Tx, error) {
 		errMsg = C.GoString(result.error_msg)
 	}
 	C.exec_result_free(result)
-	c.muWrite.Unlock()
 
 	if !success {
+		c.muWrite.Unlock()
 		return nil, errors.Newf("BEGIN IMMEDIATE failed: %s", errMsg)
 	}
-	return &RustTx{store: c.store, muWrite: c.muWrite}, nil
+	// muWrite stays locked — Commit/Rollback will unlock it.
+	c.inTx = true
+	return &RustTx{store: c.store, muWrite: c.muWrite, conn: c}, nil
 }
 
 func (c *RustConn) Close() error {
@@ -95,10 +131,13 @@ func (c *RustConn) Close() error {
 type RustTx struct {
 	store   *C.SqliteStore
 	muWrite *sync.Mutex
+	conn    *RustConn
 }
 
 func (tx *RustTx) Commit() error {
-	tx.muWrite.Lock()
+	// muWrite is held since Begin() — release it after COMMIT.
+	defer tx.muWrite.Unlock()
+	tx.conn.inTx = false
 	result := C.sql_commit(tx.store)
 	success := bool(result.success)
 	var errMsg string
@@ -106,7 +145,6 @@ func (tx *RustTx) Commit() error {
 		errMsg = C.GoString(result.error_msg)
 	}
 	C.exec_result_free(result)
-	tx.muWrite.Unlock()
 
 	if !success {
 		return errors.Newf("COMMIT failed: %s", errMsg)
@@ -115,7 +153,9 @@ func (tx *RustTx) Commit() error {
 }
 
 func (tx *RustTx) Rollback() error {
-	tx.muWrite.Lock()
+	// muWrite is held since Begin() — release it after ROLLBACK.
+	defer tx.muWrite.Unlock()
+	tx.conn.inTx = false
 	result := C.sql_rollback(tx.store)
 	success := bool(result.success)
 	var errMsg string
@@ -123,7 +163,6 @@ func (tx *RustTx) Rollback() error {
 		errMsg = C.GoString(result.error_msg)
 	}
 	C.exec_result_free(result)
-	tx.muWrite.Unlock()
 
 	if !success {
 		return errors.Newf("ROLLBACK failed: %s", errMsg)
@@ -137,7 +176,9 @@ type RustStmt struct {
 	readConn *C.ReadConn
 	muWrite  *sync.Mutex
 	muRead   *sync.Mutex
+	conn     *RustConn // back-pointer to check inTx
 	query    string
+	caller   string // flight recorder caller tag
 }
 
 // NumInput returns -1 to indicate variable number of args.
@@ -160,7 +201,14 @@ func (s *RustStmt) Exec(args []driver.Value) (driver.Result, error) {
 	cParams := C.CString(paramsJSON)
 	defer C.free(unsafe.Pointer(cParams))
 
-	s.muWrite.Lock()
+	// If inside a transaction, muWrite is already held by Begin() — don't re-lock.
+	if !s.conn.inTx {
+		s.muWrite.Lock()
+		defer s.muWrite.Unlock()
+	}
+	if s.caller != "" {
+		setCaller(s.caller)
+	}
 	result := C.sql_exec(s.store, cSQL, cParams)
 	success := bool(result.success)
 	var errMsg string
@@ -172,7 +220,6 @@ func (s *RustStmt) Exec(args []driver.Value) (driver.Result, error) {
 		errMsg = C.GoString(result.error_msg)
 	}
 	C.exec_result_free(result)
-	s.muWrite.Unlock()
 
 	if !success {
 		return nil, errors.Newf("exec failed: %s", errMsg)
@@ -191,10 +238,17 @@ func (s *RustStmt) Query(args []driver.Value) (driver.Rows, error) {
 	cParams := C.CString(paramsJSON)
 	defer C.free(unsafe.Pointer(cParams))
 
+	// Lock appropriately: readConn uses muRead, write conn uses muWrite.
+	// Inside a transaction, muWrite is already held — skip locking.
 	if s.readConn != nil {
 		s.muRead.Lock()
-	} else {
+		defer s.muRead.Unlock()
+	} else if !s.conn.inTx {
 		s.muWrite.Lock()
+		defer s.muWrite.Unlock()
+	}
+	if s.caller != "" {
+		setCaller(s.caller)
 	}
 	var result C.QueryResultC
 	if s.readConn != nil {
@@ -216,11 +270,6 @@ func (s *RustStmt) Query(args []driver.Value) (driver.Rows, error) {
 		}
 	}
 	C.query_result_free(result)
-	if s.readConn != nil {
-		s.muRead.Unlock()
-	} else {
-		s.muWrite.Unlock()
-	}
 
 	if !success {
 		return nil, errors.Newf("query failed: %s", errMsg)

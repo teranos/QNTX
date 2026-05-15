@@ -63,7 +63,7 @@ This pattern solves parent-child job coordination without blocking worker thread
 
 ### Smart Phase Recovery (Implemented)
 
-**Location**: `pulse/async/worker.go:requeueOrphanedJob()`
+**Location**: `pulse/async/worker.go:failOrphanedJob()`
 
 When recovering orphaned jobs, GRACE validates phase consistency:
 

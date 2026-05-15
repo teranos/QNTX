@@ -241,45 +241,39 @@ func (wp *WorkerPool) recoverOrphanedJobs() error {
 
 	wp.logger.Starting("Opening - found orphaned jobs from previous crash", "count", len(orphanedJobs))
 
-	// Strategy: Super gradual warm start to avoid overwhelming the system
-	// Phase 0 (Immediate): First job only
-	// Phase 1 (0-10s): 1 job per second for next 9 jobs (jobs 2-10)
-	// Phase 2 (10s-15min): Remaining jobs spread over 15 minutes
-
-	if len(orphanedJobs) == 0 {
-		return nil
+	// Fail all orphaned jobs immediately. Scheduled jobs will create fresh
+	// ones on their next tick. No gradual recovery needed — failing is instant.
+	failed := 0
+	for _, job := range orphanedJobs {
+		if err := wp.failOrphanedJob(job); err != nil {
+			wp.logger.SugaredLogger.Warnw("Failed to mark orphaned job as failed", "job_id", job.ID, "error", err)
+		} else {
+			failed++
+		}
 	}
-
-	// Recover first job immediately
-	if err := wp.requeueOrphanedJob(orphanedJobs[0]); err != nil {
-		wp.logger.SugaredLogger.Warnw("Failed to recover orphaned job", "job_id", orphanedJobs[0].ID, "error", err)
-	} else {
-		wp.logger.Starting("Immediately recovered first job", "current", 1, "total", len(orphanedJobs))
-	}
-
-	// Gradual recovery for remaining jobs in background
-	if len(orphanedJobs) > 1 {
-		wp.logger.Starting("Will gradually recover remaining jobs (warm start over 15 minutes)", "count", len(orphanedJobs)-1)
-		go wp.gradualRecovery(orphanedJobs[1:])
-	}
+	wp.logger.Starting("Orphaned jobs cleared", "failed", failed, "total", len(orphanedJobs))
 
 	return nil
 }
 
-// requeueOrphanedJob re-queues a single orphaned job
-func (wp *WorkerPool) requeueOrphanedJob(job *Job) error {
-	job.Status = JobStatusQueued
-	job.Error = "" // Clear any stale error message
+// failOrphanedJob marks an orphaned running job as failed so the scheduler
+// can create a fresh one on its next tick. Re-queuing orphans is unsafe:
+// the job may have partially mutated state before the crash.
+func (wp *WorkerPool) failOrphanedJob(job *Job) error {
+	job.Status = JobStatusFailed
+	job.Error = "orphaned: server restart while running"
+	now := time.Now()
+	job.CompletedAt = &now
 
 	if err := wp.queue.UpdateJob(job); err != nil {
-		err = errors.Wrapf(err, "failed to update recovered job %s", job.ID)
+		err = errors.Wrapf(err, "failed to fail orphaned job %s", job.ID)
 		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
 		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
 		err = errors.WithDetail(err, fmt.Sprintf("Source: %s", job.Source))
 		return err
 	}
 
-	wp.logger.Starting("Recovered orphaned job", "job_id", job.ID, "handler", job.HandlerName)
+	wp.logger.Starting("Failed orphaned job", "job_id", job.ID, "handler", job.HandlerName)
 	return nil
 }
 
@@ -289,43 +283,6 @@ func (wp *WorkerPool) requeueOrphanedJob(job *Job) error {
 // Warm Start Strategy:
 // - Phase 1 (0-10s): Jobs 2-10 at 1 job per second (9 jobs total)
 // - Phase 2 (10s-15min): Remaining jobs spread over 15 minutes
-func (wp *WorkerPool) gradualRecovery(jobs []*Job) {
-	if len(jobs) == 0 {
-		return
-	}
-
-	startTime := time.Now()
-
-	// Calculate phase durations (configurable for testing)
-	warmStartDuration := 10 * time.Second
-	slowStartDuration := 15 * time.Minute
-	if wp.poolConfig.GracefulStartPhase > 0 {
-		warmStartDuration = wp.poolConfig.GracefulStartPhase / 5
-		slowStartDuration = wp.poolConfig.GracefulStartPhase * 3
-	}
-
-	// Warm start: first 9 jobs (or fewer if less available)
-	warmStartLimit := min(9, len(jobs))
-	warmStartInterval := warmStartDuration / time.Duration(warmStartLimit)
-	wp.logger.Starting("Warm start phase", "count", warmStartLimit, "interval", warmStartInterval)
-
-	warmRecovered := wp.recoverJobsWithInterval(jobs[:warmStartLimit], warmStartInterval, "warm start")
-	wp.logger.Starting("Warm start complete", "recovered", warmRecovered, "duration", time.Since(startTime))
-
-	// Slow start: remaining jobs
-	remainingJobs := jobs[warmStartLimit:]
-	if len(remainingJobs) == 0 {
-		wp.logger.Starting("All jobs recovered during warm start")
-		return
-	}
-
-	slowStartInterval := slowStartDuration / time.Duration(len(remainingJobs))
-	wp.logger.Starting("Slow start phase", "count", len(remainingJobs), "interval", slowStartInterval)
-
-	slowRecovered := wp.recoverJobsWithInterval(remainingJobs, slowStartInterval, "slow start")
-	wp.logger.Starting("Gradual recovery complete", "recovered", warmRecovered+slowRecovered, "total", len(jobs), "duration", time.Since(startTime))
-}
-
 // Stop gracefully stops the worker pool
 // ❀ Closing: Workers checkpoint and exit cleanly on context cancellation
 // Uses a configurable timeout (default 20s) to allow jobs to checkpoint without blocking indefinitely
@@ -710,37 +667,6 @@ func (wp *WorkerPool) updateJobPulseState(job *Job) {
 	if err := wp.queue.UpdateJob(job); err != nil {
 		wp.logger.SugaredLogger.Warnw("Failed to update job pulse state", "error", err)
 	}
-}
-
-// recoverJobsWithInterval recovers a batch of jobs with a delay between each.
-// Returns the number of jobs successfully recovered.
-func (wp *WorkerPool) recoverJobsWithInterval(jobs []*Job, interval time.Duration, phase string) int {
-	recovered := 0
-	for i, job := range jobs {
-		select {
-		case <-wp.ctx.Done():
-			wp.logger.Closing("Gradual recovery cancelled during "+phase, "recovered", recovered, "total", len(jobs))
-			return recovered
-		default:
-		}
-
-		if err := wp.requeueOrphanedJob(job); err != nil {
-			wp.logger.SugaredLogger.Warnw("Failed to recover job during "+phase, "job_id", job.ID, "error", err)
-			continue
-		}
-		recovered++
-
-		// Progress logging every 10 jobs
-		if recovered%10 == 0 {
-			wp.logger.Starting("Gradual recovery progress", "current", recovered, "total", len(jobs), "phase", phase)
-		}
-
-		// Wait before next job (unless it's the last one)
-		if i < len(jobs)-1 {
-			time.Sleep(interval)
-		}
-	}
-	return recovered
 }
 
 // GetQueue returns the job queue (useful for enqueuing jobs)

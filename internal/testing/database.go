@@ -210,5 +210,51 @@ func (s *sqlTestStore) insertAttestation(as *types.As) error {
 		string(attrsJSON),
 		createdAt,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	// Populate junction tables (mirrors what Rust does in production)
+	insertJunction(s.db, as.ID, as.Subjects, as.Predicates, as.Contexts, as.Actors)
+	return nil
+}
+
+// insertJunction populates the four junction tables for an attestation.
+func insertJunction(db *sql.DB, id string, subjects, predicates, contexts, actors []string) {
+	for _, s := range subjects {
+		db.Exec("INSERT INTO attestation_subjects (attestation_id, subject) VALUES (?, ?)", id, s)
+	}
+	for _, p := range predicates {
+		db.Exec("INSERT INTO attestation_predicates (attestation_id, predicate) VALUES (?, ?)", id, p)
+	}
+	for _, c := range contexts {
+		db.Exec("INSERT INTO attestation_contexts (attestation_id, context) VALUES (?, ?)", id, c)
+	}
+	for _, a := range actors {
+		db.Exec("INSERT INTO attestation_actors (attestation_id, actor) VALUES (?, ?)", id, a)
+	}
+}
+
+// SyncJunctionTables populates junction tables from the JSON columns in attestations.
+// Use after raw SQL INSERT into attestations in tests.
+func SyncJunctionTables(db *sql.DB) error {
+	statements := []string{
+		`INSERT OR IGNORE INTO attestation_subjects (attestation_id, subject)
+		 SELECT a.id, j.value FROM attestations a, json_each(a.subjects) j
+		 WHERE a.id NOT IN (SELECT DISTINCT attestation_id FROM attestation_subjects)`,
+		`INSERT OR IGNORE INTO attestation_predicates (attestation_id, predicate)
+		 SELECT a.id, j.value FROM attestations a, json_each(a.predicates) j
+		 WHERE a.id NOT IN (SELECT DISTINCT attestation_id FROM attestation_predicates)`,
+		`INSERT OR IGNORE INTO attestation_contexts (attestation_id, context)
+		 SELECT a.id, j.value FROM attestations a, json_each(a.contexts) j
+		 WHERE a.id NOT IN (SELECT DISTINCT attestation_id FROM attestation_contexts)`,
+		`INSERT OR IGNORE INTO attestation_actors (attestation_id, actor)
+		 SELECT a.id, j.value FROM attestations a, json_each(a.actors) j
+		 WHERE a.id NOT IN (SELECT DISTINCT attestation_id FROM attestation_actors)`,
+	}
+	for _, stmt := range statements {
+		if _, err := db.Exec(stmt); err != nil {
+			return err
+		}
+	}
+	return nil
 }

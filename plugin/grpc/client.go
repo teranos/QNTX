@@ -681,7 +681,7 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.logger.Info("WebSocket connection established, bridging to gRPC stream")
+	h.logger.Debug("WebSocket connection established, bridging to gRPC stream")
 
 	// Send CONNECT message to plugin
 	if err := stream.Send(&protocol.WebSocketMessage{
@@ -837,7 +837,7 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 	// Log connection metrics
 	metrics := h.keepalive.Metrics()
-	h.logger.Infow("WebSocket connection closed",
+	h.logger.Debugw("WebSocket connection closed",
 		"uptime", metrics.GetConnectionUptime(),
 		"pings_sent", metrics.GetTotalPings(),
 		"pongs_received", metrics.GetTotalPongs(),

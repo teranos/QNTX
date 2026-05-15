@@ -236,8 +236,8 @@ function renderDbStats(): void {
     }
 
     // -- Performance --
-    if (dbStats.performance) {
-        renderPerformanceSection(sectionPerformance, dbStats.performance);
+    if (dbStats.performance || dbStats.live) {
+        renderPerformanceSection(sectionPerformance, dbStats.performance, dbStats.live);
     } else {
         sectionPerformance.innerHTML = '';
     }
@@ -496,8 +496,76 @@ function formatMs(ms: number): string {
     return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function renderPerformanceSection(container: HTMLElement, perf: PerfData): void {
-    if (!perf.current || perf.current.length === 0) return;
+interface LiveStatus {
+    write_lock?: { holder: string; held_ms: number };
+    wal_bytes?: number;
+    db_bytes?: number;
+    dilation?: number;
+    mem_pct?: number;
+    cpu_pct?: number;
+}
+
+function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}K`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)}GB`;
+}
+
+function renderLiveStatus(live: LiveStatus): string {
+    const lines: string[] = [];
+
+    // Write lock
+    const wl = live.write_lock;
+    if (wl) {
+        const heldSec = wl.held_ms / 1000;
+        const color = heldSec > 30 ? '#ef4444' : heldSec > 5 ? '#f59e0b' : '#4ade80';
+        lines.push(`<div style="display: flex; align-items: center; gap: 6px; font-size: 10px;">
+            <span style="width: 6px; height: 6px; border-radius: 50%; background: ${color};"></span>
+            <span style="color: #e2e8f0;">write: <b>${wl.holder}</b> ${formatMs(wl.held_ms)}</span>
+        </div>`);
+    } else {
+        lines.push(`<div style="display: flex; align-items: center; gap: 6px; font-size: 10px;">
+            <span style="width: 6px; height: 6px; border-radius: 50%; background: #4ade80;"></span>
+            <span style="color: #64748b;">write: idle</span>
+        </div>`);
+    }
+
+    // Dilation + pressure
+    if (live.dilation != null) {
+        const d = live.dilation;
+        const color = d >= 1.0 ? '#4ade80' : d >= 0.5 ? '#f59e0b' : '#ef4444';
+        const mem = live.mem_pct != null ? `${live.mem_pct.toFixed(0)}% mem` : '';
+        const cpu = live.cpu_pct != null ? `${live.cpu_pct.toFixed(0)}% cpu` : '';
+        const pressure = [mem, cpu].filter(Boolean).join(' · ');
+        lines.push(`<div style="font-size: 10px; color: #94a3b8;">
+            dilation <span style="color: ${color};">${d.toFixed(2)}x</span>${pressure ? ` · ${pressure}` : ''}
+        </div>`);
+    }
+
+    // DB + WAL size
+    const sizes: string[] = [];
+    if (live.db_bytes != null) sizes.push(`db ${formatBytes(live.db_bytes)}`);
+    if (live.wal_bytes != null) sizes.push(`wal ${formatBytes(live.wal_bytes)}`);
+    if (sizes.length > 0) {
+        lines.push(`<div style="font-size: 10px; color: #64748b;">${sizes.join(' · ')}</div>`);
+    }
+
+    return lines.join('');
+}
+
+function renderPerformanceSection(container: HTMLElement, perf: PerfData | null, live?: LiveStatus): void {
+    let liveHTML = '';
+    if (live) {
+        liveHTML = `<div style="margin-bottom: 8px;">${renderLiveStatus(live)}</div>`;
+    }
+
+    if (!perf || !perf.current || perf.current.length === 0) {
+        if (liveHTML) {
+            container.innerHTML = `<div style="padding: 8px 0; border-bottom: 1px solid var(--border-color, #333);">${liveHTML}</div>`;
+        }
+        return;
+    }
 
     const maxVal = Math.max(...perf.current.map(e => e.max));
     if (maxVal === 0) return;
@@ -539,6 +607,7 @@ function renderPerformanceSection(container: HTMLElement, perf: PerfData): void 
 
     container.innerHTML = `
         <div style="padding: 8px 0; border-bottom: 1px solid var(--border-color, #333);">
+            ${liveHTML}
             <span class="glyph-label" style="font-size: 11px;">Performance (5m windows):</span>
             <div style="margin-top: 4px;">${rows}</div>
         </div>

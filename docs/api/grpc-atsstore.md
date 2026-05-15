@@ -14,6 +14,7 @@ ATSStoreService provides attestation storage operations for gRPC plugins
 | CreateAttestation | CreateAttestationRequest | CreateAttestationResponse | No |
 | AttestationExists | AttestationExistsRequest | AttestationExistsResponse | No |
 | GenerateAndCreateAttestation | GenerateAttestationRequest | GenerateAttestationResponse | No |
+| BatchGenerateAndCreateAttestations | BatchGenerateAttestationRequest | BatchGenerateAttestationResponse | No |
 | GetAttestations | GetAttestationsRequest | GetAttestationsResponse | No |
 | GetAttestationsStream | GetAttestationsRequest | Attestation | Server |
 
@@ -41,6 +42,15 @@ GenerateAndCreateAttestation generates an attestation ID and creates it
 
 - **Request**: `GenerateAttestationRequest`
 - **Response**: `GenerateAttestationResponse`
+
+---
+
+### BatchGenerateAndCreateAttestations
+
+BatchGenerateAndCreateAttestations generates IDs and creates multiple attestations in one write transaction
+
+- **Request**: `BatchGenerateAttestationRequest`
+- **Response**: `BatchGenerateAttestationResponse`
 
 ---
 
@@ -149,6 +159,21 @@ AttestationFilter for querying attestations
 | success | bool | - |
 | error | string | - |
 | attestation | Attestation | - |
+
+### BatchGenerateAttestationRequest
+
+| Field | Type | Description |
+|-------|------|-------------|
+| auth_token | string | - |
+| commands | AttestationCommand | - |
+
+### BatchGenerateAttestationResponse
+
+| Field | Type | Description |
+|-------|------|-------------|
+| success | bool | - |
+| error | string | - |
+| created | int32 | - |
 
 ### GetAttestationsRequest
 

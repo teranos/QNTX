@@ -66,6 +66,7 @@ pub mod bounded;
 pub mod distill;
 pub mod enforcement;
 pub mod error;
+pub mod flight_recorder;
 pub mod json;
 pub mod migrate;
 pub mod store;

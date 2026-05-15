@@ -81,7 +81,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 	// Open and migrate database
 	dbStart := time.Now()
-	database, atsStore, dbPath, err := openDatabase(dbPath)
+	database, atsStore, dbPath, rustStore, err := openDatabase(dbPath)
 	if err != nil {
 		return errors.Wrap(err, "failed to open database")
 	}
@@ -105,6 +105,21 @@ func runServer(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to create server")
 	}
 	bootLog.Infow("NewQNTXServer complete", "took", time.Since(srvStart))
+
+	// Wire Rust-side WAL checkpointer (closes read conns, checkpoints, reopens)
+	if cp, ok := rustStore.(server.WALCheckpointer); ok {
+		srv.SetWALCheckpointer(cp)
+	}
+
+	// Wire Rust-side age distiller (fold old attestations into sigmas)
+	if ad, ok := rustStore.(server.AgeDistiller); ok {
+		srv.SetAgeDistiller(ad)
+	}
+
+	// Wire write lock inspector (diagnostics for UI)
+	if wl, ok := rustStore.(server.WriteLockInspector); ok {
+		srv.SetWriteLockInspector(wl)
+	}
 
 	// Wire deferred plugin initialization — fires when server is fully ready
 	// (migrations done, HTTP listening), not before.

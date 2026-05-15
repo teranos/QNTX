@@ -87,6 +87,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/config", wrap(s.HandleConfig))
 	http.HandleFunc("/api/dev", wrap(s.HandleDevMode))                                              // Dev mode status
 	http.HandleFunc("/api/debug", wrap(s.HandleDebug))                                              // Browser console debugging (dev mode only)
+	http.HandleFunc("/api/crash-test", wrap(s.HandleCrashTest))                                     // Flight recorder crash test (dev mode only)
 	http.HandleFunc("/api/prose", wrap(s.HandleProse))                                              // Prose content tree
 	http.HandleFunc("/api/prose/", wrap(s.HandleProseContent))                                      // Individual prose files
 	http.HandleFunc("/api/pulse/executions/", wrap(s.HandlePulseExecution))                         // Individual execution (GET) and logs (GET /logs)

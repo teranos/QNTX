@@ -5,10 +5,7 @@
 //! - N contexts per actor — delete least-used contexts
 //! - N actors per entity/subject — delete least-recent actors
 //!
-//! Enforcement checks use counter tables (enforcement_actor_context, etc.)
-//! for O(1) lookups instead of scanning junction tables with JOINs.
-//! Counters are maintained incrementally in put().
-//!
+//! Enforcement checks use junction table COUNT queries with existing indices.
 //! Also handles telemetry logging to the storage_events table.
 
 use qntx_core::attestation::Attestation;
@@ -53,18 +50,20 @@ impl SqliteStore {
         &mut self,
         input: &EnforcementInput,
     ) -> Result<Vec<EnforcementEvent>, SqliteError> {
-        // Wrap all enforcement in a transaction — distill inserts + deletes + counter
-        // updates must be atomic to prevent corruption under write pressure.
-        self.conn.execute_batch("BEGIN IMMEDIATE")?;
+        // Use SAVEPOINT instead of BEGIN IMMEDIATE — enforce_limits is called
+        // from put(), which may already be inside a transaction (e.g. when Go's
+        // database/sql driver calls sql_begin before routing through storage_put).
+        // SAVEPOINTs nest safely within existing transactions.
+        self.conn.execute_batch("SAVEPOINT enforce_limits")?;
 
         let result = self.enforce_limits_inner(input);
 
         match &result {
             Ok(_) => {
-                self.conn.execute_batch("COMMIT")?;
+                self.conn.execute_batch("RELEASE SAVEPOINT enforce_limits")?;
             }
             Err(_) => {
-                let _ = self.conn.execute_batch("ROLLBACK");
+                let _ = self.conn.execute_batch("ROLLBACK TO SAVEPOINT enforce_limits");
             }
         }
 
@@ -75,9 +74,11 @@ impl SqliteStore {
         &mut self,
         input: &EnforcementInput,
     ) -> Result<Vec<EnforcementEvent>, SqliteError> {
+        let total_start = std::time::Instant::now();
         let mut events = Vec::new();
 
         // 1. Enforce N attestations per (actor, context) pair
+        let t1 = std::time::Instant::now();
         for actor in &input.actors {
             for context in &input.contexts {
                 match self.enforce_actor_context_limit(
@@ -96,8 +97,10 @@ impl SqliteStore {
                 }
             }
         }
+        let d1 = t1.elapsed();
 
         // 2. Enforce N contexts per actor
+        let t2 = std::time::Instant::now();
         for actor in &input.actors {
             match self.enforce_actor_contexts_limit(actor, input.config.actor_contexts_limit) {
                 Ok(Some(ev)) => events.push(ev),
@@ -110,8 +113,10 @@ impl SqliteStore {
                 }
             }
         }
+        let d2 = t2.elapsed();
 
         // 3. Enforce N actors per entity/subject
+        let t3 = std::time::Instant::now();
         for subject in &input.subjects {
             match self.enforce_entity_actors_limit(subject, input.config.entity_actors_limit) {
                 Ok(Some(ev)) => events.push(ev),
@@ -124,6 +129,7 @@ impl SqliteStore {
                 }
             }
         }
+        let d3 = t3.elapsed();
 
         // Log all events to storage_events table
         for ev in &events {
@@ -132,40 +138,68 @@ impl SqliteStore {
             }
         }
 
+        let total = total_start.elapsed();
+        if total.as_millis() > 100 {
+            eprintln!(
+                "qntx-sqlite: enforce_limits took {}ms (ac={}ms acs={}ms ea={}ms) evictions={}",
+                total.as_millis(),
+                d1.as_millis(),
+                d2.as_millis(),
+                d3.as_millis(),
+                events.len(),
+            );
+        }
+
         Ok(events)
     }
 
     /// Enforce actor_context_limit: keep only N most recent attestations per (actor, context).
     /// Uses half-bound threshold: triggers at `limit + limit/2`, evicts down to `limit`.
-    /// Counter lookup is O(1) — only runs DELETE when threshold is exceeded.
+    /// Uses in-memory counter for threshold check (O(1)), falls back to DB COUNT for actual count.
     fn enforce_actor_context_limit(
         &mut self,
         actor: &str,
         context: &str,
         limit: usize,
     ) -> Result<Option<EnforcementEvent>, SqliteError> {
-        // O(1) counter lookup instead of COUNT + JOIN
+        let threshold = limit + limit / 2;
+
+        // O(1) threshold check from in-memory counter (skip if not initialized — e.g. FlushEnforcement)
+        if self.enforcement_counters.initialized {
+            let cached_count = self
+                .enforcement_counters
+                .actor_context
+                .get(&(actor.to_string(), context.to_string()))
+                .copied()
+                .unwrap_or(0);
+
+            if cached_count <= threshold {
+                return Ok(None);
+            }
+        }
+
+        // Get exact count from DB
         let count: i64 = self
             .conn
             .query_row(
-                "SELECT count FROM enforcement_actor_context WHERE actor = ?1 AND context = ?2",
+                "SELECT COUNT(*) FROM attestation_actors a
+                 JOIN attestation_contexts c ON a.attestation_id = c.attestation_id
+                 WHERE a.actor = ?1 AND c.context = ?2",
                 rusqlite::params![actor, context],
                 |row| row.get::<_, i64>(0),
             )
             .unwrap_or(0);
 
-        // Half-bound threshold: trigger at limit + limit/2
-        let threshold = limit + limit / 2;
+        // Re-check with exact count (counter might be slightly off)
         if (count as usize) <= threshold {
+            // Correct the in-memory counter
+            self.enforcement_counters
+                .actor_context
+                .insert((actor.to_string(), context.to_string()), count as usize);
             return Ok(None);
         }
 
-        // +1 accounts for the distill attestation inserted after deletion.
-        // put_attestation() increments the enforcement counter even when
-        // self.distilling=true (enforcement is skipped but counter update isn't).
-        // Without +1: delete 8 from 24, counter drops to 16, distill insert
-        // bumps to 17 — one over limit. With +1: delete 9, counter=15,
-        // distill insert bumps to 16 = exactly limit.
+        // +1 accounts for the distill attestation inserted after deletion
         let delete_count = count as usize - limit + 1;
 
         // Load full attestation data for the eviction batch
@@ -205,7 +239,7 @@ impl SqliteStore {
         };
 
         // Delete oldest attestations first (CASCADE deletes junction rows)
-        let deleted = self.conn.execute(
+        let _deleted = self.conn.execute(
             "DELETE FROM attestations
              WHERE id IN (
                  SELECT att.id FROM attestations att
@@ -218,19 +252,7 @@ impl SqliteStore {
             rusqlite::params![actor, context, delete_count],
         )?;
 
-        // Update counter to reflect deletions, delete if zero
-        self.conn.execute(
-            "UPDATE enforcement_actor_context SET count = count - ?3
-             WHERE actor = ?1 AND context = ?2",
-            rusqlite::params![actor, context, deleted],
-        )?;
-        self.conn.execute(
-            "DELETE FROM enforcement_actor_context WHERE actor = ?1 AND context = ?2 AND count <= 0",
-            rusqlite::params![actor, context],
-        )?;
-
-        // Σ Insert sigma after deleting originals so the sigma's
-        // counter increment doesn't inflate the count.
+        // Σ Insert sigma after deleting originals.
         if !eviction_batch.is_empty() {
             let sigma = distill::build_distill_attestation(&eviction_batch, context);
             self.distilling = true;
@@ -243,6 +265,10 @@ impl SqliteStore {
                 );
             }
         }
+
+        // Update in-memory counter: deleted delete_count, inserted 1 distill = net -(delete_count-1)
+        self.enforcement_counters
+            .decrement_actor_context(actor, context, delete_count.saturating_sub(1));
 
         Ok(Some(EnforcementEvent {
             event_type: "actor_context_limit".to_string(),
@@ -257,30 +283,29 @@ impl SqliteStore {
 
     /// Enforce actor_contexts_limit: keep only N most-used contexts per actor.
     /// Uses half-bound threshold: triggers at `limit + limit/2`, evicts down to `limit`.
-    /// Counter lookup is O(1) — only queries context details when threshold is exceeded.
+    /// Uses in-memory counter for threshold check (O(1)), falls back to DB query for eviction.
     fn enforce_actor_contexts_limit(
         &mut self,
         actor: &str,
         limit: usize,
     ) -> Result<Option<EnforcementEvent>, SqliteError> {
-        // O(1) counter lookup
-        let count: i64 = self
-            .conn
-            .query_row(
-                "SELECT count FROM enforcement_actor_contexts WHERE actor = ?1",
-                rusqlite::params![actor],
-                |row| row.get::<_, i64>(0),
-            )
-            .unwrap_or(0);
-
-        // Half-bound threshold
         let threshold = limit + limit / 2;
-        if (count as usize) <= threshold {
-            return Ok(None);
+
+        // O(1) threshold check (skip if not initialized — e.g. FlushEnforcement)
+        if self.enforcement_counters.initialized {
+            let cached_count = self
+                .enforcement_counters
+                .actor_contexts
+                .get(actor)
+                .map(|s| s.len())
+                .unwrap_or(0);
+
+            if cached_count <= threshold {
+                return Ok(None);
+            }
         }
 
-        // Only now do we need to find which contexts to evict — query the
-        // counter table (small) instead of junction tables (huge).
+        // Counter says threshold exceeded — get exact data from DB for eviction
         struct ContextUsage {
             context: String,
             _usage_count: i64,
@@ -288,9 +313,12 @@ impl SqliteStore {
 
         let contexts: Vec<ContextUsage> = {
             let mut stmt = self.conn.prepare(
-                "SELECT context, count FROM enforcement_actor_context
-                 WHERE actor = ?1
-                 ORDER BY count ASC",
+                "SELECT c.context, COUNT(*) as cnt
+                 FROM attestation_contexts c
+                 JOIN attestation_actors a ON c.attestation_id = a.attestation_id
+                 WHERE a.actor = ?1
+                 GROUP BY c.context
+                 ORDER BY cnt ASC",
             )?;
             let mut rows = stmt.query(rusqlite::params![actor])?;
             let mut result = Vec::new();
@@ -303,7 +331,8 @@ impl SqliteStore {
             result
         };
 
-        if contexts.len() <= limit {
+        // Re-check with exact count
+        if contexts.len() <= threshold {
             return Ok(None);
         }
 
@@ -398,7 +427,7 @@ impl SqliteStore {
 
             // Σ Insert sigma after deleting originals
             if !eviction_batch.is_empty() {
-                let sigma = distill::build_distill_attestation(&eviction_batch, "_distill");
+                let sigma = distill::build_distill_attestation(&eviction_batch, &cu.context);
                 self.distilling = true;
                 let insert_result = put_attestation(&self.conn, &sigma);
                 self.distilling = false;
@@ -410,33 +439,13 @@ impl SqliteStore {
                 }
             }
 
-            // Remove counter row for this evicted (actor, context) pair
-            self.conn.execute(
-                "DELETE FROM enforcement_actor_context WHERE actor = ?1 AND context = ?2",
-                rusqlite::params![actor, cu.context],
-            )?;
-        }
-
-        // Update distinct context count for this actor
-        let remaining: i64 = self
-            .conn
-            .query_row(
-                "SELECT COUNT(*) FROM enforcement_actor_context WHERE actor = ?1",
-                rusqlite::params![actor],
-                |row| row.get(0),
-            )
-            .unwrap_or(0);
-        if remaining <= 0 {
-            self.conn.execute(
-                "DELETE FROM enforcement_actor_contexts WHERE actor = ?1",
-                rusqlite::params![actor],
-            )?;
-        } else {
-            self.conn.execute(
-                "INSERT INTO enforcement_actor_contexts (actor, count) VALUES (?1, ?2)
-                 ON CONFLICT(actor) DO UPDATE SET count = ?2",
-                rusqlite::params![actor, remaining],
-            )?;
+            // Update in-memory counters: remove evicted context
+            self.enforcement_counters
+                .actor_context
+                .remove(&(actor.to_string(), cu.context.clone()));
+            if let Some(ctx_set) = self.enforcement_counters.actor_contexts.get_mut(actor) {
+                ctx_set.remove(&cu.context);
+            }
         }
 
         if total_deleted == 0 {
@@ -456,29 +465,29 @@ impl SqliteStore {
 
     /// Enforce entity_actors_limit: keep only N most-recent actors per entity/subject.
     /// Uses half-bound threshold: triggers at `limit + limit/2`, evicts down to `limit`.
-    /// Counter lookup is O(1) — only queries actor details when threshold is exceeded.
+    /// Uses in-memory counter for threshold check (O(1)), falls back to DB query for eviction.
     fn enforce_entity_actors_limit(
         &mut self,
         entity: &str,
         limit: usize,
     ) -> Result<Option<EnforcementEvent>, SqliteError> {
-        // O(1) counter lookup
-        let count: i64 = self
-            .conn
-            .query_row(
-                "SELECT count FROM enforcement_entity_actors WHERE subject = ?1",
-                rusqlite::params![entity],
-                |row| row.get::<_, i64>(0),
-            )
-            .unwrap_or(0);
-
-        // Half-bound threshold
         let threshold = limit + limit / 2;
-        if (count as usize) <= threshold {
-            return Ok(None);
+
+        // O(1) threshold check (skip if not initialized — e.g. FlushEnforcement)
+        if self.enforcement_counters.initialized {
+            let cached_count = self
+                .enforcement_counters
+                .entity_actors
+                .get(entity)
+                .map(|s| s.len())
+                .unwrap_or(0);
+
+            if cached_count <= threshold {
+                return Ok(None);
+            }
         }
 
-        // Only now query which actors to evict
+        // Counter says threshold exceeded — get exact data from DB for eviction
         let actors: Vec<String> = {
             let mut stmt = self.conn.prepare(
                 "SELECT a.actor, MAX(att.timestamp) as last_seen
@@ -497,7 +506,8 @@ impl SqliteStore {
             result
         };
 
-        if actors.len() <= limit {
+        // Re-check with exact count
+        if actors.len() <= threshold {
             return Ok(None);
         }
 
@@ -602,33 +612,14 @@ impl SqliteStore {
                 }
             }
 
-            // Remove detail tracking row
-            self.conn.execute(
-                "DELETE FROM enforcement_entity_actors_detail WHERE subject = ?1 AND actor = ?2",
-                rusqlite::params![entity, actor],
-            )?;
-        }
-
-        // Update counter to reflect actual remaining actors
-        let remaining: i64 = self
-            .conn
-            .query_row(
-                "SELECT COUNT(*) FROM enforcement_entity_actors_detail WHERE subject = ?1",
-                rusqlite::params![entity],
-                |row| row.get(0),
-            )
-            .unwrap_or(0);
-        if remaining <= 0 {
-            self.conn.execute(
-                "DELETE FROM enforcement_entity_actors WHERE subject = ?1",
-                rusqlite::params![entity],
-            )?;
-        } else {
-            self.conn.execute(
-                "INSERT INTO enforcement_entity_actors (subject, count) VALUES (?1, ?2)
-                 ON CONFLICT(subject) DO UPDATE SET count = ?2",
-                rusqlite::params![entity, remaining],
-            )?;
+            // Update in-memory counters: remove evicted actor from entity
+            if let Some(actor_set) = self.enforcement_counters.entity_actors.get_mut(entity) {
+                actor_set.remove(actor);
+            }
+            // Remove actor_context entries for this actor (all contexts)
+            self.enforcement_counters
+                .actor_context
+                .retain(|(a, _), _| a != actor);
         }
 
         if total_deleted == 0 {
@@ -792,10 +783,10 @@ mod tests {
         let events = store.enforce_limits(&input).unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].event_type, "actor_context_limit");
-        assert_eq!(events[0].deleted_count, 3); // 4 - 2 + 1 = 3 (the +1 compensates for distill insert)
+        assert_eq!(events[0].deleted_count, 3); // 4 - 2 + 1 = 3 (+1 for distill)
         assert_eq!(events[0].limit_value, 2);
 
-        // Verify: 1 original kept + 1 distill attestation = 2
+        // Verify: 1 original kept + 1 distill attestation = 2 = limit
         let count = store.count().unwrap();
         assert_eq!(count, 2);
 
@@ -936,7 +927,7 @@ mod tests {
 
         let events = store.enforce_limits(&input).unwrap();
         assert_eq!(events.len(), 1);
-        assert_eq!(events[0].deleted_count, 3); // 4 - 2 + 1 = 3 (the +1 compensates for distill insert)
+        assert_eq!(events[0].deleted_count, 3); // 4 - 2 + 1 = 3 (+1 for distill)
 
         // Find the distill attestation
         let all_ids = store.ids().unwrap();
@@ -962,27 +953,27 @@ mod tests {
         );
         assert_eq!(
             distill_att.attributes.get("_count").unwrap(),
-            &serde_json::json!(3) // batch size: 3 evicted attestations
+            &serde_json::json!(3) // batch size: 3 evicted attestations (AS-1, AS-2, AS-3)
         );
         assert_eq!(
             distill_att.attributes.get("_total").unwrap(),
             &serde_json::json!(3) // no prior distills, so _total == _count
         );
 
-        // Check merged elapsed_ms: min=50, max=200, sum=350, count=3
+        // Check merged elapsed_ms: min=50, max=200, sum=350, count=3 (AS-1 + AS-2 + AS-3)
         let elapsed = distill_att.attributes.get("elapsed_ms").unwrap();
-        assert_eq!(elapsed.get("min").unwrap(), &serde_json::json!(50)); // AS-3
+        assert_eq!(elapsed.get("min").unwrap(), &serde_json::json!(50));  // AS-3
         assert_eq!(elapsed.get("max").unwrap(), &serde_json::json!(200)); // AS-2
         assert_eq!(elapsed.get("sum").unwrap(), &serde_json::json!(350)); // 100+200+50
         assert_eq!(elapsed.get("count").unwrap(), &serde_json::json!(3));
 
-        // Check merged stage: frequencies should contain "connecting" and "discovered"
+        // Check merged stage: AS-1, AS-2, AS-3 have stage values
         let stage = distill_att.attributes.get("stage").unwrap();
         let freqs = stage.get("frequencies").unwrap().as_object().unwrap();
         assert!(freqs.contains_key("connecting"));
         assert!(freqs.contains_key("discovered"));
 
-        // Predicates should be distill-prefixed
+        // Predicates should include the evicted predicates
         assert!(distill_att
             .predicates
             .iter()

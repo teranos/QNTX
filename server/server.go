@@ -106,12 +106,31 @@ type QNTXServer struct {
 	embeddingStats              schedule.EmbeddingStats // drained by ticker for periodic summary
 	groundDBPath                string
 	watcherDB                   *sql.DB                // Separate DB connection for watcher engine (avoids RustStore contention)
+	walCheckpointer             WALCheckpointer        // Rust-side WAL checkpoint (closes read conns, checkpoints, reopens)
+	ageDistiller                AgeDistiller           // Rust-side age distillation (fold old attestations into sigmas)
+	writeLockInspector          WriteLockInspector     // Rust-side write lock holder tracking
 	onReady                     func()                 // Called once when server is fully ready (routes, DB, listeners)
 
 	// Cached database stats — refreshed every 30s in the background.
 	// Glyph opens return instantly from cache instead of blocking on 4+ queries.
 	dbStatsCache atomic.Pointer[cachedDBStats]
 }
+
+// SetWALCheckpointer sets the Rust-side WAL checkpointer (closes read conns, checkpoints, reopens).
+func (s *QNTXServer) SetWALCheckpointer(c WALCheckpointer) {
+	s.walCheckpointer = c
+}
+
+// SetAgeDistiller sets the Rust-side age distiller (fold old attestations into sigmas).
+func (s *QNTXServer) SetAgeDistiller(d AgeDistiller) {
+	s.ageDistiller = d
+}
+
+// SetWriteLockInspector sets the write lock inspector for diagnostics.
+func (s *QNTXServer) SetWriteLockInspector(w WriteLockInspector) {
+	s.writeLockInspector = w
+}
+
 
 // handleClientRegister handles a new client connection
 func (s *QNTXServer) handleClientRegister(client *Client) {

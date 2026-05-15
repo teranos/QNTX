@@ -5,7 +5,7 @@ use qntx_core::{
     storage::{AttestationStore, QueryStore, StorageStats, StoreError},
 };
 use rusqlite::{backup, Connection, OptionalExtension};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::error::SqliteError;
 
@@ -44,10 +44,68 @@ pub struct SqliteStore {
     /// Database file path, if file-backed. Used by backup to open a separate read connection.
     pub(crate) db_path: Option<String>,
     /// Enforcement config for bounded storage limits (16/64/64 default).
-    /// When set, enforcement runs on every put() using O(1) counter lookups.
+    /// When set, enforcement runs every 50 puts using junction table COUNT queries.
     pub(crate) enforcement_config: Option<EnforcementConfig>,
     /// When true, put() skips enforcement to prevent infinite loops during distillation.
     pub(crate) distilling: bool,
+    /// Counter for amortized enforcement: only run enforcement every N puts.
+    put_count: u64,
+    /// In-memory enforcement counters for O(1) threshold checks.
+    /// Populated lazily from DB on first access, then maintained on put/delete.
+    pub(crate) enforcement_counters: EnforcementCounters,
+}
+
+/// In-memory counters for O(1) enforcement threshold checks.
+/// Avoids expensive COUNT queries with JOINs on every put().
+#[derive(Default)]
+pub struct EnforcementCounters {
+    /// (actor, context) → attestation count
+    pub(crate) actor_context: HashMap<(String, String), usize>,
+    /// actor → set of distinct contexts
+    pub(crate) actor_contexts: HashMap<String, HashSet<String>>,
+    /// subject → set of distinct actors
+    pub(crate) entity_actors: HashMap<String, HashSet<String>>,
+    /// Whether counters have been populated from DB
+    pub(crate) initialized: bool,
+}
+
+impl EnforcementCounters {
+    /// Check if any counter exceeds its half-bound threshold.
+    /// O(1) — just checks the in-memory maps for the attestation's dimensions.
+    pub fn any_threshold_exceeded(
+        &self,
+        config: &qntx_core::storage::enforcement::EnforcementConfig,
+    ) -> bool {
+        let ac_threshold = config.actor_context_limit + config.actor_context_limit / 2;
+        for count in self.actor_context.values() {
+            if *count > ac_threshold {
+                return true;
+            }
+        }
+
+        let acs_threshold = config.actor_contexts_limit + config.actor_contexts_limit / 2;
+        for contexts in self.actor_contexts.values() {
+            if contexts.len() > acs_threshold {
+                return true;
+            }
+        }
+
+        let ea_threshold = config.entity_actors_limit + config.entity_actors_limit / 2;
+        for actors in self.entity_actors.values() {
+            if actors.len() > ea_threshold {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Decrement actor_context counter after enforcement deletes.
+    pub fn decrement_actor_context(&mut self, actor: &str, context: &str, count: usize) {
+        if let Some(val) = self.actor_context.get_mut(&(actor.to_string(), context.to_string())) {
+            *val = val.saturating_sub(count);
+        }
+    }
 }
 
 /// Read-only SQLite connection for concurrent queries.
@@ -70,6 +128,8 @@ impl SqliteStore {
             db_path: None,
             enforcement_config: None,
             distilling: false,
+            put_count: 0,
+            enforcement_counters: EnforcementCounters::default(),
         }
     }
 
@@ -92,11 +152,22 @@ impl SqliteStore {
         crate::vec::init_vec_extension();
 
         let path_str = path.as_ref().to_string_lossy().to_string();
+
+        // Initialize flight recorder next to the database file
+        let recorder_path = format!("{}.flight", path_str);
+        crate::flight_recorder::init(&recorder_path);
         let conn = Connection::open(&path)?;
 
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
         conn.pragma_update(None, "busy_timeout", "5000")?;
+        conn.pragma_update(None, "mmap_size", "0")?;
+        // WAL always memory-maps the -shm index file for reader/writer coordination.
+        // With many connections sharing the same mmap, auto-checkpoints during writes
+        // can invalidate the mapping → SIGBUS at _platform_memmove with page-aligned
+        // fault addresses. Disable auto-checkpoint; put() runs PASSIVE checkpoints
+        // every 5000 writes instead (PASSIVE never truncates WAL or -shm).
+        conn.pragma_update(None, "wal_autocheckpoint", "0")?;
         crate::migrate::migrate(&conn)?;
 
         Ok(Self {
@@ -104,6 +175,8 @@ impl SqliteStore {
             db_path: Some(path_str),
             enforcement_config: None,
             distilling: false,
+            put_count: 0,
+            enforcement_counters: EnforcementCounters::default(),
         })
     }
 
@@ -120,7 +193,131 @@ impl SqliteStore {
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )?;
         conn.pragma_update(None, "busy_timeout", "5000")?;
+        conn.pragma_update(None, "mmap_size", "0")?;
         Ok(ReadConn { conn })
+    }
+
+    /// Run a TRUNCATE checkpoint on the write connection.
+    /// Caller MUST ensure no read connections are open — TRUNCATE requires
+    /// exclusive access to the WAL. Returns (busy, wal_pages, checkpointed_pages).
+    pub fn wal_checkpoint_truncate(&self) -> StoreResult<(i32, i32, i32)> {
+        let mut busy = 0i32;
+        let mut log = 0i32;
+        let mut checkpointed = 0i32;
+        self.conn
+            .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| {
+                busy = row.get(0)?;
+                log = row.get(1)?;
+                checkpointed = row.get(2)?;
+                Ok(())
+            })
+            .map_err(SqliteError::from)?;
+        Ok((busy, log, checkpointed))
+    }
+
+    /// Age-triggered distillation: fold old attestations into sigmas.
+    ///
+    /// Queries attestations older than `cutoff_rfc3339` plus all existing sigmas
+    /// (source='distill'). Groups by first predicate, builds a sigma per group,
+    /// deletes originals. All within a single transaction.
+    ///
+    /// Returns (distilled_count, sigmas_created, skipped_singles).
+    pub fn age_distill(
+        &self,
+        cutoff_rfc3339: &str,
+        batch_size: usize,
+    ) -> StoreResult<(usize, usize, usize)> {
+        use crate::distill::build_distill_attestation;
+
+        // Load candidates
+        let mut stmt = self.conn.prepare(
+            "SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did
+             FROM attestations
+             WHERE (timestamp < ?1 OR source = 'distill')
+             ORDER BY timestamp ASC
+             LIMIT ?2"
+        ).map_err(SqliteError::from)?;
+
+        let rows = stmt.query_map(
+            rusqlite::params![cutoff_rfc3339, batch_size as i64],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, String>(6)?,
+                    row.get::<_, Option<String>>(7)?,
+                    row.get::<_, String>(8)?,
+                    row.get::<_, Option<Vec<u8>>>(9)?,
+                    row.get::<_, Option<String>>(10)?,
+                ))
+            },
+        ).map_err(SqliteError::from)?;
+
+        let mut candidates: Vec<Attestation> = Vec::new();
+        for row in rows {
+            let row_data = row.map_err(SqliteError::from)?;
+            match Self::row_to_attestation(row_data) {
+                Ok(att) => candidates.push(att),
+                Err(_) => continue,
+            }
+        }
+        drop(stmt);
+
+        if candidates.is_empty() {
+            return Ok((0, 0, 0));
+        }
+
+        // Group by first predicate
+        let mut groups: HashMap<String, Vec<Attestation>> = HashMap::new();
+        for att in candidates {
+            let predicate = att.predicates.first().cloned().unwrap_or_else(|| "_".to_string());
+            groups.entry(predicate).or_default().push(att);
+        }
+
+        let tx = self.conn.unchecked_transaction().map_err(SqliteError::from)?;
+
+        let mut total_distilled = 0usize;
+        let mut total_created = 0usize;
+        let mut total_skipped = 0usize;
+
+        for (predicate, batch) in &groups {
+            if batch.len() < 2 {
+                total_skipped += batch.len();
+                continue;
+            }
+
+            // Build sigma — uses distill:<predicate> as context
+            let context = format!("distill:{}", predicate.trim_start_matches("distill:"));
+            let sigma = build_distill_attestation(batch, &context);
+
+            // The sigma predicate should be distill:<original_predicate>
+            let sigma = Attestation {
+                subjects: vec![format!("distill:{}", predicate.trim_start_matches("distill:"))],
+                predicates: vec![format!("distill:{}", predicate.trim_start_matches("distill:"))],
+                ..sigma
+            };
+
+            // Delete originals (CASCADE handles junction tables)
+            for att in batch {
+                tx.execute(
+                    "DELETE FROM attestations WHERE id = ?1",
+                    rusqlite::params![att.id],
+                ).map_err(SqliteError::from)?;
+                total_distilled += 1;
+            }
+
+            // Insert sigma
+            put_attestation(&tx, &sigma)?;
+            total_created += 1;
+        }
+
+        tx.commit().map_err(SqliteError::from)?;
+
+        Ok((total_distilled, total_created, total_skipped))
     }
 
     /// Run PRAGMA integrity_check and return the result lines.
@@ -141,13 +338,14 @@ impl SqliteStore {
     }
 
     /// Create a hot backup of the database to the given path.
-    /// Opens a separate read-only source connection so the backup does not need
-    /// exclusive access to `self.conn` — callers do NOT need to hold the mutex.
+    /// Flushes WAL to the main DB first via TRUNCATE checkpoint, then opens a
+    /// separate read-only source connection — callers do NOT need to hold the mutex.
     pub fn backup(&self, dest_path: &str) -> StoreResult<()> {
         let src_path = self
             .db_path
             .as_deref()
             .ok_or_else(|| StoreError::Backend("backup requires a file-backed database".into()))?;
+
         let src = Connection::open_with_flags(
             src_path,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
@@ -320,6 +518,7 @@ pub(crate) fn put_attestation(conn: &Connection, attestation: &Attestation) -> S
     let timestamp_sql = timestamp_to_sql(attestation.timestamp);
     let created_at_sql = timestamp_to_sql(attestation.created_at);
 
+    crate::flight_recorder::record_fmt("put:insert_main", &attestation.id);
     conn.execute(
         "INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at, signature, signer_did)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -340,6 +539,7 @@ pub(crate) fn put_attestation(conn: &Connection, attestation: &Attestation) -> S
     .map_err(SqliteError::from)?;
 
     // Populate junction tables for indexed lookups
+    crate::flight_recorder::record_fmt("put:junction_actors", &attestation.id);
     for actor in &attestation.actors {
         conn.execute(
             "INSERT INTO attestation_actors (attestation_id, actor) VALUES (?, ?)",
@@ -347,6 +547,7 @@ pub(crate) fn put_attestation(conn: &Connection, attestation: &Attestation) -> S
         )
         .map_err(SqliteError::from)?;
     }
+    crate::flight_recorder::record_fmt("put:junction_contexts", &attestation.id);
     for context in &attestation.contexts {
         conn.execute(
             "INSERT INTO attestation_contexts (attestation_id, context) VALUES (?, ?)",
@@ -354,6 +555,7 @@ pub(crate) fn put_attestation(conn: &Connection, attestation: &Attestation) -> S
         )
         .map_err(SqliteError::from)?;
     }
+    crate::flight_recorder::record_fmt("put:junction_subjects", &attestation.id);
     for subject in &attestation.subjects {
         conn.execute(
             "INSERT INTO attestation_subjects (attestation_id, subject) VALUES (?, ?)",
@@ -361,6 +563,7 @@ pub(crate) fn put_attestation(conn: &Connection, attestation: &Attestation) -> S
         )
         .map_err(SqliteError::from)?;
     }
+    crate::flight_recorder::record_fmt("put:junction_predicates", &attestation.id);
     for predicate in &attestation.predicates {
         conn.execute(
             "INSERT INTO attestation_predicates (attestation_id, predicate) VALUES (?, ?)",
@@ -369,52 +572,7 @@ pub(crate) fn put_attestation(conn: &Connection, attestation: &Attestation) -> S
         .map_err(SqliteError::from)?;
     }
 
-    // Update enforcement counters (O(1) per combination).
-    for actor in &attestation.actors {
-        for context in &attestation.contexts {
-            let new_count: i64 = conn
-                .query_row(
-                    "INSERT INTO enforcement_actor_context (actor, context, count)
-                 VALUES (?1, ?2, 1)
-                 ON CONFLICT(actor, context) DO UPDATE SET count = count + 1
-                 RETURNING count",
-                    rusqlite::params![actor, context],
-                    |row| row.get(0),
-                )
-                .map_err(SqliteError::from)?;
-
-            if new_count == 1 {
-                conn.execute(
-                    "INSERT INTO enforcement_actor_contexts (actor, count)
-                     VALUES (?1, 1)
-                     ON CONFLICT(actor) DO UPDATE SET count = count + 1",
-                    rusqlite::params![actor],
-                )
-                .map_err(SqliteError::from)?;
-            }
-        }
-    }
-    for subject in &attestation.subjects {
-        for actor in &attestation.actors {
-            let changed = conn
-                .execute(
-                    "INSERT OR IGNORE INTO enforcement_entity_actors_detail (subject, actor)
-                 VALUES (?1, ?2)",
-                    rusqlite::params![subject, actor],
-                )
-                .map_err(SqliteError::from)?;
-            if changed > 0 {
-                conn.execute(
-                    "INSERT INTO enforcement_entity_actors (subject, count)
-                     VALUES (?1, 1)
-                     ON CONFLICT(subject) DO UPDATE SET count = count + 1",
-                    rusqlite::params![subject],
-                )
-                .map_err(SqliteError::from)?;
-            }
-        }
-    }
-
+    crate::flight_recorder::record_fmt("put:done", &attestation.id);
     Ok(())
 }
 
@@ -430,20 +588,57 @@ impl AttestationStore for SqliteStore {
 
         put_attestation(&self.conn, &attestation)?;
 
-        // Enforce bounded storage limits using counter lookups (O(1) per check).
+        // Update in-memory counters and check thresholds.
         // Skip enforcement when distilling to prevent infinite loops (distill insert → enforce → distill).
         if !self.distilling {
+            self.enforcement_counters.initialized = true;
+
+            // Update counters for every put
+            for actor in &actors {
+                for context in &contexts {
+                    *self
+                        .enforcement_counters
+                        .actor_context
+                        .entry((actor.clone(), context.clone()))
+                        .or_insert(0) += 1;
+                }
+                self.enforcement_counters
+                    .actor_contexts
+                    .entry(actor.clone())
+                    .or_default()
+                    .extend(contexts.iter().cloned());
+            }
+            for subject in &subjects {
+                self.enforcement_counters
+                    .entity_actors
+                    .entry(subject.clone())
+                    .or_default()
+                    .extend(actors.iter().cloned());
+            }
+
+            // Only run enforcement when a threshold is exceeded (O(1) check)
             if let Some(ref config) = self.enforcement_config {
-                let input = EnforcementInput {
-                    actors,
-                    contexts,
-                    subjects,
-                    config: config.clone(),
-                };
-                if let Err(e) = self.enforce_limits(&input) {
-                    eprintln!("qntx-sqlite: post-put enforcement failed: {}", e);
+                let needs_enforcement = self.enforcement_counters.any_threshold_exceeded(config);
+                if needs_enforcement {
+                    let input = EnforcementInput {
+                        actors,
+                        contexts,
+                        subjects,
+                        config: config.clone(),
+                    };
+                    if let Err(e) = self.enforce_limits(&input) {
+                        eprintln!("qntx-sqlite: post-put enforcement failed: {}", e);
+                    }
                 }
             }
+        }
+
+        // Periodic PASSIVE checkpoint — moves WAL pages to the main DB without
+        // truncating WAL or -shm. Safe with concurrent readers (PASSIVE skips
+        // pages that readers hold). Every 5000 puts keeps WAL bounded at ~20MB.
+        self.put_count += 1;
+        if self.put_count.is_multiple_of(5000) {
+            let _ = self.conn.execute_batch("PRAGMA wal_checkpoint(PASSIVE)");
         }
 
         Ok(())

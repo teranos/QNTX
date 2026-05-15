@@ -345,6 +345,14 @@ ExecResultC sql_rollback(SqliteStore *store);
 QueryResultC read_conn_sql_query(const ReadConn *rc, const char *sql, const char *params_json);
 
 /**
+ * Set the caller tag for the current thread's flight recorder entries.
+ * Call before issuing FFI calls to attribute queries to their source.
+ *
+ * @param caller Caller identifier (e.g. "db-stats", "watcher:ax-1234", "plugin:village")
+ */
+void flight_recorder_set_caller(const char *caller);
+
+/**
  * Free an ExecResultC.
  */
 void exec_result_free(ExecResultC result);
@@ -368,18 +376,79 @@ void query_result_free(QueryResultC result);
 StringArrayResultC storage_integrity_check(const SqliteStore *store);
 
 // ============================================================================
+// Age Distillation
+// ============================================================================
+
+typedef struct {
+    bool success;
+    char *error_msg;
+    size_t distilled;
+    size_t sigmas_created;
+    size_t skipped;
+} DistillResultC;
+
+/**
+ * Run age-triggered distillation: fold old attestations into sigmas.
+ * Queries attestations older than cutoff plus all existing sigmas,
+ * groups by predicate, creates one sigma per group, deletes originals.
+ * All within a single transaction.
+ *
+ * Caller must hold the write mutex before calling.
+ *
+ * @param store Store handle
+ * @param cutoff_rfc3339 RFC3339 timestamp cutoff for old attestations
+ * @param batch_size Maximum number of attestations to process
+ * @return Result with distilled/sigmas_created/skipped counts
+ */
+DistillResultC storage_age_distill(SqliteStore *store, const char *cutoff_rfc3339, size_t batch_size);
+
+// ============================================================================
+// WAL Checkpoint
+// ============================================================================
+
+typedef struct {
+    bool success;
+    char *error_msg;
+    int32_t busy;
+    int32_t wal_pages;
+    int32_t checkpointed_pages;
+} CheckpointResultC;
+
+/**
+ * Run a TRUNCATE WAL checkpoint. Closes all provided read connections,
+ * checkpoints the write connection, then reopens read connections.
+ *
+ * read_conns is a mutable array of `count` ReadConn pointers. On return,
+ * each slot is replaced with a fresh connection (or NULL on reopen failure).
+ *
+ * Caller must hold the write mutex before calling.
+ *
+ * @param store Store handle
+ * @param read_conns Array of ReadConn pointers (mutated in place)
+ * @param count Number of read connections
+ * @return Checkpoint result with busy/wal_pages/checkpointed_pages
+ */
+CheckpointResultC storage_wal_checkpoint(SqliteStore *store, ReadConn **read_conns, size_t count);
+
+// ============================================================================
 // Backup
 // ============================================================================
 
 /**
- * Create a hot backup of the database to the given path.
- * Uses SQLite's online backup API — safe to call while the database is in use.
+ * Create a hot backup of the database.
+ * Opens its own read-only source connection — does not touch the store pointer.
  *
- * @param store Store handle
+ * @param src_path Source database path
  * @param dest_path Filesystem path for the backup file
  * @return Result indicating success/failure
  */
-StorageResultC storage_backup(const SqliteStore *store, const char *dest_path);
+StorageResultC storage_backup(const char *src_path, const char *dest_path);
+
+/**
+ * Deliberately trigger SIGBUS to verify flight recorder.
+ * Development/testing only.
+ */
+void storage_crash_test(void);
 
 // ============================================================================
 // Memory Management

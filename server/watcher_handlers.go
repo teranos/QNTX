@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/watcher"
+	"github.com/teranos/QNTX/db/rustdriver"
 	"github.com/teranos/QNTX/errors"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	serverembeddings "github.com/teranos/QNTX/server/embeddings"
@@ -528,6 +529,7 @@ func (s *QNTXServer) initWatcherEngine() error {
 	}
 	watcherDB.SetMaxOpenConns(4)
 	s.watcherDB = watcherDB
+	rustdriver.SetCaller("watcher-db")
 
 	// Pass atsStore as AttestationReader so watcher queries go through Rust's connection,
 	// eliminating dual-driver access to the attestations table.
@@ -662,7 +664,7 @@ func (s *QNTXServer) runDilationLoop() {
 	}
 
 	logDilation := func(d, memPct, cpuPct float64, tag string) {
-		s.logger.Infof("\n%s", formatDist(d, memPct, cpuPct, tag))
+		s.logger.Debugf("\n%s", formatDist(d, memPct, cpuPct, tag))
 		resetDist()
 	}
 

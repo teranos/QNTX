@@ -247,7 +247,7 @@ func (h *KeepaliveHandler) Start(ctx context.Context, sendPing func(timestamp in
 	h.lastPong = time.Now()
 	h.mu.Unlock()
 
-	h.logger.Infow("Starting keepalive handler",
+	h.logger.Debugw("Starting keepalive handler",
 		"ping_interval", h.config.PingInterval,
 		"pong_timeout", h.config.PongTimeout,
 	)

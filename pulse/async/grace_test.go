@@ -263,25 +263,26 @@ func TestGRACEGracefulStart(t *testing.T) {
 	// Give recovery time to run
 	time.Sleep(100 * time.Millisecond)
 
-	// Verify both jobs were recovered (re-queued)
+	// Verify both jobs were failed (orphan recovery marks them failed so
+	// the scheduler creates fresh jobs on the next tick)
 	recoveredJob1, err := queue.GetJob(job1.ID)
 	if err != nil {
 		t.Fatalf("Failed to get job1 after recovery: %v", err)
 	}
-	if recoveredJob1.Status != JobStatusQueued {
-		t.Errorf("Expected job1 to be re-queued, got status '%s'", recoveredJob1.Status)
+	if recoveredJob1.Status != JobStatusFailed {
+		t.Errorf("Expected job1 to be failed, got status '%s'", recoveredJob1.Status)
 	} else {
-		t.Log("✓ Orphaned job 1 recovered and re-queued")
+		t.Log("✓ Orphaned job 1 marked as failed")
 	}
 
 	recoveredJob2, err := queue.GetJob(job2.ID)
 	if err != nil {
 		t.Fatalf("Failed to get job2 after recovery: %v", err)
 	}
-	if recoveredJob2.Status != JobStatusQueued {
-		t.Errorf("Expected job2 to be re-queued, got status '%s'", recoveredJob2.Status)
+	if recoveredJob2.Status != JobStatusFailed {
+		t.Errorf("Expected job2 to be failed, got status '%s'", recoveredJob2.Status)
 	} else {
-		t.Log("✓ Orphaned job 2 recovered and re-queued")
+		t.Log("✓ Orphaned job 2 marked as failed")
 	}
 }
 
@@ -539,11 +540,11 @@ func TestGRACEPhaseRecoveryNoChildTasks(t *testing.T) {
 		t.Fatalf("Failed to get job after recovery: %v", err)
 	}
 
-	// Verify job status is queued (ready to re-run)
-	if recovered.Status != JobStatusQueued {
-		t.Errorf("Expected job to be queued, got status '%s'", recovered.Status)
+	// Verify job status is failed (scheduler creates fresh job on next tick)
+	if recovered.Status != JobStatusFailed {
+		t.Errorf("Expected job to be failed, got status '%s'", recovered.Status)
 	} else {
-		t.Log("✓ Job re-queued after recovery")
+		t.Log("✓ Job marked as failed after recovery")
 	}
 }
 
@@ -601,11 +602,11 @@ func TestGRACEPhaseRecoveryWithChildTasks(t *testing.T) {
 		t.Fatalf("Failed to get job after recovery: %v", err)
 	}
 
-	// Verify job status is queued (ready to continue processing)
-	if recovered.Status != JobStatusQueued {
-		t.Errorf("Expected job to be queued, got status '%s'", recovered.Status)
+	// Verify job status is failed (scheduler creates fresh job on next tick)
+	if recovered.Status != JobStatusFailed {
+		t.Errorf("Expected job to be failed, got status '%s'", recovered.Status)
 	} else {
-		t.Log("✓ Parent job re-queued after recovery")
+		t.Log("✓ Parent job marked as failed after recovery")
 	}
 
 	// Verify child tasks remain queued
