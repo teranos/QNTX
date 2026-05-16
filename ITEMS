@@ -1,0 +1,96 @@
+# ITEMS
+
+Punch list from the weekly-commits review session. Each item is traced to a
+file/line or commit. Status: [done] / [open] / [decision].
+
+## A. Stale references / dead code
+
+1. [open] qntx-core/src/storage/traits.rs:61 and :67 — doc comments on
+   predicates() and contexts() still say "Used for fuzzy matching index
+   population". Fuzzy-ax was removed (ADR-015). The main-branch cleanup
+   commit c7b4629a swept Go and qntx-grpc but missed qntx-core. Two-line fix.
+
+2. [open] ats/storage/rich_search_test.go — TestSearchRichStringFields_
+   FuzzyMatching and branches checking Strategy == "fuzzy:all-words" /
+   "fuzzy:partial" test a strategy rich_search.go never produces (it only
+   emits StrategySubstring). The test logs warnings instead of failing
+   (line ~370: "No fuzzy match ... might need Rust backend"), so it passes
+   trivially. Decide what it should assert now, or delete it.
+
+3. [done] Stale fuzzy references in Go (ats/doc.go, ats/ax/README.md,
+   ats/store.go, ats/types/attestation.go, ats/ax/fixtures.go orphan
+   GetFuzzyMatchingTestCase, ats/storage/executor_integration_test.go dead
+   commented-out test, rich_search.go contradicting comment). Cleaned up —
+   but see item E1: this duplicates main commit c7b4629a.
+
+## B. Architecture / swappability
+
+4. [open] Two divergent AttestationStore definitions:
+   - Rust  qntx-core/src/storage/traits.rs — plain CRUD (put/get/delete/
+     update/ids/clear) + QueryStore.
+   - Go    ats/store.go — signing-aware (CreateAttestation,
+     CreateAttestationInbound, GenerateAndCreateAttestation, bounded
+     variants).
+   "Swap out ats" is blocked because the swappable thing implements the
+   Rust trait, but production runs the Go contract. Reconciling these into
+   one seam is the actual prerequisite for swappability.
+
+5. [open] qntx-core/src/storage/memory.rs (MemoryStore) — complete against
+   the Rust trait, ~250 lines, zero deps, 8 tests. It is NOT a production-
+   faithful backend: production goes Go contract -> ffi.rs -> SqliteStore
+   (enforcement, distillation, signing, vec search). query() returns
+   conflicts: Vec::new() // TODO. Keep it trivial (its value is being a
+   cheap forcing function); do NOT replace it with an off-the-shelf
+   in-memory DB. Note: SQLite ":memory:" already provides a production-
+   faithful in-memory option with zero new dependencies.
+
+6. [open] ats/storage/embedding_store.go (1,338 lines) — embedding storage
+   baked into the attestation core. ADR-017 declares embedding a
+   plugin-provided service. Same shape as the graph package, which was
+   removed today (ADR-021). Candidate to follow graph out of core.
+
+## C. Decisions needed
+
+7. [decision] ADR-011 (OCaml core engine "kern") — still "Proposed". It
+   would move the parser Rust -> OCaml, a second migration of a component
+   that already moved Go -> Rust (PR #688). Resolving this decides whether
+   the engine-layer migration is essentially complete or the parser hops
+   languages a second time.
+
+8. [decision] types/attestation.go TODO(#605) — rename As -> Attestation
+   and AsCommand -> As. The core type has 110 importers; the most
+   load-bearing noun in the codebase is not yet named. Settle or close.
+
+## D. Known issues / observations
+
+9. [open] ats has two parallel query/filter paths: AttestationFilter +
+   AttestationStore.GetAttestations (store.go) vs types.AxFilter +
+   AttestationQueryStore.ExecuteAxQuery. Looks like accretion — the ax
+   query language grew beside an older filter struct.
+
+10. [open] ats/store.go AttestationItem interface returns single-valued
+    GetSubject/GetPredicate/GetContext, but the As model supports multiple
+    subjects/predicates/contexts. Compound attestations cannot enter
+    through BatchStore.PersistItems.
+
+11. [open] signing/signing.go:52 TODO(#583) — "Reject unsigned attestations
+    once all nodes sign." Signature verification is currently optional,
+    despite the system's verifiable-claims premise.
+
+12. [open] db package tests fail pre-existing: TestOpen and
+    TestOpenWithMigrations (db.Open returns nil error for an invalid path;
+    test observed sqlite3.SQLiteDriver / mattn). Not caused by this
+    session's changes — flagged for the owner.
+
+## E. Branch housekeeping
+
+13. [decision] Commit 63331540 on branch claude/review-weekly-commits-Unakw
+    duplicates main commit c7b4629a ("Remove stale fuzzy-matching
+    references"). c7b4629a is a strict superset (also regenerated
+    types/generated/typescript/types.ts, docs/types/server.md,
+    qntx-grpc types). Recommend dropping 63331540. The branch is 17
+    commits behind origin/main.
+
+14. [open] make types could not run in this environment (needs Nix). Any
+    Go struct-comment change that feeds typegen requires make types to
+    propagate into types/generated/. (Already handled on main by c7b4629a.)
