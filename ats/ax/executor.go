@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/alias"
-	"github.com/teranos/QNTX/ats/ax/classification"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 )
@@ -52,7 +52,7 @@ func NewAxExecutorWithOptions(queryStore ats.AttestationQueryStore, aliasResolve
 	}
 	return &AxExecutor{
 		queryStore:     queryStore,
-		classifier:     NewDefaultClassifier(classification.DefaultTemporalConfig()),
+		classifier:     NewDefaultClassifier(DefaultTemporalConfig()),
 		aliasResolver:  aliasResolver,
 		entityResolver: opts.EntityResolver,
 		queryExpander:  opts.QueryExpander,
@@ -61,7 +61,7 @@ func NewAxExecutorWithOptions(queryStore ats.AttestationQueryStore, aliasResolve
 }
 
 // SetClassificationConfig replaces the classifier with one using the provided config
-func (ae *AxExecutor) SetClassificationConfig(config classification.TemporalConfig) {
+func (ae *AxExecutor) SetClassificationConfig(config TemporalConfig) {
 	ae.classifier = NewDefaultClassifier(config)
 }
 
@@ -189,9 +189,9 @@ func (ae *AxExecutor) executeAdvancedClassification(claims []ats.IndividualClaim
 }
 
 // applyResolutionStrategies applies resolution strategies to filter claims based on classification results
-func (ae *AxExecutor) applyResolutionStrategies(claimGroups map[string][]ats.IndividualClaim, conflicts []classification.AdvancedConflict) []ats.IndividualClaim {
+func (ae *AxExecutor) applyResolutionStrategies(claimGroups map[string][]ats.IndividualClaim, conflicts []AdvancedConflict) []ats.IndividualClaim {
 	// Create a map of conflict resolutions by matching conflicts to claim groups
-	resolutionMap := make(map[string]classification.AdvancedConflict)
+	resolutionMap := make(map[string]AdvancedConflict)
 	for _, conflict := range conflicts {
 		// Find the matching claim group for this conflict
 		for groupKey, groupClaims := range claimGroups {
@@ -263,28 +263,39 @@ func (ae *AxExecutor) getMostRecentClaim(claims []ats.IndividualClaim) ats.Indiv
 	return mostRecent
 }
 
-// getHighestAuthorityClaim returns the claim from the highest authority actor
+// getHighestAuthorityClaim returns the claim from the highest authority actor.
+// Uses Rust's actor prefix convention: human: > llm: > system: > external.
 func (ae *AxExecutor) getHighestAuthorityClaim(claims []ats.IndividualClaim) ats.IndividualClaim {
 	if len(claims) == 0 {
 		return ats.IndividualClaim{}
 	}
 
-	var actors []string
-	for _, claim := range claims {
-		actors = append(actors, claim.Actor)
-	}
-
-	highestCred := ae.classifier.GetHighestCredibility(actors)
-
-	// Find claim from highest credibility actor
-	for _, claim := range claims {
-		if ae.classifier.GetActorCredibility(claim.Actor).Authority == highestCred.Authority {
-			return claim
+	best := claims[0]
+	bestRank := actorRank(best.Actor)
+	for _, claim := range claims[1:] {
+		r := actorRank(claim.Actor)
+		if r > bestRank {
+			best = claim
+			bestRank = r
 		}
 	}
+	return best
+}
 
-	// Fallback to first claim if no match found
-	return claims[0]
+// actorRank returns a numeric rank matching Rust's ActorCredibility ordering:
+// Human(3) > Llm(2) > System(1) > External(0)
+func actorRank(actor string) int {
+	lower := strings.ToLower(actor)
+	if strings.HasPrefix(lower, "human:") || strings.HasSuffix(lower, "@verified") {
+		return 3
+	}
+	if strings.HasPrefix(lower, "llm:") || strings.Contains(lower, "gpt") || strings.Contains(lower, "claude") || strings.Contains(lower, "anthropic") || strings.Contains(lower, "openai") {
+		return 2
+	}
+	if strings.HasPrefix(lower, "system:") || strings.HasPrefix(lower, "qntx:") {
+		return 1
+	}
+	return 0
 }
 
 // claimConfidence returns the confidence for a claim based on its conflict group.

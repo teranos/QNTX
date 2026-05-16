@@ -13,7 +13,6 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/alias"
-	"github.com/teranos/QNTX/ats/ax/classification"
 	"github.com/teranos/QNTX/ats/types"
 )
 
@@ -106,7 +105,7 @@ func TestSetClassificationConfig(t *testing.T) {
 	originalClassifier := executor.classifier
 
 	// Set custom config with different evolution window
-	customConfig := classification.TemporalConfig{
+	customConfig := TemporalConfig{
 		EvolutionWindow: 48 * time.Hour, // Different from default 24h
 	}
 	executor.SetClassificationConfig(customConfig)

@@ -7,14 +7,13 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/QNTX/ats/ax/classification"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/wasm"
 )
 
 // NewDefaultClassifier creates the WASM-backed classifier.
 // Panics if the WASM engine is unavailable — run `make wasm` to build.
-func NewDefaultClassifier(config classification.TemporalConfig) Classifier {
+func NewDefaultClassifier(config TemporalConfig) Classifier {
 	c, err := NewWasmClassifier(config)
 	if err != nil {
 		panic("WASM classifier unavailable: " + err.Error() + " — run `make wasm`")
@@ -23,31 +22,23 @@ func NewDefaultClassifier(config classification.TemporalConfig) Classifier {
 }
 
 // WasmClassifier delegates classification to the Rust engine via WASM (wazero).
-// Credibility methods stay in Go since they're used for post-classification
-// resolution application and are just pattern matching.
 type WasmClassifier struct {
-	credMgr *classification.CredibilityManager
-	config  classification.TemporalConfig
+	config TemporalConfig
 }
 
 // NewWasmClassifier creates a WASM-backed classifier.
 // Returns an error if the WASM engine cannot be initialized.
-func NewWasmClassifier(config classification.TemporalConfig) (*WasmClassifier, error) {
+func NewWasmClassifier(config TemporalConfig) (*WasmClassifier, error) {
 	if _, err := wasm.GetEngine(); err != nil {
 		return nil, err
 	}
-	return &WasmClassifier{
-		credMgr: classification.NewCredibilityManager(),
-		config:  config,
-	}, nil
+	return &WasmClassifier{config: config}, nil
 }
 
 // ClassifyConflicts delegates to the Rust WASM engine for classification.
-func (w *WasmClassifier) ClassifyConflicts(claimGroups map[string][]ats.IndividualClaim) classification.ClassificationResult {
+func (w *WasmClassifier) ClassifyConflicts(claimGroups map[string][]ats.IndividualClaim) ClassificationResult {
 	engine, err := wasm.GetEngine()
 	if err != nil {
-		// WASM engine was available at construction time but is gone now.
-		// This should not happen — crash loud so we notice.
 		panic("WASM engine unavailable after successful init: " + err.Error())
 	}
 
@@ -59,16 +50,6 @@ func (w *WasmClassifier) ClassifyConflicts(claimGroups map[string][]ats.Individu
 	}
 
 	return w.convertOutput(output, claimGroups)
-}
-
-// GetActorCredibility delegates to the credibility manager.
-func (w *WasmClassifier) GetActorCredibility(actor string) classification.ActorCredibility {
-	return w.credMgr.GetActorCredibility(actor)
-}
-
-// GetHighestCredibility delegates to the credibility manager.
-func (w *WasmClassifier) GetHighestCredibility(actors []string) classification.ActorCredibility {
-	return w.credMgr.GetHighestCredibility(actors)
 }
 
 // Backend returns the classifier backend type.
@@ -110,8 +91,8 @@ func (w *WasmClassifier) buildWasmInput(claimGroups map[string][]ats.IndividualC
 }
 
 // convertOutput converts WASM ClassifyOutput back to Go ClassificationResult.
-func (w *WasmClassifier) convertOutput(output *wasm.ClassifyOutput, claimGroups map[string][]ats.IndividualClaim) classification.ClassificationResult {
-	conflicts := make([]classification.AdvancedConflict, len(output.Conflicts))
+func (w *WasmClassifier) convertOutput(output *wasm.ClassifyOutput, claimGroups map[string][]ats.IndividualClaim) ClassificationResult {
+	conflicts := make([]AdvancedConflict, len(output.Conflicts))
 
 	for i, wc := range output.Conflicts {
 		// Collect unique source attestations from matching claims
@@ -128,10 +109,9 @@ func (w *WasmClassifier) convertOutput(output *wasm.ClassifyOutput, claimGroups 
 			}
 		}
 
-		// Rust returns PascalCase conflict types ("Evolution"), Go uses lowercase ("evolution")
-		resolutionType := classification.ResolutionType(strings.ToLower(wc.ConflictType))
+		resolutionType := ResolutionType(strings.ToLower(wc.ConflictType))
 
-		conflicts[i] = classification.AdvancedConflict{
+		conflicts[i] = AdvancedConflict{
 			Conflict: types.Conflict{
 				Subject:      wc.Subject,
 				Predicate:    wc.Predicate,
@@ -148,7 +128,7 @@ func (w *WasmClassifier) convertOutput(output *wasm.ClassifyOutput, claimGroups 
 		}
 	}
 
-	return classification.ClassificationResult{
+	return ClassificationResult{
 		Conflicts:      conflicts,
 		AutoResolved:   output.AutoResolved,
 		ReviewRequired: output.ReviewRequired,
@@ -157,12 +137,12 @@ func (w *WasmClassifier) convertOutput(output *wasm.ClassifyOutput, claimGroups 
 }
 
 // convertActorHierarchy converts WASM actor rankings to Go ActorRanking types.
-func convertActorHierarchy(wasmRankings []wasm.ClassifyActorRank) []classification.ActorRanking {
-	rankings := make([]classification.ActorRanking, len(wasmRankings))
+func convertActorHierarchy(wasmRankings []wasm.ClassifyActorRank) []ActorRanking {
+	rankings := make([]ActorRanking, len(wasmRankings))
 	for i, wr := range wasmRankings {
-		rankings[i] = classification.ActorRanking{
+		rankings[i] = ActorRanking{
 			Actor: wr.Actor,
-			Credibility: classification.ActorCredibility{
+			Credibility: ActorCredibility{
 				Type:      credibilityStringToType(wr.Credibility),
 				Authority: credibilityStringToAuthority(wr.Credibility),
 			},
@@ -174,28 +154,28 @@ func convertActorHierarchy(wasmRankings []wasm.ClassifyActorRank) []classificati
 	return rankings
 }
 
-func credibilityStringToType(s string) classification.ActorType {
+func credibilityStringToType(s string) ActorType {
 	switch s {
 	case "Human":
-		return classification.ActorTypeHuman
+		return ActorTypeHuman
 	case "Llm":
-		return classification.ActorTypeLLM
+		return ActorTypeLLM
 	case "System":
-		return classification.ActorTypeSystem
+		return ActorTypeSystem
 	default:
-		return classification.ActorTypeExternal
+		return ActorTypeExternal
 	}
 }
 
 func credibilityStringToAuthority(s string) float64 {
 	switch s {
 	case "Human":
-		return 0.9
+		return 1.0
 	case "Llm":
-		return 0.6
+		return 0.75
 	case "System":
-		return 0.4
+		return 0.5
 	default:
-		return 0.3
+		return 0.25
 	}
 }
