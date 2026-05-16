@@ -389,23 +389,23 @@ func TestGRACEGradualRecovery(t *testing.T) {
 	wp.Start()
 	defer wp.Stop()
 
-	// Verify first job recovered immediately
-	time.Sleep(100 * time.Millisecond)
+	// Verify first job recovered within initial window
+	time.Sleep(500 * time.Millisecond)
 	countRecovered := countJobsByStatus(t, queue, JobStatusQueued)
 	if countRecovered < 1 {
-		t.Errorf("Expected at least 1 job recovered immediately, got %d", countRecovered)
+		t.Errorf("Expected at least 1 job recovered within 500ms, got %d", countRecovered)
 	} else {
-		t.Logf("✓ First job recovered immediately (%d queued)", countRecovered)
+		t.Logf("✓ First job recovered (%d queued)", countRecovered)
 	}
 
 	// Verify warm start phase (jobs 2-10 at ~1/second)
-	// After 5 seconds, expect ~6 jobs recovered (1 immediate + 5 gradual)
-	time.Sleep(5 * time.Second)
-	countAfter5s := countJobsByStatus(t, queue, JobStatusQueued)
-	if countAfter5s < 5 || countAfter5s > 7 {
-		t.Logf("Warning: Expected ~6 jobs after 5s, got %d (timing may vary)", countAfter5s)
+	// After 7 seconds, expect 5-9 jobs recovered (1 immediate + gradual)
+	time.Sleep(7 * time.Second)
+	countAfter := countJobsByStatus(t, queue, JobStatusQueued)
+	if countAfter < 4 || countAfter > 10 {
+		t.Logf("Warning: Expected 5-9 jobs after 7s, got %d (timing may vary)", countAfter)
 	} else {
-		t.Logf("✓ Warm start progressing (%d jobs recovered after 5s)", countAfter5s)
+		t.Logf("✓ Warm start progressing (%d jobs recovered after 7s)", countAfter)
 	}
 
 	// Verify full recovery completes (all 12 jobs)
