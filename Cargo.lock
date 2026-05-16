@@ -3794,7 +3794,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-app"
-version = "0.2.41"
+version = "0.2.42"
 dependencies = [
  "log",
  "qntx-grpc",
@@ -3813,7 +3813,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-core"
-version = "0.2.41"
+version = "0.2.42"
 dependencies = [
  "pretty_assertions",
  "serde",
@@ -3824,11 +3824,11 @@ dependencies = [
 
 [[package]]
 name = "qntx-ffi-common"
-version = "0.2.41"
+version = "0.2.42"
 
 [[package]]
 name = "qntx-grpc"
-version = "0.2.41"
+version = "0.2.42"
 dependencies = [
  "http",
  "lazy_static",
@@ -3847,14 +3847,14 @@ dependencies = [
 
 [[package]]
 name = "qntx-id"
-version = "0.2.41"
+version = "0.2.42"
 dependencies = [
  "unicode-normalization",
 ]
 
 [[package]]
 name = "qntx-indexeddb"
-version = "0.2.41"
+version = "0.2.42"
 dependencies = [
  "js-sys",
  "qntx-core",
@@ -3889,7 +3889,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-proto"
-version = "0.2.41"
+version = "0.2.42"
 dependencies = [
  "base64 0.22.1",
  "prost",
@@ -3903,7 +3903,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-pty-glyph"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "chrono",
  "clap",
@@ -3947,7 +3947,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-reduce-plugin"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "clap",
  "parking_lot",
@@ -3966,7 +3966,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-sqlite"
-version = "0.2.41"
+version = "0.2.42"
 dependencies = [
  "base64 0.22.1",
  "chrono",

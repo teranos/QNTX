@@ -76,6 +76,7 @@ impl DomainPluginService for ReducePluginService {
             search_provider: false,
             vector_search_provider: false,
             watchers: vec![],
+            ..Default::default()
         }))
     }
 

@@ -3,7 +3,6 @@ package ax
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
 	"go.uber.org/zap"
@@ -134,15 +133,12 @@ func (ae *AxExecutor) ExecuteAsk(ctx context.Context, filter types.AxFilter) (*t
 	return result, nil
 }
 
-// executeAdvancedClassification groups claims, classifies conflicts, applies resolution
-// strategies, and returns deterministically ordered results.
+// executeAdvancedClassification groups claims, classifies conflicts, and returns
+// deterministically ordered results.
 //
-// Resolution strategies are applied in Rust (via WASM) — the classifier returns
-// resolved_source_ids indicating which claims survived. Go only filters and sorts.
-//
-// Ordering contract: results are sorted by confidence desc, then recency desc.
-// Classified conflicts carry their computed confidence; unclassified claims (no conflict)
-// get a neutral 0.5 — present but uncorroborated.
+// All resolution logic (strategy application, sorting) happens in Rust via WASM.
+// Go groups claims, calls the classifier, and reconstructs attestations in the
+// order Rust returned (confidence desc, recency desc, ID asc).
 func (ae *AxExecutor) executeAdvancedClassification(claims []ats.IndividualClaim) ([]types.Conflict, []types.As) {
 	// Group claims by key for classification
 	claimGroups := make(map[string][]ats.IndividualClaim)
@@ -152,41 +148,22 @@ func (ae *AxExecutor) executeAdvancedClassification(claims []ats.IndividualClaim
 		claimGroups[key] = append(claimGroups[key], claim)
 	}
 
-	// Perform smart classification (Rust applies resolution strategies internally)
+	// Perform smart classification (Rust applies resolution strategies and sorts)
 	classificationResult := ae.classifier.ClassifyConflicts(claimGroups)
 
-	// Filter claims to only those that survived resolution
-	resolvedSet := make(map[string]bool, len(classificationResult.ResolvedSourceIDs))
-	for _, id := range classificationResult.ResolvedSourceIDs {
-		resolvedSet[id] = true
+	// Build claim lookup by source ID for ordered reconstruction
+	claimsBySourceID := make(map[string]ats.IndividualClaim, len(claims))
+	for _, claim := range claims {
+		claimsBySourceID[claim.SourceAs.ID] = claim
 	}
 
+	// Reconstruct filtered claims in the order Rust returned (pre-sorted)
 	var filteredClaims []ats.IndividualClaim
-	for _, claim := range claims {
-		if resolvedSet[claim.SourceAs.ID] {
+	for _, id := range classificationResult.ResolvedSourceIDs {
+		if claim, ok := claimsBySourceID[id]; ok {
 			filteredClaims = append(filteredClaims, claim)
 		}
 	}
-
-	// Build confidence lookup from classification results
-	confidenceMap := make(map[string]float64)
-	for _, conflict := range classificationResult.Conflicts {
-		key := conflict.Conflict.Subject + "|" + conflict.Conflict.Predicate + "|" + conflict.Conflict.Context
-		confidenceMap[key] = conflict.Confidence
-	}
-
-	// Sort by confidence desc, then recency desc, then source ID for deterministic ordering
-	sort.Slice(filteredClaims, func(i, j int) bool {
-		ci := claimConfidence(filteredClaims[i], confidenceMap)
-		cj := claimConfidence(filteredClaims[j], confidenceMap)
-		if ci != cj {
-			return ci > cj
-		}
-		if !filteredClaims[i].Timestamp.Equal(filteredClaims[j].Timestamp) {
-			return filteredClaims[i].Timestamp.After(filteredClaims[j].Timestamp)
-		}
-		return filteredClaims[i].SourceAs.ID < filteredClaims[j].SourceAs.ID
-	})
 
 	// Convert AdvancedConflicts back to basic Conflicts
 	var conflicts []types.Conflict
@@ -200,15 +177,7 @@ func (ae *AxExecutor) executeAdvancedClassification(claims []ats.IndividualClaim
 	return conflicts, attestations
 }
 
-// claimConfidence returns the confidence for a claim based on its conflict group.
-// Unclassified claims get 0.5 — present but uncorroborated.
-func claimConfidence(claim ats.IndividualClaim, confidenceMap map[string]float64) float64 {
-	key := claim.Subject + "|" + claim.Predicate + "|" + claim.Context
-	if conf, ok := confidenceMap[key]; ok {
-		return conf
-	}
-	return 0.5
-}
+
 
 // generateSummary generates a basic summary of the results
 func (ae *AxExecutor) generateSummary(attestations []types.As) types.AxSummary {

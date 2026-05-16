@@ -87,7 +87,7 @@ pub fn build_distill_attestation(evicted: &[Attestation], context: &str) -> Atte
         subjects: subjects_set,
         predicates,
         contexts: vec![context.to_string()],
-        actors: vec!["distill".to_string()],
+        actors: vec!["system:distill".to_string()],
         timestamp: now_ms,
         source: "distill".to_string(),
         attributes,
@@ -750,7 +750,7 @@ mod tests {
 
         assert!(distill.id.starts_with("AS-distill-"));
         assert_eq!(distill.source, "distill");
-        assert_eq!(distill.actors, vec!["distill"]);
+        assert_eq!(distill.actors, vec!["system:distill"]);
         assert_eq!(distill.contexts, vec!["ctx1"]);
 
         // Subjects: union of {X, Y} and {X} = {X, Y}
@@ -861,7 +861,7 @@ mod tests {
             subjects: vec!["X".into()],
             predicates: vec!["test".into()],
             contexts: vec!["ctx".into()],
-            actors: vec!["distill".into()],
+            actors: vec!["system:distill".into()],
             timestamp: 1747137000000,
             source: "distill".into(),
             attributes: attrs1,
@@ -874,7 +874,7 @@ mod tests {
             subjects: vec!["X".into()],
             predicates: vec!["test".into()],
             contexts: vec!["ctx".into()],
-            actors: vec!["distill".into()],
+            actors: vec!["system:distill".into()],
             timestamp: 1747138200000,
             source: "distill".into(),
             attributes: attrs2,
@@ -918,7 +918,7 @@ mod tests {
             subjects: vec!["X".into()],
             predicates: vec!["test".into()],
             contexts: vec!["ctx".into()],
-            actors: vec!["distill".into()],
+            actors: vec!["system:distill".into()],
             timestamp: 1747137000000,
             source: "distill".into(),
             attributes: attrs1,
@@ -1011,7 +1011,7 @@ mod tests {
             subjects: vec!["X".into()],
             predicates: vec!["test".into()],
             contexts: vec!["ctx".into()],
-            actors: vec!["distill".into()],
+            actors: vec!["system:distill".into()],
             timestamp: 1747137000000,
             source: "distill".into(),
             attributes: attrs1,

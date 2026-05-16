@@ -85,6 +85,7 @@ impl DomainPluginService for PTYGlyphService {
         Ok(Response::new(InitializeResponse {
             handler_names: vec![],
             schedules: vec![],
+            ..Default::default()
         }))
     }
 

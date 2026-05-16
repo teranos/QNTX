@@ -174,36 +174,6 @@ func TestExecuteAsk_NoLoggerNoPanic(t *testing.T) {
 	require.NoError(t, err, "ExecuteAsk should not fail without logger")
 }
 
-func TestClaimConfidence_ReturnsConflictConfidence(t *testing.T) {
-	confidenceMap := map[string]float64{
-		"ALICE|is_dev|GitHub": 0.85,
-	}
-
-	claim := ats.IndividualClaim{
-		Subject:   "ALICE",
-		Predicate: "is_dev",
-		Context:   "GitHub",
-	}
-
-	got := claimConfidence(claim, confidenceMap)
-	assert.Equal(t, 0.85, got)
-}
-
-func TestClaimConfidence_UnclassifiedGetsNeutralBaseline(t *testing.T) {
-	confidenceMap := map[string]float64{
-		"BOB|is_cto|Acme": 0.9,
-	}
-
-	// Different claim — not in the confidence map
-	claim := ats.IndividualClaim{
-		Subject:   "ALICE",
-		Predicate: "is_dev",
-		Context:   "GitHub",
-	}
-
-	got := claimConfidence(claim, confidenceMap)
-	assert.Equal(t, 0.5, got, "uncorroborated claim should get neutral 0.5")
-}
 
 func TestExecuteAdvancedClassification_DeterministicOrdering(t *testing.T) {
 	queryStore := &mockQueryStore{}

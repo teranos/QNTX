@@ -81,19 +81,22 @@ impl SmartClassifier {
         Self { temporal, config }
     }
 
-    /// Classify all claim groups and return structured results
+    /// Classify all claim groups and return structured results.
+    /// `resolved_source_ids` is returned pre-sorted: confidence desc, recency desc, ID asc.
     pub fn classify(&self, input: &ClassifyInput) -> ClassifyOutput {
         let mut conflicts = Vec::new();
         let mut auto_resolved = 0;
         let mut review_required = 0;
         let mut total_analyzed = 0;
-        let mut resolved_source_ids = Vec::new();
+
+        // Track resolved claims with their sort keys: (source_id, confidence, timestamp_ms)
+        let mut resolved: Vec<(String, f64, i64)> = Vec::new();
 
         for group in &input.claim_groups {
             if group.claims.len() <= 1 {
-                // Single claim — always survives
+                // Single claim — always survives with neutral confidence
                 for claim in &group.claims {
-                    resolved_source_ids.push(claim.source_id.clone());
+                    resolved.push((claim.source_id.clone(), 0.5, claim.timestamp_ms));
                 }
                 continue;
             }
@@ -102,9 +105,18 @@ impl SmartClassifier {
             let conflict = self.classify_group(group, input.now_ms);
 
             // Apply resolution strategy to determine surviving claims
-            let survivors = self.apply_strategy(&conflict.strategy, &group.claims);
-            for id in &survivors {
-                resolved_source_ids.push(id.clone());
+            let survivor_ids = self.apply_strategy(&conflict.strategy, &group.claims);
+
+            // Map survivor IDs to their timestamps, attach conflict confidence
+            let confidence = conflict.confidence;
+            for id in &survivor_ids {
+                let ts = group
+                    .claims
+                    .iter()
+                    .find(|c| &c.source_id == id)
+                    .map(|c| c.timestamp_ms)
+                    .unwrap_or(0);
+                resolved.push((id.clone(), confidence, ts));
             }
 
             if conflict.auto_resolved {
@@ -115,6 +127,16 @@ impl SmartClassifier {
 
             conflicts.push(conflict);
         }
+
+        // Sort: confidence desc, then recency desc, then source ID asc for determinism
+        resolved.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.2.cmp(&a.2))
+                .then_with(|| a.0.cmp(&b.0))
+        });
+
+        let resolved_source_ids = resolved.into_iter().map(|(id, _, _)| id).collect();
 
         ClassifyOutput {
             conflicts,
