@@ -11,6 +11,39 @@ import { createMockUiState } from '../../test/mock-ui-state';
 const { uiState, glyphs: mockCanvasGlyphs, compositions: mockCanvasCompositions } = createMockUiState();
 mock.module('../../state/ui', () => ({ uiState }));
 
+// Mock CodeMirror — we test our code's logic, not CodeMirror's DOM mounting
+class MockEditorView {
+    state: { doc: { toString: () => string } };
+    static updateListener = { of: () => ({}) };
+    static lineWrapping = {};
+    constructor(config: any) {
+        this.state = { doc: { toString: () => config.state?.doc || '' } };
+        if (config.parent) config.parent.textContent = 'editor-mounted';
+    }
+    destroy() {}
+}
+class MockEditorState {
+    doc: string;
+    static create(config: any) { return { doc: config.doc || '' }; }
+    constructor() { this.doc = ''; }
+}
+mock.module('@codemirror/view', () => ({
+    EditorView: MockEditorView,
+    keymap: { of: () => ({}) },
+}));
+mock.module('@codemirror/state', () => ({
+    EditorState: MockEditorState,
+}));
+mock.module('@codemirror/commands', () => ({
+    defaultKeymap: [],
+}));
+mock.module('@codemirror/theme-one-dark', () => ({
+    oneDark: {},
+}));
+mock.module('@codemirror/lang-python', () => ({
+    python: () => ({}),
+}));
+
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 

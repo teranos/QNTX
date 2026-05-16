@@ -70,6 +70,8 @@ export class GlyphProximity {
     }
 
     private setupPointerTracking(): void {
+        if (typeof document === 'undefined') return;
+
         // Desktop: track mouse position globally for proximity effect
         document.addEventListener('mousemove', (e) => {
             this.mouseX = e.clientX;

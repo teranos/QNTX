@@ -25,7 +25,7 @@
 // Import generated symbol constants and mappings from Go source
 import {
     SO,
-    Pulse, Prose, DB,
+    Prose,
     CommandToSymbol,
     CommandDescriptions,
 } from '@generated/sym.js';
@@ -35,26 +35,17 @@ import { tooltip } from './components/tooltip.ts';
 
 // Import all panel/window modules statically
 import { toggleConfig } from './config-panel.js';
-// ai-provider-window.ts removed — LLM provider is now a tray glyph
-// pulse-panel.ts removed — Pulse is now a tray glyph
 import { toggleProsePanel } from './prose/panel.js';
-import { togglePythonEditor } from './python/panel.js';
 import { glyphRun } from '@qntx/glyphs';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
-type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'db';
+type PaletteCommand = keyof typeof CommandToSymbol | 'prose';
 
 /**
  * Get symbol for a command, with fallback for UI-only commands
  */
 function getSymbol(cmd: string): string {
-    if (cmd === 'pulse') return Pulse;
     if (cmd === 'prose') return Prose;
-    if (cmd === 'db') return DB;
-    if (cmd === 'go') return 'Go';
-    if (cmd === 'py') return 'py';
-    if (cmd === 'plugins') return '\u2699'; // Gear symbol
-    if (cmd === 'scraper') return '⛶'; // White draughts king - extraction/capture
     return CommandToSymbol[cmd] || cmd;
 }
 
@@ -152,11 +143,7 @@ function getInitialTooltip(cmd: string): string {
 
     // UI-only commands (not SEG operators)
     const uiTooltips: Record<string, string> = {
-        'pulse': '꩜ Pulse — Async operations',
-        'db': '⊔ Database — Storage layer',
         'prose': '⚇ Prose — Documentation',
-        'py': 'py — Python editor',
-        'plugins': '⚙ Plugins — Domain extensions',
     };
     return uiTooltips[cmd] || cmd;
 }
@@ -241,29 +228,9 @@ function handleSymbolClick(e: Event): void {
             // Therefore - consequent action/trigger
             handleSoCommand(cmd);
             break;
-        case 'pulse':
-            // Pulse - show scheduled jobs panel
-            glyphRun.openGlyph('pulse-glyph');
-            break;
-        case 'db':
-            // Database - show database statistics glyph
-            glyphRun.openGlyph('database-glyph');
-            break;
-        case 'sigma':
-            // Sigma - show sigma overview panel
-            glyphRun.openGlyph('sigma-panel');
-            break;
         case 'prose':
             // Prose - show documentation panel
             showProsePanel();
-            break;
-        case 'py':
-            // Python - show Python code editor/executor
-            showPythonEditor();
-            break;
-        case 'plugins':
-            // Plugins - show installed domain plugins
-            showPluginPanel();
             break;
         default:
             log.warn(SEG.UI, `[Symbol Palette] Unknown command: ${cmd}`);
@@ -301,20 +268,6 @@ function showAIProviderPanel(): void {
  */
 function showProsePanel(): void {
     toggleProsePanel();
-}
-
-/**
- * Show Python editor - displays Python code editor with execution support
- */
-function showPythonEditor(): void {
-    togglePythonEditor();
-}
-
-/**
- * Show plugin panel - displays installed domain plugins and their status
- */
-function showPluginPanel(): void {
-    glyphRun.openGlyph('plugin-glyph');
 }
 
 /**

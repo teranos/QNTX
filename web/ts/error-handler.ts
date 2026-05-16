@@ -45,7 +45,6 @@
  *   - code/suggestions.ts (2 catch blocks)
  *   - prose/editor.ts (3 catch blocks)
  *   - filetree/navigator.ts (3 catch blocks)
- *   - python/panel.ts (5 catch blocks)
  *   - webscraper-panel.ts (1 catch block)
  */
 

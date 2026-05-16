@@ -5,8 +5,6 @@
  * TODO: Migrate all consumers to glyph manifestations, then delete this file.
  * Consumers blocking deletion:
  *   - prose/panel.ts (ProsePanel)
- *   - code/panel.ts (GoEditorPanel)
- *   - python/panel.ts (PythonEditorPanel)
  *   - config-panel.ts (ConfigPanel)
  *   - prose/prompt-preview-panel.ts (PromptPreviewPanel)
  * Also delete: base-panel-error.ts, css/panel-base.css, css/components/base-panel.css
