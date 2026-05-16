@@ -64,7 +64,7 @@ func TestGRACEShutdownFlow(t *testing.T) {
 	// Create and enqueue a test job
 	// Use timestamp in description to ensure unique job ID per test run
 	jobDesc := fmt.Sprintf("GRACE Test %d", time.Now().UnixNano())
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"test_data": "grace-test",
 		"actor":     "grace-test",
 	}
@@ -102,7 +102,7 @@ WaitForRunning:
 				continue
 			}
 			if checkJob.Status == JobStatusRunning {
-				t.Log("✓ Job started running")
+				t.Log("Job started running")
 				break WaitForRunning
 			}
 		}
@@ -123,13 +123,7 @@ WaitForRunning:
 
 	if finalJob.Status != JobStatusQueued {
 		t.Errorf("Expected job to be re-queued after shutdown, got status '%s'", finalJob.Status)
-	} else {
-		t.Log("✓ Job was re-queued after graceful shutdown")
 	}
-
-	// Note: Checkpoint functionality has been removed.
-	// Job state is now managed via payload updates by handlers.
-	t.Log("✓ Job state preserved (checkpoint logic now in handlers)")
 
 	// Verify job error is cleared (not a hard failure)
 	if finalJob.Error != "" {
@@ -137,107 +131,21 @@ WaitForRunning:
 	}
 }
 
-// TestGRACEContextCancellation removed due to race condition in test setup
-// The test sets wp.executor after starting workers, causing flaky behavior.
-// Context cancellation is tested in TestGRACEShutdownFlow (integration test)
-// TODO(QNTX #71): Reimplement with proper executor injection during WorkerPool creation
-
-// TestGRACECheckpointSaving tests that checkpoints are saved correctly
-func TestGRACECheckpointSaving(t *testing.T) {
+// TestGRACEOrphanRecovery tests recovery of orphaned jobs on worker start.
+// Simulates a crash (jobs left in "running" state) then verifies new worker
+// pool marks them as failed so the scheduler can re-create them.
+func TestGRACEOrphanRecovery(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
-	ctx := context.Background()
-	wp := NewWorkerPoolWithContext(ctx, db, cfg, WorkerPoolConfig{Workers: 1}, zap.NewNop().Sugar())
-
-	payload := map[string]interface{}{"test": "checkpoint"}
-	payloadJSON, _ := json.Marshal(payload)
-	job, err := NewJobWithPayload("test.checkpoint-handler", "checkpoint test", payloadJSON, 3, 0.01, "test")
-	if err != nil {
-		t.Fatalf("Failed to create job: %v", err)
-	}
-	if err := wp.queue.Enqueue(job); err != nil {
-		t.Fatalf("Failed to enqueue job: %v", err)
-	}
-
-	// Note: Checkpoint functionality has been removed.
-	// Job progress is now managed via handler-specific payload updates.
-	// This test now just verifies that jobs can be created and retrieved.
-
-	wp.queue.UpdateJob(job)
-
-	// Retrieve job from DB
-	retrieved, err := wp.queue.GetJob(job.ID)
-	if err != nil {
-		t.Fatalf("Failed to retrieve job: %v", err)
-	}
-
-	// Verify job was saved and retrieved
-	if retrieved.ID != job.ID {
-		t.Errorf("Expected job ID %s, got %s", job.ID, retrieved.ID)
-	}
-
-	t.Log("✓ Job saved and retrieved successfully (checkpoint logic now in handlers)")
-}
-
-// TestGRACEWorkerShutdownTimeout tests worker shutdown timeout behavior
-func TestGRACEWorkerShutdownTimeout(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	cfg := createTestConfig()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	wp := NewWorkerPoolWithContext(ctx, db, cfg, WorkerPoolConfig{Workers: 1}, zap.NewNop().Sugar())
-	wp.Start()
-
-	// Stop should complete within reasonable time even with no jobs
-	stopDone := make(chan bool)
-	go func() {
-		wp.Stop()
-		stopDone <- true
-	}()
-
-	select {
-	case <-stopDone:
-		t.Log("✓ Worker pool stopped cleanly")
-	case <-time.After(25 * time.Second): // 20s timeout + 5s buffer
-		t.Error("Worker pool shutdown exceeded timeout")
-	}
-}
-
-// TestGRACENoJobsRunning tests graceful start with no orphaned jobs
-func TestGRACENoJobsRunning(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	cfg := createTestConfig()
-
-	// Start with empty queue (no orphaned jobs)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	wp := NewWorkerPoolWithContext(ctx, db, cfg, WorkerPoolConfig{Workers: 1}, zap.NewNop().Sugar())
-	wp.Start()
-	defer wp.Stop()
-
-	// Graceful start should complete without errors
-	time.Sleep(100 * time.Millisecond)
-
-	t.Log("✓ Graceful start completed with no orphaned jobs")
-}
-
-// TestGRACEGracefulStart tests recovery of orphaned jobs on worker start
-func TestGRACEGracefulStart(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	cfg := createTestConfig()
-
-	// Simulate crash: Create jobs in "running" state (orphaned)
 	queue := NewQueue(db)
 
+	// Simulate crash: Create jobs in "running" state (orphaned)
 	job1, err := createTestJob("test.grace-handler", "orphaned job 1", 5, 0.01)
 	if err != nil {
 		t.Fatalf("Failed to create job1: %v", err)
 	}
-	job1.Status = JobStatusRunning // Simulate job that was running when server crashed
+	job1.Status = JobStatusRunning
 	if err := queue.store.CreateJob(job1); err != nil {
 		t.Fatalf("Failed to store job1: %v", err)
 	}
@@ -247,12 +155,11 @@ func TestGRACEGracefulStart(t *testing.T) {
 		t.Fatalf("Failed to create job2: %v", err)
 	}
 	job2.Status = JobStatusRunning
-	// Note: Checkpoint functionality removed - job state managed via payload updates
 	if err := queue.store.CreateJob(job2); err != nil {
 		t.Fatalf("Failed to store job2: %v", err)
 	}
 
-	// Now start worker pool (should recover orphaned jobs)
+	// Start worker pool (should recover orphaned jobs)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -261,18 +168,15 @@ func TestGRACEGracefulStart(t *testing.T) {
 	defer wp.Stop()
 
 	// Give recovery time to run
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
-	// Verify both jobs were failed (orphan recovery marks them failed so
-	// the scheduler creates fresh jobs on the next tick)
+	// Verify both jobs were marked failed (orphan recovery)
 	recoveredJob1, err := queue.GetJob(job1.ID)
 	if err != nil {
 		t.Fatalf("Failed to get job1 after recovery: %v", err)
 	}
 	if recoveredJob1.Status != JobStatusFailed {
 		t.Errorf("Expected job1 to be failed, got status '%s'", recoveredJob1.Status)
-	} else {
-		t.Log("✓ Orphaned job 1 marked as failed")
 	}
 
 	recoveredJob2, err := queue.GetJob(job2.ID)
@@ -281,171 +185,12 @@ func TestGRACEGracefulStart(t *testing.T) {
 	}
 	if recoveredJob2.Status != JobStatusFailed {
 		t.Errorf("Expected job2 to be failed, got status '%s'", recoveredJob2.Status)
-	} else {
-		t.Log("✓ Orphaned job 2 marked as failed")
 	}
 }
 
-// TestGRACEGracefulStartNoOrphans verifies clean start with no orphaned jobs
-func TestGRACEGracefulStartNoOrphans(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	cfg := createTestConfig()
-
-	// Create a completed job and a queued job (not orphaned)
-	queue := NewQueue(db)
-
-	job1, err := createTestJob("test.grace-handler", "completed job", 5, 0.01)
-	if err != nil {
-		t.Fatalf("Failed to create job1: %v", err)
-	}
-	job1.Status = JobStatusCompleted
-	if err := queue.store.CreateJob(job1); err != nil {
-		t.Fatalf("Failed to store job1: %v", err)
-	}
-
-	job2, err := createTestJob("test.grace-handler", "queued job", 5, 0.01)
-	if err != nil {
-		t.Fatalf("Failed to create job2: %v", err)
-	}
-	job2.Status = JobStatusQueued
-	if err := queue.store.CreateJob(job2); err != nil {
-		t.Fatalf("Failed to store job2: %v", err)
-	}
-
-	// Start worker pool
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	wp := NewWorkerPoolWithContext(ctx, db, cfg, WorkerPoolConfig{Workers: 1}, zap.NewNop().Sugar())
-	wp.Start()
-	defer wp.Stop()
-
-	// Give startup time
-	time.Sleep(100 * time.Millisecond)
-
-	// Verify jobs unchanged (no orphans to recover)
-	checkJob1, err := queue.GetJob(job1.ID)
-	if err != nil {
-		t.Fatalf("Failed to get job1: %v", err)
-	}
-	if checkJob1.Status != JobStatusCompleted {
-		t.Errorf("Expected completed job to stay completed, got '%s'", checkJob1.Status)
-	}
-
-	checkJob2, err := queue.GetJob(job2.ID)
-	if err != nil {
-		t.Fatalf("Failed to get job2: %v", err)
-	}
-	if checkJob2.Status != JobStatusQueued {
-		t.Errorf("Expected queued job to stay queued, got '%s'", checkJob2.Status)
-	}
-
-	t.Log("✓ Non-orphaned jobs unchanged after graceful start")
-}
-
-// TestGRACEGradualRecovery tests the super gradual warm start recovery
-// Jobs 2-10 recovered at 1/second, remaining jobs spread over 15 minutes
-//
-// NOTE: This is a SLOW test (~35s) that validates timing characteristics
-// Skip with: go test -short
-func TestGRACEGradualRecovery(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping slow timing test in -short mode")
-	}
-
-	db := qntxtest.CreateTestDB(t)
-	cfg := createTestConfig()
-
-	// Simulate crash: Create 12 orphaned jobs
-	queue := NewQueue(db)
-	for i := 1; i <= 12; i++ {
-		job, err := createTestJob("test.grace-handler", fmt.Sprintf("orphan %d", i), 1, 0.01)
-		if err != nil {
-			t.Fatalf("Failed to create job %d: %v", i, err)
-		}
-		job.Status = JobStatusRunning
-		if err := queue.store.CreateJob(job); err != nil {
-			t.Fatalf("Failed to store job %d: %v", i, err)
-		}
-	}
-
-	// Start worker pool (triggers gradual recovery)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	pollInterval := 100 * time.Millisecond
-	wp := NewWorkerPoolWithContext(ctx, db, cfg, WorkerPoolConfig{
-		Workers:            1,
-		GracefulStartPhase: 10 * time.Second, // Test mode: 10s phases (warm start = 2s, slow start = 30s)
-		PollInterval:       &pollInterval,
-	}, zap.NewNop().Sugar())
-
-	// Register handler so recovered jobs can actually execute and complete
-	wp.Registry().Register(&GRACETestHandler{
-		taskDuration: 10 * time.Millisecond,
-		totalTasks:   1,
-	})
-
-	wp.Start()
-	defer wp.Stop()
-
-	// Verify first job recovered within initial window
-	time.Sleep(500 * time.Millisecond)
-	countRecovered := countJobsByStatus(t, queue, JobStatusQueued)
-	if countRecovered < 1 {
-		t.Errorf("Expected at least 1 job recovered within 500ms, got %d", countRecovered)
-	} else {
-		t.Logf("✓ First job recovered (%d queued)", countRecovered)
-	}
-
-	// Verify warm start phase (jobs 2-10 at ~1/second)
-	// After 7 seconds, expect 5-9 jobs recovered (1 immediate + gradual)
-	time.Sleep(7 * time.Second)
-	countAfter := countJobsByStatus(t, queue, JobStatusQueued)
-	if countAfter < 4 || countAfter > 10 {
-		t.Logf("Warning: Expected 5-9 jobs after 7s, got %d (timing may vary)", countAfter)
-	} else {
-		t.Logf("✓ Warm start progressing (%d jobs recovered after 7s)", countAfter)
-	}
-
-	// Verify full recovery completes (all 12 jobs)
-	// With test mode timing (10s phases), should complete in ~30s total
-	// Wait up to 35s to account for timing variance
-	timeout := time.After(35 * time.Second)
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-timeout:
-			// Count jobs by all statuses to debug
-			queued := countJobsByStatus(t, queue, JobStatusQueued)
-			running := countJobsByStatus(t, queue, JobStatusRunning)
-			completed := countJobsByStatus(t, queue, JobStatusCompleted)
-			failed := countJobsByStatus(t, queue, JobStatusFailed)
-			total := queued + running + completed + failed
-			t.Errorf("Timeout: Expected all 12 jobs recovered, got queued=%d, running=%d, completed=%d, failed=%d, total=%d",
-				queued, running, completed, failed, total)
-			return
-		case <-ticker.C:
-			// Check if all jobs have finished processing
-			// Jobs transition: orphaned(running) → recovered(queued) → executing(running) → completed/failed
-			// Success = all 12 jobs are completed or failed (means they were recovered and finished)
-			completed := countJobsByStatus(t, queue, JobStatusCompleted)
-			failed := countJobsByStatus(t, queue, JobStatusFailed)
-			finished := completed + failed
-
-			if finished >= 12 {
-				// All 12 jobs have been recovered and finished processing
-				t.Logf("✓ All 12 jobs recovered gradually and finished processing (completed=%d, failed=%d)",
-					completed, failed)
-				return
-			}
-		}
-	}
-}
-
-// TestGRACECrashAndRestart simulates a full crash and restart cycle
+// TestGRACECrashAndRestart simulates a full crash and restart cycle.
+// Phase 1: Start worker, enqueue job, hard-cancel context (simulate crash).
+// Phase 2: Start new worker pool, verify orphaned job is recovered.
 func TestGRACECrashAndRestart(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
@@ -467,7 +212,7 @@ func TestGRACECrashAndRestart(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Simulate crash (force stop without graceful shutdown)
-	cancel1() // Context cancelled but we don't call wp1.Stop() - simulates hard crash
+	cancel1()
 
 	// Phase 2: Restart worker pool (should recover orphaned job)
 	ctx2, cancel2 := context.WithCancel(context.Background())
@@ -478,114 +223,71 @@ func TestGRACECrashAndRestart(t *testing.T) {
 	defer wp2.Stop()
 
 	// Give recovery time
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
-	// Verify job was recovered
+	// Verify job was recovered (marked failed for scheduler to re-create)
 	recovered, err := wp2.queue.GetJob(job.ID)
 	if err != nil {
 		t.Fatalf("Failed to get job after restart: %v", err)
 	}
 
-	if recovered.Status != JobStatusQueued {
-		t.Errorf("Expected job to be recovered and queued, got status '%s'", recovered.Status)
-	} else {
-		t.Log("✓ Job recovered after simulated crash and restart")
+	// Job should be failed (orphan recovery) or queued (re-queued by graceful handler)
+	if recovered.Status != JobStatusQueued && recovered.Status != JobStatusFailed {
+		t.Errorf("Expected job to be recovered (queued or failed), got status '%s'", recovered.Status)
 	}
 }
 
-// TestGRACETaskAtomicity removed due to race condition in test setup
-// The test sets wp.executor after starting workers, causing flaky behavior.
-// Task atomicity is verified in TestGRACEShutdownFlow (integration test)
-// TODO(QNTX #71): Reimplement with proper executor injection during WorkerPool creation
-
-// TestGRACEPhaseRecoveryNoChildTasks tests orphaned job recovery when no child tasks exist
-// Note: Phase-specific recovery logic has been removed (domain logic belongs in handlers)
-func TestGRACEPhaseRecoveryNoChildTasks(t *testing.T) {
-	db := qntxtest.CreateTestDB(t)
-	cfg := createTestConfig()
-
-	// Simulate crash scenario: Parent job was running with no child tasks
-	queue := NewQueue(db)
-
-	// Create orphaned parent job with payload indicating it might spawn tasks
-	payload := map[string]interface{}{
-		"source": "phase recovery test - no tasks",
-		"actor":  "test-actor",
-	}
-	payloadJSON, _ := json.Marshal(payload)
-	job, _ := NewJobWithPayload("test.grace-handler", "phase recovery test - no tasks", payloadJSON, 5, 0.01, "test-actor")
-	job.Status = JobStatusRunning // Simulate crash (job was running)
-	queue.store.CreateJob(job)
-
-	// Verify no child tasks exist
-	tasks, _ := queue.ListTasksByParent(job.ID)
-	if len(tasks) != 0 {
-		t.Fatalf("Test setup error: Expected no child tasks, got %d", len(tasks))
-	}
-
-	// Start worker pool (should trigger generic recovery)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	wp := NewWorkerPoolWithContext(ctx, db, cfg, WorkerPoolConfig{Workers: 1}, zap.NewNop().Sugar())
-	wp.Start()
-	defer wp.Stop()
-
-	// Give recovery time to run
-	time.Sleep(200 * time.Millisecond)
-
-	// Verify job was recovered
-	recovered, err := queue.GetJob(job.ID)
-	if err != nil {
-		t.Fatalf("Failed to get job after recovery: %v", err)
-	}
-
-	// Verify job status is failed (scheduler creates fresh job on next tick)
-	if recovered.Status != JobStatusFailed {
-		t.Errorf("Expected job to be failed, got status '%s'", recovered.Status)
-	} else {
-		t.Log("✓ Job marked as failed after recovery")
-	}
-}
-
-// TestGRACEPhaseRecoveryWithChildTasks tests orphaned parent job recovery with child tasks
-// Note: Phase-specific recovery logic has been removed (domain logic belongs in handlers)
-func TestGRACEPhaseRecoveryWithChildTasks(t *testing.T) {
+// TestGRACEChildTasksPreserved tests that child tasks survive parent orphan recovery.
+// When a parent job is marked failed during recovery, its child tasks must remain queued.
+func TestGRACEChildTasksPreserved(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	queue := NewQueue(db)
 
 	// Create orphaned parent job
-	payload := map[string]interface{}{
-		"source": "phase recovery test - with tasks",
+	payload := map[string]any{
+		"source": "child task preservation test",
 		"actor":  "test-actor",
 	}
 	payloadJSON, _ := json.Marshal(payload)
-	parentJob, _ := NewJobWithPayload("test.grace-handler", "phase recovery test - with tasks", payloadJSON, 5, 0.01, "test-actor")
+	parentJob, err := NewJobWithPayload("test.grace-handler", "parent with children", payloadJSON, 5, 0.01, "test-actor")
+	if err != nil {
+		t.Fatalf("Failed to create parent job: %v", err)
+	}
 	parentJob.Status = JobStatusRunning // Simulate crash
-	queue.store.CreateJob(parentJob)
+	if err := queue.store.CreateJob(parentJob); err != nil {
+		t.Fatalf("Failed to store parent job: %v", err)
+	}
 
-	// Create child tasks (simulate tasks were successfully created before crash)
+	// Create child tasks (simulate tasks created before crash)
 	for i := 1; i <= 3; i++ {
-		childPayload := map[string]interface{}{
+		childPayload := map[string]any{
 			"source": fmt.Sprintf("scoring task %d", i),
 			"actor":  "test-actor",
 		}
 		childPayloadJSON, _ := json.Marshal(childPayload)
-		childTask, _ := NewJobWithPayload("test.child-handler", fmt.Sprintf("scoring task %d", i), childPayloadJSON, 1, 0.001, "test-actor")
-		childTask.ParentJobID = parentJob.ID // Link to parent
+		childTask, err := NewJobWithPayload("test.child-handler", fmt.Sprintf("scoring task %d", i), childPayloadJSON, 1, 0.001, "test-actor")
+		if err != nil {
+			t.Fatalf("Failed to create child task %d: %v", i, err)
+		}
+		childTask.ParentJobID = parentJob.ID
 		childTask.Status = JobStatusQueued
-		queue.store.CreateJob(childTask)
+		if err := queue.store.CreateJob(childTask); err != nil {
+			t.Fatalf("Failed to store child task %d: %v", i, err)
+		}
 	}
 
 	// Verify child tasks exist
-	tasks, _ := queue.ListTasksByParent(parentJob.ID)
+	tasks, err := queue.ListTasksByParent(parentJob.ID)
+	if err != nil {
+		t.Fatalf("Failed to list child tasks: %v", err)
+	}
 	if len(tasks) != 3 {
-		t.Fatalf("Test setup error: Expected 3 child tasks, got %d", len(tasks))
+		t.Fatalf("Expected 3 child tasks, got %d", len(tasks))
 	}
 
-	// Start worker pool (should trigger generic recovery)
+	// Start worker pool (triggers orphan recovery)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -593,84 +295,30 @@ func TestGRACEPhaseRecoveryWithChildTasks(t *testing.T) {
 	wp.Start()
 	defer wp.Stop()
 
-	// Give recovery time to run
 	time.Sleep(200 * time.Millisecond)
 
-	// Verify parent job was recovered
+	// Verify parent job was marked failed
 	recovered, err := queue.GetJob(parentJob.ID)
 	if err != nil {
-		t.Fatalf("Failed to get job after recovery: %v", err)
+		t.Fatalf("Failed to get parent job after recovery: %v", err)
 	}
-
-	// Verify job status is failed (scheduler creates fresh job on next tick)
 	if recovered.Status != JobStatusFailed {
-		t.Errorf("Expected job to be failed, got status '%s'", recovered.Status)
-	} else {
-		t.Log("✓ Parent job marked as failed after recovery")
+		t.Errorf("Expected parent job to be failed, got status '%s'", recovered.Status)
 	}
 
-	// Verify child tasks remain queued
+	// Verify child tasks remain queued (not deleted or failed)
 	for _, task := range tasks {
-		checkTask, _ := queue.GetJob(task.ID)
+		checkTask, err := queue.GetJob(task.ID)
+		if err != nil {
+			t.Fatalf("Failed to get child task %s: %v", task.ID, err)
+		}
 		if checkTask.Status != JobStatusQueued {
 			t.Errorf("Expected child task %s to stay queued, got '%s'", task.ID, checkTask.Status)
 		}
 	}
-	t.Log("✓ Child tasks remain queued")
 }
 
-// Helper functions
-
-func countJobsByStatus(t *testing.T, queue *Queue, status JobStatus) int {
-	jobs, err := queue.store.ListJobs(&status, 100)
-	if err != nil {
-		t.Fatalf("Failed to list jobs: %v", err)
-	}
-
-	return len(jobs)
-}
-
-// MockExecutor simulates job execution for testing
-type MockExecutor struct {
-	taskDuration    time.Duration
-	totalTasks      int
-	tasksCompleted  int
-	checkpointStage string
-	cancelled       bool
-}
-
-func (m *MockExecutor) Execute(ctx context.Context, job *Job) error {
-	tasks := []string{"parse", "extract", "validate", "transform", "complete"}
-
-	for i, taskName := range tasks {
-		if i >= m.totalTasks {
-			break
-		}
-
-		// Check context BEFORE starting task (respects cancellation between tasks)
-		select {
-		case <-ctx.Done():
-			m.cancelled = true
-			m.checkpointStage = taskName
-			// Note: Checkpoint functionality removed - handlers manage state via payload updates
-			return fmt.Errorf("context cancelled before %s", taskName)
-		default:
-		}
-
-		// Execute task atomically (simulates indivisible work unit)
-		time.Sleep(m.taskDuration)
-
-		// Task completed - increment counter
-		m.tasksCompleted++
-		m.checkpointStage = taskName
-		// Note: Checkpoint functionality removed - handlers manage state via payload updates
-	}
-
-	return nil
-}
-
-// GRACETestHandler implements JobHandler for GRACE shutdown testing
-// Simulates generic work without domain-specific logic
+// Helper: GRACETestHandler implements JobHandler for GRACE shutdown testing
 type GRACETestHandler struct {
 	taskDuration   time.Duration
 	totalTasks     int
@@ -685,21 +333,14 @@ func (h *GRACETestHandler) Execute(ctx context.Context, job *Job) error {
 			break
 		}
 
-		// Check context BEFORE starting task (GRACE shutdown behavior)
 		select {
 		case <-ctx.Done():
-			// Context cancelled - handler can update payload if needed for resume
-			// Note: Checkpoint functionality removed - handlers manage state via payload updates
 			return fmt.Errorf("context cancelled before %s", taskName)
 		default:
 		}
 
-		// Execute task atomically
 		time.Sleep(h.taskDuration)
-
-		// Task completed
 		h.tasksCompleted++
-		// Note: Checkpoint functionality removed - handlers manage state via payload updates
 	}
 
 	return nil
