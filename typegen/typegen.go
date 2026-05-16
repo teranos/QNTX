@@ -47,7 +47,6 @@ var ExcludedTypes = map[string]bool{
 	"Client":              true, // WebSocket client
 	"ConsoleBuffer":       true, // Internal buffer
 	"StorageEventsPoller": true, // Internal poller
-	"GraphViewState":      true, // Internal state
 	"QNTXServer":          true, // Internal server
 }
 
