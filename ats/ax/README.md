@@ -11,54 +11,10 @@ This package implements:
 - **Alias resolution** for identity equivalence
 - **Advanced classification** with temporal logic
 
-## Commands
-
-### `qntx ax` - Query Attestations
-
-Query the knowledge graph with natural language:
-
-```bash
-# Basic queries
-qntx ax ENTITY-123                   # What do we know about ENTITY-123?
-qntx ax is member of ACME            # Who are ACME members?
-qntx ax has certification            # Find entities with certifications
-qntx ax by registry since yesterday  # Recent registry attestations
-
-# Temporal comparison queries (over)
-qntx ax over 5y                      # Find entities with duration over 5 years
-qntx ax has certification over 3y    # Certifications held over 3 years
-qntx ax is participant over 2y       # Participation duration over 2 years
-qntx ax over 6m                      # Over 6 months duration (m = months, y = years)
-
-# Output options
-qntx ax ENTITY-456                   # Clean mode (default): just attestations
-qntx ax ENTITY-456 --verbose         # Verbose mode: sameness analysis + summary
-qntx ax ENTITY-456 --format=json     # JSON output for scripts
-qntx ax ENTITY-456 --limit=50        # Limit results
-
-# Display modes
-qntx ax ENTITY-789                   # Clean table (no ASID, no sameness analysis)
-qntx ax ENTITY-789 --verbose         # Full table with sameness analysis and statistics
-qntx ax ENTITY-789 --summary         # Summary statistics only
-```
-
-### Alias Resolution
-
-Aliases work automatically in ax queries:
-
-```bash
-# Aliases are resolved transparently
-qntx ax ENTITY-A                     # Finds data for both ENTITY-A and ALT-ID-123
-qntx ax J271Z                        # Returns data for both primary and alternative IDs
-qntx ax 'FULL-NAME'                  # Also finds data for abbreviated forms
-```
-
-## Architecture
-
-### Data Models
+## Data Models
 
 ```go
-// AxFilter - Query specification for ax commands
+// AxFilter - Query specification
 type AxFilter struct {
     Subjects       []string     // Entities to query
     Predicates     []string     // What to match (literal)
