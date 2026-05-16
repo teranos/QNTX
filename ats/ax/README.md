@@ -13,7 +13,7 @@ This package implements:
 
 ## Commands
 
-### `qntx ax` - Query Attestations ⋈
+### `qntx ax` - Query Attestations
 
 Query the knowledge graph with natural language:
 
@@ -85,8 +85,6 @@ type AxResult struct {
     Summary      AxSummary     // Statistical summary
     Format       string        // Display format
 }
-
-// Uses ats.IndividualClaim for expanded claim analysis
 ```
 
 ## Features
@@ -108,95 +106,3 @@ type AxResult struct {
 - **Supersession detection** (authority overrides)
 - **Resolution strategies** that filter duplicate results
 - **Actor credibility hierarchy** (Human > LLM > System > External)
-
-### 🚧 Planned
-
-**Future Enhancements:**
-
-- **Graph fragment export** for web UI visualization
-- **Advanced temporal queries** with complex range expressions
-- **Relationship inference** and graph traversal
-- **Performance optimization** for large datasets
-- **Enhanced sameness analysis** with machine learning
-
-## Usage Examples
-
-### Query Execution
-
-```go
-import (
-    "github.com/teranos/QNTX/ats/ax"
-    "github.com/teranos/QNTX/ats/parser"
-)
-
-// Parse natural language into structured query
-filter, err := parser.ParseAxCommand([]string{"has", "certification", "of", "TYPE_A", "since", "yesterday"})
-if err != nil {
-    return err
-}
-
-// Execute query with advanced classification
-executor := ax.NewAdvancedAxExecutor(db)
-result, err := executor.ExecuteAx(*filter)
-if err != nil {
-    return err
-}
-
-fmt.Printf("Found %d attestations with %d sameness issues\n",
-    len(result.Attestations), len(result.Conflicts))
-```
-
-### Using Alias Resolution
-
-```go
-// Alias resolution happens automatically in queries
-executor := ax.NewAdvancedAxExecutor(db)
-
-// This query will automatically find aliases
-filter := &models.AxFilter{
-    Subjects: []string{"ENTITY-123"},
-    Limit:    100,
-}
-
-result, err := executor.ExecuteAx(*filter)
-// Will find attestations for both primary ID and alternative IDs if aliased
-```
-
-## Development Status
-
-- **Performance Optimization**: 🚧 Future - Response time targets and benchmarking
-- **Graph Visualization**: 🚧 Future - export capabilities
-
-## Testing
-
-```bash
-# Run all ax package tests
-go test ./ats/ax/...
-
-# Run parser tests specifically
-go test ./ats/ax/parser/...
-
-# Run with verbose output
-go test ./ats/ax/... -v
-
-# Run specific test suites
-go test ./ats/ax/classification/... -v
-go test ./ats/ax/alias/... -v
-```
-
-## Contributing
-
-When adding new features:
-
-1. Follow the existing query execution patterns in `executor.go`
-2. Add comprehensive tests with table-driven structure
-3. Use temporal mocking for deterministic time-based tests
-4. Consider sameness analysis implications for new query types
-5. Update this README with new functionality
-6. Test alias resolution with new query patterns
-
-**Package Relationship:**
-
-- `internal/ax` - Query execution and analysis (this package)
-- `internal/ats` - Attestation Type System (creation and storage)
-- Commands use both packages: `ax` command uses this package and imports parsers from `internal/ats`, `as` command uses `internal/ats`
