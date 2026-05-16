@@ -22,9 +22,6 @@ func TestServerInitialization(t *testing.T) {
 	if server.db == nil {
 		t.Error("Database not initialized")
 	}
-	if server.builder == nil {
-		t.Error("Graph builder not initialized")
-	}
 	if server.usageTracker == nil {
 		t.Error("Usage tracker not initialized")
 	}

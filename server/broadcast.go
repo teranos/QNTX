@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/errors"
-	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -26,9 +25,8 @@ import (
 // broadcastRequest represents a request to broadcast data to clients.
 // All broadcasts go through a dedicated worker goroutine to prevent race conditions.
 type broadcastRequest struct {
-	reqType string        // "message", "graph", "close", "watcher_match"
+	reqType string        // "message", "close", "watcher_match"
 	msg     interface{}   // Generic message (for reqType="message")
-	graph   *graph.Graph  // Graph data (for reqType="graph")
 	payload interface{}   // Generic payload (for reqType="watcher_match")
 	clientID string        // Target client ID. Empty string means "broadcast to all clients"
 	// (semantically: no specific target = all targets).
@@ -826,8 +824,6 @@ func (s *QNTXServer) processBroadcastRequest(req *broadcastRequest) {
 	switch req.reqType {
 	case "message":
 		s.sendMessageToClients(req.msg, req.clientID)
-	case "graph":
-		s.sendGraphToClients(req.graph)
 	case "close":
 		s.closeClientChannels(req.client)
 	case "watcher_match":
@@ -871,38 +867,6 @@ func (s *QNTXServer) sendMessageToClients(msg interface{}, targetClientID string
 			s.logger.Debugw("Message dropped for slow client (channel full)",
 				"client_id", client.id)
 		}
-	}
-}
-
-// sendGraphToClients sends a graph to all clients.
-// Only called from broadcast worker - no concurrent access to client channels.
-func (s *QNTXServer) sendGraphToClients(g *graph.Graph) {
-	s.mu.RLock()
-	clients := make([]*Client, 0, len(s.clients))
-	for client := range s.clients {
-		clients = append(clients, client)
-	}
-	s.mu.RUnlock()
-
-	dropped := 0
-	for _, client := range clients {
-		select {
-		case client.send <- g:
-			// Success
-		default:
-			// Channel full - remove slow client
-			dropped++
-			s.broadcastDrops.Add(1)
-			s.removeSlowClient(client)
-		}
-	}
-
-	if dropped > 0 {
-		s.logger.Warnw("Graph broadcast had drops",
-			"clients", len(clients),
-			"dropped", dropped,
-			"total_drops", s.broadcastDrops.Load(),
-		)
 	}
 }
 

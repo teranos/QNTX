@@ -19,8 +19,6 @@ import (
 	"time"
 
 	appcfg "github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/graph"
-	grapherr "github.com/teranos/QNTX/graph/error"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/plugin"
@@ -34,28 +32,15 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	upgrader := getAxUpgrader()
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		graphErr := grapherr.New(
-			grapherr.CategoryWebSocket,
-			err,
-			"Failed to upgrade WebSocket connection",
-		).WithSubcategory(grapherr.SubcategoryWSUpgrade)
-
-		s.logger.Errorw("WebSocket upgrade failed",
-			graphErr.ToLogFields()...,
-		)
+		s.logger.Errorw("WebSocket upgrade failed", "error", err, "remote_addr", r.RemoteAddr)
 		return
 	}
 
 	client := &Client{
 		server:  s,
 		conn:    conn,
-		send:    make(chan *graph.Graph, 256),
 		sendMsg: make(chan interface{}, 256),
 		id:      fmt.Sprintf("%s_%d", r.RemoteAddr, time.Now().UnixNano()),
-		graphView: &GraphViewState{ // Phase 2: Initialize graph visibility state
-			hiddenNodeTypes:   make(map[string]bool), // Empty = show all types initially
-			hideIsolatedNodes: false,                 // Show isolated nodes by default
-		},
 	}
 
 	// Send version info BEFORE starting writePump (avoid concurrent writes)
@@ -72,21 +57,6 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			"client_id", client.id,
 			"error", err,
 		)
-	}
-
-	// Send initial query if configured
-	if s.initialQuery != "" {
-		initialMsg := map[string]interface{}{
-			"type":  "query",
-			"query": s.initialQuery,
-		}
-		if err := conn.WriteJSON(initialMsg); err != nil {
-			s.logger.Debugw("Failed to send initial query",
-				"client_id", client.id,
-				"query", s.initialQuery,
-				"error", err,
-			)
-		}
 	}
 
 	s.register <- client

@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/graph"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
@@ -35,7 +34,6 @@ func TestRace_BroadcastDuringUnregister(t *testing.T) {
 		for i := 0; i < numClients; i++ {
 			client := &Client{
 				server:  srv,
-				send:    make(chan *graph.Graph, 256),
 				sendMsg: make(chan interface{}, 256),
 				id:      t.Name() + "_client_" + string(rune('A'+i)),
 			}
@@ -108,7 +106,6 @@ func TestRace_ConcurrentBroadcastAndChannelClose(t *testing.T) {
 		// Create a client
 		client := &Client{
 			server:  srv,
-			send:    make(chan *graph.Graph, 1), // Small buffer to increase contention
 			sendMsg: make(chan interface{}, 1),
 			id:      t.Name() + "_iteration_" + string(rune('A'+(iteration%26))),
 		}
@@ -163,7 +160,6 @@ func TestRace_UsageBroadcastDuringClientDisconnect(t *testing.T) {
 		for i := 0; i < numClients; i++ {
 			client := &Client{
 				server:  srv,
-				send:    make(chan *graph.Graph, 256),
 				sendMsg: make(chan interface{}, 256),
 				id:      t.Name() + "_client_" + string(rune('A'+i)),
 			}
@@ -198,65 +194,6 @@ func TestRace_UsageBroadcastDuringClientDisconnect(t *testing.T) {
 	}
 }
 
-// TestRace_GraphBroadcastToDisconnectingClients tests the graph broadcast
-// path which uses client.send channel
-func TestRace_GraphBroadcastToDisconnectingClients(t *testing.T) {
-	store, db := qntxtest.CreateTestStore(t)
-
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
-	if err != nil {
-		t.Fatalf("Failed to create QNTXServer: %v", err)
-	}
-
-	go srv.Run()
-
-	for iteration := 0; iteration < 30; iteration++ {
-		// Create clients with small buffers to increase contention
-		numClients := 30
-		clients := make([]*Client, numClients)
-		for i := 0; i < numClients; i++ {
-			client := &Client{
-				server:  srv,
-				send:    make(chan *graph.Graph, 2), // Small buffer
-				sendMsg: make(chan interface{}, 2),
-				id:      t.Name() + "_c_" + string(rune('A'+i)),
-			}
-			clients[i] = client
-			srv.register <- client
-		}
-		time.Sleep(10 * time.Millisecond)
-
-		var wg sync.WaitGroup
-
-		// Goroutine 1: Broadcast graphs via the broadcast channel
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for i := 0; i < 20; i++ {
-				g := &graph.Graph{
-					Nodes: []graph.Node{{ID: "node1", Label: "Test"}},
-					Links: []graph.Link{},
-					Meta:  graph.Meta{},
-				}
-				srv.broadcast <- g
-				time.Sleep(100 * time.Microsecond)
-			}
-		}()
-
-		// Goroutine 2: Unregister clients rapidly
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for _, client := range clients {
-				srv.unregister <- client
-			}
-		}()
-
-		wg.Wait()
-		time.Sleep(5 * time.Millisecond)
-	}
-}
-
 // TestRace_MultipleWritersToClientChannels tests the scenario where
 // multiple goroutines try to send to client channels while
 // the client might be getting unregistered.
@@ -272,7 +209,6 @@ func TestRace_MultipleWritersToClientChannels(t *testing.T) {
 
 	client := &Client{
 		server:  srv,
-		send:    make(chan *graph.Graph, 10),
 		sendMsg: make(chan interface{}, 10),
 		id:      "multi_writer_test",
 	}

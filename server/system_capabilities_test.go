@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/graph"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/server/syscap"
 )
@@ -24,8 +23,6 @@ func TestSendSystemCapabilities(t *testing.T) {
 	// Create a mock client
 	client := &Client{
 		server:  srv,
-		send:    make(chan *graph.Graph, 256),
-
 		sendMsg: make(chan interface{}, 256),
 		id:      "test_client_capabilities",
 	}
@@ -73,8 +70,6 @@ func TestSendSystemCapabilities_ClosedClient(t *testing.T) {
 	// Create a client with closed channel
 	client := &Client{
 		server:  srv,
-		send:    make(chan *graph.Graph, 256),
-
 		sendMsg: make(chan interface{}),
 		id:      "test_client_closed",
 	}
@@ -104,8 +99,6 @@ func TestSendSystemCapabilities_FullChannel(t *testing.T) {
 	// Create a client with unbuffered channel (will fill immediately)
 	client := &Client{
 		server:  srv,
-		send:    make(chan *graph.Graph, 256),
-
 		sendMsg: make(chan interface{}), // unbuffered
 		id:      "test_client_full",
 	}

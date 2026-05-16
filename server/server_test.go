@@ -13,7 +13,6 @@ import (
 	"github.com/gorilla/websocket"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/QNTX/graph"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
@@ -44,10 +43,6 @@ func TestNewQNTXServer(t *testing.T) {
 		t.Errorf("Server verbosity = %d, want 1", int(srv.verbosity.Load()))
 	}
 
-	if srv.builder == nil {
-		t.Error("Server builder not initialized")
-	}
-
 	if srv.clients == nil {
 		t.Error("Server clients map not initialized")
 	}
@@ -70,8 +65,6 @@ func TestServerHubRegistration(t *testing.T) {
 	// Create a mock client
 	client := &Client{
 		server:  srv,
-		send:    make(chan *graph.Graph, 256),
-
 		sendMsg: make(chan interface{}, 256),
 		id:      "test_client_1",
 	}
@@ -114,8 +107,6 @@ func TestServerHubUnregistration(t *testing.T) {
 	// Create and register a client
 	client := &Client{
 		server:  srv,
-		send:    make(chan *graph.Graph, 256),
-
 		sendMsg: make(chan interface{}, 256),
 		id:      "test_client_unreg",
 	}
@@ -150,15 +141,6 @@ func TestServerHubUnregistration(t *testing.T) {
 		t.Errorf("Server should have 0 clients, got %d", count)
 	}
 
-	// Verify channels were closed (reading from closed channel returns zero value immediately)
-	select {
-	case _, ok := <-client.send:
-		if ok {
-			t.Error("Client send channel should be closed")
-		}
-	case <-time.After(10 * time.Millisecond):
-		t.Error("Client send channel was not closed")
-	}
 }
 
 // Test concurrent client registration
@@ -184,8 +166,7 @@ func TestServerConcurrentRegistration(t *testing.T) {
 			defer wg.Done()
 			client := &Client{
 				server:  srv,
-				send:    make(chan *graph.Graph, 256),
-		
+				sendMsg: make(chan interface{}, 256),
 				id:      fmt.Sprintf("client_%d", id),
 			}
 			srv.register <- client
@@ -483,141 +464,6 @@ func getKeys(m map[string]interface{}) []string {
 	return keys
 }
 
-// Test broadcast to multiple clients
-func TestBroadcastToMultipleClients(t *testing.T) {
-	store, db := createTestStore(t)
-	defer db.Close()
-
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
-	if err != nil {
-		t.Fatalf("Failed to create QNTXServer: %v", err)
-	}
-
-	// Start hub
-	go srv.Run()
-
-	// Create and register multiple clients
-	numClients := 3
-	clients := make([]*Client, numClients)
-	for i := 0; i < numClients; i++ {
-		client := &Client{
-			server:  srv,
-			send:    make(chan *graph.Graph, 256),
-	
-			sendMsg: make(chan interface{}, 256),
-			id:      fmt.Sprintf("test_client_%d", i),
-		}
-		clients[i] = client
-		srv.register <- client
-	}
-
-	// Wait for registration
-	time.Sleep(50 * time.Millisecond)
-
-	// Create test graph
-	testGraph := &graph.Graph{
-		Nodes: []graph.Node{{ID: "test1", Label: "Test Node"}},
-		Links: []graph.Link{},
-		Meta:  graph.Meta{},
-	}
-
-	// Broadcast graph
-	srv.broadcast <- testGraph
-
-	// Verify all clients received the graph
-	time.Sleep(50 * time.Millisecond)
-	for i, client := range clients {
-		select {
-		case receivedGraph := <-client.send:
-			if len(receivedGraph.Nodes) != 1 || receivedGraph.Nodes[0].ID != "test1" {
-				t.Errorf("Client %d received incorrect graph", i)
-			}
-		case <-time.After(100 * time.Millisecond):
-			t.Errorf("Client %d did not receive broadcast", i)
-		}
-	}
-}
-
-// Test slow client removal during broadcast
-func TestSlowClientRemoval(t *testing.T) {
-	store, db := createTestStore(t)
-	defer db.Close()
-
-	srv, err := NewQNTXServer(db, store, ":memory:", 0)
-	if err != nil {
-		t.Fatalf("Failed to create QNTXServer: %v", err)
-	}
-
-	// Start hub
-	go srv.Run()
-
-	// Create a slow client with tiny buffer
-	slowClient := &Client{
-		server:  srv,
-		send:    make(chan *graph.Graph, 1), // Small buffer
-		sendMsg: make(chan interface{}, 1),
-		id:      "slow_client",
-	}
-	srv.register <- slowClient
-	time.Sleep(10 * time.Millisecond)
-
-	// Create a normal client
-	fastClient := &Client{
-		server:  srv,
-		send:    make(chan *graph.Graph, 256),
-
-		sendMsg: make(chan interface{}, 256),
-		id:      "fast_client",
-	}
-	srv.register <- fastClient
-	time.Sleep(10 * time.Millisecond)
-
-	// Verify both clients registered
-	srv.mu.RLock()
-	clientCount := len(srv.clients)
-	srv.mu.RUnlock()
-	if clientCount != 2 {
-		t.Fatalf("Expected 2 clients, got %d", clientCount)
-	}
-
-	// Send multiple graphs to overflow slow client's buffer
-	for i := 0; i < 10; i++ {
-		testGraph := &graph.Graph{
-			Nodes: []graph.Node{{ID: fmt.Sprintf("node%d", i), Label: "Test"}},
-			Links: []graph.Link{},
-			Meta:  graph.Meta{},
-		}
-		srv.broadcast <- testGraph
-		time.Sleep(5 * time.Millisecond)
-	}
-
-	// Give time for slow client removal
-	time.Sleep(100 * time.Millisecond)
-
-	// Verify slow client was removed but fast client remains
-	srv.mu.RLock()
-	clientCount = len(srv.clients)
-	_, slowExists := srv.clients[slowClient]
-	_, fastExists := srv.clients[fastClient]
-	srv.mu.RUnlock()
-
-	if slowExists {
-		t.Error("Slow client should have been removed")
-	}
-	if !fastExists {
-		t.Error("Fast client should still be connected")
-	}
-	if clientCount != 1 {
-		t.Errorf("Expected 1 client after slow client removal, got %d", clientCount)
-	}
-
-	// Verify broadcastDrops counter was incremented
-	drops := srv.broadcastDrops.Load()
-	if drops == 0 {
-		t.Error("Broadcast drops counter should be > 0")
-	}
-}
-
 // Test broadcast message helper
 func TestBroadcastMessage(t *testing.T) {
 	store, db := createTestStore(t)
@@ -634,15 +480,11 @@ func TestBroadcastMessage(t *testing.T) {
 	// Create clients
 	client1 := &Client{
 		server:  srv,
-		send:    make(chan *graph.Graph, 256),
-
 		sendMsg: make(chan interface{}, 256),
 		id:      "client1",
 	}
 	client2 := &Client{
 		server:  srv,
-		send:    make(chan *graph.Graph, 256),
-
 		sendMsg: make(chan interface{}, 256),
 		id:      "client2",
 	}
