@@ -11,7 +11,7 @@ import (
 // handleGetTaskLogsForJob returns logs for a specific task within a job context.
 // task_id may be NULL in database (for stage-level logs), so the store also checks the stage column.
 func (s *QNTXServer) handleGetTaskLogsForJob(w http.ResponseWriter, r *http.Request, jobID string, taskID string) {
-	store := schedule.NewTaskLogStore(s.db)
+	store := schedule.NewTaskLogStore(s.pulseReadDB)
 
 	logs, err := store.ListLogsForTask(jobID, taskID)
 	if err != nil {
@@ -19,6 +19,9 @@ func (s *QNTXServer) handleGetTaskLogsForJob(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	if logs == nil {
+		logs = []schedule.LogEntry{}
+	}
 	writeJSON(w, http.StatusOK, TaskLogsResponse{
 		TaskID: taskID,
 		Logs:   logs,

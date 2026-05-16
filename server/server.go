@@ -100,6 +100,7 @@ type QNTXServer struct {
 	embeddingStats              schedule.EmbeddingStats // drained by ticker for periodic summary
 	groundDBPath                string
 	watcherDB                   *sql.DB                // Separate DB connection for watcher engine (avoids RustStore contention)
+	pulseReadDB                 *sql.DB                // Dedicated read connection for pulse API (no _txlock=immediate, no write lock contention)
 	walCheckpointer             WALCheckpointer        // Rust-side WAL checkpoint (closes read conns, checkpoints, reopens)
 	ageDistiller                AgeDistiller           // Rust-side age distillation (fold old attestations into sigmas)
 	writeLockInspector          WriteLockInspector     // Rust-side write lock holder tracking

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/teranos/QNTX/pulse/schedule"
 )
@@ -52,12 +53,22 @@ func (s *QNTXServer) HandleJobExecutions(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Get executions from store
+	t0 := time.Now()
 	execStore := s.newExecutionStore()
 	executions, total, err := execStore.ListExecutions(jobID, limit, offset, statusFilter)
+	queryDur := time.Since(t0)
+
 	if err != nil {
 		writeWrappedError(w, s.logger, err, fmt.Sprintf("failed to list executions for job %s", jobID), http.StatusInternalServerError)
 		return
 	}
+
+	s.logger.Infow("HandleJobExecutions timing",
+		"job_id", jobID,
+		"query_ms", queryDur.Milliseconds(),
+		"rows", len(executions),
+		"total", total,
+	)
 
 	// Convert to response format (flatten pointer slice)
 	execResponses := make([]schedule.Execution, 0, len(executions))
@@ -148,8 +159,7 @@ func parseIntQueryParam(r *http.Request, name string, defaultValue, min, max int
 
 // Note: writeJSON and writeError functions removed - use writeJSON/writeError from response.go
 
-// newExecutionStore creates a new execution store instance
+// newExecutionStore creates a new execution store instance using the dedicated pulse read connection.
 func (s *QNTXServer) newExecutionStore() *schedule.ExecutionStore {
-	// TODO: Consider caching the store instance on QNTXServer
-	return schedule.NewExecutionStore(s.db)
+	return schedule.NewExecutionStore(s.pulseReadDB)
 }

@@ -194,6 +194,16 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	server.verbosity.Store(int32(verbosity))
 	server.state.Store(int32(ServerStateRunning)) // Opening/Closing Phase 4: Initialize to running
 
+	// Dedicated read connection for pulse API reads — same pattern as watcherDB.
+	// Goes through rustsqlite so Rust stays sole DB owner.
+	if pulseReadDB, openErr := sql.Open("rustsqlite", dbPath); openErr != nil {
+		serverLogger.Warnw("Failed to open pulse read DB, falling back to main DB", "error", openErr)
+		server.pulseReadDB = db
+	} else {
+		pulseReadDB.SetMaxOpenConns(4)
+		server.pulseReadDB = pulseReadDB
+	}
+
 	// Set as global default server for async plugin initialization
 	SetDefaultServer(server)
 

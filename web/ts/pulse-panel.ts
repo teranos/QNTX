@@ -25,10 +25,12 @@ import {
     handleJobAction,
     handleLoadMore,
     handleRetryExecutions,
-    handleViewDetailed,
     handleProseLocationClick,
     toggleJobExpansion,
     loadExecutionsForJob,
+    handleToggleExecution,
+    handleToggleChild,
+    handleAutoLoadTaskLogs,
     type JobActionContext,
 } from './pulse/job-actions';
 import { hydrateButtons, registerButton, type HydrateConfig } from './components/button';
@@ -61,7 +63,7 @@ function getActionContext(): JobActionContext {
     return {
         get jobs() { return jobs; },
         get state() { return state; },
-        render: () => render(),
+        render: () => { renderSchedules(); refreshTooltips(); return Promise.resolve(); },
         loadJobs: () => loadJobs(),
     };
 }
@@ -287,8 +289,10 @@ export function createPulseGlyph(): Glyph {
                 onToggleExpansion: (jobId) => toggleJobExpansion(jobId, ctx),
                 onLoadMore: (jobId) => handleLoadMore(jobId, ctx),
                 onRetryExecutions: (jobId) => handleRetryExecutions(jobId, ctx),
-                onViewDetailed: (jobId) => handleViewDetailed(jobId, ctx),
-                onProseLocation: (docId) => handleProseLocationClick(docId)
+                onProseLocation: (docId) => handleProseLocationClick(docId),
+                onToggleExecution: (executionId, asyncJobId) => handleToggleExecution(executionId, asyncJobId, ctx),
+                onToggleChild: (childId) => handleToggleChild(childId, ctx),
+                onAutoLoadTaskLogs: (jobId, taskId) => handleAutoLoadTaskLogs(jobId, taskId, ctx),
             });
 
             // Subscribe to real-time execution events

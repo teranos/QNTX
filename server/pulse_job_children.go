@@ -15,7 +15,7 @@ import (
 func (s *QNTXServer) handleGetJobChildren(w http.ResponseWriter, r *http.Request, scheduledJobID string) {
 	// The incoming ID is a scheduled job ID (SP...), but child tasks are linked to async job IDs (JB...).
 	// We need to find the most recent execution's async_job_id for this scheduled job.
-	execStore := schedule.NewExecutionStore(s.db)
+	execStore := schedule.NewExecutionStore(s.pulseReadDB)
 
 	asyncJobID, err := execStore.GetAsyncJobIDForScheduledJob(scheduledJobID)
 	if err != nil {
@@ -36,7 +36,7 @@ func (s *QNTXServer) handleGetJobChildren(w http.ResponseWriter, r *http.Request
 	}
 
 	// Fetch child jobs using the async job ID
-	queue := async.NewQueue(s.db)
+	queue := async.NewQueue(s.pulseReadDB)
 	childJobs, err := queue.ListTasksByParent(asyncJobID)
 	if err != nil {
 		logger.AddPulseSymbol(s.logger).Errorw("Failed to fetch child jobs",

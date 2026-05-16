@@ -10,7 +10,7 @@
  * - localStorage persistence
  */
 
-import type { Execution } from './execution-types';
+import type { Execution, JobStagesResponse, JobChildrenResponse, TaskLogsResponse } from './execution-types';
 import { log, SEG } from '../logger';
 import { handleError } from '../error-handler';
 
@@ -29,6 +29,16 @@ export class PulsePanelState {
 
     // How many executions to show per job (default 5, can increase with "Load more")
     public executionLimits: Map<string, number> = new Map();
+
+    // Execution detail state (merged from job-detail-panel)
+    public expandedExecutions: Set<string> = new Set();
+    public executionStages: Map<string, JobStagesResponse> = new Map();
+    public executionChildren: Map<string, JobChildrenResponse> = new Map();
+    public expandedChildren: Set<string> = new Set();
+    public childStages: Map<string, JobStagesResponse> = new Map();
+    public taskLogs: Map<string, TaskLogsResponse> = new Map();
+    public loadingTasks: Set<string> = new Set();
+    public executionPages: Map<string, number> = new Map();
 
     private readonly STORAGE_KEY = 'pulse-panel-expanded-jobs';
     private readonly DEFAULT_LIMIT = 5;
@@ -228,6 +238,7 @@ export class PulsePanelState {
         this.loadingExecutions.delete(jobId);
         this.executionErrors.delete(jobId);
         this.executionLimits.delete(jobId);
+        this.executionPages.delete(jobId);
         this.saveToLocalStorage();
     }
 
@@ -240,6 +251,14 @@ export class PulsePanelState {
         this.loadingExecutions.clear();
         this.executionErrors.clear();
         this.executionLimits.clear();
+        this.expandedExecutions.clear();
+        this.executionStages.clear();
+        this.executionChildren.clear();
+        this.expandedChildren.clear();
+        this.childStages.clear();
+        this.taskLogs.clear();
+        this.loadingTasks.clear();
+        this.executionPages.clear();
         this.saveToLocalStorage();
     }
 }

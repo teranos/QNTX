@@ -528,8 +528,13 @@ func (wp *WorkerPool) processNextJob() error {
 		wp.mu.Unlock()
 	}()
 
-	// Execute the job
+	// Execute the job — write structured logs to task_logs for observability
+	execStart := time.Now()
+	wp.writeTaskLog(job.ID, job.HandlerName, "info", fmt.Sprintf("Starting %s", job.HandlerName))
+
 	if err := wp.executor.Execute(wp.ctx, job); err != nil {
+		execDur := time.Since(execStart)
+		wp.writeTaskLog(job.ID, job.HandlerName, "error", fmt.Sprintf("Failed after %dms: %s", execDur.Milliseconds(), err))
 		// ❀ Closing: Check if error is due to context cancellation
 		select {
 		case <-wp.ctx.Done():
@@ -558,6 +563,8 @@ func (wp *WorkerPool) processNextJob() error {
 	}
 
 	// Mark job as completed
+	execDur := time.Since(execStart)
+	wp.writeTaskLog(job.ID, job.HandlerName, "info", fmt.Sprintf("Completed in %dms", execDur.Milliseconds()))
 	return errors.Wrapf(wp.queue.CompleteJob(job.ID), "failed to mark job %s as completed (handler: %s)", job.ID, job.HandlerName)
 }
 
@@ -666,6 +673,19 @@ func (wp *WorkerPool) updateJobPulseState(job *Job) {
 	})
 	if err := wp.queue.UpdateJob(job); err != nil {
 		wp.logger.SugaredLogger.Warnw("Failed to update job pulse state", "error", err)
+	}
+}
+
+// writeTaskLog writes a structured log entry to task_logs for observability.
+// Every handler execution gets automatic start/complete/fail logs without
+// the handler needing to know about task_logs.
+func (wp *WorkerPool) writeTaskLog(jobID, stage, level, message string) {
+	_, err := wp.db.Exec(
+		`INSERT INTO task_logs (job_id, stage, timestamp, level, message) VALUES (?, ?, ?, ?, ?)`,
+		jobID, stage, time.Now().Format(time.RFC3339), level, message,
+	)
+	if err != nil {
+		wp.logger.SugaredLogger.Warnw("Failed to write task log", "job_id", jobID, "error", err)
 	}
 }
 

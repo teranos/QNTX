@@ -599,12 +599,8 @@
     gap: 4px;
 }
 
-/* Individual execution card */
+/* Individual execution card — expandable */
 .pulse-execution-card {
-    display: grid;
-    grid-template-columns: auto 1fr auto auto;
-    gap: 8px;
-    align-items: center;
     padding: 6px 10px;
     background: rgba(255, 255, 255, 0.04);
     border-radius: var(--border-radius);
@@ -622,6 +618,30 @@
 
 .pulse-execution-card.pulse-exec-running {
     border-left-color: #5ac8fa;
+}
+
+.pulse-execution-card.pulse-exec-expanded {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+/* Execution card header — clickable row */
+.pulse-exec-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.pulse-exec-header:hover {
+    opacity: 0.85;
+}
+
+.pulse-exec-toggle {
+    font-size: var(--font-size-sm);
+    color: var(--text-on-dark-tertiary);
+    width: 14px;
+    flex-shrink: 0;
 }
 
 .pulse-exec-status {
@@ -652,23 +672,173 @@
     font-size: var(--font-size-sm);
     color: var(--text-on-dark-tertiary);
     font-family: 'SF Mono', Monaco, monospace;
+    margin-left: auto;
 }
 
 .pulse-exec-summary {
-    grid-column: 1 / -1;
     font-size: var(--font-size-sm);
     color: var(--text-on-dark-secondary);
     margin-top: 2px;
+    padding-left: 22px;
     overflow-wrap: break-word;
     word-break: break-word;
 }
 
-.pulse-execution-card .pulse-exec-error {
-    grid-column: 1 / -1;
+.pulse-exec-error-msg {
     font-size: var(--font-size-sm);
     color: var(--color-error);
     margin-top: 2px;
+    padding-left: 22px;
     font-family: 'SF Mono', Monaco, monospace;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* =============================================================================
+   Execution Detail — stages, children, task logs (inline)
+   ============================================================================= */
+
+.pulse-exec-detail {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-on-dark);
+}
+
+.pulse-exec-no-detail {
+    font-size: var(--font-size-sm);
+    color: var(--text-on-dark-tertiary);
+    font-style: italic;
+    padding: 4px 0;
+}
+
+/* Stages */
+.pulse-stage {
+    margin-bottom: 8px;
+}
+
+.pulse-stage-header {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-on-dark-secondary);
+    padding: 2px 0;
+    margin-bottom: 4px;
+}
+
+/* Task logs */
+.pulse-task-logs {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+    font-size: var(--font-size-sm);
+    margin-bottom: 4px;
+}
+
+.pulse-task-loading {
+    font-size: var(--font-size-sm);
+    color: var(--text-on-dark-tertiary);
+    font-style: italic;
+    padding: 4px 0;
+}
+
+.pulse-log-entry {
+    display: flex;
+    gap: 8px;
+    padding: 2px 6px;
+    border-radius: 2px;
+}
+
+.pulse-log-entry:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.pulse-log-time {
+    color: var(--text-on-dark-tertiary);
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.pulse-log-level {
+    font-weight: 600;
+    flex-shrink: 0;
+    width: 40px;
+}
+
+.pulse-log-error .pulse-log-level { color: var(--color-error); }
+.pulse-log-warn .pulse-log-level,
+.pulse-log-warning .pulse-log-level { color: var(--color-warning); }
+.pulse-log-info .pulse-log-level { color: #5ac8fa; }
+.pulse-log-debug .pulse-log-level { color: var(--text-on-dark-tertiary); }
+
+.pulse-log-msg {
+    color: var(--text-on-dark-secondary);
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* Child jobs */
+.pulse-children {
+    margin-top: 4px;
+}
+
+.pulse-children-header {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-on-dark-secondary);
+    margin-bottom: 6px;
+}
+
+.pulse-child {
+    padding: 4px 8px;
+    border-left: 2px solid var(--border-on-dark);
+    margin-bottom: 4px;
+}
+
+.pulse-child-expanded {
+    border-left-color: var(--text-on-dark-secondary);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.pulse-child-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    font-size: var(--font-size-sm);
+}
+
+.pulse-child-header:hover {
+    opacity: 0.85;
+}
+
+.pulse-child-handler {
+    font-family: 'SF Mono', Monaco, monospace;
+    color: var(--text-on-dark);
+    flex: 1;
+}
+
+.pulse-child-status {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: var(--font-size-sm);
+}
+
+.pulse-child-status-running { color: #5ac8fa; }
+.pulse-child-status-completed { color: var(--color-success); }
+.pulse-child-status-failed { color: var(--color-error); }
+.pulse-child-status-queued,
+.pulse-child-status-paused { color: var(--color-warning); }
+
+.pulse-child-progress {
+    color: var(--text-on-dark-tertiary);
+    font-variant-numeric: tabular-nums;
+}
+
+.pulse-child-error {
+    font-size: var(--font-size-sm);
+    color: var(--color-error);
+    padding: 2px 0 2px 22px;
     overflow-wrap: break-word;
     word-break: break-word;
 }

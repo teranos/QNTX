@@ -16,6 +16,19 @@ Hybrid cloud/local setups need multiple backend support. The directory structure
 
 ## Usage
 
+**Preferred: `rustsqlite` driver** — Rust owns the database. New connections go through `rustsqlite`:
+
+```go
+import "database/sql"
+
+db, err := sql.Open("rustsqlite", dbPath)
+db.SetMaxOpenConns(4)
+```
+
+See `server/watcher_handlers.go` (watcherDB) and `server/init.go` (pulseReadDB) for examples.
+
+**Legacy: Go `db.Open()`** — Uses `mattn/go-sqlite3` with `_txlock=immediate`. Being phased out.
+
 ```go
 import "github.com/teranos/QNTX/db"
 

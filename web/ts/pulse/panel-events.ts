@@ -8,11 +8,12 @@
 
 export interface PanelEventHandlers {
     onToggleExpansion: (jobId: string) => Promise<void>;
-    // Note: onForceTrigger and onJobAction removed - now handled by hydrated Button components
     onLoadMore: (jobId: string) => Promise<void>;
     onRetryExecutions: (jobId: string) => Promise<void>;
-    onViewDetailed: (jobId: string) => Promise<void>;
     onProseLocation: (docId: string) => Promise<void>;
+    onToggleExecution: (executionId: string, asyncJobId: string) => Promise<void>;
+    onToggleChild: (childId: string) => Promise<void>;
+    onAutoLoadTaskLogs: (jobId: string, taskId: string) => Promise<void>;
 }
 
 /**
@@ -28,30 +29,39 @@ export function attachPanelEventListeners(
     const clickHandler = async (e: Event) => {
         const target = e.target as HTMLElement;
 
-        // Handle toggle expand buttons
+        // Handle toggle expand buttons (job row)
         const toggleBtn = target.closest('[data-action="toggle-expand"]') as HTMLElement | null;
         if (toggleBtn) {
             e.stopPropagation();
-            const card = toggleBtn.closest('.pulse-job-card') as HTMLElement;
-            const jobId = card?.dataset.jobId;
+            const row = toggleBtn.closest('[data-job-id]') as HTMLElement;
+            const jobId = row?.dataset.jobId;
             if (jobId) {
                 await handlers.onToggleExpansion(jobId);
             }
             return;
         }
 
-        // Note: Job action buttons (pause, resume, delete, force-trigger) are now
-        // hydrated Button components that handle their own click events
-
-        // Handle "View detailed history" links
-        const detailedLink = target.closest('[data-action="view-detailed"]') as HTMLElement | null;
-        if (detailedLink) {
-            e.preventDefault();
+        // Handle toggle execution expand (execution card)
+        const execHeader = target.closest('[data-action="toggle-execution"]') as HTMLElement | null;
+        if (execHeader) {
             e.stopPropagation();
-            const card = detailedLink.closest('.pulse-job-card') as HTMLElement;
-            const jobId = card?.dataset.jobId;
-            if (jobId) {
-                await handlers.onViewDetailed(jobId);
+            const card = execHeader.closest('[data-execution-id]') as HTMLElement;
+            const executionId = card?.dataset.executionId;
+            const asyncJobId = card?.dataset.asyncJobId || '';
+            if (executionId) {
+                await handlers.onToggleExecution(executionId, asyncJobId);
+            }
+            return;
+        }
+
+        // Handle toggle child expand
+        const childHeader = target.closest('[data-action="toggle-child"]') as HTMLElement | null;
+        if (childHeader) {
+            e.stopPropagation();
+            const childEl = childHeader.closest('[data-child-id]') as HTMLElement;
+            const childId = childEl?.dataset.childId;
+            if (childId) {
+                await handlers.onToggleChild(childId);
             }
             return;
         }
@@ -60,8 +70,8 @@ export function attachPanelEventListeners(
         const loadMoreBtn = target.closest('[data-action="load-more"]') as HTMLElement | null;
         if (loadMoreBtn) {
             e.stopPropagation();
-            const card = loadMoreBtn.closest('.pulse-job-card') as HTMLElement;
-            const jobId = card?.dataset.jobId;
+            const row = loadMoreBtn.closest('[data-job-id]') as HTMLElement;
+            const jobId = row?.dataset.jobId;
             if (jobId) {
                 await handlers.onLoadMore(jobId);
             }
@@ -92,11 +102,36 @@ export function attachPanelEventListeners(
         }
     };
 
+    // MutationObserver to auto-load task logs when they appear in the DOM
+    const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+            for (const node of mutation.addedNodes) {
+                if (!(node instanceof HTMLElement)) continue;
+
+                // Check the node itself and its descendants for task loading placeholders
+                const loadingElements = node.matches?.('.pulse-task-loading')
+                    ? [node]
+                    : Array.from(node.querySelectorAll('.pulse-task-loading'));
+
+                for (const el of loadingElements) {
+                    const jobId = (el as HTMLElement).dataset.jobId;
+                    const taskId = (el as HTMLElement).dataset.taskId;
+                    if (jobId && taskId) {
+                        handlers.onAutoLoadTaskLogs(jobId, taskId);
+                    }
+                }
+            }
+        }
+    });
+
+    observer.observe(panel, { childList: true, subtree: true });
+
     // Attach single delegated listener
     panel.addEventListener('click', clickHandler);
 
     // Return cleanup function
     return () => {
         panel.removeEventListener('click', clickHandler);
+        observer.disconnect();
     };
 }

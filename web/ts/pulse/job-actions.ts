@@ -11,11 +11,10 @@
 
 import type { ScheduledJobResponse } from './types';
 import { pauseScheduledJob, resumeScheduledJob, deleteScheduledJob, forceTriggerJob } from './api';
-import { listExecutions } from './execution-api';
+import { listExecutions, getJobStages, getJobChildren, getTaskLogsForJob } from './execution-api';
 import type { PulsePanelState } from './panel-state';
 import { handleError, SEG } from '../error-handler';
 import { log } from '../logger';
-import { Button } from '../components/button';
 
 // Note: Two-click confirmation is now handled by the Button component
 // The old manual confirmation state tracking has been removed
@@ -118,7 +117,6 @@ export async function loadExecutionsForJob(
 ): Promise<void> {
     ctx.state.loadingExecutions.add(jobId);
     ctx.state.executionErrors.delete(jobId);
-    await ctx.render();
 
     try {
         const response = await listExecutions(jobId, { limit: 20, offset: 0 });
@@ -157,17 +155,97 @@ export async function handleRetryExecutions(
 }
 
 /**
- * Open job detail panel
+ * Toggle execution expansion — load stages/children on first expand
  */
-export async function handleViewDetailed(
-    jobId: string,
+export async function handleToggleExecution(
+    executionId: string,
+    asyncJobId: string,
     ctx: JobActionContext
 ): Promise<void> {
-    const job = ctx.jobs.get(jobId);
-    if (!job) return;
+    const { state } = ctx;
 
-    const { showJobDetail } = await import('./job-detail-panel.js');
-    showJobDetail(job);
+    if (state.expandedExecutions.has(executionId)) {
+        state.expandedExecutions.delete(executionId);
+        await ctx.render();
+        return;
+    }
+
+    state.expandedExecutions.add(executionId);
+    await ctx.render();
+
+    if (asyncJobId && !state.executionStages.has(executionId)) {
+        try {
+            const stages = await getJobStages(asyncJobId);
+            state.executionStages.set(executionId, stages);
+
+            if (stages.stages.length === 0) {
+                const children = await getJobChildren(asyncJobId);
+                state.executionChildren.set(executionId, children);
+            }
+        } catch (error: unknown) {
+            handleError(error, 'Failed to load execution detail', { context: SEG.PULSE, silent: true });
+            state.executionStages.set(executionId, { job_id: asyncJobId, stages: [] });
+        }
+        await ctx.render();
+    }
+}
+
+/**
+ * Toggle child job expansion — load stages on first expand
+ */
+export async function handleToggleChild(
+    childId: string,
+    ctx: JobActionContext
+): Promise<void> {
+    const { state } = ctx;
+
+    if (state.expandedChildren.has(childId)) {
+        state.expandedChildren.delete(childId);
+        await ctx.render();
+        return;
+    }
+
+    state.expandedChildren.add(childId);
+    await ctx.render();
+
+    if (!state.childStages.has(childId)) {
+        try {
+            const stages = await getJobStages(childId);
+            state.childStages.set(childId, stages);
+        } catch (error: unknown) {
+            handleError(error, 'Failed to load child job stages', { context: SEG.PULSE, silent: true });
+            state.childStages.set(childId, { job_id: childId, stages: [] });
+        }
+        await ctx.render();
+    }
+}
+
+/**
+ * Auto-load task logs when a task loading placeholder appears
+ */
+export async function handleAutoLoadTaskLogs(
+    jobId: string,
+    taskId: string,
+    ctx: JobActionContext
+): Promise<void> {
+    const taskKey = `${jobId}:${taskId}`;
+    const { state } = ctx;
+
+    if (state.taskLogs.has(taskKey) || state.loadingTasks.has(taskKey)) return;
+
+    state.loadingTasks.add(taskKey);
+
+    try {
+        const logs = await getTaskLogsForJob(jobId, taskId);
+        state.taskLogs.set(taskKey, logs);
+    } catch (error: unknown) {
+        handleError(error, 'Failed to load task logs', { context: SEG.PULSE, silent: true });
+        state.taskLogs.set(taskKey, { task_id: taskId, logs: [] });
+    } finally {
+        state.loadingTasks.delete(taskKey);
+    }
+
+    await ctx.render();
 }
 
 /**
@@ -180,96 +258,3 @@ export async function handleProseLocationClick(docId: string): Promise<void> {
     await showProseDocument(docId);
 }
 
-// ============================================================================
-// Button Component Factory Functions
-// Use these when creating job action buttons programmatically
-// ============================================================================
-
-/**
- * Create a Force Trigger button using the Button component
- * Includes two-stage confirmation
- */
-export function createForceTriggerButton(
-    job: ScheduledJobResponse,
-    ctx: JobActionContext
-): Button {
-    return new Button({
-        label: 'Force Trigger',
-        onClick: async () => {
-            log.debug(SEG.PULSE, 'Force triggering job:', job.ats_code || job.handler_name);
-            await forceTriggerJob(job.ats_code, job.handler_name);
-
-            if (!ctx.state.expandedJobs.has(job.id)) {
-                ctx.state.expandedJobs.add(job.id);
-                ctx.state.saveToLocalStorage();
-            }
-
-            await loadExecutionsForJob(job.id, ctx);
-        },
-        variant: 'warning',
-        size: 'small',
-        confirmation: {
-            label: 'Confirm Trigger',
-            timeout: 5000
-        }
-    });
-}
-
-/**
- * Create a Delete button using the Button component
- * Includes two-stage confirmation
- */
-export function createDeleteButton(
-    jobId: string,
-    ctx: JobActionContext
-): Button {
-    return new Button({
-        label: 'Delete',
-        onClick: async () => {
-            await deleteScheduledJob(jobId);
-            await ctx.loadJobs();
-        },
-        variant: 'danger',
-        size: 'small',
-        confirmation: {
-            label: 'Confirm Delete',
-            timeout: 5000
-        }
-    });
-}
-
-/**
- * Create a Pause button using the Button component
- */
-export function createPauseButton(
-    jobId: string,
-    ctx: JobActionContext
-): Button {
-    return new Button({
-        label: 'Pause',
-        onClick: async () => {
-            await pauseScheduledJob(jobId);
-            await ctx.loadJobs();
-        },
-        variant: 'secondary',
-        size: 'small'
-    });
-}
-
-/**
- * Create a Resume button using the Button component
- */
-export function createResumeButton(
-    jobId: string,
-    ctx: JobActionContext
-): Button {
-    return new Button({
-        label: 'Resume',
-        onClick: async () => {
-            await resumeScheduledJob(jobId);
-            await ctx.loadJobs();
-        },
-        variant: 'primary',
-        size: 'small'
-    });
-}
