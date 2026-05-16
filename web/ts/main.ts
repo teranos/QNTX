@@ -351,9 +351,7 @@ async function init(): Promise<void> {
 
         // Panel show events from menu bar (menu items always show, never toggle)
         listen('show-pulse-panel', () => {
-            import('./pulse-panel.ts').then(({ showPulsePanel }) => {
-                showPulsePanel();
-            });
+            glyphRun.openGlyph('pulse-glyph');
         });
 
         listen('show-prose-panel', () => {

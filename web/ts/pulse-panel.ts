@@ -1,9 +1,10 @@
 /**
  * Pulse Panel - Scheduled Jobs Dashboard
  *
- * TODO: Migrate to glyph panel manifestation, then delete. See base-panel.ts.
+ * Manifests as a glyph with 'panel' manifestationType — slides in from
+ * the opposite edge of the system drawer.
  *
- * Displays all scheduled Pulse jobs when clicking pulse (꩜) in the symbol palette:
+ * Displays all scheduled Pulse jobs:
  * - Lists all scheduled jobs with their intervals
  * - Shows job state (active, paused, stopping, inactive)
  * - Displays next run time and last execution
@@ -11,16 +12,8 @@
  * - Updates in real-time via WebSocket
  * - Inline execution history (expandable per job)
  * - Force trigger button for immediate execution
- *
- * TODO: Future improvements for inline execution view:
- * - Add full log viewing capability directly in execution cards (currently requires "View detailed history" link)
- * - Add search/filtering for executions (by status, date range, etc.)
- * - Consider infinite scroll instead of "Load N more" pagination
- * - Add execution progress indicators for running jobs
- * - Add bulk actions (cancel all running, retry failed, etc.)
  */
 
-import { BasePanel } from './base-panel.ts';
 import type { ScheduledJobResponse } from './pulse/types';
 import { listScheduledJobs } from './pulse/api';
 import { PulsePanelState } from './pulse/panel-state';
@@ -35,323 +28,316 @@ import {
     handleViewDetailed,
     handleProseLocationClick,
     toggleJobExpansion,
+    loadExecutionsForJob,
     type JobActionContext,
 } from './pulse/job-actions';
 import { hydrateButtons, registerButton, type HydrateConfig } from './components/button';
+import { tooltip } from './components/tooltip.ts';
 import type { DaemonStatusMessage } from '../types/websocket';
+import type { Glyph } from '@qntx/glyphs';
+import { Pulse } from '@generated/sym.js';
 import { log, SEG } from './logger.ts';
 
-// Global daemon status (updated via WebSocket)
+// Pre-import dynamic modules to avoid chunk-load latency on first render
+const systemStatusModule = import('./pulse/system-status.ts');
+const activeQueueModule = import('./pulse/active-queue.ts');
+const schedulesModule = import('./pulse/schedules.ts');
+
+// Module-level state — persists across panel open/close for instant re-open
+let contentElement: HTMLElement | null = null;
+let jobs: Map<string, ScheduledJobResponse> = new Map();
+let state: PulsePanelState = new PulsePanelState();
 let currentDaemonStatus: DaemonStatusMessage | null = null;
+let activeQueueCleanupTimer: ReturnType<typeof setTimeout> | null = null;
+let tooltipCleanup: (() => void) | null = null;
+let cachedActiveQueue: import('./pulse/active-queue.ts').ActiveQueueResult | null = null;
 
-// Global pulse panel instance
-let pulsePanelInstance: PulsePanel | null = null;
+// Eagerly prefetch schedule data so it's ready before panel opens
+listScheduledJobs().then(result => {
+    result.forEach(job => jobs.set(job.id, job));
+}).catch(() => { /* silent — will retry on panel open */ });
 
-class PulsePanel extends BasePanel {
-    private jobs: Map<string, ScheduledJobResponse> = new Map();
-    private state: PulsePanelState;
-    private unsubscribers: Array<() => void> = [];
-    private activeQueueCleanupTimer: ReturnType<typeof setTimeout> | null = null;
+function getActionContext(): JobActionContext {
+    return {
+        get jobs() { return jobs; },
+        get state() { return state; },
+        render: () => render(),
+        loadJobs: () => loadJobs(),
+    };
+}
 
-    constructor() {
-        super({
-            id: 'pulse-panel',
-            classes: ['panel-slide-left', 'pulse-panel'],
-            useOverlay: true,
-            closeOnEscape: true
-        });
+async function loadJobs(): Promise<void> {
+    try {
+        const result = await listScheduledJobs();
 
-        this.state = new PulsePanelState();
-        this.subscribeToEvents();
-        pulsePanelInstance = this;
+        jobs.clear();
+        result.forEach(job => jobs.set(job.id, job));
+
+        // Clean up orphaned job IDs from expandedJobs
+        state.cleanupOrphanedJobs(new Set(jobs.keys()));
+
+        renderSchedules();
+        refreshTooltips();
+    } catch (error: unknown) {
+        log.error(SEG.ERROR, '[Pulse Panel] Failed to load jobs:', error);
+        const container = contentElement?.querySelector('#pulse-schedules-content');
+        if (container) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            container.innerHTML = `<div class="panel-error"><div class="panel-error-title">Failed to load jobs</div><div class="panel-error-message">${err.message}</div></div>`;
+        }
+    }
+}
+
+async function render(): Promise<void> {
+    await Promise.all([renderSystemStatus(), renderActiveQueue()]);
+    renderSchedules();
+    refreshTooltips();
+}
+
+async function renderSystemStatus(): Promise<void> {
+    const container = contentElement?.querySelector('#pulse-system-status-content');
+    if (!container) return;
+
+    const { renderSystemStatus: renderStatus } = await systemStatusModule;
+    container.innerHTML = renderStatus(currentDaemonStatus);
+    attachSystemStatusHandlers();
+}
+
+async function renderActiveQueue(): Promise<void> {
+    const container = contentElement?.querySelector('#pulse-active-queue-content');
+    if (!container) return;
+
+    const { renderActiveQueue: renderQueue, fetchActiveJobs } = await activeQueueModule;
+
+    // Show cached data instantly, then refresh
+    if (cachedActiveQueue) {
+        container.innerHTML = renderQueue(cachedActiveQueue);
     }
 
-    /**
-     * Get job action context for handlers
-     */
-    private getActionContext(): JobActionContext {
-        // Use getters so ctx always resolves current values — setupEventListeners()
-        // runs during super() before field initializers set this.jobs/this.state.
-        const self = this;
-        return {
-            get jobs() { return self.jobs; },
-            get state() { return self.state; },
-            render: () => this.render(),
-            loadJobs: () => this.loadJobs(),
+    const result = await fetchActiveJobs();
+    cachedActiveQueue = result;
+    container.innerHTML = renderQueue(result);
+
+    // Schedule cleanup re-render when recently-finished jobs will expire
+    if (activeQueueCleanupTimer) {
+        clearTimeout(activeQueueCleanupTimer);
+        activeQueueCleanupTimer = null;
+    }
+    if (result.hasRecent) {
+        activeQueueCleanupTimer = setTimeout(() => {
+            activeQueueCleanupTimer = null;
+            renderActiveQueue();
+        }, 8000);
+    }
+}
+
+function renderSchedules(): void {
+    const container = contentElement?.querySelector('#pulse-schedules-content');
+    if (!container) return;
+
+    schedulesModule.then(({ renderEmptyState, renderJobTable }) => {
+        if (jobs.size === 0) {
+            container.innerHTML = renderEmptyState();
+            return;
+        }
+
+        const sortedJobs = Array.from(jobs.values())
+            .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+        container.innerHTML = renderJobTable(sortedJobs, state);
+
+        // Hydrate buttons for each job
+        hydrateJobButtons(container as HTMLElement);
+
+        // Fetch executions for pre-expanded jobs that don't have cached data
+        const ctx = getActionContext();
+        for (const jobId of state.expandedJobs) {
+            if (!state.jobExecutions.has(jobId) && !state.loadingExecutions.has(jobId) && jobs.has(jobId)) {
+                loadExecutionsForJob(jobId, ctx);
+            }
+        }
+    });
+}
+
+function hydrateJobButtons(container: HTMLElement): void {
+    const ctx = getActionContext();
+    const config: HydrateConfig = {};
+
+    for (const job of jobs.values()) {
+        const isActive = job.state === 'active';
+
+        config[`force-trigger-${job.id}`] = {
+            label: 'Force Trigger',
+            onClick: async () => {
+                await handleForceTrigger(job.id, ctx);
+            },
+            variant: 'warning',
+            size: 'small',
+            confirmation: {
+                label: 'Confirm Trigger',
+                timeout: 5000
+            }
+        };
+
+        config[`toggle-state-${job.id}`] = {
+            label: isActive ? 'Pause' : 'Resume',
+            onClick: async () => {
+                await handleJobAction(job.id, isActive ? 'pause' : 'resume', ctx);
+            },
+            variant: isActive ? 'secondary' : 'primary',
+            size: 'small'
+        };
+
+        config[`delete-${job.id}`] = {
+            label: 'Delete',
+            onClick: async () => {
+                await handleJobAction(job.id, 'delete', ctx);
+            },
+            variant: 'danger',
+            size: 'small',
+            confirmation: {
+                label: 'Confirm Delete',
+                timeout: 5000
+            }
         };
     }
 
-    /**
-     * Subscribe to Pulse execution events for real-time updates
-     */
-    private subscribeToEvents(): void {
-        this.unsubscribers = subscribeToExecutionEvents({
-            jobs: this.jobs,
-            state: this.state,
-            isVisible: () => this.isVisible,
-            render: () => this.render(),
-        });
+    const buttons = hydrateButtons(container, config);
+    for (const [buttonId, button] of Object.entries(buttons)) {
+        registerButton(buttonId, button);
     }
+}
 
-    protected getTemplate(): string {
-        return PanelRenderer.renderPanelTemplate();
-    }
+function attachSystemStatusHandlers(): void {
+    const container = contentElement?.querySelector('#pulse-system-status-content');
+    if (!container) return;
 
-    protected setupEventListeners(): void {
-        // Attach panel event listeners once using event delegation
-        // Note: Job action buttons are now hydrated Button components
-        const ctx = this.getActionContext();
-        const cleanup = attachPanelEventListeners(this.panel!, {
-            onToggleExpansion: (jobId) => toggleJobExpansion(jobId, ctx),
-            onLoadMore: (jobId) => handleLoadMore(jobId, ctx),
-            onRetryExecutions: (jobId) => handleRetryExecutions(jobId, ctx),
-            onViewDetailed: (jobId) => handleViewDetailed(jobId, ctx),
-            onProseLocation: (docId) => handleProseLocationClick(docId)
-        });
-
-        // Store cleanup function for onDestroy
-        // Note: unsubscribers array is initialized by field initializer after super() returns
-        if (!this.unsubscribers) {
-            this.unsubscribers = [];
-        }
-        this.unsubscribers.push(cleanup);
-    }
-
-    protected async onShow(): Promise<void> {
-        // Don't use base showLoading() — it wipes .panel-content, destroying our section containers.
-        // The template already has per-section "Loading..." placeholders.
-        await this.loadJobs();
-    }
-
-    private async loadJobs(): Promise<void> {
-        const content = this.$('.pulse-panel-content');
-        if (!content) return;
-
-        try {
-            const jobs = await listScheduledJobs();
-
-            this.jobs.clear();
-            jobs.forEach(job => this.jobs.set(job.id, job));
-
-            // Clean up orphaned job IDs from expandedJobs
-            this.state.cleanupOrphanedJobs(new Set(this.jobs.keys()));
-
-            await this.render();
-        } catch (error: unknown) {
-            log.error(SEG.ERROR, '[Pulse Panel] Failed to load jobs:', error);
-            const err = error instanceof Error ? error : new Error(String(error));
-            this.showErrorState(err);
-        }
-    }
-
-    private async render(): Promise<void> {
-        await this.renderSystemStatus();
-        await this.renderActiveQueue();
-        this.renderSchedules();
-
-        // Refresh tooltips after dynamic content updates
-        this.refreshTooltips();
-    }
-
-    private async renderSystemStatus(): Promise<void> {
-        const container = this.$('#pulse-system-status-content');
-        if (!container) return;
-
-        const { renderSystemStatus } = await import('./pulse/system-status.ts');
-
-        container.innerHTML = renderSystemStatus(currentDaemonStatus);
-        this.attachSystemStatusHandlers();
-    }
-
-    private async renderActiveQueue(): Promise<void> {
-        const container = this.$('#pulse-active-queue-content');
-        if (!container) return;
-
-        const { renderActiveQueue, fetchActiveJobs } = await import('./pulse/active-queue.ts');
-        const result = await fetchActiveJobs();
-
-        container.innerHTML = renderActiveQueue(result);
-
-        // Schedule cleanup re-render when recently-finished jobs will expire
-        if (this.activeQueueCleanupTimer) {
-            clearTimeout(this.activeQueueCleanupTimer);
-            this.activeQueueCleanupTimer = null;
-        }
-        if (result.hasRecent) {
-            this.activeQueueCleanupTimer = setTimeout(() => {
-                this.activeQueueCleanupTimer = null;
-                this.renderActiveQueue();
-            }, 8000);
-        }
-    }
-
-    private renderSchedules(): void {
-        const container = this.$('#pulse-schedules-content');
-        if (!container) return;
-
-        import('./pulse/schedules.ts').then(({ renderEmptyState, renderJobCard }) => {
-            if (this.jobs.size === 0) {
-                container.innerHTML = renderEmptyState();
-                return;
+    const daemonBtn = container.querySelector('[data-action="start-daemon"], [data-action="stop-daemon"]') as HTMLButtonElement;
+    if (daemonBtn) {
+        daemonBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const action = daemonBtn.dataset.action;
+            if (action) {
+                await handleSystemStatusAction(action);
             }
-
-            const jobsHtml = Array.from(this.jobs.values())
-                .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-                .map(job => renderJobCard(job, this.state))
-                .join('');
-
-            container.innerHTML = `<div class="panel-list pulse-jobs-list">${jobsHtml}</div>`;
-
-            // Hydrate buttons for each job
-            this.hydrateJobButtons(container as HTMLElement);
         });
     }
 
-    /**
-     * Hydrate button placeholders with Button component instances
-     * Registers buttons for WebSocket-driven state updates
-     */
-    private hydrateJobButtons(container: HTMLElement): void {
-        const ctx = this.getActionContext();
-
-        // Build hydration config for all jobs
-        const config: HydrateConfig = {};
-
-        for (const job of this.jobs.values()) {
-            const isActive = job.state === 'active';
-
-            // Force Trigger button with confirmation
-            config[`force-trigger-${job.id}`] = {
-                label: 'Force Trigger',
-                onClick: async () => {
-                    await handleForceTrigger(job.id, ctx);
-                },
-                variant: 'warning',
-                size: 'small',
-                confirmation: {
-                    label: 'Confirm Trigger',
-                    timeout: 5000
-                }
-            };
-
-            // Pause/Resume toggle button
-            config[`toggle-state-${job.id}`] = {
-                label: isActive ? 'Pause' : 'Resume',
-                onClick: async () => {
-                    await handleJobAction(job.id, isActive ? 'pause' : 'resume', ctx);
-                },
-                variant: isActive ? 'secondary' : 'primary',
-                size: 'small'
-            };
-
-            // Delete button with confirmation
-            config[`delete-${job.id}`] = {
-                label: 'Delete',
-                onClick: async () => {
-                    await handleJobAction(job.id, 'delete', ctx);
-                },
-                variant: 'danger',
-                size: 'small',
-                confirmation: {
-                    label: 'Confirm Delete',
-                    timeout: 5000
-                }
-            };
-        }
-
-        // Hydrate all buttons
-        const buttons = hydrateButtons(container, config);
-
-        // Register buttons for WebSocket-driven state updates
-        for (const [buttonId, button] of Object.entries(buttons)) {
-            registerButton(buttonId, button);
-        }
-    }
-
-    private attachSystemStatusHandlers(): void {
-        const container = this.$('#pulse-system-status-content');
-        if (!container) return;
-
-        const daemonBtn = container.querySelector('[data-action="start-daemon"], [data-action="stop-daemon"]') as HTMLButtonElement;
-        if (daemonBtn) {
-            daemonBtn.addEventListener('click', async (e) => {
-                e.preventDefault();
-                const action = daemonBtn.dataset.action;
-                if (action) {
-                    await this.handleSystemStatusAction(action);
-                }
-            });
-        }
-
-        const budgetBtn = container.querySelector('[data-action="edit-budget"]') as HTMLButtonElement;
-        if (budgetBtn) {
-            budgetBtn.addEventListener('click', async (e) => {
-                e.preventDefault();
-                await this.handleSystemStatusAction('edit-budget');
-            });
-        }
-
-        // Listen for confirmation reset events (triggered when 5s timeout expires)
-        container.addEventListener('daemon-confirm-reset', async () => {
-            await this.renderSystemStatus();
+    const budgetBtn = container.querySelector('[data-action="edit-budget"]') as HTMLButtonElement;
+    if (budgetBtn) {
+        budgetBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            await handleSystemStatusAction('edit-budget');
         });
     }
 
-    private async handleSystemStatusAction(action: string): Promise<void> {
-        const { handleSystemStatusAction } = await import('./pulse/system-status.ts');
-        const executed = await handleSystemStatusAction(action);
+    container.addEventListener('daemon-confirm-reset', async () => {
+        await renderSystemStatus();
+    });
+}
 
-        // If action wasn't executed (waiting for confirmation), re-render to show confirm state
-        if (!executed) {
-            await this.renderSystemStatus();
-        }
-    }
+async function handleSystemStatusAction(action: string): Promise<void> {
+    const { handleSystemStatusAction: handle } = await import('./pulse/system-status.ts');
+    const executed = await handle(action);
 
-    /**
-     * Update daemon status and re-render system status section if visible
-     * Called by WebSocket handler when daemon_status messages arrive
-     */
-    public async updateDaemonStatus(data: DaemonStatusMessage): Promise<void> {
-        currentDaemonStatus = data;
-
-        if (this.isVisible) {
-            await this.renderSystemStatus();
-        }
-    }
-
-    /**
-     * Clean up event subscriptions when panel is destroyed
-     */
-    protected onDestroy(): void {
-        this.unsubscribers.forEach(unsub => unsub());
-        this.unsubscribers = [];
-        if (this.activeQueueCleanupTimer) {
-            clearTimeout(this.activeQueueCleanupTimer);
-            this.activeQueueCleanupTimer = null;
-        }
+    if (!executed) {
+        await renderSystemStatus();
     }
 }
 
-// Create global instance
-// TODO(issue #16): Refactor global window pollution
-// Replace with event delegation and custom events for cross-panel communication
-const pulsePanel = new PulsePanel();
-(window as any).pulsePanel = pulsePanel;
-
-export function showPulsePanel(): void {
-    pulsePanel.show();
-}
-
-export function togglePulsePanel(): void {
-    pulsePanel.toggle();
+function refreshTooltips(): void {
+    if (!contentElement) return;
+    if (tooltipCleanup) {
+        tooltipCleanup();
+    }
+    tooltipCleanup = tooltip.attach(contentElement, '.has-tooltip');
 }
 
 /**
- * Update pulse panel with new daemon status
- * Called by WebSocket handler in websocket-handlers/daemon-status.ts
+ * Update daemon status from WebSocket
+ * Called via custom event dispatched by websocket-handlers/daemon-status.ts
  */
-export function updatePulsePanelDaemonStatus(data: DaemonStatusMessage): void {
-    if (pulsePanelInstance) {
-        pulsePanelInstance.updateDaemonStatus(data);
+function handleDaemonStatusUpdate(e: Event): void {
+    const detail = (e as CustomEvent<DaemonStatusMessage>).detail;
+    currentDaemonStatus = detail;
+
+    if (contentElement?.isConnected) {
+        renderSystemStatus();
     }
+}
+
+/**
+ * Create a Glyph definition for the pulse panel
+ */
+export function createPulseGlyph(): Glyph {
+    return {
+        id: 'pulse-glyph',
+        title: `${Pulse} Pulse`,
+        manifestationType: 'panel',
+        renderContent: () => {
+            const content = document.createElement('div');
+            contentElement = content;
+
+            // Render template
+            content.innerHTML = PanelRenderer.renderPanelTemplate();
+
+            // Attach delegated event listeners
+            const ctx = getActionContext();
+            const cleanupEvents = attachPanelEventListeners(content, {
+                onToggleExpansion: (jobId) => toggleJobExpansion(jobId, ctx),
+                onLoadMore: (jobId) => handleLoadMore(jobId, ctx),
+                onRetryExecutions: (jobId) => handleRetryExecutions(jobId, ctx),
+                onViewDetailed: (jobId) => handleViewDetailed(jobId, ctx),
+                onProseLocation: (docId) => handleProseLocationClick(docId)
+            });
+
+            // Subscribe to real-time execution events
+            const unsubscribers = subscribeToExecutionEvents({
+                jobs,
+                state,
+                isVisible: () => contentElement?.isConnected ?? false,
+                render: () => render(),
+            });
+
+            // Listen for daemon status updates
+            document.addEventListener('pulse-daemon-status', handleDaemonStatusUpdate);
+
+            // Cleanup when panel is closed (element disconnected from DOM)
+            const cleanupInterval = setInterval(() => {
+                if (!contentElement?.isConnected) {
+                    clearInterval(cleanupInterval);
+                    cleanupEvents();
+                    unsubscribers.forEach(unsub => unsub());
+                    document.removeEventListener('pulse-daemon-status', handleDaemonStatusUpdate);
+                    if (activeQueueCleanupTimer) {
+                        clearTimeout(activeQueueCleanupTimer);
+                        activeQueueCleanupTimer = null;
+                    }
+                    if (tooltipCleanup) {
+                        tooltipCleanup();
+                        tooltipCleanup = null;
+                    }
+                    contentElement = null;
+                    return;
+                }
+            }, 2000);
+
+            // Show cached data instantly (system status is always from WebSocket cache)
+            renderSystemStatus();
+
+            // If we have cached data, render immediately then refresh in background
+            if (jobs.size > 0) {
+                renderSchedules();
+            }
+            if (cachedActiveQueue) {
+                // Already rendered by renderActiveQueue's cache path
+            }
+
+            // Refresh all sections in background
+            renderActiveQueue();
+            loadJobs();
+
+            return content;
+        }
+    };
 }

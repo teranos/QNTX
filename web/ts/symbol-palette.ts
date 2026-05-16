@@ -36,7 +36,7 @@ import { tooltip } from './components/tooltip.ts';
 // Import all panel/window modules statically
 import { toggleConfig } from './config-panel.js';
 // ai-provider-window.ts removed — LLM provider is now a tray glyph
-import { togglePulsePanel } from './pulse-panel.js';
+// pulse-panel.ts removed — Pulse is now a tray glyph
 import { toggleProsePanel } from './prose/panel.js';
 import { togglePythonEditor } from './python/panel.js';
 import { glyphRun } from '@qntx/glyphs';
@@ -216,7 +216,7 @@ function handleSymbolClick(e: Event): void {
             break;
         case 'ix':
             // Ingest - job visibility moved to Pulse
-            togglePulsePanel();
+            glyphRun.openGlyph('pulse-glyph');
             break;
         case 'as':
             activateAttestationMode(cmd);
@@ -243,7 +243,7 @@ function handleSymbolClick(e: Event): void {
             break;
         case 'pulse':
             // Pulse - show scheduled jobs panel
-            showPulsePanel();
+            glyphRun.openGlyph('pulse-glyph');
             break;
         case 'db':
             // Database - show database statistics glyph
@@ -294,13 +294,6 @@ function showConfigPanel(): void {
  */
 function showAIProviderPanel(): void {
     glyphRun.openGlyph('llm-provider-glyph');
-}
-
-/**
- * Show pulse panel - displays scheduled jobs dashboard
- */
-function showPulsePanel(): void {
-    togglePulsePanel();
 }
 
 /**

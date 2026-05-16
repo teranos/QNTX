@@ -4,20 +4,16 @@
  * Contains the main panel template.
  * Job card rendering is in schedules.ts, system status in system-status.ts,
  * and active queue in active-queue.ts.
+ *
+ * Header/close button provided by glyph manifestation system (glyph.title).
  */
 
-import { Pulse } from '@generated/sym.js';
-
 /**
- * Render the main panel template (header + content wrapper)
+ * Render the panel content sections
  */
 export function renderPanelTemplate(): string {
     return `
-        <div class="panel-header pulse-panel-header">
-            <h2 class="panel-title"><span class="pulse-icon">${Pulse}</span> Pulse</h2>
-            <button class="panel-close" aria-label="Close">✕</button>
-        </div>
-        <div class="panel-content pulse-panel-content">
+        <div class="pulse-panel-content">
             <!-- System Status Section -->
             <div class="pulse-section pulse-system-status">
                 <h3 class="pulse-section-title">System Status</h3>

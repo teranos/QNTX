@@ -61,6 +61,7 @@ import { log, SEG } from './logger.ts';
 import { formatBuildTime } from './components/tooltip.ts';
 import type { VersionMessage, SystemCapabilitiesMessage } from '../types/websocket';
 import { createPluginGlyph } from './plugin-panel.ts';
+import { createPulseGlyph } from './pulse-panel.ts';
 import { createLlmProviderGlyph } from './llm-provider-glyph.ts';
 
 // Self diagnostics state
@@ -219,6 +220,9 @@ export function registerDefaultGlyphs(): void {
             defaultRange: 'month'
         }
     ));
+
+    // Pulse Panel Glyph — scheduled jobs dashboard
+    glyphRun.add(createPulseGlyph());
 
     // Plugin Panel Glyph — panel manifestation
     glyphRun.add(createPluginGlyph());

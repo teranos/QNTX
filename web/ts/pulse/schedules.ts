@@ -135,73 +135,66 @@ function buildTimeTooltip(isoTime: string | null | undefined, label: string): st
 }
 
 /**
- * Render a single scheduled job card
+ * Render all scheduled jobs as a compact table
  */
-export function renderJobCard(job: ScheduledJobResponse, state: PulsePanelState): string {
-    const isActive = job.state === 'active';
-    const nextRun = formatRelativeTime(job.next_run_at);
-    const lastRun = job.last_run_at ? formatRelativeTime(job.last_run_at) : 'Never';
-    const isExpanded = state.expandedJobs.has(job.id);
-    const expandIcon = isExpanded ? '▼' : '▶';
+export function renderJobTable(jobs: ScheduledJobResponse[], state: PulsePanelState): string {
+    const rows = jobs.map(job => {
+        const isActive = job.state === 'active';
+        const nextRun = formatRelativeTime(job.next_run_at);
+        const lastRun = job.last_run_at ? formatRelativeTime(job.last_run_at) : '—';
+        const isExpanded = state.expandedJobs.has(job.id);
+        const statusTooltip = escapeHtml(buildStatusTooltip(job));
+        const intervalTooltip = escapeHtml(buildIntervalTooltip(job));
+        const nextRunTooltip = escapeHtml(buildTimeTooltip(job.next_run_at, 'Next run'));
+        const lastRunTooltip = escapeHtml(buildTimeTooltip(job.last_run_at, 'Last run'));
+        const code = job.ats_code || job.handler_name || '';
+        const shortId = !job.ats_code && job.id ? job.id.slice(-6) : '';
 
-    // Build tooltips
-    const statusTooltip = escapeHtml(buildStatusTooltip(job));
-    const intervalTooltip = escapeHtml(buildIntervalTooltip(job));
-    const nextRunTooltip = escapeHtml(buildTimeTooltip(job.next_run_at, 'Next run'));
-    const lastRunTooltip = escapeHtml(buildTimeTooltip(job.last_run_at, 'Last run'));
+        const executionHistoryHtml = isExpanded ? renderExecutionHistory(job, state) : '';
 
-    // Prose location link if job was created from a prose document
-    const proseLocationHtml = job.created_from_doc ? `
-        <div class="pulse-meta-row pulse-prose-location">
-            <span class="pulse-meta-label">Source:</span>
-            <a href="#" class="pulse-prose-link has-tooltip" data-doc-id="${escapeHtml(job.created_from_doc)}" data-tooltip="Open in prose editor">
-                ▣ ${escapeHtml(job.created_from_doc)}
-            </a>
-        </div>
-    ` : '';
-
-    // Inline execution history (when expanded)
-    const executionHistoryHtml = isExpanded ? renderExecutionHistory(job, state) : '';
+        return `
+            <tr class="pulse-table-row ${isExpanded ? 'expanded' : ''}" data-job-id="${job.id}">
+                <td class="pulse-table-expand">
+                    <button class="pulse-expand-toggle" data-action="toggle-expand">${isExpanded ? '▼' : '▶'}</button>
+                </td>
+                <td class="pulse-table-code"><code>${escapeHtml(code)}</code>${shortId ? ` <span class="pulse-schedule-label">${escapeHtml(shortId)}</span>` : ''}</td>
+                <td class="pulse-table-state"><span class="pulse-badge-inline pulse-badge-${job.state} has-tooltip" data-tooltip="${statusTooltip}">${job.state}</span></td>
+                <td class="pulse-table-interval has-tooltip" data-tooltip="${intervalTooltip}">${formatInterval(job.interval_seconds ?? 0)}</td>
+                <td class="pulse-table-time has-tooltip" data-tooltip="${nextRunTooltip}">${nextRun}</td>
+                <td class="pulse-table-time has-tooltip" data-tooltip="${lastRunTooltip}">${lastRun}</td>
+                <td class="pulse-table-actions">
+                    ${buttonPlaceholder(`force-trigger-${job.id}`, '▶')}
+                    ${buttonPlaceholder(`toggle-state-${job.id}`, isActive ? '⏸' : '▶')}
+                    ${buttonPlaceholder(`delete-${job.id}`, '✕')}
+                </td>
+            </tr>
+            ${isExpanded ? `<tr class="pulse-table-expansion" data-job-id="${job.id}"><td colspan="7">${executionHistoryHtml}</td></tr>` : ''}
+        `;
+    }).join('');
 
     return `
-        <div class="panel-card pulse-job-card ${isExpanded ? 'expanded' : ''}" data-job-id="${job.id}">
-            <div class="panel-flex-between pulse-job-header">
-                <button class="pulse-expand-toggle has-tooltip" data-action="toggle-expand" data-tooltip="${isExpanded ? 'Collapse' : 'Expand'}">
-                    ${expandIcon}
-                </button>
-                <div class="panel-badge-icon pulse-job-badge pulse-badge-${job.state} has-tooltip"
-                     data-tooltip="${statusTooltip}">
-                    <span class="pulse-icon">${Pulse}</span>
-                    <span class="pulse-state">${job.state}</span>
-                </div>
-                <div class="pulse-job-interval has-tooltip" data-tooltip="${intervalTooltip}">${formatInterval(job.interval_seconds ?? 0)}</div>
-            </div>
-
-            <div class="pulse-job-code">
-                <code>${escapeHtml(job.ats_code || job.handler_name || '')}</code>${!job.ats_code && job.id ? ` <span class="pulse-schedule-label">${escapeHtml(job.id.slice(-6))}</span>` : ''}
-            </div>
-
-            <div class="pulse-job-meta">
-                <div class="pulse-meta-row">
-                    <span class="pulse-meta-label">Next run:</span>
-                    <span class="pulse-meta-value has-tooltip" data-tooltip="${nextRunTooltip}">${nextRun}</span>
-                </div>
-                <div class="pulse-meta-row">
-                    <span class="pulse-meta-label">Last run:</span>
-                    <span class="pulse-meta-value has-tooltip" data-tooltip="${lastRunTooltip}">${lastRun}</span>
-                </div>
-                ${proseLocationHtml}
-            </div>
-
-            <div class="pulse-job-actions">
-                ${buttonPlaceholder(`force-trigger-${job.id}`, 'Force Trigger', 'pulse-btn pulse-btn-force')}
-                ${buttonPlaceholder(`toggle-state-${job.id}`, isActive ? 'Pause' : 'Resume', `pulse-btn pulse-btn-${isActive ? 'pause' : 'resume'}`)}
-                ${buttonPlaceholder(`delete-${job.id}`, 'Delete', 'pulse-btn pulse-btn-delete')}
-            </div>
-
-            ${executionHistoryHtml}
-        </div>
+        <table class="pulse-schedule-table">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Job</th>
+                    <th>State</th>
+                    <th>Interval</th>
+                    <th>Next</th>
+                    <th>Last</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
     `;
+}
+
+/**
+ * Render a single scheduled job card (legacy, used by expanded execution history)
+ */
+export function renderJobCard(job: ScheduledJobResponse, state: PulsePanelState): string {
+    return renderJobTable([job], state);
 }
 
 /**

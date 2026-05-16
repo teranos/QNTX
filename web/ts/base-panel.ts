@@ -8,9 +8,7 @@
  *   - code/panel.ts (GoEditorPanel)
  *   - python/panel.ts (PythonEditorPanel)
  *   - config-panel.ts (ConfigPanel)
- *   - pulse-panel.ts (PulsePanel)
  *   - prose/prompt-preview-panel.ts (PromptPreviewPanel)
- *   - pulse/job-detail-panel.ts (JobDetailPanel — similar pattern, not direct extend)
  * Also delete: base-panel-error.ts, css/panel-base.css, css/components/base-panel.css
  *
  * BasePanel - Abstract base class for slide-in panels

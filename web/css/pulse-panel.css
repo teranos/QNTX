@@ -19,16 +19,21 @@
   gap: var(--gap);
 }
 
-/* Pulse-specific badge variants */
+/* Pulse-specific badge variants (dark-mode) */
 .pulse-badge-active {
-  background: var(--status-completed-bg);
-  color: var(--status-completed-text);
+  background: rgba(34, 198, 94, 0.15);
+  color: var(--color-success);
+}
+
+.pulse-badge-paused {
+  background: rgba(255, 171, 0, 0.15);
+  color: var(--color-warning);
 }
 
 .pulse-badge-stopping,
 .pulse-badge-inactive {
-  background: #fce4ec;
-  color: #c2185b;
+  background: rgba(228, 71, 71, 0.15);
+  color: var(--color-error);
 }
 
 .pulse-job-interval {
@@ -37,27 +42,106 @@
   color: var(--text-secondary);
 }
 
-/* Pulse-specific code block styling */
-.pulse-job-code {
-  margin: 8px 0;
-  overflow-x: auto;
+/* =============================================================================
+   Schedule Table
+   ============================================================================= */
+
+.pulse-schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+  color: var(--text-on-dark);
 }
 
-.pulse-job-code code {
-  color: #000;
-}
-
-.pulse-schedule-label {
-  color: var(--text-muted, #888);
-  font-size: 0.85em;
-}
-
-/* Job Meta */
-.pulse-job-meta {
-  margin: 8px 0;
+.pulse-schedule-table thead th {
+  text-align: left;
+  padding: 6px 8px;
+  font-weight: 600;
+  color: var(--text-on-dark-tertiary);
+  border-bottom: 1px solid var(--border-on-dark);
+  white-space: nowrap;
   font-size: var(--font-size-sm);
 }
 
+.pulse-schedule-table thead th:first-child {
+  width: 28px;
+  padding-right: 0;
+}
+
+.pulse-table-row td {
+  padding: 6px 8px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border-on-dark);
+  color: var(--text-on-dark);
+}
+
+.pulse-table-row:hover td {
+  background: var(--bg-dark-hover);
+}
+
+.pulse-table-expand {
+  width: 28px;
+  padding-right: 0 !important;
+}
+
+.pulse-table-code code {
+  font-size: var(--font-size-sm);
+  color: var(--text-on-dark-emphasis);
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.pulse-schedule-label {
+  color: var(--text-on-dark-tertiary);
+  font-size: 0.85em;
+}
+
+.pulse-badge-inline {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.pulse-table-interval {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--text-on-dark-secondary);
+}
+
+.pulse-table-time {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--text-on-dark-secondary);
+}
+
+.pulse-table-actions {
+  white-space: nowrap;
+  display: flex;
+  gap: 4px;
+}
+
+/* Button placeholders before hydration — minimal styling for flash prevention */
+.qntx-btn-placeholder {
+  padding: 2px 6px;
+  border: 1px solid var(--border-on-dark);
+  border-radius: var(--border-radius);
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  line-height: 1;
+  color: var(--text-on-dark-tertiary);
+}
+
+.pulse-table-expansion td {
+  padding: 0 8px 12px 36px;
+  border-bottom: 1px solid var(--border-on-dark);
+}
+
+/* Legacy card styles kept for expanded execution view */
 .pulse-meta-row {
   display: flex;
   justify-content: space-between;
@@ -309,15 +393,15 @@
     background: none;
     border: none;
     padding: 4px 8px;
-    margin-right: 8px;
+    margin-right: 0;
     cursor: pointer;
-    font-size: var(--font-size-md);
-    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    color: var(--text-on-dark-tertiary);
     transition: color 0.2s;
 }
 
 .pulse-expand-toggle:hover {
-    color: var(--text-primary);
+    color: var(--text-on-dark);
 }
 
 /* Force Trigger button styling */
@@ -378,162 +462,166 @@
 
 /* Execution history section */
 .pulse-execution-history {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid #e5e5e5;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-on-dark);
 }
 
 .pulse-execution-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
 }
 
 .pulse-execution-header h4 {
     margin: 0;
-    font-size: var(--font-size-md);
+    font-size: var(--font-size-sm);
     font-weight: 600;
-    color: var(--text-primary);
+    color: var(--text-on-dark-secondary);
 }
 
 .pulse-detailed-link {
-    font-size: var(--font-size-md);
-    color: #007aff;
+    font-size: var(--font-size-sm);
+    color: var(--text-on-dark-tertiary);
     text-decoration: none;
 }
 
 .pulse-detailed-link:hover {
+    color: var(--text-on-dark);
     text-decoration: underline;
 }
 
 .pulse-execution-loading,
 .pulse-execution-empty {
-    padding: 24px;
+    padding: 16px;
     text-align: center;
-    color: var(--text-tertiary);
+    color: var(--text-on-dark-tertiary);
     font-style: italic;
+    font-size: var(--font-size-sm);
 }
 
 .pulse-execution-error {
-    padding: 16px;
-    background: #fff3cd;
-    border: 1px solid #ffc107;
-    border-radius: var(--border-radius-lg);
-    color: #856404;
-    margin-bottom: 12px;
+    padding: 12px;
+    background: rgba(228, 71, 71, 0.1);
+    border: 1px solid rgba(228, 71, 71, 0.25);
+    border-radius: var(--border-radius);
+    color: var(--text-on-dark);
+    margin-bottom: 8px;
 }
 
 .pulse-execution-error strong {
     display: block;
-    margin-bottom: 8px;
-    color: #664d03;
+    margin-bottom: 6px;
+    color: var(--color-error);
 }
 
 .pulse-retry-button {
-    margin-top: 12px;
-    padding: var(--panel-padding-sm);
-    background: #ffc107;
-    color: #000;
-    border: none;
+    margin-top: 8px;
+    padding: 4px 10px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-on-dark);
+    border: 1px solid var(--border-on-dark);
     border-radius: var(--border-radius);
     cursor: pointer;
-    font-size: var(--font-size-md);
+    font-size: var(--font-size-sm);
     font-weight: 500;
 }
 
 .pulse-retry-button:hover {
-    background: #ffb300;
+    background: rgba(255, 255, 255, 0.12);
 }
 
 /* Rich error display styles */
 .pulse-rich-error {
-    background: #fff8f8;
-    border: 1px solid #ffcdd2;
-    border-left: 3px solid #ef5350;
+    background: rgba(228, 71, 71, 0.08);
+    border: 1px solid rgba(228, 71, 71, 0.2);
+    border-left: 3px solid var(--color-error);
 }
 
 .pulse-error-title {
     font-weight: 600;
-    font-size: var(--font-size-md);
-    color: var(--status-failed-text);
+    font-size: var(--font-size-sm);
+    color: var(--color-error);
     margin-bottom: 4px;
 }
 
 .pulse-error-message {
-    font-size: var(--font-size-md);
-    color: var(--text-primary);
-    margin-bottom: 8px;
+    font-size: var(--font-size-sm);
+    color: var(--text-on-dark-secondary);
+    margin-bottom: 6px;
 }
 
 .pulse-error-suggestion {
     font-size: var(--font-size-sm);
-    color: var(--text-secondary);
+    color: var(--text-on-dark-tertiary);
     font-style: italic;
-    margin-bottom: 8px;
-    padding: 6px 8px;
-    background: var(--status-pending-bg);
+    margin-bottom: 6px;
+    padding: 4px 8px;
+    background: rgba(255, 171, 0, 0.1);
     border-radius: var(--border-radius);
 }
 
 .pulse-error-details {
-    margin-top: 8px;
-    margin-bottom: 8px;
+    margin-top: 6px;
+    margin-bottom: 6px;
 }
 
 .pulse-error-details summary {
     cursor: pointer;
     font-size: var(--font-size-sm);
-    color: var(--text-secondary);
+    color: var(--text-on-dark-tertiary);
     user-select: none;
 }
 
 .pulse-error-details summary:hover {
-    color: var(--text-primary);
+    color: var(--text-on-dark);
 }
 
 .pulse-error-details-content {
-    margin-top: 8px;
+    margin-top: 6px;
     padding: 8px;
-    background: var(--bg-almost-white);
+    background: rgba(0, 0, 0, 0.2);
     border-radius: var(--border-radius);
     font-size: var(--font-size-sm);
     font-family: 'SF Mono', Monaco, 'Courier New', monospace;
     white-space: pre-wrap;
     word-break: break-word;
+    overflow-wrap: break-word;
     max-height: 150px;
     overflow-y: auto;
+    color: var(--text-on-dark-secondary);
 }
 
 .pulse-execution-list {
     display: flex;
     flex-direction: column;
-    gap: var(--gap);
+    gap: 4px;
 }
 
 /* Individual execution card */
 .pulse-execution-card {
     display: grid;
     grid-template-columns: auto 1fr auto auto;
-    gap: 12px;
+    gap: 8px;
     align-items: center;
-    padding: 12px;
-    background: var(--bg-almost-white);
-    border-radius: var(--border-radius-lg);
-    border-left: 3px solid #ccc;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: var(--border-radius);
+    border-left: 3px solid rgba(255, 255, 255, 0.1);
 }
 
 .pulse-execution-card.pulse-exec-success {
-    border-left-color: #34c759;
+    border-left-color: var(--color-success);
 }
 
 .pulse-execution-card.pulse-exec-error {
-    border-left-color: #ff3b30;
-    background: #fff5f5;
+    border-left-color: var(--color-error);
+    background: rgba(228, 71, 71, 0.06);
 }
 
 .pulse-execution-card.pulse-exec-running {
-    border-left-color: #007aff;
+    border-left-color: #5ac8fa;
 }
 
 .pulse-exec-status {
@@ -544,59 +632,63 @@
 }
 
 .pulse-exec-success .pulse-exec-status {
-    color: #34c759;
+    color: var(--color-success);
 }
 
 .pulse-exec-error .pulse-exec-status {
-    color: #ff3b30;
+    color: var(--color-error);
 }
 
 .pulse-exec-running .pulse-exec-status {
-    color: #007aff;
+    color: #5ac8fa;
 }
 
 .pulse-exec-time {
-    font-size: var(--font-size-md);
-    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    color: var(--text-on-dark-secondary);
 }
 
 .pulse-exec-duration {
-    font-size: var(--font-size-md);
-    color: var(--text-tertiary);
+    font-size: var(--font-size-sm);
+    color: var(--text-on-dark-tertiary);
     font-family: 'SF Mono', Monaco, monospace;
 }
 
 .pulse-exec-summary {
     grid-column: 1 / -1;
-    font-size: var(--font-size-md);
-    color: var(--text-secondary);
-    margin-top: 4px;
+    font-size: var(--font-size-sm);
+    color: var(--text-on-dark-secondary);
+    margin-top: 2px;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
-.pulse-exec-error {
+.pulse-execution-card .pulse-exec-error {
     grid-column: 1 / -1;
-    font-size: var(--font-size-md);
-    color: #ff3b30;
-    margin-top: 4px;
+    font-size: var(--font-size-sm);
+    color: var(--color-error);
+    margin-top: 2px;
     font-family: 'SF Mono', Monaco, monospace;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 /* Load more button */
 .pulse-load-more {
-    margin-top: 12px;
+    margin-top: 8px;
     width: 100%;
-    padding: 10px;
-    background: var(--bg-hover);
-    border: 1px solid var(--border);
-    border-radius: var(--border-radius-lg);
-    font-size: var(--font-size-md);
-    color: #007aff;
+    padding: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-on-dark);
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-sm);
+    color: var(--text-on-dark-secondary);
     cursor: pointer;
-    transition: background 0.2s;
+    transition: background 0.15s;
 }
 
 .pulse-load-more:hover {
-    background: #e5e5e5;
+    background: rgba(255, 255, 255, 0.08);
 }
 
 /* Expanded state */

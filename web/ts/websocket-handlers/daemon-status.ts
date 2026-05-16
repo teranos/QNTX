@@ -14,9 +14,8 @@ const BUDGET_WARNING_THRESHOLD = 0.80; // Warn at 80% of budget
  * Called by main.ts when daemon status updates arrive
  */
 export async function handleDaemonStatus(data: DaemonStatusMessage): Promise<void> {
-    // Update pulse panel if it exists
-    const { updatePulsePanelDaemonStatus } = await import('../pulse-panel.ts');
-    updatePulsePanelDaemonStatus(data);
+    // Update pulse panel via custom event (panel listens when open)
+    document.dispatchEvent(new CustomEvent('pulse-daemon-status', { detail: data }));
 
     // Update Pulse daemon status indicator
     const { statusIndicators } = await import('../status-indicators.ts');
