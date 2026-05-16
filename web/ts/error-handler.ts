@@ -31,7 +31,6 @@
  *   handlePanelError(e, 'Failed to load jobs');
  *
  * TODO: Migrate catch blocks in these files to use handleError:
- *   - pulse/job-detail-panel.ts (5 catch blocks)
  *   - pulse/scheduling-controls.ts (4 catch blocks)
  *   - pulse/api.ts (3 catch blocks)
  *   - pulse/ats-node-view.ts (1 catch block)
