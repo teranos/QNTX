@@ -136,7 +136,7 @@ emitter := ix.NewLogCapturingEmitter(baseEmitter, h.db, job.ID)
 ### Phase 6: Frontend Integration
 **Files:**
 - `web/ts/pulse/execution-api.ts` (update `getExecutionLogs`)
-- `web/ts/pulse/job-detail-panel.ts` (already has UI)
+- Pulse glyph panel manifestation (handles job detail UI)
 
 **What:** Update `getExecutionLogs()` to call new `/jobs/:job_id/logs` endpoint instead of `/executions/:id/logs`.
 
@@ -290,7 +290,7 @@ emitter := ix.NewLogCapturingEmitter(baseEmitter, h.db, job.ID)
 | 3. Async Workers | ✅ DONE | internal/role/async_handlers.go:125-126 | - |
 | 4. Ticker | ⏭️ DEFERRED | (deferred - async jobs sufficient) | - |
 | 5. API | ✅ DONE | internal/server/pulse_handlers.go | 2 endpoints |
-| 6. Frontend | 📋 [QNTX #30](https://github.com/teranos/QNTX/issues/30) | execution-api.ts, job-detail-panel.ts | - |
+| 6. Frontend | 📋 [QNTX #30](https://github.com/teranos/QNTX/issues/30) | execution-api.ts, glyph panel manifestation | - |
 | 7. Tests | ✅ DONE | internal/ats/ix/log_capturing_emitter_test.go | 6 tests |
 | 8. E2E Validation | ✅ DONE | Manual async job execution | Verified |
 | 9. Documentation | ✅ DONE | This file + cross-references | - |
@@ -379,7 +379,7 @@ The frontend UI is already built (execution card expansion, log viewer) but need
 
 **Summary:**
 - Update `web/ts/pulse/execution-api.ts` - Add `getJobStages()` and `getTaskLogs()` functions
-- Update `web/ts/pulse/job-detail-panel.ts` - Render stage → task hierarchy, display logs on task click
+- Pulse glyph panel manifestation - Render stage → task hierarchy, display logs on task click
 - UI flow: execution card → stages → tasks → logs
 
 **Deferred Items:**

@@ -112,7 +112,7 @@ import {
 /**
  * Handle execution started notification
  * - Notifies ATS block subscribers to show running state
- * - Dispatches custom event for panels (pulse-panel, job-detail-panel)
+ * - Dispatches custom event for pulse-panel
  */
 export function handlePulseExecutionStarted(data: PulseExecutionStartedMessage): void {
     log.debug(SEG.PULSE, 'Execution started:', {
@@ -125,7 +125,6 @@ export function handlePulseExecutionStarted(data: PulseExecutionStartedMessage):
     notifyATSBlockSubscribers(data.scheduled_job_id, 'running', data.execution_id);
 
     // Dispatch custom event for type-safe cross-panel communication
-    // Panels subscribe to these events directly (see pulse-panel.ts and job-detail-panel.ts)
     dispatchExecutionStarted({
         scheduledJobId: data.scheduled_job_id,
         executionId: data.execution_id,
@@ -152,7 +151,6 @@ export function handlePulseExecutionFailed(data: PulseExecutionFailedMessage): v
     notifyATSBlockSubscribers(data.scheduled_job_id, 'failed', data.execution_id);
 
     // Dispatch custom event for type-safe cross-panel communication
-    // Panels subscribe to these events directly (see pulse-panel.ts and job-detail-panel.ts)
     dispatchExecutionFailed({
         scheduledJobId: data.scheduled_job_id,
         executionId: data.execution_id,
@@ -183,7 +181,6 @@ export function handlePulseExecutionCompleted(data: PulseExecutionCompletedMessa
     notifyATSBlockSubscribers(data.scheduled_job_id, 'completed', data.execution_id);
 
     // Dispatch custom event for type-safe cross-panel communication
-    // Panels subscribe to these events directly (see pulse-panel.ts and job-detail-panel.ts)
     dispatchExecutionCompleted({
         scheduledJobId: data.scheduled_job_id,
         executionId: data.execution_id,
@@ -212,6 +209,4 @@ export function handlePulseExecutionLogStream(data: PulseExecutionLogStreamMessa
         logChunk: data.log_chunk
     });
 
-    // Job detail panel now subscribes to custom events directly
-    // See job-detail-panel.ts subscribeToEvents()
 }

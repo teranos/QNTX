@@ -30,7 +30,7 @@ export class PulsePanelState {
     // How many executions to show per job (default 5, can increase with "Load more")
     public executionLimits: Map<string, number> = new Map();
 
-    // Execution detail state (merged from job-detail-panel)
+    // Execution detail state
     public expandedExecutions: Set<string> = new Set();
     public executionStages: Map<string, JobStagesResponse> = new Map();
     public executionChildren: Map<string, JobChildrenResponse> = new Map();
