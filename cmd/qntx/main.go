@@ -34,7 +34,6 @@ and infrastructure tools for building knowledge-based applications.
 
 Available commands:
   am     - Manage QNTX core configuration ("I am")
-  ax     - Query attestations
   db     - Manage QNTX database operations
   pulse  - Manage Pulse daemon (async job processor + scheduler)
   ix     - Manage async ingestion jobs
@@ -94,7 +93,6 @@ func init() {
 
 	// Add commands
 	rootCmd.AddCommand(commands.AmCmd)
-	rootCmd.AddCommand(commands.AxCmd)
 	// CodeCmd now provided by code domain plugin
 	rootCmd.AddCommand(commands.DbCmd)
 	rootCmd.AddCommand(commands.HandlerCmd)
