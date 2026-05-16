@@ -148,7 +148,7 @@ func (ae *AxExecutor) executeAdvancedClassification(claims []ats.IndividualClaim
 	claimGroups := make(map[string][]ats.IndividualClaim)
 
 	for _, claim := range claims {
-		key := claim.Subject + "|" + claim.Predicate + "|" + claim.Context + "|" + claim.Actor
+		key := claim.Subject + "|" + claim.Predicate + "|" + claim.Context
 		claimGroups[key] = append(claimGroups[key], claim)
 	}
 
