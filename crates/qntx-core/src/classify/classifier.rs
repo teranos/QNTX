@@ -227,10 +227,17 @@ impl SmartClassifier {
         }
     }
 
-    /// Determine the type of conflict resolution needed
+    /// Determine the type of conflict resolution needed.
+    /// Priority: Evolution > Supersession > Verification > Coexistence > Review.
+    /// Supersession ranks above verification because a credibility difference
+    /// is a stronger signal than temporal proximity.
     fn determine_resolution_type(&self, claims: &[ClaimInput]) -> ConflictType {
         if self.is_same_actor_evolution(claims) {
             return ConflictType::Evolution;
+        }
+
+        if self.has_human_supersession(claims) {
+            return ConflictType::Supersession;
         }
 
         if self.is_simultaneous_verification(claims) {
@@ -239,10 +246,6 @@ impl SmartClassifier {
 
         if self.is_different_contexts(claims) {
             return ConflictType::Coexistence;
-        }
-
-        if self.has_human_supersession(claims) {
-            return ConflictType::Supersession;
         }
 
         ConflictType::Review
@@ -442,7 +445,7 @@ mod tests {
                 key: "ALICE|is_author|GitHub".to_string(),
                 claims: vec![
                     make_claim("ALICE", "is_author", "GitHub", "human:alice", now - 10_000),
-                    make_claim("ALICE", "is_author", "GitHub", "system:ci", now - 5_000),
+                    make_claim("ALICE", "is_author", "GitHub", "human:bob", now - 5_000),
                 ],
             }],
             config: TemporalConfig::default(),
