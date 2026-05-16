@@ -97,7 +97,9 @@ impl EmbeddedMeili {
         });
 
         let ready = tokio::task::spawn_blocking(move || {
-            ready_rx.recv_timeout(Duration::from_secs(25)).unwrap_or(false)
+            ready_rx
+                .recv_timeout(Duration::from_secs(25))
+                .unwrap_or(false)
         })
         .await
         .map_err(|e| format!("ready-wait task failed: {}", e))?;
@@ -179,4 +181,3 @@ fn find_available_port() -> Result<u16, std::io::Error> {
     drop(listener);
     Ok(port)
 }
-
