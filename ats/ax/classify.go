@@ -71,10 +71,11 @@ type AdvancedConflict struct {
 
 // ClassificationResult represents the result of conflict classification
 type ClassificationResult struct {
-	Conflicts      []AdvancedConflict `json:"conflicts"`
-	AutoResolved   int                `json:"auto_resolved"`
-	ReviewRequired int                `json:"review_required"`
-	TotalAnalyzed  int                `json:"total_analyzed"`
+	Conflicts         []AdvancedConflict `json:"conflicts"`
+	AutoResolved      int                `json:"auto_resolved"`
+	ReviewRequired    int                `json:"review_required"`
+	TotalAnalyzed     int                `json:"total_analyzed"`
+	ResolvedSourceIDs []string           `json:"resolved_source_ids"`
 }
 
 // Classifier defines the interface for conflict classification implementations.

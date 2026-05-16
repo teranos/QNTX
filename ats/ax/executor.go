@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -138,6 +137,9 @@ func (ae *AxExecutor) ExecuteAsk(ctx context.Context, filter types.AxFilter) (*t
 // executeAdvancedClassification groups claims, classifies conflicts, applies resolution
 // strategies, and returns deterministically ordered results.
 //
+// Resolution strategies are applied in Rust (via WASM) — the classifier returns
+// resolved_source_ids indicating which claims survived. Go only filters and sorts.
+//
 // Ordering contract: results are sorted by confidence desc, then recency desc.
 // Classified conflicts carry their computed confidence; unclassified claims (no conflict)
 // get a neutral 0.5 — present but uncorroborated.
@@ -150,11 +152,21 @@ func (ae *AxExecutor) executeAdvancedClassification(claims []ats.IndividualClaim
 		claimGroups[key] = append(claimGroups[key], claim)
 	}
 
-	// Perform smart classification
+	// Perform smart classification (Rust applies resolution strategies internally)
 	classificationResult := ae.classifier.ClassifyConflicts(claimGroups)
 
-	// Apply resolution strategies to filter claims
-	filteredClaims := ae.applyResolutionStrategies(claimGroups, classificationResult.Conflicts)
+	// Filter claims to only those that survived resolution
+	resolvedSet := make(map[string]bool, len(classificationResult.ResolvedSourceIDs))
+	for _, id := range classificationResult.ResolvedSourceIDs {
+		resolvedSet[id] = true
+	}
+
+	var filteredClaims []ats.IndividualClaim
+	for _, claim := range claims {
+		if resolvedSet[claim.SourceAs.ID] {
+			filteredClaims = append(filteredClaims, claim)
+		}
+	}
 
 	// Build confidence lookup from classification results
 	confidenceMap := make(map[string]float64)
@@ -186,116 +198,6 @@ func (ae *AxExecutor) executeAdvancedClassification(claims []ats.IndividualClaim
 	attestations := ats.ConvertClaimsToAttestations(filteredClaims)
 
 	return conflicts, attestations
-}
-
-// applyResolutionStrategies applies resolution strategies to filter claims based on classification results
-func (ae *AxExecutor) applyResolutionStrategies(claimGroups map[string][]ats.IndividualClaim, conflicts []AdvancedConflict) []ats.IndividualClaim {
-	// Create a map of conflict resolutions by matching conflicts to claim groups
-	resolutionMap := make(map[string]AdvancedConflict)
-	for _, conflict := range conflicts {
-		// Find the matching claim group for this conflict
-		for groupKey, groupClaims := range claimGroups {
-			if len(groupClaims) > 0 {
-				firstClaim := groupClaims[0]
-				if firstClaim.Subject == conflict.Conflict.Subject &&
-					firstClaim.Predicate == conflict.Conflict.Predicate &&
-					firstClaim.Context == conflict.Conflict.Context {
-					resolutionMap[groupKey] = conflict
-					break
-				}
-			}
-		}
-	}
-
-	var filteredClaims []ats.IndividualClaim
-
-	// Process each claim group
-	for groupKey, groupClaims := range claimGroups {
-		if len(groupClaims) <= 1 {
-			// Single claim - always include
-			filteredClaims = append(filteredClaims, groupClaims...)
-			continue
-		}
-
-		// Check if this group has a conflict resolution
-		if conflict, hasConflict := resolutionMap[groupKey]; hasConflict {
-			// Apply strategy based on resolution type
-			switch conflict.Strategy {
-			case "show_latest":
-				// Evolution - show only the most recent claim
-				latest := ae.getMostRecentClaim(groupClaims)
-				filteredClaims = append(filteredClaims, latest)
-			case "show_all_sources":
-				// Verification - show all sources (no filtering)
-				filteredClaims = append(filteredClaims, groupClaims...)
-			case "show_highest_authority":
-				// Supersession - show only the highest authority claim
-				highest := ae.getHighestAuthorityClaim(groupClaims)
-				filteredClaims = append(filteredClaims, highest)
-			case "show_all_contexts":
-				// Coexistence - show all (different contexts should coexist)
-				filteredClaims = append(filteredClaims, groupClaims...)
-			default:
-				// Unknown strategy or requires review - show all for human decision
-				filteredClaims = append(filteredClaims, groupClaims...)
-			}
-		} else {
-			// No conflict detected - show all claims
-			filteredClaims = append(filteredClaims, groupClaims...)
-		}
-	}
-
-	return filteredClaims
-}
-
-// getMostRecentClaim returns the claim with the most recent timestamp
-func (ae *AxExecutor) getMostRecentClaim(claims []ats.IndividualClaim) ats.IndividualClaim {
-	if len(claims) == 0 {
-		return ats.IndividualClaim{}
-	}
-
-	mostRecent := claims[0]
-	for _, claim := range claims[1:] {
-		if claim.Timestamp.After(mostRecent.Timestamp) {
-			mostRecent = claim
-		}
-	}
-	return mostRecent
-}
-
-// getHighestAuthorityClaim returns the claim from the highest authority actor.
-// Uses Rust's actor prefix convention: human: > llm: > system: > external.
-func (ae *AxExecutor) getHighestAuthorityClaim(claims []ats.IndividualClaim) ats.IndividualClaim {
-	if len(claims) == 0 {
-		return ats.IndividualClaim{}
-	}
-
-	best := claims[0]
-	bestRank := actorRank(best.Actor)
-	for _, claim := range claims[1:] {
-		r := actorRank(claim.Actor)
-		if r > bestRank {
-			best = claim
-			bestRank = r
-		}
-	}
-	return best
-}
-
-// actorRank returns a numeric rank matching Rust's ActorCredibility ordering:
-// Human(3) > Llm(2) > System(1) > External(0)
-func actorRank(actor string) int {
-	lower := strings.ToLower(actor)
-	if strings.HasPrefix(lower, "human:") || strings.HasSuffix(lower, "@verified") {
-		return 3
-	}
-	if strings.HasPrefix(lower, "llm:") || strings.Contains(lower, "gpt") || strings.Contains(lower, "claude") || strings.Contains(lower, "anthropic") || strings.Contains(lower, "openai") {
-		return 2
-	}
-	if strings.HasPrefix(lower, "system:") || strings.HasPrefix(lower, "qntx:") {
-		return 1
-	}
-	return 0
 }
 
 // claimConfidence returns the confidence for a claim based on its conflict group.

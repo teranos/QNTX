@@ -155,10 +155,11 @@ type ClassifyActorRank struct {
 
 // ClassifyOutput is the result of classify_claims.
 type ClassifyOutput struct {
-	Conflicts      []ClassifyConflictOutput `json:"conflicts"`
-	AutoResolved   int                      `json:"auto_resolved"`
-	ReviewRequired int                      `json:"review_required"`
-	TotalAnalyzed  int                      `json:"total_analyzed"`
+	Conflicts         []ClassifyConflictOutput `json:"conflicts"`
+	AutoResolved      int                      `json:"auto_resolved"`
+	ReviewRequired    int                      `json:"review_required"`
+	TotalAnalyzed     int                      `json:"total_analyzed"`
+	ResolvedSourceIDs []string                 `json:"resolved_source_ids"`
 }
 
 // ClassifyClaims invokes the WASM classify_claims function.

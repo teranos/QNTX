@@ -48,6 +48,10 @@ pub struct ClassifyOutput {
     pub auto_resolved: usize,
     pub review_required: usize,
     pub total_analyzed: usize,
+    /// Source IDs of claims that survive resolution (winning claims after applying strategies).
+    /// Claims from single-claim groups are always included. For multi-claim groups,
+    /// the resolution strategy determines which claims survive.
+    pub resolved_source_ids: Vec<String>,
 }
 
 /// A single classified conflict
@@ -83,14 +87,25 @@ impl SmartClassifier {
         let mut auto_resolved = 0;
         let mut review_required = 0;
         let mut total_analyzed = 0;
+        let mut resolved_source_ids = Vec::new();
 
         for group in &input.claim_groups {
             if group.claims.len() <= 1 {
+                // Single claim — always survives
+                for claim in &group.claims {
+                    resolved_source_ids.push(claim.source_id.clone());
+                }
                 continue;
             }
 
             total_analyzed += 1;
             let conflict = self.classify_group(group, input.now_ms);
+
+            // Apply resolution strategy to determine surviving claims
+            let survivors = self.apply_strategy(&conflict.strategy, &group.claims);
+            for id in &survivors {
+                resolved_source_ids.push(id.clone());
+            }
 
             if conflict.auto_resolved {
                 auto_resolved += 1;
@@ -106,6 +121,40 @@ impl SmartClassifier {
             auto_resolved,
             review_required,
             total_analyzed,
+            resolved_source_ids,
+        }
+    }
+
+    /// Apply a resolution strategy to a group of claims, returning the surviving source IDs.
+    fn apply_strategy(&self, strategy: &str, claims: &[ClaimInput]) -> Vec<String> {
+        match strategy {
+            "show_latest" => {
+                // Evolution — only the most recent claim survives
+                if let Some(latest) = claims.iter().max_by_key(|c| c.timestamp_ms) {
+                    vec![latest.source_id.clone()]
+                } else {
+                    vec![]
+                }
+            }
+            "show_highest_authority" => {
+                // Supersession — highest credibility actor wins
+                if let Some(best) = claims
+                    .iter()
+                    .max_by_key(|c| ActorCredibility::from_actor(&c.actor))
+                {
+                    vec![best.source_id.clone()]
+                } else {
+                    vec![]
+                }
+            }
+            "show_all_sources" | "show_all_contexts" | "human_review" => {
+                // Verification/Coexistence/Review — all claims survive
+                claims.iter().map(|c| c.source_id.clone()).collect()
+            }
+            _ => {
+                // Unknown strategy — show all
+                claims.iter().map(|c| c.source_id.clone()).collect()
+            }
         }
     }
 

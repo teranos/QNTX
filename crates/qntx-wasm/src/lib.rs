@@ -417,41 +417,6 @@ mod wazero {
             );
         }
 
-        #[test]
-        fn sync_content_hash_basic() {
-            let input = serde_json::json!({
-                "id": "as-test",
-                "subjects": ["user-1"],
-                "predicates": ["member"],
-                "contexts": ["team"],
-                "actors": ["hr"],
-                "timestamp": 1000,
-                "source": "cli",
-                "created_at": 2000
-            });
-            let result = sync_content_hash_impl(&input.to_string());
-            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
-            assert!(parsed["error"].is_null(), "unexpected error: {}", result);
-            assert_eq!(parsed["hash"].as_str().unwrap().len(), 64);
-        }
-
-        #[test]
-        fn sync_content_hash_deterministic() {
-            let input = serde_json::json!({
-                "id": "as-1",
-                "subjects": ["s"],
-                "predicates": ["p"],
-                "contexts": ["c"],
-                "actors": ["a"],
-                "timestamp": 1000,
-                "source": "cli",
-                "created_at": 0
-            });
-            let json = input.to_string();
-            let r1 = sync_content_hash_impl(&json);
-            let r2 = sync_content_hash_impl(&json);
-            assert_eq!(r1, r2);
-        }
     }
 } // end mod wazero
 

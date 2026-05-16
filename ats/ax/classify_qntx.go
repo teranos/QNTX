@@ -129,10 +129,11 @@ func (w *WasmClassifier) convertOutput(output *wasm.ClassifyOutput, claimGroups 
 	}
 
 	return ClassificationResult{
-		Conflicts:      conflicts,
-		AutoResolved:   output.AutoResolved,
-		ReviewRequired: output.ReviewRequired,
-		TotalAnalyzed:  output.TotalAnalyzed,
+		Conflicts:         conflicts,
+		AutoResolved:      output.AutoResolved,
+		ReviewRequired:    output.ReviewRequired,
+		TotalAnalyzed:     output.TotalAnalyzed,
+		ResolvedSourceIDs: output.ResolvedSourceIDs,
 	}
 }
 
