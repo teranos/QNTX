@@ -943,7 +943,8 @@ mod tests {
 
         let distill_att = store.get(distill_ids[0]).unwrap().unwrap();
         assert_eq!(distill_att.source, "distill");
-        assert_eq!(distill_att.actors, vec!["system:distill"]);
+        assert!(distill_att.actors.contains(&"system:distill".to_string()));
+        assert!(distill_att.actors.contains(&"bot".to_string()));
         assert_eq!(distill_att.contexts, vec!["crawl"]);
 
         // Check _distill metadata

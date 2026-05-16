@@ -43,15 +43,13 @@ In the Rust enforcement path, the sigma is inserted AFTER deleting originals. Th
 ```
 subjects:   ["distill:<predicate>"]
 predicates: ["distill:<predicate>"]
-actors:     ["distill"]                              // canonical actor, avoids entity_actors_limit inflation
+actors:     ["system:distill", ...inherited actors]   // all unique actors from evicted attestations (capped at 10K)
 contexts:   [union of evicted contexts, capped at 50]
 source:     "distill"
 attributes: {
   _distill: true,
   _count: 8,
   _total: 342,
-  _actors_count: 12,
-  _actors_sample: ["bot", "crawler", ...],           // up to 50
   _subjects_count: 45,
   _subjects_sample: ["sub_1", "sub_2", ...],         // up to 10
   _first_seen: "2026-05-04T...",
@@ -69,7 +67,7 @@ attributes: {
 
 - **Number** -> `{min, max, sum, count}` — avg derived as sum/count
 - **String** -> `{frequencies: {val: count, ...}, count}` — frequency-tracked distribution, capped at 50 unique values. Legacy `{values: [...], count}` format (pre-frequency sigmas) passes values through as `unplaced` without fabricating counts. If constant across all attestations, kept as scalar.
-- **Sigma metadata keys** (`_distill`, `_count`, `_total`, `_first_seen`, `_last_seen`, `_version`, `_rust_version`, `_subjects_count`, `_subjects_sample`, `_actors_count`, `_actors_sample`, `_histogram`) are skipped during merging and rebuilt from the batch
+- **Sigma metadata keys** (`_distill`, `_count`, `_total`, `_first_seen`, `_last_seen`, `_version`, `_rust_version`, `_subjects_count`, `_subjects_sample`, `_actors_count`, `_actors_sample`, `_histogram`) are skipped during merging and rebuilt from the batch. Note: `_actors_count` and `_actors_sample` are legacy — actors are now inherited directly into the sigma's `actors[]` field.
 
 ### Re-distillation attribute stripping
 

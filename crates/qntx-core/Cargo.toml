@@ -32,5 +32,9 @@ pretty_assertions = "1.4"
 # WASM-specific deps (if needed later)
 # getrandom = { version = "0.2", features = ["js"] }
 
+[[bench]]
+name = "classify_large_actors"
+harness = false
+
 [lib]
 crate-type = ["rlib"]

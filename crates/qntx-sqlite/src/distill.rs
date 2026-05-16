@@ -55,39 +55,38 @@ pub fn build_distill_attestation(evicted: &[Attestation], context: &str) -> Atte
         }
     }
 
-    // Collect all actors for _actors_sample (not used as attestation actors —
-    // using canonical "distill" actor to avoid inflating entity_actors_limit)
-    let mut actors_sample: Vec<String> = Vec::new();
+    // Collect all unique actors from evicted attestations — the sigma inherits them.
+    // system:distill is prepended as the canonical actor to indicate this is a distilled record.
+    // Capped at 10K actors to bound storage and query cost.
+    const SIGMA_ACTORS_CAP: usize = 10_000;
+    let mut sigma_actors: Vec<String> = vec!["system:distill".to_string()];
     {
         let mut seen = HashSet::new();
+        seen.insert("system:distill".to_string());
         for att in evicted {
             for a in &att.actors {
-                if seen.insert(a.clone()) && actors_sample.len() < 50 {
-                    actors_sample.push(a.clone());
+                if sigma_actors.len() >= SIGMA_ACTORS_CAP {
+                    break;
                 }
+                if seen.insert(a.clone()) {
+                    sigma_actors.push(a.clone());
+                }
+            }
+            if sigma_actors.len() >= SIGMA_ACTORS_CAP {
+                break;
             }
         }
     }
 
     // Merge attributes
-    let mut attributes = merge_attributes(evicted);
-
-    // Store original actor set in attributes (not as attestation actors)
-    attributes.insert(
-        "_actors_count".to_string(),
-        Value::Number((actors_sample.len() as u64).into()),
-    );
-    attributes.insert(
-        "_actors_sample".to_string(),
-        Value::Array(actors_sample.into_iter().map(Value::String).collect()),
-    );
+    let attributes = merge_attributes(evicted);
 
     Attestation {
         id,
         subjects: subjects_set,
         predicates,
         contexts: vec![context.to_string()],
-        actors: vec!["system:distill".to_string()],
+        actors: sigma_actors,
         timestamp: now_ms,
         source: "distill".to_string(),
         attributes,
@@ -750,7 +749,7 @@ mod tests {
 
         assert!(distill.id.starts_with("AS-distill-"));
         assert_eq!(distill.source, "distill");
-        assert_eq!(distill.actors, vec!["system:distill"]);
+        assert_eq!(distill.actors, vec!["system:distill", "bot"]);
         assert_eq!(distill.contexts, vec!["ctx1"]);
 
         // Subjects: union of {X, Y} and {X} = {X, Y}
