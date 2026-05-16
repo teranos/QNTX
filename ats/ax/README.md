@@ -1,12 +1,12 @@
 # Ax - Attestation Query
 
-The `ax` package provides natural language querying capabilities for attestations, with support for fuzzy matching, alias resolution, and advanced sameness analysis.
+The `ax` package provides natural language querying capabilities for attestations, with alias resolution and advanced sameness analysis.
 
 ## Overview
 
 This package implements:
 
-- **Query execution** for natural language queries with fuzzy matching
+- **Query execution** for natural language queries with literal matching
 - **Sameness analysis** and conflict resolution
 - **Alias resolution** for identity equivalence
 - **Advanced classification** with temporal logic
@@ -21,7 +21,7 @@ Query the knowledge graph with natural language:
 # Basic queries
 qntx ax ENTITY-123                   # What do we know about ENTITY-123?
 qntx ax is member of ACME            # Who are ACME members?
-qntx ax has certification            # Find entities with certifications (fuzzy matching)
+qntx ax has certification            # Find entities with certifications
 qntx ax by registry since yesterday  # Recent registry attestations
 
 # Temporal comparison queries (over)
@@ -61,7 +61,7 @@ qntx ax 'FULL-NAME'                  # Also finds data for abbreviated forms
 // AxFilter - Query specification for ax commands
 type AxFilter struct {
     Subjects       []string     // Entities to query
-    Predicates     []string     // What to match (with fuzzy)
+    Predicates     []string     // What to match (literal)
     Contexts       []string     // Context filtering
     Actors         []string     // Actor filtering
     TimeStart      *time.Time   // Temporal range start
@@ -96,7 +96,7 @@ type AxResult struct {
 - **Natural language parsing** with flexible grammar
 - **Temporal expressions** (yesterday, last week, ISO dates)
 - **Temporal comparisons** ("over 5y" for duration filtering)
-- **Fuzzy predicate matching** with similarity scoring
+- **Literal predicate matching**
 - **Alias resolution** for identity equivalence
 - **Cartesian expansion** for multi-dimensional attestations
 

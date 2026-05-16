@@ -31,7 +31,7 @@
 //
 // Query System (ax):
 //   - Natural language query parsing
-//   - Fuzzy matching for predicates and contexts
+//   - Literal matching for predicates and contexts
 //   - Temporal range queries
 //   - Alias resolution for entity equivalence
 //   - Advanced classification with sameness analysis

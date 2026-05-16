@@ -111,7 +111,7 @@ pub struct AxDebug {
 pub struct AxFilter {
     /// Specific entities to ask about
     pub subjects: Vec<String>,
-    /// What predicates to match (with fuzzy)
+    /// What predicates to match
     pub predicates: Vec<String>,
     /// What contexts to match
     pub contexts: Vec<String>,

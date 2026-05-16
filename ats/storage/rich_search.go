@@ -202,7 +202,7 @@ func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit 
 						continue
 					}
 
-					// Simple substring matching for now (Rust fuzzy matcher will be integrated later)
+					// Simple substring matching
 					if strings.Contains(strings.ToLower(strValue), strings.ToLower(query)) {
 						// Calculate basic score based on position
 						pos := strings.Index(strings.ToLower(strValue), strings.ToLower(query))

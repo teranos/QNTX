@@ -219,35 +219,6 @@ func TestAxExecutorTemporalFiltering(t *testing.T) {
 	}
 }
 
-// TestAxExecutorFuzzyPredicateExpansion is disabled because it tests unexported implementation details
-// TODO(QNTX #71): Reimplement this test using public API when needed
-/*
-func TestAxExecutorFuzzyPredicateExpansion(t *testing.T) {
-	db := setupTestDatabaseWithAttestations(t)
-
-	executor := NewExecutor(db)
-
-	// Test fuzzy predicate expansion directly
-	expanded, err := executor.expandFuzzyPredicates(context.Background(), []string{"engineer"})
-	require.NoError(t, err)
-
-	// Should expand to include various engineer types
-	expectedPredicates := []string{
-		"engineer",
-		"software engineer",
-		"senior software engineer",
-	}
-
-	for _, expected := range expectedPredicates {
-		assert.Contains(t, expanded, expected,
-			"Fuzzy expansion should include '%s'", expected)
-	}
-
-	// Should not include non-engineer predicates
-	assert.NotContains(t, expanded, "manager")
-	assert.NotContains(t, expanded, "product manager")
-}
-*/
 
 // TestAxExecutorGetAllPredicatesFromDB is disabled because it tests unexported implementation details
 // TODO(QNTX #71): Reimplement this test using public API when needed

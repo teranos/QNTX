@@ -120,7 +120,7 @@ export interface AxFilter {
    */
   subjects: string[];
   /**
-   * What predicates to match (with fuzzy)
+   * What predicates to match
    */
   predicates: string[];
   /**

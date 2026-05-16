@@ -90,11 +90,11 @@ type PersistenceResult struct {
 // This interface abstracts storage-specific query implementations.
 type AttestationQueryStore interface {
 	// GetAllPredicates returns all distinct predicates in storage
-	// Used for fuzzy matching and predicate discovery
+	// Used for predicate discovery
 	GetAllPredicates(ctx context.Context) ([]string, error)
 
 	// GetAllContexts returns all distinct contexts in storage
-	// Used for fuzzy matching and context discovery
+	// Used for context discovery
 	GetAllContexts(ctx context.Context) ([]string, error)
 
 	// ExecuteAxQuery executes an ax filter query and returns matching attestations

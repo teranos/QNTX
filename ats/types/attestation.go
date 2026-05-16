@@ -106,7 +106,7 @@ type OverFilter struct {
 // AxFilter represents the parsed CLI command for querying attestations
 type AxFilter struct {
 	Subjects       []string    `json:"subjects"`        // Specific entities to ask about
-	Predicates     []string    `json:"predicates"`      // What predicates to match (with fuzzy)
+	Predicates     []string    `json:"predicates"`      // What predicates to match
 	Contexts       []string    `json:"contexts"`        // What contexts to match
 	Actors         []string    `json:"actors"`          // Filter by specific actors
 	TimeStart      *time.Time  `json:"time_start"`      // Temporal range start

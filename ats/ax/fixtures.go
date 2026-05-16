@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/internal/util"
 )
 
 // TestFixtures provides predictable test data for Ask System testing
@@ -40,7 +39,7 @@ func NewTestFixtures() *TestFixtures {
 				Timestamp:  yesterday,
 				Source:     "registry-system",
 			},
-			// A300: Entities participating in projects (fuzzy matching test)
+			// A300: Entities participating in projects
 			{
 				ID:         "A300",
 				Subjects:   []string{"APOC", "SWITCH"},
@@ -50,7 +49,7 @@ func NewTestFixtures() *TestFixtures {
 				Timestamp:  yesterday,
 				Source:     "project-tracker",
 			},
-			// A400: Ghost's classification (fuzzy matching variant)
+			// A400: Ghost's classification
 			{
 				ID:         "A400",
 				Subjects:   []string{"GHOST"},
@@ -117,20 +116,6 @@ func (tf *TestFixtures) GetConflictTestCase() []types.As {
 		}
 	}
 	return conflictAttestations
-}
-
-// GetFuzzyMatchingTestCase returns attestations for fuzzy predicate testing
-func (tf *TestFixtures) GetFuzzyMatchingTestCase() []types.As {
-	var roleAttestations []types.As
-	for _, as := range tf.Attestations {
-		for _, pred := range as.Predicates {
-			if util.ContainsString([]string{"participant", "active participant", "contributor"}, pred) {
-				roleAttestations = append(roleAttestations, as)
-				break
-			}
-		}
-	}
-	return roleAttestations
 }
 
 // GetCartesianTestCase returns attestations for cartesian expansion testing
