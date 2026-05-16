@@ -445,6 +445,7 @@ export interface DatabaseStatsMessage extends BaseMessage {
   unique_subjects: number;
   unique_contexts: number;
   rich_fields?: unknown[];
+  distillation?: { [key: string]: any };
 }
 
 /**
