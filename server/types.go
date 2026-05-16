@@ -59,12 +59,9 @@ type cachedUsageStats struct {
 
 // QueryMessage represents a client message
 type QueryMessage struct {
-	Type          string  `json:"type"`           // "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility", "rich_search"
-	Query         string  `json:"query"`          // The Ax query text (can be multi-line)
-	Line          int     `json:"line"`           // Current line number (for multi-line support)
-	Cursor        int     `json:"cursor"`         // Cursor position
+	Type          string  `json:"type"`           // "ping", "set_verbosity", "upload", "daemon_control", "pulse_config_update", "job_control", "rich_search"
+	Query         string  `json:"query"`          // Query text for rich_search
 	Verbosity     int     `json:"verbosity"`      // Verbosity level for set_verbosity
-	GraphLimit    int     `json:"graph_limit"`    // Graph node limit for set_graph_limit
 	Filename      string  `json:"filename"`       // For upload messages
 	FileType      string  `json:"fileType"`       // For upload messages: "linkedin", "vcf", etc.
 	Data          string  `json:"data"`           // For upload messages: base64 encoded file content
@@ -73,8 +70,6 @@ type QueryMessage struct {
 	WeeklyBudget  float64 `json:"weekly_budget"`  // For pulse_config_update messages
 	MonthlyBudget float64 `json:"monthly_budget"` // For pulse_config_update messages
 	JobID         string  `json:"job_id"`         // For job_control messages
-	NodeType      string  `json:"node_type"`      // For visibility messages: node type to toggle
-	Hidden        bool    `json:"hidden"`         // For visibility messages: whether to hide the node type/isolated nodes
 	// Watcher fields (for watcher_upsert messages)
 	WatcherID         string  `json:"watcher_id"`          // For watcher_upsert: ID of watcher (generated if empty)
 	WatcherQuery      string  `json:"watcher_query"`       // For watcher_upsert: AX query string

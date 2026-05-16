@@ -47,7 +47,7 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 	testStore, _ := createTestStore(t)
 
 	// Create server instance with file-backed DB
-	srv, err := NewQNTXServer(testDB, testStore, dbPath, 0, "")
+	srv, err := NewQNTXServer(testDB, testStore, dbPath, 0)
 	require.NoError(t, err)
 	defer srv.Stop()
 

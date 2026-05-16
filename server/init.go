@@ -17,7 +17,6 @@ import (
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/glyph/handlers"
 	glyphstorage "github.com/teranos/QNTX/glyph/storage"
-	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
@@ -37,7 +36,6 @@ import (
 // 3. createServerDependencies() - create and add to return
 // 4. (Optional) Global storage if needed (e.g., SetDefaultPluginManager)
 type serverDependencies struct {
-	builder       *graph.AxGraphBuilder
 	usageTracker  *tracker.UsageTracker
 	budgetTracker *budget.Tracker
 	daemon        *async.WorkerPool
@@ -47,12 +45,7 @@ type serverDependencies struct {
 
 // NewQNTXServer creates a new QNTX server.
 // atsStore is the pre-created attestation store (shared with the Rust SQL driver).
-// Optional initialQuery can be provided to pre-load an Ax query on connection.
-func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, verbosity int, initialQuery ...string) (*QNTXServer, error) {
-	query := ""
-	if len(initialQuery) > 0 {
-		query = initialQuery[0]
-	}
+func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, verbosity int) (*QNTXServer, error) {
 	// Defensive: Validate critical inputs
 	if db == nil {
 		return nil, errors.New("database connection cannot be nil")
@@ -81,9 +74,6 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	}
 
 	// Defensive: Validate critical dependencies (nil daemon is allowed)
-	if deps.builder == nil {
-		return nil, errors.New("graph builder creation failed")
-	}
 	if deps.usageTracker == nil {
 		return nil, errors.New("usage tracker creation failed")
 	}
@@ -182,20 +172,17 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		dbPath:        dbPath,
 		logPath:       logPath,
 		bindAddress:   bindAddr,
-		builder:       deps.builder,
 		usageTracker:  deps.usageTracker,
 		budgetTracker: deps.budgetTracker,
 		daemon:        daemon,             // Use daemon with server context
 		pluginManager: deps.pluginManager, // May be nil if no plugins enabled
 		ticker:        nil,                // Will be set below after passing server as broadcaster
 		clients:       make(map[*Client]bool),
-		broadcast:     make(chan *graph.Graph, MaxClientMessageQueueSize),
 		broadcastReq:  make(chan *broadcastRequest, MaxClientMessageQueueSize*2), // 2x buffer for multiple message types
 		register:      make(chan *Client),
 		unregister:    make(chan *Client),
 		logger:        serverLogger,
 		consoleBuffer: consoleBuffer, // Browser console log buffer with terminal printing
-		initialQuery:  query,
 		rlAuth:        newRateLimitGroup(rl.AuthRate, rl.AuthBurst),
 		rlWS:          newRateLimitGroup(rl.WSRate, rl.WSBurst),
 		rlWrite:       newRateLimitGroup(rl.WriteRate, rl.WriteBurst),
@@ -205,7 +192,6 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 		cancel:        cancel,
 	}
 	server.verbosity.Store(int32(verbosity))
-	server.graphLimit.Store(1000)                 // Default graph node limit
 	server.state.Store(int32(ServerStateRunning)) // Opening/Closing Phase 4: Initialize to running
 
 	// Set as global default server for async plugin initialization
@@ -299,8 +285,7 @@ func NewQNTXServer(db *sql.DB, atsStore ats.AttestationStore, dbPath string, ver
 	}
 
 	// Initialize gRPC plugins (if any are loaded)
-	// IMPORTANT: This must happen during server startup, not lazily on first HTTP request,
-	// so that plugins can register type definitions before graph queries are executed.
+	// IMPORTANT: This must happen during server startup, not lazily on first HTTP request.
 	serverLogger.Debugw("Plugin manager check", "plugin_manager_is_nil", server.pluginManager == nil, "services_is_nil", server.services == nil)
 
 	// Log plugin registry state — plugins load asynchronously, so the manager
@@ -444,13 +429,6 @@ func createServerLogger(verbosity int) *zap.SugaredLogger {
 func createServerDependencies(db *sql.DB, atsStore ats.AttestationStore, verbosity int, serverLogger *zap.SugaredLogger) (*serverDependencies, error) {
 	start := time.Now()
 
-	// Create builder with server logger — atsStore routes attestation queries through Rust FFI
-	builder, err := graph.NewAxGraphBuilder(db, verbosity, serverLogger, atsStore)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create graph builder")
-	}
-	serverLogger.Debugw("Graph builder created", "duration_ms", time.Since(start).Milliseconds())
-
 	// Load configuration for daemon setup
 	cfgStart := time.Now()
 	cfg, err := appcfg.Load()
@@ -487,7 +465,6 @@ func createServerDependencies(db *sql.DB, atsStore ats.AttestationStore, verbosi
 	serverLogger.Debugw("All dependencies created", "total_duration_ms", time.Since(start).Milliseconds())
 
 	return &serverDependencies{
-		builder:       builder,
 		usageTracker:  usageTracker,
 		budgetTracker: budgetTracker,
 		daemon:        daemon,

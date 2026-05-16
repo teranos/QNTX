@@ -539,26 +539,6 @@ func (g *Generator) parseWebSocketTypes() error {
 			},
 		},
 		{
-			Type:        "query",
-			Direction:   "client→server",
-			Description: "Execute an ATS query",
-			Fields: map[string]string{
-				"query":    "ATS query string",
-				"line":     "Cursor line position",
-				"cursor":   "Cursor column position",
-				"filename": "Source file name",
-			},
-		},
-		{
-			Type:        "graph",
-			Direction:   "server→client",
-			Description: "Graph data update for visualization",
-			Fields: map[string]string{
-				"nodes": "Array of graph nodes",
-				"edges": "Array of graph edges",
-			},
-		},
-		{
 			Type:        "job_update",
 			Direction:   "server→client",
 			Description: "Async job status update",

@@ -15,9 +15,7 @@ import (
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
-	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	grapherr "github.com/teranos/QNTX/graph/error"
 	"github.com/teranos/QNTX/internal/logger"
 	"github.com/teranos/QNTX/server/syscap"
 )
@@ -43,100 +41,13 @@ const (
 	semanticSearchThreshold = float32(0.3)
 )
 
-// createErrorGraph creates an empty graph with error metadata.
-// It handles both structured GraphError types and generic errors,
-// providing appropriate metadata for UI display.
-func createErrorGraph(err error) *graph.Graph {
-	meta := graph.Meta{
-		GeneratedAt: time.Now(),
-		Stats: graph.Stats{
-			TotalNodes: 0,
-			TotalEdges: 0,
-		},
-	}
-
-	// Use structured error metadata if available
-	if graphErr, ok := err.(*grapherr.GraphError); ok {
-		meta.Config = graphErr.ToGraphMeta()
-	} else {
-		meta.Config = map[string]string{
-			"error": err.Error(),
-		}
-	}
-
-	return &graph.Graph{
-		Nodes: []graph.Node{},
-		Links: []graph.Link{},
-		Meta:  meta,
-	}
-}
-
-// applyVisibilityFilters applies client-specific visibility preferences to a graph.
-// Phase 2: Server-side visibility control - backend sets Visible field based on client prefs.
-// Frontend just renders nodes where visible === true.
-func (c *Client) applyVisibilityFilters(g *graph.Graph) {
-	c.graphView.mu.RLock()
-	defer c.graphView.mu.RUnlock()
-
-	// Build connection count map to identify isolated nodes
-	connectionCount := make(map[string]int)
-	for _, link := range g.Links {
-		connectionCount[link.Source]++
-		connectionCount[link.Target]++
-	}
-
-	// Apply visibility rules to nodes
-	for i := range g.Nodes {
-		node := &g.Nodes[i]
-
-		// Rule 1: Hide nodes if their type is in hiddenNodeTypes
-		if c.graphView.hiddenNodeTypes[node.Type] {
-			node.Visible = false
-			continue
-		}
-
-		// Rule 2: Hide isolated nodes if hideIsolatedNodes is true
-		if c.graphView.hideIsolatedNodes && connectionCount[node.ID] == 0 {
-			node.Visible = false
-			continue
-		}
-
-		// Default: visible (already set to true by graph builder)
-	}
-
-	// Build set of visible node IDs for link filtering
-	visibleNodes := make(map[string]bool)
-	for _, node := range g.Nodes {
-		if node.Visible {
-			visibleNodes[node.ID] = true
-		}
-	}
-
-	// Apply visibility to links: hide link if either endpoint is hidden
-	for i := range g.Links {
-		link := &g.Links[i]
-		// Link is only visible if both endpoints are visible
-		link.Hidden = !visibleNodes[link.Source] || !visibleNodes[link.Target]
-	}
-}
-
-// GraphViewState encapsulates client-specific graph visibility preferences (Phase 2)
-type GraphViewState struct {
-	hiddenNodeTypes   map[string]bool // Node types to hide (e.g., "contact" -> true)
-	hideIsolatedNodes bool            // Whether to hide nodes with no connections
-	mu                sync.RWMutex    // Protects state updates
-}
-
 // Client represents a WebSocket client connection
 type Client struct {
 	server    *QNTXServer
 	conn      *websocket.Conn
-	send      chan *graph.Graph
-	sendMsg   chan interface{} // Generic message channel for ix progress/errors
+	sendMsg   chan interface{} // Generic message channel for all WebSocket messages
 	id        string
 	closeOnce sync.Once       // Defensive: Prevents double-close panics
-	graphView *GraphViewState // Phase 2: Client's graph visibility preferences
-	lastQuery string          // Phase 2: Last executed query for re-rendering with new visibility
 }
 
 // readPump handles reading messages from the WebSocket connection
@@ -209,14 +120,9 @@ func (c *Client) handleReadError(err error) {
 		websocket.CloseAbnormalClosure,
 		websocket.CloseNoStatusReceived,
 	) {
-		graphErr := grapherr.New(
-			grapherr.CategoryWebSocket,
-			err,
-			"WebSocket connection closed unexpectedly",
-		).WithSubcategory(grapherr.SubcategoryWSRead)
-
 		c.server.logger.Warnw("WebSocket read error",
-			graphErr.ToLogFields()...,
+			"error", err,
+			"client_id", c.id,
 		)
 	}
 }
@@ -225,14 +131,8 @@ func (c *Client) handleReadError(err error) {
 // This separation from readPump reduces complexity and improves testability.
 func (c *Client) routeMessage(msg *QueryMessage) {
 	switch msg.Type {
-	case "query":
-		c.handleQuery(msg.Query)
-	case "clear":
-		c.handleClear()
 	case "set_verbosity":
 		c.handleSetVerbosity(msg.Verbosity)
-	case "set_graph_limit":
-		c.handleSetGraphLimit(msg.GraphLimit)
 	case "upload":
 		c.handleUpload(msg.Filename, msg.FileType, msg.Data)
 	case "daemon_control":
@@ -241,8 +141,6 @@ func (c *Client) routeMessage(msg *QueryMessage) {
 		c.handlePulseConfigUpdate(*msg)
 	case "job_control":
 		c.handleJobControl(*msg)
-	case "visibility": // Phase 2: Handle visibility preference updates
-		c.handleVisibility(*msg)
 	case "rich_search":
 		c.handleRichSearch(msg.Query)
 	case "get_database_stats":
@@ -259,7 +157,7 @@ func (c *Client) routeMessage(msg *QueryMessage) {
 	}
 }
 
-// writePump writes graph updates and log batches to the WebSocket connection
+// writePump writes messages to the WebSocket connection
 func (c *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
@@ -274,34 +172,6 @@ func (c *Client) writePump() {
 		case <-c.server.ctx.Done():
 			c.server.logger.Debugw("Write pump stopping due to server shutdown", "client_id", c.id)
 			return
-		case g, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if !ok {
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
-				return
-			}
-
-			// Send graph as JSON
-			if err := c.conn.WriteJSON(g); err != nil {
-				graphErr := grapherr.New(
-					grapherr.CategoryWebSocket,
-					err,
-					"Failed to send graph to client",
-				).WithSubcategory(grapherr.SubcategoryWSWrite)
-
-				c.server.logger.Warnw("Graph write error",
-					append(graphErr.ToLogFields(), "client_id", c.id)...,
-				)
-				return
-			}
-
-			if logger.ShouldOutput(int(c.server.verbosity.Load()), logger.OutputInternalFlow) {
-				c.server.logger.Debugw("Sent graph to client",
-					"client_id", c.id,
-					"nodes", len(g.Nodes),
-					"links", len(g.Links),
-				)
-			}
 
 		case msg, ok := <-c.sendMsg:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
@@ -309,13 +179,11 @@ func (c *Client) writePump() {
 				return
 			}
 
-			// Send generic message (ix progress, errors, etc.)
 			if err := c.conn.WriteJSON(msg); err != nil {
 				c.server.logger.Debugw("Message write error",
 					"error", err.Error(),
 					"client_id", c.id,
 				)
-				// Don't return - message errors shouldn't kill connection
 			}
 
 		case <-ticker.C:
@@ -324,85 +192,6 @@ func (c *Client) writePump() {
 				return
 			}
 		}
-	}
-}
-
-// handleQuery processes an Ax query and sends the resulting graph
-func (c *Client) handleQuery(query string) {
-	ctx := c.server.ctx // Use server's cancellable context
-	queryID := fmt.Sprintf("q_%d", time.Now().UnixNano())
-
-	// TODO: Extract ix command handling - domain-specific ingestion commands deferred
-	// For now, treat all input as Ax queries
-	c.lastQuery = query
-
-	// Log query start
-	c.server.logger.Infow("Processing Ax query",
-		"query_id", queryID,
-		"client_id", c.id,
-		"query_length", len(query),
-	)
-
-	if logger.ShouldOutput(int(c.server.verbosity.Load()), logger.OutputAxExecution) {
-		c.server.logger.Debugw("Query details",
-			"query_id", queryID,
-			"query", query,
-		)
-	}
-
-	// Build graph from query (this will generate logs that get batched)
-	limit := int(c.server.graphLimit.Load())
-	g, err := c.server.builder.BuildFromQuery(ctx, query, limit)
-	if err != nil {
-		// Error already logged by builder - create error graph for display
-		g = createErrorGraph(err)
-	} else {
-		c.server.logger.Infow("Query completed",
-			"query_id", queryID,
-			"nodes", len(g.Nodes),
-			"links", len(g.Links),
-		)
-	}
-
-	// Phase 2: Apply client-specific visibility filters before sending
-	c.applyVisibilityFilters(g)
-
-	// Send graph to client
-	select {
-	case c.send <- g:
-	default:
-		c.server.logger.Warnw("Client send channel full, dropping graph update",
-			"client_id", c.id,
-			"query_id", queryID,
-		)
-	}
-}
-
-// handleClear sends an empty graph
-func (c *Client) handleClear() {
-	c.server.logger.Debugw("Clearing graph", "client_id", c.id)
-
-	g := &graph.Graph{
-		Nodes: []graph.Node{},
-		Links: []graph.Link{},
-		Meta: graph.Meta{
-			GeneratedAt: time.Now(),
-			Stats: graph.Stats{
-				TotalNodes: 0,
-				TotalEdges: 0,
-			},
-			Config: map[string]string{
-				"description": "Type an Ax query to see the graph...",
-			},
-		},
-	}
-
-	select {
-	case c.send <- g:
-	default:
-		c.server.logger.Warnw("Client send channel full, dropping clear",
-			"client_id", c.id,
-		)
 	}
 }
 
@@ -417,29 +206,6 @@ func (c *Client) handleSetVerbosity(verbosity int) {
 		"new_verbosity", verbosity,
 		"level_name", logger.LevelName(verbosity),
 	)
-}
-
-// handleSetGraphLimit sets the graph node limit and triggers a refresh
-func (c *Client) handleSetGraphLimit(limit int) {
-	if limit <= 0 || limit > 100000 {
-		c.server.logger.Warnw("Invalid graph limit, ignoring",
-			"client_id", c.id,
-			"requested_limit", limit,
-		)
-		return
-	}
-
-	oldLimit := int(c.server.graphLimit.Load())
-	c.server.graphLimit.Store(int32(limit))
-
-	c.server.logger.Infow("Graph limit changed",
-		"client_id", c.id,
-		"old_limit", oldLimit,
-		"new_limit", limit,
-	)
-
-	// Trigger graph refresh with new limit
-	c.server.refreshGraphFromDatabase()
 }
 
 // handleUpload processes file uploads from the client
@@ -974,65 +740,6 @@ func mergeSearchResults(text, semantic []storage.RichSearchMatch) []storage.Rich
 	return result
 }
 
-// handleVisibility updates client visibility preferences and refreshes the graph
-func (c *Client) handleVisibility(msg QueryMessage) {
-	c.server.logger.Infow("Visibility preference update",
-		"action", msg.Action,
-		"client_id", c.id,
-	)
-
-	// Update client's visibility preferences (lock only for state mutation)
-	c.graphView.mu.Lock()
-	switch msg.Action {
-	case "toggle_node_type":
-		// Normalize node type to lowercase for consistent matching
-		nodeType := strings.ToLower(strings.TrimSpace(msg.NodeType))
-
-		if msg.Hidden {
-			c.graphView.hiddenNodeTypes[nodeType] = true
-			c.server.logger.Debugw("Node type hidden",
-				"node_type", nodeType,
-				"client_id", c.id,
-			)
-		} else {
-			delete(c.graphView.hiddenNodeTypes, nodeType)
-			c.server.logger.Debugw("Node type shown",
-				"node_type", nodeType,
-				"client_id", c.id,
-			)
-		}
-
-	case "toggle_isolated":
-		c.graphView.hideIsolatedNodes = msg.Hidden
-		c.server.logger.Debugw("Isolated nodes visibility changed",
-			"hidden", msg.Hidden,
-			"client_id", c.id,
-		)
-
-	default:
-		c.server.logger.Warnw("Unknown visibility action",
-			"action", msg.Action,
-			"client_id", c.id,
-		)
-		c.graphView.mu.Unlock()
-		return
-	}
-	c.graphView.mu.Unlock()
-
-	// Re-run last query to generate updated graph with new visibility
-	// (This will trigger applyVisibilityFilters before sending)
-	if c.lastQuery != "" {
-		c.server.logger.Debugw("Re-running query with updated visibility",
-			"client_id", c.id,
-			"query", c.lastQuery,
-		)
-		c.handleQuery(c.lastQuery)
-	} else {
-		c.server.logger.Debugw("No query to re-run",
-			"client_id", c.id,
-		)
-	}
-}
 
 // base64Decode decodes a base64 string (helper for file uploads)
 func base64Decode(data string) (string, error) {
@@ -1063,9 +770,6 @@ func base64Decode(data string) (string, error) {
 // Only called from the broadcast worker goroutine (single-writer model).
 func (c *Client) close() {
 	c.closeOnce.Do(func() {
-		if c.send != nil {
-			close(c.send)
-		}
 		if c.sendMsg != nil {
 			close(c.sendMsg)
 		}

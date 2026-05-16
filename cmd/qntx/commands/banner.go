@@ -14,7 +14,6 @@ func printStartupBanner(verbosity int, dbPath string, logPath string, pluginName
 	// ANSI escape codes
 	cyan := "\033[36m"
 	green := "\033[32m"
-	yellow := "\033[33m"
 	blue := "\033[34m"
 	magenta := "\033[35m"
 	white := "\033[37m"
@@ -39,8 +38,8 @@ func printStartupBanner(verbosity int, dbPath string, logPath string, pluginName
 	fmt.Printf("   ║           %s%s%s██     ██  ██    %s                       ║\n", white, bold, bgBlack, reset+cyan+bold)
 	fmt.Printf("   ║           %s%s%s██    ██    ██   %s                       ║\n", white, bold, bgBlack, reset+cyan+bold)
 	fmt.Printf("   ║                                                   ║\n")
-	fmt.Printf("   ║   %s▣%s Attest  %s⟐%s View  %s%s%s Graph  %s%s%s Pulse            ║\n",
-		blue, reset+cyan+bold, yellow, reset+cyan+bold, green, sym.AX, reset+cyan+bold, magenta, sym.Pulse, reset+cyan+bold)
+	fmt.Printf("   ║   %s▣%s Attest  %s%s%s Pulse                          ║\n",
+		blue, reset+cyan+bold, magenta, sym.Pulse, reset+cyan+bold)
 	fmt.Printf("   ║                                                   ║\n")
 	fmt.Printf("   ╚═══════════════════════════════════════════════════╝%s\n\n", reset)
 

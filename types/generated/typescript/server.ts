@@ -685,29 +685,17 @@ export interface PulseExecutionStartedMessage {
 
 export interface QueryMessage {
   /**
-   * "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility", "rich_search"
+   * "ping", "set_verbosity", "upload", "daemon_control", "pulse_config_update", "job_control", "rich_search"
    */
   type: string;
   /**
-   * The Ax query text (can be multi-line)
+   * Query text for rich_search
    */
   query: string;
-  /**
-   * Current line number (for multi-line support)
-   */
-  line: number;
-  /**
-   * Cursor position
-   */
-  cursor: number;
   /**
    * Verbosity level for set_verbosity
    */
   verbosity: number;
-  /**
-   * Graph node limit for set_graph_limit
-   */
-  graph_limit: number;
   /**
    * For upload messages
    */
@@ -740,14 +728,6 @@ export interface QueryMessage {
    * For job_control messages
    */
   job_id: string;
-  /**
-   * For visibility messages: node type to toggle
-   */
-  node_type: string;
-  /**
-   * For visibility messages: whether to hide the node type/isolated nodes
-   */
-  hidden: boolean;
   /**
    * Watcher fields (for watcher_upsert messages)
    */

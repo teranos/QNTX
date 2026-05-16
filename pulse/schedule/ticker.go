@@ -281,7 +281,7 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 			metrics.MemoryUsedGB, metrics.MemoryTotalGB, metrics.MemoryPercent)
 	}
 
-	t.pulseLog.Infow(msg)
+	t.pulseLog.Debugw(msg)
 }
 
 // logActivitySummary logs a combined creation + eviction summary.

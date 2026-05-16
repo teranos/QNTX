@@ -22,7 +22,7 @@ Complete API documentation for the QNTX server.
 
 ## WebSocket Protocol
 
-- **[WebSocket Protocol](./websocket.md)** (6 message types)
+- **[WebSocket Protocol](./websocket.md)** (5 message types)
 
 ## gRPC APIs
 

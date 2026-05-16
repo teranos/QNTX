@@ -29,7 +29,6 @@ var ServerCmd = &cobra.Command{
 
 var (
 	serverTestMode  bool
-	serverAtsQuery  string
 	serverNoBrowser bool
 	serverDevMode   bool
 	serverDBPath    string
@@ -42,7 +41,6 @@ var DeferredPluginInit func()
 func init() {
 	// Server command flags
 	ServerCmd.Flags().BoolVar(&serverTestMode, "test-mode", false, "Run with test database")
-	ServerCmd.Flags().StringVar(&serverAtsQuery, "ats", "", "Pre-load graph with an Ax query (e.g., --ats 'role:developer')")
 	ServerCmd.Flags().BoolVar(&serverNoBrowser, "no-browser", true, "Disable automatic browser opening")
 	ServerCmd.Flags().BoolVar(&serverDevMode, "dev", false, "Enable development mode")
 	ServerCmd.Flags().StringVar(&serverDBPath, "db-path", "", "Custom database path (overrides config)")
@@ -100,7 +98,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 	// Create server with pre-created attestation store
 	srvStart := time.Now()
-	srv, err := server.NewQNTXServer(database, atsStore, dbPath, verbosity, serverAtsQuery)
+	srv, err := server.NewQNTXServer(database, atsStore, dbPath, verbosity)
 	if err != nil {
 		return errors.Wrap(err, "failed to create server")
 	}

@@ -15,19 +15,6 @@ Real-time communication protocol for the QNTX web interface.
 
 All messages are JSON objects with a `type` field indicating the message type.
 
-### Client → Server
-
-#### `query`
-
-Execute an ATS query
-
-| Field | Description |
-|-------|-------------|
-| cursor | Cursor column position |
-| filename | Source file name |
-| line | Cursor line position |
-| query | ATS query string |
-
 ### Server → Client
 
 #### `job_update`

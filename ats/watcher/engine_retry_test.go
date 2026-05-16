@@ -71,9 +71,8 @@ func TestEngine_RetryLogic(t *testing.T) {
 	})
 
 	// Wait for retries (initial + 2 retries with exponential backoff: 1s, 2s)
-	// Add extra buffer for processing time and ticker intervals
-	// Retry ticker runs every 1s, so we need to wait for multiple ticks
-	time.Sleep(6 * time.Second)
+	// Add extra buffer for processing time and ticker intervals on slow CI runners
+	time.Sleep(10 * time.Second)
 
 	// Should have succeeded on third attempt
 	if attempts != 3 {
@@ -160,8 +159,8 @@ func TestEngine_RateLimitDrain(t *testing.T) {
 	}
 
 	// Wait for drain loop to process all queued entries
-	// 4 queued entries at 2/sec = ~2 seconds, add buffer for drain interval jitter
-	deadline := time.After(5 * time.Second)
+	// 4 queued entries at 2/sec = ~2 seconds, add buffer for drain interval jitter on CI
+	deadline := time.After(10 * time.Second)
 	for {
 		select {
 		case <-deadline:

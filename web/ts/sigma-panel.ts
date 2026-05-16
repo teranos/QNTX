@@ -36,6 +36,9 @@ function sigmaToAttestation(sigma: any): Attestation {
         timestamp: sigma.timestamp ? new Date(sigma.timestamp).getTime() : 0,
         source: sigma.source || 'distill',
         attributes: attrs,
+        created_at: sigma.created_at ? new Date(sigma.created_at).getTime() : 0,
+        signature: sigma.signature || new Uint8Array(),
+        signer_did: sigma.signer_did || '',
     };
 }
 
@@ -219,11 +222,6 @@ function renderPanel(): void {
             }
         });
     });
-}
-
-function getTotal(sigma: any): number {
-    const attrs = typeof sigma.attributes === 'string' ? JSON.parse(sigma.attributes) : sigma.attributes;
-    return attrs?._total || attrs?._count || 0;
 }
 
 export function createSigmaPanel(): Glyph {

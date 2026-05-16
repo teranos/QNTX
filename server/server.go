@@ -15,7 +15,6 @@ import (
 
 	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/glyph/handlers"
-	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
@@ -40,7 +39,6 @@ type QNTXServer struct {
 	authHandler         *auth.Handler        // nil when auth.enabled = false
 	authEnabled         bool                 // resolved at init, never changes
 	nodeDID             *nodedid.Handler     // node's decentralized identity
-	builder             *graph.AxGraphBuilder
 	usageTracker        *tracker.UsageTracker // Cached usage tracker (eliminates 172k+ allocations/day)
 	budgetTracker       *budget.Tracker       // Budget tracking for Pulse daemon
 	daemon              *async.WorkerPool     // Background job processor (daemon)
@@ -48,19 +46,15 @@ type QNTXServer struct {
 	configWatcher       *am.ConfigWatcher     // Config watcher for auto-reload on config changes
 	storageEventsPoller *StorageEventsPoller  // Poller for storage events (warnings/evictions)
 	clients             map[*Client]bool
-	broadcast           chan *graph.Graph
 	broadcastReq        chan *broadcastRequest // Requests to broadcast worker (thread-safe sends)
 	register            chan *Client
 	unregister          chan *Client
 	mu                  sync.RWMutex
-	lastGraph           *graph.Graph        // Cache last broadcast graph for reconnecting clients
 	lastStatus          *cachedDaemonStatus // Cache last daemon status for change detection
 	lastUsage           *cachedUsageStats   // Cache last usage stats for change detection
 	verbosity           atomic.Int32        // Thread-safe verbosity level (fixes Issue #64)
-	graphLimit          atomic.Int32        // Thread-safe graph node limit (default 1000)
 	logger              *zap.SugaredLogger
 	consoleBuffer       *ConsoleBuffer              // Browser console log buffer for debugging (dev mode only)
-	initialQuery        string                      // Pre-loaded Ax query to execute on client connection
 	pluginRegistry      *plugin.Registry            // Domain plugin registry
 	pluginManager       *grpcplugin.PluginManager   // Plugin process manager
 	services            plugin.ServiceRegistry      // Service registry for plugins
@@ -149,7 +143,6 @@ func (s *QNTXServer) handleClientRegister(client *Client) {
 
 	s.clients[client] = true
 	totalClients := len(s.clients)
-	cachedGraph := s.lastGraph
 	s.mu.Unlock()
 
 	s.logger.Infow("Client connected",
@@ -163,31 +156,6 @@ func (s *QNTXServer) handleClientRegister(client *Client) {
 		"client_id", client.id,
 		"version", versionInfo.Short(),
 	)
-
-	// Send cached graph to newly connected client
-	if cachedGraph != nil {
-		s.logger.Infow("Sending cached graph to reconnected client",
-			"client_id", client.id,
-			"nodes", len(cachedGraph.Nodes),
-			"links", len(cachedGraph.Links),
-		)
-
-		// Send via broadcast worker (thread-safe)
-		req := &broadcastRequest{
-			reqType:  "graph",
-			graph:    cachedGraph,
-			clientID: client.id, // Send to specific client only
-		}
-
-		select {
-		case s.broadcastReq <- req:
-			s.logger.Debugw("Queued cached graph for client", "client_id", client.id)
-		case <-s.ctx.Done():
-			return
-		default:
-			s.logger.Warnw("Broadcast request queue full, skipping cached graph", "client_id", client.id)
-		}
-	}
 }
 
 // handleClientUnregister handles a client disconnection
@@ -241,30 +209,6 @@ func (s *QNTXServer) removeSlowClient(client *Client) {
 	)
 }
 
-// handleBroadcast sends a graph update to all connected clients via the broadcast worker
-func (s *QNTXServer) handleBroadcast(g *graph.Graph) {
-	// Cache graph for reconnecting clients
-	s.mu.Lock()
-	s.lastGraph = g
-	s.mu.Unlock()
-
-	// Send to broadcast worker (thread-safe)
-	req := &broadcastRequest{
-		reqType: "graph",
-		graph:   g,
-	}
-
-	select {
-	case s.broadcastReq <- req:
-		// Request queued successfully
-	case <-s.ctx.Done():
-		// Server shutting down
-	default:
-		// Broadcast queue full (should never happen with proper sizing)
-		s.logger.Warnw("Broadcast request queue full, dropping graph update")
-	}
-}
-
 // Run starts the server hub event loop
 func (s *QNTXServer) Run() {
 	// Start dedicated broadcast worker (MUST start before processing any messages)
@@ -280,8 +224,6 @@ func (s *QNTXServer) Run() {
 			s.handleClientRegister(client)
 		case client := <-s.unregister:
 			s.handleClientUnregister(client)
-		case g := <-s.broadcast:
-			s.handleBroadcast(g)
 		}
 	}
 }

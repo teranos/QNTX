@@ -21,7 +21,6 @@ import (
 var languagePackages = map[string][]string{
 	"typescript": {
 		"github.com/teranos/QNTX/ats/types",
-		"github.com/teranos/QNTX/graph", // Frontend graph visualization
 		"github.com/teranos/QNTX/pulse/async",
 		"github.com/teranos/QNTX/pulse/budget",
 		"github.com/teranos/QNTX/pulse/schedule",
@@ -31,7 +30,6 @@ var languagePackages = map[string][]string{
 	},
 	"rust": {
 		"github.com/teranos/QNTX/ats/types",
-		// graph package excluded - frontend-only types
 		"github.com/teranos/QNTX/pulse/async",
 		"github.com/teranos/QNTX/pulse/budget",
 		"github.com/teranos/QNTX/pulse/schedule",
@@ -44,7 +42,6 @@ var languagePackages = map[string][]string{
 	},
 	"markdown": {
 		"github.com/teranos/QNTX/ats/types",
-		"github.com/teranos/QNTX/graph",
 		"github.com/teranos/QNTX/pulse/async",
 		"github.com/teranos/QNTX/pulse/budget",
 		"github.com/teranos/QNTX/pulse/schedule",

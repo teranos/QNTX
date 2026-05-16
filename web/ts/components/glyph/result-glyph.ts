@@ -476,6 +476,7 @@ export function createResultGlyph(
 
     // Resize canvas to match element pixel density, redraw last frame
     function fitNebulaCanvas(): void {
+        if (!element.isConnected) return;
         const rect = element.getBoundingClientRect();
         nebulaCanvas.width = Math.round(rect.width * devicePixelRatio);
         nebulaCanvas.height = Math.round(rect.height * devicePixelRatio);
