@@ -19,9 +19,15 @@
 
 ## Development Workflow
 
-Hot-reloading TypeScript frontend dev server. Restart `make dev` to pick up QNTX backend changes. Ports are configured in `am.toml`. Initial startup takes 10+ seconds (Go build + WASM + frontend bundling).
+Hot-reloading TypeScript frontend dev server. Ports are configured in `am.toml`. Initial startup takes 10+ seconds (Go build + WASM + frontend bundling).
 
-**KNOW** the developer is always running the latest version of QNTX. It is **FORBIDDEN** to discuss or question whether the developer has run the latest version. If there is an issue, it is in the code, not with running the latest binary or configuration.
+**KNOW** the developer is always running the latest version of QNTX. If there is an issue, it is in the code.
+
+Never:
+- Ask if the developer has rebuilt/restarted
+- Suggest running build commands (`make wasm`, `make dev`, `go build`, etc.)
+- Remind about rebuild steps after code changes
+- Imply the running binary might be stale
 
 **The developer announces every `make dev` kill and start.** These announcements are authoritative — when they say it's killed, it's dead; when they say it's started, the latest code is running. Never contradict or second-guess these statements.
 

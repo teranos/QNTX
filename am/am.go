@@ -117,18 +117,11 @@ type PulseConfig struct {
 // CodeConfig configures the code review system
 type CodeConfig struct {
 	GitHub CodeGitHubConfig `mapstructure:"github"`
-	Gopls  CodeGoplsConfig  `mapstructure:"gopls"`
 }
 
 // CodeGitHubConfig configures GitHub integration for code review
 type CodeGitHubConfig struct {
 	Token string `mapstructure:"token"`
-}
-
-// CodeGoplsConfig configures gopls (Go language server) integration
-type CodeGoplsConfig struct {
-	WorkspaceRoot string `mapstructure:"workspace_root"` // Workspace root for gopls (default: project root)
-	Enabled       bool   `mapstructure:"enabled"`        // Enable gopls integration (default: true)
 }
 
 // AxConfig configures the attestation query system

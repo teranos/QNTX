@@ -60,7 +60,7 @@ Infrastructure configured by `am`:
 - **`database`** - SQLite storage path and settings
 - **`server`** - Web UI ports, CORS origins, log themes
 - **`pulse`** - Async job workers, scheduling, HTTP rate limiting
-- **`code`** - Code review system (GitHub, gopls integration)
+- **`code`** - Code review system (GitHub integration)
 - **`local_inference`** - Local LLM support (llama.cpp plugin)
 - **`ax`** - Attestation query defaults
 

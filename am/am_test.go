@@ -106,7 +106,6 @@ func TestSetDefaults(t *testing.T) {
 		{"server.log_theme", "everforest"},
 		{"pulse.workers", 1},
 		{"pulse.ticker_interval_seconds", 1},
-		{"code.gopls.enabled", true},
 		{"ax.default_actor", "ax@user"},
 	}
 

@@ -213,12 +213,4 @@ ticker_interval_seconds = 1
 # Environment: QNTX_CODE_GITHUB_TOKEN
 # token = "ghp_..."
 
-[code.gopls]
-# Go language server integration
-# Workspace root for gopls (default: project root)
-# workspace_root = "/path/to/workspace"
-
-# Enable gopls integration
-# Default: true
-enabled = true
 

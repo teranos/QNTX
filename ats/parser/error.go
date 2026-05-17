@@ -38,7 +38,6 @@ type ParseError struct {
 	Position    int                    // Token position where error occurred
 	TokenCount  int                    // Total tokens being parsed
 	Token       *axToken               // Token that caused the error (optional)
-	Range       *Range                 // Source range (optional)
 	Suggestions []string               // Possible fixes
 	Context     map[string]interface{} // Additional debug context
 	Timestamp   time.Time              // When error occurred
@@ -140,12 +139,6 @@ func (e *ParseError) WithPosition(pos int, total int) *ParseError {
 // WithToken sets the token that caused the error
 func (e *ParseError) WithToken(token *axToken) *ParseError {
 	e.Token = token
-	return e
-}
-
-// WithRange sets the source range
-func (e *ParseError) WithRange(r Range) *ParseError {
-	e.Range = &r
 	return e
 }
 
