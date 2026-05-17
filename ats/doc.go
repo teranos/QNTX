@@ -71,7 +71,6 @@
 // # Extensibility
 //
 // ATS supports customization through interfaces:
-//   - QueryExpander: Add domain-specific semantic search
 //   - ActorDetector: Implement custom actor identification
 //   - EntityResolver: Handle entity aliases and equivalences
 //   - ProgressEmitter: Custom progress tracking for data ingestion

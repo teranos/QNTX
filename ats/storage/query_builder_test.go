@@ -6,10 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 )
-
 
 // TestBuildSubjectFilter tests subject filter SQL generation
 func TestBuildSubjectFilter(t *testing.T) {
@@ -196,56 +194,6 @@ func TestBuildTemporalFilters(t *testing.T) {
 	})
 }
 
-// TestBuildNaturalLanguageFilter tests NL query expansion
-func TestBuildNaturalLanguageFilter(t *testing.T) {
-	mockExpander := &mockQueryExpander{
-		nlPredicates: []string{"is"},
-		expansions: []ats.PredicateExpansion{
-			{Predicate: "role", Context: "engineer"},
-			{Predicate: "title", Context: "engineer"},
-		},
-	}
-
-	t.Run("natural language expansion", func(t *testing.T) {
-		qb := &queryBuilder{}
-		filter := types.AxFilter{
-			Predicates: []string{"is", "engineer"},
-		}
-
-		qb.buildNaturalLanguageFilter(mockExpander, filter)
-
-		assert.Equal(t, 1, len(qb.whereClauses))
-		assert.Contains(t, qb.whereClauses[0], "attestation_predicates")
-		assert.Contains(t, qb.whereClauses[0], "attestation_contexts")
-		assert.Contains(t, qb.whereClauses[0], "AND")
-		assert.Contains(t, qb.whereClauses[0], "OR")
-	})
-
-	t.Run("empty predicates", func(t *testing.T) {
-		qb := &queryBuilder{}
-		filter := types.AxFilter{
-			Predicates: []string{},
-		}
-
-		qb.buildNaturalLanguageFilter(mockExpander, filter)
-
-		assert.Equal(t, 0, len(qb.whereClauses))
-	})
-
-	t.Run("with explicit contexts", func(t *testing.T) {
-		qb := &queryBuilder{}
-		filter := types.AxFilter{
-			Predicates: []string{"is", "engineer"},
-			Contexts:   []string{"ACME Corp"},
-		}
-
-		qb.buildNaturalLanguageFilter(mockExpander, filter)
-
-		// Should have clauses for both NL expansion and explicit contexts
-		assert.GreaterOrEqual(t, len(qb.whereClauses), 1)
-	})
-}
-
 // TestAddClause tests the helper method
 func TestAddClause(t *testing.T) {
 	qb := &queryBuilder{}
@@ -259,18 +207,4 @@ func TestAddClause(t *testing.T) {
 	assert.Equal(t, "another = ?", qb.whereClauses[1])
 	assert.Equal(t, "value1", qb.args[0])
 	assert.Equal(t, "value2", qb.args[1])
-}
-
-// mockQueryExpander for testing
-type mockQueryExpander struct {
-	nlPredicates []string
-	expansions   []ats.PredicateExpansion
-}
-
-func (m *mockQueryExpander) ExpandPredicate(predicate string, values []string) []ats.PredicateExpansion {
-	return m.expansions
-}
-
-func (m *mockQueryExpander) GetNaturalLanguagePredicates() []string {
-	return m.nlPredicates
 }

@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 )
 
@@ -114,43 +113,6 @@ func BuildFilterQuery(filter types.AxFilter) (string, []interface{}) {
 	}
 
 	return query, qb.args
-}
-
-// buildNaturalLanguageFilter handles NL query expansion with predicate-context pairing
-func (qb *queryBuilder) buildNaturalLanguageFilter(expander ats.QueryExpander, filter types.AxFilter) {
-	if len(filter.Predicates) == 0 {
-		return
-	}
-
-	// First predicate is the NL predicate, rest are context values
-	nlPredicate := filter.Predicates[0]
-	contextValues := filter.Predicates[1:]
-
-	// Expand using QueryExpander
-	expansions := expander.ExpandPredicate(nlPredicate, contextValues)
-
-	// Build OR clauses for each expansion (predicate AND context pairs)
-	if len(expansions) > 0 {
-		var expansionClauses []string
-		for _, exp := range expansions {
-			expansionClauses = append(expansionClauses,
-				"(id IN (SELECT attestation_id FROM attestation_predicates WHERE predicate = ?) AND id IN (SELECT attestation_id FROM attestation_contexts WHERE context = ? COLLATE NOCASE))")
-			qb.args = append(qb.args, exp.Predicate, exp.Context)
-		}
-		// Wrap all expansions in OR
-		qb.whereClauses = append(qb.whereClauses, "("+strings.Join(expansionClauses, " OR ")+")")
-	}
-
-	// Also add any explicit contexts from filter.Contexts
-	if len(filter.Contexts) > 0 {
-		placeholders := make([]string, len(filter.Contexts))
-		for i, ctx := range filter.Contexts {
-			placeholders[i] = "?"
-			qb.args = append(qb.args, ctx)
-		}
-		qb.whereClauses = append(qb.whereClauses,
-			"id IN (SELECT attestation_id FROM attestation_contexts WHERE context IN ("+strings.Join(placeholders, ",")+" COLLATE NOCASE))")
-	}
 }
 
 // buildTemporalFilters adds timestamp range filters

@@ -65,8 +65,6 @@ func TestNewAxExecutor_DefaultsApplied(t *testing.T) {
 
 	// Verify default options are applied
 	assert.NotNil(t, executor.entityResolver, "EntityResolver should have default")
-	assert.NotNil(t, executor.queryExpander, "QueryExpander should have default")
-	// Fuzzy matcher removed — predicates/contexts matched literally (ADR-015)
 }
 
 func TestNewAxExecutorWithOptions_LoggerSet(t *testing.T) {
@@ -86,15 +84,12 @@ func TestNewAxExecutorWithOptions_CustomOptions(t *testing.T) {
 	aliasResolver := alias.NewResolver(&mockAliasStore{})
 
 	customResolver := &ats.NoOpEntityResolver{}
-	customExpander := &ats.NoOpQueryExpander{}
 
 	executor := NewAxExecutorWithOptions(queryStore, aliasResolver, AxExecutorOptions{
 		EntityResolver: customResolver,
-		QueryExpander:  customExpander,
 	})
 
 	assert.Equal(t, customResolver, executor.entityResolver)
-	assert.Equal(t, customExpander, executor.queryExpander)
 }
 
 func TestSetClassificationConfig(t *testing.T) {

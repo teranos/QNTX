@@ -42,7 +42,7 @@ Types themselves are attestations too - we attest that "restaurant" is a type wi
 
 ## Extensibility
 
-ATS stays domain-agnostic through interfaces: `QueryExpander` (semantic search), `ActorDetector` (actor identification), `EntityResolver` (entity aliases). Your domain logic plugs in without modifying core.
+ATS stays domain-agnostic through interfaces: `ActorDetector` (actor identification), `EntityResolver` (entity aliases). Your domain logic plugs in without modifying core.
 
 ### Data Models
 

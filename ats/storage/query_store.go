@@ -22,25 +22,13 @@ type RawQuerier interface {
 
 // SQLQueryStore implements ats.AttestationQueryStore for SQL databases
 type SQLQueryStore struct {
-	db            *sql.DB
-	rawQuerier    RawQuerier        // Optional: routes queries through Rust FFI
-	queryExpander ats.QueryExpander // Optional query expander for NL queries
+	db         *sql.DB
+	rawQuerier RawQuerier // Optional: routes queries through Rust FFI
 }
 
 // NewSQLQueryStore creates a new SQL query store
 func NewSQLQueryStore(db *sql.DB) *SQLQueryStore {
-	return &SQLQueryStore{
-		db:            db,
-		queryExpander: &ats.NoOpQueryExpander{}, // Default to no expansion
-	}
-}
-
-// NewSQLQueryStoreWithExpander creates a SQL query store with custom QueryExpander
-func NewSQLQueryStoreWithExpander(db *sql.DB, expander ats.QueryExpander) *SQLQueryStore {
-	return &SQLQueryStore{
-		db:            db,
-		queryExpander: expander,
-	}
+	return &SQLQueryStore{db: db}
 }
 
 // SetRawQuerier sets the raw query executor (Rust FFI).
@@ -157,14 +145,8 @@ func (s *SQLQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilte
 	// Fallback: Go query builder for non-FFI environments
 	qb := &queryBuilder{}
 	qb.buildSubjectFilter(filter.Subjects)
-
-	if s.isNaturalLanguageQuery(filter) {
-		qb.buildNaturalLanguageFilter(s.queryExpander, filter)
-	} else {
-		qb.buildPredicateFilter(filter.Predicates)
-		qb.buildContextFilter(filter.Contexts)
-	}
-
+	qb.buildPredicateFilter(filter.Predicates)
+	qb.buildContextFilter(filter.Contexts)
 	qb.buildActorFilter(filter.Actors)
 	qb.buildTemporalFilters(filter)
 
@@ -223,26 +205,6 @@ func parsePredicatesFromJSON(jsonStr string) []string {
 	}
 
 	return predicates
-}
-
-// isNaturalLanguageQuery detects if filter requires QueryExpander processing
-func (s *SQLQueryStore) isNaturalLanguageQuery(filter types.AxFilter) bool {
-	if len(filter.Predicates) == 0 {
-		return false
-	}
-
-	// Check if first predicate is a natural language trigger
-	firstPred := filter.Predicates[0]
-	nlPredicates := s.queryExpander.GetNaturalLanguagePredicates()
-
-	for _, nlPred := range nlPredicates {
-		if firstPred == nlPred {
-			// NL predicate detected - check if we have semantic values
-			return len(filter.Predicates) > 1
-		}
-	}
-
-	return false
 }
 
 // Ensure SQLQueryStore implements the interface

@@ -19,14 +19,12 @@ type AxExecutor struct {
 	classifier     Classifier
 	aliasResolver  *alias.Resolver
 	entityResolver ats.EntityResolver
-	queryExpander  ats.QueryExpander
 	logger         *zap.SugaredLogger
 }
 
 // NewAxExecutor creates a new ask executor with default components:
 // - Smart classification enabled
 // - NoOpEntityResolver (no external identity resolution)
-// - NoOpQueryExpander (literal query matching only)
 func NewAxExecutor(queryStore ats.AttestationQueryStore, aliasResolver *alias.Resolver) *AxExecutor {
 	return NewAxExecutorWithOptions(queryStore, aliasResolver, AxExecutorOptions{})
 }
@@ -34,7 +32,6 @@ func NewAxExecutor(queryStore ats.AttestationQueryStore, aliasResolver *alias.Re
 // AxExecutorOptions provides optional configuration for AxExecutor.
 type AxExecutorOptions struct {
 	EntityResolver ats.EntityResolver // Optional entity ID resolution (default: NoOpEntityResolver)
-	QueryExpander  ats.QueryExpander  // Optional query expansion (default: NoOpQueryExpander)
 	Logger         *zap.SugaredLogger // Optional logger for debug output (default: nil, no logging)
 	RawQuerier     interface{}        // Optional: routes attestation queries through Rust FFI (storage.RawQuerier)
 }
@@ -45,15 +42,11 @@ func NewAxExecutorWithOptions(queryStore ats.AttestationQueryStore, aliasResolve
 	if opts.EntityResolver == nil {
 		opts.EntityResolver = &ats.NoOpEntityResolver{}
 	}
-	if opts.QueryExpander == nil {
-		opts.QueryExpander = &ats.NoOpQueryExpander{}
-	}
 	return &AxExecutor{
 		queryStore:     queryStore,
 		classifier:     NewDefaultClassifier(DefaultTemporalConfig()),
 		aliasResolver:  aliasResolver,
 		entityResolver: opts.EntityResolver,
-		queryExpander:  opts.QueryExpander,
 		logger:         opts.Logger,
 	}
 }

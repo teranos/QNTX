@@ -47,29 +47,6 @@ func (d *DefaultActorDetector) GetLLMActor() string {
 	return ""
 }
 
-// QueryExpander provides domain-specific query expansion logic.
-// Implementations can add semantic mappings for natural language queries.
-type QueryExpander interface {
-	// ExpandPredicate maps a predicate to alternative search patterns.
-	// For example, "is type_a" might expand to search for:
-	//   - Direct: predicate="is", context="type_a"
-	//   - Semantic: predicate="category", context="type_a"
-	//   - Semantic: predicate="has_attribute", context="type_a"
-	// Returns empty slice to use literal matching only.
-	ExpandPredicate(predicate string, values []string) []PredicateExpansion
-
-	// GetNaturalLanguagePredicates returns predicates that trigger semantic expansion.
-	// For example: ["is", "has", "speaks", "knows", "located_in"] for entity attribute queries.
-	// Returns empty slice to disable natural language expansion.
-	GetNaturalLanguagePredicates() []string
-}
-
-// PredicateExpansion represents a single predicate search pattern.
-type PredicateExpansion struct {
-	Predicate string // The predicate to search for
-	Context   string // The context value to match
-}
-
 // NoOpEntityResolver is a resolver that returns no alternative IDs.
 // Use this for standalone ATS installations without external identity systems.
 type NoOpEntityResolver struct{}
@@ -77,28 +54,6 @@ type NoOpEntityResolver struct{}
 // GetAlternativeIDs returns empty slice (no external identity resolution).
 func (n *NoOpEntityResolver) GetAlternativeIDs(id string) ([]string, error) {
 	return []string{}, nil
-}
-
-// NoOpQueryExpander provides literal query matching without semantic expansion.
-// Use this for generic ATS installations or domains that don't need
-// natural language query interpretation.
-type NoOpQueryExpander struct{}
-
-// ExpandPredicate returns literal predicate-context pairs without expansion.
-func (n *NoOpQueryExpander) ExpandPredicate(predicate string, values []string) []PredicateExpansion {
-	var expansions []PredicateExpansion
-	for _, value := range values {
-		expansions = append(expansions, PredicateExpansion{
-			Predicate: predicate,
-			Context:   value,
-		})
-	}
-	return expansions
-}
-
-// GetNaturalLanguagePredicates returns empty slice (no semantic expansion).
-func (n *NoOpQueryExpander) GetNaturalLanguagePredicates() []string {
-	return []string{}
 }
 
 // getSystemActor generates a system-based actor string using environment variables.
