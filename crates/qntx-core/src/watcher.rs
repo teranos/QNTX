@@ -163,14 +163,16 @@ pub fn match_watchers_json(input: &str) -> String {
     let parsed: MatchInput = match serde_json::from_str(input) {
         Ok(v) => v,
         Err(e) => {
-            return format!(r#"{{"error":"invalid input: {}"}}"#, e.to_string().replace('"', "\\\""));
+            return format!(
+                r#"{{"error":"invalid input: {}"}}"#,
+                e.to_string().replace('"', "\\\"")
+            );
         }
     };
 
     let output = match_watchers(&parsed);
-    serde_json::to_string(&output).unwrap_or_else(|e| {
-        format!(r#"{{"error":"serialization failed: {}"}}"#, e)
-    })
+    serde_json::to_string(&output)
+        .unwrap_or_else(|e| format!(r#"{{"error":"serialization failed: {}"}}"#, e))
 }
 
 #[cfg(test)]
@@ -178,7 +180,12 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn make_attestation(subjects: &[&str], predicates: &[&str], contexts: &[&str], actors: &[&str]) -> MatchAttestation {
+    fn make_attestation(
+        subjects: &[&str],
+        predicates: &[&str],
+        contexts: &[&str],
+        actors: &[&str],
+    ) -> MatchAttestation {
         MatchAttestation {
             subjects: subjects.iter().map(|s| s.to_string()).collect(),
             predicates: predicates.iter().map(|s| s.to_string()).collect(),
@@ -206,7 +213,10 @@ mod tests {
     fn test_empty_filter_matches_all() {
         let att = make_attestation(&["ALICE"], &["crawled"], &["web"], &["levi"]);
         let watcher = make_filter("w1", &[], &[]);
-        let input = MatchInput { attestation: att, watchers: vec![watcher] };
+        let input = MatchInput {
+            attestation: att,
+            watchers: vec![watcher],
+        };
         let output = match_watchers(&input);
         assert_eq!(output.matched_ids, vec!["w1"]);
     }
@@ -216,7 +226,10 @@ mod tests {
         let att = make_attestation(&["ALICE"], &["crawled"], &[], &[]);
         let w1 = make_filter("w1", &["ALICE"], &[]);
         let w2 = make_filter("w2", &["BOB"], &[]);
-        let input = MatchInput { attestation: att, watchers: vec![w1, w2] };
+        let input = MatchInput {
+            attestation: att,
+            watchers: vec![w1, w2],
+        };
         let output = match_watchers(&input);
         assert_eq!(output.matched_ids, vec!["w1"]);
     }
@@ -225,7 +238,10 @@ mod tests {
     fn test_case_insensitive_overlap() {
         let att = make_attestation(&["Alice"], &["Crawled"], &[], &[]);
         let w1 = make_filter("w1", &["alice"], &["crawled"]);
-        let input = MatchInput { attestation: att, watchers: vec![w1] };
+        let input = MatchInput {
+            attestation: att,
+            watchers: vec![w1],
+        };
         let output = match_watchers(&input);
         assert_eq!(output.matched_ids, vec!["w1"]);
     }
@@ -234,7 +250,10 @@ mod tests {
     fn test_predicate_mismatch() {
         let att = make_attestation(&["ALICE"], &["crawled"], &[], &[]);
         let w1 = make_filter("w1", &["ALICE"], &["announced"]);
-        let input = MatchInput { attestation: att, watchers: vec![w1] };
+        let input = MatchInput {
+            attestation: att,
+            watchers: vec![w1],
+        };
         let output = match_watchers(&input);
         assert!(output.matched_ids.is_empty());
     }
@@ -251,7 +270,10 @@ mod tests {
         let mut w2 = make_filter("w2", &[], &[]);
         w2.time_start_ms = Some(6000);
 
-        let input = MatchInput { attestation: att, watchers: vec![w1, w2] };
+        let input = MatchInput {
+            attestation: att,
+            watchers: vec![w1, w2],
+        };
         let output = match_watchers(&input);
         assert_eq!(output.matched_ids, vec!["w1"]);
     }
@@ -276,7 +298,10 @@ mod tests {
             }],
         };
 
-        let input = MatchInput { attestation: att, watchers: vec![w1] };
+        let input = MatchInput {
+            attestation: att,
+            watchers: vec![w1],
+        };
         let output = match_watchers(&input);
         assert_eq!(output.matched_ids, vec!["w1"]);
     }
@@ -301,7 +326,10 @@ mod tests {
             }],
         };
 
-        let input = MatchInput { attestation: att, watchers: vec![w1] };
+        let input = MatchInput {
+            attestation: att,
+            watchers: vec![w1],
+        };
         let output = match_watchers(&input);
         assert_eq!(output.matched_ids, vec!["w1"]);
     }
@@ -326,21 +354,32 @@ mod tests {
             }],
         };
 
-        let input = MatchInput { attestation: att, watchers: vec![w1] };
+        let input = MatchInput {
+            attestation: att,
+            watchers: vec![w1],
+        };
         let output = match_watchers(&input);
         assert_eq!(output.matched_ids, vec!["w1"]);
     }
 
     #[test]
     fn test_batch_multiple_watchers() {
-        let att = make_attestation(&["NODE1"], &["announced", "crawled"], &["reticulum"], &["levi"]);
+        let att = make_attestation(
+            &["NODE1"],
+            &["announced", "crawled"],
+            &["reticulum"],
+            &["levi"],
+        );
 
         let w1 = make_filter("w1", &["NODE1"], &["announced"]);
         let w2 = make_filter("w2", &["NODE1"], &["crawled"]);
         let w3 = make_filter("w3", &["NODE2"], &[]);
         let w4 = make_filter("w4", &[], &["announced"]);
 
-        let input = MatchInput { attestation: att, watchers: vec![w1, w2, w3, w4] };
+        let input = MatchInput {
+            attestation: att,
+            watchers: vec![w1, w2, w3, w4],
+        };
         let output = match_watchers(&input);
         assert_eq!(output.matched_ids, vec!["w1", "w2", "w4"]);
     }

@@ -10,9 +10,19 @@ use serde::{Deserialize, Serialize};
 pub enum ResolvedTemporal {
     Since(i64),
     Until(i64),
-    On { start_ms: i64, end_ms: i64 },
-    Between { start_ms: i64, end_ms: i64 },
-    Over { raw: String, value: Option<f64>, unit: Option<String> },
+    On {
+        start_ms: i64,
+        end_ms: i64,
+    },
+    Between {
+        start_ms: i64,
+        end_ms: i64,
+    },
+    Over {
+        raw: String,
+        value: Option<f64>,
+        unit: Option<String>,
+    },
 }
 
 /// Resolve a temporal expression string to epoch milliseconds.
@@ -102,7 +112,7 @@ fn parse_named_day(expr: &str, now_ms: i64) -> Option<i64> {
 
     let direction = parts[0];
     let target_dow = match parts[1] {
-        "monday" | "mon" => 0i64,    // Monday = 0
+        "monday" | "mon" => 0i64, // Monday = 0
         "tuesday" | "tue" => 1,
         "wednesday" | "wed" => 2,
         "thursday" | "thu" => 3,
@@ -122,11 +132,19 @@ fn parse_named_day(expr: &str, now_ms: i64) -> Option<i64> {
     let offset_days = match direction {
         "last" => {
             let back = (current_dow - target_dow).rem_euclid(7);
-            if back == 0 { -7 } else { -back }
+            if back == 0 {
+                -7
+            } else {
+                -back
+            }
         }
         "next" => {
             let forward = (target_dow - current_dow).rem_euclid(7);
-            if forward == 0 { 7 } else { forward }
+            if forward == 0 {
+                7
+            } else {
+                forward
+            }
         }
         "this" => target_dow - current_dow,
         _ => return None,
@@ -169,10 +187,8 @@ fn parse_iso_datetime(expr: &str) -> Option<i64> {
     let (hour, minute, second, frac_ms) = parse_hms(time_str)?;
 
     let epoch_days = days_from_epoch(year, month, day)?;
-    let day_ms = hour as i64 * 3_600_000
-        + minute as i64 * 60_000
-        + second as i64 * 1_000
-        + frac_ms as i64;
+    let day_ms =
+        hour as i64 * 3_600_000 + minute as i64 * 60_000 + second as i64 * 1_000 + frac_ms as i64;
 
     Some(epoch_days * 86_400_000 + day_ms - tz_offset_ms)
 }
@@ -257,7 +273,10 @@ fn split_timezone(time_str: &str) -> (&str, i64) {
             let tz_part = &time_str[i + 1..];
             let tz_parts: Vec<&str> = tz_part.splitn(2, ':').collect();
             if let Some(hours) = tz_parts.first().and_then(|h| h.parse::<i64>().ok()) {
-                let minutes = tz_parts.get(1).and_then(|m| m.parse::<i64>().ok()).unwrap_or(0);
+                let minutes = tz_parts
+                    .get(1)
+                    .and_then(|m| m.parse::<i64>().ok())
+                    .unwrap_or(0);
                 let offset_ms = sign * (hours * 3_600_000 + minutes * 60_000);
                 return (&time_str[..i], offset_ms);
             }
@@ -287,7 +306,11 @@ fn days_in_month(year: i32, month: u32) -> u32 {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         4 | 6 | 9 | 11 => 30,
         2 => {
-            if is_leap_year(year) { 29 } else { 28 }
+            if is_leap_year(year) {
+                29
+            } else {
+                28
+            }
         }
         _ => 0,
     }
@@ -314,14 +337,26 @@ mod tests {
 
     #[test]
     fn test_yesterday_tomorrow() {
-        assert_eq!(resolve_temporal("yesterday", MOCK_NOW_MS), Some(MOCK_NOW_MS - 86_400_000));
-        assert_eq!(resolve_temporal("tomorrow", MOCK_NOW_MS), Some(MOCK_NOW_MS + 86_400_000));
+        assert_eq!(
+            resolve_temporal("yesterday", MOCK_NOW_MS),
+            Some(MOCK_NOW_MS - 86_400_000)
+        );
+        assert_eq!(
+            resolve_temporal("tomorrow", MOCK_NOW_MS),
+            Some(MOCK_NOW_MS + 86_400_000)
+        );
     }
 
     #[test]
     fn test_last_next_week() {
-        assert_eq!(resolve_temporal("last week", MOCK_NOW_MS), Some(MOCK_NOW_MS - 7 * 86_400_000));
-        assert_eq!(resolve_temporal("next week", MOCK_NOW_MS), Some(MOCK_NOW_MS + 7 * 86_400_000));
+        assert_eq!(
+            resolve_temporal("last week", MOCK_NOW_MS),
+            Some(MOCK_NOW_MS - 7 * 86_400_000)
+        );
+        assert_eq!(
+            resolve_temporal("next week", MOCK_NOW_MS),
+            Some(MOCK_NOW_MS + 7 * 86_400_000)
+        );
     }
 
     #[test]
@@ -424,9 +459,18 @@ mod tests {
 
     #[test]
     fn test_case_insensitive() {
-        assert_eq!(resolve_temporal("Yesterday", MOCK_NOW_MS), Some(MOCK_NOW_MS - 86_400_000));
-        assert_eq!(resolve_temporal("LAST WEEK", MOCK_NOW_MS), Some(MOCK_NOW_MS - 7 * 86_400_000));
-        assert_eq!(resolve_temporal("Next Monday", MOCK_NOW_MS), resolve_temporal("next monday", MOCK_NOW_MS));
+        assert_eq!(
+            resolve_temporal("Yesterday", MOCK_NOW_MS),
+            Some(MOCK_NOW_MS - 86_400_000)
+        );
+        assert_eq!(
+            resolve_temporal("LAST WEEK", MOCK_NOW_MS),
+            Some(MOCK_NOW_MS - 7 * 86_400_000)
+        );
+        assert_eq!(
+            resolve_temporal("Next Monday", MOCK_NOW_MS),
+            resolve_temporal("next monday", MOCK_NOW_MS)
+        );
     }
 
     #[test]
