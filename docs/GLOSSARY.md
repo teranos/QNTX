@@ -75,6 +75,7 @@ Infrastructure and lifecycle markers:
 | `▣` | Prose | Documentation and prose content |
 | `▤` | Doc | Document/file content (PDF, etc.) |
 | `⌗` | Subcanvas | Nested canvas workspace |
+| `⏿` | Watcher | Observer — rendered inline next to watched predicates in the UI. Color follows spice saturation: bright blue under low dilation, deep sea blue when relaxed, faded white when never fired |
 
 ### Manifestation
 The visual form a glyph takes when it morphs beyond the GlyphRun. A glyph can manifest as a window, canvas, fullscreen overlay, modal, tooltip, or any other interactive surface. The same DOM element, the same identity — different manifestations. See [glyphs.md](vision/glyphs.md) for the full vision.
