@@ -74,9 +74,13 @@ entity_actors_limit = 64
 # ════════════════════════════════════════════════════════════════
 
 [server]
-# HTTP server port for QNTX web UI
+# HTTP server port for QNTX backend API
 # Default: 8770 (development), fallback 7878 (production)
 port = 8770
+
+# Frontend dev server port (bun/vite hot-reload)
+# Default: 8820
+# frontend_port = 8820
 
 # Network interface to bind
 # "127.0.0.1" = local only (default), "0.0.0.0" = all interfaces
